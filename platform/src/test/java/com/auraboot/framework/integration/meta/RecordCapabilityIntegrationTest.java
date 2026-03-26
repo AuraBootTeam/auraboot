@@ -66,7 +66,7 @@ public class RecordCapabilityIntegrationTest extends BaseIntegrationTest {
     @BeforeAll
     void createTestRecord() {
         // Must set context before any DB operation (TenantLineInterceptor needs it)
-        MetaContext.setContext(ADMIN_TENANT_ID, ADMIN_USER_ID, "admin", "admin@auraboot.test");
+        MetaContext.setContext(ADMIN_TENANT_ID, ADMIN_USER_ID, "admin", "admin@test.local");
 
         // Insert a test record directly via SQL to bypass DynamicDataService permissions.
         String pid = "cap_test_" + System.currentTimeMillis();
@@ -87,7 +87,7 @@ public class RecordCapabilityIntegrationTest extends BaseIntegrationTest {
     @BeforeEach
     public void switchToAdminTenant() {
         // Override the default test context to use the admin tenant
-        MetaContext.setContext(ADMIN_TENANT_ID, ADMIN_USER_ID, "admin", "admin@auraboot.test");
+        MetaContext.setContext(ADMIN_TENANT_ID, ADMIN_USER_ID, "admin", "admin@test.local");
     }
 
     // ==================== Service-Level Tests ====================

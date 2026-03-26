@@ -36,7 +36,7 @@ test.describe('Auth Recovery & Signup Deep', () => {
     await page.locator('input#email').click();
     await page.locator('input#email').fill('invalid-email');
     await page.locator('input#password').click();
-    await page.locator('input#password').fill('Test2026x');
+    await page.locator('input#password').fill('SomePassword1!');
     await page.locator('button[type="submit"]').click();
 
     // Should stay on signup and show validation message
@@ -68,7 +68,7 @@ test.describe('Auth Recovery & Signup Deep', () => {
       { timeout: 30000 },
     );
 
-    await page.locator('input[type="email"]').first().fill('admin@auraboot.test');
+    await page.locator('input[type="email"]').first().fill('user@example.com');
     await page.getByRole('button', { name: /send reset link/i }).click();
     const resp = await submitResp;
     expect(resp.ok()).toBe(true);
@@ -84,8 +84,8 @@ test.describe('Auth Recovery & Signup Deep', () => {
 
     const newPwd = page.locator('input[type="password"]').first();
     const confirmPwd = page.locator('input[type="password"]').nth(1);
-    await newPwd.fill('Test2026x');
-    await confirmPwd.fill('Test2026x');
+    await newPwd.fill('StrongPass1!');
+    await confirmPwd.fill('StrongPass1!');
     await page.getByRole('button', { name: /reset password/i }).click();
 
     await expect(page.getByText(/invalid reset link/i)).toBeVisible();
@@ -105,7 +105,7 @@ test.describe('Auth Recovery & Signup Deep', () => {
     await expect(page.getByText(/at least 8 characters/i)).toBeVisible();
 
     // Mismatch branch
-    await newPwd.fill('Test2026x');
+    await newPwd.fill('StrongPass1!');
     await confirmPwd.fill('Test2026y');
     await page.getByRole('button', { name: /reset password/i }).click();
     await expect(page.getByText(/passwords do not match/i)).toBeVisible();

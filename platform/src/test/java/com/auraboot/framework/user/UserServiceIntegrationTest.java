@@ -32,7 +32,7 @@ public class UserServiceIntegrationTest extends BaseIntegrationTest {
     @Test
     @Order(1)
     void signUp_withValidData_createsUserAndReturnsUser() {
-        User user = userService.signUp(testEmail, "Test2026x!", "Test User " + testRunId);
+        User user = userService.signUp(testEmail, "E2eTestPass2026!", "Test User " + testRunId);
 
         assertNotNull(user, "signUp should return a non-null User");
         assertNotNull(user.getId(), "Created user must have an auto-generated id");
@@ -57,7 +57,7 @@ public class UserServiceIntegrationTest extends BaseIntegrationTest {
     @Test
     @Order(3)
     void signIn_withCorrectPassword_returnsUser() {
-        User user = userService.signIn(testEmail, "Test2026x!");
+        User user = userService.signIn(testEmail, "E2eTestPass2026!");
 
         assertNotNull(user, "signIn with correct credentials must return User");
         assertEquals(testEmail, user.getEmail());

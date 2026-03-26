@@ -13,8 +13,11 @@ dist-ssr
 *.local
 
 # Local secrets
+.env
 application-local.yml
 monitoring/.env
+*.pem
+!**/license/public.pem
 
 # Editor directories and files
 .vscode/*

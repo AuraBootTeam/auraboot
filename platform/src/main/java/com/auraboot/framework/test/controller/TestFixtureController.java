@@ -72,7 +72,7 @@ public class TestFixtureController {
         boolean contextSet = false;
         try {
             var tenant = tenantService.findByName("e2e_test");
-            var user   = userService.findByEmail("e2e@auraboot.test");
+            var user   = userService.findByEmail("e2e@test.local");
             if (tenant != null && user != null) {
                 MetaContext.setContext(
                         tenant.getId(),
@@ -256,7 +256,7 @@ public class TestFixtureController {
         }
 
         // Resolve userId via test user email
-        var user = userService.findByEmail("e2e@auraboot.test");
+        var user = userService.findByEmail("e2e@test.local");
         if (user != null) {
             userId = user.getId();
         }

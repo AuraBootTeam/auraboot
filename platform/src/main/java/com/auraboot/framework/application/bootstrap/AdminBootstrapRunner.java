@@ -37,8 +37,8 @@ import com.auraboot.framework.common.constant.StatusConstants;
 @RequiredArgsConstructor
 public class AdminBootstrapRunner implements ApplicationRunner {
 
-    private static final String ADMIN_EMAIL = "admin@auraboot.test";
-    private static final String ADMIN_PASSWORD = "Test2026x";
+    private static final String ADMIN_EMAIL = "admin@example.com";
+    private static final String ADMIN_PASSWORD = "ChangeMeOnFirstLogin!";
     private static final String ADMIN_DISPLAY_NAME = "Admin";
     private static final String TENANT_NAME = "AuraBoot Demo";
 

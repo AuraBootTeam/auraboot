@@ -46,8 +46,8 @@ import java.util.Map;
 public class TestSeedController {
 
     private static final String TEST_TENANT_NAME = "e2e_test";
-    private static final String TEST_USER_EMAIL = "e2e@auraboot.test";
-    private static final String TEST_USER_PASSWORD = "Test2026x";
+    private static final String TEST_USER_EMAIL = "e2e@test.local";
+    private static final String TEST_USER_PASSWORD = "E2eTestPass2026!";
     private static final String TEST_USER_DISPLAY_NAME = "E2E Test Admin";
 
     private final TenantService tenantService;

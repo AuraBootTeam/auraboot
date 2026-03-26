@@ -88,7 +88,7 @@ test.describe('Email Inbox', () => {
               subject: SUBJECT_IN,
               fromAddress: `sender-${UID}@example.com`,
               fromName: `Sender ${UID}`,
-              toAddresses: ['admin@auraboot.test'],
+              toAddresses: ['test@example.com'],
               bodyText: `E2E test inbound email ${UID}`,
               isRead: false,
               gmailMessageId: `msg-in-${UID}`,
@@ -98,7 +98,7 @@ test.describe('Email Inbox', () => {
             {
               direction: 'outbound',
               subject: SUBJECT_OUT,
-              fromAddress: 'admin@auraboot.test',
+              fromAddress: 'test@example.com',
               toAddresses: [`recipient-${UID}@example.com`],
               bodyText: `E2E test outbound email ${UID}`,
               isRead: true,

@@ -2,7 +2,7 @@
  * Environment Initialization E2E Test
  *
  * This test performs initial environment setup:
- * 1. Register test user (admin@auraboot.test / Test2026x)
+ * 1. Register test user (via TEST_ADMIN_EMAIL / TEST_ADMIN_PASSWORD env vars)
  * 2. Create tenant (Xinran)
  * 3. Test plugin import
  *

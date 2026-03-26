@@ -77,7 +77,7 @@ auraboot:
       enabled: false
       active-kid: v1                    # kid for newly issued tokens
       public-key-path: classpath:license/public.pem
-      private-key-path: classpath:license/private.pem
+      # private-key-path: classpath:license/private.pem  # Enterprise only — not included in open-source
       # jwks-url:                       # optional: https://license.auraboot.com/.well-known/jwks.json
       # jwks-refresh-interval: 24h      # optional: how often to refresh remote keys
   payment:
@@ -192,7 +192,7 @@ spring:
   datasource:
     url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/aura_boot?charSet=UTF8}
     driver-class-name: org.postgresql.Driver
-    username: ${DATABASE_USERNAME:ghj}
+    username: ${DATABASE_USERNAME:auraboot}
     password: ${DATABASE_PASSWORD:}
     hikari:
       maximum-pool-size: 20

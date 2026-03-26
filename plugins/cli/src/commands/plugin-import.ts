@@ -63,8 +63,8 @@ export async function pluginImportCommand(dir: string, options: ImportOptions): 
     // Authenticate if no token
     let authToken = token;
     if (!authToken) {
-      const email = options.user ?? process.env.AURA_USER ?? 'admin@auraboot.test';
-      const password = options.password ?? process.env.AURA_PASSWORD ?? 'Test2026x';
+      const email = options.user ?? process.env.AURA_USER ?? 'admin@example.com';
+      const password = options.password ?? process.env.AURA_PASSWORD ?? '';
 
       log.info(`Authenticating as ${email}...`);
       const loginResp = await fetch(`${baseUrl}/api/auth/login`, {

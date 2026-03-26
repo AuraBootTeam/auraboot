@@ -22,7 +22,7 @@ import { test, expect, type APIRequestContext } from '@playwright/test';
 
 // Use 127.0.0.1 to bypass system HTTP proxy (Node fetch doesn't respect NO_PROXY)
 const BACKEND_URL = 'http://127.0.0.1:6443';
-const TEST_USER = { email: 'admin@auraboot.test', password: 'Test2026x' };
+const TEST_USER = { email: process.env.TEST_ADMIN_EMAIL || 'e2e@test.local', password: process.env.TEST_ADMIN_PASSWORD || 'E2eTestPass2026!' };
 const LLM_TIMEOUT = 60_000; // LLM calls can be slow (MiniMax tool loop ~15-30s)
 const AGENT_POLL_INTERVAL = 2_000;
 const AGENT_MAX_WAIT = 60_000;

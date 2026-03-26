@@ -14,7 +14,7 @@
  *
  * Prerequisites:
  * - All 5 templates must be imported (run scripts/import-templates.sh)
- * - User is logged in as admin@auraboot.test
+ * - User is logged in as the default test admin
  *
  * @since GAP-080 (2026-03-17)
  */

@@ -81,7 +81,7 @@ import com.auraboot.framework.common.constant.StatusConstants;
  * <pre>{@code
  * TOKEN=$(curl -s http://localhost:6443/api/auth/login \
  *   -H 'Content-Type: application/json' \
- *   -d '{"email":"admin@example.com","password":" Test2026x"}' | jq -r .data.jwt)
+ *   -d '{"email":"admin@example.com","password":"your-password"}' | jq -r .data.jwt)
  *
  * curl -X POST http://localhost:6443/api/plugins/import/import-directory \
  *   -H "Authorization: Bearer $TOKEN" \

@@ -7,8 +7,8 @@ describe('login command', () => {
       const envUser = 'env@test.com';
       const envPass = 'env-pass';
 
-      const email = opts.user || envUser || 'admin@auraboot.test';
-      const password = opts.password || envPass || 'Test2026x';
+      const email = opts.user || envUser || 'admin@example.com';
+      const password = opts.password || envPass || '';
 
       expect(email).toBe('cli@test.com');
       expect(password).toBe('cli-pass');
@@ -19,8 +19,8 @@ describe('login command', () => {
       const envUser = 'env@test.com';
       const envPass = 'env-pass';
 
-      const email = opts.user || envUser || 'admin@auraboot.test';
-      const password = opts.password || envPass || 'Test2026x';
+      const email = opts.user || envUser || 'admin@example.com';
+      const password = opts.password || envPass || '';
 
       expect(email).toBe('env@test.com');
       expect(password).toBe('env-pass');
@@ -31,23 +31,23 @@ describe('login command', () => {
       const envUser = undefined;
       const envPass = undefined;
 
-      const email = opts.user || envUser || 'admin@auraboot.test';
-      const password = opts.password || envPass || 'Test2026x';
+      const email = opts.user || envUser || 'admin@example.com';
+      const password = opts.password || envPass || '';
 
-      expect(email).toBe('admin@auraboot.test');
-      expect(password).toBe('Test2026x');
+      expect(email).toBe('admin@example.com');
+      expect(password).toBe('');
     });
   });
 
   describe('login request', () => {
     it('should construct correct login body', () => {
-      const email = 'admin@auraboot.test';
-      const password = 'Test2026x';
+      const email = 'admin@example.com';
+      const password = 'test-password';
       const body = JSON.stringify({ email, password });
 
       const parsed = JSON.parse(body);
-      expect(parsed.email).toBe('admin@auraboot.test');
-      expect(parsed.password).toBe('Test2026x');
+      expect(parsed.email).toBe('admin@example.com');
+      expect(parsed.password).toBe('test-password');
     });
   });
 
