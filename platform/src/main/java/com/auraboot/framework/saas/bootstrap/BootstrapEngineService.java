@@ -7,6 +7,7 @@ import com.auraboot.framework.saas.bootstrap.dto.BootstrapProgressResponse;
 import com.auraboot.framework.saas.bootstrap.dto.BootstrapRequest;
 import com.auraboot.framework.saas.config.entity.BootstrapEntity;
 import com.auraboot.framework.saas.config.mapper.BootstrapMapper;
+import com.auraboot.framework.saas.config.mapper.SystemConfigMapper;
 import com.auraboot.framework.saas.config.service.SystemConfigService;
 import com.auraboot.framework.saas.constant.BootstrapStatus;
 import com.auraboot.framework.saas.constant.SystemConfigKeys;
@@ -44,6 +45,7 @@ public class BootstrapEngineService {
     private static final int TOTAL_STEPS = 15;
 
     private final SystemConfigService systemConfigService;
+    private final SystemConfigMapper systemConfigMapper;
     private final BootstrapMapper bootstrapMapper;
     private final UserService userService;
     private final TenantService tenantService;
@@ -323,13 +325,13 @@ public class BootstrapEngineService {
         systemConfigService.initialize(SystemConfigKeys.SYSTEM_ALLOW_SELF_REGISTRATION, "false",
                 "system", "boolean", "Allow self-registration", false);
 
-        // Instance identity: generate db_uuid (immutable, created once)
+        // Instance identity: generate db_uuid via PostgreSQL gen_random_uuid() (immutable, created once)
         String existingDbUuid = systemConfigService.get(SystemConfigKeys.SYSTEM_DB_UUID).orElse(null);
         if (existingDbUuid == null || existingDbUuid.isBlank()) {
-            String dbUuid = java.util.UUID.randomUUID().toString();
+            String dbUuid = systemConfigMapper.generateDbUuid();
             systemConfigService.initialize(SystemConfigKeys.SYSTEM_DB_UUID, dbUuid,
                     "system", "string", "Database instance unique identifier (immutable)", true);
-            log.info("Generated db_uuid: {}", dbUuid);
+            log.info("Generated db_uuid via gen_random_uuid(): {}", dbUuid);
         }
 
         // Instance URL (user-provided or default, mutable)

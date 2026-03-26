@@ -1,0 +1,8 @@
+{
+  "pluginId": "test-unsigned-plugin",
+  "namespace": "tup",
+  "version": "1.0.0",
+  "displayName": "Test Unsigned Plugin",
+  "description": "A test plugin without signature",
+  "author": "Unknown Publisher"
+}
