@@ -1,0 +1,51 @@
+# AuraBoot — Production Deployment
+# Uses pre-built Docker images from GHCR.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Required env vars (set in .env or export):
+#   GHCR_REPO    — e.g. ghcr.io/your-org/aurameta-gap024
+#   IMAGE_TAG    — e.g. latest, v1.0.0, main, or a commit sha
+#   DB_PASSWORD  — PostgreSQL password (override default)
+
+services:
+  backend:
+    image: ${GHCR_REPO:-ghcr.io/your-org/auraboot}/backend:${IMAGE_TAG:-latest}
+    container_name: auraboot-backend
+    restart: unless-stopped
+    ports:
+      - "6443:6443"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-aura_boot}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-auraboot}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-auraboot_dev}
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      JAVA_OPTS: "-Xms512m -Xmx1024m -XX:+UseG1GC"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["cmd", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:6443/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+
+  frontend:
+    image: ${GHCR_REPO:-ghcr.io/your-org/auraboot}/frontend:${IMAGE_TAG:-latest}
+    container_name: auraboot-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+      - "3500:3500"
+    environment:
+      NODE_ENV: production
+      SPRING_BOOT_URL: http://backend:6443
+      BFF_PORT: 3500
+    depends_on:
+      backend:
+        condition: service_healthy
