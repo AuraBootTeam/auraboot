@@ -140,7 +140,7 @@ Every pull request must include:
 
 ### Bug Reports
 
-Use the [Bug Report template](https://github.com/AuraBoot/auraboot/issues/new?template=bug_report.yml) and include:
+Use the [Bug Report template](https://github.com/AuraBootTeam/auraboot/issues/new?template=bug_report.yml) and include:
 
 - A clear description of the problem
 - Steps to reproduce
@@ -149,7 +149,7 @@ Use the [Bug Report template](https://github.com/AuraBoot/auraboot/issues/new?te
 
 ### Feature Requests
 
-Use the [Feature Request template](https://github.com/AuraBoot/auraboot/issues/new?template=feature_request.yml) and describe:
+Use the [Feature Request template](https://github.com/AuraBootTeam/auraboot/issues/new?template=feature_request.yml) and describe:
 
 - The problem you are trying to solve
 - Your proposed solution
@@ -173,14 +173,14 @@ See the [Plugin Development Guide](docs/system-reference/plugins/02-插件开发
 
 ## Contributor License Agreement
 
-By submitting a pull request, you agree that your contributions are licensed under the [AGPL-3.0 License](LICENSE), the same license as the project. You confirm that you have the right to grant this license for your contributions.
+By submitting a pull request, you agree that your contributions are licensed under the [AuraBoot License](LICENSE.txt), the same license as the project. You confirm that you have the right to grant this license for your contributions.
 
 ---
 
 ## Getting Help
 
-- [GitHub Discussions](https://github.com/AuraBoot/auraboot/discussions) — Questions and ideas
-- [GitHub Issues](https://github.com/AuraBoot/auraboot/issues) — Bug reports and feature requests
+- [GitHub Discussions](https://github.com/AuraBootTeam/auraboot/discussions) — Questions and ideas
+- [GitHub Issues](https://github.com/AuraBootTeam/auraboot/issues) — Bug reports and feature requests
 - [Discord](https://discord.gg/auraboot) — Community chat
 
 Thank you for helping make AuraBoot better!
