@@ -91,3 +91,8 @@ report.json
 .claude/worktrees/
 
 tests/load/results/
+
+# Shared Claude Code config (symlinks to auraboot-enterprise)
+CLAUDE.md
+AGENTS.md
+.claude/

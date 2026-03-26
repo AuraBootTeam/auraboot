@@ -40,7 +40,7 @@ cd web-admin && npm install && npm run dev:full
 
 Open [http://localhost:5173](http://localhost:5173) in your browser.
 
-**Test account:** `admin@auraboot.test` / `Test2026x`
+**Test account:** `admin@example.com` / `Test2026x`
 
 ### Verifying Your Setup
 

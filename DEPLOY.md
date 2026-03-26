@@ -18,7 +18,7 @@ docker compose --profile full up --build -d
 
 # Open the app
 open http://localhost:3000
-# Default login: admin@auraboot.test / Test2026x
+# Default login: admin@example.com / Test2026x
 ```
 
 ## Infrastructure Only (Local Development)
