@@ -147,15 +147,11 @@ dependencies {
     implementation "io.netty:netty-resolver-dns-native-macos:4.1.107.Final:osx-aarch_64"
 
     // SmartEngine - Workflow engine
-    // WARNING: SNAPSHOT version is not recommended for production
-    // TODO: Replace with stable release when available (e.g., 3.7.0)
-    // Current SNAPSHOT is built from local source for development
-    // See: https://github.com/alibaba/SmartEngine for release versions
-    implementation ('com.alibaba.smart.framework:smart-engine-extension-storage-mysql:3.7.0-SNAPSHOT') {
+    implementation ('com.auraboot.smart.framework:smart-engine-extension-storage-mysql:4.0.0') {
         // Pin transitive dependencies to avoid unexpected changes
         exclude group: 'org.slf4j', module: 'slf4j-log4j12'
     }
-    implementation ('com.alibaba.smart.framework:smart-engine-extension-storage-custom:3.7.0-SNAPSHOT') {
+    implementation ('com.auraboot.smart.framework:smart-engine-extension-storage-custom:4.0.0') {
         exclude group: 'org.slf4j', module: 'slf4j-log4j12'
     }
     implementation 'org.mvel:mvel2:2.5.2.Final'
