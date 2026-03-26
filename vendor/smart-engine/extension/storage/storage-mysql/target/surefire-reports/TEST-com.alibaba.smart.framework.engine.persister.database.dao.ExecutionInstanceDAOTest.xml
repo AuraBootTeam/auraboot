@@ -1,0 +1,661 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report-3.0.xsd" version="3.0" name="com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest" time="0.046" tests="4" errors="4" skipped="0" failures="0">
+  <properties>
+    <property name="socksProxyHost" value="127.0.0.1"/>
+    <property name="http.proxyHost" value="127.0.0.1"/>
+    <property name="java.specification.version" value="21"/>
+    <property name="sun.jnu.encoding" value="UTF-8"/>
+    <property name="java.class.path" value="/Users/ghj/work/startup/phenix/AuraMeta/vendor/smart-engine/extension/storage/storage-mysql/target/test-classes:/Users/ghj/work/startup/phenix/AuraMeta/vendor/smart-engine/extension/storage/storage-mysql/target/classes:/Users/ghj/work/startup/phenix/AuraMeta/vendor/smart-engine/core/target/classes:/Users/ghj/.m2/repository/com/esotericsoftware/reflectasm/1.11.3/reflectasm-1.11.3-shaded.jar:/Users/ghj/work/startup/phenix/AuraMeta/vendor/smart-engine/extension/storage/storage-common/target/classes:/Users/ghj/.m2/repository/com/alibaba/fastjson/1.2.83/fastjson-1.2.83.jar:/Users/ghj/.m2/repository/junit/junit/4.13.1/junit-4.13.1.jar:/Users/ghj/.m2/repository/org/hamcrest/hamcrest-core/1.3/hamcrest-core-1.3.jar:/Users/ghj/.m2/repository/org/slf4j/slf4j-log4j12/1.7.13/slf4j-log4j12-1.7.13.jar:/Users/ghj/.m2/repository/log4j/log4j/1.2.17/log4j-1.2.17.jar:/Users/ghj/.m2/repository/org/aspectj/aspectjweaver/1.7.4/aspectjweaver-1.7.4.jar:/Users/ghj/.m2/repository/aopalliance/aopalliance/1.0/aopalliance-1.0.jar:/Users/ghj/.m2/repository/org/aspectj/aspectjrt/1.7.4/aspectjrt-1.7.4.jar:/Users/ghj/.m2/repository/org/springframework/spring-test/5.3.27/spring-test-5.3.27.jar:/Users/ghj/.m2/repository/org/mybatis/mybatis/3.5.6/mybatis-3.5.6.jar:/Users/ghj/.m2/repository/org/mybatis/mybatis-spring/1.3.1/mybatis-spring-1.3.1.jar:/Users/ghj/.m2/repository/mysql/mysql-connector-java/8.0.28/mysql-connector-java-8.0.28.jar:/Users/ghj/.m2/repository/com/google/protobuf/protobuf-java/3.11.4/protobuf-java-3.11.4.jar:/Users/ghj/.m2/repository/com/h2database/h2/2.2.220/h2-2.2.220.jar:/Users/ghj/.m2/repository/org/projectlombok/lombok/1.18.38/lombok-1.18.38.jar:/Users/ghj/.m2/repository/org/slf4j/slf4j-api/1.7.13/slf4j-api-1.7.13.jar:/Users/ghj/.m2/repository/org/junit/jupiter/junit-jupiter-api/5.9.1/junit-jupiter-api-5.9.1.jar:/Users/ghj/.m2/repository/org/opentest4j/opentest4j/1.2.0/opentest4j-1.2.0.jar:/Users/ghj/.m2/repository/org/junit/platform/junit-platform-commons/1.9.1/junit-platform-commons-1.9.1.jar:/Users/ghj/.m2/repository/org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.jar:/Users/ghj/.m2/repository/org/junit/jupiter/junit-jupiter-engine/5.9.1/junit-jupiter-engine-5.9.1.jar:/Users/ghj/.m2/repository/org/junit/platform/junit-platform-engine/1.9.1/junit-platform-engine-1.9.1.jar:/Users/ghj/.m2/repository/org/junit/vintage/junit-vintage-engine/5.9.1/junit-vintage-engine-5.9.1.jar:/Users/ghj/.m2/repository/org/openjdk/jmh/jmh-core/1.25.2/jmh-core-1.25.2.jar:/Users/ghj/.m2/repository/net/sf/jopt-simple/jopt-simple/4.6/jopt-simple-4.6.jar:/Users/ghj/.m2/repository/org/openjdk/jmh/jmh-generator-annprocess/1.25.2/jmh-generator-annprocess-1.25.2.jar:/Users/ghj/.m2/repository/org/apache/commons/commons-math3/3.6.1/commons-math3-3.6.1.jar:/Users/ghj/.m2/repository/org/springframework/spring-core/5.3.27/spring-core-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-jcl/5.3.27/spring-jcl-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-jdbc/5.3.27/spring-jdbc-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-tx/5.3.27/spring-tx-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-beans/5.3.27/spring-beans-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-context/5.3.27/spring-context-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-aop/5.3.27/spring-aop-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-expression/5.3.27/spring-expression-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-orm/5.3.27/spring-orm-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-context-support/5.3.27/spring-context-support-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-instrument/5.3.27/spring-instrument-5.3.27.jar:/Users/ghj/.m2/repository/org/mvel/mvel2/2.5.2.Final/mvel2-2.5.2.Final.jar:/Users/ghj/.m2/repository/com/fasterxml/jackson/core/jackson-core/2.17.2/jackson-core-2.17.2.jar:/Users/ghj/.m2/repository/com/fasterxml/jackson/core/jackson-databind/2.17.2/jackson-databind-2.17.2.jar:/Users/ghj/.m2/repository/com/fasterxml/jackson/core/jackson-annotations/2.17.2/jackson-annotations-2.17.2.jar:/Users/ghj/.m2/repository/org/postgresql/postgresql/42.7.4/postgresql-42.7.4.jar:/Users/ghj/.m2/repository/org/checkerframework/checker-qual/3.42.0/checker-qual-3.42.0.jar:"/>
+    <property name="https.proxyPort" value="7891"/>
+    <property name="java.vm.vendor" value="Homebrew"/>
+    <property name="sun.arch.data.model" value="64"/>
+    <property name="java.vendor.url" value="https://github.com/Homebrew/homebrew-core/issues"/>
+    <property name="user.timezone" value="Asia/Shanghai"/>
+    <property name="os.name" value="Mac OS X"/>
+    <property name="java.vm.specification.version" value="21"/>
+    <property name="sun.java.launcher" value="SUN_STANDARD"/>
+    <property name="user.country" value="US"/>
+    <property name="sun.boot.library.path" value="/opt/homebrew/Cellar/openjdk@21/21.0.8/libexec/openjdk.jdk/Contents/Home/lib"/>
+    <property name="sun.java.command" value="/Users/ghj/work/startup/phenix/AuraMeta/vendor/smart-engine/extension/storage/storage-mysql/target/surefire/surefirebooter-20260325171428676_21.jar /Users/ghj/work/startup/phenix/AuraMeta/vendor/smart-engine/extension/storage/storage-mysql/target/surefire 2026-03-25T17-14-11_912-jvmRun1 surefire-20260325171428676_19tmp surefire_2-20260325171428676_20tmp"/>
+    <property name="http.nonProxyHosts" value="127.0.0.1|192.168.0.0/16|*.192.168.0.0/16|10.0.0.0/8|*.10.0.0.0/8|172.16.0.0/12|*.172.16.0.0/12|localhost|*.localhost|local|*.local|crashlytics.com|*.crashlytics.com|&lt;local&gt;|*.&lt;local&gt;"/>
+    <property name="jdk.debug" value="release"/>
+    <property name="surefire.test.class.path" value="/Users/ghj/work/startup/phenix/AuraMeta/vendor/smart-engine/extension/storage/storage-mysql/target/test-classes:/Users/ghj/work/startup/phenix/AuraMeta/vendor/smart-engine/extension/storage/storage-mysql/target/classes:/Users/ghj/work/startup/phenix/AuraMeta/vendor/smart-engine/core/target/classes:/Users/ghj/.m2/repository/com/esotericsoftware/reflectasm/1.11.3/reflectasm-1.11.3-shaded.jar:/Users/ghj/work/startup/phenix/AuraMeta/vendor/smart-engine/extension/storage/storage-common/target/classes:/Users/ghj/.m2/repository/com/alibaba/fastjson/1.2.83/fastjson-1.2.83.jar:/Users/ghj/.m2/repository/junit/junit/4.13.1/junit-4.13.1.jar:/Users/ghj/.m2/repository/org/hamcrest/hamcrest-core/1.3/hamcrest-core-1.3.jar:/Users/ghj/.m2/repository/org/slf4j/slf4j-log4j12/1.7.13/slf4j-log4j12-1.7.13.jar:/Users/ghj/.m2/repository/log4j/log4j/1.2.17/log4j-1.2.17.jar:/Users/ghj/.m2/repository/org/aspectj/aspectjweaver/1.7.4/aspectjweaver-1.7.4.jar:/Users/ghj/.m2/repository/aopalliance/aopalliance/1.0/aopalliance-1.0.jar:/Users/ghj/.m2/repository/org/aspectj/aspectjrt/1.7.4/aspectjrt-1.7.4.jar:/Users/ghj/.m2/repository/org/springframework/spring-test/5.3.27/spring-test-5.3.27.jar:/Users/ghj/.m2/repository/org/mybatis/mybatis/3.5.6/mybatis-3.5.6.jar:/Users/ghj/.m2/repository/org/mybatis/mybatis-spring/1.3.1/mybatis-spring-1.3.1.jar:/Users/ghj/.m2/repository/mysql/mysql-connector-java/8.0.28/mysql-connector-java-8.0.28.jar:/Users/ghj/.m2/repository/com/google/protobuf/protobuf-java/3.11.4/protobuf-java-3.11.4.jar:/Users/ghj/.m2/repository/com/h2database/h2/2.2.220/h2-2.2.220.jar:/Users/ghj/.m2/repository/org/projectlombok/lombok/1.18.38/lombok-1.18.38.jar:/Users/ghj/.m2/repository/org/slf4j/slf4j-api/1.7.13/slf4j-api-1.7.13.jar:/Users/ghj/.m2/repository/org/junit/jupiter/junit-jupiter-api/5.9.1/junit-jupiter-api-5.9.1.jar:/Users/ghj/.m2/repository/org/opentest4j/opentest4j/1.2.0/opentest4j-1.2.0.jar:/Users/ghj/.m2/repository/org/junit/platform/junit-platform-commons/1.9.1/junit-platform-commons-1.9.1.jar:/Users/ghj/.m2/repository/org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.jar:/Users/ghj/.m2/repository/org/junit/jupiter/junit-jupiter-engine/5.9.1/junit-jupiter-engine-5.9.1.jar:/Users/ghj/.m2/repository/org/junit/platform/junit-platform-engine/1.9.1/junit-platform-engine-1.9.1.jar:/Users/ghj/.m2/repository/org/junit/vintage/junit-vintage-engine/5.9.1/junit-vintage-engine-5.9.1.jar:/Users/ghj/.m2/repository/org/openjdk/jmh/jmh-core/1.25.2/jmh-core-1.25.2.jar:/Users/ghj/.m2/repository/net/sf/jopt-simple/jopt-simple/4.6/jopt-simple-4.6.jar:/Users/ghj/.m2/repository/org/openjdk/jmh/jmh-generator-annprocess/1.25.2/jmh-generator-annprocess-1.25.2.jar:/Users/ghj/.m2/repository/org/apache/commons/commons-math3/3.6.1/commons-math3-3.6.1.jar:/Users/ghj/.m2/repository/org/springframework/spring-core/5.3.27/spring-core-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-jcl/5.3.27/spring-jcl-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-jdbc/5.3.27/spring-jdbc-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-tx/5.3.27/spring-tx-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-beans/5.3.27/spring-beans-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-context/5.3.27/spring-context-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-aop/5.3.27/spring-aop-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-expression/5.3.27/spring-expression-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-orm/5.3.27/spring-orm-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-context-support/5.3.27/spring-context-support-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-instrument/5.3.27/spring-instrument-5.3.27.jar:/Users/ghj/.m2/repository/org/mvel/mvel2/2.5.2.Final/mvel2-2.5.2.Final.jar:/Users/ghj/.m2/repository/com/fasterxml/jackson/core/jackson-core/2.17.2/jackson-core-2.17.2.jar:/Users/ghj/.m2/repository/com/fasterxml/jackson/core/jackson-databind/2.17.2/jackson-databind-2.17.2.jar:/Users/ghj/.m2/repository/com/fasterxml/jackson/core/jackson-annotations/2.17.2/jackson-annotations-2.17.2.jar:/Users/ghj/.m2/repository/org/postgresql/postgresql/42.7.4/postgresql-42.7.4.jar:/Users/ghj/.m2/repository/org/checkerframework/checker-qual/3.42.0/checker-qual-3.42.0.jar:"/>
+    <property name="sun.cpu.endian" value="little"/>
+    <property name="user.home" value="/Users/ghj"/>
+    <property name="user.language" value="en"/>
+    <property name="java.specification.vendor" value="Oracle Corporation"/>
+    <property name="java.version.date" value="2025-07-15"/>
+    <property name="java.home" value="/opt/homebrew/Cellar/openjdk@21/21.0.8/libexec/openjdk.jdk/Contents/Home"/>
+    <property name="file.separator" value="/"/>
+    <property name="https.proxyHost" value="127.0.0.1"/>
+    <property name="basedir" value="/Users/ghj/work/startup/phenix/AuraMeta/vendor/smart-engine/extension/storage/storage-mysql"/>
+    <property name="java.vm.compressedOopsMode" value="Zero based"/>
+    <property name="line.separator" value="&#10;"/>
+    <property name="java.vm.specification.vendor" value="Oracle Corporation"/>
+    <property name="java.specification.name" value="Java Platform API Specification"/>
+    <property name="apple.awt.application.name" value="ForkedBooter"/>
+    <property name="surefire.real.class.path" value="/Users/ghj/work/startup/phenix/AuraMeta/vendor/smart-engine/extension/storage/storage-mysql/target/surefire/surefirebooter-20260325171428676_21.jar"/>
+    <property name="sun.management.compiler" value="HotSpot 64-Bit Tiered Compilers"/>
+    <property name="ftp.nonProxyHosts" value="127.0.0.1|192.168.0.0/16|*.192.168.0.0/16|10.0.0.0/8|*.10.0.0.0/8|172.16.0.0/12|*.172.16.0.0/12|localhost|*.localhost|local|*.local|crashlytics.com|*.crashlytics.com|&lt;local&gt;|*.&lt;local&gt;"/>
+    <property name="java.runtime.version" value="21.0.8"/>
+    <property name="user.name" value="ghj"/>
+    <property name="stdout.encoding" value="UTF-8"/>
+    <property name="path.separator" value=":"/>
+    <property name="os.version" value="26.3.1"/>
+    <property name="java.runtime.name" value="OpenJDK Runtime Environment"/>
+    <property name="file.encoding" value="UTF-8"/>
+    <property name="java.vm.name" value="OpenJDK 64-Bit Server VM"/>
+    <property name="java.vendor.version" value="Homebrew"/>
+    <property name="localRepository" value="/Users/ghj/.m2/repository"/>
+    <property name="java.vendor.url.bug" value="https://github.com/Homebrew/homebrew-core/issues"/>
+    <property name="java.io.tmpdir" value="/var/folders/7c/x2329f5573786r05wcgl2tzw0000gn/T/"/>
+    <property name="java.version" value="21.0.8"/>
+    <property name="user.dir" value="/Users/ghj/work/startup/phenix/AuraMeta/vendor/smart-engine/extension/storage/storage-mysql"/>
+    <property name="os.arch" value="aarch64"/>
+    <property name="socksProxyPort" value="7891"/>
+    <property name="java.vm.specification.name" value="Java Virtual Machine Specification"/>
+    <property name="native.encoding" value="UTF-8"/>
+    <property name="java.library.path" value="/Users/ghj/Library/Java/Extensions:/Library/Java/Extensions:/Network/Library/Java/Extensions:/System/Library/Java/Extensions:/usr/lib/java:."/>
+    <property name="java.vm.info" value="mixed mode, sharing"/>
+    <property name="stderr.encoding" value="UTF-8"/>
+    <property name="java.vendor" value="Homebrew"/>
+    <property name="java.vm.version" value="21.0.8"/>
+    <property name="sun.io.unicode.encoding" value="UnicodeBig"/>
+    <property name="socksNonProxyHosts" value="127.0.0.1|192.168.0.0/16|*.192.168.0.0/16|10.0.0.0/8|*.10.0.0.0/8|172.16.0.0/12|*.172.16.0.0/12|localhost|*.localhost|local|*.local|crashlytics.com|*.crashlytics.com|&lt;local&gt;|*.&lt;local&gt;"/>
+    <property name="java.class.version" value="65.0"/>
+    <property name="http.proxyPort" value="7891"/>
+  </properties>
+  <testcase name="testFindOne" classname="com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest" time="0.011">
+    <error message="Could not open JDBC Connection for transaction; nested exception is org.postgresql.util.PSQLException: FATAL: database &quot;aura_meta&quot; does not exist" type="org.springframework.transaction.CannotCreateTransactionException"><![CDATA[org.springframework.transaction.CannotCreateTransactionException: Could not open JDBC Connection for transaction; nested exception is org.postgresql.util.PSQLException: FATAL: database "aura_meta" does not exist
+	at org.springframework.jdbc.datasource.DataSourceTransactionManager.doBegin(DataSourceTransactionManager.java:309)
+	at org.springframework.transaction.support.AbstractPlatformTransactionManager.startTransaction(AbstractPlatformTransactionManager.java:400)
+	at org.springframework.transaction.support.AbstractPlatformTransactionManager.getTransaction(AbstractPlatformTransactionManager.java:373)
+	at org.springframework.test.context.transaction.TransactionContext.startTransaction(TransactionContext.java:103)
+	at org.springframework.test.context.transaction.TransactionalTestExecutionListener.beforeTestMethod(TransactionalTestExecutionListener.java:231)
+	at org.springframework.test.context.TestContextManager.beforeTestMethod(TestContextManager.java:293)
+	at org.springframework.test.context.junit4.statements.RunBeforeTestMethodCallbacks.evaluate(RunBeforeTestMethodCallbacks.java:74)
+	at org.springframework.test.context.junit4.statements.RunAfterTestMethodCallbacks.evaluate(RunAfterTestMethodCallbacks.java:86)
+	at org.springframework.test.context.junit4.statements.SpringRepeat.evaluate(SpringRepeat.java:84)
+	at org.junit.runners.ParentRunner.runLeaf(ParentRunner.java:366)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.runChild(SpringJUnit4ClassRunner.java:251)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.runChild(SpringJUnit4ClassRunner.java:97)
+	at org.junit.runners.ParentRunner$4.run(ParentRunner.java:331)
+	at org.junit.runners.ParentRunner$1.schedule(ParentRunner.java:79)
+	at org.junit.runners.ParentRunner.runChildren(ParentRunner.java:329)
+	at org.junit.runners.ParentRunner.access$100(ParentRunner.java:66)
+	at org.junit.runners.ParentRunner$2.evaluate(ParentRunner.java:293)
+	at org.springframework.test.context.junit4.statements.RunBeforeTestClassCallbacks.evaluate(RunBeforeTestClassCallbacks.java:61)
+	at org.springframework.test.context.junit4.statements.RunAfterTestClassCallbacks.evaluate(RunAfterTestClassCallbacks.java:70)
+	at org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)
+	at org.junit.runners.ParentRunner.run(ParentRunner.java:413)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.run(SpringJUnit4ClassRunner.java:190)
+	at org.junit.runner.JUnitCore.run(JUnitCore.java:137)
+	at org.junit.runner.JUnitCore.run(JUnitCore.java:115)
+	at org.junit.vintage.engine.execution.RunnerExecutor.execute(RunnerExecutor.java:42)
+	at org.junit.vintage.engine.VintageTestEngine.executeAllChildren(VintageTestEngine.java:80)
+	at org.junit.vintage.engine.VintageTestEngine.execute(VintageTestEngine.java:72)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:147)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:127)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:90)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.lambda$execute$0(EngineExecutionOrchestrator.java:55)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.withInterceptedStreams(EngineExecutionOrchestrator.java:102)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:54)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:114)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:86)
+	at org.junit.platform.launcher.core.DefaultLauncherSession$DelegatingLauncher.execute(DefaultLauncherSession.java:86)
+	at org.apache.maven.surefire.junitplatform.LazyLauncher.execute(LazyLauncher.java:56)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.execute(JUnitPlatformProvider.java:184)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invokeAllTests(JUnitPlatformProvider.java:148)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invoke(JUnitPlatformProvider.java:122)
+	at org.apache.maven.surefire.booter.ForkedBooter.runSuitesInProcess(ForkedBooter.java:385)
+	at org.apache.maven.surefire.booter.ForkedBooter.execute(ForkedBooter.java:162)
+	at org.apache.maven.surefire.booter.ForkedBooter.run(ForkedBooter.java:507)
+	at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:495)
+Caused by: org.postgresql.util.PSQLException: FATAL: database "aura_meta" does not exist
+	at org.postgresql.core.v3.QueryExecutorImpl.receiveErrorResponse(QueryExecutorImpl.java:2733)
+	at org.postgresql.core.v3.QueryExecutorImpl.readStartupMessages(QueryExecutorImpl.java:2845)
+	at org.postgresql.core.v3.QueryExecutorImpl.<init>(QueryExecutorImpl.java:176)
+	at org.postgresql.core.v3.ConnectionFactoryImpl.openConnectionImpl(ConnectionFactoryImpl.java:323)
+	at org.postgresql.core.ConnectionFactory.openConnection(ConnectionFactory.java:54)
+	at org.postgresql.jdbc.PgConnection.<init>(PgConnection.java:273)
+	at org.postgresql.Driver.makeConnection(Driver.java:446)
+	at org.postgresql.Driver.connect(Driver.java:298)
+	at java.sql/java.sql.DriverManager.getConnection(DriverManager.java:683)
+	at java.sql/java.sql.DriverManager.getConnection(DriverManager.java:191)
+	at org.springframework.jdbc.datasource.DriverManagerDataSource.getConnectionFromDriverManager(DriverManagerDataSource.java:155)
+	at org.springframework.jdbc.datasource.DriverManagerDataSource.getConnectionFromDriver(DriverManagerDataSource.java:146)
+	at org.springframework.jdbc.datasource.AbstractDriverBasedDataSource.getConnectionFromDriver(AbstractDriverBasedDataSource.java:205)
+	at org.springframework.jdbc.datasource.AbstractDriverBasedDataSource.getConnection(AbstractDriverBasedDataSource.java:169)
+	at org.springframework.jdbc.datasource.DataSourceTransactionManager.doBegin(DataSourceTransactionManager.java:265)
+	... 43 more
+]]></error>
+    <system-out><![CDATA[[DEBUG,ProfileValueUtils,main] Retrieved @ProfileValueSourceConfiguration [null] for test class [com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest]
+[DEBUG,ProfileValueUtils,main] Retrieved ProfileValueSource type [class org.springframework.test.annotation.SystemProfileValueSource] for class [com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest]
+[DEBUG,ProfileValueUtils,main] Retrieved @ProfileValueSourceConfiguration [null] for test class [com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest]
+[DEBUG,ProfileValueUtils,main] Retrieved ProfileValueSource type [class org.springframework.test.annotation.SystemProfileValueSource] for class [com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest]
+[DEBUG,ProfileValueUtils,main] Retrieved @ProfileValueSourceConfiguration [null] for test class [com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest]
+[DEBUG,ProfileValueUtils,main] Retrieved ProfileValueSource type [class org.springframework.test.annotation.SystemProfileValueSource] for class [com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest]
+[DEBUG,AbstractDirtiesContextTestExecutionListener,main] Before test class: context [DefaultTestContext@24534cb0 testClass = ExecutionInstanceDAOTest, testInstance = [null], testMethod = [null], testException = [null], mergedContextConfiguration = [MergedContextConfiguration@5a50d9fc testClass = ExecutionInstanceDAOTest, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]], attributes = map[[empty]]], class annotated with @DirtiesContext [false] with mode [null].
+[DEBUG,DefaultCacheAwareContextLoaderDelegate,main] Retrieved ApplicationContext [712627377] from cache with key [[MergedContextConfiguration@5a50d9fc testClass = ExecutionInstanceDAOTest, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]]]
+[DEBUG,cache,main] Spring test ApplicationContext cache statistics: [DefaultContextCache@58a4a74d size = 1, maxSize = 32, parentContextCount = 0, hitCount = 1361, missCount = 1]
+[DEBUG,ProfileValueUtils,main] Retrieved @ProfileValueSourceConfiguration [null] for test class [com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest]
+[DEBUG,ProfileValueUtils,main] Retrieved ProfileValueSource type [class org.springframework.test.annotation.SystemProfileValueSource] for class [com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest]
+[DEBUG,DependencyInjectionTestExecutionListener,main] Performing dependency injection for test context [[DefaultTestContext@24534cb0 testClass = ExecutionInstanceDAOTest, testInstance = com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest@106d77da, testMethod = [null], testException = [null], mergedContextConfiguration = [MergedContextConfiguration@5a50d9fc testClass = ExecutionInstanceDAOTest, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]], attributes = map['org.springframework.test.context.event.ApplicationEventsTestExecutionListener.recordApplicationEvents' -> false]]].
+[DEBUG,DefaultCacheAwareContextLoaderDelegate,main] Retrieved ApplicationContext [712627377] from cache with key [[MergedContextConfiguration@5a50d9fc testClass = ExecutionInstanceDAOTest, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]]]
+[DEBUG,cache,main] Spring test ApplicationContext cache statistics: [DefaultContextCache@58a4a74d size = 1, maxSize = 32, parentContextCount = 0, hitCount = 1362, missCount = 1]
+[DEBUG,DefaultCacheAwareContextLoaderDelegate,main] Retrieved ApplicationContext [712627377] from cache with key [[MergedContextConfiguration@5a50d9fc testClass = ExecutionInstanceDAOTest, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]]]
+[DEBUG,cache,main] Spring test ApplicationContext cache statistics: [DefaultContextCache@58a4a74d size = 1, maxSize = 32, parentContextCount = 0, hitCount = 1363, missCount = 1]
+[DEBUG,AbstractDirtiesContextTestExecutionListener,main] Before test method: context [DefaultTestContext@24534cb0 testClass = ExecutionInstanceDAOTest, testInstance = com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest@106d77da, testMethod = testFindOne@ExecutionInstanceDAOTest, testException = [null], mergedContextConfiguration = [MergedContextConfiguration@5a50d9fc testClass = ExecutionInstanceDAOTest, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]], attributes = map['org.springframework.test.context.event.ApplicationEventsTestExecutionListener.recordApplicationEvents' -> false]], class annotated with @DirtiesContext [false] with mode [null], method annotated with @DirtiesContext [false] with mode [null].
+[DEBUG,TransactionalTestExecutionListener,main] Explicit transaction definition [PROPAGATION_REQUIRED,ISOLATION_DEFAULT] found for test context [DefaultTestContext@24534cb0 testClass = ExecutionInstanceDAOTest, testInstance = com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest@106d77da, testMethod = testFindOne@ExecutionInstanceDAOTest, testException = [null], mergedContextConfiguration = [MergedContextConfiguration@5a50d9fc testClass = ExecutionInstanceDAOTest, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]], attributes = map['org.springframework.test.context.event.ApplicationEventsTestExecutionListener.recordApplicationEvents' -> false]]
+[DEBUG,DefaultCacheAwareContextLoaderDelegate,main] Retrieved ApplicationContext [712627377] from cache with key [[MergedContextConfiguration@5a50d9fc testClass = ExecutionInstanceDAOTest, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]]]
+[DEBUG,cache,main] Spring test ApplicationContext cache statistics: [DefaultContextCache@58a4a74d size = 1, maxSize = 32, parentContextCount = 0, hitCount = 1364, missCount = 1]
+[DEBUG,TransactionalTestExecutionListener,main] No method-level @Rollback override: using default rollback [true] for test context [DefaultTestContext@24534cb0 testClass = ExecutionInstanceDAOTest, testInstance = com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest@106d77da, testMethod = testFindOne@ExecutionInstanceDAOTest, testException = [null], mergedContextConfiguration = [MergedContextConfiguration@5a50d9fc testClass = ExecutionInstanceDAOTest, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]], attributes = map['org.springframework.test.context.event.ApplicationEventsTestExecutionListener.recordApplicationEvents' -> false]].
+[DEBUG,DataSourceTransactionManager,main] Creating new transaction with name [com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest.testFindOne]: PROPAGATION_REQUIRED,ISOLATION_DEFAULT
+[DEBUG,DriverManagerDataSource,main] Creating new JDBC DriverManager Connection to [jdbc:postgresql://localhost:5432/aura_meta?charSet=UTF8]
+[WARN,TestContextManager,main] Caught exception while invoking 'beforeTestMethod' callback on TestExecutionListener [org.springframework.test.context.transaction.TransactionalTestExecutionListener@73194df] for test method [public void com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest.testFindOne()] and test instance [com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest@106d77da]
+org.springframework.transaction.CannotCreateTransactionException: Could not open JDBC Connection for transaction; nested exception is org.postgresql.util.PSQLException: FATAL: database "aura_meta" does not exist
+	at org.springframework.jdbc.datasource.DataSourceTransactionManager.doBegin(DataSourceTransactionManager.java:309)
+	at org.springframework.transaction.support.AbstractPlatformTransactionManager.startTransaction(AbstractPlatformTransactionManager.java:400)
+	at org.springframework.transaction.support.AbstractPlatformTransactionManager.getTransaction(AbstractPlatformTransactionManager.java:373)
+	at org.springframework.test.context.transaction.TransactionContext.startTransaction(TransactionContext.java:103)
+	at org.springframework.test.context.transaction.TransactionalTestExecutionListener.beforeTestMethod(TransactionalTestExecutionListener.java:231)
+	at org.springframework.test.context.TestContextManager.beforeTestMethod(TestContextManager.java:293)
+	at org.springframework.test.context.junit4.statements.RunBeforeTestMethodCallbacks.evaluate(RunBeforeTestMethodCallbacks.java:74)
+	at org.springframework.test.context.junit4.statements.RunAfterTestMethodCallbacks.evaluate(RunAfterTestMethodCallbacks.java:86)
+	at org.springframework.test.context.junit4.statements.SpringRepeat.evaluate(SpringRepeat.java:84)
+	at org.junit.runners.ParentRunner.runLeaf(ParentRunner.java:366)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.runChild(SpringJUnit4ClassRunner.java:251)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.runChild(SpringJUnit4ClassRunner.java:97)
+	at org.junit.runners.ParentRunner$4.run(ParentRunner.java:331)
+	at org.junit.runners.ParentRunner$1.schedule(ParentRunner.java:79)
+	at org.junit.runners.ParentRunner.runChildren(ParentRunner.java:329)
+	at org.junit.runners.ParentRunner.access$100(ParentRunner.java:66)
+	at org.junit.runners.ParentRunner$2.evaluate(ParentRunner.java:293)
+	at org.springframework.test.context.junit4.statements.RunBeforeTestClassCallbacks.evaluate(RunBeforeTestClassCallbacks.java:61)
+	at org.springframework.test.context.junit4.statements.RunAfterTestClassCallbacks.evaluate(RunAfterTestClassCallbacks.java:70)
+	at org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)
+	at org.junit.runners.ParentRunner.run(ParentRunner.java:413)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.run(SpringJUnit4ClassRunner.java:190)
+	at org.junit.runner.JUnitCore.run(JUnitCore.java:137)
+	at org.junit.runner.JUnitCore.run(JUnitCore.java:115)
+	at org.junit.vintage.engine.execution.RunnerExecutor.execute(RunnerExecutor.java:42)
+	at org.junit.vintage.engine.VintageTestEngine.executeAllChildren(VintageTestEngine.java:80)
+	at org.junit.vintage.engine.VintageTestEngine.execute(VintageTestEngine.java:72)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:147)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:127)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:90)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.lambda$execute$0(EngineExecutionOrchestrator.java:55)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.withInterceptedStreams(EngineExecutionOrchestrator.java:102)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:54)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:114)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:86)
+	at org.junit.platform.launcher.core.DefaultLauncherSession$DelegatingLauncher.execute(DefaultLauncherSession.java:86)
+	at org.apache.maven.surefire.junitplatform.LazyLauncher.execute(LazyLauncher.java:56)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.execute(JUnitPlatformProvider.java:184)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invokeAllTests(JUnitPlatformProvider.java:148)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invoke(JUnitPlatformProvider.java:122)
+	at org.apache.maven.surefire.booter.ForkedBooter.runSuitesInProcess(ForkedBooter.java:385)
+	at org.apache.maven.surefire.booter.ForkedBooter.execute(ForkedBooter.java:162)
+	at org.apache.maven.surefire.booter.ForkedBooter.run(ForkedBooter.java:507)
+	at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:495)
+Caused by: org.postgresql.util.PSQLException: FATAL: database "aura_meta" does not exist
+	at org.postgresql.core.v3.QueryExecutorImpl.receiveErrorResponse(QueryExecutorImpl.java:2733)
+	at org.postgresql.core.v3.QueryExecutorImpl.readStartupMessages(QueryExecutorImpl.java:2845)
+	at org.postgresql.core.v3.QueryExecutorImpl.<init>(QueryExecutorImpl.java:176)
+	at org.postgresql.core.v3.ConnectionFactoryImpl.openConnectionImpl(ConnectionFactoryImpl.java:323)
+	at org.postgresql.core.ConnectionFactory.openConnection(ConnectionFactory.java:54)
+	at org.postgresql.jdbc.PgConnection.<init>(PgConnection.java:273)
+	at org.postgresql.Driver.makeConnection(Driver.java:446)
+	at org.postgresql.Driver.connect(Driver.java:298)
+	at java.sql/java.sql.DriverManager.getConnection(DriverManager.java:683)
+	at java.sql/java.sql.DriverManager.getConnection(DriverManager.java:191)
+	at org.springframework.jdbc.datasource.DriverManagerDataSource.getConnectionFromDriverManager(DriverManagerDataSource.java:155)
+	at org.springframework.jdbc.datasource.DriverManagerDataSource.getConnectionFromDriver(DriverManagerDataSource.java:146)
+	at org.springframework.jdbc.datasource.AbstractDriverBasedDataSource.getConnectionFromDriver(AbstractDriverBasedDataSource.java:205)
+	at org.springframework.jdbc.datasource.AbstractDriverBasedDataSource.getConnection(AbstractDriverBasedDataSource.java:169)
+	at org.springframework.jdbc.datasource.DataSourceTransactionManager.doBegin(DataSourceTransactionManager.java:265)
+	... 43 more
+[DEBUG,DefaultCacheAwareContextLoaderDelegate,main] Retrieved ApplicationContext [712627377] from cache with key [[MergedContextConfiguration@5a50d9fc testClass = ExecutionInstanceDAOTest, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]]]
+[DEBUG,cache,main] Spring test ApplicationContext cache statistics: [DefaultContextCache@58a4a74d size = 1, maxSize = 32, parentContextCount = 0, hitCount = 1365, missCount = 1]
+[DEBUG,AbstractDirtiesContextTestExecutionListener,main] After test method: context [DefaultTestContext@24534cb0 testClass = ExecutionInstanceDAOTest, testInstance = com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest@106d77da, testMethod = testFindOne@ExecutionInstanceDAOTest, testException = org.springframework.transaction.CannotCreateTransactionException: Could not open JDBC Connection for transaction; nested exception is org.postgresql.util.PSQLException: FATAL: database "aura_meta" does not exist, mergedContextConfiguration = [MergedContextConfiguration@5a50d9fc testClass = ExecutionInstanceDAOTest, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]], attributes = map['org.springframework.test.context.event.ApplicationEventsTestExecutionListener.recordApplicationEvents' -> false]], class annotated with @DirtiesContext [false] with mode [null], method annotated with @DirtiesContext [false] with mode [null].
+]]></system-out>
+  </testcase>
+  <testcase name="testDelete" classname="com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest" time="0.006">
+    <error message="Could not open JDBC Connection for transaction; nested exception is org.postgresql.util.PSQLException: FATAL: database &quot;aura_meta&quot; does not exist" type="org.springframework.transaction.CannotCreateTransactionException"><![CDATA[org.springframework.transaction.CannotCreateTransactionException: Could not open JDBC Connection for transaction; nested exception is org.postgresql.util.PSQLException: FATAL: database "aura_meta" does not exist
+	at org.springframework.jdbc.datasource.DataSourceTransactionManager.doBegin(DataSourceTransactionManager.java:309)
+	at org.springframework.transaction.support.AbstractPlatformTransactionManager.startTransaction(AbstractPlatformTransactionManager.java:400)
+	at org.springframework.transaction.support.AbstractPlatformTransactionManager.getTransaction(AbstractPlatformTransactionManager.java:373)
+	at org.springframework.test.context.transaction.TransactionContext.startTransaction(TransactionContext.java:103)
+	at org.springframework.test.context.transaction.TransactionalTestExecutionListener.beforeTestMethod(TransactionalTestExecutionListener.java:231)
+	at org.springframework.test.context.TestContextManager.beforeTestMethod(TestContextManager.java:293)
+	at org.springframework.test.context.junit4.statements.RunBeforeTestMethodCallbacks.evaluate(RunBeforeTestMethodCallbacks.java:74)
+	at org.springframework.test.context.junit4.statements.RunAfterTestMethodCallbacks.evaluate(RunAfterTestMethodCallbacks.java:86)
+	at org.springframework.test.context.junit4.statements.SpringRepeat.evaluate(SpringRepeat.java:84)
+	at org.junit.runners.ParentRunner.runLeaf(ParentRunner.java:366)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.runChild(SpringJUnit4ClassRunner.java:251)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.runChild(SpringJUnit4ClassRunner.java:97)
+	at org.junit.runners.ParentRunner$4.run(ParentRunner.java:331)
+	at org.junit.runners.ParentRunner$1.schedule(ParentRunner.java:79)
+	at org.junit.runners.ParentRunner.runChildren(ParentRunner.java:329)
+	at org.junit.runners.ParentRunner.access$100(ParentRunner.java:66)
+	at org.junit.runners.ParentRunner$2.evaluate(ParentRunner.java:293)
+	at org.springframework.test.context.junit4.statements.RunBeforeTestClassCallbacks.evaluate(RunBeforeTestClassCallbacks.java:61)
+	at org.springframework.test.context.junit4.statements.RunAfterTestClassCallbacks.evaluate(RunAfterTestClassCallbacks.java:70)
+	at org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)
+	at org.junit.runners.ParentRunner.run(ParentRunner.java:413)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.run(SpringJUnit4ClassRunner.java:190)
+	at org.junit.runner.JUnitCore.run(JUnitCore.java:137)
+	at org.junit.runner.JUnitCore.run(JUnitCore.java:115)
+	at org.junit.vintage.engine.execution.RunnerExecutor.execute(RunnerExecutor.java:42)
+	at org.junit.vintage.engine.VintageTestEngine.executeAllChildren(VintageTestEngine.java:80)
+	at org.junit.vintage.engine.VintageTestEngine.execute(VintageTestEngine.java:72)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:147)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:127)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:90)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.lambda$execute$0(EngineExecutionOrchestrator.java:55)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.withInterceptedStreams(EngineExecutionOrchestrator.java:102)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:54)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:114)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:86)
+	at org.junit.platform.launcher.core.DefaultLauncherSession$DelegatingLauncher.execute(DefaultLauncherSession.java:86)
+	at org.apache.maven.surefire.junitplatform.LazyLauncher.execute(LazyLauncher.java:56)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.execute(JUnitPlatformProvider.java:184)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invokeAllTests(JUnitPlatformProvider.java:148)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invoke(JUnitPlatformProvider.java:122)
+	at org.apache.maven.surefire.booter.ForkedBooter.runSuitesInProcess(ForkedBooter.java:385)
+	at org.apache.maven.surefire.booter.ForkedBooter.execute(ForkedBooter.java:162)
+	at org.apache.maven.surefire.booter.ForkedBooter.run(ForkedBooter.java:507)
+	at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:495)
+Caused by: org.postgresql.util.PSQLException: FATAL: database "aura_meta" does not exist
+	at org.postgresql.core.v3.QueryExecutorImpl.receiveErrorResponse(QueryExecutorImpl.java:2733)
+	at org.postgresql.core.v3.QueryExecutorImpl.readStartupMessages(QueryExecutorImpl.java:2845)
+	at org.postgresql.core.v3.QueryExecutorImpl.<init>(QueryExecutorImpl.java:176)
+	at org.postgresql.core.v3.ConnectionFactoryImpl.openConnectionImpl(ConnectionFactoryImpl.java:323)
+	at org.postgresql.core.ConnectionFactory.openConnection(ConnectionFactory.java:54)
+	at org.postgresql.jdbc.PgConnection.<init>(PgConnection.java:273)
+	at org.postgresql.Driver.makeConnection(Driver.java:446)
+	at org.postgresql.Driver.connect(Driver.java:298)
+	at java.sql/java.sql.DriverManager.getConnection(DriverManager.java:683)
+	at java.sql/java.sql.DriverManager.getConnection(DriverManager.java:191)
+	at org.springframework.jdbc.datasource.DriverManagerDataSource.getConnectionFromDriverManager(DriverManagerDataSource.java:155)
+	at org.springframework.jdbc.datasource.DriverManagerDataSource.getConnectionFromDriver(DriverManagerDataSource.java:146)
+	at org.springframework.jdbc.datasource.AbstractDriverBasedDataSource.getConnectionFromDriver(AbstractDriverBasedDataSource.java:205)
+	at org.springframework.jdbc.datasource.AbstractDriverBasedDataSource.getConnection(AbstractDriverBasedDataSource.java:169)
+	at org.springframework.jdbc.datasource.DataSourceTransactionManager.doBegin(DataSourceTransactionManager.java:265)
+	... 43 more
+]]></error>
+    <system-out><![CDATA[[DEBUG,ProfileValueUtils,main] Retrieved @ProfileValueSourceConfiguration [null] for test class [com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest]
+[DEBUG,ProfileValueUtils,main] Retrieved ProfileValueSource type [class org.springframework.test.annotation.SystemProfileValueSource] for class [com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest]
+[DEBUG,DependencyInjectionTestExecutionListener,main] Performing dependency injection for test context [[DefaultTestContext@24534cb0 testClass = ExecutionInstanceDAOTest, testInstance = com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest@7b6c6e70, testMethod = [null], testException = [null], mergedContextConfiguration = [MergedContextConfiguration@5a50d9fc testClass = ExecutionInstanceDAOTest, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]], attributes = map['org.springframework.test.context.event.ApplicationEventsTestExecutionListener.recordApplicationEvents' -> false]]].
+[DEBUG,DefaultCacheAwareContextLoaderDelegate,main] Retrieved ApplicationContext [712627377] from cache with key [[MergedContextConfiguration@5a50d9fc testClass = ExecutionInstanceDAOTest, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]]]
+[DEBUG,cache,main] Spring test ApplicationContext cache statistics: [DefaultContextCache@58a4a74d size = 1, maxSize = 32, parentContextCount = 0, hitCount = 1366, missCount = 1]
+[DEBUG,DefaultCacheAwareContextLoaderDelegate,main] Retrieved ApplicationContext [712627377] from cache with key [[MergedContextConfiguration@5a50d9fc testClass = ExecutionInstanceDAOTest, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]]]
+[DEBUG,cache,main] Spring test ApplicationContext cache statistics: [DefaultContextCache@58a4a74d size = 1, maxSize = 32, parentContextCount = 0, hitCount = 1367, missCount = 1]
+[DEBUG,AbstractDirtiesContextTestExecutionListener,main] Before test method: context [DefaultTestContext@24534cb0 testClass = ExecutionInstanceDAOTest, testInstance = com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest@7b6c6e70, testMethod = testDelete@ExecutionInstanceDAOTest, testException = [null], mergedContextConfiguration = [MergedContextConfiguration@5a50d9fc testClass = ExecutionInstanceDAOTest, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]], attributes = map['org.springframework.test.context.event.ApplicationEventsTestExecutionListener.recordApplicationEvents' -> false]], class annotated with @DirtiesContext [false] with mode [null], method annotated with @DirtiesContext [false] with mode [null].
+[DEBUG,TransactionalTestExecutionListener,main] Explicit transaction definition [PROPAGATION_REQUIRED,ISOLATION_DEFAULT] found for test context [DefaultTestContext@24534cb0 testClass = ExecutionInstanceDAOTest, testInstance = com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest@7b6c6e70, testMethod = testDelete@ExecutionInstanceDAOTest, testException = [null], mergedContextConfiguration = [MergedContextConfiguration@5a50d9fc testClass = ExecutionInstanceDAOTest, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]], attributes = map['org.springframework.test.context.event.ApplicationEventsTestExecutionListener.recordApplicationEvents' -> false]]
+[DEBUG,DefaultCacheAwareContextLoaderDelegate,main] Retrieved ApplicationContext [712627377] from cache with key [[MergedContextConfiguration@5a50d9fc testClass = ExecutionInstanceDAOTest, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]]]
+[DEBUG,cache,main] Spring test ApplicationContext cache statistics: [DefaultContextCache@58a4a74d size = 1, maxSize = 32, parentContextCount = 0, hitCount = 1368, missCount = 1]
+[DEBUG,TransactionalTestExecutionListener,main] No method-level @Rollback override: using default rollback [true] for test context [DefaultTestContext@24534cb0 testClass = ExecutionInstanceDAOTest, testInstance = com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest@7b6c6e70, testMethod = testDelete@ExecutionInstanceDAOTest, testException = [null], mergedContextConfiguration = [MergedContextConfiguration@5a50d9fc testClass = ExecutionInstanceDAOTest, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]], attributes = map['org.springframework.test.context.event.ApplicationEventsTestExecutionListener.recordApplicationEvents' -> false]].
+[DEBUG,DataSourceTransactionManager,main] Creating new transaction with name [com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest.testDelete]: PROPAGATION_REQUIRED,ISOLATION_DEFAULT
+[DEBUG,DriverManagerDataSource,main] Creating new JDBC DriverManager Connection to [jdbc:postgresql://localhost:5432/aura_meta?charSet=UTF8]
+[WARN,TestContextManager,main] Caught exception while invoking 'beforeTestMethod' callback on TestExecutionListener [org.springframework.test.context.transaction.TransactionalTestExecutionListener@73194df] for test method [public void com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest.testDelete()] and test instance [com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest@7b6c6e70]
+org.springframework.transaction.CannotCreateTransactionException: Could not open JDBC Connection for transaction; nested exception is org.postgresql.util.PSQLException: FATAL: database "aura_meta" does not exist
+	at org.springframework.jdbc.datasource.DataSourceTransactionManager.doBegin(DataSourceTransactionManager.java:309)
+	at org.springframework.transaction.support.AbstractPlatformTransactionManager.startTransaction(AbstractPlatformTransactionManager.java:400)
+	at org.springframework.transaction.support.AbstractPlatformTransactionManager.getTransaction(AbstractPlatformTransactionManager.java:373)
+	at org.springframework.test.context.transaction.TransactionContext.startTransaction(TransactionContext.java:103)
+	at org.springframework.test.context.transaction.TransactionalTestExecutionListener.beforeTestMethod(TransactionalTestExecutionListener.java:231)
+	at org.springframework.test.context.TestContextManager.beforeTestMethod(TestContextManager.java:293)
+	at org.springframework.test.context.junit4.statements.RunBeforeTestMethodCallbacks.evaluate(RunBeforeTestMethodCallbacks.java:74)
+	at org.springframework.test.context.junit4.statements.RunAfterTestMethodCallbacks.evaluate(RunAfterTestMethodCallbacks.java:86)
+	at org.springframework.test.context.junit4.statements.SpringRepeat.evaluate(SpringRepeat.java:84)
+	at org.junit.runners.ParentRunner.runLeaf(ParentRunner.java:366)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.runChild(SpringJUnit4ClassRunner.java:251)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.runChild(SpringJUnit4ClassRunner.java:97)
+	at org.junit.runners.ParentRunner$4.run(ParentRunner.java:331)
+	at org.junit.runners.ParentRunner$1.schedule(ParentRunner.java:79)
+	at org.junit.runners.ParentRunner.runChildren(ParentRunner.java:329)
+	at org.junit.runners.ParentRunner.access$100(ParentRunner.java:66)
+	at org.junit.runners.ParentRunner$2.evaluate(ParentRunner.java:293)
+	at org.springframework.test.context.junit4.statements.RunBeforeTestClassCallbacks.evaluate(RunBeforeTestClassCallbacks.java:61)
+	at org.springframework.test.context.junit4.statements.RunAfterTestClassCallbacks.evaluate(RunAfterTestClassCallbacks.java:70)
+	at org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)
+	at org.junit.runners.ParentRunner.run(ParentRunner.java:413)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.run(SpringJUnit4ClassRunner.java:190)
+	at org.junit.runner.JUnitCore.run(JUnitCore.java:137)
+	at org.junit.runner.JUnitCore.run(JUnitCore.java:115)
+	at org.junit.vintage.engine.execution.RunnerExecutor.execute(RunnerExecutor.java:42)
+	at org.junit.vintage.engine.VintageTestEngine.executeAllChildren(VintageTestEngine.java:80)
+	at org.junit.vintage.engine.VintageTestEngine.execute(VintageTestEngine.java:72)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:147)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:127)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:90)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.lambda$execute$0(EngineExecutionOrchestrator.java:55)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.withInterceptedStreams(EngineExecutionOrchestrator.java:102)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:54)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:114)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:86)
+	at org.junit.platform.launcher.core.DefaultLauncherSession$DelegatingLauncher.execute(DefaultLauncherSession.java:86)
+	at org.apache.maven.surefire.junitplatform.LazyLauncher.execute(LazyLauncher.java:56)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.execute(JUnitPlatformProvider.java:184)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invokeAllTests(JUnitPlatformProvider.java:148)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invoke(JUnitPlatformProvider.java:122)
+	at org.apache.maven.surefire.booter.ForkedBooter.runSuitesInProcess(ForkedBooter.java:385)
+	at org.apache.maven.surefire.booter.ForkedBooter.execute(ForkedBooter.java:162)
+	at org.apache.maven.surefire.booter.ForkedBooter.run(ForkedBooter.java:507)
+	at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:495)
+Caused by: org.postgresql.util.PSQLException: FATAL: database "aura_meta" does not exist
+	at org.postgresql.core.v3.QueryExecutorImpl.receiveErrorResponse(QueryExecutorImpl.java:2733)
+	at org.postgresql.core.v3.QueryExecutorImpl.readStartupMessages(QueryExecutorImpl.java:2845)
+	at org.postgresql.core.v3.QueryExecutorImpl.<init>(QueryExecutorImpl.java:176)
+	at org.postgresql.core.v3.ConnectionFactoryImpl.openConnectionImpl(ConnectionFactoryImpl.java:323)
+	at org.postgresql.core.ConnectionFactory.openConnection(ConnectionFactory.java:54)
+	at org.postgresql.jdbc.PgConnection.<init>(PgConnection.java:273)
+	at org.postgresql.Driver.makeConnection(Driver.java:446)
+	at org.postgresql.Driver.connect(Driver.java:298)
+	at java.sql/java.sql.DriverManager.getConnection(DriverManager.java:683)
+	at java.sql/java.sql.DriverManager.getConnection(DriverManager.java:191)
+	at org.springframework.jdbc.datasource.DriverManagerDataSource.getConnectionFromDriverManager(DriverManagerDataSource.java:155)
+	at org.springframework.jdbc.datasource.DriverManagerDataSource.getConnectionFromDriver(DriverManagerDataSource.java:146)
+	at org.springframework.jdbc.datasource.AbstractDriverBasedDataSource.getConnectionFromDriver(AbstractDriverBasedDataSource.java:205)
+	at org.springframework.jdbc.datasource.AbstractDriverBasedDataSource.getConnection(AbstractDriverBasedDataSource.java:169)
+	at org.springframework.jdbc.datasource.DataSourceTransactionManager.doBegin(DataSourceTransactionManager.java:265)
+	... 43 more
+[DEBUG,DefaultCacheAwareContextLoaderDelegate,main] Retrieved ApplicationContext [712627377] from cache with key [[MergedContextConfiguration@5a50d9fc testClass = ExecutionInstanceDAOTest, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]]]
+[DEBUG,cache,main] Spring test ApplicationContext cache statistics: [DefaultContextCache@58a4a74d size = 1, maxSize = 32, parentContextCount = 0, hitCount = 1369, missCount = 1]
+[DEBUG,AbstractDirtiesContextTestExecutionListener,main] After test method: context [DefaultTestContext@24534cb0 testClass = ExecutionInstanceDAOTest, testInstance = com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest@7b6c6e70, testMethod = testDelete@ExecutionInstanceDAOTest, testException = org.springframework.transaction.CannotCreateTransactionException: Could not open JDBC Connection for transaction; nested exception is org.postgresql.util.PSQLException: FATAL: database "aura_meta" does not exist, mergedContextConfiguration = [MergedContextConfiguration@5a50d9fc testClass = ExecutionInstanceDAOTest, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]], attributes = map['org.springframework.test.context.event.ApplicationEventsTestExecutionListener.recordApplicationEvents' -> false]], class annotated with @DirtiesContext [false] with mode [null], method annotated with @DirtiesContext [false] with mode [null].
+]]></system-out>
+  </testcase>
+  <testcase name="testInsert" classname="com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest" time="0.021">
+    <error message="Could not open JDBC Connection for transaction; nested exception is org.postgresql.util.PSQLException: FATAL: database &quot;aura_meta&quot; does not exist" type="org.springframework.transaction.CannotCreateTransactionException"><![CDATA[org.springframework.transaction.CannotCreateTransactionException: Could not open JDBC Connection for transaction; nested exception is org.postgresql.util.PSQLException: FATAL: database "aura_meta" does not exist
+	at org.springframework.jdbc.datasource.DataSourceTransactionManager.doBegin(DataSourceTransactionManager.java:309)
+	at org.springframework.transaction.support.AbstractPlatformTransactionManager.startTransaction(AbstractPlatformTransactionManager.java:400)
+	at org.springframework.transaction.support.AbstractPlatformTransactionManager.getTransaction(AbstractPlatformTransactionManager.java:373)
+	at org.springframework.test.context.transaction.TransactionContext.startTransaction(TransactionContext.java:103)
+	at org.springframework.test.context.transaction.TransactionalTestExecutionListener.beforeTestMethod(TransactionalTestExecutionListener.java:231)
+	at org.springframework.test.context.TestContextManager.beforeTestMethod(TestContextManager.java:293)
+	at org.springframework.test.context.junit4.statements.RunBeforeTestMethodCallbacks.evaluate(RunBeforeTestMethodCallbacks.java:74)
+	at org.springframework.test.context.junit4.statements.RunAfterTestMethodCallbacks.evaluate(RunAfterTestMethodCallbacks.java:86)
+	at org.springframework.test.context.junit4.statements.SpringRepeat.evaluate(SpringRepeat.java:84)
+	at org.junit.runners.ParentRunner.runLeaf(ParentRunner.java:366)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.runChild(SpringJUnit4ClassRunner.java:251)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.runChild(SpringJUnit4ClassRunner.java:97)
+	at org.junit.runners.ParentRunner$4.run(ParentRunner.java:331)
+	at org.junit.runners.ParentRunner$1.schedule(ParentRunner.java:79)
+	at org.junit.runners.ParentRunner.runChildren(ParentRunner.java:329)
+	at org.junit.runners.ParentRunner.access$100(ParentRunner.java:66)
+	at org.junit.runners.ParentRunner$2.evaluate(ParentRunner.java:293)
+	at org.springframework.test.context.junit4.statements.RunBeforeTestClassCallbacks.evaluate(RunBeforeTestClassCallbacks.java:61)
+	at org.springframework.test.context.junit4.statements.RunAfterTestClassCallbacks.evaluate(RunAfterTestClassCallbacks.java:70)
+	at org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)
+	at org.junit.runners.ParentRunner.run(ParentRunner.java:413)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.run(SpringJUnit4ClassRunner.java:190)
+	at org.junit.runner.JUnitCore.run(JUnitCore.java:137)
+	at org.junit.runner.JUnitCore.run(JUnitCore.java:115)
+	at org.junit.vintage.engine.execution.RunnerExecutor.execute(RunnerExecutor.java:42)
+	at org.junit.vintage.engine.VintageTestEngine.executeAllChildren(VintageTestEngine.java:80)
+	at org.junit.vintage.engine.VintageTestEngine.execute(VintageTestEngine.java:72)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:147)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:127)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:90)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.lambda$execute$0(EngineExecutionOrchestrator.java:55)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.withInterceptedStreams(EngineExecutionOrchestrator.java:102)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:54)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:114)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:86)
+	at org.junit.platform.launcher.core.DefaultLauncherSession$DelegatingLauncher.execute(DefaultLauncherSession.java:86)
+	at org.apache.maven.surefire.junitplatform.LazyLauncher.execute(LazyLauncher.java:56)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.execute(JUnitPlatformProvider.java:184)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invokeAllTests(JUnitPlatformProvider.java:148)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invoke(JUnitPlatformProvider.java:122)
+	at org.apache.maven.surefire.booter.ForkedBooter.runSuitesInProcess(ForkedBooter.java:385)
+	at org.apache.maven.surefire.booter.ForkedBooter.execute(ForkedBooter.java:162)
+	at org.apache.maven.surefire.booter.ForkedBooter.run(ForkedBooter.java:507)
+	at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:495)
+Caused by: org.postgresql.util.PSQLException: FATAL: database "aura_meta" does not exist
+	at org.postgresql.core.v3.QueryExecutorImpl.receiveErrorResponse(QueryExecutorImpl.java:2733)
+	at org.postgresql.core.v3.QueryExecutorImpl.readStartupMessages(QueryExecutorImpl.java:2845)
+	at org.postgresql.core.v3.QueryExecutorImpl.<init>(QueryExecutorImpl.java:176)
+	at org.postgresql.core.v3.ConnectionFactoryImpl.openConnectionImpl(ConnectionFactoryImpl.java:323)
+	at org.postgresql.core.ConnectionFactory.openConnection(ConnectionFactory.java:54)
+	at org.postgresql.jdbc.PgConnection.<init>(PgConnection.java:273)
+	at org.postgresql.Driver.makeConnection(Driver.java:446)
+	at org.postgresql.Driver.connect(Driver.java:298)
+	at java.sql/java.sql.DriverManager.getConnection(DriverManager.java:683)
+	at java.sql/java.sql.DriverManager.getConnection(DriverManager.java:191)
+	at org.springframework.jdbc.datasource.DriverManagerDataSource.getConnectionFromDriverManager(DriverManagerDataSource.java:155)
+	at org.springframework.jdbc.datasource.DriverManagerDataSource.getConnectionFromDriver(DriverManagerDataSource.java:146)
+	at org.springframework.jdbc.datasource.AbstractDriverBasedDataSource.getConnectionFromDriver(AbstractDriverBasedDataSource.java:205)
+	at org.springframework.jdbc.datasource.AbstractDriverBasedDataSource.getConnection(AbstractDriverBasedDataSource.java:169)
+	at org.springframework.jdbc.datasource.DataSourceTransactionManager.doBegin(DataSourceTransactionManager.java:265)
+	... 43 more
+]]></error>
+    <system-out><![CDATA[[DEBUG,ProfileValueUtils,main] Retrieved @ProfileValueSourceConfiguration [null] for test class [com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest]
+[DEBUG,ProfileValueUtils,main] Retrieved ProfileValueSource type [class org.springframework.test.annotation.SystemProfileValueSource] for class [com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest]
+[DEBUG,DependencyInjectionTestExecutionListener,main] Performing dependency injection for test context [[DefaultTestContext@24534cb0 testClass = ExecutionInstanceDAOTest, testInstance = com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest@370c1968, testMethod = [null], testException = [null], mergedContextConfiguration = [MergedContextConfiguration@5a50d9fc testClass = ExecutionInstanceDAOTest, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]], attributes = map['org.springframework.test.context.event.ApplicationEventsTestExecutionListener.recordApplicationEvents' -> false]]].
+[DEBUG,DefaultCacheAwareContextLoaderDelegate,main] Retrieved ApplicationContext [712627377] from cache with key [[MergedContextConfiguration@5a50d9fc testClass = ExecutionInstanceDAOTest, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]]]
+[DEBUG,cache,main] Spring test ApplicationContext cache statistics: [DefaultContextCache@58a4a74d size = 1, maxSize = 32, parentContextCount = 0, hitCount = 1370, missCount = 1]
+[DEBUG,DefaultCacheAwareContextLoaderDelegate,main] Retrieved ApplicationContext [712627377] from cache with key [[MergedContextConfiguration@5a50d9fc testClass = ExecutionInstanceDAOTest, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]]]
+[DEBUG,cache,main] Spring test ApplicationContext cache statistics: [DefaultContextCache@58a4a74d size = 1, maxSize = 32, parentContextCount = 0, hitCount = 1371, missCount = 1]
+[DEBUG,AbstractDirtiesContextTestExecutionListener,main] Before test method: context [DefaultTestContext@24534cb0 testClass = ExecutionInstanceDAOTest, testInstance = com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest@370c1968, testMethod = testInsert@ExecutionInstanceDAOTest, testException = [null], mergedContextConfiguration = [MergedContextConfiguration@5a50d9fc testClass = ExecutionInstanceDAOTest, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]], attributes = map['org.springframework.test.context.event.ApplicationEventsTestExecutionListener.recordApplicationEvents' -> false]], class annotated with @DirtiesContext [false] with mode [null], method annotated with @DirtiesContext [false] with mode [null].
+[DEBUG,TransactionalTestExecutionListener,main] Explicit transaction definition [PROPAGATION_REQUIRED,ISOLATION_DEFAULT] found for test context [DefaultTestContext@24534cb0 testClass = ExecutionInstanceDAOTest, testInstance = com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest@370c1968, testMethod = testInsert@ExecutionInstanceDAOTest, testException = [null], mergedContextConfiguration = [MergedContextConfiguration@5a50d9fc testClass = ExecutionInstanceDAOTest, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]], attributes = map['org.springframework.test.context.event.ApplicationEventsTestExecutionListener.recordApplicationEvents' -> false]]
+[DEBUG,DefaultCacheAwareContextLoaderDelegate,main] Retrieved ApplicationContext [712627377] from cache with key [[MergedContextConfiguration@5a50d9fc testClass = ExecutionInstanceDAOTest, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]]]
+[DEBUG,cache,main] Spring test ApplicationContext cache statistics: [DefaultContextCache@58a4a74d size = 1, maxSize = 32, parentContextCount = 0, hitCount = 1372, missCount = 1]
+[DEBUG,TransactionalTestExecutionListener,main] No method-level @Rollback override: using default rollback [true] for test context [DefaultTestContext@24534cb0 testClass = ExecutionInstanceDAOTest, testInstance = com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest@370c1968, testMethod = testInsert@ExecutionInstanceDAOTest, testException = [null], mergedContextConfiguration = [MergedContextConfiguration@5a50d9fc testClass = ExecutionInstanceDAOTest, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]], attributes = map['org.springframework.test.context.event.ApplicationEventsTestExecutionListener.recordApplicationEvents' -> false]].
+[DEBUG,DataSourceTransactionManager,main] Creating new transaction with name [com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest.testInsert]: PROPAGATION_REQUIRED,ISOLATION_DEFAULT
+[DEBUG,DriverManagerDataSource,main] Creating new JDBC DriverManager Connection to [jdbc:postgresql://localhost:5432/aura_meta?charSet=UTF8]
+[WARN,TestContextManager,main] Caught exception while invoking 'beforeTestMethod' callback on TestExecutionListener [org.springframework.test.context.transaction.TransactionalTestExecutionListener@73194df] for test method [public void com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest.testInsert()] and test instance [com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest@370c1968]
+org.springframework.transaction.CannotCreateTransactionException: Could not open JDBC Connection for transaction; nested exception is org.postgresql.util.PSQLException: FATAL: database "aura_meta" does not exist
+	at org.springframework.jdbc.datasource.DataSourceTransactionManager.doBegin(DataSourceTransactionManager.java:309)
+	at org.springframework.transaction.support.AbstractPlatformTransactionManager.startTransaction(AbstractPlatformTransactionManager.java:400)
+	at org.springframework.transaction.support.AbstractPlatformTransactionManager.getTransaction(AbstractPlatformTransactionManager.java:373)
+	at org.springframework.test.context.transaction.TransactionContext.startTransaction(TransactionContext.java:103)
+	at org.springframework.test.context.transaction.TransactionalTestExecutionListener.beforeTestMethod(TransactionalTestExecutionListener.java:231)
+	at org.springframework.test.context.TestContextManager.beforeTestMethod(TestContextManager.java:293)
+	at org.springframework.test.context.junit4.statements.RunBeforeTestMethodCallbacks.evaluate(RunBeforeTestMethodCallbacks.java:74)
+	at org.springframework.test.context.junit4.statements.RunAfterTestMethodCallbacks.evaluate(RunAfterTestMethodCallbacks.java:86)
+	at org.springframework.test.context.junit4.statements.SpringRepeat.evaluate(SpringRepeat.java:84)
+	at org.junit.runners.ParentRunner.runLeaf(ParentRunner.java:366)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.runChild(SpringJUnit4ClassRunner.java:251)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.runChild(SpringJUnit4ClassRunner.java:97)
+	at org.junit.runners.ParentRunner$4.run(ParentRunner.java:331)
+	at org.junit.runners.ParentRunner$1.schedule(ParentRunner.java:79)
+	at org.junit.runners.ParentRunner.runChildren(ParentRunner.java:329)
+	at org.junit.runners.ParentRunner.access$100(ParentRunner.java:66)
+	at org.junit.runners.ParentRunner$2.evaluate(ParentRunner.java:293)
+	at org.springframework.test.context.junit4.statements.RunBeforeTestClassCallbacks.evaluate(RunBeforeTestClassCallbacks.java:61)
+	at org.springframework.test.context.junit4.statements.RunAfterTestClassCallbacks.evaluate(RunAfterTestClassCallbacks.java:70)
+	at org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)
+	at org.junit.runners.ParentRunner.run(ParentRunner.java:413)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.run(SpringJUnit4ClassRunner.java:190)
+	at org.junit.runner.JUnitCore.run(JUnitCore.java:137)
+	at org.junit.runner.JUnitCore.run(JUnitCore.java:115)
+	at org.junit.vintage.engine.execution.RunnerExecutor.execute(RunnerExecutor.java:42)
+	at org.junit.vintage.engine.VintageTestEngine.executeAllChildren(VintageTestEngine.java:80)
+	at org.junit.vintage.engine.VintageTestEngine.execute(VintageTestEngine.java:72)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:147)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:127)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:90)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.lambda$execute$0(EngineExecutionOrchestrator.java:55)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.withInterceptedStreams(EngineExecutionOrchestrator.java:102)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:54)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:114)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:86)
+	at org.junit.platform.launcher.core.DefaultLauncherSession$DelegatingLauncher.execute(DefaultLauncherSession.java:86)
+	at org.apache.maven.surefire.junitplatform.LazyLauncher.execute(LazyLauncher.java:56)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.execute(JUnitPlatformProvider.java:184)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invokeAllTests(JUnitPlatformProvider.java:148)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invoke(JUnitPlatformProvider.java:122)
+	at org.apache.maven.surefire.booter.ForkedBooter.runSuitesInProcess(ForkedBooter.java:385)
+	at org.apache.maven.surefire.booter.ForkedBooter.execute(ForkedBooter.java:162)
+	at org.apache.maven.surefire.booter.ForkedBooter.run(ForkedBooter.java:507)
+	at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:495)
+Caused by: org.postgresql.util.PSQLException: FATAL: database "aura_meta" does not exist
+	at org.postgresql.core.v3.QueryExecutorImpl.receiveErrorResponse(QueryExecutorImpl.java:2733)
+	at org.postgresql.core.v3.QueryExecutorImpl.readStartupMessages(QueryExecutorImpl.java:2845)
+	at org.postgresql.core.v3.QueryExecutorImpl.<init>(QueryExecutorImpl.java:176)
+	at org.postgresql.core.v3.ConnectionFactoryImpl.openConnectionImpl(ConnectionFactoryImpl.java:323)
+	at org.postgresql.core.ConnectionFactory.openConnection(ConnectionFactory.java:54)
+	at org.postgresql.jdbc.PgConnection.<init>(PgConnection.java:273)
+	at org.postgresql.Driver.makeConnection(Driver.java:446)
+	at org.postgresql.Driver.connect(Driver.java:298)
+	at java.sql/java.sql.DriverManager.getConnection(DriverManager.java:683)
+	at java.sql/java.sql.DriverManager.getConnection(DriverManager.java:191)
+	at org.springframework.jdbc.datasource.DriverManagerDataSource.getConnectionFromDriverManager(DriverManagerDataSource.java:155)
+	at org.springframework.jdbc.datasource.DriverManagerDataSource.getConnectionFromDriver(DriverManagerDataSource.java:146)
+	at org.springframework.jdbc.datasource.AbstractDriverBasedDataSource.getConnectionFromDriver(AbstractDriverBasedDataSource.java:205)
+	at org.springframework.jdbc.datasource.AbstractDriverBasedDataSource.getConnection(AbstractDriverBasedDataSource.java:169)
+	at org.springframework.jdbc.datasource.DataSourceTransactionManager.doBegin(DataSourceTransactionManager.java:265)
+	... 43 more
+[DEBUG,DefaultCacheAwareContextLoaderDelegate,main] Retrieved ApplicationContext [712627377] from cache with key [[MergedContextConfiguration@5a50d9fc testClass = ExecutionInstanceDAOTest, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]]]
+[DEBUG,cache,main] Spring test ApplicationContext cache statistics: [DefaultContextCache@58a4a74d size = 1, maxSize = 32, parentContextCount = 0, hitCount = 1373, missCount = 1]
+[DEBUG,AbstractDirtiesContextTestExecutionListener,main] After test method: context [DefaultTestContext@24534cb0 testClass = ExecutionInstanceDAOTest, testInstance = com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest@370c1968, testMethod = testInsert@ExecutionInstanceDAOTest, testException = org.springframework.transaction.CannotCreateTransactionException: Could not open JDBC Connection for transaction; nested exception is org.postgresql.util.PSQLException: FATAL: database "aura_meta" does not exist, mergedContextConfiguration = [MergedContextConfiguration@5a50d9fc testClass = ExecutionInstanceDAOTest, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]], attributes = map['org.springframework.test.context.event.ApplicationEventsTestExecutionListener.recordApplicationEvents' -> false]], class annotated with @DirtiesContext [false] with mode [null], method annotated with @DirtiesContext [false] with mode [null].
+]]></system-out>
+  </testcase>
+  <testcase name="testUpdate" classname="com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest" time="0.006">
+    <error message="Could not open JDBC Connection for transaction; nested exception is org.postgresql.util.PSQLException: FATAL: database &quot;aura_meta&quot; does not exist" type="org.springframework.transaction.CannotCreateTransactionException"><![CDATA[org.springframework.transaction.CannotCreateTransactionException: Could not open JDBC Connection for transaction; nested exception is org.postgresql.util.PSQLException: FATAL: database "aura_meta" does not exist
+	at org.springframework.jdbc.datasource.DataSourceTransactionManager.doBegin(DataSourceTransactionManager.java:309)
+	at org.springframework.transaction.support.AbstractPlatformTransactionManager.startTransaction(AbstractPlatformTransactionManager.java:400)
+	at org.springframework.transaction.support.AbstractPlatformTransactionManager.getTransaction(AbstractPlatformTransactionManager.java:373)
+	at org.springframework.test.context.transaction.TransactionContext.startTransaction(TransactionContext.java:103)
+	at org.springframework.test.context.transaction.TransactionalTestExecutionListener.beforeTestMethod(TransactionalTestExecutionListener.java:231)
+	at org.springframework.test.context.TestContextManager.beforeTestMethod(TestContextManager.java:293)
+	at org.springframework.test.context.junit4.statements.RunBeforeTestMethodCallbacks.evaluate(RunBeforeTestMethodCallbacks.java:74)
+	at org.springframework.test.context.junit4.statements.RunAfterTestMethodCallbacks.evaluate(RunAfterTestMethodCallbacks.java:86)
+	at org.springframework.test.context.junit4.statements.SpringRepeat.evaluate(SpringRepeat.java:84)
+	at org.junit.runners.ParentRunner.runLeaf(ParentRunner.java:366)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.runChild(SpringJUnit4ClassRunner.java:251)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.runChild(SpringJUnit4ClassRunner.java:97)
+	at org.junit.runners.ParentRunner$4.run(ParentRunner.java:331)
+	at org.junit.runners.ParentRunner$1.schedule(ParentRunner.java:79)
+	at org.junit.runners.ParentRunner.runChildren(ParentRunner.java:329)
+	at org.junit.runners.ParentRunner.access$100(ParentRunner.java:66)
+	at org.junit.runners.ParentRunner$2.evaluate(ParentRunner.java:293)
+	at org.springframework.test.context.junit4.statements.RunBeforeTestClassCallbacks.evaluate(RunBeforeTestClassCallbacks.java:61)
+	at org.springframework.test.context.junit4.statements.RunAfterTestClassCallbacks.evaluate(RunAfterTestClassCallbacks.java:70)
+	at org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)
+	at org.junit.runners.ParentRunner.run(ParentRunner.java:413)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.run(SpringJUnit4ClassRunner.java:190)
+	at org.junit.runner.JUnitCore.run(JUnitCore.java:137)
+	at org.junit.runner.JUnitCore.run(JUnitCore.java:115)
+	at org.junit.vintage.engine.execution.RunnerExecutor.execute(RunnerExecutor.java:42)
+	at org.junit.vintage.engine.VintageTestEngine.executeAllChildren(VintageTestEngine.java:80)
+	at org.junit.vintage.engine.VintageTestEngine.execute(VintageTestEngine.java:72)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:147)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:127)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:90)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.lambda$execute$0(EngineExecutionOrchestrator.java:55)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.withInterceptedStreams(EngineExecutionOrchestrator.java:102)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:54)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:114)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:86)
+	at org.junit.platform.launcher.core.DefaultLauncherSession$DelegatingLauncher.execute(DefaultLauncherSession.java:86)
+	at org.apache.maven.surefire.junitplatform.LazyLauncher.execute(LazyLauncher.java:56)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.execute(JUnitPlatformProvider.java:184)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invokeAllTests(JUnitPlatformProvider.java:148)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invoke(JUnitPlatformProvider.java:122)
+	at org.apache.maven.surefire.booter.ForkedBooter.runSuitesInProcess(ForkedBooter.java:385)
+	at org.apache.maven.surefire.booter.ForkedBooter.execute(ForkedBooter.java:162)
+	at org.apache.maven.surefire.booter.ForkedBooter.run(ForkedBooter.java:507)
+	at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:495)
+Caused by: org.postgresql.util.PSQLException: FATAL: database "aura_meta" does not exist
+	at org.postgresql.core.v3.QueryExecutorImpl.receiveErrorResponse(QueryExecutorImpl.java:2733)
+	at org.postgresql.core.v3.QueryExecutorImpl.readStartupMessages(QueryExecutorImpl.java:2845)
+	at org.postgresql.core.v3.QueryExecutorImpl.<init>(QueryExecutorImpl.java:176)
+	at org.postgresql.core.v3.ConnectionFactoryImpl.openConnectionImpl(ConnectionFactoryImpl.java:323)
+	at org.postgresql.core.ConnectionFactory.openConnection(ConnectionFactory.java:54)
+	at org.postgresql.jdbc.PgConnection.<init>(PgConnection.java:273)
+	at org.postgresql.Driver.makeConnection(Driver.java:446)
+	at org.postgresql.Driver.connect(Driver.java:298)
+	at java.sql/java.sql.DriverManager.getConnection(DriverManager.java:683)
+	at java.sql/java.sql.DriverManager.getConnection(DriverManager.java:191)
+	at org.springframework.jdbc.datasource.DriverManagerDataSource.getConnectionFromDriverManager(DriverManagerDataSource.java:155)
+	at org.springframework.jdbc.datasource.DriverManagerDataSource.getConnectionFromDriver(DriverManagerDataSource.java:146)
+	at org.springframework.jdbc.datasource.AbstractDriverBasedDataSource.getConnectionFromDriver(AbstractDriverBasedDataSource.java:205)
+	at org.springframework.jdbc.datasource.AbstractDriverBasedDataSource.getConnection(AbstractDriverBasedDataSource.java:169)
+	at org.springframework.jdbc.datasource.DataSourceTransactionManager.doBegin(DataSourceTransactionManager.java:265)
+	... 43 more
+]]></error>
+    <system-out><![CDATA[[DEBUG,ProfileValueUtils,main] Retrieved @ProfileValueSourceConfiguration [null] for test class [com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest]
+[DEBUG,ProfileValueUtils,main] Retrieved ProfileValueSource type [class org.springframework.test.annotation.SystemProfileValueSource] for class [com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest]
+[DEBUG,DependencyInjectionTestExecutionListener,main] Performing dependency injection for test context [[DefaultTestContext@24534cb0 testClass = ExecutionInstanceDAOTest, testInstance = com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest@42fb8c87, testMethod = [null], testException = [null], mergedContextConfiguration = [MergedContextConfiguration@5a50d9fc testClass = ExecutionInstanceDAOTest, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]], attributes = map['org.springframework.test.context.event.ApplicationEventsTestExecutionListener.recordApplicationEvents' -> false]]].
+[DEBUG,DefaultCacheAwareContextLoaderDelegate,main] Retrieved ApplicationContext [712627377] from cache with key [[MergedContextConfiguration@5a50d9fc testClass = ExecutionInstanceDAOTest, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]]]
+[DEBUG,cache,main] Spring test ApplicationContext cache statistics: [DefaultContextCache@58a4a74d size = 1, maxSize = 32, parentContextCount = 0, hitCount = 1374, missCount = 1]
+[DEBUG,DefaultCacheAwareContextLoaderDelegate,main] Retrieved ApplicationContext [712627377] from cache with key [[MergedContextConfiguration@5a50d9fc testClass = ExecutionInstanceDAOTest, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]]]
+[DEBUG,cache,main] Spring test ApplicationContext cache statistics: [DefaultContextCache@58a4a74d size = 1, maxSize = 32, parentContextCount = 0, hitCount = 1375, missCount = 1]
+[DEBUG,AbstractDirtiesContextTestExecutionListener,main] Before test method: context [DefaultTestContext@24534cb0 testClass = ExecutionInstanceDAOTest, testInstance = com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest@42fb8c87, testMethod = testUpdate@ExecutionInstanceDAOTest, testException = [null], mergedContextConfiguration = [MergedContextConfiguration@5a50d9fc testClass = ExecutionInstanceDAOTest, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]], attributes = map['org.springframework.test.context.event.ApplicationEventsTestExecutionListener.recordApplicationEvents' -> false]], class annotated with @DirtiesContext [false] with mode [null], method annotated with @DirtiesContext [false] with mode [null].
+[DEBUG,TransactionalTestExecutionListener,main] Explicit transaction definition [PROPAGATION_REQUIRED,ISOLATION_DEFAULT] found for test context [DefaultTestContext@24534cb0 testClass = ExecutionInstanceDAOTest, testInstance = com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest@42fb8c87, testMethod = testUpdate@ExecutionInstanceDAOTest, testException = [null], mergedContextConfiguration = [MergedContextConfiguration@5a50d9fc testClass = ExecutionInstanceDAOTest, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]], attributes = map['org.springframework.test.context.event.ApplicationEventsTestExecutionListener.recordApplicationEvents' -> false]]
+[DEBUG,DefaultCacheAwareContextLoaderDelegate,main] Retrieved ApplicationContext [712627377] from cache with key [[MergedContextConfiguration@5a50d9fc testClass = ExecutionInstanceDAOTest, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]]]
+[DEBUG,cache,main] Spring test ApplicationContext cache statistics: [DefaultContextCache@58a4a74d size = 1, maxSize = 32, parentContextCount = 0, hitCount = 1376, missCount = 1]
+[DEBUG,TransactionalTestExecutionListener,main] No method-level @Rollback override: using default rollback [true] for test context [DefaultTestContext@24534cb0 testClass = ExecutionInstanceDAOTest, testInstance = com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest@42fb8c87, testMethod = testUpdate@ExecutionInstanceDAOTest, testException = [null], mergedContextConfiguration = [MergedContextConfiguration@5a50d9fc testClass = ExecutionInstanceDAOTest, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]], attributes = map['org.springframework.test.context.event.ApplicationEventsTestExecutionListener.recordApplicationEvents' -> false]].
+[DEBUG,DataSourceTransactionManager,main] Creating new transaction with name [com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest.testUpdate]: PROPAGATION_REQUIRED,ISOLATION_DEFAULT
+[DEBUG,DriverManagerDataSource,main] Creating new JDBC DriverManager Connection to [jdbc:postgresql://localhost:5432/aura_meta?charSet=UTF8]
+[WARN,TestContextManager,main] Caught exception while invoking 'beforeTestMethod' callback on TestExecutionListener [org.springframework.test.context.transaction.TransactionalTestExecutionListener@73194df] for test method [public void com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest.testUpdate()] and test instance [com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest@42fb8c87]
+org.springframework.transaction.CannotCreateTransactionException: Could not open JDBC Connection for transaction; nested exception is org.postgresql.util.PSQLException: FATAL: database "aura_meta" does not exist
+	at org.springframework.jdbc.datasource.DataSourceTransactionManager.doBegin(DataSourceTransactionManager.java:309)
+	at org.springframework.transaction.support.AbstractPlatformTransactionManager.startTransaction(AbstractPlatformTransactionManager.java:400)
+	at org.springframework.transaction.support.AbstractPlatformTransactionManager.getTransaction(AbstractPlatformTransactionManager.java:373)
+	at org.springframework.test.context.transaction.TransactionContext.startTransaction(TransactionContext.java:103)
+	at org.springframework.test.context.transaction.TransactionalTestExecutionListener.beforeTestMethod(TransactionalTestExecutionListener.java:231)
+	at org.springframework.test.context.TestContextManager.beforeTestMethod(TestContextManager.java:293)
+	at org.springframework.test.context.junit4.statements.RunBeforeTestMethodCallbacks.evaluate(RunBeforeTestMethodCallbacks.java:74)
+	at org.springframework.test.context.junit4.statements.RunAfterTestMethodCallbacks.evaluate(RunAfterTestMethodCallbacks.java:86)
+	at org.springframework.test.context.junit4.statements.SpringRepeat.evaluate(SpringRepeat.java:84)
+	at org.junit.runners.ParentRunner.runLeaf(ParentRunner.java:366)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.runChild(SpringJUnit4ClassRunner.java:251)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.runChild(SpringJUnit4ClassRunner.java:97)
+	at org.junit.runners.ParentRunner$4.run(ParentRunner.java:331)
+	at org.junit.runners.ParentRunner$1.schedule(ParentRunner.java:79)
+	at org.junit.runners.ParentRunner.runChildren(ParentRunner.java:329)
+	at org.junit.runners.ParentRunner.access$100(ParentRunner.java:66)
+	at org.junit.runners.ParentRunner$2.evaluate(ParentRunner.java:293)
+	at org.springframework.test.context.junit4.statements.RunBeforeTestClassCallbacks.evaluate(RunBeforeTestClassCallbacks.java:61)
+	at org.springframework.test.context.junit4.statements.RunAfterTestClassCallbacks.evaluate(RunAfterTestClassCallbacks.java:70)
+	at org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)
+	at org.junit.runners.ParentRunner.run(ParentRunner.java:413)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.run(SpringJUnit4ClassRunner.java:190)
+	at org.junit.runner.JUnitCore.run(JUnitCore.java:137)
+	at org.junit.runner.JUnitCore.run(JUnitCore.java:115)
+	at org.junit.vintage.engine.execution.RunnerExecutor.execute(RunnerExecutor.java:42)
+	at org.junit.vintage.engine.VintageTestEngine.executeAllChildren(VintageTestEngine.java:80)
+	at org.junit.vintage.engine.VintageTestEngine.execute(VintageTestEngine.java:72)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:147)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:127)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:90)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.lambda$execute$0(EngineExecutionOrchestrator.java:55)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.withInterceptedStreams(EngineExecutionOrchestrator.java:102)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:54)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:114)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:86)
+	at org.junit.platform.launcher.core.DefaultLauncherSession$DelegatingLauncher.execute(DefaultLauncherSession.java:86)
+	at org.apache.maven.surefire.junitplatform.LazyLauncher.execute(LazyLauncher.java:56)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.execute(JUnitPlatformProvider.java:184)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invokeAllTests(JUnitPlatformProvider.java:148)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invoke(JUnitPlatformProvider.java:122)
+	at org.apache.maven.surefire.booter.ForkedBooter.runSuitesInProcess(ForkedBooter.java:385)
+	at org.apache.maven.surefire.booter.ForkedBooter.execute(ForkedBooter.java:162)
+	at org.apache.maven.surefire.booter.ForkedBooter.run(ForkedBooter.java:507)
+	at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:495)
+Caused by: org.postgresql.util.PSQLException: FATAL: database "aura_meta" does not exist
+	at org.postgresql.core.v3.QueryExecutorImpl.receiveErrorResponse(QueryExecutorImpl.java:2733)
+	at org.postgresql.core.v3.QueryExecutorImpl.readStartupMessages(QueryExecutorImpl.java:2845)
+	at org.postgresql.core.v3.QueryExecutorImpl.<init>(QueryExecutorImpl.java:176)
+	at org.postgresql.core.v3.ConnectionFactoryImpl.openConnectionImpl(ConnectionFactoryImpl.java:323)
+	at org.postgresql.core.ConnectionFactory.openConnection(ConnectionFactory.java:54)
+	at org.postgresql.jdbc.PgConnection.<init>(PgConnection.java:273)
+	at org.postgresql.Driver.makeConnection(Driver.java:446)
+	at org.postgresql.Driver.connect(Driver.java:298)
+	at java.sql/java.sql.DriverManager.getConnection(DriverManager.java:683)
+	at java.sql/java.sql.DriverManager.getConnection(DriverManager.java:191)
+	at org.springframework.jdbc.datasource.DriverManagerDataSource.getConnectionFromDriverManager(DriverManagerDataSource.java:155)
+	at org.springframework.jdbc.datasource.DriverManagerDataSource.getConnectionFromDriver(DriverManagerDataSource.java:146)
+	at org.springframework.jdbc.datasource.AbstractDriverBasedDataSource.getConnectionFromDriver(AbstractDriverBasedDataSource.java:205)
+	at org.springframework.jdbc.datasource.AbstractDriverBasedDataSource.getConnection(AbstractDriverBasedDataSource.java:169)
+	at org.springframework.jdbc.datasource.DataSourceTransactionManager.doBegin(DataSourceTransactionManager.java:265)
+	... 43 more
+[DEBUG,DefaultCacheAwareContextLoaderDelegate,main] Retrieved ApplicationContext [712627377] from cache with key [[MergedContextConfiguration@5a50d9fc testClass = ExecutionInstanceDAOTest, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]]]
+[DEBUG,cache,main] Spring test ApplicationContext cache statistics: [DefaultContextCache@58a4a74d size = 1, maxSize = 32, parentContextCount = 0, hitCount = 1377, missCount = 1]
+[DEBUG,AbstractDirtiesContextTestExecutionListener,main] After test method: context [DefaultTestContext@24534cb0 testClass = ExecutionInstanceDAOTest, testInstance = com.alibaba.smart.framework.engine.persister.database.dao.ExecutionInstanceDAOTest@42fb8c87, testMethod = testUpdate@ExecutionInstanceDAOTest, testException = org.springframework.transaction.CannotCreateTransactionException: Could not open JDBC Connection for transaction; nested exception is org.postgresql.util.PSQLException: FATAL: database "aura_meta" does not exist, mergedContextConfiguration = [MergedContextConfiguration@5a50d9fc testClass = ExecutionInstanceDAOTest, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]], attributes = map['org.springframework.test.context.event.ApplicationEventsTestExecutionListener.recordApplicationEvents' -> false]], class annotated with @DirtiesContext [false] with mode [null], method annotated with @DirtiesContext [false] with mode [null].
+]]></system-out>
+  </testcase>
+</testsuite>

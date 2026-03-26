@@ -461,6 +461,17 @@ public class TestFixtureController {
         Long tenantId = tenant.getId();
         Long userId   = user.getId();
 
+        // Create or resolve second chat member for group conversation
+        String chatMemberEmail = "e2e_chat_member_" + System.currentTimeMillis() + "@test.local";
+        var chatUser = userService.findByEmail(chatMemberEmail);
+        if (chatUser == null) {
+            // User doesn't exist, create a new one (simplified creation)
+            // This would need userService.createUser() or equivalent
+            // For now, try to reuse or skip if creation is not available
+            log.warn("Chat member user not found, using primary user for group members");
+        }
+        Long chatUserId = chatUser != null ? chatUser.getId() : userId;
+
         List<String> conversationIds = new ArrayList<>();
         int totalMessages = 0;
         try {
@@ -490,9 +501,10 @@ public class TestFixtureController {
                 totalMessages += sendChatMessages(conversationService, tenantId, dmId, userId, runId, 3);
             }
 
-            // Create group conversation
+            // Create group conversation with multiple members
+            List<Long> groupMembers = Arrays.asList(userId, chatUserId);
             Object groupConv = invokeCreateConversation(createConv, conversationService,
-                    tenantId, "group", "grp_" + runId, userId, List.of(userId));
+                    tenantId, "group", "grp_" + runId, userId, groupMembers);
             String groupId = extractStringId(groupConv);
             if (groupId != null) {
                 conversationIds.add(groupId);

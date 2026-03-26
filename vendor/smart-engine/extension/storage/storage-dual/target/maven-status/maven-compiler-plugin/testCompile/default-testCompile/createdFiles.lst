@@ -1,0 +1,13 @@
+com/alibaba/smart/framework/engine/test/storage/dual/ThreadLocalModeSwitchTest.class
+com/alibaba/smart/framework/engine/test/storage/dual/DualModeProcessTest$1.class
+com/alibaba/smart/framework/engine/test/storage/dual/StorageRouterRegistryTest.class
+com/alibaba/smart/framework/engine/test/storage/dual/DualModeProcessTest.class
+com/alibaba/smart/framework/engine/test/storage/dual/DefaultDatabaseModeTest.class
+com/alibaba/smart/framework/engine/test/storage/dual/helper/BasicServiceTaskDelegation.class
+com/alibaba/smart/framework/engine/test/storage/dual/helper/DefaultTaskAssigneeDispatcher.class
+com/alibaba/smart/framework/engine/test/storage/dual/DualStorageEngineInitTest.class
+com/alibaba/smart/framework/engine/test/storage/dual/BackwardCompatibilityTest.class
+com/alibaba/smart/framework/engine/test/storage/dual/helper/AuditProcessServiceTaskDelegation.class
+com/alibaba/smart/framework/engine/test/storage/dual/DualModeProcessTest$DualModeInstanceAccessor.class
+com/alibaba/smart/framework/engine/test/storage/dual/helper/TimeBasedIdGenerator.class
+com/alibaba/smart/framework/engine/test/storage/dual/MemoryModeTest.class
