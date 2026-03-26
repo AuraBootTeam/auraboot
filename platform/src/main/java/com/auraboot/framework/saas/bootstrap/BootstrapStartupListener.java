@@ -63,7 +63,7 @@ public class BootstrapStartupListener implements ApplicationRunner {
         } catch (Exception e) {
             log.warn("Could not load bootstrap-seed-config.json, using defaults: {}", e.getMessage());
             BootstrapRequest request = new BootstrapRequest();
-            request.setAdminEmail("admin@auraboot.test");
+            request.setAdminEmail("admin@example.com");
             request.setAdminPassword("Test2026x");
             request.setCompanyName("AuraBoot Dev");
             request.setSystemMode("single");

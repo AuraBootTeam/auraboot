@@ -72,7 +72,7 @@ if [ $? -eq 0 ]; then
     echo -e "${GREEN}=== Initialization Complete ===${NC}"
     echo ""
     echo "Environment is ready with:"
-    echo "  - User: admin@auraboot.test / Test2026x"
+    echo "  - User: admin@example.com / Test2026x"
     echo "  - Tenant: Xinran"
     echo "  - Plugin import verified"
 else

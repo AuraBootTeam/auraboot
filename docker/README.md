@@ -12,7 +12,7 @@
 docker compose --profile full up --build
 
 # Open http://localhost:3000
-# Login: admin@auraboot.test / Test2026x
+# Login: admin@example.com / Test2026x
 ```
 
 ## Commands

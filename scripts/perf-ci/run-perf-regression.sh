@@ -8,7 +8,7 @@
 #   BASE_URL            Target server (default: http://localhost:6443)
 #   PERF_BASELINE_DIR   Where baseline JSON files live (default: scripts/perf-ci/baseline/)
 #   PERF_ALERT_WEBHOOK  Optional Slack webhook URL (forwarded to notify.sh)
-#   USERNAME            Login email (default: admin@auraboot.test)
+#   USERNAME            Login email (default: admin@example.com)
 #   PASSWORD            Login password (default: Test2026x)
 #
 # Exit codes:
@@ -28,7 +28,7 @@ NOTIFY_SCRIPT="$SCRIPT_DIR/notify.sh"
 PROFILE="smoke"
 BASE_URL="${BASE_URL:-http://localhost:6443}"
 PERF_BASELINE_DIR="${PERF_BASELINE_DIR:-$SCRIPT_DIR/baseline}"
-USERNAME="${USERNAME:-admin@auraboot.test}"
+USERNAME="${USERNAME:-admin@example.com}"
 PASSWORD="${PASSWORD:-Test2026x}"
 
 # ---------------------------------------------------------------------------

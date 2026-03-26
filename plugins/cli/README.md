@@ -62,7 +62,7 @@ Publish a plugin to the AuraBoot platform.
 
 ```bash
 aura plugin publish . --target http://localhost:5173
-aura plugin publish . --target http://localhost:5173 --user admin@auraboot.test --password Test2026x
+aura plugin publish . --target http://localhost:5173 --user admin@example.com --password Test2026x
 ```
 
 Options:
@@ -108,7 +108,7 @@ Both flat file mode (single JSON array per resource type) and directory mode (on
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `AURA_USER` | Login email | `admin@auraboot.test` |
+| `AURA_USER` | Login email | `admin@example.com` |
 | `AURA_PASSWORD` | Login password | `Test2026x` |
 
 ## Development
