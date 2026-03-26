@@ -1066,7 +1066,14 @@ public class CommandExecutorImpl implements CommandExecutor {
                 continue;
             }
 
-            var result = validationService.validateField(fieldDefinition, value, context);
+            // For UPDATE operations where the field IS in the payload, use CREATE context
+            // so that required checks are enforced. Explicitly sending an empty value for
+            // a required field on update must be rejected — the skip-absent logic above
+            // already handles the "field not sent" case.
+            ValidationContext fieldContext = (isUpdateLike && payloadHasField)
+                    ? ValidationContext.CREATE
+                    : context;
+            var result = validationService.validateField(fieldDefinition, value, fieldContext);
             if (!result.isValid() && result.getErrors() != null) {
                 errors.addAll(result.getErrors());
             }

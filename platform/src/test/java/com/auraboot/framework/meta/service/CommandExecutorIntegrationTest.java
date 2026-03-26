@@ -1524,4 +1524,194 @@ class CommandExecutorIntegrationTest {
         assertNotNull(result, "Command with concurrency guard should succeed");
         assertEquals("completed", result.getPhaseReached());
     }
+
+    // ==================== Field Validation Tests ====================
+
+    private record ModelWithValidation(String modelCode, String nameField, String valueField) {}
+
+    private ModelWithValidation setupModelWithRequiredField() {
+        String suffix = System.currentTimeMillis() + "_" + UUID.randomUUID().toString().substring(0, 4);
+        String modelCode = "cmd_val_" + suffix;
+        String nameFieldCode = "name_" + suffix;
+        String valueFieldCode = "value_" + suffix;
+        tableName = "mt_" + modelCode.toLowerCase();
+
+        testModel = buildModel(modelCode);
+        metaModelMapper.insert(testModel);
+
+        Field nameField = buildField(nameFieldCode, "string", false, true, 1);
+        Field valueField = buildField(valueFieldCode, "integer", false, false, 2);
+
+        metaFieldMapper.insert(nameField);
+        metaFieldMapper.insert(valueField);
+        testFields.add(nameField);
+        testFields.add(valueField);
+
+        fieldBindingMapper.insert(buildBinding(testModel.getId(), nameField.getId(), 1));
+        fieldBindingMapper.insert(buildBinding(testModel.getId(), valueField.getId(), 2));
+
+        SchemaOperationResult result = schemaManagementService.createTableByModel(modelCode);
+        assertTrue(result.isSuccess(), "Table creation should succeed");
+
+        return new ModelWithValidation(modelCode, nameFieldCode, valueFieldCode);
+    }
+
+    private String setupCommandWithInputFields(String modelCode, String nameField, String valueField) {
+        String suffix = modelCode.replace("cmd_val_", "");
+        String commandCode = "cmd_val_" + suffix;
+
+        String execConfig = String.format(
+                "{\"inputFields\":[\"%s\",\"%s\"]}",
+                nameField, valueField);
+
+        CommandDefinitionCreateRequest request = new CommandDefinitionCreateRequest();
+        request.setCode(commandCode);
+        request.setDisplayName("Validation Test Command " + suffix);
+        request.setDescription("Command with inputFields for field validation tests");
+        request.setModelCode(modelCode);
+        request.setInputSchema("{\"type\":\"object\"}");
+        request.setExecutionConfig(execConfig);
+
+        CommandDefinitionDTO created = commandService.create(request);
+        assertNotNull(created);
+
+        BindingRuleDTO nameMapRule = new BindingRuleDTO();
+        nameMapRule.setRuleType("field_map");
+        nameMapRule.setSourceField(nameField);
+        nameMapRule.setTargetModel(modelCode);
+        nameMapRule.setTargetField(nameField);
+        nameMapRule.setSequence(1);
+        nameMapRule.setEnabled(true);
+        commandService.addBindingRule(created.getPid(), nameMapRule);
+
+        BindingRuleDTO valueMapRule = new BindingRuleDTO();
+        valueMapRule.setRuleType("field_map");
+        valueMapRule.setSourceField(valueField);
+        valueMapRule.setTargetModel(modelCode);
+        valueMapRule.setTargetField(valueField);
+        valueMapRule.setSequence(2);
+        valueMapRule.setEnabled(true);
+        commandService.addBindingRule(created.getPid(), valueMapRule);
+
+        commandService.publish(created.getPid());
+        return commandCode;
+    }
+
+    @Test
+    @Order(100)
+    @DisplayName("Field validation: CREATE with empty required field should fail")
+    void test100_fieldValidation_createEmptyRequired_fails() {
+        var model = setupModelWithRequiredField();
+        String commandCode = setupCommandWithInputFields(model.modelCode(), model.nameField(), model.valueField());
+
+        CommandExecuteRequest request = new CommandExecuteRequest();
+        request.setPayload(Map.of(model.nameField(), "", model.valueField(), 42));
+        request.setOperationType("create");
+        request.setClientRequestId("req_val_" + UUID.randomUUID());
+
+        ValidationException ex = assertThrows(ValidationException.class,
+                () -> commandExecutor.execute(commandCode, request),
+                "CREATE with empty required field should throw ValidationException");
+
+        assertTrue(ex.getMessage().contains("required"),
+                "Error message should mention 'required', got: " + ex.getMessage());
+    }
+
+    @Test
+    @Order(101)
+    @DisplayName("Field validation: CREATE with null required field should fail")
+    void test101_fieldValidation_createNullRequired_fails() {
+        var model = setupModelWithRequiredField();
+        String commandCode = setupCommandWithInputFields(model.modelCode(), model.nameField(), model.valueField());
+
+        CommandExecuteRequest request = new CommandExecuteRequest();
+        Map<String, Object> payload = new HashMap<>();
+        payload.put(model.nameField(), null);
+        payload.put(model.valueField(), 42);
+        request.setPayload(payload);
+        request.setOperationType("create");
+        request.setClientRequestId("req_val_" + UUID.randomUUID());
+
+        ValidationException ex = assertThrows(ValidationException.class,
+                () -> commandExecutor.execute(commandCode, request),
+                "CREATE with null required field should throw ValidationException");
+
+        assertTrue(ex.getMessage().contains("required"),
+                "Error message should mention 'required', got: " + ex.getMessage());
+    }
+
+    @Test
+    @Order(102)
+    @DisplayName("Field validation: CREATE with valid required field should succeed")
+    void test102_fieldValidation_createValidRequired_succeeds() {
+        var model = setupModelWithRequiredField();
+        String commandCode = setupCommandWithInputFields(model.modelCode(), model.nameField(), model.valueField());
+
+        CommandExecuteRequest request = new CommandExecuteRequest();
+        request.setPayload(Map.of(model.nameField(), "valid_name", model.valueField(), 42));
+        request.setOperationType("create");
+        request.setClientRequestId("req_val_" + UUID.randomUUID());
+
+        CommandExecuteResult result = commandExecutor.execute(commandCode, request);
+        assertNotNull(result, "Command should succeed with valid required field");
+        assertEquals("completed", result.getPhaseReached());
+    }
+
+    @Test
+    @Order(103)
+    @DisplayName("Field validation: UPDATE clearing required field to empty should fail")
+    void test103_fieldValidation_updateClearRequired_fails() {
+        var model = setupModelWithRequiredField();
+        String commandCode = setupCommandWithInputFields(model.modelCode(), model.nameField(), model.valueField());
+
+        String recordPid = UniqueIdGenerator.generate();
+        Map<String, Object> insertData = new HashMap<>();
+        insertData.put("pid", recordPid);
+        insertData.put("tenant_id", testTenant.getId());
+        insertData.put(model.nameField(), "original_name");
+        insertData.put(model.valueField(), 10);
+        insertData.put("created_at", Instant.now());
+        insertData.put("updated_at", Instant.now());
+        dynamicDataMapper.insert(tableName, insertData);
+
+        CommandExecuteRequest updateReq = new CommandExecuteRequest();
+        updateReq.setPayload(Map.of(model.nameField(), "", model.valueField(), 20));
+        updateReq.setOperationType("update");
+        updateReq.setTargetRecordId(recordPid);
+        updateReq.setClientRequestId("req_val_update_" + UUID.randomUUID());
+
+        ValidationException ex = assertThrows(ValidationException.class,
+                () -> commandExecutor.execute(commandCode, updateReq),
+                "UPDATE clearing required field to empty should throw ValidationException");
+
+        assertTrue(ex.getMessage().contains("required"),
+                "Error message should mention 'required', got: " + ex.getMessage());
+    }
+
+    @Test
+    @Order(104)
+    @DisplayName("Field validation: UPDATE without required field in payload should succeed")
+    void test104_fieldValidation_updateOmitRequired_succeeds() {
+        var model = setupModelWithRequiredField();
+        String commandCode = setupCommandWithInputFields(model.modelCode(), model.nameField(), model.valueField());
+
+        String recordPid = UniqueIdGenerator.generate();
+        Map<String, Object> insertData = new HashMap<>();
+        insertData.put("pid", recordPid);
+        insertData.put("tenant_id", testTenant.getId());
+        insertData.put(model.nameField(), "keep_this_name");
+        insertData.put(model.valueField(), 10);
+        insertData.put("created_at", Instant.now());
+        insertData.put("updated_at", Instant.now());
+        dynamicDataMapper.insert(tableName, insertData);
+
+        CommandExecuteRequest updateReq = new CommandExecuteRequest();
+        updateReq.setPayload(Map.of(model.valueField(), 99));
+        updateReq.setOperationType("update");
+        updateReq.setTargetRecordId(recordPid);
+        updateReq.setClientRequestId("req_val_update2_" + UUID.randomUUID());
+
+        CommandExecuteResult updateResult = commandExecutor.execute(commandCode, updateReq);
+        assertNotNull(updateResult, "UPDATE without required field in payload should succeed");
+    }
 }
