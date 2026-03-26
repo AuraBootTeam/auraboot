@@ -97,6 +97,9 @@ public class TestFixtureController {
                 case "inbox_mention" -> createInboxItemsWithType(runId, request.getParams(), authHeader, "mention", "low", "E2E Mention Item");
                 case "inbox_assignment" -> createInboxItemsWithType(runId, request.getParams(), authHeader, "assignment", "high", "E2E Assignment Item");
                 case "customers" -> createCustomersFixture(runId, request.getParams());
+                case "multiview" -> createMultiviewFixture(runId, request.getParams());
+                case "chat" -> createChatFixture(runId, request.getParams());
+                case "native_fields" -> createNativeFieldsFixture(runId, request.getParams());
                 default -> FixtureResult.builder()
                         .success(false)
                         .fixtureName(request.getName())
@@ -352,6 +355,313 @@ public class TestFixtureController {
             return FixtureResult.builder()
                     .success(false)
                     .fixtureName("customers")
+                    .testRunId(runId)
+                    .recordsCreated(recordIds.size())
+                    .recordIds(recordIds)
+                    .metadata(Map.of("error", e.getMessage()))
+                    .build();
+        }
+    }
+
+    /**
+     * Fixture: "multiview"
+     * Creates 6 records in e2et_order with mixed statuses so the iOS multiview
+     * test can exercise list / kanban / calendar / gallery view switching.
+     * The model must already exist (shipped with the e2e test plugin).
+     * <p>
+     * viewConfigs expected in the page schema (set up by plugin):
+     *   list     — default
+     *   kanban   — statusField: e2et_order_status
+     *   calendar — dateField: e2et_order_due_date  (may be null if field absent)
+     *   gallery  — imageField: e2et_order_image, titleField: e2et_order_title, columns: 3
+     */
+    private FixtureResult createMultiviewFixture(String runId, Map<String, Object> params) {
+        String modelCode = params != null && params.containsKey("modelCode")
+                ? (String) params.get("modelCode")
+                : "e2et_order";
+        int count = params != null && params.containsKey("count")
+                ? ((Number) params.get("count")).intValue()
+                : 6;
+
+        String[] statuses = {"draft", "submitted", "approved", "draft", "submitted", "approved"};
+        List<String> recordIds = new ArrayList<>();
+        try {
+            for (int i = 0; i < count; i++) {
+                Map<String, Object> record = new HashMap<>();
+                record.put("e2et_order_title", "mv_" + runId + "_" + (i + 1));
+                record.put("e2et_order_status", statuses[i % statuses.length]);
+                Map<String, Object> created = dynamicDataService.create(modelCode, record);
+                Object pid = created.get("pid");
+                if (pid != null) {
+                    recordIds.add(pid.toString());
+                }
+            }
+            log.info("Multiview fixture created: runId={}, count={}, model={}", runId, count, modelCode);
+            return FixtureResult.builder()
+                    .success(true)
+                    .fixtureName("multiview")
+                    .testRunId(runId)
+                    .recordsCreated(count)
+                    .recordIds(recordIds)
+                    .metadata(Map.of(
+                            "modelCode", modelCode,
+                            "viewTypes", List.of("list", "kanban", "calendar", "gallery"),
+                            "statusField", "e2et_order_status",
+                            "titleField", "e2et_order_title"
+                    ))
+                    .build();
+        } catch (Exception e) {
+            log.error("Failed to create multiview fixture: {}", e.getMessage(), e);
+            return FixtureResult.builder()
+                    .success(false)
+                    .fixtureName("multiview")
+                    .testRunId(runId)
+                    .recordsCreated(recordIds.size())
+                    .recordIds(recordIds)
+                    .metadata(Map.of("error", e.getMessage()))
+                    .build();
+        }
+    }
+
+    /**
+     * Fixture: "chat"
+     * Creates 2 conversations (1 direct message, 1 group) with a few messages each.
+     * Uses ApplicationContext to look up ConversationService / MessageService beans
+     * to avoid a compile-time dependency on the enterprise IM module.
+     * <p>
+     * Expected bean names (enterprise-im module):
+     *   "conversationService"  — createConversation(tenantId, type, name, creatorId, memberIds)
+     *   "chatMessageService"   — sendMessage(tenantId, conversationId, senderId, content, type)
+     * <p>
+     * If the IM module is not loaded, returns success=false with an explanatory error.
+     */
+    private FixtureResult createChatFixture(String runId, Map<String, Object> params) {
+        // Resolve IM service via ApplicationContext — avoids compile-time dependency
+        Object conversationService;
+        try {
+            conversationService = applicationContext.getBean("conversationService");
+        } catch (Exception e) {
+            return FixtureResult.builder()
+                    .success(false).fixtureName("chat").testRunId(runId)
+                    .recordsCreated(0).recordIds(List.of())
+                    .metadata(Map.of("error", "IM module is not available (enterprise-im not loaded): " + e.getMessage()))
+                    .build();
+        }
+
+        // Resolve tenant and user
+        var tenant = tenantService.findByName("e2e_test");
+        var user   = userService.findByEmail("e2e@test.local");
+        if (tenant == null || user == null) {
+            return FixtureResult.builder()
+                    .success(false).fixtureName("chat").testRunId(runId)
+                    .recordsCreated(0).recordIds(List.of())
+                    .metadata(Map.of("error", "Cannot resolve tenant/user — call POST /api/test/seed first"))
+                    .build();
+        }
+        Long tenantId = tenant.getId();
+        Long userId   = user.getId();
+
+        List<String> conversationIds = new ArrayList<>();
+        int totalMessages = 0;
+        try {
+            // Attempt to find createConversation method — signature may vary by enterprise version.
+            // We try (tenantId, type, name, creatorId) first, then fall through.
+            Method createConv = null;
+            for (Method m : conversationService.getClass().getMethods()) {
+                if ("createConversation".equals(m.getName())) {
+                    createConv = m;
+                    break;
+                }
+            }
+            if (createConv == null) {
+                return FixtureResult.builder()
+                        .success(false).fixtureName("chat").testRunId(runId)
+                        .recordsCreated(0).recordIds(List.of())
+                        .metadata(Map.of("error", "conversationService.createConversation method not found"))
+                        .build();
+            }
+
+            // Create direct-message conversation
+            Object dmConv = invokeCreateConversation(createConv, conversationService,
+                    tenantId, "direct", "dm_" + runId, userId, List.of(userId));
+            String dmId = extractStringId(dmConv);
+            if (dmId != null) {
+                conversationIds.add(dmId);
+                totalMessages += sendChatMessages(conversationService, tenantId, dmId, userId, runId, 3);
+            }
+
+            // Create group conversation
+            Object groupConv = invokeCreateConversation(createConv, conversationService,
+                    tenantId, "group", "grp_" + runId, userId, List.of(userId));
+            String groupId = extractStringId(groupConv);
+            if (groupId != null) {
+                conversationIds.add(groupId);
+                totalMessages += sendChatMessages(conversationService, tenantId, groupId, userId, runId, 3);
+            }
+
+            log.info("Chat fixture created: runId={}, conversations={}, messages={}", runId, conversationIds.size(), totalMessages);
+            return FixtureResult.builder()
+                    .success(true)
+                    .fixtureName("chat")
+                    .testRunId(runId)
+                    .recordsCreated(conversationIds.size())
+                    .recordIds(conversationIds)
+                    .metadata(Map.of(
+                            "conversationIds", conversationIds,
+                            "totalMessages", totalMessages,
+                            "tenantId", tenantId,
+                            "userId", userId
+                    ))
+                    .build();
+        } catch (Exception e) {
+            log.error("Failed to create chat fixture: {}", e.getMessage(), e);
+            return FixtureResult.builder()
+                    .success(false)
+                    .fixtureName("chat")
+                    .testRunId(runId)
+                    .recordsCreated(conversationIds.size())
+                    .recordIds(conversationIds)
+                    .metadata(Map.of("error", e.getMessage()))
+                    .build();
+        }
+    }
+
+    /** Invoke createConversation reflectively, trying multiple overload signatures. */
+    private Object invokeCreateConversation(Method method, Object service,
+                                             Long tenantId, String type, String name,
+                                             Long creatorId, List<Long> memberIds) throws Exception {
+        Class<?>[] paramTypes = method.getParameterTypes();
+        if (paramTypes.length == 4) {
+            // (tenantId, type, name, creatorId)
+            return method.invoke(service, tenantId, type, name, creatorId);
+        } else if (paramTypes.length == 5) {
+            // (tenantId, type, name, creatorId, memberIds)
+            return method.invoke(service, tenantId, type, name, creatorId, memberIds);
+        } else {
+            // Generic fallback — try with all 5 args and hope for the best
+            return method.invoke(service, tenantId, type, name, creatorId, memberIds);
+        }
+    }
+
+    /** Send N test messages to a conversation via reflection; returns count sent. */
+    private int sendChatMessages(Object conversationService, Long tenantId, String conversationId,
+                                  Long senderId, String runId, int count) {
+        Object messageService;
+        try {
+            messageService = applicationContext.getBean("chatMessageService");
+        } catch (Exception e) {
+            log.warn("chatMessageService bean not found, skipping message creation: {}", e.getMessage());
+            return 0;
+        }
+
+        Method sendMethod = null;
+        for (Method m : messageService.getClass().getMethods()) {
+            if ("sendMessage".equals(m.getName())) {
+                sendMethod = m;
+                break;
+            }
+        }
+        if (sendMethod == null) {
+            log.warn("chatMessageService.sendMessage method not found, skipping message creation");
+            return 0;
+        }
+
+        int sent = 0;
+        for (int i = 0; i < count; i++) {
+            try {
+                String content = "E2E test message [" + runId + "-" + (i + 1) + "]";
+                Class<?>[] p = sendMethod.getParameterTypes();
+                if (p.length == 4) {
+                    sendMethod.invoke(messageService, tenantId, conversationId, senderId, content);
+                } else if (p.length == 5) {
+                    sendMethod.invoke(messageService, tenantId, conversationId, senderId, content, "text");
+                } else {
+                    sendMethod.invoke(messageService, tenantId, conversationId, senderId, content, "text");
+                }
+                sent++;
+            } catch (Exception e) {
+                log.warn("Failed to send message {}/{}: {}", i + 1, count, e.getMessage());
+            }
+        }
+        return sent;
+    }
+
+    /** Extract string ID from a reflectively-created entity object. Tries getId(), then id field. */
+    private String extractStringId(Object entity) {
+        if (entity == null) return null;
+        try {
+            Object id = entity.getClass().getMethod("getId").invoke(entity);
+            return id != null ? String.valueOf(id) : null;
+        } catch (Exception e) {
+            try {
+                var field = entity.getClass().getDeclaredField("id");
+                field.setAccessible(true);
+                Object id = field.get(entity);
+                return id != null ? String.valueOf(id) : null;
+            } catch (Exception ex) {
+                log.warn("Cannot extract id from {}: {}", entity.getClass().getSimpleName(), ex.getMessage());
+                return null;
+            }
+        }
+    }
+
+    /**
+     * Fixture: "native_fields"
+     * Creates records in e2et_order with simulated camera-photo URLs and
+     * base64-encoded signature data — used by iOS NativeCapabilityFlowTests
+     * to verify that camera and signature fields render correctly.
+     * <p>
+     * Field mapping (configured in the e2e test plugin's e2et_order model):
+     *   e2et_order_photo     — extension.renderComponent = "camera"  (stores image URL)
+     *   e2et_order_signature — extension.renderComponent = "signature" (stores base64 SVG)
+     */
+    private FixtureResult createNativeFieldsFixture(String runId, Map<String, Object> params) {
+        String modelCode = params != null && params.containsKey("modelCode")
+                ? (String) params.get("modelCode")
+                : "e2et_order";
+        int count = params != null && params.containsKey("count")
+                ? ((Number) params.get("count")).intValue()
+                : 3;
+
+        // Minimal inline SVG signature encoded as base64 data URI
+        String signatureDataUri = "data:image/svg+xml;base64,"
+                + "PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMDAiIGhlaWdodD0iNTAiPjxwYXRoIGQ9Ik0xMCAzMCBRNTAgNSAxMDAgMzAgUTE1MCA1NSAxOTAgMzAiIHN0cm9rZT0iIzMzMyIgZmlsbD0ibm9uZSIvPjwvc3ZnPg==";
+        // Placeholder camera photo URL (PNG 1x1 pixel data URI)
+        String photoDataUri = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+
+        List<String> recordIds = new ArrayList<>();
+        try {
+            for (int i = 0; i < count; i++) {
+                Map<String, Object> record = new HashMap<>();
+                record.put("e2et_order_title", "nf_" + runId + "_" + (i + 1));
+                record.put("e2et_order_status", "draft");
+                // Store simulated native field values using the field codes expected by the plugin
+                record.put("e2et_order_photo", photoDataUri);
+                record.put("e2et_order_signature", signatureDataUri);
+                Map<String, Object> created = dynamicDataService.create(modelCode, record);
+                Object pid = created.get("pid");
+                if (pid != null) {
+                    recordIds.add(pid.toString());
+                }
+            }
+            log.info("Native fields fixture created: runId={}, count={}, model={}", runId, count, modelCode);
+            return FixtureResult.builder()
+                    .success(true)
+                    .fixtureName("native_fields")
+                    .testRunId(runId)
+                    .recordsCreated(count)
+                    .recordIds(recordIds)
+                    .metadata(Map.of(
+                            "modelCode", modelCode,
+                            "cameraField", "e2et_order_photo",
+                            "signatureField", "e2et_order_signature"
+                    ))
+                    .build();
+        } catch (Exception e) {
+            log.error("Failed to create native_fields fixture: {}", e.getMessage(), e);
+            return FixtureResult.builder()
+                    .success(false)
+                    .fixtureName("native_fields")
                     .testRunId(runId)
                     .recordsCreated(recordIds.size())
                     .recordIds(recordIds)
