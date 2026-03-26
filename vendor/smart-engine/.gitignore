@@ -1,0 +1,26 @@
+target
+*.class
+*.classpath
+*.project
+*.iml
+*.idea
+.idea
+*.swp
+*.swo
+bin
+.settings/
+test-output/
+src/generated/*
+logs/
+.DS_Store
+pom.xml.versionsBackup
+release.properties
+**.xml.releaseBackup
+
+# VS Code
+.vscode/
+
+
+#lock file using for test
+smart-engine.lock
+.factorypath
