@@ -1,0 +1,39 @@
+[
+  {
+    "code": "crm_act_type",
+    "displayName:zh-CN": "活动类型",
+    "displayName:en": "Activity Type",
+    "dataType": "enum",
+    "dictCode": "crm_activity_type",
+    "constraints": { "required": true },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_act_subject",
+    "displayName:zh-CN": "主题",
+    "displayName:en": "Subject",
+    "dataType": "string",
+    "constraints": { "required": true, "maxLength": 200 },
+    "feature": { "searchable": true, "sortable": true }
+  },
+  {
+    "code": "crm_act_content",
+    "displayName:zh-CN": "内容",
+    "displayName:en": "Content",
+    "dataType": "text"
+  },
+  {
+    "code": "crm_act_date",
+    "displayName:zh-CN": "活动日期",
+    "displayName:en": "Activity Date",
+    "dataType": "datetime",
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "crm_act_owner",
+    "displayName:zh-CN": "负责人",
+    "displayName:en": "Owner",
+    "dataType": "string",
+    "constraints": { "maxLength": 100 }
+  }
+]

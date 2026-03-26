@@ -1,0 +1,571 @@
+common:
+  type: 类型
+  status: 状态
+  date: 日期
+  id: 编号
+  name: 名称
+  description: 描述
+  created_at: 创建时间
+  updated_at: 更新时间
+  creator: 创建人
+  modifier: 修改人
+  loading: 加载中...
+  yes: 是
+  no: 否
+
+  SchemaList: 模式列表
+  form: 新建视图
+
+  deletedFlag: 状态
+  active: 激活
+  inactive: 未激活
+  createdAt: 创建时间
+
+  print: 打印
+  new: 新建
+  export: 导出
+  delete: 删除
+  edit: 编辑
+  view: 查看
+
+  query_conditions: 查询条件
+  reset: 重置
+  search: 查询
+  query: 查询
+  operation: 操作
+
+  items_per_page: 每页显示
+  items_total: "共 {total} 条"
+  first_page: 首页
+  previous_page: 上一页
+  next_page: 下一页
+  last_page: 末页
+  page_of: "第 {current} 页，共 {total} 页"
+
+  please_input: "请输入{field}"
+  please_select: "请选择{field}"
+  all: 全部
+
+  start_date: 开始日期
+  end_date: 结束日期
+
+  confirm_delete: 确认删除？
+#
+## Model Management Translations
+#model:
+#  # Page Titles
+#  list_title: 模型管理
+#  list_subtitle: 管理系统中的所有模型定义
+#  create_title: 创建模型
+#  edit_title: 编辑模型
+#  detail_title: 模型详情
+#
+#  # Field Labels
+#  code: 模型编码
+#  display_name: 显示名称
+#  model_type: 模型类型
+#  description: 描述
+#  namespace: 命名空间
+#  env: 环境
+#  version: 版本号
+#  status: 状态
+#  is_current: 当前版本
+#  release_id: 发布ID
+#  field_count: 字段数量
+#  created_by: 创建人
+#  updated_by: 更新人
+#  version_note: 版本说明
+#
+#  # Model Types
+#  type_entity: 实体模型
+#  type_view: 视图模型
+#  type_aggregate: 聚合模型
+#
+#  # Model Status
+#  status_draft: 草稿
+#  status_published: 已发布
+#  status_archived: 已归档
+#
+#  # Actions
+#  create: 创建模型
+#  edit: 编辑模型
+#  delete: 删除模型
+#  view_detail: 查看详情
+#  refresh_cache: 刷新缓存
+#  export: 导出模型
+#  batch_delete: 批量删除
+#
+#  # Tabs
+#  tab_basic: 基本信息
+#  tab_fields: 字段管理
+#  tab_permissions: 权限点
+#  tab_versions: 版本历史
+#  tab_pages: 关联页面
+#
+#  # Field Management
+#  field_binding: 字段绑定
+#  add_field: 添加字段
+#  remove_field: 移除字段
+#  field_config: 字段配置
+#  field_required: 必填
+#  field_default_value: 默认值
+#  field_validation: 验证规则
+#  field_dict: 关联字典
+#  field_order: 显示顺序
+#
+#  # CRUD Template
+#  crud_wizard: CRUD向导
+#  crud_wizard_subtitle: 快速生成CRUD页面
+#  crud_step_type: 选择操作类型
+#  crud_step_config: 配置参数
+#  crud_step_confirm: 确认生成
+#  crud_menu_name: 菜单名称
+#  crud_menu_parent: 父级菜单
+#  crud_menu_icon: 菜单图标
+#  crud_default_roles: 默认角色
+#  crud_generate_list: 生成列表页
+#  crud_generate_form: 生成表单页
+#  crud_generate_detail: 生成详情页
+#  crud_enable_export: 启用导出
+#  crud_enable_import: 启用导入
+#  crud_generation_success: 生成成功
+#  crud_generation_failed: 生成失败
+#  crud_access_links: 访问链接
+#
+#  # Preview
+#  preview_form: 预览表单
+#  preview_list: 预览列表
+#  preview_loading: 加载中...
+#  preview_no_fields: 该模型还没有关联任何字段
+#  preview_add_fields_hint: 请先添加字段后再预览
+#  preview_test_submit: 测试提交
+#  preview_reset: 重置
+#  preview_close: 关闭
+#
+#  # Version Management
+#  version_history: 版本历史
+#  version_number: 版本号
+#  version_current: 当前版本
+#  version_note: 版本说明
+#  version_created_at: 创建时间
+#  version_created_by: 创建人
+#  version_view: 查看版本
+#  version_compare: 对比版本
+#  version_rollback: 回滚到此版本
+#  version_rollback_confirm: 确认回滚到版本 {version}？
+#  version_rollback_success: 回滚成功
+#  version_rollback_failed: 回滚失败
+#  version_diff_title: 版本对比
+#  version_diff_from: 从版本
+#  version_diff_to: 到版本
+#  version_diff_field: 字段
+#  version_diff_old_value: 旧值
+#  version_diff_new_value: 新值
+#  version_diff_change_type: 变更类型
+#  version_diff_added: 新增
+#  version_diff_modified: 修改
+#  version_diff_removed: 删除
+#
+#  # Git-First
+#  git_first_notice: Git-First工作流提示
+#  git_first_enabled: 当前启用Git-First模式
+#  git_first_workflow: 所有变更将通过Git流程处理
+#  git_first_steps: "工作流程: DSL生成 → Git提交 → Release处理 → 运行时投影"
+#  git_first_release_status: Release状态
+#  git_first_release_pending: 等待处理
+#  git_first_release_generating: 生成中
+#  git_first_release_validated: 已验证
+#  git_first_release_projecting: 投影中
+#  git_first_release_published: 已发布
+#  git_first_release_failed: 失败
+#
+#  # permissions
+#  permission_list: 权限点列表
+#  permission_type: 权限点类型
+#  permission_action: 操作
+#  permission_bind_role: 绑定角色
+#  permission_unbind_role: 解绑角色
+#  permission_references: 引用情况
+#  permission_action_read: 读取
+#  permission_action_create: 创建
+#  permission_action_update: 更新
+#  permission_action_delete: 删除
+#  permission_action_query: 查询
+#  permission_action_export: 导出
+#  permission_action_import: 导入
+#
+#  # Messages
+#  create_success: 模型创建成功
+#  create_failed: 模型创建失败
+#  update_success: 模型更新成功
+#  update_failed: 模型更新失败
+#  delete_success: 模型删除成功
+#  delete_failed: 模型删除失败
+#  delete_confirm: 确认删除模型 "{name}"？
+#  batch_delete_confirm: 确认删除选中的 {count} 个模型？
+#  code_duplicate: 模型编码已存在
+#  code_required: 请输入模型编码
+#  display_name_required: 请输入显示名称
+#  model_type_required: 请选择模型类型
+#  validation_failed: 表单验证失败
+#  no_data: 暂无数据
+#  loading: 加载中...
+#  cache_refresh_success: 缓存刷新成功
+#  cache_refresh_failed: 缓存刷新失败
+#
+#  # Placeholders
+#  placeholder_code: 请输入模型编码（英文字母、数字、下划线）
+#  placeholder_display_name: 请输入显示名称
+#  placeholder_description: 请输入描述信息
+#  placeholder_search: 搜索模型编码或名称
+#  placeholder_version_note: 请输入版本说明
+#
+#  # Validation Messages
+#  validation_code_format: 模型编码只能包含英文字母、数字和下划线
+#  validation_code_length: 模型编码长度为2-50个字符
+#  validation_display_name_length: 显示名称长度为2-100个字符
+#  validation_description_length: 描述长度不能超过500个字符
+
+# Notification System
+notification:
+  center:
+    title: 通知中心
+    unread_count: "{count} 条未读"
+    mark_all_read: 全部已读
+    view_all: 查看全部
+    empty: 暂无新通知
+  time:
+    just_now: 刚刚
+    minutes_ago: "{count}分钟前"
+    hours_ago: "{count}小时前"
+    yesterday: 昨天
+    days_ago: "{count}天前"
+  priority:
+    high: 高优先级
+    normal: 普通
+    low: 低优先级
+  channel:
+    in_app: 站内信
+    email: 邮件
+    wechat_work: 企业微信
+    dingtalk: 钉钉
+    slack: Slack
+  category:
+    business: 业务通知
+    approval: 审批通知
+    system: 系统通知
+    alert: 告警通知
+  preferences:
+    load_failed: 加载通知偏好失败
+    update_failed: 更新通知偏好失败
+
+# BPM Notification
+bpm:
+  notification:
+    task_created:
+      title: 您有新的待办任务
+    task_completed:
+      title: 任务已完成
+    process_started:
+      title: 流程已发起
+    process_ended:
+      title: 流程已结束
+    sla_warning:
+      title: SLA 预警提醒
+    sla_escalated:
+      title: SLA 已升级
+    default:
+      title: 流程通知
+
+# Flow Designer SDK
+flow:
+  palette:
+    title: 组件库
+    empty: 暂无可用组件
+  category:
+    trigger: 触发器
+    action: 动作
+    control: 控制
+  panel:
+    selectNode: 选择一个节点进行配置
+    noConfig: 暂无配置项
+    deleteNode: 删除节点
+    deleteConfirm: 确定要删除此节点吗？
+  toolbar:
+    title: 流程设计器
+    unsaved: 未保存
+    hasErrors: 有错误
+    save: 保存
+    saving: 保存中...
+    validate: 验证
+    import: 导入
+    export: 导出
+    importError: 导入文件格式错误
+
+# Automation
+automation:
+  # Page-level
+  page:
+    title: 自动化规则
+  list:
+    title: 自动化列表
+    create: + 新建规则
+    empty: 暂无自动化规则，点击上方按钮创建
+    search: 搜索规则...
+    enabled: 已启用
+    disabled: 已禁用
+    enable: 启用
+    disable: 禁用
+    edit: 编辑
+    delete: 删除
+    logs: 日志
+    lastRun: 上次执行
+    deleteConfirm: 确定要删除"{name}"吗？
+
+  # Triggers
+  trigger:
+    recordCreate: 记录创建时
+    recordCreate.desc: 当指定模型的记录被创建时触发
+    recordUpdate: 记录更新时
+    recordUpdate.desc: 当指定模型的记录被更新时触发
+    fieldChange: 字段变更时
+    fieldChange.desc: 当指定字段的值发生变更时触发
+    stateChange: 状态变更时
+    stateChange.desc: 当记录状态从一个值变更为另一个值时触发
+    scheduled: 定时触发
+    scheduled.desc: 按照 Cron 表达式定时触发
+    webhook: Webhook 触发
+    webhook.desc: 当收到外部 Webhook 请求时触发
+
+  # Actions
+  action:
+    updateRecord: 更新记录
+    updateRecord.desc: 更新指定模型的记录字段
+    createRecord: 创建记录
+    createRecord.desc: 在指定模型中创建新记录
+    sendNotification: 发送通知
+    sendNotification.desc: 向指定用户发送通知
+    executeCommand: 执行命令
+    executeCommand.desc: 执行指定的系统命令
+    callApi: 调用 API
+    callApi.desc: 调用外部 HTTP API
+    sendWebhook: 发送 Webhook
+    sendWebhook.desc: 向指定 URL 发送 Webhook 请求
+
+  # Controls
+  control:
+    condition: 条件分支
+    condition.desc: 根据条件表达式决定执行路径
+    delay: 延时
+    delay.desc: 等待指定时间后继续执行
+    loop: 循环
+    loop.desc: 遍历集合中的每个元素
+
+  # Fields
+  field:
+    modelCode: 模型
+    modelCode.desc: 选择要操作的数据模型
+    fieldCode: 字段
+    watchFields: 监听字段
+    watchFields.desc: 留空表示监听所有字段
+    stateField: 状态字段
+    fromValue: 原始值
+    fromValue.desc: 留空表示任意原始值
+    toValue: 目标值
+    toValue.desc: 留空表示任意目标值
+    fromStates: 原状态
+    fromStates.desc: 留空表示任意原状态
+    toStates: 目标状态
+    toStates.desc: 留空表示任意目标状态
+    cron: Cron 表达式
+    cron.desc: '例如: 0 0 * * * (每天零点)'
+    timezone: 时区
+    secret: 密钥
+    secret.desc: 用于验证请求签名的密钥
+    validationMode: 验证方式
+    validationMode.none: 无验证
+    validationMode.signature: 签名验证
+    validationMode.token: Token 验证
+    recordId: 记录 ID
+    recordId.desc: 支持表达式引用，如 ${trigger.recordId}
+    updateFields: 更新字段
+    updateFields.desc: 要更新的字段和值，JSON 格式
+    createFields: 记录字段
+    createFields.desc: 新记录的字段和值，JSON 格式
+    notificationType: 通知类型
+    notificationType.email: 邮件
+    notificationType.sms: 短信
+    notificationType.push: 推送
+    notificationType.inApp: 站内消息
+    notificationTitle: 通知标题
+    notificationContent: 通知内容
+    recipients: 接收人
+    recipients.desc: 支持表达式引用用户 ID 或邮箱
+    commandCode: 命令代码
+    commandCode.desc: 要执行的命令标识符
+    commandParams: 命令参数
+    commandParams.desc: 传递给命令的参数，JSON 格式
+    apiUrl: API 地址
+    httpMethod: 请求方法
+    httpHeaders: 请求头
+    httpBody: 请求体
+    webhookUrl: Webhook 地址
+    webhookPayload: 请求负载
+    expression: 条件表达式
+    expression.desc: 返回 true 或 false 的表达式
+    duration: 延时时长
+    duration.desc: 等待的时间数值
+    unit: 时间单位
+    unit.seconds: 秒
+    unit.minutes: 分钟
+    unit.hours: 小时
+    unit.days: 天
+    collection: 集合
+    collection.desc: 要遍历的数组或列表
+    itemVariable: 元素变量名
+    itemVariable.desc: 当前元素的变量名，默认为 item
+
+# Auth
+auth:
+  login: 登录
+  register: 注册
+  welcome: 欢迎回来
+  selectMethod: 选择登录方式
+  tagline: 企业级低代码平台，快速构建业务应用
+  email: 邮箱
+  emailPlaceholder: 请输入邮箱地址
+  password: 密码
+  passwordPlaceholder: 请输入密码
+  rememberMe: 记住我
+  forgotPassword: 忘记密码？
+  loginNow: 立即登录
+  mobile: 手机号
+  mobilePlaceholder: 请输入手机号
+  verifyCode: 验证码
+  codePlaceholder: 请输入验证码
+  sending: 发送中...
+  getCode: 获取验证码
+  socialLogin: 其他登录方式
+  noAccount: 还没有账号？
+  registerNow: 立即注册
+  feature:
+    designer: 可视化页面设计器
+    dataModel: 灵活数据模型
+    workflow: 自动化工作流
+  channel:
+    emailPassword: 邮箱密码
+    sms: 短信登录
+    emailCode: 邮箱验证码
+  social:
+    wechat: 微信登录
+    oidc: SSO 登录
+  error:
+    invalidCredentials: 邮箱或密码错误
+    invalidMobile: 请输入有效的手机号
+    codeRequired: 请输入验证码
+    codeInvalid: 验证码错误或已过期
+
+# Dashboard Viewer
+dashboard:
+  drag_hint: 拖拽标签可调整顺序
+  empty: 暂无已发布的仪表盘
+  goto_management: 前往仪表盘管理
+  refresh: 刷新
+  refreshed: 数据已刷新
+
+# AI Center — Colleagues & Settings
+ai:
+  colleagues:
+    title: AI 同事
+    subtitle: 管理您的 AI 团队成员
+    create: 创建 AI 同事
+    noDescription: 暂无描述
+    badge:
+      official: 官方
+      fullPower: 满血
+    aurabot:
+      desc: 内置 AI 助手，拥有完整数据访问权限
+    action:
+      chat: 对话
+      edit: 编辑
+      save: 保存修改
+      saving: 保存中...
+    empty:
+      title: 还没有 AI 同事
+      description: 创建第一个 AI 同事，自动化任务并提升工作效率。
+    status:
+      active: 活跃
+      disabled: 已停用
+      draft: 草稿
+    tab:
+      profile: 基本信息
+      tools: 工具与技能
+      memory: 记忆
+      runs: 运行历史
+      schedules: 定时任务
+    section:
+      basicInfo: 基本信息
+      soulProfile: 个性设置
+      executionLimits: 执行限制
+    field:
+      name: 名称
+      description: 描述
+      agentType: 智能体类型
+      model: 模型
+      personality: 个性特征
+      expertise: 专长领域
+      communicationStyle: 沟通风格
+      selectStyle: 选择风格...
+      boundaries: 行为边界
+      systemPrompt: 系统提示词
+      maxConcurrentRuns: 最大并发运行数
+      timeout: 超时时间（秒）
+    tools:
+      available: 可用工具
+      skills: 技能
+      noTools: 未配置工具
+      noSkills: 未配置技能
+    memory:
+      empty: 暂无记忆
+      emptyDesc: 智能体在交互中学习后，记忆将在此显示。
+      count: "共 {count} 条记忆"
+    runs:
+      empty: 暂无运行记录
+      emptyDesc: 智能体执行任务后，运行历史将在此显示。
+      count: "最近 {count} 条运行记录"
+    schedules:
+      empty: 暂无定时任务
+      emptyDesc: 配置定时任务后，将在此显示。
+      count: "{count} 个定时任务"
+    error:
+      loadFailed: 加载 AI 同事失败
+      notFound: 未找到该智能体
+      saveFailed: 保存失败
+    success:
+      saved: 智能体保存成功
+  wizard:
+    template:
+      title: 创建 AI 同事
+      subtitle: 从模板快速开始，或从头构建。
+      sectionLabel: 从模板开始
+      startFromScratch: 或从头创建 →
+  template:
+    procurement:
+      name: 采购审批专家
+      desc: 审核采购订单，检查预算，按 SOP 审批
+    weeklyReport:
+      name: 周报助手
+      desc: 从活动数据和项目更新生成团队周报
+    customerService:
+      name: 客服专员
+      desc: 处理客户咨询，查询订单状态，撰写专业回复
+    dataAnalyst:
+      name: 数据分析师
+      desc: 查询数据，生成业务洞察，推荐图表方案
+    onboarding:
+      name: 新员工引导
+      desc: 帮助新员工熟悉平台、查找资源、完成入职任务
+  settings:
+    title: AI 设置
+    subtitle: 配置提供商、工具和 AI 中心治理策略
+  retry: 重试

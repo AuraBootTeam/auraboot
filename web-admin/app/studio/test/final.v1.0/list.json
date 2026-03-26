@@ -1,0 +1,396 @@
+{
+  "kind": "List",
+  "version": "1.0.0",
+  "id": "list.store",
+  "title": "$i18n:list.store.title",
+  "stateBinding": {
+    "filters": "{{state.filters}}",
+    "selection": "{{state.selectedIds}}"
+  },
+  "layout": {
+    "areas": ["filters", "toolbar", "main"],
+    "areasConfig": {
+      "filters": {
+        "type": "grid",
+        "cols": 12,
+        "rowGap": 8,
+        "colGap": 8
+      },
+      "toolbar": {
+        "type": "flex",
+        "direction": "row",
+        "justify": "space-between",
+        "align": "center"
+      },
+      "main": {
+        "type": "grid",
+        "cols": 12,
+        "rowGap": 0,
+        "colGap": 0
+      }
+    }
+  },
+  "areas": {
+    "filters": {
+      "blocks": [
+        {
+          "id": "block_store_filters",
+          "blockType": "filter-form",
+          "layout": {
+            "colSpan": 12,
+            "rowSpan": 1
+          },
+          "model": "{{state.filters}}",
+          "fields": [
+            {
+              "field": "keyword",
+              "label": "$i18n:list.store.filter.keyword.label",
+              "component": "SmartInput",
+              "layout": {
+                "colSpan": 4,
+                "rowSpan": 1
+              },
+              "props": {
+                "placeholder": "$i18n:list.store.filter.keyword.placeholder"
+              }
+            },
+            {
+              "field": "type",
+              "label": "$i18n:list.store.filter.type.label",
+              "component": "SmartSelect",
+              "layout": {
+                "colSpan": 4,
+                "rowSpan": 1
+              },
+              "dataSource": "ds_storeTypes"
+            },
+            {
+              "field": "status",
+              "label": "$i18n:list.store.filter.status.label",
+              "component": "SmartSelect",
+              "layout": {
+                "colSpan": 4,
+                "rowSpan": 1
+              },
+              "dataSource": "ds_storeStatuses"
+            }
+          ],
+          "buttons": [
+            {
+              "code": "search",
+              "content": "$i18n:list.store.btn.search",
+              "primary": true,
+              "events": {
+                "onClick": {
+                  "handler": "search"
+                }
+              }
+            },
+            {
+              "code": "reset",
+              "content": "$i18n:list.store.btn.reset",
+              "events": {
+                "onClick": {
+                  "handler": "reset"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "toolbar": {
+      "blocks": [
+        {
+          "id": "block_selectedInfo",
+          "blockType": "text",
+          "layout": {
+            "colSpan": 6,
+            "rowSpan": 1
+          },
+          "content": "$i18n:list.store.selected.content",
+          "visibleWhen": "${state.selectedIds.length > 0}"
+        },
+        {
+          "id": "block_store_toolbar",
+          "blockType": "form-buttons",
+          "layout": {
+            "colSpan": 6,
+            "rowSpan": 1
+          },
+          "buttons": [
+            {
+              "code": "create",
+              "content": "$i18n:list.store.btn.create",
+              "primary": true,
+              "visibleWhen": "${hasPermission('store:create')}",
+              "events": {
+                "onClick": {
+                  "handler": "openCreateForm"
+                }
+              }
+            },
+            {
+              "code": "deleteSelected",
+              "content": "$i18n:list.store.btn.deleteSelected",
+              "danger": true,
+              "visibleWhen": "${hasPermission('store:delete')}",
+              "enableWhen": "${state.selectedIds.length > 0}",
+              "events": {
+                "onClick": {
+                  "handler": "deleteSelectedStores"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "main": {
+      "blocks": [
+        {
+          "id": "block_store_table",
+          "blockType": "data-table",
+          "layout": {
+            "colSpan": 12,
+            "rowSpan": 1
+          },
+          "table": {
+            "rowKey": "id",
+            "dataSource": "ds_storeList",
+            "pagination": {
+              "pageSize": 20,
+              "pageSizeOptions": [10, 20, 50, 100],
+              "showTotal": true
+            },
+            "selection": {
+              "mode": "multiple",
+              "bind": "{{state.selectedIds}}"
+            },
+            "columns": [
+              {
+                "field": "code",
+                "label": "$i18n:list.store.col.code",
+                "sortable": true
+              },
+              {
+                "field": "name",
+                "label": "$i18n:list.store.col.name"
+              },
+              {
+                "field": "type",
+                "label": "$i18n:list.store.col.type"
+              },
+              {
+                "field": "status",
+                "label": "$i18n:list.store.col.status"
+              },
+              {
+                "field": "manager",
+                "label": "$i18n:list.store.col.manager",
+                "render": "${row.type === 'direct' ? row.manager : '---'}"
+              },
+              {
+                "field": "createdAt",
+                "label": "$i18n:list.store.col.createdAt"
+              },
+              {
+                "field": "buttons",
+                "label": "$i18n:list.store.col.buttons",
+                "isActionColumn": true,
+                "buttons": [
+                  {
+                    "code": "view",
+                    "content": "$i18n:list.store.btn.view",
+                    "events": {
+                      "onClick": {
+                        "handler": "openDetailDrawer",
+                        "args": {
+                          "id": "${row.id}"
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "code": "edit",
+                    "content": "$i18n:list.store.btn.edit",
+                    "visibleWhen": "${hasPermission('store:update')}",
+                    "events": {
+                      "onClick": {
+                        "handler": "openEditForm",
+                        "args": {
+                          "id": "${row.id}"
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "code": "delete",
+                    "content": "$i18n:list.store.btn.delete",
+                    "danger": true,
+                    "visibleWhen": "${hasPermission('store:delete')}",
+                    "events": {
+                      "onClick": {
+                        "handler": "deleteSingleStore",
+                        "args": {
+                          "id": "${row.id}"
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "dataSources": {
+    "ds_storeTypes": {
+      "valueField": "value",
+      "labelField": "label"
+    },
+    "ds_storeStatuses": {
+      "valueField": "value",
+      "labelField": "label"
+    },
+    "ds_storeList": {
+      "type": "api",
+      "endpoint": "/api/dynamic/store/list",
+      "method": "get",
+      "params": "{{state.filters}}",
+      "pagination": true,
+      "autoFetch": true,
+      "adaptor": "table"
+    }
+  },
+  "handlers": {
+    "loadStoreList": {
+      "type": "flow",
+      "steps": [
+        {
+          "action": "dataSource.fetch",
+          "target": "ds_storeList"
+        }
+      ]
+    },
+    "resetStoreFilters": {
+      "type": "flow",
+      "steps": [
+        {
+          "action": "state.reset",
+          "target": "state.filters"
+        },
+        {
+          "action": "dataSource.fetch",
+          "target": "ds_storeList"
+        }
+      ]
+    },
+    "openCreateForm": {
+      "type": "flow",
+      "steps": [
+        {
+          "action": "ui.openContainer",
+          "target": "drawer.form",
+          "args": {
+            "mode": "create"
+          }
+        }
+      ]
+    },
+    "openEditForm": {
+      "type": "flow",
+      "steps": [
+        {
+          "action": "state.set"
+        },
+        {
+          "action": "ui.openContainer",
+          "target": "drawer.form",
+          "args": {
+            "mode": "edit",
+            "id": "${args.id}"
+          }
+        }
+      ]
+    },
+    "openDetailDrawer": {
+      "type": "flow",
+      "steps": [
+        {
+          "action": "state.set"
+        },
+        {
+          "action": "ui.openContainer",
+          "target": "drawer.detail",
+          "args": {
+            "id": "${args.id}"
+          }
+        }
+      ]
+    },
+    "deleteSelectedStores": {
+      "type": "flow",
+      "steps": [
+        {
+          "action": "dialog.confirm",
+          "args": {
+            "title": "$i18n:list.store.deleteSelected.confirm.title",
+            "content": "$i18n:list.store.deleteSelected.confirm.content"
+          },
+          "next": "doDelete"
+        },
+        {
+          "id": "doDelete",
+          "action": "api.request",
+          "method": "post",
+          "endpoint": "/api/stores/batchDelete",
+          "body": {
+            "ids": "{{state.selectedIds}}"
+          },
+          "next": "afterDelete"
+        },
+        {
+          "id": "afterDelete",
+          "action": "toast.show",
+          "level": "success",
+          "content": "$i18n:list.store.deleteSelected.success"
+        },
+        {
+          "action": "dataSource.fetch",
+          "target": "ds_storeList"
+        }
+      ]
+    },
+    "deleteSingleStore": {
+      "type": "flow",
+      "steps": [
+        {
+          "action": "dialog.confirm",
+          "args": {
+            "title": "$i18n:list.store.delete.confirm.title",
+            "content": "$i18n:list.store.delete.confirm.content"
+          },
+          "next": "doDelete"
+        },
+        {
+          "id": "doDelete",
+          "action": "api.request",
+          "method": "delete",
+          "endpoint": "/api/stores/${args.id}"
+        },
+        {
+          "action": "toast.show",
+          "level": "success",
+          "content": "$i18n:list.store.delete.success"
+        },
+        {
+          "action": "dataSource.fetch",
+          "target": "ds_storeList"
+        }
+      ]
+    }
+  }
+}

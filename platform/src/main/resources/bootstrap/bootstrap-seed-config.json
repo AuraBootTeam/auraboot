@@ -1,0 +1,8 @@
+{
+  "companyName": "AuraBoot Dev",
+  "adminEmail": "admin@auraboot.test",
+  "adminPassword": "Test2026x",
+  "adminDisplayName": "Admin",
+  "systemMode": "single",
+  "seedDemoData": true
+}

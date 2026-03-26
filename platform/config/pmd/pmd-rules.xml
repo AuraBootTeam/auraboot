@@ -1,0 +1,84 @@
+<?xml version="1.0"?>
+<ruleset name="AuraBoot PMD Rules"
+    xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+
+    <description>
+        AuraBoot PMD configuration — design and complexity rules only.
+        Warn-only: enforced via ignoreFailures = true in build.gradle.
+        codestyle → Checkstyle handles it.
+        errorprone → SpotBugs handles it (Phase 2).
+    </description>
+
+    <!-- ========== Best Practices ========== -->
+    <rule ref="category/java/bestpractices.xml">
+        <!-- Exclude rules that conflict with Lombok or Spring patterns -->
+        <exclude name="JUnitTestsShouldIncludeAssert"/>
+        <exclude name="JUnitAssertionsShouldIncludeMessage"/>
+        <exclude name="GuardLogStatement"/>
+        <exclude name="AvoidUsingHardCodedIP"/>
+        <exclude name="UnusedPrivateMethod"/>
+        <exclude name="AbstractClassWithoutAbstractMethod"/>
+        <exclude name="AvoidReassigningParameters"/>
+    </rule>
+
+    <!-- ========== Design ========== -->
+    <rule ref="category/java/design.xml">
+        <!-- Exclude overly strict rules -->
+        <exclude name="LawOfDemeter"/>
+        <exclude name="LoosePackageCoupling"/>
+        <exclude name="DataClass"/>
+        <exclude name="TooManyMethods"/>
+        <exclude name="ExcessiveImports"/>
+        <exclude name="AvoidCatchingGenericException"/>
+        <exclude name="UseObjectForClearerAPI"/>
+        <exclude name="AvoidDeeplyNestedIfStmts"/>
+        <exclude name="ExcessiveParameterList"/>
+        <exclude name="ExcessivePublicCount"/>
+        <exclude name="CouplingBetweenObjects"/>
+        <exclude name="NcssCount"/>
+        <exclude name="ExcessiveClassLength"/>
+        <exclude name="ExcessiveMethodLength"/>
+        <exclude name="AbstractClassWithoutAnyMethod"/>
+        <exclude name="SignatureDeclareThrowsException"/>
+        <exclude name="CyclomaticComplexity"/>
+        <exclude name="CognitiveComplexity"/>
+        <exclude name="GodClass"/>
+        <exclude name="ImmutableField"/>
+        <exclude name="MutableStaticState"/>
+        <exclude name="FinalFieldCouldBeStatic"/>
+        <exclude name="SimplifyBooleanReturns"/>
+        <exclude name="SwitchDensity"/>
+        <exclude name="TooManyFields"/>
+        <exclude name="UseUtilityClass"/>
+        <exclude name="CollapsibleIfStatements"/>
+        <exclude name="SimplifiedTernary"/>
+        <exclude name="NPathComplexity"/>
+    </rule>
+
+    <!-- Re-add complexity rules with project-tuned thresholds -->
+    <rule ref="category/java/design.xml/CyclomaticComplexity">
+        <properties>
+            <property name="methodReportLevel" value="15"/>
+            <property name="classReportLevel" value="80"/>
+        </properties>
+    </rule>
+    <rule ref="category/java/design.xml/CognitiveComplexity">
+        <properties>
+            <property name="reportLevel" value="20"/>
+        </properties>
+    </rule>
+    <!-- GodClass uses default thresholds in PMD 7 (no configurable WMC property) -->
+    <rule ref="category/java/design.xml/GodClass"/>
+
+    <!-- ========== Performance ========== -->
+    <rule ref="category/java/performance.xml">
+        <exclude name="AvoidInstantiatingObjectsInLoops"/>
+        <exclude name="ConsecutiveAppendsShouldReuse"/>
+        <exclude name="ConsecutiveLiteralAppends"/>
+        <exclude name="TooFewBranchesForASwitchStatement"/>
+        <exclude name="UseStringBufferForStringAppends"/>
+    </rule>
+
+</ruleset>

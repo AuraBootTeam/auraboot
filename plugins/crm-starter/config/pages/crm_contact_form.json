@@ -1,0 +1,102 @@
+{
+  "pageKey": "crm_contact_form",
+  "name:zh-CN": "联系人表单",
+  "name:en": "Contact Form",
+  "pageType": "form",
+  "modelCode": "crm_contact",
+  "dslSchema": {
+    "id": "form.crm_contact",
+    "kind": "Form",
+    "version": "1.0.0",
+    "modelCode": "crm_contact",
+    "layout": {
+      "areas": [
+        "main",
+        "footer"
+      ],
+      "areasConfig": {
+        "main": {
+          "type": "grid",
+          "cols": 12,
+          "rowGap": 16,
+          "colGap": 16
+        },
+        "footer": {
+          "type": "flex",
+          "direction": "row"
+        }
+      }
+    },
+    "areas": {
+      "main": {
+        "blocks": [
+          {
+            "id": "basic",
+            "blockType": "form-section",
+            "title": {
+              "zh-CN": "基本信息",
+              "en-US": "Basic Information"
+            },
+            "fields": [
+              {
+                "field": "crm_ct_account_id",
+                "colSpan": 6
+              },
+              {
+                "field": "crm_ct_name",
+                "colSpan": 6
+              },
+              {
+                "field": "crm_ct_title",
+                "colSpan": 6
+              },
+              {
+                "field": "crm_ct_email",
+                "colSpan": 6
+              },
+              {
+                "field": "crm_ct_phone",
+                "colSpan": 6
+              },
+              {
+                "field": "crm_ct_mobile",
+                "colSpan": 6
+              },
+              {
+                "field": "crm_ct_is_primary",
+                "colSpan": 6
+              },
+              {
+                "field": "crm_ct_remark",
+                "colSpan": 12
+              }
+            ]
+          }
+        ]
+      },
+      "footer": {
+        "blocks": [
+          {
+            "id": "buttons",
+            "blockType": "form-buttons",
+            "buttons": [
+              {
+                "code": "submit",
+                "primary": true,
+                "label": "save",
+                "action": {
+                  "type": "command",
+                  "command": "crms:update_contact"
+                }
+              },
+              {
+                "code": "cancel",
+                "label": "cancel"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

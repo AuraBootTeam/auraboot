@@ -1,0 +1,38 @@
+[
+  {
+    "code": "gp_tc_task_id",
+    "displayName:zh-CN": "所属任务",
+    "displayName:en": "Task",
+    "dataType": "reference",
+    "description": "Foreign key to parent gp_task. Demonstrates REFERENCE field type for parent-child relationship.",
+    "constraints": { "required": true },
+    "extension": {
+      "refModelCode": "gp_task",
+      "refDisplayField": "gp_task_title"
+    }
+  },
+  {
+    "code": "gp_tc_content",
+    "displayName:zh-CN": "评论内容",
+    "displayName:en": "Content",
+    "dataType": "text",
+    "description": "Comment body text.",
+    "constraints": { "required": true, "maxLength": 2000 },
+    "extension": {
+      "multiline": true,
+      "placeholder:zh-CN": "请输入评论内容",
+      "placeholder:en": "Enter comment content"
+    }
+  },
+  {
+    "code": "gp_tc_author",
+    "displayName:zh-CN": "作者",
+    "displayName:en": "Author",
+    "dataType": "string",
+    "description": "Comment author. Auto-set to current user on creation.",
+    "constraints": { "maxLength": 100 },
+    "extension": {
+      "readOnly": true
+    }
+  }
+]

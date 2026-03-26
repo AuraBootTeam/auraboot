@@ -1,0 +1,1144 @@
+package com.auraboot.framework.bpm.converter;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+/**
+ * Unit tests for JsonToBpmnConverter and BpmnToJsonConverter.
+ * Verifies JSON-to-BPMN-XML conversion, BPMN-XML-to-JSON conversion,
+ * and round-trip fidelity.
+ */
+class JsonToBpmnConverterTest {
+
+    private JsonToBpmnConverter jsonToBpmn;
+    private BpmnToJsonConverter bpmnToJson;
+    private ObjectMapper objectMapper;
+
+    @BeforeEach
+    void setUp() {
+        objectMapper = new ObjectMapper();
+        jsonToBpmn = new JsonToBpmnConverter(objectMapper);
+        bpmnToJson = new BpmnToJsonConverter(objectMapper);
+    }
+
+    // ==================== Simple Linear Process ====================
+
+    @Nested
+    @DisplayName("Simple linear process (start -> task -> end)")
+    class SimpleLinearProcess {
+
+        @Test
+        @DisplayName("should produce valid BPMN XML with correct structure")
+        void shouldProduceValidBpmnXml() {
+            String json = """
+                {
+                  "key": "simple-process",
+                  "name": "Simple Process",
+                  "nodes": [
+                    {"id": "node_1", "type": "startEvent", "position": {"x": 100, "y": 200}, "data": {"type": "startEvent", "label": "Start"}},
+                    {"id": "node_2", "type": "userTask", "position": {"x": 300, "y": 200}, "data": {"type": "userTask", "label": "Review", "config": {}}},
+                    {"id": "node_3", "type": "endEvent", "position": {"x": 500, "y": 200}, "data": {"type": "endEvent", "label": "End"}}
+                  ],
+                  "edges": [
+                    {"id": "edge_1", "source": "node_1", "target": "node_2", "data": {}},
+                    {"id": "edge_2", "source": "node_2", "target": "node_3", "data": {}}
+                  ]
+                }
+                """;
+
+            String xml = jsonToBpmn.convert(json);
+
+            assertNotNull(xml);
+            assertTrue(xml.contains("<?xml"));
+            assertTrue(xml.contains("<definitions"));
+            assertTrue(xml.contains("xmlns=\"http://www.omg.org/spec/BPMN/20100524/MODEL\""));
+            assertTrue(xml.contains("<process id=\"simple-process\""));
+            assertTrue(xml.contains("name=\"Simple Process\""));
+            assertTrue(xml.contains("isExecutable=\"true\""));
+        }
+
+        @Test
+        @DisplayName("should contain all node elements")
+        void shouldContainAllNodes() {
+            String json = """
+                {
+                  "key": "test",
+                  "name": "Test",
+                  "nodes": [
+                    {"id": "start", "type": "startEvent", "position": {"x": 100, "y": 200}, "data": {"type": "startEvent", "label": "Start"}},
+                    {"id": "task1", "type": "userTask", "position": {"x": 300, "y": 200}, "data": {"type": "userTask", "label": "Task 1", "config": {}}},
+                    {"id": "end", "type": "endEvent", "position": {"x": 500, "y": 200}, "data": {"type": "endEvent", "label": "End"}}
+                  ],
+                  "edges": [
+                    {"id": "e1", "source": "start", "target": "task1", "data": {}},
+                    {"id": "e2", "source": "task1", "target": "end", "data": {}}
+                  ]
+                }
+                """;
+
+            String xml = jsonToBpmn.convert(json);
+
+            assertTrue(xml.contains("startEvent"));
+            assertTrue(xml.contains("id=\"start\""));
+            assertTrue(xml.contains("userTask"));
+            assertTrue(xml.contains("id=\"task1\""));
+            assertTrue(xml.contains("endEvent"));
+            assertTrue(xml.contains("id=\"end\""));
+        }
+
+        @Test
+        @DisplayName("should contain sequence flows with correct source/target")
+        void shouldContainSequenceFlows() {
+            String json = """
+                {
+                  "key": "test",
+                  "name": "Test",
+                  "nodes": [
+                    {"id": "s", "type": "startEvent", "position": {"x": 100, "y": 200}, "data": {"type": "startEvent", "label": "S"}},
+                    {"id": "t", "type": "userTask", "position": {"x": 300, "y": 200}, "data": {"type": "userTask", "label": "T", "config": {}}},
+                    {"id": "e", "type": "endEvent", "position": {"x": 500, "y": 200}, "data": {"type": "endEvent", "label": "E"}}
+                  ],
+                  "edges": [
+                    {"id": "flow1", "source": "s", "target": "t", "data": {}},
+                    {"id": "flow2", "source": "t", "target": "e", "data": {}}
+                  ]
+                }
+                """;
+
+            String xml = jsonToBpmn.convert(json);
+
+            assertTrue(xml.contains("sequenceFlow"));
+            assertTrue(xml.contains("id=\"flow1\""));
+            assertTrue(xml.contains("sourceRef=\"s\""));
+            assertTrue(xml.contains("targetRef=\"t\""));
+            assertTrue(xml.contains("id=\"flow2\""));
+            assertTrue(xml.contains("sourceRef=\"t\""));
+            assertTrue(xml.contains("targetRef=\"e\""));
+        }
+    }
+
+    // ==================== Exclusive Gateway with Conditions ====================
+
+    @Nested
+    @DisplayName("Process with exclusive gateway and conditions")
+    class ExclusiveGatewayProcess {
+
+        @Test
+        @DisplayName("should render exclusive gateway element")
+        void shouldRenderExclusiveGateway() {
+            String json = """
+                {
+                  "key": "gateway-process",
+                  "name": "Gateway Process",
+                  "nodes": [
+                    {"id": "start", "type": "startEvent", "position": {"x": 100, "y": 200}, "data": {"type": "startEvent", "label": "Start"}},
+                    {"id": "gw", "type": "exclusiveGateway", "position": {"x": 300, "y": 200}, "data": {"type": "exclusiveGateway", "label": "Decision", "config": {}}},
+                    {"id": "end", "type": "endEvent", "position": {"x": 500, "y": 200}, "data": {"type": "endEvent", "label": "End"}}
+                  ],
+                  "edges": [
+                    {"id": "e1", "source": "start", "target": "gw", "data": {}},
+                    {"id": "e2", "source": "gw", "target": "end", "data": {}}
+                  ]
+                }
+                """;
+
+            String xml = jsonToBpmn.convert(json);
+
+            assertTrue(xml.contains("exclusiveGateway"));
+            assertTrue(xml.contains("id=\"gw\""));
+            assertTrue(xml.contains("name=\"Decision\""));
+        }
+
+        @Test
+        @DisplayName("should render condition expressions on sequence flows")
+        void shouldRenderConditionExpressions() {
+            String json = """
+                {
+                  "key": "cond-process",
+                  "name": "Conditional Process",
+                  "nodes": [
+                    {"id": "start", "type": "startEvent", "position": {"x": 100, "y": 200}, "data": {"type": "startEvent", "label": "Start"}},
+                    {"id": "gw", "type": "exclusiveGateway", "position": {"x": 300, "y": 200}, "data": {"type": "exclusiveGateway", "label": "Check"}},
+                    {"id": "task1", "type": "userTask", "position": {"x": 500, "y": 100}, "data": {"type": "userTask", "label": "Approve", "config": {}}},
+                    {"id": "end", "type": "endEvent", "position": {"x": 500, "y": 300}, "data": {"type": "endEvent", "label": "End"}}
+                  ],
+                  "edges": [
+                    {"id": "e1", "source": "start", "target": "gw", "data": {}},
+                    {"id": "e2", "source": "gw", "target": "task1", "data": {"label": "Approved", "condition": {"type": "expression", "content": "approved == true"}}},
+                    {"id": "e3", "source": "gw", "target": "end", "data": {"label": "Rejected"}},
+                    {"id": "e4", "source": "task1", "target": "end", "data": {}}
+                  ]
+                }
+                """;
+
+            String xml = jsonToBpmn.convert(json);
+
+            assertTrue(xml.contains("<conditionExpression"));
+            assertTrue(xml.contains("approved == true"));
+            assertTrue(xml.contains("name=\"Approved\""));
+        }
+
+        @Test
+        @DisplayName("should set default attribute on gateway when defaultFlow is specified in config")
+        void shouldSetDefaultFlowFromConfig() {
+            String json = """
+                {
+                  "key": "default-flow",
+                  "name": "Default Flow Test",
+                  "nodes": [
+                    {"id": "start", "type": "startEvent", "position": {"x": 100, "y": 200}, "data": {"type": "startEvent", "label": "Start"}},
+                    {"id": "gw", "type": "exclusiveGateway", "position": {"x": 300, "y": 200}, "data": {"type": "exclusiveGateway", "label": "GW", "config": {"defaultFlow": "e3"}}},
+                    {"id": "task1", "type": "userTask", "position": {"x": 500, "y": 100}, "data": {"type": "userTask", "label": "T1", "config": {}}},
+                    {"id": "end", "type": "endEvent", "position": {"x": 500, "y": 300}, "data": {"type": "endEvent", "label": "End"}}
+                  ],
+                  "edges": [
+                    {"id": "e1", "source": "start", "target": "gw", "data": {}},
+                    {"id": "e2", "source": "gw", "target": "task1", "data": {"condition": {"type": "expression", "content": "x > 10"}}},
+                    {"id": "e3", "source": "gw", "target": "end", "data": {"isDefault": true}},
+                    {"id": "e4", "source": "task1", "target": "end", "data": {}}
+                  ]
+                }
+                """;
+
+            String xml = jsonToBpmn.convert(json);
+
+            // The gateway should have default="e3"
+            assertTrue(xml.contains("default=\"e3\""), "Gateway should have default attribute. XML: " + xml);
+        }
+
+        @Test
+        @DisplayName("should set default attribute from edge isDefault flag")
+        void shouldSetDefaultFlowFromEdgeFlag() {
+            String json = """
+                {
+                  "key": "default-edge",
+                  "name": "Default Edge Test",
+                  "nodes": [
+                    {"id": "start", "type": "startEvent", "position": {"x": 100, "y": 200}, "data": {"type": "startEvent", "label": "Start"}},
+                    {"id": "gw", "type": "exclusiveGateway", "position": {"x": 300, "y": 200}, "data": {"type": "exclusiveGateway", "label": "GW", "config": {}}},
+                    {"id": "end1", "type": "endEvent", "position": {"x": 500, "y": 100}, "data": {"type": "endEvent", "label": "End1"}},
+                    {"id": "end2", "type": "endEvent", "position": {"x": 500, "y": 300}, "data": {"type": "endEvent", "label": "End2"}}
+                  ],
+                  "edges": [
+                    {"id": "e1", "source": "start", "target": "gw", "data": {}},
+                    {"id": "e2", "source": "gw", "target": "end1", "data": {"condition": {"type": "expression", "content": "x > 0"}}},
+                    {"id": "e3", "source": "gw", "target": "end2", "data": {"isDefault": true}}
+                  ]
+                }
+                """;
+
+            String xml = jsonToBpmn.convert(json);
+
+            assertTrue(xml.contains("default=\"e3\""), "Gateway should have default attribute from edge isDefault flag. XML: " + xml);
+        }
+    }
+
+    // ==================== UserTask Assignee Configurations ====================
+
+    @Nested
+    @DisplayName("UserTask assignee configurations")
+    class UserTaskAssignee {
+
+        @Test
+        @DisplayName("should render user type assignee with smart:assigneeType and smart:assigneeId")
+        void shouldRenderUserAssignee() {
+            String json = """
+                {
+                  "key": "user-assignee",
+                  "name": "User Assignee Test",
+                  "nodes": [
+                    {"id": "start", "type": "startEvent", "position": {"x": 100, "y": 200}, "data": {"type": "startEvent", "label": "Start"}},
+                    {"id": "task1", "type": "userTask", "position": {"x": 300, "y": 200}, "data": {"type": "userTask", "label": "Review", "config": {
+                      "assignee": {"type": "user", "userIds": ["manager1"]}
+                    }}},
+                    {"id": "end", "type": "endEvent", "position": {"x": 500, "y": 200}, "data": {"type": "endEvent", "label": "End"}}
+                  ],
+                  "edges": [
+                    {"id": "e1", "source": "start", "target": "task1", "data": {}},
+                    {"id": "e2", "source": "task1", "target": "end", "data": {}}
+                  ]
+                }
+                """;
+
+            String xml = jsonToBpmn.convert(json);
+
+            assertTrue(xml.contains("assigneeType=\"user\""), "Should contain assigneeType. XML: " + xml);
+            assertTrue(xml.contains("assigneeId=\"manager1\""), "Should contain assigneeId. XML: " + xml);
+        }
+
+        @Test
+        @DisplayName("should render expression-based assignee with smart:assignee")
+        void shouldRenderExpressionAssignee() {
+            String json = """
+                {
+                  "key": "expr-assignee",
+                  "name": "Expression Assignee Test",
+                  "nodes": [
+                    {"id": "start", "type": "startEvent", "position": {"x": 100, "y": 200}, "data": {"type": "startEvent", "label": "Start"}},
+                    {"id": "task1", "type": "userTask", "position": {"x": 300, "y": 200}, "data": {"type": "userTask", "label": "Review", "config": {
+                      "assignee": {"type": "expression", "expression": "${assignee}"}
+                    }}},
+                    {"id": "end", "type": "endEvent", "position": {"x": 500, "y": 200}, "data": {"type": "endEvent", "label": "End"}}
+                  ],
+                  "edges": [
+                    {"id": "e1", "source": "start", "target": "task1", "data": {}},
+                    {"id": "e2", "source": "task1", "target": "end", "data": {}}
+                  ]
+                }
+                """;
+
+            String xml = jsonToBpmn.convert(json);
+
+            assertTrue(xml.contains("assignee=\"${assignee}\""), "Should contain expression assignee. XML: " + xml);
+            // Should NOT contain assigneeType for expression-based
+            assertFalse(xml.contains("assigneeType"), "Should not contain assigneeType for expression. XML: " + xml);
+        }
+
+        @Test
+        @DisplayName("should render candidate users and groups")
+        void shouldRenderCandidateUsersAndGroups() {
+            String json = """
+                {
+                  "key": "candidates",
+                  "name": "Candidates Test",
+                  "nodes": [
+                    {"id": "start", "type": "startEvent", "position": {"x": 100, "y": 200}, "data": {"type": "startEvent", "label": "Start"}},
+                    {"id": "task1", "type": "userTask", "position": {"x": 300, "y": 200}, "data": {"type": "userTask", "label": "Review", "config": {
+                      "candidateUsers": ["user1", "user2"],
+                      "candidateGroups": ["managers", "admins"]
+                    }}},
+                    {"id": "end", "type": "endEvent", "position": {"x": 500, "y": 200}, "data": {"type": "endEvent", "label": "End"}}
+                  ],
+                  "edges": [
+                    {"id": "e1", "source": "start", "target": "task1", "data": {}},
+                    {"id": "e2", "source": "task1", "target": "end", "data": {}}
+                  ]
+                }
+                """;
+
+            String xml = jsonToBpmn.convert(json);
+
+            assertTrue(xml.contains("candidateUsers=\"user1,user2\""), "Should contain candidateUsers. XML: " + xml);
+            assertTrue(xml.contains("candidateGroups=\"managers,admins\""), "Should contain candidateGroups. XML: " + xml);
+        }
+
+        @Test
+        @DisplayName("should render role-based assignee")
+        void shouldRenderRoleAssignee() {
+            String json = """
+                {
+                  "key": "role-assignee",
+                  "name": "Role Assignee Test",
+                  "nodes": [
+                    {"id": "start", "type": "startEvent", "position": {"x": 100, "y": 200}, "data": {"type": "startEvent", "label": "Start"}},
+                    {"id": "task1", "type": "userTask", "position": {"x": 300, "y": 200}, "data": {"type": "userTask", "label": "Review", "config": {
+                      "assignee": {"type": "role", "roleIds": ["mgr_role"]}
+                    }}},
+                    {"id": "end", "type": "endEvent", "position": {"x": 500, "y": 200}, "data": {"type": "endEvent", "label": "End"}}
+                  ],
+                  "edges": [
+                    {"id": "e1", "source": "start", "target": "task1", "data": {}},
+                    {"id": "e2", "source": "task1", "target": "end", "data": {}}
+                  ]
+                }
+                """;
+
+            String xml = jsonToBpmn.convert(json);
+
+            assertTrue(xml.contains("assigneeType=\"role\""), "Should contain assigneeType=role. XML: " + xml);
+            assertTrue(xml.contains("assigneeId=\"mgr_role\""), "Should contain assigneeId. XML: " + xml);
+        }
+    }
+
+    // ==================== ServiceTask Configurations ====================
+
+    @Nested
+    @DisplayName("ServiceTask configurations")
+    class ServiceTaskConfig {
+
+        @Test
+        @DisplayName("should render Java service task with smart:class")
+        void shouldRenderJavaServiceTask() {
+            String json = """
+                {
+                  "key": "svc-process",
+                  "name": "Service Process",
+                  "nodes": [
+                    {"id": "start", "type": "startEvent", "position": {"x": 100, "y": 200}, "data": {"type": "startEvent", "label": "Start"}},
+                    {"id": "svc1", "type": "serviceTask", "position": {"x": 300, "y": 200}, "data": {"type": "serviceTask", "label": "Notify", "config": {
+                      "serviceType": "java",
+                      "className": "com.example.NotifyService"
+                    }}},
+                    {"id": "end", "type": "endEvent", "position": {"x": 500, "y": 200}, "data": {"type": "endEvent", "label": "End"}}
+                  ],
+                  "edges": [
+                    {"id": "e1", "source": "start", "target": "svc1", "data": {}},
+                    {"id": "e2", "source": "svc1", "target": "end", "data": {}}
+                  ]
+                }
+                """;
+
+            String xml = jsonToBpmn.convert(json);
+
+            assertTrue(xml.contains("serviceTask"), "Should contain serviceTask element. XML: " + xml);
+            assertTrue(xml.contains("id=\"svc1\""));
+            assertTrue(xml.contains("class=\"com.example.NotifyService\""),
+                    "Should contain smart:class attribute. XML: " + xml);
+        }
+
+        @Test
+        @DisplayName("should render async service task")
+        void shouldRenderAsyncServiceTask() {
+            String json = """
+                {
+                  "key": "async-svc",
+                  "name": "Async Service",
+                  "nodes": [
+                    {"id": "start", "type": "startEvent", "position": {"x": 100, "y": 200}, "data": {"type": "startEvent", "label": "Start"}},
+                    {"id": "svc1", "type": "serviceTask", "position": {"x": 300, "y": 200}, "data": {"type": "serviceTask", "label": "Async Task", "config": {
+                      "serviceType": "java",
+                      "className": "com.example.AsyncService",
+                      "async": true
+                    }}},
+                    {"id": "end", "type": "endEvent", "position": {"x": 500, "y": 200}, "data": {"type": "endEvent", "label": "End"}}
+                  ],
+                  "edges": [
+                    {"id": "e1", "source": "start", "target": "svc1", "data": {}},
+                    {"id": "e2", "source": "svc1", "target": "end", "data": {}}
+                  ]
+                }
+                """;
+
+            String xml = jsonToBpmn.convert(json);
+
+            assertTrue(xml.contains("async=\"true\""), "Should contain smart:async attribute. XML: " + xml);
+        }
+
+        @Test
+        @DisplayName("should render COMMAND service task with commandServiceTaskDelegate class")
+        void shouldRenderCommandServiceTask() {
+            String json = """
+                {
+                  "key": "chain-process",
+                  "name": "Chain Process",
+                  "nodes": [
+                    {"id": "start", "type": "startEvent", "position": {"x": 100, "y": 200}, "data": {"type": "startEvent", "label": "Start"}},
+                    {"id": "cmd1", "type": "serviceTask", "position": {"x": 300, "y": 200}, "data": {"type": "serviceTask", "label": "Create Order", "config": {
+                      "serviceType": "command"
+                    }}},
+                    {"id": "end", "type": "endEvent", "position": {"x": 500, "y": 200}, "data": {"type": "endEvent", "label": "End"}}
+                  ],
+                  "edges": [
+                    {"id": "e1", "source": "start", "target": "cmd1", "data": {}},
+                    {"id": "e2", "source": "cmd1", "target": "end", "data": {}}
+                  ]
+                }
+                """;
+
+            String xml = jsonToBpmn.convert(json);
+
+            assertTrue(xml.contains("serviceTask"), "Should contain serviceTask element. XML: " + xml);
+            assertTrue(xml.contains("id=\"cmd1\""));
+            assertTrue(xml.contains("class=\"commandServiceTaskDelegate\""),
+                    "Should use commandServiceTaskDelegate for COMMAND type. XML: " + xml);
+        }
+
+        @Test
+        @DisplayName("should render service task without className gracefully")
+        void shouldHandleServiceTaskWithoutClassName() {
+            String json = """
+                {
+                  "key": "empty-svc",
+                  "name": "Empty Service",
+                  "nodes": [
+                    {"id": "start", "type": "startEvent", "position": {"x": 100, "y": 200}, "data": {"type": "startEvent", "label": "Start"}},
+                    {"id": "svc1", "type": "serviceTask", "position": {"x": 300, "y": 200}, "data": {"type": "serviceTask", "label": "Empty", "config": {
+                      "serviceType": "http"
+                    }}},
+                    {"id": "end", "type": "endEvent", "position": {"x": 500, "y": 200}, "data": {"type": "endEvent", "label": "End"}}
+                  ],
+                  "edges": [
+                    {"id": "e1", "source": "start", "target": "svc1", "data": {}},
+                    {"id": "e2", "source": "svc1", "target": "end", "data": {}}
+                  ]
+                }
+                """;
+
+            String xml = jsonToBpmn.convert(json);
+
+            assertTrue(xml.contains("serviceTask"));
+            assertTrue(xml.contains("id=\"svc1\""));
+            // Should NOT contain smart:class since no className was specified
+            assertFalse(xml.contains("class="), "Should not contain class attribute. XML: " + xml);
+        }
+    }
+
+    // ==================== ReceiveTask ====================
+
+    @Nested
+    @DisplayName("ReceiveTask")
+    class ReceiveTaskTests {
+
+        @Test
+        @DisplayName("should render receive task element")
+        void shouldRenderReceiveTask() {
+            String json = """
+                {
+                  "key": "recv-process",
+                  "name": "Receive Process",
+                  "nodes": [
+                    {"id": "start", "type": "startEvent", "position": {"x": 100, "y": 200}, "data": {"type": "startEvent", "label": "Start"}},
+                    {"id": "recv1", "type": "receiveTask", "position": {"x": 300, "y": 200}, "data": {"type": "receiveTask", "label": "Wait Signal", "config": {}}},
+                    {"id": "end", "type": "endEvent", "position": {"x": 500, "y": 200}, "data": {"type": "endEvent", "label": "End"}}
+                  ],
+                  "edges": [
+                    {"id": "e1", "source": "start", "target": "recv1", "data": {}},
+                    {"id": "e2", "source": "recv1", "target": "end", "data": {}}
+                  ]
+                }
+                """;
+
+            String xml = jsonToBpmn.convert(json);
+
+            assertTrue(xml.contains("receiveTask"), "Should contain receiveTask element. XML: " + xml);
+            assertTrue(xml.contains("id=\"recv1\""));
+            assertTrue(xml.contains("name=\"Wait Signal\""));
+        }
+    }
+
+    // ==================== Round-trip Tests ====================
+
+    @Nested
+    @DisplayName("Round-trip: JSON -> XML -> JSON preserves key data")
+    class RoundTrip {
+
+        @Test
+        @DisplayName("should preserve process key and name")
+        void shouldPreserveProcessKeyAndName() throws Exception {
+            String json = """
+                {
+                  "key": "round-trip-test",
+                  "name": "Round Trip Test",
+                  "nodes": [
+                    {"id": "start", "type": "startEvent", "position": {"x": 100, "y": 200}, "data": {"type": "startEvent", "label": "Start"}},
+                    {"id": "end", "type": "endEvent", "position": {"x": 500, "y": 200}, "data": {"type": "endEvent", "label": "End"}}
+                  ],
+                  "edges": [
+                    {"id": "e1", "source": "start", "target": "end", "data": {}}
+                  ]
+                }
+                """;
+
+            // JSON -> XML -> JSON
+            String xml = jsonToBpmn.convert(json);
+            String resultJson = bpmnToJson.convert(xml);
+            JsonNode result = objectMapper.readTree(resultJson);
+
+            assertEquals("round-trip-test", result.path("key").asText());
+            assertEquals("Round Trip Test", result.path("name").asText());
+        }
+
+        @Test
+        @DisplayName("should preserve node count and types")
+        void shouldPreserveNodeCountAndTypes() throws Exception {
+            String json = """
+                {
+                  "key": "node-count-test",
+                  "name": "Node Count Test",
+                  "nodes": [
+                    {"id": "start", "type": "startEvent", "position": {"x": 100, "y": 200}, "data": {"type": "startEvent", "label": "Start"}},
+                    {"id": "task1", "type": "userTask", "position": {"x": 300, "y": 200}, "data": {"type": "userTask", "label": "Task 1", "config": {"assignee": {"type": "user", "userIds": ["admin"]}}}},
+                    {"id": "svc1", "type": "serviceTask", "position": {"x": 500, "y": 200}, "data": {"type": "serviceTask", "label": "Service 1", "config": {"serviceType": "java", "className": "com.example.Svc"}}},
+                    {"id": "end", "type": "endEvent", "position": {"x": 700, "y": 200}, "data": {"type": "endEvent", "label": "End"}}
+                  ],
+                  "edges": [
+                    {"id": "e1", "source": "start", "target": "task1", "data": {}},
+                    {"id": "e2", "source": "task1", "target": "svc1", "data": {}},
+                    {"id": "e3", "source": "svc1", "target": "end", "data": {}}
+                  ]
+                }
+                """;
+
+            String xml = jsonToBpmn.convert(json);
+            String resultJson = bpmnToJson.convert(xml);
+            JsonNode result = objectMapper.readTree(resultJson);
+
+            JsonNode nodes = result.path("nodes");
+            assertEquals(4, nodes.size(), "Should preserve 4 nodes");
+
+            // Verify node types are preserved
+            boolean hasStart = false, hasEnd = false, hasUserTask = false, hasServiceTask = false;
+            for (JsonNode node : nodes) {
+                String type = node.path("data").path("type").asText();
+                switch (type) {
+                    case "startEvent" -> hasStart = true;
+                    case "endEvent" -> hasEnd = true;
+                    case "userTask" -> hasUserTask = true;
+                    case "serviceTask" -> hasServiceTask = true;
+                }
+            }
+            assertTrue(hasStart, "Should have startEvent");
+            assertTrue(hasEnd, "Should have endEvent");
+            assertTrue(hasUserTask, "Should have userTask");
+            assertTrue(hasServiceTask, "Should have serviceTask");
+        }
+
+        @Test
+        @DisplayName("should preserve edge count and connections")
+        void shouldPreserveEdgeCountAndConnections() throws Exception {
+            String json = """
+                {
+                  "key": "edge-test",
+                  "name": "Edge Test",
+                  "nodes": [
+                    {"id": "start", "type": "startEvent", "position": {"x": 100, "y": 200}, "data": {"type": "startEvent", "label": "Start"}},
+                    {"id": "task1", "type": "userTask", "position": {"x": 300, "y": 200}, "data": {"type": "userTask", "label": "Task", "config": {}}},
+                    {"id": "end", "type": "endEvent", "position": {"x": 500, "y": 200}, "data": {"type": "endEvent", "label": "End"}}
+                  ],
+                  "edges": [
+                    {"id": "flow1", "source": "start", "target": "task1", "data": {}},
+                    {"id": "flow2", "source": "task1", "target": "end", "data": {}}
+                  ]
+                }
+                """;
+
+            String xml = jsonToBpmn.convert(json);
+            String resultJson = bpmnToJson.convert(xml);
+            JsonNode result = objectMapper.readTree(resultJson);
+
+            JsonNode edges = result.path("edges");
+            assertEquals(2, edges.size(), "Should preserve 2 edges");
+
+            // Find flow1 and verify
+            boolean foundFlow1 = false;
+            for (JsonNode edge : edges) {
+                if ("flow1".equals(edge.path("id").asText())) {
+                    assertEquals("start", edge.path("source").asText());
+                    assertEquals("task1", edge.path("target").asText());
+                    foundFlow1 = true;
+                }
+            }
+            assertTrue(foundFlow1, "Should find flow1 edge");
+        }
+
+        @Test
+        @DisplayName("should preserve condition expressions through round-trip")
+        void shouldPreserveConditions() throws Exception {
+            String json = """
+                {
+                  "key": "cond-roundtrip",
+                  "name": "Condition Round Trip",
+                  "nodes": [
+                    {"id": "start", "type": "startEvent", "position": {"x": 100, "y": 200}, "data": {"type": "startEvent", "label": "Start"}},
+                    {"id": "gw", "type": "exclusiveGateway", "position": {"x": 300, "y": 200}, "data": {"type": "exclusiveGateway", "label": "GW", "config": {}}},
+                    {"id": "end1", "type": "endEvent", "position": {"x": 500, "y": 100}, "data": {"type": "endEvent", "label": "End1"}},
+                    {"id": "end2", "type": "endEvent", "position": {"x": 500, "y": 300}, "data": {"type": "endEvent", "label": "End2"}}
+                  ],
+                  "edges": [
+                    {"id": "e1", "source": "start", "target": "gw", "data": {}},
+                    {"id": "e2", "source": "gw", "target": "end1", "data": {"label": "Yes", "condition": {"type": "expression", "content": "approved == true"}}},
+                    {"id": "e3", "source": "gw", "target": "end2", "data": {"label": "No"}}
+                  ]
+                }
+                """;
+
+            String xml = jsonToBpmn.convert(json);
+            String resultJson = bpmnToJson.convert(xml);
+            JsonNode result = objectMapper.readTree(resultJson);
+
+            // Find the edge with condition
+            JsonNode edges = result.path("edges");
+            boolean foundCondition = false;
+            for (JsonNode edge : edges) {
+                if ("e2".equals(edge.path("id").asText())) {
+                    JsonNode condition = edge.path("data").path("condition");
+                    assertFalse(condition.isMissingNode(), "Should have condition");
+                    assertEquals("approved == true", condition.path("content").asText());
+                    foundCondition = true;
+                }
+            }
+            assertTrue(foundCondition, "Should find edge e2 with condition");
+        }
+
+        @Test
+        @DisplayName("should preserve userTask assignee through round-trip")
+        void shouldPreserveAssignee() throws Exception {
+            String json = """
+                {
+                  "key": "assignee-roundtrip",
+                  "name": "Assignee Round Trip",
+                  "nodes": [
+                    {"id": "start", "type": "startEvent", "position": {"x": 100, "y": 200}, "data": {"type": "startEvent", "label": "Start"}},
+                    {"id": "task1", "type": "userTask", "position": {"x": 300, "y": 200}, "data": {"type": "userTask", "label": "Review", "config": {
+                      "assignee": {"type": "user", "userIds": ["manager1"]}
+                    }}},
+                    {"id": "end", "type": "endEvent", "position": {"x": 500, "y": 200}, "data": {"type": "endEvent", "label": "End"}}
+                  ],
+                  "edges": [
+                    {"id": "e1", "source": "start", "target": "task1", "data": {}},
+                    {"id": "e2", "source": "task1", "target": "end", "data": {}}
+                  ]
+                }
+                """;
+
+            String xml = jsonToBpmn.convert(json);
+            String resultJson = bpmnToJson.convert(xml);
+            JsonNode result = objectMapper.readTree(resultJson);
+
+            // Find userTask node
+            JsonNode nodes = result.path("nodes");
+            boolean foundAssignee = false;
+            for (JsonNode node : nodes) {
+                if ("task1".equals(node.path("id").asText())) {
+                    JsonNode assignee = node.path("data").path("config").path("assignee");
+                    assertFalse(assignee.isMissingNode(), "Should have assignee config");
+                    assertEquals("user", assignee.path("type").asText());
+                    JsonNode userIds = assignee.path("userIds");
+                    assertTrue(userIds.isArray() && userIds.size() == 1);
+                    assertEquals("manager1", userIds.get(0).asText());
+                    foundAssignee = true;
+                }
+            }
+            assertTrue(foundAssignee, "Should find task1 with assignee");
+        }
+
+        @Test
+        @DisplayName("should preserve serviceTask className through round-trip")
+        void shouldPreserveServiceTaskClass() throws Exception {
+            String json = """
+                {
+                  "key": "svc-roundtrip",
+                  "name": "Service Round Trip",
+                  "nodes": [
+                    {"id": "start", "type": "startEvent", "position": {"x": 100, "y": 200}, "data": {"type": "startEvent", "label": "Start"}},
+                    {"id": "svc1", "type": "serviceTask", "position": {"x": 300, "y": 200}, "data": {"type": "serviceTask", "label": "Notify", "config": {
+                      "serviceType": "java",
+                      "className": "com.example.NotifyService"
+                    }}},
+                    {"id": "end", "type": "endEvent", "position": {"x": 500, "y": 200}, "data": {"type": "endEvent", "label": "End"}}
+                  ],
+                  "edges": [
+                    {"id": "e1", "source": "start", "target": "svc1", "data": {}},
+                    {"id": "e2", "source": "svc1", "target": "end", "data": {}}
+                  ]
+                }
+                """;
+
+            String xml = jsonToBpmn.convert(json);
+            String resultJson = bpmnToJson.convert(xml);
+            JsonNode result = objectMapper.readTree(resultJson);
+
+            // Find serviceTask node
+            JsonNode nodes = result.path("nodes");
+            boolean foundService = false;
+            for (JsonNode node : nodes) {
+                if ("svc1".equals(node.path("id").asText())) {
+                    JsonNode config = node.path("data").path("config");
+                    assertEquals("java", config.path("serviceType").asText());
+                    assertEquals("com.example.NotifyService", config.path("className").asText());
+                    foundService = true;
+                }
+            }
+            assertTrue(foundService, "Should find svc1 with className");
+        }
+    }
+
+    // ==================== Edge Cases ====================
+
+    @Nested
+    @DisplayName("Edge cases")
+    class EdgeCases {
+
+        @Test
+        @DisplayName("should handle empty nodes array")
+        void shouldHandleEmptyNodes() {
+            String json = """
+                {
+                  "key": "empty",
+                  "name": "Empty Process",
+                  "nodes": [],
+                  "edges": []
+                }
+                """;
+
+            String xml = jsonToBpmn.convert(json);
+
+            assertNotNull(xml);
+            assertTrue(xml.contains("<process"));
+            assertTrue(xml.contains("id=\"empty\""));
+        }
+
+        @Test
+        @DisplayName("should handle missing optional fields gracefully")
+        void shouldHandleMissingOptionalFields() {
+            String json = """
+                {
+                  "key": "minimal",
+                  "name": "Minimal",
+                  "nodes": [
+                    {"id": "s", "type": "startEvent", "position": {"x": 0, "y": 0}, "data": {"type": "startEvent", "label": "S"}},
+                    {"id": "t", "type": "userTask", "position": {"x": 200, "y": 0}, "data": {"type": "userTask", "label": "T"}},
+                    {"id": "e", "type": "endEvent", "position": {"x": 400, "y": 0}, "data": {"type": "endEvent", "label": "E"}}
+                  ],
+                  "edges": [
+                    {"id": "f1", "source": "s", "target": "t", "data": {}},
+                    {"id": "f2", "source": "t", "target": "e", "data": {}}
+                  ]
+                }
+                """;
+
+            // Should not throw
+            String xml = jsonToBpmn.convert(json);
+            assertNotNull(xml);
+            assertTrue(xml.contains("userTask"));
+        }
+
+        @Test
+        @DisplayName("should handle node with no config")
+        void shouldHandleNodeWithNoConfig() {
+            String json = """
+                {
+                  "key": "no-config",
+                  "name": "No Config",
+                  "nodes": [
+                    {"id": "s", "type": "startEvent", "position": {"x": 0, "y": 0}, "data": {"type": "startEvent", "label": "S"}},
+                    {"id": "t", "type": "serviceTask", "position": {"x": 200, "y": 0}, "data": {"type": "serviceTask", "label": "SvcTask"}},
+                    {"id": "e", "type": "endEvent", "position": {"x": 400, "y": 0}, "data": {"type": "endEvent", "label": "E"}}
+                  ],
+                  "edges": [
+                    {"id": "f1", "source": "s", "target": "t", "data": {}},
+                    {"id": "f2", "source": "t", "target": "e", "data": {}}
+                  ]
+                }
+                """;
+
+            String xml = jsonToBpmn.convert(json);
+            assertNotNull(xml);
+            assertTrue(xml.contains("serviceTask"));
+            assertTrue(xml.contains("id=\"t\""));
+        }
+
+        @Test
+        @DisplayName("should throw BpmnConversionException for invalid JSON")
+        void shouldThrowForInvalidJson() {
+            assertThrows(BpmnConversionException.class, () ->
+                    jsonToBpmn.convert("not valid json"));
+        }
+
+        @Test
+        @DisplayName("should use defaults when key/name are missing")
+        void shouldUseDefaultsWhenKeyMissing() {
+            String json = """
+                {
+                  "nodes": [],
+                  "edges": []
+                }
+                """;
+
+            String xml = jsonToBpmn.convert(json);
+            assertNotNull(xml);
+            assertTrue(xml.contains("id=\"process_1\""), "Should use default process id. XML: " + xml);
+        }
+
+        @Test
+        @DisplayName("should handle edge with label but no condition")
+        void shouldHandleEdgeWithLabelOnly() {
+            String json = """
+                {
+                  "key": "label-edge",
+                  "name": "Label Edge",
+                  "nodes": [
+                    {"id": "s", "type": "startEvent", "position": {"x": 0, "y": 0}, "data": {"type": "startEvent", "label": "S"}},
+                    {"id": "e", "type": "endEvent", "position": {"x": 200, "y": 0}, "data": {"type": "endEvent", "label": "E"}}
+                  ],
+                  "edges": [
+                    {"id": "f1", "source": "s", "target": "e", "data": {"label": "Go"}}
+                  ]
+                }
+                """;
+
+            String xml = jsonToBpmn.convert(json);
+            assertTrue(xml.contains("name=\"Go\""), "Should contain edge label as name. XML: " + xml);
+            // Should NOT contain conditionExpression
+            assertFalse(xml.contains("conditionExpression"), "Should not contain condition. XML: " + xml);
+        }
+    }
+
+    // ==================== BpmnToJsonConverter Specific Tests ====================
+
+    @Nested
+    @DisplayName("BpmnToJsonConverter specific tests")
+    class BpmnToJsonTests {
+
+        @Test
+        @DisplayName("should parse SmartEngine simple-approval.bpmn20.xml format")
+        void shouldParseSmartEngineFormat() {
+            String bpmn = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                             xmlns:smart="http://smart.alibaba.com"
+                             targetNamespace="http://auraboot.com/bpm">
+                  <process id="simple-approval" name="Simple Approval" isExecutable="true">
+                    <startEvent id="start" name="Start"/>
+                    <sequenceFlow id="flow1" sourceRef="start" targetRef="task1"/>
+                    <userTask id="task1" name="Approval Task"
+                              smart:assigneeType="user"
+                              smart:assigneeId="approver1"/>
+                    <sequenceFlow id="flow2" sourceRef="task1" targetRef="end"/>
+                    <endEvent id="end" name="End"/>
+                  </process>
+                </definitions>
+                """;
+
+            String json = bpmnToJson.convert(bpmn);
+            assertNotNull(json);
+
+            JsonNode result;
+            try {
+                result = objectMapper.readTree(json);
+            } catch (Exception e) {
+                fail("Should produce valid JSON: " + e.getMessage());
+                return;
+            }
+
+            assertEquals("simple-approval", result.path("key").asText());
+            assertEquals("Simple Approval", result.path("name").asText());
+            assertEquals(3, result.path("nodes").size());
+            assertEquals(2, result.path("edges").size());
+
+            // Verify userTask assignee was parsed
+            for (JsonNode node : result.path("nodes")) {
+                if ("task1".equals(node.path("id").asText())) {
+                    JsonNode assignee = node.path("data").path("config").path("assignee");
+                    assertEquals("user", assignee.path("type").asText());
+                    assertEquals("approver1", assignee.path("userIds").get(0).asText());
+                }
+            }
+        }
+
+        @Test
+        @DisplayName("should parse BPMN with smartengine.org namespace")
+        void shouldParseSmartEngineOrgNamespace() {
+            String bpmn = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                             xmlns:smart="http://smartengine.org/schema/process"
+                             targetNamespace="smart">
+                  <process id="test-process" isExecutable="true">
+                    <startEvent id="start"/>
+                    <sequenceFlow id="f1" sourceRef="start" targetRef="svc"/>
+                    <serviceTask id="svc" name="Service" smart:class="com.example.MyService"/>
+                    <sequenceFlow id="f2" sourceRef="svc" targetRef="end"/>
+                    <endEvent id="end"/>
+                  </process>
+                </definitions>
+                """;
+
+            String json = bpmnToJson.convert(bpmn);
+            JsonNode result;
+            try {
+                result = objectMapper.readTree(json);
+            } catch (Exception e) {
+                fail("Should produce valid JSON: " + e.getMessage());
+                return;
+            }
+
+            // Find serviceTask
+            for (JsonNode node : result.path("nodes")) {
+                if ("svc".equals(node.path("id").asText())) {
+                    JsonNode config = node.path("data").path("config");
+                    assertEquals("java", config.path("serviceType").asText());
+                    assertEquals("com.example.MyService", config.path("className").asText());
+                }
+            }
+        }
+
+        @Test
+        @DisplayName("should parse BPMN with condition expressions")
+        void shouldParseConditions() throws Exception {
+            String bpmn = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                             targetNamespace="test">
+                  <process id="cond-test">
+                    <startEvent id="start"/>
+                    <sequenceFlow id="f1" sourceRef="start" targetRef="gw"/>
+                    <exclusiveGateway id="gw" name="Decision" default="f3"/>
+                    <sequenceFlow id="f2" sourceRef="gw" targetRef="end1">
+                      <conditionExpression xsi:type="mvel">amount > 1000</conditionExpression>
+                    </sequenceFlow>
+                    <sequenceFlow id="f3" sourceRef="gw" targetRef="end2"/>
+                    <endEvent id="end1"/>
+                    <endEvent id="end2"/>
+                  </process>
+                </definitions>
+                """;
+
+            String json = bpmnToJson.convert(bpmn);
+            JsonNode result = objectMapper.readTree(json);
+
+            // Verify condition on f2
+            for (JsonNode edge : result.path("edges")) {
+                if ("f2".equals(edge.path("id").asText())) {
+                    JsonNode condition = edge.path("data").path("condition");
+                    assertEquals("amount > 1000", condition.path("content").asText());
+                }
+                // Verify f3 is marked as default
+                if ("f3".equals(edge.path("id").asText())) {
+                    assertTrue(edge.path("data").path("isDefault").asBoolean(false),
+                            "f3 should be marked as default");
+                }
+            }
+        }
+
+        @Test
+        @DisplayName("should throw BpmnConversionException for invalid XML")
+        void shouldThrowForInvalidXml() {
+            assertThrows(BpmnConversionException.class, () ->
+                    bpmnToJson.convert("not valid xml at all"));
+        }
+
+        @Test
+        @DisplayName("should throw BpmnConversionException for XML without process element")
+        void shouldThrowForMissingProcess() {
+            String xml = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL">
+                </definitions>
+                """;
+
+            assertThrows(BpmnConversionException.class, () ->
+                    bpmnToJson.convert(xml));
+        }
+    }
+
+    // ==================== Full Scenario Test ====================
+
+    @Test
+    @DisplayName("should handle the complete leave-approval example from the spec")
+    void shouldHandleCompleteLeaveApprovalExample() throws Exception {
+        String json = """
+            {
+              "key": "leave-approval",
+              "name": "Leave Approval Process",
+              "nodes": [
+                {"id": "node_1", "type": "startEvent", "position": {"x": 100, "y": 200}, "data": {"type": "startEvent", "label": "Start", "config": {}}},
+                {"id": "node_2", "type": "userTask", "position": {"x": 300, "y": 200}, "data": {"type": "userTask", "label": "Manager Approval", "config": {
+                  "description": "Manager reviews leave request",
+                  "assignee": {"type": "user", "userIds": ["manager1"], "assigneeMode": "single"},
+                  "candidateUsers": [],
+                  "candidateGroups": ["managers"],
+                  "priority": 50,
+                  "skipable": false
+                }}},
+                {"id": "node_3", "type": "exclusiveGateway", "position": {"x": 500, "y": 200}, "data": {"type": "exclusiveGateway", "label": "Decision", "config": {"defaultFlow": "edge_4"}}},
+                {"id": "node_4", "type": "serviceTask", "position": {"x": 700, "y": 100}, "data": {"type": "serviceTask", "label": "Send Notification", "config": {
+                  "serviceType": "java",
+                  "className": "com.example.NotifyService",
+                  "async": false
+                }}},
+                {"id": "node_5", "type": "endEvent", "position": {"x": 900, "y": 200}, "data": {"type": "endEvent", "label": "End"}}
+              ],
+              "edges": [
+                {"id": "edge_1", "source": "node_1", "target": "node_2", "data": {}},
+                {"id": "edge_2", "source": "node_2", "target": "node_3", "data": {}},
+                {"id": "edge_3", "source": "node_3", "target": "node_4", "data": {"label": "Approved", "condition": {"type": "expression", "content": "approved == true"}}},
+                {"id": "edge_4", "source": "node_3", "target": "node_5", "data": {"label": "Rejected", "isDefault": true}},
+                {"id": "edge_5", "source": "node_4", "target": "node_5", "data": {}}
+              ]
+            }
+            """;
+
+        // Convert to BPMN XML
+        String xml = jsonToBpmn.convert(json);
+
+        // Verify XML structure
+        assertTrue(xml.contains("id=\"leave-approval\""));
+        assertTrue(xml.contains("name=\"Leave Approval Process\""));
+        assertTrue(xml.contains("startEvent"));
+        assertTrue(xml.contains("userTask"));
+        assertTrue(xml.contains("exclusiveGateway"));
+        assertTrue(xml.contains("serviceTask"));
+        assertTrue(xml.contains("endEvent"));
+        assertTrue(xml.contains("assigneeType=\"user\""));
+        assertTrue(xml.contains("assigneeId=\"manager1\""));
+        assertTrue(xml.contains("candidateGroups=\"managers\""));
+        assertTrue(xml.contains("class=\"com.example.NotifyService\""));
+        assertTrue(xml.contains("default=\"edge_4\""));
+        assertTrue(xml.contains("approved == true"));
+
+        // Round-trip back to JSON
+        String resultJson = bpmnToJson.convert(xml);
+        JsonNode result = objectMapper.readTree(resultJson);
+
+        assertEquals("leave-approval", result.path("key").asText());
+        assertEquals(5, result.path("nodes").size());
+        assertEquals(5, result.path("edges").size());
+    }
+
+    @Test
+    @DisplayName("convertFromMap should work with Map input")
+    void shouldConvertFromMap() throws Exception {
+        ObjectNode processMap = objectMapper.createObjectNode();
+        processMap.put("key", "map-test");
+        processMap.put("name", "Map Test");
+
+        ArrayNode nodes = objectMapper.createArrayNode();
+        ObjectNode startNode = objectMapper.createObjectNode();
+        startNode.put("id", "s");
+        startNode.put("type", "startEvent");
+        ObjectNode startPos = objectMapper.createObjectNode();
+        startPos.put("x", 100);
+        startPos.put("y", 200);
+        startNode.set("position", startPos);
+        ObjectNode startData = objectMapper.createObjectNode();
+        startData.put("type", "startEvent");
+        startData.put("label", "Start");
+        startNode.set("data", startData);
+        nodes.add(startNode);
+
+        ObjectNode endNode = objectMapper.createObjectNode();
+        endNode.put("id", "e");
+        endNode.put("type", "endEvent");
+        ObjectNode endPos = objectMapper.createObjectNode();
+        endPos.put("x", 300);
+        endPos.put("y", 200);
+        endNode.set("position", endPos);
+        ObjectNode endData = objectMapper.createObjectNode();
+        endData.put("type", "endEvent");
+        endData.put("label", "End");
+        endNode.set("data", endData);
+        nodes.add(endNode);
+
+        processMap.set("nodes", nodes);
+
+        ArrayNode edges = objectMapper.createArrayNode();
+        ObjectNode edge = objectMapper.createObjectNode();
+        edge.put("id", "f1");
+        edge.put("source", "s");
+        edge.put("target", "e");
+        edge.set("data", objectMapper.createObjectNode());
+        edges.add(edge);
+        processMap.set("edges", edges);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> map = objectMapper.convertValue(processMap, Map.class);
+
+        String xml = jsonToBpmn.convertFromMap(map);
+        assertNotNull(xml);
+        assertTrue(xml.contains("id=\"map-test\""));
+        assertTrue(xml.contains("startEvent"));
+        assertTrue(xml.contains("endEvent"));
+    }
+}

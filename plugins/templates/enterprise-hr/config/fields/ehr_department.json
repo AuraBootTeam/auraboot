@@ -1,0 +1,8 @@
+[
+  {"code":"ehr_dp_code","displayName:zh-CN":"部门编号","displayName:en":"Department Code","dataType":"string","description":"Unique department code.","constraints":{"required":true,"maxLength":50},"feature":{"searchable":true,"sortable":true},"extension":{"placeholder:zh-CN":"请输入部门编号","placeholder:en":"Enter department code"}},
+  {"code":"ehr_dp_name","displayName:zh-CN":"部门名称","displayName:en":"Department Name","dataType":"string","description":"Department name.","constraints":{"required":true,"maxLength":200},"feature":{"searchable":true,"sortable":true},"extension":{"placeholder:zh-CN":"请输入部门名称","placeholder:en":"Enter department name"}},
+  {"code":"ehr_dp_parent_id","displayName:zh-CN":"上级部门","displayName:en":"Parent Department","dataType":"reference","description":"Parent department for hierarchy.","extension":{"refModel":"ehr_department","refLabelField":"ehr_dp_name"}},
+  {"code":"ehr_dp_manager","displayName:zh-CN":"部门负责人","displayName:en":"Manager","dataType":"string","description":"Department manager name.","constraints":{"maxLength":100},"feature":{"searchable":true}},
+  {"code":"ehr_dp_headcount","displayName:zh-CN":"编制人数","displayName:en":"Headcount","dataType":"integer","description":"Authorized headcount."},
+  {"code":"ehr_dp_description","displayName:zh-CN":"描述","displayName:en":"Description","dataType":"text","description":"Department description.","constraints":{"maxLength":2000},"extension":{"multiline":true}}
+]

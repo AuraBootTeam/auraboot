@@ -1,0 +1,79 @@
+[
+  {
+    "code": "gp_task_code",
+    "displayName:zh-CN": "任务编号",
+    "displayName:en": "Task Code",
+    "dataType": "string",
+    "description": "Auto-generated task code. Demonstrates AUTO_GENERATE strategy in CREATE command.",
+    "constraints": { "required": true, "maxLength": 50 },
+    "feature": { "searchable": true, "sortable": true },
+    "extension": {
+      "readOnly": true,
+      "placeholder:zh-CN": "系统自动生成",
+      "placeholder:en": "Auto generated"
+    }
+  },
+  {
+    "code": "gp_task_title",
+    "displayName:zh-CN": "任务标题",
+    "displayName:en": "Task Title",
+    "dataType": "string",
+    "description": "Short descriptive title of the task. Required field.",
+    "constraints": { "required": true, "maxLength": 200 },
+    "feature": { "searchable": true, "sortable": true },
+    "extension": {
+      "placeholder:zh-CN": "请输入任务标题",
+      "placeholder:en": "Enter task title"
+    }
+  },
+  {
+    "code": "gp_task_description",
+    "displayName:zh-CN": "任务描述",
+    "displayName:en": "Description",
+    "dataType": "text",
+    "description": "Detailed description of the task. TEXT type for long content.",
+    "constraints": { "maxLength": 5000 },
+    "extension": {
+      "multiline": true,
+      "placeholder:zh-CN": "请输入任务描述",
+      "placeholder:en": "Enter task description"
+    }
+  },
+  {
+    "code": "gp_task_status",
+    "displayName:zh-CN": "状态",
+    "displayName:en": "Status",
+    "dataType": "enum",
+    "dictCode": "gp_task_status",
+    "defaultValue": "new",
+    "description": "Task lifecycle status. Managed by STATE_TRANSITION commands, not directly editable.",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "gp_task_priority",
+    "displayName:zh-CN": "优先级",
+    "displayName:en": "Priority",
+    "dataType": "enum",
+    "dictCode": "gp_task_priority",
+    "defaultValue": "medium",
+    "description": "Task urgency level. Demonstrates ENUM field with dict reference.",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "gp_task_assignee",
+    "displayName:zh-CN": "负责人",
+    "displayName:en": "Assignee",
+    "dataType": "string",
+    "description": "User assigned to complete this task.",
+    "constraints": { "maxLength": 100 },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "gp_task_due_date",
+    "displayName:zh-CN": "截止日期",
+    "displayName:en": "Due Date",
+    "dataType": "date",
+    "description": "Deadline for task completion. Used in overdue_tasks named query.",
+    "feature": { "sortable": true }
+  }
+]

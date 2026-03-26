@@ -1,0 +1,116 @@
+# Device Model Integration Test Configuration
+
+spring:
+  # 数据源配置 - 使用实际数据库
+  datasource:
+    url: jdbc:postgresql://localhost:5432/aura_boot?charSet=UTF8
+    username: ghj
+    password: 
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 2
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      
+  # JPA配置
+  jpa:
+    hibernate:
+      ddl-auto: none  # 不修改数据库结构，使用现有表
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        
+  # 缓存配置
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=1000,expireAfterWrite=30m
+
+# Git配置 - 测试环境禁用调度任务
+aura:
+  plugins:
+    temp:
+      dir: /tmp/aura-plugins-test
+  git:
+    repos:
+      base-path: ${java.io.tmpdir}/aura-test-repos  # 使用临时目录
+    scheduler:
+      enabled: false  # 测试环境禁用调度任务
+      
+# MyBatis Plus配置
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      logic-delete-field: deletedFlag
+      logic-delete-value: true
+      logic-not-delete-value: false
+  mapper-locations: classpath*:mybatis/sqlmap/*.xml
+      
+# 应用配置
+auraboot:
+  # 租户配置
+  tenant:
+    enabled: true
+    default-tenant-id: tenant_integration_test
+    
+  # 权限配置
+  permission:
+    cache-enabled: true
+    cache-ttl: 1800  # 30分钟
+    
+  # 字典配置
+  dict:
+    cache-enabled: true
+    cache-ttl: 3600  # 1小时
+    
+  # 查询配置
+  query:
+    sql-injection-check: true
+    max-result-size: 10000
+    timeout: 30000  # 30秒
+
+# 安全配置
+security:
+  jwt:
+    secret: your_very_long_and_secure_secret_key_at_least_32_chars
+    expiration: 86400
+  password:
+    require-uppercase: false
+    require-special: false
+
+# 雪花ID配置
+snowflake:
+  worker-id: 1      # 工作机器ID (0-31)
+  datacenter-id: 1  # 数据中心ID (0-31)
+
+# 数据库ID类型配置
+database:
+  id-type: long
+    
+# 日志配置
+logging:
+  level:
+    com.auraboot.framework: DEBUG
+    org.springframework.security: DEBUG
+    org.springframework.cache: DEBUG
+    org.mybatis: DEBUG
+    
+# 测试专用配置
+test:
+  # 测试数据配置
+  data:
+    cleanup-after-test: false  # 测试后不清理数据，便于验证
+    create-sample-data: true   # 创建示例数据
+    
+  # 性能测试配置
+  performance:
+    large-dataset-size: 1000
+    concurrent-threads: 10
+    query-timeout: 5000

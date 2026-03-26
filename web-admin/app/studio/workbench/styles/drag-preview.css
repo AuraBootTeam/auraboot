@@ -1,0 +1,324 @@
+@reference "tailwindcss";
+
+/* 拖拽预览系统样式 */
+
+/* 预览容器 */
+#drag-preview-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 9999;
+  overflow: hidden;
+}
+
+/* 拖拽预览元素基础样式 */
+.drag-preview-element {
+  position: absolute;
+  pointer-events: none;
+  user-select: none;
+  transform-origin: top left;
+  transition: all 0.2s ease-out;
+  will-change: transform, opacity;
+}
+
+/* Ghost样式预览 */
+.drag-preview-ghost {
+  filter: blur(1px);
+  background: rgba(255, 255, 255, 0.9) !important;
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 8px;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+/* 轮廓样式预览 */
+.drag-preview-outline {
+  background: transparent !important;
+  border: 2px solid #3b82f6 !important;
+  border-radius: 8px;
+  box-shadow:
+    0 0 0 1px rgba(59, 130, 246, 0.2),
+    0 4px 16px rgba(59, 130, 246, 0.3);
+}
+
+/* 实体样式预览 */
+.drag-preview-solid {
+  background: #ffffff !important;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(0, 0, 0, 0.05);
+}
+
+/* 组件信息标签 */
+.drag-preview-info {
+  position: absolute;
+  top: -30px;
+  left: 0;
+  background: #1f2937;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  z-index: 10001;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.drag-preview-info::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 8px;
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 4px solid #1f2937;
+}
+
+/* 占位符样式 */
+.drag-placeholder {
+  position: absolute;
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 1;
+  animation: placeholderPulse 2s ease-in-out infinite;
+}
+
+.drag-placeholder-dashed {
+  border: 2px dashed #3b82f6;
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.drag-placeholder-dotted {
+  border: 2px dotted #3b82f6;
+  background: rgba(59, 130, 246, 0.05);
+}
+
+.drag-placeholder-solid {
+  border: 2px solid #3b82f6;
+  background: rgba(59, 130, 246, 0.15);
+}
+
+/* Ghost效果 - 应用到原始元素 */
+.drag-ghost-effect {
+  opacity: 0.3;
+  filter: blur(2px);
+  transition: all 0.2s ease-out;
+  transform: scale(0.98);
+}
+
+/* 拖拽状态指示器 */
+.drag-status-indicator {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  z-index: 10002;
+  pointer-events: none;
+  animation: fadeInScale 0.2s ease-out;
+}
+
+/* 拖拽类型指示 */
+.drag-type-move .drag-status-indicator {
+  background: #3b82f6;
+}
+
+.drag-type-copy .drag-status-indicator {
+  background: #10b981;
+}
+
+.drag-type-create .drag-status-indicator {
+  background: #8b5cf6;
+}
+
+/* 拖拽轨迹效果 */
+.drag-trail {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: #3b82f6;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 9998;
+  animation: trailFade 1s ease-out forwards;
+}
+
+/* 动画定义 */
+@keyframes placeholderPulse {
+  0%,
+  100% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.02);
+  }
+}
+
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes trailFade {
+  from {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+}
+
+@keyframes dragBounce {
+  0%,
+  20%,
+  50%,
+  80%,
+  100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-4px);
+  }
+  60% {
+    transform: translateY(-2px);
+  }
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+  .drag-preview-info {
+    font-size: 10px;
+    padding: 2px 6px;
+    top: -24px;
+  }
+
+  .drag-status-indicator {
+    font-size: 12px;
+    padding: 6px 10px;
+  }
+
+  .drag-preview-element {
+    transform: scale(0.8);
+  }
+}
+
+/* 高对比度模式 */
+@media (prefers-contrast: high) {
+  .drag-preview-ghost {
+    border-color: #000000;
+    background: rgba(255, 255, 255, 0.95) !important;
+  }
+
+  .drag-preview-outline {
+    border-color: #000000 !important;
+  }
+
+  .drag-placeholder-dashed,
+  .drag-placeholder-dotted,
+  .drag-placeholder-solid {
+    border-color: #000000;
+  }
+}
+
+/* 减少动画模式 */
+@media (prefers-reduced-motion: reduce) {
+  .drag-preview-element,
+  .drag-ghost-effect,
+  .drag-placeholder {
+    transition: none;
+    animation: none;
+  }
+
+  .drag-status-indicator {
+    animation: none;
+  }
+
+  .drag-trail {
+    display: none;
+  }
+}
+
+/* 深色模式 */
+@media (prefers-color-scheme: dark) {
+  .drag-preview-ghost {
+    background: rgba(31, 41, 55, 0.9) !important;
+    border-color: rgba(96, 165, 250, 0.4);
+  }
+
+  .drag-preview-solid {
+    background: #374151 !important;
+    border-color: #4b5563;
+  }
+
+  .drag-preview-info {
+    background: #111827;
+    color: #f9fafb;
+  }
+
+  .drag-preview-info::after {
+    border-top-color: #111827;
+  }
+
+  .drag-placeholder-dashed,
+  .drag-placeholder-dotted,
+  .drag-placeholder-solid {
+    border-color: #60a5fa;
+    background: rgba(96, 165, 250, 0.1);
+  }
+}
+
+/* 性能优化 */
+.drag-preview-element,
+.drag-ghost-effect,
+.drag-placeholder {
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* 防止文本选择 */
+.drag-preview-element * {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+/* 确保层级正确 */
+.drag-preview-element {
+  isolation: isolate;
+}
+
+/* 拖拽时的光标 */
+.dragging {
+  cursor: grabbing !important;
+}
+
+.dragging * {
+  cursor: grabbing !important;
+}

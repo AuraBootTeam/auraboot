@@ -1,0 +1,22 @@
+{
+  "kind": "Form",
+  "version": "1.0.0",
+  "id": "schema.runtime.sample",
+  "title": "Sample Form",
+  "layout": {
+    "areas": ["main"],
+    "areasConfig": {
+      "main": {
+        "type": "grid",
+        "cols": 1,
+        "rowGap": 8,
+        "colGap": 8
+      }
+    }
+  },
+  "areas": {
+    "main": {
+      "blocks": []
+    }
+  }
+}

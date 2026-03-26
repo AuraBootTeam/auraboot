@@ -1,0 +1,83 @@
+{
+  "pageKey": "tcrm_account_detail",
+  "name:zh-CN": "客户详情",
+  "name:en": "Account Detail",
+  "pageType": "detail",
+  "modelCode": "tcrm_account",
+  "dslSchema": {
+    "id": "detail.tcrm_account",
+    "kind": "Detail",
+    "version": "1.0.0",
+    "modelCode": "tcrm_account",
+    "layout": {
+      "areas": ["header", "main", "sub-tables"],
+      "areasConfig": {
+        "header": { "type": "flex", "direction": "row" },
+        "main": { "type": "grid", "cols": 12, "rowGap": 16, "colGap": 16 },
+        "sub-tables": { "type": "stack" }
+      }
+    },
+    "areas": {
+      "header": {
+        "blocks": [{
+          "id": "action_bar",
+          "blockType": "toolbar",
+          "buttons": [
+            { "code": "edit", "action": "edit", "navigateTo": "tcrm_account_form", "permissionCode": "TCRM.account.manage" },
+            { "code": "delete", "action": "delete", "danger": true, "commandCode": "tcrm:delete_account", "permissionCode": "TCRM.account.manage", "confirmMessageKey": "delete.confirm" }
+          ]
+        }]
+      },
+      "main": {
+        "blocks": [{
+          "id": "info",
+          "blockType": "form-section",
+          "readOnly": true,
+          "title": { "zh-CN": "客户信息", "en-US": "Account Information" },
+          "fields": [
+            { "field": "tcrm_ac_code", "colSpan": 6 },
+            { "field": "tcrm_ac_name", "colSpan": 6 },
+            { "field": "tcrm_ac_industry", "colSpan": 6 },
+            { "field": "tcrm_ac_phone", "colSpan": 6 },
+            { "field": "tcrm_ac_website", "colSpan": 6 },
+            { "field": "tcrm_ac_address", "colSpan": 6 },
+            { "field": "tcrm_ac_notes", "colSpan": 12 }
+          ]
+        }]
+      },
+      "sub-tables": {
+        "blocks": [
+          {
+            "id": "contacts",
+            "blockType": "sub-table",
+            "title": { "zh-CN": "联系人", "en-US": "Contacts" },
+            "modelCode": "tcrm_contact",
+            "foreignKey": "tcrm_ct_account_id",
+            "columns": [
+              { "field": "tcrm_ct_name", "width": 150 },
+              { "field": "tcrm_ct_title", "width": 150 },
+              { "field": "tcrm_ct_email", "width": 200 },
+              { "field": "tcrm_ct_phone", "width": 140 }
+            ],
+            "createCommandCode": "tcrm:create_contact"
+          },
+          {
+            "id": "opportunities",
+            "blockType": "sub-table",
+            "title": { "zh-CN": "商机", "en-US": "Opportunities" },
+            "modelCode": "tcrm_opportunity",
+            "foreignKey": "tcrm_op_account_id",
+            "columns": [
+              { "field": "tcrm_op_code", "width": 150 },
+              { "field": "tcrm_op_name", "width": 200 },
+              { "field": "tcrm_op_stage", "width": 120, "renderType": "tag", "dictCode": "tcrm_opp_stage" },
+              { "field": "tcrm_op_amount", "width": 120 },
+              { "field": "tcrm_op_expected_close", "width": 130 }
+            ],
+            "createCommandCode": "tcrm:create_opportunity"
+          }
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,251 @@
+{
+  "meta": {
+    "type": "form",
+    "version": "1.0",
+    "model": "Store",
+    "scenario": "Store.Create",
+    "title": { "i18n": "form.store.title", "fallback": "创建门店" }
+  },
+  "layout": {
+    "colSpan": 6
+  },
+  "sections": [
+    {
+      "code": "basic",
+      "title": { "i18n": "form.store.section.basic", "fallback": "基本信息" },
+      "fields": [
+        {
+          "field": "code",
+          "component": "SmartInput",
+          "props": {
+            "label": { "i18n": "form.store.code", "fallback": "门店编码" },
+            "readOnly": "${mode === 'edit'}",
+            "placeholder": { "i18n": "form.store.code.placeholder", "fallback": "请输入门店编码" }
+          },
+          "validation": [
+            {
+              "type": "required",
+              "message": { "i18n": "form.store.code.required", "fallback": "门店编码不能为空" }
+            },
+            {
+              "type": "pattern",
+              "value": "^[A-Z0-9]{4,20}$",
+              "message": {
+                "i18n": "form.store.code.pattern",
+                "fallback": "门店编码只能包含4-20个大写字母和数字"
+              }
+            }
+          ]
+        },
+        {
+          "field": "name",
+          "component": "SmartInput",
+          "props": {
+            "label": { "i18n": "form.store.name", "fallback": "门店名称" },
+            "placeholder": { "i18n": "form.store.name.placeholder", "fallback": "请输入门店名称" }
+          },
+          "validation": [
+            {
+              "type": "required",
+              "message": { "i18n": "form.store.name.required", "fallback": "门店名称不能为空" }
+            }
+          ]
+        },
+        {
+          "field": "type",
+          "component": "SmartSelect",
+          "props": {
+            "label": { "i18n": "form.store.type", "fallback": "门店类型" },
+            "options": [
+              {
+                "label": { "i18n": "form.store.type.direct", "fallback": "直营店" },
+                "value": "direct"
+              },
+              {
+                "label": { "i18n": "form.store.type.franchise", "fallback": "加盟店" },
+                "value": "franchise"
+              },
+              {
+                "label": { "i18n": "form.store.type.flagship", "fallback": "旗舰店" },
+                "value": "flagship"
+              },
+              {
+                "label": { "i18n": "form.store.type.community", "fallback": "社区店" },
+                "value": "community"
+              }
+            ],
+            "placeholder": { "i18n": "form.store.type.placeholder", "fallback": "请选择门店类型" }
+          },
+          "validation": [
+            {
+              "type": "required",
+              "message": { "i18n": "form.store.type.required", "fallback": "请选择门店类型" }
+            }
+          ]
+        },
+        {
+          "field": "status",
+          "component": "SmartSelect",
+          "props": {
+            "label": { "i18n": "form.store.status", "fallback": "门店状态" },
+            "options": [
+              {
+                "label": { "i18n": "form.store.status.active", "fallback": "开业" },
+                "value": "active"
+              },
+              {
+                "label": { "i18n": "form.store.status.inactive", "fallback": "未开业" },
+                "value": "inactive"
+              },
+              {
+                "label": { "i18n": "form.store.status.preparing", "fallback": "筹备中" },
+                "value": "preparing"
+              },
+              {
+                "label": { "i18n": "form.store.status.closed", "fallback": "已关闭" },
+                "value": "closed"
+              }
+            ],
+            "placeholder": { "i18n": "form.store.status.placeholder", "fallback": "请选择门店状态" }
+          },
+          "validation": [
+            {
+              "type": "required",
+              "message": { "i18n": "form.store.status.required", "fallback": "请选择门店状态" }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "location",
+      "title": { "i18n": "form.store.section.location", "fallback": "位置信息" },
+      "fields": [
+        {
+          "field": "address",
+          "component": "SmartTextArea",
+          "props": {
+            "label": { "i18n": "form.store.address", "fallback": "详细地址" },
+            "placeholder": {
+              "i18n": "form.store.address.placeholder",
+              "fallback": "请输入门店详细地址"
+            }
+          },
+          "layout": {
+            "rowSpan": 2
+          },
+          "validation": [
+            {
+              "type": "required",
+              "message": { "i18n": "form.store.address.required", "fallback": "详细地址不能为空" }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "contact",
+      "title": { "i18n": "form.store.section.contact", "fallback": "联系信息" },
+      "fields": [
+        {
+          "field": "contact_phone",
+          "component": "SmartTelphone",
+          "props": {
+            "label": { "i18n": "form.store.contact_phone", "fallback": "联系电话" },
+            "placeholder": {
+              "i18n": "form.store.contact_phone.placeholder",
+              "fallback": "请输入联系电话"
+            }
+          },
+          "validation": [
+            {
+              "type": "required",
+              "message": {
+                "i18n": "form.store.contact_phone.required",
+                "fallback": "联系电话不能为空"
+              }
+            },
+            {
+              "type": "pattern",
+              "value": "^1[3-9]\\d{9}$",
+              "message": {
+                "i18n": "form.store.contact_phone.pattern",
+                "fallback": "请输入正确的电话号码"
+              }
+            }
+          ]
+        },
+        {
+          "field": "contact_email",
+          "component": "SmartEmail",
+          "props": {
+            "label": { "i18n": "form.store.contact_email", "fallback": "联系邮箱" },
+            "placeholder": {
+              "i18n": "form.store.contact_email.placeholder",
+              "fallback": "请输入联系邮箱"
+            }
+          },
+          "validation": [
+            {
+              "type": "email",
+              "message": {
+                "i18n": "form.store.contact_email.email",
+                "fallback": "请输入正确的邮箱地址"
+              }
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "code": "additional",
+      "title": { "i18n": "form.store.section.additional", "fallback": "附加信息" },
+      "fields": [
+        {
+          "field": "description",
+          "component": "SmartTextArea",
+          "props": {
+            "label": { "i18n": "form.store.description", "fallback": "门店描述" },
+            "showCount": true,
+            "placeholder": {
+              "i18n": "form.store.description.placeholder",
+              "fallback": "请输入门店描述信息"
+            }
+          }
+        },
+        {
+          "field": "images",
+          "component": "ImageUpload",
+          "props": {
+            "label": { "i18n": "form.store.images", "fallback": "门店图片" },
+            "accept": "image/*",
+            "maxSize": 5242880,
+            "listType": "picture-card",
+            "maxCount": 10,
+            "multiple": true
+          },
+          "layout": {
+            "colSpan": 12
+          }
+        }
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "code": "create",
+      "props": {
+        "label": { "i18n": "form.store.action.create", "fallback": "提交" },
+        "primary": true
+      }
+    },
+    {
+      "code": "cancel",
+      "props": {
+        "label": { "i18n": "form.store.action.cancel", "fallback": "取消" },
+        "primary": false
+      }
+    }
+  ]
+}

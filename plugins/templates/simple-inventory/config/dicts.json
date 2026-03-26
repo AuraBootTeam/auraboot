@@ -1,0 +1,191 @@
+[
+  {
+    "code": "tinv_product_category",
+    "name": "Product Category",
+    "name:zh-CN": "产品类别",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "raw_material",
+        "label": "Raw Material",
+        "label:zh-CN": "原材料",
+        "sortNo": 10,
+        "color": "#fa8c16",
+        "status": "enabled"
+      },
+      {
+        "value": "finished_good",
+        "label": "Finished Good",
+        "label:zh-CN": "成品",
+        "sortNo": 20,
+        "color": "#52c41a",
+        "status": "enabled"
+      },
+      {
+        "value": "consumable",
+        "label": "Consumable",
+        "label:zh-CN": "耗材",
+        "sortNo": 30,
+        "color": "#1890ff",
+        "status": "enabled"
+      },
+      {
+        "value": "other",
+        "label": "Other",
+        "label:zh-CN": "其他",
+        "sortNo": 40,
+        "color": "#d9d9d9",
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "tinv_unit",
+    "name": "Unit",
+    "name:zh-CN": "单位",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "pcs",
+        "label": "Pcs",
+        "label:zh-CN": "个",
+        "sortNo": 10,
+        "color": "#1890ff",
+        "status": "enabled"
+      },
+      {
+        "value": "KG",
+        "label": "Kg",
+        "label:zh-CN": "千克",
+        "sortNo": 20,
+        "color": "#fa8c16",
+        "status": "enabled"
+      },
+      {
+        "value": "M",
+        "label": "Meter",
+        "label:zh-CN": "米",
+        "sortNo": 30,
+        "color": "#52c41a",
+        "status": "enabled"
+      },
+      {
+        "value": "box",
+        "label": "Box",
+        "label:zh-CN": "箱",
+        "sortNo": 40,
+        "color": "#722ed1",
+        "status": "enabled"
+      },
+      {
+        "value": "set",
+        "label": "Set",
+        "label:zh-CN": "套",
+        "sortNo": 50,
+        "color": "#eb2f96",
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "tinv_product_status",
+    "name": "Product Status",
+    "name:zh-CN": "产品状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "active",
+        "label": "Active",
+        "label:zh-CN": "在售",
+        "sortNo": 10,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "discontinued",
+        "label": "Discontinued",
+        "label:zh-CN": "停售",
+        "sortNo": 20,
+        "color": "#d9d9d9",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      }
+    ]
+  },
+  {
+    "code": "tinv_wh_status",
+    "name": "Warehouse Status",
+    "name:zh-CN": "仓库状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "active",
+        "label": "Active",
+        "label:zh-CN": "启用",
+        "sortNo": 10,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "inactive",
+        "label": "Inactive",
+        "label:zh-CN": "停用",
+        "sortNo": 20,
+        "color": "#d9d9d9",
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      }
+    ]
+  },
+  {
+    "code": "tinv_doc_status",
+    "name": "Document Status",
+    "name:zh-CN": "单据状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "draft",
+        "label": "Draft",
+        "label:zh-CN": "草稿",
+        "sortNo": 10,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "confirmed",
+        "label": "Confirmed",
+        "label:zh-CN": "已确认",
+        "sortNo": 20,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "cancelled",
+        "label": "Cancelled",
+        "label:zh-CN": "已取消",
+        "sortNo": 30,
+        "color": "#d9d9d9",
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      }
+    ]
+  }
+]

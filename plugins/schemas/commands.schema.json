@@ -1,0 +1,7 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AuraBoot Plugin Commands",
+  "description": "Array of command definitions for plugin config/commands.json",
+  "type": "array",
+  "items": { "$ref": "plugin-manifest.schema.json#/$defs/commandDefinition" }
+}

@@ -1,0 +1,88 @@
+[
+  {
+    "code": "thr_lv_code",
+    "displayName:zh-CN": "请假编号",
+    "displayName:en": "Leave Code",
+    "dataType": "string",
+    "description": "Auto-generated leave request code.",
+    "constraints": { "required": true, "maxLength": 50 },
+    "feature": { "searchable": true, "sortable": true },
+    "extension": {
+      "readOnly": true,
+      "placeholder:zh-CN": "系统自动生成",
+      "placeholder:en": "Auto generated"
+    }
+  },
+  {
+    "code": "thr_lv_employee_id",
+    "displayName:zh-CN": "员工",
+    "displayName:en": "Employee",
+    "dataType": "reference",
+    "description": "Foreign key to the employee submitting this leave request.",
+    "constraints": { "required": true },
+    "extension": {
+      "refModelCode": "thr_employee",
+      "refDisplayField": "thr_em_name"
+    }
+  },
+  {
+    "code": "thr_lv_leave_type",
+    "displayName:zh-CN": "请假类型",
+    "displayName:en": "Leave Type",
+    "dataType": "enum",
+    "dictCode": "thr_leave_type",
+    "description": "Type of leave being requested.",
+    "constraints": { "required": true },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "thr_lv_start_date",
+    "displayName:zh-CN": "开始日期",
+    "displayName:en": "Start Date",
+    "dataType": "date",
+    "description": "First day of the leave period.",
+    "constraints": { "required": true },
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "thr_lv_end_date",
+    "displayName:zh-CN": "结束日期",
+    "displayName:en": "End Date",
+    "dataType": "date",
+    "description": "Last day of the leave period.",
+    "constraints": { "required": true },
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "thr_lv_days",
+    "displayName:zh-CN": "天数",
+    "displayName:en": "Days",
+    "dataType": "decimal",
+    "description": "Number of leave days requested. Supports half-day increments (e.g. 0.5, 1.5).",
+    "constraints": { "required": true },
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "thr_lv_status",
+    "displayName:zh-CN": "状态",
+    "displayName:en": "Status",
+    "dataType": "enum",
+    "dictCode": "thr_leave_status",
+    "defaultValue": "pending",
+    "description": "Leave request lifecycle status. Managed by STATE_TRANSITION commands.",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "thr_lv_reason",
+    "displayName:zh-CN": "请假原因",
+    "displayName:en": "Reason",
+    "dataType": "text",
+    "description": "Reason for the leave request.",
+    "constraints": { "maxLength": 2000 },
+    "extension": {
+      "multiline": true,
+      "placeholder:zh-CN": "请输入请假原因",
+      "placeholder:en": "Enter reason for leave"
+    }
+  }
+]

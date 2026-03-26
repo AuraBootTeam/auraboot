@@ -1,0 +1,44 @@
+[
+  {
+    "code": "tpm.project.manage",
+    "name:zh-CN": "项目管理",
+    "name:en": "Project Management",
+    "resourceType": "operation",
+    "module": "tpm"
+  },
+  {
+    "code": "tpm.project.read",
+    "name:zh-CN": "查看项目",
+    "name:en": "View Projects",
+    "resourceType": "data",
+    "module": "tpm"
+  },
+  {
+    "code": "tpm.task.manage",
+    "name:zh-CN": "任务管理",
+    "name:en": "Task Management",
+    "resourceType": "operation",
+    "module": "tpm"
+  },
+  {
+    "code": "tpm.task.read",
+    "name:zh-CN": "查看任务",
+    "name:en": "View Tasks",
+    "resourceType": "data",
+    "module": "tpm"
+  },
+  {
+    "code": "tpm.milestone.manage",
+    "name:zh-CN": "里程碑管理",
+    "name:en": "Milestone Management",
+    "resourceType": "operation",
+    "module": "tpm"
+  },
+  {
+    "code": "tpm.milestone.read",
+    "name:zh-CN": "查看里程碑",
+    "name:en": "View Milestones",
+    "resourceType": "data",
+    "module": "tpm"
+  }
+]

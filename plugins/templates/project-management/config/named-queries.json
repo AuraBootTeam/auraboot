@@ -1,0 +1,16 @@
+[
+  {
+    "code": "tpm_task_summary",
+    "name:zh-CN": "项目任务统计",
+    "name:en": "Task Summary by Project",
+    "description": "Task counts grouped by status for each project.",
+    "purpose": "Provides task breakdown per project for progress tracking dashboards.",
+    "parameter_schema": { "type": "object", "properties": { "tenantId": { "type": "string", "description": "Tenant ID (auto-injected)" } }, "required": ["tenantId"] },
+    "fromSql": "SELECT tpm_ts_project_id AS project_id, tpm_ts_status AS status, COUNT(*) AS count FROM mt_tpm_task WHERE tenant_id = #{params.tenantId} GROUP BY tpm_ts_project_id, tpm_ts_status ORDER BY tpm_ts_project_id, CASE tpm_ts_status WHEN 'todo' THEN 1 WHEN 'in_progress' THEN 2 WHEN 'in_review' THEN 3 WHEN 'done' THEN 4 ELSE 5 END",
+    "outputFields": [
+      { "code": "project_id", "columnExpr": "project_id", "dataType": "string", "searchable": true },
+      { "code": "status", "columnExpr": "status", "dataType": "string", "searchable": true },
+      { "code": "count", "columnExpr": "count", "dataType": "number", "sortable": true }
+    ]
+  }
+]

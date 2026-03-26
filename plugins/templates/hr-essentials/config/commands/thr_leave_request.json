@@ -1,0 +1,207 @@
+[
+  {
+    "code": "thr:create_leave_request",
+    "displayName:zh-CN": "新建请假",
+    "displayName:en": "Create Leave Request",
+    "type": "create",
+    "modelCode": "thr_leave_request",
+    "inputFields": [
+      "thr_lv_employee_id",
+      "thr_lv_leave_type",
+      "thr_lv_start_date",
+      "thr_lv_end_date",
+      "thr_lv_days",
+      "thr_lv_reason"
+    ],
+    "autoSetFields": {
+      "thr_lv_code": {
+        "strategy": "auto_generate",
+        "pattern": "LV-{yyyyMMdd}-{seq}"
+      },
+      "thr_lv_status": {
+        "strategy": "fixed_value",
+        "value": "pending"
+      }
+    },
+    "permissions": [
+      "THR.leave.manage"
+    ],
+    "agent_hint": "Create a new leave request. Required: employee_id (reference to thr_employee), leave_type (ANNUAL/SICK/PERSONAL/MATERNITY/OTHER), start_date, end_date, days. Optional: reason. Auto-generated: code (LV-yyyyMMdd-seq), status (pending).",
+    "cmd_risk_level": "L1",
+    "precondition_description": "The referenced employee must exist.",
+    "side_effect_description": null,
+    "output_description": "Returns the created leave request record with auto-generated code and initial status pending.",
+    "example_input": {
+      "thr_lv_employee_id": "<employee-pid>",
+      "thr_lv_leave_type": "annual",
+      "thr_lv_start_date": "2026-04-01",
+      "thr_lv_end_date": "2026-04-05",
+      "thr_lv_days": 5,
+      "thr_lv_reason": "Family vacation"
+    },
+    "idempotent": false,
+    "reversible": true
+  },
+  {
+    "code": "thr:update_leave_request",
+    "displayName:zh-CN": "编辑请假",
+    "displayName:en": "Update Leave Request",
+    "type": "update",
+    "modelCode": "thr_leave_request",
+    "inputFields": [
+      "thr_lv_employee_id",
+      "thr_lv_leave_type",
+      "thr_lv_start_date",
+      "thr_lv_end_date",
+      "thr_lv_days",
+      "thr_lv_reason"
+    ],
+    "permissions": [
+      "THR.leave.manage"
+    ],
+    "agent_hint": "Update an existing leave request. Editable fields: employee, leave_type, start_date, end_date, days, reason. Status is NOT editable here — use state transition commands instead.",
+    "cmd_risk_level": "L1",
+    "precondition_description": "Leave request must exist; status field cannot be changed via this command.",
+    "side_effect_description": null,
+    "output_description": "Returns the updated leave request record with all modified fields.",
+    "example_input": {
+      "thr_lv_end_date": "2026-04-07",
+      "thr_lv_days": 7,
+      "thr_lv_reason": "Extended family vacation"
+    },
+    "idempotent": true,
+    "reversible": true
+  },
+  {
+    "code": "thr:approve_leave",
+    "displayName:zh-CN": "批准请假",
+    "displayName:en": "Approve Leave",
+    "type": "state_transition",
+    "modelCode": "thr_leave_request",
+    "stateField": "thr_lv_status",
+    "fromStates": ["pending"],
+    "toState": "approved",
+    "permissions": [
+      "THR.leave.manage"
+    ],
+    "agent_hint": "Approve a pending leave request. Transitions status from pending to approved. Only leave requests in pending status can be approved.",
+    "cmd_risk_level": "L2",
+    "precondition_description": "Leave request must be in pending status.",
+    "side_effect_description": null,
+    "output_description": "Returns the updated leave request record with status set to approved.",
+    "example_input": {},
+    "idempotent": false,
+    "reversible": false
+  },
+  {
+    "code": "thr:reject_leave",
+    "displayName:zh-CN": "拒绝请假",
+    "displayName:en": "Reject Leave",
+    "type": "state_transition",
+    "modelCode": "thr_leave_request",
+    "stateField": "thr_lv_status",
+    "fromStates": ["pending"],
+    "toState": "rejected",
+    "permissions": [
+      "THR.leave.manage"
+    ],
+    "agent_hint": "Reject a pending leave request. Transitions status from pending to rejected. Only leave requests in pending status can be rejected.",
+    "cmd_risk_level": "L2",
+    "precondition_description": "Leave request must be in pending status.",
+    "side_effect_description": null,
+    "output_description": "Returns the updated leave request record with status set to rejected.",
+    "example_input": {},
+    "idempotent": false,
+    "reversible": false
+  },
+  {
+    "code": "thr:cancel_leave",
+    "displayName:zh-CN": "取消请假",
+    "displayName:en": "Cancel Leave",
+    "type": "state_transition",
+    "modelCode": "thr_leave_request",
+    "stateField": "thr_lv_status",
+    "fromStates": ["pending"],
+    "toState": "cancelled",
+    "permissions": [
+      "THR.leave.manage"
+    ],
+    "agent_hint": "Cancel a pending leave request. Transitions status from pending to cancelled. Only the requester or HR manager should cancel leave requests. Only pending requests can be cancelled.",
+    "cmd_risk_level": "L2",
+    "precondition_description": "Leave request must be in pending status.",
+    "side_effect_description": null,
+    "output_description": "Returns the updated leave request record with status set to cancelled.",
+    "example_input": {},
+    "idempotent": false,
+    "reversible": false
+  },
+  {
+    "code": "thr:delete_leave_request",
+    "displayName:zh-CN": "删除请假",
+    "displayName:en": "Delete Leave Request",
+    "type": "delete",
+    "modelCode": "thr_leave_request",
+    "preconditions": [
+      {
+        "field": "thr_lv_status",
+        "operator": "IN",
+        "value": ["pending"]
+      }
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此请假申请？此操作不可撤销。",
+      "confirmMessage:en": "Confirm delete this leave request? This action is irreversible."
+    },
+    "permissions": [
+      "THR.leave.manage"
+    ],
+    "agent_hint": "Delete a leave request permanently. Irreversible operation. Precondition: leave request status must be pending — approved, rejected, or cancelled requests cannot be deleted.",
+    "cmd_risk_level": "L4",
+    "precondition_description": "Leave request must be in pending status; approved, rejected, or cancelled requests cannot be deleted.",
+    "side_effect_description": null,
+    "output_description": "Returns confirmation of deletion; the leave request record is permanently removed.",
+    "example_input": {},
+    "idempotent": false,
+    "reversible": false
+  },
+  {
+    "code": "thr:detail_leave_request",
+    "displayName:zh-CN": "查看请假",
+    "displayName:en": "View Leave Request",
+    "type": "query",
+    "modelCode": "thr_leave_request",
+    "permissions": [
+      "THR.leave.read"
+    ],
+    "agent_hint": "Retrieve a single leave request record by ID. Returns all fields including employee, leave type, dates, days, status, and reason.",
+    "cmd_risk_level": "L0",
+    "precondition_description": "Leave request with the specified ID must exist.",
+    "side_effect_description": null,
+    "output_description": "Returns the full leave request record including all fields.",
+    "example_input": {},
+    "idempotent": true,
+    "reversible": true
+  },
+  {
+    "code": "thr:list_leave_requests",
+    "displayName:zh-CN": "请假列表",
+    "displayName:en": "List Leave Requests",
+    "type": "query",
+    "modelCode": "thr_leave_request",
+    "permissions": [
+      "THR.leave.read"
+    ],
+    "agent_hint": "Query leave request records with pagination and filtering. Supports filters by status, leave_type, employee. Supports keyword search on code.",
+    "cmd_risk_level": "L0",
+    "precondition_description": "No preconditions — returns empty list if no leave requests match.",
+    "side_effect_description": null,
+    "output_description": "Returns a paginated list of leave request records matching the specified filters.",
+    "example_input": {
+      "pageNum": 1,
+      "pageSize": 20,
+      "filters": [{"fieldName": "thr_lv_status", "operator": "EQ", "value": "pending"}]
+    },
+    "idempotent": true,
+    "reversible": true
+  }
+]

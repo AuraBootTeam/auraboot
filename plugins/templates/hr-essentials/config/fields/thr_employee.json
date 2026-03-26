@@ -1,0 +1,109 @@
+[
+  {
+    "code": "thr_em_code",
+    "displayName:zh-CN": "员工编号",
+    "displayName:en": "Employee Code",
+    "dataType": "string",
+    "description": "Auto-generated employee code. Demonstrates AUTO_GENERATE strategy in CREATE command.",
+    "constraints": { "required": true, "maxLength": 50 },
+    "feature": { "searchable": true, "sortable": true },
+    "extension": {
+      "readOnly": true,
+      "placeholder:zh-CN": "系统自动生成",
+      "placeholder:en": "Auto generated"
+    }
+  },
+  {
+    "code": "thr_em_name",
+    "displayName:zh-CN": "姓名",
+    "displayName:en": "Name",
+    "dataType": "string",
+    "description": "Employee full name. Required field.",
+    "constraints": { "required": true, "maxLength": 100 },
+    "feature": { "searchable": true, "sortable": true },
+    "extension": {
+      "placeholder:zh-CN": "请输入员工姓名",
+      "placeholder:en": "Enter employee name"
+    }
+  },
+  {
+    "code": "thr_em_department",
+    "displayName:zh-CN": "部门",
+    "displayName:en": "Department",
+    "dataType": "enum",
+    "dictCode": "thr_department",
+    "description": "Department the employee belongs to.",
+    "constraints": { "required": false },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "thr_em_position",
+    "displayName:zh-CN": "职位",
+    "displayName:en": "Position",
+    "dataType": "string",
+    "description": "Job title or position within the department.",
+    "constraints": { "maxLength": 100 },
+    "feature": { "searchable": true },
+    "extension": {
+      "placeholder:zh-CN": "请输入职位",
+      "placeholder:en": "Enter position"
+    }
+  },
+  {
+    "code": "thr_em_email",
+    "displayName:zh-CN": "邮箱",
+    "displayName:en": "Email",
+    "dataType": "string",
+    "description": "Employee email address for communication.",
+    "constraints": { "maxLength": 200 },
+    "feature": { "searchable": true },
+    "extension": {
+      "placeholder:zh-CN": "请输入邮箱",
+      "placeholder:en": "Enter email"
+    }
+  },
+  {
+    "code": "thr_em_phone",
+    "displayName:zh-CN": "电话",
+    "displayName:en": "Phone",
+    "dataType": "string",
+    "description": "Employee phone number.",
+    "constraints": { "maxLength": 50 },
+    "extension": {
+      "placeholder:zh-CN": "请输入电话号码",
+      "placeholder:en": "Enter phone number"
+    }
+  },
+  {
+    "code": "thr_em_hire_date",
+    "displayName:zh-CN": "入职日期",
+    "displayName:en": "Hire Date",
+    "dataType": "date",
+    "description": "Date the employee joined the organization.",
+    "constraints": { "required": false },
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "thr_em_status",
+    "displayName:zh-CN": "状态",
+    "displayName:en": "Status",
+    "dataType": "enum",
+    "dictCode": "thr_emp_status",
+    "defaultValue": "active",
+    "description": "Employee lifecycle status. Managed by STATE_TRANSITION commands, not directly editable.",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "thr_em_notes",
+    "displayName:zh-CN": "备注",
+    "displayName:en": "Notes",
+    "dataType": "text",
+    "description": "Additional notes about the employee.",
+    "constraints": { "maxLength": 5000 },
+    "extension": {
+      "multiline": true,
+      "placeholder:zh-CN": "请输入备注",
+      "placeholder:en": "Enter notes"
+    }
+  }
+]

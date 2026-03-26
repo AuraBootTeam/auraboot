@@ -1,0 +1,11 @@
+[
+  {"code":"tasset_mn_code","displayName:zh-CN":"维护编号","displayName:en":"Maintenance Code","dataType":"string","description":"Auto-generated code.","constraints":{"required":true,"maxLength":50},"feature":{"searchable":true,"sortable":true},"extension":{"readOnly":true,"placeholder:zh-CN":"系统自动生成","placeholder:en":"Auto generated"}},
+  {"code":"tasset_mn_asset_id","displayName:zh-CN":"关联资产","displayName:en":"Asset","dataType":"reference","description":"The asset being maintained.","feature":{"searchable":true},"extension":{"referenceModelCode":"tasset_asset"}},
+  {"code":"tasset_mn_type","displayName:zh-CN":"维护类型","displayName:en":"Type","dataType":"enum","dictCode":"tasset_maint_type","description":"Type of maintenance.","feature":{"searchable":true}},
+  {"code":"tasset_mn_status","displayName:zh-CN":"状态","displayName:en":"Status","dataType":"enum","dictCode":"tasset_maint_status","defaultValue":"scheduled","description":"Maintenance status.","feature":{"searchable":true}},
+  {"code":"tasset_mn_scheduled_date","displayName:zh-CN":"计划日期","displayName:en":"Scheduled Date","dataType":"date","description":"Planned date.","feature":{"sortable":true}},
+  {"code":"tasset_mn_completed_date","displayName:zh-CN":"完成日期","displayName:en":"Completed Date","dataType":"date","description":"Actual completion date.","feature":{"sortable":true}},
+  {"code":"tasset_mn_cost","displayName:zh-CN":"费用","displayName:en":"Cost","dataType":"decimal","description":"Maintenance cost.","extension":{"precision":2}},
+  {"code":"tasset_mn_technician","displayName:zh-CN":"技术员","displayName:en":"Technician","dataType":"string","description":"Person performing the maintenance.","constraints":{"maxLength":100},"feature":{"searchable":true}},
+  {"code":"tasset_mn_notes","displayName:zh-CN":"备注","displayName:en":"Notes","dataType":"text","description":"Notes.","constraints":{"maxLength":5000},"extension":{"multiline":true}}
+]

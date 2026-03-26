@@ -1,0 +1,44 @@
+[
+  {
+    "code": "thr.employee.manage",
+    "name:zh-CN": "员工管理",
+    "name:en": "Employee Management",
+    "resourceType": "operation",
+    "module": "thr"
+  },
+  {
+    "code": "thr.employee.read",
+    "name:zh-CN": "查看员工",
+    "name:en": "View Employees",
+    "resourceType": "data",
+    "module": "thr"
+  },
+  {
+    "code": "thr.attendance.manage",
+    "name:zh-CN": "考勤管理",
+    "name:en": "Attendance Management",
+    "resourceType": "operation",
+    "module": "thr"
+  },
+  {
+    "code": "thr.attendance.read",
+    "name:zh-CN": "查看考勤",
+    "name:en": "View Attendance",
+    "resourceType": "data",
+    "module": "thr"
+  },
+  {
+    "code": "thr.leave.manage",
+    "name:zh-CN": "请假管理",
+    "name:en": "Leave Management",
+    "resourceType": "operation",
+    "module": "thr"
+  },
+  {
+    "code": "thr.leave.read",
+    "name:zh-CN": "查看请假",
+    "name:en": "View Leave Requests",
+    "resourceType": "data",
+    "module": "thr"
+  }
+]

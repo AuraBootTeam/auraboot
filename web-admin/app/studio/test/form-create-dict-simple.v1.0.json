@@ -1,0 +1,25 @@
+{
+  "meta": {
+    "type": "form",
+    "version": "1.0",
+    "model": "Store",
+    "scenario": "Store.Create",
+    "title": { "i18n": "form.store.title", "fallback": "创建门店" }
+  },
+  "sections": [
+    {
+      "fields": [
+        "code",
+        "name",
+        "type",
+        "status",
+        "address",
+        "contact_phone",
+        "contact_email",
+        "description",
+        "images"
+      ]
+    }
+  ],
+  "actions": ["create", "cancel"]
+}

@@ -1,0 +1,206 @@
+{
+  "baseUrl": "http://localhost:5173",
+  "batchTag": "QUARRY_DEMO_2026-03-05_BATCH_1772717589905_28M1M",
+  "generatedAt": "2026-03-05T13:33:09.905Z",
+  "projects": [
+    {
+      "key": "A",
+      "id": "01KJZ37KDTEDPX8Y6QPMNSG37E",
+      "name": "西岭矿区数字化升级 QUARRY_DEMO_2026-03-05_BATCH_1772717589905_28M1M"
+    },
+    {
+      "key": "B",
+      "id": "01KJZ37KRJE9B3WC9CESMC3R8R",
+      "name": "南山爆破工艺优化 QUARRY_DEMO_2026-03-05_BATCH_1772717589905_28M1M"
+    },
+    {
+      "key": "C",
+      "id": "01KJZ37M2TK0Q88F7K3FT71CWP",
+      "name": "北湖绿色骨料试点 QUARRY_DEMO_2026-03-05_BATCH_1772717589905_28M1M"
+    }
+  ],
+  "contracts": [
+    {
+      "project": "项目A",
+      "id": "01KJZ37NCR4NAK5TJ2A4548Q51",
+      "amount": 5600000,
+      "contractType": "construction"
+    },
+    {
+      "project": "项目B",
+      "id": "01KJZ37RMEG38F1FX4E958E216",
+      "amount": 4200000,
+      "contractType": "procurement"
+    },
+    {
+      "project": "项目C",
+      "id": "01KJZ37X83REVP66E4C5TZNNH1",
+      "amount": 2600000,
+      "contractType": "consulting"
+    }
+  ],
+  "contractChanges": [
+    {
+      "id": "01KJZ37W8Y4ZA8NNS44QE64XV6",
+      "contractId": "01KJZ37RMEG38F1FX4E958E216",
+      "status": "approved"
+    }
+  ],
+  "dailyReports": [
+    {
+      "project": "A",
+      "id": "01KJZ3813NK2TT9G2CAQFEHKFH",
+      "date": "2026-02-27"
+    },
+    {
+      "project": "A",
+      "id": "01KJZ3822Q1WRPH39MJPZ7DWH4",
+      "date": "2026-02-28"
+    },
+    {
+      "project": "B",
+      "id": "01KJZ3831F999J6W028P1STMJS",
+      "date": "2026-02-28"
+    },
+    {
+      "project": "B",
+      "id": "01KJZ384073T2AZK6MKHY2WWN2",
+      "date": "2026-03-01"
+    },
+    {
+      "project": "C",
+      "id": "01KJZ384YZBK4DSA70772W4YC9",
+      "date": "2026-03-01"
+    },
+    {
+      "project": "C",
+      "id": "01KJZ385XYSR349JFM25A8PG5Y",
+      "date": "2026-03-02"
+    }
+  ],
+  "weeklyReports": [
+    {
+      "id": "01KJZ386X3NQ92STATV2553YBS",
+      "status": "approved"
+    },
+    {
+      "id": "01KJZ387VZT51YPESPN5SD7V3B",
+      "status": "rejected"
+    }
+  ],
+  "materialInspections": [
+    {
+      "id": "01KJZ388TN589PE059YSQCYB0P",
+      "result": "passed"
+    },
+    {
+      "id": "01KJZ389SQX8HDGN23TTSMTA3R",
+      "result": "failed"
+    }
+  ],
+  "siteIssues": [
+    {
+      "id": "01KJZ38ARJAX0KSY2SEPP9Q6K5",
+      "status": "closed",
+      "category": "quality",
+      "severity": "high"
+    }
+  ],
+  "equipmentInspections": [
+    {
+      "id": "01KJZ38CBVSW6F08E8ZGJ2NN85",
+      "result": "passed",
+      "equipmentType": "crane"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "01KJZ38DAN1VF57BR908449363"
+    },
+    {
+      "id": "01KJZ38DMXB3A6N0BDYWM0CMET"
+    }
+  ],
+  "issues": [
+    {
+      "flow": "need_rectify",
+      "id": "01KJZ38DZ9RN5C9ZBTSVV9NFA8"
+    },
+    {
+      "flow": "no_action",
+      "id": "01KJZ38G95QD6G2HQDYPAS7RXN"
+    },
+    {
+      "flow": "create_inspection",
+      "id": "01KJZ38H85MVJCE84K4KX9SFYV"
+    }
+  ],
+  "inspectionTasks": [
+    {
+      "id": "1",
+      "status": "completed"
+    }
+  ],
+  "qualityStandards": [
+    {
+      "id": "01KJZ38K68FC0R6KYJ5WWK8K5W"
+    }
+  ],
+  "qualityCheckpoints": [
+    {
+      "id": "01KJZ38KGM50VM3408F8JBXA8Y",
+      "result": "passed"
+    },
+    {
+      "id": "01KJZ38M56DHPQ830YCA2R4AV2",
+      "result": "conditional"
+    },
+    {
+      "id": "01KJZ38MSSTNDKJS6M16WB8BJ1",
+      "result": "failed"
+    }
+  ],
+  "annualPlans": [
+    {
+      "id": "01KJZ38NEE1PDCZQVY4AEZ0CHG",
+      "name": "2026年度生产计划 QUARRY_DEMO_2026-03-05_BATCH_1772717589905_28M1M",
+      "status": "approved"
+    }
+  ],
+  "docCategories": [
+    {
+      "id": "01KJZ38Q39PS5KG0B84KAFRKJP"
+    }
+  ],
+  "documents": [
+    {
+      "id": "01KJZ38QDPHC4H86N2PG7CDXC7",
+      "accessLevel": "public",
+      "status": "published"
+    },
+    {
+      "id": "01KJZ38R25YMHX1TY6GDTXBZ91",
+      "accessLevel": "confidential",
+      "status": "archived"
+    }
+  ],
+  "docVersions": [
+    {
+      "id": "01KJZ38S1AMDC6SD4JT3E91N5G",
+      "documentId": "01KJZ38QDPHC4H86N2PG7CDXC7"
+    }
+  ],
+  "articles": [
+    {
+      "id": "01KJZ38SBP613GE9HBCD1MAH8W",
+      "status": "archived"
+    }
+  ],
+  "projectDocLinks": [
+    {
+      "id": "01KJZ38TAEVJ0QTMNHY1QPYY8Z",
+      "projectId": "01KJZ37KDTEDPX8Y6QPMNSG37E",
+      "documentId": "01KJZ38QDPHC4H86N2PG7CDXC7"
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:smart="http://smart.alibaba.com"
+             targetNamespace="http://auraboot.com/bpm">
+
+  <process id="conditional-approval" name="Conditional Approval" isExecutable="true">
+
+    <startEvent id="start" name="Start"/>
+
+    <sequenceFlow id="flow1" sourceRef="start" targetRef="gateway"/>
+
+    <exclusiveGateway id="gateway" name="Amount Check"/>
+
+    <sequenceFlow id="flow-high" sourceRef="gateway" targetRef="managerApproval">
+      <conditionExpression>amount &gt; 10000</conditionExpression>
+    </sequenceFlow>
+
+    <sequenceFlow id="flow-low" sourceRef="gateway" targetRef="autoApproval">
+      <conditionExpression>amount &lt;= 10000</conditionExpression>
+    </sequenceFlow>
+
+    <userTask id="managerApproval" name="Manager Approval"
+              smart:assigneeType="user"
+              smart:assigneeId="manager1"/>
+
+    <serviceTask id="autoApproval" name="Auto Approval"/>
+
+    <sequenceFlow id="flow3" sourceRef="managerApproval" targetRef="end"/>
+    <sequenceFlow id="flow4" sourceRef="autoApproval" targetRef="end"/>
+
+    <endEvent id="end" name="End"/>
+
+  </process>
+
+</definitions>

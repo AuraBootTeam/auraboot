@@ -1,0 +1,12 @@
+[
+  {"code":"ehr_lv_code","displayName:zh-CN":"申请编号","displayName:en":"Request Code","dataType":"string","description":"Auto-generated leave request code.","constraints":{"required":true,"maxLength":50},"feature":{"searchable":true,"sortable":true},"extension":{"readOnly":true,"placeholder:zh-CN":"系统自动生成","placeholder:en":"Auto generated"}},
+  {"code":"ehr_lv_employee_id","displayName:zh-CN":"员工","displayName:en":"Employee","dataType":"reference","description":"Employee who is requesting leave.","constraints":{"required":true},"extension":{"refModel":"ehr_employee","refLabelField":"ehr_em_name"}},
+  {"code":"ehr_lv_leave_type","displayName:zh-CN":"假期类型","displayName:en":"Leave Type","dataType":"enum","dictCode":"ehr_leave_type","description":"Type of leave.","constraints":{"required":true},"feature":{"searchable":true}},
+  {"code":"ehr_lv_start_date","displayName:zh-CN":"开始日期","displayName:en":"Start Date","dataType":"date","description":"Leave start date.","constraints":{"required":true},"feature":{"sortable":true}},
+  {"code":"ehr_lv_end_date","displayName:zh-CN":"结束日期","displayName:en":"End Date","dataType":"date","description":"Leave end date.","constraints":{"required":true}},
+  {"code":"ehr_lv_days","displayName:zh-CN":"天数","displayName:en":"Days","dataType":"decimal","description":"Total leave days.","constraints":{"required":true},"extension":{"precision":1}},
+  {"code":"ehr_lv_status","displayName:zh-CN":"状态","displayName:en":"Status","dataType":"enum","dictCode":"ehr_leave_status","defaultValue":"draft","description":"Leave request workflow status.","feature":{"searchable":true}},
+  {"code":"ehr_lv_reason","displayName:zh-CN":"请假原因","displayName:en":"Reason","dataType":"text","description":"Reason for leave.","constraints":{"required":true,"maxLength":2000},"extension":{"multiline":true}},
+  {"code":"ehr_lv_approver","displayName:zh-CN":"审批人","displayName:en":"Approver","dataType":"string","description":"Manager who approved/rejected.","constraints":{"maxLength":100}},
+  {"code":"ehr_lv_approval_notes","displayName:zh-CN":"审批意见","displayName:en":"Approval Notes","dataType":"text","description":"Approver comments.","constraints":{"maxLength":2000},"extension":{"multiline":true}}
+]

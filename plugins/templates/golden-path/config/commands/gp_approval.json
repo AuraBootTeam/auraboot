@@ -1,0 +1,109 @@
+[
+  {
+    "code": "gp:request_approval",
+    "displayName:zh-CN": "发起审批",
+    "displayName:en": "Request Approval",
+    "type": "create",
+    "modelCode": "gp_approval",
+    "inputFields": [
+      "gp_apr_task_pid",
+      "gp_apr_approver",
+      "gp_apr_notes"
+    ],
+    "autoSetFields": {
+      "gp_apr_status": {
+        "strategy": "fixed_value",
+        "value": "pending"
+      }
+    },
+    "permissions": [
+      "GP.approval.manage"
+    ],
+    "agent_hint": "Create a new approval request for a task. Associates the request with the specified task and approver. Status is auto-set to pending.",
+    "cmd_risk_level": "L3",
+    "precondition_description": "The referenced task must exist and be in in_progress state.",
+    "side_effect_description": "Notifies the designated approver via system notification.",
+    "output_description": "Returns the created approval request record with pending status.",
+    "example_input": {
+      "gp_apr_task_pid": "01JEXAMPLE001",
+      "gp_apr_approver": "admin",
+      "gp_apr_notes": "Please review the implementation before we go live."
+    },
+    "idempotent": false,
+    "reversible": true
+  },
+  {
+    "code": "gp:approve",
+    "displayName:zh-CN": "批准",
+    "displayName:en": "Approve",
+    "type": "state_transition",
+    "modelCode": "gp_approval",
+    "stateField": "gp_apr_status",
+    "fromStates": ["pending"],
+    "toState": "approved",
+    "autoSetFields": {
+      "gp_apr_decision_at": {
+        "strategy": "current_datetime"
+      }
+    },
+    "permissions": [
+      "GP.approval.manage"
+    ],
+    "agent_hint": "Approve a pending approval request. Transitions status from pending to approved and records the decision timestamp automatically.",
+    "cmd_risk_level": "L2",
+    "precondition_description": "Approval must be in pending status.",
+    "side_effect_description": null,
+    "output_description": "Returns the updated approval record with approved status and decision timestamp.",
+    "example_input": {},
+    "idempotent": true,
+    "reversible": false
+  },
+  {
+    "code": "gp:reject",
+    "displayName:zh-CN": "拒绝",
+    "displayName:en": "Reject",
+    "type": "state_transition",
+    "modelCode": "gp_approval",
+    "stateField": "gp_apr_status",
+    "fromStates": ["pending"],
+    "toState": "rejected",
+    "autoSetFields": {
+      "gp_apr_decision_at": {
+        "strategy": "current_datetime"
+      }
+    },
+    "permissions": [
+      "GP.approval.manage"
+    ],
+    "agent_hint": "Reject a pending approval request. Transitions status from pending to rejected and records the decision timestamp automatically.",
+    "cmd_risk_level": "L2",
+    "precondition_description": "Approval must be in pending status.",
+    "side_effect_description": null,
+    "output_description": "Returns the updated approval record with rejected status and decision timestamp.",
+    "example_input": {},
+    "idempotent": true,
+    "reversible": false
+  },
+  {
+    "code": "gp:list_approvals",
+    "displayName:zh-CN": "审批列表",
+    "displayName:en": "List Approvals",
+    "type": "query",
+    "modelCode": "gp_approval",
+    "permissions": [
+      "GP.approval.read"
+    ],
+    "agent_hint": "Query approval records with pagination and filtering. Supports filters by status, approver, and task PID.",
+    "cmd_risk_level": "L0",
+    "precondition_description": "No preconditions — returns empty list if no approvals match.",
+    "side_effect_description": null,
+    "output_description": "Returns a paginated list of approval records matching the specified filters.",
+    "example_input": {
+      "pageNum": 1,
+      "pageSize": 20,
+      "filters": [{"fieldName": "gp_apr_status", "operator": "EQ", "value": "pending"}]
+    },
+    "idempotent": true,
+    "reversible": true
+  }
+]

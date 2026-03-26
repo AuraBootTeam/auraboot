@@ -1,0 +1,7 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AuraBoot Plugin Models",
+  "description": "Array of model definitions for plugin config/models.json",
+  "type": "array",
+  "items": { "$ref": "plugin-manifest.schema.json#/$defs/modelDefinition" }
+}

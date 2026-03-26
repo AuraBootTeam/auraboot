@@ -1,0 +1,58 @@
+[
+  {
+    "code": "tcrm.lead.manage",
+    "name:zh-CN": "线索管理",
+    "name:en": "Lead Management",
+    "resourceType": "operation",
+    "module": "tcrm"
+  },
+  {
+    "code": "tcrm.lead.read",
+    "name:zh-CN": "查看线索",
+    "name:en": "View Leads",
+    "resourceType": "data",
+    "module": "tcrm"
+  },
+  {
+    "code": "tcrm.account.manage",
+    "name:zh-CN": "客户管理",
+    "name:en": "Account Management",
+    "resourceType": "operation",
+    "module": "tcrm"
+  },
+  {
+    "code": "tcrm.account.read",
+    "name:zh-CN": "查看客户",
+    "name:en": "View Accounts",
+    "resourceType": "data",
+    "module": "tcrm"
+  },
+  {
+    "code": "tcrm.contact.manage",
+    "name:zh-CN": "联系人管理",
+    "name:en": "Contact Management",
+    "resourceType": "operation",
+    "module": "tcrm"
+  },
+  {
+    "code": "tcrm.contact.read",
+    "name:zh-CN": "查看联系人",
+    "name:en": "View Contacts",
+    "resourceType": "data",
+    "module": "tcrm"
+  },
+  {
+    "code": "tcrm.opportunity.manage",
+    "name:zh-CN": "商机管理",
+    "name:en": "Opportunity Management",
+    "resourceType": "operation",
+    "module": "tcrm"
+  },
+  {
+    "code": "tcrm.opportunity.read",
+    "name:zh-CN": "查看商机",
+    "name:en": "View Opportunities",
+    "resourceType": "data",
+    "module": "tcrm"
+  }
+]

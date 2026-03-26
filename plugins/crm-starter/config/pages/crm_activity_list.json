@@ -1,0 +1,183 @@
+{
+  "pageKey": "crm_activity_list",
+  "name:zh-CN": "活动列表",
+  "name:en": "Activities",
+  "pageType": "list",
+  "modelCode": "crm_activity",
+  "dslSchema": {
+    "id": "list.crm_activity",
+    "kind": "List",
+    "areas": {
+      "toolbar": {
+        "blocks": [
+          {
+            "id": "crm_activity_toolbar",
+            "blockType": "toolbar",
+            "buttons": [
+              {
+                "code": "create",
+                "primary": true,
+                "permissionCode": "CRMS.activity.manage",
+                "label": "create",
+                "action": {
+                  "type": "navigate",
+                  "to": "crm_activity_form",
+                  "command": "crms:create_activity"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "list-tabs": {
+        "blocks": [
+          {
+            "id": "crm_activity_tabs",
+            "blockType": "list-tabs",
+            "tabs": [
+              {
+                "key": "all",
+                "label": {
+                  "en": "All",
+                  "zh-CN": "全部"
+                },
+                "filter": null
+              },
+              {
+                "key": "call",
+                "label": {
+                  "en": "Calls",
+                  "zh-CN": "电话"
+                },
+                "filter": {
+                  "field": "crm_act_type",
+                  "value": "call",
+                  "operator": "EQ"
+                }
+              },
+              {
+                "key": "visit",
+                "label": {
+                  "en": "Visits",
+                  "zh-CN": "拜访"
+                },
+                "filter": {
+                  "field": "crm_act_type",
+                  "value": "visit",
+                  "operator": "EQ"
+                }
+              },
+              {
+                "key": "meeting",
+                "label": {
+                  "en": "Meetings",
+                  "zh-CN": "会议"
+                },
+                "filter": {
+                  "field": "crm_act_type",
+                  "value": "meeting",
+                  "operator": "EQ"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "main": {
+        "blocks": [
+          {
+            "id": "crm_activity_table",
+            "blockType": "data-table",
+            "columns": [
+              {
+                "field": "crm_act_type",
+                "width": 100,
+                "renderType": "tag"
+              },
+              {
+                "field": "crm_act_subject",
+                "width": 200,
+                "sortable": true
+              },
+              {
+                "field": "crm_act_date",
+                "width": 160,
+                "sortable": true
+              },
+              {
+                "field": "crm_act_owner",
+                "width": 120
+              },
+              {
+                "field": "actions",
+                "isActionColumn": true,
+                "buttons": [
+                  {
+                    "code": "view",
+                    "label": "detail",
+                    "action": {
+                      "type": "navigate",
+                      "to": "crm_activity_detail"
+                    }
+                  },
+                  {
+                    "code": "edit",
+                    "permissionCode": "CRMS.activity.manage",
+                    "label": "edit",
+                    "action": {
+                      "type": "navigate",
+                      "to": "crm_activity_form"
+                    }
+                  },
+                  {
+                    "code": "delete",
+                    "danger": true,
+                    "permissionCode": "CRMS.activity.manage",
+                    "label": "delete",
+                    "confirm": "delete.confirm",
+                    "action": {
+                      "type": "command",
+                      "command": "crms:delete_activity"
+                    }
+                  }
+                ]
+              }
+            ],
+            "searchFields": [
+              "crm_act_subject"
+            ],
+            "defaultSort": {
+              "field": "crm_act_date",
+              "order": "desc"
+            }
+          }
+        ]
+      }
+    },
+    "layout": {
+      "areas": [
+        "list-tabs",
+        "toolbar",
+        "main"
+      ],
+      "areasConfig": {
+        "list-tabs": {
+          "type": "flex",
+          "direction": "row"
+        },
+        "toolbar": {
+          "type": "flex",
+          "direction": "row",
+          "justify": "space-between",
+          "align": "center"
+        },
+        "main": {
+          "type": "grid",
+          "cols": 12,
+          "rowGap": 0,
+          "colGap": 0
+        }
+      }
+    }
+  }
+}

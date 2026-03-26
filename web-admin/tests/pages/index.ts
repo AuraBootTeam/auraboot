@@ -1,0 +1,11 @@
+export { BasePage } from './BasePage';
+export { DynamicListPage } from './DynamicListPage';
+export { DynamicFormPage } from './DynamicFormPage';
+export { HeaderPage } from './HeaderPage';
+export { LoginPage } from './LoginPage';
+export { PageDesignerPage } from './PageDesignerPage';
+export { DashboardDesignerPage } from './DashboardDesignerPage';
+export { ReportsOverviewPage } from './ReportsOverviewPage';
+export { UserProfilePage } from './UserProfilePage';
+export { AutomationListPage } from './AutomationListPage';
+export { NamedQueryPage } from './NamedQueryPage';

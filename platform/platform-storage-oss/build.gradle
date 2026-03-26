@@ -1,0 +1,56 @@
+plugins {
+    id 'java-library'
+}
+
+group = 'com.auraboot'
+version = '1.0.0-SNAPSHOT'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    maven { url = 'https://maven.aliyun.com/repository/public' }
+    mavenCentral()
+}
+
+dependencies {
+    // Platform core (StorageProvider, StorageProperties, StorageType)
+    compileOnly project(':')
+
+    // Alibaba Cloud OSS SDK
+    implementation 'com.aliyun.oss:aliyun-sdk-oss:3.17.4'
+
+    // Lombok
+    compileOnly 'org.projectlombok:lombok:1.18.40'
+    annotationProcessor 'org.projectlombok:lombok:1.18.40'
+
+    // Spring Boot (conditional annotations, lifecycle interfaces)
+    compileOnly 'org.springframework.boot:spring-boot-autoconfigure:3.5.6'
+    compileOnly 'org.springframework:spring-beans:6.2.6'
+    compileOnly 'org.springframework:spring-context:6.2.6'
+
+    // SLF4J for @Slf4j
+    compileOnly 'org.slf4j:slf4j-api:2.0.12'
+
+    // Test — platform classes and Spring needed at test runtime too
+    testImplementation(project(':')) {
+        transitive = false
+    }
+    testImplementation 'org.springframework:spring-beans:6.2.6'
+
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+    testImplementation 'org.mockito:mockito-core:5.11.0'
+    testImplementation 'org.mockito:mockito-junit-jupiter:5.11.0'
+}
+
+compileJava {
+    options.encoding = 'UTF-8'
+    options.compilerArgs += ['-parameters']
+}
+
+test {
+    useJUnitPlatform()
+}

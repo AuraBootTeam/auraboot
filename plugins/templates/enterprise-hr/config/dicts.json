@@ -1,0 +1,473 @@
+[
+  {
+    "code": "ehr_employee_status",
+    "name": "Employee Status",
+    "name:zh-CN": "员工状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "probation",
+        "label": "Probation",
+        "label:zh-CN": "试用期",
+        "sortNo": 10,
+        "color": "#faad14",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "active",
+        "label": "Active",
+        "label:zh-CN": "在职",
+        "sortNo": 20,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "on_leave",
+        "label": "On Leave",
+        "label:zh-CN": "休假中",
+        "sortNo": 30,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "resigned",
+        "label": "Resigned",
+        "label:zh-CN": "已离职",
+        "sortNo": 40,
+        "color": "#d9d9d9",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "terminated",
+        "label": "Terminated",
+        "label:zh-CN": "已解雇",
+        "sortNo": 50,
+        "color": "#f5222d",
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      }
+    ]
+  },
+  {
+    "code": "ehr_gender",
+    "name": "Gender",
+    "name:zh-CN": "性别",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "male",
+        "label": "Male",
+        "label:zh-CN": "男",
+        "sortNo": 10,
+        "color": "#1890ff",
+        "status": "enabled"
+      },
+      {
+        "value": "female",
+        "label": "Female",
+        "label:zh-CN": "女",
+        "sortNo": 20,
+        "color": "#eb2f96",
+        "status": "enabled"
+      },
+      {
+        "value": "other",
+        "label": "Other",
+        "label:zh-CN": "其他",
+        "sortNo": 30,
+        "color": "#d9d9d9",
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "ehr_position_grade",
+    "name": "Position Grade",
+    "name:zh-CN": "职级",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "P1",
+        "label": "P1 - Junior",
+        "label:zh-CN": "P1 - 初级",
+        "sortNo": 10,
+        "color": "#8c8c8c",
+        "status": "enabled"
+      },
+      {
+        "value": "P2",
+        "label": "P2 - Intermediate",
+        "label:zh-CN": "P2 - 中级",
+        "sortNo": 20,
+        "color": "#1890ff",
+        "status": "enabled"
+      },
+      {
+        "value": "P3",
+        "label": "P3 - Senior",
+        "label:zh-CN": "P3 - 高级",
+        "sortNo": 30,
+        "color": "#52c41a",
+        "status": "enabled"
+      },
+      {
+        "value": "P4",
+        "label": "P4 - Staff",
+        "label:zh-CN": "P4 - 资深",
+        "sortNo": 40,
+        "color": "#722ed1",
+        "status": "enabled"
+      },
+      {
+        "value": "P5",
+        "label": "P5 - Principal",
+        "label:zh-CN": "P5 - 首席",
+        "sortNo": 50,
+        "color": "#fa8c16",
+        "status": "enabled"
+      },
+      {
+        "value": "M1",
+        "label": "M1 - Manager",
+        "label:zh-CN": "M1 - 经理",
+        "sortNo": 60,
+        "color": "#13c2c2",
+        "status": "enabled"
+      },
+      {
+        "value": "M2",
+        "label": "M2 - Director",
+        "label:zh-CN": "M2 - 总监",
+        "sortNo": 70,
+        "color": "#eb2f96",
+        "status": "enabled"
+      },
+      {
+        "value": "M3",
+        "label": "M3 - VP",
+        "label:zh-CN": "M3 - 副总裁",
+        "sortNo": 80,
+        "color": "#f5222d",
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "ehr_position_status",
+    "name": "Position Status",
+    "name:zh-CN": "职位状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "open",
+        "label": "Open",
+        "label:zh-CN": "招聘中",
+        "sortNo": 10,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "filled",
+        "label": "Filled",
+        "label:zh-CN": "已招满",
+        "sortNo": 20,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "closed",
+        "label": "Closed",
+        "label:zh-CN": "已关闭",
+        "sortNo": 30,
+        "color": "#d9d9d9",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      }
+    ]
+  },
+  {
+    "code": "ehr_attendance_type",
+    "name": "Attendance Type",
+    "name:zh-CN": "考勤类型",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "normal",
+        "label": "Normal",
+        "label:zh-CN": "正常",
+        "sortNo": 10,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "orange"
+        }
+      },
+      {
+        "value": "late",
+        "label": "Late",
+        "label:zh-CN": "迟到",
+        "sortNo": 20,
+        "color": "#faad14",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "early_leave",
+        "label": "Early Leave",
+        "label:zh-CN": "早退",
+        "sortNo": 30,
+        "color": "#fa8c16",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "absent",
+        "label": "Absent",
+        "label:zh-CN": "缺勤",
+        "sortNo": 40,
+        "color": "#f5222d",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "work_from_home",
+        "label": "Work from Home",
+        "label:zh-CN": "远程办公",
+        "sortNo": 50,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      }
+    ]
+  },
+  {
+    "code": "ehr_leave_type",
+    "name": "Leave Type",
+    "name:zh-CN": "假期类型",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "annual",
+        "label": "Annual Leave",
+        "label:zh-CN": "年假",
+        "sortNo": 10,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "sick",
+        "label": "Sick Leave",
+        "label:zh-CN": "病假",
+        "sortNo": 20,
+        "color": "#f5222d",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "personal",
+        "label": "Personal Leave",
+        "label:zh-CN": "事假",
+        "sortNo": 30,
+        "color": "#faad14",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "maternity",
+        "label": "Maternity Leave",
+        "label:zh-CN": "产假",
+        "sortNo": 40,
+        "color": "#eb2f96",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "paternity",
+        "label": "Paternity Leave",
+        "label:zh-CN": "陪产假",
+        "sortNo": 50,
+        "color": "#13c2c2",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "bereavement",
+        "label": "Bereavement Leave",
+        "label:zh-CN": "丧假",
+        "sortNo": 60,
+        "color": "#8c8c8c",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "marriage",
+        "label": "Marriage Leave",
+        "label:zh-CN": "婚假",
+        "sortNo": 70,
+        "color": "#722ed1",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      }
+    ]
+  },
+  {
+    "code": "ehr_leave_status",
+    "name": "Leave Status",
+    "name:zh-CN": "请假状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "draft",
+        "label": "Draft",
+        "label:zh-CN": "草稿",
+        "sortNo": 10,
+        "color": "#8c8c8c",
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "pending",
+        "label": "Pending",
+        "label:zh-CN": "待审批",
+        "sortNo": 20,
+        "color": "#faad14",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "approved",
+        "label": "Approved",
+        "label:zh-CN": "已批准",
+        "sortNo": 30,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "rejected",
+        "label": "Rejected",
+        "label:zh-CN": "已拒绝",
+        "sortNo": 40,
+        "color": "#f5222d",
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      },
+      {
+        "value": "cancelled",
+        "label": "Cancelled",
+        "label:zh-CN": "已取消",
+        "sortNo": 50,
+        "color": "#d9d9d9",
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      }
+    ]
+  },
+  {
+    "code": "ehr_payroll_status",
+    "name": "Payroll Status",
+    "name:zh-CN": "薪资状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "draft",
+        "label": "Draft",
+        "label:zh-CN": "草稿",
+        "sortNo": 10,
+        "color": "#8c8c8c",
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "calculated",
+        "label": "Calculated",
+        "label:zh-CN": "已计算",
+        "sortNo": 20,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "approved",
+        "label": "Approved",
+        "label:zh-CN": "已审批",
+        "sortNo": 30,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "paid",
+        "label": "Paid",
+        "label:zh-CN": "已发放",
+        "sortNo": 40,
+        "color": "#722ed1",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      }
+    ]
+  }
+]

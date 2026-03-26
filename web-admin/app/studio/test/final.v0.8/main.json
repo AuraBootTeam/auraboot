@@ -1,0 +1,117 @@
+{
+  "kind": "Page",
+  "version": "4.0.0",
+  "id": "page.store.main",
+  "title": "$i18n:page.store.main.title",
+  "components": {
+    "ListRegion": "@/components/main/ListRegion",
+    "FormRegion": "@/components/main/FormRegion",
+    "ChartRegion": "@/components/main/ChartRegion",
+    "Chart": "@/components/chart/Chart"
+  },
+  "stateBinding": {
+    "filters": "{{state.filters}}",
+    "selection": "{{state.selectedIds}}",
+    "formModel": "{{state.form}}"
+  },
+  "layout": {
+    "areas": ["main"],
+    "areasConfig": {
+      "main": {
+        "type": "grid",
+        "cols": 12,
+        "rowGap": 16,
+        "colGap": 16
+      }
+    }
+  },
+  "areas": {
+    "main": {
+      "blocks": [
+        {
+          "id": "block_store_list_region",
+          "blockType": "list-region",
+          "title": "$i18n:page.store.main.block.list.title",
+          "layout": {
+            "colSpan": 8,
+            "rowSpan": 2
+          },
+          "listRef": "list.store",
+          "draggable": true,
+          "resizable": true
+        },
+        {
+          "id": "block_store_form_region",
+          "blockType": "form-region",
+          "title": "$i18n:page.store.main.block.form.title",
+          "layout": {
+            "colSpan": 4,
+            "rowSpan": 2
+          },
+          "formRef": "form.store",
+          "container": {
+            "type": "drawer",
+            "placement": "right",
+            "width": 480
+          },
+          "draggable": true,
+          "resizable": true
+        },
+        {
+          "id": "block_store_chart",
+          "blockType": "chart-region",
+          "title": "$i18n:page.store.main.block.chart.title",
+          "layout": {
+            "colSpan": 12,
+            "rowSpan": 1
+          },
+          "chart": {
+            "mark": "bar",
+            "data": {
+              "dataSource": "ds_storeStats"
+            },
+            "encoding": {
+              "x": {
+                "field": "name",
+                "type": "nominal",
+                "axis": {
+                  "title": "店铺名称"
+                }
+              },
+              "y": {
+                "field": "sales",
+                "type": "quantitative",
+                "axis": {
+                  "title": "销售额"
+                }
+              }
+            },
+            "legend": {},
+            "interactions": [
+              {
+                "trigger": "element:click",
+                "target": "list.store",
+                "action": "filter",
+                "mapping": {
+                  "name": "${datum.name}"
+                }
+              }
+            ]
+          },
+          "draggable": true,
+          "resizable": true
+        }
+      ]
+    }
+  },
+  "dataSources": {
+    "ds_storeStats": {
+      "type": "api",
+      "endpoint": "/api/stores/stats",
+      "method": "get",
+      "params": "{{state.filters}}",
+      "autoFetch": true,
+      "adaptor": "series"
+    }
+  }
+}

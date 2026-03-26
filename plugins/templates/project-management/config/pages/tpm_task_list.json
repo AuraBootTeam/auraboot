@@ -1,0 +1,25 @@
+{
+  "pageKey": "tpm_task_list", "name:zh-CN": "任务列表", "name:en": "Tasks", "pageType": "list", "modelCode": "tpm_task",
+  "dslSchema": { "id": "list.tpm_task", "kind": "List", "areas": {
+    "toolbar": { "blocks": [{ "id": "tpm_ts_toolbar", "blockType": "toolbar", "buttons": [{ "code": "create", "action": "create", "primary": true, "commandCode": "tpm:create_task", "navigateTo": "tpm_task_form", "permissionCode": "TPM.task.manage" }] }] },
+    "list-tabs": { "blocks": [{ "id": "tpm_ts_tabs", "blockType": "list-tabs", "tabs": [
+      { "key": "all", "label": { "en": "All", "zh-CN": "全部" }, "filter": null },
+      { "key": "todo", "label": { "en": "To Do", "zh-CN": "待办" }, "filter": { "field": "tpm_ts_status", "value": "todo", "operator": "EQ" } },
+      { "key": "in_progress", "label": { "en": "In Progress", "zh-CN": "进行中" }, "filter": { "field": "tpm_ts_status", "value": "in_progress", "operator": "EQ" } },
+      { "key": "in_review", "label": { "en": "In Review", "zh-CN": "审核中" }, "filter": { "field": "tpm_ts_status", "value": "in_review", "operator": "EQ" } },
+      { "key": "done", "label": { "en": "Done", "zh-CN": "已完成" }, "filter": { "field": "tpm_ts_status", "value": "done", "operator": "EQ" } }
+    ] }] },
+    "main": { "blocks": [{ "id": "tpm_ts_table", "blockType": "data-table", "columns": [
+      { "field": "tpm_ts_code", "width": 140, "sortable": true }, { "field": "tpm_ts_title", "width": 220, "sortable": true },
+      { "field": "tpm_ts_project_id", "width": 160 },
+      { "field": "tpm_ts_status", "width": 110, "renderType": "tag", "dictCode": "tpm_task_status" },
+      { "field": "tpm_ts_priority", "width": 100, "renderType": "tag", "dictCode": "tpm_priority" },
+      { "field": "tpm_ts_assignee", "width": 120 }, { "field": "tpm_ts_due_date", "width": 120, "sortable": true },
+      { "field": "actions", "isActionColumn": true, "buttons": [
+        { "code": "view", "action": "detail", "navigateTo": "tpm_task_detail" },
+        { "code": "edit", "action": "edit", "navigateTo": "tpm_task_form", "permissionCode": "TPM.task.manage" },
+        { "code": "delete", "action": "delete", "danger": true, "commandCode": "tpm:delete_task", "permissionCode": "TPM.task.manage", "confirmMessageKey": "delete.confirm" }
+      ] }
+    ], "searchFields": ["tpm_ts_title", "tpm_ts_code"], "defaultSort": { "field": "created_at", "order": "desc" } }] }
+  } }
+}

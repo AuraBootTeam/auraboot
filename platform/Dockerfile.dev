@@ -1,0 +1,34 @@
+# AuraBoot Backend — Development Dockerfile
+# Uses Gradle bootRun with devtools for hot reload
+
+FROM eclipse-temurin:21-jdk
+
+WORKDIR /app
+
+# Copy Gradle wrapper and config
+COPY gradlew gradlew
+COPY gradle gradle
+COPY build.gradle settings.gradle gradle.properties ./
+
+COPY platform-plugin-api/build.gradle platform-plugin-api/build.gradle
+COPY platform-storage-minio/build.gradle platform-storage-minio/build.gradle
+COPY platform-storage-s3/build.gradle platform-storage-s3/build.gradle
+COPY platform-storage-oss/build.gradle platform-storage-oss/build.gradle
+COPY platform-mq-kafka/build.gradle platform-mq-kafka/build.gradle
+COPY platform-mq-rabbitmq/build.gradle platform-mq-rabbitmq/build.gradle
+
+RUN chmod +x gradlew
+
+# Download dependencies
+RUN ./gradlew dependencies --no-daemon || true
+
+# Copy source (will be overridden by volume mount in dev)
+COPY src ./src
+COPY platform-plugin-api/src platform-plugin-api/src
+COPY vendor ./vendor
+
+EXPOSE 6443
+
+ENV SPRING_DEVTOOLS_RESTART_ENABLED=true
+
+CMD ["./gradlew", "bootRun", "--no-daemon"]

@@ -1,0 +1,117 @@
+{
+  "pageKey": "crm_contact_detail",
+  "name:zh-CN": "联系人详情",
+  "name:en": "Contact Detail",
+  "pageType": "detail",
+  "modelCode": "crm_contact",
+  "dslSchema": {
+    "id": "detail.crm_contact",
+    "kind": "Detail",
+    "version": "1.0.0",
+    "modelCode": "crm_contact",
+    "layout": {
+      "areas": [
+        "header",
+        "main"
+      ],
+      "areasConfig": {
+        "header": {
+          "type": "flex",
+          "align": "center",
+          "justify": "space-between",
+          "direction": "row"
+        },
+        "main": {
+          "type": "flex",
+          "direction": "column",
+          "rowGap": 16
+        }
+      }
+    },
+    "areas": {
+      "header": {
+        "blocks": [
+          {
+            "id": "crm_contact_detail_toolbar",
+            "blockType": "toolbar",
+            "buttons": [
+              {
+                "code": "edit",
+                "icon": "Edit",
+                "permissionCode": "CRMS.contact.manage",
+                "label": "edit",
+                "action": {
+                  "type": "navigate",
+                  "to": "crm_contact_form"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "main": {
+        "blocks": [
+          {
+            "id": "crm_contact_tabs",
+            "blockType": "tabs",
+            "tabs": [
+              {
+                "key": "overview",
+                "label": {
+                  "zh-CN": "概览",
+                  "en-US": "Overview"
+                },
+                "blocks": [
+                  {
+                    "id": "section_basic",
+                    "blockType": "form-section",
+                    "title": {
+                      "zh-CN": "基本信息",
+                      "en-US": "Basic Information"
+                    },
+                    "columns": 2,
+                    "fields": [
+                      {
+                        "field": "crm_ct_account_id",
+                        "readOnly": true
+                      },
+                      {
+                        "field": "crm_ct_name",
+                        "readOnly": true
+                      },
+                      {
+                        "field": "crm_ct_title",
+                        "readOnly": true
+                      },
+                      {
+                        "field": "crm_ct_email",
+                        "readOnly": true
+                      },
+                      {
+                        "field": "crm_ct_phone",
+                        "readOnly": true
+                      },
+                      {
+                        "field": "crm_ct_mobile",
+                        "readOnly": true
+                      },
+                      {
+                        "field": "crm_ct_is_primary",
+                        "readOnly": true
+                      },
+                      {
+                        "field": "crm_ct_remark",
+                        "span": 2,
+                        "readOnly": true
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

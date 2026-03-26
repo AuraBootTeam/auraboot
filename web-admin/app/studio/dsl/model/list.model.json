@@ -1,0 +1,416 @@
+{
+  "kind": "List",
+  "version": "1.0.0",
+  "id": "list.meta.model",
+  "title": "$i18n:list.model.title",
+  "stateBinding": {
+    "filters": "{{state.filters}}",
+    "selection": "{{state.selectedIds}}"
+  },
+  "layout": {
+    "areas": ["filters", "toolbar", "main"],
+    "areasConfig": {
+      "filters": {
+        "type": "grid",
+        "cols": 12,
+        "rowGap": 8,
+        "colGap": 8
+      },
+      "toolbar": {
+        "type": "flex",
+        "direction": "row",
+        "justify": "space-between",
+        "align": "center"
+      },
+      "main": {
+        "type": "grid",
+        "cols": 12,
+        "rowGap": 0,
+        "colGap": 0
+      }
+    }
+  },
+  "areas": {
+    "filters": {
+      "blocks": [
+        {
+          "id": "block_model_filters",
+          "blockType": "filter-form",
+          "layout": { "colSpan": 12, "rowSpan": 1 },
+          "model": "{{state.filters}}",
+          "fields": [
+            {
+              "field": "keyword",
+              "label": "$i18n:list.model.filter.keyword.label",
+              "component": "SmartInput",
+              "layout": { "colSpan": 4, "rowSpan": 1 },
+              "props": {
+                "placeholder": "$i18n:list.model.filter.keyword.placeholder"
+              }
+            },
+            {
+              "field": "modelType",
+              "label": "$i18n:list.model.filter.modelType.label",
+              "component": "SmartSelect",
+              "layout": { "colSpan": 4, "rowSpan": 1 },
+              "dataSource": "ds_modelTypes",
+              "props": {
+                "placeholder": "$i18n:list.model.filter.modelType.placeholder"
+              }
+            },
+            {
+              "field": "status",
+              "label": "$i18n:list.model.filter.status.label",
+              "component": "SmartSelect",
+              "layout": { "colSpan": 4, "rowSpan": 1 },
+              "dataSource": "ds_modelStatuses",
+              "props": {
+                "placeholder": "$i18n:list.model.filter.status.placeholder"
+              }
+            }
+          ],
+          "buttons": [
+            {
+              "code": "search",
+              "content": "$i18n:list.model.btn.search",
+              "primary": true,
+              "events": {
+                "onClick": { "handler": "searchModels" }
+              }
+            },
+            {
+              "code": "reset",
+              "content": "$i18n:list.model.btn.reset",
+              "events": {
+                "onClick": { "handler": "resetFilters" }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "toolbar": {
+      "blocks": [
+        {
+          "id": "block_selectedInfo",
+          "blockType": "text",
+          "layout": { "colSpan": 6, "rowSpan": 1 },
+          "content": "$i18n:list.model.selected.content",
+          "visibleWhen": "${state.selectedIds.length > 0}"
+        },
+        {
+          "id": "block_model_toolbar",
+          "blockType": "form-buttons",
+          "layout": { "colSpan": 6, "rowSpan": 1 },
+          "buttons": [
+            {
+              "code": "create",
+              "content": "$i18n:list.model.btn.create",
+              "primary": true,
+              "visibleWhen": "${hasPermission('model:create')}",
+              "events": {
+                "onClick": { "handler": "openCreateForm" }
+              }
+            },
+            {
+              "code": "export",
+              "content": "$i18n:list.model.btn.export",
+              "visibleWhen": "${hasPermission('model:export')}",
+              "events": {
+                "onClick": { "handler": "exportModels" }
+              }
+            },
+            {
+              "code": "deleteSelected",
+              "content": "$i18n:list.model.btn.deleteSelected",
+              "danger": true,
+              "visibleWhen": "${hasPermission('model:delete')}",
+              "enableWhen": "${state.selectedIds.length > 0}",
+              "events": {
+                "onClick": { "handler": "deleteSelectedModels" }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "main": {
+      "blocks": [
+        {
+          "id": "block_model_table",
+          "blockType": "data-table",
+          "layout": { "colSpan": 12, "rowSpan": 1 },
+          "table": {
+            "rowKey": "pid",
+            "dataSource": "ds_modelList",
+            "pagination": {
+              "pageSize": 20,
+              "pageSizeOptions": [10, 20, 50, 100],
+              "showTotal": true
+            },
+            "selection": {
+              "mode": "multiple",
+              "bind": "{{state.selectedIds}}"
+            },
+            "columns": [
+              {
+                "field": "code",
+                "label": "$i18n:list.model.col.code",
+                "sortable": true,
+                "width": 150
+              },
+              {
+                "field": "displayName",
+                "label": "$i18n:list.model.col.displayName",
+                "sortable": true,
+                "width": 200
+              },
+              {
+                "field": "modelType",
+                "label": "$i18n:list.model.col.modelType",
+                "width": 120,
+                "render": "${$dict('model_type', row.modelType)}"
+              },
+              {
+                "field": "status",
+                "label": "$i18n:list.model.col.status",
+                "width": 100,
+                "render": "${$statusBadge(row.status)}"
+              },
+              {
+                "field": "version",
+                "label": "$i18n:list.model.col.version",
+                "width": 80
+              },
+              {
+                "field": "fieldCount",
+                "label": "$i18n:list.model.col.fieldCount",
+                "width": 100,
+                "render": "${row.fieldCount || 0}"
+              },
+              {
+                "field": "createdAt",
+                "label": "$i18n:list.model.col.createdAt",
+                "width": 180,
+                "render": "${$formatDate(row.createdAt)}"
+              },
+              {
+                "field": "buttons",
+                "label": "$i18n:list.model.col.actions",
+                "isActionColumn": true,
+                "width": 200,
+                "fixed": "right",
+                "buttons": [
+                  {
+                    "code": "view",
+                    "content": "$i18n:list.model.btn.view",
+                    "events": {
+                      "onClick": {
+                        "handler": "openDetailDrawer",
+                        "args": { "pid": "${row.pid}" }
+                      }
+                    }
+                  },
+                  {
+                    "code": "edit",
+                    "content": "$i18n:list.model.btn.edit",
+                    "visibleWhen": "${hasPermission('model:update')}",
+                    "events": {
+                      "onClick": {
+                        "handler": "openEditForm",
+                        "args": { "pid": "${row.pid}" }
+                      }
+                    }
+                  },
+                  {
+                    "code": "delete",
+                    "content": "$i18n:list.model.btn.delete",
+                    "danger": true,
+                    "visibleWhen": "${hasPermission('model:delete')}",
+                    "events": {
+                      "onClick": {
+                        "handler": "deleteSingleModel",
+                        "args": { "pid": "${row.pid}" }
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "dataSources": {
+    "ds_modelTypes": {
+      "type": "static",
+      "valueField": "value",
+      "labelField": "label",
+      "data": [
+        { "value": "entity", "label": "$i18n:model.type.entity" },
+        { "value": "view", "label": "$i18n:model.type.view" },
+        { "value": "aggregate", "label": "$i18n:model.type.aggregate" }
+      ]
+    },
+    "ds_modelStatuses": {
+      "type": "static",
+      "valueField": "value",
+      "labelField": "label",
+      "data": [
+        { "value": "draft", "label": "$i18n:model.status.draft" },
+        { "value": "published", "label": "$i18n:model.status.published" },
+        { "value": "archived", "label": "$i18n:model.status.archived" }
+      ]
+    },
+    "ds_modelList": {
+      "type": "api",
+      "endpoint": "/api/meta/models",
+      "method": "get",
+      "params": "{{state.filters}}",
+      "pagination": true,
+      "autoFetch": true,
+      "adaptor": "table"
+    }
+  },
+  "handlers": {
+    "searchModels": {
+      "type": "flow",
+      "steps": [
+        {
+          "action": "dataSource.fetch",
+          "target": "ds_modelList"
+        }
+      ]
+    },
+    "resetFilters": {
+      "type": "flow",
+      "steps": [
+        {
+          "action": "state.reset",
+          "target": "state.filters"
+        },
+        {
+          "action": "dataSource.fetch",
+          "target": "ds_modelList"
+        }
+      ]
+    },
+    "openCreateForm": {
+      "type": "flow",
+      "steps": [
+        {
+          "action": "ui.openContainer",
+          "target": "drawer.modelForm",
+          "args": { "mode": "create" }
+        }
+      ]
+    },
+    "openEditForm": {
+      "type": "flow",
+      "steps": [
+        {
+          "action": "ui.openContainer",
+          "target": "drawer.modelForm",
+          "args": {
+            "mode": "edit",
+            "pid": "${args.pid}"
+          }
+        }
+      ]
+    },
+    "openDetailDrawer": {
+      "type": "flow",
+      "steps": [
+        {
+          "action": "router.push",
+          "path": "/meta/models/${args.pid}"
+        }
+      ]
+    },
+    "deleteSingleModel": {
+      "type": "flow",
+      "steps": [
+        {
+          "action": "dialog.confirm",
+          "args": {
+            "title": "$i18n:list.model.delete.confirm.title",
+            "content": "$i18n:list.model.delete.confirm.content"
+          },
+          "next": "checkGitFirst"
+        },
+        {
+          "id": "checkGitFirst",
+          "action": "api.request",
+          "method": "get",
+          "endpoint": "/api/git/router/requires-git-first",
+          "params": { "resourceType": "model" },
+          "next": "doDelete"
+        },
+        {
+          "id": "doDelete",
+          "action": "api.request",
+          "method": "delete",
+          "endpoint": "/api/meta/models/${args.pid}",
+          "next": "afterDelete"
+        },
+        {
+          "id": "afterDelete",
+          "action": "toast.show",
+          "level": "success",
+          "content": "$i18n:list.model.delete.success"
+        },
+        {
+          "action": "dataSource.fetch",
+          "target": "ds_modelList"
+        }
+      ]
+    },
+    "deleteSelectedModels": {
+      "type": "flow",
+      "steps": [
+        {
+          "action": "dialog.confirm",
+          "args": {
+            "title": "$i18n:list.model.deleteSelected.confirm.title",
+            "content": "$i18n:list.model.deleteSelected.confirm.content"
+          },
+          "next": "doDelete"
+        },
+        {
+          "id": "doDelete",
+          "action": "api.request",
+          "method": "post",
+          "endpoint": "/api/meta/models/batch-delete",
+          "body": { "pids": "{{state.selectedIds}}" },
+          "next": "afterDelete"
+        },
+        {
+          "id": "afterDelete",
+          "action": "toast.show",
+          "level": "success",
+          "content": "$i18n:list.model.deleteSelected.success"
+        },
+        {
+          "action": "dataSource.fetch",
+          "target": "ds_modelList"
+        }
+      ]
+    },
+    "exportModels": {
+      "type": "flow",
+      "steps": [
+        {
+          "action": "api.download",
+          "method": "post",
+          "endpoint": "/api/meta/models/export",
+          "body": {
+            "filters": "{{state.filters}}",
+            "selectedIds": "{{state.selectedIds}}"
+          },
+          "filename": "models_${$formatDate(new Date(), 'yyyymmdd')}.xlsx"
+        }
+      ]
+    }
+  }
+}

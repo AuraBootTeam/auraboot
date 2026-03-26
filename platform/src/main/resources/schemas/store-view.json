@@ -1,0 +1,393 @@
+{
+  "meta": {
+    "title": {
+      "zh-CN": "门店详情",
+      "en-US": "Store Details"
+    },
+    "entityCode": "Store",
+    "dslVersion": "1.0.0",
+    "version": "2.0.0",
+    "pageKey": "store-view",
+    "schemaType": "view"
+  },
+  "endpoint": {
+    "get": {
+      "url": "/api/dynamic/Store/{id}",
+      "method": "get",
+      "permission": "store:read"
+    }
+  },
+  "regions": [
+    {
+      "type": "description",
+      "title": {
+        "zh-CN": "基本信息",
+        "en-US": "Basic Information"
+      },
+      "layout": {
+        "type": "grid",
+        "columns": 2,
+        "gap": 16
+      },
+      "fields": [
+        {
+          "code": "code",
+          "type": "text",
+          "props": {
+            "label": {
+              "zh-CN": "门店编码",
+              "en-US": "Store Code"
+            }
+          },
+          "layout": {
+            "span": 1
+          }
+        },
+        {
+          "code": "name",
+          "type": "text",
+          "props": {
+            "label": {
+              "zh-CN": "门店名称",
+              "en-US": "Store Name"
+            }
+          },
+          "layout": {
+            "span": 1
+          }
+        },
+        {
+          "code": "type",
+          "type": "tag",
+          "props": {
+            "label": {
+              "zh-CN": "门店类型",
+              "en-US": "Store Type"
+            },
+            "mapping": {
+              "direct": {
+                "text": {
+                  "zh-CN": "直营店",
+                  "en-US": "Direct Store"
+                },
+                "color": "blue"
+              },
+              "franchise": {
+                "text": {
+                  "zh-CN": "加盟店",
+                  "en-US": "Franchise Store"
+                },
+                "color": "green"
+              },
+              "flagship": {
+                "text": {
+                  "zh-CN": "旗舰店",
+                  "en-US": "Flagship Store"
+                },
+                "color": "gold"
+              },
+              "community": {
+                "text": {
+                  "zh-CN": "社区店",
+                  "en-US": "Community Store"
+                },
+                "color": "purple"
+              }
+            }
+          },
+          "layout": {
+            "span": 1
+          }
+        },
+        {
+          "code": "status",
+          "type": "badge",
+          "props": {
+            "label": {
+              "zh-CN": "门店状态",
+              "en-US": "Store Status"
+            },
+            "mapping": {
+              "active": {
+                "text": {
+                  "zh-CN": "开业",
+                  "en-US": "Active"
+                },
+                "status": "success"
+              },
+              "inactive": {
+                "text": {
+                  "zh-CN": "未开业",
+                  "en-US": "Inactive"
+                },
+                "status": "default"
+              },
+              "preparing": {
+                "text": {
+                  "zh-CN": "筹备中",
+                  "en-US": "Preparing"
+                },
+                "status": "processing"
+              },
+              "closed": {
+                "text": {
+                  "zh-CN": "已关闭",
+                  "en-US": "Closed"
+                },
+                "status": "error"
+              }
+            }
+          },
+          "layout": {
+            "span": 1
+          }
+        },
+        {
+          "code": "address",
+          "type": "text",
+          "props": {
+            "label": {
+              "zh-CN": "门店地址",
+              "en-US": "Store Address"
+            }
+          },
+          "layout": {
+            "span": 2
+          }
+        },
+        {
+          "code": "contactPhone",
+          "type": "text",
+          "props": {
+            "label": {
+              "zh-CN": "联系电话",
+              "en-US": "Contact Phone"
+            }
+          },
+          "layout": {
+            "span": 1
+          }
+        },
+        {
+          "code": "manager",
+          "type": "text",
+          "props": {
+            "label": {
+              "zh-CN": "店长姓名",
+              "en-US": "Manager Name"
+            }
+          },
+          "layout": {
+            "span": 1
+          }
+        },
+        {
+          "code": "openingHours",
+          "type": "text",
+          "props": {
+            "label": {
+              "zh-CN": "营业时间",
+              "en-US": "Opening Hours"
+            }
+          },
+          "layout": {
+            "span": 1
+          }
+        },
+        {
+          "code": "area",
+          "type": "number",
+          "props": {
+            "label": {
+              "zh-CN": "营业面积",
+              "en-US": "Business Area"
+            },
+            "suffix": "㎡",
+            "precision": 2
+          },
+          "layout": {
+            "span": 1
+          }
+        },
+        {
+          "code": "description",
+          "type": "text",
+          "props": {
+            "label": {
+              "zh-CN": "门店描述",
+              "en-US": "Store Description"
+            },
+            "type": "paragraph"
+          },
+          "layout": {
+            "span": 2
+          }
+        }
+      ]
+    },
+    {
+      "type": "description",
+      "title": {
+        "zh-CN": "系统信息",
+        "en-US": "System Information"
+      },
+      "layout": {
+        "type": "grid",
+        "columns": 2,
+        "gap": 16
+      },
+      "fields": [
+        {
+          "code": "createdAt",
+          "type": "datetime",
+          "props": {
+            "label": {
+              "zh-CN": "创建时间",
+              "en-US": "Created At"
+            },
+            "format": "YYYY-MM-DD HH:mm:ss"
+          },
+          "layout": {
+            "span": 1
+          }
+        },
+        {
+          "code": "updatedAt",
+          "type": "datetime",
+          "props": {
+            "label": {
+              "zh-CN": "更新时间",
+              "en-US": "Updated At"
+            },
+            "format": "YYYY-MM-DD HH:mm:ss"
+          },
+          "layout": {
+            "span": 1
+          }
+        },
+        {
+          "code": "createdBy",
+          "type": "text",
+          "props": {
+            "label": {
+              "zh-CN": "创建人",
+              "en-US": "Created By"
+            }
+          },
+          "layout": {
+            "span": 1
+          }
+        },
+        {
+          "code": "updatedBy",
+          "type": "text",
+          "props": {
+            "label": {
+              "zh-CN": "更新人",
+              "en-US": "Updated By"
+            }
+          },
+          "layout": {
+            "span": 1
+          }
+        }
+      ]
+    },
+    {
+      "type": "action",
+      "actions": [
+        {
+          "code": "edit",
+          "props": {
+            "type": "primary",
+            "label": {
+              "zh-CN": "编辑",
+              "en-US": "Edit"
+            },
+            "icon": "EditOutlined"
+          },
+          "permission": "store:update"
+        },
+        {
+          "code": "delete",
+          "props": {
+            "type": "danger",
+            "label": {
+              "zh-CN": "删除",
+              "en-US": "Delete"
+            },
+            "icon": "DeleteOutlined"
+          },
+          "permission": "store:delete"
+        },
+        {
+          "code": "back",
+          "props": {
+            "label": {
+              "zh-CN": "返回",
+              "en-US": "Back"
+            },
+            "icon": "ArrowLeftOutlined"
+          }
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "on": "edit.click",
+      "do": [
+        {
+          "type": "navigate",
+          "to": "/dynamic/Store/edit/${$data.id}"
+        }
+      ]
+    },
+    {
+      "on": "delete.click",
+      "do": [
+        {
+          "type": "confirm",
+          "title": {
+            "zh-CN": "确认删除",
+            "en-US": "Confirm Delete"
+          },
+          "content": {
+            "zh-CN": "确定要删除门店 \"${$data.name}\" 吗？此操作不可恢复。",
+            "en-US": "Are you sure to delete store \"${$data.name}\"? This action cannot be undone."
+          },
+          "onConfirm": [
+            {
+              "type": "apiCall",
+              "target": "api.deleteStore",
+              "payload": {
+                "id": "${$data.id}"
+              }
+            },
+            {
+              "type": "toast",
+              "level": "success",
+              "message": {
+                "zh-CN": "删除成功",
+                "en-US": "Delete successful"
+              }
+            },
+            {
+              "type": "navigate",
+              "to": "/dynamic/Store"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "on": "back.click",
+      "do": [
+        {
+          "type": "navigate",
+          "to": "/dynamic/Store"
+        }
+      ]
+    }
+  ]
+}

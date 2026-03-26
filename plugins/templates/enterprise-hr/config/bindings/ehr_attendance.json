@@ -1,0 +1,10 @@
+[
+  {"modelCode":"ehr_attendance","fieldCode":"ehr_at_code","sequence":1,"required":true,"visible":true,"editable":false,"displayConfig":{"searchable":true,"sortable":true}},
+  {"modelCode":"ehr_attendance","fieldCode":"ehr_at_employee_id","sequence":2,"required":true,"visible":true,"editable":true,"displayConfig":{"searchable":true}},
+  {"modelCode":"ehr_attendance","fieldCode":"ehr_at_date","sequence":3,"required":true,"visible":true,"editable":true,"displayConfig":{"sortable":true}},
+  {"modelCode":"ehr_attendance","fieldCode":"ehr_at_check_in","sequence":4,"required":false,"visible":true,"editable":true},
+  {"modelCode":"ehr_attendance","fieldCode":"ehr_at_check_out","sequence":5,"required":false,"visible":true,"editable":true},
+  {"modelCode":"ehr_attendance","fieldCode":"ehr_at_type","sequence":6,"required":false,"visible":true,"editable":true,"displayConfig":{"searchable":true}},
+  {"modelCode":"ehr_attendance","fieldCode":"ehr_at_overtime_hours","sequence":7,"required":false,"visible":true,"editable":true},
+  {"modelCode":"ehr_attendance","fieldCode":"ehr_at_notes","sequence":8,"required":false,"visible":false,"editable":true}
+]

@@ -1,0 +1,68 @@
+{
+  "meta": {
+    "title": {
+      "zh-CN": "门店列表",
+      "en-US": "Store List"
+    },
+    "entityCode": "Store",
+    "dslVersion": "1.0.0",
+    "version": "2.0.0"
+  },
+  "endpoint": {
+    "url": "/api/dynamic/Store/list",
+    "method": "get",
+    "permission": "store:read",
+    "transform": {
+      "request": "fn(q){ return { filters:q.filters, sorts:q.sorts, page:q.page, size:q.size }; }",
+      "response": "fn(res){ return { rows: res.data, total: res.total }; }"
+    }
+  },
+  "regions": [
+    {
+      "type": "filters",
+      "ref": {
+        "blockCode": "store.list.filter@^1"
+      }
+    },
+    {
+      "type": "preset",
+      "ref": {
+        "blockCode": "store.list.preset@^1"
+      }
+    },
+    {
+      "type": "action",
+      "ref": {
+        "blockCode": "store.list.action@^1"
+      }
+
+    },
+    {
+      "type": "table",
+      "ref": {
+        "blockCode": "store.list.column@^3"
+      },
+      "props": {
+        "rowSelection": {
+          "type": "checkbox"
+        },
+        "rowKey": "id",
+        "scroll": {
+          "x": 1200
+        }
+      }
+    },
+    {
+      "type": "form",
+      "ref": {
+        "blockCode": "store.form.edit@^2"
+      },
+      "props": {
+        "width": 720,
+        "destroyOnClose": true
+      }
+    }
+  ]
+
+
+}

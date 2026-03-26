@@ -1,0 +1,85 @@
+[
+  {
+    "code": "tcrm_ld_code",
+    "displayName:zh-CN": "线索编号",
+    "displayName:en": "Lead Code",
+    "dataType": "string",
+    "description": "Auto-generated lead code.",
+    "constraints": { "required": true, "maxLength": 50 },
+    "feature": { "searchable": true, "sortable": true },
+    "extension": { "readOnly": true, "placeholder:zh-CN": "系统自动生成", "placeholder:en": "Auto generated" }
+  },
+  {
+    "code": "tcrm_ld_name",
+    "displayName:zh-CN": "姓名",
+    "displayName:en": "Name",
+    "dataType": "string",
+    "description": "Lead person name.",
+    "constraints": { "required": true, "maxLength": 200 },
+    "feature": { "searchable": true, "sortable": true },
+    "extension": { "placeholder:zh-CN": "请输入姓名", "placeholder:en": "Enter name" }
+  },
+  {
+    "code": "tcrm_ld_company",
+    "displayName:zh-CN": "公司",
+    "displayName:en": "Company",
+    "dataType": "string",
+    "description": "Company or organization the lead belongs to.",
+    "constraints": { "maxLength": 200 },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "tcrm_ld_email",
+    "displayName:zh-CN": "邮箱",
+    "displayName:en": "Email",
+    "dataType": "string",
+    "description": "Lead email address.",
+    "constraints": { "maxLength": 200 },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "tcrm_ld_phone",
+    "displayName:zh-CN": "电话",
+    "displayName:en": "Phone",
+    "dataType": "string",
+    "description": "Lead phone number.",
+    "constraints": { "maxLength": 50 }
+  },
+  {
+    "code": "tcrm_ld_source",
+    "displayName:zh-CN": "来源",
+    "displayName:en": "Source",
+    "dataType": "enum",
+    "dictCode": "tcrm_lead_source",
+    "description": "How the lead was acquired.",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "tcrm_ld_status",
+    "displayName:zh-CN": "状态",
+    "displayName:en": "Status",
+    "dataType": "enum",
+    "dictCode": "tcrm_lead_status",
+    "defaultValue": "new",
+    "description": "Lead lifecycle status. Managed by state transition commands.",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "tcrm_ld_assignee",
+    "displayName:zh-CN": "负责人",
+    "displayName:en": "Assignee",
+    "dataType": "string",
+    "description": "Sales rep assigned to this lead.",
+    "constraints": { "maxLength": 100 },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "tcrm_ld_notes",
+    "displayName:zh-CN": "备注",
+    "displayName:en": "Notes",
+    "dataType": "text",
+    "description": "Free-form notes about the lead.",
+    "constraints": { "maxLength": 5000 },
+    "extension": { "multiline": true }
+  }
+]

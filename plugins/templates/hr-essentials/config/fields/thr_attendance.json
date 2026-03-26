@@ -1,0 +1,76 @@
+[
+  {
+    "code": "thr_at_code",
+    "displayName:zh-CN": "考勤编号",
+    "displayName:en": "Attendance Code",
+    "dataType": "string",
+    "description": "Auto-generated attendance record code.",
+    "constraints": { "required": true, "maxLength": 50 },
+    "feature": { "searchable": true, "sortable": true },
+    "extension": {
+      "readOnly": true,
+      "placeholder:zh-CN": "系统自动生成",
+      "placeholder:en": "Auto generated"
+    }
+  },
+  {
+    "code": "thr_at_employee_id",
+    "displayName:zh-CN": "员工",
+    "displayName:en": "Employee",
+    "dataType": "reference",
+    "description": "Foreign key to the employee this attendance record belongs to.",
+    "constraints": { "required": true },
+    "extension": {
+      "refModelCode": "thr_employee",
+      "refDisplayField": "thr_em_name"
+    }
+  },
+  {
+    "code": "thr_at_date",
+    "displayName:zh-CN": "日期",
+    "displayName:en": "Date",
+    "dataType": "date",
+    "description": "The date of this attendance record.",
+    "constraints": { "required": true },
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "thr_at_check_in",
+    "displayName:zh-CN": "签到时间",
+    "displayName:en": "Check In",
+    "dataType": "datetime",
+    "description": "Timestamp when the employee checked in.",
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "thr_at_check_out",
+    "displayName:zh-CN": "签退时间",
+    "displayName:en": "Check Out",
+    "dataType": "datetime",
+    "description": "Timestamp when the employee checked out.",
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "thr_at_type",
+    "displayName:zh-CN": "考勤类型",
+    "displayName:en": "Type",
+    "dataType": "enum",
+    "dictCode": "thr_att_type",
+    "defaultValue": "normal",
+    "description": "Classification of the attendance record (normal, late, early leave, absent).",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "thr_at_notes",
+    "displayName:zh-CN": "备注",
+    "displayName:en": "Notes",
+    "dataType": "text",
+    "description": "Additional notes about this attendance record.",
+    "constraints": { "maxLength": 2000 },
+    "extension": {
+      "multiline": true,
+      "placeholder:zh-CN": "请输入备注",
+      "placeholder:en": "Enter notes"
+    }
+  }
+]

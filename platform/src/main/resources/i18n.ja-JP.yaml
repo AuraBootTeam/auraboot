@@ -1,0 +1,300 @@
+common:
+  type: タイプ
+  status: ステータス
+  date: 日付
+  id: ID
+  name: 名前
+  description: 説明
+  created_at: 作成日時
+  updated_at: 更新日時
+  creator: 作成者
+  modifier: 更新者
+  loading: 読み込み中...
+  yes: はい
+  no: いいえ
+
+  SchemaList: スキーマ一覧
+  form: 新規ビュー
+
+  deletedFlag: ステータス
+  active: 有効
+  inactive: 無効
+  createdAt: 作成日時
+
+  print: 印刷
+  new: 新規作成
+  export: エクスポート
+  delete: 削除
+  edit: 編集
+  view: 表示
+
+  query_conditions: 検索条件
+  reset: リセット
+  search: 検索
+  query: 検索
+  operation: 操作
+
+  items_per_page: 表示件数
+  items_total: "全 {total} 件"
+  first_page: 先頭ページ
+  previous_page: 前のページ
+  next_page: 次のページ
+  last_page: 最終ページ
+  page_of: "{total} ページ中 {current} ページ目"
+
+  please_input: "{field}を入力してください"
+  please_select: "{field}を選択してください"
+  all: すべて
+
+  start_date: 開始日
+  end_date: 終了日
+
+  confirm_delete: 削除してもよろしいですか？
+
+# Notification System
+notification:
+  center:
+    title: 通知センター
+    unread_count: "未読 {count} 件"
+    mark_all_read: すべて既読にする
+    view_all: すべて表示
+    empty: 新しい通知はありません
+  time:
+    just_now: たった今
+    minutes_ago: "{count}分前"
+    hours_ago: "{count}時間前"
+    yesterday: 昨日
+    days_ago: "{count}日前"
+  priority:
+    high: 高優先度
+    normal: 通常
+    low: 低優先度
+  channel:
+    in_app: アプリ内通知
+    email: メール
+    wechat_work: 企業微信
+    dingtalk: DingTalk
+    slack: Slack
+  category:
+    business: 業務通知
+    approval: 承認通知
+    system: システム通知
+    alert: アラート通知
+  preferences:
+    load_failed: 通知設定の読み込みに失敗しました
+    update_failed: 通知設定の更新に失敗しました
+
+# BPM Notification
+bpm:
+  notification:
+    task_created:
+      title: 新しいタスクがあります
+    task_completed:
+      title: タスクが完了しました
+    process_started:
+      title: プロセスが開始されました
+    process_ended:
+      title: プロセスが完了しました
+    sla_warning:
+      title: SLA 警告
+    sla_escalated:
+      title: SLA エスカレーション
+    default:
+      title: BPM 通知
+
+# Flow Designer SDK
+flow:
+  palette:
+    title: コンポーネントライブラリ
+    empty: 利用可能なコンポーネントがありません
+  category:
+    trigger: トリガー
+    action: アクション
+    control: 制御
+  panel:
+    selectNode: ノードを選択して設定
+    noConfig: 設定項目がありません
+    deleteNode: ノードを削除
+    deleteConfirm: このノードを削除してもよろしいですか？
+  toolbar:
+    title: フローデザイナー
+    unsaved: 未保存
+    hasErrors: エラーあり
+    save: 保存
+    saving: 保存中...
+    validate: 検証
+    import: インポート
+    export: エクスポート
+    importError: インポートファイルの形式が不正です
+
+# Automation
+automation:
+  # Page-level
+  page:
+    title: オートメーションルール
+  list:
+    title: オートメーション一覧
+    create: + 新規ルール作成
+    empty: オートメーションルールがありません。上のボタンから作成してください
+    search: ルールを検索...
+    enabled: 有効
+    disabled: 無効
+    enable: 有効にする
+    disable: 無効にする
+    edit: 編集
+    delete: 削除
+    logs: ログ
+    lastRun: 前回実行
+    deleteConfirm: 「{name}」を削除してもよろしいですか？
+
+  # Triggers
+  trigger:
+    recordCreate: レコード作成時
+    recordCreate.desc: 指定モデルのレコードが作成されたときに実行
+    recordUpdate: レコード更新時
+    recordUpdate.desc: 指定モデルのレコードが更新されたときに実行
+    fieldChange: フィールド変更時
+    fieldChange.desc: 指定フィールドの値が変更されたときに実行
+    stateChange: ステータス変更時
+    stateChange.desc: レコードのステータスが変更されたときに実行
+    scheduled: スケジュール実行
+    scheduled.desc: Cron 式に従って定期実行
+    webhook: Webhook トリガー
+    webhook.desc: 外部 Webhook リクエストを受信したときに実行
+
+  # Actions
+  action:
+    updateRecord: レコード更新
+    updateRecord.desc: 指定モデルのレコードフィールドを更新
+    createRecord: レコード作成
+    createRecord.desc: 指定モデルに新しいレコードを作成
+    sendNotification: 通知送信
+    sendNotification.desc: 指定ユーザーに通知を送信
+    executeCommand: コマンド実行
+    executeCommand.desc: 指定のシステムコマンドを実行
+    callApi: API 呼び出し
+    callApi.desc: 外部 HTTP API を呼び出し
+    sendWebhook: Webhook 送信
+    sendWebhook.desc: 指定 URL に Webhook リクエストを送信
+
+  # Controls
+  control:
+    condition: 条件分岐
+    condition.desc: 条件式に基づいて実行パスを決定
+    delay: 遅延
+    delay.desc: 指定時間待機後に続行
+    loop: ループ
+    loop.desc: コレクション内の各要素を反復処理
+
+  # Fields
+  field:
+    modelCode: モデル
+    modelCode.desc: 操作対象のデータモデルを選択
+    fieldCode: フィールド
+    watchFields: 監視フィールド
+    watchFields.desc: 空欄の場合はすべてのフィールドを監視
+    stateField: ステータスフィールド
+    fromValue: 変更前の値
+    fromValue.desc: 空欄の場合は任意の値にマッチ
+    toValue: 変更後の値
+    toValue.desc: 空欄の場合は任意の値にマッチ
+    fromStates: 変更前のステータス
+    fromStates.desc: 空欄の場合は任意のステータスにマッチ
+    toStates: 変更後のステータス
+    toStates.desc: 空欄の場合は任意のステータスにマッチ
+    cron: Cron 式
+    cron.desc: '例: 0 0 * * * (毎日0時)'
+    timezone: タイムゾーン
+    secret: シークレットキー
+    secret.desc: リクエスト署名の検証に使用するキー
+    validationMode: 検証方式
+    validationMode.none: 検証なし
+    validationMode.signature: 署名検証
+    validationMode.token: トークン検証
+    recordId: レコード ID
+    recordId.desc: 式参照をサポート（例：${trigger.recordId}）
+    updateFields: 更新フィールド
+    updateFields.desc: 更新するフィールドと値（JSON 形式）
+    createFields: レコードフィールド
+    createFields.desc: 新しいレコードのフィールドと値（JSON 形式）
+    notificationType: 通知タイプ
+    notificationType.email: メール
+    notificationType.sms: SMS
+    notificationType.push: プッシュ通知
+    notificationType.inApp: アプリ内メッセージ
+    notificationTitle: 通知タイトル
+    notificationContent: 通知内容
+    recipients: 受信者
+    recipients.desc: 式参照でユーザー ID またはメールを指定可能
+    commandCode: コマンドコード
+    commandCode.desc: 実行するコマンドの識別子
+    commandParams: コマンドパラメータ
+    commandParams.desc: コマンドに渡すパラメータ（JSON 形式）
+    apiUrl: API URL
+    httpMethod: HTTP メソッド
+    httpHeaders: リクエストヘッダー
+    httpBody: リクエストボディ
+    webhookUrl: Webhook URL
+    webhookPayload: リクエストペイロード
+    expression: 条件式
+    expression.desc: true または false を返す式
+    duration: 遅延時間
+    duration.desc: 待機する時間
+    unit: 時間単位
+    unit.seconds: 秒
+    unit.minutes: 分
+    unit.hours: 時間
+    unit.days: 日
+    collection: コレクション
+    collection.desc: 反復処理する配列またはリスト
+    itemVariable: 要素変数名
+    itemVariable.desc: 現在の要素の変数名（デフォルト：item）
+
+# Auth
+auth:
+  login: ログイン
+  register: 新規登録
+  welcome: おかえりなさい
+  selectMethod: ログイン方法を選択
+  tagline: エンタープライズローコードプラットフォーム
+  email: メールアドレス
+  emailPlaceholder: メールアドレスを入力
+  password: パスワード
+  passwordPlaceholder: パスワードを入力
+  rememberMe: ログイン状態を保持
+  forgotPassword: パスワードをお忘れですか？
+  loginNow: ログイン
+  mobile: 電話番号
+  mobilePlaceholder: 電話番号を入力
+  verifyCode: 認証コード
+  codePlaceholder: 認証コードを入力
+  sending: 送信中...
+  getCode: コードを取得
+  socialLogin: その他のログイン方法
+  noAccount: アカウントをお持ちでないですか？
+  registerNow: 新規登録
+  feature:
+    designer: ビジュアルページデザイナー
+    dataModel: 柔軟なデータモデル
+    workflow: 自動化ワークフロー
+  channel:
+    emailPassword: メール＆パスワード
+    sms: SMS ログイン
+    emailCode: メール認証コード
+  social:
+    wechat: WeChat ログイン
+    oidc: SSO ログイン
+  error:
+    invalidCredentials: メールアドレスまたはパスワードが正しくありません
+    invalidMobile: 有効な電話番号を入力してください
+    codeRequired: 認証コードを入力してください
+    codeInvalid: 認証コードが無効または期限切れです
+
+# Dashboard Viewer
+dashboard:
+  drag_hint: タブをドラッグして順序を変更
+  empty: 公開されたダッシュボードがありません
+  goto_management: ダッシュボード管理へ
+  refresh: 更新
+  refreshed: データを更新しました
+  retry: リトライ

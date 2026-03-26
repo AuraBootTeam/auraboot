@@ -1,0 +1,9 @@
+{
+  "meta": {
+    "dslVersion": "1.0.0",
+    "template": "default",
+
+    "entityCode": "store",
+    "version": "2.0.0"
+  }
+}

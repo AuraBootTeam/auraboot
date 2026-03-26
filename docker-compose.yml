@@ -1,0 +1,171 @@
+# AuraBoot — Infrastructure for Local Development
+# Starts PostgreSQL, Redis, and MinIO (optional file storage).
+# Backend and frontend are run locally, or use --profile full for complete stack.
+#
+# Usage:
+#   docker compose up -d          # start all infrastructure
+#   docker compose up -d postgres redis  # start only DB + cache
+#   docker compose down           # stop
+
+services:
+  # ─── PostgreSQL 16 ────────────────────────────────────────────────────────
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: auraboot-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-aura_boot}
+      POSTGRES_USER: ${POSTGRES_USER:-auraboot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-auraboot_dev}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./platform/src/main/resources/database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-auraboot} -d ${POSTGRES_DB:-aura_boot}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  # ─── Redis 7 ──────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: auraboot-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["cmd", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  # ─── MinIO (optional — only needed for file upload features) ───────────────
+  minio:
+    image: minio/minio:latest
+    container_name: auraboot-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "9000:9000"   # S3-compatible API
+      - "9001:9001"   # Web console: http://localhost:9001
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["cmd", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ─── Backend (Spring Boot) ──────────────────────────────── profile: full
+  backend:
+    profiles: [full]
+    build:
+      context: ./platform
+      dockerfile: Dockerfile
+    container_name: auraboot-backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-aura_boot}?charSet=UTF8
+      DATABASE_USERNAME: ${POSTGRES_USER:-auraboot}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-auraboot_dev}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: ${JWT_SECRET:-docker-eval-secret-change-in-production-min-32-chars}
+      FRONTEND_BASE_URL: http://localhost:${AURABOOT_PORT:-3000}
+      SPRING_PROFILES_ACTIVE: community
+      AURABOOT_BOOTSTRAP_ENABLED: "true"
+    volumes:
+      - backend_data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["cmd", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:6443/actuator/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+
+  # ─── Frontend (BFF + SSR) ──────────────────────────────── profile: full
+  frontend:
+    profiles: [full]
+    build:
+      context: ./web-admin
+      dockerfile: Dockerfile
+    container_name: auraboot-frontend
+    restart: unless-stopped
+    ports:
+      - "${AURABOOT_PORT:-3000}:3000"
+    environment:
+      NODE_ENV: production
+      BFF_PORT: "3000"
+      SPRING_BOOT_URL: http://backend:6443
+      CORS_ALLOWED_ORIGINS: http://localhost:${AURABOOT_PORT:-3000}
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  # ─── Prometheus (metrics collection) ─────────────────── profile: monitoring
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: auraboot-prometheus
+    profiles: [monitoring]
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=15d'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  # ─── Grafana (dashboards & visualization) ───────────── profile: monitoring
+  grafana:
+    image: grafana/grafana:11.0.0
+    container_name: auraboot-grafana
+    profiles: [monitoring]
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GF_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/platform-overview.json
+    volumes:
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./docker/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  minio_data:
+    driver: local
+  backend_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local

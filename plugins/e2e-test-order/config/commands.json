@@ -1,0 +1,682 @@
+[
+  {
+    "code": "e2eto:create_e2et_order",
+    "displayName:zh-CN": "新建订单（含交货日期）",
+    "displayName:en": "Create E2E Test Order",
+    "description": "Create order with order_date and delivery_date for cross-field validation testing",
+    "type": "create",
+    "modelCode": "e2et_order",
+    "inputFields": [
+      "e2et_order_title",
+      "e2et_order_desc",
+      "e2et_order_type",
+      "e2et_order_customer",
+      "e2et_order_urgent",
+      "e2et_order_remark",
+      "e2et_order_discount",
+      "e2et_order_date",
+      "e2et_delivery_date"
+    ],
+    "autoSetFields": {
+      "e2et_order_no": {
+        "strategy": "auto_generate",
+        "pattern": "ORD-{yyyyMMdd}-{seq}"
+      },
+      "e2et_order_status": {
+        "strategy": "fixed_value",
+        "value": "draft"
+      }
+    },
+    "permissions": [
+      "E2ET.order.manage"
+    ]
+  },
+  {
+    "code": "e2et:create_order",
+    "displayName:zh-CN": "新建订单",
+    "displayName:en": "Create Order",
+    "description": "Create order with auto-generated number, default draft status, and current timestamp",
+    "type": "create",
+    "modelCode": "e2et_order",
+    "inputFields": [
+      "e2et_order_title",
+      "e2et_order_desc",
+      "e2et_order_type",
+      "e2et_order_customer",
+      "e2et_order_urgent",
+      "e2et_order_remark",
+      "e2et_order_discount"
+    ],
+    "autoSetFields": {
+      "e2et_order_no": {
+        "strategy": "auto_generate",
+        "pattern": "ORD-{yyyyMMdd}-{seq}"
+      },
+      "e2et_order_status": {
+        "strategy": "fixed_value",
+        "value": "draft"
+      },
+      "e2et_order_date": {
+        "strategy": "current_date"
+      }
+    },
+    "permissions": [
+      "E2ET.order.manage"
+    ]
+  },
+  {
+    "code": "e2et:update_order",
+    "displayName:zh-CN": "编辑订单",
+    "displayName:en": "Update Order",
+    "description": "Update order; only allowed in draft or rejected status",
+    "type": "update",
+    "modelCode": "e2et_order",
+    "inputFields": [
+      "e2et_order_title",
+      "e2et_order_desc",
+      "e2et_order_type",
+      "e2et_order_customer",
+      "e2et_order_urgent",
+      "e2et_order_remark",
+      "e2et_order_discount"
+    ],
+    "preconditions": [
+      {
+        "field": "e2et_order_status",
+        "operator": "IN",
+        "value": [
+          "draft",
+          "rejected"
+        ],
+        "message:zh-CN": "仅草稿或已退回状态可编辑",
+        "message:en": "Only draft or rejected orders can be edited"
+      }
+    ],
+    "validation": {
+      "rules": [
+        {
+          "type": "required",
+          "field": "e2et_order_title",
+          "message:zh-CN": "订单标题不能为空",
+          "message:en": "Order title is required"
+        }
+      ]
+    },
+    "permissions": [
+      "E2ET.order.manage"
+    ]
+  },
+  {
+    "code": "e2et:delete_order",
+    "displayName:zh-CN": "删除订单",
+    "displayName:en": "Delete Order",
+    "description": "Delete order with cascade to items and logs; only draft status",
+    "type": "delete",
+    "modelCode": "e2et_order",
+    "preconditions": [
+      {
+        "field": "e2et_order_status",
+        "operator": "EQ",
+        "value": "draft",
+        "message:zh-CN": "仅草稿状态的订单可以删除",
+        "message:en": "Only draft orders can be deleted"
+      }
+    ],
+    "cascadeDelete": [
+      {
+        "childModel": "e2et_order_item",
+        "parentField": "e2et_order_id"
+      },
+      {
+        "childModel": "e2et_order_log",
+        "parentField": "e2et_log_order_id"
+      }
+    ],
+    "permissions": [
+      "E2ET.order.manage"
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此订单？关联明细和日志将一并删除，此操作不可撤销。",
+      "confirmMessage:en": "Delete this order? All items and logs will be deleted. This cannot be undone."
+    }
+  },
+  {
+    "code": "e2et:submit_order",
+    "displayName:zh-CN": "提交订单",
+    "displayName:en": "Submit Order",
+    "description": "Submit order: draft→submitted; requires at least one item (HAS_CHILDREN); creates audit log (sideEffect)",
+    "type": "state_transition",
+    "modelCode": "e2et_order",
+    "stateField": "e2et_order_status",
+    "fromStates": [
+      "draft",
+      "rejected"
+    ],
+    "toState": "submitted",
+    "validation": {
+      "rules": [
+        {
+          "type": "has_children",
+          "childModel": "e2et_order_item",
+          "parentField": "e2et_order_id",
+          "minCount": 1,
+          "message:zh-CN": "请至少添加一条订单明细后再提交",
+          "message:en": "At least one order item is required before submission"
+        }
+      ]
+    },
+    "sideEffects": [
+      {
+        "condition": "true",
+        "actions": [
+          {
+            "type": "create_record",
+            "modelCode": "e2et_order_log",
+            "fields": {
+              "e2et_log_order_id": "${recordId}",
+              "e2et_log_action": "submit",
+              "e2et_log_remark": "Order submitted for approval"
+            }
+          }
+        ]
+      }
+    ],
+    "permissions": [
+      "E2ET.order.manage"
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认提交此订单？提交后将进入审批流程。",
+      "confirmMessage:en": "Submit this order? It will enter the approval workflow."
+    }
+  },
+  {
+    "code": "e2et:approve_order",
+    "displayName:zh-CN": "审批通过",
+    "displayName:en": "Approve Order",
+    "description": "Approve order: submitted→approved; creates audit log (sideEffect); requires approve permission",
+    "type": "state_transition",
+    "modelCode": "e2et_order",
+    "stateField": "e2et_order_status",
+    "fromStates": [
+      "submitted"
+    ],
+    "toState": "approved",
+    "sideEffects": [
+      {
+        "condition": "true",
+        "actions": [
+          {
+            "type": "create_record",
+            "modelCode": "e2et_order_log",
+            "fields": {
+              "e2et_log_order_id": "${recordId}",
+              "e2et_log_action": "approve",
+              "e2et_log_remark": "Order approved"
+            }
+          }
+        ]
+      }
+    ],
+    "permissions": [
+      "E2ET.order.approve"
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认审批通过此订单？",
+      "confirmMessage:en": "Approve this order?"
+    }
+  },
+  {
+    "code": "e2et:reject_order",
+    "displayName:zh-CN": "退回订单",
+    "displayName:en": "Reject Order",
+    "description": "Reject order: submitted→rejected; creates audit log (sideEffect)",
+    "type": "state_transition",
+    "modelCode": "e2et_order",
+    "stateField": "e2et_order_status",
+    "fromStates": [
+      "submitted"
+    ],
+    "toState": "rejected",
+    "inputFields": [
+      "e2et_order_remark"
+    ],
+    "sideEffects": [
+      {
+        "condition": "true",
+        "actions": [
+          {
+            "type": "create_record",
+            "modelCode": "e2et_order_log",
+            "fields": {
+              "e2et_log_order_id": "${recordId}",
+              "e2et_log_action": "reject",
+              "e2et_log_remark": "Order rejected"
+            }
+          }
+        ]
+      }
+    ],
+    "permissions": [
+      "E2ET.order.approve"
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认退回此订单？退回后可重新修改提交。",
+      "confirmMessage:en": "Reject this order? It can be revised and resubmitted."
+    }
+  },
+  {
+    "code": "e2et:complete_order",
+    "displayName:zh-CN": "完成订单",
+    "displayName:en": "Complete Order",
+    "description": "Complete order: approved→completed",
+    "type": "state_transition",
+    "modelCode": "e2et_order",
+    "stateField": "e2et_order_status",
+    "fromStates": [
+      "approved"
+    ],
+    "toState": "completed",
+    "sideEffects": [
+      {
+        "condition": "true",
+        "actions": [
+          {
+            "type": "create_record",
+            "modelCode": "e2et_order_log",
+            "fields": {
+              "e2et_log_order_id": "${recordId}",
+              "e2et_log_action": "complete",
+              "e2et_log_remark": "Order completed"
+            }
+          }
+        ]
+      }
+    ],
+    "permissions": [
+      "E2ET.order.manage"
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认完成此订单？",
+      "confirmMessage:en": "Complete this order?"
+    }
+  },
+  {
+    "code": "e2et:cancel_order",
+    "displayName:zh-CN": "取消订单",
+    "displayName:en": "Cancel Order",
+    "description": "Cancel order: [draft,submitted]→cancelled (multi-source state transition)",
+    "type": "state_transition",
+    "modelCode": "e2et_order",
+    "stateField": "e2et_order_status",
+    "fromStates": [
+      "draft",
+      "submitted"
+    ],
+    "toState": "cancelled",
+    "sideEffects": [
+      {
+        "condition": "true",
+        "actions": [
+          {
+            "type": "create_record",
+            "modelCode": "e2et_order_log",
+            "fields": {
+              "e2et_log_order_id": "${recordId}",
+              "e2et_log_action": "cancel",
+              "e2et_log_remark": "Order cancelled"
+            }
+          }
+        ]
+      }
+    ],
+    "permissions": [
+      "E2ET.order.manage"
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认取消此订单？取消后不可恢复。",
+      "confirmMessage:en": "Cancel this order? This cannot be undone."
+    }
+  },
+  {
+    "code": "e2et:create_order_item",
+    "displayName:zh-CN": "添加订单明细",
+    "displayName:en": "Add Order Item",
+    "description": "Add item to order with auto-computed subtotal and AGGREGATE sideEffect to parent",
+    "type": "create",
+    "modelCode": "e2et_order_item",
+    "inputFields": [
+      "e2et_order_id",
+      "e2et_item_name",
+      "e2et_item_spec",
+      "e2et_item_qty",
+      "e2et_item_price"
+    ],
+    "computedFields": {
+      "e2et_item_subtotal": "e2et_item_qty * e2et_item_price"
+    },
+    "sideEffects": [
+      {
+        "condition": "true",
+        "actions": [
+          {
+            "type": "aggregate",
+            "function": "sum",
+            "targetModel": "e2et_order",
+            "childModel": "e2et_order_item",
+            "childField": "e2et_item_subtotal",
+            "parentField": "e2et_order_amount",
+            "parentFk": "e2et_order_id"
+          },
+          {
+            "type": "aggregate",
+            "function": "sum",
+            "targetModel": "e2et_order",
+            "childModel": "e2et_order_item",
+            "childField": "e2et_item_qty",
+            "parentField": "e2et_order_qty",
+            "parentFk": "e2et_order_id"
+          }
+        ]
+      }
+    ],
+    "permissions": [
+      "E2ET.order.manage"
+    ]
+  },
+  {
+    "code": "e2et:update_order_item",
+    "displayName:zh-CN": "编辑订单明细",
+    "displayName:en": "Update Order Item",
+    "description": "Update item with re-computed subtotal and AGGREGATE sideEffect to parent",
+    "type": "update",
+    "modelCode": "e2et_order_item",
+    "inputFields": [
+      "e2et_item_name",
+      "e2et_item_spec",
+      "e2et_item_qty",
+      "e2et_item_price"
+    ],
+    "computedFields": {
+      "e2et_item_subtotal": "e2et_item_qty * e2et_item_price"
+    },
+    "sideEffects": [
+      {
+        "condition": "true",
+        "actions": [
+          {
+            "type": "aggregate",
+            "function": "sum",
+            "targetModel": "e2et_order",
+            "childModel": "e2et_order_item",
+            "childField": "e2et_item_subtotal",
+            "parentField": "e2et_order_amount",
+            "parentFk": "e2et_order_id"
+          },
+          {
+            "type": "aggregate",
+            "function": "sum",
+            "targetModel": "e2et_order",
+            "childModel": "e2et_order_item",
+            "childField": "e2et_item_qty",
+            "parentField": "e2et_order_qty",
+            "parentFk": "e2et_order_id"
+          }
+        ]
+      }
+    ],
+    "permissions": [
+      "E2ET.order.manage"
+    ]
+  },
+  {
+    "code": "e2et:delete_order_item",
+    "displayName:zh-CN": "删除订单明细",
+    "displayName:en": "Delete Order Item",
+    "description": "Delete an order item with AGGREGATE sideEffect to re-sum parent totals",
+    "type": "delete",
+    "modelCode": "e2et_order_item",
+    "sideEffects": [
+      {
+        "condition": "true",
+        "actions": [
+          {
+            "type": "aggregate",
+            "function": "sum",
+            "targetModel": "e2et_order",
+            "childModel": "e2et_order_item",
+            "childField": "e2et_item_subtotal",
+            "parentField": "e2et_order_amount",
+            "parentFk": "e2et_order_id"
+          },
+          {
+            "type": "aggregate",
+            "function": "sum",
+            "targetModel": "e2et_order",
+            "childModel": "e2et_order_item",
+            "childField": "e2et_item_qty",
+            "parentField": "e2et_order_qty",
+            "parentFk": "e2et_order_id"
+          }
+        ]
+      }
+    ],
+    "permissions": [
+      "E2ET.order.manage"
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此明细？",
+      "confirmMessage:en": "Delete this item?"
+    }
+  },
+  {
+    "code": "e2et:create_customer",
+    "displayName:zh-CN": "新建客户",
+    "displayName:en": "Create Customer",
+    "description": "Create customer with UNIQUE_COMPOSITE validation on code+region",
+    "type": "create",
+    "modelCode": "e2et_customer",
+    "inputFields": [
+      "e2et_cust_code",
+      "e2et_cust_name",
+      "e2et_cust_region",
+      "e2et_cust_contact",
+      "e2et_cust_email",
+      "e2et_cust_active"
+    ],
+    "validation": {
+      "rules": [
+        {
+          "type": "unique_composite",
+          "fields": [
+            "e2et_cust_code",
+            "e2et_cust_region"
+          ],
+          "message:zh-CN": "同区域内客户编码不能重复",
+          "message:en": "Customer code must be unique within the same region"
+        }
+      ]
+    },
+    "permissions": [
+      "E2ET.customer.manage"
+    ]
+  },
+  {
+    "code": "e2et:update_customer",
+    "displayName:zh-CN": "编辑客户",
+    "displayName:en": "Update Customer",
+    "description": "Update customer information",
+    "type": "update",
+    "modelCode": "e2et_customer",
+    "inputFields": [
+      "e2et_cust_name",
+      "e2et_cust_region",
+      "e2et_cust_contact",
+      "e2et_cust_email",
+      "e2et_cust_active"
+    ],
+    "permissions": [
+      "E2ET.customer.manage"
+    ]
+  },
+  {
+    "code": "e2et:delete_customer",
+    "displayName:zh-CN": "删除客户",
+    "displayName:en": "Delete Customer",
+    "description": "Delete customer record",
+    "type": "delete",
+    "modelCode": "e2et_customer",
+    "permissions": [
+      "E2ET.customer.manage"
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此客户？",
+      "confirmMessage:en": "Delete this customer?"
+    }
+  },
+  {
+    "code": "e2et:create_payment",
+    "displayName:zh-CN": "新建付款单",
+    "displayName:en": "Create Payment",
+    "description": "Create payment with auto-generated number and draft status",
+    "type": "create",
+    "modelCode": "e2et_payment",
+    "inputFields": [
+      "e2et_pay_order_id",
+      "e2et_pay_amount",
+      "e2et_pay_method",
+      "e2et_pay_remark"
+    ],
+    "autoSetFields": {
+      "e2et_pay_no": {
+        "strategy": "auto_generate",
+        "pattern": "PAY-{yyyyMMdd}-{seq}"
+      },
+      "e2et_pay_status": {
+        "strategy": "fixed_value",
+        "value": "draft"
+      }
+    },
+    "permissions": [
+      "E2ET.payment.manage"
+    ]
+  },
+  {
+    "code": "e2et:submit_payment",
+    "displayName:zh-CN": "提交付款",
+    "displayName:en": "Submit Payment",
+    "description": "Submit payment: draft→pending, triggers BPM approval workflow",
+    "type": "state_transition",
+    "modelCode": "e2et_payment",
+    "stateField": "e2et_pay_status",
+    "fromStates": [
+      "draft"
+    ],
+    "toState": "pending",
+    "executionConfig": {
+      "processKey": "e2et_payment_approval"
+    },
+    "permissions": [
+      "E2ET.payment.manage"
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认提交付款单？提交后将进入审批流程。",
+      "confirmMessage:en": "Submit this payment? It will enter the approval workflow."
+    }
+  },
+  {
+    "code": "e2et:approve_payment",
+    "displayName:zh-CN": "审批通过",
+    "displayName:en": "Approve Payment",
+    "description": "Approve payment: pending→approved with UPDATE_RECORD sideEffect on order",
+    "type": "state_transition",
+    "modelCode": "e2et_payment",
+    "stateField": "e2et_pay_status",
+    "fromStates": [
+      "pending"
+    ],
+    "toState": "approved",
+    "autoSetFields": {
+      "e2et_pay_approver": {
+        "strategy": "current_user"
+      }
+    },
+    "sideEffects": [
+      {
+        "condition": "true",
+        "actions": [
+          {
+            "type": "create_record",
+            "modelCode": "e2et_order_log",
+            "fields": {
+              "e2et_log_order_id": "${e2et_pay_order_id}",
+              "e2et_log_action": "payment_approved"
+            }
+          },
+          {
+            "type": "update_record",
+            "targetModel": "e2et_order",
+            "targetIdField": "e2et_pay_order_id",
+            "fields": {
+              "e2et_order_remark": "Payment approved and processed"
+            }
+          }
+        ]
+      }
+    ],
+    "permissions": [
+      "E2ET.payment.approve"
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认审批通过此付款单？",
+      "confirmMessage:en": "Approve this payment?"
+    }
+  },
+  {
+    "code": "e2et:reject_payment",
+    "displayName:zh-CN": "驳回付款",
+    "displayName:en": "Reject Payment",
+    "description": "Reject payment: pending→rejected",
+    "type": "state_transition",
+    "modelCode": "e2et_payment",
+    "stateField": "e2et_pay_status",
+    "fromStates": [
+      "pending"
+    ],
+    "toState": "rejected",
+    "inputFields": [
+      "e2et_pay_remark"
+    ],
+    "permissions": [
+      "E2ET.payment.approve"
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认驳回此付款单？",
+      "confirmMessage:en": "Reject this payment?"
+    }
+  },
+  {
+    "code": "e2et:pay_payment",
+    "displayName:zh-CN": "确认付款",
+    "displayName:en": "Confirm Payment",
+    "description": "Confirm payment: approved→paid with auto-set pay_date",
+    "type": "state_transition",
+    "modelCode": "e2et_payment",
+    "stateField": "e2et_pay_status",
+    "fromStates": [
+      "approved"
+    ],
+    "toState": "paid",
+    "autoSetFields": {
+      "e2et_pay_date": {
+        "strategy": "current_date"
+      }
+    },
+    "permissions": [
+      "E2ET.payment.manage"
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认已完成付款？",
+      "confirmMessage:en": "Confirm payment completed?"
+    }
+  }
+]

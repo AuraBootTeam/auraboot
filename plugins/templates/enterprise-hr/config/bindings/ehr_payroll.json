@@ -1,0 +1,12 @@
+[
+  {"modelCode":"ehr_payroll","fieldCode":"ehr_pr_code","sequence":1,"required":true,"visible":true,"editable":false,"displayConfig":{"searchable":true,"sortable":true}},
+  {"modelCode":"ehr_payroll","fieldCode":"ehr_pr_employee_id","sequence":2,"required":true,"visible":true,"editable":true,"displayConfig":{"searchable":true}},
+  {"modelCode":"ehr_payroll","fieldCode":"ehr_pr_period","sequence":3,"required":true,"visible":true,"editable":true,"displayConfig":{"searchable":true,"sortable":true}},
+  {"modelCode":"ehr_payroll","fieldCode":"ehr_pr_base_salary","sequence":4,"required":true,"visible":true,"editable":true},
+  {"modelCode":"ehr_payroll","fieldCode":"ehr_pr_allowances","sequence":5,"required":false,"visible":true,"editable":true},
+  {"modelCode":"ehr_payroll","fieldCode":"ehr_pr_overtime_pay","sequence":6,"required":false,"visible":true,"editable":true},
+  {"modelCode":"ehr_payroll","fieldCode":"ehr_pr_deductions","sequence":7,"required":false,"visible":true,"editable":true},
+  {"modelCode":"ehr_payroll","fieldCode":"ehr_pr_net_pay","sequence":8,"required":false,"visible":true,"editable":false},
+  {"modelCode":"ehr_payroll","fieldCode":"ehr_pr_status","sequence":9,"required":false,"visible":true,"editable":false,"displayConfig":{"searchable":true}},
+  {"modelCode":"ehr_payroll","fieldCode":"ehr_pr_notes","sequence":10,"required":false,"visible":false,"editable":true}
+]

@@ -1,0 +1,55 @@
+plugins {
+    id 'java-library'
+}
+
+group = 'com.auraboot'
+version = '1.0.0-SNAPSHOT'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    maven { url = 'https://maven.aliyun.com/repository/public' }
+    mavenLocal()
+    mavenCentral()
+}
+
+dependencies {
+    compileOnly project(':')  // Platform core (StorageProvider, StorageProperties, StorageType)
+
+    // AWS SDK v2
+    implementation platform('software.amazon.awssdk:bom:2.25.0')
+    implementation 'software.amazon.awssdk:s3'
+
+    compileOnly 'org.projectlombok:lombok:1.18.40'
+    annotationProcessor 'org.projectlombok:lombok:1.18.40'
+
+    // Spring conditional
+    compileOnly 'org.springframework.boot:spring-boot-autoconfigure:3.5.6'
+    compileOnly 'org.springframework:spring-context:6.2.6'
+
+    // Test — depend on root project classes only (no transitive deps)
+    testImplementation(project(':')) {
+        transitive = false
+    }
+    testImplementation(project(':platform-plugin-api')) {
+        transitive = false
+    }
+    testImplementation 'org.springframework:spring-beans:6.2.6'  // DisposableBean
+    testImplementation 'org.springframework.boot:spring-boot-autoconfigure:3.5.6'  // @ConditionalOnProperty
+    testImplementation 'org.springframework:spring-context:6.2.6'  // @Component
+    testImplementation 'com.baomidou:mybatis-plus-annotation:3.5.14'  // @EnumValue
+    testImplementation 'com.fasterxml.jackson.core:jackson-annotations:2.19.2'  // @JsonValue
+    testImplementation 'org.projectlombok:lombok:1.18.40'
+    testAnnotationProcessor 'org.projectlombok:lombok:1.18.40'
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+    testImplementation 'org.mockito:mockito-core:5.11.0'
+    testImplementation 'org.mockito:mockito-junit-jupiter:5.11.0'
+}
+
+test {
+    useJUnitPlatform()
+}

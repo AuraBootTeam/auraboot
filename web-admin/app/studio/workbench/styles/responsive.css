@@ -1,0 +1,489 @@
+@reference "tailwindcss";
+
+/* 响应式断点系统样式 */
+
+/* 断点工具栏 */
+.breakpoint-toolbar {
+  @apply flex items-center gap-2 rounded-lg border border-gray-200 bg-white p-2 shadow-sm;
+}
+
+.breakpoint-toolbar.compact {
+  @apply gap-1 p-1;
+}
+
+.breakpoint-toolbar.vertical {
+  @apply flex-col;
+}
+
+.breakpoint-toolbar.horizontal {
+  @apply flex-row;
+}
+
+/* 断点按钮 */
+.breakpoint-button {
+  @apply flex items-center gap-1 rounded px-2 py-1 text-sm font-medium transition-all duration-200;
+}
+
+.breakpoint-button.compact {
+  @apply px-1 py-0.5 text-xs;
+}
+
+.breakpoint-button.active {
+  @apply border border-blue-200 bg-blue-100 text-blue-700 shadow-sm;
+}
+
+.breakpoint-button:not(.active) {
+  @apply text-gray-600 hover:bg-gray-100 hover:text-gray-800;
+}
+
+.breakpoint-button:not(.active):hover {
+  @apply scale-105 transform;
+}
+
+/* 设备图标 */
+.device-icon {
+  @apply h-4 w-4 transition-transform duration-200;
+}
+
+.device-icon.compact {
+  @apply h-3 w-3;
+}
+
+.breakpoint-button.active .device-icon {
+  @apply text-blue-600;
+}
+
+/* 预览控制 */
+.preview-controls {
+  @apply flex items-center gap-2;
+}
+
+.preview-controls.vertical {
+  @apply flex-col;
+}
+
+.preview-toggle {
+  @apply flex items-center gap-1 rounded px-2 py-1 text-sm font-medium transition-all duration-200;
+}
+
+.preview-toggle.active {
+  @apply border border-green-200 bg-green-100 text-green-700;
+}
+
+.preview-toggle:not(.active) {
+  @apply text-gray-600 hover:bg-gray-100;
+}
+
+/* 设备选择器 */
+.device-selector {
+  @apply rounded border border-gray-200 bg-white px-2 py-1 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none;
+}
+
+.device-selector.compact {
+  @apply px-1 py-0.5 text-xs;
+}
+
+/* 缩放控制 */
+.zoom-controls {
+  @apply flex items-center gap-1;
+}
+
+.zoom-controls.vertical {
+  @apply flex-col;
+}
+
+.zoom-button {
+  @apply rounded p-1 text-gray-600 transition-colors duration-200 hover:bg-gray-100;
+}
+
+.zoom-button:hover {
+  @apply scale-110 transform;
+}
+
+.zoom-display {
+  @apply min-w-[3rem] rounded px-2 py-1 text-center font-mono text-xs text-gray-600 transition-colors hover:bg-gray-100;
+}
+
+.zoom-display.compact {
+  @apply px-1 py-0.5;
+}
+
+/* 工具按钮 */
+.tool-button {
+  @apply rounded p-1 transition-all duration-200;
+}
+
+.tool-button.active {
+  @apply bg-blue-100 text-blue-700;
+}
+
+.tool-button:not(.active) {
+  @apply text-gray-600 hover:bg-gray-100;
+}
+
+.tool-button:hover {
+  @apply scale-110 transform;
+}
+
+/* 设置面板 */
+.settings-panel {
+  @apply absolute top-full left-0 z-50 mt-2 min-w-[200px] rounded-lg border border-gray-200 bg-white p-3 shadow-lg;
+}
+
+.settings-panel::before {
+  content: '';
+  @apply absolute -top-1 left-4 h-2 w-2 rotate-45 transform border-t border-l border-gray-200 bg-white;
+}
+
+.settings-title {
+  @apply mb-3 text-sm font-medium text-gray-700;
+}
+
+.settings-actions {
+  @apply mb-3 flex gap-2;
+}
+
+.settings-action {
+  @apply flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-600 transition-colors hover:bg-gray-100;
+}
+
+.settings-reset {
+  @apply w-full rounded px-2 py-1 text-xs text-red-600 transition-colors hover:bg-red-50;
+}
+
+/* 预览框架 */
+.preview-frame-container {
+  @apply relative h-full w-full overflow-hidden;
+}
+
+.preview-frame-container.dark {
+  @apply bg-gray-900;
+}
+
+.preview-frame-container.light {
+  @apply bg-gray-50;
+}
+
+.preview-frame {
+  @apply relative overflow-hidden transition-all duration-300 ease-out;
+}
+
+.preview-frame.with-device-frame {
+  @apply shadow-2xl;
+}
+
+.preview-frame.interactive {
+  @apply cursor-pointer;
+}
+
+.preview-frame:not(.interactive) {
+  @apply pointer-events-none;
+}
+
+/* 设备外框动画 */
+.preview-frame.with-device-frame {
+  animation: deviceFrameIn 0.3s ease-out;
+}
+
+@keyframes deviceFrameIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* 内容区域 */
+.preview-content {
+  @apply relative h-full w-full overflow-hidden bg-white transition-transform duration-300;
+}
+
+/* 状态栏 */
+.status-bar {
+  @apply flex items-center justify-between bg-black px-4 text-xs text-white;
+}
+
+.status-bar-signal {
+  @apply flex gap-1;
+}
+
+.status-bar-dot {
+  @apply h-1 w-1 rounded-full bg-white;
+}
+
+.status-bar-dot.weak {
+  @apply opacity-50;
+}
+
+.status-bar-battery {
+  @apply relative h-3 w-6 rounded-sm border border-white;
+}
+
+.status-bar-battery-level {
+  @apply h-full rounded-sm bg-white;
+}
+
+/* 安全区域指示器 */
+.safe-area-indicator {
+  @apply pointer-events-none absolute inset-0;
+}
+
+.safe-area-top {
+  @apply absolute top-0 right-0 left-0 border-b border-dashed border-red-400 opacity-50;
+}
+
+.safe-area-bottom {
+  @apply absolute right-0 bottom-0 left-0 border-t border-dashed border-red-400 opacity-50;
+}
+
+.safe-area-label {
+  @apply rounded bg-white px-1 text-xs text-red-500;
+}
+
+/* 网格覆盖层 */
+.grid-overlay {
+  @apply pointer-events-none absolute inset-0 opacity-20;
+}
+
+/* 标尺 */
+.ruler {
+  @apply absolute border-gray-300 bg-gray-100 text-xs text-gray-600 select-none;
+}
+
+.ruler.horizontal {
+  @apply right-0 left-0 flex h-6 items-end border-b;
+}
+
+.ruler.vertical {
+  @apply top-0 bottom-0 flex w-6 flex-col justify-start border-r;
+}
+
+.ruler-mark {
+  @apply absolute bg-gray-400;
+}
+
+.ruler-mark.horizontal {
+  @apply bottom-0 w-px;
+}
+
+.ruler-mark.vertical {
+  @apply left-0 h-px;
+}
+
+.ruler-mark.major {
+  @apply h-4;
+}
+
+.ruler-mark.minor {
+  @apply h-2;
+}
+
+.ruler-mark.micro {
+  @apply h-1;
+}
+
+.ruler-mark.vertical.major {
+  @apply w-4;
+}
+
+.ruler-mark.vertical.minor {
+  @apply w-2;
+}
+
+.ruler-mark.vertical.micro {
+  @apply w-1;
+}
+
+.ruler-label {
+  @apply absolute text-xs text-gray-600;
+}
+
+.ruler-label.horizontal {
+  @apply bottom-full left-0 mb-1 -translate-x-1/2 transform;
+}
+
+.ruler-label.vertical {
+  @apply top-0 right-full mr-1 -translate-y-1/2 transform;
+}
+
+/* 调试信息 */
+.debug-info {
+  @apply absolute top-2 right-2 rounded bg-black/75 p-2 text-xs text-white;
+}
+
+.debug-info div {
+  @apply mb-1;
+}
+
+.debug-info div:last-child {
+  @apply mb-0;
+}
+
+/* 加载状态 */
+.preview-loading {
+  @apply flex h-full items-center justify-center text-gray-500;
+}
+
+.preview-loading::after {
+  content: '';
+  @apply ml-2 h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600;
+}
+
+/* 响应式断点 */
+@media (max-width: 640px) {
+  .breakpoint-toolbar {
+    @apply flex-col gap-1 p-1;
+  }
+
+  .breakpoint-button {
+    @apply px-1 py-0.5 text-xs;
+  }
+
+  .device-icon {
+    @apply h-3 w-3;
+  }
+
+  .zoom-controls {
+    @apply flex-col gap-1;
+  }
+
+  .settings-panel {
+    @apply min-w-[150px];
+  }
+}
+
+@media (max-width: 480px) {
+  .breakpoint-toolbar {
+    @apply gap-0.5 p-1;
+  }
+
+  .preview-controls {
+    @apply flex-col gap-1;
+  }
+
+  .zoom-controls {
+    @apply flex-row gap-0.5;
+  }
+}
+
+/* 高对比度模式 */
+@media (prefers-contrast: high) {
+  .breakpoint-button.active {
+    @apply border-2 border-blue-800 bg-blue-200;
+  }
+
+  .preview-toggle.active {
+    @apply border-2 border-green-800 bg-green-200;
+  }
+
+  .tool-button.active {
+    @apply border-2 border-blue-800 bg-blue-200;
+  }
+
+  .ruler {
+    @apply border-2 border-gray-600;
+  }
+
+  .ruler-mark {
+    @apply bg-gray-800;
+  }
+}
+
+/* 减少动画模式 */
+@media (prefers-reduced-motion: reduce) {
+  .breakpoint-button,
+  .preview-toggle,
+  .zoom-button,
+  .tool-button,
+  .preview-frame,
+  .preview-content {
+    @apply transition-none;
+  }
+
+  .preview-frame.with-device-frame {
+    animation: none;
+  }
+
+  .preview-loading::after {
+    @apply animate-none;
+  }
+}
+
+/* 暗色模式 */
+@media (prefers-color-scheme: dark) {
+  .breakpoint-toolbar {
+    @apply border-gray-700 bg-gray-800;
+  }
+
+  .breakpoint-button:not(.active) {
+    @apply text-gray-300 hover:bg-gray-700;
+  }
+
+  .preview-toggle:not(.active) {
+    @apply text-gray-300 hover:bg-gray-700;
+  }
+
+  .device-selector {
+    @apply border-gray-700 bg-gray-800 text-gray-300;
+  }
+
+  .zoom-button,
+  .tool-button:not(.active) {
+    @apply text-gray-300 hover:bg-gray-700;
+  }
+
+  .zoom-display {
+    @apply text-gray-300 hover:bg-gray-700;
+  }
+
+  .settings-panel {
+    @apply border-gray-700 bg-gray-800;
+  }
+
+  .settings-title {
+    @apply text-gray-300;
+  }
+
+  .settings-action {
+    @apply text-gray-300 hover:bg-gray-700;
+  }
+
+  .ruler {
+    @apply border-gray-600 bg-gray-800 text-gray-300;
+  }
+
+  .ruler-mark {
+    @apply bg-gray-500;
+  }
+
+  .ruler-label {
+    @apply text-gray-300;
+  }
+
+  .preview-frame-container.light {
+    @apply bg-gray-800;
+  }
+
+  .safe-area-label {
+    @apply bg-gray-800 text-red-400;
+  }
+}
+
+/* 打印样式 */
+@media print {
+  .breakpoint-toolbar,
+  .settings-panel,
+  .debug-info,
+  .ruler,
+  .safe-area-indicator,
+  .grid-overlay {
+    @apply hidden;
+  }
+
+  .preview-frame {
+    @apply border-none shadow-none;
+  }
+}

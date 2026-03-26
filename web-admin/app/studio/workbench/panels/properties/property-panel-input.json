@@ -1,0 +1,363 @@
+{
+  "meta": {
+    "type": "property-panel",
+    "version": "1.0",
+    "component": "SmartInput",
+    "title": { "i18n": "property.panel.input.title", "fallback": "单行文本属性设置" }
+  },
+  "layout": {
+    "type": "vertical",
+    "spacing": "medium",
+    "padding": "medium"
+  },
+  "sections": [
+    {
+      "code": "basic",
+      "title": { "i18n": "property.panel.section.basic", "fallback": "基本属性" },
+      "layout": {
+        "columns": 1,
+        "gap": "small"
+      },
+      "fields": [
+        {
+          "field": "label",
+          "component": "SmartInput",
+          "props": {
+            "label": { "i18n": "property.panel.input.label", "fallback": "标签" },
+            "placeholder": {
+              "i18n": "property.panel.input.label.placeholder",
+              "fallback": "请输入字段标签"
+            },
+            "size": "small"
+          },
+          "layout": {
+            "fullWidth": true
+          },
+          "validation": [
+            {
+              "type": "required",
+              "message": {
+                "i18n": "property.panel.input.label.required",
+                "fallback": "标签不能为空"
+              }
+            }
+          ]
+        },
+        {
+          "field": "name",
+          "component": "SmartInput",
+          "props": {
+            "label": { "i18n": "property.panel.input.name", "fallback": "字段名" },
+            "placeholder": {
+              "i18n": "property.panel.input.name.placeholder",
+              "fallback": "请输入字段名称"
+            },
+            "size": "small"
+          },
+          "layout": {
+            "fullWidth": true
+          },
+          "validation": [
+            {
+              "type": "required",
+              "message": {
+                "i18n": "property.panel.input.name.required",
+                "fallback": "字段名不能为空"
+              }
+            },
+            {
+              "type": "pattern",
+              "value": "^[a-zA-Z][a-zA-Z0-9_]*$",
+              "message": {
+                "i18n": "property.panel.input.name.pattern",
+                "fallback": "字段名只能包含字母、数字和下划线，且以字母开头"
+              }
+            }
+          ]
+        },
+        {
+          "field": "placeholder",
+          "component": "SmartInput",
+          "props": {
+            "label": { "i18n": "property.panel.input.placeholder", "fallback": "占位符" },
+            "placeholder": {
+              "i18n": "property.panel.input.placeholder.placeholder",
+              "fallback": "请输入占位符文本"
+            },
+            "size": "small"
+          },
+          "layout": {
+            "fullWidth": true
+          }
+        },
+        {
+          "field": "defaultValue",
+          "component": "SmartInput",
+          "props": {
+            "label": { "i18n": "property.panel.input.defaultValue", "fallback": "默认值" },
+            "placeholder": {
+              "i18n": "property.panel.input.defaultValue.placeholder",
+              "fallback": "请输入默认值"
+            },
+            "size": "small"
+          },
+          "layout": {
+            "fullWidth": true
+          }
+        }
+      ]
+    },
+    {
+      "code": "validation",
+      "title": { "i18n": "property.panel.section.validation", "fallback": "验证规则" },
+      "layout": {
+        "columns": 1,
+        "gap": "small"
+      },
+      "fields": [
+        {
+          "field": "required",
+          "component": "SmartCheckbox",
+          "props": {
+            "label": { "i18n": "property.panel.input.required", "fallback": "必填" },
+            "size": "small"
+          },
+          "layout": {
+            "colSpan": 1
+          }
+        },
+        {
+          "field": "showRequiredMark",
+          "component": "SmartCheckbox",
+          "props": {
+            "label": {
+              "i18n": "property.panel.input.showRequiredMark",
+              "fallback": "显示必填标记"
+            },
+            "size": "small"
+          },
+          "layout": {
+            "colSpan": 1
+          }
+        },
+        {
+          "field": "maxLength",
+          "component": "SmartInput",
+          "props": {
+            "label": { "i18n": "property.panel.input.maxLength", "fallback": "最大长度" },
+            "placeholder": {
+              "i18n": "property.panel.input.maxLength.placeholder",
+              "fallback": "输入最大字符数"
+            },
+            "type": "number",
+            "size": "small",
+            "min": 1
+          },
+          "layout": {
+            "colSpan": 1
+          }
+        },
+        {
+          "field": "minLength",
+          "component": "SmartInput",
+          "props": {
+            "label": { "i18n": "property.panel.input.minLength", "fallback": "最小长度" },
+            "placeholder": {
+              "i18n": "property.panel.input.minLength.placeholder",
+              "fallback": "输入最小字符数"
+            },
+            "type": "number",
+            "size": "small",
+            "min": 0
+          },
+          "layout": {
+            "colSpan": 1
+          }
+        }
+      ]
+    },
+    {
+      "code": "behavior",
+      "title": { "i18n": "property.panel.section.behavior", "fallback": "行为控制" },
+      "layout": {
+        "columns": 2,
+        "gap": "small"
+      },
+      "fields": [
+        {
+          "field": "disabled",
+          "component": "SmartCheckbox",
+          "props": {
+            "label": { "i18n": "property.panel.input.disabled", "fallback": "禁用" },
+            "size": "small"
+          },
+          "layout": {
+            "colSpan": 1
+          }
+        },
+        {
+          "field": "readOnly",
+          "component": "SmartCheckbox",
+          "props": {
+            "label": { "i18n": "property.panel.input.readOnly", "fallback": "只读" },
+            "size": "small"
+          },
+          "layout": {
+            "colSpan": 1
+          }
+        },
+        {
+          "field": "hidden",
+          "component": "SmartCheckbox",
+          "props": {
+            "label": { "i18n": "property.panel.input.hidden", "fallback": "隐藏" },
+            "size": "small"
+          },
+          "layout": {
+            "colSpan": 1
+          }
+        },
+        {
+          "field": "clearable",
+          "component": "SmartCheckbox",
+          "props": {
+            "label": { "i18n": "property.panel.input.clearable", "fallback": "可清空" },
+            "size": "small"
+          },
+          "layout": {
+            "colSpan": 1
+          }
+        }
+      ]
+    },
+    {
+      "code": "layout",
+      "title": { "i18n": "property.panel.section.layout", "fallback": "布局设置" },
+      "layout": {
+        "columns": 2,
+        "gap": "small"
+      },
+      "fields": [
+        {
+          "field": "colSpan",
+          "component": "SmartSelect",
+          "props": {
+            "label": { "i18n": "property.panel.input.colSpan", "fallback": "横跨列数" },
+            "placeholder": {
+              "i18n": "property.panel.input.colSpan.placeholder",
+              "fallback": "选择横跨列数"
+            },
+            "size": "small",
+            "options": [
+              {
+                "label": { "i18n": "property.panel.input.colSpan.1", "fallback": "1列" },
+                "value": 1
+              },
+              {
+                "label": { "i18n": "property.panel.input.colSpan.2", "fallback": "2列" },
+                "value": 2
+              },
+              {
+                "label": { "i18n": "property.panel.input.colSpan.3", "fallback": "3列" },
+                "value": 3
+              },
+              {
+                "label": { "i18n": "property.panel.input.colSpan.4", "fallback": "4列" },
+                "value": 4
+              },
+              {
+                "label": { "i18n": "property.panel.input.colSpan.6", "fallback": "6列" },
+                "value": 6
+              },
+              {
+                "label": { "i18n": "property.panel.input.colSpan.12", "fallback": "12列(整行)" },
+                "value": 12
+              }
+            ]
+          },
+          "layout": {
+            "colSpan": 1
+          },
+          "validation": [
+            {
+              "type": "required",
+              "message": {
+                "i18n": "property.panel.input.colSpan.required",
+                "fallback": "请选择横跨列数"
+              }
+            }
+          ]
+        },
+        {
+          "field": "labelCol",
+          "component": "SmartSelect",
+          "props": {
+            "label": { "i18n": "property.panel.input.labelCol", "fallback": "标签宽度" },
+            "placeholder": {
+              "i18n": "property.panel.input.labelCol.placeholder",
+              "fallback": "选择标签宽度"
+            },
+            "size": "small",
+            "options": [
+              {
+                "label": { "i18n": "property.panel.input.labelCol.auto", "fallback": "自动" },
+                "value": "auto"
+              },
+              {
+                "label": { "i18n": "property.panel.input.labelCol.2", "fallback": "2列" },
+                "value": 2
+              },
+              {
+                "label": { "i18n": "property.panel.input.labelCol.3", "fallback": "3列" },
+                "value": 3
+              },
+              {
+                "label": { "i18n": "property.panel.input.labelCol.4", "fallback": "4列" },
+                "value": 4
+              },
+              {
+                "label": { "i18n": "property.panel.input.labelCol.6", "fallback": "6列" },
+                "value": 6
+              }
+            ]
+          },
+          "layout": {
+            "colSpan": 1
+          }
+        },
+        {
+          "field": "fullWidth",
+          "component": "SmartCheckbox",
+          "props": {
+            "label": {
+              "i18n": "property.panel.input.fullWidth",
+              "fallback": "标签和输入框整行显示"
+            },
+            "size": "small"
+          },
+          "layout": {
+            "colSpan": 2
+          }
+        }
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "code": "apply",
+      "props": {
+        "label": { "i18n": "property.panel.action.apply", "fallback": "应用" },
+        "type": "primary",
+        "size": "small"
+      }
+    },
+    {
+      "code": "reset",
+      "props": {
+        "label": { "i18n": "property.panel.action.reset", "fallback": "重置" },
+        "type": "default",
+        "size": "small"
+      }
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+[
+  { "modelCode": "gp_task_comment", "fieldCode": "gp_tc_task_id", "sequence": 1, "required": true, "visible": true, "editable": false },
+  { "modelCode": "gp_task_comment", "fieldCode": "gp_tc_content", "sequence": 2, "required": true, "visible": true, "editable": true },
+  { "modelCode": "gp_task_comment", "fieldCode": "gp_tc_author", "sequence": 3, "required": false, "visible": true, "editable": false }
+]

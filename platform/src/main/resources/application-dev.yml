@@ -1,0 +1,73 @@
+#logging:
+#  level:
+#    root: INFO
+#
+#    # ===== 核心：Spring 事务 =====
+##    org.springframework.transaction: TRACE
+##    org.springframework.jdbc.support.JdbcTransactionManager: TRACE
+##    org.springframework.transaction.interceptor: TRACE
+##
+##    # ===== MyBatis / JDBC =====
+##    org.mybatis: DEBUG
+##    com.baomidou.mybatisplus: DEBUG
+##    org.springframework.jdbc.core: DEBUG
+##
+##    # ===== Web & Exception =====
+##    org.springframework.web: DEBUG
+##    org.springframework.web.servlet.mvc.method.annotation.ExceptionHandlerExceptionResolver: DEBUG
+##
+##    # ===== 你自己的代码（非常关键）=====
+##    com.auraboot.framework: DEBUG
+logging:
+  level:
+    root: info
+
+    # ========== MyBatis / JDBC（核心降噪） ==========
+    org.apache.ibatis: warn
+    org.apache.ibatis.session: warn
+    org.apache.ibatis.logging: warn
+    org.mybatis: warn
+    org.mybatis.spring: warn
+
+    # JDBC 连接 & SQL
+    java.sql: warn
+    javax.sql: warn
+
+    # Spring 事务（关闭“不是事务也没事”的提示）
+    org.springframework.transaction: warn
+    org.springframework.jdbc.datasource: warn
+
+    # ========== Spring Web / Security ==========
+    org.springframework.web: debug
+    org.springframework.security: info
+
+    # ========== Hikari ==========
+    com.zaxxer.hikari: info
+
+    io.opentelemetry.sdk.trace.SdkSpan : info
+
+    # ========== 你自己的代码 ==========
+    com.auraboot.framework: info
+
+# Agent Control Plane
+agent:
+  enabled: true
+  anthropic:
+    api-key: ${ANTHROPIC_API_KEY:}
+
+# Dev-mode: enable all actuator endpoints for debugging
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,env,beans,configprops,loggers,prometheus
+    enabled-by-default: true
+  endpoint:
+    health:
+      show-details: always
+    prometheus:
+      enabled: true
+  prometheus:
+    metrics:
+      export:
+        enabled: true

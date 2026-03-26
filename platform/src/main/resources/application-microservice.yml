@@ -1,0 +1,51 @@
+# ============================================================
+# Microservice deployment profile
+# ============================================================
+# Each service instance loads ONLY its own module. Inter-service
+# communication goes through Redis Streams (or RabbitMQ).
+#
+# Activate per service:
+#   --spring.profiles.active=microservice
+#   --aura.modules.active=meta-core
+#   --server.port=6443
+# ============================================================
+
+aura:
+  event:
+    transport: redis
+
+  # Override per container via env / CLI args
+  modules:
+    meta-core: false
+    biz-runtime: false
+    bpm-engine: false
+    im-service: false
+    agent-runtime: false
+
+# Service discovery (future: Consul / Eureka)
+# For now, services communicate via direct HTTP + event bus.
+
+spring:
+  threads:
+    virtual:
+      enabled: true
+  data:
+    redis:
+      host: ${REDIS_HOST:redis}
+      port: ${REDIS_PORT:6379}
+
+# Each service exposes its own port (overridden per container)
+server:
+  port: ${SERVER_PORT:6443}
+
+# Health check for container orchestration
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true

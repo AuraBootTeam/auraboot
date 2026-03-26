@@ -1,0 +1,80 @@
+[
+  {
+    "code": "eam_root",
+    "parentCode": null,
+    "name:zh-CN": "资产管理",
+    "name:en": "Asset Management",
+    "path": null,
+    "component": null,
+    "icon": "IconBox",
+    "type": 0,
+    "permissionCode": null,
+    "orderNo": 810,
+    "visible": true
+  },
+  {
+    "code": "eam_assets",
+    "parentCode": "eam_root",
+    "name:zh-CN": "资产",
+    "name:en": "Assets",
+    "path": "/dynamic/eam-asset",
+    "component": null,
+    "icon": "IconMonitor",
+    "type": 1,
+    "permissionCode": "eam.asset.read",
+    "orderNo": 1,
+    "visible": true
+  },
+  {
+    "code": "eam_categories",
+    "parentCode": "eam_root",
+    "name:zh-CN": "分类",
+    "name:en": "Categories",
+    "path": "/dynamic/eam-asset-category",
+    "component": null,
+    "icon": "IconFolderTree",
+    "type": 1,
+    "permissionCode": "eam.category.read",
+    "orderNo": 2,
+    "visible": true
+  },
+  {
+    "code": "eam_maintenance",
+    "parentCode": "eam_root",
+    "name:zh-CN": "维护计划",
+    "name:en": "Schedules",
+    "path": "/dynamic/eam-maintenance",
+    "component": null,
+    "icon": "IconCalendarClock",
+    "type": 1,
+    "permissionCode": "eam.maintenance.read",
+    "orderNo": 3,
+    "visible": true
+  },
+  {
+    "code": "eam_work_orders",
+    "parentCode": "eam_root",
+    "name:zh-CN": "工单",
+    "name:en": "Work Orders",
+    "path": "/dynamic/eam-work-order",
+    "component": null,
+    "icon": "IconClipboardList",
+    "type": 1,
+    "permissionCode": "eam.workorder.read",
+    "orderNo": 4,
+    "visible": true
+  },
+  {
+    "code": "eam_depreciation",
+    "parentCode": "eam_root",
+    "name:zh-CN": "折旧",
+    "name:en": "Depreciation",
+    "path": "/dynamic/eam-depreciation",
+    "component": null,
+    "icon": "IconTrendingDown",
+    "type": 1,
+    "permissionCode": "eam.depreciation.read",
+    "orderNo": 5,
+    "visible": true
+  }
+]

@@ -1,0 +1,33 @@
+# Dependencies
+node_modules
+
+# Build output (rebuilt in Docker)
+build
+.react-router
+
+# Tests
+tests
+test-results
+playwright-report
+playwright.*.ts
+vitest.config.ts
+
+# IDE
+.idea
+.vscode
+
+# OS
+.DS_Store
+
+# Logs
+*.log
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Development scripts
+scripts
+docs
+*.md

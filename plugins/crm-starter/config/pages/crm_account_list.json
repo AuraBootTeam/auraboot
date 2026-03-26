@@ -1,0 +1,186 @@
+{
+  "pageKey": "crm_account_list",
+  "name:zh-CN": "客户列表",
+  "name:en": "Accounts",
+  "pageType": "list",
+  "modelCode": "crm_account",
+  "dslSchema": {
+    "id": "list.crm_account",
+    "kind": "List",
+    "areas": {
+      "toolbar": {
+        "blocks": [
+          {
+            "id": "crm_account_toolbar",
+            "blockType": "toolbar",
+            "buttons": [
+              {
+                "code": "create",
+                "primary": true,
+                "permissionCode": "CRMS.account.manage",
+                "label": "create",
+                "action": {
+                  "type": "navigate",
+                  "to": "crm_account_form",
+                  "command": "crms:create_account"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "list-tabs": {
+        "blocks": [
+          {
+            "id": "crm_account_tabs",
+            "blockType": "list-tabs",
+            "tabs": [
+              {
+                "key": "all",
+                "label": {
+                  "en": "All",
+                  "zh-CN": "全部"
+                },
+                "filter": null
+              },
+              {
+                "key": "active",
+                "label": {
+                  "en": "Active",
+                  "zh-CN": "活跃"
+                },
+                "filter": {
+                  "field": "crm_acc_status",
+                  "value": "active",
+                  "operator": "EQ"
+                }
+              },
+              {
+                "key": "inactive",
+                "label": {
+                  "en": "Inactive",
+                  "zh-CN": "停用"
+                },
+                "filter": {
+                  "field": "crm_acc_status",
+                  "value": "inactive",
+                  "operator": "EQ"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "main": {
+        "blocks": [
+          {
+            "id": "crm_account_table",
+            "blockType": "data-table",
+            "columns": [
+              {
+                "field": "crm_acc_code",
+                "width": 140,
+                "sortable": true
+              },
+              {
+                "field": "crm_acc_name",
+                "width": 200,
+                "sortable": true
+              },
+              {
+                "field": "crm_acc_industry",
+                "width": 120
+              },
+              {
+                "field": "crm_acc_phone",
+                "width": 140
+              },
+              {
+                "field": "crm_acc_rating",
+                "width": 100,
+                "renderType": "tag"
+              },
+              {
+                "field": "crm_acc_status",
+                "width": 100,
+                "renderType": "tag"
+              },
+              {
+                "field": "crm_acc_owner",
+                "width": 120
+              },
+              {
+                "field": "actions",
+                "isActionColumn": true,
+                "buttons": [
+                  {
+                    "code": "view",
+                    "label": "detail",
+                    "action": {
+                      "type": "navigate",
+                      "to": "crm_account_detail"
+                    }
+                  },
+                  {
+                    "code": "edit",
+                    "permissionCode": "CRMS.account.manage",
+                    "label": "edit",
+                    "action": {
+                      "type": "navigate",
+                      "to": "crm_account_form"
+                    }
+                  },
+                  {
+                    "code": "delete",
+                    "danger": true,
+                    "permissionCode": "CRMS.account.manage",
+                    "label": "delete",
+                    "confirm": "delete.confirm",
+                    "action": {
+                      "type": "command",
+                      "command": "crms:delete_account"
+                    }
+                  }
+                ]
+              }
+            ],
+            "searchFields": [
+              "crm_acc_name",
+              "crm_acc_code",
+              "crm_acc_industry"
+            ],
+            "defaultSort": {
+              "field": "created_at",
+              "order": "desc"
+            }
+          }
+        ]
+      }
+    },
+    "layout": {
+      "areas": [
+        "list-tabs",
+        "toolbar",
+        "main"
+      ],
+      "areasConfig": {
+        "list-tabs": {
+          "type": "flex",
+          "direction": "row"
+        },
+        "toolbar": {
+          "type": "flex",
+          "direction": "row",
+          "justify": "space-between",
+          "align": "center"
+        },
+        "main": {
+          "type": "grid",
+          "cols": 12,
+          "rowGap": 0,
+          "colGap": 0
+        }
+      }
+    }
+  }
+}

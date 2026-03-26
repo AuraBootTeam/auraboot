@@ -1,0 +1,16 @@
+[
+  {"code":"ehr_em_code","displayName:zh-CN":"员工编号","displayName:en":"Employee Code","dataType":"string","description":"Auto-generated employee code.","constraints":{"required":true,"maxLength":50},"feature":{"searchable":true,"sortable":true},"extension":{"readOnly":true,"placeholder:zh-CN":"系统自动生成","placeholder:en":"Auto generated"}},
+  {"code":"ehr_em_name","displayName:zh-CN":"姓名","displayName:en":"Full Name","dataType":"string","description":"Employee full name.","constraints":{"required":true,"maxLength":100},"feature":{"searchable":true,"sortable":true},"extension":{"placeholder:zh-CN":"请输入姓名","placeholder:en":"Enter full name"}},
+  {"code":"ehr_em_email","displayName:zh-CN":"邮箱","displayName:en":"Email","dataType":"string","description":"Work email address.","constraints":{"required":true,"maxLength":200},"feature":{"searchable":true},"extension":{"placeholder:zh-CN":"请输入邮箱","placeholder:en":"Enter email"}},
+  {"code":"ehr_em_phone","displayName:zh-CN":"手机号","displayName:en":"Phone","dataType":"string","description":"Mobile phone number.","constraints":{"maxLength":30},"feature":{"searchable":true}},
+  {"code":"ehr_em_gender","displayName:zh-CN":"性别","displayName:en":"Gender","dataType":"enum","dictCode":"ehr_gender","description":"Employee gender."},
+  {"code":"ehr_em_birth_date","displayName:zh-CN":"出生日期","displayName:en":"Date of Birth","dataType":"date","description":"Date of birth."},
+  {"code":"ehr_em_department_id","displayName:zh-CN":"部门","displayName:en":"Department","dataType":"reference","description":"Department assignment.","constraints":{"required":true},"extension":{"refModel":"ehr_department","refLabelField":"ehr_dp_name"}},
+  {"code":"ehr_em_position_id","displayName:zh-CN":"职位","displayName:en":"Position","dataType":"reference","description":"Job position.","extension":{"refModel":"ehr_position","refLabelField":"ehr_ps_title"}},
+  {"code":"ehr_em_hire_date","displayName:zh-CN":"入职日期","displayName:en":"Hire Date","dataType":"date","description":"Employment start date.","constraints":{"required":true},"feature":{"sortable":true}},
+  {"code":"ehr_em_status","displayName:zh-CN":"状态","displayName:en":"Status","dataType":"enum","dictCode":"ehr_employee_status","defaultValue":"probation","description":"Employment lifecycle status.","feature":{"searchable":true}},
+  {"code":"ehr_em_base_salary","displayName:zh-CN":"基本工资","displayName:en":"Base Salary","dataType":"decimal","description":"Monthly base salary.","extension":{"precision":2}},
+  {"code":"ehr_em_emergency_contact","displayName:zh-CN":"紧急联系人","displayName:en":"Emergency Contact","dataType":"string","description":"Emergency contact name and phone.","constraints":{"maxLength":200}},
+  {"code":"ehr_em_address","displayName:zh-CN":"地址","displayName:en":"Address","dataType":"string","description":"Home address.","constraints":{"maxLength":500}},
+  {"code":"ehr_em_notes","displayName:zh-CN":"备注","displayName:en":"Notes","dataType":"text","description":"Additional notes.","constraints":{"maxLength":5000},"extension":{"multiline":true}}
+]

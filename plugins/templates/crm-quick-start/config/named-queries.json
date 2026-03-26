@@ -1,0 +1,41 @@
+[
+  {
+    "code": "tcrm_pipeline_summary",
+    "name:zh-CN": "商机管道统计",
+    "name:en": "Pipeline Summary",
+    "description": "Aggregate opportunity amounts grouped by stage for pipeline visualization.",
+    "purpose": "Provides total deal value and count at each pipeline stage for sales dashboards.",
+    "parameter_schema": {
+      "type": "object",
+      "properties": {
+        "tenantId": { "type": "string", "description": "Tenant ID (auto-injected)" }
+      },
+      "required": ["tenantId"]
+    },
+    "fromSql": "SELECT tcrm_op_stage AS stage, COUNT(*) AS deal_count, COALESCE(SUM(tcrm_op_amount), 0) AS total_amount FROM mt_tcrm_opportunity WHERE tenant_id = #{params.tenantId} GROUP BY tcrm_op_stage ORDER BY CASE tcrm_op_stage WHEN 'prospecting' THEN 1 WHEN 'proposal' THEN 2 WHEN 'negotiation' THEN 3 WHEN 'closed_won' THEN 4 WHEN 'closed_lost' THEN 5 ELSE 6 END",
+    "outputFields": [
+      { "code": "stage", "columnExpr": "stage", "dataType": "string", "searchable": true },
+      { "code": "deal_count", "columnExpr": "deal_count", "dataType": "number", "sortable": true },
+      { "code": "total_amount", "columnExpr": "total_amount", "dataType": "number", "sortable": true }
+    ]
+  },
+  {
+    "code": "tcrm_lead_conversion",
+    "name:zh-CN": "线索转化统计",
+    "name:en": "Lead Conversion Stats",
+    "description": "Lead counts grouped by status for conversion funnel analysis.",
+    "purpose": "Shows how many leads are at each stage of the qualification funnel.",
+    "parameter_schema": {
+      "type": "object",
+      "properties": {
+        "tenantId": { "type": "string", "description": "Tenant ID (auto-injected)" }
+      },
+      "required": ["tenantId"]
+    },
+    "fromSql": "SELECT tcrm_ld_status AS status, COUNT(*) AS count FROM mt_tcrm_lead WHERE tenant_id = #{params.tenantId} GROUP BY tcrm_ld_status ORDER BY CASE tcrm_ld_status WHEN 'new' THEN 1 WHEN 'contacted' THEN 2 WHEN 'qualified' THEN 3 WHEN 'lost' THEN 4 ELSE 5 END",
+    "outputFields": [
+      { "code": "status", "columnExpr": "status", "dataType": "string", "searchable": true },
+      { "code": "count", "columnExpr": "count", "dataType": "number", "sortable": true }
+    ]
+  }
+]

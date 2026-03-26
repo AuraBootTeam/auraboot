@@ -1,0 +1,158 @@
+{
+  "pageKey": "crm_campaign_detail",
+  "name:zh-CN": "营销活动详情",
+  "name:en": "Campaign Detail",
+  "pageType": "detail",
+  "modelCode": "crm_campaign",
+  "dslSchema": {
+    "id": "detail.crm_campaign",
+    "kind": "Detail",
+    "version": "1.0.0",
+    "modelCode": "crm_campaign",
+    "layout": {
+      "areas": [
+        "header",
+        "main"
+      ],
+      "areasConfig": {
+        "header": {
+          "type": "flex",
+          "align": "center",
+          "justify": "space-between",
+          "direction": "row"
+        },
+        "main": {
+          "type": "flex",
+          "direction": "column",
+          "rowGap": 16
+        }
+      }
+    },
+    "areas": {
+      "header": {
+        "blocks": [
+          {
+            "id": "crm_campaign_detail_toolbar",
+            "blockType": "toolbar",
+            "buttons": [
+              {
+                "code": "edit",
+                "icon": "Edit",
+                "permissionCode": "CRMS.campaign.manage",
+                "label": "edit",
+                "action": {
+                  "type": "navigate",
+                  "to": "crm_campaign_form"
+                }
+              },
+              {
+                "code": "activate",
+                "permissionCode": "CRMS.campaign.manage",
+                "label": {
+                  "zh-CN": "启动",
+                  "en-US": "Activate"
+                },
+                "action": {
+                  "type": "command",
+                  "command": "crms:activate_campaign"
+                }
+              },
+              {
+                "code": "complete",
+                "permissionCode": "CRMS.campaign.manage",
+                "label": {
+                  "zh-CN": "完成",
+                  "en-US": "Complete"
+                },
+                "action": {
+                  "type": "command",
+                  "command": "crms:complete_campaign"
+                }
+              },
+              {
+                "code": "cancel",
+                "danger": true,
+                "permissionCode": "CRMS.campaign.manage",
+                "label": {
+                  "zh-CN": "取消",
+                  "en-US": "Cancel"
+                },
+                "action": {
+                  "type": "command",
+                  "command": "crms:cancel_campaign"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "main": {
+        "blocks": [
+          {
+            "id": "crm_campaign_tabs",
+            "blockType": "tabs",
+            "tabs": [
+              {
+                "key": "overview",
+                "label": {
+                  "zh-CN": "概览",
+                  "en-US": "Overview"
+                },
+                "blocks": [
+                  {
+                    "id": "section_basic",
+                    "blockType": "form-section",
+                    "title": {
+                      "zh-CN": "基本信息",
+                      "en-US": "Basic Information"
+                    },
+                    "columns": 2,
+                    "fields": [
+                      {
+                        "field": "crm_cpn_code",
+                        "readOnly": true
+                      },
+                      {
+                        "field": "crm_cpn_name",
+                        "readOnly": true
+                      },
+                      {
+                        "field": "crm_cpn_type",
+                        "readOnly": true
+                      },
+                      {
+                        "field": "crm_cpn_status",
+                        "readOnly": true
+                      },
+                      {
+                        "field": "crm_cpn_start_date",
+                        "readOnly": true
+                      },
+                      {
+                        "field": "crm_cpn_end_date",
+                        "readOnly": true
+                      },
+                      {
+                        "field": "crm_cpn_budget",
+                        "readOnly": true
+                      },
+                      {
+                        "field": "crm_cpn_owner",
+                        "readOnly": true
+                      },
+                      {
+                        "field": "crm_cpn_description",
+                        "span": 2,
+                        "readOnly": true
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

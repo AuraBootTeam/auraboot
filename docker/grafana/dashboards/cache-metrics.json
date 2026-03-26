@@ -1,0 +1,152 @@
+{
+  "uid": "auraboot-cache-metrics",
+  "title": "Cache Performance",
+  "tags": ["auraboot", "cache"],
+  "timezone": "browser",
+  "refresh": "10s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Cache Hit Rate",
+      "type": "gauge",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(meta_cache_hits_total) / (sum(meta_cache_hits_total) + sum(meta_cache_misses_total)) * 100",
+          "legendFormat": "Hit Rate",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 60 },
+              { "color": "green", "value": 80 }
+            ]
+          }
+        }
+      },
+      "datasource": { "type": "prometheus", "uid": "pbfa97cfb590b2093" }
+    },
+    {
+      "id": 2,
+      "title": "Total Cache Hits",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(meta_cache_hits_total)",
+          "legendFormat": "Hits",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null }
+            ]
+          }
+        }
+      },
+      "datasource": { "type": "prometheus", "uid": "pbfa97cfb590b2093" }
+    },
+    {
+      "id": 3,
+      "title": "Total Cache Misses",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(meta_cache_misses_total)",
+          "legendFormat": "Misses",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              { "color": "orange", "value": null }
+            ]
+          }
+        }
+      },
+      "datasource": { "type": "prometheus", "uid": "pbfa97cfb590b2093" }
+    },
+    {
+      "id": 4,
+      "title": "Cache Hit Rate Over Time",
+      "type": "timeseries",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(meta_cache_hits_total[5m])) / (sum(rate(meta_cache_hits_total[5m])) + sum(rate(meta_cache_misses_total[5m]))) * 100",
+          "legendFormat": "Hit Rate %",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 20,
+            "gradientMode": "scheme"
+          },
+          "thresholds": {
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 60 },
+              { "color": "green", "value": 80 }
+            ]
+          }
+        }
+      },
+      "datasource": { "type": "prometheus", "uid": "pbfa97cfb590b2093" }
+    },
+    {
+      "id": 5,
+      "title": "Cache Operations Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 18 },
+      "targets": [
+        {
+          "expr": "sum(rate(meta_cache_hits_total[1m]))",
+          "legendFormat": "Hits/s",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(meta_cache_misses_total[1m]))",
+          "legendFormat": "Misses/s",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 15
+          }
+        }
+      },
+      "datasource": { "type": "prometheus", "uid": "pbfa97cfb590b2093" }
+    }
+  ],
+  "schemaVersion": 39,
+  "version": 1
+}

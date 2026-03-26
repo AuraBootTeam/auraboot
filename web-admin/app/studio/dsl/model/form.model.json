@@ -1,0 +1,344 @@
+{
+  "kind": "Form",
+  "version": "1.0.0",
+  "id": "form.meta.model",
+  "title": "$i18n:form.model.title",
+  "description": "$i18n:form.model.description",
+  "stateBinding": {
+    "model": "{{state.form}}"
+  },
+  "layout": {
+    "areas": ["main"],
+    "areasConfig": {
+      "main": {
+        "type": "grid",
+        "cols": 12,
+        "rowGap": 12,
+        "colGap": 12
+      }
+    }
+  },
+  "areas": {
+    "main": {
+      "blocks": [
+        {
+          "id": "block_model_basic",
+          "blockType": "form-section",
+          "title": "$i18n:form.model.section.basic",
+          "layout": { "colSpan": 12, "rowSpan": 1 },
+          "fields": [
+            {
+              "field": "code",
+              "label": "$i18n:form.model.field.code.label",
+              "component": "SmartInput",
+              "layout": { "colSpan": 6, "rowSpan": 1 },
+              "props": {
+                "placeholder": "$i18n:form.model.field.code.placeholder"
+              },
+              "validation": [
+                {
+                  "type": "required",
+                  "message": "$i18n:form.model.field.code.required"
+                },
+                {
+                  "type": "pattern",
+                  "pattern": "^[a-zA-Z0-9_]+$",
+                  "message": "$i18n:form.model.field.code.pattern"
+                },
+                {
+                  "type": "minLength",
+                  "value": 3,
+                  "message": "$i18n:form.model.field.code.minLength"
+                },
+                {
+                  "type": "maxLength",
+                  "value": 50,
+                  "message": "$i18n:form.model.field.code.maxLength"
+                },
+                {
+                  "type": "async",
+                  "validator": "checkCodeUnique",
+                  "message": "$i18n:form.model.field.code.duplicate"
+                }
+              ],
+              "readOnlyWhen": "${form.mode === 'edit'}"
+            },
+            {
+              "field": "displayName",
+              "label": "$i18n:form.model.field.displayName.label",
+              "component": "SmartInput",
+              "layout": { "colSpan": 6, "rowSpan": 1 },
+              "props": {
+                "placeholder": "$i18n:form.model.field.displayName.placeholder"
+              },
+              "validation": [
+                {
+                  "type": "required",
+                  "message": "$i18n:form.model.field.displayName.required"
+                },
+                {
+                  "type": "maxLength",
+                  "value": 100,
+                  "message": "$i18n:form.model.field.displayName.maxLength"
+                }
+              ]
+            },
+            {
+              "field": "modelType",
+              "label": "$i18n:form.model.field.modelType.label",
+              "component": "SmartSelect",
+              "layout": { "colSpan": 6, "rowSpan": 1 },
+              "dataSource": "ds_modelTypes",
+              "props": {
+                "placeholder": "$i18n:form.model.field.modelType.placeholder"
+              },
+              "validation": [
+                {
+                  "type": "required",
+                  "message": "$i18n:form.model.field.modelType.required"
+                }
+              ]
+            },
+            {
+              "field": "description",
+              "label": "$i18n:form.model.field.description.label",
+              "component": "SmartTextarea",
+              "layout": { "colSpan": 12, "rowSpan": 2 },
+              "props": {
+                "placeholder": "$i18n:form.model.field.description.placeholder",
+                "autoSize": {
+                  "minRows": 3,
+                  "maxRows": 6
+                }
+              },
+              "validation": [
+                {
+                  "type": "maxLength",
+                  "value": 500,
+                  "message": "$i18n:form.model.field.description.maxLength"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "block_model_advanced",
+          "blockType": "form-section",
+          "title": "$i18n:form.model.section.advanced",
+          "layout": { "colSpan": 12, "rowSpan": 1 },
+          "collapsible": true,
+          "defaultCollapsed": true,
+          "fields": [
+            {
+              "field": "namespace",
+              "label": "$i18n:form.model.field.namespace.label",
+              "component": "SmartInput",
+              "layout": { "colSpan": 6, "rowSpan": 1 },
+              "props": {
+                "placeholder": "$i18n:form.model.field.namespace.placeholder"
+              }
+            },
+            {
+              "field": "env",
+              "label": "$i18n:form.model.field.env.label",
+              "component": "SmartSelect",
+              "layout": { "colSpan": 6, "rowSpan": 1 },
+              "dataSource": "ds_environments",
+              "props": {
+                "placeholder": "$i18n:form.model.field.env.placeholder"
+              }
+            },
+            {
+              "field": "extension",
+              "label": "$i18n:form.model.field.extension.label",
+              "component": "SmartJsonEditor",
+              "layout": { "colSpan": 12, "rowSpan": 4 },
+              "props": {
+                "placeholder": "$i18n:form.model.field.extension.placeholder",
+                "height": 200
+              }
+            }
+          ]
+        },
+        {
+          "id": "block_model_version",
+          "blockType": "form-section",
+          "title": "$i18n:form.model.section.version",
+          "layout": { "colSpan": 12, "rowSpan": 1 },
+          "visibleWhen": "${form.mode === 'edit'}",
+          "fields": [
+            {
+              "field": "versionNote",
+              "label": "$i18n:form.model.field.versionNote.label",
+              "component": "SmartTextarea",
+              "layout": { "colSpan": 12, "rowSpan": 2 },
+              "props": {
+                "placeholder": "$i18n:form.model.field.versionNote.placeholder",
+                "autoSize": {
+                  "minRows": 2,
+                  "maxRows": 4
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "block_git_first_notice",
+          "blockType": "alert",
+          "layout": { "colSpan": 12, "rowSpan": 1 },
+          "visibleWhen": "${$gitFirstEnabled('model')}",
+          "props": {
+            "type": "info",
+            "message": "$i18n:form.model.gitFirst.title",
+            "description": "$i18n:form.model.gitFirst.description",
+            "showIcon": true
+          }
+        },
+        {
+          "id": "block_model_buttons",
+          "blockType": "form-buttons",
+          "layout": { "colSpan": 12, "rowSpan": 1 },
+          "buttons": [
+            {
+              "code": "submit",
+              "content": "${form.mode === 'create' ? '$i18n:form.model.btn.create' : '$i18n:form.model.btn.update'}",
+              "primary": true,
+              "visibleWhen": "${hasPermission('model:create') || hasPermission('model:update')}",
+              "events": {
+                "onClick": { "handler": "submitModelForm" }
+              }
+            },
+            {
+              "code": "reset",
+              "content": "$i18n:form.model.btn.reset",
+              "events": {
+                "onClick": { "handler": "resetModelForm" }
+              }
+            },
+            {
+              "code": "cancel",
+              "content": "$i18n:form.model.btn.cancel",
+              "events": {
+                "onClick": { "handler": "cancelModelForm" }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "dataSources": {
+    "ds_modelTypes": {
+      "type": "static",
+      "valueField": "value",
+      "labelField": "label",
+      "data": [
+        { "value": "entity", "label": "$i18n:model.type.entity" },
+        { "value": "view", "label": "$i18n:model.type.view" },
+        { "value": "aggregate", "label": "$i18n:model.type.aggregate" }
+      ]
+    },
+    "ds_environments": {
+      "type": "static",
+      "valueField": "value",
+      "labelField": "label",
+      "data": [
+        { "value": "dev", "label": "$i18n:env.dev" },
+        { "value": "test", "label": "$i18n:env.test" },
+        { "value": "staging", "label": "$i18n:env.staging" },
+        { "value": "prod", "label": "$i18n:env.prod" }
+      ]
+    }
+  },
+  "handlers": {
+    "submitModelForm": {
+      "type": "flow",
+      "steps": [
+        {
+          "action": "form.validate",
+          "target": "form.meta.model",
+          "next": "checkGitFirst"
+        },
+        {
+          "id": "checkGitFirst",
+          "action": "api.request",
+          "method": "get",
+          "endpoint": "/api/git/router/requires-git-first",
+          "params": { "resourceType": "model" },
+          "next": "submitToApi"
+        },
+        {
+          "id": "submitToApi",
+          "action": "api.request",
+          "method": "${form.mode === 'create' ? 'post' : 'put'}",
+          "endpoint": "${form.mode === 'create' ? '/api/meta/models' : '/api/meta/models/' + form.pid}",
+          "body": "{{state.form}}",
+          "next": "afterSubmit"
+        },
+        {
+          "id": "afterSubmit",
+          "action": "toast.show",
+          "level": "success",
+          "content": "${form.mode === 'create' ? '$i18n:form.model.submit.create.success' : '$i18n:form.model.submit.update.success'}"
+        },
+        {
+          "action": "notify",
+          "channel": "dataSource",
+          "payload": {
+            "id": "ds_modelList",
+            "event": "reload"
+          }
+        },
+        {
+          "action": "ui.closeContainer",
+          "target": "drawer.modelForm"
+        },
+        {
+          "action": "conditional",
+          "condition": "${form.mode === 'create'}",
+          "then": "openWizard"
+        },
+        {
+          "id": "openWizard",
+          "action": "ui.openContainer",
+          "target": "dialog.crudWizard",
+          "args": {
+            "modelCode": "{{state.form.code}}",
+            "modelName": "{{state.form.displayName}}"
+          }
+        }
+      ]
+    },
+    "resetModelForm": {
+      "type": "flow",
+      "steps": [
+        {
+          "action": "form.reset",
+          "target": "form.meta.model"
+        }
+      ]
+    },
+    "cancelModelForm": {
+      "type": "flow",
+      "steps": [
+        {
+          "action": "ui.closeContainer",
+          "target": "drawer.modelForm"
+        }
+      ]
+    },
+    "checkCodeUnique": {
+      "type": "flow",
+      "steps": [
+        {
+          "action": "api.request",
+          "method": "get",
+          "endpoint": "/api/meta/models/code/${args.value}/unique",
+          "params": {
+            "excludePid": "${form.pid}"
+          }
+        }
+      ]
+    }
+  }
+}

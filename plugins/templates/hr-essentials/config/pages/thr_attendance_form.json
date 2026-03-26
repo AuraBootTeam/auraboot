@@ -1,0 +1,56 @@
+{
+  "pageKey": "thr_attendance_form",
+  "name:zh-CN": "考勤表单",
+  "name:en": "Attendance Form",
+  "pageType": "form",
+  "modelCode": "thr_attendance",
+  "dslSchema": {
+    "id": "form.thr_attendance",
+    "kind": "Form",
+    "version": "1.0.0",
+    "modelCode": "thr_attendance",
+    "layout": {
+      "areas": ["main", "footer"],
+      "areasConfig": {
+        "main": { "type": "grid", "cols": 12, "rowGap": 16, "colGap": 16 },
+        "footer": { "type": "flex", "direction": "row" }
+      }
+    },
+    "areas": {
+      "main": {
+        "blocks": [
+          {
+            "id": "basic",
+            "blockType": "form-section",
+            "title": { "zh-CN": "考勤信息", "en-US": "Attendance Information" },
+            "fields": [
+              { "field": "thr_at_employee_id", "colSpan": 6 },
+              { "field": "thr_at_date", "colSpan": 6 },
+              { "field": "thr_at_check_in", "colSpan": 6 },
+              { "field": "thr_at_check_out", "colSpan": 6 },
+              { "field": "thr_at_type", "colSpan": 6 }
+            ]
+          },
+          {
+            "id": "detail",
+            "blockType": "form-section",
+            "title": { "zh-CN": "备注", "en-US": "Notes" },
+            "fields": [
+              { "field": "thr_at_notes", "colSpan": 12 }
+            ]
+          }
+        ]
+      },
+      "footer": {
+        "blocks": [{
+          "id": "buttons",
+          "blockType": "form-buttons",
+          "buttons": [
+            { "code": "submit", "action": "save", "commandCode": "thr:update_attendance", "primary": true },
+            { "code": "cancel", "action": "cancel" }
+          ]
+        }]
+      }
+    }
+  }
+}

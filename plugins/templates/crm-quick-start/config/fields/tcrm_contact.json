@@ -1,0 +1,65 @@
+[
+  {
+    "code": "tcrm_ct_code",
+    "displayName:zh-CN": "联系人编号",
+    "displayName:en": "Contact Code",
+    "dataType": "string",
+    "description": "Auto-generated contact code.",
+    "constraints": { "required": true, "maxLength": 50 },
+    "feature": { "searchable": true, "sortable": true },
+    "extension": { "readOnly": true, "placeholder:zh-CN": "系统自动生成", "placeholder:en": "Auto generated" }
+  },
+  {
+    "code": "tcrm_ct_name",
+    "displayName:zh-CN": "姓名",
+    "displayName:en": "Name",
+    "dataType": "string",
+    "description": "Contact person name.",
+    "constraints": { "required": true, "maxLength": 200 },
+    "feature": { "searchable": true, "sortable": true },
+    "extension": { "placeholder:zh-CN": "请输入姓名", "placeholder:en": "Enter name" }
+  },
+  {
+    "code": "tcrm_ct_account_id",
+    "displayName:zh-CN": "所属客户",
+    "displayName:en": "Account",
+    "dataType": "reference",
+    "description": "The account this contact belongs to.",
+    "feature": { "searchable": true },
+    "extension": { "referenceModelCode": "tcrm_account" }
+  },
+  {
+    "code": "tcrm_ct_title",
+    "displayName:zh-CN": "职位",
+    "displayName:en": "Title",
+    "dataType": "string",
+    "description": "Job title.",
+    "constraints": { "maxLength": 200 }
+  },
+  {
+    "code": "tcrm_ct_email",
+    "displayName:zh-CN": "邮箱",
+    "displayName:en": "Email",
+    "dataType": "string",
+    "description": "Contact email.",
+    "constraints": { "maxLength": 200 },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "tcrm_ct_phone",
+    "displayName:zh-CN": "电话",
+    "displayName:en": "Phone",
+    "dataType": "string",
+    "description": "Contact phone number.",
+    "constraints": { "maxLength": 50 }
+  },
+  {
+    "code": "tcrm_ct_notes",
+    "displayName:zh-CN": "备注",
+    "displayName:en": "Notes",
+    "dataType": "text",
+    "description": "Notes about the contact.",
+    "constraints": { "maxLength": 5000 },
+    "extension": { "multiline": true }
+  }
+]

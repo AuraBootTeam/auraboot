@@ -1,0 +1,20 @@
+id: 1
+version: 1.0.0
+action: create_product
+
+process:
+  name: "My Sample Process"
+  nodes:
+    - id: "task1"
+      delegation: "com.custom.solution.msg.MailSender"
+    - id: "task2"
+      delegation: "com.custom.solution.search.Indexer"
+    - id: "task1-to-task2"
+      type: "sequence"
+      from: "task1"
+      to: "task2"
+
+
+# sequence can be ignored in simple cases; default: from node 1 to 2 ,from 2 to 3 ,and so on
+# name default  as id ,type default as "activity"
+# default receiver task ; signal every step ; buildPvmDefiioni  test passed ;  ignore

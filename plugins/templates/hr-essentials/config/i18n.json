@@ -1,0 +1,63 @@
+[
+  { "key": "model.thr_employee._meta.label", "zh-CN": "员工", "en-US": "Employee", "source": "import", "refType": "model" },
+  { "key": "model.thr_employee.thr_em_code.label", "zh-CN": "员工编号", "en-US": "Employee Code", "source": "import", "refType": "field" },
+  { "key": "model.thr_employee.thr_em_name.label", "zh-CN": "姓名", "en-US": "Name", "source": "import", "refType": "field" },
+  { "key": "model.thr_employee.thr_em_department.label", "zh-CN": "部门", "en-US": "Department", "source": "import", "refType": "field" },
+  { "key": "model.thr_employee.thr_em_position.label", "zh-CN": "职位", "en-US": "Position", "source": "import", "refType": "field" },
+  { "key": "model.thr_employee.thr_em_email.label", "zh-CN": "邮箱", "en-US": "Email", "source": "import", "refType": "field" },
+  { "key": "model.thr_employee.thr_em_phone.label", "zh-CN": "电话", "en-US": "Phone", "source": "import", "refType": "field" },
+  { "key": "model.thr_employee.thr_em_hire_date.label", "zh-CN": "入职日期", "en-US": "Hire Date", "source": "import", "refType": "field" },
+  { "key": "model.thr_employee.thr_em_status.label", "zh-CN": "状态", "en-US": "Status", "source": "import", "refType": "field" },
+  { "key": "model.thr_employee.thr_em_notes.label", "zh-CN": "备注", "en-US": "Notes", "source": "import", "refType": "field" },
+
+  { "key": "model.thr_attendance._meta.label", "zh-CN": "考勤记录", "en-US": "Attendance", "source": "import", "refType": "model" },
+  { "key": "model.thr_attendance.thr_at_code.label", "zh-CN": "考勤编号", "en-US": "Attendance Code", "source": "import", "refType": "field" },
+  { "key": "model.thr_attendance.thr_at_employee_id.label", "zh-CN": "员工", "en-US": "Employee", "source": "import", "refType": "field" },
+  { "key": "model.thr_attendance.thr_at_date.label", "zh-CN": "日期", "en-US": "Date", "source": "import", "refType": "field" },
+  { "key": "model.thr_attendance.thr_at_check_in.label", "zh-CN": "签到时间", "en-US": "Check In", "source": "import", "refType": "field" },
+  { "key": "model.thr_attendance.thr_at_check_out.label", "zh-CN": "签退时间", "en-US": "Check Out", "source": "import", "refType": "field" },
+  { "key": "model.thr_attendance.thr_at_type.label", "zh-CN": "考勤类型", "en-US": "Type", "source": "import", "refType": "field" },
+  { "key": "model.thr_attendance.thr_at_notes.label", "zh-CN": "备注", "en-US": "Notes", "source": "import", "refType": "field" },
+
+  { "key": "model.thr_leave_request._meta.label", "zh-CN": "请假申请", "en-US": "Leave Request", "source": "import", "refType": "model" },
+  { "key": "model.thr_leave_request.thr_lv_code.label", "zh-CN": "请假编号", "en-US": "Leave Code", "source": "import", "refType": "field" },
+  { "key": "model.thr_leave_request.thr_lv_employee_id.label", "zh-CN": "员工", "en-US": "Employee", "source": "import", "refType": "field" },
+  { "key": "model.thr_leave_request.thr_lv_leave_type.label", "zh-CN": "请假类型", "en-US": "Leave Type", "source": "import", "refType": "field" },
+  { "key": "model.thr_leave_request.thr_lv_start_date.label", "zh-CN": "开始日期", "en-US": "Start Date", "source": "import", "refType": "field" },
+  { "key": "model.thr_leave_request.thr_lv_end_date.label", "zh-CN": "结束日期", "en-US": "End Date", "source": "import", "refType": "field" },
+  { "key": "model.thr_leave_request.thr_lv_days.label", "zh-CN": "天数", "en-US": "Days", "source": "import", "refType": "field" },
+  { "key": "model.thr_leave_request.thr_lv_status.label", "zh-CN": "状态", "en-US": "Status", "source": "import", "refType": "field" },
+  { "key": "model.thr_leave_request.thr_lv_reason.label", "zh-CN": "请假原因", "en-US": "Reason", "source": "import", "refType": "field" },
+
+  { "key": "thr.action.create_employee", "zh-CN": "新建员工", "en-US": "Create Employee", "source": "import", "refType": "action" },
+  { "key": "thr.action.update_employee", "zh-CN": "编辑员工", "en-US": "Update Employee", "source": "import", "refType": "action" },
+  { "key": "thr.action.on_leave", "zh-CN": "休假", "en-US": "On Leave", "source": "import", "refType": "action" },
+  { "key": "thr.action.return_from_leave", "zh-CN": "复职", "en-US": "Return from Leave", "source": "import", "refType": "action" },
+  { "key": "thr.action.resign", "zh-CN": "离职", "en-US": "Resign", "source": "import", "refType": "action" },
+  { "key": "thr.action.delete_employee", "zh-CN": "删除员工", "en-US": "Delete Employee", "source": "import", "refType": "action" },
+
+  { "key": "thr.action.create_attendance", "zh-CN": "新建考勤", "en-US": "Create Attendance", "source": "import", "refType": "action" },
+  { "key": "thr.action.update_attendance", "zh-CN": "编辑考勤", "en-US": "Update Attendance", "source": "import", "refType": "action" },
+  { "key": "thr.action.delete_attendance", "zh-CN": "删除考勤", "en-US": "Delete Attendance", "source": "import", "refType": "action" },
+
+  { "key": "thr.action.create_leave_request", "zh-CN": "新建请假", "en-US": "Create Leave Request", "source": "import", "refType": "action" },
+  { "key": "thr.action.update_leave_request", "zh-CN": "编辑请假", "en-US": "Update Leave Request", "source": "import", "refType": "action" },
+  { "key": "thr.action.approve_leave", "zh-CN": "批准请假", "en-US": "Approve Leave", "source": "import", "refType": "action" },
+  { "key": "thr.action.reject_leave", "zh-CN": "拒绝请假", "en-US": "Reject Leave", "source": "import", "refType": "action" },
+  { "key": "thr.action.cancel_leave", "zh-CN": "取消请假", "en-US": "Cancel Leave", "source": "import", "refType": "action" },
+  { "key": "thr.action.delete_leave_request", "zh-CN": "删除请假", "en-US": "Delete Leave Request", "source": "import", "refType": "action" },
+
+  { "key": "thr.page.thr_employee_list.title", "zh-CN": "员工列表", "en-US": "Employees", "source": "import", "refType": "page" },
+  { "key": "thr.page.thr_employee_form.title", "zh-CN": "员工表单", "en-US": "Employee Form", "source": "import", "refType": "page" },
+  { "key": "thr.page.thr_employee_form.section.basic", "zh-CN": "基本信息", "en-US": "Basic Information", "source": "import", "refType": "page" },
+  { "key": "thr.page.thr_employee_form.section.detail", "zh-CN": "其他信息", "en-US": "Additional Information", "source": "import", "refType": "page" },
+  { "key": "thr.page.thr_employee_detail.title", "zh-CN": "员工详情", "en-US": "Employee Detail", "source": "import", "refType": "page" },
+
+  { "key": "thr.page.thr_attendance_list.title", "zh-CN": "考勤列表", "en-US": "Attendance", "source": "import", "refType": "page" },
+  { "key": "thr.page.thr_attendance_form.title", "zh-CN": "考勤表单", "en-US": "Attendance Form", "source": "import", "refType": "page" },
+  { "key": "thr.page.thr_attendance_detail.title", "zh-CN": "考勤详情", "en-US": "Attendance Detail", "source": "import", "refType": "page" },
+
+  { "key": "thr.page.thr_leave_request_list.title", "zh-CN": "请假列表", "en-US": "Leave Requests", "source": "import", "refType": "page" },
+  { "key": "thr.page.thr_leave_request_form.title", "zh-CN": "请假表单", "en-US": "Leave Request Form", "source": "import", "refType": "page" },
+  { "key": "thr.page.thr_leave_request_detail.title", "zh-CN": "请假详情", "en-US": "Leave Request Detail", "source": "import", "refType": "page" }
+]

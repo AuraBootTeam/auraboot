@@ -1,0 +1,91 @@
+[
+  {
+    "code": "e2et_menu",
+    "parentCode": null,
+    "name:zh-CN": "E2E测试",
+    "name:en": "E2E Test",
+    "path": "/e2et",
+    "component": null,
+    "icon": "FlaskConical",
+    "type": 0,
+    "permissionCode": "e2et.order.read",
+    "orderNo": 1,
+    "visible": true,
+    "extension": {
+      "platforms": [
+        "web",
+        "mobile"
+      ]
+    }
+  },
+  {
+    "code": "e2et_order_list",
+    "parentCode": "e2et_menu",
+    "name:zh-CN": "测试订单",
+    "name:en": "Test Orders",
+    "path": "/dynamic/e2et-order",
+    "component": null,
+    "icon": "ShoppingCart",
+    "type": 1,
+    "permissionCode": "e2et.order.read",
+    "orderNo": 10,
+    "visible": true,
+    "pageKey": "e2et_order_list"
+  },
+  {
+    "code": "e2et_customer_list",
+    "parentCode": "e2et_menu",
+    "name:zh-CN": "客户管理",
+    "name:en": "Customer Management",
+    "path": "/dynamic/e2et-customer",
+    "component": null,
+    "icon": "Users",
+    "type": 1,
+    "permissionCode": "e2et.customer.read",
+    "orderNo": 20,
+    "visible": true,
+    "pageKey": "e2et_customer_list"
+  },
+  {
+    "code": "e2et_payment_list",
+    "parentCode": "e2et_menu",
+    "name:zh-CN": "付款管理",
+    "name:en": "Payment Management",
+    "path": "/dynamic/e2et-payment",
+    "component": null,
+    "icon": "CreditCard",
+    "type": 1,
+    "permissionCode": "e2et.payment.manage",
+    "orderNo": 30,
+    "visible": true,
+    "pageKey": "e2et_payment_list"
+  },
+  {
+    "code": "e2et_dashboard",
+    "parentCode": "e2et_menu",
+    "name:zh-CN": "订单仪表盘",
+    "name:en": "Order Dashboard",
+    "path": "/dynamic/e2et-order-dashboard",
+    "component": null,
+    "icon": "LayoutDashboard",
+    "type": 1,
+    "permissionCode": "e2et.order.read",
+    "orderNo": 40,
+    "visible": true,
+    "pageKey": "e2et_order_dashboard_list"
+  },
+  {
+    "code": "e2et_record_list",
+    "parentCode": "e2et_menu",
+    "name:zh-CN": "测试记录",
+    "name:en": "Test Records",
+    "path": "/dynamic/e2et-record",
+    "component": null,
+    "icon": "FileText",
+    "type": 1,
+    "permissionCode": "e2et.order.read",
+    "orderNo": 50,
+    "visible": true,
+    "pageKey": "e2et_record_list"
+  }
+]

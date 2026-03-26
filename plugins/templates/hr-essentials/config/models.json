@@ -1,0 +1,56 @@
+[
+  {
+    "code": "thr_employee",
+    "displayName:zh-CN": "员工",
+    "displayName:en": "Employee",
+    "description": "Employee entity for the HR Essentials template. Demonstrates state machine lifecycle for employee status transitions.",
+    "modelType": "entity",
+    "modelCategory": "entity",
+    "semantic_description": "An employee record representing a person employed by the organization. Tracks personal info, department, position, and employment status through a lifecycle from active employment through leave to resignation.",
+    "domain_category": "HR",
+    "data_sensitivity": "confidential",
+    "lifecycle_description": "active → ON_LEAVE (↔ active) → RESIGNED; active → RESIGNED",
+    "extension": {
+      "icon": "User",
+      "category": "hr-essentials",
+      "titleField": "thr_em_name",
+      "subtitleField": "thr_em_code"
+    }
+  },
+  {
+    "code": "thr_attendance",
+    "displayName:zh-CN": "考勤记录",
+    "displayName:en": "Attendance",
+    "description": "Attendance record for tracking daily check-in/check-out times and attendance classification.",
+    "modelType": "entity",
+    "modelCategory": "activity",
+    "semantic_description": "A daily attendance record for an employee, capturing check-in and check-out times and classifying the attendance type (normal, late, early leave, absent). Used for payroll and performance tracking.",
+    "domain_category": "HR",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "Created → Updated → Deleted (no status machine; type is a classification field, not a lifecycle state)",
+    "extension": {
+      "icon": "Clock",
+      "category": "hr-essentials",
+      "titleField": "thr_at_code",
+      "subtitleField": "thr_at_date"
+    }
+  },
+  {
+    "code": "thr_leave_request",
+    "displayName:zh-CN": "请假申请",
+    "displayName:en": "Leave Request",
+    "description": "Leave request entity with approval workflow. Demonstrates multi-target state transitions and preconditioned deletion.",
+    "modelType": "entity",
+    "modelCategory": "document",
+    "semantic_description": "A leave request submitted by an employee, specifying leave type, duration, and reason. Goes through an approval workflow from pending to approved/rejected, or can be cancelled by the requester.",
+    "domain_category": "HR",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "pending → approved / rejected; pending → cancelled",
+    "extension": {
+      "icon": "CalendarOff",
+      "category": "hr-essentials",
+      "titleField": "thr_lv_code",
+      "subtitleField": "thr_lv_leave_type"
+    }
+  }
+]

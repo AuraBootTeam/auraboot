@@ -1,0 +1,46 @@
+{
+  "pageKey": "tcrm_account_list",
+  "name:zh-CN": "客户列表",
+  "name:en": "Accounts",
+  "pageType": "list",
+  "modelCode": "tcrm_account",
+  "dslSchema": {
+    "id": "list.tcrm_account",
+    "kind": "List",
+    "areas": {
+      "toolbar": {
+        "blocks": [{
+          "id": "tcrm_account_toolbar",
+          "blockType": "toolbar",
+          "buttons": [
+            { "code": "create", "action": "create", "primary": true, "commandCode": "tcrm:create_account", "navigateTo": "tcrm_account_form", "permissionCode": "TCRM.account.manage" }
+          ]
+        }]
+      },
+      "main": {
+        "blocks": [{
+          "id": "tcrm_account_table",
+          "blockType": "data-table",
+          "columns": [
+            { "field": "tcrm_ac_code", "width": 160, "sortable": true },
+            { "field": "tcrm_ac_name", "width": 200, "sortable": true },
+            { "field": "tcrm_ac_industry", "width": 120, "renderType": "tag", "dictCode": "tcrm_industry" },
+            { "field": "tcrm_ac_phone", "width": 140 },
+            { "field": "tcrm_ac_website", "width": 180 },
+            {
+              "field": "actions",
+              "isActionColumn": true,
+              "buttons": [
+                { "code": "view", "action": "detail", "navigateTo": "tcrm_account_detail" },
+                { "code": "edit", "action": "edit", "navigateTo": "tcrm_account_form", "permissionCode": "TCRM.account.manage" },
+                { "code": "delete", "action": "delete", "danger": true, "commandCode": "tcrm:delete_account", "permissionCode": "TCRM.account.manage", "confirmMessageKey": "delete.confirm" }
+              ]
+            }
+          ],
+          "searchFields": ["tcrm_ac_name", "tcrm_ac_code"],
+          "defaultSort": { "field": "created_at", "order": "desc" }
+        }]
+      }
+    }
+  }
+}

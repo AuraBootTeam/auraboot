@@ -1,0 +1,460 @@
+[
+  {
+    "code": "crm_account_status",
+    "name": "Account Status",
+    "name:zh-CN": "客户状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "active",
+        "label": "Active",
+        "label:zh-CN": "活跃",
+        "sortNo": 10,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "inactive",
+        "label": "Inactive",
+        "label:zh-CN": "停用",
+        "sortNo": 20,
+        "color": "#d9d9d9",
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_account_rating",
+    "name": "Account Rating",
+    "name:zh-CN": "客户评级",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "A",
+        "label": "A - Key Account",
+        "label:zh-CN": "A - 重点客户",
+        "sortNo": 10,
+        "color": "#f5222d",
+        "status": "enabled"
+      },
+      {
+        "value": "B",
+        "label": "B - Important",
+        "label:zh-CN": "B - 重要客户",
+        "sortNo": 20,
+        "color": "#fa8c16",
+        "status": "enabled"
+      },
+      {
+        "value": "C",
+        "label": "C - Normal",
+        "label:zh-CN": "C - 一般客户",
+        "sortNo": 30,
+        "color": "#1890ff",
+        "status": "enabled"
+      },
+      {
+        "value": "D",
+        "label": "D - Low Priority",
+        "label:zh-CN": "D - 低优先级",
+        "sortNo": 40,
+        "color": "#d9d9d9",
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "crm_lead_status",
+    "name": "Lead Status",
+    "name:zh-CN": "线索状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "new",
+        "label": "New",
+        "label:zh-CN": "新建",
+        "sortNo": 10,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "contacted",
+        "label": "Contacted",
+        "label:zh-CN": "已联系",
+        "sortNo": 20,
+        "color": "#13c2c2",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "qualified",
+        "label": "Qualified",
+        "label:zh-CN": "已合格",
+        "sortNo": 30,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "converted",
+        "label": "Converted",
+        "label:zh-CN": "已转化",
+        "sortNo": 40,
+        "color": "#722ed1",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "lost",
+        "label": "Lost",
+        "label:zh-CN": "已丢失",
+        "sortNo": 50,
+        "color": "#d9d9d9",
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_lead_source",
+    "name": "Lead Source",
+    "name:zh-CN": "线索来源",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "exhibition",
+        "label": "Exhibition",
+        "label:zh-CN": "展会",
+        "sortNo": 10,
+        "status": "enabled"
+      },
+      {
+        "value": "website",
+        "label": "Website",
+        "label:zh-CN": "网站",
+        "sortNo": 20,
+        "status": "enabled"
+      },
+      {
+        "value": "referral",
+        "label": "Referral",
+        "label:zh-CN": "推荐",
+        "sortNo": 30,
+        "status": "enabled"
+      },
+      {
+        "value": "cold_call",
+        "label": "Cold Call",
+        "label:zh-CN": "陌拜",
+        "sortNo": 40,
+        "status": "enabled"
+      },
+      {
+        "value": "social_media",
+        "label": "Social Media",
+        "label:zh-CN": "社交媒体",
+        "sortNo": 50,
+        "status": "enabled"
+      },
+      {
+        "value": "other",
+        "label": "Other",
+        "label:zh-CN": "其他",
+        "sortNo": 60,
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "crm_contact_role",
+    "name": "Contact Role",
+    "name:zh-CN": "联系人角色",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "decision_maker",
+        "label": "Decision Maker",
+        "label:zh-CN": "决策者",
+        "sortNo": 10,
+        "status": "enabled"
+      },
+      {
+        "value": "technical",
+        "label": "Technical",
+        "label:zh-CN": "技术",
+        "sortNo": 20,
+        "status": "enabled"
+      },
+      {
+        "value": "procurement",
+        "label": "Procurement",
+        "label:zh-CN": "采购",
+        "sortNo": 30,
+        "status": "enabled"
+      },
+      {
+        "value": "influencer",
+        "label": "Influencer",
+        "label:zh-CN": "影响者",
+        "sortNo": 40,
+        "status": "enabled"
+      },
+      {
+        "value": "other",
+        "label": "Other",
+        "label:zh-CN": "其他",
+        "sortNo": 50,
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "crm_opp_stage",
+    "name": "Opportunity Stage",
+    "name:zh-CN": "商机阶段",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "discovery",
+        "label": "Discovery",
+        "label:zh-CN": "发现",
+        "sortNo": 10,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "qualification",
+        "label": "Qualification",
+        "label:zh-CN": "资质审查",
+        "sortNo": 20,
+        "color": "#13c2c2",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "proposal",
+        "label": "Proposal",
+        "label:zh-CN": "提案",
+        "sortNo": 30,
+        "color": "#fa8c16",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "negotiation",
+        "label": "Negotiation",
+        "label:zh-CN": "谈判",
+        "sortNo": 40,
+        "color": "#722ed1",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "closed_won",
+        "label": "Closed Won",
+        "label:zh-CN": "赢单",
+        "sortNo": 50,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "closed_lost",
+        "label": "Closed Lost",
+        "label:zh-CN": "输单",
+        "sortNo": 60,
+        "color": "#d9d9d9",
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_activity_type",
+    "name": "Activity Type",
+    "name:zh-CN": "活动类型",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "call",
+        "label": "Call",
+        "label:zh-CN": "电话",
+        "sortNo": 10,
+        "color": "#1890ff",
+        "status": "enabled"
+      },
+      {
+        "value": "visit",
+        "label": "Visit",
+        "label:zh-CN": "拜访",
+        "sortNo": 20,
+        "color": "#52c41a",
+        "status": "enabled"
+      },
+      {
+        "value": "email",
+        "label": "Email",
+        "label:zh-CN": "邮件",
+        "sortNo": 30,
+        "color": "#fa8c16",
+        "status": "enabled"
+      },
+      {
+        "value": "meeting",
+        "label": "Meeting",
+        "label:zh-CN": "会议",
+        "sortNo": 40,
+        "color": "#722ed1",
+        "status": "enabled"
+      },
+      {
+        "value": "wechat",
+        "label": "WeChat",
+        "label:zh-CN": "微信",
+        "sortNo": 50,
+        "color": "#13c2c2",
+        "status": "enabled"
+      },
+      {
+        "value": "other",
+        "label": "Other",
+        "label:zh-CN": "其他",
+        "sortNo": 60,
+        "color": "#d9d9d9",
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "crm_campaign_type",
+    "name": "Campaign Type",
+    "name:zh-CN": "营销活动类型",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "exhibition",
+        "label": "Exhibition",
+        "label:zh-CN": "展会",
+        "sortNo": 10,
+        "status": "enabled"
+      },
+      {
+        "value": "digital",
+        "label": "Digital",
+        "label:zh-CN": "数字营销",
+        "sortNo": 20,
+        "status": "enabled"
+      },
+      {
+        "value": "email",
+        "label": "Email",
+        "label:zh-CN": "邮件",
+        "sortNo": 30,
+        "status": "enabled"
+      },
+      {
+        "value": "referral",
+        "label": "Referral",
+        "label:zh-CN": "推荐",
+        "sortNo": 40,
+        "status": "enabled"
+      },
+      {
+        "value": "social_media",
+        "label": "Social Media",
+        "label:zh-CN": "社交媒体",
+        "sortNo": 50,
+        "status": "enabled"
+      },
+      {
+        "value": "other",
+        "label": "Other",
+        "label:zh-CN": "其他",
+        "sortNo": 60,
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "crm_campaign_status",
+    "name": "Campaign Status",
+    "name:zh-CN": "营销活动状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "planned",
+        "label": "Planned",
+        "label:zh-CN": "计划中",
+        "sortNo": 10,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "active",
+        "label": "Active",
+        "label:zh-CN": "进行中",
+        "sortNo": 20,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "completed",
+        "label": "Completed",
+        "label:zh-CN": "已完成",
+        "sortNo": 30,
+        "color": "#d9d9d9",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "cancelled",
+        "label": "Cancelled",
+        "label:zh-CN": "已取消",
+        "sortNo": 40,
+        "color": "#f5222d",
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      }
+    ]
+  }
+]

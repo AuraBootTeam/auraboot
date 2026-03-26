@@ -1,0 +1,55 @@
+{
+  "pageKey": "tcrm_opportunity_detail",
+  "name:zh-CN": "商机详情",
+  "name:en": "Opportunity Detail",
+  "pageType": "detail",
+  "modelCode": "tcrm_opportunity",
+  "dslSchema": {
+    "id": "detail.tcrm_opportunity",
+    "kind": "Detail",
+    "version": "1.0.0",
+    "modelCode": "tcrm_opportunity",
+    "layout": {
+      "areas": ["header", "main"],
+      "areasConfig": {
+        "header": { "type": "flex", "direction": "row" },
+        "main": { "type": "grid", "cols": 12, "rowGap": 16, "colGap": 16 }
+      }
+    },
+    "areas": {
+      "header": {
+        "blocks": [{
+          "id": "action_bar",
+          "blockType": "toolbar",
+          "buttons": [
+            { "code": "edit", "action": "edit", "navigateTo": "tcrm_opportunity_form", "permissionCode": "TCRM.opportunity.manage" },
+            { "code": "advance_to_proposal", "commandCode": "tcrm:advance_to_proposal", "permissionCode": "TCRM.opportunity.manage" },
+            { "code": "advance_to_negotiation", "commandCode": "tcrm:advance_to_negotiation", "permissionCode": "TCRM.opportunity.manage" },
+            { "code": "win_opportunity", "commandCode": "tcrm:win_opportunity", "permissionCode": "TCRM.opportunity.manage" },
+            { "code": "lose_opportunity", "commandCode": "tcrm:lose_opportunity", "permissionCode": "TCRM.opportunity.manage" },
+            { "code": "delete", "action": "delete", "danger": true, "commandCode": "tcrm:delete_opportunity", "permissionCode": "TCRM.opportunity.manage", "confirmMessageKey": "delete.confirm" }
+          ]
+        }]
+      },
+      "main": {
+        "blocks": [{
+          "id": "info",
+          "blockType": "form-section",
+          "readOnly": true,
+          "title": { "zh-CN": "商机信息", "en-US": "Opportunity Information" },
+          "fields": [
+            { "field": "tcrm_op_code", "colSpan": 6 },
+            { "field": "tcrm_op_name", "colSpan": 6 },
+            { "field": "tcrm_op_account_id", "colSpan": 6 },
+            { "field": "tcrm_op_contact_id", "colSpan": 6 },
+            { "field": "tcrm_op_amount", "colSpan": 6 },
+            { "field": "tcrm_op_stage", "colSpan": 6 },
+            { "field": "tcrm_op_expected_close", "colSpan": 6 },
+            { "field": "tcrm_op_assignee", "colSpan": 6 },
+            { "field": "tcrm_op_notes", "colSpan": 12 }
+          ]
+        }]
+      }
+    }
+  }
+}

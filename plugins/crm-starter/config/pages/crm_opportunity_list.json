@@ -1,0 +1,202 @@
+{
+  "pageKey": "crm_opportunity_list",
+  "name:zh-CN": "商机列表",
+  "name:en": "Opportunities",
+  "pageType": "list",
+  "modelCode": "crm_opportunity",
+  "dslSchema": {
+    "id": "list.crm_opportunity",
+    "kind": "List",
+    "areas": {
+      "toolbar": {
+        "blocks": [
+          {
+            "id": "crm_opportunity_toolbar",
+            "blockType": "toolbar",
+            "buttons": [
+              {
+                "code": "create",
+                "primary": true,
+                "permissionCode": "CRMS.opportunity.manage",
+                "label": "create",
+                "action": {
+                  "type": "navigate",
+                  "to": "crm_opportunity_form",
+                  "command": "crms:create_opportunity"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "list-tabs": {
+        "blocks": [
+          {
+            "id": "crm_opportunity_tabs",
+            "blockType": "list-tabs",
+            "tabs": [
+              {
+                "key": "all",
+                "label": {
+                  "en": "All",
+                  "zh-CN": "全部"
+                },
+                "filter": null
+              },
+              {
+                "key": "open",
+                "label": {
+                  "en": "Open",
+                  "zh-CN": "进行中"
+                },
+                "filter": {
+                  "field": "crm_opp_stage",
+                  "value": ["discovery", "qualification", "proposal", "negotiation"],
+                  "operator": "IN"
+                }
+              },
+              {
+                "key": "closed_won",
+                "label": {
+                  "en": "Won",
+                  "zh-CN": "赢单"
+                },
+                "filter": {
+                  "field": "crm_opp_stage",
+                  "value": "closed_won",
+                  "operator": "EQ"
+                }
+              },
+              {
+                "key": "closed_lost",
+                "label": {
+                  "en": "Lost",
+                  "zh-CN": "输单"
+                },
+                "filter": {
+                  "field": "crm_opp_stage",
+                  "value": "closed_lost",
+                  "operator": "EQ"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "main": {
+        "blocks": [
+          {
+            "id": "crm_opportunity_table",
+            "blockType": "data-table",
+            "columns": [
+              {
+                "field": "crm_opp_code",
+                "width": 140,
+                "sortable": true
+              },
+              {
+                "field": "crm_opp_name",
+                "width": 200,
+                "sortable": true
+              },
+              {
+                "field": "crm_opp_account_id",
+                "width": 160
+              },
+              {
+                "field": "crm_opp_stage",
+                "width": 120,
+                "renderType": "tag"
+              },
+              {
+                "field": "crm_opp_expected_amount",
+                "width": 140,
+                "sortable": true
+              },
+              {
+                "field": "crm_opp_expected_close_date",
+                "width": 140,
+                "sortable": true
+              },
+              {
+                "field": "crm_opp_probability",
+                "width": 100
+              },
+              {
+                "field": "crm_opp_owner",
+                "width": 120
+              },
+              {
+                "field": "actions",
+                "isActionColumn": true,
+                "buttons": [
+                  {
+                    "code": "view",
+                    "label": "detail",
+                    "action": {
+                      "type": "navigate",
+                      "to": "crm_opportunity_detail"
+                    }
+                  },
+                  {
+                    "code": "edit",
+                    "permissionCode": "CRMS.opportunity.manage",
+                    "label": "edit",
+                    "action": {
+                      "type": "navigate",
+                      "to": "crm_opportunity_form"
+                    }
+                  },
+                  {
+                    "code": "delete",
+                    "danger": true,
+                    "permissionCode": "CRMS.opportunity.manage",
+                    "label": "delete",
+                    "confirm": "delete.confirm",
+                    "action": {
+                      "type": "command",
+                      "command": "crms:delete_opportunity"
+                    }
+                  }
+                ]
+              }
+            ],
+            "searchFields": [
+              "crm_opp_name",
+              "crm_opp_code"
+            ],
+            "defaultSort": {
+              "field": "created_at",
+              "order": "desc"
+            }
+          }
+        ]
+      }
+    },
+    "layout": {
+      "areas": [
+        "list-tabs",
+        "toolbar",
+        "main"
+      ],
+      "areasConfig": {
+        "list-tabs": {
+          "type": "flex",
+          "direction": "row"
+        },
+        "toolbar": {
+          "type": "flex",
+          "direction": "row",
+          "justify": "space-between",
+          "align": "center"
+        },
+        "main": {
+          "type": "grid",
+          "cols": 12,
+          "rowGap": 0,
+          "colGap": 0
+        }
+      }
+    }
+  }
+}

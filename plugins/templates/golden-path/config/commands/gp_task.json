@@ -1,0 +1,219 @@
+[
+  {
+    "code": "gp:create_task",
+    "displayName:zh-CN": "新建任务",
+    "displayName:en": "Create Task",
+    "type": "create",
+    "modelCode": "gp_task",
+    "inputFields": [
+      "gp_task_title",
+      "gp_task_description",
+      "gp_task_priority",
+      "gp_task_assignee",
+      "gp_task_due_date"
+    ],
+    "autoSetFields": {
+      "gp_task_code": {
+        "strategy": "auto_generate",
+        "pattern": "TASK-{yyyyMMdd}-{seq}"
+      },
+      "gp_task_status": {
+        "strategy": "fixed_value",
+        "value": "new"
+      }
+    },
+    "permissions": [
+      "GP.task.manage"
+    ],
+    "agent_hint": "Create a new task. Required: title. Optional: description, priority (LOW/MEDIUM/HIGH/URGENT), assignee, due_date. Auto-generated: code (TASK-yyyyMMdd-seq), status (NEW).",
+    "cmd_risk_level": "L1",
+    "precondition_description": "No preconditions — any authenticated user with GP.task.manage permission can create a task.",
+    "side_effect_description": null,
+    "output_description": "Returns the created task record with auto-generated code and initial status NEW.",
+    "example_input": {
+      "gp_task_title": "Implement login page",
+      "gp_task_description": "Build the login page with email/password authentication",
+      "gp_task_priority": "high",
+      "gp_task_assignee": "alice",
+      "gp_task_due_date": "2026-04-01"
+    },
+    "idempotent": false,
+    "reversible": true
+  },
+  {
+    "code": "gp:update_task",
+    "displayName:zh-CN": "编辑任务",
+    "displayName:en": "Update Task",
+    "type": "update",
+    "modelCode": "gp_task",
+    "inputFields": [
+      "gp_task_title",
+      "gp_task_description",
+      "gp_task_priority",
+      "gp_task_assignee",
+      "gp_task_due_date"
+    ],
+    "permissions": [
+      "GP.task.manage"
+    ],
+    "agent_hint": "Update an existing task. Editable fields: title, description, priority, assignee, due_date. Status is NOT editable here — use state transition commands instead.",
+    "cmd_risk_level": "L1",
+    "precondition_description": "Task must exist; status field is not included in inputFields and cannot be changed via this command.",
+    "side_effect_description": null,
+    "output_description": "Returns the updated task record with all modified fields.",
+    "example_input": {
+      "gp_task_title": "Implement login page (revised)",
+      "gp_task_priority": "urgent",
+      "gp_task_due_date": "2026-03-25"
+    },
+    "idempotent": true,
+    "reversible": true
+  },
+  {
+    "code": "gp:start_task",
+    "displayName:zh-CN": "开始任务",
+    "displayName:en": "Start Task",
+    "type": "state_transition",
+    "modelCode": "gp_task",
+    "stateField": "gp_task_status",
+    "fromStates": ["new"],
+    "toState": "in_progress",
+    "permissions": [
+      "GP.task.manage"
+    ],
+    "agent_hint": "Transition task status from NEW to in_progress. Indicates work has begun on this task. No additional input fields required.",
+    "cmd_risk_level": "L1",
+    "precondition_description": "Task must be in NEW status.",
+    "side_effect_description": null,
+    "output_description": "Returns the updated task record with status set to in_progress.",
+    "example_input": {},
+    "idempotent": false,
+    "reversible": false
+  },
+  {
+    "code": "gp:complete_task",
+    "displayName:zh-CN": "完成任务",
+    "displayName:en": "Complete Task",
+    "type": "state_transition",
+    "modelCode": "gp_task",
+    "stateField": "gp_task_status",
+    "fromStates": ["in_progress"],
+    "toState": "done",
+    "sideEffects": [
+      {
+        "type": "create",
+        "targetModel": "gp_task_comment",
+        "fieldMap": {
+          "gp_tc_task_id": "${recordId}",
+          "gp_tc_content": "Task completed.",
+          "gp_tc_author": "${currentUser}"
+        }
+      }
+    ],
+    "permissions": [
+      "GP.task.manage"
+    ],
+    "agent_hint": "Transition task status from in_progress to DONE. Automatically creates a completion comment on the task via sideEffect. Use only when the task work is fully finished.",
+    "cmd_risk_level": "L2",
+    "precondition_description": "Task must be in in_progress status.",
+    "side_effect_description": "Creates a gp_task_comment record with content 'Task completed.' linked to the completed task.",
+    "output_description": "Returns the updated task record with status set to DONE.",
+    "example_input": {},
+    "idempotent": false,
+    "reversible": false
+  },
+  {
+    "code": "gp:archive_task",
+    "displayName:zh-CN": "归档任务",
+    "displayName:en": "Archive Task",
+    "type": "state_transition",
+    "modelCode": "gp_task",
+    "stateField": "gp_task_status",
+    "fromStates": ["done"],
+    "toState": "archived",
+    "extension": {
+      "confirmMessage:zh-CN": "确认归档此任务？归档后不可恢复。",
+      "confirmMessage:en": "Confirm archive this task? This cannot be undone."
+    },
+    "permissions": [
+      "GP.task.manage"
+    ],
+    "agent_hint": "Transition task status from DONE to archived. This is a terminal state — archived tasks cannot be reopened. Requires user confirmation.",
+    "cmd_risk_level": "L2",
+    "precondition_description": "Task must be in DONE status.",
+    "side_effect_description": null,
+    "output_description": "Returns the updated task record with terminal status archived.",
+    "example_input": {},
+    "idempotent": false,
+    "reversible": false
+  },
+  {
+    "code": "gp:delete_task",
+    "displayName:zh-CN": "删除任务",
+    "displayName:en": "Delete Task",
+    "type": "delete",
+    "modelCode": "gp_task",
+    "preconditions": [
+      {
+        "field": "gp_task_status",
+        "operator": "IN",
+        "value": ["new"]
+      }
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此任务？此操作不可撤销。",
+      "confirmMessage:en": "Confirm delete this task? This action is irreversible."
+    },
+    "permissions": [
+      "GP.task.manage"
+    ],
+    "agent_hint": "Delete a task permanently. Irreversible operation. Precondition: task status must be NEW — tasks that are in progress, done, or archived cannot be deleted.",
+    "cmd_risk_level": "L4",
+    "precondition_description": "Task must be in NEW status; tasks in in_progress, DONE, or archived cannot be deleted.",
+    "side_effect_description": null,
+    "output_description": "Returns confirmation of deletion; the task record is permanently removed.",
+    "example_input": {},
+    "idempotent": false,
+    "reversible": false
+  },
+  {
+    "code": "gp:detail_task",
+    "displayName:zh-CN": "查看任务",
+    "displayName:en": "View Task",
+    "type": "query",
+    "modelCode": "gp_task",
+    "permissions": [
+      "GP.task.read"
+    ],
+    "agent_hint": "Retrieve a single task record by ID. Returns all fields including status, priority, assignee, and due date.",
+    "cmd_risk_level": "L0",
+    "precondition_description": "Task with the specified ID must exist.",
+    "side_effect_description": null,
+    "output_description": "Returns the full task record including all fields.",
+    "example_input": {},
+    "idempotent": true,
+    "reversible": true
+  },
+  {
+    "code": "gp:list_tasks",
+    "displayName:zh-CN": "任务列表",
+    "displayName:en": "List Tasks",
+    "type": "query",
+    "modelCode": "gp_task",
+    "permissions": [
+      "GP.task.read"
+    ],
+    "agent_hint": "Query task records with pagination and filtering. Supports filters by status, priority, assignee. Supports keyword search on title and code.",
+    "cmd_risk_level": "L0",
+    "precondition_description": "No preconditions — returns empty list if no tasks match.",
+    "side_effect_description": null,
+    "output_description": "Returns a paginated list of task records matching the specified filters.",
+    "example_input": {
+      "pageNum": 1,
+      "pageSize": 20,
+      "filters": [{"fieldName": "gp_task_status", "operator": "IN", "value": ["new", "in_progress"]}]
+    },
+    "idempotent": true,
+    "reversible": true
+  }
+]

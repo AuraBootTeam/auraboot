@@ -1,0 +1,12 @@
+[
+  { "modelCode": "crm_account", "fieldCode": "crm_acc_code", "sequence": 1, "required": true, "visible": true, "editable": false, "displayConfig": { "searchable": true, "sortable": true } },
+  { "modelCode": "crm_account", "fieldCode": "crm_acc_name", "sequence": 2, "required": true, "visible": true, "editable": true, "displayConfig": { "searchable": true, "sortable": true } },
+  { "modelCode": "crm_account", "fieldCode": "crm_acc_industry", "sequence": 3, "required": false, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "crm_account", "fieldCode": "crm_acc_website", "sequence": 4, "required": false, "visible": true, "editable": true },
+  { "modelCode": "crm_account", "fieldCode": "crm_acc_phone", "sequence": 5, "required": false, "visible": true, "editable": true },
+  { "modelCode": "crm_account", "fieldCode": "crm_acc_address", "sequence": 6, "required": false, "visible": false, "editable": true },
+  { "modelCode": "crm_account", "fieldCode": "crm_acc_rating", "sequence": 7, "required": false, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "crm_account", "fieldCode": "crm_acc_owner", "sequence": 8, "required": false, "visible": true, "editable": false },
+  { "modelCode": "crm_account", "fieldCode": "crm_acc_status", "sequence": 9, "required": false, "visible": true, "editable": false, "displayConfig": { "searchable": true } },
+  { "modelCode": "crm_account", "fieldCode": "crm_acc_remark", "sequence": 10, "required": false, "visible": false, "editable": true }
+]

@@ -1,0 +1,29 @@
+[
+  {
+    "code": "tasset_asset", "displayName:zh-CN": "资产", "displayName:en": "Asset",
+    "description": "Physical or software asset tracked through its lifecycle.",
+    "modelType": "entity", "modelCategory": "entity",
+    "semantic_description": "An IT, office, or software asset tracked from purchase through assignment, maintenance, and retirement.",
+    "domain_category": "asset", "data_sensitivity": "internal",
+    "lifecycle_description": "AVAILABLE → IN_USE → UNDER_MAINTENANCE (↔ IN_USE / AVAILABLE) → RETIRED",
+    "extension": { "icon": "Monitor", "category": "asset-management", "titleField": "tasset_as_name", "subtitleField": "tasset_as_code" }
+  },
+  {
+    "code": "tasset_category", "displayName:zh-CN": "资产分类", "displayName:en": "Asset Category",
+    "description": "Classification category for assets.",
+    "modelType": "entity", "modelCategory": "entity",
+    "semantic_description": "A category used to classify assets for reporting and filtering.",
+    "domain_category": "asset", "data_sensitivity": "internal",
+    "lifecycle_description": "No lifecycle — reference entity.",
+    "extension": { "icon": "Tag", "category": "asset-management", "titleField": "tasset_ct_name", "subtitleField": "tasset_ct_code" }
+  },
+  {
+    "code": "tasset_maintenance", "displayName:zh-CN": "维护记录", "displayName:en": "Maintenance Record",
+    "description": "Maintenance, repair, or inspection record for an asset.",
+    "modelType": "entity", "modelCategory": "activity",
+    "semantic_description": "A maintenance activity linked to an asset, tracking repairs, inspections, or upgrades.",
+    "domain_category": "asset", "data_sensitivity": "internal",
+    "lifecycle_description": "SCHEDULED → in_progress → completed",
+    "extension": { "icon": "Tool", "category": "asset-management", "titleField": "tasset_mn_code", "subtitleField": "tasset_mn_code" }
+  }
+]

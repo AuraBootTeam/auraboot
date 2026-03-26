@@ -1,0 +1,28 @@
+name: new-leads-digest
+description: Query new leads from the last 24 hours, analyze quality, and output a digest
+version: "1.0"
+
+steps:
+  - type: query
+    source: crm_lead
+    filters:
+      - field: crm_lead_status
+        operator: EQ
+        value: NEW
+    sort:
+      field: created_at
+      order: desc
+    limit: 50
+    output: new_leads
+
+  - type: analyze
+    input: new_leads
+    prompt: >
+      Analyze the new leads: assess quality based on company size, source channel,
+      and completeness of contact info. Score each lead 1-10 and provide
+      recommended next actions. Group by source channel.
+    output: lead_analysis
+
+  - type: notify
+    message: "New Leads Digest: {{lead_analysis.summary}}"
+    channel: console

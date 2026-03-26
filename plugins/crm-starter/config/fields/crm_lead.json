@@ -1,0 +1,97 @@
+[
+  {
+    "code": "crm_lead_code",
+    "displayName:zh-CN": "线索编号",
+    "displayName:en": "Lead Code",
+    "dataType": "string",
+    "constraints": { "required": true, "maxLength": 50 },
+    "feature": { "searchable": true, "sortable": true }
+  },
+  {
+    "code": "crm_lead_company",
+    "displayName:zh-CN": "公司名称",
+    "displayName:en": "Company Name",
+    "dataType": "string",
+    "constraints": { "required": true, "maxLength": 200 },
+    "feature": { "searchable": true, "sortable": true }
+  },
+  {
+    "code": "crm_lead_contact_name",
+    "displayName:zh-CN": "联系人",
+    "displayName:en": "Contact Name",
+    "dataType": "string",
+    "constraints": { "required": true, "maxLength": 100 },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_lead_contact_phone",
+    "displayName:zh-CN": "联系电话",
+    "displayName:en": "Contact Phone",
+    "dataType": "string",
+    "constraints": { "maxLength": 50 }
+  },
+  {
+    "code": "crm_lead_contact_email",
+    "displayName:zh-CN": "联系邮箱",
+    "displayName:en": "Contact Email",
+    "dataType": "string",
+    "constraints": { "maxLength": 200 }
+  },
+  {
+    "code": "crm_lead_source",
+    "displayName:zh-CN": "线索来源",
+    "displayName:en": "Lead Source",
+    "dataType": "enum",
+    "dictCode": "crm_lead_source",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_lead_industry",
+    "displayName:zh-CN": "行业",
+    "displayName:en": "Industry",
+    "dataType": "string",
+    "constraints": { "maxLength": 100 }
+  },
+  {
+    "code": "crm_lead_score",
+    "displayName:zh-CN": "评分",
+    "displayName:en": "Score",
+    "dataType": "integer",
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "crm_lead_status",
+    "displayName:zh-CN": "线索状态",
+    "displayName:en": "Status",
+    "dataType": "enum",
+    "dictCode": "crm_lead_status",
+    "defaultValue": "new",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_lead_requirement",
+    "displayName:zh-CN": "需求描述",
+    "displayName:en": "Requirement",
+    "dataType": "text"
+  },
+  {
+    "code": "crm_lead_campaign",
+    "displayName:zh-CN": "关联活动",
+    "displayName:en": "Campaign",
+    "dataType": "string",
+    "constraints": { "maxLength": 200 }
+  },
+  {
+    "code": "crm_lead_assigned_to",
+    "displayName:zh-CN": "分配给",
+    "displayName:en": "Assigned To",
+    "dataType": "string",
+    "constraints": { "maxLength": 100 }
+  },
+  {
+    "code": "crm_lead_lost_reason",
+    "displayName:zh-CN": "丢失原因",
+    "displayName:en": "Lost Reason",
+    "dataType": "text"
+  }
+]

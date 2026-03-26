@@ -1,0 +1,7 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AuraBoot Plugin Pages",
+  "description": "Array of page definitions for plugin config/pages.json",
+  "type": "array",
+  "items": { "$ref": "plugin-manifest.schema.json#/$defs/pageDefinition" }
+}

@@ -1,0 +1,67 @@
+[
+  {
+    "code": "tcrm_root",
+    "parentCode": null,
+    "name:zh-CN": "crm",
+    "name:en": "crm",
+    "path": null,
+    "component": null,
+    "icon": "IconUsers",
+    "type": 0,
+    "permissionCode": null,
+    "orderNo": 800,
+    "visible": true
+  },
+  {
+    "code": "tcrm_leads",
+    "parentCode": "tcrm_root",
+    "name:zh-CN": "线索",
+    "name:en": "Leads",
+    "path": "/dynamic/tcrm-lead",
+    "component": null,
+    "icon": "IconUserPlus",
+    "type": 1,
+    "permissionCode": "tcrm.lead.read",
+    "orderNo": 1,
+    "visible": true
+  },
+  {
+    "code": "tcrm_accounts",
+    "parentCode": "tcrm_root",
+    "name:zh-CN": "客户",
+    "name:en": "Accounts",
+    "path": "/dynamic/tcrm-account",
+    "component": null,
+    "icon": "IconBuilding",
+    "type": 1,
+    "permissionCode": "tcrm.account.read",
+    "orderNo": 2,
+    "visible": true
+  },
+  {
+    "code": "tcrm_contacts",
+    "parentCode": "tcrm_root",
+    "name:zh-CN": "联系人",
+    "name:en": "Contacts",
+    "path": "/dynamic/tcrm-contact",
+    "component": null,
+    "icon": "IconUser",
+    "type": 1,
+    "permissionCode": "tcrm.contact.read",
+    "orderNo": 3,
+    "visible": true
+  },
+  {
+    "code": "tcrm_opportunities",
+    "parentCode": "tcrm_root",
+    "name:zh-CN": "商机",
+    "name:en": "Opportunities",
+    "path": "/dynamic/tcrm-opportunity",
+    "component": null,
+    "icon": "IconDollarSign",
+    "type": 1,
+    "permissionCode": "tcrm.opportunity.read",
+    "orderNo": 4,
+    "visible": true
+  }
+]

@@ -1,0 +1,722 @@
+@reference "tailwindcss";
+
+/**
+ * 撤销重做系统样式
+ * 包含工具栏、面板和相关组件的样式定义
+ */
+
+/* 撤销重做工具栏 */
+.undo-redo-toolbar {
+  @apply flex items-center gap-2 rounded-lg border border-gray-200 bg-white p-2 shadow-sm;
+  position: relative;
+}
+
+.undo-redo-toolbar--compact {
+  @apply gap-1 p-1;
+}
+
+.undo-redo-toolbar--minimal {
+  @apply gap-1 border-none bg-transparent p-1 shadow-none;
+}
+
+.undo-redo-toolbar__main {
+  @apply flex items-center gap-2;
+}
+
+.undo-redo-toolbar--compact .undo-redo-toolbar__main {
+  @apply gap-1;
+}
+
+.undo-redo-toolbar__button {
+  @apply flex items-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:border-gray-300 hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-gray-200 disabled:hover:bg-white;
+  transition: all 0.15s ease;
+}
+
+.undo-redo-toolbar--compact .undo-redo-toolbar__button {
+  @apply gap-1 px-2 py-1;
+}
+
+.undo-redo-toolbar--minimal .undo-redo-toolbar__button {
+  @apply border-none bg-transparent px-2 py-1 hover:bg-gray-100;
+}
+
+.undo-redo-toolbar__button.active {
+  @apply border-blue-200 bg-blue-50 text-blue-700;
+}
+
+.undo-redo-toolbar__button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.undo-redo-toolbar__divider {
+  @apply mx-1 h-6 w-px bg-gray-200;
+}
+
+.undo-redo-toolbar__status {
+  @apply ml-auto flex items-center gap-2 text-sm text-gray-500;
+}
+
+.undo-redo-toolbar__status-text {
+  @apply font-mono;
+}
+
+.undo-redo-toolbar__loading {
+  @apply flex items-center justify-center;
+}
+
+/* 面板样式 */
+.undo-redo-panel {
+  @apply absolute top-full left-0 z-50 mt-2 w-80 rounded-lg border border-gray-200 bg-white shadow-lg;
+  animation: slideDown 0.15s ease-out;
+}
+
+.undo-redo-panel--history {
+  @apply w-72;
+}
+
+.undo-redo-panel--snapshots {
+  @apply w-80;
+}
+
+.undo-redo-panel--performance {
+  @apply w-64;
+}
+
+.undo-redo-panel--settings {
+  @apply w-96;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.undo-redo-panel__header {
+  @apply flex items-center justify-between border-b border-gray-200 p-3;
+}
+
+.undo-redo-panel__header h3 {
+  @apply text-sm font-semibold text-gray-900;
+}
+
+.undo-redo-panel__actions {
+  @apply flex items-center gap-1;
+}
+
+.undo-redo-panel__action {
+  @apply rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600;
+  transition: all 0.15s ease;
+}
+
+.undo-redo-panel__close {
+  @apply rounded p-1 text-lg leading-none text-gray-400 hover:bg-gray-100 hover:text-gray-600;
+  transition: all 0.15s ease;
+}
+
+.undo-redo-panel__content {
+  @apply max-h-80 overflow-y-auto p-3;
+}
+
+.undo-redo-panel__empty {
+  @apply py-8 text-center text-gray-500;
+}
+
+/* 历史记录列表 */
+.history-list {
+  @apply space-y-1;
+}
+
+.history-item {
+  @apply flex cursor-pointer items-center gap-3 rounded-md p-2 hover:bg-gray-50;
+  transition: all 0.15s ease;
+}
+
+.history-item.current {
+  @apply border border-blue-200 bg-blue-50;
+}
+
+.history-item.executed {
+  @apply text-gray-900;
+}
+
+.history-item.pending {
+  @apply text-gray-400;
+}
+
+.history-item__icon {
+  @apply flex-shrink-0 text-gray-400;
+}
+
+.history-item.current .history-item__icon {
+  @apply text-blue-500;
+}
+
+.history-item__content {
+  @apply min-w-0 flex-1;
+}
+
+.history-item__name {
+  @apply truncate text-sm font-medium;
+}
+
+.history-item__time {
+  @apply text-xs text-gray-500;
+}
+
+/* 快照列表 */
+.snapshot-list {
+  @apply space-y-2;
+}
+
+.snapshot-item {
+  @apply flex items-center justify-between rounded-md bg-gray-50 p-3;
+}
+
+.snapshot-item__content {
+  @apply min-w-0 flex-1;
+}
+
+.snapshot-item__name {
+  @apply truncate text-sm font-medium text-gray-900;
+}
+
+.snapshot-item__time {
+  @apply text-xs text-gray-500;
+}
+
+.snapshot-item__actions {
+  @apply ml-3 flex items-center gap-2;
+}
+
+.snapshot-item__action {
+  @apply rounded px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 hover:text-blue-700;
+  transition: all 0.15s ease;
+}
+
+.snapshot-item__action--danger {
+  @apply text-red-600 hover:bg-red-50 hover:text-red-700;
+}
+
+/* 性能统计 */
+.performance-stats {
+  @apply space-y-3;
+}
+
+.performance-stat {
+  @apply flex items-center justify-between border-b border-gray-100 py-2 last:border-b-0;
+}
+
+.performance-stat label {
+  @apply text-sm text-gray-600;
+}
+
+.performance-stat value {
+  @apply font-mono text-sm font-semibold text-gray-900;
+}
+
+/* 设置表单 */
+.settings-form {
+  @apply space-y-4;
+}
+
+.settings-field {
+  @apply space-y-1;
+}
+
+.settings-field label {
+  @apply block text-sm font-medium text-gray-700;
+}
+
+.settings-field input[type='number'] {
+  @apply w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none;
+}
+
+.settings-field input[type='checkbox'] {
+  @apply mr-2 rounded border-gray-300 text-blue-600 focus:ring-blue-500;
+}
+
+.settings-actions {
+  @apply mt-6 flex items-center justify-end gap-2 border-t border-gray-200 pt-4;
+}
+
+.settings-actions button {
+  @apply rounded-md px-4 py-2 text-sm font-medium focus:ring-2 focus:ring-offset-2 focus:outline-none;
+}
+
+.settings-actions button:first-child {
+  @apply bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500;
+}
+
+.settings-actions button:last-child {
+  @apply border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 focus:ring-gray-500;
+}
+
+/* 简化按钮组 */
+.simple-undo-redo {
+  @apply flex items-center gap-1;
+}
+
+.simple-undo-redo__button {
+  @apply rounded-md p-2 text-gray-600 hover:bg-gray-100 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-gray-600;
+  transition: all 0.15s ease;
+}
+
+.simple-undo-redo__button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+/* 加载动画 */
+.spinner {
+  @apply h-4 w-4 rounded-full border-2 border-gray-300 border-t-blue-600;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+  .undo-redo-toolbar {
+    @apply flex-wrap;
+  }
+
+  .undo-redo-panel {
+    @apply w-full max-w-sm;
+  }
+
+  .undo-redo-panel--settings {
+    @apply w-full max-w-md;
+  }
+}
+
+/* 高对比度模式 */
+@media (prefers-contrast: high) {
+  .undo-redo-toolbar__button {
+    @apply border-2;
+  }
+
+  .undo-redo-toolbar__button.active {
+    @apply border-blue-600;
+  }
+
+  .history-item.current {
+    @apply border-2 border-blue-600;
+  }
+}
+
+/* 减少动画模式 */
+@media (prefers-reduced-motion: reduce) {
+  .undo-redo-toolbar__button,
+  .undo-redo-panel__action,
+  .undo-redo-panel__close,
+  .history-item,
+  .snapshot-item__action,
+  .simple-undo-redo__button {
+    transition: none;
+  }
+
+  .undo-redo-toolbar__button:hover:not(:disabled),
+  .simple-undo-redo__button:hover:not(:disabled) {
+    transform: none;
+  }
+
+  .undo-redo-panel {
+    animation: none;
+  }
+
+  .spinner {
+    animation: none;
+  }
+}
+
+/* 暗色模式 */
+@media (prefers-color-scheme: dark) {
+  .undo-redo-toolbar {
+    @apply border-gray-700 bg-gray-800;
+  }
+
+  .undo-redo-toolbar__button {
+    @apply border-gray-700 bg-gray-800 text-gray-300 hover:border-gray-600 hover:bg-gray-700;
+  }
+
+  .undo-redo-toolbar__button.active {
+    @apply border-blue-700 bg-blue-900 text-blue-300;
+  }
+
+  .undo-redo-toolbar__divider {
+    @apply bg-gray-700;
+  }
+
+  .undo-redo-toolbar__status {
+    @apply text-gray-400;
+  }
+
+  .undo-redo-panel {
+    @apply border-gray-700 bg-gray-800;
+  }
+
+  .undo-redo-panel__header {
+    @apply border-gray-700;
+  }
+
+  .undo-redo-panel__header h3 {
+    @apply text-gray-100;
+  }
+
+  .undo-redo-panel__action,
+  .undo-redo-panel__close {
+    @apply text-gray-400 hover:bg-gray-700 hover:text-gray-200;
+  }
+
+  .undo-redo-panel__empty {
+    @apply text-gray-500;
+  }
+
+  .history-item {
+    @apply hover:bg-gray-700;
+  }
+
+  .history-item.current {
+    @apply border-blue-700 bg-blue-900;
+  }
+
+  .history-item.executed {
+    @apply text-gray-100;
+  }
+
+  .history-item.pending {
+    @apply text-gray-500;
+  }
+
+  .history-item__icon {
+    @apply text-gray-500;
+  }
+
+  .history-item.current .history-item__icon {
+    @apply text-blue-400;
+  }
+
+  .history-item__time {
+    @apply text-gray-500;
+  }
+
+  .snapshot-item {
+    @apply bg-gray-700;
+  }
+
+  .snapshot-item__name {
+    @apply text-gray-100;
+  }
+
+  .snapshot-item__time {
+    @apply text-gray-400;
+  }
+
+  .snapshot-item__action {
+    @apply text-blue-400 hover:bg-blue-900 hover:text-blue-300;
+  }
+
+  .snapshot-item__action--danger {
+    @apply text-red-400 hover:bg-red-900 hover:text-red-300;
+  }
+
+  .performance-stat {
+    @apply border-gray-700;
+  }
+
+  .performance-stat label {
+    @apply text-gray-400;
+  }
+
+  .performance-stat value {
+    @apply text-gray-100;
+  }
+
+  .settings-field label {
+    @apply text-gray-300;
+  }
+
+  .settings-field input[type='number'] {
+    @apply border-gray-600 bg-gray-700 text-gray-100 focus:border-blue-400 focus:ring-blue-400;
+  }
+
+  .settings-field input[type='checkbox'] {
+    @apply border-gray-600 bg-gray-700 text-blue-400 focus:ring-blue-400;
+  }
+
+  .settings-actions {
+    @apply border-gray-700;
+  }
+
+  .settings-actions button:first-child {
+    @apply bg-blue-600 hover:bg-blue-700 focus:ring-blue-400;
+  }
+
+  .settings-actions button:last-child {
+    @apply border-gray-600 bg-gray-700 text-gray-300 hover:bg-gray-600 focus:ring-gray-400;
+  }
+
+  .simple-undo-redo__button {
+    @apply text-gray-400 hover:bg-gray-700 hover:text-gray-100;
+  }
+
+  .spinner {
+    @apply border-gray-600 border-t-blue-400;
+  }
+}
+
+/* 快捷键帮助面板 */
+.shortcut-help-overlay {
+  @apply fixed inset-0 z-50 flex items-center justify-center bg-black/50;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.shortcut-help-panel {
+  @apply mx-4 flex max-h-[90vh] w-full max-w-4xl flex-col rounded-lg bg-white shadow-xl;
+  animation: slideUp 0.2s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.shortcut-help-panel__header {
+  @apply flex items-center justify-between border-b border-gray-200 p-6;
+}
+
+.shortcut-help-panel__title {
+  @apply flex items-center gap-3;
+}
+
+.shortcut-help-panel__title h2 {
+  @apply text-xl font-semibold text-gray-900;
+}
+
+.shortcut-help-panel__close {
+  @apply rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600;
+  transition: all 0.15s ease;
+}
+
+.shortcut-help-panel__toolbar {
+  @apply flex items-center gap-4 border-b border-gray-100 p-4;
+}
+
+.shortcut-help-panel__search {
+  @apply flex max-w-md flex-1 items-center gap-2;
+}
+
+.shortcut-help-panel__search input {
+  @apply flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none;
+}
+
+.shortcut-help-panel__filter {
+  @apply flex items-center gap-2;
+}
+
+.shortcut-help-panel__filter select {
+  @apply rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none;
+}
+
+.shortcut-help-panel__content {
+  @apply flex-1 overflow-y-auto p-6;
+}
+
+.shortcut-help-panel__empty {
+  @apply py-12 text-center text-gray-500;
+}
+
+.shortcut-help-panel__footer {
+  @apply border-t border-gray-100 p-4 text-center;
+}
+
+.shortcut-help-panel__tip {
+  @apply text-sm text-gray-500;
+}
+
+.shortcut-help-panel__tip kbd {
+  @apply rounded border border-gray-300 bg-gray-100 px-2 py-1 font-mono text-xs;
+}
+
+/* 快捷键分组 */
+.shortcut-groups {
+  @apply space-y-6;
+}
+
+.shortcut-group {
+  @apply space-y-3;
+}
+
+.shortcut-group__header {
+  @apply flex items-center justify-between;
+}
+
+.shortcut-group__title {
+  @apply text-lg font-semibold text-gray-900;
+}
+
+.shortcut-group__count {
+  @apply rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-500;
+}
+
+.shortcut-group__shortcuts {
+  @apply grid grid-cols-1 gap-3 md:grid-cols-2;
+}
+
+.shortcut-item {
+  @apply flex items-center justify-between rounded-lg bg-gray-50 p-3 hover:bg-gray-100;
+  transition: background-color 0.15s ease;
+}
+
+.shortcut-item__description {
+  @apply flex-1 text-sm text-gray-700;
+}
+
+.shortcut-item__keys {
+  @apply flex items-center gap-1;
+}
+
+.shortcut-key {
+  @apply rounded border border-gray-300 bg-white px-2 py-1 font-mono text-xs shadow-sm;
+}
+
+/* 快捷键帮助按钮 */
+.shortcut-help-button {
+  @apply flex items-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:border-gray-300 hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 focus:outline-none;
+  transition: all 0.15s ease;
+}
+
+.shortcut-help-button--minimal {
+  @apply border-none bg-transparent px-2 py-1 hover:bg-gray-100;
+}
+
+.shortcut-help-button:hover {
+  transform: translateY(-1px);
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+  .shortcut-help-panel {
+    @apply mx-2 max-h-[95vh];
+  }
+
+  .shortcut-help-panel__toolbar {
+    @apply flex-col items-stretch gap-3;
+  }
+
+  .shortcut-help-panel__search {
+    @apply max-w-none;
+  }
+
+  .shortcut-group__shortcuts {
+    @apply grid-cols-1;
+  }
+}
+
+/* 暗色模式 */
+@media (prefers-color-scheme: dark) {
+  .shortcut-help-panel {
+    @apply bg-gray-800;
+  }
+
+  .shortcut-help-panel__header {
+    @apply border-gray-700;
+  }
+
+  .shortcut-help-panel__title h2 {
+    @apply text-gray-100;
+  }
+
+  .shortcut-help-panel__close {
+    @apply text-gray-400 hover:bg-gray-700 hover:text-gray-200;
+  }
+
+  .shortcut-help-panel__toolbar {
+    @apply border-gray-700;
+  }
+
+  .shortcut-help-panel__search input {
+    @apply border-gray-600 bg-gray-700 text-gray-100 focus:border-blue-400 focus:ring-blue-400;
+  }
+
+  .shortcut-help-panel__filter select {
+    @apply border-gray-600 bg-gray-700 text-gray-100 focus:border-blue-400 focus:ring-blue-400;
+  }
+
+  .shortcut-help-panel__empty {
+    @apply text-gray-500;
+  }
+
+  .shortcut-help-panel__footer {
+    @apply border-gray-700;
+  }
+
+  .shortcut-help-panel__tip {
+    @apply text-gray-400;
+  }
+
+  .shortcut-help-panel__tip kbd {
+    @apply border-gray-600 bg-gray-700 text-gray-300;
+  }
+
+  .shortcut-group__title {
+    @apply text-gray-100;
+  }
+
+  .shortcut-group__count {
+    @apply bg-gray-700 text-gray-400;
+  }
+
+  .shortcut-item {
+    @apply bg-gray-700 hover:bg-gray-600;
+  }
+
+  .shortcut-item__description {
+    @apply text-gray-300;
+  }
+
+  .shortcut-key {
+    @apply border-gray-600 bg-gray-800 text-gray-300;
+  }
+
+  .shortcut-help-button {
+    @apply border-gray-700 bg-gray-800 text-gray-300 hover:border-gray-600 hover:bg-gray-700;
+  }
+
+  .shortcut-help-button--minimal {
+    @apply bg-transparent hover:bg-gray-700;
+  }
+}
+
+/* 打印样式 */
+@media print {
+  .undo-redo-toolbar,
+  .undo-redo-panel,
+  .shortcut-help-overlay {
+    @apply hidden;
+  }
+}

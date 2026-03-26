@@ -1,0 +1,11 @@
+[
+  {"code":"tinv_si_code","displayName:zh-CN":"入库编号","displayName:en":"Receipt Code","dataType":"string","description":"Auto-generated.","constraints":{"required":true,"maxLength":50},"feature":{"searchable":true,"sortable":true},"extension":{"readOnly":true,"placeholder:zh-CN":"系统自动生成","placeholder:en":"Auto generated"}},
+  {"code":"tinv_si_product_id","displayName:zh-CN":"产品","displayName:en":"Product","dataType":"reference","description":"Product received.","feature":{"searchable":true},"extension":{"referenceModelCode":"tinv_product"}},
+  {"code":"tinv_si_warehouse_id","displayName:zh-CN":"仓库","displayName:en":"Warehouse","dataType":"reference","description":"Destination warehouse.","feature":{"searchable":true},"extension":{"referenceModelCode":"tinv_warehouse"}},
+  {"code":"tinv_si_quantity","displayName:zh-CN":"数量","displayName:en":"Quantity","dataType":"decimal","description":"Quantity received.","constraints":{"required":true},"extension":{"precision":2}},
+  {"code":"tinv_si_unit_cost","displayName:zh-CN":"单位成本","displayName:en":"Unit Cost","dataType":"decimal","description":"Cost per unit.","extension":{"precision":2}},
+  {"code":"tinv_si_status","displayName:zh-CN":"状态","displayName:en":"Status","dataType":"enum","dictCode":"tinv_doc_status","defaultValue":"draft","description":"Document status.","feature":{"searchable":true}},
+  {"code":"tinv_si_supplier","displayName:zh-CN":"供应商","displayName:en":"Supplier","dataType":"string","description":"Supplier name.","constraints":{"maxLength":200},"feature":{"searchable":true}},
+  {"code":"tinv_si_receipt_date","displayName:zh-CN":"入库日期","displayName:en":"Receipt Date","dataType":"date","description":"Date received.","feature":{"sortable":true}},
+  {"code":"tinv_si_notes","displayName:zh-CN":"备注","displayName:en":"Notes","dataType":"text","description":"Notes.","constraints":{"maxLength":5000},"extension":{"multiline":true}}
+]

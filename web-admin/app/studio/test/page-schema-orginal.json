@@ -1,0 +1,261 @@
+{
+  "type": "Page",
+  "version": "1.0.0",
+  "id": "page_dashboard_xywh",
+  "title": {
+    "zh-CN": "业务仪表盘（含 xywh 示例）",
+    "en-US": "Business Dashboard (xywh sample)"
+  },
+
+  "layout": {
+    "type": "grid-areas",
+    "columns": ["240px", "1fr"],
+    "rows": ["auto", "1fr", "auto"],
+    "areas": [
+      ["header", "header"],
+      ["sider", "main"],
+      ["footer", "footer"]
+    ],
+    "gap": 12,
+    "responsive": {
+      "sm": {
+        "columns": ["1fr"],
+        "areas": [["header"], ["main"], ["footer"]]
+      }
+    }
+  },
+
+  "areas": {
+    "header": {
+      "type": "flex",
+      "layoutProps": {
+        "direction": "row",
+        "justify": "space-between",
+        "align": "center",
+        "gap": 12
+      },
+      "blocks": [
+        {
+          "id": "header_title",
+          "type": "block",
+          "blockType": "text",
+          "components": [
+            {
+              "id": "title_text",
+              "x-component": "Text",
+              "props": { "content": "📊 企业数据中心", "fontSize": 20, "fontWeight": "bold" }
+            }
+          ]
+        },
+        {
+          "id": "user_menu",
+          "type": "block",
+          "blockType": "avatar-menu",
+          "components": [
+            {
+              "id": "avatar",
+              "x-component": "AvatarMenu",
+              "props": { "userField": "currentUser", "actions": ["profile", "logout"] }
+            }
+          ]
+        }
+      ]
+    },
+
+    "sider": {
+      "type": "flex",
+      "layoutProps": { "direction": "column", "gap": 8 },
+      "blocks": [
+        {
+          "id": "nav_menu",
+          "type": "block",
+          "blockType": "navigation",
+          "components": [
+            {
+              "id": "menu",
+              "x-component": "NavMenu",
+              "props": {
+                "items": [
+                  { "label": "总览", "icon": "Home", "target": "page_dashboard_xywh" },
+                  { "label": "订单管理", "icon": "FileText", "target": "page_orders" },
+                  { "label": "库存", "icon": "Box", "target": "page_inventory" }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+
+    "main": {
+      "type": "grid",
+      "layoutProps": {
+        "cols": 12,
+        "gapX": 12,
+        "gapY": 12,
+        "rowHeight": 80,
+        "dense": false
+      },
+      "blocks": [
+        {
+          "id": "overview_cards",
+          "type": "block",
+          "blockType": "card-group",
+          "layout": { "colSpan": { "sm": 12, "md": 12, "lg": 12 }, "rowSpan": 1 },
+          "components": [
+            {
+              "id": "summary_cards",
+              "x-component": "CardGrid",
+              "props": {
+                "items": [
+                  { "title": "今日销售额", "value": "¥102,340" },
+                  { "title": "订单数量", "value": "856" },
+                  { "title": "库存告警", "value": "12项" }
+                ]
+              }
+            }
+          ]
+        },
+
+        {
+          "id": "sales_chart",
+          "type": "block",
+          "blockType": "chart",
+          "ref": "block://charts/sales-trend",
+          "layout": { "colSpan": { "sm": 12, "md": 12, "lg": 8 }, "rowSpan": 2 },
+          "components": [
+            {
+              "id": "sales_line_chart",
+              "x-component": "Chart",
+              "props": {
+                "chartType": "line",
+                "dataSource": "api/sales/daily",
+                "xField": "date",
+                "yField": "amount",
+                "height": 280
+              }
+            }
+          ]
+        },
+
+        {
+          "id": "category_analysis",
+          "type": "block",
+          "blockType": "composite",
+          "layout": { "colSpan": { "sm": 12, "md": 12, "lg": 4 }, "rowSpan": 2 },
+          "components": [
+            {
+              "id": "title",
+              "x-component": "Text",
+              "props": { "content": "📈 分类销售占比", "fontSize": 16, "fontWeight": "bold" }
+            },
+            {
+              "id": "chart",
+              "x-component": "Chart",
+              "props": {
+                "chartType": "pie",
+                "dataSource": "api/sales/category",
+                "angleField": "value",
+                "colorField": "type",
+                "radius": 0.75
+              }
+            }
+          ]
+        },
+
+        {
+          "id": "order_table",
+          "type": "block",
+          "blockType": "table",
+          "layout": { "colSpan": { "sm": 12, "md": 12, "lg": 12 }, "rowSpan": 3 },
+          "components": [
+            {
+              "id": "recent_orders",
+              "x-component": "Table",
+              "props": {
+                "dataSource": "api/orders/recent",
+                "columns": [
+                  { "title": "订单号", "dataIndex": "orderId" },
+                  { "title": "客户", "dataIndex": "customer" },
+                  { "title": "金额", "dataIndex": "amount" },
+                  { "title": "状态", "dataIndex": "status" }
+                ]
+              },
+              "events": [
+                {
+                  "event": "onRowClick",
+                  "action": "openPage",
+                  "target": "page_order_detail",
+                  "params": { "id": "{{record.id}}" }
+                }
+              ]
+            }
+          ]
+        },
+
+        {
+          "id": "promo_banner",
+          "type": "block",
+          "blockType": "banner",
+          "layout": {
+            "x": 0,
+            "y": 6,
+            "w": 12,
+            "h": 1,
+            "responsive": {
+              "md": { "colSpan": 12, "rowSpan": 1 },
+              "sm": { "colSpan": 12, "rowSpan": 1 }
+            }
+          },
+          "components": [
+            {
+              "id": "promo_card",
+              "x-component": "Callout",
+              "props": {
+                "title": "🔥 双11活动：全场 8 折",
+                "description": "仅限本周，点击查看活动详情",
+                "action": { "type": "link", "to": "page_campaign", "label": "了解更多" }
+              }
+            }
+          ]
+        }
+      ]
+    },
+
+    "footer": {
+      "type": "flex",
+      "layoutProps": { "direction": "row", "justify": "center", "align": "center" },
+      "blocks": [
+        {
+          "id": "footer_text",
+          "type": "block",
+          "blockType": "text",
+          "components": [
+            {
+              "id": "footer_label",
+              "x-component": "Text",
+              "props": {
+                "content": "© 2025 杭州曜熠科技有限公司 All Rights Reserved",
+                "fontSize": 12,
+                "color": "#999"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+
+  "metadata": {
+    "tenantId": "tenant-001",
+    "version": "1.0.1",
+    "createdAt": "2025-10-27T10:00:00Z",
+    "updatedAt": "2025-11-01T10:00:00Z",
+    "createdBy": "admin",
+    "lastModifiedBy": "designer",
+    "status": "published",
+    "tags": ["dashboard", "analytics", "xywh"],
+    "visibility": "public",
+    "i18n": { "titleKey": "page.dashboard.xywh.title" }
+  }
+}

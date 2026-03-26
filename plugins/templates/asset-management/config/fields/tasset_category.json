@@ -1,0 +1,5 @@
+[
+  {"code":"tasset_ct_code","displayName:zh-CN":"分类编号","displayName:en":"Category Code","dataType":"string","description":"Auto-generated code.","constraints":{"required":true,"maxLength":50},"feature":{"searchable":true,"sortable":true},"extension":{"readOnly":true,"placeholder:zh-CN":"系统自动生成","placeholder:en":"Auto generated"}},
+  {"code":"tasset_ct_name","displayName:zh-CN":"分类名称","displayName:en":"Category Name","dataType":"string","description":"Category name.","constraints":{"required":true,"maxLength":200},"feature":{"searchable":true,"sortable":true},"extension":{"placeholder:zh-CN":"请输入分类名称","placeholder:en":"Enter category name"}},
+  {"code":"tasset_ct_description","displayName:zh-CN":"描述","displayName:en":"Description","dataType":"text","description":"Category description.","constraints":{"maxLength":5000},"extension":{"multiline":true}}
+]

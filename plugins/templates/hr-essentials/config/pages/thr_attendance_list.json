@@ -1,0 +1,47 @@
+{
+  "pageKey": "thr_attendance_list",
+  "name:zh-CN": "考勤列表",
+  "name:en": "Attendance",
+  "pageType": "list",
+  "modelCode": "thr_attendance",
+  "dslSchema": {
+    "id": "list.thr_attendance",
+    "kind": "List",
+    "areas": {
+      "toolbar": {
+        "blocks": [{
+          "id": "thr_attendance_toolbar",
+          "blockType": "toolbar",
+          "buttons": [
+            { "code": "create", "action": "create", "primary": true, "commandCode": "thr:create_attendance", "navigateTo": "thr_attendance_form", "permissionCode": "THR.attendance.manage" }
+          ]
+        }]
+      },
+      "main": {
+        "blocks": [{
+          "id": "thr_attendance_table",
+          "blockType": "data-table",
+          "columns": [
+            { "field": "thr_at_code", "width": 160, "sortable": true },
+            { "field": "thr_at_employee_id", "width": 150 },
+            { "field": "thr_at_date", "width": 130, "sortable": true },
+            { "field": "thr_at_check_in", "width": 160, "sortable": true },
+            { "field": "thr_at_check_out", "width": 160, "sortable": true },
+            { "field": "thr_at_type", "width": 100, "renderType": "tag", "dictCode": "thr_att_type" },
+            {
+              "field": "actions",
+              "isActionColumn": true,
+              "buttons": [
+                { "code": "view", "action": "detail", "navigateTo": "thr_attendance_detail" },
+                { "code": "edit", "action": "edit", "navigateTo": "thr_attendance_form", "permissionCode": "THR.attendance.manage" },
+                { "code": "delete", "action": "delete", "danger": true, "commandCode": "thr:delete_attendance", "permissionCode": "THR.attendance.manage", "confirmMessageKey": "delete.confirm" }
+              ]
+            }
+          ],
+          "searchFields": ["thr_at_code"],
+          "defaultSort": { "field": "thr_at_date", "order": "desc" }
+        }]
+      }
+    }
+  }
+}

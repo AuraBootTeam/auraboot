@@ -1,0 +1,54 @@
+[
+  {
+    "code": "tasset_root",
+    "parentCode": null,
+    "name:zh-CN": "资产管理",
+    "name:en": "Assets",
+    "path": null,
+    "component": null,
+    "icon": "IconBox",
+    "type": 0,
+    "permissionCode": null,
+    "orderNo": 820,
+    "visible": true
+  },
+  {
+    "code": "tasset_assets",
+    "parentCode": "tasset_root",
+    "name:zh-CN": "资产",
+    "name:en": "Assets",
+    "path": "/dynamic/tasset-asset",
+    "component": null,
+    "icon": "IconMonitor",
+    "type": 1,
+    "permissionCode": "tasset.asset.read",
+    "orderNo": 1,
+    "visible": true
+  },
+  {
+    "code": "tasset_categories",
+    "parentCode": "tasset_root",
+    "name:zh-CN": "分类",
+    "name:en": "Categories",
+    "path": "/dynamic/tasset-category",
+    "component": null,
+    "icon": "IconTag",
+    "type": 1,
+    "permissionCode": "tasset.category.read",
+    "orderNo": 2,
+    "visible": true
+  },
+  {
+    "code": "tasset_maintenance",
+    "parentCode": "tasset_root",
+    "name:zh-CN": "维护记录",
+    "name:en": "Maintenance",
+    "path": "/dynamic/tasset-maintenance",
+    "component": null,
+    "icon": "IconTool",
+    "type": 1,
+    "permissionCode": "tasset.maintenance.read",
+    "orderNo": 3,
+    "visible": true
+  }
+]

@@ -1,0 +1,12 @@
+# Prometheus config — Monolith mode
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'aura-monolith'
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ['app:6443']
+        labels:
+          service: monolith

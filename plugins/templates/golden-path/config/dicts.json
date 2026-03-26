@@ -1,0 +1,147 @@
+[
+  {
+    "code": "gp_task_status",
+    "name": "Task Status",
+    "name:zh-CN": "任务状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "new",
+        "label": "New",
+        "label:zh-CN": "新建",
+        "sortNo": 10,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "in_progress",
+        "label": "In Progress",
+        "label:zh-CN": "进行中",
+        "sortNo": 20,
+        "color": "#fa8c16",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "done",
+        "label": "Done",
+        "label:zh-CN": "已完成",
+        "sortNo": 30,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "archived",
+        "label": "Archived",
+        "label:zh-CN": "已归档",
+        "sortNo": 40,
+        "color": "#d9d9d9",
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      }
+    ]
+  },
+  {
+    "code": "gp_task_priority",
+    "name": "Task Priority",
+    "name:zh-CN": "任务优先级",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "low",
+        "label": "Low",
+        "label:zh-CN": "低",
+        "sortNo": 10,
+        "color": "#d9d9d9",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "medium",
+        "label": "Medium",
+        "label:zh-CN": "中",
+        "sortNo": 20,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "orange"
+        }
+      },
+      {
+        "value": "high",
+        "label": "High",
+        "label:zh-CN": "高",
+        "sortNo": 30,
+        "color": "#fa8c16",
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      },
+      {
+        "value": "urgent",
+        "label": "Urgent",
+        "label:zh-CN": "紧急",
+        "sortNo": 40,
+        "color": "#f5222d",
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      }
+    ]
+  },
+  {
+    "code": "gp_approval_status",
+    "name": "Approval Status",
+    "name:zh-CN": "审批状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "pending",
+        "label": "Pending",
+        "label:zh-CN": "待审批",
+        "sortNo": 10,
+        "color": "#fa8c16",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "approved",
+        "label": "Approved",
+        "label:zh-CN": "已批准",
+        "sortNo": 20,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "rejected",
+        "label": "Rejected",
+        "label:zh-CN": "已拒绝",
+        "sortNo": 30,
+        "color": "#f5222d",
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      }
+    ]
+  }
+]

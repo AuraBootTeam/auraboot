@@ -1,0 +1,324 @@
+{
+  "kind": "Form",
+  "version": "1.0.0",
+  "id": "form.store",
+  "title": "$i18n:form.store.title",
+  "description": "$i18n:form.store.description",
+  "stateBinding": {
+    "model": "{{state.form}}"
+  },
+  "layout": {
+    "areas": ["main"],
+    "areasConfig": {
+      "main": {
+        "type": "grid",
+        "cols": 12,
+        "rowGap": 12,
+        "colGap": 12
+      }
+    }
+  },
+  "areas": {
+    "main": {
+      "blocks": [
+        {
+          "id": "block_store_basic",
+          "blockType": "form-section",
+          "title": "$i18n:form.store.section.basic",
+          "layout": {
+            "colSpan": 12,
+            "rowSpan": 1
+          },
+          "fields": [
+            {
+              "field": "code",
+              "label": "$i18n:form.store.field.code.label",
+              "component": "SmartInput",
+              "layout": {
+                "colSpan": 6,
+                "rowSpan": 1
+              },
+              "props": {
+                "placeholder": "$i18n:form.store.field.code.placeholder"
+              },
+              "validation": [
+                {
+                  "type": "required",
+                  "message": "$i18n:form.store.field.code.required"
+                }
+              ],
+              "readOnlyWhen": "${form.mode === 'edit'}"
+            },
+            {
+              "field": "name",
+              "label": "$i18n:form.store.field.name.label",
+              "component": "SmartInput",
+              "layout": {
+                "colSpan": 6,
+                "rowSpan": 1
+              },
+              "props": {
+                "placeholder": "$i18n:form.store.field.name.placeholder"
+              },
+              "validation": [
+                {
+                  "type": "required",
+                  "message": "$i18n:form.store.field.name.required"
+                }
+              ]
+            },
+            {
+              "field": "type",
+              "label": "$i18n:form.store.field.type.label",
+              "component": "SmartSelect",
+              "layout": {
+                "colSpan": 6,
+                "rowSpan": 1
+              },
+              "dataSource": "ds_storeTypes",
+              "props": {
+                "placeholder": "$i18n:form.store.field.type.placeholder"
+              },
+              "validation": [
+                {
+                  "type": "required",
+                  "message": "$i18n:form.store.field.type.required"
+                }
+              ]
+            },
+            {
+              "field": "status",
+              "label": "$i18n:form.store.field.status.label",
+              "component": "SmartSelect",
+              "layout": {
+                "colSpan": 6,
+                "rowSpan": 1
+              },
+              "dataSource": "ds_storeStatuses",
+              "props": {
+                "placeholder": "$i18n:form.store.field.status.placeholder"
+              }
+            }
+          ]
+        },
+        {
+          "id": "block_store_contact",
+          "blockType": "form-section",
+          "title": "$i18n:form.store.section.contact",
+          "layout": {
+            "colSpan": 12,
+            "rowSpan": 1
+          },
+          "fields": [
+            {
+              "field": "contactPhone",
+              "label": "$i18n:form.store.field.contactPhone.label",
+              "component": "SmartInput",
+              "layout": {
+                "colSpan": 6,
+                "rowSpan": 1
+              },
+              "props": {
+                "placeholder": "$i18n:form.store.field.contactPhone.placeholder"
+              },
+              "validation": [
+                {
+                  "type": "required",
+                  "message": "$i18n:form.store.field.contactPhone.required"
+                }
+              ]
+            },
+            {
+              "field": "contactEmail",
+              "label": "$i18n:form.store.field.contactEmail.label",
+              "component": "SmartInput",
+              "layout": {
+                "colSpan": 6,
+                "rowSpan": 1
+              },
+              "props": {
+                "placeholder": "$i18n:form.store.field.contactEmail.placeholder"
+              },
+              "validation": [
+                {
+                  "type": "email",
+                  "message": "$i18n:form.store.field.contactEmail.invalid"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "block_store_location",
+          "blockType": "form-section",
+          "title": "$i18n:form.store.section.location",
+          "layout": {
+            "colSpan": 12,
+            "rowSpan": 1
+          },
+          "fields": [
+            {
+              "field": "address",
+              "label": "$i18n:form.store.field.address.label",
+              "component": "SmartTextarea",
+              "layout": {
+                "colSpan": 12,
+                "rowSpan": 2
+              },
+              "props": {
+                "placeholder": "$i18n:form.store.field.address.placeholder",
+                "autoSize": {
+                  "minRows": 2,
+                  "maxRows": 4
+                }
+              },
+              "validation": [
+                {
+                  "type": "required",
+                  "message": "$i18n:form.store.field.address.required"
+                }
+              ]
+            }
+          ]
+        },
+
+        {
+          "id": "block_store_advanced",
+          "blockType": "form-section",
+          "title": "$i18n:form.store.section.advanced",
+          "layout": {
+            "colSpan": 12,
+            "rowSpan": 1
+          },
+          "visibleWhen": "${hasPermission('store:viewAdvanced')}",
+          "fields": [
+            {
+              "field": "manager",
+              "label": "$i18n:form.store.field.manager.label",
+              "component": "SmartInput",
+              "layout": {
+                "colSpan": 6,
+                "rowSpan": 1
+              },
+              "visibleWhen": "${form.type === 'direct'}",
+              "enableWhen": "${hasPermission('store:manage')}"
+            }
+          ]
+        },
+        {
+          "id": "block_store_buttons",
+          "blockType": "form-buttons",
+          "layout": {
+            "colSpan": 12,
+            "rowSpan": 1
+          },
+          "buttons": [
+            {
+              "code": "create",
+              "content": "$i18n:form.store.btn.submit",
+              "primary": true,
+              "visibleWhen": "${hasPermission('store:create') || hasPermission('store:update')}",
+              "events": {
+                "onClick": {
+                  "handler": "createFormHandler"
+                }
+              }
+            },
+            {
+              "code": "reset",
+              "content": "$i18n:form.store.btn.reset",
+              "events": {
+                "onClick": {
+                  "handler": "resetFormHandler"
+                }
+              }
+            },
+            {
+              "code": "cancel",
+              "content": "$i18n:form.store.btn.cancel",
+              "events": {
+                "onClick": {
+                  "handler": "cancelFormHandler"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "dataSources": {
+    "ds_storeTypes": {
+      "valueField": "value",
+      "labelField": "label"
+    },
+    "ds_storeStatuses": {
+      "valueField": "value",
+      "labelField": "label"
+    }
+  },
+  "handlers": {
+    "createFormHandler": {
+      "type": "flow",
+      "steps": [
+        {
+          "action": "form.validate",
+          "target": "form.store"
+        },
+        {
+          "action": "api.request",
+          "method": "post",
+          "endpoint": "/api/stores",
+          "body": "{{state.form}}",
+          "next": "afterSubmit"
+        },
+        {
+          "id": "afterSubmit",
+          "action": "toast.show",
+          "level": "success",
+          "content": "$i18n:form.store.submit.success"
+        },
+        {
+          "action": "notify",
+          "channel": "dataSource",
+          "payload": {
+            "id": "ds_storeList",
+            "event": "reload"
+          }
+        }
+      ]
+    },
+    "resetFormHandler": {
+      "type": "flow",
+      "steps": [
+        {
+          "action": "form.reset",
+          "target": "form.store"
+        }
+      ]
+    },
+    "cancelFormHandler": {
+      "type": "flow",
+      "steps": [
+        {
+          "action": "ui.closeContainer",
+          "target": "drawer.storeForm"
+        }
+      ]
+    },
+    "loadCitiesForCountry": {
+      "type": "flow",
+      "steps": [
+        {
+          "action": "dataSource.fetch",
+          "target": "ds_citiesByCountry"
+        },
+        {
+          "action": "form.setOptions",
+          "field": "city",
+          "fromDataSource": "ds_citiesByCountry"
+        }
+      ]
+    }
+  }
+}

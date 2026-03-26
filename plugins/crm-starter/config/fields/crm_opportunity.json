@@ -1,0 +1,73 @@
+[
+  {
+    "code": "crm_opp_code",
+    "displayName:zh-CN": "商机编号",
+    "displayName:en": "Opportunity Code",
+    "dataType": "string",
+    "constraints": { "required": true, "maxLength": 50 },
+    "feature": { "searchable": true, "sortable": true }
+  },
+  {
+    "code": "crm_opp_name",
+    "displayName:zh-CN": "商机名称",
+    "displayName:en": "Opportunity Name",
+    "dataType": "string",
+    "constraints": { "required": true, "maxLength": 200 },
+    "feature": { "searchable": true, "sortable": true }
+  },
+  {
+    "code": "crm_opp_account_id",
+    "displayName:zh-CN": "客户",
+    "displayName:en": "Account",
+    "dataType": "reference",
+    "constraints": { "required": true },
+    "extension": {
+      "referenceModel": "crm_account",
+      "referenceDisplayField": "crm_acc_name"
+    }
+  },
+  {
+    "code": "crm_opp_stage",
+    "displayName:zh-CN": "阶段",
+    "displayName:en": "Stage",
+    "dataType": "enum",
+    "dictCode": "crm_opp_stage",
+    "defaultValue": "discovery",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_opp_expected_amount",
+    "displayName:zh-CN": "预期金额",
+    "displayName:en": "Expected Amount",
+    "dataType": "decimal",
+    "constraints": { "precision": 14, "scale": 2 },
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "crm_opp_expected_close_date",
+    "displayName:zh-CN": "预计成交日期",
+    "displayName:en": "Expected Close Date",
+    "dataType": "date",
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "crm_opp_probability",
+    "displayName:zh-CN": "成交概率(%)",
+    "displayName:en": "Probability (%)",
+    "dataType": "integer",
+    "constraints": { "min": 0, "max": 100 }
+  },
+  {
+    "code": "crm_opp_owner",
+    "displayName:zh-CN": "负责人",
+    "displayName:en": "Owner",
+    "dataType": "string",
+    "constraints": { "maxLength": 100 }
+  },
+  {
+    "code": "crm_opp_notes",
+    "displayName:zh-CN": "备注",
+    "displayName:en": "Notes",
+    "dataType": "text"
+  }
+]

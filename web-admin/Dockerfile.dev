@@ -1,0 +1,21 @@
+# AuraBoot Frontend — Development Dockerfile
+# Runs Vite dev server + BFF with hot reload
+
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Copy package files
+COPY package.json package-lock.json ./
+
+# Install all dependencies
+RUN npm ci
+
+# Copy source (will be overridden by volume mount in dev)
+COPY . .
+
+EXPOSE 5173 3500
+
+ENV NODE_ENV=development
+
+CMD ["npm", "run", "dev:full"]

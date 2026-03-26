@@ -1,0 +1,54 @@
+[
+  {
+    "code": "gp_task",
+    "displayName:zh-CN": "任务",
+    "displayName:en": "Task",
+    "description": "Task entity for the Golden Path template. Demonstrates state machine, agent hints, and full lifecycle.",
+    "modelType": "entity",
+    "modelCategory": "entity",
+    "semantic_description": "A task represents a unit of work assigned to a person with a lifecycle from creation through completion to archival. Used for project tracking and team coordination.",
+    "domain_category": "project",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "NEW → in_progress → DONE → archived / (DELETE allowed from NEW only)",
+    "extension": {
+      "icon": "CheckSquare",
+      "category": "golden-path",
+      "titleField": "gp_task_title",
+      "subtitleField": "gp_task_code"
+    }
+  },
+  {
+    "code": "gp_task_comment",
+    "displayName:zh-CN": "任务评论",
+    "displayName:en": "Task Comment",
+    "description": "Comment on a task. Demonstrates child model with REFERENCE field to parent.",
+    "modelType": "entity",
+    "modelCategory": "activity",
+    "semantic_description": "A comment attached to a task, containing free-text content and author information. Used for collaboration and discussion threads on tasks.",
+    "domain_category": "project",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "Created → Updated → Deleted (no status machine; immutable author and task reference after creation)",
+    "extension": {
+      "icon": "MessageSquare",
+      "category": "golden-path",
+      "titleField": "gp_tc_content"
+    }
+  },
+  {
+    "code": "gp_approval",
+    "displayName:zh-CN": "审批",
+    "displayName:en": "Approval",
+    "description": "Approval request for a task. Demonstrates Agent-BPM integration with multi-level review patterns.",
+    "modelType": "entity",
+    "modelCategory": "document",
+    "semantic_description": "An approval request for a task, demonstrating Agent-BPM integration with multi-level review. Links a task to a designated approver and tracks the decision outcome.",
+    "domain_category": "project",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "pending → approved / rejected",
+    "extension": {
+      "icon": "CheckCircle",
+      "category": "golden-path",
+      "titleField": "gp_apr_task_pid"
+    }
+  }
+]

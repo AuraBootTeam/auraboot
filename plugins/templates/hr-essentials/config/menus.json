@@ -1,0 +1,54 @@
+[
+  {
+    "code": "thr_root",
+    "parentCode": null,
+    "name:zh-CN": "人事管理",
+    "name:en": "HR",
+    "path": null,
+    "component": null,
+    "icon": "IconUsers",
+    "type": 0,
+    "permissionCode": null,
+    "orderNo": 840,
+    "visible": true
+  },
+  {
+    "code": "thr_employees",
+    "parentCode": "thr_root",
+    "name:zh-CN": "员工",
+    "name:en": "Employees",
+    "path": "/dynamic/thr-employee",
+    "component": null,
+    "icon": "IconUser",
+    "type": 1,
+    "permissionCode": "thr.employee.read",
+    "orderNo": 1,
+    "visible": true
+  },
+  {
+    "code": "thr_attendance",
+    "parentCode": "thr_root",
+    "name:zh-CN": "考勤记录",
+    "name:en": "Attendance",
+    "path": "/dynamic/thr-attendance",
+    "component": null,
+    "icon": "IconClock",
+    "type": 1,
+    "permissionCode": "thr.attendance.read",
+    "orderNo": 2,
+    "visible": true
+  },
+  {
+    "code": "thr_leave_requests",
+    "parentCode": "thr_root",
+    "name:zh-CN": "请假申请",
+    "name:en": "Leave Requests",
+    "path": "/dynamic/thr-leave-request",
+    "component": null,
+    "icon": "IconCalendarOff",
+    "type": 1,
+    "permissionCode": "thr.leave.read",
+    "orderNo": 3,
+    "visible": true
+  }
+]

@@ -1,0 +1,33 @@
+# Development overrides — use with:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+# Provides volume mounts for hot reload and relaxed resource limits.
+
+version: "3.9"
+
+services:
+  backend:
+    build:
+      context: ./platform
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./platform/src:/app/src:ro
+      - ./platform/build.gradle:/app/build.gradle:ro
+      - gradle_cache:/root/.gradle
+    environment:
+      SPRING_DEVTOOLS_RESTART_ENABLED: "true"
+      JAVA_OPTS: "-Xms256m -Xmx1024m -XX:+UseG1GC"
+
+  frontend:
+    build:
+      context: ./web-admin
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./web-admin/app:/app/app:ro
+      - ./web-admin/public:/app/public:ro
+    environment:
+      NODE_ENV: development
+
+volumes:
+  gradle_cache:
+    driver: local

@@ -1,0 +1,11 @@
+[
+  {"code":"eam_ms_code","displayName:zh-CN":"计划编号","displayName:en":"Schedule Code","dataType":"string","description":"Auto-generated maintenance schedule code.","constraints":{"required":true,"maxLength":50},"feature":{"searchable":true,"sortable":true},"extension":{"readOnly":true,"placeholder:zh-CN":"系统自动生成","placeholder:en":"Auto generated"}},
+  {"code":"eam_ms_name","displayName:zh-CN":"计划名称","displayName:en":"Schedule Name","dataType":"string","description":"Maintenance schedule name.","constraints":{"required":true,"maxLength":200},"feature":{"searchable":true,"sortable":true},"extension":{"placeholder:zh-CN":"请输入计划名称","placeholder:en":"Enter schedule name"}},
+  {"code":"eam_ms_asset_id","displayName:zh-CN":"资产","displayName:en":"Asset","dataType":"reference","description":"Asset this schedule applies to.","constraints":{"required":true},"extension":{"refModel":"eam_asset","refLabelField":"eam_as_name"}},
+  {"code":"eam_ms_type","displayName:zh-CN":"维护类型","displayName:en":"Maintenance Type","dataType":"enum","dictCode":"eam_maintenance_type","description":"Type of maintenance.","constraints":{"required":true},"feature":{"searchable":true}},
+  {"code":"eam_ms_frequency","displayName:zh-CN":"频率","displayName:en":"Frequency","dataType":"enum","dictCode":"eam_maintenance_freq","description":"Maintenance frequency.","feature":{"searchable":true}},
+  {"code":"eam_ms_next_due","displayName:zh-CN":"下次到期","displayName:en":"Next Due Date","dataType":"date","description":"Next scheduled maintenance date.","feature":{"sortable":true}},
+  {"code":"eam_ms_status","displayName:zh-CN":"状态","displayName:en":"Status","dataType":"enum","dictCode":"eam_schedule_status","defaultValue":"active","description":"Schedule status.","feature":{"searchable":true}},
+  {"code":"eam_ms_assigned_to","displayName:zh-CN":"负责人","displayName:en":"Assigned To","dataType":"string","description":"Person responsible.","constraints":{"maxLength":100},"feature":{"searchable":true}},
+  {"code":"eam_ms_notes","displayName:zh-CN":"备注","displayName:en":"Notes","dataType":"text","description":"Schedule notes.","constraints":{"maxLength":2000},"extension":{"multiline":true}}
+]

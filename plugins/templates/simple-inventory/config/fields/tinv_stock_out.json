@@ -1,0 +1,11 @@
+[
+  {"code":"tinv_so_code","displayName:zh-CN":"出库编号","displayName:en":"Shipment Code","dataType":"string","description":"Auto-generated.","constraints":{"required":true,"maxLength":50},"feature":{"searchable":true,"sortable":true},"extension":{"readOnly":true,"placeholder:zh-CN":"系统自动生成","placeholder:en":"Auto generated"}},
+  {"code":"tinv_so_product_id","displayName:zh-CN":"产品","displayName:en":"Product","dataType":"reference","description":"Product shipped.","feature":{"searchable":true},"extension":{"referenceModelCode":"tinv_product"}},
+  {"code":"tinv_so_warehouse_id","displayName:zh-CN":"仓库","displayName:en":"Warehouse","dataType":"reference","description":"Source warehouse.","feature":{"searchable":true},"extension":{"referenceModelCode":"tinv_warehouse"}},
+  {"code":"tinv_so_quantity","displayName:zh-CN":"数量","displayName:en":"Quantity","dataType":"decimal","description":"Quantity shipped.","constraints":{"required":true},"extension":{"precision":2}},
+  {"code":"tinv_so_unit_price","displayName:zh-CN":"单价","displayName:en":"Unit Price","dataType":"decimal","description":"Selling price per unit.","extension":{"precision":2}},
+  {"code":"tinv_so_status","displayName:zh-CN":"状态","displayName:en":"Status","dataType":"enum","dictCode":"tinv_doc_status","defaultValue":"draft","description":"Document status.","feature":{"searchable":true}},
+  {"code":"tinv_so_customer","displayName:zh-CN":"客户","displayName:en":"Customer","dataType":"string","description":"Customer name.","constraints":{"maxLength":200},"feature":{"searchable":true}},
+  {"code":"tinv_so_ship_date","displayName:zh-CN":"出库日期","displayName:en":"Ship Date","dataType":"date","description":"Date shipped.","feature":{"sortable":true}},
+  {"code":"tinv_so_notes","displayName:zh-CN":"备注","displayName:en":"Notes","dataType":"text","description":"Notes.","constraints":{"maxLength":5000},"extension":{"multiline":true}}
+]

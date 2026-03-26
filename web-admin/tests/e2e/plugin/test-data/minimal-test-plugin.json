@@ -1,0 +1,98 @@
+{
+  "pluginId": "com.test.minimal-import-test",
+  "namespace": "mtest",
+  "version": "1.0.0",
+  "displayName": "Minimal Import Test",
+  "displayName:zh-CN": "最小化导入测试",
+  "description": "Minimal plugin for testing import functionality",
+  "author": "Test Team",
+  "minPlatformVersion: '1.0.0',
+
+  "dicts": [
+    {
+      "code": "mtest_priority",
+      "name": "Priority",
+      "name:zh-CN": "优先级",
+      "dictType": "static",
+      "items": [
+        { "value": "high", "label": "High", "label:zh-CN": "高", "sortNo": 10, "status": "enabled" },
+        { "value": "low", "label": "Low", "label:zh-CN": "低", "sortNo": 20, "status": "enabled" }
+      ]
+    }
+  ],
+
+  "fields": [
+    {
+      "code": "mtest_name",
+      "displayName": "Name",
+      "displayName:zh-CN": "名称",
+      "dataType": "string",
+      "constraints": { "required": true, "maxLength": 100 },
+      "feature": { "searchable": true }
+    },
+    {
+      "code": "mtest_priority",
+      "displayName": "Priority",
+      "displayName:zh-CN": "优先级",
+      "dataType": "enum",
+      "dictCode": "mtest_priority",
+      "constraints": { "required": true },
+      "defaultValue": "low"
+    },
+    {
+      "code": "mtest_quantity",
+      "displayName": "Quantity",
+      "displayName:zh-CN": "数量",
+      "dataType": "integer",
+      "constraints": { "min": 0, "max": 1000 }
+    }
+  ],
+
+  "models": [
+    {
+      "code": "mtest_item",
+      "displayName": "Test Item",
+      "displayName:zh-CN": "测试项目",
+      "description": "Minimal test model",
+      "modelType": "entity"
+    }
+  ],
+
+  "modelFieldBindings": [
+    { "modelCode": "mtest_item", "fieldCode": "mtest_name", "sequence": 10, "required": true },
+    { "modelCode": "mtest_item", "fieldCode": "mtest_priority", "sequence": 20, "required": true, "defaultValue": "low" },
+    { "modelCode": "mtest_item", "fieldCode": "mtest_quantity", "sequence": 30, "required": false }
+  ],
+
+  "permissions": [
+    {
+      "code": "mtest:item:read",
+      "name": "View Test Items",
+      "name:zh-CN": "查看测试项目",
+      "resourceType": "model",
+      "resourceCode": "mtest_item",
+      "action": "read"
+    },
+    {
+      "code": "mtest:item:create",
+      "name": "Create Test Items",
+      "name:zh-CN": "创建测试项目",
+      "resourceType": "model",
+      "resourceCode": "mtest_item",
+      "action": "create"
+    }
+  ],
+
+  "menus": [
+    {
+      "code": "mtest_root",
+      "name": "Minimal Test",
+      "name:zh-CN": "最小测试",
+      "path": "/mtest",
+      "icon": "TestTube",
+      "type": 1,
+      "orderNo": 900,
+      "visible": true
+    }
+  ]
+}

@@ -1,0 +1,173 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://auraboot.io/schemas/product-package.json",
+  "title": "AuraBoot Product Package Manifest",
+  "description": "Schema for solution-level product package manifest (product-package.yaml)",
+  "type": "object",
+  "required": ["id", "name", "version", "plugins"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "maxLength": 128,
+      "description": "Unique product package identifier"
+    },
+    "name": {
+      "type": "string",
+      "maxLength": 256,
+      "description": "Display name"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(-[a-zA-Z0-9.-]+)?(\\+[a-zA-Z0-9.-]+)?$",
+      "description": "Semantic version"
+    },
+    "vendor": {
+      "type": "string",
+      "maxLength": 128
+    },
+    "category": {
+      "type": "string",
+      "maxLength": 64
+    },
+    "locale": {
+      "type": "string",
+      "maxLength": 16
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 2000
+    },
+    "plugins": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$",
+            "maxLength": 128
+          },
+          "version": {
+            "type": "string",
+            "pattern": "^\\d+\\.\\d+\\.\\d+(-[a-zA-Z0-9.-]+)?(\\+[a-zA-Z0-9.-]+)?$"
+          },
+          "required": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "seed": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+(-[a-zA-Z0-9.-]+)?(\\+[a-zA-Z0-9.-]+)?$"
+        },
+        "resettable": { "type": "boolean" },
+        "runOnInstall": {
+          "type": "object",
+          "properties": {
+            "demo": { "type": "boolean" },
+            "production": { "type": "boolean" }
+          },
+          "additionalProperties": false
+        },
+        "runCommand": {
+          "type": "object",
+          "properties": {
+            "demo": { "type": "string", "maxLength": 500 },
+            "production": { "type": "string", "maxLength": 500 }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "ui": {
+      "type": "object",
+      "properties": {
+        "homePage": { "type": "string", "maxLength": 256 },
+        "menuPreset": { "type": "string", "maxLength": 128 }
+      },
+      "additionalProperties": false
+    },
+    "permissions": {
+      "type": "object",
+      "properties": {
+        "rolePreset": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["code"],
+            "properties": {
+              "code": { "type": "string", "maxLength": 128 },
+              "name": { "type": "string", "maxLength": 128 }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "operations": {
+      "type": "object",
+      "properties": {
+        "installOrder": {
+          "type": "array",
+          "items": { "type": "string", "maxLength": 128 }
+        },
+        "postChecks": {
+          "type": "array",
+          "items": { "type": "string", "maxLength": 256 }
+        }
+      },
+      "additionalProperties": false
+    },
+    "modes": {
+      "type": "object",
+      "properties": {
+        "demo": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "description": { "type": "string", "maxLength": 500 }
+          },
+          "additionalProperties": false
+        },
+        "production": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "description": { "type": "string", "maxLength": 500 }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "artifacts": {
+      "type": "object",
+      "properties": {
+        "demoScript": { "type": "string", "maxLength": 500 },
+        "requirementSource": { "type": "string", "maxLength": 500 }
+      },
+      "additionalProperties": false
+    },
+    "license": {
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "maxLength": 64 },
+        "billingUnit": { "type": "string", "maxLength": 64 }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

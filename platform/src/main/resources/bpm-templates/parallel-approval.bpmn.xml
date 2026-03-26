@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xmlns:smart="http://smart.alibaba.com"
+             xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+             xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+             xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+             id="parallel-approval-definitions"
+             targetNamespace="http://auraboot.com/bpm"
+             version="1.0.0">
+
+  <!-- ============================================================
+       Parallel Approval Process (parallel-approval)
+
+       Flow:
+         StartEvent
+           -> UserTask: Submit Application
+           -> ParallelGateway (fork)
+               |- UserTask: Approver A
+               |- UserTask: Approver B
+           -> ParallelGateway (join)
+           -> EndEvent (Completed)
+
+       All parallel approvers must complete before the process ends.
+       ============================================================ -->
+
+  <process id="parallel-approval" name="Parallel Approval Process" isExecutable="true" version="1">
+
+    <!-- ==================== Start ==================== -->
+
+    <startEvent id="start_event" name="Start">
+      <documentation>Process initiated when applicant submits a request requiring parallel approvals.</documentation>
+    </startEvent>
+
+    <sequenceFlow id="flow_start_to_submit" sourceRef="start_event" targetRef="task_submit"/>
+
+    <!-- ==================== Submit Application ==================== -->
+
+    <userTask id="task_submit" name="Submit Application"
+              smart:assigneeType="user"
+              smart:assigneeId="${initiator}">
+      <documentation>Applicant fills in and submits the application form for parallel review.</documentation>
+    </userTask>
+
+    <sequenceFlow id="flow_submit_to_fork" sourceRef="task_submit" targetRef="gw_fork"/>
+
+    <!-- ==================== Parallel Fork ==================== -->
+
+    <parallelGateway id="gw_fork" name="Fork">
+      <documentation>Splits the flow into parallel approval branches. All branches execute concurrently.</documentation>
+    </parallelGateway>
+
+    <sequenceFlow id="flow_fork_to_approver_a" sourceRef="gw_fork" targetRef="task_approver_a"/>
+    <sequenceFlow id="flow_fork_to_approver_b" sourceRef="gw_fork" targetRef="task_approver_b"/>
+
+    <!-- ==================== Approver A ==================== -->
+
+    <userTask id="task_approver_a" name="Approver A Review"
+              smart:assigneeType="user"
+              smart:assigneeId="${approverA}">
+      <documentation>First approver reviews the application independently.</documentation>
+    </userTask>
+
+    <sequenceFlow id="flow_approver_a_to_join" sourceRef="task_approver_a" targetRef="gw_join"/>
+
+    <!-- ==================== Approver B ==================== -->
+
+    <userTask id="task_approver_b" name="Approver B Review"
+              smart:assigneeType="user"
+              smart:assigneeId="${approverB}">
+      <documentation>Second approver reviews the application independently.</documentation>
+    </userTask>
+
+    <sequenceFlow id="flow_approver_b_to_join" sourceRef="task_approver_b" targetRef="gw_join"/>
+
+    <!-- ==================== Parallel Join ==================== -->
+
+    <parallelGateway id="gw_join" name="Join">
+      <documentation>Waits for all parallel approval branches to complete before proceeding.</documentation>
+    </parallelGateway>
+
+    <sequenceFlow id="flow_join_to_end" sourceRef="gw_join" targetRef="end_completed"/>
+
+    <!-- ==================== End ==================== -->
+
+    <endEvent id="end_completed" name="Completed">
+      <documentation>Process completes after all approvers have finished their review.</documentation>
+    </endEvent>
+
+  </process>
+
+  <!--
+       BPMN Diagram Layout
+
+       Visual layout (left to right, with parallel branches vertically):
+
+       Start => Submit => Fork =+=> Approver A =+=> Join => End
+                                |                |
+                                +=> Approver B =+
+
+       Coordinates:
+         Center row (y=218):  Start(100), Submit(230), Fork(430), Join(730), End(850)
+         Upper branch (y=140): Approver A (550)
+         Lower branch (y=300): Approver B (550)
+  -->
+
+  <bpmndi:BPMNDiagram id="BPMNDiagram_parallel_approval">
+    <bpmndi:BPMNPlane id="BPMNPlane_parallel_approval" bpmnElement="parallel-approval">
+
+      <!-- Start Event -->
+      <bpmndi:BPMNShape id="start_event_di" bpmnElement="start_event">
+        <dc:Bounds x="100" y="200" width="36" height="36"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="103" y="243" width="30" height="14"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <!-- Submit Application Task -->
+      <bpmndi:BPMNShape id="task_submit_di" bpmnElement="task_submit">
+        <dc:Bounds x="230" y="178" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+
+      <!-- Fork Gateway -->
+      <bpmndi:BPMNShape id="gw_fork_di" bpmnElement="gw_fork">
+        <dc:Bounds x="430" y="193" width="50" height="50"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="445" y="250" width="22" height="14"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <!-- Approver A Task (upper branch) -->
+      <bpmndi:BPMNShape id="task_approver_a_di" bpmnElement="task_approver_a">
+        <dc:Bounds x="550" y="100" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+
+      <!-- Approver B Task (lower branch) -->
+      <bpmndi:BPMNShape id="task_approver_b_di" bpmnElement="task_approver_b">
+        <dc:Bounds x="550" y="260" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+
+      <!-- Join Gateway -->
+      <bpmndi:BPMNShape id="gw_join_di" bpmnElement="gw_join">
+        <dc:Bounds x="730" y="193" width="50" height="50"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="745" y="250" width="20" height="14"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <!-- End Event -->
+      <bpmndi:BPMNShape id="end_completed_di" bpmnElement="end_completed">
+        <dc:Bounds x="850" y="200" width="36" height="36"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="837" y="243" width="62" height="14"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <!-- Flow: Start -> Submit -->
+      <bpmndi:BPMNEdge id="flow_start_to_submit_di" bpmnElement="flow_start_to_submit">
+        <di:waypoint xsi:type="dc:Point" x="136" y="218"/>
+        <di:waypoint xsi:type="dc:Point" x="230" y="218"/>
+      </bpmndi:BPMNEdge>
+
+      <!-- Flow: Submit -> Fork -->
+      <bpmndi:BPMNEdge id="flow_submit_to_fork_di" bpmnElement="flow_submit_to_fork">
+        <di:waypoint xsi:type="dc:Point" x="330" y="218"/>
+        <di:waypoint xsi:type="dc:Point" x="430" y="218"/>
+      </bpmndi:BPMNEdge>
+
+      <!-- Flow: Fork -> Approver A (upper branch) -->
+      <bpmndi:BPMNEdge id="flow_fork_to_approver_a_di" bpmnElement="flow_fork_to_approver_a">
+        <di:waypoint xsi:type="dc:Point" x="455" y="193"/>
+        <di:waypoint xsi:type="dc:Point" x="455" y="140"/>
+        <di:waypoint xsi:type="dc:Point" x="550" y="140"/>
+      </bpmndi:BPMNEdge>
+
+      <!-- Flow: Fork -> Approver B (lower branch) -->
+      <bpmndi:BPMNEdge id="flow_fork_to_approver_b_di" bpmnElement="flow_fork_to_approver_b">
+        <di:waypoint xsi:type="dc:Point" x="455" y="243"/>
+        <di:waypoint xsi:type="dc:Point" x="455" y="300"/>
+        <di:waypoint xsi:type="dc:Point" x="550" y="300"/>
+      </bpmndi:BPMNEdge>
+
+      <!-- Flow: Approver A -> Join -->
+      <bpmndi:BPMNEdge id="flow_approver_a_to_join_di" bpmnElement="flow_approver_a_to_join">
+        <di:waypoint xsi:type="dc:Point" x="650" y="140"/>
+        <di:waypoint xsi:type="dc:Point" x="755" y="140"/>
+        <di:waypoint xsi:type="dc:Point" x="755" y="193"/>
+      </bpmndi:BPMNEdge>
+
+      <!-- Flow: Approver B -> Join -->
+      <bpmndi:BPMNEdge id="flow_approver_b_to_join_di" bpmnElement="flow_approver_b_to_join">
+        <di:waypoint xsi:type="dc:Point" x="650" y="300"/>
+        <di:waypoint xsi:type="dc:Point" x="755" y="300"/>
+        <di:waypoint xsi:type="dc:Point" x="755" y="243"/>
+      </bpmndi:BPMNEdge>
+
+      <!-- Flow: Join -> End -->
+      <bpmndi:BPMNEdge id="flow_join_to_end_di" bpmnElement="flow_join_to_end">
+        <di:waypoint xsi:type="dc:Point" x="780" y="218"/>
+        <di:waypoint xsi:type="dc:Point" x="850" y="218"/>
+      </bpmndi:BPMNEdge>
+
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+
+</definitions>

@@ -1,0 +1,158 @@
+[
+  {
+    "code": "crms:create_campaign",
+    "displayName:zh-CN": "新建营销活动",
+    "displayName:en": "Create Campaign",
+    "type": "create",
+    "modelCode": "crm_campaign",
+    "inputFields": [
+      "crm_cpn_name",
+      "crm_cpn_type",
+      "crm_cpn_start_date",
+      "crm_cpn_end_date",
+      "crm_cpn_budget",
+      "crm_cpn_description"
+    ],
+    "autoSetFields": {
+      "crm_cpn_code": {
+        "strategy": "auto_generate",
+        "pattern": "CPN-{yyyyMMdd}-{seq}"
+      },
+      "crm_cpn_status": {
+        "strategy": "fixed_value",
+        "value": "planned"
+      },
+      "crm_cpn_owner": {
+        "strategy": "current_username"
+      }
+    },
+    "permissions": [
+      "CRMS.campaign.manage"
+    ],
+    "agent_hint": "Create a new campaign. Key inputs: name, type, start_date, end_date, budget, description. Auto-generated: code, status, owner.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crms:update_campaign",
+    "displayName:zh-CN": "编辑营销活动",
+    "displayName:en": "Update Campaign",
+    "type": "update",
+    "modelCode": "crm_campaign",
+    "inputFields": [
+      "crm_cpn_name",
+      "crm_cpn_type",
+      "crm_cpn_start_date",
+      "crm_cpn_end_date",
+      "crm_cpn_budget",
+      "crm_cpn_description"
+    ],
+    "permissions": [
+      "CRMS.campaign.manage"
+    ],
+    "agent_hint": "Update an existing campaign. Editable fields: name, type, start_date, end_date, budget, description.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crms:delete_campaign",
+    "displayName:zh-CN": "删除营销活动",
+    "displayName:en": "Delete Campaign",
+    "type": "delete",
+    "modelCode": "crm_campaign",
+    "preconditions": [
+      {
+        "field": "crm_cpn_status",
+        "operator": "EQ",
+        "value": "planned"
+      }
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此营销活动？",
+      "confirmMessage:en": "Confirm delete this campaign?"
+    },
+    "permissions": [
+      "CRMS.campaign.manage"
+    ],
+    "agent_hint": "Delete campaign record(s). Preconditions: status = planned.",
+    "cmd_risk_level": "L4"
+  },
+  {
+    "code": "crms:activate_campaign",
+    "displayName:zh-CN": "启动活动",
+    "displayName:en": "Activate Campaign",
+    "type": "state_transition",
+    "modelCode": "crm_campaign",
+    "stateField": "crm_cpn_status",
+    "fromStates": [
+      "planned"
+    ],
+    "toState": "active",
+    "permissions": [
+      "CRMS.campaign.manage"
+    ],
+    "agent_hint": "Transition campaign status from PLANNED to ACTIVE.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crms:complete_campaign",
+    "displayName:zh-CN": "完成活动",
+    "displayName:en": "Complete Campaign",
+    "type": "state_transition",
+    "modelCode": "crm_campaign",
+    "stateField": "crm_cpn_status",
+    "fromStates": [
+      "active"
+    ],
+    "toState": "completed",
+    "permissions": [
+      "CRMS.campaign.manage"
+    ],
+    "agent_hint": "Transition campaign status from ACTIVE to COMPLETED.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crms:cancel_campaign",
+    "displayName:zh-CN": "取消活动",
+    "displayName:en": "Cancel Campaign",
+    "type": "state_transition",
+    "modelCode": "crm_campaign",
+    "stateField": "crm_cpn_status",
+    "fromStates": [
+      "planned",
+      "active"
+    ],
+    "toState": "cancelled",
+    "extension": {
+      "confirmMessage:zh-CN": "确认取消此营销活动？",
+      "confirmMessage:en": "Confirm cancelling this campaign?"
+    },
+    "permissions": [
+      "CRMS.campaign.manage"
+    ],
+    "agent_hint": "Transition campaign status from PLANNED/ACTIVE to CANCELLED.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crms:detail_campaign",
+    "displayName:zh-CN": "查看营销活动",
+    "displayName:en": "View Campaign",
+    "type": "query",
+    "modelCode": "crm_campaign",
+    "permissions": [
+      "CRMS.campaign.read"
+    ],
+    "agent_hint": "Query campaign records.",
+    "cmd_risk_level": "L0"
+  },
+  {
+    "code": "crms:list_campaigns",
+    "displayName:zh-CN": "营销活动列表",
+    "displayName:en": "List Campaigns",
+    "type": "query",
+    "modelCode": "crm_campaign",
+    "permissions": [
+      "CRMS.campaign.read"
+    ],
+    "agent_hint": "Query campaign records.",
+    "cmd_risk_level": "L0"
+  }
+]

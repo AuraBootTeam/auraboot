@@ -1,0 +1,134 @@
+{
+  "kind": "PageLayout",
+  "version": "1.0.0",
+  "id": "page.app.shell",
+  "title": "$i18n:page.app.shell.title",
+  "state": {
+    "collapsed": false,
+    "currentUser": {
+      "name": "Admin",
+      "avatar": "/assets/avatar.png"
+    }
+  },
+
+  "layout": {
+    "areas": ["header", "sider", "main"],
+    "areasConfig": {
+      "header": {
+        "type": "flex",
+        "direction": "row",
+        "justify": "space-between",
+        "align": "center",
+        "padding": "$spacing.md",
+        "height": 60
+      },
+      "sider": {
+        "type": "flex",
+        "direction": "column",
+        "width": "{{state.collapsed ? 64 : 240}}"
+      },
+      "main": {
+        "type": "grid",
+        "cols": 12,
+        "rowGap": 16,
+        "colGap": 16,
+        "padding": "$spacing.lg"
+      }
+    }
+  },
+  "areas": {
+    "header": {
+      "blocks": [
+        {
+          "id": "block_header_title",
+          "blockType": "header-title",
+          "layout": { "colSpan": 6, "rowSpan": 1 },
+          "content": "$i18n:app.name",
+          "style": {
+            "color": "$color.text.onHeader",
+            "fontSize": "$font.size.lg"
+          }
+        },
+        {
+          "id": "block_header_user",
+          "blockType": "header-user",
+          "layout": { "colSpan": 6, "rowSpan": 1 },
+          "component": "UserMenu",
+          "props": {
+            "user": "{{state.currentUser}}",
+            "menu": [{ "label": "$i18n:user.menu.logout", "handler": "logout" }]
+          }
+        }
+      ]
+    },
+    "sider": {
+      "blocks": [
+        {
+          "id": "block_sider_menu",
+          "blockType": "nav-menu",
+          "layout": { "colSpan": 12, "rowSpan": 1 },
+          "component": "NavMenu",
+          "props": {
+            "collapsed": "{{state.collapsed}}",
+            "items": [
+              {
+                "key": "dashboard",
+                "icon": "Dashboard",
+                "label": "$i18n:menu.dashboard",
+                "route": "/dashboard"
+              },
+              { "key": "store", "icon": "Shop", "label": "$i18n:menu.store", "route": "/store" }
+            ]
+          },
+          "events": {
+            "onSelect": { "handler": "navigateByMenu" }
+          }
+        },
+        {
+          "id": "block_sider_toggle",
+          "blockType": "sider-toggle",
+          "layout": { "colSpan": 12, "rowSpan": 1 },
+          "component": "SiderToggle",
+          "props": {
+            "collapsed": "{{state.collapsed}}"
+          },
+          "events": {
+            "onClick": { "handler": "toggleSider" }
+          }
+        }
+      ]
+    },
+    "main": {
+      "blocks": [
+        {
+          "id": "block_main_page",
+          "blockType": "page-fragment",
+          "layout": { "colSpan": 12, "rowSpan": 1 },
+          "pageRef": "page.store.main"
+        }
+      ]
+    }
+  },
+  "theme": {
+    "tokens": {
+      "headerBg": "$color.bg.header",
+      "headerText": "$color.text.onHeader",
+      "siderBg": "$color.bg.sider",
+      "mainBg": "$color.bg.layout"
+    }
+  },
+  "handlers": {
+    "toggleSider": {
+      "type": "flow",
+      "steps": [{ "action": "state.set", "args": { "collapsed": "{{!state.collapsed}}" } }]
+    },
+    "navigateByMenu": {
+      "type": "flow",
+      "steps": [{ "action": "router.push", "path": "${args.route}" }]
+    },
+    "logout": {
+      "type": "built-in",
+      "name": "auth.logout"
+    }
+  }
+}

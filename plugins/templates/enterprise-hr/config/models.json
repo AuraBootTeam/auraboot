@@ -1,0 +1,80 @@
+[
+  {
+    "code": "ehr_employee",
+    "displayName:zh-CN": "员工",
+    "displayName:en": "Employee",
+    "description": "Enterprise employee record with full lifecycle management.",
+    "modelType": "entity",
+    "modelCategory": "master",
+    "semantic_description": "An employee within the organization, tracking personal information, employment details, department assignment, position, and status through a full employment lifecycle.",
+    "domain_category": "HR",
+    "data_sensitivity": "confidential",
+    "lifecycle_description": "PROBATION → active → ON_LEAVE (↔ active) → RESIGNED / TERMINATED",
+    "extension": { "icon": "User", "category": "enterprise-hr", "titleField": "ehr_em_name", "subtitleField": "ehr_em_code" }
+  },
+  {
+    "code": "ehr_department",
+    "displayName:zh-CN": "部门",
+    "displayName:en": "Department",
+    "description": "Organizational department with hierarchy support.",
+    "modelType": "entity",
+    "modelCategory": "master",
+    "semantic_description": "An organizational unit representing a department or division. Supports parent-child hierarchy for org chart construction.",
+    "domain_category": "HR",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "No lifecycle — reference entity.",
+    "extension": { "icon": "Building2", "category": "enterprise-hr", "titleField": "ehr_dp_name", "subtitleField": "ehr_dp_code" }
+  },
+  {
+    "code": "ehr_position",
+    "displayName:zh-CN": "职位",
+    "displayName:en": "Position",
+    "description": "Job position definition within the organization.",
+    "modelType": "entity",
+    "modelCategory": "master",
+    "semantic_description": "A defined job position within a department, specifying title, grade level, and salary range.",
+    "domain_category": "HR",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "open → FILLED → closed",
+    "extension": { "icon": "Briefcase", "category": "enterprise-hr", "titleField": "ehr_ps_title", "subtitleField": "ehr_ps_code" }
+  },
+  {
+    "code": "ehr_attendance",
+    "displayName:zh-CN": "考勤记录",
+    "displayName:en": "Attendance",
+    "description": "Daily attendance record for clock-in and clock-out tracking.",
+    "modelType": "entity",
+    "modelCategory": "activity",
+    "semantic_description": "A daily attendance entry for an employee capturing check-in/check-out times, overtime hours, and attendance classification.",
+    "domain_category": "HR",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "No lifecycle — activity record.",
+    "extension": { "icon": "Clock", "category": "enterprise-hr", "titleField": "ehr_at_code", "subtitleField": "ehr_at_date" }
+  },
+  {
+    "code": "ehr_leave_request",
+    "displayName:zh-CN": "请假申请",
+    "displayName:en": "Leave Request",
+    "description": "Leave request with multi-level approval workflow.",
+    "modelType": "entity",
+    "modelCategory": "document",
+    "semantic_description": "A formal leave request submitted by an employee, specifying leave type, duration, and reason. Follows approval workflow from submission through manager review.",
+    "domain_category": "HR",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "draft → pending → approved / rejected; pending → cancelled",
+    "extension": { "icon": "CalendarOff", "category": "enterprise-hr", "titleField": "ehr_lv_code", "subtitleField": "ehr_lv_leave_type" }
+  },
+  {
+    "code": "ehr_payroll",
+    "displayName:zh-CN": "薪资记录",
+    "displayName:en": "Payroll",
+    "description": "Monthly payroll record for each employee.",
+    "modelType": "entity",
+    "modelCategory": "document",
+    "semantic_description": "A monthly payroll entry for an employee, capturing base salary, allowances, deductions, overtime pay, and net pay. Follows a processing workflow from draft through approval to payment.",
+    "domain_category": "HR",
+    "data_sensitivity": "restricted",
+    "lifecycle_description": "draft → CALCULATED → approved → paid",
+    "extension": { "icon": "Wallet", "category": "enterprise-hr", "titleField": "ehr_pr_code", "subtitleField": "ehr_pr_period" }
+  }
+]

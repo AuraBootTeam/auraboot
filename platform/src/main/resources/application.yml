@@ -1,0 +1,464 @@
+
+# 服务器配置
+server:
+  address: 0.0.0.0
+  port: 6443
+  ssl:
+    enabled: false
+    bundle: web-server
+    client-auth: none
+  http2:
+    enabled: true
+  tomcat:
+    connection-timeout: 60000     # 60s connection timeout (long uploads handled at app layer)
+    max-connections: 8192         # 最大连接数
+    accept-count: 100            # 等待队列长度
+    max-http-form-post-size: 104857600  # 100MB POST数据大小
+    threads:
+      max: 200                   # 最大工作线程数
+      min-spare: 10             # 最小空闲线程数
+
+# 基础日志配置
+logging:
+  level:
+    org.apache.tomcat.util.net.jsse.JSSESupport: INFO
+    org.apache.coyote: INFO
+    com.zaxxer.hikari.pool: INFO
+    org.postgresql: INFO
+    org.springframework.transaction.interceptor: DEBUG
+    org.springframework.transaction.support: DEBUG
+    org.springframework.jdbc.datasource: DEBUG
+
+# Security configuration
+# IMPORTANT: Set JWT_SECRET environment variable in production
+# Generate with: openssl rand -base64 64
+security:
+  jwt:
+    secret: ${JWT_SECRET:dev-only-secret-key-replace-in-production-min-32-chars}
+    expiration: ${JWT_EXPIRATION:86400}
+  field-encryption:
+    key: ${FIELD_ENCRYPTION_KEY:}  # Production: openssl rand -base64 32
+  password:
+    min-length: 8
+    max-length: 128
+    require-uppercase: true
+    require-lowercase: true
+    require-digit: true
+    require-special: false
+    history-count: 5
+    expiry-days: 90
+    reset-token-expiry-minutes: 30
+  lockout:
+    max-attempts: 5
+    duration-minutes: 30
+  frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:5173}
+
+# 雪花ID配置
+snowflake:
+  worker-id: 1      # 工作机器ID (0-31)
+  datacenter-id: 1  # 数据中心ID (0-31)
+
+# 数据库ID类型配置
+database:
+  id-type: long
+
+# Platform metadata
+auraboot:
+  platform:
+    version: 1.0.0
+  bootstrap:
+    enabled: ${AURABOOT_BOOTSTRAP_ENABLED:false}
+  entitlement:
+    enabled: false
+    grace-period-days: 7
+    expiring-notify-days: 7
+    cache-ttl-minutes: 15
+    offline-license:
+      enabled: false
+      active-kid: v1                    # kid for newly issued tokens
+      public-key-path: classpath:license/public.pem
+      private-key-path: classpath:license/private.pem
+      # jwks-url:                       # optional: https://license.auraboot.com/.well-known/jwks.json
+      # jwks-refresh-interval: 24h      # optional: how often to refresh remote keys
+  payment:
+    enabled: false
+    stripe:
+      secret-key: ${STRIPE_SECRET_KEY:}
+      publishable-key: ${STRIPE_PUBLISHABLE_KEY:}
+      webhook-secret: ${STRIPE_WEBHOOK_SECRET:}
+    trial:
+      default-days: 30
+      require-payment-method: false
+    default-currency: USD
+    success-url: ${PAYMENT_SUCCESS_URL:http://localhost:5173/marketplace?payment=success}
+    cancel-url: ${PAYMENT_CANCEL_URL:http://localhost:5173/marketplace?payment=cancel}
+  saas:
+    bootstrap:
+      mode: ${AURABOOT_BOOTSTRAP_MODE:none}   # setup | seed | none
+  crm:
+    calendar:
+      state-secret: ${CALENDAR_STATE_SECRET:dev-calendar-state-secret-32chars}
+      google:
+        enabled: true
+        client-id: ${GOOGLE_CALENDAR_CLIENT_ID:}
+        client-secret: ${GOOGLE_CALENDAR_CLIENT_SECRET:}
+      microsoft:
+        enabled: true
+        client-id: ${MICROSOFT_CALENDAR_CLIENT_ID:}
+        client-secret: ${MICROSOFT_CALENDAR_CLIENT_SECRET:}
+  performance:
+    # Queries taking longer than this threshold (ms) are logged at WARN level and metered.
+    slow-query-threshold-ms: 500
+    # When true, the trimmed SQL text is included in the log line. Set false to reduce log volume.
+    slow-query-log-params: true
+
+# OpenAPI / Swagger UI
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+    enabled: true
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+    tags-sorter: alpha
+    operations-sorter: alpha
+    try-it-out-enabled: true
+    filter: true
+  packages-to-scan: com.auraboot.framework
+  paths-to-match: /api/**
+  group-configs:
+    - group: meta
+      paths-to-match: /api/meta/**
+      display-name: Meta (Models, Fields, Commands)
+    - group: dynamic
+      paths-to-match: /api/dynamic/**
+      display-name: Dynamic Data
+    - group: plugins
+      paths-to-match: /api/plugins/**
+      display-name: Plugins
+    - group: auth
+      paths-to-match: /api/auth/**
+      display-name: Authentication
+    - group: bpm
+      paths-to-match: /api/bpm/**
+      display-name: BPM / Workflow
+    - group: connectors
+      paths-to-match: /api/connectors/**
+      display-name: API Connectors
+    - group: all
+      paths-to-match: /api/**
+      display-name: All APIs
+
+# Spring配置
+spring:
+  application:
+    name: auraboot-platform
+  profiles:
+    active: dev,local,test  # dev + local (local for secrets, gitignored) + test (enables TestSeedController for E2E)
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 100MB        # 单个文件最大大小
+      max-request-size: 100MB     # 整个请求最大大小
+      file-size-threshold: 2KB    # 文件写入磁盘的阈值
+      location: ${java.io.tmpdir} # 临时文件存储位置
+      resolve-lazily: false       # 是否延迟解析
+#  ssl:
+#    bundle:
+#      pem:
+#        web-server:
+#          keystore:
+#            certificate: file:../certs/_wildcard.metaochan.com+5.pem
+#            private-code: file:../certs/_wildcard.metaochan.com+5-code.pem
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    mapper:
+      accept-case-insensitive-enums: true
+    time-zone: UTC
+  devtools:
+    restart:
+      enabled: false
+      additional-paths: src/main/java
+      exclude: static/**,public/**
+    livereload:
+      enabled: true
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      database: 0
+      timeout: 5000ms
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/aura_boot?charSet=UTF8}
+    driver-class-name: org.postgresql.Driver
+    username: ${DATABASE_USERNAME:ghj}
+    password: ${DATABASE_PASSWORD:}
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+# Spring Boot Actuator configuration
+# Security: Only expose safe endpoints by default
+# Sensitive endpoints (env, configprops, beans) require authentication in production
+management:
+  endpoints:
+    web:
+      exposure:
+        # Safe endpoints for production - add more via ACTUATOR_ENDPOINTS env var
+        include: ${ACTUATOR_ENDPOINTS:health,info,metrics,prometheus}
+      base-path: /actuator
+    enabled-by-default: false
+  endpoint:
+    health:
+      enabled: true
+      show-details: when_authorized
+      show-components: when_authorized
+    info:
+      enabled: true
+    metrics:
+      enabled: true
+    prometheus:
+      enabled: true
+    # Sensitive endpoints - disabled by default, enable only in dev/debug
+    env:
+      enabled: ${ACTUATOR_ENV_ENABLED:false}
+    beans:
+      enabled: ${ACTUATOR_BEANS_ENABLED:false}
+    configprops:
+      enabled: ${ACTUATOR_CONFIGPROPS_ENABLED:false}
+    loggers:
+      enabled: ${ACTUATOR_LOGGERS_ENABLED:false}
+  health:
+    defaults:
+      enabled: true
+    db:
+      enabled: true
+    diskspace:
+      enabled: true
+  metrics:
+    tags:
+      application: auraboot
+  info:
+    env:
+      enabled: false  # Don't expose env info
+    java:
+      enabled: true
+    os:
+      enabled: true
+  tracing:
+    sampling:
+      probability: 1.0  # 100% in dev; reduce to 0.1 in prod
+    propagation:
+      type: w3c
+  otlp:
+    tracing:
+      endpoint: http://localhost:4318/v1/traces
+
+# MyBatis-Plus 配置
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      logic-delete-field: deletedFlag
+      logic-delete-value: true
+      logic-not-delete-value: false
+    enable-sql-runner: true
+  mapper-locations: classpath*:mybatis/sqlmap/*.xml
+
+# AI 服务配置
+ai:
+  service:
+    base-url: http://localhost:8001
+    gateway-secret: ${GATEWAY_SECRET:your-secret-key-here}
+    connect-timeout: 5000
+    read-timeout: 60000
+    enabled: true
+    max-retries: 3
+  storage:
+    base-path: ${AI_STORAGE_PATH:./data/ai-documents}
+    max-file-size: 52428800  # 50MB
+    allowed-extensions: .pdf,.doc,.docx,.txt
+  attachment:
+    base-path: ${AI_ATTACHMENT_PATH:./data/ai-attachments}
+    max-file-size: 10485760  # 10MB
+    allowed-types: image/jpeg,image/png,image/gif,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document
+
+# AuraBoot Git 配置
+aura:
+  git:
+    repos-base-path: ${AURA_GIT_REPOS_PATH:./data/git-repos}
+    default-repo-id: 1           # 默认仓库ID
+    scheduler:
+      enabled: true
+      sync-interval: 300000      # 5分钟同步间隔
+      release-interval: 600000   # 10分钟Release检查间隔
+      health-check-interval: 3600000  # 1小时健康检查间隔
+    release:
+      auto-create: true
+      processing-timeout: 1800000  # 30分钟处理超时
+      max-concurrent-processing: 5
+      max-retries: 3
+    artifact:
+      storage-type: database     # 产物存储方式: database, filesystem, s3
+      filesystem-path: ${AURA_ARTIFACT_PATH:./data/artifacts}
+      large-file-threshold: 1048576  # 1MB大文件阈值
+      compression-enabled: true
+    projection:
+      sync-timeout-seconds: 3   # 投影同步超时(秒)
+      check-interval-ms: 1000    # 投影状态检查间隔(毫秒)
+      transaction-timeout-seconds: 30  # 投影事务超时(秒)
+      max-retries: 3             # 最大重试次数
+      retry-delay-seconds: 60    # 重试延迟(秒)
+      slow-operation-threshold-seconds: 5  # 慢操作阈值(秒)
+    cleanup:
+      failed-release-retention-days: 3
+      artifact-retention-days: 90
+      audit-log-retention-days: 180
+  
+  # Git-First架构一致性配置
+  git-first:
+    enabled: true
+    router:
+      # 核心层：强制Git-first（影响运行语义）
+      core-layer-resources:
+        - ENTITY
+        - FIELD
+        - DICT
+        - MODEL
+      # 应用层：Git-first + 依赖检查（业务逻辑）
+      application-layer-resources:
+        - PAGE
+        - QUERY
+        - WORKFLOW
+        - FORM
+        - PAGE_DSL
+        - QUERY_DEFINITION
+      # 配置层：在线管理（高度在线化）
+      configuration-layer-resources:
+        - MENU_CONFIG
+        - ROLE_PERMISSION_BINDING
+        - USER_PREFERENCE
+        - PERSONAL_SETTING
+        - DISPLAY_CONFIG
+        - MENU_ORDER
+        - USER_ROLE_BINDING
+    validation:
+      strict-mode: true          # 严格验证模式
+      fail-fast: true            # 验证失败立即停止
+      enforce-on-update: true    # 更新操作强制验证
+    dependency-management:
+      atomic-release-units: true # 启用原子性发布单元
+      dependency-validation: true # 启用依赖验证
+      auto-complete-dependencies: true # 自动补全依赖
+      max-dependency-depth: 10   # 最大依赖深度
+      circular-dependency-check: true # 循环依赖检查
+    rollback:
+      fast-rollback-enabled: true # 启用快速回滚
+      target-rollback-time-ms: 5000 # 目标回滚时间5秒
+      batch-pointer-switch: true # 批量指针切换
+      async-validation: true     # 异步验证一致性
+  
+  # 多租户隔离配置
+  multi-tenant:
+    index-isolation: true        # 索引租户隔离
+    constraint-isolation: true   # 约束租户隔离
+    context-validation:
+      enabled: true              # 启用上下文验证
+      fail-on-missing: true      # 上下文缺失时失败
+      audit-violations: true     # 审计违规操作
+    data-access:
+      unified-service: true      # 使用统一数据访问服务
+      release-pointer-aware: true # 感知Release指针
+      status-field-unified: true # 统一状态字段
+
+  # 租户初始化配置
+  tenant:
+    bootstrap:
+      # 默认模板名称（不含.json后缀）
+      default-template-name: default-bootstrap
+      # 模板文件路径（相对于classpath）
+      template-path: tenant-templates
+      # 是否启用模板验证
+      validation-enabled: true
+      # 是否启用权限-菜单一致性验证
+      permission-menu-consistency-check: true
+
+  # Infrastructure: Storage Provider
+  storage:
+    type: local                    # local | minio | oss | s3
+    tenant-isolated: true
+    local:
+      base-path: ${AURA_FILE_STORAGE_PATH:./data/files}
+    # minio:
+    #   endpoint: http://localhost:9000
+    #   access-key: minioadmin
+    #   secret-key: minioadmin
+    #   bucket: aura-files
+    # oss:
+    #   endpoint: https://oss-cn-hangzhou.aliyuncs.com
+    #   access-key-id: xxx
+    #   access-key-secret: xxx
+    #   bucket: aura-files
+    # s3:
+    #   region: us-east-1
+    #   access-key-id: xxx
+    #   secret-access-key: xxx
+    #   bucket: aura-files
+    cdn:
+      base-url:                    # e.g. https://cdn.example.com
+
+  # Infrastructure: Message Queue Provider
+  mq:
+    type: memory                   # memory | redis | kafka | rabbitmq
+    # redis:                       # Recommended for production (uses existing Redis, zero extra infra)
+    #   consumer-group: aura-group
+    # kafka:
+    #   bootstrap-servers: localhost:9092
+    #   consumer-group: aura-group
+    # rabbitmq:
+    #   host: localhost
+    #   port: 5672
+    #   username: guest
+    #   password: guest
+    #   exchange: aura-exchange
+
+  # BPM engine abstraction layer (GAP-027)
+  bpm:
+    engine: smartengine  # smartengine | camunda | flowable
+
+  # Event bus transport layer (GAP-105)
+  event:
+    transport: local     # local | redis | rabbitmq
+
+  # Infrastructure: HTTP Client
+  http:
+    connect-timeout: 5s
+    read-timeout: 30s
+    max-connections: 200
+    max-per-route: 50
+    retry:
+      max-attempts: 3
+      backoff: 1s
+
+# Agent Control Plane Runtime
+agent:
+  enabled: true
+  max-concurrent-runs: 5
+  default-cost-limit: 1.0
+  anthropic:
+    api-key: ${ANTHROPIC_API_KEY:}
+    base-url: https://api.anthropic.com
+    default-model: claude-sonnet-4-6
+    max-tokens: 4096
+
+# Multi-currency: ECB daily rate fetch
+currency:
+  ecb:
+    enabled: false   # Set to true in production to enable scheduled ECB rate sync
+    url: https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml

@@ -1,0 +1,811 @@
+[
+  {
+    "code": "ecm_policy_category",
+    "name": "Policy Category",
+    "name:zh-CN": "政策类别",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "data_privacy",
+        "label": "Data Privacy",
+        "label:zh-CN": "数据隐私",
+        "sortNo": 10,
+        "color": "#1890ff",
+        "status": "enabled"
+      },
+      {
+        "value": "information_security",
+        "label": "Information Security",
+        "label:zh-CN": "信息安全",
+        "sortNo": 20,
+        "color": "#722ed1",
+        "status": "enabled"
+      },
+      {
+        "value": "financial",
+        "label": "Financial",
+        "label:zh-CN": "财务合规",
+        "sortNo": 30,
+        "color": "#52c41a",
+        "status": "enabled"
+      },
+      {
+        "value": "health_safety",
+        "label": "Health & Safety",
+        "label:zh-CN": "健康安全",
+        "sortNo": 40,
+        "color": "#f5222d",
+        "status": "enabled"
+      },
+      {
+        "value": "environmental",
+        "label": "Environmental",
+        "label:zh-CN": "环境合规",
+        "sortNo": 50,
+        "color": "#13c2c2",
+        "status": "enabled"
+      },
+      {
+        "value": "quality",
+        "label": "Quality",
+        "label:zh-CN": "质量管理",
+        "sortNo": 60,
+        "color": "#fa8c16",
+        "status": "enabled"
+      },
+      {
+        "value": "HR",
+        "label": "Human Resources",
+        "label:zh-CN": "人力资源",
+        "sortNo": 70,
+        "color": "#eb2f96",
+        "status": "enabled"
+      },
+      {
+        "value": "general",
+        "label": "General",
+        "label:zh-CN": "通用",
+        "sortNo": 80,
+        "color": "#d9d9d9",
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "ecm_policy_status",
+    "name": "Policy Status",
+    "name:zh-CN": "政策状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "draft",
+        "label": "Draft",
+        "label:zh-CN": "草稿",
+        "sortNo": 10,
+        "color": "#8c8c8c",
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "under_review",
+        "label": "Under Review",
+        "label:zh-CN": "评审中",
+        "sortNo": 20,
+        "color": "#faad14",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "approved",
+        "label": "Approved",
+        "label:zh-CN": "已批准",
+        "sortNo": 30,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "archived",
+        "label": "Archived",
+        "label:zh-CN": "已归档",
+        "sortNo": 40,
+        "color": "#d9d9d9",
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      }
+    ]
+  },
+  {
+    "code": "ecm_audit_type",
+    "name": "Audit Type",
+    "name:zh-CN": "审计类型",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "internal",
+        "label": "Internal",
+        "label:zh-CN": "内部审计",
+        "sortNo": 10,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "external",
+        "label": "External",
+        "label:zh-CN": "外部审计",
+        "sortNo": 20,
+        "color": "#722ed1",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "regulatory",
+        "label": "Regulatory",
+        "label:zh-CN": "监管审计",
+        "sortNo": 30,
+        "color": "#f5222d",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "certification",
+        "label": "Certification",
+        "label:zh-CN": "认证审计",
+        "sortNo": 40,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      }
+    ]
+  },
+  {
+    "code": "ecm_severity",
+    "name": "Severity",
+    "name:zh-CN": "严重程度",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "critical",
+        "label": "Critical",
+        "label:zh-CN": "严重",
+        "sortNo": 10,
+        "color": "#f5222d",
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      },
+      {
+        "value": "major",
+        "label": "Major",
+        "label:zh-CN": "重大",
+        "sortNo": 20,
+        "color": "#fa8c16",
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      },
+      {
+        "value": "minor",
+        "label": "Minor",
+        "label:zh-CN": "一般",
+        "sortNo": 30,
+        "color": "#faad14",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "observation",
+        "label": "Observation",
+        "label:zh-CN": "观察项",
+        "sortNo": 40,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "opportunity",
+        "label": "Improvement Opportunity",
+        "label:zh-CN": "改进机会",
+        "sortNo": 50,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      }
+    ]
+  },
+  {
+    "code": "ecm_audit_status",
+    "name": "Audit Status",
+    "name:zh-CN": "审计状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "planned",
+        "label": "Planned",
+        "label:zh-CN": "已计划",
+        "sortNo": 10,
+        "color": "#8c8c8c",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "in_progress",
+        "label": "In Progress",
+        "label:zh-CN": "进行中",
+        "sortNo": 20,
+        "color": "#fa8c16",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "draft_report",
+        "label": "Draft Report",
+        "label:zh-CN": "草案报告",
+        "sortNo": 30,
+        "color": "#faad14",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "final",
+        "label": "Final",
+        "label:zh-CN": "最终报告",
+        "sortNo": 40,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "closed",
+        "label": "Closed",
+        "label:zh-CN": "已关闭",
+        "sortNo": 50,
+        "color": "#d9d9d9",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      }
+    ]
+  },
+  {
+    "code": "ecm_action_type",
+    "name": "Action Type",
+    "name:zh-CN": "措施类型",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "corrective",
+        "label": "Corrective",
+        "label:zh-CN": "纠正",
+        "sortNo": 10,
+        "color": "#f5222d",
+        "status": "enabled"
+      },
+      {
+        "value": "preventive",
+        "label": "Preventive",
+        "label:zh-CN": "预防",
+        "sortNo": 20,
+        "color": "#1890ff",
+        "status": "enabled"
+      },
+      {
+        "value": "improvement",
+        "label": "Improvement",
+        "label:zh-CN": "改进",
+        "sortNo": 30,
+        "color": "#52c41a",
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "ecm_action_status",
+    "name": "Action Status",
+    "name:zh-CN": "措施状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "open",
+        "label": "Open",
+        "label:zh-CN": "待处理",
+        "sortNo": 10,
+        "color": "#8c8c8c",
+        "status": "enabled"
+      },
+      {
+        "value": "in_progress",
+        "label": "In Progress",
+        "label:zh-CN": "进行中",
+        "sortNo": 20,
+        "color": "#fa8c16",
+        "status": "enabled"
+      },
+      {
+        "value": "completed",
+        "label": "Completed",
+        "label:zh-CN": "已完成",
+        "sortNo": 30,
+        "color": "#52c41a",
+        "status": "enabled"
+      },
+      {
+        "value": "verified",
+        "label": "Verified",
+        "label:zh-CN": "已验证",
+        "sortNo": 40,
+        "color": "#1890ff",
+        "status": "enabled"
+      },
+      {
+        "value": "closed",
+        "label": "Closed",
+        "label:zh-CN": "已关闭",
+        "sortNo": 50,
+        "color": "#d9d9d9",
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "ecm_priority",
+    "name": "Priority",
+    "name:zh-CN": "优先级",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "critical",
+        "label": "Critical",
+        "label:zh-CN": "紧急",
+        "sortNo": 10,
+        "color": "#f5222d",
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      },
+      {
+        "value": "high",
+        "label": "High",
+        "label:zh-CN": "高",
+        "sortNo": 20,
+        "color": "#fa8c16",
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      },
+      {
+        "value": "medium",
+        "label": "Medium",
+        "label:zh-CN": "中",
+        "sortNo": 30,
+        "color": "#faad14",
+        "status": "enabled",
+        "extension": {
+          "color": "orange"
+        }
+      },
+      {
+        "value": "low",
+        "label": "Low",
+        "label:zh-CN": "低",
+        "sortNo": 40,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      }
+    ]
+  },
+  {
+    "code": "ecm_risk_category",
+    "name": "Risk Category",
+    "name:zh-CN": "风险类别",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "strategic",
+        "label": "Strategic",
+        "label:zh-CN": "战略风险",
+        "sortNo": 10,
+        "color": "#722ed1",
+        "status": "enabled"
+      },
+      {
+        "value": "operational",
+        "label": "Operational",
+        "label:zh-CN": "运营风险",
+        "sortNo": 20,
+        "color": "#1890ff",
+        "status": "enabled"
+      },
+      {
+        "value": "financial",
+        "label": "Financial",
+        "label:zh-CN": "财务风险",
+        "sortNo": 30,
+        "color": "#52c41a",
+        "status": "enabled"
+      },
+      {
+        "value": "compliance",
+        "label": "Compliance",
+        "label:zh-CN": "合规风险",
+        "sortNo": 40,
+        "color": "#f5222d",
+        "status": "enabled"
+      },
+      {
+        "value": "technology",
+        "label": "Technology",
+        "label:zh-CN": "技术风险",
+        "sortNo": 50,
+        "color": "#13c2c2",
+        "status": "enabled"
+      },
+      {
+        "value": "reputational",
+        "label": "Reputational",
+        "label:zh-CN": "声誉风险",
+        "sortNo": 60,
+        "color": "#eb2f96",
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "ecm_risk_status",
+    "name": "Risk Status",
+    "name:zh-CN": "风险状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "identified",
+        "label": "Identified",
+        "label:zh-CN": "已识别",
+        "sortNo": 10,
+        "color": "#8c8c8c",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "assessed",
+        "label": "Assessed",
+        "label:zh-CN": "已评估",
+        "sortNo": 20,
+        "color": "#faad14",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "mitigated",
+        "label": "Mitigated",
+        "label:zh-CN": "已缓解",
+        "sortNo": 30,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "accepted",
+        "label": "Accepted",
+        "label:zh-CN": "已接受",
+        "sortNo": 40,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "closed",
+        "label": "Closed",
+        "label:zh-CN": "已关闭",
+        "sortNo": 50,
+        "color": "#d9d9d9",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      }
+    ]
+  },
+  {
+    "code": "ecm_likelihood",
+    "name": "Likelihood",
+    "name:zh-CN": "可能性",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "rare",
+        "label": "Rare",
+        "label:zh-CN": "罕见",
+        "sortNo": 10,
+        "color": "#52c41a",
+        "status": "enabled"
+      },
+      {
+        "value": "unlikely",
+        "label": "Unlikely",
+        "label:zh-CN": "不太可能",
+        "sortNo": 20,
+        "color": "#1890ff",
+        "status": "enabled"
+      },
+      {
+        "value": "possible",
+        "label": "Possible",
+        "label:zh-CN": "可能",
+        "sortNo": 30,
+        "color": "#faad14",
+        "status": "enabled"
+      },
+      {
+        "value": "likely",
+        "label": "Likely",
+        "label:zh-CN": "很可能",
+        "sortNo": 40,
+        "color": "#fa8c16",
+        "status": "enabled"
+      },
+      {
+        "value": "almost_certain",
+        "label": "Almost Certain",
+        "label:zh-CN": "几乎确定",
+        "sortNo": 50,
+        "color": "#f5222d",
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "ecm_impact",
+    "name": "Impact",
+    "name:zh-CN": "影响程度",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "negligible",
+        "label": "Negligible",
+        "label:zh-CN": "可忽略",
+        "sortNo": 10,
+        "color": "#52c41a",
+        "status": "enabled"
+      },
+      {
+        "value": "low",
+        "label": "Low",
+        "label:zh-CN": "低",
+        "sortNo": 20,
+        "color": "#1890ff",
+        "status": "enabled"
+      },
+      {
+        "value": "moderate",
+        "label": "Moderate",
+        "label:zh-CN": "中等",
+        "sortNo": 30,
+        "color": "#faad14",
+        "status": "enabled"
+      },
+      {
+        "value": "high",
+        "label": "High",
+        "label:zh-CN": "高",
+        "sortNo": 40,
+        "color": "#fa8c16",
+        "status": "enabled"
+      },
+      {
+        "value": "catastrophic",
+        "label": "Catastrophic",
+        "label:zh-CN": "灾难性",
+        "sortNo": 50,
+        "color": "#f5222d",
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "ecm_risk_level",
+    "name": "Risk Level",
+    "name:zh-CN": "风险等级",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "low",
+        "label": "Low",
+        "label:zh-CN": "低",
+        "sortNo": 10,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "medium",
+        "label": "Medium",
+        "label:zh-CN": "中",
+        "sortNo": 20,
+        "color": "#faad14",
+        "status": "enabled",
+        "extension": {
+          "color": "orange"
+        }
+      },
+      {
+        "value": "high",
+        "label": "High",
+        "label:zh-CN": "高",
+        "sortNo": 30,
+        "color": "#fa8c16",
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      },
+      {
+        "value": "critical",
+        "label": "Critical",
+        "label:zh-CN": "严重",
+        "sortNo": 40,
+        "color": "#f5222d",
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      }
+    ]
+  },
+  {
+    "code": "ecm_training_category",
+    "name": "Training Category",
+    "name:zh-CN": "培训类别",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "compliance",
+        "label": "Compliance",
+        "label:zh-CN": "合规培训",
+        "sortNo": 10,
+        "color": "#1890ff",
+        "status": "enabled"
+      },
+      {
+        "value": "safety",
+        "label": "Safety",
+        "label:zh-CN": "安全培训",
+        "sortNo": 20,
+        "color": "#f5222d",
+        "status": "enabled"
+      },
+      {
+        "value": "quality",
+        "label": "Quality",
+        "label:zh-CN": "质量培训",
+        "sortNo": 30,
+        "color": "#52c41a",
+        "status": "enabled"
+      },
+      {
+        "value": "security",
+        "label": "Security",
+        "label:zh-CN": "信息安全",
+        "sortNo": 40,
+        "color": "#722ed1",
+        "status": "enabled"
+      },
+      {
+        "value": "ethics",
+        "label": "Ethics",
+        "label:zh-CN": "职业道德",
+        "sortNo": 50,
+        "color": "#fa8c16",
+        "status": "enabled"
+      },
+      {
+        "value": "technical",
+        "label": "Technical",
+        "label:zh-CN": "技术培训",
+        "sortNo": 60,
+        "color": "#13c2c2",
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "ecm_training_status",
+    "name": "Training Status",
+    "name:zh-CN": "培训状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "scheduled",
+        "label": "Scheduled",
+        "label:zh-CN": "已计划",
+        "sortNo": 10,
+        "color": "#8c8c8c",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "in_progress",
+        "label": "In Progress",
+        "label:zh-CN": "进行中",
+        "sortNo": 20,
+        "color": "#fa8c16",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "completed",
+        "label": "Completed",
+        "label:zh-CN": "已完成",
+        "sortNo": 30,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "expired",
+        "label": "Expired",
+        "label:zh-CN": "已过期",
+        "sortNo": 40,
+        "color": "#f5222d",
+        "status": "enabled",
+        "extension": {
+          "color": "orange"
+        }
+      }
+    ]
+  }
+]

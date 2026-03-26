@@ -1,0 +1,8 @@
+[
+  { "code": "tpm_ms_code", "displayName:zh-CN": "里程碑编号", "displayName:en": "Milestone Code", "dataType": "string", "description": "Auto-generated milestone code.", "constraints": { "required": true, "maxLength": 50 }, "feature": { "searchable": true, "sortable": true }, "extension": { "readOnly": true, "placeholder:zh-CN": "系统自动生成", "placeholder:en": "Auto generated" } },
+  { "code": "tpm_ms_name", "displayName:zh-CN": "里程碑名称", "displayName:en": "Milestone Name", "dataType": "string", "description": "Milestone name.", "constraints": { "required": true, "maxLength": 200 }, "feature": { "searchable": true, "sortable": true }, "extension": { "placeholder:zh-CN": "请输入里程碑名称", "placeholder:en": "Enter milestone name" } },
+  { "code": "tpm_ms_project_id", "displayName:zh-CN": "所属项目", "displayName:en": "Project", "dataType": "reference", "description": "The project this milestone belongs to.", "feature": { "searchable": true }, "extension": { "referenceModelCode": "tpm_project" } },
+  { "code": "tpm_ms_target_date", "displayName:zh-CN": "目标日期", "displayName:en": "Target Date", "dataType": "date", "description": "Target date to reach milestone.", "feature": { "sortable": true } },
+  { "code": "tpm_ms_status", "displayName:zh-CN": "状态", "displayName:en": "Status", "dataType": "enum", "dictCode": "tpm_milestone_status", "defaultValue": "pending", "description": "Milestone status.", "feature": { "searchable": true } },
+  { "code": "tpm_ms_description", "displayName:zh-CN": "描述", "displayName:en": "Description", "dataType": "text", "description": "Milestone description.", "constraints": { "maxLength": 5000 }, "extension": { "multiline": true } }
+]

@@ -1,0 +1,1513 @@
+{
+    "version": "2.0",
+    "exportedAt": "2026-03-17T00:00:00.000000Z",
+    "enums": {
+        "PluginResourceType": [
+            {
+                "code": "model",
+                "label": "Model resource",
+                "since": "1.0"
+            },
+            {
+                "code": "command",
+                "label": "Command resource",
+                "since": "1.0"
+            },
+            {
+                "code": "page",
+                "label": "Page schema resource",
+                "since": "1.0"
+            },
+            {
+                "code": "dict",
+                "label": "Dictionary resource",
+                "since": "1.0"
+            },
+            {
+                "code": "named_query",
+                "label": "Named query resource",
+                "since": "1.0"
+            },
+            {
+                "code": "menu",
+                "label": "Menu resource",
+                "since": "1.0"
+            },
+            {
+                "code": "permission",
+                "label": "Permission resource",
+                "since": "1.0"
+            },
+            {
+                "code": "role",
+                "label": "Role resource",
+                "since": "1.0"
+            }
+        ],
+        "ChartDataSourceType": [
+            {
+                "code": "namedQuery",
+                "label": "Named query data source",
+                "since": "1.0"
+            },
+            {
+                "code": "aggregate",
+                "label": "Aggregate data source",
+                "since": "1.0"
+            },
+            {
+                "code": "static",
+                "label": "Static data source",
+                "since": "1.0"
+            }
+        ],
+        "BpmNodeIntervention": [
+            {
+                "code": "approve",
+                "label": "Approve node",
+                "since": "1.0"
+            },
+            {
+                "code": "reject",
+                "label": "Reject node",
+                "since": "1.0"
+            },
+            {
+                "code": "delegate",
+                "label": "Delegate to another user",
+                "since": "1.0"
+            },
+            {
+                "code": "add_sign",
+                "label": "Add co-signer",
+                "since": "1.0"
+            }
+        ],
+        "BpmTriggerType": [
+            {
+                "code": "manual",
+                "label": "Manual trigger",
+                "since": "1.0"
+            },
+            {
+                "code": "auto",
+                "label": "Automatic trigger",
+                "since": "1.0"
+            },
+            {
+                "code": "scheduled",
+                "label": "Scheduled trigger",
+                "since": "1.0"
+            },
+            {
+                "code": "api",
+                "label": "API trigger",
+                "since": "1.0"
+            }
+        ],
+        "AutomationLogStatus": [
+            {
+                "code": "pending",
+                "label": "Pending execution",
+                "since": "1.0"
+            },
+            {
+                "code": "running",
+                "label": "Currently running",
+                "since": "1.0"
+            },
+            {
+                "code": "success",
+                "label": "Completed successfully",
+                "since": "1.0"
+            },
+            {
+                "code": "failed",
+                "label": "Execution failed",
+                "since": "1.0"
+            },
+            {
+                "code": "cancelled",
+                "label": "Cancelled",
+                "since": "1.0"
+            }
+        ],
+        "NamedQueryStatus": [
+            {
+                "code": "draft",
+                "label": "Draft",
+                "since": "1.0"
+            },
+            {
+                "code": "published",
+                "label": "Published",
+                "since": "1.0"
+            },
+            {
+                "code": "deprecated",
+                "label": "Deprecated",
+                "since": "1.0"
+            },
+            {
+                "code": "archived",
+                "label": "Archived",
+                "since": "1.0"
+            },
+            {
+                "code": "error",
+                "label": "Error state",
+                "since": "1.0"
+            }
+        ],
+        "DataPermissionMask": [
+            {
+                "code": "hide",
+                "label": "Hide field value",
+                "since": "1.0"
+            },
+            {
+                "code": "partial",
+                "label": "Show partial value",
+                "since": "1.0"
+            },
+            {
+                "code": "hash",
+                "label": "Hash field value",
+                "since": "1.0"
+            },
+            {
+                "code": "custom",
+                "label": "Custom mask rule",
+                "since": "1.0"
+            }
+        ],
+        "DataPermissionScope": [
+            {
+                "code": "all",
+                "label": "All records",
+                "since": "1.0"
+            },
+            {
+                "code": "self",
+                "label": "Own records only",
+                "since": "1.0"
+            },
+            {
+                "code": "department",
+                "label": "Department records",
+                "since": "1.0"
+            },
+            {
+                "code": "custom",
+                "label": "Custom scope rule",
+                "since": "1.0"
+            }
+        ],
+        "NotificationChannel": [
+            {
+                "code": "in_app",
+                "label": "In-app notification",
+                "since": "1.0"
+            },
+            {
+                "code": "email",
+                "label": "Email notification",
+                "since": "1.0"
+            },
+            {
+                "code": "sms",
+                "label": "SMS notification",
+                "since": "1.0"
+            },
+            {
+                "code": "webhook",
+                "label": "Webhook callback",
+                "since": "1.0"
+            }
+        ],
+        "AutomationTrigger": [
+            {
+                "code": "on_record_create",
+                "label": "On record create",
+                "since": "1.0"
+            },
+            {
+                "code": "on_record_update",
+                "label": "On record update",
+                "since": "1.0"
+            },
+            {
+                "code": "on_field_change",
+                "label": "On field change",
+                "since": "1.0"
+            },
+            {
+                "code": "on_state_change",
+                "label": "On state change",
+                "since": "1.0"
+            },
+            {
+                "code": "scheduled",
+                "label": "Scheduled trigger",
+                "since": "1.0"
+            },
+            {
+                "code": "webhook",
+                "label": "Webhook trigger",
+                "since": "1.0"
+            },
+            {
+                "code": "on_bpm_event",
+                "label": "On BPM event",
+                "since": "1.1"
+            },
+            {
+                "code": "on_inactivity",
+                "label": "On inactivity timeout",
+                "since": "1.1"
+            }
+        ],
+        "ChartType": [
+            {
+                "code": "number",
+                "label": "Number card",
+                "since": "1.0"
+            },
+            {
+                "code": "bar",
+                "label": "Bar chart",
+                "since": "1.0"
+            },
+            {
+                "code": "line",
+                "label": "Line chart",
+                "since": "1.0"
+            },
+            {
+                "code": "pie",
+                "label": "Pie chart",
+                "since": "1.0"
+            },
+            {
+                "code": "table",
+                "label": "Table chart",
+                "since": "1.0"
+            },
+            {
+                "code": "gauge",
+                "label": "Gauge chart",
+                "since": "1.0"
+            },
+            {
+                "code": "area",
+                "label": "Area chart",
+                "since": "1.1"
+            },
+            {
+                "code": "radar",
+                "label": "Radar chart",
+                "since": "1.1"
+            },
+            {
+                "code": "scatter",
+                "label": "Scatter chart",
+                "since": "1.1"
+            },
+            {
+                "code": "funnel",
+                "label": "Funnel chart",
+                "since": "1.1"
+            },
+            {
+                "code": "heatmap",
+                "label": "Heatmap chart",
+                "since": "1.1"
+            },
+            {
+                "code": "treemap",
+                "label": "Treemap chart",
+                "since": "1.1"
+            },
+            {
+                "code": "map",
+                "label": "Geographic map chart",
+                "since": "1.1"
+            },
+            {
+                "code": "spc",
+                "label": "Statistical process control chart",
+                "since": "1.1"
+            },
+            {
+                "code": "pareto",
+                "label": "Pareto chart",
+                "since": "1.1"
+            },
+            {
+                "code": "gantt",
+                "label": "Gantt chart",
+                "since": "1.1"
+            },
+            {
+                "code": "number-card",
+                "label": "Number card (alias)",
+                "since": "1.1"
+            },
+            {
+                "code": "progress",
+                "label": "Progress bar",
+                "since": "1.1"
+            },
+            {
+                "code": "leaderboard",
+                "label": "Leaderboard",
+                "since": "1.1"
+            },
+            {
+                "code": "rich-text",
+                "label": "Rich text widget",
+                "since": "1.1"
+            },
+            {
+                "code": "image",
+                "label": "Image widget",
+                "since": "1.1"
+            },
+            {
+                "code": "iframe",
+                "label": "Embedded iframe",
+                "since": "1.1"
+            },
+            {
+                "code": "countdown",
+                "label": "Countdown timer",
+                "since": "1.1"
+            },
+            {
+                "code": "calendar",
+                "label": "Calendar widget",
+                "since": "1.1"
+            }
+        ],
+        "SavedViewScope": [
+            {
+                "code": "personal",
+                "label": "Personal view",
+                "since": "1.0"
+            },
+            {
+                "code": "team",
+                "label": "Team-shared view",
+                "since": "1.0"
+            },
+            {
+                "code": "global",
+                "label": "Global view",
+                "since": "1.0"
+            }
+        ],
+        "SavedViewType": [
+            {
+                "code": "table",
+                "label": "Table view",
+                "since": "1.0"
+            },
+            {
+                "code": "kanban",
+                "label": "Kanban board",
+                "since": "1.0"
+            },
+            {
+                "code": "calendar",
+                "label": "Calendar view",
+                "since": "1.0"
+            },
+            {
+                "code": "gallery",
+                "label": "Gallery view",
+                "since": "1.0"
+            },
+            {
+                "code": "gantt",
+                "label": "Gantt chart",
+                "since": "1.0"
+            },
+            {
+                "code": "tree",
+                "label": "Tree view",
+                "since": "1.0"
+            }
+        ],
+        "PageSuffix": [
+            {
+                "code": "_list",
+                "label": "List page suffix",
+                "since": "1.0"
+            },
+            {
+                "code": "_form",
+                "label": "Form page suffix",
+                "since": "1.0"
+            },
+            {
+                "code": "_detail",
+                "label": "Detail page suffix",
+                "since": "1.0"
+            },
+            {
+                "code": "_dashboard",
+                "label": "Dashboard suffix",
+                "since": "1.0"
+            },
+            {
+                "code": "_kanban",
+                "label": "Kanban suffix",
+                "since": "1.0"
+            },
+            {
+                "code": "_gantt",
+                "label": "Gantt suffix",
+                "since": "1.0"
+            },
+            {
+                "code": "_calendar",
+                "label": "Calendar suffix",
+                "since": "1.0"
+            },
+            {
+                "code": "_gallery",
+                "label": "Gallery suffix",
+                "since": "1.0"
+            }
+        ],
+        "BlockType": [
+            {
+                "code": "form",
+                "label": "Form block",
+                "since": "1.0"
+            },
+            {
+                "code": "form-section",
+                "label": "Form section",
+                "since": "1.0"
+            },
+            {
+                "code": "form-buttons",
+                "label": "Form buttons",
+                "since": "1.0"
+            },
+            {
+                "code": "form-wizard",
+                "label": "Form wizard",
+                "since": "1.0"
+            },
+            {
+                "code": "table",
+                "label": "Table block",
+                "since": "1.0"
+            },
+            {
+                "code": "data-table",
+                "label": "Data table",
+                "since": "1.0"
+            },
+            {
+                "code": "filters",
+                "label": "Filter block",
+                "since": "1.0"
+            },
+            {
+                "code": "filter-form",
+                "label": "Filter form",
+                "since": "1.0"
+            },
+            {
+                "code": "toolbar",
+                "label": "Toolbar block",
+                "since": "1.0"
+            },
+            {
+                "code": "action",
+                "label": "Action block",
+                "since": "1.0"
+            },
+            {
+                "code": "description",
+                "label": "Description block",
+                "since": "1.0"
+            },
+            {
+                "code": "chart",
+                "label": "Chart block",
+                "since": "1.0"
+            },
+            {
+                "code": "tabs",
+                "label": "Tab container",
+                "since": "1.0"
+            },
+            {
+                "code": "list-tabs",
+                "label": "List tabs",
+                "since": "1.0"
+            },
+            {
+                "code": "sub-table",
+                "label": "Sub-table block",
+                "since": "1.0"
+            },
+            {
+                "code": "monthly-grid",
+                "label": "Monthly grid",
+                "since": "1.0"
+            },
+            {
+                "code": "stat-card",
+                "label": "Statistics card",
+                "since": "1.1"
+            },
+            {
+                "code": "custom",
+                "label": "Custom block",
+                "since": "1.0"
+            }
+        ],
+        "PageKind": [
+            {
+                "code": "Page",
+                "label": "Generic page",
+                "since": "1.0"
+            },
+            {
+                "code": "List",
+                "label": "List page",
+                "since": "1.0"
+            },
+            {
+                "code": "Form",
+                "label": "Form page",
+                "since": "1.0"
+            },
+            {
+                "code": "Detail",
+                "label": "Detail page",
+                "since": "1.0"
+            },
+            {
+                "code": "PageLayout",
+                "label": "Layout page",
+                "since": "1.0"
+            },
+            {
+                "code": "Dashboard",
+                "label": "Dashboard page",
+                "since": "1.0"
+            }
+        ],
+        "LinkageActionType": [
+            {
+                "code": "show",
+                "label": "Show field",
+                "since": "1.0"
+            },
+            {
+                "code": "hide",
+                "label": "Hide field",
+                "since": "1.0"
+            },
+            {
+                "code": "enable",
+                "label": "Enable field",
+                "since": "1.0"
+            },
+            {
+                "code": "disable",
+                "label": "Disable field",
+                "since": "1.0"
+            },
+            {
+                "code": "setRequired",
+                "label": "Set required",
+                "since": "1.0"
+            },
+            {
+                "code": "setValue",
+                "label": "Set value",
+                "since": "1.0"
+            },
+            {
+                "code": "setOptions",
+                "label": "Set options",
+                "since": "1.0"
+            },
+            {
+                "code": "validate",
+                "label": "Trigger validation",
+                "since": "1.0"
+            }
+        ],
+        "RiskLevel": [
+            {
+                "code": "L0",
+                "label": "Safe read \u2014 no side effects",
+                "since": "1.1"
+            },
+            {
+                "code": "L1",
+                "label": "Internal write \u2014 single object",
+                "since": "1.1"
+            },
+            {
+                "code": "L2",
+                "label": "Cross-object write \u2014 cascade",
+                "since": "1.1"
+            },
+            {
+                "code": "L3",
+                "label": "External side effect",
+                "since": "1.1"
+            },
+            {
+                "code": "L4",
+                "label": "Irreversible operation",
+                "since": "1.1"
+            }
+        ],
+        "AggregateFunction": [
+            {
+                "code": "sum",
+                "label": "Sum",
+                "since": "1.0"
+            },
+            {
+                "code": "count",
+                "label": "Count",
+                "since": "1.0"
+            },
+            {
+                "code": "avg",
+                "label": "Average",
+                "since": "1.0"
+            },
+            {
+                "code": "max",
+                "label": "Maximum",
+                "since": "1.0"
+            },
+            {
+                "code": "min",
+                "label": "Minimum",
+                "since": "1.0"
+            }
+        ],
+        "PreconditionOperator": [
+            {
+                "code": "EQ",
+                "label": "Equals",
+                "since": "1.0"
+            },
+            {
+                "code": "NE",
+                "label": "Not equals",
+                "since": "1.0"
+            },
+            {
+                "code": "GT",
+                "label": "Greater than",
+                "since": "1.0"
+            },
+            {
+                "code": "GE",
+                "label": "Greater or equal",
+                "since": "1.0"
+            },
+            {
+                "code": "LT",
+                "label": "Less than",
+                "since": "1.0"
+            },
+            {
+                "code": "LE",
+                "label": "Less or equal",
+                "since": "1.0"
+            },
+            {
+                "code": "IN",
+                "label": "In set",
+                "since": "1.0"
+            },
+            {
+                "code": "not_in",
+                "label": "Not in set",
+                "since": "1.0"
+            },
+            {
+                "code": "is_null",
+                "label": "Is null",
+                "since": "1.0"
+            },
+            {
+                "code": "is_not_null",
+                "label": "Is not null",
+                "since": "1.0"
+            },
+            {
+                "code": "between",
+                "label": "Between range",
+                "since": "1.0"
+            },
+            {
+                "code": "like",
+                "label": "Pattern match",
+                "since": "1.0"
+            },
+            {
+                "code": "not_like",
+                "label": "Not pattern match",
+                "since": "1.0"
+            },
+            {
+                "code": "contains",
+                "label": "Contains substring",
+                "since": "1.0"
+            },
+            {
+                "code": "starts_with",
+                "label": "Starts with",
+                "since": "1.0"
+            },
+            {
+                "code": "ends_with",
+                "label": "Ends with",
+                "since": "1.0"
+            }
+        ],
+        "AutoSetStrategy": [
+            {
+                "code": "current_user",
+                "label": "Current user ID",
+                "since": "1.0"
+            },
+            {
+                "code": "current_user_pid",
+                "label": "Current user PID",
+                "since": "1.0"
+            },
+            {
+                "code": "current_username",
+                "label": "Current username",
+                "since": "1.0"
+            },
+            {
+                "code": "current_datetime",
+                "label": "Current timestamp",
+                "since": "1.0"
+            },
+            {
+                "code": "current_tenant",
+                "label": "Current tenant ID",
+                "since": "1.0"
+            },
+            {
+                "code": "uuid",
+                "label": "Generated UUID",
+                "since": "1.0"
+            },
+            {
+                "code": "sequence",
+                "label": "Auto-increment sequence",
+                "since": "1.0"
+            },
+            {
+                "code": "expression",
+                "label": "SpEL expression",
+                "since": "1.0"
+            },
+            {
+                "code": "fixed_value",
+                "label": "Fixed constant",
+                "since": "1.0"
+            },
+            {
+                "code": "auto_generate",
+                "label": "Auto-generated value",
+                "since": "1.0"
+            },
+            {
+                "code": "copy_field",
+                "label": "Copy from another field",
+                "since": "1.0"
+            },
+            {
+                "code": "field_map",
+                "label": "Map from source field",
+                "since": "1.0"
+            }
+        ],
+        "CommandType": [
+            {
+                "code": "create",
+                "label": "Create record",
+                "since": "1.0"
+            },
+            {
+                "code": "update",
+                "label": "Update record",
+                "since": "1.0"
+            },
+            {
+                "code": "delete",
+                "label": "Delete record",
+                "since": "1.0"
+            },
+            {
+                "code": "state_transition",
+                "label": "State transition",
+                "since": "1.0"
+            },
+            {
+                "code": "query",
+                "label": "Query records",
+                "since": "1.0"
+            },
+            {
+                "code": "batch",
+                "label": "Batch operation",
+                "since": "1.0"
+            },
+            {
+                "code": "custom",
+                "label": "Custom command",
+                "since": "1.0"
+            },
+            {
+                "code": "action",
+                "label": "Standalone action",
+                "since": "1.1"
+            }
+        ],
+        "FieldSemanticRole": [
+            {
+                "code": "identifier",
+                "label": "Unique identifier",
+                "since": "1.1"
+            },
+            {
+                "code": "name",
+                "label": "Display name",
+                "since": "1.1"
+            },
+            {
+                "code": "status",
+                "label": "Status field",
+                "since": "1.1"
+            },
+            {
+                "code": "amount",
+                "label": "Monetary amount",
+                "since": "1.1"
+            },
+            {
+                "code": "date",
+                "label": "Date semantic",
+                "since": "1.1"
+            },
+            {
+                "code": "reference",
+                "label": "Reference semantic",
+                "since": "1.1"
+            },
+            {
+                "code": "description",
+                "label": "Description text",
+                "since": "1.1"
+            },
+            {
+                "code": "metric",
+                "label": "Numeric metric",
+                "since": "1.1"
+            }
+        ],
+        "RelationType": [
+            {
+                "code": "reference",
+                "label": "Foreign-key reference",
+                "since": "1.0"
+            },
+            {
+                "code": "many_to_many",
+                "label": "Many-to-many junction",
+                "since": "1.0"
+            },
+            {
+                "code": "one_to_one",
+                "label": "One-to-one mapping",
+                "since": "1.0"
+            }
+        ],
+        "FieldType": [
+            {
+                "code": "input",
+                "label": "Text input",
+                "since": "1.0"
+            },
+            {
+                "code": "number",
+                "label": "Number input",
+                "since": "1.0"
+            },
+            {
+                "code": "select",
+                "label": "Dropdown select",
+                "since": "1.0"
+            },
+            {
+                "code": "radio",
+                "label": "Radio group",
+                "since": "1.0"
+            },
+            {
+                "code": "checkbox",
+                "label": "Checkbox group",
+                "since": "1.0"
+            },
+            {
+                "code": "date",
+                "label": "Date picker",
+                "since": "1.0"
+            },
+            {
+                "code": "datetime",
+                "label": "Datetime picker",
+                "since": "1.0"
+            },
+            {
+                "code": "textarea",
+                "label": "Text area",
+                "since": "1.0"
+            },
+            {
+                "code": "rich_text",
+                "label": "Rich text editor",
+                "since": "1.0"
+            },
+            {
+                "code": "switch",
+                "label": "Toggle switch",
+                "since": "1.0"
+            },
+            {
+                "code": "upload",
+                "label": "File upload",
+                "since": "1.0"
+            },
+            {
+                "code": "custom",
+                "label": "Custom component",
+                "since": "1.0"
+            },
+            {
+                "code": "ai_input",
+                "label": "AI-assisted input",
+                "since": "1.1"
+            }
+        ],
+        "DataType": [
+            {
+                "code": "string",
+                "label": "String",
+                "since": "1.0"
+            },
+            {
+                "code": "text",
+                "label": "Long text",
+                "since": "1.0"
+            },
+            {
+                "code": "integer",
+                "label": "Integer",
+                "since": "1.0"
+            },
+            {
+                "code": "decimal",
+                "label": "Decimal",
+                "since": "1.0"
+            },
+            {
+                "code": "boolean",
+                "label": "Boolean",
+                "since": "1.0"
+            },
+            {
+                "code": "date",
+                "label": "Date",
+                "since": "1.0"
+            },
+            {
+                "code": "datetime",
+                "label": "Date and time",
+                "since": "1.0"
+            },
+            {
+                "code": "json",
+                "label": "JSON object",
+                "since": "1.0"
+            },
+            {
+                "code": "enum",
+                "label": "Enumeration",
+                "since": "1.0"
+            },
+            {
+                "code": "reference",
+                "label": "Reference to another model",
+                "since": "1.0"
+            },
+            {
+                "code": "computed",
+                "label": "Computed field",
+                "since": "1.0"
+            },
+            {
+                "code": "ai_text",
+                "label": "AI-generated text",
+                "since": "1.1"
+            },
+            {
+                "code": "money",
+                "label": "Multi-currency amount",
+                "since": "1.1"
+            }
+        ],
+        "ModelType": [
+            {
+                "code": "entity",
+                "label": "Standard entity model",
+                "since": "1.0"
+            },
+            {
+                "code": "view",
+                "label": "Read-only view model",
+                "since": "1.0"
+            },
+            {
+                "code": "tree",
+                "label": "Hierarchical tree model",
+                "since": "1.0"
+            },
+            {
+                "code": "virtual",
+                "label": "Virtual model without table",
+                "since": "1.1"
+            }
+        ]
+    },
+    "extensions": {
+        "commandHandlers": [
+            {
+                "code": "query",
+                "source": "platform",
+                "description": "Query handler",
+                "riskLevel": "L0"
+            },
+            {
+                "code": "custom",
+                "source": "platform",
+                "description": "Custom logic handler",
+                "riskLevel": "L2"
+            },
+            {
+                "code": "state_transition",
+                "source": "platform",
+                "description": "State transition handler",
+                "riskLevel": "L2"
+            },
+            {
+                "code": "batch",
+                "source": "platform",
+                "description": "Batch operation handler",
+                "riskLevel": "L2"
+            },
+            {
+                "code": "create",
+                "source": "platform",
+                "description": "Default CREATE handler",
+                "riskLevel": "L1"
+            },
+            {
+                "code": "update",
+                "source": "platform",
+                "description": "Default UPDATE handler",
+                "riskLevel": "L1"
+            },
+            {
+                "code": "action",
+                "source": "platform",
+                "description": "Generic action handler",
+                "riskLevel": "L1"
+            },
+            {
+                "code": "delete",
+                "source": "platform",
+                "description": "Default DELETE handler",
+                "riskLevel": "L4"
+            }
+        ],
+        "sideEffectHandlers": [
+            {
+                "code": "batch_create_record",
+                "source": "platform",
+                "description": "Batch create from single template"
+            },
+            {
+                "code": "batch_create_records",
+                "source": "platform",
+                "description": "Batch create from array payload"
+            },
+            {
+                "code": "aggregate",
+                "source": "platform",
+                "description": "Aggregate calculation side effect"
+            },
+            {
+                "code": "batch_update_records",
+                "source": "platform",
+                "description": "Batch update from array payload"
+            },
+            {
+                "code": "batch_update_record",
+                "source": "platform",
+                "description": "Batch update from single template"
+            },
+            {
+                "code": "create_record",
+                "source": "platform",
+                "description": "Create a single record"
+            },
+            {
+                "code": "document_flow",
+                "source": "platform",
+                "description": "Document flow tracking"
+            },
+            {
+                "code": "update_record",
+                "source": "platform",
+                "description": "Update a single record"
+            }
+        ],
+        "automationActions": [
+            {
+                "code": "conditional",
+                "source": "platform",
+                "description": "Conditional branching"
+            },
+            {
+                "code": "send_notification",
+                "source": "platform",
+                "description": "Send a notification"
+            },
+            {
+                "code": "call_api",
+                "source": "platform",
+                "description": "Call an external API"
+            },
+            {
+                "code": "loop",
+                "source": "platform",
+                "description": "Loop over a collection"
+            },
+            {
+                "code": "execute_command",
+                "source": "platform",
+                "description": "Execute a DSL command"
+            },
+            {
+                "code": "send_webhook",
+                "source": "platform",
+                "description": "Send a webhook request"
+            },
+            {
+                "code": "create_record",
+                "source": "platform",
+                "description": "Create a record"
+            },
+            {
+                "code": "update_record",
+                "source": "platform",
+                "description": "Update a record"
+            },
+            {
+                "code": "parallel",
+                "source": "platform",
+                "description": "Execute actions in parallel"
+            }
+        ],
+        "expressionFunctions": [
+            {
+                "name": "#currentUser",
+                "source": "platform",
+                "description": "Current authenticated user",
+                "type": "variable"
+            },
+            {
+                "name": "#now",
+                "source": "platform",
+                "description": "Current timestamp",
+                "type": "variable"
+            },
+            {
+                "name": "#record",
+                "source": "platform",
+                "description": "Current record being processed",
+                "type": "variable"
+            },
+            {
+                "name": "#oldRecord",
+                "source": "platform",
+                "description": "Previous state of the record before update",
+                "type": "variable"
+            },
+            {
+                "name": "#env",
+                "source": "platform",
+                "description": "Environment variables",
+                "type": "variable"
+            },
+            {
+                "name": "#sourceRecordId",
+                "source": "platform",
+                "description": "Source record ID for side effects",
+                "type": "variable"
+            },
+            {
+                "name": "#payload",
+                "source": "platform",
+                "description": "Command execution payload",
+                "type": "variable"
+            }
+        ],
+        "renderComponents": [
+            {
+                "source": "platform",
+                "code": "date",
+                "category": "basic",
+                "dataTypes": [
+                    "date"
+                ]
+            },
+            {
+                "source": "platform",
+                "code": "image",
+                "category": "display",
+                "dataTypes": [
+                    "string"
+                ]
+            },
+            {
+                "source": "platform",
+                "code": "select",
+                "category": "basic",
+                "dataTypes": [
+                    "enum"
+                ]
+            },
+            {
+                "source": "platform",
+                "code": "upload",
+                "category": "basic",
+                "dataTypes": [
+                    "file"
+                ]
+            },
+            {
+                "source": "platform",
+                "code": "rating",
+                "category": "display",
+                "dataTypes": [
+                    "integer"
+                ]
+            },
+            {
+                "source": "platform",
+                "code": "textarea",
+                "category": "basic",
+                "dataTypes": [
+                    "text"
+                ]
+            },
+            {
+                "source": "platform",
+                "code": "avatar",
+                "category": "display",
+                "dataTypes": [
+                    "string"
+                ]
+            },
+            {
+                "source": "platform",
+                "code": "tag-input",
+                "category": "advanced",
+                "dataTypes": [
+                    "json"
+                ]
+            },
+            {
+                "source": "platform",
+                "code": "radio-group",
+                "category": "basic",
+                "dataTypes": [
+                    "enum"
+                ]
+            },
+            {
+                "source": "platform",
+                "code": "switch",
+                "category": "basic",
+                "dataTypes": [
+                    "boolean"
+                ]
+            },
+            {
+                "source": "platform",
+                "code": "color-picker",
+                "category": "advanced",
+                "dataTypes": [
+                    "string"
+                ]
+            },
+            {
+                "source": "platform",
+                "code": "checkbox-group",
+                "category": "basic",
+                "dataTypes": [
+                    "enum"
+                ]
+            },
+            {
+                "source": "platform",
+                "code": "input",
+                "category": "basic",
+                "dataTypes": [
+                    "string"
+                ]
+            },
+            {
+                "source": "platform",
+                "code": "number",
+                "category": "basic",
+                "dataTypes": [
+                    "integer",
+                    "decimal"
+                ]
+            },
+            {
+                "source": "platform",
+                "code": "datetime",
+                "category": "basic",
+                "dataTypes": [
+                    "datetime"
+                ]
+            },
+            {
+                "source": "platform",
+                "code": "progress",
+                "category": "display",
+                "dataTypes": [
+                    "decimal"
+                ]
+            },
+            {
+                "source": "platform",
+                "code": "richtext",
+                "category": "editor",
+                "dataTypes": [
+                    "text"
+                ]
+            }
+        ],
+        "blockRenderers": [
+            {
+                "code": "tabs",
+                "source": "platform",
+                "description": "Tab container renderer"
+            },
+            {
+                "code": "description",
+                "source": "platform",
+                "description": "Description/detail renderer"
+            },
+            {
+                "code": "filters",
+                "source": "platform",
+                "description": "Filter panel renderer"
+            },
+            {
+                "code": "form-wizard",
+                "source": "platform",
+                "description": "Multi-step form wizard renderer"
+            },
+            {
+                "code": "toolbar",
+                "source": "platform",
+                "description": "Toolbar renderer"
+            },
+            {
+                "code": "form-section",
+                "source": "platform",
+                "description": "Form section renderer"
+            },
+            {
+                "code": "form",
+                "source": "platform",
+                "description": "Form layout renderer"
+            },
+            {
+                "code": "filter-form",
+                "source": "platform",
+                "description": "Filter form renderer"
+            },
+            {
+                "code": "data-table",
+                "source": "platform",
+                "description": "Data table renderer"
+            },
+            {
+                "code": "form-buttons",
+                "source": "platform",
+                "description": "Form button bar renderer"
+            },
+            {
+                "code": "action",
+                "source": "platform",
+                "description": "Action button renderer"
+            },
+            {
+                "code": "chart",
+                "source": "platform",
+                "description": "Chart renderer"
+            },
+            {
+                "code": "table",
+                "source": "platform",
+                "description": "Table renderer"
+            }
+        ]
+    },
+    "mappings": {
+        "dataTypeDefaults": {
+            "string": "input",
+            "text": "textarea",
+            "integer": "number",
+            "decimal": "number",
+            "boolean": "switch",
+            "date": "date",
+            "datetime": "datetime",
+            "json": "code-editor",
+            "enum": "select",
+            "reference": "reference-picker",
+            "computed": "readonly",
+            "ai_text": "ai-input",
+            "money": "money-input"
+        }
+    }
+}

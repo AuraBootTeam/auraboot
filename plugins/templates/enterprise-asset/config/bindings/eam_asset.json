@@ -1,0 +1,18 @@
+[
+  {"modelCode":"eam_asset","fieldCode":"eam_as_code","sequence":1,"required":true,"visible":true,"editable":false,"displayConfig":{"searchable":true,"sortable":true}},
+  {"modelCode":"eam_asset","fieldCode":"eam_as_name","sequence":2,"required":true,"visible":true,"editable":true,"displayConfig":{"searchable":true,"sortable":true}},
+  {"modelCode":"eam_asset","fieldCode":"eam_as_category_id","sequence":3,"required":true,"visible":true,"editable":true,"displayConfig":{"searchable":true}},
+  {"modelCode":"eam_asset","fieldCode":"eam_as_status","sequence":4,"required":false,"visible":true,"editable":false,"displayConfig":{"searchable":true}},
+  {"modelCode":"eam_asset","fieldCode":"eam_as_serial","sequence":5,"required":false,"visible":true,"editable":true,"displayConfig":{"searchable":true}},
+  {"modelCode":"eam_asset","fieldCode":"eam_as_model","sequence":6,"required":false,"visible":true,"editable":true,"displayConfig":{"searchable":true}},
+  {"modelCode":"eam_asset","fieldCode":"eam_as_manufacturer","sequence":7,"required":false,"visible":true,"editable":true,"displayConfig":{"searchable":true}},
+  {"modelCode":"eam_asset","fieldCode":"eam_as_purchase_date","sequence":8,"required":false,"visible":true,"editable":true,"displayConfig":{"sortable":true}},
+  {"modelCode":"eam_asset","fieldCode":"eam_as_purchase_cost","sequence":9,"required":false,"visible":true,"editable":true},
+  {"modelCode":"eam_asset","fieldCode":"eam_as_useful_life","sequence":10,"required":false,"visible":false,"editable":true},
+  {"modelCode":"eam_asset","fieldCode":"eam_as_salvage_value","sequence":11,"required":false,"visible":false,"editable":true},
+  {"modelCode":"eam_asset","fieldCode":"eam_as_book_value","sequence":12,"required":false,"visible":true,"editable":false},
+  {"modelCode":"eam_asset","fieldCode":"eam_as_location","sequence":13,"required":false,"visible":true,"editable":true,"displayConfig":{"searchable":true}},
+  {"modelCode":"eam_asset","fieldCode":"eam_as_assigned_to","sequence":14,"required":false,"visible":true,"editable":true,"displayConfig":{"searchable":true}},
+  {"modelCode":"eam_asset","fieldCode":"eam_as_warranty_expiry","sequence":15,"required":false,"visible":true,"editable":true,"displayConfig":{"sortable":true}},
+  {"modelCode":"eam_asset","fieldCode":"eam_as_notes","sequence":16,"required":false,"visible":false,"editable":true}
+]

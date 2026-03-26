@@ -1,0 +1,74 @@
+[
+  {
+    "code": "tcrm_lead",
+    "displayName:zh-CN": "线索",
+    "displayName:en": "Lead",
+    "description": "Sales lead / prospect. Tracks initial interest from potential customers through qualification.",
+    "modelType": "entity",
+    "modelCategory": "entity",
+    "semantic_description": "A sales lead representing a potential customer who has shown interest. Tracked from initial capture through qualification or disqualification.",
+    "domain_category": "crm",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "NEW → CONTACTED → QUALIFIED → LOST (also NEW → LOST)",
+    "extension": {
+      "icon": "UserPlus",
+      "category": "crm-quick-start",
+      "titleField": "tcrm_ld_name",
+      "subtitleField": "tcrm_ld_code"
+    }
+  },
+  {
+    "code": "tcrm_account",
+    "displayName:zh-CN": "客户",
+    "displayName:en": "Account",
+    "description": "Company or organization that is a customer or prospect.",
+    "modelType": "entity",
+    "modelCategory": "entity",
+    "semantic_description": "A company or organization record. Central entity linking contacts and opportunities.",
+    "domain_category": "crm",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "No status lifecycle — accounts are long-lived reference entities.",
+    "extension": {
+      "icon": "Building",
+      "category": "crm-quick-start",
+      "titleField": "tcrm_ac_name",
+      "subtitleField": "tcrm_ac_code"
+    }
+  },
+  {
+    "code": "tcrm_contact",
+    "displayName:zh-CN": "联系人",
+    "displayName:en": "Contact",
+    "description": "Individual person associated with an account.",
+    "modelType": "entity",
+    "modelCategory": "entity",
+    "semantic_description": "A person at a customer company. Linked to an account for organizational context.",
+    "domain_category": "crm",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "No status lifecycle — contacts are reference entities.",
+    "extension": {
+      "icon": "User",
+      "category": "crm-quick-start",
+      "titleField": "tcrm_ct_name",
+      "subtitleField": "tcrm_ct_code"
+    }
+  },
+  {
+    "code": "tcrm_opportunity",
+    "displayName:zh-CN": "商机",
+    "displayName:en": "Opportunity",
+    "description": "Sales opportunity with pipeline stage tracking and expected revenue.",
+    "modelType": "entity",
+    "modelCategory": "document",
+    "semantic_description": "A sales deal being pursued. Tracks pipeline stage from prospecting through close (won or lost).",
+    "domain_category": "crm",
+    "data_sensitivity": "confidential",
+    "lifecycle_description": "PROSPECTING → PROPOSAL → NEGOTIATION → CLOSED_WON / CLOSED_LOST",
+    "extension": {
+      "icon": "DollarSign",
+      "category": "crm-quick-start",
+      "titleField": "tcrm_op_name",
+      "subtitleField": "tcrm_op_code"
+    }
+  }
+]
