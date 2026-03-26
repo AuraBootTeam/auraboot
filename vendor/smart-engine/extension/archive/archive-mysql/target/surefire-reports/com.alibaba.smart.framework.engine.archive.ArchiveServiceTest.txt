@@ -1,4 +1,0 @@
--------------------------------------------------------------------------------
-Test set: com.alibaba.smart.framework.engine.archive.ArchiveServiceTest
--------------------------------------------------------------------------------
-Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.244 s -- in com.alibaba.smart.framework.engine.archive.ArchiveServiceTest
