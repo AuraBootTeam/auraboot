@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report-3.0.xsd" version="3.0" name="com.alibaba.smart.framework.engine.test.orchestration.ServiceOrchestrationTest" time="0.154" tests="1" errors="0" skipped="0" failures="0">
+  <properties>
+    <property name="socksProxyHost" value="127.0.0.1"/>
+    <property name="http.proxyHost" value="127.0.0.1"/>
+    <property name="java.specification.version" value="21"/>
+    <property name="sun.jnu.encoding" value="UTF-8"/>
+    <property name="java.class.path" value="/Users/ghj/work/startup/phenix/AuraMeta/vendor/smart-engine/extension/storage/storage-custom/target/test-classes:/Users/ghj/work/startup/phenix/AuraMeta/vendor/smart-engine/extension/storage/storage-custom/target/classes:/Users/ghj/work/startup/phenix/AuraMeta/vendor/smart-engine/core/target/classes:/Users/ghj/.m2/repository/com/esotericsoftware/reflectasm/1.11.3/reflectasm-1.11.3-shaded.jar:/Users/ghj/work/startup/phenix/AuraMeta/vendor/smart-engine/extension/storage/storage-common/target/classes:/Users/ghj/.m2/repository/org/mvel/mvel2/2.5.2.Final/mvel2-2.5.2.Final.jar:/Users/ghj/.m2/repository/org/aspectj/aspectjweaver/1.7.4/aspectjweaver-1.7.4.jar:/Users/ghj/.m2/repository/aopalliance/aopalliance/1.0/aopalliance-1.0.jar:/Users/ghj/.m2/repository/org/aspectj/aspectjrt/1.7.4/aspectjrt-1.7.4.jar:/Users/ghj/.m2/repository/org/slf4j/slf4j-log4j12/1.7.13/slf4j-log4j12-1.7.13.jar:/Users/ghj/.m2/repository/log4j/log4j/1.2.17/log4j-1.2.17.jar:/Users/ghj/.m2/repository/org/projectlombok/lombok/1.18.38/lombok-1.18.38.jar:/Users/ghj/.m2/repository/org/slf4j/slf4j-api/1.7.13/slf4j-api-1.7.13.jar:/Users/ghj/.m2/repository/junit/junit/4.13.1/junit-4.13.1.jar:/Users/ghj/.m2/repository/org/hamcrest/hamcrest-core/1.3/hamcrest-core-1.3.jar:/Users/ghj/.m2/repository/org/junit/jupiter/junit-jupiter-api/5.9.1/junit-jupiter-api-5.9.1.jar:/Users/ghj/.m2/repository/org/opentest4j/opentest4j/1.2.0/opentest4j-1.2.0.jar:/Users/ghj/.m2/repository/org/junit/platform/junit-platform-commons/1.9.1/junit-platform-commons-1.9.1.jar:/Users/ghj/.m2/repository/org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.jar:/Users/ghj/.m2/repository/org/junit/jupiter/junit-jupiter-engine/5.9.1/junit-jupiter-engine-5.9.1.jar:/Users/ghj/.m2/repository/org/junit/platform/junit-platform-engine/1.9.1/junit-platform-engine-1.9.1.jar:/Users/ghj/.m2/repository/org/junit/vintage/junit-vintage-engine/5.9.1/junit-vintage-engine-5.9.1.jar:/Users/ghj/.m2/repository/org/openjdk/jmh/jmh-core/1.25.2/jmh-core-1.25.2.jar:/Users/ghj/.m2/repository/net/sf/jopt-simple/jopt-simple/4.6/jopt-simple-4.6.jar:/Users/ghj/.m2/repository/org/openjdk/jmh/jmh-generator-annprocess/1.25.2/jmh-generator-annprocess-1.25.2.jar:/Users/ghj/.m2/repository/org/apache/commons/commons-math3/3.6.1/commons-math3-3.6.1.jar:/Users/ghj/.m2/repository/org/springframework/spring-core/5.3.27/spring-core-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-jcl/5.3.27/spring-jcl-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-jdbc/5.3.27/spring-jdbc-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-tx/5.3.27/spring-tx-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-beans/5.3.27/spring-beans-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-context/5.3.27/spring-context-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-aop/5.3.27/spring-aop-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-expression/5.3.27/spring-expression-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-orm/5.3.27/spring-orm-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-context-support/5.3.27/spring-context-support-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-instrument/5.3.27/spring-instrument-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-test/5.3.27/spring-test-5.3.27.jar:/Users/ghj/.m2/repository/com/fasterxml/jackson/core/jackson-core/2.17.2/jackson-core-2.17.2.jar:/Users/ghj/.m2/repository/com/fasterxml/jackson/core/jackson-databind/2.17.2/jackson-databind-2.17.2.jar:/Users/ghj/.m2/repository/com/fasterxml/jackson/core/jackson-annotations/2.17.2/jackson-annotations-2.17.2.jar:/Users/ghj/.m2/repository/org/postgresql/postgresql/42.7.4/postgresql-42.7.4.jar:/Users/ghj/.m2/repository/org/checkerframework/checker-qual/3.42.0/checker-qual-3.42.0.jar:"/>
+    <property name="https.proxyPort" value="7891"/>
+    <property name="java.vm.vendor" value="Homebrew"/>
+    <property name="sun.arch.data.model" value="64"/>
+    <property name="java.vendor.url" value="https://github.com/Homebrew/homebrew-core/issues"/>
+    <property name="user.timezone" value="Asia/Shanghai"/>
+    <property name="os.name" value="Mac OS X"/>
+    <property name="java.vm.specification.version" value="21"/>
+    <property name="sun.java.launcher" value="SUN_STANDARD"/>
+    <property name="user.country" value="US"/>
+    <property name="sun.boot.library.path" value="/opt/homebrew/Cellar/openjdk@21/21.0.8/libexec/openjdk.jdk/Contents/Home/lib"/>
+    <property name="sun.java.command" value="/Users/ghj/work/startup/phenix/AuraMeta/vendor/smart-engine/extension/storage/storage-custom/target/surefire/surefirebooter-20260325171413817_11.jar /Users/ghj/work/startup/phenix/AuraMeta/vendor/smart-engine/extension/storage/storage-custom/target/surefire 2026-03-25T17-14-11_912-jvmRun1 surefire-20260325171413817_9tmp surefire_1-20260325171413817_10tmp"/>
+    <property name="http.nonProxyHosts" value="127.0.0.1|192.168.0.0/16|*.192.168.0.0/16|10.0.0.0/8|*.10.0.0.0/8|172.16.0.0/12|*.172.16.0.0/12|localhost|*.localhost|local|*.local|crashlytics.com|*.crashlytics.com|&lt;local&gt;|*.&lt;local&gt;"/>
+    <property name="jdk.debug" value="release"/>
+    <property name="surefire.test.class.path" value="/Users/ghj/work/startup/phenix/AuraMeta/vendor/smart-engine/extension/storage/storage-custom/target/test-classes:/Users/ghj/work/startup/phenix/AuraMeta/vendor/smart-engine/extension/storage/storage-custom/target/classes:/Users/ghj/work/startup/phenix/AuraMeta/vendor/smart-engine/core/target/classes:/Users/ghj/.m2/repository/com/esotericsoftware/reflectasm/1.11.3/reflectasm-1.11.3-shaded.jar:/Users/ghj/work/startup/phenix/AuraMeta/vendor/smart-engine/extension/storage/storage-common/target/classes:/Users/ghj/.m2/repository/org/mvel/mvel2/2.5.2.Final/mvel2-2.5.2.Final.jar:/Users/ghj/.m2/repository/org/aspectj/aspectjweaver/1.7.4/aspectjweaver-1.7.4.jar:/Users/ghj/.m2/repository/aopalliance/aopalliance/1.0/aopalliance-1.0.jar:/Users/ghj/.m2/repository/org/aspectj/aspectjrt/1.7.4/aspectjrt-1.7.4.jar:/Users/ghj/.m2/repository/org/slf4j/slf4j-log4j12/1.7.13/slf4j-log4j12-1.7.13.jar:/Users/ghj/.m2/repository/log4j/log4j/1.2.17/log4j-1.2.17.jar:/Users/ghj/.m2/repository/org/projectlombok/lombok/1.18.38/lombok-1.18.38.jar:/Users/ghj/.m2/repository/org/slf4j/slf4j-api/1.7.13/slf4j-api-1.7.13.jar:/Users/ghj/.m2/repository/junit/junit/4.13.1/junit-4.13.1.jar:/Users/ghj/.m2/repository/org/hamcrest/hamcrest-core/1.3/hamcrest-core-1.3.jar:/Users/ghj/.m2/repository/org/junit/jupiter/junit-jupiter-api/5.9.1/junit-jupiter-api-5.9.1.jar:/Users/ghj/.m2/repository/org/opentest4j/opentest4j/1.2.0/opentest4j-1.2.0.jar:/Users/ghj/.m2/repository/org/junit/platform/junit-platform-commons/1.9.1/junit-platform-commons-1.9.1.jar:/Users/ghj/.m2/repository/org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.jar:/Users/ghj/.m2/repository/org/junit/jupiter/junit-jupiter-engine/5.9.1/junit-jupiter-engine-5.9.1.jar:/Users/ghj/.m2/repository/org/junit/platform/junit-platform-engine/1.9.1/junit-platform-engine-1.9.1.jar:/Users/ghj/.m2/repository/org/junit/vintage/junit-vintage-engine/5.9.1/junit-vintage-engine-5.9.1.jar:/Users/ghj/.m2/repository/org/openjdk/jmh/jmh-core/1.25.2/jmh-core-1.25.2.jar:/Users/ghj/.m2/repository/net/sf/jopt-simple/jopt-simple/4.6/jopt-simple-4.6.jar:/Users/ghj/.m2/repository/org/openjdk/jmh/jmh-generator-annprocess/1.25.2/jmh-generator-annprocess-1.25.2.jar:/Users/ghj/.m2/repository/org/apache/commons/commons-math3/3.6.1/commons-math3-3.6.1.jar:/Users/ghj/.m2/repository/org/springframework/spring-core/5.3.27/spring-core-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-jcl/5.3.27/spring-jcl-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-jdbc/5.3.27/spring-jdbc-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-tx/5.3.27/spring-tx-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-beans/5.3.27/spring-beans-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-context/5.3.27/spring-context-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-aop/5.3.27/spring-aop-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-expression/5.3.27/spring-expression-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-orm/5.3.27/spring-orm-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-context-support/5.3.27/spring-context-support-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-instrument/5.3.27/spring-instrument-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-test/5.3.27/spring-test-5.3.27.jar:/Users/ghj/.m2/repository/com/fasterxml/jackson/core/jackson-core/2.17.2/jackson-core-2.17.2.jar:/Users/ghj/.m2/repository/com/fasterxml/jackson/core/jackson-databind/2.17.2/jackson-databind-2.17.2.jar:/Users/ghj/.m2/repository/com/fasterxml/jackson/core/jackson-annotations/2.17.2/jackson-annotations-2.17.2.jar:/Users/ghj/.m2/repository/org/postgresql/postgresql/42.7.4/postgresql-42.7.4.jar:/Users/ghj/.m2/repository/org/checkerframework/checker-qual/3.42.0/checker-qual-3.42.0.jar:"/>
+    <property name="sun.cpu.endian" value="little"/>
+    <property name="user.home" value="/Users/ghj"/>
+    <property name="user.language" value="en"/>
+    <property name="java.specification.vendor" value="Oracle Corporation"/>
+    <property name="java.version.date" value="2025-07-15"/>
+    <property name="java.home" value="/opt/homebrew/Cellar/openjdk@21/21.0.8/libexec/openjdk.jdk/Contents/Home"/>
+    <property name="file.separator" value="/"/>
+    <property name="https.proxyHost" value="127.0.0.1"/>
+    <property name="basedir" value="/Users/ghj/work/startup/phenix/AuraMeta/vendor/smart-engine/extension/storage/storage-custom"/>
+    <property name="java.vm.compressedOopsMode" value="Non-zero based"/>
+    <property name="line.separator" value="&#10;"/>
+    <property name="java.vm.specification.vendor" value="Oracle Corporation"/>
+    <property name="java.specification.name" value="Java Platform API Specification"/>
+    <property name="apple.awt.application.name" value="ForkedBooter"/>
+    <property name="surefire.real.class.path" value="/Users/ghj/work/startup/phenix/AuraMeta/vendor/smart-engine/extension/storage/storage-custom/target/surefire/surefirebooter-20260325171413817_11.jar"/>
+    <property name="sun.management.compiler" value="HotSpot 64-Bit Tiered Compilers"/>
+    <property name="ftp.nonProxyHosts" value="127.0.0.1|192.168.0.0/16|*.192.168.0.0/16|10.0.0.0/8|*.10.0.0.0/8|172.16.0.0/12|*.172.16.0.0/12|localhost|*.localhost|local|*.local|crashlytics.com|*.crashlytics.com|&lt;local&gt;|*.&lt;local&gt;"/>
+    <property name="java.runtime.version" value="21.0.8"/>
+    <property name="user.name" value="ghj"/>
+    <property name="stdout.encoding" value="UTF-8"/>
+    <property name="path.separator" value=":"/>
+    <property name="os.version" value="26.3.1"/>
+    <property name="java.runtime.name" value="OpenJDK Runtime Environment"/>
+    <property name="file.encoding" value="UTF-8"/>
+    <property name="java.vm.name" value="OpenJDK 64-Bit Server VM"/>
+    <property name="java.vendor.version" value="Homebrew"/>
+    <property name="localRepository" value="/Users/ghj/.m2/repository"/>
+    <property name="java.vendor.url.bug" value="https://github.com/Homebrew/homebrew-core/issues"/>
+    <property name="java.io.tmpdir" value="/var/folders/7c/x2329f5573786r05wcgl2tzw0000gn/T/"/>
+    <property name="java.version" value="21.0.8"/>
+    <property name="user.dir" value="/Users/ghj/work/startup/phenix/AuraMeta/vendor/smart-engine/extension/storage/storage-custom"/>
+    <property name="os.arch" value="aarch64"/>
+    <property name="socksProxyPort" value="7891"/>
+    <property name="java.vm.specification.name" value="Java Virtual Machine Specification"/>
+    <property name="native.encoding" value="UTF-8"/>
+    <property name="java.library.path" value="/Users/ghj/Library/Java/Extensions:/Library/Java/Extensions:/Network/Library/Java/Extensions:/System/Library/Java/Extensions:/usr/lib/java:."/>
+    <property name="java.vm.info" value="mixed mode, sharing"/>
+    <property name="stderr.encoding" value="UTF-8"/>
+    <property name="java.vendor" value="Homebrew"/>
+    <property name="java.vm.version" value="21.0.8"/>
+    <property name="sun.io.unicode.encoding" value="UnicodeBig"/>
+    <property name="socksNonProxyHosts" value="127.0.0.1|192.168.0.0/16|*.192.168.0.0/16|10.0.0.0/8|*.10.0.0.0/8|172.16.0.0/12|*.172.16.0.0/12|localhost|*.localhost|local|*.local|crashlytics.com|*.crashlytics.com|&lt;local&gt;|*.&lt;local&gt;"/>
+    <property name="java.class.version" value="65.0"/>
+    <property name="http.proxyPort" value="7891"/>
+  </properties>
+  <testcase name="testExclusive" classname="com.alibaba.smart.framework.engine.test.orchestration.ServiceOrchestrationTest" time="0.009"/>
+</testsuite>

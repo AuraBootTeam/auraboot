@@ -1,0 +1,5 @@
+com/alibaba/smart/framework/engine/archive/config/ArchiveProperties.class
+com/alibaba/smart/framework/engine/archive/service/ArchiveService.class
+com/alibaba/smart/framework/engine/archive/scheduler/ArchiveScheduler.class
+com/alibaba/smart/framework/engine/archive/dao/ArchiveDAO.class
+com/alibaba/smart/framework/engine/archive/service/DefaultArchiveService.class

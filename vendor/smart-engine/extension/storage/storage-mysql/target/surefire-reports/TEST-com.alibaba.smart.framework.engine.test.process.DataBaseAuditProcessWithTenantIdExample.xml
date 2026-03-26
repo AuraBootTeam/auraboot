@@ -1,0 +1,1322 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report-3.0.xsd" version="3.0" name="com.alibaba.smart.framework.engine.test.process.DataBaseAuditProcessWithTenantIdExample" time="0.03" tests="2" errors="0" skipped="0" failures="0">
+  <properties>
+    <property name="socksProxyHost" value="127.0.0.1"/>
+    <property name="http.proxyHost" value="127.0.0.1"/>
+    <property name="java.specification.version" value="21"/>
+    <property name="sun.jnu.encoding" value="UTF-8"/>
+    <property name="java.class.path" value="/Users/ghj/work/startup/phenix/AuraMeta/vendor/smart-engine/extension/storage/storage-mysql/target/test-classes:/Users/ghj/work/startup/phenix/AuraMeta/vendor/smart-engine/extension/storage/storage-mysql/target/classes:/Users/ghj/.m2/repository/com/alibaba/smart/framework/smart-engine-core/3.7.0-SNAPSHOT/smart-engine-core-3.7.0-SNAPSHOT.jar:/Users/ghj/.m2/repository/com/esotericsoftware/reflectasm/1.11.3/reflectasm-1.11.3-shaded.jar:/Users/ghj/.m2/repository/com/alibaba/smart/framework/smart-engine-extension-storage-common/3.7.0-SNAPSHOT/smart-engine-extension-storage-common-3.7.0-SNAPSHOT.jar:/Users/ghj/.m2/repository/com/alibaba/fastjson/1.2.83/fastjson-1.2.83.jar:/Users/ghj/.m2/repository/junit/junit/4.13.1/junit-4.13.1.jar:/Users/ghj/.m2/repository/org/hamcrest/hamcrest-core/1.3/hamcrest-core-1.3.jar:/Users/ghj/.m2/repository/org/slf4j/slf4j-log4j12/1.7.13/slf4j-log4j12-1.7.13.jar:/Users/ghj/.m2/repository/log4j/log4j/1.2.17/log4j-1.2.17.jar:/Users/ghj/.m2/repository/org/aspectj/aspectjweaver/1.7.4/aspectjweaver-1.7.4.jar:/Users/ghj/.m2/repository/aopalliance/aopalliance/1.0/aopalliance-1.0.jar:/Users/ghj/.m2/repository/org/aspectj/aspectjrt/1.7.4/aspectjrt-1.7.4.jar:/Users/ghj/.m2/repository/org/springframework/spring-test/5.3.27/spring-test-5.3.27.jar:/Users/ghj/.m2/repository/org/mybatis/mybatis/3.5.6/mybatis-3.5.6.jar:/Users/ghj/.m2/repository/org/mybatis/mybatis-spring/1.3.1/mybatis-spring-1.3.1.jar:/Users/ghj/.m2/repository/mysql/mysql-connector-java/8.0.28/mysql-connector-java-8.0.28.jar:/Users/ghj/.m2/repository/com/google/protobuf/protobuf-java/3.11.4/protobuf-java-3.11.4.jar:/Users/ghj/.m2/repository/com/h2database/h2/2.2.220/h2-2.2.220.jar:/Users/ghj/.m2/repository/org/projectlombok/lombok/1.18.38/lombok-1.18.38.jar:/Users/ghj/.m2/repository/org/slf4j/slf4j-api/1.7.13/slf4j-api-1.7.13.jar:/Users/ghj/.m2/repository/org/junit/jupiter/junit-jupiter-api/5.9.1/junit-jupiter-api-5.9.1.jar:/Users/ghj/.m2/repository/org/opentest4j/opentest4j/1.2.0/opentest4j-1.2.0.jar:/Users/ghj/.m2/repository/org/junit/platform/junit-platform-commons/1.9.1/junit-platform-commons-1.9.1.jar:/Users/ghj/.m2/repository/org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.jar:/Users/ghj/.m2/repository/org/junit/jupiter/junit-jupiter-engine/5.9.1/junit-jupiter-engine-5.9.1.jar:/Users/ghj/.m2/repository/org/junit/platform/junit-platform-engine/1.9.1/junit-platform-engine-1.9.1.jar:/Users/ghj/.m2/repository/org/junit/vintage/junit-vintage-engine/5.9.1/junit-vintage-engine-5.9.1.jar:/Users/ghj/.m2/repository/org/openjdk/jmh/jmh-core/1.25.2/jmh-core-1.25.2.jar:/Users/ghj/.m2/repository/net/sf/jopt-simple/jopt-simple/4.6/jopt-simple-4.6.jar:/Users/ghj/.m2/repository/org/openjdk/jmh/jmh-generator-annprocess/1.25.2/jmh-generator-annprocess-1.25.2.jar:/Users/ghj/.m2/repository/org/apache/commons/commons-math3/3.6.1/commons-math3-3.6.1.jar:/Users/ghj/.m2/repository/org/springframework/spring-core/5.3.27/spring-core-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-jcl/5.3.27/spring-jcl-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-jdbc/5.3.27/spring-jdbc-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-tx/5.3.27/spring-tx-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-beans/5.3.27/spring-beans-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-context/5.3.27/spring-context-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-aop/5.3.27/spring-aop-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-expression/5.3.27/spring-expression-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-orm/5.3.27/spring-orm-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-context-support/5.3.27/spring-context-support-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-instrument/5.3.27/spring-instrument-5.3.27.jar:/Users/ghj/.m2/repository/org/mvel/mvel2/2.5.2.Final/mvel2-2.5.2.Final.jar:/Users/ghj/.m2/repository/com/fasterxml/jackson/core/jackson-core/2.17.2/jackson-core-2.17.2.jar:/Users/ghj/.m2/repository/com/fasterxml/jackson/core/jackson-databind/2.17.2/jackson-databind-2.17.2.jar:/Users/ghj/.m2/repository/com/fasterxml/jackson/core/jackson-annotations/2.17.2/jackson-annotations-2.17.2.jar:/Users/ghj/.m2/repository/org/postgresql/postgresql/42.7.4/postgresql-42.7.4.jar:/Users/ghj/.m2/repository/org/checkerframework/checker-qual/3.42.0/checker-qual-3.42.0.jar:"/>
+    <property name="https.proxyPort" value="7891"/>
+    <property name="java.vm.vendor" value="Homebrew"/>
+    <property name="sun.arch.data.model" value="64"/>
+    <property name="java.vendor.url" value="https://github.com/Homebrew/homebrew-core/issues"/>
+    <property name="user.timezone" value="Asia/Shanghai"/>
+    <property name="os.name" value="Mac OS X"/>
+    <property name="java.vm.specification.version" value="21"/>
+    <property name="sun.java.launcher" value="SUN_STANDARD"/>
+    <property name="user.country" value="US"/>
+    <property name="sun.boot.library.path" value="/opt/homebrew/Cellar/openjdk@21/21.0.8/libexec/openjdk.jdk/Contents/Home/lib"/>
+    <property name="sun.java.command" value="/Users/ghj/work/startup/phenix/AuraMeta/vendor/smart-engine/extension/storage/storage-mysql/target/surefire/surefirebooter-20260208115413018_3.jar /Users/ghj/work/startup/phenix/AuraMeta/vendor/smart-engine/extension/storage/storage-mysql/target/surefire 2026-02-08T11-54-12_988-jvmRun1 surefire-20260208115413018_1tmp surefire_0-20260208115413018_2tmp"/>
+    <property name="http.nonProxyHosts" value="127.0.0.1|192.168.0.0/16|*.192.168.0.0/16|10.0.0.0/8|*.10.0.0.0/8|172.16.0.0/12|*.172.16.0.0/12|localhost|*.localhost|local|*.local|crashlytics.com|*.crashlytics.com|&lt;local&gt;|*.&lt;local&gt;"/>
+    <property name="jdk.debug" value="release"/>
+    <property name="test" value="!*CallActivity*"/>
+    <property name="surefire.test.class.path" value="/Users/ghj/work/startup/phenix/AuraMeta/vendor/smart-engine/extension/storage/storage-mysql/target/test-classes:/Users/ghj/work/startup/phenix/AuraMeta/vendor/smart-engine/extension/storage/storage-mysql/target/classes:/Users/ghj/.m2/repository/com/alibaba/smart/framework/smart-engine-core/3.7.0-SNAPSHOT/smart-engine-core-3.7.0-SNAPSHOT.jar:/Users/ghj/.m2/repository/com/esotericsoftware/reflectasm/1.11.3/reflectasm-1.11.3-shaded.jar:/Users/ghj/.m2/repository/com/alibaba/smart/framework/smart-engine-extension-storage-common/3.7.0-SNAPSHOT/smart-engine-extension-storage-common-3.7.0-SNAPSHOT.jar:/Users/ghj/.m2/repository/com/alibaba/fastjson/1.2.83/fastjson-1.2.83.jar:/Users/ghj/.m2/repository/junit/junit/4.13.1/junit-4.13.1.jar:/Users/ghj/.m2/repository/org/hamcrest/hamcrest-core/1.3/hamcrest-core-1.3.jar:/Users/ghj/.m2/repository/org/slf4j/slf4j-log4j12/1.7.13/slf4j-log4j12-1.7.13.jar:/Users/ghj/.m2/repository/log4j/log4j/1.2.17/log4j-1.2.17.jar:/Users/ghj/.m2/repository/org/aspectj/aspectjweaver/1.7.4/aspectjweaver-1.7.4.jar:/Users/ghj/.m2/repository/aopalliance/aopalliance/1.0/aopalliance-1.0.jar:/Users/ghj/.m2/repository/org/aspectj/aspectjrt/1.7.4/aspectjrt-1.7.4.jar:/Users/ghj/.m2/repository/org/springframework/spring-test/5.3.27/spring-test-5.3.27.jar:/Users/ghj/.m2/repository/org/mybatis/mybatis/3.5.6/mybatis-3.5.6.jar:/Users/ghj/.m2/repository/org/mybatis/mybatis-spring/1.3.1/mybatis-spring-1.3.1.jar:/Users/ghj/.m2/repository/mysql/mysql-connector-java/8.0.28/mysql-connector-java-8.0.28.jar:/Users/ghj/.m2/repository/com/google/protobuf/protobuf-java/3.11.4/protobuf-java-3.11.4.jar:/Users/ghj/.m2/repository/com/h2database/h2/2.2.220/h2-2.2.220.jar:/Users/ghj/.m2/repository/org/projectlombok/lombok/1.18.38/lombok-1.18.38.jar:/Users/ghj/.m2/repository/org/slf4j/slf4j-api/1.7.13/slf4j-api-1.7.13.jar:/Users/ghj/.m2/repository/org/junit/jupiter/junit-jupiter-api/5.9.1/junit-jupiter-api-5.9.1.jar:/Users/ghj/.m2/repository/org/opentest4j/opentest4j/1.2.0/opentest4j-1.2.0.jar:/Users/ghj/.m2/repository/org/junit/platform/junit-platform-commons/1.9.1/junit-platform-commons-1.9.1.jar:/Users/ghj/.m2/repository/org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.jar:/Users/ghj/.m2/repository/org/junit/jupiter/junit-jupiter-engine/5.9.1/junit-jupiter-engine-5.9.1.jar:/Users/ghj/.m2/repository/org/junit/platform/junit-platform-engine/1.9.1/junit-platform-engine-1.9.1.jar:/Users/ghj/.m2/repository/org/junit/vintage/junit-vintage-engine/5.9.1/junit-vintage-engine-5.9.1.jar:/Users/ghj/.m2/repository/org/openjdk/jmh/jmh-core/1.25.2/jmh-core-1.25.2.jar:/Users/ghj/.m2/repository/net/sf/jopt-simple/jopt-simple/4.6/jopt-simple-4.6.jar:/Users/ghj/.m2/repository/org/openjdk/jmh/jmh-generator-annprocess/1.25.2/jmh-generator-annprocess-1.25.2.jar:/Users/ghj/.m2/repository/org/apache/commons/commons-math3/3.6.1/commons-math3-3.6.1.jar:/Users/ghj/.m2/repository/org/springframework/spring-core/5.3.27/spring-core-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-jcl/5.3.27/spring-jcl-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-jdbc/5.3.27/spring-jdbc-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-tx/5.3.27/spring-tx-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-beans/5.3.27/spring-beans-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-context/5.3.27/spring-context-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-aop/5.3.27/spring-aop-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-expression/5.3.27/spring-expression-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-orm/5.3.27/spring-orm-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-context-support/5.3.27/spring-context-support-5.3.27.jar:/Users/ghj/.m2/repository/org/springframework/spring-instrument/5.3.27/spring-instrument-5.3.27.jar:/Users/ghj/.m2/repository/org/mvel/mvel2/2.5.2.Final/mvel2-2.5.2.Final.jar:/Users/ghj/.m2/repository/com/fasterxml/jackson/core/jackson-core/2.17.2/jackson-core-2.17.2.jar:/Users/ghj/.m2/repository/com/fasterxml/jackson/core/jackson-databind/2.17.2/jackson-databind-2.17.2.jar:/Users/ghj/.m2/repository/com/fasterxml/jackson/core/jackson-annotations/2.17.2/jackson-annotations-2.17.2.jar:/Users/ghj/.m2/repository/org/postgresql/postgresql/42.7.4/postgresql-42.7.4.jar:/Users/ghj/.m2/repository/org/checkerframework/checker-qual/3.42.0/checker-qual-3.42.0.jar:"/>
+    <property name="sun.cpu.endian" value="little"/>
+    <property name="user.home" value="/Users/ghj"/>
+    <property name="user.language" value="en"/>
+    <property name="java.specification.vendor" value="Oracle Corporation"/>
+    <property name="java.version.date" value="2025-07-15"/>
+    <property name="java.home" value="/opt/homebrew/Cellar/openjdk@21/21.0.8/libexec/openjdk.jdk/Contents/Home"/>
+    <property name="file.separator" value="/"/>
+    <property name="https.proxyHost" value="127.0.0.1"/>
+    <property name="basedir" value="/Users/ghj/work/startup/phenix/AuraMeta/vendor/smart-engine/extension/storage/storage-mysql"/>
+    <property name="java.vm.compressedOopsMode" value="Non-zero disjoint base"/>
+    <property name="line.separator" value="&#10;"/>
+    <property name="java.vm.specification.vendor" value="Oracle Corporation"/>
+    <property name="java.specification.name" value="Java Platform API Specification"/>
+    <property name="apple.awt.application.name" value="ForkedBooter"/>
+    <property name="surefire.real.class.path" value="/Users/ghj/work/startup/phenix/AuraMeta/vendor/smart-engine/extension/storage/storage-mysql/target/surefire/surefirebooter-20260208115413018_3.jar"/>
+    <property name="sun.management.compiler" value="HotSpot 64-Bit Tiered Compilers"/>
+    <property name="ftp.nonProxyHosts" value="127.0.0.1|192.168.0.0/16|*.192.168.0.0/16|10.0.0.0/8|*.10.0.0.0/8|172.16.0.0/12|*.172.16.0.0/12|localhost|*.localhost|local|*.local|crashlytics.com|*.crashlytics.com|&lt;local&gt;|*.&lt;local&gt;"/>
+    <property name="java.runtime.version" value="21.0.8"/>
+    <property name="user.name" value="ghj"/>
+    <property name="stdout.encoding" value="UTF-8"/>
+    <property name="path.separator" value=":"/>
+    <property name="os.version" value="26.2"/>
+    <property name="java.runtime.name" value="OpenJDK Runtime Environment"/>
+    <property name="file.encoding" value="UTF-8"/>
+    <property name="java.vm.name" value="OpenJDK 64-Bit Server VM"/>
+    <property name="java.vendor.version" value="Homebrew"/>
+    <property name="localRepository" value="/Users/ghj/.m2/repository"/>
+    <property name="java.vendor.url.bug" value="https://github.com/Homebrew/homebrew-core/issues"/>
+    <property name="java.io.tmpdir" value="/var/folders/7c/x2329f5573786r05wcgl2tzw0000gn/T/"/>
+    <property name="java.version" value="21.0.8"/>
+    <property name="user.dir" value="/Users/ghj/work/startup/phenix/AuraMeta/vendor/smart-engine/extension/storage/storage-mysql"/>
+    <property name="os.arch" value="aarch64"/>
+    <property name="socksProxyPort" value="7891"/>
+    <property name="java.vm.specification.name" value="Java Virtual Machine Specification"/>
+    <property name="native.encoding" value="UTF-8"/>
+    <property name="java.library.path" value="/Users/ghj/Library/Java/Extensions:/Library/Java/Extensions:/Network/Library/Java/Extensions:/System/Library/Java/Extensions:/usr/lib/java:."/>
+    <property name="java.vm.info" value="mixed mode, sharing"/>
+    <property name="stderr.encoding" value="UTF-8"/>
+    <property name="java.vendor" value="Homebrew"/>
+    <property name="java.vm.version" value="21.0.8"/>
+    <property name="sun.io.unicode.encoding" value="UnicodeBig"/>
+    <property name="socksNonProxyHosts" value="127.0.0.1|192.168.0.0/16|*.192.168.0.0/16|10.0.0.0/8|*.10.0.0.0/8|172.16.0.0/12|*.172.16.0.0/12|localhost|*.localhost|local|*.local|crashlytics.com|*.crashlytics.com|&lt;local&gt;|*.&lt;local&gt;"/>
+    <property name="java.class.version" value="65.0"/>
+    <property name="http.proxyPort" value="7891"/>
+  </properties>
+  <testcase name="testAuditProcess" classname="com.alibaba.smart.framework.engine.test.process.DataBaseAuditProcessWithTenantIdExample" time="0.015">
+    <system-out><![CDATA[[DEBUG,ProfileValueUtils,main] Retrieved @ProfileValueSourceConfiguration [null] for test class [com.alibaba.smart.framework.engine.test.process.DataBaseAuditProcessWithTenantIdExample]
+[DEBUG,ProfileValueUtils,main] Retrieved ProfileValueSource type [class org.springframework.test.annotation.SystemProfileValueSource] for class [com.alibaba.smart.framework.engine.test.process.DataBaseAuditProcessWithTenantIdExample]
+[DEBUG,ProfileValueUtils,main] Retrieved @ProfileValueSourceConfiguration [null] for test class [com.alibaba.smart.framework.engine.test.process.DataBaseAuditProcessWithTenantIdExample]
+[DEBUG,ProfileValueUtils,main] Retrieved ProfileValueSource type [class org.springframework.test.annotation.SystemProfileValueSource] for class [com.alibaba.smart.framework.engine.test.process.DataBaseAuditProcessWithTenantIdExample]
+[DEBUG,ProfileValueUtils,main] Retrieved @ProfileValueSourceConfiguration [null] for test class [com.alibaba.smart.framework.engine.test.process.DataBaseAuditProcessWithTenantIdExample]
+[DEBUG,ProfileValueUtils,main] Retrieved ProfileValueSource type [class org.springframework.test.annotation.SystemProfileValueSource] for class [com.alibaba.smart.framework.engine.test.process.DataBaseAuditProcessWithTenantIdExample]
+[DEBUG,AbstractDirtiesContextTestExecutionListener,main] Before test class: context [DefaultTestContext@35d60381 testClass = DataBaseAuditProcessWithTenantIdExample, testInstance = [null], testMethod = [null], testException = [null], mergedContextConfiguration = [MergedContextConfiguration@68ab6ab0 testClass = DataBaseAuditProcessWithTenantIdExample, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]], attributes = map[[empty]]], class annotated with @DirtiesContext [false] with mode [null].
+[DEBUG,DefaultCacheAwareContextLoaderDelegate,main] Retrieved ApplicationContext [1936550492] from cache with key [[MergedContextConfiguration@68ab6ab0 testClass = DataBaseAuditProcessWithTenantIdExample, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]]]
+[DEBUG,cache,main] Spring test ApplicationContext cache statistics: [DefaultContextCache@5c748168 size = 1, maxSize = 32, parentContextCount = 0, hitCount = 1108, missCount = 1]
+[DEBUG,ProfileValueUtils,main] Retrieved @ProfileValueSourceConfiguration [null] for test class [com.alibaba.smart.framework.engine.test.process.DataBaseAuditProcessWithTenantIdExample]
+[DEBUG,ProfileValueUtils,main] Retrieved ProfileValueSource type [class org.springframework.test.annotation.SystemProfileValueSource] for class [com.alibaba.smart.framework.engine.test.process.DataBaseAuditProcessWithTenantIdExample]
+[DEBUG,DependencyInjectionTestExecutionListener,main] Performing dependency injection for test context [[DefaultTestContext@35d60381 testClass = DataBaseAuditProcessWithTenantIdExample, testInstance = com.alibaba.smart.framework.engine.test.process.DataBaseAuditProcessWithTenantIdExample@61ffd148, testMethod = [null], testException = [null], mergedContextConfiguration = [MergedContextConfiguration@68ab6ab0 testClass = DataBaseAuditProcessWithTenantIdExample, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]], attributes = map['org.springframework.test.context.event.ApplicationEventsTestExecutionListener.recordApplicationEvents' -> false]]].
+[DEBUG,DefaultCacheAwareContextLoaderDelegate,main] Retrieved ApplicationContext [1936550492] from cache with key [[MergedContextConfiguration@68ab6ab0 testClass = DataBaseAuditProcessWithTenantIdExample, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]]]
+[DEBUG,cache,main] Spring test ApplicationContext cache statistics: [DefaultContextCache@5c748168 size = 1, maxSize = 32, parentContextCount = 0, hitCount = 1109, missCount = 1]
+[DEBUG,DefaultCacheAwareContextLoaderDelegate,main] Retrieved ApplicationContext [1936550492] from cache with key [[MergedContextConfiguration@68ab6ab0 testClass = DataBaseAuditProcessWithTenantIdExample, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]]]
+[DEBUG,cache,main] Spring test ApplicationContext cache statistics: [DefaultContextCache@5c748168 size = 1, maxSize = 32, parentContextCount = 0, hitCount = 1110, missCount = 1]
+[DEBUG,AbstractDirtiesContextTestExecutionListener,main] Before test method: context [DefaultTestContext@35d60381 testClass = DataBaseAuditProcessWithTenantIdExample, testInstance = com.alibaba.smart.framework.engine.test.process.DataBaseAuditProcessWithTenantIdExample@61ffd148, testMethod = testAuditProcess@DataBaseAuditProcessWithTenantIdExample, testException = [null], mergedContextConfiguration = [MergedContextConfiguration@68ab6ab0 testClass = DataBaseAuditProcessWithTenantIdExample, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]], attributes = map['org.springframework.test.context.event.ApplicationEventsTestExecutionListener.recordApplicationEvents' -> false]], class annotated with @DirtiesContext [false] with mode [null], method annotated with @DirtiesContext [false] with mode [null].
+[DEBUG,TransactionalTestExecutionListener,main] Explicit transaction definition [PROPAGATION_REQUIRED,ISOLATION_DEFAULT] found for test context [DefaultTestContext@35d60381 testClass = DataBaseAuditProcessWithTenantIdExample, testInstance = com.alibaba.smart.framework.engine.test.process.DataBaseAuditProcessWithTenantIdExample@61ffd148, testMethod = testAuditProcess@DataBaseAuditProcessWithTenantIdExample, testException = [null], mergedContextConfiguration = [MergedContextConfiguration@68ab6ab0 testClass = DataBaseAuditProcessWithTenantIdExample, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]], attributes = map['org.springframework.test.context.event.ApplicationEventsTestExecutionListener.recordApplicationEvents' -> false]]
+[DEBUG,DefaultCacheAwareContextLoaderDelegate,main] Retrieved ApplicationContext [1936550492] from cache with key [[MergedContextConfiguration@68ab6ab0 testClass = DataBaseAuditProcessWithTenantIdExample, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]]]
+[DEBUG,cache,main] Spring test ApplicationContext cache statistics: [DefaultContextCache@5c748168 size = 1, maxSize = 32, parentContextCount = 0, hitCount = 1111, missCount = 1]
+[DEBUG,TransactionalTestExecutionListener,main] No method-level @Rollback override: using default rollback [true] for test context [DefaultTestContext@35d60381 testClass = DataBaseAuditProcessWithTenantIdExample, testInstance = com.alibaba.smart.framework.engine.test.process.DataBaseAuditProcessWithTenantIdExample@61ffd148, testMethod = testAuditProcess@DataBaseAuditProcessWithTenantIdExample, testException = [null], mergedContextConfiguration = [MergedContextConfiguration@68ab6ab0 testClass = DataBaseAuditProcessWithTenantIdExample, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]], attributes = map['org.springframework.test.context.event.ApplicationEventsTestExecutionListener.recordApplicationEvents' -> false]].
+[DEBUG,DataSourceTransactionManager,main] Creating new transaction with name [com.alibaba.smart.framework.engine.test.process.DataBaseAuditProcessWithTenantIdExample.testAuditProcess]: PROPAGATION_REQUIRED,ISOLATION_DEFAULT
+[DEBUG,DriverManagerDataSource,main] Creating new JDBC DriverManager Connection to [jdbc:postgresql://localhost:5432/aura_meta?charSet=UTF8]
+[DEBUG,DataSourceTransactionManager,main] Acquired Connection [org.postgresql.jdbc.PgConnection@58324c9f] for JDBC transaction
+[DEBUG,DataSourceTransactionManager,main] Switching JDBC Connection [org.postgresql.jdbc.PgConnection@58324c9f] to manual commit
+[INFO,TransactionContext,main] Began transaction (1) for test context [DefaultTestContext@35d60381 testClass = DataBaseAuditProcessWithTenantIdExample, testInstance = com.alibaba.smart.framework.engine.test.process.DataBaseAuditProcessWithTenantIdExample@61ffd148, testMethod = testAuditProcess@DataBaseAuditProcessWithTenantIdExample, testException = [null], mergedContextConfiguration = [MergedContextConfiguration@68ab6ab0 testClass = DataBaseAuditProcessWithTenantIdExample, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]], attributes = map['org.springframework.test.context.event.ApplicationEventsTestExecutionListener.recordApplicationEvents' -> false]]; transaction manager [org.springframework.jdbc.datasource.DataSourceTransactionManager@5a6fa56e]; rollback [true]
+[DEBUG,DefaultCacheAwareContextLoaderDelegate,main] Retrieved ApplicationContext [1936550492] from cache with key [[MergedContextConfiguration@68ab6ab0 testClass = DataBaseAuditProcessWithTenantIdExample, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]]]
+[DEBUG,cache,main] Spring test ApplicationContext cache statistics: [DefaultContextCache@5c748168 size = 1, maxSize = 32, parentContextCount = 0, hitCount = 1112, missCount = 1]
+[DEBUG,DefaultCacheAwareContextLoaderDelegate,main] Retrieved ApplicationContext [1936550492] from cache with key [[MergedContextConfiguration@68ab6ab0 testClass = DataBaseAuditProcessWithTenantIdExample, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]]]
+[DEBUG,cache,main] Spring test ApplicationContext cache statistics: [DefaultContextCache@5c748168 size = 1, maxSize = 32, parentContextCount = 0, hitCount = 1113, missCount = 1]
+[DEBUG,AbstractElementParser,main] id is ignored when parsing attribute from ProcessDefinitionSourceImpl(processDefinitionList=[], tenantId=null)
+[DEBUG,AbstractElementParser,main] version is ignored when parsing attribute from ProcessDefinitionSourceImpl(processDefinitionList=[], tenantId=null)
+[DEBUG,AbstractElementParser,main] targetNamespace is ignored when parsing attribute from ProcessDefinitionSourceImpl(processDefinitionList=[], tenantId=null)
+[DEBUG,AbstractElementParser,main] id is ignored when parsing attribute from theStart
+[DEBUG,AbstractElementParser,main] id is ignored when parsing attribute from theStart --> flow1 --> submitTask
+[DEBUG,AbstractElementParser,main] sourceRef is ignored when parsing attribute from theStart --> flow1 --> submitTask
+[DEBUG,AbstractElementParser,main] targetRef is ignored when parsing attribute from theStart --> flow1 --> submitTask
+[DEBUG,AbstractElementParser,main] id is ignored when parsing attribute from submitTask
+[DEBUG,AbstractElementParser,main] name is ignored when parsing attribute from submitTask
+[DEBUG,AbstractElementParser,main] id is ignored when parsing attribute from submitTask --> flowFromSubmitTask --> auditTask
+[DEBUG,AbstractElementParser,main] sourceRef is ignored when parsing attribute from submitTask --> flowFromSubmitTask --> auditTask
+[DEBUG,AbstractElementParser,main] targetRef is ignored when parsing attribute from submitTask --> flowFromSubmitTask --> auditTask
+[DEBUG,AbstractElementParser,main] id is ignored when parsing attribute from auditTask
+[DEBUG,AbstractElementParser,main] name is ignored when parsing attribute from auditTask
+[DEBUG,AbstractElementParser,main] id is ignored when parsing attribute from auditTask --> flowFromAuditTask --> exclusiveGw1
+[DEBUG,AbstractElementParser,main] sourceRef is ignored when parsing attribute from auditTask --> flowFromAuditTask --> exclusiveGw1
+[DEBUG,AbstractElementParser,main] targetRef is ignored when parsing attribute from auditTask --> flowFromAuditTask --> exclusiveGw1
+[DEBUG,AbstractElementParser,main] id is ignored when parsing attribute from exclusiveGw1
+[DEBUG,AbstractElementParser,main] name is ignored when parsing attribute from exclusiveGw1
+[DEBUG,AbstractElementParser,main] id is ignored when parsing attribute from exclusiveGw1 --> flow2 --> executeTask
+[DEBUG,AbstractElementParser,main] sourceRef is ignored when parsing attribute from exclusiveGw1 --> flow2 --> executeTask
+[DEBUG,AbstractElementParser,main] targetRef is ignored when parsing attribute from exclusiveGw1 --> flow2 --> executeTask
+[DEBUG,AbstractElementParser,main] id is ignored when parsing attribute from exclusiveGw1 --> flow3 --> advancedAuditTask
+[DEBUG,AbstractElementParser,main] sourceRef is ignored when parsing attribute from exclusiveGw1 --> flow3 --> advancedAuditTask
+[DEBUG,AbstractElementParser,main] targetRef is ignored when parsing attribute from exclusiveGw1 --> flow3 --> advancedAuditTask
+[DEBUG,AbstractElementParser,main] id is ignored when parsing attribute from executeTask
+[DEBUG,AbstractElementParser,main] name is ignored when parsing attribute from executeTask
+[DEBUG,AbstractElementParser,main] {http://smartengine.org/schema/process}class is ignored when parsing attribute from executeTask
+[DEBUG,AbstractElementParser,main] id is ignored when parsing attribute from executeTask --> flow5 --> theEnd
+[DEBUG,AbstractElementParser,main] sourceRef is ignored when parsing attribute from executeTask --> flow5 --> theEnd
+[DEBUG,AbstractElementParser,main] targetRef is ignored when parsing attribute from executeTask --> flow5 --> theEnd
+[DEBUG,AbstractElementParser,main] id is ignored when parsing attribute from advancedAuditTask
+[DEBUG,AbstractElementParser,main] name is ignored when parsing attribute from advancedAuditTask
+[DEBUG,AbstractElementParser,main] id is ignored when parsing attribute from advancedAuditTask --> flowFromAdvancedAuditTask --> exclusiveGw2
+[DEBUG,AbstractElementParser,main] sourceRef is ignored when parsing attribute from advancedAuditTask --> flowFromAdvancedAuditTask --> exclusiveGw2
+[DEBUG,AbstractElementParser,main] targetRef is ignored when parsing attribute from advancedAuditTask --> flowFromAdvancedAuditTask --> exclusiveGw2
+[DEBUG,AbstractElementParser,main] id is ignored when parsing attribute from exclusiveGw2
+[DEBUG,AbstractElementParser,main] name is ignored when parsing attribute from exclusiveGw2
+[DEBUG,AbstractElementParser,main] id is ignored when parsing attribute from exclusiveGw2 --> flow9 --> executeTask
+[DEBUG,AbstractElementParser,main] sourceRef is ignored when parsing attribute from exclusiveGw2 --> flow9 --> executeTask
+[DEBUG,AbstractElementParser,main] targetRef is ignored when parsing attribute from exclusiveGw2 --> flow9 --> executeTask
+[DEBUG,AbstractElementParser,main] id is ignored when parsing attribute from exclusiveGw2 --> flow10 --> theEnd
+[DEBUG,AbstractElementParser,main] sourceRef is ignored when parsing attribute from exclusiveGw2 --> flow10 --> theEnd
+[DEBUG,AbstractElementParser,main] targetRef is ignored when parsing attribute from exclusiveGw2 --> flow10 --> theEnd
+[DEBUG,AbstractElementParser,main] id is ignored when parsing attribute from EndEvent(className=null)
+[DEBUG,DefaultDelegationExecutor,main] No behavior found:theStart
+Creating a new SqlSession
+Registering transaction synchronization for SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+JDBC Connection [org.postgresql.jdbc.PgConnection@58324c9f] will be managed by Spring
+==>  Preparing: update se_execution_instance SET gmt_modified=CURRENT_TIMESTAMP ,active = CASE WHEN ? THEN 1 ELSE 0 END where id=? and tenant_id = ?
+==> Parameters: false(Boolean), 1770522858940(Long), -1(String)
+<==    Updates: 0
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+[INFO,UserTaskBehavior,main] The taskAssigneeCandidateInstance are [TaskAssigneeCandidateInstance(assigneeId=1, assigneeType=user, priority=500), TaskAssigneeCandidateInstance(assigneeId=3, assigneeType=user, priority=500), TaskAssigneeCandidateInstance(assigneeId=5, assigneeType=user, priority=500)] for PI:1770522858938 and AI id: submitTask
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: insert into se_process_instance ( id, gmt_create, gmt_modified, process_definition_id_and_version,process_definition_type,start_user_id, status, complete_time, parent_process_instance_id,parent_execution_instance_id, reason, biz_unique_id, title,tag,comment,tenant_id ) values (?, ?, ?, ?,?,?, ?, ?, ?,?, ?, ?, ?, ?,?, ?)
+==> Parameters: 1770522858938(Long), 2026-02-08 11:54:16.789(Timestamp), 2026-02-08 11:54:16.789(Timestamp), exclusiveTest:1.0.0(String), null, null, running(String), null, null, null, null, null, null, null, null, -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified, process_definition_id_and_version,process_definition_type,start_user_id, status, complete_time, parent_process_instance_id,parent_execution_instance_id, reason, biz_unique_id, title,tag,comment,tenant_id from se_process_instance where id=? and tenant_id = ?
+==> Parameters: 1770522858938(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_definition_id_and_version, process_definition_type, start_user_id, status, complete_time, parent_process_instance_id, parent_execution_instance_id, reason, biz_unique_id, title, tag, comment, tenant_id
+<==        Row: 1770522858938, 2026-02-08 11:54:16.789, 2026-02-08 11:54:16.789, exclusiveTest:1.0.0, null, null, running, null, null, null, null, null, null, null, null, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: insert into se_activity_instance( id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,tenant_id ) values (?, ?, ?, ?, ?, ?,?)
+==> Parameters: 1770522858939(Long), 2026-02-08 11:54:16.791(Timestamp), 2026-02-08 11:54:16.791(Timestamp), 1770522858938(Long), exclusiveTest:1.0.0(String), theStart(String), -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,tenant_id from se_activity_instance where id=? and tenant_id = ?
+==> Parameters: 1770522858939(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, process_definition_id_and_version, process_definition_activity_id, tenant_id
+<==        Row: 1770522858939, 2026-02-08 11:54:16.791, 2026-02-08 11:54:16.791, 1770522858938, exclusiveTest:1.0.0, theStart, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: insert into se_execution_instance( id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,activity_instance_id,active,block_id,tenant_id ) values (?, ?, ?, ?, ?, ?, ?, CASE WHEN ? THEN 1 ELSE 0 END, ?,?)
+==> Parameters: 1770522858940(Long), 2026-02-08 11:54:16.791(Timestamp), 2026-02-08 11:54:16.791(Timestamp), 1770522858938(Long), exclusiveTest:1.0.0(String), theStart(String), 1770522858939(Long), false(Boolean), null, -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,activity_instance_id,active,block_id,tenant_id from se_execution_instance where id=? and tenant_id = ?
+==> Parameters: 1770522858940(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, process_definition_id_and_version, process_definition_activity_id, activity_instance_id, active, block_id, tenant_id
+<==        Row: 1770522858940, 2026-02-08 11:54:16.791, 2026-02-08 11:54:16.791, 1770522858938, exclusiveTest:1.0.0, theStart, 1770522858939, 0, null, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: insert into se_activity_instance( id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,tenant_id ) values (?, ?, ?, ?, ?, ?,?)
+==> Parameters: 1770522858942(Long), 2026-02-08 11:54:16.791(Timestamp), 2026-02-08 11:54:16.791(Timestamp), 1770522858938(Long), exclusiveTest:1.0.0(String), submitTask(String), -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,tenant_id from se_activity_instance where id=? and tenant_id = ?
+==> Parameters: 1770522858942(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, process_definition_id_and_version, process_definition_activity_id, tenant_id
+<==        Row: 1770522858942, 2026-02-08 11:54:16.791, 2026-02-08 11:54:16.791, 1770522858938, exclusiveTest:1.0.0, submitTask, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: insert into se_execution_instance( id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,activity_instance_id,active,block_id,tenant_id ) values (?, ?, ?, ?, ?, ?, ?, CASE WHEN ? THEN 1 ELSE 0 END, ?,?)
+==> Parameters: 1770522858943(Long), 2026-02-08 11:54:16.791(Timestamp), 2026-02-08 11:54:16.791(Timestamp), 1770522858938(Long), exclusiveTest:1.0.0(String), submitTask(String), 1770522858942(Long), true(Boolean), null, -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,activity_instance_id,active,block_id,tenant_id from se_execution_instance where id=? and tenant_id = ?
+==> Parameters: 1770522858943(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, process_definition_id_and_version, process_definition_activity_id, activity_instance_id, active, block_id, tenant_id
+<==        Row: 1770522858943, 2026-02-08 11:54:16.791, 2026-02-08 11:54:16.791, 1770522858938, exclusiveTest:1.0.0, submitTask, 1770522858942, 1, null, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: insert into se_task_instance( id, gmt_create, gmt_modified,process_instance_id, process_definition_id_and_version,process_definition_type, activity_instance_id, process_definition_activity_id, execution_instance_id,claim_user_id,priority,tag,claim_time,complete_time,status,comment,extension,title,tenant_id ) values (?, ?, ?, ?, ?,?, ?, ?,?,?,?,?,?,?,?,?,?,?, ?)
+==> Parameters: 1770522858944(Long), 2026-02-08 11:54:16.791(Timestamp), 2026-02-08 11:54:16.791(Timestamp), 1770522858938(Long), exclusiveTest:1.0.0(String), null, 1770522858942(Long), submitTask(String), 1770522858943(Long), null, null, null, null, null, pending(String), null, null, null, -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified,process_instance_id, process_definition_id_and_version,process_definition_type, activity_instance_id, process_definition_activity_id, execution_instance_id,claim_user_id,priority,tag,claim_time,complete_time,status,comment,extension,title,tenant_id from se_task_instance where id=? and tenant_id = ?
+==> Parameters: 1770522858944(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, process_definition_id_and_version, process_definition_type, activity_instance_id, process_definition_activity_id, execution_instance_id, claim_user_id, priority, tag, claim_time, complete_time, status, comment, extension, title, tenant_id
+<==        Row: 1770522858944, 2026-02-08 11:54:16.791, 2026-02-08 11:54:16.791, 1770522858938, exclusiveTest:1.0.0, null, 1770522858942, submitTask, 1770522858943, null, null, null, null, null, pending, null, null, null, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: insert into se_task_assignee_instance( id, gmt_create, gmt_modified,process_instance_id, task_instance_id,assignee_id,assignee_type,tenant_id ) values (?, ?, ?, ?, ?,?,?, ?)
+==> Parameters: 1770522858945(Long), 2026-02-08 11:54:16.792(Timestamp), 2026-02-08 11:54:16.792(Timestamp), 1770522858938(Long), 1770522858944(Long), 1(String), user(String), -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified,process_instance_id, task_instance_id,assignee_id,assignee_type,tenant_id from se_task_assignee_instance where id=? and tenant_id = ?
+==> Parameters: 1770522858945(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, task_instance_id, assignee_id, assignee_type, tenant_id
+<==        Row: 1770522858945, 2026-02-08 11:54:16.792, 2026-02-08 11:54:16.792, 1770522858938, 1770522858944, 1, user, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: insert into se_task_assignee_instance( id, gmt_create, gmt_modified,process_instance_id, task_instance_id,assignee_id,assignee_type,tenant_id ) values (?, ?, ?, ?, ?,?,?, ?)
+==> Parameters: 1770522858946(Long), 2026-02-08 11:54:16.792(Timestamp), 2026-02-08 11:54:16.792(Timestamp), 1770522858938(Long), 1770522858944(Long), 3(String), user(String), -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified,process_instance_id, task_instance_id,assignee_id,assignee_type,tenant_id from se_task_assignee_instance where id=? and tenant_id = ?
+==> Parameters: 1770522858946(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, task_instance_id, assignee_id, assignee_type, tenant_id
+<==        Row: 1770522858946, 2026-02-08 11:54:16.792, 2026-02-08 11:54:16.792, 1770522858938, 1770522858944, 3, user, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: insert into se_task_assignee_instance( id, gmt_create, gmt_modified,process_instance_id, task_instance_id,assignee_id,assignee_type,tenant_id ) values (?, ?, ?, ?, ?,?,?, ?)
+==> Parameters: 1770522858947(Long), 2026-02-08 11:54:16.792(Timestamp), 2026-02-08 11:54:16.792(Timestamp), 1770522858938(Long), 1770522858944(Long), 5(String), user(String), -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified,process_instance_id, task_instance_id,assignee_id,assignee_type,tenant_id from se_task_assignee_instance where id=? and tenant_id = ?
+==> Parameters: 1770522858947(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, task_instance_id, assignee_id, assignee_type, tenant_id
+<==        Row: 1770522858947, 2026-02-08 11:54:16.792, 2026-02-08 11:54:16.792, 1770522858938, 1770522858944, 5, user, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified,process_instance_id, process_definition_id_and_version,process_definition_type, activity_instance_id, process_definition_activity_id, execution_instance_id,claim_user_id,priority,tag,claim_time,complete_time,status,comment,extension,title,tenant_id from se_task_instance where process_instance_id = ? and status = ? and tenant_id = ?
+==> Parameters: 1770522858938(Long), pending(String), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, process_definition_id_and_version, process_definition_type, activity_instance_id, process_definition_activity_id, execution_instance_id, claim_user_id, priority, tag, claim_time, complete_time, status, comment, extension, title, tenant_id
+<==        Row: 1770522858944, 2026-02-08 11:54:16.791, 2026-02-08 11:54:16.791, 1770522858938, exclusiveTest:1.0.0, null, 1770522858942, submitTask, 1770522858943, null, null, null, null, null, pending, null, null, null, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified,process_instance_id, process_definition_id_and_version,process_definition_type, activity_instance_id, process_definition_activity_id, execution_instance_id,claim_user_id,priority,tag,claim_time,complete_time,status,comment,extension,title,tenant_id from se_task_instance where id=?
+==> Parameters: 1770522858944(Long)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, process_definition_id_and_version, process_definition_type, activity_instance_id, process_definition_activity_id, execution_instance_id, claim_user_id, priority, tag, claim_time, complete_time, status, comment, extension, title, tenant_id
+<==        Row: 1770522858944, 2026-02-08 11:54:16.791, 2026-02-08 11:54:16.791, 1770522858938, exclusiveTest:1.0.0, null, 1770522858942, submitTask, 1770522858943, null, null, null, null, null, pending, null, null, null, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: update se_task_instance SET gmt_modified=CURRENT_TIMESTAMP ,claim_time = ? ,complete_time = ? ,status = ? where id=? and status = ? and tenant_id = ?
+==> Parameters: 2026-02-08 11:54:16.793(Timestamp), 2026-02-08 11:54:16.793(Timestamp), completed(String), 1770522858944(Long), pending(String), -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+[WARN,DefaultTaskCommandService,main] Failed to close supervision for task: 1770522858944
+org.springframework.beans.factory.NoSuchBeanDefinitionException: No bean named 'supervisionInstanceStorage' available
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.getBeanDefinition(DefaultListableBeanFactory.java:874)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.getMergedLocalBeanDefinition(AbstractBeanFactory.java:1358)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:309)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:208)
+	at org.springframework.context.support.AbstractApplicationContext.getBean(AbstractApplicationContext.java:1156)
+	at com.alibaba.smart.framework.engine.test.DatabaseBaseTestCase$DataBaseAccessService.access(DatabaseBaseTestCase.java:123)
+	at com.alibaba.smart.framework.engine.service.command.impl.DefaultTaskCommandService.complete(DefaultTaskCommandService.java:104)
+	at com.alibaba.smart.framework.engine.service.command.impl.DefaultTaskCommandService.complete(DefaultTaskCommandService.java:119)
+	at com.alibaba.smart.framework.engine.test.process.DataBaseAuditProcessWithTenantIdExample.testAuditProcess(DataBaseAuditProcessWithTenantIdExample.java:66)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:59)
+	at org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)
+	at org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:56)
+	at org.junit.internal.runners.statements.InvokeMethod.evaluate(InvokeMethod.java:17)
+	at org.springframework.test.context.junit4.statements.RunBeforeTestExecutionCallbacks.evaluate(RunBeforeTestExecutionCallbacks.java:74)
+	at org.springframework.test.context.junit4.statements.RunAfterTestExecutionCallbacks.evaluate(RunAfterTestExecutionCallbacks.java:84)
+	at org.junit.internal.runners.statements.RunBefores.evaluate(RunBefores.java:26)
+	at org.springframework.test.context.junit4.statements.RunBeforeTestMethodCallbacks.evaluate(RunBeforeTestMethodCallbacks.java:75)
+	at org.junit.internal.runners.statements.RunAfters.evaluate(RunAfters.java:27)
+	at org.springframework.test.context.junit4.statements.RunAfterTestMethodCallbacks.evaluate(RunAfterTestMethodCallbacks.java:86)
+	at org.springframework.test.context.junit4.statements.SpringRepeat.evaluate(SpringRepeat.java:84)
+	at org.junit.runners.ParentRunner.runLeaf(ParentRunner.java:366)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.runChild(SpringJUnit4ClassRunner.java:251)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.runChild(SpringJUnit4ClassRunner.java:97)
+	at org.junit.runners.ParentRunner$4.run(ParentRunner.java:331)
+	at org.junit.runners.ParentRunner$1.schedule(ParentRunner.java:79)
+	at org.junit.runners.ParentRunner.runChildren(ParentRunner.java:329)
+	at org.junit.runners.ParentRunner.access$100(ParentRunner.java:66)
+	at org.junit.runners.ParentRunner$2.evaluate(ParentRunner.java:293)
+	at org.springframework.test.context.junit4.statements.RunBeforeTestClassCallbacks.evaluate(RunBeforeTestClassCallbacks.java:61)
+	at org.springframework.test.context.junit4.statements.RunAfterTestClassCallbacks.evaluate(RunAfterTestClassCallbacks.java:70)
+	at org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)
+	at org.junit.runners.ParentRunner.run(ParentRunner.java:413)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.run(SpringJUnit4ClassRunner.java:190)
+	at org.junit.runner.JUnitCore.run(JUnitCore.java:137)
+	at org.junit.runner.JUnitCore.run(JUnitCore.java:115)
+	at org.junit.vintage.engine.execution.RunnerExecutor.execute(RunnerExecutor.java:42)
+	at org.junit.vintage.engine.VintageTestEngine.executeAllChildren(VintageTestEngine.java:80)
+	at org.junit.vintage.engine.VintageTestEngine.execute(VintageTestEngine.java:72)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:147)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:127)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:90)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.lambda$execute$0(EngineExecutionOrchestrator.java:55)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.withInterceptedStreams(EngineExecutionOrchestrator.java:102)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:54)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:114)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:86)
+	at org.junit.platform.launcher.core.DefaultLauncherSession$DelegatingLauncher.execute(DefaultLauncherSession.java:86)
+	at org.apache.maven.surefire.junitplatform.LazyLauncher.execute(LazyLauncher.java:56)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.execute(JUnitPlatformProvider.java:184)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invokeAllTests(JUnitPlatformProvider.java:148)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invoke(JUnitPlatformProvider.java:122)
+	at org.apache.maven.surefire.booter.ForkedBooter.runSuitesInProcess(ForkedBooter.java:385)
+	at org.apache.maven.surefire.booter.ForkedBooter.execute(ForkedBooter.java:162)
+	at org.apache.maven.surefire.booter.ForkedBooter.run(ForkedBooter.java:507)
+	at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:495)
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,activity_instance_id,active,block_id,tenant_id from se_execution_instance where id=?
+==> Parameters: 1770522858943(Long)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, process_definition_id_and_version, process_definition_activity_id, activity_instance_id, active, block_id, tenant_id
+<==        Row: 1770522858943, 2026-02-08 11:54:16.791, 2026-02-08 11:54:16.791, 1770522858938, exclusiveTest:1.0.0, submitTask, 1770522858942, 1, null, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified, process_definition_id_and_version,process_definition_type,start_user_id, status, complete_time, parent_process_instance_id,parent_execution_instance_id, reason, biz_unique_id, title,tag,comment,tenant_id from se_process_instance where id=?
+==> Parameters: 1770522858938(Long)
+<==    Columns: id, gmt_create, gmt_modified, process_definition_id_and_version, process_definition_type, start_user_id, status, complete_time, parent_process_instance_id, parent_execution_instance_id, reason, biz_unique_id, title, tag, comment, tenant_id
+<==        Row: 1770522858938, 2026-02-08 11:54:16.789, 2026-02-08 11:54:16.789, exclusiveTest:1.0.0, null, null, running, null, null, null, null, null, null, null, null, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,tenant_id from se_activity_instance where id=? and tenant_id = ?
+==> Parameters: 1770522858942(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, process_definition_id_and_version, process_definition_activity_id, tenant_id
+<==        Row: 1770522858942, 2026-02-08 11:54:16.791, 2026-02-08 11:54:16.791, 1770522858938, exclusiveTest:1.0.0, submitTask, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: update se_execution_instance SET gmt_modified=CURRENT_TIMESTAMP ,active = CASE WHEN ? THEN 1 ELSE 0 END where id=? and tenant_id = ?
+==> Parameters: false(Boolean), 1770522858943(Long), -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+[DEBUG,DefaultDelegationExecutor,main] No behavior found:submitTask
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: update se_execution_instance SET gmt_modified=CURRENT_TIMESTAMP ,active = CASE WHEN ? THEN 1 ELSE 0 END where id=? and tenant_id = ?
+==> Parameters: false(Boolean), 1770522858943(Long), -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+[INFO,UserTaskBehavior,main] The taskAssigneeCandidateInstance are [TaskAssigneeCandidateInstance(assigneeId=1, assigneeType=user, priority=500), TaskAssigneeCandidateInstance(assigneeId=3, assigneeType=user, priority=500), TaskAssigneeCandidateInstance(assigneeId=5, assigneeType=user, priority=500)] for PI:1770522858938 and AI id: auditTask
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: update se_process_instance SET gmt_modified=CURRENT_TIMESTAMP ,status = ? where id=? and tenant_id = ?
+==> Parameters: running(String), 1770522858938(Long), -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: insert into se_activity_instance( id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,tenant_id ) values (?, ?, ?, ?, ?, ?,?)
+==> Parameters: 1770522858951(Long), 2026-02-08 11:54:16.794(Timestamp), 2026-02-08 11:54:16.794(Timestamp), 1770522858938(Long), exclusiveTest:1.0.0(String), auditTask(String), -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,tenant_id from se_activity_instance where id=? and tenant_id = ?
+==> Parameters: 1770522858951(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, process_definition_id_and_version, process_definition_activity_id, tenant_id
+<==        Row: 1770522858951, 2026-02-08 11:54:16.794, 2026-02-08 11:54:16.794, 1770522858938, exclusiveTest:1.0.0, auditTask, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: insert into se_execution_instance( id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,activity_instance_id,active,block_id,tenant_id ) values (?, ?, ?, ?, ?, ?, ?, CASE WHEN ? THEN 1 ELSE 0 END, ?,?)
+==> Parameters: 1770522858952(Long), 2026-02-08 11:54:16.794(Timestamp), 2026-02-08 11:54:16.794(Timestamp), 1770522858938(Long), exclusiveTest:1.0.0(String), auditTask(String), 1770522858951(Long), true(Boolean), null, -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,activity_instance_id,active,block_id,tenant_id from se_execution_instance where id=? and tenant_id = ?
+==> Parameters: 1770522858952(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, process_definition_id_and_version, process_definition_activity_id, activity_instance_id, active, block_id, tenant_id
+<==        Row: 1770522858952, 2026-02-08 11:54:16.794, 2026-02-08 11:54:16.794, 1770522858938, exclusiveTest:1.0.0, auditTask, 1770522858951, 1, null, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: insert into se_task_instance( id, gmt_create, gmt_modified,process_instance_id, process_definition_id_and_version,process_definition_type, activity_instance_id, process_definition_activity_id, execution_instance_id,claim_user_id,priority,tag,claim_time,complete_time,status,comment,extension,title,tenant_id ) values (?, ?, ?, ?, ?,?, ?, ?,?,?,?,?,?,?,?,?,?,?, ?)
+==> Parameters: 1770522858953(Long), 2026-02-08 11:54:16.794(Timestamp), 2026-02-08 11:54:16.794(Timestamp), 1770522858938(Long), exclusiveTest:1.0.0(String), null, 1770522858951(Long), auditTask(String), 1770522858952(Long), null, null, null, null, null, pending(String), null, null, null, -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified,process_instance_id, process_definition_id_and_version,process_definition_type, activity_instance_id, process_definition_activity_id, execution_instance_id,claim_user_id,priority,tag,claim_time,complete_time,status,comment,extension,title,tenant_id from se_task_instance where id=? and tenant_id = ?
+==> Parameters: 1770522858953(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, process_definition_id_and_version, process_definition_type, activity_instance_id, process_definition_activity_id, execution_instance_id, claim_user_id, priority, tag, claim_time, complete_time, status, comment, extension, title, tenant_id
+<==        Row: 1770522858953, 2026-02-08 11:54:16.794, 2026-02-08 11:54:16.794, 1770522858938, exclusiveTest:1.0.0, null, 1770522858951, auditTask, 1770522858952, null, null, null, null, null, pending, null, null, null, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: insert into se_task_assignee_instance( id, gmt_create, gmt_modified,process_instance_id, task_instance_id,assignee_id,assignee_type,tenant_id ) values (?, ?, ?, ?, ?,?,?, ?)
+==> Parameters: 1770522858954(Long), 2026-02-08 11:54:16.794(Timestamp), 2026-02-08 11:54:16.794(Timestamp), 1770522858938(Long), 1770522858953(Long), 1(String), user(String), -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified,process_instance_id, task_instance_id,assignee_id,assignee_type,tenant_id from se_task_assignee_instance where id=? and tenant_id = ?
+==> Parameters: 1770522858954(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, task_instance_id, assignee_id, assignee_type, tenant_id
+<==        Row: 1770522858954, 2026-02-08 11:54:16.794, 2026-02-08 11:54:16.794, 1770522858938, 1770522858953, 1, user, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: insert into se_task_assignee_instance( id, gmt_create, gmt_modified,process_instance_id, task_instance_id,assignee_id,assignee_type,tenant_id ) values (?, ?, ?, ?, ?,?,?, ?)
+==> Parameters: 1770522858955(Long), 2026-02-08 11:54:16.794(Timestamp), 2026-02-08 11:54:16.794(Timestamp), 1770522858938(Long), 1770522858953(Long), 3(String), user(String), -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified,process_instance_id, task_instance_id,assignee_id,assignee_type,tenant_id from se_task_assignee_instance where id=? and tenant_id = ?
+==> Parameters: 1770522858955(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, task_instance_id, assignee_id, assignee_type, tenant_id
+<==        Row: 1770522858955, 2026-02-08 11:54:16.794, 2026-02-08 11:54:16.794, 1770522858938, 1770522858953, 3, user, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: insert into se_task_assignee_instance( id, gmt_create, gmt_modified,process_instance_id, task_instance_id,assignee_id,assignee_type,tenant_id ) values (?, ?, ?, ?, ?,?,?, ?)
+==> Parameters: 1770522858956(Long), 2026-02-08 11:54:16.795(Timestamp), 2026-02-08 11:54:16.795(Timestamp), 1770522858938(Long), 1770522858953(Long), 5(String), user(String), -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified,process_instance_id, task_instance_id,assignee_id,assignee_type,tenant_id from se_task_assignee_instance where id=? and tenant_id = ?
+==> Parameters: 1770522858956(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, task_instance_id, assignee_id, assignee_type, tenant_id
+<==        Row: 1770522858956, 2026-02-08 11:54:16.795, 2026-02-08 11:54:16.795, 1770522858938, 1770522858953, 5, user, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified,process_instance_id, process_definition_id_and_version,process_definition_type, activity_instance_id, process_definition_activity_id, execution_instance_id,claim_user_id,priority,tag,claim_time,complete_time,status,comment,extension,title,tenant_id from se_task_instance where process_instance_id = ? and status = ? and tenant_id = ?
+==> Parameters: 1770522858938(Long), pending(String), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, process_definition_id_and_version, process_definition_type, activity_instance_id, process_definition_activity_id, execution_instance_id, claim_user_id, priority, tag, claim_time, complete_time, status, comment, extension, title, tenant_id
+<==        Row: 1770522858953, 2026-02-08 11:54:16.794, 2026-02-08 11:54:16.794, 1770522858938, exclusiveTest:1.0.0, null, 1770522858951, auditTask, 1770522858952, null, null, null, null, null, pending, null, null, null, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified,process_instance_id, task_instance_id,assignee_id,assignee_type,tenant_id from se_task_assignee_instance where task_instance_id=? and tenant_id = ?
+==> Parameters: 1770522858953(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, task_instance_id, assignee_id, assignee_type, tenant_id
+<==        Row: 1770522858954, 2026-02-08 11:54:16.794, 2026-02-08 11:54:16.794, 1770522858938, 1770522858953, 1, user, -1
+<==        Row: 1770522858955, 2026-02-08 11:54:16.794, 2026-02-08 11:54:16.794, 1770522858938, 1770522858953, 3, user, -1
+<==        Row: 1770522858956, 2026-02-08 11:54:16.795, 2026-02-08 11:54:16.795, 1770522858938, 1770522858953, 5, user, -1
+<==      Total: 3
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: update se_task_assignee_instance SET gmt_modified=CURRENT_TIMESTAMP ,assignee_id = ? where id=? and tenant_id = ?
+==> Parameters: 4(String), 1770522858955(Long), -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified,process_instance_id, task_instance_id,assignee_id,assignee_type,tenant_id from se_task_assignee_instance where id=? and tenant_id = ?
+==> Parameters: 1770522858955(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, task_instance_id, assignee_id, assignee_type, tenant_id
+<==        Row: 1770522858955, 2026-02-08 11:54:16.794, 2026-02-08 11:54:16.790069, 1770522858938, 1770522858953, 4, user, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified,process_instance_id, task_instance_id,assignee_id,assignee_type,tenant_id from se_task_assignee_instance where task_instance_id=? and tenant_id = ?
+==> Parameters: 1770522858953(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, task_instance_id, assignee_id, assignee_type, tenant_id
+<==        Row: 1770522858954, 2026-02-08 11:54:16.794, 2026-02-08 11:54:16.794, 1770522858938, 1770522858953, 1, user, -1
+<==        Row: 1770522858956, 2026-02-08 11:54:16.795, 2026-02-08 11:54:16.795, 1770522858938, 1770522858953, 5, user, -1
+<==        Row: 1770522858955, 2026-02-08 11:54:16.794, 2026-02-08 11:54:16.790069, 1770522858938, 1770522858953, 4, user, -1
+<==      Total: 3
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified,process_instance_id, process_definition_id_and_version,process_definition_type, activity_instance_id, process_definition_activity_id, execution_instance_id,claim_user_id,priority,tag,claim_time,complete_time,status,comment,extension,title,tenant_id from se_task_instance where id=?
+==> Parameters: 1770522858953(Long)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, process_definition_id_and_version, process_definition_type, activity_instance_id, process_definition_activity_id, execution_instance_id, claim_user_id, priority, tag, claim_time, complete_time, status, comment, extension, title, tenant_id
+<==        Row: 1770522858953, 2026-02-08 11:54:16.794, 2026-02-08 11:54:16.794, 1770522858938, exclusiveTest:1.0.0, null, 1770522858951, auditTask, 1770522858952, null, null, null, null, null, pending, null, null, null, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: update se_task_instance SET gmt_modified=CURRENT_TIMESTAMP ,claim_time = ? ,complete_time = ? ,status = ? where id=? and status = ? and tenant_id = ?
+==> Parameters: 2026-02-08 11:54:16.796(Timestamp), 2026-02-08 11:54:16.796(Timestamp), completed(String), 1770522858953(Long), pending(String), -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+[WARN,DefaultTaskCommandService,main] Failed to close supervision for task: 1770522858953
+org.springframework.beans.factory.NoSuchBeanDefinitionException: No bean named 'supervisionInstanceStorage' available
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.getBeanDefinition(DefaultListableBeanFactory.java:874)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.getMergedLocalBeanDefinition(AbstractBeanFactory.java:1358)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:309)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:208)
+	at org.springframework.context.support.AbstractApplicationContext.getBean(AbstractApplicationContext.java:1156)
+	at com.alibaba.smart.framework.engine.test.DatabaseBaseTestCase$DataBaseAccessService.access(DatabaseBaseTestCase.java:123)
+	at com.alibaba.smart.framework.engine.service.command.impl.DefaultTaskCommandService.complete(DefaultTaskCommandService.java:104)
+	at com.alibaba.smart.framework.engine.service.command.impl.DefaultTaskCommandService.complete(DefaultTaskCommandService.java:119)
+	at com.alibaba.smart.framework.engine.test.process.DataBaseAuditProcessWithTenantIdExample.testAuditProcess(DataBaseAuditProcessWithTenantIdExample.java:83)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:59)
+	at org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)
+	at org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:56)
+	at org.junit.internal.runners.statements.InvokeMethod.evaluate(InvokeMethod.java:17)
+	at org.springframework.test.context.junit4.statements.RunBeforeTestExecutionCallbacks.evaluate(RunBeforeTestExecutionCallbacks.java:74)
+	at org.springframework.test.context.junit4.statements.RunAfterTestExecutionCallbacks.evaluate(RunAfterTestExecutionCallbacks.java:84)
+	at org.junit.internal.runners.statements.RunBefores.evaluate(RunBefores.java:26)
+	at org.springframework.test.context.junit4.statements.RunBeforeTestMethodCallbacks.evaluate(RunBeforeTestMethodCallbacks.java:75)
+	at org.junit.internal.runners.statements.RunAfters.evaluate(RunAfters.java:27)
+	at org.springframework.test.context.junit4.statements.RunAfterTestMethodCallbacks.evaluate(RunAfterTestMethodCallbacks.java:86)
+	at org.springframework.test.context.junit4.statements.SpringRepeat.evaluate(SpringRepeat.java:84)
+	at org.junit.runners.ParentRunner.runLeaf(ParentRunner.java:366)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.runChild(SpringJUnit4ClassRunner.java:251)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.runChild(SpringJUnit4ClassRunner.java:97)
+	at org.junit.runners.ParentRunner$4.run(ParentRunner.java:331)
+	at org.junit.runners.ParentRunner$1.schedule(ParentRunner.java:79)
+	at org.junit.runners.ParentRunner.runChildren(ParentRunner.java:329)
+	at org.junit.runners.ParentRunner.access$100(ParentRunner.java:66)
+	at org.junit.runners.ParentRunner$2.evaluate(ParentRunner.java:293)
+	at org.springframework.test.context.junit4.statements.RunBeforeTestClassCallbacks.evaluate(RunBeforeTestClassCallbacks.java:61)
+	at org.springframework.test.context.junit4.statements.RunAfterTestClassCallbacks.evaluate(RunAfterTestClassCallbacks.java:70)
+	at org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)
+	at org.junit.runners.ParentRunner.run(ParentRunner.java:413)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.run(SpringJUnit4ClassRunner.java:190)
+	at org.junit.runner.JUnitCore.run(JUnitCore.java:137)
+	at org.junit.runner.JUnitCore.run(JUnitCore.java:115)
+	at org.junit.vintage.engine.execution.RunnerExecutor.execute(RunnerExecutor.java:42)
+	at org.junit.vintage.engine.VintageTestEngine.executeAllChildren(VintageTestEngine.java:80)
+	at org.junit.vintage.engine.VintageTestEngine.execute(VintageTestEngine.java:72)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:147)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:127)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:90)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.lambda$execute$0(EngineExecutionOrchestrator.java:55)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.withInterceptedStreams(EngineExecutionOrchestrator.java:102)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:54)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:114)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:86)
+	at org.junit.platform.launcher.core.DefaultLauncherSession$DelegatingLauncher.execute(DefaultLauncherSession.java:86)
+	at org.apache.maven.surefire.junitplatform.LazyLauncher.execute(LazyLauncher.java:56)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.execute(JUnitPlatformProvider.java:184)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invokeAllTests(JUnitPlatformProvider.java:148)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invoke(JUnitPlatformProvider.java:122)
+	at org.apache.maven.surefire.booter.ForkedBooter.runSuitesInProcess(ForkedBooter.java:385)
+	at org.apache.maven.surefire.booter.ForkedBooter.execute(ForkedBooter.java:162)
+	at org.apache.maven.surefire.booter.ForkedBooter.run(ForkedBooter.java:507)
+	at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:495)
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,activity_instance_id,active,block_id,tenant_id from se_execution_instance where id=?
+==> Parameters: 1770522858952(Long)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, process_definition_id_and_version, process_definition_activity_id, activity_instance_id, active, block_id, tenant_id
+<==        Row: 1770522858952, 2026-02-08 11:54:16.794, 2026-02-08 11:54:16.794, 1770522858938, exclusiveTest:1.0.0, auditTask, 1770522858951, 1, null, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified, process_definition_id_and_version,process_definition_type,start_user_id, status, complete_time, parent_process_instance_id,parent_execution_instance_id, reason, biz_unique_id, title,tag,comment,tenant_id from se_process_instance where id=?
+==> Parameters: 1770522858938(Long)
+<==    Columns: id, gmt_create, gmt_modified, process_definition_id_and_version, process_definition_type, start_user_id, status, complete_time, parent_process_instance_id, parent_execution_instance_id, reason, biz_unique_id, title, tag, comment, tenant_id
+<==        Row: 1770522858938, 2026-02-08 11:54:16.789, 2026-02-08 11:54:16.790069, exclusiveTest:1.0.0, null, null, running, null, null, null, null, null, null, null, null, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,tenant_id from se_activity_instance where id=? and tenant_id = ?
+==> Parameters: 1770522858951(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, process_definition_id_and_version, process_definition_activity_id, tenant_id
+<==        Row: 1770522858951, 2026-02-08 11:54:16.794, 2026-02-08 11:54:16.794, 1770522858938, exclusiveTest:1.0.0, auditTask, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: update se_execution_instance SET gmt_modified=CURRENT_TIMESTAMP ,active = CASE WHEN ? THEN 1 ELSE 0 END where id=? and tenant_id = ?
+==> Parameters: false(Boolean), 1770522858952(Long), -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+[DEBUG,DefaultDelegationExecutor,main] No behavior found:auditTask
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: update se_execution_instance SET gmt_modified=CURRENT_TIMESTAMP ,active = CASE WHEN ? THEN 1 ELSE 0 END where id=? and tenant_id = ?
+==> Parameters: false(Boolean), 1770522858952(Long), -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+[DEBUG,DefaultDelegationExecutor,main] No behavior found:exclusiveGw1
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: update se_execution_instance SET gmt_modified=CURRENT_TIMESTAMP ,active = CASE WHEN ? THEN 1 ELSE 0 END where id=? and tenant_id = ?
+==> Parameters: false(Boolean), 1770522858962(Long), -1(String)
+<==    Updates: 0
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+[DEBUG,ExpressionUtil,main] expressionEvaluator.result result is true, each param is approve == 'agree'
+             {_$_smart_engine_$_tenant_id=-1, approve=agree, desc=ok} 
+[DEBUG,ExpressionUtil,main] expressionEvaluator.result result is false, each param is approve == 'upgrade'
+             {_$_smart_engine_$_tenant_id=-1, approve=agree, desc=ok} 
+[INFO,AuditProcessServiceTaskDelegation,main] TCC executing: current request is {_$_smart_engine_$_tenant_id=-1, approve=agree, desc=ok}
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: update se_execution_instance SET gmt_modified=CURRENT_TIMESTAMP ,active = CASE WHEN ? THEN 1 ELSE 0 END where id=? and tenant_id = ?
+==> Parameters: false(Boolean), 1770522858964(Long), -1(String)
+<==    Updates: 0
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+[DEBUG,DefaultDelegationExecutor,main] No behavior found:theEnd
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: update se_execution_instance SET gmt_modified=CURRENT_TIMESTAMP ,active = CASE WHEN ? THEN 1 ELSE 0 END where id=? and tenant_id = ?
+==> Parameters: false(Boolean), 1770522858966(Long), -1(String)
+<==    Updates: 0
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: update se_process_instance SET gmt_modified=CURRENT_TIMESTAMP ,status = ? where id=? and tenant_id = ?
+==> Parameters: completed(String), 1770522858938(Long), -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: insert into se_activity_instance( id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,tenant_id ) values (?, ?, ?, ?, ?, ?,?)
+==> Parameters: 1770522858961(Long), 2026-02-08 11:54:16.797(Timestamp), 2026-02-08 11:54:16.797(Timestamp), 1770522858938(Long), exclusiveTest:1.0.0(String), exclusiveGw1(String), -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,tenant_id from se_activity_instance where id=? and tenant_id = ?
+==> Parameters: 1770522858961(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, process_definition_id_and_version, process_definition_activity_id, tenant_id
+<==        Row: 1770522858961, 2026-02-08 11:54:16.797, 2026-02-08 11:54:16.797, 1770522858938, exclusiveTest:1.0.0, exclusiveGw1, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: insert into se_execution_instance( id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,activity_instance_id,active,block_id,tenant_id ) values (?, ?, ?, ?, ?, ?, ?, CASE WHEN ? THEN 1 ELSE 0 END, ?,?)
+==> Parameters: 1770522858962(Long), 2026-02-08 11:54:16.797(Timestamp), 2026-02-08 11:54:16.797(Timestamp), 1770522858938(Long), exclusiveTest:1.0.0(String), exclusiveGw1(String), 1770522858961(Long), false(Boolean), null, -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,activity_instance_id,active,block_id,tenant_id from se_execution_instance where id=? and tenant_id = ?
+==> Parameters: 1770522858962(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, process_definition_id_and_version, process_definition_activity_id, activity_instance_id, active, block_id, tenant_id
+<==        Row: 1770522858962, 2026-02-08 11:54:16.797, 2026-02-08 11:54:16.797, 1770522858938, exclusiveTest:1.0.0, exclusiveGw1, 1770522858961, 0, null, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: insert into se_activity_instance( id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,tenant_id ) values (?, ?, ?, ?, ?, ?,?)
+==> Parameters: 1770522858963(Long), 2026-02-08 11:54:16.798(Timestamp), 2026-02-08 11:54:16.798(Timestamp), 1770522858938(Long), exclusiveTest:1.0.0(String), executeTask(String), -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,tenant_id from se_activity_instance where id=? and tenant_id = ?
+==> Parameters: 1770522858963(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, process_definition_id_and_version, process_definition_activity_id, tenant_id
+<==        Row: 1770522858963, 2026-02-08 11:54:16.798, 2026-02-08 11:54:16.798, 1770522858938, exclusiveTest:1.0.0, executeTask, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: insert into se_execution_instance( id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,activity_instance_id,active,block_id,tenant_id ) values (?, ?, ?, ?, ?, ?, ?, CASE WHEN ? THEN 1 ELSE 0 END, ?,?)
+==> Parameters: 1770522858964(Long), 2026-02-08 11:54:16.798(Timestamp), 2026-02-08 11:54:16.798(Timestamp), 1770522858938(Long), exclusiveTest:1.0.0(String), executeTask(String), 1770522858963(Long), false(Boolean), null, -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,activity_instance_id,active,block_id,tenant_id from se_execution_instance where id=? and tenant_id = ?
+==> Parameters: 1770522858964(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, process_definition_id_and_version, process_definition_activity_id, activity_instance_id, active, block_id, tenant_id
+<==        Row: 1770522858964, 2026-02-08 11:54:16.798, 2026-02-08 11:54:16.798, 1770522858938, exclusiveTest:1.0.0, executeTask, 1770522858963, 0, null, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: insert into se_activity_instance( id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,tenant_id ) values (?, ?, ?, ?, ?, ?,?)
+==> Parameters: 1770522858965(Long), 2026-02-08 11:54:16.798(Timestamp), 2026-02-08 11:54:16.798(Timestamp), 1770522858938(Long), exclusiveTest:1.0.0(String), theEnd(String), -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,tenant_id from se_activity_instance where id=? and tenant_id = ?
+==> Parameters: 1770522858965(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, process_definition_id_and_version, process_definition_activity_id, tenant_id
+<==        Row: 1770522858965, 2026-02-08 11:54:16.798, 2026-02-08 11:54:16.798, 1770522858938, exclusiveTest:1.0.0, theEnd, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: insert into se_execution_instance( id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,activity_instance_id,active,block_id,tenant_id ) values (?, ?, ?, ?, ?, ?, ?, CASE WHEN ? THEN 1 ELSE 0 END, ?,?)
+==> Parameters: 1770522858966(Long), 2026-02-08 11:54:16.798(Timestamp), 2026-02-08 11:54:16.798(Timestamp), 1770522858938(Long), exclusiveTest:1.0.0(String), theEnd(String), 1770522858965(Long), false(Boolean), null, -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,activity_instance_id,active,block_id,tenant_id from se_execution_instance where id=? and tenant_id = ?
+==> Parameters: 1770522858966(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, process_definition_id_and_version, process_definition_activity_id, activity_instance_id, active, block_id, tenant_id
+<==        Row: 1770522858966, 2026-02-08 11:54:16.798, 2026-02-08 11:54:16.798, 1770522858938, exclusiveTest:1.0.0, theEnd, 1770522858965, 0, null, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified, process_definition_id_and_version,process_definition_type,start_user_id, status, complete_time, parent_process_instance_id,parent_execution_instance_id, reason, biz_unique_id, title,tag,comment,tenant_id from se_process_instance where id=? and tenant_id = ?
+==> Parameters: 1770522858938(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_definition_id_and_version, process_definition_type, start_user_id, status, complete_time, parent_process_instance_id, parent_execution_instance_id, reason, biz_unique_id, title, tag, comment, tenant_id
+<==        Row: 1770522858938, 2026-02-08 11:54:16.789, 2026-02-08 11:54:16.790069, exclusiveTest:1.0.0, null, null, completed, null, null, null, null, null, null, null, null, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,tenant_id from se_activity_instance where process_instance_id=? and tenant_id = ? order by gmt_modified desc
+==> Parameters: 1770522858938(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, process_definition_id_and_version, process_definition_activity_id, tenant_id
+<==        Row: 1770522858963, 2026-02-08 11:54:16.798, 2026-02-08 11:54:16.798, 1770522858938, exclusiveTest:1.0.0, executeTask, -1
+<==        Row: 1770522858965, 2026-02-08 11:54:16.798, 2026-02-08 11:54:16.798, 1770522858938, exclusiveTest:1.0.0, theEnd, -1
+<==        Row: 1770522858961, 2026-02-08 11:54:16.797, 2026-02-08 11:54:16.797, 1770522858938, exclusiveTest:1.0.0, exclusiveGw1, -1
+<==        Row: 1770522858951, 2026-02-08 11:54:16.794, 2026-02-08 11:54:16.794, 1770522858938, exclusiveTest:1.0.0, auditTask, -1
+<==        Row: 1770522858939, 2026-02-08 11:54:16.791, 2026-02-08 11:54:16.791, 1770522858938, exclusiveTest:1.0.0, theStart, -1
+<==        Row: 1770522858942, 2026-02-08 11:54:16.791, 2026-02-08 11:54:16.791, 1770522858938, exclusiveTest:1.0.0, submitTask, -1
+<==      Total: 6
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+[DEBUG,DefaultCacheAwareContextLoaderDelegate,main] Retrieved ApplicationContext [1936550492] from cache with key [[MergedContextConfiguration@68ab6ab0 testClass = DataBaseAuditProcessWithTenantIdExample, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]]]
+[DEBUG,cache,main] Spring test ApplicationContext cache statistics: [DefaultContextCache@5c748168 size = 1, maxSize = 32, parentContextCount = 0, hitCount = 1114, missCount = 1]
+[DEBUG,DefaultCacheAwareContextLoaderDelegate,main] Retrieved ApplicationContext [1936550492] from cache with key [[MergedContextConfiguration@68ab6ab0 testClass = DataBaseAuditProcessWithTenantIdExample, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]]]
+[DEBUG,cache,main] Spring test ApplicationContext cache statistics: [DefaultContextCache@5c748168 size = 1, maxSize = 32, parentContextCount = 0, hitCount = 1115, missCount = 1]
+Transaction synchronization deregistering SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+Transaction synchronization closing SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5d7d8613]
+[DEBUG,DataSourceTransactionManager,main] Initiating transaction rollback
+[DEBUG,DataSourceTransactionManager,main] Rolling back JDBC transaction on Connection [org.postgresql.jdbc.PgConnection@58324c9f]
+[DEBUG,DataSourceTransactionManager,main] Releasing JDBC Connection [org.postgresql.jdbc.PgConnection@58324c9f] after transaction
+[INFO,TransactionContext,main] Rolled back transaction for test: [DefaultTestContext@35d60381 testClass = DataBaseAuditProcessWithTenantIdExample, testInstance = com.alibaba.smart.framework.engine.test.process.DataBaseAuditProcessWithTenantIdExample@61ffd148, testMethod = testAuditProcess@DataBaseAuditProcessWithTenantIdExample, testException = [null], mergedContextConfiguration = [MergedContextConfiguration@68ab6ab0 testClass = DataBaseAuditProcessWithTenantIdExample, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]], attributes = map['org.springframework.test.context.event.ApplicationEventsTestExecutionListener.recordApplicationEvents' -> false]]
+[DEBUG,AbstractDirtiesContextTestExecutionListener,main] After test method: context [DefaultTestContext@35d60381 testClass = DataBaseAuditProcessWithTenantIdExample, testInstance = com.alibaba.smart.framework.engine.test.process.DataBaseAuditProcessWithTenantIdExample@61ffd148, testMethod = testAuditProcess@DataBaseAuditProcessWithTenantIdExample, testException = [null], mergedContextConfiguration = [MergedContextConfiguration@68ab6ab0 testClass = DataBaseAuditProcessWithTenantIdExample, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]], attributes = map['org.springframework.test.context.event.ApplicationEventsTestExecutionListener.recordApplicationEvents' -> false]], class annotated with @DirtiesContext [false] with mode [null], method annotated with @DirtiesContext [false] with mode [null].
+]]></system-out>
+  </testcase>
+  <testcase name="testFailedServiceTaskAuditProcess" classname="com.alibaba.smart.framework.engine.test.process.DataBaseAuditProcessWithTenantIdExample" time="0.015">
+    <system-out><![CDATA[[DEBUG,ProfileValueUtils,main] Retrieved @ProfileValueSourceConfiguration [null] for test class [com.alibaba.smart.framework.engine.test.process.DataBaseAuditProcessWithTenantIdExample]
+[DEBUG,ProfileValueUtils,main] Retrieved ProfileValueSource type [class org.springframework.test.annotation.SystemProfileValueSource] for class [com.alibaba.smart.framework.engine.test.process.DataBaseAuditProcessWithTenantIdExample]
+[DEBUG,DependencyInjectionTestExecutionListener,main] Performing dependency injection for test context [[DefaultTestContext@35d60381 testClass = DataBaseAuditProcessWithTenantIdExample, testInstance = com.alibaba.smart.framework.engine.test.process.DataBaseAuditProcessWithTenantIdExample@2a47597, testMethod = [null], testException = [null], mergedContextConfiguration = [MergedContextConfiguration@68ab6ab0 testClass = DataBaseAuditProcessWithTenantIdExample, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]], attributes = map['org.springframework.test.context.event.ApplicationEventsTestExecutionListener.recordApplicationEvents' -> false]]].
+[DEBUG,DefaultCacheAwareContextLoaderDelegate,main] Retrieved ApplicationContext [1936550492] from cache with key [[MergedContextConfiguration@68ab6ab0 testClass = DataBaseAuditProcessWithTenantIdExample, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]]]
+[DEBUG,cache,main] Spring test ApplicationContext cache statistics: [DefaultContextCache@5c748168 size = 1, maxSize = 32, parentContextCount = 0, hitCount = 1116, missCount = 1]
+[DEBUG,DefaultCacheAwareContextLoaderDelegate,main] Retrieved ApplicationContext [1936550492] from cache with key [[MergedContextConfiguration@68ab6ab0 testClass = DataBaseAuditProcessWithTenantIdExample, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]]]
+[DEBUG,cache,main] Spring test ApplicationContext cache statistics: [DefaultContextCache@5c748168 size = 1, maxSize = 32, parentContextCount = 0, hitCount = 1117, missCount = 1]
+[DEBUG,AbstractDirtiesContextTestExecutionListener,main] Before test method: context [DefaultTestContext@35d60381 testClass = DataBaseAuditProcessWithTenantIdExample, testInstance = com.alibaba.smart.framework.engine.test.process.DataBaseAuditProcessWithTenantIdExample@2a47597, testMethod = testFailedServiceTaskAuditProcess@DataBaseAuditProcessWithTenantIdExample, testException = [null], mergedContextConfiguration = [MergedContextConfiguration@68ab6ab0 testClass = DataBaseAuditProcessWithTenantIdExample, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]], attributes = map['org.springframework.test.context.event.ApplicationEventsTestExecutionListener.recordApplicationEvents' -> false]], class annotated with @DirtiesContext [false] with mode [null], method annotated with @DirtiesContext [false] with mode [null].
+[DEBUG,TransactionalTestExecutionListener,main] Explicit transaction definition [PROPAGATION_REQUIRED,ISOLATION_DEFAULT] found for test context [DefaultTestContext@35d60381 testClass = DataBaseAuditProcessWithTenantIdExample, testInstance = com.alibaba.smart.framework.engine.test.process.DataBaseAuditProcessWithTenantIdExample@2a47597, testMethod = testFailedServiceTaskAuditProcess@DataBaseAuditProcessWithTenantIdExample, testException = [null], mergedContextConfiguration = [MergedContextConfiguration@68ab6ab0 testClass = DataBaseAuditProcessWithTenantIdExample, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]], attributes = map['org.springframework.test.context.event.ApplicationEventsTestExecutionListener.recordApplicationEvents' -> false]]
+[DEBUG,DefaultCacheAwareContextLoaderDelegate,main] Retrieved ApplicationContext [1936550492] from cache with key [[MergedContextConfiguration@68ab6ab0 testClass = DataBaseAuditProcessWithTenantIdExample, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]]]
+[DEBUG,cache,main] Spring test ApplicationContext cache statistics: [DefaultContextCache@5c748168 size = 1, maxSize = 32, parentContextCount = 0, hitCount = 1118, missCount = 1]
+[DEBUG,TransactionalTestExecutionListener,main] No method-level @Rollback override: using default rollback [true] for test context [DefaultTestContext@35d60381 testClass = DataBaseAuditProcessWithTenantIdExample, testInstance = com.alibaba.smart.framework.engine.test.process.DataBaseAuditProcessWithTenantIdExample@2a47597, testMethod = testFailedServiceTaskAuditProcess@DataBaseAuditProcessWithTenantIdExample, testException = [null], mergedContextConfiguration = [MergedContextConfiguration@68ab6ab0 testClass = DataBaseAuditProcessWithTenantIdExample, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]], attributes = map['org.springframework.test.context.event.ApplicationEventsTestExecutionListener.recordApplicationEvents' -> false]].
+[DEBUG,DataSourceTransactionManager,main] Creating new transaction with name [com.alibaba.smart.framework.engine.test.process.DataBaseAuditProcessWithTenantIdExample.testFailedServiceTaskAuditProcess]: PROPAGATION_REQUIRED,ISOLATION_DEFAULT
+[DEBUG,DriverManagerDataSource,main] Creating new JDBC DriverManager Connection to [jdbc:postgresql://localhost:5432/aura_meta?charSet=UTF8]
+[DEBUG,DataSourceTransactionManager,main] Acquired Connection [org.postgresql.jdbc.PgConnection@12f279b5] for JDBC transaction
+[DEBUG,DataSourceTransactionManager,main] Switching JDBC Connection [org.postgresql.jdbc.PgConnection@12f279b5] to manual commit
+[INFO,TransactionContext,main] Began transaction (1) for test context [DefaultTestContext@35d60381 testClass = DataBaseAuditProcessWithTenantIdExample, testInstance = com.alibaba.smart.framework.engine.test.process.DataBaseAuditProcessWithTenantIdExample@2a47597, testMethod = testFailedServiceTaskAuditProcess@DataBaseAuditProcessWithTenantIdExample, testException = [null], mergedContextConfiguration = [MergedContextConfiguration@68ab6ab0 testClass = DataBaseAuditProcessWithTenantIdExample, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]], attributes = map['org.springframework.test.context.event.ApplicationEventsTestExecutionListener.recordApplicationEvents' -> false]]; transaction manager [org.springframework.jdbc.datasource.DataSourceTransactionManager@5a6fa56e]; rollback [true]
+[DEBUG,DefaultCacheAwareContextLoaderDelegate,main] Retrieved ApplicationContext [1936550492] from cache with key [[MergedContextConfiguration@68ab6ab0 testClass = DataBaseAuditProcessWithTenantIdExample, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]]]
+[DEBUG,cache,main] Spring test ApplicationContext cache statistics: [DefaultContextCache@5c748168 size = 1, maxSize = 32, parentContextCount = 0, hitCount = 1119, missCount = 1]
+[DEBUG,DefaultCacheAwareContextLoaderDelegate,main] Retrieved ApplicationContext [1936550492] from cache with key [[MergedContextConfiguration@68ab6ab0 testClass = DataBaseAuditProcessWithTenantIdExample, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]]]
+[DEBUG,cache,main] Spring test ApplicationContext cache statistics: [DefaultContextCache@5c748168 size = 1, maxSize = 32, parentContextCount = 0, hitCount = 1120, missCount = 1]
+[DEBUG,AbstractElementParser,main] id is ignored when parsing attribute from ProcessDefinitionSourceImpl(processDefinitionList=[], tenantId=null)
+[DEBUG,AbstractElementParser,main] version is ignored when parsing attribute from ProcessDefinitionSourceImpl(processDefinitionList=[], tenantId=null)
+[DEBUG,AbstractElementParser,main] targetNamespace is ignored when parsing attribute from ProcessDefinitionSourceImpl(processDefinitionList=[], tenantId=null)
+[DEBUG,AbstractElementParser,main] id is ignored when parsing attribute from theStart
+[DEBUG,AbstractElementParser,main] id is ignored when parsing attribute from theStart --> flow1 --> submitTask
+[DEBUG,AbstractElementParser,main] sourceRef is ignored when parsing attribute from theStart --> flow1 --> submitTask
+[DEBUG,AbstractElementParser,main] targetRef is ignored when parsing attribute from theStart --> flow1 --> submitTask
+[DEBUG,AbstractElementParser,main] id is ignored when parsing attribute from submitTask
+[DEBUG,AbstractElementParser,main] name is ignored when parsing attribute from submitTask
+[DEBUG,AbstractElementParser,main] id is ignored when parsing attribute from submitTask --> flowFromSubmitTask --> auditTask
+[DEBUG,AbstractElementParser,main] sourceRef is ignored when parsing attribute from submitTask --> flowFromSubmitTask --> auditTask
+[DEBUG,AbstractElementParser,main] targetRef is ignored when parsing attribute from submitTask --> flowFromSubmitTask --> auditTask
+[DEBUG,AbstractElementParser,main] id is ignored when parsing attribute from auditTask
+[DEBUG,AbstractElementParser,main] name is ignored when parsing attribute from auditTask
+[DEBUG,AbstractElementParser,main] id is ignored when parsing attribute from auditTask --> flowFromAuditTask --> exclusiveGw1
+[DEBUG,AbstractElementParser,main] sourceRef is ignored when parsing attribute from auditTask --> flowFromAuditTask --> exclusiveGw1
+[DEBUG,AbstractElementParser,main] targetRef is ignored when parsing attribute from auditTask --> flowFromAuditTask --> exclusiveGw1
+[DEBUG,AbstractElementParser,main] id is ignored when parsing attribute from exclusiveGw1
+[DEBUG,AbstractElementParser,main] name is ignored when parsing attribute from exclusiveGw1
+[DEBUG,AbstractElementParser,main] id is ignored when parsing attribute from exclusiveGw1 --> flow2 --> executeTask
+[DEBUG,AbstractElementParser,main] sourceRef is ignored when parsing attribute from exclusiveGw1 --> flow2 --> executeTask
+[DEBUG,AbstractElementParser,main] targetRef is ignored when parsing attribute from exclusiveGw1 --> flow2 --> executeTask
+[DEBUG,AbstractElementParser,main] id is ignored when parsing attribute from exclusiveGw1 --> flow3 --> advancedAuditTask
+[DEBUG,AbstractElementParser,main] sourceRef is ignored when parsing attribute from exclusiveGw1 --> flow3 --> advancedAuditTask
+[DEBUG,AbstractElementParser,main] targetRef is ignored when parsing attribute from exclusiveGw1 --> flow3 --> advancedAuditTask
+[DEBUG,AbstractElementParser,main] id is ignored when parsing attribute from executeTask
+[DEBUG,AbstractElementParser,main] name is ignored when parsing attribute from executeTask
+[DEBUG,AbstractElementParser,main] {http://smartengine.org/schema/process}class is ignored when parsing attribute from executeTask
+[DEBUG,AbstractElementParser,main] id is ignored when parsing attribute from executeTask --> flow5 --> theEnd
+[DEBUG,AbstractElementParser,main] sourceRef is ignored when parsing attribute from executeTask --> flow5 --> theEnd
+[DEBUG,AbstractElementParser,main] targetRef is ignored when parsing attribute from executeTask --> flow5 --> theEnd
+[DEBUG,AbstractElementParser,main] id is ignored when parsing attribute from advancedAuditTask
+[DEBUG,AbstractElementParser,main] name is ignored when parsing attribute from advancedAuditTask
+[DEBUG,AbstractElementParser,main] id is ignored when parsing attribute from advancedAuditTask --> flowFromAdvancedAuditTask --> exclusiveGw2
+[DEBUG,AbstractElementParser,main] sourceRef is ignored when parsing attribute from advancedAuditTask --> flowFromAdvancedAuditTask --> exclusiveGw2
+[DEBUG,AbstractElementParser,main] targetRef is ignored when parsing attribute from advancedAuditTask --> flowFromAdvancedAuditTask --> exclusiveGw2
+[DEBUG,AbstractElementParser,main] id is ignored when parsing attribute from exclusiveGw2
+[DEBUG,AbstractElementParser,main] name is ignored when parsing attribute from exclusiveGw2
+[DEBUG,AbstractElementParser,main] id is ignored when parsing attribute from exclusiveGw2 --> flow9 --> executeTask
+[DEBUG,AbstractElementParser,main] sourceRef is ignored when parsing attribute from exclusiveGw2 --> flow9 --> executeTask
+[DEBUG,AbstractElementParser,main] targetRef is ignored when parsing attribute from exclusiveGw2 --> flow9 --> executeTask
+[DEBUG,AbstractElementParser,main] id is ignored when parsing attribute from exclusiveGw2 --> flow10 --> theEnd
+[DEBUG,AbstractElementParser,main] sourceRef is ignored when parsing attribute from exclusiveGw2 --> flow10 --> theEnd
+[DEBUG,AbstractElementParser,main] targetRef is ignored when parsing attribute from exclusiveGw2 --> flow10 --> theEnd
+[DEBUG,AbstractElementParser,main] id is ignored when parsing attribute from EndEvent(className=null)
+[DEBUG,DefaultDelegationExecutor,main] No behavior found:theStart
+Creating a new SqlSession
+Registering transaction synchronization for SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+JDBC Connection [org.postgresql.jdbc.PgConnection@12f279b5] will be managed by Spring
+==>  Preparing: update se_execution_instance SET gmt_modified=CURRENT_TIMESTAMP ,active = CASE WHEN ? THEN 1 ELSE 0 END where id=? and tenant_id = ?
+==> Parameters: false(Boolean), 1770522858977(Long), -1(String)
+<==    Updates: 0
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+[INFO,UserTaskBehavior,main] The taskAssigneeCandidateInstance are [TaskAssigneeCandidateInstance(assigneeId=1, assigneeType=user, priority=500), TaskAssigneeCandidateInstance(assigneeId=3, assigneeType=user, priority=500), TaskAssigneeCandidateInstance(assigneeId=5, assigneeType=user, priority=500)] for PI:1770522858975 and AI id: submitTask
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: insert into se_process_instance ( id, gmt_create, gmt_modified, process_definition_id_and_version,process_definition_type,start_user_id, status, complete_time, parent_process_instance_id,parent_execution_instance_id, reason, biz_unique_id, title,tag,comment,tenant_id ) values (?, ?, ?, ?,?,?, ?, ?, ?,?, ?, ?, ?, ?,?, ?)
+==> Parameters: 1770522858975(Long), 2026-02-08 11:54:16.805(Timestamp), 2026-02-08 11:54:16.805(Timestamp), exclusiveTest:1.0.0(String), null, null, running(String), null, null, null, null, null, null, null, null, -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified, process_definition_id_and_version,process_definition_type,start_user_id, status, complete_time, parent_process_instance_id,parent_execution_instance_id, reason, biz_unique_id, title,tag,comment,tenant_id from se_process_instance where id=? and tenant_id = ?
+==> Parameters: 1770522858975(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_definition_id_and_version, process_definition_type, start_user_id, status, complete_time, parent_process_instance_id, parent_execution_instance_id, reason, biz_unique_id, title, tag, comment, tenant_id
+<==        Row: 1770522858975, 2026-02-08 11:54:16.805, 2026-02-08 11:54:16.805, exclusiveTest:1.0.0, null, null, running, null, null, null, null, null, null, null, null, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: insert into se_activity_instance( id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,tenant_id ) values (?, ?, ?, ?, ?, ?,?)
+==> Parameters: 1770522858976(Long), 2026-02-08 11:54:16.806(Timestamp), 2026-02-08 11:54:16.806(Timestamp), 1770522858975(Long), exclusiveTest:1.0.0(String), theStart(String), -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,tenant_id from se_activity_instance where id=? and tenant_id = ?
+==> Parameters: 1770522858976(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, process_definition_id_and_version, process_definition_activity_id, tenant_id
+<==        Row: 1770522858976, 2026-02-08 11:54:16.806, 2026-02-08 11:54:16.806, 1770522858975, exclusiveTest:1.0.0, theStart, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: insert into se_execution_instance( id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,activity_instance_id,active,block_id,tenant_id ) values (?, ?, ?, ?, ?, ?, ?, CASE WHEN ? THEN 1 ELSE 0 END, ?,?)
+==> Parameters: 1770522858977(Long), 2026-02-08 11:54:16.806(Timestamp), 2026-02-08 11:54:16.806(Timestamp), 1770522858975(Long), exclusiveTest:1.0.0(String), theStart(String), 1770522858976(Long), false(Boolean), null, -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,activity_instance_id,active,block_id,tenant_id from se_execution_instance where id=? and tenant_id = ?
+==> Parameters: 1770522858977(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, process_definition_id_and_version, process_definition_activity_id, activity_instance_id, active, block_id, tenant_id
+<==        Row: 1770522858977, 2026-02-08 11:54:16.806, 2026-02-08 11:54:16.806, 1770522858975, exclusiveTest:1.0.0, theStart, 1770522858976, 0, null, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: insert into se_activity_instance( id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,tenant_id ) values (?, ?, ?, ?, ?, ?,?)
+==> Parameters: 1770522858978(Long), 2026-02-08 11:54:16.807(Timestamp), 2026-02-08 11:54:16.807(Timestamp), 1770522858975(Long), exclusiveTest:1.0.0(String), submitTask(String), -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,tenant_id from se_activity_instance where id=? and tenant_id = ?
+==> Parameters: 1770522858978(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, process_definition_id_and_version, process_definition_activity_id, tenant_id
+<==        Row: 1770522858978, 2026-02-08 11:54:16.807, 2026-02-08 11:54:16.807, 1770522858975, exclusiveTest:1.0.0, submitTask, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: insert into se_execution_instance( id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,activity_instance_id,active,block_id,tenant_id ) values (?, ?, ?, ?, ?, ?, ?, CASE WHEN ? THEN 1 ELSE 0 END, ?,?)
+==> Parameters: 1770522858979(Long), 2026-02-08 11:54:16.807(Timestamp), 2026-02-08 11:54:16.807(Timestamp), 1770522858975(Long), exclusiveTest:1.0.0(String), submitTask(String), 1770522858978(Long), true(Boolean), null, -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,activity_instance_id,active,block_id,tenant_id from se_execution_instance where id=? and tenant_id = ?
+==> Parameters: 1770522858979(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, process_definition_id_and_version, process_definition_activity_id, activity_instance_id, active, block_id, tenant_id
+<==        Row: 1770522858979, 2026-02-08 11:54:16.807, 2026-02-08 11:54:16.807, 1770522858975, exclusiveTest:1.0.0, submitTask, 1770522858978, 1, null, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: insert into se_task_instance( id, gmt_create, gmt_modified,process_instance_id, process_definition_id_and_version,process_definition_type, activity_instance_id, process_definition_activity_id, execution_instance_id,claim_user_id,priority,tag,claim_time,complete_time,status,comment,extension,title,tenant_id ) values (?, ?, ?, ?, ?,?, ?, ?,?,?,?,?,?,?,?,?,?,?, ?)
+==> Parameters: 1770522858980(Long), 2026-02-08 11:54:16.807(Timestamp), 2026-02-08 11:54:16.807(Timestamp), 1770522858975(Long), exclusiveTest:1.0.0(String), null, 1770522858978(Long), submitTask(String), 1770522858979(Long), null, null, null, null, null, pending(String), null, null, null, -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified,process_instance_id, process_definition_id_and_version,process_definition_type, activity_instance_id, process_definition_activity_id, execution_instance_id,claim_user_id,priority,tag,claim_time,complete_time,status,comment,extension,title,tenant_id from se_task_instance where id=? and tenant_id = ?
+==> Parameters: 1770522858980(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, process_definition_id_and_version, process_definition_type, activity_instance_id, process_definition_activity_id, execution_instance_id, claim_user_id, priority, tag, claim_time, complete_time, status, comment, extension, title, tenant_id
+<==        Row: 1770522858980, 2026-02-08 11:54:16.807, 2026-02-08 11:54:16.807, 1770522858975, exclusiveTest:1.0.0, null, 1770522858978, submitTask, 1770522858979, null, null, null, null, null, pending, null, null, null, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: insert into se_task_assignee_instance( id, gmt_create, gmt_modified,process_instance_id, task_instance_id,assignee_id,assignee_type,tenant_id ) values (?, ?, ?, ?, ?,?,?, ?)
+==> Parameters: 1770522858981(Long), 2026-02-08 11:54:16.807(Timestamp), 2026-02-08 11:54:16.807(Timestamp), 1770522858975(Long), 1770522858980(Long), 1(String), user(String), -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified,process_instance_id, task_instance_id,assignee_id,assignee_type,tenant_id from se_task_assignee_instance where id=? and tenant_id = ?
+==> Parameters: 1770522858981(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, task_instance_id, assignee_id, assignee_type, tenant_id
+<==        Row: 1770522858981, 2026-02-08 11:54:16.807, 2026-02-08 11:54:16.807, 1770522858975, 1770522858980, 1, user, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: insert into se_task_assignee_instance( id, gmt_create, gmt_modified,process_instance_id, task_instance_id,assignee_id,assignee_type,tenant_id ) values (?, ?, ?, ?, ?,?,?, ?)
+==> Parameters: 1770522858982(Long), 2026-02-08 11:54:16.808(Timestamp), 2026-02-08 11:54:16.808(Timestamp), 1770522858975(Long), 1770522858980(Long), 3(String), user(String), -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified,process_instance_id, task_instance_id,assignee_id,assignee_type,tenant_id from se_task_assignee_instance where id=? and tenant_id = ?
+==> Parameters: 1770522858982(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, task_instance_id, assignee_id, assignee_type, tenant_id
+<==        Row: 1770522858982, 2026-02-08 11:54:16.808, 2026-02-08 11:54:16.808, 1770522858975, 1770522858980, 3, user, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: insert into se_task_assignee_instance( id, gmt_create, gmt_modified,process_instance_id, task_instance_id,assignee_id,assignee_type,tenant_id ) values (?, ?, ?, ?, ?,?,?, ?)
+==> Parameters: 1770522858983(Long), 2026-02-08 11:54:16.808(Timestamp), 2026-02-08 11:54:16.808(Timestamp), 1770522858975(Long), 1770522858980(Long), 5(String), user(String), -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified,process_instance_id, task_instance_id,assignee_id,assignee_type,tenant_id from se_task_assignee_instance where id=? and tenant_id = ?
+==> Parameters: 1770522858983(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, task_instance_id, assignee_id, assignee_type, tenant_id
+<==        Row: 1770522858983, 2026-02-08 11:54:16.808, 2026-02-08 11:54:16.808, 1770522858975, 1770522858980, 5, user, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified,process_instance_id, process_definition_id_and_version,process_definition_type, activity_instance_id, process_definition_activity_id, execution_instance_id,claim_user_id,priority,tag,claim_time,complete_time,status,comment,extension,title,tenant_id from se_task_instance where process_instance_id = ? and status = ? and tenant_id = ?
+==> Parameters: 1770522858975(Long), pending(String), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, process_definition_id_and_version, process_definition_type, activity_instance_id, process_definition_activity_id, execution_instance_id, claim_user_id, priority, tag, claim_time, complete_time, status, comment, extension, title, tenant_id
+<==        Row: 1770522858980, 2026-02-08 11:54:16.807, 2026-02-08 11:54:16.807, 1770522858975, exclusiveTest:1.0.0, null, 1770522858978, submitTask, 1770522858979, null, null, null, null, null, pending, null, null, null, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified,process_instance_id, process_definition_id_and_version,process_definition_type, activity_instance_id, process_definition_activity_id, execution_instance_id,claim_user_id,priority,tag,claim_time,complete_time,status,comment,extension,title,tenant_id from se_task_instance where id=?
+==> Parameters: 1770522858980(Long)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, process_definition_id_and_version, process_definition_type, activity_instance_id, process_definition_activity_id, execution_instance_id, claim_user_id, priority, tag, claim_time, complete_time, status, comment, extension, title, tenant_id
+<==        Row: 1770522858980, 2026-02-08 11:54:16.807, 2026-02-08 11:54:16.807, 1770522858975, exclusiveTest:1.0.0, null, 1770522858978, submitTask, 1770522858979, null, null, null, null, null, pending, null, null, null, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: update se_task_instance SET gmt_modified=CURRENT_TIMESTAMP ,claim_time = ? ,complete_time = ? ,status = ? where id=? and status = ? and tenant_id = ?
+==> Parameters: 2026-02-08 11:54:16.808(Timestamp), 2026-02-08 11:54:16.808(Timestamp), completed(String), 1770522858980(Long), pending(String), -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+[WARN,DefaultTaskCommandService,main] Failed to close supervision for task: 1770522858980
+org.springframework.beans.factory.NoSuchBeanDefinitionException: No bean named 'supervisionInstanceStorage' available
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.getBeanDefinition(DefaultListableBeanFactory.java:874)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.getMergedLocalBeanDefinition(AbstractBeanFactory.java:1358)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:309)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:208)
+	at org.springframework.context.support.AbstractApplicationContext.getBean(AbstractApplicationContext.java:1156)
+	at com.alibaba.smart.framework.engine.test.DatabaseBaseTestCase$DataBaseAccessService.access(DatabaseBaseTestCase.java:123)
+	at com.alibaba.smart.framework.engine.service.command.impl.DefaultTaskCommandService.complete(DefaultTaskCommandService.java:104)
+	at com.alibaba.smart.framework.engine.service.command.impl.DefaultTaskCommandService.complete(DefaultTaskCommandService.java:119)
+	at com.alibaba.smart.framework.engine.test.process.DataBaseAuditProcessWithTenantIdExample.testFailedServiceTaskAuditProcess(DataBaseAuditProcessWithTenantIdExample.java:140)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:59)
+	at org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)
+	at org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:56)
+	at org.junit.internal.runners.statements.InvokeMethod.evaluate(InvokeMethod.java:17)
+	at org.springframework.test.context.junit4.statements.RunBeforeTestExecutionCallbacks.evaluate(RunBeforeTestExecutionCallbacks.java:74)
+	at org.springframework.test.context.junit4.statements.RunAfterTestExecutionCallbacks.evaluate(RunAfterTestExecutionCallbacks.java:84)
+	at org.junit.internal.runners.statements.RunBefores.evaluate(RunBefores.java:26)
+	at org.springframework.test.context.junit4.statements.RunBeforeTestMethodCallbacks.evaluate(RunBeforeTestMethodCallbacks.java:75)
+	at org.junit.internal.runners.statements.RunAfters.evaluate(RunAfters.java:27)
+	at org.springframework.test.context.junit4.statements.RunAfterTestMethodCallbacks.evaluate(RunAfterTestMethodCallbacks.java:86)
+	at org.springframework.test.context.junit4.statements.SpringRepeat.evaluate(SpringRepeat.java:84)
+	at org.junit.runners.ParentRunner.runLeaf(ParentRunner.java:366)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.runChild(SpringJUnit4ClassRunner.java:251)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.runChild(SpringJUnit4ClassRunner.java:97)
+	at org.junit.runners.ParentRunner$4.run(ParentRunner.java:331)
+	at org.junit.runners.ParentRunner$1.schedule(ParentRunner.java:79)
+	at org.junit.runners.ParentRunner.runChildren(ParentRunner.java:329)
+	at org.junit.runners.ParentRunner.access$100(ParentRunner.java:66)
+	at org.junit.runners.ParentRunner$2.evaluate(ParentRunner.java:293)
+	at org.springframework.test.context.junit4.statements.RunBeforeTestClassCallbacks.evaluate(RunBeforeTestClassCallbacks.java:61)
+	at org.springframework.test.context.junit4.statements.RunAfterTestClassCallbacks.evaluate(RunAfterTestClassCallbacks.java:70)
+	at org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)
+	at org.junit.runners.ParentRunner.run(ParentRunner.java:413)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.run(SpringJUnit4ClassRunner.java:190)
+	at org.junit.runner.JUnitCore.run(JUnitCore.java:137)
+	at org.junit.runner.JUnitCore.run(JUnitCore.java:115)
+	at org.junit.vintage.engine.execution.RunnerExecutor.execute(RunnerExecutor.java:42)
+	at org.junit.vintage.engine.VintageTestEngine.executeAllChildren(VintageTestEngine.java:80)
+	at org.junit.vintage.engine.VintageTestEngine.execute(VintageTestEngine.java:72)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:147)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:127)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:90)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.lambda$execute$0(EngineExecutionOrchestrator.java:55)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.withInterceptedStreams(EngineExecutionOrchestrator.java:102)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:54)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:114)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:86)
+	at org.junit.platform.launcher.core.DefaultLauncherSession$DelegatingLauncher.execute(DefaultLauncherSession.java:86)
+	at org.apache.maven.surefire.junitplatform.LazyLauncher.execute(LazyLauncher.java:56)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.execute(JUnitPlatformProvider.java:184)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invokeAllTests(JUnitPlatformProvider.java:148)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invoke(JUnitPlatformProvider.java:122)
+	at org.apache.maven.surefire.booter.ForkedBooter.runSuitesInProcess(ForkedBooter.java:385)
+	at org.apache.maven.surefire.booter.ForkedBooter.execute(ForkedBooter.java:162)
+	at org.apache.maven.surefire.booter.ForkedBooter.run(ForkedBooter.java:507)
+	at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:495)
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,activity_instance_id,active,block_id,tenant_id from se_execution_instance where id=?
+==> Parameters: 1770522858979(Long)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, process_definition_id_and_version, process_definition_activity_id, activity_instance_id, active, block_id, tenant_id
+<==        Row: 1770522858979, 2026-02-08 11:54:16.807, 2026-02-08 11:54:16.807, 1770522858975, exclusiveTest:1.0.0, submitTask, 1770522858978, 1, null, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified, process_definition_id_and_version,process_definition_type,start_user_id, status, complete_time, parent_process_instance_id,parent_execution_instance_id, reason, biz_unique_id, title,tag,comment,tenant_id from se_process_instance where id=?
+==> Parameters: 1770522858975(Long)
+<==    Columns: id, gmt_create, gmt_modified, process_definition_id_and_version, process_definition_type, start_user_id, status, complete_time, parent_process_instance_id, parent_execution_instance_id, reason, biz_unique_id, title, tag, comment, tenant_id
+<==        Row: 1770522858975, 2026-02-08 11:54:16.805, 2026-02-08 11:54:16.805, exclusiveTest:1.0.0, null, null, running, null, null, null, null, null, null, null, null, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,tenant_id from se_activity_instance where id=? and tenant_id = ?
+==> Parameters: 1770522858978(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, process_definition_id_and_version, process_definition_activity_id, tenant_id
+<==        Row: 1770522858978, 2026-02-08 11:54:16.807, 2026-02-08 11:54:16.807, 1770522858975, exclusiveTest:1.0.0, submitTask, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: update se_execution_instance SET gmt_modified=CURRENT_TIMESTAMP ,active = CASE WHEN ? THEN 1 ELSE 0 END where id=? and tenant_id = ?
+==> Parameters: false(Boolean), 1770522858979(Long), -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+[DEBUG,DefaultDelegationExecutor,main] No behavior found:submitTask
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: update se_execution_instance SET gmt_modified=CURRENT_TIMESTAMP ,active = CASE WHEN ? THEN 1 ELSE 0 END where id=? and tenant_id = ?
+==> Parameters: false(Boolean), 1770522858979(Long), -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+[INFO,UserTaskBehavior,main] The taskAssigneeCandidateInstance are [TaskAssigneeCandidateInstance(assigneeId=1, assigneeType=user, priority=500), TaskAssigneeCandidateInstance(assigneeId=3, assigneeType=user, priority=500), TaskAssigneeCandidateInstance(assigneeId=5, assigneeType=user, priority=500)] for PI:1770522858975 and AI id: auditTask
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: update se_process_instance SET gmt_modified=CURRENT_TIMESTAMP ,status = ? where id=? and tenant_id = ?
+==> Parameters: running(String), 1770522858975(Long), -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: insert into se_activity_instance( id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,tenant_id ) values (?, ?, ?, ?, ?, ?,?)
+==> Parameters: 1770522858988(Long), 2026-02-08 11:54:16.809(Timestamp), 2026-02-08 11:54:16.809(Timestamp), 1770522858975(Long), exclusiveTest:1.0.0(String), auditTask(String), -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,tenant_id from se_activity_instance where id=? and tenant_id = ?
+==> Parameters: 1770522858988(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, process_definition_id_and_version, process_definition_activity_id, tenant_id
+<==        Row: 1770522858988, 2026-02-08 11:54:16.809, 2026-02-08 11:54:16.809, 1770522858975, exclusiveTest:1.0.0, auditTask, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: insert into se_execution_instance( id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,activity_instance_id,active,block_id,tenant_id ) values (?, ?, ?, ?, ?, ?, ?, CASE WHEN ? THEN 1 ELSE 0 END, ?,?)
+==> Parameters: 1770522858989(Long), 2026-02-08 11:54:16.809(Timestamp), 2026-02-08 11:54:16.809(Timestamp), 1770522858975(Long), exclusiveTest:1.0.0(String), auditTask(String), 1770522858988(Long), true(Boolean), null, -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,activity_instance_id,active,block_id,tenant_id from se_execution_instance where id=? and tenant_id = ?
+==> Parameters: 1770522858989(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, process_definition_id_and_version, process_definition_activity_id, activity_instance_id, active, block_id, tenant_id
+<==        Row: 1770522858989, 2026-02-08 11:54:16.809, 2026-02-08 11:54:16.809, 1770522858975, exclusiveTest:1.0.0, auditTask, 1770522858988, 1, null, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: insert into se_task_instance( id, gmt_create, gmt_modified,process_instance_id, process_definition_id_and_version,process_definition_type, activity_instance_id, process_definition_activity_id, execution_instance_id,claim_user_id,priority,tag,claim_time,complete_time,status,comment,extension,title,tenant_id ) values (?, ?, ?, ?, ?,?, ?, ?,?,?,?,?,?,?,?,?,?,?, ?)
+==> Parameters: 1770522858990(Long), 2026-02-08 11:54:16.809(Timestamp), 2026-02-08 11:54:16.809(Timestamp), 1770522858975(Long), exclusiveTest:1.0.0(String), null, 1770522858988(Long), auditTask(String), 1770522858989(Long), null, null, null, null, null, pending(String), null, null, null, -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified,process_instance_id, process_definition_id_and_version,process_definition_type, activity_instance_id, process_definition_activity_id, execution_instance_id,claim_user_id,priority,tag,claim_time,complete_time,status,comment,extension,title,tenant_id from se_task_instance where id=? and tenant_id = ?
+==> Parameters: 1770522858990(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, process_definition_id_and_version, process_definition_type, activity_instance_id, process_definition_activity_id, execution_instance_id, claim_user_id, priority, tag, claim_time, complete_time, status, comment, extension, title, tenant_id
+<==        Row: 1770522858990, 2026-02-08 11:54:16.809, 2026-02-08 11:54:16.809, 1770522858975, exclusiveTest:1.0.0, null, 1770522858988, auditTask, 1770522858989, null, null, null, null, null, pending, null, null, null, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: insert into se_task_assignee_instance( id, gmt_create, gmt_modified,process_instance_id, task_instance_id,assignee_id,assignee_type,tenant_id ) values (?, ?, ?, ?, ?,?,?, ?)
+==> Parameters: 1770522858991(Long), 2026-02-08 11:54:16.81(Timestamp), 2026-02-08 11:54:16.81(Timestamp), 1770522858975(Long), 1770522858990(Long), 1(String), user(String), -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified,process_instance_id, task_instance_id,assignee_id,assignee_type,tenant_id from se_task_assignee_instance where id=? and tenant_id = ?
+==> Parameters: 1770522858991(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, task_instance_id, assignee_id, assignee_type, tenant_id
+<==        Row: 1770522858991, 2026-02-08 11:54:16.81, 2026-02-08 11:54:16.81, 1770522858975, 1770522858990, 1, user, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: insert into se_task_assignee_instance( id, gmt_create, gmt_modified,process_instance_id, task_instance_id,assignee_id,assignee_type,tenant_id ) values (?, ?, ?, ?, ?,?,?, ?)
+==> Parameters: 1770522858992(Long), 2026-02-08 11:54:16.81(Timestamp), 2026-02-08 11:54:16.81(Timestamp), 1770522858975(Long), 1770522858990(Long), 3(String), user(String), -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified,process_instance_id, task_instance_id,assignee_id,assignee_type,tenant_id from se_task_assignee_instance where id=? and tenant_id = ?
+==> Parameters: 1770522858992(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, task_instance_id, assignee_id, assignee_type, tenant_id
+<==        Row: 1770522858992, 2026-02-08 11:54:16.81, 2026-02-08 11:54:16.81, 1770522858975, 1770522858990, 3, user, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: insert into se_task_assignee_instance( id, gmt_create, gmt_modified,process_instance_id, task_instance_id,assignee_id,assignee_type,tenant_id ) values (?, ?, ?, ?, ?,?,?, ?)
+==> Parameters: 1770522858993(Long), 2026-02-08 11:54:16.81(Timestamp), 2026-02-08 11:54:16.81(Timestamp), 1770522858975(Long), 1770522858990(Long), 5(String), user(String), -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified,process_instance_id, task_instance_id,assignee_id,assignee_type,tenant_id from se_task_assignee_instance where id=? and tenant_id = ?
+==> Parameters: 1770522858993(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, task_instance_id, assignee_id, assignee_type, tenant_id
+<==        Row: 1770522858993, 2026-02-08 11:54:16.81, 2026-02-08 11:54:16.81, 1770522858975, 1770522858990, 5, user, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified,process_instance_id, process_definition_id_and_version,process_definition_type, activity_instance_id, process_definition_activity_id, execution_instance_id,claim_user_id,priority,tag,claim_time,complete_time,status,comment,extension,title,tenant_id from se_task_instance where process_instance_id = ? and status = ? and tenant_id = ?
+==> Parameters: 1770522858975(Long), pending(String), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, process_definition_id_and_version, process_definition_type, activity_instance_id, process_definition_activity_id, execution_instance_id, claim_user_id, priority, tag, claim_time, complete_time, status, comment, extension, title, tenant_id
+<==        Row: 1770522858990, 2026-02-08 11:54:16.809, 2026-02-08 11:54:16.809, 1770522858975, exclusiveTest:1.0.0, null, 1770522858988, auditTask, 1770522858989, null, null, null, null, null, pending, null, null, null, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified,process_instance_id, process_definition_id_and_version,process_definition_type, activity_instance_id, process_definition_activity_id, execution_instance_id,claim_user_id,priority,tag,claim_time,complete_time,status,comment,extension,title,tenant_id from se_task_instance where id=?
+==> Parameters: 1770522858990(Long)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, process_definition_id_and_version, process_definition_type, activity_instance_id, process_definition_activity_id, execution_instance_id, claim_user_id, priority, tag, claim_time, complete_time, status, comment, extension, title, tenant_id
+<==        Row: 1770522858990, 2026-02-08 11:54:16.809, 2026-02-08 11:54:16.809, 1770522858975, exclusiveTest:1.0.0, null, 1770522858988, auditTask, 1770522858989, null, null, null, null, null, pending, null, null, null, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: update se_task_instance SET gmt_modified=CURRENT_TIMESTAMP ,claim_time = ? ,complete_time = ? ,status = ? where id=? and status = ? and tenant_id = ?
+==> Parameters: 2026-02-08 11:54:16.811(Timestamp), 2026-02-08 11:54:16.811(Timestamp), completed(String), 1770522858990(Long), pending(String), -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+[WARN,DefaultTaskCommandService,main] Failed to close supervision for task: 1770522858990
+org.springframework.beans.factory.NoSuchBeanDefinitionException: No bean named 'supervisionInstanceStorage' available
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.getBeanDefinition(DefaultListableBeanFactory.java:874)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.getMergedLocalBeanDefinition(AbstractBeanFactory.java:1358)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:309)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:208)
+	at org.springframework.context.support.AbstractApplicationContext.getBean(AbstractApplicationContext.java:1156)
+	at com.alibaba.smart.framework.engine.test.DatabaseBaseTestCase$DataBaseAccessService.access(DatabaseBaseTestCase.java:123)
+	at com.alibaba.smart.framework.engine.service.command.impl.DefaultTaskCommandService.complete(DefaultTaskCommandService.java:104)
+	at com.alibaba.smart.framework.engine.service.command.impl.DefaultTaskCommandService.complete(DefaultTaskCommandService.java:119)
+	at com.alibaba.smart.framework.engine.test.process.DataBaseAuditProcessWithTenantIdExample.testFailedServiceTaskAuditProcess(DataBaseAuditProcessWithTenantIdExample.java:153)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:59)
+	at org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)
+	at org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:56)
+	at org.junit.internal.runners.statements.InvokeMethod.evaluate(InvokeMethod.java:17)
+	at org.springframework.test.context.junit4.statements.RunBeforeTestExecutionCallbacks.evaluate(RunBeforeTestExecutionCallbacks.java:74)
+	at org.springframework.test.context.junit4.statements.RunAfterTestExecutionCallbacks.evaluate(RunAfterTestExecutionCallbacks.java:84)
+	at org.junit.internal.runners.statements.RunBefores.evaluate(RunBefores.java:26)
+	at org.springframework.test.context.junit4.statements.RunBeforeTestMethodCallbacks.evaluate(RunBeforeTestMethodCallbacks.java:75)
+	at org.junit.internal.runners.statements.RunAfters.evaluate(RunAfters.java:27)
+	at org.springframework.test.context.junit4.statements.RunAfterTestMethodCallbacks.evaluate(RunAfterTestMethodCallbacks.java:86)
+	at org.springframework.test.context.junit4.statements.SpringRepeat.evaluate(SpringRepeat.java:84)
+	at org.junit.runners.ParentRunner.runLeaf(ParentRunner.java:366)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.runChild(SpringJUnit4ClassRunner.java:251)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.runChild(SpringJUnit4ClassRunner.java:97)
+	at org.junit.runners.ParentRunner$4.run(ParentRunner.java:331)
+	at org.junit.runners.ParentRunner$1.schedule(ParentRunner.java:79)
+	at org.junit.runners.ParentRunner.runChildren(ParentRunner.java:329)
+	at org.junit.runners.ParentRunner.access$100(ParentRunner.java:66)
+	at org.junit.runners.ParentRunner$2.evaluate(ParentRunner.java:293)
+	at org.springframework.test.context.junit4.statements.RunBeforeTestClassCallbacks.evaluate(RunBeforeTestClassCallbacks.java:61)
+	at org.springframework.test.context.junit4.statements.RunAfterTestClassCallbacks.evaluate(RunAfterTestClassCallbacks.java:70)
+	at org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)
+	at org.junit.runners.ParentRunner.run(ParentRunner.java:413)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.run(SpringJUnit4ClassRunner.java:190)
+	at org.junit.runner.JUnitCore.run(JUnitCore.java:137)
+	at org.junit.runner.JUnitCore.run(JUnitCore.java:115)
+	at org.junit.vintage.engine.execution.RunnerExecutor.execute(RunnerExecutor.java:42)
+	at org.junit.vintage.engine.VintageTestEngine.executeAllChildren(VintageTestEngine.java:80)
+	at org.junit.vintage.engine.VintageTestEngine.execute(VintageTestEngine.java:72)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:147)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:127)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:90)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.lambda$execute$0(EngineExecutionOrchestrator.java:55)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.withInterceptedStreams(EngineExecutionOrchestrator.java:102)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:54)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:114)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:86)
+	at org.junit.platform.launcher.core.DefaultLauncherSession$DelegatingLauncher.execute(DefaultLauncherSession.java:86)
+	at org.apache.maven.surefire.junitplatform.LazyLauncher.execute(LazyLauncher.java:56)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.execute(JUnitPlatformProvider.java:184)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invokeAllTests(JUnitPlatformProvider.java:148)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invoke(JUnitPlatformProvider.java:122)
+	at org.apache.maven.surefire.booter.ForkedBooter.runSuitesInProcess(ForkedBooter.java:385)
+	at org.apache.maven.surefire.booter.ForkedBooter.execute(ForkedBooter.java:162)
+	at org.apache.maven.surefire.booter.ForkedBooter.run(ForkedBooter.java:507)
+	at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:495)
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,activity_instance_id,active,block_id,tenant_id from se_execution_instance where id=?
+==> Parameters: 1770522858989(Long)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, process_definition_id_and_version, process_definition_activity_id, activity_instance_id, active, block_id, tenant_id
+<==        Row: 1770522858989, 2026-02-08 11:54:16.809, 2026-02-08 11:54:16.809, 1770522858975, exclusiveTest:1.0.0, auditTask, 1770522858988, 1, null, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified, process_definition_id_and_version,process_definition_type,start_user_id, status, complete_time, parent_process_instance_id,parent_execution_instance_id, reason, biz_unique_id, title,tag,comment,tenant_id from se_process_instance where id=?
+==> Parameters: 1770522858975(Long)
+<==    Columns: id, gmt_create, gmt_modified, process_definition_id_and_version, process_definition_type, start_user_id, status, complete_time, parent_process_instance_id, parent_execution_instance_id, reason, biz_unique_id, title, tag, comment, tenant_id
+<==        Row: 1770522858975, 2026-02-08 11:54:16.805, 2026-02-08 11:54:16.805356, exclusiveTest:1.0.0, null, null, running, null, null, null, null, null, null, null, null, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,tenant_id from se_activity_instance where id=? and tenant_id = ?
+==> Parameters: 1770522858988(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, process_definition_id_and_version, process_definition_activity_id, tenant_id
+<==        Row: 1770522858988, 2026-02-08 11:54:16.809, 2026-02-08 11:54:16.809, 1770522858975, exclusiveTest:1.0.0, auditTask, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: update se_execution_instance SET gmt_modified=CURRENT_TIMESTAMP ,active = CASE WHEN ? THEN 1 ELSE 0 END where id=? and tenant_id = ?
+==> Parameters: false(Boolean), 1770522858989(Long), -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+[DEBUG,DefaultDelegationExecutor,main] No behavior found:auditTask
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: update se_execution_instance SET gmt_modified=CURRENT_TIMESTAMP ,active = CASE WHEN ? THEN 1 ELSE 0 END where id=? and tenant_id = ?
+==> Parameters: false(Boolean), 1770522858989(Long), -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+[DEBUG,DefaultDelegationExecutor,main] No behavior found:exclusiveGw1
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: update se_execution_instance SET gmt_modified=CURRENT_TIMESTAMP ,active = CASE WHEN ? THEN 1 ELSE 0 END where id=? and tenant_id = ?
+==> Parameters: false(Boolean), 1770522858998(Long), -1(String)
+<==    Updates: 0
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+[DEBUG,ExpressionUtil,main] expressionEvaluator.result result is true, each param is approve == 'agree'
+             {_$_smart_engine_$_tenant_id=-1, approve=agree, desc=ok} 
+[DEBUG,ExpressionUtil,main] expressionEvaluator.result result is false, each param is approve == 'upgrade'
+             {_$_smart_engine_$_tenant_id=-1, approve=agree, desc=ok} 
+[INFO,AuditProcessServiceTaskDelegation,main] TCC executing: current request is {_$_smart_engine_$_tenant_id=-1, approve=agree, desc=ok}
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: update se_execution_instance SET gmt_modified=CURRENT_TIMESTAMP ,active = CASE WHEN ? THEN 1 ELSE 0 END where id=? and tenant_id = ?
+==> Parameters: false(Boolean), 1770522859000(Long), -1(String)
+<==    Updates: 0
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+[DEBUG,DefaultDelegationExecutor,main] No behavior found:theEnd
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: update se_execution_instance SET gmt_modified=CURRENT_TIMESTAMP ,active = CASE WHEN ? THEN 1 ELSE 0 END where id=? and tenant_id = ?
+==> Parameters: false(Boolean), 1770522859002(Long), -1(String)
+<==    Updates: 0
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: update se_process_instance SET gmt_modified=CURRENT_TIMESTAMP ,status = ? where id=? and tenant_id = ?
+==> Parameters: completed(String), 1770522858975(Long), -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: insert into se_activity_instance( id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,tenant_id ) values (?, ?, ?, ?, ?, ?,?)
+==> Parameters: 1770522858997(Long), 2026-02-08 11:54:16.812(Timestamp), 2026-02-08 11:54:16.812(Timestamp), 1770522858975(Long), exclusiveTest:1.0.0(String), exclusiveGw1(String), -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,tenant_id from se_activity_instance where id=? and tenant_id = ?
+==> Parameters: 1770522858997(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, process_definition_id_and_version, process_definition_activity_id, tenant_id
+<==        Row: 1770522858997, 2026-02-08 11:54:16.812, 2026-02-08 11:54:16.812, 1770522858975, exclusiveTest:1.0.0, exclusiveGw1, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: insert into se_execution_instance( id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,activity_instance_id,active,block_id,tenant_id ) values (?, ?, ?, ?, ?, ?, ?, CASE WHEN ? THEN 1 ELSE 0 END, ?,?)
+==> Parameters: 1770522858998(Long), 2026-02-08 11:54:16.812(Timestamp), 2026-02-08 11:54:16.812(Timestamp), 1770522858975(Long), exclusiveTest:1.0.0(String), exclusiveGw1(String), 1770522858997(Long), false(Boolean), null, -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,activity_instance_id,active,block_id,tenant_id from se_execution_instance where id=? and tenant_id = ?
+==> Parameters: 1770522858998(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, process_definition_id_and_version, process_definition_activity_id, activity_instance_id, active, block_id, tenant_id
+<==        Row: 1770522858998, 2026-02-08 11:54:16.812, 2026-02-08 11:54:16.812, 1770522858975, exclusiveTest:1.0.0, exclusiveGw1, 1770522858997, 0, null, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: insert into se_activity_instance( id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,tenant_id ) values (?, ?, ?, ?, ?, ?,?)
+==> Parameters: 1770522858999(Long), 2026-02-08 11:54:16.813(Timestamp), 2026-02-08 11:54:16.813(Timestamp), 1770522858975(Long), exclusiveTest:1.0.0(String), executeTask(String), -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,tenant_id from se_activity_instance where id=? and tenant_id = ?
+==> Parameters: 1770522858999(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, process_definition_id_and_version, process_definition_activity_id, tenant_id
+<==        Row: 1770522858999, 2026-02-08 11:54:16.813, 2026-02-08 11:54:16.813, 1770522858975, exclusiveTest:1.0.0, executeTask, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: insert into se_execution_instance( id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,activity_instance_id,active,block_id,tenant_id ) values (?, ?, ?, ?, ?, ?, ?, CASE WHEN ? THEN 1 ELSE 0 END, ?,?)
+==> Parameters: 1770522859000(Long), 2026-02-08 11:54:16.813(Timestamp), 2026-02-08 11:54:16.813(Timestamp), 1770522858975(Long), exclusiveTest:1.0.0(String), executeTask(String), 1770522858999(Long), false(Boolean), null, -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,activity_instance_id,active,block_id,tenant_id from se_execution_instance where id=? and tenant_id = ?
+==> Parameters: 1770522859000(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, process_definition_id_and_version, process_definition_activity_id, activity_instance_id, active, block_id, tenant_id
+<==        Row: 1770522859000, 2026-02-08 11:54:16.813, 2026-02-08 11:54:16.813, 1770522858975, exclusiveTest:1.0.0, executeTask, 1770522858999, 0, null, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: insert into se_activity_instance( id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,tenant_id ) values (?, ?, ?, ?, ?, ?,?)
+==> Parameters: 1770522859001(Long), 2026-02-08 11:54:16.813(Timestamp), 2026-02-08 11:54:16.813(Timestamp), 1770522858975(Long), exclusiveTest:1.0.0(String), theEnd(String), -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,tenant_id from se_activity_instance where id=? and tenant_id = ?
+==> Parameters: 1770522859001(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, process_definition_id_and_version, process_definition_activity_id, tenant_id
+<==        Row: 1770522859001, 2026-02-08 11:54:16.813, 2026-02-08 11:54:16.813, 1770522858975, exclusiveTest:1.0.0, theEnd, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: insert into se_execution_instance( id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,activity_instance_id,active,block_id,tenant_id ) values (?, ?, ?, ?, ?, ?, ?, CASE WHEN ? THEN 1 ELSE 0 END, ?,?)
+==> Parameters: 1770522859002(Long), 2026-02-08 11:54:16.813(Timestamp), 2026-02-08 11:54:16.813(Timestamp), 1770522858975(Long), exclusiveTest:1.0.0(String), theEnd(String), 1770522859001(Long), false(Boolean), null, -1(String)
+<==    Updates: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified, process_instance_id,process_definition_id_and_version,process_definition_activity_id,activity_instance_id,active,block_id,tenant_id from se_execution_instance where id=? and tenant_id = ?
+==> Parameters: 1770522859002(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_instance_id, process_definition_id_and_version, process_definition_activity_id, activity_instance_id, active, block_id, tenant_id
+<==        Row: 1770522859002, 2026-02-08 11:54:16.813, 2026-02-08 11:54:16.813, 1770522858975, exclusiveTest:1.0.0, theEnd, 1770522859001, 0, null, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Fetched SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c] from current transaction
+==>  Preparing: select id, gmt_create, gmt_modified, process_definition_id_and_version,process_definition_type,start_user_id, status, complete_time, parent_process_instance_id,parent_execution_instance_id, reason, biz_unique_id, title,tag,comment,tenant_id from se_process_instance where id=? and tenant_id = ?
+==> Parameters: 1770522858975(Long), -1(String)
+<==    Columns: id, gmt_create, gmt_modified, process_definition_id_and_version, process_definition_type, start_user_id, status, complete_time, parent_process_instance_id, parent_execution_instance_id, reason, biz_unique_id, title, tag, comment, tenant_id
+<==        Row: 1770522858975, 2026-02-08 11:54:16.805, 2026-02-08 11:54:16.805356, exclusiveTest:1.0.0, null, null, completed, null, null, null, null, null, null, null, null, -1
+<==      Total: 1
+Releasing transactional SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+[DEBUG,DefaultCacheAwareContextLoaderDelegate,main] Retrieved ApplicationContext [1936550492] from cache with key [[MergedContextConfiguration@68ab6ab0 testClass = DataBaseAuditProcessWithTenantIdExample, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]]]
+[DEBUG,cache,main] Spring test ApplicationContext cache statistics: [DefaultContextCache@5c748168 size = 1, maxSize = 32, parentContextCount = 0, hitCount = 1121, missCount = 1]
+[DEBUG,DefaultCacheAwareContextLoaderDelegate,main] Retrieved ApplicationContext [1936550492] from cache with key [[MergedContextConfiguration@68ab6ab0 testClass = DataBaseAuditProcessWithTenantIdExample, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]]]
+[DEBUG,cache,main] Spring test ApplicationContext cache statistics: [DefaultContextCache@5c748168 size = 1, maxSize = 32, parentContextCount = 0, hitCount = 1122, missCount = 1]
+Transaction synchronization deregistering SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+Transaction synchronization closing SqlSession [org.apache.ibatis.session.defaults.DefaultSqlSession@5ff6dd3c]
+[DEBUG,DataSourceTransactionManager,main] Initiating transaction rollback
+[DEBUG,DataSourceTransactionManager,main] Rolling back JDBC transaction on Connection [org.postgresql.jdbc.PgConnection@12f279b5]
+[DEBUG,DataSourceTransactionManager,main] Releasing JDBC Connection [org.postgresql.jdbc.PgConnection@12f279b5] after transaction
+[INFO,TransactionContext,main] Rolled back transaction for test: [DefaultTestContext@35d60381 testClass = DataBaseAuditProcessWithTenantIdExample, testInstance = com.alibaba.smart.framework.engine.test.process.DataBaseAuditProcessWithTenantIdExample@2a47597, testMethod = testFailedServiceTaskAuditProcess@DataBaseAuditProcessWithTenantIdExample, testException = [null], mergedContextConfiguration = [MergedContextConfiguration@68ab6ab0 testClass = DataBaseAuditProcessWithTenantIdExample, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]], attributes = map['org.springframework.test.context.event.ApplicationEventsTestExecutionListener.recordApplicationEvents' -> false]]
+[DEBUG,AbstractDirtiesContextTestExecutionListener,main] After test method: context [DefaultTestContext@35d60381 testClass = DataBaseAuditProcessWithTenantIdExample, testInstance = com.alibaba.smart.framework.engine.test.process.DataBaseAuditProcessWithTenantIdExample@2a47597, testMethod = testFailedServiceTaskAuditProcess@DataBaseAuditProcessWithTenantIdExample, testException = [null], mergedContextConfiguration = [MergedContextConfiguration@68ab6ab0 testClass = DataBaseAuditProcessWithTenantIdExample, locations = '{classpath:/spring/application-test.xml}', classes = '{}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{}', contextCustomizers = set[[empty]], contextLoader = 'org.springframework.test.context.support.DelegatingSmartContextLoader', parent = [null]], attributes = map['org.springframework.test.context.event.ApplicationEventsTestExecutionListener.recordApplicationEvents' -> false]], class annotated with @DirtiesContext [false] with mode [null], method annotated with @DirtiesContext [false] with mode [null].
+]]></system-out>
+  </testcase>
+</testsuite>
