@@ -149,11 +149,8 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
     implementation 'com.github.ben-manes.caffeine:caffeine:3.1.8'
-    implementation 'org.springframework.boot:spring-boot-starter-batch'
     implementation 'org.springframework.boot:spring-boot-starter-data-jdbc'
-    implementation 'org.springframework.boot:spring-boot-starter-graphql'
     implementation 'org.springframework.boot:spring-boot-starter-mail'
-    implementation 'org.springframework.boot:spring-boot-starter-websocket'
 
     // MyBatis Plus
     implementation 'com.baomidou:mybatis-plus-spring-boot3-starter'
@@ -176,9 +173,6 @@ dependencies {
         exclude group: 'org.ow2.asm', module: 'asm'
     }
 
-    // Stripe Payment SDK
-    implementation 'com.stripe:stripe-java:28.2.0'
-
     // 数据库 — PostgreSQL (default) and MySQL (optional)
     implementation 'org.postgresql:postgresql:42.7.8'
     runtimeOnly 'com.mysql:mysql-connector-j'
@@ -187,22 +181,8 @@ dependencies {
     implementation 'org.apache.poi:poi:5.3.0'
     implementation 'org.apache.poi:poi-ooxml:5.3.0'
 
-    // JasperReports for PDF/Excel report generation
-    implementation 'net.sf.jasperreports:jasperreports:6.21.3'
-
-    // HTML → PDF generation (openhtmltopdf + jsoup for HTML→XHTML normalization)
-    implementation 'com.openhtmltopdf:openhtmltopdf-pdfbox:1.0.10'
-    implementation 'com.openhtmltopdf:openhtmltopdf-slf4j:1.0.10'
-    implementation 'org.jsoup:jsoup:1.17.2'
-
-    // Thymeleaf for HTML template rendering (with Spring EL support for ?. and ?: operators)
-    implementation 'org.thymeleaf:thymeleaf-spring6:3.1.3.RELEASE'
-
     // Git集成
     implementation 'org.eclipse.jgit:org.eclipse.jgit:6.8.0.202311291450-r'
-
-    // Jakarta Mail (Angus Mail) for IMAP email inbound polling
-    implementation 'org.eclipse.angus:angus-mail:2.0.3'
 
     // 注解
     implementation 'org.jetbrains:annotations:26.0.2'
@@ -264,24 +244,10 @@ dependencies {
     implementation "org.pf4j:pf4j:${pf4jVersion}"
     implementation "org.pf4j:pf4j-spring:${pf4jSpringVersion}"
 
-    // SMS SDKs
-    implementation 'com.tencentcloudapi:tencentcloud-sdk-java-sms:3.1.1135'
-    implementation 'com.aliyun:dysmsapi20170525:3.0.0'
-
-    // Google OAuth (for ID token verification) + Google Calendar API + Gmail API
+    // Google OAuth (for ID token verification) + Gmail API
     implementation 'com.google.api-client:google-api-client:2.7.2'
-    implementation 'com.google.apis:google-api-services-calendar:v3-rev20241101-2.0.0'
     implementation 'com.google.apis:google-api-services-gmail:v1-rev20240520-2.0.0'
     implementation 'com.google.http-client:google-http-client-jackson2:1.44.1'
-
-    // Microsoft Graph SDK (for Outlook Calendar sync)
-    implementation('com.microsoft.graph:microsoft-graph:6.23.0') {
-        exclude group: 'com.azure', module: 'azure-identity'
-    }
-    implementation 'com.azure:azure-identity:1.14.2'
-
-    // OIDC id_token verification (nimbus-jose-jwt)
-    implementation 'com.nimbusds:nimbus-jose-jwt:9.37.3'
 
     // Drools Rule Engine
     implementation "org.drools:drools-core:${droolsVersion}"
@@ -319,10 +285,7 @@ test {
     exclude '**/agent/**'
     exclude '**/bpm/**'
     exclude '**/controller/**'
-    exclude '**/crm/service/CrmEmailServiceIntegrationTest.class'
     exclude '**/currency/EcbRateFetcherTest.class'
-    exclude '**/dashboard/**'
-    exclude '**/dashboard/service/DashboardServiceIntegrationTest.class'
     exclude '**/i18n/**'
     exclude '**/integration/CheckinIntegrationTest.class'
     exclude '**/integration/ModelPermissionIntegrationTest.class'
@@ -335,9 +298,7 @@ test {
     exclude '**/meta/service/impl/PayloadTemporalNormalizerTest.class'
     exclude '**/governance/service/MasterDataGovernanceServiceTest.class'
     exclude '**/governance/service/MasterDataPolicyServiceIntegrationTest.class'
-    exclude '**/payment/service/PaymentServiceSubscriptionTest.class'
     exclude '**/permission/controller/PermissionControllerUnitTest.class'
-    exclude '**/payment/**'
     exclude '**/plugin/**'
     exclude '**/rag/**'
     exclude '**/tenant/service/TenantBootstrapServiceTest.class'
