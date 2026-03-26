@@ -1,0 +1,37 @@
+.hero-gradient {
+  background: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(124, 58, 237, 0.3), transparent);
+}
+
+.scroll-reveal {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+}
+
+.scroll-reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.marketing-header {
+  background-color: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.marketing-header a:visited {
+  color: inherit;
+}
+
+/* Mega menu content crossfade when switching between nav items */
+.mega-menu-content {
+  animation: megaMenuContentFade 0.2s ease-out;
+}
+
+@keyframes megaMenuContentFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

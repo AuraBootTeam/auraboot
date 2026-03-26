@@ -1,0 +1,79 @@
+[
+  {
+    "code": "gp:create_task_comment",
+    "displayName:zh-CN": "新建评论",
+    "displayName:en": "Create Comment",
+    "type": "create",
+    "modelCode": "gp_task_comment",
+    "idempotent": false,
+    "reversible": true,
+    "inputFields": [
+      "gp_tc_task_id",
+      "gp_tc_content"
+    ],
+    "autoSetFields": {
+      "gp_tc_author": {
+        "strategy": "current_user",
+        "field": "userName"
+      }
+    },
+    "permissions": [
+      "GP.task.manage"
+    ],
+    "agent_hint": "Create a new comment on a task. Required: task_id (reference to gp_task), content. Author is auto-set to current user.",
+    "cmd_risk_level": "L1",
+    "example_input": {
+      "gp_tc_task_id": "<task-pid>",
+      "gp_tc_content": "Great progress on this task! Let's review tomorrow."
+    }
+  },
+  {
+    "code": "gp:update_task_comment",
+    "displayName:zh-CN": "编辑评论",
+    "displayName:en": "Update Comment",
+    "type": "update",
+    "modelCode": "gp_task_comment",
+    "idempotent": true,
+    "reversible": true,
+    "inputFields": [
+      "gp_tc_content"
+    ],
+    "permissions": [
+      "GP.task.manage"
+    ],
+    "agent_hint": "Update an existing task comment. Only the content field is editable. Author and task reference are immutable after creation.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "gp:delete_task_comment",
+    "displayName:zh-CN": "删除评论",
+    "displayName:en": "Delete Comment",
+    "type": "delete",
+    "modelCode": "gp_task_comment",
+    "idempotent": true,
+    "reversible": false,
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此评论？",
+      "confirmMessage:en": "Confirm delete this comment?"
+    },
+    "permissions": [
+      "GP.task.manage"
+    ],
+    "agent_hint": "Delete a task comment permanently. This is irreversible. No preconditions — any comment can be deleted by users with manage permission.",
+    "cmd_risk_level": "L4"
+  },
+  {
+    "code": "gp:list_task_comments",
+    "displayName:zh-CN": "评论列表",
+    "displayName:en": "List Comments",
+    "type": "query",
+    "modelCode": "gp_task_comment",
+    "idempotent": true,
+    "reversible": false,
+    "permissions": [
+      "GP.task.read"
+    ],
+    "agent_hint": "Query comments for a specific task. Filter by gp_tc_task_id to get all comments belonging to a task, ordered by creation time.",
+    "cmd_risk_level": "L0"
+  }
+]

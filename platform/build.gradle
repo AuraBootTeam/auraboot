@@ -1,0 +1,590 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.5.6'
+    id 'io.spring.dependency-management' version '1.1.6'
+    id 'jacoco'
+    id 'checkstyle'
+    id 'pmd'
+}
+
+repositories {
+        maven {
+        url = 'https://maven.aliyun.com/repository/public'
+    }
+    maven {
+        url = 'https://maven.aliyun.com/repository/spring'
+    }
+
+    mavenLocal()      // 👈 必须放前面
+    mavenCentral()
+    // Apache repository for snapshots and releases
+    maven {
+        url = 'https://repository.apache.org/content/repositories/releases/'
+        name = 'Apache Releases'
+    }
+    maven {
+        url = 'https://repository.apache.org/snapshots/'
+        name = 'Apache Snapshots'
+        content {
+
+        }
+    }
+
+    maven {
+        url = 'https://repo.spring.io/milestone'
+    }
+    maven {
+        url = 'https://repo.spring.io/snapshot'
+    }
+}
+
+// 项目基本信息
+group = 'com.auraboot'
+version = '1.0.0-SNAPSHOT'
+
+// Java工具链配置
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+// 编译配置
+compileJava {
+    options.encoding = 'UTF-8'
+    options.compilerArgs += ['-parameters', '-Xlint:all', '-Xlint:-processing', '-Xlint:-serial', '-Xdiags:verbose']
+    options.annotationProcessorPath = configurations.annotationProcessor
+}
+
+compileTestJava {
+    options.encoding = 'UTF-8'
+}
+
+// 版本管理
+ext {
+    jacksonVersion = '2.19.2'
+    sentryVersion = '6.28.0'
+    jwtVersion = '0.12.6'
+    mybatisPlusVersion = '3.5.14'
+    lombokVersion = '1.18.40'
+    aspectjVersion = '1.9.22'
+    reflectasmVersion = '1.11.3'
+    validationApiVersion = '2.0.1.Final'
+    // PF4J Plugin Framework
+    pf4jVersion = '3.13.0'
+    pf4jSpringVersion = '0.10.0'
+    // Drools Rule Engine
+    droolsVersion = '8.44.2.Final'
+    testWorkerNum = project.findProperty('workerNum') ?: '1'
+}
+
+dependencyManagement {
+    imports {
+        mavenBom "io.sentry:sentry-bom:${sentryVersion}"
+        mavenBom "com.baomidou:mybatis-plus-bom:${mybatisPlusVersion}"
+
+    }
+
+    dependencies {
+        dependency "com.baomidou:mybatis-plus-spring-boot3-starter:${mybatisPlusVersion}"
+
+        dependency "io.jsonwebtoken:jjwt-api:${jwtVersion}"
+        dependency "io.jsonwebtoken:jjwt-impl:${jwtVersion}"
+        dependency "io.jsonwebtoken:jjwt-jackson:${jwtVersion}"
+
+        dependency "com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:${jacksonVersion}"
+        dependency "com.fasterxml.jackson.core:jackson-core:${jacksonVersion}"
+
+        dependency "org.projectlombok:lombok:${lombokVersion}"
+        dependency "org.aspectj:aspectjweaver:${aspectjVersion}"
+    }
+}
+
+configurations {
+    mockitoAgent
+
+    // Exclude conflicting logging implementations globally
+    all {
+        exclude group: 'org.slf4j', module: 'slf4j-reload4j'
+        exclude group: 'org.slf4j', module: 'slf4j-log4j12'
+        exclude group: 'log4j', module: 'log4j'
+    }
+}
+
+dependencies {
+    // Plugin API module
+    implementation project(':platform-plugin-api')
+
+    // ULID
+    implementation 'de.huxhorn.sulky:de.huxhorn.sulky.ulid:8.3.0'
+
+    // Micrometer Prometheus registry for metrics export
+    implementation 'io.micrometer:micrometer-registry-prometheus'
+
+    // OpenTelemetry Micrometer bridge (for trace-metric correlation)
+    implementation 'io.micrometer:micrometer-tracing-bridge-otel'
+    implementation 'io.opentelemetry:opentelemetry-exporter-otlp:1.40.0'
+    implementation "io.netty:netty-resolver-dns-native-macos:4.1.107.Final:osx-aarch_64"
+
+    // SmartEngine - Workflow engine
+    // WARNING: SNAPSHOT version is not recommended for production
+    // TODO: Replace with stable release when available (e.g., 3.7.0)
+    // Current SNAPSHOT is built from local source for development
+    // See: https://github.com/alibaba/SmartEngine for release versions
+    implementation ('com.alibaba.smart.framework:smart-engine-extension-storage-mysql:3.7.0-SNAPSHOT') {
+        // Pin transitive dependencies to avoid unexpected changes
+        exclude group: 'org.slf4j', module: 'slf4j-log4j12'
+    }
+    implementation ('com.alibaba.smart.framework:smart-engine-extension-storage-custom:3.7.0-SNAPSHOT') {
+        exclude group: 'org.slf4j', module: 'slf4j-log4j12'
+    }
+    implementation 'org.mvel:mvel2:2.5.2.Final'
+    implementation 'com.esotericsoftware:reflectasm:1.11.3:shaded'
+
+    // Spring Boot 核心
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-webflux' // For WebClient and reactive support
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-aop'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    implementation 'com.github.ben-manes.caffeine:caffeine:3.1.8'
+    implementation 'org.springframework.boot:spring-boot-starter-batch'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jdbc'
+    implementation 'org.springframework.boot:spring-boot-starter-graphql'
+    implementation 'org.springframework.boot:spring-boot-starter-mail'
+    implementation 'org.springframework.boot:spring-boot-starter-websocket'
+
+    // MyBatis Plus
+    implementation 'com.baomidou:mybatis-plus-spring-boot3-starter'
+    implementation("com.baomidou:mybatis-plus-jsqlparser")
+
+    // Jackson
+    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml'
+    implementation 'com.fasterxml.jackson.core:jackson-core'
+
+    // JWT
+    implementation 'io.jsonwebtoken:jjwt-api'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson'
+
+    // Sentry
+    implementation 'io.sentry:sentry-spring-boot-starter-jakarta'
+
+    // 工具类
+    implementation("com.esotericsoftware:reflectasm:${reflectasmVersion}:shaded") {
+        exclude group: 'org.ow2.asm', module: 'asm'
+    }
+
+    // Stripe Payment SDK
+    implementation 'com.stripe:stripe-java:28.2.0'
+
+    // 数据库 — PostgreSQL (default) and MySQL (optional)
+    implementation 'org.postgresql:postgresql:42.7.8'
+    runtimeOnly 'com.mysql:mysql-connector-j'
+
+    // Apache POI for Excel export
+    implementation 'org.apache.poi:poi:5.3.0'
+    implementation 'org.apache.poi:poi-ooxml:5.3.0'
+
+    // JasperReports for PDF/Excel report generation
+    implementation 'net.sf.jasperreports:jasperreports:6.21.3'
+
+    // HTML → PDF generation (openhtmltopdf + jsoup for HTML→XHTML normalization)
+    implementation 'com.openhtmltopdf:openhtmltopdf-pdfbox:1.0.10'
+    implementation 'com.openhtmltopdf:openhtmltopdf-slf4j:1.0.10'
+    implementation 'org.jsoup:jsoup:1.17.2'
+
+    // Thymeleaf for HTML template rendering (with Spring EL support for ?. and ?: operators)
+    implementation 'org.thymeleaf:thymeleaf-spring6:3.1.3.RELEASE'
+
+    // Git集成
+    implementation 'org.eclipse.jgit:org.eclipse.jgit:6.8.0.202311291450-r'
+
+    // Jakarta Mail (Angus Mail) for IMAP email inbound polling
+    implementation 'org.eclipse.angus:angus-mail:2.0.3'
+
+    // 注解
+    implementation 'org.jetbrains:annotations:26.0.2'
+
+    // 开发工具
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+
+    // 项目特有的依赖
+    // implementation 'com.auraboot.buiness.solution:bill:1.0.0-SNAPSHOT' // 注释掉不存在的依赖
+    implementation 'org.springframework.boot:spring-boot'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+
+    // Swagger/OpenAPI 3
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.8'
+
+    // Jakarta注解
+    implementation 'jakarta.annotation:jakarta.annotation-api'
+
+    // Lombok
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+    testCompileOnly 'org.projectlombok:lombok'
+    testAnnotationProcessor 'org.projectlombok:lombok'
+
+    // MapStruct
+    implementation 'org.mapstruct:mapstruct:1.5.5.Final'
+    annotationProcessor 'org.mapstruct:mapstruct-processor:1.5.5.Final'
+    annotationProcessor 'org.projectlombok:lombok-mapstruct-binding:0.2.0'
+
+    // 测试
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'io.projectreactor:reactor-test' // For testing reactive code
+    mockitoAgent('org.mockito:mockito-core') {
+        transitive = false
+    }
+
+    // PostgreSQL 数据库用于测试
+    testImplementation 'org.postgresql:postgresql:42.7.8'
+
+    // JUnit 5 Platform
+    testImplementation 'org.junit.jupiter:junit-jupiter-api'
+    testImplementation 'org.junit.jupiter:junit-jupiter-engine'
+    testImplementation 'org.junit.platform:junit-platform-launcher'
+
+    // Property-Based Testing with jqwik
+    testImplementation 'net.jqwik:jqwik:1.8.2'
+
+    // ArchUnit — architecture constraint tests
+    testImplementation 'com.tngtech.archunit:archunit-junit5:1.3.0'
+
+    // DiffLib for version comparison
+    implementation 'io.github.java-diff-utils:java-diff-utils:4.12'
+
+    // JSON Schema Validator (Draft-07) for DSL page validation
+    implementation 'com.networknt:json-schema-validator:1.5.6'
+
+    // PF4J Plugin Framework for hot-loading
+    implementation "org.pf4j:pf4j:${pf4jVersion}"
+    implementation "org.pf4j:pf4j-spring:${pf4jSpringVersion}"
+
+    // SMS SDKs
+    implementation 'com.tencentcloudapi:tencentcloud-sdk-java-sms:3.1.1135'
+    implementation 'com.aliyun:dysmsapi20170525:3.0.0'
+
+    // Google OAuth (for ID token verification) + Google Calendar API + Gmail API
+    implementation 'com.google.api-client:google-api-client:2.7.2'
+    implementation 'com.google.apis:google-api-services-calendar:v3-rev20241101-2.0.0'
+    implementation 'com.google.apis:google-api-services-gmail:v1-rev20240520-2.0.0'
+    implementation 'com.google.http-client:google-http-client-jackson2:1.44.1'
+
+    // Microsoft Graph SDK (for Outlook Calendar sync)
+    implementation('com.microsoft.graph:microsoft-graph:6.23.0') {
+        exclude group: 'com.azure', module: 'azure-identity'
+    }
+    implementation 'com.azure:azure-identity:1.14.2'
+
+    // OIDC id_token verification (nimbus-jose-jwt)
+    implementation 'com.nimbusds:nimbus-jose-jwt:9.37.3'
+
+    // Drools Rule Engine
+    implementation "org.drools:drools-core:${droolsVersion}"
+    implementation "org.drools:drools-compiler:${droolsVersion}"
+    implementation "org.drools:drools-mvel:${droolsVersion}"
+    implementation "org.kie:kie-api:${droolsVersion}"
+    implementation "org.kie:kie-internal:${droolsVersion}"
+}
+
+
+// Spring Boot应用配置
+springBoot {
+    buildInfo()
+    mainClass = 'com.auraboot.framework.application.MetaApplication'
+}
+
+// 配置注解处理器
+compileJava {
+    options.annotationProcessorPath = configurations.annotationProcessor
+}
+
+// 配置Spring Boot Maven Plugin等效功能
+bootJar {
+    enabled = true
+    archiveClassifier = ''
+}
+
+bootRun {
+    jvmArgs = ['-Xms2g', '-Xmx8g','-XX:+UseG1GC', '-Duser.timezone=UTC']
+}
+
+// 配置测试任务使用JUnit Platform
+test {
+    useJUnitPlatform()
+    exclude '**/agent/**'
+    exclude '**/bpm/**'
+    exclude '**/controller/**'
+    exclude '**/crm/service/CrmEmailServiceIntegrationTest.class'
+    exclude '**/currency/EcbRateFetcherTest.class'
+    exclude '**/dashboard/**'
+    exclude '**/dashboard/service/DashboardServiceIntegrationTest.class'
+    exclude '**/i18n/**'
+    exclude '**/integration/CheckinIntegrationTest.class'
+    exclude '**/integration/ModelPermissionIntegrationTest.class'
+    exclude '**/integration/TenantBootstrapMetaContextTest.class'
+    exclude '**/integration/TenantBootstrapIntegrationTest.class'
+    exclude '**/integration/UserRoleServiceIntegrationTest.class'
+    exclude '**/integration/view/TeamScopeControllerIntegrationTest.class'
+    exclude '**/intent/PluginGeneratorServiceTest.class'
+    exclude '**/menu/MenuSystemTest.class'
+    exclude '**/meta/service/impl/PayloadTemporalNormalizerTest.class'
+    exclude '**/governance/service/MasterDataGovernanceServiceTest.class'
+    exclude '**/governance/service/MasterDataPolicyServiceIntegrationTest.class'
+    exclude '**/payment/service/PaymentServiceSubscriptionTest.class'
+    exclude '**/permission/controller/PermissionControllerUnitTest.class'
+    exclude '**/payment/**'
+    exclude '**/plugin/**'
+    exclude '**/rag/**'
+    exclude '**/tenant/service/TenantBootstrapServiceTest.class'
+    exclude '**/finance/engine/CurrencyConversionHandlerIntegrationTest.class'
+    jvmArgs "-javaagent:${configurations.mockitoAgent.singleFile}"
+    jvmArgs "-Djavax.xml.parsers.SAXParserFactory=com.sun.org.apache.xerces.internal.jaxp.SAXParserFactoryImpl"
+    jvmArgs '-Duser.timezone=UTC'
+    jvmArgs '-Xmx6g', '-Xms2g', '-XX:+UseG1GC'
+
+    // ─── Parallel execution ───
+    // Integration tests share a real PostgreSQL connection pool.
+    // Multiple JVM forks each create their own Spring context + HikariCP pool,
+    // quickly exhausting PostgreSQL max_connections. Force single-fork so all
+    // tests share one context and one pool.
+    maxParallelForks = 1
+
+    // Ensure each forked JVM gets its own temp dir to avoid collisions
+    def testTmpDir = file("${buildDir}/tmp/test")
+    testTmpDir.mkdirs()
+    systemProperty 'java.io.tmpdir', testTmpDir.absolutePath
+
+    testLogging {
+        events "passed", "skipped", "failed"
+    }
+    finalizedBy jacocoTestReport
+    // Exclude CCJSqlParserTokenManager from JaCoCo instrumentation:
+    // The class exceeds JVM method size limits after instrumentation, causing
+    // Spring context initialization failures (IllegalStateException) in tests.
+    jacoco {
+        excludes = ['net.sf.jsqlparser.parser.CCJSqlParserTokenManager']
+    }
+}
+
+// Dedicated task for running BPM tests (excluded from the default test task)
+tasks.register('testBpm', Test) {
+    useJUnitPlatform()
+    include '**/bpm/**'
+    jvmArgs "-javaagent:${configurations.mockitoAgent.singleFile}"
+    jvmArgs "-Djavax.xml.parsers.SAXParserFactory=com.sun.org.apache.xerces.internal.jaxp.SAXParserFactoryImpl"
+    jvmArgs '-Duser.timezone=UTC'
+    jvmArgs '-Xmx6g', '-Xms2g', '-XX:+UseG1GC'
+    maxParallelForks = 1
+    testLogging {
+        events "passed", "skipped", "failed"
+    }
+    jacoco {
+        excludes = ['net.sf.jsqlparser.parser.CCJSqlParserTokenManager']
+    }
+}
+
+// Dedicated task for running Agent tests (excluded from the default test task)
+tasks.register('testAgent', Test) {
+    useJUnitPlatform()
+    include '**/agent/**'
+    jvmArgs "-javaagent:${configurations.mockitoAgent.singleFile}"
+    jvmArgs "-Djavax.xml.parsers.SAXParserFactory=com.sun.org.apache.xerces.internal.jaxp.SAXParserFactoryImpl"
+    jvmArgs '-Duser.timezone=UTC'
+    jvmArgs '-Xmx6g', '-Xms2g', '-XX:+UseG1GC'
+    maxParallelForks = 1
+    testLogging {
+        events "passed", "skipped", "failed"
+    }
+    jacoco {
+        excludes = ['net.sf.jsqlparser.parser.CCJSqlParserTokenManager']
+    }
+}
+
+// Dedicated task for running plugin validation unit tests (pure-function, no Spring context needed)
+tasks.register('testPlugin', Test) {
+    useJUnitPlatform()
+    include '**/plugin/**'
+    jvmArgs "-javaagent:${configurations.mockitoAgent.singleFile}"
+    jvmArgs "-Djavax.xml.parsers.SAXParserFactory=com.sun.org.apache.xerces.internal.jaxp.SAXParserFactoryImpl"
+    jvmArgs '-Duser.timezone=UTC'
+    jvmArgs '-Xmx2g', '-Xms512m', '-XX:+UseG1GC'
+    maxParallelForks = 1
+    testLogging {
+        events "passed", "skipped", "failed"
+    }
+    jacoco {
+        excludes = ['net.sf.jsqlparser.parser.CCJSqlParserTokenManager']
+    }
+}
+
+jacoco {
+    toolVersion = '0.8.12'
+}
+
+// Classes excluded from coverage measurement:
+// - Entity / DTO / mapper interfaces (no logic, just data containers)
+// - Spring @Configuration classes (bean wiring, not business logic)
+// - Application bootstrap / seeders (one-time init, tested indirectly via integration)
+// - Generated enums/constants
+// - Complex orchestration engines tested via E2E (BPM, Finance, APS, Agent)
+// - Controllers (covered by E2E browser tests)
+// - Infrastructure adapters (MQ, Storage, DDL dialects) - platform-specific, tested in subprojects
+// - Template/report generators - output-based, verified via E2E
+// - Plugin system internals - tested via E2E plugin import flows
+def jacocoExcludes = [
+    // Data layer — no logic
+    '**/entity/**',
+    '**/dao/entity/**',
+    '**/dto/**',
+    '**/mapper/**',
+    '**/constant/**',
+    '**/config/**',
+    '**/application/bootstrap/**',
+    '**/application/config/**',
+    '**/*Application.class',
+    '**/*Properties.class',
+    '**/*Record.class',
+    '**/datasync/DataSyncMessage.class',
+    // Enums, exceptions, events — simple value holders
+    '**/enums/**',
+    '**/exception/**',
+    '**/event/**',
+    '**/bean/**',
+    '**/converter/**',
+    // Controllers — covered by E2E tests
+    '**/controller/**',
+    // Complex domain engines — covered by E2E flows
+    '**/bpm/**',
+    '**/finance/**',
+    '**/aps/**',
+    '**/mrp/**',
+    '**/excel/**',
+    // Infrastructure adapters — platform-specific, tested in subprojects or E2E
+    '**/infrastructure/mq/redis/**',
+    '**/infrastructure/mq/kafka/**',
+    '**/infrastructure/mq/rabbitmq/**',
+    '**/infrastructure/storage/s3/**',
+    '**/infrastructure/storage/oss/**',
+    '**/infrastructure/storage/minio/**',
+    '**/ddl/**',
+    // Template/report generators — output verified via E2E
+    '**/template/generator/**',
+    '**/report/**',
+    '**/print/**',
+    // Plugin system internals — tested via import/E2E flows
+    '**/plugin/extension/**',
+    '**/plugin/exception/**',
+    '**/plugin/util/**',
+    '**/plugin/marketplace/**',
+    // Agent/AI subsystems — tested via E2E
+    '**/agent/**',
+    '**/aurabot/**',
+    '**/ai/**',
+    '**/chatbi/**',
+    // Inbox/mobile — tested via E2E
+    '**/inbox/**',
+    // meta.service.impl — complex orchestration (command pipeline, metadata management,
+    // state machines, etc.) tested indirectly via integration + E2E command flows
+    '**/meta/service/impl/**',
+]
+
+jacocoTestReport {
+    dependsOn test
+    afterEvaluate {
+        classDirectories.setFrom(files(classDirectories.files.collect {
+            fileTree(dir: it, exclude: jacocoExcludes)
+        }))
+    }
+    reports {
+        xml.required = true
+        csv.required = false
+        html.required = true
+    }
+}
+
+jacocoTestCoverageVerification {
+    dependsOn jacocoTestReport
+    afterEvaluate {
+        classDirectories.setFrom(files(classDirectories.files.collect {
+            fileTree(dir: it, exclude: jacocoExcludes)
+        }))
+    }
+    violationRules {
+        rule {
+            enabled = true
+            element = 'BUNDLE'
+            limit {
+                counter = 'LINE'
+                value = 'COVEREDRATIO'
+                minimum = 0.15
+            }
+        }
+    }
+}
+
+tasks.register('coverage') {
+    group = 'verification'
+    description = 'Run tests and generate JaCoCo reports with minimum coverage checks.'
+    dependsOn 'test', 'jacocoTestReport', 'jacocoTestCoverageVerification'
+}
+
+// Task to check for SNAPSHOT dependencies (run before release)
+tasks.register('checkSnapshotDependencies') {
+    description = 'Checks for SNAPSHOT dependencies that should not be used in production'
+    group = 'verification'
+
+    doLast {
+        def snapshots = []
+        configurations.runtimeClasspath.resolvedConfiguration.resolvedArtifacts.each { artifact ->
+            if (artifact.moduleVersion.id.version.contains('SNAPSHOT')) {
+                snapshots << "${artifact.moduleVersion.id.group}:${artifact.moduleVersion.id.name}:${artifact.moduleVersion.id.version}"
+            }
+        }
+        if (!snapshots.isEmpty()) {
+            logger.warn('WARNING: Found SNAPSHOT dependencies:')
+            snapshots.each { logger.warn("  - $it") }
+            logger.warn('Consider replacing with stable versions before production deployment.')
+        }
+    }
+}
+
+// Run SNAPSHOT check before build
+tasks.named('build') {
+    finalizedBy 'checkSnapshotDependencies'
+}
+
+// ========== Checkstyle (warn-only) ==========
+checkstyle {
+    toolVersion = '10.21.4'
+    configFile = file("${rootDir}/config/checkstyle/checkstyle.xml")
+    ignoreFailures = true
+    maxWarnings = Integer.MAX_VALUE
+}
+
+// ========== PMD (warn-only) ==========
+pmd {
+    toolVersion = '7.10.0'
+    consoleOutput = true
+    ignoreFailures = true
+    ruleSetFiles = files("${rootDir}/config/pmd/pmd-rules.xml")
+    ruleSets = [] // use only our custom ruleset
+}
+
+tasks.withType(Pmd).configureEach {
+    // Analyze only main source, not test
+    if (name.contains('Test')) {
+        enabled = false
+    }
+}
+
+// ========== Aggregated code quality task ==========
+tasks.register('codeQuality') {
+    group = 'verification'
+    description = 'Run all static analysis: Checkstyle + PMD + ArchUnit tests'
+    dependsOn 'checkstyleMain', 'pmdMain', 'test'
+}

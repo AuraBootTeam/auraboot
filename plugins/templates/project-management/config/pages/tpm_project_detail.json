@@ -1,0 +1,35 @@
+{
+  "pageKey": "tpm_project_detail", "name:zh-CN": "项目详情", "name:en": "Project Detail", "pageType": "detail", "modelCode": "tpm_project",
+  "dslSchema": { "id": "detail.tpm_project", "kind": "Detail", "version": "1.0.0", "modelCode": "tpm_project",
+    "layout": { "areas": ["header", "main", "sub-tables"], "areasConfig": { "header": { "type": "flex", "direction": "row" }, "main": { "type": "grid", "cols": 12, "rowGap": 16, "colGap": 16 }, "sub-tables": { "type": "stack" } } },
+    "areas": {
+      "header": { "blocks": [{ "id": "action_bar", "blockType": "toolbar", "buttons": [
+        { "code": "edit", "action": "edit", "navigateTo": "tpm_project_form", "permissionCode": "TPM.project.manage" },
+        { "code": "activate_project", "commandCode": "tpm:activate_project", "permissionCode": "TPM.project.manage" },
+        { "code": "hold_project", "commandCode": "tpm:hold_project", "permissionCode": "TPM.project.manage" },
+        { "code": "complete_project", "commandCode": "tpm:complete_project", "permissionCode": "TPM.project.manage" },
+        { "code": "cancel_project", "commandCode": "tpm:cancel_project", "permissionCode": "TPM.project.manage" },
+        { "code": "delete", "action": "delete", "danger": true, "commandCode": "tpm:delete_project", "permissionCode": "TPM.project.manage", "confirmMessageKey": "delete.confirm" }
+      ] }] },
+      "main": { "blocks": [{ "id": "info", "blockType": "form-section", "readOnly": true, "title": { "zh-CN": "项目信息", "en-US": "Project Information" }, "fields": [
+        { "field": "tpm_pj_code", "colSpan": 6 }, { "field": "tpm_pj_name", "colSpan": 6 },
+        { "field": "tpm_pj_status", "colSpan": 6 }, { "field": "tpm_pj_priority", "colSpan": 6 },
+        { "field": "tpm_pj_owner", "colSpan": 6 }, { "field": "tpm_pj_start_date", "colSpan": 3 }, { "field": "tpm_pj_end_date", "colSpan": 3 },
+        { "field": "tpm_pj_description", "colSpan": 12 }
+      ] }] },
+      "sub-tables": { "blocks": [
+        { "id": "tasks", "blockType": "sub-table", "title": { "zh-CN": "任务", "en-US": "Tasks" }, "modelCode": "tpm_task", "foreignKey": "tpm_ts_project_id", "columns": [
+          { "field": "tpm_ts_code", "width": 140 }, { "field": "tpm_ts_title", "width": 220 },
+          { "field": "tpm_ts_status", "width": 110, "renderType": "tag", "dictCode": "tpm_task_status" },
+          { "field": "tpm_ts_priority", "width": 100, "renderType": "tag", "dictCode": "tpm_priority" },
+          { "field": "tpm_ts_assignee", "width": 120 }, { "field": "tpm_ts_due_date", "width": 120 }
+        ], "createCommandCode": "tpm:create_task" },
+        { "id": "milestones", "blockType": "sub-table", "title": { "zh-CN": "里程碑", "en-US": "Milestones" }, "modelCode": "tpm_milestone", "foreignKey": "tpm_ms_project_id", "columns": [
+          { "field": "tpm_ms_code", "width": 140 }, { "field": "tpm_ms_name", "width": 220 },
+          { "field": "tpm_ms_status", "width": 110, "renderType": "tag", "dictCode": "tpm_milestone_status" },
+          { "field": "tpm_ms_target_date", "width": 130 }
+        ], "createCommandCode": "tpm:create_milestone" }
+      ] }
+    }
+  }
+}

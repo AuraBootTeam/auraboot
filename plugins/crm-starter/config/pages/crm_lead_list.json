@@ -1,0 +1,233 @@
+{
+  "pageKey": "crm_lead_list",
+  "name:zh-CN": "线索列表",
+  "name:en": "Leads",
+  "pageType": "list",
+  "modelCode": "crm_lead",
+  "dslSchema": {
+    "id": "list.crm_lead",
+    "kind": "List",
+    "areas": {
+      "toolbar": {
+        "blocks": [
+          {
+            "id": "crm_lead_toolbar",
+            "blockType": "toolbar",
+            "buttons": [
+              {
+                "code": "create",
+                "primary": true,
+                "permissionCode": "CRMS.lead.manage",
+                "label": "create",
+                "action": {
+                  "type": "navigate",
+                  "to": "crm_lead_form",
+                  "command": "crms:create_lead"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "list-tabs": {
+        "blocks": [
+          {
+            "id": "crm_lead_tabs",
+            "blockType": "list-tabs",
+            "tabs": [
+              {
+                "key": "all",
+                "label": {
+                  "en": "All",
+                  "zh-CN": "全部"
+                },
+                "filter": null
+              },
+              {
+                "key": "new",
+                "label": {
+                  "en": "New",
+                  "zh-CN": "新建"
+                },
+                "filter": {
+                  "field": "crm_lead_status",
+                  "value": "new",
+                  "operator": "EQ"
+                }
+              },
+              {
+                "key": "contacted",
+                "label": {
+                  "en": "Contacted",
+                  "zh-CN": "已联系"
+                },
+                "filter": {
+                  "field": "crm_lead_status",
+                  "value": "contacted",
+                  "operator": "EQ"
+                }
+              },
+              {
+                "key": "qualified",
+                "label": {
+                  "en": "Qualified",
+                  "zh-CN": "已合格"
+                },
+                "filter": {
+                  "field": "crm_lead_status",
+                  "value": "qualified",
+                  "operator": "EQ"
+                }
+              },
+              {
+                "key": "converted",
+                "label": {
+                  "en": "Converted",
+                  "zh-CN": "已转化"
+                },
+                "filter": {
+                  "field": "crm_lead_status",
+                  "value": "converted",
+                  "operator": "EQ"
+                }
+              },
+              {
+                "key": "lost",
+                "label": {
+                  "en": "Lost",
+                  "zh-CN": "已丢失"
+                },
+                "filter": {
+                  "field": "crm_lead_status",
+                  "value": "lost",
+                  "operator": "EQ"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "main": {
+        "blocks": [
+          {
+            "id": "crm_lead_table",
+            "blockType": "data-table",
+            "columns": [
+              {
+                "field": "crm_lead_code",
+                "width": 150,
+                "sortable": true
+              },
+              {
+                "field": "crm_lead_company",
+                "width": 200,
+                "sortable": true
+              },
+              {
+                "field": "crm_lead_contact_name",
+                "width": 120
+              },
+              {
+                "field": "crm_lead_contact_phone",
+                "width": 140
+              },
+              {
+                "field": "crm_lead_source",
+                "width": 120,
+                "renderType": "tag",
+                "dictCode": "crm_lead_source",
+                "editable": true
+              },
+              {
+                "field": "crm_lead_score",
+                "width": 80,
+                "sortable": true,
+                "editable": true
+              },
+              {
+                "field": "crm_lead_status",
+                "width": 120,
+                "renderType": "tag",
+                "dictCode": "crm_lead_status",
+                "editable": true
+              },
+              {
+                "field": "crm_lead_assigned_to",
+                "width": 120,
+                "editable": true
+              },
+              {
+                "field": "actions",
+                "isActionColumn": true,
+                "buttons": [
+                  {
+                    "code": "view",
+                    "label": "detail",
+                    "action": {
+                      "type": "navigate",
+                      "to": "crm_lead_detail"
+                    }
+                  },
+                  {
+                    "code": "edit",
+                    "permissionCode": "CRMS.lead.manage",
+                    "label": "edit",
+                    "action": {
+                      "type": "navigate",
+                      "to": "crm_lead_form"
+                    }
+                  },
+                  {
+                    "code": "delete",
+                    "danger": true,
+                    "permissionCode": "CRMS.lead.manage",
+                    "label": "delete",
+                    "confirm": "delete.confirm",
+                    "action": {
+                      "type": "command",
+                      "command": "crms:delete_lead"
+                    }
+                  }
+                ]
+              }
+            ],
+            "searchFields": [
+              "crm_lead_company",
+              "crm_lead_code",
+              "crm_lead_contact_name"
+            ],
+            "defaultSort": {
+              "field": "created_at",
+              "order": "desc"
+            }
+          }
+        ]
+      }
+    },
+    "layout": {
+      "areas": [
+        "list-tabs",
+        "toolbar",
+        "main"
+      ],
+      "areasConfig": {
+        "list-tabs": {
+          "type": "flex",
+          "direction": "row"
+        },
+        "toolbar": {
+          "type": "flex",
+          "direction": "row",
+          "justify": "space-between",
+          "align": "center"
+        },
+        "main": {
+          "type": "grid",
+          "cols": 12,
+          "rowGap": 0,
+          "colGap": 0
+        }
+      }
+    }
+  }
+}

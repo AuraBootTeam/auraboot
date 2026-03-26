@@ -1,0 +1,93 @@
+[
+  {
+    "code": "ecm.policy.manage",
+    "name:zh-CN": "政策管理",
+    "name:en": "Policy Management",
+    "resourceType": "operation",
+    "module": "ecm"
+  },
+  {
+    "code": "ecm.policy.read",
+    "name:zh-CN": "查看政策",
+    "name:en": "View Policies",
+    "resourceType": "data",
+    "module": "ecm"
+  },
+  {
+    "code": "ecm.policy.approve",
+    "name:zh-CN": "审批政策",
+    "name:en": "Approve Policies",
+    "resourceType": "operation",
+    "module": "ecm"
+  },
+  {
+    "code": "ecm.audit.manage",
+    "name:zh-CN": "审计管理",
+    "name:en": "Audit Management",
+    "resourceType": "operation",
+    "module": "ecm"
+  },
+  {
+    "code": "ecm.audit.read",
+    "name:zh-CN": "查看审计",
+    "name:en": "View Audits",
+    "resourceType": "data",
+    "module": "ecm"
+  },
+  {
+    "code": "ecm.action.manage",
+    "name:zh-CN": "措施管理",
+    "name:en": "Action Management",
+    "resourceType": "operation",
+    "module": "ecm"
+  },
+  {
+    "code": "ecm.action.read",
+    "name:zh-CN": "查看措施",
+    "name:en": "View Actions",
+    "resourceType": "data",
+    "module": "ecm"
+  },
+  {
+    "code": "ecm.action.approve",
+    "name:zh-CN": "验证措施",
+    "name:en": "Verify Actions",
+    "resourceType": "operation",
+    "module": "ecm"
+  },
+  {
+    "code": "ecm.risk.manage",
+    "name:zh-CN": "风险管理",
+    "name:en": "Risk Management",
+    "resourceType": "operation",
+    "module": "ecm"
+  },
+  {
+    "code": "ecm.risk.read",
+    "name:zh-CN": "查看风险",
+    "name:en": "View Risks",
+    "resourceType": "data",
+    "module": "ecm"
+  },
+  {
+    "code": "ecm.risk.approve",
+    "name:zh-CN": "审批风险",
+    "name:en": "Approve Risks",
+    "resourceType": "operation",
+    "module": "ecm"
+  },
+  {
+    "code": "ecm.training.manage",
+    "name:zh-CN": "培训管理",
+    "name:en": "Training Management",
+    "resourceType": "operation",
+    "module": "ecm"
+  },
+  {
+    "code": "ecm.training.read",
+    "name:zh-CN": "查看培训",
+    "name:en": "View Training",
+    "resourceType": "data",
+    "module": "ecm"
+  }
+]

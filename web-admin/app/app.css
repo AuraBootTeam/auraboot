@@ -1,0 +1,294 @@
+@import 'tailwindcss';
+@source './plugins/**/*.tsx';
+@source './plugins/**/*.ts';
+@source './plugins/**/*.css';
+
+/* RTL/LTR direction variants — enables rtl:pl-4 / ltr:ml-2 utility classes */
+@variant rtl ([dir="rtl"] &);
+@variant ltr ([dir="ltr"] &);
+
+/*
+  ============================================================================
+  Design System CSS Variables
+  ============================================================================
+  These variables provide a centralized color token system for the application.
+  Used by drag.css, components, and other style files.
+
+  Color values are based on Tailwind CSS color palette.
+  ============================================================================
+*/
+
+:root {
+  /* Tailwind v4 Compatibility */
+  --color-gray-200: #e5e7eb;
+
+  /* Background Colors */
+  --bg-primary: #ffffff; /* white */
+  --bg-secondary: #f9fafb; /* gray-50 */
+  --bg-hover: #f3f4f6; /* gray-100 */
+  --bg-active: #e5e7eb; /* gray-200 */
+
+  /* Text Colors */
+  --text-primary: #111827; /* gray-900 */
+  --text-secondary: #6b7280; /* gray-500 */
+  --text-tertiary: #9ca3af; /* gray-400 */
+  --text-inverse: #ffffff; /* white */
+
+  /* Border Colors */
+  --border-primary: #e5e7eb; /* gray-200 */
+  --border-secondary: #f3f4f6; /* gray-100 */
+  --border-focus: #3b82f6; /* blue-500 */
+
+  /* Accent Colors (Primary Brand) */
+  --accent-primary: #3b82f6; /* blue-500 */
+  --accent-primary-hover: #2563eb; /* blue-600 */
+  --accent-primary-rgb: 59, 130, 246;
+
+  /* Success Colors */
+  --success-primary: #10b981; /* emerald-500 */
+  --success-primary-hover: #059669; /* emerald-600 */
+  --success-primary-rgb: 16, 185, 129;
+
+  /* Error Colors */
+  --error-primary: #ef4444; /* red-500 */
+  --error-primary-hover: #dc2626; /* red-600 */
+  --error-primary-rgb: 239, 68, 68;
+
+  /* Warning Colors */
+  --warning-primary: #f59e0b; /* amber-500 */
+  --warning-primary-rgb: 245, 158, 11;
+
+  /* Info Colors */
+  --info-primary: #06b6d4; /* cyan-500 */
+  --info-primary-rgb: 6, 182, 212;
+
+  /* Shadow */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+}
+
+/* Dark Mode Variables */
+.dark {
+  /* Tailwind v4 Compatibility */
+  --color-gray-200: #374151; /* gray-700 in dark mode */
+
+  /* Background Colors */
+  --bg-primary: #1f2937; /* gray-800 */
+  --bg-secondary: #111827; /* gray-900 */
+  --bg-hover: #374151; /* gray-700 */
+  --bg-active: #4b5563; /* gray-600 */
+
+  /* Text Colors */
+  --text-primary: #f9fafb; /* gray-50 */
+  --text-secondary: #9ca3af; /* gray-400 */
+  --text-tertiary: #6b7280; /* gray-500 */
+  --text-inverse: #111827; /* gray-900 */
+
+  /* Border Colors */
+  --border-primary: #374151; /* gray-700 */
+  --border-secondary: #4b5563; /* gray-600 */
+  --border-focus: #60a5fa; /* blue-400 */
+
+  /* Accent Colors (Primary Brand) */
+  --accent-primary: #60a5fa; /* blue-400 */
+  --accent-primary-hover: #3b82f6; /* blue-500 */
+  --accent-primary-rgb: 96, 165, 250;
+
+  /* Success Colors */
+  --success-primary: #34d399; /* emerald-400 */
+  --success-primary-hover: #10b981; /* emerald-500 */
+  --success-primary-rgb: 52, 211, 153;
+
+  /* Error Colors */
+  --error-primary: #f87171; /* red-400 */
+  --error-primary-hover: #ef4444; /* red-500 */
+  --error-primary-rgb: 248, 113, 113;
+
+  /* Warning Colors */
+  --warning-primary: #fbbf24; /* amber-400 */
+  --warning-primary-rgb: 251, 191, 36;
+
+  /* Info Colors */
+  --info-primary: #22d3ee; /* cyan-400 */
+  --info-primary-rgb: 34, 211, 238;
+
+  /* Shadow (darker for dark mode) */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.3);
+}
+
+/*
+  The default border color has changed to `currentColor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentColor);
+  }
+}
+
+/* # @import "daisyui/dist/full.css"; */
+/* @plugin "daisyui"; */
+
+.loading-indicator:before {
+  content: '';
+  background: #00000080;
+  position: fixed;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  z-index: 1000;
+}
+
+.loading-indicator:after {
+  content: ' ';
+  position: fixed;
+  top: 40%;
+  left: 45%;
+  z-index: 10010;
+  color: white;
+  text-align: center;
+  font-weight: bold;
+  font-size: 1.2rem;
+  border: 16px solid #f3f3f3;
+  /* Light grey */
+  border-top: 16px solid #0474bf;
+  /* Blue */
+  border-radius: 50%;
+  width: 120px;
+  height: 120px;
+  animation: spin 2s linear infinite;
+}
+
+.App {
+  text-align: center;
+}
+
+.App-logo {
+  height: 40vmin;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .App-logo {
+    animation: App-logo-spin infinite 20s linear;
+  }
+}
+
+.App-header {
+  background-color: #282c34;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(10px + 2vmin);
+  color: white;
+}
+
+.App-link {
+  color: #61dafb;
+}
+
+@keyframes slide-in-right {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.2s ease-out;
+}
+
+@keyframes App-logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 
+.sidebar {
+  width: 150px;
+  border-right: 1px solid black;
+}
+
+.sidebar-field {
+  all: unset;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 50px;
+  width: 150px;
+  border-bottom: 1px solid greenyellow;
+  cursor: pointer;
+  user-select: none;
+}
+
+.sidebar-field.overlay {
+  background: black;
+  color: yellow;
+} */
+
+.canvas {
+  flex: 1;
+  border: 1px solid black;
+  margin: 50px;
+  border-radius: 5px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  max-height: 100%;
+  overflow-y: auto;
+}
+
+.canvas-field {
+  padding: 15px;
+}
+
+.canvas-field.overlay {
+  opacity: 0.5;
+  color: red;
+}
+
+.canvas-field > * {
+  width: 100%;
+  pointer-events: none;
+}
+
+.spacer {
+  background: green;
+  width: 100%;
+  opacity: 0.25;
+  height: 40px;
+}
+
+/** test for draw lines
+**/
+.App {
+  font-family: sans-serif;
+  text-align: center;
+}
+
+.connectPoint {
+  opacity: 0.2;
+}
+
+.connectPoint:hover {
+  opacity: 0.6;
+}

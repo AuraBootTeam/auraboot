@@ -1,0 +1,7 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AuraBoot Plugin Fields",
+  "description": "Array of field definitions for plugin config/fields.json",
+  "type": "array",
+  "items": { "$ref": "plugin-manifest.schema.json#/$defs/fieldDefinition" }
+}

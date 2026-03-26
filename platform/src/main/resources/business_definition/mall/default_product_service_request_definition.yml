@@ -1,0 +1,14 @@
+reserved_words: [ id,version,type,action,components,xxx ]
+dynamic_words: [ xxx_id, ] ## xxx means domain name, default widget type, id means dependency pk, datasource means xxx service , value validate , id,name,status, deleted_flag default .
+
+default:
+  legal-check: true  # 法律 合规
+  name: i18n  # 可以被省略 ，但是如果被配置了，则直接使用配置的值，不再区分i18n
+  widget: input # 可以被省略
+
+
+rule:
+  datasource: # @currency 当有          datasource 这个key时， 就默认widget是 select。 这样也减少配置。
+  # xxx: #  sample for explaination, default plain text, from user input ,  not
+
+#         hidden: true # means 隐式传参，不用在当前页面选择，一般由前面的步骤选择后，然后传参过来。

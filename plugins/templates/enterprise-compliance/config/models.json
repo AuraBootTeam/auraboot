@@ -1,0 +1,67 @@
+[
+  {
+    "code": "ecm_policy",
+    "displayName:zh-CN": "合规政策",
+    "displayName:en": "Policy",
+    "description": "Compliance policy or regulation document with versioned lifecycle.",
+    "modelType": "entity",
+    "modelCategory": "master",
+    "semantic_description": "A compliance policy document defining rules, procedures, or standards. Tracks version, approval status, and review dates.",
+    "domain_category": "compliance",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "draft → UNDER_REVIEW → approved → archived",
+    "extension": { "icon": "FileText", "category": "enterprise-compliance", "titleField": "ecm_po_title", "subtitleField": "ecm_po_code" }
+  },
+  {
+    "code": "ecm_audit_finding",
+    "displayName:zh-CN": "审计发现",
+    "displayName:en": "Audit Finding",
+    "description": "Finding from an internal or external audit with severity and workflow.",
+    "modelType": "entity",
+    "modelCategory": "document",
+    "semantic_description": "An audit finding documenting a non-conformance, observation, or improvement opportunity discovered during an audit.",
+    "domain_category": "compliance",
+    "data_sensitivity": "confidential",
+    "lifecycle_description": "PLANNED → in_progress → DRAFT_REPORT → FINAL → closed",
+    "extension": { "icon": "Search", "category": "enterprise-compliance", "titleField": "ecm_af_title", "subtitleField": "ecm_af_code" }
+  },
+  {
+    "code": "ecm_corrective_action",
+    "displayName:zh-CN": "纠正措施",
+    "displayName:en": "Corrective Action",
+    "description": "Corrective or preventive action to address an audit finding.",
+    "modelType": "entity",
+    "modelCategory": "document",
+    "semantic_description": "A corrective or preventive action (CAPA) linked to an audit finding, tracking root cause analysis, action plan, and verification.",
+    "domain_category": "compliance",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "open → in_progress → completed → VERIFIED → closed",
+    "extension": { "icon": "CheckCircle", "category": "enterprise-compliance", "titleField": "ecm_ca_title", "subtitleField": "ecm_ca_code" }
+  },
+  {
+    "code": "ecm_risk_assessment",
+    "displayName:zh-CN": "风险评估",
+    "displayName:en": "Risk Assessment",
+    "description": "Risk assessment with likelihood and impact scoring.",
+    "modelType": "entity",
+    "modelCategory": "entity",
+    "semantic_description": "A risk assessment entry evaluating potential risks by likelihood and impact, with mitigation strategies and residual risk tracking.",
+    "domain_category": "compliance",
+    "data_sensitivity": "confidential",
+    "lifecycle_description": "IDENTIFIED → ASSESSED → MITIGATED → ACCEPTED → closed",
+    "extension": { "icon": "AlertTriangle", "category": "enterprise-compliance", "titleField": "ecm_ra_title", "subtitleField": "ecm_ra_code" }
+  },
+  {
+    "code": "ecm_training_record",
+    "displayName:zh-CN": "培训记录",
+    "displayName:en": "Training Record",
+    "description": "Employee compliance training completion record.",
+    "modelType": "entity",
+    "modelCategory": "activity",
+    "semantic_description": "A record of an employee completing a compliance training course, tracking completion date, score, and certification expiry.",
+    "domain_category": "compliance",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "SCHEDULED → in_progress → completed → expired",
+    "extension": { "icon": "GraduationCap", "category": "enterprise-compliance", "titleField": "ecm_tr_course", "subtitleField": "ecm_tr_code" }
+  }
+]

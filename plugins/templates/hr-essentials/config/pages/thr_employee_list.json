@@ -1,0 +1,60 @@
+{
+  "pageKey": "thr_employee_list",
+  "name:zh-CN": "员工列表",
+  "name:en": "Employees",
+  "pageType": "list",
+  "modelCode": "thr_employee",
+  "dslSchema": {
+    "id": "list.thr_employee",
+    "kind": "List",
+    "areas": {
+      "toolbar": {
+        "blocks": [{
+          "id": "thr_employee_toolbar",
+          "blockType": "toolbar",
+          "buttons": [
+            { "code": "create", "action": "create", "primary": true, "commandCode": "thr:create_employee", "navigateTo": "thr_employee_form", "permissionCode": "THR.employee.manage" }
+          ]
+        }]
+      },
+      "list-tabs": {
+        "blocks": [{
+          "id": "thr_employee_tabs",
+          "blockType": "list-tabs",
+          "tabs": [
+            { "key": "all", "label": { "en": "All", "zh-CN": "全部" }, "filter": null },
+            { "key": "active", "label": { "en": "Active", "zh-CN": "在职" }, "filter": { "field": "thr_em_status", "value": "active", "operator": "EQ" } },
+            { "key": "on_leave", "label": { "en": "On Leave", "zh-CN": "休假中" }, "filter": { "field": "thr_em_status", "value": "on_leave", "operator": "EQ" } },
+            { "key": "resigned", "label": { "en": "Resigned", "zh-CN": "已离职" }, "filter": { "field": "thr_em_status", "value": "resigned", "operator": "EQ" } }
+          ]
+        }]
+      },
+      "main": {
+        "blocks": [{
+          "id": "thr_employee_table",
+          "blockType": "data-table",
+          "columns": [
+            { "field": "thr_em_code", "width": 160, "sortable": true },
+            { "field": "thr_em_name", "width": 150, "sortable": true },
+            { "field": "thr_em_department", "width": 130, "renderType": "tag", "dictCode": "thr_department" },
+            { "field": "thr_em_position", "width": 150 },
+            { "field": "thr_em_email", "width": 200 },
+            { "field": "thr_em_hire_date", "width": 130, "sortable": true },
+            { "field": "thr_em_status", "width": 100, "renderType": "tag", "dictCode": "thr_emp_status" },
+            {
+              "field": "actions",
+              "isActionColumn": true,
+              "buttons": [
+                { "code": "view", "action": "detail", "navigateTo": "thr_employee_detail" },
+                { "code": "edit", "action": "edit", "navigateTo": "thr_employee_form", "permissionCode": "THR.employee.manage" },
+                { "code": "delete", "action": "delete", "danger": true, "commandCode": "thr:delete_employee", "permissionCode": "THR.employee.manage", "confirmMessageKey": "delete.confirm" }
+              ]
+            }
+          ],
+          "searchFields": ["thr_em_name", "thr_em_code", "thr_em_email"],
+          "defaultSort": { "field": "created_at", "order": "desc" }
+        }]
+      }
+    }
+  }
+}

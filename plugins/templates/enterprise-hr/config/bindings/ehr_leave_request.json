@@ -1,0 +1,12 @@
+[
+  {"modelCode":"ehr_leave_request","fieldCode":"ehr_lv_code","sequence":1,"required":true,"visible":true,"editable":false,"displayConfig":{"searchable":true,"sortable":true}},
+  {"modelCode":"ehr_leave_request","fieldCode":"ehr_lv_employee_id","sequence":2,"required":true,"visible":true,"editable":true,"displayConfig":{"searchable":true}},
+  {"modelCode":"ehr_leave_request","fieldCode":"ehr_lv_leave_type","sequence":3,"required":true,"visible":true,"editable":true,"displayConfig":{"searchable":true}},
+  {"modelCode":"ehr_leave_request","fieldCode":"ehr_lv_start_date","sequence":4,"required":true,"visible":true,"editable":true,"displayConfig":{"sortable":true}},
+  {"modelCode":"ehr_leave_request","fieldCode":"ehr_lv_end_date","sequence":5,"required":true,"visible":true,"editable":true},
+  {"modelCode":"ehr_leave_request","fieldCode":"ehr_lv_days","sequence":6,"required":true,"visible":true,"editable":true},
+  {"modelCode":"ehr_leave_request","fieldCode":"ehr_lv_status","sequence":7,"required":false,"visible":true,"editable":false,"displayConfig":{"searchable":true}},
+  {"modelCode":"ehr_leave_request","fieldCode":"ehr_lv_reason","sequence":8,"required":true,"visible":true,"editable":true},
+  {"modelCode":"ehr_leave_request","fieldCode":"ehr_lv_approver","sequence":9,"required":false,"visible":true,"editable":false},
+  {"modelCode":"ehr_leave_request","fieldCode":"ehr_lv_approval_notes","sequence":10,"required":false,"visible":false,"editable":true}
+]

@@ -1,0 +1,46 @@
+[
+  { "key": "model.gp_task._meta.label", "zh-CN": "任务", "en-US": "Task", "source": "import", "refType": "model" },
+  { "key": "model.gp_task.gp_task_code.label", "zh-CN": "任务编号", "en-US": "Task Code", "source": "import", "refType": "field" },
+  { "key": "model.gp_task.gp_task_title.label", "zh-CN": "任务标题", "en-US": "Task Title", "source": "import", "refType": "field" },
+  { "key": "model.gp_task.gp_task_description.label", "zh-CN": "任务描述", "en-US": "Description", "source": "import", "refType": "field" },
+  { "key": "model.gp_task.gp_task_status.label", "zh-CN": "状态", "en-US": "Status", "source": "import", "refType": "field" },
+  { "key": "model.gp_task.gp_task_priority.label", "zh-CN": "优先级", "en-US": "Priority", "source": "import", "refType": "field" },
+  { "key": "model.gp_task.gp_task_assignee.label", "zh-CN": "负责人", "en-US": "Assignee", "source": "import", "refType": "field" },
+  { "key": "model.gp_task.gp_task_due_date.label", "zh-CN": "截止日期", "en-US": "Due Date", "source": "import", "refType": "field" },
+
+  { "key": "model.gp_task_comment._meta.label", "zh-CN": "任务评论", "en-US": "Task Comment", "source": "import", "refType": "model" },
+  { "key": "model.gp_task_comment.gp_tc_task_id.label", "zh-CN": "所属任务", "en-US": "Task", "source": "import", "refType": "field" },
+  { "key": "model.gp_task_comment.gp_tc_content.label", "zh-CN": "评论内容", "en-US": "Content", "source": "import", "refType": "field" },
+  { "key": "model.gp_task_comment.gp_tc_author.label", "zh-CN": "作者", "en-US": "Author", "source": "import", "refType": "field" },
+
+  { "key": "gp.action.create_task", "zh-CN": "新建任务", "en-US": "Create Task", "source": "import", "refType": "action" },
+  { "key": "gp.action.update_task", "zh-CN": "编辑任务", "en-US": "Update Task", "source": "import", "refType": "action" },
+  { "key": "gp.action.start_task", "zh-CN": "开始任务", "en-US": "Start Task", "source": "import", "refType": "action" },
+  { "key": "gp.action.complete_task", "zh-CN": "完成任务", "en-US": "Complete Task", "source": "import", "refType": "action" },
+  { "key": "gp.action.archive_task", "zh-CN": "归档任务", "en-US": "Archive Task", "source": "import", "refType": "action" },
+  { "key": "gp.action.delete_task", "zh-CN": "删除任务", "en-US": "Delete Task", "source": "import", "refType": "action" },
+  { "key": "gp.action.create_task_comment", "zh-CN": "新建评论", "en-US": "Create Comment", "source": "import", "refType": "action" },
+  { "key": "gp.action.update_task_comment", "zh-CN": "编辑评论", "en-US": "Update Comment", "source": "import", "refType": "action" },
+  { "key": "gp.action.delete_task_comment", "zh-CN": "删除评论", "en-US": "Delete Comment", "source": "import", "refType": "action" },
+
+  { "key": "gp.page.task_list.title", "zh-CN": "任务列表", "en-US": "Tasks", "source": "import", "refType": "page" },
+  { "key": "gp.page.task_form.title", "zh-CN": "任务表单", "en-US": "Task Form", "source": "import", "refType": "page" },
+  { "key": "gp.page.task_form.section.basic", "zh-CN": "基本信息", "en-US": "Basic Information", "source": "import", "refType": "page" },
+  { "key": "gp.page.task_form.section.detail", "zh-CN": "详细信息", "en-US": "Details", "source": "import", "refType": "page" },
+  { "key": "gp.page.comment_list.title", "zh-CN": "评论列表", "en-US": "Comments", "source": "import", "refType": "page" },
+  { "key": "gp.page.comment_form.title", "zh-CN": "评论表单", "en-US": "Comment Form", "source": "import", "refType": "page" },
+
+  { "key": "model.gp_approval._meta.label", "zh-CN": "审批", "en-US": "Approval", "source": "import", "refType": "model" },
+  { "key": "model.gp_approval.gp_apr_task_pid.label", "zh-CN": "关联任务", "en-US": "Task", "source": "import", "refType": "field" },
+  { "key": "model.gp_approval.gp_apr_approver.label", "zh-CN": "审批人", "en-US": "Approver", "source": "import", "refType": "field" },
+  { "key": "model.gp_approval.gp_apr_status.label", "zh-CN": "状态", "en-US": "Status", "source": "import", "refType": "field" },
+  { "key": "model.gp_approval.gp_apr_decision_at.label", "zh-CN": "决策时间", "en-US": "Decision Time", "source": "import", "refType": "field" },
+  { "key": "model.gp_approval.gp_apr_notes.label", "zh-CN": "备注", "en-US": "Notes", "source": "import", "refType": "field" },
+
+  { "key": "gp.action.request_approval", "zh-CN": "发起审批", "en-US": "Request Approval", "source": "import", "refType": "action" },
+  { "key": "gp.action.approve", "zh-CN": "批准", "en-US": "Approve", "source": "import", "refType": "action" },
+  { "key": "gp.action.reject", "zh-CN": "拒绝", "en-US": "Reject", "source": "import", "refType": "action" },
+  { "key": "gp.action.list_approvals", "zh-CN": "审批列表", "en-US": "List Approvals", "source": "import", "refType": "action" },
+
+  { "key": "gp.page.approval_list.title", "zh-CN": "审批列表", "en-US": "Approvals", "source": "import", "refType": "page" }
+]

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             targetNamespace="http://auraboot.com/bpm">
+
+  <process id="simple-flow" name="Simple Flow (no UserTask)" version="1" isExecutable="true">
+
+    <startEvent id="start" name="Start"/>
+
+    <sequenceFlow id="flow1" sourceRef="start" targetRef="end"/>
+
+    <endEvent id="end" name="End"/>
+
+  </process>
+
+</definitions>

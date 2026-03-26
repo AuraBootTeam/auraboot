@@ -1,0 +1,11 @@
+[
+  { "modelCode": "thr_employee", "fieldCode": "thr_em_code", "sequence": 1, "required": true, "visible": true, "editable": false, "displayConfig": { "searchable": true, "sortable": true } },
+  { "modelCode": "thr_employee", "fieldCode": "thr_em_name", "sequence": 2, "required": true, "visible": true, "editable": true, "displayConfig": { "searchable": true, "sortable": true } },
+  { "modelCode": "thr_employee", "fieldCode": "thr_em_department", "sequence": 3, "required": true, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "thr_employee", "fieldCode": "thr_em_position", "sequence": 4, "required": false, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "thr_employee", "fieldCode": "thr_em_email", "sequence": 5, "required": false, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "thr_employee", "fieldCode": "thr_em_phone", "sequence": 6, "required": false, "visible": false, "editable": true },
+  { "modelCode": "thr_employee", "fieldCode": "thr_em_hire_date", "sequence": 7, "required": true, "visible": true, "editable": true, "displayConfig": { "sortable": true } },
+  { "modelCode": "thr_employee", "fieldCode": "thr_em_status", "sequence": 8, "required": false, "visible": true, "editable": false, "displayConfig": { "searchable": true } },
+  { "modelCode": "thr_employee", "fieldCode": "thr_em_notes", "sequence": 9, "required": false, "visible": false, "editable": true }
+]

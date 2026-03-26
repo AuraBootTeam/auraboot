@@ -1,0 +1,153 @@
+{
+  "meta": { "title": { "en-US": "View Store", "zh-CN": "查看门店" } },
+  "props": { "mode": "view" },
+  "regions": [
+    {
+      "type": "detail",
+      "sections": [
+        {
+          "code": "basic",
+          "title": { "en-US": "Basic Information", "zh-CN": "基本信息" },
+          "fields": [
+            {
+              "code": "code",
+              "type": "display",
+              "props": { "label": { "en-US": "Store Code", "zh-CN": "门店编码" } },
+              "layout": { "span": 1 }
+            },
+            {
+              "code": "name",
+              "type": "display",
+              "props": { "label": { "en-US": "Store Name", "zh-CN": "门店名称" } },
+              "layout": { "span": 1 }
+            },
+            {
+              "code": "type",
+              "type": "display",
+              "props": {
+                "label": { "en-US": "Store Type", "zh-CN": "门店类型" },
+                "valueMap": {
+                  "direct": { "en-US": "Direct Store", "zh-CN": "直营店" },
+                  "flagship": { "en-US": "Flagship Store", "zh-CN": "旗舰店" },
+                  "community": { "en-US": "Community Store", "zh-CN": "社区店" },
+                  "franchise": { "en-US": "Franchise Store", "zh-CN": "加盟店" }
+                }
+              },
+              "layout": { "span": 1 }
+            },
+            {
+              "code": "status",
+              "type": "display",
+              "props": {
+                "label": { "en-US": "Store Status", "zh-CN": "门店状态" },
+                "valueMap": {
+                  "active": { "en-US": "Active", "zh-CN": "开业" },
+                  "closed": { "en-US": "Closed", "zh-CN": "已关闭" },
+                  "inactive": { "en-US": "Inactive", "zh-CN": "未开业" },
+                  "preparing": { "en-US": "Preparing", "zh-CN": "筹备中" }
+                },
+                "statusColor": {
+                  "active": "success",
+                  "closed": "error",
+                  "inactive": "warning",
+                  "preparing": "processing"
+                }
+              },
+              "layout": { "span": 1 }
+            }
+          ],
+          "layout": { "gap": "medium", "type": "grid", "columns": 2 }
+        },
+        {
+          "code": "location",
+          "title": { "en-US": "Location Information", "zh-CN": "位置信息" },
+          "fields": [
+            {
+              "code": "address",
+              "type": "display",
+              "props": { "label": { "en-US": "Detailed Address", "zh-CN": "详细地址" } },
+              "layout": { "span": 1 }
+            }
+          ],
+          "layout": { "gap": "medium", "type": "grid", "columns": 1 }
+        },
+        {
+          "code": "contact",
+          "title": { "en-US": "Contact Information", "zh-CN": "联系信息" },
+          "fields": [
+            {
+              "code": "contact_phone",
+              "type": "display",
+              "props": { "label": { "en-US": "Contact Phone", "zh-CN": "联系电话" } },
+              "layout": { "span": 1 }
+            },
+            {
+              "code": "contact_email",
+              "type": "display",
+              "props": { "label": { "en-US": "Contact Email", "zh-CN": "联系邮箱" } },
+              "layout": { "span": 1 }
+            }
+          ],
+          "layout": { "gap": "medium", "type": "grid", "columns": 2 }
+        },
+        {
+          "code": "additional",
+          "title": { "en-US": "Additional Information", "zh-CN": "附加信息" },
+          "fields": [
+            {
+              "code": "description",
+              "type": "display",
+              "props": { "label": { "en-US": "Store Description", "zh-CN": "门店描述" } },
+              "layout": { "span": 1 }
+            },
+            {
+              "code": "images",
+              "type": "imageDisplay",
+              "props": {
+                "label": { "en-US": "Store Images", "zh-CN": "门店图片" },
+                "preview": true
+              },
+              "layout": { "span": 1 }
+            }
+          ],
+          "layout": { "gap": "medium", "type": "grid", "columns": 1 }
+        },
+        {
+          "code": "audit",
+          "title": { "en-US": "Audit Information", "zh-CN": "审计信息" },
+          "fields": [
+            {
+              "code": "created_at",
+              "type": "display",
+              "props": {
+                "label": { "en-US": "Created At", "zh-CN": "创建时间" },
+                "format": "YYYY-MM-DD HH:mm:ss"
+              },
+              "layout": { "span": 1 }
+            },
+            {
+              "code": "updated_at",
+              "type": "display",
+              "props": {
+                "label": { "en-US": "Updated At", "zh-CN": "更新时间" },
+                "format": "YYYY-MM-DD HH:mm:ss"
+              },
+              "layout": { "span": 1 }
+            }
+          ],
+          "layout": { "gap": "medium", "type": "grid", "columns": 2 }
+        }
+      ]
+    },
+    {
+      "type": "action",
+      "actions": [
+        {
+          "code": "edit",
+          "props": { "label": { "en-US": "Edit", "zh-CN": "编辑" }, "primary": true }
+        },
+        { "code": "back", "props": { "label": { "en-US": "Back", "zh-CN": "返回" } } }
+      ]
+    }
+  ]
+}

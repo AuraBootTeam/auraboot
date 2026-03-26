@@ -1,0 +1,81 @@
+{
+  "meta": {
+    "type": "form",
+    "version": "1.0",
+    "model": "Store",
+    "scenario": "Store.Create",
+    "title": { "i18n": "form.store.title", "fallback": "创建门店" }
+  },
+  "layout": {
+    "colSpan": 6
+  },
+  "sections": [
+    {
+      "code": "basic",
+      "title": { "i18n": "form.store.section.basic", "fallback": "基本信息" },
+      "fields": [
+        {
+          "field": "code"
+        },
+        {
+          "field": "name"
+        },
+        {
+          "field": "type"
+        },
+        {
+          "field": "status"
+        }
+      ]
+    },
+    {
+      "code": "location",
+      "title": { "i18n": "form.store.section.location", "fallback": "位置信息" },
+      "fields": [
+        {
+          "field": "address"
+        }
+      ]
+    },
+    {
+      "code": "contact",
+      "title": { "i18n": "form.store.section.contact", "fallback": "联系信息" },
+      "fields": [
+        {
+          "field": "contact_phone"
+        },
+        {
+          "field": "contact_email"
+        }
+      ]
+    },
+    {
+      "code": "additional",
+      "title": { "i18n": "form.store.section.additional", "fallback": "附加信息" },
+      "fields": [
+        {
+          "field": "description"
+        },
+        {
+          "field": "images"
+        }
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "code": "create",
+      "props": {
+        "label": { "i18n": "form.store.action.create", "fallback": "提交" },
+        "primary": true
+      }
+    },
+    {
+      "code": "cancel",
+      "props": {
+        "label": { "i18n": "form.store.action.cancel", "fallback": "取消" },
+        "primary": false
+      }
+    }
+  ]
+}

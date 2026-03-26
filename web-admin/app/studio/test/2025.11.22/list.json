@@ -1,0 +1,164 @@
+{
+  "version": "2.1.0",
+  "kind": "Page",
+  "metadata": {
+    "id": "page_store_list",
+    "entityCode": "store",
+    "title": "$i18n:store.list.title",
+    "description": "门店列表管理页面"
+  },
+  "state": {
+    "filterValues": { "status": ["active"] },
+    "pagination": { "current": 1, "pageSize": 10, "total": 0 },
+    "selectedRowKeys": [],
+    "loading": false
+  },
+  "dataSources": [
+    {
+      "id": "listStoreApi",
+      "type": "http",
+      "url": "/api/dynamic/Store/list",
+      "method": "get",
+      "autoLoad": true,
+      "params": {
+        "filters": "{{state.filterValues}}",
+        "pagination": "{{state.pagination}}"
+      }
+    },
+    {
+      "id": "deleteStoreApi",
+      "type": "http",
+      "url": "/api/dynamic/Store/delete",
+      "method": "post"
+    }
+  ],
+  "actions": {
+    "doSearch": {
+      "desc": "标准查询流程",
+      "type": "flow",
+      "steps": [
+        { "action": "state.set", "args": { "loading": true } },
+        { "action": "dataSource.fetch", "target": "listStoreApi" },
+        { "action": "component.refresh", "target": "storeTable" },
+        { "action": "toast.success", "content": "$i18n:msg.search.success" },
+        { "action": "state.set", "args": { "loading": false } }
+      ]
+    },
+    "doDelete": {
+      "desc": "删除逻辑（包含确认交互）",
+      "type": "flow",
+      "params": ["ids"],
+      "steps": [
+        {
+          "action": "dialog.confirm",
+          "args": {
+            "title": "$i18n:dialog.delete.title",
+            "content": "$i18n:dialog.delete.confirm_msg"
+          },
+          "next": "callApi"
+        },
+        {
+          "id": "callApi",
+          "action": "dataSource.fetch",
+          "target": "deleteStoreApi",
+          "args": { "ids": "{{params.ids}}" },
+          "next": "refresh"
+        },
+        {
+          "id": "refresh",
+          "action": "execute",
+          "target": "doSearch"
+        }
+      ]
+    },
+    "navigateNew": {
+      "type": "built-in",
+      "action": "router.push",
+      "args": { "path": "/store/new" }
+    }
+  },
+  "layout": {
+    "component": "PageContainer",
+    "children": [
+      {
+        "component": "Card",
+        "props": { "title": "$i18n:store.list.filter.title" },
+        "children": [
+          {
+            "component": "Form",
+            "id": "filterForm",
+            "props": {
+              "layout": "inline",
+              "initialValues": "{{state.filterValues}}"
+            },
+            "children": [
+              {
+                "component": "Input",
+                "props": {
+                  "name": "name",
+                  "label": "$i18n:store.field.name",
+                  "allowClear": true
+                }
+              },
+              {
+                "component": "Select",
+                "props": {
+                  "name": "status",
+                  "label": "$i18n:store.field.status",
+                  "options": [
+                    { "label": "$i18n:status.active", "value": "active" },
+                    { "label": "$i18n:status.closed", "value": "closed" }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "component": "Toolbar",
+        "children": [
+          {
+            "component": "Button",
+            "props": { "type": "primary", "content": "$i18n:btn.search" },
+            "events": { "onClick": { "action": "doSearch" } }
+          },
+          {
+            "component": "Button",
+            "props": { "content": "$i18n:btn.create" },
+            "permissions": ["store:create"],
+            "events": { "onClick": { "action": "navigateNew" } }
+          }
+        ]
+      },
+      {
+        "component": "Table",
+        "id": "storeTable",
+        "props": {
+          "dataSource": "{{dataSources.listStoreApi.data}}",
+          "rowKey": "id",
+          "columns": [
+            { "title": "$i18n:store.field.code", "dataIndex": "code" },
+            { "title": "$i18n:store.field.name", "dataIndex": "name" },
+            {
+              "title": "$i18n:col.action",
+              "key": "actions",
+              "render": {
+                "component": "Space",
+                "children": [
+                  {
+                    "component": "Button",
+                    "props": { "type": "link", "danger": true, "content": "$i18n:btn.delete" },
+                    "events": {
+                      "onClick": { "action": "doDelete", "args": { "ids": ["{{row.id}}"] } }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

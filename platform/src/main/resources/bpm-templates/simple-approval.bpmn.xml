@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xmlns:smart="http://smart.alibaba.com"
+             xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+             xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+             xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+             id="simple-approval-definitions"
+             targetNamespace="http://auraboot.com/bpm"
+             version="1.0.0">
+
+  <!-- ============================================================
+       Simple Approval Process (simple-approval)
+
+       Flow:
+         StartEvent
+           -> UserTask: Submit Application
+           -> UserTask: Approve / Reject
+           -> ExclusiveGateway: Decision
+               |- approved -> EndEvent (Approved)
+               |- rejected -> UserTask: Revise & Resubmit -> back to Submit
+       ============================================================ -->
+
+  <process id="simple-approval" name="Simple Approval Process" isExecutable="true" version="1">
+
+    <!-- ==================== Start ==================== -->
+
+    <startEvent id="start_event" name="Start">
+      <documentation>Process initiated when applicant submits a request.</documentation>
+    </startEvent>
+
+    <sequenceFlow id="flow_start_to_submit" sourceRef="start_event" targetRef="task_submit"/>
+
+    <!-- ==================== Submit Application ==================== -->
+
+    <userTask id="task_submit" name="Submit Application"
+              smart:assigneeType="user"
+              smart:assigneeId="${initiator}">
+      <documentation>Applicant fills in and submits the application form.</documentation>
+    </userTask>
+
+    <sequenceFlow id="flow_submit_to_approve" sourceRef="task_submit" targetRef="task_approve"/>
+
+    <!-- ==================== Approval ==================== -->
+
+    <userTask id="task_approve" name="Approval"
+              smart:assigneeType="user"
+              smart:assigneeId="${approver}">
+      <documentation>Approver reviews the application and decides to approve or reject.</documentation>
+    </userTask>
+
+    <sequenceFlow id="flow_approve_to_gateway" sourceRef="task_approve" targetRef="gw_decision"/>
+
+    <!-- ==================== Decision Gateway ==================== -->
+
+    <exclusiveGateway id="gw_decision" name="Decision Gateway">
+      <documentation>Routes the flow based on the approval outcome.</documentation>
+    </exclusiveGateway>
+
+    <!-- Approved path -->
+    <sequenceFlow id="flow_approved" name="Approved" sourceRef="gw_decision" targetRef="end_approved">
+      <conditionExpression xsi:type="tFormalExpression"><![CDATA[outcome == 'approved']]></conditionExpression>
+    </sequenceFlow>
+
+    <!-- Rejected path -->
+    <sequenceFlow id="flow_rejected" name="Rejected" sourceRef="gw_decision" targetRef="task_revise">
+      <conditionExpression xsi:type="tFormalExpression"><![CDATA[outcome == 'rejected']]></conditionExpression>
+    </sequenceFlow>
+
+    <!-- ==================== Revise & Resubmit ==================== -->
+
+    <userTask id="task_revise" name="Revise and Resubmit"
+              smart:assigneeType="user"
+              smart:assigneeId="${initiator}">
+      <documentation>Applicant revises the application based on rejection feedback and resubmits.</documentation>
+    </userTask>
+
+    <sequenceFlow id="flow_revise_to_submit" sourceRef="task_revise" targetRef="task_submit"/>
+
+    <!-- ==================== End ==================== -->
+
+    <endEvent id="end_approved" name="Approved End">
+      <documentation>Process completes successfully after approval.</documentation>
+    </endEvent>
+
+  </process>
+
+  <!--
+       BPMN Diagram Layout
+
+       Visual layout (left to right, with rejection loop below):
+
+       Start => Submit => Approve => Decision Gateway
+                  ^                       |        |
+                  |                  approved   rejected
+                  |                       |        |
+                  |                     [End]      |
+                  +======= Revise <=================+
+
+       Coordinates:
+         Row 1 (y=200): Start(100), Submit(230), Approve(430), Gateway(630), End(780)
+         Row 2 (y=350): Revise(430)
+         Loop back: Revise => Submit (via waypoints)
+  -->
+
+  <bpmndi:BPMNDiagram id="BPMNDiagram_simple_approval">
+    <bpmndi:BPMNPlane id="BPMNPlane_simple_approval" bpmnElement="simple-approval">
+
+      <!-- Start Event -->
+      <bpmndi:BPMNShape id="start_event_di" bpmnElement="start_event">
+        <dc:Bounds x="100" y="200" width="36" height="36"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="103" y="243" width="30" height="14"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <!-- Submit Application Task -->
+      <bpmndi:BPMNShape id="task_submit_di" bpmnElement="task_submit">
+        <dc:Bounds x="230" y="178" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+
+      <!-- Approval Task -->
+      <bpmndi:BPMNShape id="task_approve_di" bpmnElement="task_approve">
+        <dc:Bounds x="430" y="178" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+
+      <!-- Decision Gateway -->
+      <bpmndi:BPMNShape id="gw_decision_di" bpmnElement="gw_decision" isMarkerVisible="true">
+        <dc:Bounds x="630" y="193" width="50" height="50"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="617" y="163" width="76" height="14"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <!-- Approved End Event -->
+      <bpmndi:BPMNShape id="end_approved_di" bpmnElement="end_approved">
+        <dc:Bounds x="780" y="200" width="36" height="36"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="763" y="243" width="70" height="14"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <!-- Revise Task -->
+      <bpmndi:BPMNShape id="task_revise_di" bpmnElement="task_revise">
+        <dc:Bounds x="430" y="330" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+
+      <!-- Flow: Start -> Submit -->
+      <bpmndi:BPMNEdge id="flow_start_to_submit_di" bpmnElement="flow_start_to_submit">
+        <di:waypoint xsi:type="dc:Point" x="136" y="218"/>
+        <di:waypoint xsi:type="dc:Point" x="230" y="218"/>
+      </bpmndi:BPMNEdge>
+
+      <!-- Flow: Submit -> Approve -->
+      <bpmndi:BPMNEdge id="flow_submit_to_approve_di" bpmnElement="flow_submit_to_approve">
+        <di:waypoint xsi:type="dc:Point" x="330" y="218"/>
+        <di:waypoint xsi:type="dc:Point" x="430" y="218"/>
+      </bpmndi:BPMNEdge>
+
+      <!-- Flow: Approve -> Gateway -->
+      <bpmndi:BPMNEdge id="flow_approve_to_gateway_di" bpmnElement="flow_approve_to_gateway">
+        <di:waypoint xsi:type="dc:Point" x="530" y="218"/>
+        <di:waypoint xsi:type="dc:Point" x="630" y="218"/>
+      </bpmndi:BPMNEdge>
+
+      <!-- Flow: Gateway -> End (Approved) -->
+      <bpmndi:BPMNEdge id="flow_approved_di" bpmnElement="flow_approved">
+        <di:waypoint xsi:type="dc:Point" x="680" y="218"/>
+        <di:waypoint xsi:type="dc:Point" x="780" y="218"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="710" y="197" width="50" height="14"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+
+      <!-- Flow: Gateway -> Revise (Rejected) -->
+      <bpmndi:BPMNEdge id="flow_rejected_di" bpmnElement="flow_rejected">
+        <di:waypoint xsi:type="dc:Point" x="655" y="243"/>
+        <di:waypoint xsi:type="dc:Point" x="655" y="370"/>
+        <di:waypoint xsi:type="dc:Point" x="530" y="370"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="660" y="303" width="50" height="14"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+
+      <!-- Flow: Revise -> Submit (loop back) -->
+      <bpmndi:BPMNEdge id="flow_revise_to_submit_di" bpmnElement="flow_revise_to_submit">
+        <di:waypoint xsi:type="dc:Point" x="430" y="370"/>
+        <di:waypoint xsi:type="dc:Point" x="280" y="370"/>
+        <di:waypoint xsi:type="dc:Point" x="280" y="258"/>
+      </bpmndi:BPMNEdge>
+
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+
+</definitions>

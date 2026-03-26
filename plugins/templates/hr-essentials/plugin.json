@@ -1,0 +1,52 @@
+{
+  "pluginId": "com.auraboot.template.hr-essentials",
+  "namespace": "thr",
+  "version": "1.0.0",
+  "dslVersion": 1,
+  "pluginType": "config",
+  "displayName": "HR Essentials Template",
+  "displayName:zh-CN": "人事管理插件模板",
+  "displayName:en": "HR Essentials Plugin Template",
+  "description": "HR management template covering employee records, attendance tracking, and leave request workflows. Demonstrates lifecycle state machines, parent-child references, and agent-ready commands.",
+  "author": "AuraBoot Team",
+  "homepage": "https://auraboot.io/plugins/hr-essentials",
+  "minPlatformVersion": "1.0.0",
+  "dependencies": [],
+  "provides": [
+    {"type": "model", "code": "thr_employee"},
+    {"type": "model", "code": "thr_attendance"},
+    {"type": "model", "code": "thr_leave_request"},
+    {"type": "command", "code": "thr:create_employee"},
+    {"type": "command", "code": "thr:on_leave"},
+    {"type": "command", "code": "thr:return_from_leave"},
+    {"type": "command", "code": "thr:resign"},
+    {"type": "command", "code": "thr:create_attendance"},
+    {"type": "command", "code": "thr:create_leave_request"},
+    {"type": "command", "code": "thr:approve_leave"},
+    {"type": "command", "code": "thr:reject_leave"},
+    {"type": "command", "code": "thr:cancel_leave"}
+  ],
+  "requires": [],
+  "resourceDirs": {
+    "models": "config/models.json",
+    "fields": "config/fields",
+    "modelFieldBindings": "config/bindings",
+    "commands": "config/commands",
+    "pages": "config/pages",
+    "dicts": "config/dicts.json",
+    "permissions": "config/permissions.json",
+    "menus": "config/menus.json",
+    "i18n": "config/i18n.json",
+    "namedQueries": "config/named-queries.json"
+  },
+  "importOptions": {
+    "conflictStrategy": "overwrite",
+    "validateReferences": true,
+    "autoPublishModels": true,
+    "autoPublishFields": true,
+    "autoPublishCommands": true,
+    "autoPublishPages": true,
+    "autoDeployProcesses": false,
+    "createResourcePermissions": true
+  }
+}

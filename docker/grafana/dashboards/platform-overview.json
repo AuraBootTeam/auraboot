@@ -1,0 +1,303 @@
+{
+  "uid": "auraboot-platform-overview",
+  "title": "AuraBoot Platform Overview",
+  "tags": ["auraboot", "overview"],
+  "timezone": "browser",
+  "refresh": "10s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "API Request Rate",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(meta_api_requests_total{application=\"auraboot\"}[5m]))",
+          "legendFormat": "req/s",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "thresholds": {
+            "steps": [
+              { "color": "blue", "value": null }
+            ]
+          }
+        }
+      },
+      "datasource": { "type": "prometheus", "uid": "pbfa97cfb590b2093" }
+    },
+    {
+      "id": 2,
+      "title": "Permission Check Rate",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(meta_permission_checks_total{application=\"auraboot\"}[5m]))",
+          "legendFormat": "checks/s",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "thresholds": {
+            "steps": [
+              { "color": "purple", "value": null }
+            ]
+          }
+        }
+      },
+      "datasource": { "type": "prometheus", "uid": "pbfa97cfb590b2093" }
+    },
+    {
+      "id": 3,
+      "title": "Query Execution Rate",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(meta_query_executions_total{application=\"auraboot\"}[5m]))",
+          "legendFormat": "queries/s",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null }
+            ]
+          }
+        }
+      },
+      "datasource": { "type": "prometheus", "uid": "pbfa97cfb590b2093" }
+    },
+    {
+      "id": 4,
+      "title": "DSL Projection Rate",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(meta_dsl_projections_total{application=\"auraboot\"}[5m]))",
+          "legendFormat": "projections/s",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "thresholds": {
+            "steps": [
+              { "color": "orange", "value": null }
+            ]
+          }
+        }
+      },
+      "datasource": { "type": "prometheus", "uid": "pbfa97cfb590b2093" }
+    },
+    {
+      "id": 5,
+      "title": "API Latency (P95)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 6 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{application=\"auraboot\"}[5m])) by (le))",
+          "legendFormat": "p95",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(http_server_requests_seconds_bucket{application=\"auraboot\"}[5m])) by (le))",
+          "legendFormat": "p50",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "gradientMode": "scheme"
+          },
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.5 },
+              { "color": "red", "value": 1.0 }
+            ]
+          }
+        }
+      },
+      "datasource": { "type": "prometheus", "uid": "pbfa97cfb590b2093" }
+    },
+    {
+      "id": 6,
+      "title": "Permission Check Latency",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 6 },
+      "targets": [
+        {
+          "expr": "rate(meta_permission_check_time_seconds_sum{application=\"auraboot\"}[5m]) / rate(meta_permission_check_time_seconds_count{application=\"auraboot\"}[5m])",
+          "legendFormat": "Avg Latency",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 15,
+            "gradientMode": "scheme"
+          },
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.1 },
+              { "color": "red", "value": 0.5 }
+            ]
+          }
+        }
+      },
+      "datasource": { "type": "prometheus", "uid": "pbfa97cfb590b2093" }
+    },
+    {
+      "id": 7,
+      "title": "Query Execution Latency",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 6 },
+      "targets": [
+        {
+          "expr": "rate(meta_query_execution_time_seconds_sum{application=\"auraboot\"}[5m]) / rate(meta_query_execution_time_seconds_count{application=\"auraboot\"}[5m])",
+          "legendFormat": "Avg Latency",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 15,
+            "gradientMode": "scheme"
+          },
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.5 },
+              { "color": "red", "value": 2.0 }
+            ]
+          }
+        }
+      },
+      "datasource": { "type": "prometheus", "uid": "pbfa97cfb590b2093" }
+    },
+    {
+      "id": 8,
+      "title": "Cache Hit Rate",
+      "type": "gauge",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 14 },
+      "targets": [
+        {
+          "expr": "sum(meta_cache_hits_total) / (sum(meta_cache_hits_total) + sum(meta_cache_misses_total)) * 100",
+          "legendFormat": "Hit Rate",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 60 },
+              { "color": "green", "value": 80 }
+            ]
+          }
+        }
+      },
+      "datasource": { "type": "prometheus", "uid": "pbfa97cfb590b2093" }
+    },
+    {
+      "id": 9,
+      "title": "System Uptime",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 14 },
+      "targets": [
+        {
+          "expr": "process_uptime_seconds{application=\"auraboot\"}",
+          "legendFormat": "Uptime",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null }
+            ]
+          }
+        }
+      },
+      "datasource": { "type": "prometheus", "uid": "pbfa97cfb590b2093" }
+    },
+    {
+      "id": 10,
+      "title": "Platform Metrics Over Time",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 14 },
+      "targets": [
+        {
+          "expr": "sum(rate(meta_api_requests_total{application=\"auraboot\"}[1m]))",
+          "legendFormat": "API Requests",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(meta_permission_checks_total{application=\"auraboot\"}[1m]))",
+          "legendFormat": "Permission Checks",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(rate(meta_query_executions_total{application=\"auraboot\"}[1m]))",
+          "legendFormat": "Query Executions",
+          "refId": "C"
+        },
+        {
+          "expr": "sum(rate(meta_dsl_projections_total{application=\"auraboot\"}[1m]))",
+          "legendFormat": "DSL Projections",
+          "refId": "D"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10
+          }
+        }
+      },
+      "datasource": { "type": "prometheus", "uid": "pbfa97cfb590b2093" }
+    }
+  ],
+  "schemaVersion": 39,
+  "version": 1
+}

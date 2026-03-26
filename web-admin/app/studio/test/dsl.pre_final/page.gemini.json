@@ -1,0 +1,87 @@
+{
+  "kind": "PageLayout", // 顶层布局类型
+  "id": "root_layout",
+  "version": "3.0.0",
+
+  "state": {
+    "collapsed": false,
+    "currentUser": { "name": "Admin", "avatar": "..." }
+  },
+
+  "handlers": {
+    "toggleSider": {
+      "type": "flow",
+      "steps": [{ "action": "state.set", "args": { "collapsed": "{{!state.collapsed}}" } }]
+    },
+    "logout": {
+      "type": "built-in",
+      "name": "auth.logout"
+    }
+  },
+
+  // === 宏观布局: Header + Sider + Main ===
+  "layout": {
+    "type": "grid",
+    "columns": ["{{state.collapsed ? '64px' : '240px'}}", "1fr"], // 动态宽度
+    "rows": ["60px", "1fr"],
+    "areas": [
+      ["header", "header"],
+      ["sider", "main"]
+    ]
+  },
+
+  "blocks": [
+    // 1. Header Block
+    {
+      "id": "block_header",
+      "area": "header",
+      "type": "Header",
+      "props": {
+        "logo": "/assets/logo.png",
+        "title": "$i18n:app.name",
+        "backgroundColor": "$color.bgContainer"
+      },
+      "children": [
+        // 头部右侧内容
+        {
+          "type": "AvatarDropdown",
+          "props": {
+            "user": "{{state.currentUser}}",
+            "menu": [{ "label": "Logout", "handler": "logout" }]
+          }
+        }
+      ]
+    },
+
+    // 2. Sider Block
+    {
+      "id": "block_sider",
+      "area": "sider",
+      "type": "Menu",
+      "props": {
+        "collapsed": "{{state.collapsed}}",
+        "items": [
+          {
+            "key": "dashboard",
+            "icon": "Home",
+            "label": "$i18n:menu.dashboard",
+            "path": "/dashboard"
+          },
+          { "key": "store", "icon": "Shop", "label": "$i18n:menu.store", "path": "/store" }
+        ]
+      }
+    },
+
+    // 3. Main Block (路由出口)
+    {
+      "id": "block_main",
+      "area": "main",
+      "type": "RouterView", // 特殊 Block，用于渲染子页面
+      "props": {
+        "padding": "$spacing.lg",
+        "backgroundColor": "$color.bgLayout"
+      }
+      // 注意：这里不直接写 Main 页面的内容，而是由 Router 根据 URL 动态挂载上述的 page-main-dashboard.json 或 store-list.json
+    }
+  ]
+}

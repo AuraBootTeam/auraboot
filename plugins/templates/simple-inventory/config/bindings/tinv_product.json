@@ -1,0 +1,9 @@
+[
+  {"modelCode":"tinv_product","fieldCode":"tinv_pd_code","sequence":1,"required":true,"visible":true,"editable":false,"displayConfig":{"searchable":true,"sortable":true}},
+  {"modelCode":"tinv_product","fieldCode":"tinv_pd_name","sequence":2,"required":true,"visible":true,"editable":true,"displayConfig":{"searchable":true,"sortable":true}},
+  {"modelCode":"tinv_product","fieldCode":"tinv_pd_category","sequence":3,"required":false,"visible":true,"editable":true,"displayConfig":{"searchable":true}},
+  {"modelCode":"tinv_product","fieldCode":"tinv_pd_unit","sequence":4,"required":false,"visible":true,"editable":true,"displayConfig":{"searchable":true}},
+  {"modelCode":"tinv_product","fieldCode":"tinv_pd_unit_price","sequence":5,"required":false,"visible":true,"editable":true},
+  {"modelCode":"tinv_product","fieldCode":"tinv_pd_description","sequence":6,"required":false,"visible":false,"editable":true},
+  {"modelCode":"tinv_product","fieldCode":"tinv_pd_status","sequence":7,"required":false,"visible":true,"editable":false,"displayConfig":{"searchable":true}}
+]

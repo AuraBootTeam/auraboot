@@ -1,0 +1,12 @@
+[
+  {"code":"tasset_as_code","displayName:zh-CN":"资产编号","displayName:en":"Asset Code","dataType":"string","description":"Auto-generated asset code.","constraints":{"required":true,"maxLength":50},"feature":{"searchable":true,"sortable":true},"extension":{"readOnly":true,"placeholder:zh-CN":"系统自动生成","placeholder:en":"Auto generated"}},
+  {"code":"tasset_as_name","displayName:zh-CN":"资产名称","displayName:en":"Asset Name","dataType":"string","description":"Asset name.","constraints":{"required":true,"maxLength":200},"feature":{"searchable":true,"sortable":true},"extension":{"placeholder:zh-CN":"请输入资产名称","placeholder:en":"Enter asset name"}},
+  {"code":"tasset_as_category","displayName:zh-CN":"类别","displayName:en":"Category","dataType":"enum","dictCode":"tasset_category","description":"Asset category.","feature":{"searchable":true}},
+  {"code":"tasset_as_status","displayName:zh-CN":"状态","displayName:en":"Status","dataType":"enum","dictCode":"tasset_asset_status","defaultValue":"available","description":"Asset lifecycle status.","feature":{"searchable":true}},
+  {"code":"tasset_as_serial","displayName:zh-CN":"序列号","displayName:en":"Serial Number","dataType":"string","description":"Manufacturer serial number.","constraints":{"maxLength":100},"feature":{"searchable":true}},
+  {"code":"tasset_as_purchase_date","displayName:zh-CN":"采购日期","displayName:en":"Purchase Date","dataType":"date","description":"Date of purchase.","feature":{"sortable":true}},
+  {"code":"tasset_as_purchase_cost","displayName:zh-CN":"采购成本","displayName:en":"Purchase Cost","dataType":"decimal","description":"Purchase cost.","extension":{"precision":2}},
+  {"code":"tasset_as_location","displayName:zh-CN":"位置","displayName:en":"Location","dataType":"string","description":"Physical location.","constraints":{"maxLength":200},"feature":{"searchable":true}},
+  {"code":"tasset_as_assigned_to","displayName:zh-CN":"使用人","displayName:en":"Assigned To","dataType":"string","description":"Person currently using this asset.","constraints":{"maxLength":100},"feature":{"searchable":true}},
+  {"code":"tasset_as_notes","displayName:zh-CN":"备注","displayName:en":"Notes","dataType":"text","description":"Notes.","constraints":{"maxLength":5000},"extension":{"multiline":true}}
+]

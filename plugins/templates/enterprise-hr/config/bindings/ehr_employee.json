@@ -1,0 +1,16 @@
+[
+  {"modelCode":"ehr_employee","fieldCode":"ehr_em_code","sequence":1,"required":true,"visible":true,"editable":false,"displayConfig":{"searchable":true,"sortable":true}},
+  {"modelCode":"ehr_employee","fieldCode":"ehr_em_name","sequence":2,"required":true,"visible":true,"editable":true,"displayConfig":{"searchable":true,"sortable":true}},
+  {"modelCode":"ehr_employee","fieldCode":"ehr_em_email","sequence":3,"required":true,"visible":true,"editable":true,"displayConfig":{"searchable":true}},
+  {"modelCode":"ehr_employee","fieldCode":"ehr_em_phone","sequence":4,"required":false,"visible":true,"editable":true,"displayConfig":{"searchable":true}},
+  {"modelCode":"ehr_employee","fieldCode":"ehr_em_gender","sequence":5,"required":false,"visible":true,"editable":true},
+  {"modelCode":"ehr_employee","fieldCode":"ehr_em_birth_date","sequence":6,"required":false,"visible":false,"editable":true},
+  {"modelCode":"ehr_employee","fieldCode":"ehr_em_department_id","sequence":7,"required":true,"visible":true,"editable":true,"displayConfig":{"searchable":true}},
+  {"modelCode":"ehr_employee","fieldCode":"ehr_em_position_id","sequence":8,"required":false,"visible":true,"editable":true},
+  {"modelCode":"ehr_employee","fieldCode":"ehr_em_hire_date","sequence":9,"required":true,"visible":true,"editable":true,"displayConfig":{"sortable":true}},
+  {"modelCode":"ehr_employee","fieldCode":"ehr_em_status","sequence":10,"required":false,"visible":true,"editable":false,"displayConfig":{"searchable":true}},
+  {"modelCode":"ehr_employee","fieldCode":"ehr_em_base_salary","sequence":11,"required":false,"visible":false,"editable":true},
+  {"modelCode":"ehr_employee","fieldCode":"ehr_em_emergency_contact","sequence":12,"required":false,"visible":false,"editable":true},
+  {"modelCode":"ehr_employee","fieldCode":"ehr_em_address","sequence":13,"required":false,"visible":false,"editable":true},
+  {"modelCode":"ehr_employee","fieldCode":"ehr_em_notes","sequence":14,"required":false,"visible":false,"editable":true}
+]

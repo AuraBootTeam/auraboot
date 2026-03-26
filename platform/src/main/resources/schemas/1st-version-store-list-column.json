@@ -1,0 +1,192 @@
+{
+  "meta": {
+    "blockCode": "store.list.column",
+    "version": "3.0.0",
+    "title": {
+      "zh-CN": "门店列表视图",
+      "en-US": "Store List Column"
+    },
+    "entityCode": "Store",
+    "type": "table"
+  },
+
+  "layout": {
+    "size": "middle"
+  },
+  "style": {
+    "size": "middle",
+    "scroll": {
+      "x": 1200,
+      "y": 600
+    }
+  },
+  "props": {
+    "rowKey": "id",
+    "scroll": {
+      "x": 1200,
+      "y": 600
+    }
+  },
+  "pagination": {
+    "showSizeChanger": true,
+    "showQuickJumper": true,
+    "showTotal": true,
+    "pageSizeOptions": [
+      "10",
+      "20",
+      "50",
+      "100"
+    ]
+  },
+
+  "columns": [
+    {
+      "code": "code",
+      "label": {
+        "zh-CN": "门店编码",
+        "en-US": "Store Code"
+      },
+      "sortable": true
+    },
+    {
+      "code": "name",
+      "label": {
+        "zh-CN": "门店名称",
+        "en-US": "Store Name"
+      }
+    },
+    {
+      "code": "type",
+      "label": {
+        "zh-CN": "门店类型",
+        "en-US": "Store Type"
+      }
+    },
+    {
+      "code": "status",
+      "label": {
+        "zh-CN": "状态",
+        "en-US": "Status"
+      }
+
+    },
+    {
+      "code": "address",
+      "label": {
+        "zh-CN": "地址",
+        "en-US": "Address"
+      }
+    },
+    {
+      "code": "contactPhone",
+      "label": {
+        "zh-CN": "联系电话",
+        "en-US": "Contact Phone"
+      }
+
+    },
+    {
+      "code": "manager",
+      "label": {
+        "zh-CN": "店长",
+        "en-US": "Manager"
+      }
+    },
+    {
+      "code": "openingHours",
+      "label": {
+        "zh-CN": "营业时间",
+        "en-US": "Opening Hours"
+      }
+    },
+    {
+      "code": "createdAt",
+      "label": {
+        "zh-CN": "创建时间",
+        "en-US": "Created At"
+      }
+    },
+
+    {"code": "actions",
+      "label": {
+        "zh-CN": "操作",
+        "en-US": "Actions"
+      }
+    }
+  ],
+  "actions": [
+    {
+      "code": "view",
+      "label": {
+        "zh-CN": "查看",
+        "en-US": "View"
+      },
+      "props": {
+        "icon": "EyeOutlined",
+        "type": "link"
+      },
+      "permission": "store:read"
+    },
+    {
+      "code": "edit",
+      "label": {
+        "zh-CN": "编辑",
+        "en-US": "Edit"
+      },
+      "props": {
+        "icon": "EditOutlined"
+      },
+      "permission": "store:update"
+    },
+    {
+      "code": "delete",
+      "label": {
+        "zh-CN": "删除",
+        "en-US": "Delete"
+      },
+      "props": {
+        "icon": "DeleteOutlined",
+        "type": "link",
+        "danger": true
+      },
+
+      "confirm": {
+        "zh-CN": "确定要删除选中的 {count} 个门店吗？此操作不可撤销。",
+        "en-US": "Are you sure to delete {count} selected stores? This action cannot be undone."
+      },
+
+      "permission": "store:delete"
+    }
+  ],
+  "batchActions": [
+    {
+      "code": "batchDelete",
+      "label": {
+        "zh-CN": "批量删除",
+        "en-US": "Batch Delete"
+      },
+      "props": {
+        "icon": "DeleteOutlined",
+        "danger": true
+      },
+
+      "confirm": {
+        "zh-CN": "确定要删除选中的 {count} 个门店吗？此操作不可撤销。",
+        "en-US": "Are you sure to delete {count} selected stores? This action cannot be undone."
+      },
+      "permission": "store:delete"
+    },
+    {
+      "code": "batchExport",
+      "label": {
+        "zh-CN": "批量导出",
+        "en-US": "Batch Export"
+      },
+      "props": {
+        "icon": "ExportOutlined"
+      },
+      "permission": "store:export"
+    }
+  ]
+
+}

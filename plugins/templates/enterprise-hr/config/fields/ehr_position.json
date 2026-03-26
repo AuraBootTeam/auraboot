@@ -1,0 +1,10 @@
+[
+  {"code":"ehr_ps_code","displayName:zh-CN":"职位编号","displayName:en":"Position Code","dataType":"string","description":"Unique position code.","constraints":{"required":true,"maxLength":50},"feature":{"searchable":true,"sortable":true},"extension":{"readOnly":true,"placeholder:zh-CN":"系统自动生成","placeholder:en":"Auto generated"}},
+  {"code":"ehr_ps_title","displayName:zh-CN":"职位名称","displayName:en":"Title","dataType":"string","description":"Job title.","constraints":{"required":true,"maxLength":200},"feature":{"searchable":true,"sortable":true},"extension":{"placeholder:zh-CN":"请输入职位名称","placeholder:en":"Enter job title"}},
+  {"code":"ehr_ps_department_id","displayName:zh-CN":"所属部门","displayName:en":"Department","dataType":"reference","description":"Department this position belongs to.","constraints":{"required":true},"extension":{"refModel":"ehr_department","refLabelField":"ehr_dp_name"}},
+  {"code":"ehr_ps_grade","displayName:zh-CN":"职级","displayName:en":"Grade","dataType":"enum","dictCode":"ehr_position_grade","description":"Position grade level.","feature":{"searchable":true}},
+  {"code":"ehr_ps_status","displayName:zh-CN":"状态","displayName:en":"Status","dataType":"enum","dictCode":"ehr_position_status","defaultValue":"open","description":"Position status.","feature":{"searchable":true}},
+  {"code":"ehr_ps_min_salary","displayName:zh-CN":"最低薪资","displayName:en":"Min Salary","dataType":"decimal","description":"Minimum salary for this position.","extension":{"precision":2}},
+  {"code":"ehr_ps_max_salary","displayName:zh-CN":"最高薪资","displayName:en":"Max Salary","dataType":"decimal","description":"Maximum salary for this position.","extension":{"precision":2}},
+  {"code":"ehr_ps_description","displayName:zh-CN":"职位描述","displayName:en":"Description","dataType":"text","description":"Job description and responsibilities.","constraints":{"maxLength":5000},"extension":{"multiline":true}}
+]

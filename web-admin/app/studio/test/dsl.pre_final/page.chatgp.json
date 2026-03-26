@@ -1,0 +1,118 @@
+{
+  "kind": "PageShell",
+  "schemaVersion": "2.0.0",
+  "id": "page.store.shell",
+  "meta": {
+    "schemaStage": "storage",
+    "title": "$i18n:page.store.shell.title"
+  },
+  "mode": "runtime",
+  "theme": {
+    "tokens": {
+      "headerBg": "$color-bg-header",
+      "headerText": "$color-text-on-header",
+      "siderBg": "$color-bg-sider",
+      "mainBg": "$color-bg-surface"
+    }
+  },
+  "layout": {
+    "areas": ["header", "sider", "main"],
+    "areasConfig": {
+      "header": {
+        "type": "flex",
+        "direction": "row",
+        "justify": "space-between",
+        "align": "center",
+        "padding": "$space-md"
+      },
+      "sider": {
+        "type": "flex",
+        "direction": "column",
+        "width": 240
+      },
+      "main": {
+        "type": "grid",
+        "cols": 12,
+        "rowGap": 16,
+        "colGap": 16
+      }
+    }
+  },
+  "areas": {
+    "header": {
+      "blocks": [
+        {
+          "id": "block_header_title",
+          "blockType": "header-title",
+          "layout": { "colSpan": 6, "rowSpan": 1 },
+          "content": "$i18n:page.store.shell.header.title",
+          "style": {
+            "color": "$color-text-on-header",
+            "fontSize": "$font-size-header-lg"
+          }
+        },
+        {
+          "id": "block_header_user",
+          "blockType": "header-user",
+          "layout": { "colSpan": 6, "rowSpan": 1 },
+          "component": "UserMenu",
+          "props": {
+            "avatarShape": "circle"
+          }
+        }
+      ]
+    },
+    "sider": {
+      "blocks": [
+        {
+          "id": "block_sider_menu",
+          "blockType": "nav-menu",
+          "layout": { "colSpan": 12, "rowSpan": 1 },
+          "component": "NavMenu",
+          "props": {
+            "items": [
+              {
+                "key": "dashboard",
+                "label": "$i18n:nav.dashboard",
+                "icon": "Dashboard",
+                "route": "/dashboard"
+              },
+              {
+                "key": "store",
+                "label": "$i18n:nav.store",
+                "icon": "Shop",
+                "route": "/store"
+              }
+            ]
+          },
+          "events": {
+            "onSelect": {
+              "handler": "navigateByMenu"
+            }
+          }
+        }
+      ]
+    },
+    "main": {
+      "blocks": [
+        {
+          "id": "block_main_store_page",
+          "blockType": "page-fragment",
+          "layout": { "colSpan": 12, "rowSpan": 1 },
+          "pageRef": "page.store.main" // 引用主内容 DSL
+        }
+      ]
+    }
+  },
+  "handlers": {
+    "navigateByMenu": {
+      "type": "flow",
+      "steps": [
+        {
+          "action": "router.push",
+          "path": "${args.route}"
+        }
+      ]
+    }
+  }
+}

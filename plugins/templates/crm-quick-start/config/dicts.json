@@ -1,0 +1,221 @@
+[
+  {
+    "code": "tcrm_lead_status",
+    "name": "Lead Status",
+    "name:zh-CN": "线索状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "new",
+        "label": "New",
+        "label:zh-CN": "新建",
+        "sortNo": 10,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "contacted",
+        "label": "Contacted",
+        "label:zh-CN": "已联系",
+        "sortNo": 20,
+        "color": "#fa8c16",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "qualified",
+        "label": "Qualified",
+        "label:zh-CN": "已合格",
+        "sortNo": 30,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "lost",
+        "label": "Lost",
+        "label:zh-CN": "已流失",
+        "sortNo": 40,
+        "color": "#d9d9d9",
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      }
+    ]
+  },
+  {
+    "code": "tcrm_lead_source",
+    "name": "Lead Source",
+    "name:zh-CN": "线索来源",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "website",
+        "label": "Website",
+        "label:zh-CN": "网站",
+        "sortNo": 10,
+        "color": "#1890ff",
+        "status": "enabled"
+      },
+      {
+        "value": "referral",
+        "label": "Referral",
+        "label:zh-CN": "推荐",
+        "sortNo": 20,
+        "color": "#52c41a",
+        "status": "enabled"
+      },
+      {
+        "value": "cold_call",
+        "label": "Cold Call",
+        "label:zh-CN": "陌生拜访",
+        "sortNo": 30,
+        "color": "#fa8c16",
+        "status": "enabled"
+      },
+      {
+        "value": "social",
+        "label": "Social Media",
+        "label:zh-CN": "社交媒体",
+        "sortNo": 40,
+        "color": "#722ed1",
+        "status": "enabled"
+      },
+      {
+        "value": "other",
+        "label": "Other",
+        "label:zh-CN": "其他",
+        "sortNo": 50,
+        "color": "#d9d9d9",
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "tcrm_industry",
+    "name": "Industry",
+    "name:zh-CN": "行业",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "tech",
+        "label": "Technology",
+        "label:zh-CN": "科技",
+        "sortNo": 10,
+        "color": "#1890ff",
+        "status": "enabled"
+      },
+      {
+        "value": "manufacturing",
+        "label": "Manufacturing",
+        "label:zh-CN": "制造业",
+        "sortNo": 20,
+        "color": "#fa8c16",
+        "status": "enabled"
+      },
+      {
+        "value": "finance",
+        "label": "Finance",
+        "label:zh-CN": "金融",
+        "sortNo": 30,
+        "color": "#52c41a",
+        "status": "enabled"
+      },
+      {
+        "value": "retail",
+        "label": "Retail",
+        "label:zh-CN": "零售",
+        "sortNo": 40,
+        "color": "#eb2f96",
+        "status": "enabled"
+      },
+      {
+        "value": "healthcare",
+        "label": "Healthcare",
+        "label:zh-CN": "医疗",
+        "sortNo": 50,
+        "color": "#13c2c2",
+        "status": "enabled"
+      },
+      {
+        "value": "other",
+        "label": "Other",
+        "label:zh-CN": "其他",
+        "sortNo": 60,
+        "color": "#d9d9d9",
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "tcrm_opp_stage",
+    "name": "Opportunity Stage",
+    "name:zh-CN": "商机阶段",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "prospecting",
+        "label": "Prospecting",
+        "label:zh-CN": "初步接洽",
+        "sortNo": 10,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "proposal",
+        "label": "Proposal",
+        "label:zh-CN": "方案报价",
+        "sortNo": 20,
+        "color": "#fa8c16",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "negotiation",
+        "label": "Negotiation",
+        "label:zh-CN": "商务谈判",
+        "sortNo": 30,
+        "color": "#722ed1",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "closed_won",
+        "label": "Closed Won",
+        "label:zh-CN": "赢单",
+        "sortNo": 40,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "closed_lost",
+        "label": "Closed Lost",
+        "label:zh-CN": "丢单",
+        "sortNo": 50,
+        "color": "#f5222d",
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      }
+    ]
+  }
+]

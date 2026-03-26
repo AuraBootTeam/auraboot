@@ -1,0 +1,31 @@
+name: overdue-tasks-alert
+description: Find overdue project tasks and format an alert summary
+version: "1.0"
+
+steps:
+  - type: query
+    source: pm_task
+    filters:
+      - field: pm_task_status
+        operator: NEQ
+        value: DONE
+      - field: pm_task_due_date
+        operator: LT
+        value: "{{today}}"
+    sort:
+      field: pm_task_due_date
+      order: asc
+    limit: 50
+    output: overdue_tasks
+
+  - type: analyze
+    input: overdue_tasks
+    prompt: >
+      List the overdue tasks grouped by assignee and project.
+      Highlight tasks overdue by more than 7 days.
+      Provide a priority recommendation for each.
+    output: alert_summary
+
+  - type: notify
+    message: "Overdue Tasks Alert: {{alert_summary.summary}}"
+    channel: console

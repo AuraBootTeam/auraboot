@@ -1,0 +1,464 @@
+{
+  "meta": {
+    "title": {
+      "zh-CN": "新建门店",
+      "en-US": "Create Store"
+    }
+  },
+  "props": {
+    "mode": "create"
+  },
+  "regions": [
+    {
+      "type": "form",
+      "sections": [
+        {
+          "code": "basic",
+          "title": {
+            "zh-CN": "基本信息",
+            "en-US": "Basic Information"
+          },
+          "layout": {
+            "type": "grid",
+            "columns": 2,
+            "gap": "medium"
+          },
+          "fields": [
+            {
+              "code": "code",
+              "type": "input",
+              "props": {
+                "label": {
+                  "zh-CN": "门店编码",
+                  "en-US": "Store Code"
+                },
+                "placeholder": {
+                  "zh-CN": "请输入门店编码",
+                  "en-US": "Please enter store code"
+                },
+                "required": true,
+                "maxLength": 20,
+                "readOnly": "${mode === 'edit'}"
+              },
+              "layout": {
+                "span": 1
+              },
+              "validation": [
+                {
+                  "type": "required",
+                  "message": {
+                    "zh-CN": "门店编码不能为空",
+                    "en-US": "Store code is required"
+                  }
+                },
+                {
+                  "type": "pattern",
+                  "value": "^[A-Z0-9]{4,20}$",
+                  "message": {
+                    "zh-CN": "门店编码格式不正确，应为4-20位大写字母和数字",
+                    "en-US": "Invalid store code format, should be 4-20 uppercase letters and numbers"
+                  }
+                }
+              ]
+
+            },
+            {
+              "code": "name",
+              "type": "input",
+              "props": {
+                "label": {
+                  "zh-CN": "门店名称",
+                  "en-US": "Store Name"
+                },
+                "required": true,
+                "locales": [
+                  "zh-CN",
+                  "en-US"
+                ],
+                "maxLength": 100
+              },
+              "layout": {
+                "span": 1
+              },
+              "validation": [
+                {
+                  "type": "required",
+                  "message": {
+                    "zh-CN": "门店名称不能为空",
+                    "en-US": "Store name is required"
+                  }
+                }
+              ]
+            },
+            {
+              "code": "type",
+              "type": "select",
+              "props": {
+                "label": {
+                  "zh-CN": "门店类型",
+                  "en-US": "Store Type"
+                },
+                "required": true,
+                "binding": "store.type"
+
+              },
+              "layout": {
+                "span": 1
+              },
+              "validation": [
+                {
+                  "type": "required",
+                  "message": {
+                    "zh-CN": "请选择门店类型",
+                    "en-US": "Please select store type"
+                  }
+                }
+              ]
+            },
+            {
+              "code": "status",
+              "type": "select",
+              "props": {
+                "label": {
+                  "zh-CN": "门店状态",
+                  "en-US": "Store Status"
+                },
+                "required": true,
+                "binding": "store.status"
+
+              },
+              "layout": {
+                "span": 1
+              },
+              "validation": [
+                {
+                  "type": "required",
+                  "message": {
+                    "zh-CN": "请选择门店状态",
+                    "en-US": "Please select store status"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "location",
+          "title": {
+            "zh-CN": "位置信息",
+            "en-US": "Location Information"
+          },
+          "layout": {
+            "type": "grid",
+            "columns": 1,
+            "gap": "medium"
+          },
+          "fields": [
+            {
+              "code": "address",
+              "type": "textarea",
+              "props": {
+                "label": {
+                  "zh-CN": "详细地址",
+                  "en-US": "Detailed Address"
+                },
+                "placeholder": {
+                  "zh-CN": "请输入门店详细地址",
+                  "en-US": "Please enter detailed address"
+                },
+                "required": true,
+                "rows": 3,
+                "maxLength": 500
+              },
+              "layout": {
+                "span": 1
+              },
+              "validation": [
+                {
+                  "type": "required",
+                  "message": {
+                    "zh-CN": "详细地址不能为空",
+                    "en-US": "Detailed address is required"
+                  }
+                }
+              ]
+            },
+            {
+              "code": "coordinates",
+              "type": "coordinatesPicker",
+              "props": {
+                "label": {
+                  "zh-CN": "地理坐标",
+                  "en-US": "Coordinates"
+                },
+                "placeholder": {
+                  "zh-CN": "点击地图选择位置",
+                  "en-US": "Click map to select location"
+                },
+                "mapProvider": "amap",
+                "zoom": 15
+              },
+              "layout": {
+                "span": 1
+              }
+            }
+          ]
+        },
+        {
+          "code": "contact",
+          "title": {
+            "zh-CN": "联系信息",
+            "en-US": "Contact Information"
+          },
+          "layout": {
+            "type": "grid",
+            "columns": 2,
+            "gap": "medium"
+          },
+          "fields": [
+            {
+              "code": "contact_phone",
+              "type": "input",
+              "props": {
+                "label": {
+                  "zh-CN": "联系电话",
+                  "en-US": "Contact Phone"
+                },
+                "placeholder": {
+                  "zh-CN": "请输入联系电话",
+                  "en-US": "Please enter contact phone"
+                },
+                "required": true,
+                "inputType": "tel",
+                "maxLength": 20
+              },
+              "layout": {
+                "span": 1
+              },
+              "validation": [
+                {
+                  "type": "required",
+                  "message": {
+                    "zh-CN": "联系电话不能为空",
+                    "en-US": "Contact phone is required"
+                  }
+                },
+                {
+                  "type": "pattern",
+                  "value": "^1[3-9]\\d{9}$|^0\\d{2,3}-?\\d{7,8}$",
+                  "message": {
+                    "zh-CN": "请输入正确的电话号码",
+                    "en-US": "Please enter a valid phone number"
+                  }
+                }
+              ]
+            },
+            {
+              "code": "contact_email",
+              "type": "input",
+              "props": {
+                "label": {
+                  "zh-CN": "联系邮箱",
+                  "en-US": "Contact Email"
+                },
+                "placeholder": {
+                  "zh-CN": "请输入联系邮箱",
+                  "en-US": "Please enter contact email"
+                },
+                "inputType": "email",
+                "maxLength": 100
+              },
+              "layout": {
+                "span": 1
+              },
+              "validation": [
+                {
+                  "type": "email",
+                  "message": {
+                    "zh-CN": "请输入正确的邮箱地址",
+                    "en-US": "Please enter a valid email address"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "management",
+          "title": {
+            "zh-CN": "管理信息",
+            "en-US": "Management Information"
+          },
+          "layout": {
+            "type": "grid",
+            "columns": 2,
+            "gap": "medium"
+          },
+          "fields": [
+            {
+              "code": "manager_id",
+              "type": "userSelect",
+              "props": {
+                "label": {
+                  "zh-CN": "门店经理",
+                  "en-US": "Store Manager"
+                },
+                "placeholder": {
+                  "zh-CN": "请选择门店经理",
+                  "en-US": "Please select store manager"
+                },
+                "searchable": true,
+                "clearable": true,
+                "roleFilter": [
+                  "store_manager",
+                  "assistant_manager"
+                ]
+              },
+              "layout": {
+                "span": 1
+              }
+            },
+            {
+              "code": "organization_id",
+              "type": "organizationSelect",
+              "props": {
+                "label": {
+                  "zh-CN": "所属组织",
+                  "en-US": "Organization"
+                },
+                "required": true,
+                "searchable": true,
+                "treeSelect": true
+              },
+              "layout": {
+                "span": 1
+              },
+              "validation": [
+                {
+                  "type": "required",
+                  "message": {
+                    "zh-CN": "请选择所属组织",
+                    "en-US": "Please select organization"
+                  }
+                }
+              ]
+            },
+            {
+              "code": "opening_hours",
+              "type": "timeRangePicker",
+              "props": {
+                "label": {
+                  "zh-CN": "营业时间",
+                  "en-US": "Opening Hours"
+                },
+                "format": "HH:mm",
+                "allowClear": true
+              },
+              "layout": {
+                "span": 2
+              }
+            },
+            {
+              "code": "created_at",
+              "type": "datetime",
+              "props": {
+                "label": {
+                  "zh-CN": "创建时间",
+                  "en-US": "Created At"
+                },
+                "readOnly": true,
+                "visible": false
+              },
+              "layout": {
+                "span": 1
+              }
+            },
+            {
+              "code": "updated_at",
+              "type": "datetime",
+              "props": {
+                "label": {
+                  "zh-CN": "更新时间",
+                  "en-US": "Updated At"
+                },
+                "readOnly": true,
+                "visible": false
+              },
+              "layout": {
+                "span": 1
+              }
+            }
+          ]
+        },
+        {
+          "code": "additional",
+          "title": {
+            "zh-CN": "附加信息",
+            "en-US": "Additional Information"
+          },
+          "layout": {
+            "type": "grid",
+            "columns": 1,
+            "gap": "medium"
+          },
+          "fields": [
+            {
+              "code": "description",
+              "type": "textarea",
+              "props": {
+                "label": {
+                  "zh-CN": "门店描述",
+                  "en-US": "Store Description"
+                },
+                "placeholder": {
+                  "zh-CN": "请输入门店描述信息",
+                  "en-US": "Please enter store description"
+                },
+                "rows": 4,
+                "maxLength": 1000,
+                "showCount": true
+              },
+              "layout": {
+                "span": 1
+              }
+            },
+            {
+              "code": "images",
+              "type": "imageUpload",
+              "props": {
+                "label": {
+                  "zh-CN": "门店图片",
+                  "en-US": "Store Images"
+                },
+                "multiple": true,
+                "maxCount": 10,
+                "maxSize": 5242880,
+                "accept": "image/*",
+                "listType": "picture-card"
+              },
+              "layout": {
+                "span": 1
+              }
+            }
+          ]
+        }
+      ]
+    } ,
+    {
+      "type": "action",
+      "actions": [
+        {
+          "code": "create",
+          "props": {
+            "primary": true,
+            "label": {
+              "zh-CN": "提交",
+              "en-US": "Create"
+            }
+          }
+        }
+      ]
+
+    }
+  ]
+}

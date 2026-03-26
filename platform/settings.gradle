@@ -1,0 +1,10 @@
+rootProject.name = 'AuraBoot'
+
+include 'platform-plugin-api'
+
+// Infrastructure provider modules (add to platform/build.gradle dependencies as needed)
+include 'platform-storage-minio'
+include 'platform-storage-s3'
+include 'platform-storage-oss'
+include 'platform-mq-kafka'
+include 'platform-mq-rabbitmq'

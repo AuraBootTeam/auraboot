@@ -1,0 +1,183 @@
+{
+  "kind": "Page",
+  "id": "page_store_list",
+  "version": "3.0.0",
+  "title": "$i18n:list.store.title",
+
+  // === 状态管理 ===
+  "state": {
+    "filters": { "status": "active" }, // 筛选条件
+    "pagination": { "current": 1, "pageSize": 20 },
+    "selectedIds": []
+  },
+
+  // === 数据源定义 (统一接入规范) ===
+  "dataSource": {
+    "storeListDs": {
+      "type": "api",
+      "url": "/api/store/list",
+      "method": "get",
+      "autoFetch": true, // 自动加载
+      // 声明参数依赖，依赖变动自动刷新
+      "params": {
+        "filter": "{{state.filters}}",
+        "page": "{{state.pagination.current}}",
+        "size": "{{state.pagination.pageSize}}"
+      },
+      // 适配器: 映射后端结构
+      "adapter": {
+        "response": { "list": "data.items", "total": "data.totalCount" }
+      }
+    },
+    "deleteStoreDs": {
+      "type": "api",
+      "url": "/api/store/delete",
+      "method": "post"
+    }
+  },
+
+  // === 逻辑流 ===
+  "handlers": {
+    "doSearch": {
+      "type": "flow",
+      "desc": "点击查询按钮触发 (虽然配置了自动刷新，但为了明确语义或防抖，可显式调用)",
+      "steps": [
+        { "action": "state.set", "args": { "pagination.current": 1 } }, // 重置第一页
+        { "action": "dataSource.fetch", "target": "storeListDs" }
+      ]
+    },
+    "doBatchDelete": {
+      "type": "flow",
+      "steps": [
+        { "action": "dialog.confirm", "args": { "title": "$i18n:dialog.confirm_delete" } },
+        {
+          "action": "dataSource.fetch",
+          "target": "deleteStoreDs",
+          "args": { "ids": "{{state.selectedIds}}" }
+        },
+        { "action": "toast.success", "args": { "content": "$i18n:msg.delete_success" } },
+        { "action": "dataSource.fetch", "target": "storeListDs" } // 刷新列表
+      ]
+    },
+    "navigateToCreate": {
+      "type": "built-in",
+      "name": "router.push",
+      "args": { "path": "/store/create" }
+    }
+  },
+
+  // === 布局 (Grid Area) ===
+  "layout": {
+    "type": "grid",
+    "columns": ["1fr"],
+    "rows": ["auto", "auto", "1fr"],
+    "areas": [["filter_area"], ["toolbar_area"], ["table_area"]],
+    "gap": "$spacing.md"
+  },
+
+  "blocks": [
+    // 1. 筛选区 Block
+    {
+      "id": "block_filters",
+      "area": "filter_area",
+      "type": "FilterForm", // 专用筛选表单
+      "props": {
+        "layout": "inline",
+        "columns": 4,
+        "model": "{{state.filters}}" // 双向绑定到 filters
+      },
+      "fields": [
+        { "field": "name", "component": "Input", "label": "$i18n:field.name" },
+        {
+          "field": "status",
+          "component": "Select",
+          "label": "$i18n:field.status",
+          "props": { "options": "$const.storeStatus" } // 引用全局常量
+        },
+        {
+          "code": "search_btn",
+          "component": "Button",
+          "props": { "type": "primary", "text": "$i18n:btn.search", "icon": "Search" },
+          "events": { "onClick": { "handler": "doSearch" } }
+        }
+      ]
+    },
+
+    // 2. 工具栏区 (含自定义插槽)
+    {
+      "id": "block_toolbar",
+      "area": "toolbar_area",
+      "type": "Container", // 容器 Block
+      "props": { "direction": "row", "justify": "space-between" },
+      "children": [
+        // 容器内部可以放简单的子组件列表
+        {
+          "type": "ButtonGroup",
+          "items": [
+            {
+              "code": "create",
+              "component": "Button",
+              "props": { "type": "primary", "text": "$i18n:btn.create" },
+              "events": { "onClick": { "handler": "navigateToCreate" } },
+              "enableWhen": "${hasPermission('store:create')}" // 权限控制
+            },
+            {
+              "code": "delete_batch",
+              "component": "Button",
+              "props": { "type": "danger", "text": "$i18n:btn.batch_delete" },
+              "events": { "onClick": { "handler": "doBatchDelete" } },
+              "disableWhen": "${state.selectedIds.length === 0}" // 状态依赖
+            }
+          ]
+        },
+        // 自定义插槽: 显示选中数量
+        {
+          "type": "Text",
+          "props": {
+            "content": "Selected: {{state.selectedIds.length}} items",
+            "color": "$text.secondary"
+          },
+          "visibleWhen": "${state.selectedIds.length > 0}"
+        }
+      ]
+    },
+
+    // 3. 表格区 Block
+    {
+      "id": "block_table",
+      "area": "table_area",
+      "type": "Table",
+      "props": {
+        "rowKey": "id",
+        "dataSource": "storeListDs", // 绑定数据源，自动接管 data 和 loading 状态
+        "pagination": "{{state.pagination}}", // 绑定分页
+        "rowSelection": {
+          "type": "checkbox",
+          "selectedRowKeys": "{{state.selectedIds}}" // 绑定选中项
+        },
+        "columns": [
+          { "dataIndex": "code", "title": "$i18n:field.code" },
+          { "dataIndex": "name", "title": "$i18n:field.name" },
+          {
+            "dataIndex": "manager",
+            "title": "$i18n:field.manager",
+            // 只有直营店才有店长，非直营显示 "-"
+            "render": "${row.type === 'direct' ? row.manager : '-'}"
+          },
+          {
+            "key": "actions",
+            "title": "$i18n:col.actions",
+            "type": "ActionGroup", // 操作列专用类型
+            "items": [
+              {
+                "code": "edit",
+                "text": "$i18n:btn.edit",
+                "handler": "navigateToEdit"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

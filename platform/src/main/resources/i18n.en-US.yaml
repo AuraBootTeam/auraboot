@@ -1,0 +1,551 @@
+#SchemaList:
+#  type: Type
+#  status: Status
+#  date: Date
+#  id: ID
+#  name: Name
+#  description: Description
+#  created_at: Created At
+#  updated_at: Updated At
+#  creator: Creator
+#  modifier: Modifier
+#
+#  SchemaList: Schema List
+#  form: New View
+#
+#  active: Active
+#  inactive: Inactive
+#
+#  Print: Print
+#  New: New
+#  Export: Export
+#  Delete: Delete
+#  Edit: Edit
+#  View: View
+#
+#  query_conditions: Query Conditions
+#  reset: Reset
+#  search: Search
+#  operation: Operation
+#
+#  items_per_page: Items per page
+#  first_page: First Page
+#  previous_page: Previous Page
+#  next_page: Next Page
+#  last_page: Last Page
+#  page_of: "Page {current} of {total}"
+#
+#  please_input: "Please input {field}"
+#  please_select: "Please select {field}"
+#  all: All
+#
+#  start_date: Start Date
+#  end_date: End Date
+#
+#  confirm_delete: Confirm delete?
+#  operation_success: Operation successful
+#  operation_failed: Operation failed
+#
+#  no_data: No data
+#  loading: Loading...
+#
+## Model Management Translations
+#model:
+#  # Page Titles
+#  list_title: Model Management
+#  list_subtitle: Manage all model definitions in the system
+#  create_title: Create Model
+#  edit_title: Edit Model
+#  detail_title: Model Details
+#
+#  # Field Labels
+#  code: Model Code
+#  display_name: Display Name
+#  model_type: Model Type
+#  description: Description
+#  namespace: Namespace
+#  env: Environment
+#  version: Version
+#  status: Status
+#  is_current: Current Version
+#  release_id: Release ID
+#  field_count: Field Count
+#  created_by: Created By
+#  updated_by: Updated By
+#  version_note: Version Note
+#
+#  # Model Types
+#  type_entity: Entity Model
+#  type_view: View Model
+#  type_aggregate: Aggregate Model
+#
+#  # Model Status
+#  status_draft: Draft
+#  status_published: Published
+#  status_archived: Archived
+#
+#  # Actions
+#  create: Create Model
+#  edit: Edit Model
+#  delete: Delete Model
+#  view_detail: View Details
+#  refresh_cache: Refresh Cache
+#  export: Export Models
+#  batch_delete: Batch Delete
+#
+#  # Tabs
+#  tab_basic: Basic Info
+#  tab_fields: Field Management
+#  tab_permissions: permissions
+#  tab_versions: Version History
+#  tab_pages: Related Pages
+#
+#  # Field Management
+#  field_binding: Field Binding
+#  add_field: Add Field
+#  remove_field: Remove Field
+#  field_config: Field Configuration
+#  field_required: Required
+#  field_default_value: Default Value
+#  field_validation: Validation Rules
+#  field_dict: Related Dictionary
+#  field_order: Display Order
+#
+#  # CRUD Template
+#  crud_wizard: CRUD Wizard
+#  crud_wizard_subtitle: Quickly generate CRUD pages
+#  crud_step_type: Select Operation Type
+#  crud_step_config: Configure Parameters
+#  crud_step_confirm: Confirm Generation
+#  crud_menu_name: Menu Name
+#  crud_menu_parent: Parent Menu
+#  crud_menu_icon: Menu Icon
+#  crud_default_roles: Default Roles
+#  crud_generate_list: Generate List Page
+#  crud_generate_form: Generate Form Page
+#  crud_generate_detail: Generate Detail Page
+#  crud_enable_export: Enable Export
+#  crud_enable_import: Enable Import
+#  crud_generation_success: Generation Successful
+#  crud_generation_failed: Generation Failed
+#  crud_access_links: Access Links
+#
+#  # Preview
+#  preview_form: Preview Form
+#  preview_list: Preview List
+#  preview_loading: Loading...
+#  preview_no_fields: No fields associated with this model
+#  preview_add_fields_hint: Please add fields before preview
+#  preview_test_submit: Test Submit
+#  preview_reset: Reset
+#  preview_close: Close
+#
+#  # Version Management
+#  version_history: Version History
+#  version_number: Version Number
+#  version_current: Current Version
+#  version_note: Version Note
+#  version_created_at: Created At
+#  version_created_by: Created By
+#  version_view: View Version
+#  version_compare: Compare Versions
+#  version_rollback: Rollback to This Version
+#  version_rollback_confirm: Confirm rollback to version {version}?
+#  version_rollback_success: Rollback Successful
+#  version_rollback_failed: Rollback Failed
+#  version_diff_title: Version Comparison
+#  version_diff_from: From Version
+#  version_diff_to: To Version
+#  version_diff_field: Field
+#  version_diff_old_value: Old Value
+#  version_diff_new_value: New Value
+#  version_diff_change_type: Change Type
+#  version_diff_added: Added
+#  version_diff_modified: Modified
+#  version_diff_removed: Removed
+#
+#  # Git-First
+#  git_first_notice: Git-First Workflow Notice
+#  git_first_enabled: Git-First mode is enabled
+#  git_first_workflow: All changes will be processed through Git workflow
+#  git_first_steps: "Workflow: DSL Generation → Git Commit → Release Processing → Runtime Projection"
+#  git_first_release_status: Release Status
+#  git_first_release_pending: Pending
+#  git_first_release_generating: Generating
+#  git_first_release_validated: Validated
+#  git_first_release_projecting: Projecting
+#  git_first_release_published: Published
+#  git_first_release_failed: Failed
+#
+#  # permissions
+#  permission_list: Permission List
+#  permission_type: Permission Type
+#  permission_action: Action
+#  permission_bind_role: Bind Role
+#  permission_unbind_role: Unbind Role
+#  permission_references: References
+#  permission_action_read: Read
+#  permission_action_create: Create
+#  permission_action_update: Update
+#  permission_action_delete: Delete
+#  permission_action_query: Query
+#  permission_action_export: Export
+#  permission_action_import: Import
+#
+#  # Messages
+#  create_success: Model created successfully
+#  create_failed: Failed to create model
+#  update_success: Model updated successfully
+#  update_failed: Failed to update model
+#  delete_success: Model deleted successfully
+#  delete_failed: Failed to delete model
+#  delete_confirm: Confirm delete model "{name}"?
+#  batch_delete_confirm: Confirm delete {count} selected models?
+#  code_duplicate: Model code already exists
+#  code_required: Please enter model code
+#  display_name_required: Please enter display name
+#  model_type_required: Please select model type
+#  validation_failed: Form validation failed
+#  no_data: No data available
+#  loading: Loading...
+#  cache_refresh_success: Cache refreshed successfully
+#  cache_refresh_failed: Failed to refresh cache
+#
+#  # Placeholders
+#  placeholder_code: Enter model code (letters, numbers, underscores)
+#  placeholder_display_name: Enter display name
+#  placeholder_description: Enter description
+#  placeholder_search: Search by model code or name
+#  placeholder_version_note: Enter version note
+#
+#  # Validation Messages
+#  validation_code_format: Model code can only contain letters, numbers and underscores
+#  validation_code_length: Model code length must be 2-50 characters
+#  validation_display_name_length: Display name length must be 2-100 characters
+#  validation_description_length: Description length cannot exceed 500 characters
+
+# Notification System
+notification:
+  center:
+    title: Notifications
+    unread_count: "{count} unread"
+    mark_all_read: Mark all as read
+    view_all: View all
+    empty: No new notifications
+  time:
+    just_now: Just now
+    minutes_ago: "{count}m ago"
+    hours_ago: "{count}h ago"
+    yesterday: Yesterday
+    days_ago: "{count}d ago"
+  priority:
+    high: High priority
+    normal: Normal
+    low: Low priority
+  channel:
+    in_app: In-App
+    email: Email
+    wechat_work: WeCom
+    dingtalk: DingTalk
+    slack: Slack
+  category:
+    business: Business
+    approval: Approval
+    system: System
+    alert: Alert
+  preferences:
+    load_failed: Failed to load notification preferences
+    update_failed: Failed to update notification preferences
+
+# BPM Notification
+bpm:
+  notification:
+    task_created:
+      title: New task assigned to you
+    task_completed:
+      title: Task completed
+    process_started:
+      title: Process started
+    process_ended:
+      title: Process completed
+    sla_warning:
+      title: SLA warning
+    sla_escalated:
+      title: SLA escalated
+    default:
+      title: BPM notification
+
+# Flow Designer SDK
+flow:
+  palette:
+    title: Component Library
+    empty: No components available
+  category:
+    trigger: Triggers
+    action: Actions
+    control: Controls
+  panel:
+    selectNode: Select a node to configure
+    noConfig: No configuration options
+    deleteNode: Delete Node
+    deleteConfirm: Are you sure you want to delete this node?
+  toolbar:
+    title: Flow Designer
+    unsaved: Unsaved
+    hasErrors: Has Errors
+    save: Save
+    saving: Saving...
+    validate: Validate
+    import: Import
+    export: Export
+    importError: Invalid import file format
+
+# Automation
+automation:
+  # Triggers
+  trigger:
+    recordCreate: On Record Create
+    recordCreate.desc: Triggered when a record of the specified model is created
+    recordUpdate: On Record Update
+    recordUpdate.desc: Triggered when a record of the specified model is updated
+    fieldChange: On Field Change
+    fieldChange.desc: Triggered when the value of a specified field changes
+    stateChange: On State Change
+    stateChange.desc: Triggered when record state changes from one value to another
+    scheduled: Scheduled
+    scheduled.desc: Triggered according to Cron expression
+    webhook: Webhook
+    webhook.desc: Triggered when an external Webhook request is received
+
+  # Actions
+  action:
+    updateRecord: Update Record
+    updateRecord.desc: Update fields of a record in the specified model
+    createRecord: Create Record
+    createRecord.desc: Create a new record in the specified model
+    sendNotification: Send Notification
+    sendNotification.desc: Send notification to specified users
+    executeCommand: Execute Command
+    executeCommand.desc: Execute a specified system command
+    callApi: Call API
+    callApi.desc: Call an external HTTP API
+    sendWebhook: Send Webhook
+    sendWebhook.desc: Send a Webhook request to specified URL
+
+  # Controls
+  control:
+    condition: Condition
+    condition.desc: Determine execution path based on condition expression
+    delay: Delay
+    delay.desc: Wait for specified time before continuing
+    loop: Loop
+    loop.desc: Iterate over each element in the collection
+
+  # Fields
+  field:
+    modelCode: Model
+    modelCode.desc: Select the data model to operate on
+    fieldCode: Field
+    watchFields: Watch Fields
+    watchFields.desc: Leave empty to watch all fields
+    stateField: State Field
+    fromValue: From Value
+    fromValue.desc: Leave empty for any original value
+    toValue: To Value
+    toValue.desc: Leave empty for any target value
+    fromStates: From States
+    fromStates.desc: Leave empty for any original state
+    toStates: To States
+    toStates.desc: Leave empty for any target state
+    cron: Cron Expression
+    cron.desc: 'Example: 0 0 * * * (daily at midnight)'
+    timezone: Timezone
+    secret: Secret
+    secret.desc: Secret key for validating request signatures
+    validationMode: Validation Mode
+    validationMode.none: No Validation
+    validationMode.signature: Signature Validation
+    validationMode.token: Token Validation
+    recordId: Record ID
+    recordId.desc: Supports expression reference, e.g., ${trigger.recordId}
+    updateFields: Update Fields
+    updateFields.desc: Fields and values to update, in JSON format
+    createFields: Record Fields
+    createFields.desc: Fields and values for new record, in JSON format
+    notificationType: Notification Type
+    notificationType.email: Email
+    notificationType.sms: SMS
+    notificationType.push: Push
+    notificationType.inApp: In-App Message
+    notificationTitle: Notification Title
+    notificationContent: Notification Content
+    recipients: Recipients
+    recipients.desc: Supports expression reference for user IDs or emails
+    commandCode: Command Code
+    commandCode.desc: Identifier of the command to execute
+    commandParams: Command Parameters
+    commandParams.desc: Parameters to pass to the command, in JSON format
+    apiUrl: API URL
+    httpMethod: HTTP Method
+    httpHeaders: HTTP Headers
+    httpBody: HTTP Body
+    webhookUrl: Webhook URL
+    webhookPayload: Request Payload
+    expression: Condition Expression
+    expression.desc: Expression that returns true or false
+    duration: Duration
+    duration.desc: The time value to wait
+    unit: Time Unit
+    unit.seconds: Seconds
+    unit.minutes: Minutes
+    unit.hours: Hours
+    unit.days: Days
+    collection: Collection
+    collection.desc: Array or list to iterate over
+    itemVariable: Item Variable Name
+    itemVariable.desc: Variable name for current element, default is item
+
+# Auth
+auth:
+  login: Login
+  register: Register
+  welcome: Welcome back
+  selectMethod: Select login method
+  tagline: Enterprise low-code platform for rapid business app development
+  email: Email
+  emailPlaceholder: Enter your email
+  password: Password
+  passwordPlaceholder: Enter your password
+  rememberMe: Remember me
+  forgotPassword: Forgot password?
+  loginNow: Log in
+  mobile: Mobile
+  mobilePlaceholder: Enter your mobile number
+  verifyCode: Verification code
+  codePlaceholder: Enter verification code
+  sending: Sending...
+  getCode: Get code
+  socialLogin: Other login methods
+  noAccount: "Don't have an account?"
+  registerNow: Register now
+  feature:
+    designer: Visual page designer
+    dataModel: Flexible data models
+    workflow: Automated workflows
+  channel:
+    emailPassword: Email & Password
+    sms: SMS Login
+    emailCode: Email Code
+  social:
+    wechat: WeChat Login
+    oidc: SSO Login
+  error:
+    invalidCredentials: Invalid email or password
+    invalidMobile: Please enter a valid mobile number
+    codeRequired: Please enter the verification code
+    codeInvalid: Invalid or expired verification code
+
+# Dashboard Viewer
+dashboard:
+  drag_hint: Drag tabs to reorder
+  empty: No published dashboards
+  goto_management: Go to Dashboard Management
+  refresh: Refresh
+  refreshed: Data refreshed
+
+# AI Center — Colleagues & Settings
+ai:
+  colleagues:
+    title: AI Colleagues
+    subtitle: Manage your AI team members
+    create: Create AI Colleague
+    noDescription: No description
+    badge:
+      official: Official
+      fullPower: Full Power
+    aurabot:
+      desc: Built-in AI assistant with full data access
+    action:
+      chat: Chat
+      edit: Edit
+      save: Save Changes
+      saving: Saving...
+    empty:
+      title: No AI Colleagues yet
+      description: Create your first AI colleague to automate tasks and enhance your workflow.
+    status:
+      active: Active
+      disabled: Disabled
+      draft: Draft
+    tab:
+      profile: Profile
+      tools: Tools & Skills
+      memory: Memory
+      runs: Run History
+      schedules: Schedules
+    section:
+      basicInfo: Basic Information
+      soulProfile: Soul Profile
+      executionLimits: Execution Limits
+    field:
+      name: Name
+      description: Description
+      agentType: Agent Type
+      model: Model
+      personality: Personality
+      expertise: Expertise
+      communicationStyle: Communication Style
+      selectStyle: Select style...
+      boundaries: Boundaries
+      systemPrompt: System Prompt
+      maxConcurrentRuns: Max Concurrent Runs
+      timeout: Timeout (seconds)
+    tools:
+      available: Available Tools
+      skills: Skills
+      noTools: No tools configured
+      noSkills: No skills configured
+    memory:
+      empty: No memories yet
+      emptyDesc: Memories will appear here as the agent learns from interactions.
+      count: "{count} memories"
+    runs:
+      empty: No runs yet
+      emptyDesc: Run history will appear here after the agent executes tasks.
+      count: "{count} recent runs"
+    schedules:
+      empty: No schedules
+      emptyDesc: Scheduled tasks will appear here once configured.
+      count: "{count} schedules"
+    error:
+      loadFailed: Failed to load AI colleagues
+      notFound: Agent not found
+      saveFailed: Failed to save agent
+    success:
+      saved: Agent saved successfully
+  wizard:
+    template:
+      title: Create AI Colleague
+      subtitle: Start from a template or build from scratch.
+      sectionLabel: Start from a template
+      startFromScratch: Or start from scratch →
+  template:
+    procurement:
+      name: Procurement Approver
+      desc: Reviews purchase orders, checks budgets, follows approval SOP
+    weeklyReport:
+      name: Weekly Report Writer
+      desc: Generates team weekly reports from activity data and project updates
+    customerService:
+      name: Customer Service Agent
+      desc: Handles customer inquiries, checks order status, drafts responses
+    dataAnalyst:
+      name: Data Analyst
+      desc: Queries data, generates business insights, creates chart recommendations
+    onboarding:
+      name: Onboarding Guide
+      desc: Helps new employees navigate the platform and complete onboarding tasks
+  settings:
+    title: AI Settings
+    subtitle: Configure providers, tools, and governance for the AI center
+  retry: Retry

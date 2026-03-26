@@ -1,0 +1,138 @@
+{
+  "version": "2.1.0",
+  "kind": "Page",
+  "metadata": {
+    "id": "form_store_create",
+    "model": "Store",
+    "title": "$i18n:form.store.create.title"
+  },
+  "state": {
+    "formData": {}
+  },
+  "actions": {
+    "submitForm": {
+      "desc": "通用表单提交流",
+      "type": "flow",
+      "steps": [
+        { "action": "form.validate", "target": "mainForm", "next": "doSave" },
+        {
+          "id": "doSave",
+          "action": "api.post",
+          "url": "/api/store",
+          "data": "{{state.formData}}",
+          "next": "successEffect"
+        },
+        {
+          "id": "successEffect",
+          "action": "toast.success",
+          "content": "$i18n:msg.save.success",
+          "next": "goBack"
+        },
+        { "id": "goBack", "action": "router.back" }
+      ]
+    }
+  },
+  "layout": {
+    "component": "PageContainer",
+    "children": [
+      {
+        "component": "Form",
+        "id": "mainForm",
+        "props": {
+          "labelCol": { "span": 6 },
+          "wrapperCol": { "span": 18 },
+          "model": "{{state.formData}}"
+        },
+        "children": [
+          {
+            "component": "Section",
+            "props": { "title": "$i18n:section.basic" },
+            "children": [
+              {
+                "component": "Input",
+                "props": {
+                  "name": "code",
+                  "label": "$i18n:store.field.code",
+                  "placeholder": "$i18n:ph.enter_code",
+                  "rules": [
+                    { "required": true, "message": "$i18n:rule.required" },
+                    { "pattern": "^[A-Z0-9]+$", "message": "$i18n:rule.pattern.code" }
+                  ]
+                }
+              },
+              {
+                "component": "Select",
+                "props": {
+                  "name": "type",
+                  "label": "$i18n:store.field.type",
+                  "options": [
+                    { "label": "$i18n:type.direct", "value": "direct" },
+                    { "label": "$i18n:type.franchise", "value": "franchise" }
+                  ],
+                  "rules": [{ "required": true }]
+                }
+              },
+
+              {
+                "component": "Input",
+                "props": {
+                  "name": "manager",
+                  "label": "$i18n:store.field.manager"
+                },
+                "reactions": [
+                  {
+                    "dependencies": ["type"],
+                    "when": "{{ $deps[0] === 'direct' }}",
+                    "fulfill": {
+                      "state": {
+                        "visible": true,
+                        "required": true
+                      }
+                    },
+                    "otherwise": {
+                      "state": {
+                        "visible": false,
+                        "required": false,
+                        "value": null
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "component": "Section",
+            "props": { "title": "$i18n:section.contact" },
+            "children": [
+              {
+                "component": "Input",
+                "props": {
+                  "name": "phone",
+                  "label": "$i18n:store.field.phone",
+                  "rules": [{ "pattern": "^1\\d{10}$", "message": "$i18n:rule.phone" }]
+                }
+              }
+            ]
+          },
+          {
+            "component": "Space",
+            "props": { "justify": "center" },
+            "children": [
+              {
+                "component": "Button",
+                "props": { "type": "primary", "content": "$i18n:btn.submit" },
+                "events": { "onClick": { "action": "submitForm" } }
+              },
+              {
+                "component": "Button",
+                "props": { "content": "$i18n:btn.cancel" },
+                "events": { "onClick": { "action": "router.back" } }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

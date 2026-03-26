@@ -1,0 +1,383 @@
+{
+  "pluginId": "com.auraboot.workflow-approval",
+  "namespace": "wf_approval",
+  "version": "1.0.0",
+  "displayName:zh-CN": "工作流审批模块",
+  "displayName:en": "Workflow Approval Module",
+  "description": "通用工作流审批功能，支持多级审批、会签、或签等审批方式",
+  "author": "AuraBoot Team",
+  "homepage": "https://auraboot.io/plugins/workflow-approval",
+  "minPlatformVersion": "1.0.0",
+  "dependencies": [],
+
+  "models": [
+    {
+      "code": "approval_order",
+      "displayName:zh-CN": "审批单",
+      "displayName:en": "Approval Order",
+      "description": "工作流审批单据主表",
+      "modelType": "entity",
+      "extension": {
+        "icon": "FileCheck",
+        "category": "workflow"
+      }
+    },
+    {
+      "code": "approval_record",
+      "displayName:zh-CN": "审批记录",
+      "displayName:en": "Approval Record",
+      "description": "审批历史记录",
+      "modelType": "entity",
+      "extension": {
+        "icon": "History",
+        "category": "workflow"
+      }
+    }
+  ],
+
+  "fields": [
+    {
+      "code": "order_title",
+      "displayName:zh-CN": "审批标题",
+      "dataType": "string",
+      "constraints": {
+        "required": true,
+        "maxLength": 200
+      },
+      "uiSchema": {
+        "placeholder": "请输入审批标题"
+      }
+    },
+    {
+      "code": "order_content",
+      "displayName:zh-CN": "审批内容",
+      "dataType": "text",
+      "constraints": {
+        "required": true,
+        "maxLength": 5000
+      },
+      "uiSchema": {
+        "component": "textarea",
+        "rows": 6
+      }
+    },
+    {
+      "code": "approval_status",
+      "displayName:zh-CN": "审批状态",
+      "dataType": "enum",
+      "dictCode": "approval_status",
+      "feature": {
+        "searchable": true,
+        "sortable": true
+      }
+    },
+    {
+      "code": "submit_time",
+      "displayName:zh-CN": "提交时间",
+      "dataType": "datetime",
+      "feature": {
+        "sortable": true
+      }
+    },
+    {
+      "code": "complete_time",
+      "displayName:zh-CN": "完成时间",
+      "dataType": "datetime"
+    },
+    {
+      "code": "approval_opinion",
+      "displayName:zh-CN": "审批意见",
+      "dataType": "text",
+      "constraints": {
+        "maxLength": 1000
+      }
+    },
+    {
+      "code": "approver_id",
+      "displayName:zh-CN": "审批人",
+      "dataType": "reference",
+      "refTarget": {
+        "targetModel": "ab_user",
+        "targetField": "id",
+        "relationship": "many_to_one"
+      }
+    }
+  ],
+
+  "modelFieldBindings": [
+    { "modelCode": "approval_order", "fieldCode": "order_title", "sequence": 1, "required": true },
+    { "modelCode": "approval_order", "fieldCode": "order_content", "sequence": 2, "required": true },
+    { "modelCode": "approval_order", "fieldCode": "approval_status", "sequence": 3, "required": true },
+    { "modelCode": "approval_order", "fieldCode": "submit_time", "sequence": 4 },
+    { "modelCode": "approval_order", "fieldCode": "complete_time", "sequence": 5 },
+    { "modelCode": "approval_record", "fieldCode": "approval_opinion", "sequence": 1 },
+    { "modelCode": "approval_record", "fieldCode": "approver_id", "sequence": 2, "required": true },
+    { "modelCode": "approval_record", "fieldCode": "approval_status", "sequence": 3, "required": true }
+  ],
+
+  "commands": [
+    {
+      "code": "submit_approval",
+      "displayName:zh-CN": "提交审批",
+      "description": "提交审批单并启动审批流程",
+      "modelCode": "approval_order",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string", "description": "审批标题" },
+          "content": { "type": "string", "description": "审批内容" },
+          "processKey": { "type": "string", "description": "流程定义Key" }
+        },
+        "required": ["title", "content", "processKey"]
+      },
+      "executionConfig": {
+        "executionMode": "sync",
+        "processKey": "general_approval",
+        "requireIdempotencyKey": true
+      }
+    },
+    {
+      "code": "approve_order",
+      "displayName:zh-CN": "通过审批",
+      "description": "审批通过当前审批单",
+      "modelCode": "approval_order",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orderId": { "type": "string", "description": "审批单ID" },
+          "opinion": { "type": "string", "description": "审批意见" }
+        },
+        "required": ["orderId"]
+      }
+    },
+    {
+      "code": "reject_order",
+      "displayName:zh-CN": "驳回审批",
+      "description": "驳回当前审批单",
+      "modelCode": "approval_order",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orderId": { "type": "string", "description": "审批单ID" },
+          "opinion": { "type": "string", "description": "驳回原因" }
+        },
+        "required": ["orderId", "opinion"]
+      }
+    }
+  ],
+
+  "processes": [
+    {
+      "key": "general_approval",
+      "name:zh-CN": "通用审批流程",
+      "name:en": "General Approval Process",
+      "description": "适用于一般审批场景的标准流程",
+      "category": "approval",
+      "bpmnFile": "processes/general_approval.bpmn",
+      "formBindings": {
+        "user_task_approve": {
+          "formType": "model",
+          "modelCode": "approval_order",
+          "fields": ["order_title", "order_content", "approval_opinion"],
+          "readOnlyFields": ["order_title", "order_content"]
+        }
+      },
+      "businessDataBindings": [
+        {
+          "modelCode": "approval_order",
+          "bindingType": "start_form",
+          "variableName": "approvalOrder"
+        }
+      ],
+      "autoDeploy": true
+    }
+  ],
+
+  "permissions": [
+    {
+      "code": "workflow:approval:view",
+      "name:zh-CN": "查看审批单",
+      "description": "查看审批单列表和详情",
+      "category": "workflow",
+      "resourceType": "model",
+      "resourceCode": "approval_order",
+      "action": "read"
+    },
+    {
+      "code": "workflow:approval:submit",
+      "name:zh-CN": "提交审批",
+      "description": "提交新的审批单",
+      "category": "workflow",
+      "resourceType": "command",
+      "resourceCode": "submit_approval",
+      "action": "execute"
+    },
+    {
+      "code": "workflow:approval:approve",
+      "name:zh-CN": "审批处理",
+      "description": "审批通过或驳回",
+      "category": "workflow",
+      "resourceType": "command",
+      "resourceCode": "approve_order",
+      "action": "execute"
+    },
+    {
+      "code": "workflow:process:admin",
+      "name:zh-CN": "流程管理",
+      "description": "管理流程定义和部署",
+      "category": "workflow",
+      "resourceType": "process",
+      "action": "admin"
+    }
+  ],
+
+  "roles": [
+    {
+      "code": "approval_submitter",
+      "name:zh-CN": "审批发起人",
+      "description": "可以发起审批流程的用户",
+      "type": "custom",
+      "permissions": [
+        "workflow:approval:view",
+        "workflow:approval:submit"
+      ]
+    },
+    {
+      "code": "approval_handler",
+      "name:zh-CN": "审批处理人",
+      "description": "可以处理审批任务的用户",
+      "type": "custom",
+      "permissions": [
+        "workflow:approval:view",
+        "workflow:approval:approve"
+      ]
+    },
+    {
+      "code": "workflow_admin",
+      "name:zh-CN": "流程管理员",
+      "description": "管理审批流程配置",
+      "type": "custom",
+      "permissions": [
+        "workflow:approval:view",
+        "workflow:approval:submit",
+        "workflow:approval:approve",
+        "workflow:process:admin"
+      ]
+    }
+  ],
+
+  "menus": [
+    {
+      "code": "workflow",
+      "name:zh-CN": "工作流",
+      "path": "/workflow",
+      "icon": "Flow",
+      "type": 1,
+      "orderNo": 100,
+      "permissionCode": "workflow:approval:view"
+    },
+    {
+      "code": "my_approvals",
+      "name:zh-CN": "我的审批",
+      "path": "/workflow/my-approvals",
+      "icon": "FileCheck",
+      "type": 2,
+      "parentCode": "workflow",
+      "orderNo": 1,
+      "permissionCode": "workflow:approval:view"
+    },
+    {
+      "code": "pending_tasks",
+      "name:zh-CN": "待办任务",
+      "path": "/workflow/pending-tasks",
+      "icon": "Clock",
+      "type": 2,
+      "parentCode": "workflow",
+      "orderNo": 2,
+      "permissionCode": "workflow:approval:approve"
+    },
+    {
+      "code": "process_management",
+      "name:zh-CN": "流程管理",
+      "path": "/workflow/processes",
+      "icon": "Settings",
+      "type": 2,
+      "parentCode": "workflow",
+      "orderNo": 10,
+      "permissionCode": "workflow:process:admin"
+    }
+  ],
+
+  "dicts": [
+    {
+      "code": "approval_status",
+      "name:zh-CN": "审批状态",
+      "dictType": "static",
+      "items": [
+        { "value": "draft", "label:zh-CN": "草稿", "sortNo": 1 },
+        { "value": "pending", "label:zh-CN": "待审批", "sortNo": 2 },
+        { "value": "approved", "label:zh-CN": "已通过", "sortNo": 3 },
+        { "value": "rejected", "label:zh-CN": "已驳回", "sortNo": 4 },
+        { "value": "cancelled", "label:zh-CN": "已取消", "sortNo": 5 }
+      ]
+    },
+    {
+      "code": "approval_type",
+      "name:zh-CN": "审批类型",
+      "dictType": "static",
+      "items": [
+        { "value": "single", "label:zh-CN": "单人审批", "sortNo": 1 },
+        { "value": "sequential", "label:zh-CN": "依次审批", "sortNo": 2 },
+        { "value": "countersign", "label:zh-CN": "会签", "sortNo": 3 },
+        { "value": "or_sign", "label:zh-CN": "或签", "sortNo": 4 }
+      ]
+    }
+  ],
+
+  "pages": [
+    {
+      "pageKey": "approval_order_list",
+      "name:zh-CN": "审批单列表",
+      "pageType": "list",
+      "pageCategory": "model",
+      "modelCode": "approval_order",
+      "dslSchema": {
+        "columns": [
+          { "field": "order_title", "width": 200 },
+          { "field": "approval_status", "width": 100 },
+          { "field": "submit_time", "width": 160 },
+          { "field": "complete_time", "width": 160 }
+        ],
+        "actions": ["view", "approve", "reject"]
+      }
+    },
+    {
+      "pageKey": "approval_order_form",
+      "name:zh-CN": "审批单表单",
+      "pageType": "form",
+      "pageCategory": "model",
+      "modelCode": "approval_order",
+      "dslSchema": {
+        "layout": "vertical",
+        "sections": [
+          {
+            "title": "基本信息",
+            "fields": ["order_title", "order_content"]
+          },
+          {
+            "title": "审批信息",
+            "fields": ["approval_status", "submit_time", "complete_time"]
+          }
+        ]
+      }
+    }
+  ],
+
+  "importOptions": {
+    "conflictStrategy": "error",
+    "validateReferences": true,
+    "autoDeployProcesses": true,
+    "createResourcePermissions": false,
+    "autoPublishPages": false
+  }
+}

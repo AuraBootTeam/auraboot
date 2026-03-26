@@ -1,0 +1,54 @@
+[
+  {
+    "code": "tpm_root",
+    "parentCode": null,
+    "name:zh-CN": "项目管理",
+    "name:en": "Projects",
+    "path": null,
+    "component": null,
+    "icon": "IconBriefcase",
+    "type": 0,
+    "permissionCode": null,
+    "orderNo": 810,
+    "visible": true
+  },
+  {
+    "code": "tpm_projects",
+    "parentCode": "tpm_root",
+    "name:zh-CN": "项目",
+    "name:en": "Projects",
+    "path": "/dynamic/tpm-project",
+    "component": null,
+    "icon": "IconFolder",
+    "type": 1,
+    "permissionCode": "tpm.project.read",
+    "orderNo": 1,
+    "visible": true
+  },
+  {
+    "code": "tpm_tasks",
+    "parentCode": "tpm_root",
+    "name:zh-CN": "任务",
+    "name:en": "Tasks",
+    "path": "/dynamic/tpm-task",
+    "component": null,
+    "icon": "IconCheckSquare",
+    "type": 1,
+    "permissionCode": "tpm.task.read",
+    "orderNo": 2,
+    "visible": true
+  },
+  {
+    "code": "tpm_milestones",
+    "parentCode": "tpm_root",
+    "name:zh-CN": "里程碑",
+    "name:en": "Milestones",
+    "path": "/dynamic/tpm-milestone",
+    "component": null,
+    "icon": "IconFlag",
+    "type": 1,
+    "permissionCode": "tpm.milestone.read",
+    "orderNo": 3,
+    "visible": true
+  }
+]

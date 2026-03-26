@@ -1,0 +1,94 @@
+{
+  "pageKey": "crm_opportunity_form",
+  "name:zh-CN": "商机表单",
+  "name:en": "Opportunity Form",
+  "pageType": "form",
+  "modelCode": "crm_opportunity",
+  "dslSchema": {
+    "id": "form.crm_opportunity",
+    "kind": "Form",
+    "version": "1.0.0",
+    "modelCode": "crm_opportunity",
+    "layout": {
+      "areas": [
+        "main",
+        "footer"
+      ],
+      "areasConfig": {
+        "main": {
+          "type": "grid",
+          "cols": 12,
+          "rowGap": 16,
+          "colGap": 16
+        },
+        "footer": {
+          "type": "flex",
+          "direction": "row"
+        }
+      }
+    },
+    "areas": {
+      "main": {
+        "blocks": [
+          {
+            "id": "basic",
+            "blockType": "form-section",
+            "title": {
+              "zh-CN": "基本信息",
+              "en-US": "Basic Information"
+            },
+            "fields": [
+              {
+                "field": "crm_opp_name",
+                "colSpan": 6
+              },
+              {
+                "field": "crm_opp_account_id",
+                "colSpan": 6
+              },
+              {
+                "field": "crm_opp_expected_amount",
+                "colSpan": 6
+              },
+              {
+                "field": "crm_opp_expected_close_date",
+                "colSpan": 6
+              },
+              {
+                "field": "crm_opp_probability",
+                "colSpan": 6
+              },
+              {
+                "field": "crm_opp_notes",
+                "colSpan": 12
+              }
+            ]
+          }
+        ]
+      },
+      "footer": {
+        "blocks": [
+          {
+            "id": "buttons",
+            "blockType": "form-buttons",
+            "buttons": [
+              {
+                "code": "submit",
+                "primary": true,
+                "label": "save",
+                "action": {
+                  "type": "command",
+                  "command": "crms:update_opportunity"
+                }
+              },
+              {
+                "code": "cancel",
+                "label": "cancel"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

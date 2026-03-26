@@ -1,0 +1,762 @@
+{
+  "kind": "Detail",
+  "version": "1.0.0",
+  "id": "detail.meta.model",
+  "title": "$i18n:detail.model.title",
+  "stateBinding": {
+    "model": "{{state.model}}",
+    "activeTab": "{{state.activeTab}}"
+  },
+  "layout": {
+    "areas": ["header", "tabs", "content"],
+    "areasConfig": {
+      "header": {
+        "type": "flex",
+        "direction": "row",
+        "justify": "space-between",
+        "align": "center",
+        "padding": "$spacing.lg"
+      },
+      "tabs": {
+        "type": "flex",
+        "direction": "row"
+      },
+      "content": {
+        "type": "grid",
+        "cols": 12,
+        "rowGap": 16,
+        "colGap": 16,
+        "padding": "$spacing.lg"
+      }
+    }
+  },
+  "areas": {
+    "header": {
+      "blocks": [
+        {
+          "id": "block_model_title",
+          "blockType": "page-header",
+          "layout": { "colSpan": 8, "rowSpan": 1 },
+          "title": "{{state.model.displayName}}",
+          "subtitle": "{{state.model.code}}",
+          "tags": [
+            {
+              "label": "{{state.model.modelType}}",
+              "color": "blue"
+            },
+            {
+              "label": "{{state.model.status}}",
+              "color": "${$statusColor(state.model.status)}"
+            },
+            {
+              "label": "v{{state.model.version}}",
+              "color": "gray"
+            }
+          ]
+        },
+        {
+          "id": "block_model_actions",
+          "blockType": "form-buttons",
+          "layout": { "colSpan": 4, "rowSpan": 1 },
+          "buttons": [
+            {
+              "code": "edit",
+              "content": "$i18n:detail.model.btn.edit",
+              "primary": true,
+              "visibleWhen": "${hasPermission('model:update')}",
+              "events": {
+                "onClick": {
+                  "handler": "openEditForm",
+                  "args": { "pid": "{{state.model.pid}}" }
+                }
+              }
+            },
+            {
+              "code": "delete",
+              "content": "$i18n:detail.model.btn.delete",
+              "danger": true,
+              "visibleWhen": "${hasPermission('model:delete')}",
+              "events": {
+                "onClick": {
+                  "handler": "deleteModel",
+                  "args": { "pid": "{{state.model.pid}}" }
+                }
+              }
+            },
+            {
+              "code": "more",
+              "content": "$i18n:detail.model.btn.more",
+              "dropdown": true,
+              "menu": [
+                {
+                  "key": "previewForm",
+                  "label": "$i18n:detail.model.menu.previewForm",
+                  "handler": "previewForm"
+                },
+                {
+                  "key": "previewList",
+                  "label": "$i18n:detail.model.menu.previewList",
+                  "handler": "previewList"
+                },
+                {
+                  "key": "generatePages",
+                  "label": "$i18n:detail.model.menu.generatePages",
+                  "handler": "openCrudWizard"
+                },
+                {
+                  "key": "refreshCache",
+                  "label": "$i18n:detail.model.menu.refreshCache",
+                  "handler": "refreshCache"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "tabs": {
+      "blocks": [
+        {
+          "id": "block_model_tabs",
+          "blockType": "tabs",
+          "layout": { "colSpan": 12, "rowSpan": 1 },
+          "activeKey": "{{state.activeTab}}",
+          "tabs": [
+            {
+              "key": "basic",
+              "label": "$i18n:detail.model.tab.basic"
+            },
+            {
+              "key": "fields",
+              "label": "$i18n:detail.model.tab.fields"
+            },
+            {
+              "key": "permissions",
+              "label": "$i18n:detail.model.tab.permissions"
+            },
+            {
+              "key": "versions",
+              "label": "$i18n:detail.model.tab.versions"
+            },
+            {
+              "key": "pages",
+              "label": "$i18n:detail.model.tab.pages"
+            }
+          ],
+          "events": {
+            "onChange": {
+              "handler": "changeTab"
+            }
+          }
+        }
+      ]
+    },
+    "content": {
+      "blocks": [
+        {
+          "id": "block_basic_info",
+          "blockType": "descriptions",
+          "layout": { "colSpan": 12, "rowSpan": 1 },
+          "visibleWhen": "${state.activeTab === 'basic'}",
+          "column": 2,
+          "items": [
+            {
+              "label": "$i18n:detail.model.field.code",
+              "value": "{{state.model.code}}"
+            },
+            {
+              "label": "$i18n:detail.model.field.displayName",
+              "value": "{{state.model.displayName}}"
+            },
+            {
+              "label": "$i18n:detail.model.field.modelType",
+              "value": "${$dict('model_type', state.model.modelType)}"
+            },
+            {
+              "label": "$i18n:detail.model.field.status",
+              "value": "${$statusBadge(state.model.status)}"
+            },
+            {
+              "label": "$i18n:detail.model.field.version",
+              "value": "{{state.model.version}}"
+            },
+            {
+              "label": "$i18n:detail.model.field.namespace",
+              "value": "{{state.model.namespace}}"
+            },
+            {
+              "label": "$i18n:detail.model.field.env",
+              "value": "{{state.model.env}}"
+            },
+            {
+              "label": "$i18n:detail.model.field.createdAt",
+              "value": "${$formatDate(state.model.createdAt)}"
+            },
+            {
+              "label": "$i18n:detail.model.field.updatedAt",
+              "value": "${$formatDate(state.model.updatedAt)}"
+            },
+            {
+              "label": "$i18n:detail.model.field.createdBy",
+              "value": "{{state.model.createdBy}}"
+            },
+            {
+              "label": "$i18n:detail.model.field.description",
+              "value": "{{state.model.description}}",
+              "span": 2
+            }
+          ]
+        },
+        {
+          "id": "block_fields_list",
+          "blockType": "data-table",
+          "layout": { "colSpan": 12, "rowSpan": 1 },
+          "visibleWhen": "${state.activeTab === 'fields'}",
+          "table": {
+            "rowKey": "id",
+            "dataSource": "ds_modelFields",
+            "toolbar": {
+              "buttons": [
+                {
+                  "code": "addField",
+                  "content": "$i18n:detail.model.btn.addField",
+                  "primary": true,
+                  "visibleWhen": "${hasPermission('model:update')}",
+                  "events": {
+                    "onClick": { "handler": "openFieldSelector" }
+                  }
+                },
+                {
+                  "code": "createField",
+                  "content": "$i18n:detail.model.btn.createField",
+                  "visibleWhen": "${hasPermission('model:update')}",
+                  "events": {
+                    "onClick": { "handler": "openFieldCreate" }
+                  }
+                }
+              ]
+            },
+            "columns": [
+              {
+                "field": "fieldCode",
+                "label": "$i18n:detail.model.col.fieldCode",
+                "width": 150
+              },
+              {
+                "field": "fieldName",
+                "label": "$i18n:detail.model.col.fieldName",
+                "width": 200
+              },
+              {
+                "field": "dataType",
+                "label": "$i18n:detail.model.col.dataType",
+                "width": 120
+              },
+              {
+                "field": "required",
+                "label": "$i18n:detail.model.col.required",
+                "width": 80,
+                "render": "${row.required ? '$i18n:common.yes' : '$i18n:common.no'}"
+              },
+              {
+                "field": "dictName",
+                "label": "$i18n:detail.model.col.dict",
+                "width": 150,
+                "render": "${row.dictCode ? row.dictName : '-'}"
+              },
+              {
+                "field": "displayOrder",
+                "label": "$i18n:detail.model.col.displayOrder",
+                "width": 100
+              },
+              {
+                "field": "buttons",
+                "label": "$i18n:detail.model.col.actions",
+                "isActionColumn": true,
+                "width": 150,
+                "buttons": [
+                  {
+                    "code": "configure",
+                    "content": "$i18n:detail.model.btn.configure",
+                    "events": {
+                      "onClick": {
+                        "handler": "openFieldConfig",
+                        "args": { "bindingId": "${row.id}" }
+                      }
+                    }
+                  },
+                  {
+                    "code": "remove",
+                    "content": "$i18n:detail.model.btn.remove",
+                    "danger": true,
+                    "events": {
+                      "onClick": {
+                        "handler": "removeFieldBinding",
+                        "args": { "bindingId": "${row.id}" }
+                      }
+                    }
+                  }
+                ]
+              }
+            ],
+            "draggable": true,
+            "onDragEnd": {
+              "handler": "reorderFields"
+            }
+          }
+        },
+        {
+          "id": "block_permissions_list",
+          "blockType": "data-table",
+          "layout": { "colSpan": 12, "rowSpan": 1 },
+          "visibleWhen": "${state.activeTab === 'permissions'}",
+          "table": {
+            "rowKey": "id",
+            "dataSource": "ds_modelPermissions",
+            "columns": [
+              {
+                "field": "action",
+                "label": "$i18n:detail.model.col.action",
+                "width": 150
+              },
+              {
+                "field": "displayName",
+                "label": "$i18n:detail.model.col.displayName",
+                "width": 200
+              },
+              {
+                "field": "description",
+                "label": "$i18n:detail.model.col.description"
+              },
+              {
+                "field": "createdAt",
+                "label": "$i18n:detail.model.col.createdAt",
+                "width": 180,
+                "render": "${$formatDate(row.createdAt)}"
+              }
+            ]
+          }
+        },
+        {
+          "id": "block_versions_list",
+          "blockType": "data-table",
+          "layout": { "colSpan": 12, "rowSpan": 1 },
+          "visibleWhen": "${state.activeTab === 'versions'}",
+          "table": {
+            "rowKey": "version",
+            "dataSource": "ds_modelVersions",
+            "columns": [
+              {
+                "field": "version",
+                "label": "$i18n:detail.model.col.version",
+                "width": 80
+              },
+              {
+                "field": "isCurrent",
+                "label": "$i18n:detail.model.col.isCurrent",
+                "width": 100,
+                "render": "${row.isCurrent ? '$i18n:common.yes' : '$i18n:common.no'}"
+              },
+              {
+                "field": "status",
+                "label": "$i18n:detail.model.col.status",
+                "width": 100,
+                "render": "${$statusBadge(row.status)}"
+              },
+              {
+                "field": "versionNote",
+                "label": "$i18n:detail.model.col.versionNote"
+              },
+              {
+                "field": "createdAt",
+                "label": "$i18n:detail.model.col.createdAt",
+                "width": 180,
+                "render": "${$formatDate(row.createdAt)}"
+              },
+              {
+                "field": "createdBy",
+                "label": "$i18n:detail.model.col.createdBy",
+                "width": 120
+              },
+              {
+                "field": "buttons",
+                "label": "$i18n:detail.model.col.actions",
+                "isActionColumn": true,
+                "width": 150,
+                "buttons": [
+                  {
+                    "code": "view",
+                    "content": "$i18n:detail.model.btn.view",
+                    "events": {
+                      "onClick": {
+                        "handler": "viewVersion",
+                        "args": { "version": "${row.version}" }
+                      }
+                    }
+                  },
+                  {
+                    "code": "rollback",
+                    "content": "$i18n:detail.model.btn.rollback",
+                    "visibleWhen": "${!row.isCurrent && hasPermission('model:update')}",
+                    "events": {
+                      "onClick": {
+                        "handler": "rollbackToVersion",
+                        "args": { "version": "${row.version}" }
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "id": "block_pages_list",
+          "blockType": "data-table",
+          "layout": { "colSpan": 12, "rowSpan": 1 },
+          "visibleWhen": "${state.activeTab === 'pages'}",
+          "table": {
+            "rowKey": "id",
+            "dataSource": "ds_relatedPages",
+            "columns": [
+              {
+                "field": "pageName",
+                "label": "$i18n:detail.model.col.pageName",
+                "width": 200
+              },
+              {
+                "field": "pageType",
+                "label": "$i18n:detail.model.col.pageType",
+                "width": 120
+              },
+              {
+                "field": "route",
+                "label": "$i18n:detail.model.col.route",
+                "width": 250
+              },
+              {
+                "field": "createdAt",
+                "label": "$i18n:detail.model.col.createdAt",
+                "width": 180,
+                "render": "${$formatDate(row.createdAt)}"
+              },
+              {
+                "field": "buttons",
+                "label": "$i18n:detail.model.col.actions",
+                "isActionColumn": true,
+                "width": 150,
+                "buttons": [
+                  {
+                    "code": "open",
+                    "content": "$i18n:detail.model.btn.open",
+                    "events": {
+                      "onClick": {
+                        "handler": "openPage",
+                        "args": { "route": "${row.route}" }
+                      }
+                    }
+                  },
+                  {
+                    "code": "edit",
+                    "content": "$i18n:detail.model.btn.edit",
+                    "events": {
+                      "onClick": {
+                        "handler": "editPage",
+                        "args": { "pageId": "${row.id}" }
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "dataSources": {
+    "ds_modelFields": {
+      "type": "api",
+      "endpoint": "/api/meta/models/{{state.model.pid}}/fields",
+      "method": "get",
+      "autoFetch": true
+    },
+    "ds_modelPermissions": {
+      "type": "api",
+      "endpoint": "/api/permissions/model/{{state.model.code}}",
+      "method": "get",
+      "autoFetch": true
+    },
+    "ds_modelVersions": {
+      "type": "api",
+      "endpoint": "/api/meta/models/code/{{state.model.code}}/versions",
+      "method": "get",
+      "autoFetch": true
+    },
+    "ds_relatedPages": {
+      "type": "api",
+      "endpoint": "/api/meta/models/{{state.model.pid}}/pages",
+      "method": "get",
+      "autoFetch": true
+    }
+  },
+  "handlers": {
+    "changeTab": {
+      "type": "flow",
+      "steps": [
+        {
+          "action": "state.set",
+          "target": "state.activeTab",
+          "value": "${args.key}"
+        }
+      ]
+    },
+    "openEditForm": {
+      "type": "flow",
+      "steps": [
+        {
+          "action": "ui.openContainer",
+          "target": "drawer.modelForm",
+          "args": {
+            "mode": "edit",
+            "pid": "${args.pid}"
+          }
+        }
+      ]
+    },
+    "deleteModel": {
+      "type": "flow",
+      "steps": [
+        {
+          "action": "dialog.confirm",
+          "args": {
+            "title": "$i18n:detail.model.delete.confirm.title",
+            "content": "$i18n:detail.model.delete.confirm.content"
+          },
+          "next": "doDelete"
+        },
+        {
+          "id": "doDelete",
+          "action": "api.request",
+          "method": "delete",
+          "endpoint": "/api/meta/models/${args.pid}",
+          "next": "afterDelete"
+        },
+        {
+          "id": "afterDelete",
+          "action": "toast.show",
+          "level": "success",
+          "content": "$i18n:detail.model.delete.success"
+        },
+        {
+          "action": "router.push",
+          "path": "/meta/models"
+        }
+      ]
+    },
+    "previewForm": {
+      "type": "flow",
+      "steps": [
+        {
+          "action": "ui.openContainer",
+          "target": "dialog.formPreview",
+          "args": {
+            "modelCode": "{{state.model.code}}"
+          }
+        }
+      ]
+    },
+    "previewList": {
+      "type": "flow",
+      "steps": [
+        {
+          "action": "ui.openContainer",
+          "target": "dialog.listPreview",
+          "args": {
+            "modelCode": "{{state.model.code}}"
+          }
+        }
+      ]
+    },
+    "openCrudWizard": {
+      "type": "flow",
+      "steps": [
+        {
+          "action": "ui.openContainer",
+          "target": "dialog.crudWizard",
+          "args": {
+            "modelCode": "{{state.model.code}}",
+            "modelName": "{{state.model.displayName}}"
+          }
+        }
+      ]
+    },
+    "refreshCache": {
+      "type": "flow",
+      "steps": [
+        {
+          "action": "api.request",
+          "method": "post",
+          "endpoint": "/api/meta/models/{{state.model.pid}}/refresh-cache",
+          "next": "afterRefresh"
+        },
+        {
+          "id": "afterRefresh",
+          "action": "toast.show",
+          "level": "success",
+          "content": "$i18n:detail.model.refreshCache.success"
+        }
+      ]
+    },
+    "openFieldSelector": {
+      "type": "flow",
+      "steps": [
+        {
+          "action": "ui.openContainer",
+          "target": "dialog.fieldSelector",
+          "args": {
+            "modelPid": "{{state.model.pid}}"
+          }
+        }
+      ]
+    },
+    "openFieldCreate": {
+      "type": "flow",
+      "steps": [
+        {
+          "action": "router.push",
+          "path": "/meta/fields/new?modelPid={{state.model.pid}}"
+        }
+      ]
+    },
+    "openFieldConfig": {
+      "type": "flow",
+      "steps": [
+        {
+          "action": "ui.openContainer",
+          "target": "dialog.fieldConfig",
+          "args": {
+            "bindingId": "${args.bindingId}"
+          }
+        }
+      ]
+    },
+    "removeFieldBinding": {
+      "type": "flow",
+      "steps": [
+        {
+          "action": "dialog.confirm",
+          "args": {
+            "title": "$i18n:detail.model.removeField.confirm.title",
+            "content": "$i18n:detail.model.removeField.confirm.content"
+          },
+          "next": "doRemove"
+        },
+        {
+          "id": "doRemove",
+          "action": "api.request",
+          "method": "delete",
+          "endpoint": "/api/meta/models/field-bindings/${args.bindingId}",
+          "next": "afterRemove"
+        },
+        {
+          "id": "afterRemove",
+          "action": "toast.show",
+          "level": "success",
+          "content": "$i18n:detail.model.removeField.success"
+        },
+        {
+          "action": "dataSource.fetch",
+          "target": "ds_modelFields"
+        }
+      ]
+    },
+    "reorderFields": {
+      "type": "flow",
+      "steps": [
+        {
+          "action": "api.request",
+          "method": "post",
+          "endpoint": "/api/meta/models/{{state.model.pid}}/fields/reorder",
+          "body": {
+            "fieldOrders": "${args.newOrder}"
+          },
+          "next": "afterReorder"
+        },
+        {
+          "id": "afterReorder",
+          "action": "toast.show",
+          "level": "success",
+          "content": "$i18n:detail.model.reorderFields.success"
+        }
+      ]
+    },
+    "viewVersion": {
+      "type": "flow",
+      "steps": [
+        {
+          "action": "ui.openContainer",
+          "target": "dialog.versionDetail",
+          "args": {
+            "modelCode": "{{state.model.code}}",
+            "version": "${args.version}"
+          }
+        }
+      ]
+    },
+    "rollbackToVersion": {
+      "type": "flow",
+      "steps": [
+        {
+          "action": "dialog.confirm",
+          "args": {
+            "title": "$i18n:detail.model.rollback.confirm.title",
+            "content": "$i18n:detail.model.rollback.confirm.content"
+          },
+          "next": "doRollback"
+        },
+        {
+          "id": "doRollback",
+          "action": "api.request",
+          "method": "post",
+          "endpoint": "/api/meta/models/code/{{state.model.code}}/rollback",
+          "body": {
+            "version": "${args.version}"
+          },
+          "next": "afterRollback"
+        },
+        {
+          "id": "afterRollback",
+          "action": "toast.show",
+          "level": "success",
+          "content": "$i18n:detail.model.rollback.success"
+        },
+        {
+          "action": "dataSource.fetch",
+          "target": "ds_modelVersions"
+        },
+        {
+          "action": "router.reload"
+        }
+      ]
+    },
+    "openPage": {
+      "type": "flow",
+      "steps": [
+        {
+          "action": "router.push",
+          "path": "${args.route}"
+        }
+      ]
+    },
+    "editPage": {
+      "type": "flow",
+      "steps": [
+        {
+          "action": "router.push",
+          "path": "/page-designer?pageId=${args.pageId}"
+        }
+      ]
+    }
+  }
+}

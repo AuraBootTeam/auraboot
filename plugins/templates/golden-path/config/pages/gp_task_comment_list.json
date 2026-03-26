@@ -1,0 +1,43 @@
+{
+  "pageKey": "gp_task_comment_list",
+  "name:zh-CN": "评论列表",
+  "name:en": "Comments",
+  "pageType": "list",
+  "modelCode": "gp_task_comment",
+  "dslSchema": {
+    "id": "list.gp_task_comment",
+    "kind": "List",
+    "areas": {
+      "toolbar": {
+        "blocks": [{
+          "id": "gp_comment_toolbar",
+          "blockType": "toolbar",
+          "buttons": [
+            { "code": "create", "action": "create", "primary": true, "commandCode": "gp:create_task_comment", "navigateTo": "gp_task_comment_form", "permissionCode": "GP.task.manage" }
+          ]
+        }]
+      },
+      "main": {
+        "blocks": [{
+          "id": "gp_comment_table",
+          "blockType": "data-table",
+          "columns": [
+            { "field": "gp_tc_task_id", "width": 200 },
+            { "field": "gp_tc_content", "width": 400 },
+            { "field": "gp_tc_author", "width": 120 },
+            { "field": "created_at", "width": 180, "sortable": true },
+            {
+              "field": "actions",
+              "isActionColumn": true,
+              "buttons": [
+                { "code": "edit", "action": "edit", "navigateTo": "gp_task_comment_form", "permissionCode": "GP.task.manage" },
+                { "code": "delete", "action": "delete", "danger": true, "commandCode": "gp:delete_task_comment", "permissionCode": "GP.task.manage", "confirmMessageKey": "delete.confirm" }
+              ]
+            }
+          ],
+          "defaultSort": { "field": "created_at", "order": "desc" }
+        }]
+      }
+    }
+  }
+}

@@ -1,0 +1,99 @@
+# MySQL profile — activate with: spring.profiles.active=mysql
+# Requires MySQL 8.0+
+
+server:
+  address: 0.0.0.0
+  port: 6443
+  ssl:
+    enabled: true
+    bundle: web-server
+    client-auth: none
+  http2:
+    enabled: true
+
+logging:
+  level:
+    root: debug
+    org.apache.tomcat.util.net.jsse.JSSESupport: INFO
+    org.apache.coyote: INFO
+    com.zaxxer.hikari.pool: INFO
+    com.mysql: INFO
+
+security:
+  jwt:
+    secret: your_very_long_and_secure_secret_key_at_least_32_chars
+    expiration: 86400
+
+snowflake:
+  worker-id: 1
+  datacenter-id: 1
+
+database:
+  id-type: long
+
+spring:
+  ssl:
+    bundle:
+      pem:
+        web-server:
+          keystore:
+            certificate: file:../certs/_wildcard.metaochan.com+5.pem
+            private-key: file:../certs/_wildcard.metaochan.com+5-key.pem
+  datasource:
+    url: jdbc:mysql://localhost:3306/aura_boot?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=utf8mb4
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: root
+    password: root
+  sql:
+    init:
+      schema-locations: classpath:database/schema-mysql.sql
+      data-locations: classpath:database/data-mysql.sql
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,env,beans,configprops,loggers
+      base-path: /actuator
+    enabled-by-default: true
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
+    info:
+      enabled: true
+    metrics:
+      enabled: true
+    env:
+      enabled: true
+    beans:
+      enabled: true
+    configprops:
+      enabled: true
+    loggers:
+      enabled: true
+  health:
+    defaults:
+      enabled: true
+    db:
+      enabled: true
+    diskspace:
+      enabled: true
+  info:
+    env:
+      enabled: true
+    java:
+      enabled: true
+    os:
+      enabled: true
+
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    configuration:
+      map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      logic-delete-field: deletedFlag
+      logic-delete-value: true
+      logic-not-delete-value: false

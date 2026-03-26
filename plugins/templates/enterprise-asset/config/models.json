@@ -1,0 +1,67 @@
+[
+  {
+    "code": "eam_asset",
+    "displayName:zh-CN": "资产",
+    "displayName:en": "Asset",
+    "description": "Enterprise asset with full lifecycle management from procurement to disposal.",
+    "modelType": "entity",
+    "modelCategory": "master",
+    "semantic_description": "A physical, software, or intangible asset tracked from procurement through active use, maintenance, retirement, and disposal.",
+    "domain_category": "asset",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "PROCURED → IN_USE → MAINTENANCE (↔ IN_USE) → RETIRED → DISPOSED",
+    "extension": { "icon": "Monitor", "category": "enterprise-asset", "titleField": "eam_as_name", "subtitleField": "eam_as_code" }
+  },
+  {
+    "code": "eam_asset_category",
+    "displayName:zh-CN": "资产分类",
+    "displayName:en": "Asset Category",
+    "description": "Hierarchical classification for assets.",
+    "modelType": "entity",
+    "modelCategory": "master",
+    "semantic_description": "A category for classifying assets, supporting parent-child hierarchy for structured organization.",
+    "domain_category": "asset",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "No lifecycle — reference entity.",
+    "extension": { "icon": "FolderTree", "category": "enterprise-asset", "titleField": "eam_ct_name", "subtitleField": "eam_ct_code" }
+  },
+  {
+    "code": "eam_maintenance",
+    "displayName:zh-CN": "维护计划",
+    "displayName:en": "Maintenance Schedule",
+    "description": "Planned and recurring maintenance schedule for assets.",
+    "modelType": "entity",
+    "modelCategory": "entity",
+    "semantic_description": "A scheduled maintenance plan for an asset, defining frequency, next due date, and maintenance type.",
+    "domain_category": "asset",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "active → paused → active; active → completed",
+    "extension": { "icon": "CalendarClock", "category": "enterprise-asset", "titleField": "eam_ms_name", "subtitleField": "eam_ms_code" }
+  },
+  {
+    "code": "eam_work_order",
+    "displayName:zh-CN": "工单",
+    "displayName:en": "Work Order",
+    "description": "Maintenance or repair work order for an asset.",
+    "modelType": "entity",
+    "modelCategory": "document",
+    "semantic_description": "A work order for asset maintenance, repair, or inspection. Tracks assignment, progress, and completion.",
+    "domain_category": "asset",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "open → ASSIGNED → in_progress → completed → closed",
+    "extension": { "icon": "ClipboardList", "category": "enterprise-asset", "titleField": "eam_wo_code", "subtitleField": "eam_wo_priority" }
+  },
+  {
+    "code": "eam_depreciation",
+    "displayName:zh-CN": "折旧记录",
+    "displayName:en": "Depreciation",
+    "description": "Monthly depreciation record for an asset.",
+    "modelType": "entity",
+    "modelCategory": "activity",
+    "semantic_description": "A monthly depreciation entry for an asset, calculating book value reduction over the useful life period.",
+    "domain_category": "asset",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "No lifecycle — activity record.",
+    "extension": { "icon": "TrendingDown", "category": "enterprise-asset", "titleField": "eam_dp_code", "subtitleField": "eam_dp_period" }
+  }
+]

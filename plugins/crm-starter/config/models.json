@@ -1,0 +1,86 @@
+[
+  {
+    "code": "crm_account",
+    "displayName:zh-CN": "客户",
+    "displayName:en": "Account",
+    "description": "CRM customer company (Graph Root)",
+    "modelType": "entity",
+    "modelCategory": "master",
+    "extension": {
+      "icon": "Building",
+      "category": "crm",
+      "titleField": "crm_acc_name",
+      "subtitleField": "crm_acc_code"
+    }
+  },
+  {
+    "code": "crm_contact",
+    "displayName:zh-CN": "联系人",
+    "displayName:en": "Contact",
+    "description": "Contact person linked to an account",
+    "modelType": "entity",
+    "modelCategory": "master",
+    "extension": {
+      "icon": "User",
+      "category": "crm",
+      "titleField": "crm_ct_name",
+      "subtitleField": "crm_ct_email"
+    }
+  },
+  {
+    "code": "crm_lead",
+    "displayName:zh-CN": "线索",
+    "displayName:en": "Lead",
+    "description": "Sales lead before qualification",
+    "modelType": "entity",
+    "modelCategory": "entity",
+    "extension": {
+      "icon": "Radar",
+      "category": "crm",
+      "titleField": "crm_lead_company",
+      "subtitleField": "crm_lead_code"
+    }
+  },
+  {
+    "code": "crm_opportunity",
+    "displayName:zh-CN": "商机",
+    "displayName:en": "Opportunity",
+    "description": "Sales opportunity linked to an account",
+    "modelType": "entity",
+    "modelCategory": "entity",
+    "extension": {
+      "icon": "Target",
+      "category": "crm",
+      "titleField": "crm_opp_name",
+      "subtitleField": "crm_opp_code"
+    }
+  },
+  {
+    "code": "crm_activity",
+    "displayName:zh-CN": "活动记录",
+    "displayName:en": "Activity",
+    "description": "CRM activity log (call, visit, email, meeting)",
+    "modelType": "entity",
+    "modelCategory": "entity",
+    "extension": {
+      "icon": "Activity",
+      "category": "crm",
+      "titleField": "crm_act_subject",
+      "subtitleField": "crm_act_type"
+    }
+  },
+  {
+    "code": "crm_campaign",
+    "displayName:zh-CN": "营销活动",
+    "displayName:en": "Campaign",
+    "description": "Marketing campaign for lead generation",
+    "modelType": "entity",
+    "modelCategory": "entity",
+    "extension": {
+      "icon": "Megaphone",
+      "category": "crm",
+      "titleField": "crm_cpn_name",
+      "subtitleField": "crm_cpn_code"
+    }
+  }
+]

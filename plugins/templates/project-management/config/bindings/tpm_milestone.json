@@ -1,0 +1,8 @@
+[
+  { "modelCode": "tpm_milestone", "fieldCode": "tpm_ms_code", "sequence": 1, "required": true, "visible": true, "editable": false, "displayConfig": { "searchable": true, "sortable": true } },
+  { "modelCode": "tpm_milestone", "fieldCode": "tpm_ms_name", "sequence": 2, "required": true, "visible": true, "editable": true, "displayConfig": { "searchable": true, "sortable": true } },
+  { "modelCode": "tpm_milestone", "fieldCode": "tpm_ms_project_id", "sequence": 3, "required": false, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "tpm_milestone", "fieldCode": "tpm_ms_target_date", "sequence": 4, "required": false, "visible": true, "editable": true, "displayConfig": { "sortable": true } },
+  { "modelCode": "tpm_milestone", "fieldCode": "tpm_ms_status", "sequence": 5, "required": false, "visible": true, "editable": false, "displayConfig": { "searchable": true } },
+  { "modelCode": "tpm_milestone", "fieldCode": "tpm_ms_description", "sequence": 6, "required": false, "visible": false, "editable": true }
+]

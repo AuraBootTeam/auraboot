@@ -1,0 +1,846 @@
+{
+  "version": "1.0",
+  "description": "Component property schemas — shared between frontend, backend, and CLI",
+  "totalComponents": 56,
+  "components": {
+    "input": {
+      "code": "input",
+      "label": "Input",
+      "category": "input",
+      "compatibleDataTypes": ["string"],
+      "props": [
+        { "name": "label", "type": "string", "required": true, "description": "Field label" },
+        { "name": "name", "type": "string", "required": true, "description": "Field name" },
+        { "name": "placeholder", "type": "string", "required": false, "description": "Placeholder text" },
+        { "name": "defaultValue", "type": "string", "required": false, "description": "Default value" },
+        { "name": "required", "type": "boolean", "required": false, "default": false, "description": "Whether field is required" },
+        { "name": "disabled", "type": "boolean", "required": false, "default": false, "description": "Whether field is disabled" },
+        { "name": "maxLength", "type": "number", "required": false, "default": 255, "description": "Maximum character length" },
+        { "name": "minLength", "type": "number", "required": false, "description": "Minimum character length" },
+        { "name": "pattern", "type": "string", "required": false, "description": "Regex validation pattern" },
+        { "name": "size", "type": "string", "required": false, "default": "medium", "description": "Size: small | medium | large" },
+        { "name": "variant", "type": "string", "required": false, "default": "default", "description": "Style variant: default | outline | filled" }
+      ],
+      "since": "1.0"
+    },
+    "textarea": {
+      "code": "textarea",
+      "label": "Textarea",
+      "category": "input",
+      "compatibleDataTypes": ["text", "string"],
+      "props": [
+        { "name": "label", "type": "string", "required": true, "description": "Field label" },
+        { "name": "name", "type": "string", "required": true, "description": "Field name" },
+        { "name": "placeholder", "type": "string", "required": false, "description": "Placeholder text" },
+        { "name": "defaultValue", "type": "string", "required": false, "description": "Default value" },
+        { "name": "required", "type": "boolean", "required": false, "default": false, "description": "Whether field is required" },
+        { "name": "disabled", "type": "boolean", "required": false, "default": false, "description": "Whether field is disabled" },
+        { "name": "rows", "type": "number", "required": false, "default": 4, "description": "Number of visible rows" },
+        { "name": "maxLength", "type": "number", "required": false, "default": 1000, "description": "Maximum character length" },
+        { "name": "resize", "type": "string", "required": false, "default": "vertical", "description": "Resize direction: vertical | horizontal | both | none" }
+      ],
+      "since": "1.0"
+    },
+    "select": {
+      "code": "select",
+      "label": "Select",
+      "category": "input",
+      "compatibleDataTypes": ["enum", "reference", "string"],
+      "props": [
+        { "name": "label", "type": "string", "required": true, "description": "Field label" },
+        { "name": "name", "type": "string", "required": true, "description": "Field name" },
+        { "name": "placeholder", "type": "string", "required": false, "description": "Placeholder text" },
+        { "name": "required", "type": "boolean", "required": false, "default": false, "description": "Whether field is required" },
+        { "name": "disabled", "type": "boolean", "required": false, "default": false, "description": "Whether field is disabled" },
+        { "name": "multiple", "type": "boolean", "required": false, "default": false, "description": "Allow multiple selection" },
+        { "name": "clearable", "type": "boolean", "required": false, "default": true, "description": "Allow clearing selection" },
+        { "name": "searchable", "type": "boolean", "required": false, "default": false, "description": "Enable search in options" },
+        { "name": "options", "type": "array", "required": false, "description": "Static options: [{label, value}]" }
+      ],
+      "since": "1.0"
+    },
+    "checkbox": {
+      "code": "checkbox",
+      "label": "Checkbox",
+      "category": "input",
+      "compatibleDataTypes": ["boolean"],
+      "props": [
+        { "name": "label", "type": "string", "required": true, "description": "Field label" },
+        { "name": "name", "type": "string", "required": true, "description": "Field name" },
+        { "name": "required", "type": "boolean", "required": false, "default": false, "description": "Whether field is required" },
+        { "name": "disabled", "type": "boolean", "required": false, "default": false, "description": "Whether field is disabled" },
+        { "name": "checked", "type": "boolean", "required": false, "default": false, "description": "Default checked state" },
+        { "name": "indeterminate", "type": "boolean", "required": false, "default": false, "description": "Show indeterminate state" }
+      ],
+      "since": "1.0"
+    },
+    "radio": {
+      "code": "radio",
+      "label": "Radio Group",
+      "category": "input",
+      "compatibleDataTypes": ["enum"],
+      "props": [
+        { "name": "label", "type": "string", "required": true, "description": "Field label" },
+        { "name": "name", "type": "string", "required": true, "description": "Field name" },
+        { "name": "required", "type": "boolean", "required": false, "default": false, "description": "Whether field is required" },
+        { "name": "disabled", "type": "boolean", "required": false, "default": false, "description": "Whether field is disabled" },
+        { "name": "direction", "type": "string", "required": false, "default": "horizontal", "description": "Layout direction: horizontal | vertical" },
+        { "name": "options", "type": "array", "required": false, "description": "Options: [{label, value}]" }
+      ],
+      "since": "1.0"
+    },
+    "datepicker": {
+      "code": "datepicker",
+      "label": "Date Picker",
+      "category": "input",
+      "compatibleDataTypes": ["date", "datetime"],
+      "props": [
+        { "name": "label", "type": "string", "required": true, "description": "Field label" },
+        { "name": "name", "type": "string", "required": true, "description": "Field name" },
+        { "name": "placeholder", "type": "string", "required": false, "description": "Placeholder text" },
+        { "name": "required", "type": "boolean", "required": false, "default": false, "description": "Whether field is required" },
+        { "name": "disabled", "type": "boolean", "required": false, "default": false, "description": "Whether field is disabled" },
+        { "name": "showTime", "type": "boolean", "required": false, "default": false, "description": "Show time picker" },
+        { "name": "clearable", "type": "boolean", "required": false, "default": true, "description": "Allow clearing" },
+        { "name": "format", "type": "string", "required": false, "default": "YYYY-MM-DD", "description": "Date format string" }
+      ],
+      "since": "1.0"
+    },
+    "formref": {
+      "code": "formref",
+      "label": "Form Reference",
+      "category": "input",
+      "compatibleDataTypes": ["reference"],
+      "props": [
+        { "name": "formRefId", "type": "string", "required": true, "description": "Referenced form ID" },
+        { "name": "mode", "type": "string", "required": false, "default": "embedded", "description": "Display mode: embedded | modal | drawer | page" },
+        { "name": "title", "type": "string", "required": false, "description": "Title text" },
+        { "name": "showTitle", "type": "boolean", "required": false, "default": true, "description": "Show title" },
+        { "name": "showBorder", "type": "boolean", "required": false, "default": true, "description": "Show border" },
+        { "name": "padding", "type": "number", "required": false, "default": 16, "description": "Inner padding (px)" },
+        { "name": "closable", "type": "boolean", "required": false, "description": "Allow closing (modal/drawer only)" },
+        { "name": "maskClosable", "type": "boolean", "required": false, "description": "Close on mask click (modal/drawer only)" }
+      ],
+      "since": "1.0"
+    },
+    "timepicker": {
+      "code": "timepicker",
+      "label": "Time Picker",
+      "category": "input",
+      "compatibleDataTypes": ["string", "datetime"],
+      "props": [
+        { "name": "label", "type": "string", "required": true, "description": "Field label" },
+        { "name": "name", "type": "string", "required": true, "description": "Field name" },
+        { "name": "placeholder", "type": "string", "required": false, "description": "Placeholder text" },
+        { "name": "required", "type": "boolean", "required": false, "default": false, "description": "Whether field is required" },
+        { "name": "disabled", "type": "boolean", "required": false, "default": false, "description": "Whether field is disabled" },
+        { "name": "format", "type": "string", "required": false, "default": "HH:mm", "description": "Time format" },
+        { "name": "showSecond", "type": "boolean", "required": false, "default": false, "description": "Show seconds" },
+        { "name": "use12Hours", "type": "boolean", "required": false, "default": false, "description": "Use 12-hour format" },
+        { "name": "hourStep", "type": "number", "required": false, "default": 1, "description": "Hour step increment" },
+        { "name": "minuteStep", "type": "number", "required": false, "default": 1, "description": "Minute step increment" }
+      ],
+      "since": "1.0"
+    },
+    "switch": {
+      "code": "switch",
+      "label": "Switch",
+      "category": "input",
+      "compatibleDataTypes": ["boolean"],
+      "props": [
+        { "name": "label", "type": "string", "required": true, "description": "Field label" },
+        { "name": "name", "type": "string", "required": true, "description": "Field name" },
+        { "name": "checked", "type": "boolean", "required": false, "default": false, "description": "Default state" },
+        { "name": "required", "type": "boolean", "required": false, "default": false, "description": "Whether field is required" },
+        { "name": "disabled", "type": "boolean", "required": false, "default": false, "description": "Whether field is disabled" },
+        { "name": "size", "type": "string", "required": false, "default": "default", "description": "Size: small | default | large" },
+        { "name": "checkedText", "type": "string", "required": false, "description": "Text shown when ON" },
+        { "name": "uncheckedText", "type": "string", "required": false, "description": "Text shown when OFF" },
+        { "name": "checkedValue", "type": "string", "required": false, "description": "Value when ON (default: true)" },
+        { "name": "uncheckedValue", "type": "string", "required": false, "description": "Value when OFF (default: false)" }
+      ],
+      "since": "1.0"
+    },
+    "numberinput": {
+      "code": "numberinput",
+      "label": "Number Input",
+      "category": "input",
+      "compatibleDataTypes": ["integer", "decimal"],
+      "props": [
+        { "name": "label", "type": "string", "required": true, "description": "Field label" },
+        { "name": "name", "type": "string", "required": true, "description": "Field name" },
+        { "name": "placeholder", "type": "string", "required": false, "description": "Placeholder text" },
+        { "name": "required", "type": "boolean", "required": false, "default": false, "description": "Whether field is required" },
+        { "name": "disabled", "type": "boolean", "required": false, "default": false, "description": "Whether field is disabled" },
+        { "name": "min", "type": "number", "required": false, "description": "Minimum value" },
+        { "name": "max", "type": "number", "required": false, "description": "Maximum value" },
+        { "name": "step", "type": "number", "required": false, "default": 1, "description": "Step increment" },
+        { "name": "precision", "type": "number", "required": false, "default": 0, "description": "Decimal places" },
+        { "name": "showButtons", "type": "boolean", "required": false, "default": true, "description": "Show +/- buttons" },
+        { "name": "prefix", "type": "string", "required": false, "description": "Prefix text" },
+        { "name": "suffix", "type": "string", "required": false, "description": "Suffix text (e.g. unit)" }
+      ],
+      "since": "1.0"
+    },
+    "upload": {
+      "code": "upload",
+      "label": "File Upload",
+      "category": "input",
+      "compatibleDataTypes": ["string", "json"],
+      "props": [
+        { "name": "label", "type": "string", "required": true, "description": "Field label" },
+        { "name": "name", "type": "string", "required": true, "description": "Field name" },
+        { "name": "required", "type": "boolean", "required": false, "default": false, "description": "Whether field is required" },
+        { "name": "disabled", "type": "boolean", "required": false, "default": false, "description": "Whether field is disabled" },
+        { "name": "action", "type": "string", "required": false, "default": "/api/upload", "description": "Upload endpoint URL" },
+        { "name": "multiple", "type": "boolean", "required": false, "default": false, "description": "Allow multiple files" },
+        { "name": "maxCount", "type": "number", "required": false, "default": 1, "description": "Maximum file count" },
+        { "name": "maxSize", "type": "number", "required": false, "default": 10, "description": "Max file size (MB)" },
+        { "name": "accept", "type": "string", "required": false, "description": "Accepted file types (e.g. .jpg,.png,.pdf)" },
+        { "name": "listType", "type": "string", "required": false, "default": "text", "description": "List display: text | picture | picture-card" },
+        { "name": "draggable", "type": "boolean", "required": false, "default": false, "description": "Enable drag-and-drop upload" }
+      ],
+      "since": "1.0"
+    },
+    "richtext": {
+      "code": "richtext",
+      "label": "Rich Text Editor",
+      "category": "input",
+      "compatibleDataTypes": ["text"],
+      "props": [
+        { "name": "label", "type": "string", "required": false, "description": "Field label" },
+        { "name": "name", "type": "string", "required": false, "description": "Field name" },
+        { "name": "placeholder", "type": "string", "required": false, "description": "Placeholder text" },
+        { "name": "required", "type": "boolean", "required": false, "default": false, "description": "Whether field is required" },
+        { "name": "disabled", "type": "boolean", "required": false, "default": false, "description": "Whether field is disabled" },
+        { "name": "height", "type": "string", "required": false, "default": "300px", "description": "Editor height" },
+        { "name": "toolbar", "type": "string", "required": false, "description": "Toolbar configuration" }
+      ],
+      "since": "1.0"
+    },
+    "multiselect": {
+      "code": "multiselect",
+      "label": "Multi Select",
+      "category": "input",
+      "compatibleDataTypes": ["enum", "json"],
+      "props": [
+        { "name": "label", "type": "string", "required": true, "description": "Field label" },
+        { "name": "name", "type": "string", "required": true, "description": "Field name" },
+        { "name": "placeholder", "type": "string", "required": false, "description": "Placeholder text" },
+        { "name": "required", "type": "boolean", "required": false, "default": false, "description": "Whether field is required" },
+        { "name": "disabled", "type": "boolean", "required": false, "default": false, "description": "Whether field is disabled" },
+        { "name": "searchable", "type": "boolean", "required": false, "default": true, "description": "Enable search" },
+        { "name": "maxCount", "type": "number", "required": false, "description": "Maximum selectable count" },
+        { "name": "options", "type": "array", "required": false, "description": "Static options: [{label, value}]" }
+      ],
+      "since": "1.0"
+    },
+    "treeselect": {
+      "code": "treeselect",
+      "label": "Tree Select",
+      "category": "input",
+      "compatibleDataTypes": ["reference", "string"],
+      "props": [
+        { "name": "label", "type": "string", "required": true, "description": "Field label" },
+        { "name": "name", "type": "string", "required": true, "description": "Field name" },
+        { "name": "placeholder", "type": "string", "required": false, "description": "Placeholder text" },
+        { "name": "required", "type": "boolean", "required": false, "default": false, "description": "Whether field is required" },
+        { "name": "disabled", "type": "boolean", "required": false, "default": false, "description": "Whether field is disabled" },
+        { "name": "multiple", "type": "boolean", "required": false, "default": false, "description": "Allow multiple selection" },
+        { "name": "checkable", "type": "boolean", "required": false, "default": false, "description": "Show checkboxes" },
+        { "name": "searchable", "type": "boolean", "required": false, "default": true, "description": "Enable search" }
+      ],
+      "since": "1.0"
+    },
+    "timerangepicker": {
+      "code": "timerangepicker",
+      "label": "Time Range Picker",
+      "category": "input",
+      "compatibleDataTypes": ["string", "json"],
+      "props": [
+        { "name": "label", "type": "string", "required": true, "description": "Field label" },
+        { "name": "name", "type": "string", "required": true, "description": "Field name" },
+        { "name": "required", "type": "boolean", "required": false, "default": false, "description": "Whether field is required" },
+        { "name": "disabled", "type": "boolean", "required": false, "default": false, "description": "Whether field is disabled" },
+        { "name": "format", "type": "string", "required": false, "default": "HH:mm", "description": "Time format" },
+        { "name": "placeholder", "type": "array", "required": false, "description": "Placeholders for [start, end]" }
+      ],
+      "since": "1.0"
+    },
+    "daterange": {
+      "code": "daterange",
+      "label": "Date Range Picker",
+      "category": "input",
+      "compatibleDataTypes": ["json", "string"],
+      "props": [
+        { "name": "label", "type": "string", "required": true, "description": "Field label" },
+        { "name": "name", "type": "string", "required": true, "description": "Field name" },
+        { "name": "required", "type": "boolean", "required": false, "default": false, "description": "Whether field is required" },
+        { "name": "disabled", "type": "boolean", "required": false, "default": false, "description": "Whether field is disabled" },
+        { "name": "format", "type": "string", "required": false, "default": "YYYY-MM-DD", "description": "Date format" },
+        { "name": "showTime", "type": "boolean", "required": false, "default": false, "description": "Include time selection" },
+        { "name": "placeholder", "type": "array", "required": false, "description": "Placeholders for [start, end]" }
+      ],
+      "since": "1.0"
+    },
+    "userselect": {
+      "code": "userselect",
+      "label": "User Select",
+      "category": "input",
+      "compatibleDataTypes": ["reference", "string"],
+      "props": [
+        { "name": "label", "type": "string", "required": true, "description": "Field label" },
+        { "name": "name", "type": "string", "required": true, "description": "Field name" },
+        { "name": "required", "type": "boolean", "required": false, "default": false, "description": "Whether field is required" },
+        { "name": "disabled", "type": "boolean", "required": false, "default": false, "description": "Whether field is disabled" },
+        { "name": "multiple", "type": "boolean", "required": false, "default": false, "description": "Allow multiple selection" },
+        { "name": "searchable", "type": "boolean", "required": false, "default": true, "description": "Enable search" }
+      ],
+      "since": "1.0"
+    },
+    "organizationselect": {
+      "code": "organizationselect",
+      "label": "Organization Select",
+      "category": "input",
+      "compatibleDataTypes": ["reference", "string"],
+      "props": [
+        { "name": "label", "type": "string", "required": true, "description": "Field label" },
+        { "name": "name", "type": "string", "required": true, "description": "Field name" },
+        { "name": "required", "type": "boolean", "required": false, "default": false, "description": "Whether field is required" },
+        { "name": "disabled", "type": "boolean", "required": false, "default": false, "description": "Whether field is disabled" },
+        { "name": "multiple", "type": "boolean", "required": false, "default": false, "description": "Allow multiple selection" }
+      ],
+      "since": "1.0"
+    },
+    "coordinatespicker": {
+      "code": "coordinatespicker",
+      "label": "Coordinates Picker",
+      "category": "input",
+      "compatibleDataTypes": ["json", "string"],
+      "props": [
+        { "name": "label", "type": "string", "required": true, "description": "Field label" },
+        { "name": "name", "type": "string", "required": true, "description": "Field name" },
+        { "name": "required", "type": "boolean", "required": false, "default": false, "description": "Whether field is required" },
+        { "name": "disabled", "type": "boolean", "required": false, "default": false, "description": "Whether field is disabled" },
+        { "name": "defaultCenter", "type": "object", "required": false, "description": "Default map center {lat, lng}" },
+        { "name": "zoom", "type": "number", "required": false, "default": 13, "description": "Default map zoom level" }
+      ],
+      "since": "1.0"
+    },
+    "cascadeselect": {
+      "code": "cascadeselect",
+      "label": "Cascade Select",
+      "category": "input",
+      "compatibleDataTypes": ["reference", "string", "json"],
+      "props": [
+        { "name": "label", "type": "string", "required": true, "description": "Field label" },
+        { "name": "name", "type": "string", "required": true, "description": "Field name" },
+        { "name": "required", "type": "boolean", "required": false, "default": false, "description": "Whether field is required" },
+        { "name": "disabled", "type": "boolean", "required": false, "default": false, "description": "Whether field is disabled" },
+        { "name": "placeholder", "type": "string", "required": false, "description": "Placeholder text" },
+        { "name": "searchable", "type": "boolean", "required": false, "default": true, "description": "Enable search" },
+        { "name": "changeOnSelect", "type": "boolean", "required": false, "default": false, "description": "Allow selecting non-leaf nodes" }
+      ],
+      "since": "1.0"
+    },
+    "memberpicker": {
+      "code": "memberpicker",
+      "label": "Member Picker",
+      "category": "input",
+      "compatibleDataTypes": ["reference", "json"],
+      "props": [
+        { "name": "label", "type": "string", "required": true, "description": "Field label" },
+        { "name": "name", "type": "string", "required": true, "description": "Field name" },
+        { "name": "required", "type": "boolean", "required": false, "default": false, "description": "Whether field is required" },
+        { "name": "disabled", "type": "boolean", "required": false, "default": false, "description": "Whether field is disabled" },
+        { "name": "multiple", "type": "boolean", "required": false, "default": false, "description": "Allow multiple members" },
+        { "name": "maxCount", "type": "number", "required": false, "description": "Maximum selectable count" }
+      ],
+      "since": "1.0"
+    },
+    "moneyinput": {
+      "code": "moneyinput",
+      "label": "Money Input",
+      "category": "input",
+      "compatibleDataTypes": ["money", "decimal"],
+      "props": [
+        { "name": "label", "type": "string", "required": true, "description": "Field label" },
+        { "name": "name", "type": "string", "required": true, "description": "Field name" },
+        { "name": "required", "type": "boolean", "required": false, "default": false, "description": "Whether field is required" },
+        { "name": "disabled", "type": "boolean", "required": false, "default": false, "description": "Whether field is disabled" },
+        { "name": "currency", "type": "string", "required": false, "default": "cny", "description": "Default currency code" },
+        { "name": "precision", "type": "number", "required": false, "default": 2, "description": "Decimal places" },
+        { "name": "showCurrencySelector", "type": "boolean", "required": false, "default": true, "description": "Show currency selector" }
+      ],
+      "since": "1.1"
+    },
+    "aifield": {
+      "code": "aifield",
+      "label": "AI Field",
+      "category": "input",
+      "compatibleDataTypes": ["ai_text", "text"],
+      "props": [
+        { "name": "label", "type": "string", "required": true, "description": "Field label" },
+        { "name": "name", "type": "string", "required": true, "description": "Field name" },
+        { "name": "required", "type": "boolean", "required": false, "default": false, "description": "Whether field is required" },
+        { "name": "disabled", "type": "boolean", "required": false, "default": false, "description": "Whether field is disabled" },
+        { "name": "prompt", "type": "string", "required": false, "description": "AI prompt template" },
+        { "name": "contextFields", "type": "array", "required": false, "description": "Fields to include as AI context" }
+      ],
+      "since": "1.1"
+    },
+    "agenttoolpicker": {
+      "code": "agenttoolpicker",
+      "label": "Agent Tool Picker",
+      "category": "input",
+      "compatibleDataTypes": ["json", "string"],
+      "props": [
+        { "name": "label", "type": "string", "required": true, "description": "Field label" },
+        { "name": "name", "type": "string", "required": true, "description": "Field name" },
+        { "name": "required", "type": "boolean", "required": false, "default": false, "description": "Whether field is required" },
+        { "name": "disabled", "type": "boolean", "required": false, "default": false, "description": "Whether field is disabled" },
+        { "name": "multiple", "type": "boolean", "required": false, "default": true, "description": "Allow multiple tools" }
+      ],
+      "since": "1.1"
+    },
+    "guardrailseditor": {
+      "code": "guardrailseditor",
+      "label": "Guardrails Editor",
+      "category": "input",
+      "compatibleDataTypes": ["json"],
+      "props": [
+        { "name": "label", "type": "string", "required": true, "description": "Field label" },
+        { "name": "name", "type": "string", "required": true, "description": "Field name" },
+        { "name": "required", "type": "boolean", "required": false, "default": false, "description": "Whether field is required" },
+        { "name": "disabled", "type": "boolean", "required": false, "default": false, "description": "Whether field is disabled" }
+      ],
+      "since": "1.1"
+    },
+    "ratingfield": {
+      "code": "ratingfield",
+      "label": "Rating Field",
+      "category": "input",
+      "compatibleDataTypes": ["integer", "decimal"],
+      "props": [
+        { "name": "label", "type": "string", "required": true, "description": "Field label" },
+        { "name": "name", "type": "string", "required": true, "description": "Field name" },
+        { "name": "required", "type": "boolean", "required": false, "default": false, "description": "Whether field is required" },
+        { "name": "disabled", "type": "boolean", "required": false, "default": false, "description": "Whether field is disabled" },
+        { "name": "max", "type": "number", "required": false, "default": 5, "description": "Maximum rating value" },
+        { "name": "allowHalf", "type": "boolean", "required": false, "default": false, "description": "Allow half-star ratings" },
+        { "name": "color", "type": "string", "required": false, "default": "#fadb14", "description": "Star color" }
+      ],
+      "since": "1.0"
+    },
+    "progressfield": {
+      "code": "progressfield",
+      "label": "Progress Field",
+      "category": "display",
+      "compatibleDataTypes": ["integer", "decimal"],
+      "props": [
+        { "name": "label", "type": "string", "required": false, "description": "Field label" },
+        { "name": "name", "type": "string", "required": false, "description": "Field name" },
+        { "name": "type", "type": "string", "required": false, "default": "line", "description": "Display type: line | circle | dashboard" },
+        { "name": "strokeColor", "type": "string", "required": false, "description": "Progress bar color" },
+        { "name": "showInfo", "type": "boolean", "required": false, "default": true, "description": "Show percentage text" }
+      ],
+      "since": "1.0"
+    },
+    "display": {
+      "code": "display",
+      "label": "Text Display",
+      "category": "display",
+      "compatibleDataTypes": ["string", "text", "integer", "decimal"],
+      "props": [
+        { "name": "text", "type": "string", "required": true, "description": "Display text content" },
+        { "name": "size", "type": "string", "required": false, "default": "medium", "description": "Font size: small | medium | large | xlarge" },
+        { "name": "weight", "type": "string", "required": false, "default": "normal", "description": "Font weight: normal | bold | light" },
+        { "name": "align", "type": "string", "required": false, "default": "left", "description": "Text alignment: left | center | right" },
+        { "name": "color", "type": "string", "required": false, "description": "Text color" }
+      ],
+      "since": "1.0"
+    },
+    "image": {
+      "code": "image",
+      "label": "Image",
+      "category": "display",
+      "compatibleDataTypes": ["string"],
+      "props": [
+        { "name": "src", "type": "string", "required": true, "description": "Image source URL" },
+        { "name": "alt", "type": "string", "required": false, "description": "Alt text" },
+        { "name": "width", "type": "number", "required": false, "description": "Width (grid columns)" },
+        { "name": "height", "type": "string", "required": false, "description": "Height value" },
+        { "name": "fit", "type": "string", "required": false, "default": "cover", "description": "Object fit: cover | contain | fill | scale-down" },
+        { "name": "lazy", "type": "boolean", "required": false, "default": true, "description": "Enable lazy loading" }
+      ],
+      "since": "1.0"
+    },
+    "imagedisplay": {
+      "code": "imagedisplay",
+      "label": "Image Display",
+      "category": "display",
+      "compatibleDataTypes": ["string"],
+      "props": [
+        { "name": "src", "type": "string", "required": false, "description": "Image source URL" },
+        { "name": "alt", "type": "string", "required": false, "description": "Alt text" },
+        { "name": "width", "type": "string", "required": false, "description": "Display width" },
+        { "name": "height", "type": "string", "required": false, "description": "Display height" },
+        { "name": "preview", "type": "boolean", "required": false, "default": true, "description": "Enable click-to-preview" }
+      ],
+      "since": "1.0"
+    },
+    "table": {
+      "code": "table",
+      "label": "Table",
+      "category": "display",
+      "compatibleDataTypes": ["json"],
+      "props": [
+        { "name": "columns", "type": "array", "required": false, "description": "Column configuration" },
+        { "name": "data", "type": "array", "required": false, "description": "Table data source" },
+        { "name": "pagination", "type": "boolean", "required": false, "default": true, "description": "Enable pagination" },
+        { "name": "pageSize", "type": "number", "required": false, "default": 10, "description": "Rows per page" },
+        { "name": "bordered", "type": "boolean", "required": false, "default": true, "description": "Show borders" },
+        { "name": "striped", "type": "boolean", "required": false, "default": false, "description": "Show striped rows" }
+      ],
+      "since": "1.0"
+    },
+    "list": {
+      "code": "list",
+      "label": "List",
+      "category": "display",
+      "compatibleDataTypes": ["json"],
+      "props": [
+        { "name": "data", "type": "array", "required": false, "description": "List data source" },
+        { "name": "bordered", "type": "boolean", "required": false, "default": false, "description": "Show borders" },
+        { "name": "size", "type": "string", "required": false, "default": "default", "description": "Size: small | default | large" },
+        { "name": "split", "type": "boolean", "required": false, "default": true, "description": "Show dividers between items" }
+      ],
+      "since": "1.0"
+    },
+    "date": {
+      "code": "date",
+      "label": "Date Display",
+      "category": "display",
+      "compatibleDataTypes": ["date"],
+      "props": [
+        { "name": "value", "type": "string", "required": false, "description": "Date value" },
+        { "name": "format", "type": "string", "required": false, "default": "YYYY-MM-DD", "description": "Display format" },
+        { "name": "relative", "type": "boolean", "required": false, "default": false, "description": "Show relative time" }
+      ],
+      "since": "1.0"
+    },
+    "datetime": {
+      "code": "datetime",
+      "label": "DateTime Display",
+      "category": "display",
+      "compatibleDataTypes": ["datetime"],
+      "props": [
+        { "name": "value", "type": "string", "required": false, "description": "DateTime value" },
+        { "name": "format", "type": "string", "required": false, "default": "YYYY-MM-DD HH:mm:ss", "description": "Display format" },
+        { "name": "showSeconds", "type": "boolean", "required": false, "default": true, "description": "Show seconds" },
+        { "name": "relative", "type": "boolean", "required": false, "default": false, "description": "Show relative time" }
+      ],
+      "since": "1.0"
+    },
+    "button": {
+      "code": "button",
+      "label": "Button",
+      "category": "input",
+      "compatibleDataTypes": [],
+      "props": [
+        { "name": "text", "type": "string", "required": true, "description": "Button text" },
+        { "name": "type", "type": "string", "required": false, "default": "primary", "description": "Button type: primary | secondary | success | warning | danger | link" },
+        { "name": "size", "type": "string", "required": false, "default": "medium", "description": "Size: small | medium | large" },
+        { "name": "disabled", "type": "boolean", "required": false, "default": false, "description": "Whether button is disabled" },
+        { "name": "loading", "type": "boolean", "required": false, "default": false, "description": "Show loading spinner" },
+        { "name": "block", "type": "boolean", "required": false, "default": false, "description": "Full-width button" }
+      ],
+      "since": "1.0"
+    },
+    "div": {
+      "code": "div",
+      "label": "Div Container",
+      "category": "layout",
+      "compatibleDataTypes": [],
+      "props": [
+        { "name": "width", "type": "number", "required": false, "default": 12, "description": "Grid columns (1-12)" },
+        { "name": "height", "type": "string", "required": false, "default": "auto", "description": "Height value" },
+        { "name": "padding", "type": "number", "required": false, "default": 16, "description": "Inner padding (px)" },
+        { "name": "margin", "type": "number", "required": false, "default": 0, "description": "Outer margin (px)" },
+        { "name": "backgroundColor", "type": "string", "required": false, "default": "transparent", "description": "Background color" },
+        { "name": "borderRadius", "type": "number", "required": false, "default": 0, "description": "Border radius (px)" },
+        { "name": "display", "type": "string", "required": false, "default": "block", "description": "Display: block | inline-block | flex | grid | none" },
+        { "name": "overflow", "type": "string", "required": false, "default": "visible", "description": "Overflow: visible | hidden | scroll | auto" }
+      ],
+      "since": "1.0"
+    },
+    "form": {
+      "code": "form",
+      "label": "Form Container",
+      "category": "layout",
+      "compatibleDataTypes": [],
+      "props": [
+        { "name": "title", "type": "string", "required": false, "description": "Form title" },
+        { "name": "layout", "type": "string", "required": false, "default": "vertical", "description": "Layout: vertical | horizontal | inline" },
+        { "name": "labelWidth", "type": "string", "required": false, "default": "auto", "description": "Label width" },
+        { "name": "size", "type": "string", "required": false, "default": "medium", "description": "Size: small | medium | large" },
+        { "name": "bordered", "type": "boolean", "required": false, "default": false, "description": "Show border" }
+      ],
+      "since": "1.0"
+    },
+    "navigation": {
+      "code": "navigation",
+      "label": "Navigation",
+      "category": "layout",
+      "compatibleDataTypes": [],
+      "props": [
+        { "name": "theme", "type": "string", "required": false, "default": "light", "description": "Theme: light | dark" },
+        { "name": "items", "type": "array", "required": false, "description": "Nav items: [{key, label, href}]" },
+        { "name": "selectedKey", "type": "string", "required": false, "description": "Currently selected item key" },
+        { "name": "collapsed", "type": "boolean", "required": false, "default": false, "description": "Collapsed state" },
+        { "name": "targetComponent", "type": "string", "required": false, "description": "Associated target component" },
+        { "name": "dataSource", "type": "string", "required": false, "description": "Data source reference" }
+      ],
+      "since": "1.0"
+    },
+    "container": {
+      "code": "container",
+      "label": "Container",
+      "category": "layout",
+      "compatibleDataTypes": [],
+      "props": [
+        { "name": "padding", "type": "number", "required": false, "default": 16, "description": "Inner padding (px)" },
+        { "name": "margin", "type": "number", "required": false, "default": 0, "description": "Outer margin (px)" },
+        { "name": "backgroundColor", "type": "string", "required": false, "default": "transparent", "description": "Background color" },
+        { "name": "borderRadius", "type": "number", "required": false, "default": 0, "description": "Border radius (px)" },
+        { "name": "bordered", "type": "boolean", "required": false, "default": false, "description": "Show border" },
+        { "name": "shadow", "type": "string", "required": false, "default": "none", "description": "Shadow: none | small | medium | large" },
+        { "name": "minHeight", "type": "string", "required": false, "default": "auto", "description": "Minimum height" }
+      ],
+      "since": "1.0"
+    },
+    "grid": {
+      "code": "grid",
+      "label": "Grid Layout",
+      "category": "layout",
+      "compatibleDataTypes": [],
+      "props": [
+        { "name": "columns", "type": "number", "required": false, "default": 12, "description": "Number of grid columns" },
+        { "name": "gutter", "type": "number", "required": false, "default": 16, "description": "Column gap (px)" },
+        { "name": "justify", "type": "string", "required": false, "default": "start", "description": "Horizontal alignment" },
+        { "name": "align", "type": "string", "required": false, "default": "top", "description": "Vertical alignment" },
+        { "name": "wrap", "type": "boolean", "required": false, "default": true, "description": "Enable row wrapping" },
+        { "name": "responsive", "type": "boolean", "required": false, "default": true, "description": "Enable responsive breakpoints" }
+      ],
+      "since": "1.0"
+    },
+    "flex": {
+      "code": "flex",
+      "label": "Flex Layout",
+      "category": "layout",
+      "compatibleDataTypes": [],
+      "props": [
+        { "name": "direction", "type": "string", "required": false, "default": "row", "description": "Direction: row | column | row-reverse | column-reverse" },
+        { "name": "justify", "type": "string", "required": false, "default": "flex-start", "description": "Main axis alignment" },
+        { "name": "align", "type": "string", "required": false, "default": "stretch", "description": "Cross axis alignment" },
+        { "name": "wrap", "type": "string", "required": false, "default": "nowrap", "description": "Wrap mode: nowrap | wrap | wrap-reverse" },
+        { "name": "gap", "type": "number", "required": false, "default": 8, "description": "Gap between items (px)" }
+      ],
+      "since": "1.0"
+    },
+    "columns": {
+      "code": "columns",
+      "label": "Multi-Column Layout",
+      "category": "layout",
+      "compatibleDataTypes": [],
+      "props": [
+        { "name": "count", "type": "number", "required": false, "default": 2, "description": "Number of columns" },
+        { "name": "gutter", "type": "number", "required": false, "default": 16, "description": "Column gap (px)" },
+        { "name": "split", "type": "boolean", "required": false, "default": false, "description": "Show divider between columns" },
+        { "name": "responsive", "type": "boolean", "required": false, "default": true, "description": "Enable responsive breakpoints" }
+      ],
+      "since": "1.0"
+    },
+    "card": {
+      "code": "card",
+      "label": "Card Container",
+      "category": "layout",
+      "compatibleDataTypes": [],
+      "props": [
+        { "name": "title", "type": "string", "required": false, "description": "Card title" },
+        { "name": "showHeader", "type": "boolean", "required": false, "default": true, "description": "Show header" },
+        { "name": "showFooter", "type": "boolean", "required": false, "default": false, "description": "Show footer" },
+        { "name": "bordered", "type": "boolean", "required": false, "default": true, "description": "Show border" },
+        { "name": "hoverable", "type": "boolean", "required": false, "default": false, "description": "Hover effect" },
+        { "name": "loading", "type": "boolean", "required": false, "default": false, "description": "Loading state" },
+        { "name": "size", "type": "string", "required": false, "default": "default", "description": "Size: small | default | large" }
+      ],
+      "since": "1.0"
+    },
+    "layout": {
+      "code": "layout",
+      "label": "Page Layout",
+      "category": "layout",
+      "compatibleDataTypes": [],
+      "props": [
+        { "name": "direction", "type": "string", "required": false, "default": "vertical", "description": "Layout direction: vertical | horizontal" },
+        { "name": "hasSider", "type": "boolean", "required": false, "default": false, "description": "Include sidebar" }
+      ],
+      "since": "1.0"
+    },
+    "smart-number-card": {
+      "code": "smart-number-card",
+      "label": "Number Card",
+      "category": "chart",
+      "compatibleDataTypes": ["integer", "decimal"],
+      "props": [
+        { "name": "title", "type": "string", "required": false, "description": "KPI title" },
+        { "name": "icon", "type": "string", "required": false, "description": "Icon identifier" },
+        { "name": "format", "type": "string", "required": false, "default": "number", "description": "Format: number | currency | percent" },
+        { "name": "precision", "type": "number", "required": false, "default": 0, "description": "Decimal places" },
+        { "name": "dataSource.type", "type": "string", "required": false, "description": "Data source type: aggregate | namedQuery" },
+        { "name": "dataSource.modelCode", "type": "string", "required": false, "description": "Source model code" }
+      ],
+      "since": "1.0"
+    },
+    "smart-bar-chart": {
+      "code": "smart-bar-chart",
+      "label": "Smart Bar Chart",
+      "category": "chart",
+      "compatibleDataTypes": [],
+      "props": [
+        { "name": "title", "type": "string", "required": false, "description": "Chart title" },
+        { "name": "horizontal", "type": "boolean", "required": false, "default": false, "description": "Horizontal bars" },
+        { "name": "stacked", "type": "boolean", "required": false, "default": false, "description": "Stacked bars" },
+        { "name": "dataSource.type", "type": "string", "required": false, "description": "Data source type" },
+        { "name": "dataSource.modelCode", "type": "string", "required": false, "description": "Source model code" },
+        { "name": "drillDown.enabled", "type": "boolean", "required": false, "default": false, "description": "Enable drill-down" },
+        { "name": "linkage.enabled", "type": "boolean", "required": false, "default": false, "description": "Enable chart linkage" }
+      ],
+      "since": "1.0"
+    },
+    "smart-line-chart": {
+      "code": "smart-line-chart",
+      "label": "Smart Line Chart",
+      "category": "chart",
+      "compatibleDataTypes": [],
+      "props": [
+        { "name": "title", "type": "string", "required": false, "description": "Chart title" },
+        { "name": "smooth", "type": "boolean", "required": false, "default": false, "description": "Smooth curve" },
+        { "name": "area", "type": "boolean", "required": false, "default": false, "description": "Fill area" },
+        { "name": "dataSource.type", "type": "string", "required": false, "description": "Data source type" },
+        { "name": "dataSource.modelCode", "type": "string", "required": false, "description": "Source model code" },
+        { "name": "drillDown.enabled", "type": "boolean", "required": false, "default": false, "description": "Enable drill-down" },
+        { "name": "linkage.enabled", "type": "boolean", "required": false, "default": false, "description": "Enable chart linkage" }
+      ],
+      "since": "1.0"
+    },
+    "smart-pie-chart": {
+      "code": "smart-pie-chart",
+      "label": "Smart Pie Chart",
+      "category": "chart",
+      "compatibleDataTypes": [],
+      "props": [
+        { "name": "title", "type": "string", "required": false, "description": "Chart title" },
+        { "name": "donut", "type": "boolean", "required": false, "default": false, "description": "Donut style" },
+        { "name": "showLabel", "type": "boolean", "required": false, "default": true, "description": "Show labels" },
+        { "name": "dataSource.type", "type": "string", "required": false, "description": "Data source type" },
+        { "name": "dataSource.modelCode", "type": "string", "required": false, "description": "Source model code" },
+        { "name": "drillDown.enabled", "type": "boolean", "required": false, "default": false, "description": "Enable drill-down" },
+        { "name": "linkage.enabled", "type": "boolean", "required": false, "default": false, "description": "Enable chart linkage" }
+      ],
+      "since": "1.0"
+    },
+    "smart-kanban": {
+      "code": "smart-kanban",
+      "label": "Kanban Board",
+      "category": "chart",
+      "compatibleDataTypes": [],
+      "props": [
+        { "name": "title", "type": "string", "required": false, "description": "Board title" },
+        { "name": "draggable", "type": "boolean", "required": false, "default": false, "description": "Enable drag-and-drop" },
+        { "name": "showCount", "type": "boolean", "required": false, "default": true, "description": "Show card count per column" },
+        { "name": "showAggregations", "type": "boolean", "required": false, "default": true, "description": "Show aggregation stats" },
+        { "name": "dataSource.modelCode", "type": "string", "required": false, "description": "Source model code" },
+        { "name": "dataSource.groupByField", "type": "string", "required": false, "description": "Field to group by" },
+        { "name": "dataSource.titleField", "type": "string", "required": false, "description": "Card title field" }
+      ],
+      "since": "1.0"
+    },
+    "bar-chart": {
+      "code": "bar-chart",
+      "label": "Bar Chart",
+      "category": "chart",
+      "compatibleDataTypes": [],
+      "props": [
+        { "name": "title", "type": "string", "required": false, "description": "Chart title" },
+        { "name": "width", "type": "number", "required": false, "description": "Grid columns" },
+        { "name": "height", "type": "string", "required": false, "default": "400", "description": "Chart height" },
+        { "name": "xField", "type": "string", "required": false, "default": "category", "description": "X-axis field" },
+        { "name": "yField", "type": "string", "required": false, "default": "value", "description": "Y-axis field" },
+        { "name": "color", "type": "string", "required": false, "default": "#1890ff", "description": "Bar color" },
+        { "name": "showLegend", "type": "boolean", "required": false, "default": true, "description": "Show legend" },
+        { "name": "showGrid", "type": "boolean", "required": false, "default": true, "description": "Show grid lines" },
+        { "name": "showTooltip", "type": "boolean", "required": false, "default": true, "description": "Show tooltip on hover" }
+      ],
+      "since": "1.0"
+    },
+    "line-chart": {
+      "code": "line-chart",
+      "label": "Line Chart",
+      "category": "chart",
+      "compatibleDataTypes": [],
+      "props": [
+        { "name": "title", "type": "string", "required": false, "description": "Chart title" },
+        { "name": "width", "type": "number", "required": false, "description": "Grid columns" },
+        { "name": "height", "type": "string", "required": false, "default": "400", "description": "Chart height" },
+        { "name": "xField", "type": "string", "required": false, "default": "date", "description": "X-axis field" },
+        { "name": "yField", "type": "string", "required": false, "default": "value", "description": "Y-axis field" },
+        { "name": "color", "type": "string", "required": false, "default": "#52c41a", "description": "Line color" },
+        { "name": "smooth", "type": "boolean", "required": false, "default": true, "description": "Smooth curve" },
+        { "name": "showPoints", "type": "boolean", "required": false, "default": true, "description": "Show data points" },
+        { "name": "showLegend", "type": "boolean", "required": false, "default": true, "description": "Show legend" },
+        { "name": "showTooltip", "type": "boolean", "required": false, "default": true, "description": "Show tooltip" }
+      ],
+      "since": "1.0"
+    },
+    "pie-chart": {
+      "code": "pie-chart",
+      "label": "Pie Chart",
+      "category": "chart",
+      "compatibleDataTypes": [],
+      "props": [
+        { "name": "title", "type": "string", "required": false, "description": "Chart title" },
+        { "name": "width", "type": "number", "required": false, "description": "Grid columns" },
+        { "name": "height", "type": "string", "required": false, "default": "400", "description": "Chart height" },
+        { "name": "angleField", "type": "string", "required": false, "default": "value", "description": "Angle field" },
+        { "name": "colorField", "type": "string", "required": false, "default": "category", "description": "Color field" },
+        { "name": "radius", "type": "number", "required": false, "default": 0.8, "description": "Outer radius (0-1)" },
+        { "name": "innerRadius", "type": "number", "required": false, "default": 0, "description": "Inner radius for donut (0-0.9)" },
+        { "name": "showLegend", "type": "boolean", "required": false, "default": true, "description": "Show legend" },
+        { "name": "showLabels", "type": "boolean", "required": false, "default": true, "description": "Show labels" },
+        { "name": "showTooltip", "type": "boolean", "required": false, "default": true, "description": "Show tooltip" }
+      ],
+      "since": "1.0"
+    },
+    "area-chart": {
+      "code": "area-chart",
+      "label": "Area Chart",
+      "category": "chart",
+      "compatibleDataTypes": [],
+      "props": [
+        { "name": "title", "type": "string", "required": false, "description": "Chart title" },
+        { "name": "width", "type": "number", "required": false, "description": "Grid columns" },
+        { "name": "height", "type": "string", "required": false, "default": "400", "description": "Chart height" },
+        { "name": "xField", "type": "string", "required": false, "default": "date", "description": "X-axis field" },
+        { "name": "yField", "type": "string", "required": false, "default": "value", "description": "Y-axis field" },
+        { "name": "color", "type": "string", "required": false, "default": "#722ed1", "description": "Area color" },
+        { "name": "smooth", "type": "boolean", "required": false, "default": true, "description": "Smooth curve" },
+        { "name": "fillOpacity", "type": "number", "required": false, "default": 0.6, "description": "Fill opacity (0-1)" },
+        { "name": "showLegend", "type": "boolean", "required": false, "default": true, "description": "Show legend" },
+        { "name": "showTooltip", "type": "boolean", "required": false, "default": true, "description": "Show tooltip" }
+      ],
+      "since": "1.0"
+    }
+  }
+}

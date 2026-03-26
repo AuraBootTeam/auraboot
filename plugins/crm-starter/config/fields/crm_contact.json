@@ -1,0 +1,61 @@
+[
+  {
+    "code": "crm_ct_account_id",
+    "displayName:zh-CN": "所属客户",
+    "displayName:en": "Account",
+    "dataType": "reference",
+    "referenceModelCode": "crm_account",
+    "constraints": { "required": true },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_ct_name",
+    "displayName:zh-CN": "联系人姓名",
+    "displayName:en": "Contact Name",
+    "dataType": "string",
+    "constraints": { "required": true, "maxLength": 100 },
+    "feature": { "searchable": true, "sortable": true }
+  },
+  {
+    "code": "crm_ct_title",
+    "displayName:zh-CN": "职位",
+    "displayName:en": "Job Title",
+    "dataType": "string",
+    "constraints": { "maxLength": 100 }
+  },
+  {
+    "code": "crm_ct_email",
+    "displayName:zh-CN": "邮箱",
+    "displayName:en": "Email",
+    "dataType": "string",
+    "constraints": { "maxLength": 200 },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_ct_phone",
+    "displayName:zh-CN": "座机",
+    "displayName:en": "Phone",
+    "dataType": "string",
+    "constraints": { "maxLength": 50 }
+  },
+  {
+    "code": "crm_ct_mobile",
+    "displayName:zh-CN": "手机",
+    "displayName:en": "Mobile",
+    "dataType": "string",
+    "constraints": { "maxLength": 50 }
+  },
+  {
+    "code": "crm_ct_is_primary",
+    "displayName:zh-CN": "主要联系人",
+    "displayName:en": "Primary Contact",
+    "dataType": "boolean",
+    "defaultValue": "false"
+  },
+  {
+    "code": "crm_ct_remark",
+    "displayName:zh-CN": "备注",
+    "displayName:en": "Remark",
+    "dataType": "text"
+  }
+]

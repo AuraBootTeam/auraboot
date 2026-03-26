@@ -1,0 +1,7 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AuraBoot Plugin Permissions",
+  "description": "Array of permission definitions for plugin config/permissions.json",
+  "type": "array",
+  "items": { "$ref": "plugin-manifest.schema.json#/$defs/permissionDefinition" }
+}

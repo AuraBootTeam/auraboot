@@ -1,0 +1,45 @@
+{
+  "pluginId": "com.auraboot.template.enterprise-asset",
+  "namespace": "eam",
+  "version": "1.0.0",
+  "dslVersion": 1,
+  "pluginType": "config",
+  "displayName": "Enterprise Asset Management",
+  "displayName:zh-CN": "企业级资产管理",
+  "displayName:en": "Enterprise Asset Management",
+  "description": "Comprehensive asset management suite covering asset registry, categories, maintenance scheduling, work orders, and depreciation tracking for large enterprises.",
+  "author": "AuraBoot Team",
+  "homepage": "https://auraboot.io/templates/enterprise-asset",
+  "minPlatformVersion": "1.0.0",
+  "dependencies": [],
+  "provides": [
+    {"type": "model", "code": "eam_asset"},
+    {"type": "model", "code": "eam_asset_category"},
+    {"type": "model", "code": "eam_maintenance"},
+    {"type": "model", "code": "eam_work_order"},
+    {"type": "model", "code": "eam_depreciation"}
+  ],
+  "requires": [],
+  "resourceDirs": {
+    "models": "config/models.json",
+    "fields": "config/fields",
+    "modelFieldBindings": "config/bindings",
+    "commands": "config/commands",
+    "pages": "config/pages",
+    "dicts": "config/dicts.json",
+    "permissions": "config/permissions.json",
+    "menus": "config/menus.json",
+    "i18n": "config/i18n.json",
+    "namedQueries": "config/named-queries.json"
+  },
+  "importOptions": {
+    "conflictStrategy": "overwrite",
+    "validateReferences": true,
+    "autoPublishModels": true,
+    "autoPublishFields": true,
+    "autoPublishCommands": true,
+    "autoPublishPages": true,
+    "autoDeployProcesses": false,
+    "createResourcePermissions": true
+  }
+}

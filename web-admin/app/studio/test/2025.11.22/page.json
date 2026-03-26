@@ -1,0 +1,90 @@
+{
+  "version": "2.1.0",
+  "kind": "Page",
+  "metadata": {
+    "id": "page_dashboard",
+    "title": "$i18n:dashboard.title"
+  },
+  "dataSources": [{ "id": "ds_stats", "url": "/api/dashboard/stats", "method": "get" }],
+  "layout": {
+    "component": "GridLayout",
+    "props": {
+      "gap": 12,
+      "areas": ["header header", "sider main"],
+      "columns": "200px 1fr",
+      "rows": "60px 1fr",
+      "responsive": {
+        "mobile": {
+          "columns": "1fr",
+          "areas": ["header", "main"],
+          "rows": "50px 1fr"
+        }
+      }
+    },
+    "children": [
+      {
+        "slot": "header",
+        "component": "Flex",
+        "props": {
+          "justify": "space-between",
+          "align": "center",
+          "style": { "padding": "0 20px" }
+        },
+        "children": [
+          {
+            "component": "Text",
+            "props": { "content": "$i18n:app.name", "size": "lg", "weight": "bold" }
+          },
+          { "component": "Avatar", "props": { "src": "{{currentUser.avatar}}" } }
+        ]
+      },
+      {
+        "slot": "sider",
+        "component": "Menu",
+        "props": {
+          "mode": "vertical",
+          "items": [
+            { "key": "home", "label": "$i18n:menu.home", "icon": "Home" },
+            { "key": "orders", "label": "$i18n:menu.orders", "icon": "FileText" }
+          ]
+        },
+        "events": {
+          "onSelect": { "action": "router.push", "args": { "path": "{{event.key}}" } }
+        }
+      },
+      {
+        "slot": "main",
+        "component": "Grid",
+        "props": { "columns": 4, "gap": 16 },
+        "children": [
+          {
+            "component": "StatCard",
+            "props": {
+              "title": "$i18n:dashboard.stat.sales",
+              "value": "{{dataSources.ds_stats.todaySales}}",
+              "colSpan": 1
+            }
+          },
+          {
+            "component": "StatCard",
+            "props": {
+              "title": "$i18n:dashboard.stat.orders",
+              "value": "{{dataSources.ds_stats.todayOrders}}",
+              "colSpan": 1
+            }
+          },
+          {
+            "component": "Chart",
+            "props": {
+              "type": "line",
+              "title": "$i18n:dashboard.chart.trend",
+              "dataSource": "{{dataSources.ds_stats.trend}}",
+              "colSpan": 4,
+              "rowSpan": 2
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

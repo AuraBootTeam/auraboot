@@ -1,0 +1,68 @@
+{
+  "meta": {
+    "blockCode": "store.list.filter",
+    "version": "1.0.0",
+    "title": {
+      "zh-CN": "store.list.filter_CN",
+      "en-US": "store.list.filter"
+    },
+    "entityCode": "Store",
+    "type": "filters"
+  },
+  "fields": [
+    {
+      "code": "name",
+      "type": "input",
+      "props": {
+        "allowClear": true,
+        "maxLength": 100
+      },
+      "layout": {
+        "span": 1
+      }
+    },
+    {
+      "code": "type",
+      "type": "select"
+    },
+    {
+      "code": "createdBetween",
+      "type": "dateRange",
+      "props": {
+        "allowClear": true,
+        "format": "YYYY-MM-DD",
+        "showTime": false,
+        "ranges": {
+          "今天": "today",
+          "昨天": "yesterday",
+          "最近7天": "last7days",
+          "最近30天": "last30days",
+          "本月": "thisMonth",
+          "上月": "lastMonth"
+        }
+      }
+    },
+    {
+      "code": "status",
+      "label": "status",
+      "type": "select",
+      "props": {
+        "binding": "store.status"
+      }
+    }
+  ],
+  "validation": {
+    "rules": {
+      "name": [
+        {
+          "type": "string",
+          "max": 100,
+          "message": {
+            "zh-CN": "关键字长度不能超过100个字符",
+            "en-US": "Keyword cannot exceed 100 characters"
+          }
+        }
+      ]
+    }
+  }
+}

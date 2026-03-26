@@ -1,0 +1,16 @@
+# AuraBoot Community Edition Profile
+# Usage: ./gradlew bootRun -PcommunityMode=true -Dspring.profiles.active=community
+#
+# This profile runs AuraBoot without enterprise modules.
+# Enterprise features (Agent orchestration, IM, Social Auth, advanced notifications)
+# are not available in this mode.
+
+auraboot:
+  entitlement:
+    enabled: false
+  agent:
+    enabled: true   # AI Core (AuraBot, Tool Gen, ChatBI) is available in community
+
+logging:
+  level:
+    com.auraboot.framework.agent.spi: INFO

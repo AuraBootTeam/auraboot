@@ -1,0 +1,93 @@
+[
+  {
+    "code": "ehr_root",
+    "parentCode": null,
+    "name:zh-CN": "人力资源",
+    "name:en": "Human Resources",
+    "path": null,
+    "component": null,
+    "icon": "IconUsers",
+    "type": 0,
+    "permissionCode": null,
+    "orderNo": 800,
+    "visible": true
+  },
+  {
+    "code": "ehr_employees",
+    "parentCode": "ehr_root",
+    "name:zh-CN": "员工",
+    "name:en": "Employees",
+    "path": "/dynamic/ehr-employee",
+    "component": null,
+    "icon": "IconUser",
+    "type": 1,
+    "permissionCode": "ehr.employee.read",
+    "orderNo": 1,
+    "visible": true
+  },
+  {
+    "code": "ehr_departments",
+    "parentCode": "ehr_root",
+    "name:zh-CN": "部门",
+    "name:en": "Departments",
+    "path": "/dynamic/ehr-department",
+    "component": null,
+    "icon": "IconBuilding",
+    "type": 1,
+    "permissionCode": "ehr.department.read",
+    "orderNo": 2,
+    "visible": true
+  },
+  {
+    "code": "ehr_positions",
+    "parentCode": "ehr_root",
+    "name:zh-CN": "职位",
+    "name:en": "Positions",
+    "path": "/dynamic/ehr-position",
+    "component": null,
+    "icon": "IconBriefcase",
+    "type": 1,
+    "permissionCode": "ehr.position.read",
+    "orderNo": 3,
+    "visible": true
+  },
+  {
+    "code": "ehr_attendance",
+    "parentCode": "ehr_root",
+    "name:zh-CN": "考勤",
+    "name:en": "Attendance",
+    "path": "/dynamic/ehr-attendance",
+    "component": null,
+    "icon": "IconClock",
+    "type": 1,
+    "permissionCode": "ehr.attendance.read",
+    "orderNo": 4,
+    "visible": true
+  },
+  {
+    "code": "ehr_leave",
+    "parentCode": "ehr_root",
+    "name:zh-CN": "请假",
+    "name:en": "Leave Requests",
+    "path": "/dynamic/ehr-leave-request",
+    "component": null,
+    "icon": "IconCalendarOff",
+    "type": 1,
+    "permissionCode": "ehr.leave.read",
+    "orderNo": 5,
+    "visible": true
+  },
+  {
+    "code": "ehr_payroll",
+    "parentCode": "ehr_root",
+    "name:zh-CN": "薪资",
+    "name:en": "Payroll",
+    "path": "/dynamic/ehr-payroll",
+    "component": null,
+    "icon": "IconWallet",
+    "type": 1,
+    "permissionCode": "ehr.payroll.read",
+    "orderNo": 6,
+    "visible": true
+  }
+]

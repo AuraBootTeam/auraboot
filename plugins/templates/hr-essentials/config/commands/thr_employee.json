@@ -1,0 +1,213 @@
+[
+  {
+    "code": "thr:create_employee",
+    "displayName:zh-CN": "新建员工",
+    "displayName:en": "Create Employee",
+    "type": "create",
+    "modelCode": "thr_employee",
+    "inputFields": [
+      "thr_em_name",
+      "thr_em_department",
+      "thr_em_position",
+      "thr_em_email",
+      "thr_em_phone",
+      "thr_em_hire_date",
+      "thr_em_notes"
+    ],
+    "autoSetFields": {
+      "thr_em_code": {
+        "strategy": "auto_generate",
+        "pattern": "EMP-{yyyyMMdd}-{seq}"
+      },
+      "thr_em_status": {
+        "strategy": "fixed_value",
+        "value": "active"
+      }
+    },
+    "permissions": [
+      "THR.employee.manage"
+    ],
+    "agent_hint": "Create a new employee record. Required: name, department (ENGINEERING/SALES/MARKETING/FINANCE/HR/OPERATIONS/OTHER), hire_date. Optional: position, email, phone, notes. Auto-generated: code (EMP-yyyyMMdd-seq), status (active).",
+    "cmd_risk_level": "L1",
+    "precondition_description": "No preconditions — any authenticated user with THR.employee.manage permission can create an employee.",
+    "side_effect_description": null,
+    "output_description": "Returns the created employee record with auto-generated code and initial status active.",
+    "example_input": {
+      "thr_em_name": "Zhang Wei",
+      "thr_em_department": "engineering",
+      "thr_em_position": "Senior Developer",
+      "thr_em_email": "zhang.wei@example.com",
+      "thr_em_phone": "13800138000",
+      "thr_em_hire_date": "2026-03-01",
+      "thr_em_notes": "Transferred from Beijing office"
+    },
+    "idempotent": false,
+    "reversible": true
+  },
+  {
+    "code": "thr:update_employee",
+    "displayName:zh-CN": "编辑员工",
+    "displayName:en": "Update Employee",
+    "type": "update",
+    "modelCode": "thr_employee",
+    "inputFields": [
+      "thr_em_name",
+      "thr_em_department",
+      "thr_em_position",
+      "thr_em_email",
+      "thr_em_phone",
+      "thr_em_hire_date",
+      "thr_em_notes"
+    ],
+    "permissions": [
+      "THR.employee.manage"
+    ],
+    "agent_hint": "Update an existing employee record. Editable fields: name, department, position, email, phone, hire_date, notes. Status is NOT editable here — use state transition commands instead.",
+    "cmd_risk_level": "L1",
+    "precondition_description": "Employee must exist; status field cannot be changed via this command.",
+    "side_effect_description": null,
+    "output_description": "Returns the updated employee record with all modified fields.",
+    "example_input": {
+      "thr_em_position": "Lead Developer",
+      "thr_em_department": "engineering"
+    },
+    "idempotent": true,
+    "reversible": true
+  },
+  {
+    "code": "thr:on_leave",
+    "displayName:zh-CN": "休假",
+    "displayName:en": "On Leave",
+    "type": "state_transition",
+    "modelCode": "thr_employee",
+    "stateField": "thr_em_status",
+    "fromStates": ["active"],
+    "toState": "on_leave",
+    "permissions": [
+      "THR.employee.manage"
+    ],
+    "agent_hint": "Transition employee status from active to ON_LEAVE. Indicates the employee is on extended leave (maternity, sabbatical, etc.). Can be reversed via return_from_leave command.",
+    "cmd_risk_level": "L2",
+    "precondition_description": "Employee must be in active status.",
+    "side_effect_description": null,
+    "output_description": "Returns the updated employee record with status set to ON_LEAVE.",
+    "example_input": {},
+    "idempotent": false,
+    "reversible": true
+  },
+  {
+    "code": "thr:return_from_leave",
+    "displayName:zh-CN": "复职",
+    "displayName:en": "Return from Leave",
+    "type": "state_transition",
+    "modelCode": "thr_employee",
+    "stateField": "thr_em_status",
+    "fromStates": ["on_leave"],
+    "toState": "active",
+    "permissions": [
+      "THR.employee.manage"
+    ],
+    "agent_hint": "Transition employee status from ON_LEAVE back to active. Indicates the employee has returned from leave and is back to work.",
+    "cmd_risk_level": "L1",
+    "precondition_description": "Employee must be in ON_LEAVE status.",
+    "side_effect_description": null,
+    "output_description": "Returns the updated employee record with status set back to active.",
+    "example_input": {},
+    "idempotent": false,
+    "reversible": true
+  },
+  {
+    "code": "thr:resign",
+    "displayName:zh-CN": "离职",
+    "displayName:en": "Resign",
+    "type": "state_transition",
+    "modelCode": "thr_employee",
+    "stateField": "thr_em_status",
+    "fromStates": ["active", "on_leave"],
+    "toState": "resigned",
+    "extension": {
+      "confirmMessage:zh-CN": "确认将此员工标记为已离职？此操作不可撤销。",
+      "confirmMessage:en": "Confirm marking this employee as resigned? This cannot be undone."
+    },
+    "permissions": [
+      "THR.employee.manage"
+    ],
+    "agent_hint": "Transition employee status to RESIGNED. This is a terminal state — resigned employees cannot be reactivated. Allowed from both active and ON_LEAVE. Requires user confirmation.",
+    "cmd_risk_level": "L2",
+    "precondition_description": "Employee must be in active or ON_LEAVE status.",
+    "side_effect_description": null,
+    "output_description": "Returns the updated employee record with terminal status RESIGNED.",
+    "example_input": {},
+    "idempotent": false,
+    "reversible": false
+  },
+  {
+    "code": "thr:delete_employee",
+    "displayName:zh-CN": "删除员工",
+    "displayName:en": "Delete Employee",
+    "type": "delete",
+    "modelCode": "thr_employee",
+    "preconditions": [
+      {
+        "field": "thr_em_status",
+        "operator": "IN",
+        "value": ["active"]
+      }
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此员工记录？此操作不可撤销。",
+      "confirmMessage:en": "Confirm delete this employee record? This action is irreversible."
+    },
+    "permissions": [
+      "THR.employee.manage"
+    ],
+    "agent_hint": "Delete an employee record permanently. Irreversible operation. Precondition: employee status must be active — employees on leave or resigned cannot be deleted.",
+    "cmd_risk_level": "L4",
+    "precondition_description": "Employee must be in active status; employees in ON_LEAVE or RESIGNED status cannot be deleted.",
+    "side_effect_description": null,
+    "output_description": "Returns confirmation of deletion; the employee record is permanently removed.",
+    "example_input": {},
+    "idempotent": false,
+    "reversible": false
+  },
+  {
+    "code": "thr:detail_employee",
+    "displayName:zh-CN": "查看员工",
+    "displayName:en": "View Employee",
+    "type": "query",
+    "modelCode": "thr_employee",
+    "permissions": [
+      "THR.employee.read"
+    ],
+    "agent_hint": "Retrieve a single employee record by ID. Returns all fields including status, department, position, and hire date.",
+    "cmd_risk_level": "L0",
+    "precondition_description": "Employee with the specified ID must exist.",
+    "side_effect_description": null,
+    "output_description": "Returns the full employee record including all fields.",
+    "example_input": {},
+    "idempotent": true,
+    "reversible": true
+  },
+  {
+    "code": "thr:list_employees",
+    "displayName:zh-CN": "员工列表",
+    "displayName:en": "List Employees",
+    "type": "query",
+    "modelCode": "thr_employee",
+    "permissions": [
+      "THR.employee.read"
+    ],
+    "agent_hint": "Query employee records with pagination and filtering. Supports filters by status, department, position. Supports keyword search on name and code.",
+    "cmd_risk_level": "L0",
+    "precondition_description": "No preconditions — returns empty list if no employees match.",
+    "side_effect_description": null,
+    "output_description": "Returns a paginated list of employee records matching the specified filters.",
+    "example_input": {
+      "pageNum": 1,
+      "pageSize": 20,
+      "filters": [{"fieldName": "thr_em_status", "operator": "EQ", "value": "active"}]
+    },
+    "idempotent": true,
+    "reversible": true
+  }
+]

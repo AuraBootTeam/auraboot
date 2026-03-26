@@ -1,0 +1,43 @@
+{
+  "pageKey": "gp_task_comment_form",
+  "name:zh-CN": "评论表单",
+  "name:en": "Comment Form",
+  "pageType": "form",
+  "modelCode": "gp_task_comment",
+  "dslSchema": {
+    "id": "form.gp_task_comment",
+    "kind": "Form",
+    "version": "1.0.0",
+    "modelCode": "gp_task_comment",
+    "layout": {
+      "areas": ["main", "footer"],
+      "areasConfig": {
+        "main": { "type": "grid", "cols": 12, "rowGap": 16, "colGap": 16 },
+        "footer": { "type": "flex", "direction": "row" }
+      }
+    },
+    "areas": {
+      "main": {
+        "blocks": [{
+          "id": "comment_info",
+          "blockType": "form-section",
+          "title": { "zh-CN": "评论信息", "en-US": "Comment Information" },
+          "fields": [
+            { "field": "gp_tc_task_id", "colSpan": 12 },
+            { "field": "gp_tc_content", "colSpan": 12 }
+          ]
+        }]
+      },
+      "footer": {
+        "blocks": [{
+          "id": "buttons",
+          "blockType": "form-buttons",
+          "buttons": [
+            { "code": "submit", "action": "save", "commandCode": "gp:update_task_comment", "primary": true },
+            { "code": "cancel", "action": "cancel" }
+          ]
+        }]
+      }
+    }
+  }
+}

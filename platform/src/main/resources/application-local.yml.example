@@ -1,0 +1,10 @@
+# Local secrets — copy this file to application-local.yml and fill in your values.
+# application-local.yml is gitignored.
+
+auraboot:
+  payment:
+    enabled: true
+    stripe:
+      secret-key: sk_test_your_key_here
+      publishable-key: pk_test_your_key_here
+      webhook-secret: whsec_your_secret_here

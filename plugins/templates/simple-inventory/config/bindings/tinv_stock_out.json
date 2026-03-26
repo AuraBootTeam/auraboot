@@ -1,0 +1,11 @@
+[
+  {"modelCode":"tinv_stock_out","fieldCode":"tinv_so_code","sequence":1,"required":true,"visible":true,"editable":false,"displayConfig":{"searchable":true,"sortable":true}},
+  {"modelCode":"tinv_stock_out","fieldCode":"tinv_so_product_id","sequence":2,"required":true,"visible":true,"editable":true,"displayConfig":{"searchable":true}},
+  {"modelCode":"tinv_stock_out","fieldCode":"tinv_so_warehouse_id","sequence":3,"required":true,"visible":true,"editable":true,"displayConfig":{"searchable":true}},
+  {"modelCode":"tinv_stock_out","fieldCode":"tinv_so_quantity","sequence":4,"required":true,"visible":true,"editable":true},
+  {"modelCode":"tinv_stock_out","fieldCode":"tinv_so_unit_price","sequence":5,"required":false,"visible":true,"editable":true},
+  {"modelCode":"tinv_stock_out","fieldCode":"tinv_so_status","sequence":6,"required":false,"visible":true,"editable":false,"displayConfig":{"searchable":true}},
+  {"modelCode":"tinv_stock_out","fieldCode":"tinv_so_customer","sequence":7,"required":false,"visible":true,"editable":true,"displayConfig":{"searchable":true}},
+  {"modelCode":"tinv_stock_out","fieldCode":"tinv_so_ship_date","sequence":8,"required":false,"visible":true,"editable":true,"displayConfig":{"sortable":true}},
+  {"modelCode":"tinv_stock_out","fieldCode":"tinv_so_notes","sequence":9,"required":false,"visible":false,"editable":true}
+]

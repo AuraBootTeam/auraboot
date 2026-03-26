@@ -1,0 +1,49 @@
+{
+  "pluginId": "com.auraboot.template.crm-quick-start",
+  "namespace": "tcrm",
+  "version": "1.0.0",
+  "dslVersion": 1,
+  "pluginType": "config",
+  "displayName": "CRM Quick Start",
+  "displayName:zh-CN": "CRM 快速启动",
+  "displayName:en": "CRM Quick Start",
+  "description": "Lightweight CRM template for small teams. Includes leads, accounts, contacts, and opportunities with full lifecycle management.",
+  "author": "AuraBoot Team",
+  "homepage": "https://auraboot.io/templates/crm-quick-start",
+  "minPlatformVersion": "1.0.0",
+  "dependencies": [],
+  "provides": [
+    {"type": "model", "code": "tcrm_lead"},
+    {"type": "model", "code": "tcrm_account"},
+    {"type": "model", "code": "tcrm_contact"},
+    {"type": "model", "code": "tcrm_opportunity"},
+    {"type": "command", "code": "tcrm:create_lead"},
+    {"type": "command", "code": "tcrm:qualify_lead"},
+    {"type": "command", "code": "tcrm:create_opportunity"},
+    {"type": "command", "code": "tcrm:win_opportunity"},
+    {"type": "command", "code": "tcrm:lose_opportunity"}
+  ],
+  "requires": [],
+  "resourceDirs": {
+    "models": "config/models.json",
+    "fields": "config/fields",
+    "modelFieldBindings": "config/bindings",
+    "commands": "config/commands",
+    "pages": "config/pages",
+    "dicts": "config/dicts.json",
+    "permissions": "config/permissions.json",
+    "menus": "config/menus.json",
+    "i18n": "config/i18n.json",
+    "namedQueries": "config/named-queries.json"
+  },
+  "importOptions": {
+    "conflictStrategy": "overwrite",
+    "validateReferences": true,
+    "autoPublishModels": true,
+    "autoPublishFields": true,
+    "autoPublishCommands": true,
+    "autoPublishPages": true,
+    "autoDeployProcesses": false,
+    "createResourcePermissions": true
+  }
+}

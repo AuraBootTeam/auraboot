@@ -1,0 +1,140 @@
+{
+  "project": "AuraBoot",
+  "branchName": "ralph/mfg-r2-run1",
+  "description": "Manufacturing Round 2 Run 1: MRP + APS DSL models (7 new models + dicts/permissions/menus)",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Add pe_alternative_material model with full config",
+      "description": "Add a new model pe_alternative_material to track BOM line alternative/substitute materials for PCBA manufacturing.\n\nModify these files (append to existing JSON arrays):\n\n1. plugins/pcba-erp/config/models.json — append:\n{\n  \"code\": \"pe_alternative_material\",\n  \"displayName:zh-CN\": \"替代料\",\n  \"displayName:en\": \"Alternative Material\",\n  \"description\": \"BOM line alternative/substitute materials for PCBA manufacturing\",\n  \"modelType\": \"ENTITY\",\n  \"extension\": {\n    \"icon\": \"ArrowLeftRight\",\n    \"category\": \"pcba-erp\",\n    \"titleField\": \"pe_am_material_id\"\n  }\n}\n\n2. plugins/pcba-erp/config/fields.json — append 6 fields:\n- pe_am_bom_line_id: REFERENCE to pe_bom_line (targetField: pe_bom_line_bom_id), required\n- pe_am_material_id: REFERENCE to pe_product (targetField: pe_product_name), required. This is the substitute material.\n- pe_am_priority: INTEGER, constraints min:1 max:99, required. Lower number = higher priority.\n- pe_am_conversion_factor: DECIMAL, defaultValue \"1.0\". Conversion ratio vs primary material.\n- pe_am_status: ENUM, dictCode pe_enable_status, defaultValue ENABLED\n- pe_am_remark: STRING, constraints maxLength 500\n\n3. plugins/pcba-erp/config/commands.json — append 3 commands:\n- pe:create_alt_material (CREATE, modelCode pe_alternative_material, inputFields all 6, autoSetFields pe_am_status FIXED_VALUE ENABLED, permissions [\"PE.product.manage\"])\n- pe:update_alt_material (UPDATE, modelCode pe_alternative_material, inputFields all 6, permissions [\"PE.product.manage\"])\n- pe:delete_alt_material (DELETE, modelCode pe_alternative_material, permissions [\"PE.product.manage\"], confirmMessage)\n\n4. plugins/pcba-erp/config/bindings.json — append 6 bindings:\nAll for modelCode pe_alternative_material, sequence 1-6, visible/editable true (except pe_am_bom_line_id visible false for parent FK)\n\n5. plugins/pcba-erp/config/pages.json — append list + form pages:\n- pe_alternative_material_list: LIST page with data-table, columns for material, priority, conversion_factor, status, actions (edit/delete)\n- pe_alternative_material_form: FORM page\n\nFollow EXACT JSON patterns from existing models (pe_brand, pe_bom_line). Verify JSON validity after changes.",
+      "acceptanceCriteria": [
+        "models.json contains pe_alternative_material model entry",
+        "fields.json contains 6 new pe_am_* fields with correct dataTypes",
+        "commands.json contains pe:create_alt_material, pe:update_alt_material, pe:delete_alt_material",
+        "bindings.json contains 6 bindings for pe_alternative_material",
+        "pages.json contains pe_alternative_material_list and pe_alternative_material_form pages",
+        "All JSON files pass validation: python3 -c \"import json; json.load(open('plugins/pcba-erp/config/models.json'))\"",
+        "pe_am_bom_line_id has refTarget pointing to pe_bom_line",
+        "pe_am_material_id has refTarget pointing to pe_product"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "This is a config-only story (DSL JSON). No TDD needed. The parent FK pe_am_bom_line_id should have visible:false in bindings since it's set by context. Follow pe_bom_line field pattern for REFERENCE fields. The pe_bom_line model already exists in the plugin."
+    },
+    {
+      "id": "US-002",
+      "title": "Add pe_mrp_run model with full config",
+      "description": "Add a new model pe_mrp_run to track MRP execution runs and their parameters/results.\n\nAppend to config files:\n\n1. models.json — append:\n{\n  \"code\": \"pe_mrp_run\",\n  \"displayName:zh-CN\": \"MRP运算\",\n  \"displayName:en\": \"MRP Run\",\n  \"description\": \"MRP planning run execution records with parameters and results\",\n  \"modelType\": \"ENTITY\",\n  \"extension\": {\n    \"icon\": \"Calculator\",\n    \"category\": \"pcba-erp\",\n    \"titleField\": \"pe_mrp_code\",\n    \"subtitleField\": \"pe_mrp_status\"\n  }\n}\n\n2. fields.json — append 10 fields:\n- pe_mrp_code: STRING, required, constraints maxLength 50. Auto-generated code.\n- pe_mrp_run_date: DATE, required\n- pe_mrp_status: ENUM, dictCode pe_mrp_status, defaultValue DRAFT\n- pe_mrp_scope: ENUM, dictCode pe_mrp_scope, defaultValue ALL\n- pe_mrp_horizon_days: INTEGER, defaultValue \"90\", constraints min:1 max:365\n- pe_mrp_planned_count: INTEGER, defaultValue \"0\", extension readOnly true\n- pe_mrp_exception_count: INTEGER, defaultValue \"0\", extension readOnly true\n- pe_mrp_duration_ms: INTEGER, extension readOnly true\n- pe_mrp_params: STRING, constraints maxLength 2000. JSON parameters for the run.\n- pe_mrp_remark: STRING, constraints maxLength 500\n\n3. commands.json — append 4 commands:\n- pe:create_mrp_run (CREATE, inputFields [pe_mrp_run_date, pe_mrp_scope, pe_mrp_horizon_days, pe_mrp_params, pe_mrp_remark], autoSetFields: pe_mrp_code AUTO_GENERATE pattern \"MRP-{yyyyMMdd}-{seq}\", pe_mrp_status FIXED_VALUE DRAFT)\n- pe:update_mrp_run (UPDATE, inputFields [pe_mrp_run_date, pe_mrp_scope, pe_mrp_horizon_days, pe_mrp_params, pe_mrp_remark])\n- pe:delete_mrp_run (DELETE with confirmMessage)\n- pe:execute_mrp (STATE_TRANSITION, stateField pe_mrp_status, fromStates [\"DRAFT\"], toState \"RUNNING\", handler \"pe:execute_mrp\", extension confirmMessage \"确认执行MRP运算？\" / \"Run MRP calculation?\")\nAll permissions: [\"PE.mrp.manage\"]\n\n4. bindings.json — 10 bindings for pe_mrp_run. Read-only fields (planned_count, exception_count, duration_ms) should have editable:false.\n\n5. pages.json — pe_mrp_run_list (LIST with table columns: code, run_date, status, scope, horizon_days, planned_count, exception_count, duration_ms; actions: edit, delete, execute button with visibleWhen status=DRAFT) + pe_mrp_run_form (FORM)\n\nThe execute button should use: { \"code\": \"execute\", \"action\": \"command\", \"icon\": \"Play\", \"commandCode\": \"pe:execute_mrp\", \"permissionCode\": \"PE.mrp.manage\", \"visibleWhen\": { \"fieldCode\": \"pe_mrp_status\", \"operator\": \"equals\", \"value\": \"DRAFT\" } }",
+      "acceptanceCriteria": [
+        "models.json contains pe_mrp_run model",
+        "fields.json contains 10 pe_mrp_* fields",
+        "pe_mrp_code has AUTO_GENERATE strategy in create command",
+        "pe:execute_mrp is STATE_TRANSITION from DRAFT to RUNNING with handler",
+        "commands.json contains 4 commands for pe_mrp_run",
+        "pe_mrp_run_list page has execute button visible when status=DRAFT",
+        "Read-only fields have editable:false in bindings",
+        "All JSON files pass validation"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Config-only story. The pe:execute_mrp handler will be implemented in Run 3 (Java). For now just define the command with handler field. The pe_mrp_status and pe_mrp_scope dicts will be added in US-008."
+    },
+    {
+      "id": "US-003",
+      "title": "Add pe_planned_order model with full config",
+      "description": "Add pe_planned_order model — MRP output representing planned purchase or production orders.\n\nAppend to config files:\n\n1. models.json:\n{\n  \"code\": \"pe_planned_order\",\n  \"displayName:zh-CN\": \"计划订单\",\n  \"displayName:en\": \"Planned Order\",\n  \"description\": \"MRP-generated planned purchase or production orders\",\n  \"modelType\": \"ENTITY\",\n  \"extension\": {\n    \"icon\": \"ClipboardList\",\n    \"category\": \"pcba-erp\",\n    \"titleField\": \"pe_plo_material_name\",\n    \"subtitleField\": \"pe_plo_order_type\"\n  }\n}\n\n2. fields.json — 14 fields:\n- pe_plo_mrp_run_id: REFERENCE→pe_mrp_run (targetField pe_mrp_code), required\n- pe_plo_material_id: REFERENCE→pe_product (targetField pe_product_name), required\n- pe_plo_material_name: STRING, maxLength 200. Denormalized product name.\n- pe_plo_order_type: ENUM, dictCode pe_planned_order_type, required\n- pe_plo_order_qty: DECIMAL, required, constraints min:0\n- pe_plo_order_date: DATE, required. Planned release date.\n- pe_plo_need_date: DATE, required. When material is needed.\n- pe_plo_lead_time_days: INTEGER, min:0\n- pe_plo_status: ENUM, dictCode pe_planned_order_status, defaultValue PLANNED\n- pe_plo_converted_type: STRING, maxLength 100. Target model code after conversion.\n- pe_plo_converted_id: STRING, maxLength 50. Record ID of converted order.\n- pe_plo_source_demand: STRING, maxLength 2000. JSON description of demand source.\n- pe_plo_lot_sizing_policy: STRING, maxLength 50\n- pe_plo_remark: STRING, maxLength 500\n\n3. commands.json — 4 commands:\n- pe:create_planned_order (CREATE, permissions PE.mrp.manage) — Note: normally created by MRP engine, not manually\n- pe:confirm_planned_order (STATE_TRANSITION, stateField pe_plo_status, fromStates [\"PLANNED\"], toState \"CONFIRMED\", permissions PE.mrp.manage)\n- pe:convert_planned_order (STATE_TRANSITION, stateField pe_plo_status, fromStates [\"CONFIRMED\"], toState \"CONVERTED\", handler \"pe:convert_planned_order\", permissions PE.mrp.manage, confirmMessage)\n- pe:cancel_planned_order (STATE_TRANSITION, stateField pe_plo_status, fromStates [\"PLANNED\",\"CONFIRMED\"], toState \"CANCELLED\", permissions PE.mrp.manage)\n\n4. bindings.json — 14 bindings. converted_type, converted_id, source_demand should be editable:false (system-set).\n\n5. pages.json — pe_planned_order_list with columns: material_name, order_type (TAG), order_qty, order_date, need_date, lead_time_days, status (TAG), lot_sizing_policy. Actions: confirm (visible when PLANNED), convert (visible when CONFIRMED), cancel. + pe_planned_order_form",
+      "acceptanceCriteria": [
+        "models.json contains pe_planned_order",
+        "fields.json contains 14 pe_plo_* fields",
+        "pe:confirm_planned_order transitions PLANNED→CONFIRMED",
+        "pe:convert_planned_order transitions CONFIRMED→CONVERTED with handler",
+        "pe:cancel_planned_order transitions from PLANNED or CONFIRMED to CANCELLED",
+        "pe_planned_order_list has confirm/convert/cancel action buttons with correct visibleWhen",
+        "System-set fields have editable:false in bindings",
+        "All JSON files pass validation"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "Config-only. The pe:convert_planned_order handler will be implemented in Run 5 (Chain). Dicts pe_planned_order_type and pe_planned_order_status added in US-008."
+    },
+    {
+      "id": "US-004",
+      "title": "Add pe_mrp_exception model with full config",
+      "description": "Add pe_mrp_exception model — MRP exception/warning messages for planners.\n\nAppend to config files:\n\n1. models.json:\n{\n  \"code\": \"pe_mrp_exception\",\n  \"displayName:zh-CN\": \"MRP异常\",\n  \"displayName:en\": \"MRP Exception\",\n  \"description\": \"MRP exception messages: past due, shortage, long lead time warnings\",\n  \"modelType\": \"ENTITY\",\n  \"extension\": {\n    \"icon\": \"AlertTriangle\",\n    \"category\": \"pcba-erp\",\n    \"titleField\": \"pe_mex_material_name\",\n    \"subtitleField\": \"pe_mex_type\"\n  }\n}\n\n2. fields.json — 8 fields:\n- pe_mex_mrp_run_id: REFERENCE→pe_mrp_run (targetField pe_mrp_code), required\n- pe_mex_material_id: REFERENCE→pe_product (targetField pe_product_name), required\n- pe_mex_material_name: STRING, maxLength 200. Denormalized.\n- pe_mex_type: ENUM, dictCode pe_mrp_exception_type, required\n- pe_mex_severity: ENUM, dictCode pe_severity, required\n- pe_mex_description: STRING, maxLength 1000\n- pe_mex_suggested_action: STRING, maxLength 1000\n- pe_mex_resolved: BOOLEAN, defaultValue \"false\"\n\n3. commands.json — 2 commands:\n- pe:create_mrp_exception (CREATE, for MRP engine to create exceptions programmatically, permissions PE.mrp.manage)\n- pe:resolve_mrp_exception (UPDATE, modelCode pe_mrp_exception, inputFields [\"pe_mex_resolved\"], autoSetFields pe_mex_resolved FIXED_VALUE true, permissions PE.mrp.manage)\n\n4. bindings.json — 8 bindings. All editable:false except pe_mex_resolved (this is a read-only model, updated by MRP engine or resolve action).\n\n5. pages.json — pe_mrp_exception_list (LIST only, no form needed for read-only model). Columns: material_name, type (TAG), severity (TAG with color), description, suggested_action, resolved (TAG). Actions: resolve button (visible when resolved=false). searchFields: pe_mex_material_name, pe_mex_type, pe_mex_severity, pe_mex_resolved",
+      "acceptanceCriteria": [
+        "models.json contains pe_mrp_exception",
+        "fields.json contains 8 pe_mex_* fields",
+        "pe:resolve_mrp_exception sets pe_mex_resolved to true",
+        "pe_mrp_exception_list page has resolve action visible when not resolved",
+        "Most bindings have editable:false (read-only model)",
+        "All JSON files pass validation"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "Config-only. Read-only model populated by MRP engine. Only user action is 'resolve'. Dicts pe_mrp_exception_type and pe_severity added in US-008."
+    },
+    {
+      "id": "US-005",
+      "title": "Add pe_resource model with full config",
+      "description": "Add pe_resource model — production resources (machines, lines, workers, tools) for APS scheduling.\n\nAppend to config files:\n\n1. models.json:\n{\n  \"code\": \"pe_resource\",\n  \"displayName:zh-CN\": \"生产资源\",\n  \"displayName:en\": \"Production Resource\",\n  \"description\": \"Production resources: machines, lines, workers for APS scheduling\",\n  \"modelType\": \"ENTITY\",\n  \"extension\": {\n    \"icon\": \"Cog\",\n    \"category\": \"pcba-erp\",\n    \"titleField\": \"pe_res_name\",\n    \"subtitleField\": \"pe_res_type\"\n  }\n}\n\n2. fields.json — 10 fields:\n- pe_res_code: STRING, required, maxLength 50, feature searchable+sortable\n- pe_res_name: STRING, required, maxLength 200, feature searchable+sortable\n- pe_res_type: ENUM, dictCode pe_resource_type, required, feature searchable\n- pe_res_subtype: STRING, maxLength 50. E.g. \"SMT\", \"REFLOW\", \"AOI\"\n- pe_res_capacity_per_hour: DECIMAL, constraints min:0\n- pe_res_line_id: STRING, maxLength 50. Production line identifier.\n- pe_res_status: ENUM, dictCode pe_resource_status, defaultValue AVAILABLE, feature searchable\n- pe_res_location: STRING, maxLength 200\n- pe_res_manufacturer: STRING, maxLength 200\n- pe_res_remark: STRING, maxLength 500\n\n3. commands.json — 5 commands:\n- pe:create_resource (CREATE, inputFields all 10, autoSetFields pe_res_status FIXED_VALUE AVAILABLE, permissions PE.resource.manage)\n- pe:update_resource (UPDATE, all fields, permissions PE.resource.manage)\n- pe:delete_resource (DELETE with confirmMessage, permissions PE.resource.manage)\n- pe:set_resource_maintenance (STATE_TRANSITION, stateField pe_res_status, fromStates [\"AVAILABLE\",\"BREAKDOWN\"], toState \"MAINTENANCE\", permissions PE.resource.manage)\n- pe:set_resource_available (STATE_TRANSITION, stateField pe_res_status, fromStates [\"MAINTENANCE\",\"OFFLINE\"], toState \"AVAILABLE\", permissions PE.resource.manage)\n\n4. bindings.json — 10 bindings for pe_resource.\n\n5. pages.json — pe_resource_list (columns: code, name, type TAG, subtype, capacity_per_hour, line_id, status TAG, location. Actions: edit, delete, maintenance button visible when AVAILABLE, available button visible when MAINTENANCE/OFFLINE) + pe_resource_form",
+      "acceptanceCriteria": [
+        "models.json contains pe_resource",
+        "fields.json contains 10 pe_res_* fields",
+        "pe:set_resource_maintenance transitions AVAILABLE/BREAKDOWN→MAINTENANCE",
+        "pe:set_resource_available transitions MAINTENANCE/OFFLINE→AVAILABLE",
+        "pe_resource_list page has maintenance and available action buttons with correct visibleWhen",
+        "All JSON files pass validation"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": "Config-only. Dicts pe_resource_type and pe_resource_status added in US-008. The visibleWhen for maintenance button needs operator 'in' with values ['available','breakdown'] — check if the platform supports 'in' operator, otherwise use 'equals' with single value AVAILABLE."
+    },
+    {
+      "id": "US-006",
+      "title": "Add pe_resource_calendar model with full config",
+      "description": "Add pe_resource_calendar model — resource availability schedule by date and shift for APS.\n\nAppend to config files:\n\n1. models.json:\n{\n  \"code\": \"pe_resource_calendar\",\n  \"displayName:zh-CN\": \"资源日历\",\n  \"displayName:en\": \"Resource Calendar\",\n  \"description\": \"Resource availability by date and shift for APS scheduling\",\n  \"modelType\": \"ENTITY\",\n  \"extension\": {\n    \"icon\": \"Calendar\",\n    \"category\": \"pcba-erp\",\n    \"titleField\": \"pe_rc_resource_id\"\n  }\n}\n\n2. fields.json — 8 fields:\n- pe_rc_resource_id: REFERENCE→pe_resource (targetField pe_res_name), required\n- pe_rc_date: DATE, required, feature sortable\n- pe_rc_shift: ENUM, dictCode pe_shift, required, defaultValue DAY\n- pe_rc_start_time: STRING, maxLength 5. Format \"HH:mm\" e.g. \"08:00\"\n- pe_rc_end_time: STRING, maxLength 5. Format \"HH:mm\" e.g. \"17:00\"\n- pe_rc_available_hours: DECIMAL, required, constraints min:0 max:24\n- pe_rc_is_holiday: BOOLEAN, defaultValue \"false\"\n- pe_rc_remark: STRING, maxLength 500\n\n3. commands.json — 4 commands:\n- pe:create_resource_calendar (CREATE, inputFields all 8, permissions PE.resource.manage)\n- pe:update_resource_calendar (UPDATE, permissions PE.resource.manage)\n- pe:delete_resource_calendar (DELETE, permissions PE.resource.manage)\n- pe:generate_calendar (CUSTOM, modelCode pe_resource_calendar, handler \"pe:generate_calendar\", permissions PE.resource.manage, extension confirmMessage \"批量生成日历？\" / \"Generate calendar entries?\")\n\n4. bindings.json — 8 bindings.\n\n5. pages.json — pe_resource_calendar_list (columns: resource_id, date, shift TAG, start_time, end_time, available_hours, is_holiday TAG. searchFields: pe_rc_resource_id, pe_rc_date, pe_rc_shift. Actions: edit, delete. Toolbar: create + generate_calendar button) + pe_resource_calendar_form",
+      "acceptanceCriteria": [
+        "models.json contains pe_resource_calendar",
+        "fields.json contains 8 pe_rc_* fields",
+        "pe:generate_calendar is CUSTOM type with handler",
+        "pe_resource_calendar_list has generate button in toolbar",
+        "All JSON files pass validation"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": "Config-only. pe:generate_calendar handler will be implemented later. Dict pe_shift added in US-008."
+    },
+    {
+      "id": "US-007",
+      "title": "Add pe_schedule_result model with full config",
+      "description": "Add pe_schedule_result model — APS scheduling output with assigned resource and time slots.\n\nAppend to config files:\n\n1. models.json:\n{\n  \"code\": \"pe_schedule_result\",\n  \"displayName:zh-CN\": \"排程结果\",\n  \"displayName:en\": \"Schedule Result\",\n  \"description\": \"APS scheduling output: assigned resource, time slots, strategy info\",\n  \"modelType\": \"ENTITY\",\n  \"extension\": {\n    \"icon\": \"GanttChart\",\n    \"category\": \"pcba-erp\",\n    \"titleField\": \"pe_sched_operation_name\",\n    \"subtitleField\": \"pe_sched_resource_name\"\n  }\n}\n\n2. fields.json — 12 fields:\n- pe_sched_work_order_id: REFERENCE→pe_production_plan (targetField pe_pp_code), required\n- pe_sched_operation_name: STRING, maxLength 200, required\n- pe_sched_resource_id: REFERENCE→pe_resource (targetField pe_res_name), required\n- pe_sched_resource_name: STRING, maxLength 200. Denormalized.\n- pe_sched_start_time: DATETIME, required\n- pe_sched_end_time: DATETIME, required\n- pe_sched_setup_time_min: INTEGER, min:0. Changeover time.\n- pe_sched_processing_time_min: INTEGER, min:0\n- pe_sched_strategy: STRING, maxLength 50. E.g. \"BOTTLENECK_DBR\"\n- pe_sched_version: INTEGER, defaultValue \"1\". For what-if comparison.\n- pe_sched_status: ENUM, dictCode pe_schedule_status, defaultValue DRAFT\n- pe_sched_run_date: DATE\n\n3. commands.json — 3 commands:\n- pe:create_schedule_result (CREATE, permissions PE.aps.manage) — created by APS engine\n- pe:publish_schedule (STATE_TRANSITION, stateField pe_sched_status, fromStates [\"DRAFT\"], toState \"PUBLISHED\", permissions PE.aps.manage, confirmMessage)\n- pe:delete_schedule_result (DELETE, permissions PE.aps.manage)\n\n4. bindings.json — 12 bindings. Most editable:false (system-generated by APS).\n\n5. pages.json — pe_schedule_result_list (columns: work_order_id, operation_name, resource_name, start_time, end_time, setup_time_min, processing_time_min, strategy, version, status TAG. searchFields: pe_sched_work_order_id, pe_sched_resource_id, pe_sched_status, pe_sched_strategy. Actions: publish visible when DRAFT, delete) + pe_schedule_result_form (read-only detail view)",
+      "acceptanceCriteria": [
+        "models.json contains pe_schedule_result",
+        "fields.json contains 12 pe_sched_* fields",
+        "pe:publish_schedule transitions DRAFT→PUBLISHED",
+        "pe_schedule_result_list has publish action visible when DRAFT",
+        "Most bindings are editable:false (APS-generated)",
+        "All JSON files pass validation"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": "Config-only. The pe_production_plan model already exists. Dict pe_schedule_status added in US-008. GanttChart icon may not exist in Lucide — use 'BarChart3' or 'Gantt' as fallback."
+    },
+    {
+      "id": "US-008",
+      "title": "Add MRP + APS dicts, permissions, and menus",
+      "description": "Add all new dictionaries, permissions, and menu entries for the MRP and APS modules.\n\n1. plugins/pcba-erp/config/dicts.json — append these dicts:\n\na) pe_mrp_status:\n  DRAFT (草稿/Draft, #d9d9d9), RUNNING (运算中/Running, #1890ff), COMPLETED (已完成/Completed, #52c41a), FAILED (失败/Failed, #ff4d4f)\n\nb) pe_mrp_scope:\n  ALL (全部物料/All Materials, #1890ff), SELECTED_MATERIALS (指定物料/Selected Materials, #722ed1), SELECTED_ORDERS (指定订单/Selected Orders, #fa8c16)\n\nc) pe_planned_order_type:\n  PURCHASE (采购/Purchase, #1890ff), PRODUCTION (生产/Production, #52c41a)\n\nd) pe_planned_order_status:\n  PLANNED (已计划/Planned, #d9d9d9), CONFIRMED (已确认/Confirmed, #1890ff), CONVERTED (已转换/Converted, #52c41a), CANCELLED (已取消/Cancelled, #ff4d4f)\n\ne) pe_mrp_exception_type:\n  PAST_DUE (逾期/Past Due, #ff4d4f), SHORTAGE (缺料/Shortage, #fa541c), LONG_LEAD_TIME (长交期/Long Lead Time, #fa8c16), KIT_INCOMPLETE (齐套不全/Kit Incomplete, #722ed1), EXCESS (超量/Excess, #13c2c2)\n\nf) pe_severity:\n  WARNING (警告/Warning, #fa8c16), CRITICAL (严重/Critical, #ff4d4f)\n\ng) pe_resource_type:\n  MACHINE (机台/Machine, #1890ff), LINE (产线/Line, #52c41a), WORKER (人员/Worker, #722ed1), TOOL (工具/Tool, #fa8c16)\n\nh) pe_resource_status:\n  AVAILABLE (可用/Available, #52c41a), MAINTENANCE (维护中/Maintenance, #fa8c16), OFFLINE (离线/Offline, #d9d9d9), BREAKDOWN (故障/Breakdown, #ff4d4f)\n\ni) pe_shift:\n  DAY (白班/Day Shift, #1890ff), NIGHT (夜班/Night Shift, #722ed1), OVERTIME (加班/Overtime, #fa8c16)\n\nj) pe_schedule_status:\n  DRAFT (草稿/Draft, #d9d9d9), PUBLISHED (已发布/Published, #52c41a), OUTDATED (已过期/Outdated, #ff4d4f)\n\n2. plugins/pcba-erp/config/menus.json — append menu groups:\n\na) MRP group header:\n  code: pe_mrp_group, name \"MRP计划\" / \"MRP Planning\", path /pcba-erp/mrp, icon Calculator, type 1, parentCode pe_root, orderNo 50\n\nb) MRP children:\n  - pe_mrp_runs: \"MRP运算\" / \"MRP Runs\", path /pcba-erp/mrp/runs, type 2, parentCode pe_mrp_group, orderNo 1, pageKey pe_mrp_run_list, permissionCode PE.mrp.read\n  - pe_planned_orders: \"计划订单\" / \"Planned Orders\", path /pcba-erp/mrp/planned-orders, type 2, parentCode pe_mrp_group, orderNo 2, pageKey pe_planned_order_list, permissionCode PE.mrp.read\n  - pe_mrp_exceptions: \"MRP异常\" / \"MRP Exceptions\", path /pcba-erp/mrp/exceptions, type 2, parentCode pe_mrp_group, orderNo 3, pageKey pe_mrp_exception_list, permissionCode PE.mrp.read\n  - pe_alt_materials: \"替代料\" / \"Alternative Materials\", path /pcba-erp/mrp/alternatives, type 2, parentCode pe_mrp_group, orderNo 4, pageKey pe_alternative_material_list, permissionCode PE.product.read\n\nc) APS group header:\n  code: pe_aps_group, name \"APS排程\" / \"APS Scheduling\", path /pcba-erp/aps, icon Timer, type 1, parentCode pe_root, orderNo 60\n\nd) APS children:\n  - pe_resources: \"生产资源\" / \"Resources\", path /pcba-erp/aps/resources, type 2, parentCode pe_aps_group, orderNo 1, pageKey pe_resource_list, permissionCode PE.resource.read\n  - pe_resource_calendars: \"资源日历\" / \"Resource Calendar\", path /pcba-erp/aps/calendar, type 2, parentCode pe_aps_group, orderNo 2, pageKey pe_resource_calendar_list, permissionCode PE.resource.read\n  - pe_schedule_results: \"排程结果\" / \"Schedule Results\", path /pcba-erp/aps/results, type 2, parentCode pe_aps_group, orderNo 3, pageKey pe_schedule_result_list, permissionCode PE.aps.read\n\n3. Verify ALL JSON files are valid after changes.\n\nNote: Check existing menus.json for the exact structure and type values. In the existing plugin, type=1 is used for group headers and type=2 for leaf menus with pageKey.",
+      "acceptanceCriteria": [
+        "dicts.json contains all 10 new dictionaries with correct items and colors",
+        "menus.json contains pe_mrp_group and pe_aps_group menu groups",
+        "menus.json contains 7 leaf menu items under the two groups",
+        "Each menu has correct parentCode, pageKey, and permissionCode",
+        "All dict items have zh-CN and en labels with sortNo",
+        "All JSON files pass validation: python3 validates all config files"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": "Config-only. Check existing menus.json for orderNo numbering — the new groups should come after existing production group but before any other groups. The permissions PE.mrp.manage/read, PE.aps.manage/read, PE.resource.manage/read should be referenced in commands and menus but the actual permission definitions may need to be added to a permissions.json file if one exists. Check if plugins/pcba-erp/config/permissions.json exists and add entries there too."
+    }
+  ]
+}

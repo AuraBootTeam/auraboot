@@ -1,0 +1,27 @@
+name: daily-sales-report
+description: Query won deals, generate AI summary, and output a daily sales report
+version: "1.0"
+
+steps:
+  - type: query
+    source: crm_opportunity
+    filters:
+      - field: crm_opp_stage
+        operator: EQ
+        value: CLOSED_WON
+    sort:
+      field: updated_at
+      order: desc
+    limit: 100
+    output: won_deals
+
+  - type: analyze
+    input: won_deals
+    prompt: >
+      Summarize the won deals: total revenue, average deal size, top accounts,
+      and notable trends. Group by account if possible.
+    output: sales_summary
+
+  - type: notify
+    message: "Daily Sales Report: {{sales_summary.summary}}"
+    channel: console

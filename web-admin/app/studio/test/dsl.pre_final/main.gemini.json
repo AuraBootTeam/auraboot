@@ -1,0 +1,128 @@
+{
+  "kind": "Page",
+  "id": "page_dashboard_main",
+  "version": "3.0.0",
+
+  "state": {
+    "dateRange": "today",
+    "stats": { "sales": 0, "orders": 0 }
+  },
+
+  "dataSource": {
+    "ds_stats": {
+      "type": "api",
+      "url": "/api/dashboard/stats",
+      "autoFetch": true
+    }
+  },
+
+  "handlers": {
+    "refreshCharts": {
+      "type": "flow",
+      "steps": [{ "action": "dataSource.fetch", "target": "ds_stats" }]
+    }
+  },
+
+  // === 全盘 Grid 布局 ===
+  "layout": {
+    "type": "grid",
+    "columns": ["1fr", "1fr", "1fr", "1fr"], // 4列栅格
+    "gap": "$spacing.lg",
+    "rows": ["auto", "400px", "auto"],
+    "areas": [
+      // 定义区域名，重复名字代表跨列/跨行
+      ["stats_1", "stats_2", "stats_3", "stats_4"],
+      ["main_chart", "main_chart", "main_chart", "side_list"],
+      ["footer_form", "footer_form", "footer_form", "footer_form"]
+    ]
+  },
+
+  "blocks": [
+    // 第一行: 4个统计卡片
+    {
+      "id": "card_sales",
+      "area": "stats_1",
+      "type": "StatCard",
+      "props": {
+        "title": "Total Sales",
+        "value": "{{dataSource.ds_stats.data.sales}}",
+        "icon": "Dollar",
+        "trend": "+5%"
+      }
+    },
+    {
+      "id": "card_orders",
+      "area": "stats_2",
+      "type": "StatCard",
+      "props": { "title": "Total Orders", "value": "1,203" }
+    },
+    {
+      "id": "card_visits",
+      "area": "stats_3",
+      "type": "StatCard",
+      "props": { "title": "Visits", "value": "45.2k" }
+    },
+    {
+      "id": "card_alert",
+      "area": "stats_4",
+      "type": "StatCard",
+      "props": {
+        "title": "Alerts",
+        "value": "3",
+        "color": "$color.error" // Token 引用
+      }
+    },
+
+    // 第二行左侧: 主图表 (跨3列)
+    {
+      "id": "block_chart",
+      "area": "main_chart",
+      "type": "Chart",
+      "props": {
+        "type": "Line",
+        "title": "Sales Trend",
+        "dataSource": "ds_stats", // 复用数据源
+        "xField": "date",
+        "yField": "value",
+        "height": "100%"
+      }
+    },
+
+    // 第二行右侧: 嵌入一个迷你列表 (跨1列)
+    {
+      "id": "block_top_list",
+      "area": "side_list",
+      "type": "List", // 简化的列表组件
+      "props": {
+        "title": "Top Stores",
+        "dataSource": {
+          "type": "api",
+          "url": "/api/store/top"
+        },
+        "columns": [
+          { "dataIndex": "name", "title": "Store" },
+          { "dataIndex": "sales", "title": "Sales" }
+        ]
+      }
+    },
+
+    // 第三行: 嵌入一个快速反馈表单
+    {
+      "id": "block_feedback",
+      "area": "footer_form",
+      "type": "Form",
+      "props": {
+        "layout": "inline",
+        "title": "Quick Feedback"
+      },
+      "fields": [
+        {
+          "field": "comment",
+          "component": "Input",
+          "props": { "placeholder": "Any suggestions?" }
+        },
+        { "code": "submit", "component": "Button", "props": { "text": "Send" } }
+      ]
+    }
+  ]
+}

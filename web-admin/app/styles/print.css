@@ -1,0 +1,261 @@
+/**
+ * Global Print Stylesheet
+ *
+ * Applied via @media print — hides navigation chrome, expands content
+ * to full width, and optimises typography/tables for paper output.
+ * Does NOT affect screen rendering.
+ */
+
+@media print {
+  /* ================================================================
+     1. Hide navigation chrome & interactive elements
+     ================================================================ */
+  /* Sidebar */
+  aside,
+  [data-print='hide'],
+  .print-hide {
+    display: none !important;
+  }
+
+  /* Header / top bar */
+  header {
+    display: none !important;
+  }
+
+  /* Mobile sidebar overlay */
+  .fixed.inset-0.z-40 {
+    display: none !important;
+  }
+
+  /* AuraBot AI panel */
+  [class*='AuraBotPanel'],
+  .aurabot-panel {
+    display: none !important;
+  }
+
+  /* Floating action bars, bulk action toolbars */
+  .floating-actions,
+  .bulk-action-toolbar {
+    display: none !important;
+  }
+
+  /* Toast / notification overlays */
+  [role='alert'],
+  .toast-container {
+    display: none !important;
+  }
+
+  /* Command palette */
+  [role='dialog'] {
+    display: none !important;
+  }
+
+  /* ================================================================
+     2. Page setup
+     ================================================================ */
+  @page {
+    margin: 15mm 10mm;
+    size: A4 portrait;
+  }
+
+  /* ================================================================
+     3. Content: full-width, no decorative spacing
+     ================================================================ */
+  body {
+    font-size: 11pt !important;
+    line-height: 1.4 !important;
+    color: #000 !important;
+    background: #fff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Remove the pt-16 (header offset) and sidebar flex layout */
+  .flex.h-screen.pt-16 {
+    display: block !important;
+    height: auto !important;
+    padding-top: 0 !important;
+  }
+
+  /* Main content area: full width */
+  main,
+  .content-area,
+  [data-print='content'],
+  .flex-1.flex.flex-col.overflow-hidden {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+  }
+
+  /* Remove container max-width constraints */
+  .container {
+    max-width: 100% !important;
+    padding: 0 !important;
+  }
+
+  /* Remove box-shadows on cards */
+  .shadow-sm,
+  .shadow-md,
+  .shadow-lg,
+  .shadow {
+    box-shadow: none !important;
+  }
+
+  /* ================================================================
+     4. Typography & Links
+     ================================================================ */
+  a {
+    text-decoration: none !important;
+    color: #000 !important;
+  }
+
+  /* Keep links identifiable with a subtle indicator */
+  a[href]:not(.print-no-href)::after {
+    content: none; /* Don't append URL — too noisy for business pages */
+  }
+
+  /* ================================================================
+     5. Tables — repeat headers, avoid row splits
+     ================================================================ */
+  table {
+    page-break-inside: auto;
+    border-collapse: collapse !important;
+  }
+  tr {
+    page-break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+  tfoot {
+    display: table-footer-group;
+  }
+
+  /* Ensure table borders are visible on paper */
+  th,
+  td {
+    border: 1px solid #d1d5db !important; /* gray-300 */
+    padding: 6px 8px !important;
+  }
+
+  /* Hide sticky action columns in list tables */
+  th.sticky.right-0,
+  td.sticky.right-0 {
+    display: none !important;
+  }
+
+  /* Hide DnD drag handles in sub-tables */
+  .drag-handle,
+  [data-handler-id] {
+    display: none !important;
+  }
+
+  /* ================================================================
+     6. Form fields as static text (detail pages)
+     ================================================================ */
+  input,
+  select,
+  textarea {
+    border: none !important;
+    background: none !important;
+    box-shadow: none !important;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    padding: 0 !important;
+  }
+
+  /* ================================================================
+     7. Section / page-break control
+     ================================================================ */
+  .form-section {
+    page-break-inside: avoid;
+  }
+
+  .sub-table-section {
+    page-break-before: auto;
+  }
+
+  h2,
+  h3 {
+    page-break-after: avoid;
+  }
+
+  /* ================================================================
+     8. Status badges — preserve background colours
+     ================================================================ */
+  .status-badge,
+  [class*='bg-green'],
+  [class*='bg-red'],
+  [class*='bg-yellow'],
+  [class*='bg-blue'],
+  [class*='bg-purple'],
+  [class*='bg-orange'],
+  [class*='bg-emerald'] {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* ================================================================
+     9. Print header — only visible during print
+     ================================================================ */
+  .print-header {
+    display: block !important;
+    text-align: center;
+    font-size: 14pt;
+    font-weight: bold;
+    margin-bottom: 8mm;
+    padding-bottom: 4mm;
+    border-bottom: 1px solid #000;
+  }
+
+  .print-meta {
+    display: block !important;
+    text-align: right;
+    font-size: 8pt;
+    color: #666;
+    margin-bottom: 4mm;
+  }
+
+  /* ================================================================
+     10. Scrollable containers — remove scroll, show all content
+     ================================================================ */
+  .overflow-auto,
+  .overflow-y-auto,
+  .overflow-x-auto,
+  .overflow-hidden {
+    overflow: visible !important;
+    max-height: none !important;
+  }
+
+  /* ================================================================
+     11. Dark mode reset — always print on white
+     ================================================================ */
+  .dark {
+    background: #fff !important;
+    color: #000 !important;
+  }
+  .dark * {
+    background-color: transparent !important;
+    color: #000 !important;
+    border-color: #d1d5db !important;
+  }
+  /* Restore status-badge colours even inside dark mode */
+  .dark .status-badge,
+  .dark [class*='bg-green'],
+  .dark [class*='bg-red'],
+  .dark [class*='bg-yellow'],
+  .dark [class*='bg-blue'] {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
+/* ================================================================
+   Print-only elements — hidden on screen, visible during print
+   ================================================================ */
+.print-header,
+.print-meta {
+  display: none;
+}

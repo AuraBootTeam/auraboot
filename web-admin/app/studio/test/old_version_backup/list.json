@@ -1,0 +1,253 @@
+{
+  "meta": {
+    "title": { "en-US": "Store List", "zh-CN": "门店列表" },
+    "version": "2.0.0",
+    "dslVersion": "1.0.0",
+    "entityCode": "store"
+  },
+  "events": [
+    {
+      "do": [
+        {
+          "type": "apiCall",
+          "props": {
+            "retry": { "times": 2, "backoffMs": 300 },
+            "assign": "saveResult",
+            "timeoutMs": 10000
+          },
+          "target": "api.saveProduct",
+          "payload": {
+            "id": "${$route.params.id}",
+            "name": "${$form.values.name}",
+            "price": "${Number($form.values.price)}",
+            "category": "${$form.values.category}",
+            "description": "${$form.values.description}"
+          }
+        },
+        { "type": "toast", "level": "success", "message": "保存成功" },
+        { "to": "ProductList", "type": "navigate" }
+      ],
+      "if": "${$form.valid}",
+      "on": "form.submit",
+      "catch": [{ "type": "toast", "level": "error", "message": "${$error.message}" }],
+      "finally": [{ "type": "loading", "value": false, "target": "saveBtn" }]
+    },
+    {
+      "do": [
+        {
+          "type": "apiCall",
+          "query": "${$filters}",
+          "assign": "storeList",
+          "target": "api.listStore"
+        },
+        { "data": "${$ds.storeList}", "type": "table.update", "target": "storeTable" },
+        { "type": "toast", "message": "查询完成" }
+      ],
+      "on": "search.click",
+      "concurrency": "switch"
+    },
+    {
+      "do": [{ "side": "right", "type": "openDrawer", "params": { "id": "${$row.id}" } }],
+      "on": "row.edit"
+    }
+  ],
+  "regions": [
+    {
+      "type": "filters",
+      "fields": [
+        {
+          "code": "name",
+          "type": "input",
+          "props": { "maxLength": 100, "allowClear": true },
+          "layout": { "span": 1 },
+          "validation": [
+            {
+              "type": "required",
+              "message": { "en-US": "Store name is required", "zh-CN": "门店名称不能为空" }
+            }
+          ]
+        },
+        {
+          "code": "type",
+          "type": "select",
+          "props": {
+            "options": [
+              { "label": { "en-US": "Direct Store", "zh-CN": "直营店" }, "value": "direct" },
+              { "label": { "en-US": "Franchise Store", "zh-CN": "加盟店" }, "value": "franchise" },
+              { "label": { "en-US": "Flagship Store", "zh-CN": "旗舰店" }, "value": "flagship" },
+              { "label": { "en-US": "Community Store", "zh-CN": "社区店" }, "value": "community" }
+            ],
+            "allowClear": true,
+            "placeholder": { "en-US": "Please select store type", "zh-CN": "请选择门店类型" }
+          }
+        },
+        {
+          "code": "createdBetween",
+          "type": "dateRange",
+          "props": {
+            "format": "YYYY-MM-DD",
+            "ranges": {
+              "上月": "lastMonth",
+              "今天": "today",
+              "昨天": "yesterday",
+              "本月": "thisMonth",
+              "最近7天": "last7days",
+              "最近30天": "last30days"
+            },
+            "showTime": false,
+            "allowClear": true
+          }
+        },
+        {
+          "code": "status",
+          "type": "select",
+          "props": {
+            "binding": "store.status",
+            "options": [
+              { "label": { "en-US": "Active", "zh-CN": "开业" }, "value": "active" },
+              { "label": { "en-US": "Inactive", "zh-CN": "未开业" }, "value": "inactive" },
+              { "label": { "en-US": "Preparing", "zh-CN": "筹备中" }, "value": "preparing" },
+              { "label": { "en-US": "Closed", "zh-CN": "已关闭" }, "value": "closed" }
+            ],
+            "allowClear": true,
+            "placeholder": { "en-US": "Please select store status", "zh-CN": "请选择门店状态" }
+          }
+        }
+      ]
+    },
+    {
+      "type": "preset",
+      "filters": {
+        "default": { "status": ["active"] },
+        "security": [
+          {
+            "if": "!hasRole('super_admin')",
+            "op": "IN",
+            "field": "organization_id",
+            "value": "${user.accessibleOrganizations}"
+          }
+        ],
+        "contextual": [
+          { "op": "EQ", "field": "tenant_id", "value": "${context.tenantId}", "required": true }
+        ]
+      },
+      "pagination": { "pageSize": 10 }
+    },
+    {
+      "type": "action",
+      "actions": [
+        {
+          "code": "search",
+          "props": { "label": { "en-US": "Search", "zh-CN": "查询" }, "primary": true }
+        },
+        { "code": "reset", "props": { "label": { "en-US": "Reset", "zh-CN": "重置" } } },
+        {
+          "code": "new",
+          "props": { "label": { "en-US": "New Store", "zh-CN": "新建门店" }, "primary": true },
+          "permission": "store:create"
+        },
+        {
+          "code": "export",
+          "props": { "label": { "en-US": "Export", "zh-CN": "导出" }, "primary": true },
+          "permission": "store:export"
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "props": { "rowKey": "id", "scroll": { "x": 1200 }, "rowSelection": { "type": "checkbox" } },
+      "style": { "size": "middle", "scroll": { "x": 1200, "y": 600 } },
+      "layout": { "size": "middle" },
+      "actions": [
+        {
+          "code": "view",
+          "props": {
+            "icon": "EyeOutlined",
+            "type": "link",
+            "label": { "en-US": "View", "zh-CN": "查看" }
+          },
+          "permission": "store:read"
+        },
+        {
+          "code": "edit",
+          "props": { "icon": "EditOutlined", "label": { "en-US": "Edit", "zh-CN": "编辑" } },
+          "permission": "store:update"
+        },
+        {
+          "code": "delete",
+          "props": {
+            "icon": "DeleteOutlined",
+            "type": "link",
+            "label": { "en-US": "Delete", "zh-CN": "删除" },
+            "danger": true,
+            "confirm": {
+              "en-US": "{count, plural, =0 {No stores selected} =1 {Are you sure to delete # selected store? This action cannot be undone.} other {Are you sure to delete # selected stores? This action cannot be undone.}}",
+              "zh-CN": "{count, plural, =0 {未选择门店} other {确定要删除选中的 # 个门店吗？此操作不可撤销。}}"
+            }
+          },
+          "permission": "store:delete"
+        }
+      ],
+      "columns": [
+        {
+          "code": "code",
+          "props": { "label": { "en-US": "Store Code", "zh-CN": "门店编码" } },
+          "sortable": true
+        },
+        { "code": "name", "props": { "label": { "en-US": "Store Name", "zh-CN": "门店名称" } } },
+        { "code": "type", "props": { "label": { "en-US": "Store Type", "zh-CN": "门店类型" } } },
+        { "code": "status", "props": { "label": { "en-US": "Status", "zh-CN": "状态" } } },
+        { "code": "address", "props": { "label": { "en-US": "Address", "zh-CN": "地址" } } },
+        {
+          "code": "contactPhone",
+          "props": { "label": { "en-US": "Contact Phone", "zh-CN": "联系电话" } },
+          "transform": {
+            "if": "!permission('store:view_sensitive')",
+            "mask": "phone",
+            "type": "fieldMasking"
+          }
+        },
+        { "code": "manager", "props": { "label": { "en-US": "Manager", "zh-CN": "店长" } } },
+        {
+          "code": "openingHours",
+          "props": { "label": { "en-US": "Opening Hours", "zh-CN": "营业时间" } }
+        },
+        {
+          "code": "createdAt",
+          "props": { "label": { "en-US": "Created At", "zh-CN": "创建时间" } }
+        },
+        { "code": "actions", "props": { "label": { "en-US": "Actions", "zh-CN": "操作" } } }
+      ],
+      "pagination": {
+        "showTotal": true,
+        "pageSizeOptions": ["10", "20", "50", "100"],
+        "showQuickJumper": true,
+        "showSizeChanger": true
+      },
+      "batchActions": [
+        {
+          "code": "batchDelete",
+          "props": {
+            "icon": "DeleteOutlined",
+            "label": { "en-US": "Batch Delete", "zh-CN": "批量删除" },
+            "danger": true,
+            "confirm": {
+              "en-US": "{count, plural, =0 {No stores selected} =1 {Are you sure to delete # selected store? This action cannot be undone.} other {Are you sure to delete # selected stores? This action cannot be undone.}}",
+              "zh-CN": "{count, plural, =0 {未选择门店} other {确定要删除选中的 # 个门店吗？此操作不可撤销。}}"
+            }
+          },
+          "permission": "store:delete"
+        },
+        {
+          "code": "batchExport",
+          "props": {
+            "icon": "ExportOutlined",
+            "label": { "en-US": "Batch Export", "zh-CN": "批量导出" }
+          },
+          "permission": "store:export"
+        }
+      ]
+    }
+  ],
+  "endpoint": { "url": "/api/dynamic/Store/list", "method": "get", "permission": "store:read" }
+}

@@ -1,0 +1,201 @@
+[
+  {
+    "code": "crms:create_opportunity",
+    "displayName:zh-CN": "新建商机",
+    "displayName:en": "Create Opportunity",
+    "type": "create",
+    "modelCode": "crm_opportunity",
+    "inputFields": [
+      "crm_opp_name",
+      "crm_opp_account_id",
+      "crm_opp_expected_amount",
+      "crm_opp_expected_close_date",
+      "crm_opp_probability",
+      "crm_opp_notes"
+    ],
+    "autoSetFields": {
+      "crm_opp_code": {
+        "strategy": "auto_generate",
+        "pattern": "OPP-{yyyyMMdd}-{seq}"
+      },
+      "crm_opp_stage": {
+        "strategy": "fixed_value",
+        "value": "discovery"
+      },
+      "crm_opp_owner": {
+        "strategy": "current_username"
+      }
+    },
+    "permissions": [
+      "CRMS.opportunity.manage"
+    ],
+    "agent_hint": "Create a new opportunity. Key inputs: name, account_id, expected_amount, expected_close_date, probability. Auto-generated: code, stage, owner.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crms:update_opportunity",
+    "displayName:zh-CN": "编辑商机",
+    "displayName:en": "Update Opportunity",
+    "type": "update",
+    "modelCode": "crm_opportunity",
+    "inputFields": [
+      "crm_opp_name",
+      "crm_opp_account_id",
+      "crm_opp_expected_amount",
+      "crm_opp_expected_close_date",
+      "crm_opp_probability",
+      "crm_opp_notes"
+    ],
+    "permissions": [
+      "CRMS.opportunity.manage"
+    ],
+    "agent_hint": "Update an existing opportunity. Editable fields: name, account_id, expected_amount, expected_close_date, probability, notes.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crms:delete_opportunity",
+    "displayName:zh-CN": "删除商机",
+    "displayName:en": "Delete Opportunity",
+    "type": "delete",
+    "modelCode": "crm_opportunity",
+    "preconditions": [
+      {
+        "field": "crm_opp_stage",
+        "operator": "IN",
+        "value": [
+          "discovery",
+          "qualification"
+        ]
+      }
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此商机？",
+      "confirmMessage:en": "Confirm delete this opportunity?"
+    },
+    "permissions": [
+      "CRMS.opportunity.manage"
+    ],
+    "agent_hint": "Delete opportunity record(s). Preconditions: stage IN [discovery, qualification].",
+    "cmd_risk_level": "L4"
+  },
+  {
+    "code": "crms:qualify_opportunity",
+    "displayName:zh-CN": "资质审查",
+    "displayName:en": "Qualify Opportunity",
+    "type": "state_transition",
+    "modelCode": "crm_opportunity",
+    "stateField": "crm_opp_stage",
+    "fromStates": [
+      "discovery"
+    ],
+    "toState": "qualification",
+    "permissions": [
+      "CRMS.opportunity.manage"
+    ],
+    "agent_hint": "Transition opportunity stage from DISCOVERY to QUALIFICATION.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crms:propose_opportunity",
+    "displayName:zh-CN": "提交提案",
+    "displayName:en": "Submit Proposal",
+    "type": "state_transition",
+    "modelCode": "crm_opportunity",
+    "stateField": "crm_opp_stage",
+    "fromStates": [
+      "qualification"
+    ],
+    "toState": "proposal",
+    "permissions": [
+      "CRMS.opportunity.manage"
+    ],
+    "agent_hint": "Transition opportunity stage from QUALIFICATION to PROPOSAL.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crms:negotiate_opportunity",
+    "displayName:zh-CN": "进入谈判",
+    "displayName:en": "Enter Negotiation",
+    "type": "state_transition",
+    "modelCode": "crm_opportunity",
+    "stateField": "crm_opp_stage",
+    "fromStates": [
+      "proposal"
+    ],
+    "toState": "negotiation",
+    "permissions": [
+      "CRMS.opportunity.manage"
+    ],
+    "agent_hint": "Transition opportunity stage from PROPOSAL to NEGOTIATION.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crms:win_opportunity",
+    "displayName:zh-CN": "赢单",
+    "displayName:en": "Win Opportunity",
+    "type": "state_transition",
+    "modelCode": "crm_opportunity",
+    "stateField": "crm_opp_stage",
+    "fromStates": [
+      "negotiation"
+    ],
+    "toState": "closed_won",
+    "extension": {
+      "confirmMessage:zh-CN": "确认将此商机标记为赢单？",
+      "confirmMessage:en": "Confirm marking this opportunity as won?"
+    },
+    "permissions": [
+      "CRMS.opportunity.manage"
+    ],
+    "agent_hint": "Transition opportunity stage from NEGOTIATION to CLOSED_WON.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crms:lose_opportunity",
+    "displayName:zh-CN": "输单",
+    "displayName:en": "Lose Opportunity",
+    "type": "state_transition",
+    "modelCode": "crm_opportunity",
+    "stateField": "crm_opp_stage",
+    "fromStates": [
+      "discovery",
+      "qualification",
+      "proposal",
+      "negotiation"
+    ],
+    "toState": "closed_lost",
+    "extension": {
+      "confirmMessage:zh-CN": "确认将此商机标记为输单？",
+      "confirmMessage:en": "Confirm marking this opportunity as lost?"
+    },
+    "permissions": [
+      "CRMS.opportunity.manage"
+    ],
+    "agent_hint": "Transition opportunity stage from DISCOVERY/QUALIFICATION/PROPOSAL/NEGOTIATION to CLOSED_LOST.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crms:detail_opportunity",
+    "displayName:zh-CN": "查看商机",
+    "displayName:en": "View Opportunity",
+    "type": "query",
+    "modelCode": "crm_opportunity",
+    "permissions": [
+      "CRMS.opportunity.read"
+    ],
+    "agent_hint": "Query opportunity records.",
+    "cmd_risk_level": "L0"
+  },
+  {
+    "code": "crms:list_opportunities",
+    "displayName:zh-CN": "商机列表",
+    "displayName:en": "List Opportunities",
+    "type": "query",
+    "modelCode": "crm_opportunity",
+    "permissions": [
+      "CRMS.opportunity.read"
+    ],
+    "agent_hint": "Query opportunity records.",
+    "cmd_risk_level": "L0"
+  }
+]

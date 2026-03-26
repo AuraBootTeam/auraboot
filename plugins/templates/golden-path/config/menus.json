@@ -1,0 +1,54 @@
+[
+  {
+    "code": "gp_root",
+    "parentCode": null,
+    "name:zh-CN": "Golden Path",
+    "name:en": "Golden Path",
+    "path": null,
+    "component": null,
+    "icon": "IconCheckSquare",
+    "type": 0,
+    "permissionCode": null,
+    "orderNo": 900,
+    "visible": true
+  },
+  {
+    "code": "gp_tasks",
+    "parentCode": "gp_root",
+    "name:zh-CN": "任务",
+    "name:en": "Tasks",
+    "path": "/dynamic/gp-task",
+    "component": null,
+    "icon": "IconList",
+    "type": 1,
+    "permissionCode": "gp.task.read",
+    "orderNo": 1,
+    "visible": true
+  },
+  {
+    "code": "gp_task_comments",
+    "parentCode": "gp_root",
+    "name:zh-CN": "评论",
+    "name:en": "Comments",
+    "path": "/dynamic/gp-task-comment",
+    "component": null,
+    "icon": "IconMessageSquare",
+    "type": 1,
+    "permissionCode": "gp.task.read",
+    "orderNo": 2,
+    "visible": true
+  },
+  {
+    "code": "gp_approvals",
+    "parentCode": "gp_root",
+    "name:zh-CN": "审批",
+    "name:en": "Approvals",
+    "path": "/dynamic/gp-approval",
+    "component": null,
+    "icon": "IconCheckCircle",
+    "type": 1,
+    "permissionCode": "gp.approval.read",
+    "orderNo": 3,
+    "visible": true
+  }
+]

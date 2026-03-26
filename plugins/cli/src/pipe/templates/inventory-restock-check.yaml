@@ -1,0 +1,24 @@
+name: inventory-restock-check
+description: Check low-stock items and generate restock recommendations
+version: "1.0"
+
+steps:
+  - type: query
+    source: inv_stock_balance
+    sort:
+      field: updated_at
+      order: desc
+    limit: 200
+    output: stock_levels
+
+  - type: analyze
+    input: stock_levels
+    prompt: >
+      Identify items that are below safety stock or trending toward stockout.
+      For each low-stock item, recommend restock quantity based on
+      average consumption patterns. Prioritize by urgency.
+    output: restock_report
+
+  - type: notify
+    message: "Restock Check: {{restock_report.summary}}"
+    channel: console

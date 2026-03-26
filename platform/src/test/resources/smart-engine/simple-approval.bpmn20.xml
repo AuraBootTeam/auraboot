@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:smart="http://smart.alibaba.com"
+             targetNamespace="http://auraboot.com/bpm">
+
+  <process id="simple-approval" name="Simple Approval Process" version="1" isExecutable="true">
+
+    <startEvent id="start" name="Start"/>
+
+    <sequenceFlow id="flow1" sourceRef="start" targetRef="approvalTask"/>
+
+    <userTask id="approvalTask" name="Approval Task"
+              smart:assigneeType="user"
+              smart:assigneeId="approver1"/>
+
+    <sequenceFlow id="flow2" sourceRef="approvalTask" targetRef="end"/>
+
+    <endEvent id="end" name="End"/>
+
+  </process>
+
+</definitions>

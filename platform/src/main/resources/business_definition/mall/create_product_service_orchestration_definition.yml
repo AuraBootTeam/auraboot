@@ -1,0 +1,117 @@
+id: 1
+version: 1.0.0
+action: create_product
+
+components:
+  - name: userId
+    validations:
+      - type: login_required
+        value: true
+      - type: privilege_required
+        value: create_product # 隐含是具备某些店铺的创建商品权限，需要结合shopId进行权限检验
+  - name: name
+    validations:
+      - type: required
+        value: true
+      - type: max_length
+        value: 50
+  - name: keywords
+    validations:
+      - type: required
+        value: true
+      - type: max_length
+        value: 300
+  - name: description
+    validations:
+      - type: required
+        value: true
+      - type: max_length
+        value: 4000
+  - name: shop_id # only referenceid, select page on the page
+    validations:
+      - type: required
+        value: true
+  - name: root_category_id
+    multiple: true  # 需要将参数构造为数组
+    datasource: root_category_id
+    validations:
+      - type: required
+        value: true
+      - type: privilege_required
+        value: authorized     #隐含： 用户具备选择该类目的权限 （admin 给每个店铺指定的类目 ）
+  - name: leaf_category_id
+    dependency_field: root_category_id  # 隐含：     cascading: true
+    multiple: true  # 需要将参数构造为数组
+    datasource: leaf_category_id
+    validations:
+      - type: required
+        value: false
+      - type: privilege_required
+        value: authorized_if_present
+  - name: brand_id
+    validations:
+      - type: required
+        value: false
+      - type: privilege_required
+        value: authorized_if_present # 隐含：需要被品牌方授权，该值通常来源于授权系统的api
+  - name: main_show_url
+    widget: url
+    validations:
+      - type: required
+        value: true
+      - type: max_length
+        value: 200
+  - name: slide_show_urls
+    multiple: true  # 需要将参数构造为数组
+    widget: url
+    validations:
+      - type: required
+        value: true
+      - type: max_length
+        value: 200
+  - name: skus
+    widget: sku #    type: custom , 默认type 需要被定义为保留，其他均均属于自定义。 目前type 要么是 default(不用填)，custom 。 custom逻辑最复杂，需要单独演绎展示，构造请求参数和服务的教研逻辑
+    embedded: # 意味着是数组，   默认 multiple: true
+      - name: total_stock_quantity
+        widget: input
+        validations:
+          - type: required
+            value: true
+          - type: type
+            value: int  #  默认是普通string ，但是数字和email等格式需要额外指定。
+          - type: max
+            value: 100000000
+          - type: min
+            value: 1
+      - name: original_price
+        widget: input
+        validations:
+          - type: required
+            value: true
+          - type: type
+            value: double
+          - type: max
+            value: 100000000
+          - type: min
+            value: 0.01
+      - name: one_time_price
+        validations:
+          - type: required
+            value: false
+          - type: type
+            value: double
+          - type: max
+            value: 100000000
+          - type: min
+            value: 0.01
+      - name: currency
+        datasource: currency
+        validations:
+          - type: required
+            value: true
+    extensions:
+      multi_channel_inventory: false
+
+extensions:
+  reference_attrs: leaf_category  # 可以使用 include，exclude ，针对特定的规则
+

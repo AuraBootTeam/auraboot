@@ -1,0 +1,60 @@
+plugins {
+    id 'java-library'
+}
+
+group = 'com.auraboot'
+version = '1.0.0-SNAPSHOT'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    maven { url = 'https://maven.aliyun.com/repository/public' }
+    mavenCentral()
+}
+
+dependencies {
+    // Platform core (StorageProvider, StorageProperties, StorageType)
+    compileOnly project(':')
+
+    // Spring Boot (conditional annotations, lifecycle interfaces)
+    compileOnly 'org.springframework.boot:spring-boot-autoconfigure:3.5.6'
+    compileOnly 'org.springframework:spring-beans:6.2.6'
+    compileOnly 'org.springframework:spring-context:6.2.6'
+
+    // SLF4J for @Slf4j
+    compileOnly 'org.slf4j:slf4j-api:2.0.12'
+
+    // MinIO SDK
+    implementation 'io.minio:minio:8.5.7'
+
+    // Lombok
+    compileOnly 'org.projectlombok:lombok:1.18.40'
+    annotationProcessor 'org.projectlombok:lombok:1.18.40'
+
+    // Test — use platform plain JAR directly (avoids pulling in root project's transitive BOM deps)
+    testImplementation files("${project(':').buildDir}/libs/AuraBoot-1.0.0-SNAPSHOT-plain.jar")
+    testImplementation project(':platform-plugin-api')
+    testImplementation 'org.springframework:spring-beans:6.2.6'
+    testImplementation 'org.springframework.boot:spring-boot:3.5.6'
+    testImplementation 'com.fasterxml.jackson.core:jackson-annotations:2.19.2'
+    testImplementation 'com.baomidou:mybatis-plus-annotation:3.5.14'
+
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+    testImplementation 'org.mockito:mockito-core:5.11.0'
+    testImplementation 'org.mockito:mockito-junit-jupiter:5.11.0'
+}
+
+compileJava {
+    options.encoding = 'UTF-8'
+    options.compilerArgs += ['-parameters']
+}
+
+test {
+    useJUnitPlatform()
+    // Ensure root project JAR is built before running tests
+    dependsOn ':jar'
+}

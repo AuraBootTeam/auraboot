@@ -1,0 +1,1764 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://auraboot.io/schemas/plugin-manifest.json",
+  "title": "AuraBoot Plugin Manifest",
+  "description": "Schema for AuraBoot unified plugin package manifest (plugin.json)",
+  "type": "object",
+  "required": ["pluginId", "namespace", "version"],
+  "properties": {
+    "pluginId": {
+      "type": "string",
+      "description": "Unique plugin identifier in reverse domain name format",
+      "pattern": "^[a-z][a-z0-9.-]*$",
+      "maxLength": 128,
+      "examples": ["com.auraboot.asset-management"]
+    },
+    "namespace": {
+      "type": "string",
+      "description": "Resource isolation namespace, unique within tenant",
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "maxLength": 64,
+      "examples": ["asset", "workflow"]
+    },
+    "version": {
+      "type": "string",
+      "description": "Semantic version number",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(-[a-zA-Z0-9.-]+)?(\\+[a-zA-Z0-9.-]+)?$",
+      "examples": ["1.0.0", "2.1.3-beta.1"]
+    },
+    "displayName": {
+      "type": "string",
+      "description": "Default display name",
+      "maxLength": 128
+    },
+    "displayName:zh-CN": {
+      "type": "string",
+      "description": "Chinese display name",
+      "maxLength": 128
+    },
+    "displayName:en": {
+      "type": "string",
+      "description": "English display name",
+      "maxLength": 128
+    },
+    "description": {
+      "type": "string",
+      "description": "Plugin description",
+      "maxLength": 1000
+    },
+    "author": {
+      "type": "string",
+      "description": "Author or organization name",
+      "maxLength": 128
+    },
+    "homepage": {
+      "type": "string",
+      "description": "Plugin homepage or documentation URL",
+      "format": "uri"
+    },
+    "minPlatformVersion": {
+      "type": "string",
+      "description": "Minimum required platform version",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "dslVersion": {
+      "type": "integer",
+      "description": "DSL schema format version used by this plugin's page definitions (single integer, default 1)",
+      "default": 1,
+      "minimum": 1
+    },
+    "pluginType": {
+      "type": "string",
+      "description": "Plugin type classification",
+      "enum": ["config", "hybrid", "solution"],
+      "default": "config"
+    },
+    "dependencies": {
+      "type": "array",
+      "description": "List of dependent plugins. Supports string format (pluginId only) or object format (pluginId + version range)",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string",
+            "description": "Plugin ID (matches any version)"
+          },
+          {
+            "type": "object",
+            "required": ["pluginId"],
+            "properties": {
+              "pluginId": {
+                "type": "string",
+                "description": "Dependent plugin ID"
+              },
+              "version": {
+                "type": "string",
+                "description": "Semver version range (e.g. '>=1.0.0', '^1.2.0', '~1.0.0')"
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "provides": {
+      "type": "array",
+      "description": "Capabilities this plugin provides to others",
+      "items": {
+        "type": "object",
+        "required": ["type", "code"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["model", "command", "query", "automation", "api"],
+            "description": "Capability type"
+          },
+          "code": {
+            "type": "string",
+            "description": "Capability code (e.g. crm_account, crm:create_lead)"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "requires": {
+      "type": "array",
+      "description": "Capabilities this plugin requires from other plugins",
+      "items": {
+        "type": "object",
+        "required": ["type", "code"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["model", "command", "query", "automation", "api"],
+            "description": "Required capability type"
+          },
+          "code": {
+            "type": "string",
+            "description": "Required capability code"
+          },
+          "optional": {
+            "type": "boolean",
+            "default": false,
+            "description": "If true, plugin works without this capability"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "configSchema": {
+      "type": "object",
+      "description": "Plugin-specific configuration schema"
+    },
+    "defaultConfig": {
+      "type": "object",
+      "description": "Default configuration values"
+    },
+    "requiredPermissions": {
+      "type": "array",
+      "description": "List of permissions required by this plugin",
+      "items": {
+        "type": "string"
+      }
+    },
+    "providedModels": {
+      "type": "array",
+      "description": "List of model codes this plugin will create",
+      "items": {
+        "type": "string"
+      }
+    },
+    "providedCommands": {
+      "type": "array",
+      "description": "List of command codes this plugin will register",
+      "items": {
+        "type": "string"
+      }
+    },
+    "entryPoint": {
+      "type": "string",
+      "description": "Plugin entry point class name (fully qualified)"
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional metadata"
+    },
+    "resourceDirs": {
+      "type": "object",
+      "description": "Paths to resource configuration files",
+      "properties": {
+        "dicts": { "type": "string" },
+        "fields": { "type": "string" },
+        "models": { "type": "string" },
+        "modelFieldBindings": { "type": "string" },
+        "commands": { "type": "string" },
+        "processes": { "type": "string" },
+        "permissions": { "type": "string" },
+        "roles": { "type": "string" },
+        "menus": { "type": "string" },
+        "pages": { "type": "string" },
+        "reports": { "type": "string" },
+        "namedQueries": { "type": "string" },
+        "data": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "dicts": {
+      "type": "array",
+      "description": "Inline dictionary definitions",
+      "items": { "$ref": "#/$defs/dictDefinition" }
+    },
+    "fields": {
+      "type": "array",
+      "description": "Inline field definitions",
+      "items": { "$ref": "#/$defs/fieldDefinition" }
+    },
+    "models": {
+      "type": "array",
+      "description": "Inline model definitions",
+      "items": { "$ref": "#/$defs/modelDefinition" }
+    },
+    "modelFieldBindings": {
+      "type": "array",
+      "description": "Inline model-field binding definitions",
+      "items": { "$ref": "#/$defs/bindingDefinition" }
+    },
+    "commands": {
+      "type": "array",
+      "description": "Inline command definitions",
+      "items": { "$ref": "#/$defs/commandDefinition" }
+    },
+    "bindingRules": {
+      "type": "array",
+      "description": "Standalone binding rule definitions",
+      "items": { "$ref": "#/$defs/bindingRuleDefinition" }
+    },
+    "permissions": {
+      "type": "array",
+      "description": "Inline permission definitions",
+      "items": { "$ref": "#/$defs/permissionDefinition" }
+    },
+    "roles": {
+      "type": "array",
+      "description": "Inline role definitions",
+      "items": { "$ref": "#/$defs/roleDefinition" }
+    },
+    "menus": {
+      "type": "array",
+      "description": "Inline menu definitions",
+      "items": { "$ref": "#/$defs/menuDefinition" }
+    },
+    "pages": {
+      "type": "array",
+      "description": "Inline page definitions",
+      "items": { "$ref": "#/$defs/pageDefinition" }
+    },
+    "processes": {
+      "type": "array",
+      "description": "Inline BPM process definitions",
+      "items": { "$ref": "#/$defs/processDefinition" }
+    },
+    "namedQueries": {
+      "type": "array",
+      "description": "Inline named query definitions",
+      "items": { "$ref": "#/$defs/namedQueryDefinition" }
+    },
+    "client": {
+      "type": "object",
+      "description": "Frontend client plugin configuration",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether frontend plugin is enabled"
+        },
+        "url": {
+          "type": "string",
+          "description": "CDN URL for frontend assets (optional, for CDN mode)"
+        },
+        "components": {
+          "type": "array",
+          "description": "List of frontend components provided by this plugin",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "description": "Component type: form-field, page-action, dashboard-widget, sidebar-menu"
+              },
+              "name": {
+                "type": "string",
+                "description": "Component name"
+              },
+              "description": {
+                "type": "string",
+                "description": "Component description"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "backend": {
+      "type": "object",
+      "description": "Backend plugin configuration",
+      "properties": {
+        "jarFile": {
+          "type": "string",
+          "description": "Path to the PF4J JAR file relative to package root"
+        },
+        "entryPoint": {
+          "type": "string",
+          "description": "Fully qualified class name of the plugin entry point"
+        }
+      },
+      "additionalProperties": false
+    },
+    "clientConfig": {
+      "type": "object",
+      "description": "Frontend plugin configuration (legacy)",
+      "properties": {
+        "remoteEntry": {
+          "type": "string",
+          "description": "Path to the Module Federation remote entry file"
+        },
+        "exposedModules": {
+          "type": "array",
+          "description": "List of exposed frontend modules",
+          "items": {
+            "type": "object",
+            "required": ["name", "path"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Module name for loading"
+              },
+              "path": {
+                "type": "string",
+                "description": "Module path in the federation config"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "slots": {
+          "type": "array",
+          "description": "Slot contribution configurations",
+          "items": {
+            "type": "object",
+            "required": ["slotId", "componentName"],
+            "properties": {
+              "slotId": {
+                "type": "string",
+                "description": "Target slot identifier"
+              },
+              "componentName": {
+                "type": "string",
+                "description": "Component name from exposed modules"
+              },
+              "priority": {
+                "type": "integer",
+                "description": "Rendering priority (lower = higher priority)",
+                "default": 100
+              },
+              "props": {
+                "type": "object",
+                "description": "Additional props to pass to the component"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "routes": {
+          "type": "array",
+          "description": "Route contribution configurations",
+          "items": {
+            "type": "object",
+            "required": ["path", "componentName"],
+            "properties": {
+              "path": {
+                "type": "string",
+                "description": "Route path"
+              },
+              "componentName": {
+                "type": "string",
+                "description": "Component name from exposed modules"
+              },
+              "exact": {
+                "type": "boolean",
+                "default": true
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "menuItems": {
+          "type": "array",
+          "description": "Frontend menu contributions",
+          "items": {
+            "type": "object",
+            "required": ["key", "label", "path"],
+            "properties": {
+              "key": { "type": "string" },
+              "label": { "type": "string" },
+              "icon": { "type": "string" },
+              "path": { "type": "string" },
+              "order": { "type": "integer" },
+              "parent": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "importOptions": {
+      "type": "object",
+      "description": "Import behavior options",
+      "properties": {
+        "conflictStrategy": {
+          "type": "string",
+          "enum": ["error", "skip", "overwrite"],
+          "default": "error",
+          "description": "How to handle conflicts with existing resources"
+        },
+        "validateReferences": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether to validate reference integrity"
+        },
+        "autoDeployProcesses": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether to auto-deploy process definitions"
+        },
+        "createResourcePermissions": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether to auto-create resource-level permissions"
+        },
+        "autoPublishPages": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether to auto-publish page definitions"
+        }
+      },
+      "additionalProperties": false
+    },
+    "licenseMode": {
+      "type": "string",
+      "description": "License mode governing how entitlements are managed",
+      "enum": ["free", "platform", "vendor"],
+      "default": "free"
+    },
+    "plans": {
+      "type": "array",
+      "description": "Available subscription/pricing plans for this plugin",
+      "items": {
+        "type": "object",
+        "required": ["code"],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Unique plan code within this plugin"
+          },
+          "displayNameZh": {
+            "type": "string",
+            "description": "Chinese display name for the plan"
+          },
+          "displayNameEn": {
+            "type": "string",
+            "description": "English display name for the plan"
+          },
+          "isDefault": {
+            "type": "boolean",
+            "description": "Whether this is the default plan for new installations"
+          },
+          "trialDays": {
+            "type": "integer",
+            "description": "Number of trial days before billing starts",
+            "minimum": 0
+          },
+          "billingType": {
+            "type": "string",
+            "description": "Billing model for this plan",
+            "enum": ["free", "subscription", "one_time"]
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "features": {
+      "type": "array",
+      "description": "Entitlement feature flags that can be gated per plan",
+      "items": {
+        "type": "object",
+        "required": ["key"],
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "Feature key in namespace.featureCode format",
+            "pattern": "^[a-z][a-z0-9_]*\\.[a-zA-Z][a-zA-Z0-9_]*$"
+          },
+          "displayNameZh": {
+            "type": "string",
+            "description": "Chinese display name for the feature"
+          },
+          "displayNameEn": {
+            "type": "string",
+            "description": "English display name for the feature"
+          },
+          "dependsOn": {
+            "type": "array",
+            "description": "List of feature keys this feature depends on",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "planFeatures": {
+      "type": "object",
+      "description": "Mapping of plan codes to arrays of feature keys enabled for that plan",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "dictDefinition": {
+      "type": "object",
+      "description": "Dictionary definition for enumerated value sets",
+      "required": ["code"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "description": "Dictionary code (unique within tenant)"
+        },
+        "name:zh-CN": {
+          "type": "string",
+          "description": "Chinese dictionary name"
+        },
+        "name:en": {
+          "type": "string",
+          "description": "English dictionary name"
+        },
+        "dictType": {
+          "type": "string",
+          "description": "Dictionary type",
+          "enum": ["static", "dynamic", "tree"],
+          "default": "static"
+        },
+        "description": {
+          "type": "string",
+          "description": "Dictionary description"
+        },
+        "extension": {
+          "type": "object",
+          "description": "Extension properties"
+        },
+        "items": {
+          "type": "array",
+          "description": "Dictionary items",
+          "items": { "$ref": "#/$defs/dictItemDefinition" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "dictItemDefinition": {
+      "type": "object",
+      "description": "Dictionary item definition",
+      "required": ["value"],
+      "properties": {
+        "value": {
+          "type": "string",
+          "description": "Item value (unique within dictionary)"
+        },
+        "label:zh-CN": {
+          "type": "string",
+          "description": "Chinese label"
+        },
+        "label:en": {
+          "type": "string",
+          "description": "English label"
+        },
+        "parentValue": {
+          "type": "string",
+          "description": "Parent value for tree structure"
+        },
+        "sortNo": {
+          "type": "integer",
+          "description": "Sort order",
+          "default": 0
+        },
+        "color": {
+          "type": "string",
+          "description": "Display color for the item"
+        },
+        "status": {
+          "type": "string",
+          "description": "Item status",
+          "default": "enabled"
+        },
+        "extra": {
+          "type": "object",
+          "description": "Extra properties"
+        },
+        "extension": {
+          "type": "object",
+          "description": "Extension properties (e.g. color for status tags)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "fieldDefinition": {
+      "type": "object",
+      "description": "Meta field definition",
+      "required": ["code", "dataType"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "description": "Field code (unique within tenant)"
+        },
+        "displayName:zh-CN": {
+          "type": "string",
+          "description": "Chinese display name"
+        },
+        "displayName:en": {
+          "type": "string",
+          "description": "English display name"
+        },
+        "description": {
+          "type": "string",
+          "description": "Field description"
+        },
+        "dataType": {
+          "type": "string",
+          "description": "Data type of the field",
+          "enum": [
+            "string", "text", "integer", "decimal", "boolean",
+            "date", "datetime", "json", "reference", "enum",
+            "dict", "relation", "computed"
+          ]
+        },
+        "dictCode": {
+          "type": "string",
+          "description": "Dictionary code for DICT/ENUM type fields"
+        },
+        "constraints": {
+          "type": "object",
+          "description": "Field constraints",
+          "properties": {
+            "required": {
+              "type": "boolean",
+              "description": "Whether the field is required"
+            },
+            "maxLength": {
+              "type": "integer",
+              "description": "Maximum string length"
+            },
+            "minLength": {
+              "type": "integer",
+              "description": "Minimum string length"
+            },
+            "pattern": {
+              "type": "string",
+              "description": "Regex validation pattern"
+            },
+            "min": {
+              "type": "number",
+              "description": "Minimum numeric value"
+            },
+            "max": {
+              "type": "number",
+              "description": "Maximum numeric value"
+            },
+            "precision": {
+              "type": "integer",
+              "description": "Decimal precision (total digits)"
+            },
+            "scale": {
+              "type": "integer",
+              "description": "Decimal scale (digits after decimal point)"
+            },
+            "unique": {
+              "type": "boolean",
+              "description": "Whether the field value must be unique"
+            }
+          },
+          "additionalProperties": false
+        },
+        "feature": {
+          "type": "object",
+          "description": "Field features/flags (searchable, sortable, indexable, etc.)"
+        },
+        "uiSchema": {
+          "type": "object",
+          "description": "UI schema for rendering hints"
+        },
+        "querySchema": {
+          "type": "object",
+          "description": "Query schema for search configuration"
+        },
+        "ruleSchema": {
+          "type": "object",
+          "description": "Validation rules schema"
+        },
+        "refTarget": {
+          "type": "object",
+          "description": "Reference target configuration (for REFERENCE type: targetModel, targetField, relationship, etc.)"
+        },
+        "defaultValue": {
+          "type": "string",
+          "description": "Default value expression"
+        },
+        "extension": {
+          "type": "object",
+          "description": "Extension properties"
+        }
+      },
+      "additionalProperties": false
+    },
+    "modelDefinition": {
+      "type": "object",
+      "description": "Meta model definition",
+      "required": ["code"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "description": "Model code (unique within tenant)"
+        },
+        "displayName:zh-CN": {
+          "type": "string",
+          "description": "Chinese display name"
+        },
+        "displayName:en": {
+          "type": "string",
+          "description": "English display name"
+        },
+        "description": {
+          "type": "string",
+          "description": "Model description"
+        },
+        "modelType": {
+          "type": "string",
+          "description": "Model type",
+          "enum": ["entity", "view", "virtual", "aggregate", "value_object"]
+        },
+        "modelCategory": {
+          "type": "string",
+          "enum": ["document", "master", "transaction", "activity", "reference", "entity"],
+          "description": "Business object classification"
+        },
+        "tableName": {
+          "type": "string",
+          "description": "Table name for the model (optional, auto-generated if not specified)"
+        },
+        "isAbstract": {
+          "type": "boolean",
+          "description": "Whether this model is abstract (cannot be instantiated directly)",
+          "default": false
+        },
+        "parentModelCode": {
+          "type": "string",
+          "description": "Parent model code for inheritance"
+        },
+        "extension": {
+          "type": "object",
+          "description": "Extension properties (stored in JSONB). May include: titleField, subtitleField, documentConfig, rules (cross-field validation), etc.",
+          "properties": {
+            "rules": {
+              "type": "array",
+              "description": "Cross-field validation rules (model-level baseline)",
+              "items": {
+                "type": "object",
+                "required": ["id", "assert", "message"],
+                "properties": {
+                  "id": { "type": "string" },
+                  "when": { "type": "object" },
+                  "assert": { "type": "object" },
+                  "message": { "type": "string" },
+                  "severity": { "type": "string", "enum": ["error", "warning"] },
+                  "targetField": { "type": "string" },
+                  "dependsOn": { "type": "array", "items": { "type": "string" } }
+                }
+              }
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "bindingDefinition": {
+      "type": "object",
+      "description": "Model-field binding definition",
+      "required": ["modelCode", "fieldCode"],
+      "properties": {
+        "modelCode": {
+          "type": "string",
+          "description": "Model code to bind the field to"
+        },
+        "fieldCode": {
+          "type": "string",
+          "description": "Field code to bind"
+        },
+        "sequence": {
+          "type": "integer",
+          "description": "Display sequence/order",
+          "default": 0
+        },
+        "required": {
+          "type": "boolean",
+          "description": "Whether the field is required in this model context",
+          "default": false
+        },
+        "visible": {
+          "type": "boolean",
+          "description": "Whether the field is visible in UI",
+          "default": true
+        },
+        "editable": {
+          "type": "boolean",
+          "description": "Whether the field is editable",
+          "default": true
+        },
+        "defaultValue": {
+          "type": "string",
+          "description": "Default value override for this binding"
+        },
+        "aliasCode": {
+          "type": "string",
+          "description": "Alias code for this field in the model context"
+        },
+        "dictOverrideCode": {
+          "type": "string",
+          "description": "Dictionary override code"
+        },
+        "uiHint": {
+          "type": "string",
+          "description": "UI hint override"
+        },
+        "validationOverride": {
+          "type": "string",
+          "description": "Validation rules override"
+        },
+        "isSystemBinding": {
+          "type": "boolean",
+          "description": "Whether this is a system binding (cannot be unbound)",
+          "default": false
+        },
+        "displayConfig": {
+          "type": "object",
+          "description": "Display configuration override"
+        },
+        "remarks": {
+          "type": "string",
+          "description": "Remarks/notes for this binding"
+        }
+      },
+      "additionalProperties": false
+    },
+    "commandDefinition": {
+      "type": "object",
+      "description": "Command definition for CRUD and business operations",
+      "required": ["code", "modelCode"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "description": "Command code (unique within tenant)"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Default display name"
+        },
+        "displayName:zh-CN": {
+          "type": "string",
+          "description": "Chinese display name"
+        },
+        "displayName:en": {
+          "type": "string",
+          "description": "English display name"
+        },
+        "description": {
+          "type": "string",
+          "description": "Command description"
+        },
+        "modelCode": {
+          "type": "string",
+          "description": "Primary model code this command operates on"
+        },
+        "type": {
+          "type": "string",
+          "description": "Command type",
+          "enum": [
+            "create", "update", "delete", "state_transition",
+            "query", "action", "batch_create", "batch_update",
+            "batch_delete", "import"
+          ]
+        },
+        "inputFields": {
+          "type": "array",
+          "description": "Input field codes accepted by this command",
+          "items": { "type": "string" }
+        },
+        "inputSchema": {
+          "type": "object",
+          "description": "Input schema defining command parameters"
+        },
+        "targetModels": {
+          "type": "array",
+          "description": "Target models affected by this command",
+          "items": { "type": "string" }
+        },
+        "executionConfig": {
+          "type": "object",
+          "description": "Execution configuration",
+          "properties": {
+            "executionMode": {
+              "type": "string",
+              "description": "Execution mode (e.g., SYNC, ASYNC, BPM)"
+            },
+            "handler": {
+              "type": "string",
+              "description": "Handler class or bean name"
+            },
+            "timeout": {
+              "type": "integer",
+              "description": "Execution timeout in milliseconds"
+            },
+            "retryPolicy": {
+              "type": "object",
+              "description": "Retry policy configuration"
+            },
+            "requireIdempotencyKey": {
+              "type": "boolean",
+              "description": "Whether to require an idempotency key"
+            },
+            "processKey": {
+              "type": "string",
+              "description": "BPM process key for BPM execution mode"
+            },
+            "options": {
+              "type": "object",
+              "description": "Additional execution options"
+            }
+          },
+          "additionalProperties": false
+        },
+        "bindingRules": {
+          "type": "array",
+          "description": "Binding rules for this command",
+          "items": { "$ref": "#/$defs/bindingRuleDefinition" }
+        },
+        "extension": {
+          "type": "object",
+          "description": "Extension properties"
+        },
+        "autoSetFields": {
+          "type": "object",
+          "description": "Auto-set fields on execution. Map of fieldCode to {strategy, value?}",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["strategy"],
+            "properties": {
+              "strategy": {
+                "type": "string",
+                "description": "Strategy for auto-setting field value",
+                "enum": ["auto_generate", "current_user", "current_user_pid", "current_datetime", "fixed_value", "current_username", "copy_field"]
+              },
+              "value": {
+                "description": "Fixed value when strategy is FIXED_VALUE"
+              },
+              "sourceField": {
+                "type": "string",
+                "description": "Source field when strategy is COPY_FIELD"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "sideEffects": {
+          "type": "array",
+          "description": "Side effects executed after the main operation",
+          "items": {
+            "type": "object",
+            "properties": {
+              "condition": {
+                "type": "string",
+                "description": "SpEL condition for triggering this side effect"
+              },
+              "action": {
+                "type": "string",
+                "description": "Action type (e.g., CREATE_RECORD, UPDATE_RECORD)"
+              },
+              "targetModel": {
+                "type": "string",
+                "description": "Target model code for the side effect"
+              },
+              "targetIdField": {
+                "type": "string",
+                "description": "Field containing the target record ID"
+              },
+              "fieldMapping": {
+                "type": "object",
+                "description": "Field mappings for the side effect operation"
+              },
+              "actions": {
+                "type": "array",
+                "description": "List of actions to execute",
+                "items": { "type": "object" }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "stateTransitionRules": {
+          "type": "array",
+          "description": "Conditional state transition rules (multi-branch)",
+          "items": {
+            "type": "object",
+            "properties": {
+              "condition": {
+                "type": "string",
+                "description": "Legacy condition field (deprecated, use guard)"
+              },
+              "guard": {
+                "type": "string",
+                "description": "SpEL guard expression for this transition rule"
+              },
+              "toState": {
+                "type": "string",
+                "description": "Target state when guard evaluates to true"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "fromStates": {
+          "type": "array",
+          "description": "Valid source states for state transitions",
+          "items": { "type": "string" }
+        },
+        "toState": {
+          "type": "string",
+          "description": "Target state for simple (non-branching) state transitions"
+        },
+        "stateField": {
+          "type": "string",
+          "description": "State field name for state transitions"
+        },
+        "permissions": {
+          "type": "array",
+          "description": "Required permission codes",
+          "items": { "type": "string" }
+        },
+        "cascadeDelete": {
+          "type": "array",
+          "description": "Cascade delete configuration for child models",
+          "items": {
+            "type": "object",
+            "required": ["childModel", "parentField"],
+            "properties": {
+              "childModel": {
+                "type": "string",
+                "description": "Child model code to cascade delete"
+              },
+              "parentField": {
+                "type": "string",
+                "description": "Foreign key field in child model referencing parent"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "computedFields": {
+          "type": "object",
+          "description": "Computed fields using SpEL expressions. Map of fieldCode to SpEL expression string",
+          "additionalProperties": { "type": "string" }
+        },
+        "postActions": {
+          "type": "array",
+          "description": "Post-actions executed after main operation (e.g., CREATE_CHILDREN)",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "description": "Action type identifier"
+              },
+              "action": {
+                "type": "string",
+                "description": "Action operation (e.g., CREATE_CHILDREN)"
+              },
+              "targetModel": {
+                "type": "string",
+                "description": "Target model code for the action"
+              },
+              "childModel": {
+                "type": "string",
+                "description": "Child model code for CREATE_CHILDREN actions"
+              },
+              "parentField": {
+                "type": "string",
+                "description": "Parent foreign key field in child model"
+              },
+              "fieldMapping": {
+                "type": "object",
+                "description": "Field mappings for the post-action"
+              },
+              "records": {
+                "type": "array",
+                "description": "Predefined records to create",
+                "items": { "type": "object" }
+              },
+              "count": {
+                "type": "integer",
+                "description": "Number of records to create"
+              },
+              "condition": {
+                "type": "string",
+                "description": "SpEL condition for conditional execution"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "validation": {
+          "type": "object",
+          "description": "Validation rules configuration",
+          "properties": {
+            "rules": {
+              "type": "array",
+              "description": "List of validation rules",
+              "items": {
+                "type": "object",
+                "required": ["type"],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "description": "Validation rule type (e.g., UNIQUE_COMPOSITE, HAS_CHILDREN, REQUIRED)"
+                  },
+                  "fields": {
+                    "type": "array",
+                    "description": "Fields involved in the validation",
+                    "items": { "type": "string" }
+                  },
+                  "message:zh-CN": {
+                    "type": "string",
+                    "description": "Chinese error message"
+                  },
+                  "message:en": {
+                    "type": "string",
+                    "description": "English error message"
+                  }
+                },
+                "additionalProperties": true
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "preconditions": {
+          "type": "array",
+          "description": "Preconditions that must be satisfied before execution",
+          "items": { "type": "object" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "bindingRuleDefinition": {
+      "type": "object",
+      "description": "Binding rule for command UI integration and data mapping",
+      "properties": {
+        "commandCode": {
+          "type": "string",
+          "description": "Command code this rule belongs to (null if embedded in command)"
+        },
+        "ruleType": {
+          "type": "string",
+          "description": "Rule type: FIELD_MAPPING, EXPRESSION, HANDLER, EVENT, VALIDATION, etc."
+        },
+        "expression": {
+          "type": "string",
+          "description": "Expression for EXPRESSION rule type"
+        },
+        "targetModel": {
+          "type": "string",
+          "description": "Target model for the binding"
+        },
+        "targetField": {
+          "type": "string",
+          "description": "Target field for field mapping"
+        },
+        "sourceField": {
+          "type": "string",
+          "description": "Source field for field mapping"
+        },
+        "handlerClass": {
+          "type": "string",
+          "description": "Handler class for HANDLER rule type"
+        },
+        "eventType": {
+          "type": "string",
+          "description": "Event type for EVENT rule type"
+        },
+        "context": {
+          "type": "string",
+          "description": "Binding context"
+        },
+        "modelCode": {
+          "type": "string",
+          "description": "Model code for the binding"
+        },
+        "triggerCondition": {
+          "type": "string",
+          "description": "Trigger condition expression"
+        },
+        "config": {
+          "type": "object",
+          "description": "Rule configuration"
+        },
+        "sequence": {
+          "type": "integer",
+          "description": "Execution sequence/order",
+          "default": 0
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether the rule is enabled",
+          "default": true
+        },
+        "extension": {
+          "type": "object",
+          "description": "Extension properties"
+        }
+      },
+      "additionalProperties": false
+    },
+    "permissionDefinition": {
+      "type": "object",
+      "description": "Permission definition for access control",
+      "required": ["code"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "description": "Permission code (unique within tenant)"
+        },
+        "name:zh-CN": {
+          "type": "string",
+          "description": "Chinese permission name"
+        },
+        "name:en": {
+          "type": "string",
+          "description": "English permission name"
+        },
+        "description": {
+          "type": "string",
+          "description": "Permission description"
+        },
+        "category": {
+          "type": "string",
+          "description": "Permission category for grouping"
+        },
+        "resourceType": {
+          "type": "string",
+          "description": "Resource type: MODEL, PAGE, API, MENU, etc."
+        },
+        "resourceCode": {
+          "type": "string",
+          "description": "Resource code this permission applies to"
+        },
+        "action": {
+          "type": "string",
+          "description": "Action: CREATE, READ, UPDATE, DELETE, EXECUTE, etc."
+        },
+        "module": {
+          "type": "string",
+          "description": "Module this permission belongs to"
+        },
+        "dataScopeType": {
+          "type": "string",
+          "description": "Data scope type: ALL, OWN, DEPT, CUSTOM, etc."
+        },
+        "dataScopeConfig": {
+          "type": "object",
+          "description": "Data scope configuration"
+        },
+        "parentCode": {
+          "type": "string",
+          "description": "Parent permission code for hierarchy"
+        },
+        "tags": {
+          "type": "array",
+          "description": "Tags for filtering",
+          "items": { "type": "string" }
+        },
+        "extension": {
+          "type": "object",
+          "description": "Extension properties"
+        }
+      },
+      "additionalProperties": false
+    },
+    "roleDefinition": {
+      "type": "object",
+      "description": "Role definition for RBAC",
+      "required": ["code"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "description": "Role code (unique within tenant)"
+        },
+        "name:zh-CN": {
+          "type": "string",
+          "description": "Chinese role name"
+        },
+        "name:en": {
+          "type": "string",
+          "description": "English role name"
+        },
+        "description": {
+          "type": "string",
+          "description": "Role description"
+        },
+        "type": {
+          "type": "string",
+          "description": "Role type: SYSTEM, CUSTOM, etc.",
+          "default": "custom"
+        },
+        "module": {
+          "type": "string",
+          "description": "Module this role belongs to"
+        },
+        "permissions": {
+          "type": "array",
+          "description": "Permission codes assigned to this role",
+          "items": { "type": "string" }
+        },
+        "priority": {
+          "type": "integer",
+          "description": "Priority for permission conflict resolution",
+          "default": 100
+        },
+        "isDefault": {
+          "type": "boolean",
+          "description": "Whether this is a default role for new users",
+          "default": false
+        },
+        "isSystem": {
+          "type": "boolean",
+          "description": "Whether this is a system role (cannot be deleted)",
+          "default": false
+        },
+        "scopeType": {
+          "type": "string",
+          "description": "Scope type: GLOBAL, TENANT, DEPARTMENT, etc."
+        },
+        "scopeContent": {
+          "type": "object",
+          "description": "Scope content configuration"
+        }
+      },
+      "additionalProperties": false
+    },
+    "menuDefinition": {
+      "type": "object",
+      "description": "Menu definition for navigation",
+      "required": ["code"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "description": "Menu code (unique within tenant)"
+        },
+        "name:zh-CN": {
+          "type": "string",
+          "description": "Chinese menu name"
+        },
+        "name:en": {
+          "type": "string",
+          "description": "English menu name"
+        },
+        "path": {
+          "type": "string",
+          "description": "Route path"
+        },
+        "component": {
+          "type": ["string", "null"],
+          "description": "Component path for frontend routing"
+        },
+        "icon": {
+          "type": "string",
+          "description": "Menu icon name"
+        },
+        "type": {
+          "type": "integer",
+          "description": "Menu type: 0=directory (has children), 1=menu (leaf node)",
+          "enum": [0, 1, 2, 3]
+        },
+        "parentCode": {
+          "type": ["string", "null"],
+          "description": "Parent menu code (null for top-level menus)"
+        },
+        "permissionCode": {
+          "type": "string",
+          "description": "Permission code required to see this menu"
+        },
+        "visible": {
+          "type": "boolean",
+          "description": "Whether the menu is visible",
+          "default": true
+        },
+        "orderNo": {
+          "type": "integer",
+          "description": "Display order (lower = first)",
+          "default": 0
+        },
+        "i18nKey": {
+          "type": "string",
+          "description": "I18n key for the menu name"
+        },
+        "redirect": {
+          "type": "string",
+          "description": "Redirect path"
+        },
+        "pagePid": {
+          "type": "string",
+          "description": "Page PID for page binding"
+        },
+        "pageKey": {
+          "type": "string",
+          "description": "Page key for linking to a page defined in pages. Resolved to pagePid during import"
+        },
+        "modelCode": {
+          "type": "string",
+          "description": "Model code for dynamic CRUD page binding"
+        },
+        "pageType": {
+          "type": "string",
+          "description": "Page type for dynamic rendering: list, detail, form, dashboard",
+          "default": "list"
+        },
+        "children": {
+          "type": "array",
+          "description": "Child menu definitions (recursive)",
+          "items": { "$ref": "#/$defs/menuDefinition" }
+        },
+        "extension": {
+          "type": "object",
+          "description": "Extension properties"
+        }
+      },
+      "additionalProperties": false
+    },
+    "pageDefinition": {
+      "type": "object",
+      "description": "Page schema definition for DSL-driven UI",
+      "required": ["pageKey", "pageType"],
+      "properties": {
+        "pageKey": {
+          "type": "string",
+          "description": "Page key (unique identifier)"
+        },
+        "name:zh-CN": {
+          "type": "string",
+          "description": "Chinese page name"
+        },
+        "name:en": {
+          "type": "string",
+          "description": "English page name"
+        },
+        "title": {
+          "type": "string",
+          "description": "Page title"
+        },
+        "description": {
+          "type": "string",
+          "description": "Page description"
+        },
+        "pageType": {
+          "type": "string",
+          "description": "Page type",
+          "enum": ["list", "form", "detail", "dashboard", "custom"]
+        },
+        "pageCategory": {
+          "type": "string",
+          "description": "Page category: MODEL, SYSTEM, CUSTOM, etc.",
+          "default": "model"
+        },
+        "modelCode": {
+          "type": "string",
+          "description": "Associated model code (for MODEL category pages)"
+        },
+        "commandCode": {
+          "type": "string",
+          "description": "Associated command code"
+        },
+        "route": {
+          "type": "string",
+          "description": "Route path for the page"
+        },
+        "dslSchema": {
+          "description": "DSL schema defining page structure",
+          "$ref": "dsl-schema.generated.json#/definitions/DslSchema"
+        },
+        "schemaVersion": {
+          "type": "integer",
+          "description": "DSL schema format version (single integer, default 1)",
+          "default": 1,
+          "minimum": 1
+        },
+        "metaInfo": {
+          "type": "object",
+          "description": "Page meta information"
+        },
+        "isTemplate": {
+          "type": "boolean",
+          "description": "Whether this is a page template",
+          "default": false
+        },
+        "templateCategory": {
+          "type": "string",
+          "description": "Template category if isTemplate is true"
+        },
+        "namespace": {
+          "type": "string",
+          "description": "Namespace for page isolation",
+          "default": "default"
+        },
+        "env": {
+          "type": "string",
+          "description": "Environment: dev, test, prod",
+          "default": "prod"
+        },
+        "sortWeight": {
+          "type": "integer",
+          "description": "Sort weight for ordering",
+          "default": 0
+        },
+        "extension": {
+          "type": "object",
+          "description": "Extension properties"
+        }
+      },
+      "additionalProperties": false
+    },
+    "processDefinition": {
+      "type": "object",
+      "description": "BPM process definition for workflow automation",
+      "required": ["key"],
+      "properties": {
+        "key": {
+          "type": "string",
+          "description": "Process key (unique identifier)"
+        },
+        "name:zh-CN": {
+          "type": "string",
+          "description": "Chinese process name"
+        },
+        "name:en": {
+          "type": "string",
+          "description": "English process name"
+        },
+        "description": {
+          "type": "string",
+          "description": "Process description"
+        },
+        "bpmnFile": {
+          "type": "string",
+          "description": "BPMN file path relative to plugin package"
+        },
+        "bpmnContent": {
+          "type": "string",
+          "description": "Inline BPMN XML content (alternative to bpmnFile)"
+        },
+        "category": {
+          "type": "string",
+          "description": "Process category for organization"
+        },
+        "formBindings": {
+          "type": "object",
+          "description": "Form bindings for user tasks. Key: user task ID, Value: form configuration",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "formType": {
+                "type": "string",
+                "description": "Form type: MODEL, PAGE, CUSTOM"
+              },
+              "modelCode": {
+                "type": "string",
+                "description": "Model code for MODEL form type"
+              },
+              "pagePid": {
+                "type": "string",
+                "description": "Page PID for PAGE form type"
+              },
+              "customComponent": {
+                "type": "string",
+                "description": "Custom form component name"
+              },
+              "fields": {
+                "type": "array",
+                "description": "Fields to display/edit",
+                "items": { "type": "string" }
+              },
+              "readOnlyFields": {
+                "type": "array",
+                "description": "Read-only fields",
+                "items": { "type": "string" }
+              },
+              "validation": {
+                "type": "object",
+                "description": "Validation configuration"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "businessDataBindings": {
+          "type": "array",
+          "description": "Business data bindings",
+          "items": {
+            "type": "object",
+            "properties": {
+              "modelCode": {
+                "type": "string",
+                "description": "Model code for business data"
+              },
+              "bindingType": {
+                "type": "string",
+                "description": "Binding type: START_FORM, PROCESS_VARIABLE, etc."
+              },
+              "variableName": {
+                "type": "string",
+                "description": "Variable name in process"
+              },
+              "expression": {
+                "type": "string",
+                "description": "Expression for data extraction"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "autoDeploy": {
+          "type": "boolean",
+          "description": "Whether to auto-deploy when imported",
+          "default": true
+        },
+        "designerJson": {
+          "type": "object",
+          "description": "Designer JSON (React Flow format) as alternative to bpmnFile/bpmnContent"
+        },
+        "extension": {
+          "type": "object",
+          "description": "Extension properties"
+        }
+      },
+      "additionalProperties": false
+    },
+    "namedQueryDefinition": {
+      "type": "object",
+      "description": "Named query definition",
+      "required": ["code", "fromSql"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "description": "Named query code (unique within tenant)"
+        },
+        "title": {
+          "type": "string",
+          "description": "Default query title"
+        },
+        "title:zh-CN": {
+          "type": "string",
+          "description": "Chinese query title"
+        },
+        "title:en": {
+          "type": "string",
+          "description": "English query title"
+        },
+        "description": {
+          "type": "string",
+          "description": "Query description"
+        },
+        "fromSql": {
+          "type": "string",
+          "description": "FROM clause SQL"
+        },
+        "baseWhere": {
+          "type": "object",
+          "description": "Base WHERE condition JSON"
+        },
+        "defaultOrder": {
+          "type": "object",
+          "description": "Default ORDER JSON"
+        },
+        "status": {
+          "type": "string",
+          "description": "Named query lifecycle status",
+          "enum": ["draft", "testing", "published", "deprecated", "archived", "enabled", "disabled"]
+        },
+        "fields": {
+          "type": "array",
+          "description": "Named query field definitions",
+          "items": {
+            "type": "object",
+            "required": ["fieldCode", "columnExpr", "dataType"],
+            "properties": {
+              "fieldCode": { "type": "string" },
+              "columnExpr": { "type": "string" },
+              "dataType": { "type": "string", "enum": ["string", "number", "date", "boolean", "json", "array"] },
+              "operators": { "type": "array", "items": { "type": "string" } },
+              "dictCode": { "type": "string" },
+              "sortable": { "type": "boolean" },
+              "searchable": { "type": "boolean" },
+              "displayName": { "type": "string" },
+              "description": { "type": "string" },
+              "sortOrder": { "type": "integer" },
+              "required": { "type": "boolean" },
+              "fieldGroup": { "type": "string" },
+              "uiComponent": { "type": "string" },
+              "placeholder": { "type": "string" },
+              "defaultValue": { "type": "string" },
+              "linkedField": { "type": "string" },
+              "uiConfig": { "type": "object" },
+              "tags": { "type": "array", "items": { "type": "string" } },
+              "validationRules": { "type": "string" },
+              "formatRules": { "type": "string" },
+              "weight": { "type": "integer" },
+              "sensitive": { "type": "boolean" },
+              "maskingRule": { "type": "string" },
+              "useDefaultOperators": { "type": "boolean" },
+              "validateOperators": { "type": "boolean" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "metadata": {
+          "type": "object",
+          "description": "Metadata JSON"
+        },
+        "validateSql": {
+          "type": "boolean",
+          "description": "Whether to validate SQL syntax on import"
+        },
+        "checkPermissions": {
+          "type": "boolean",
+          "description": "Whether to check permissions on import"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": true
+}

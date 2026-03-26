@@ -1,0 +1,68 @@
+{
+  "base": "form:store.form.base@^2",
+  "meta": {
+    "title": {
+      "zh-CN": "编辑门店",
+      "en-US": "Edit Store"
+    }
+  },
+  "props": {
+    "mode": "edit"
+  },
+  "endpoint": {
+      "url": "/api/dynamic/Store/${params.storeId}",
+      "method": "get",
+      "permission": "store:read"
+  },
+  "actions": [
+    {
+      "code": "update",
+      "label": {
+        "zh-CN": "保存修改",
+        "en-US": "Update"
+      },
+      "props": {
+        "htmlType": "submit",
+        "loading": "${form.submitting}"
+      },
+      "permission": "store:update"
+
+    },
+    {
+      "code": "delete",
+      "label": {
+        "zh-CN": "删除",
+        "en-US": "Delete"
+      },
+      "props": {
+        "type": "danger"
+      },
+      "confirm": {
+        "zh-CN": "确定要删除选中的 {count} 个门店吗？此操作不可撤销。",
+        "en-US": "Are you sure to delete {count} selected stores? This action cannot be undone."
+      },
+
+      "permission": "store:delete"
+
+    }
+  ],
+  "overrides": {
+    "fieldsByKey": {
+      "code": {
+        "props": {
+          "readOnly": true
+        }
+      },
+      "created_at": {
+        "props": {
+          "visible": true
+        }
+      },
+      "updated_at": {
+        "props": {
+          "visible": true
+        }
+      }
+    }
+  }
+}

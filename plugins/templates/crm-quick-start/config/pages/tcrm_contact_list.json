@@ -1,0 +1,47 @@
+{
+  "pageKey": "tcrm_contact_list",
+  "name:zh-CN": "联系人列表",
+  "name:en": "Contacts",
+  "pageType": "list",
+  "modelCode": "tcrm_contact",
+  "dslSchema": {
+    "id": "list.tcrm_contact",
+    "kind": "List",
+    "areas": {
+      "toolbar": {
+        "blocks": [{
+          "id": "tcrm_contact_toolbar",
+          "blockType": "toolbar",
+          "buttons": [
+            { "code": "create", "action": "create", "primary": true, "commandCode": "tcrm:create_contact", "navigateTo": "tcrm_contact_form", "permissionCode": "TCRM.contact.manage" }
+          ]
+        }]
+      },
+      "main": {
+        "blocks": [{
+          "id": "tcrm_contact_table",
+          "blockType": "data-table",
+          "columns": [
+            { "field": "tcrm_ct_code", "width": 160, "sortable": true },
+            { "field": "tcrm_ct_name", "width": 150, "sortable": true },
+            { "field": "tcrm_ct_account_id", "width": 180 },
+            { "field": "tcrm_ct_title", "width": 150 },
+            { "field": "tcrm_ct_email", "width": 200 },
+            { "field": "tcrm_ct_phone", "width": 140 },
+            {
+              "field": "actions",
+              "isActionColumn": true,
+              "buttons": [
+                { "code": "view", "action": "detail", "navigateTo": "tcrm_contact_detail" },
+                { "code": "edit", "action": "edit", "navigateTo": "tcrm_contact_form", "permissionCode": "TCRM.contact.manage" },
+                { "code": "delete", "action": "delete", "danger": true, "commandCode": "tcrm:delete_contact", "permissionCode": "TCRM.contact.manage", "confirmMessageKey": "delete.confirm" }
+              ]
+            }
+          ],
+          "searchFields": ["tcrm_ct_name", "tcrm_ct_code", "tcrm_ct_email"],
+          "defaultSort": { "field": "created_at", "order": "desc" }
+        }]
+      }
+    }
+  }
+}

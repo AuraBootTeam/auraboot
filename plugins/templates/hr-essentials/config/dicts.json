@@ -1,0 +1,274 @@
+[
+  {
+    "code": "thr_department",
+    "name": "Department",
+    "name:zh-CN": "部门",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "engineering",
+        "label": "Engineering",
+        "label:zh-CN": "工程部",
+        "sortNo": 10,
+        "color": "#1890ff",
+        "status": "enabled"
+      },
+      {
+        "value": "sales",
+        "label": "Sales",
+        "label:zh-CN": "销售部",
+        "sortNo": 20,
+        "color": "#52c41a",
+        "status": "enabled"
+      },
+      {
+        "value": "marketing",
+        "label": "Marketing",
+        "label:zh-CN": "市场部",
+        "sortNo": 30,
+        "color": "#722ed1",
+        "status": "enabled"
+      },
+      {
+        "value": "finance",
+        "label": "Finance",
+        "label:zh-CN": "财务部",
+        "sortNo": 40,
+        "color": "#fa8c16",
+        "status": "enabled"
+      },
+      {
+        "value": "HR",
+        "label": "HR",
+        "label:zh-CN": "人力资源部",
+        "sortNo": 50,
+        "color": "#eb2f96",
+        "status": "enabled"
+      },
+      {
+        "value": "operations",
+        "label": "Operations",
+        "label:zh-CN": "运营部",
+        "sortNo": 60,
+        "color": "#13c2c2",
+        "status": "enabled"
+      },
+      {
+        "value": "other",
+        "label": "Other",
+        "label:zh-CN": "其他",
+        "sortNo": 70,
+        "color": "#d9d9d9",
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "thr_emp_status",
+    "name": "Employee Status",
+    "name:zh-CN": "员工状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "active",
+        "label": "Active",
+        "label:zh-CN": "在职",
+        "sortNo": 10,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "on_leave",
+        "label": "On Leave",
+        "label:zh-CN": "休假中",
+        "sortNo": 20,
+        "color": "#fa8c16",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "resigned",
+        "label": "Resigned",
+        "label:zh-CN": "已离职",
+        "sortNo": 30,
+        "color": "#d9d9d9",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      }
+    ]
+  },
+  {
+    "code": "thr_att_type",
+    "name": "Attendance Type",
+    "name:zh-CN": "考勤类型",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "normal",
+        "label": "Normal",
+        "label:zh-CN": "正常",
+        "sortNo": 10,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "orange"
+        }
+      },
+      {
+        "value": "late",
+        "label": "Late",
+        "label:zh-CN": "迟到",
+        "sortNo": 20,
+        "color": "#fa8c16",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "early_leave",
+        "label": "Early Leave",
+        "label:zh-CN": "早退",
+        "sortNo": 30,
+        "color": "#faad14",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "absent",
+        "label": "Absent",
+        "label:zh-CN": "缺勤",
+        "sortNo": 40,
+        "color": "#f5222d",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      }
+    ]
+  },
+  {
+    "code": "thr_leave_type",
+    "name": "Leave Type",
+    "name:zh-CN": "请假类型",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "annual",
+        "label": "Annual Leave",
+        "label:zh-CN": "年假",
+        "sortNo": 10,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "sick",
+        "label": "Sick Leave",
+        "label:zh-CN": "病假",
+        "sortNo": 20,
+        "color": "#fa8c16",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "personal",
+        "label": "Personal Leave",
+        "label:zh-CN": "事假",
+        "sortNo": 30,
+        "color": "#722ed1",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "maternity",
+        "label": "Maternity Leave",
+        "label:zh-CN": "产假",
+        "sortNo": 40,
+        "color": "#eb2f96",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "other",
+        "label": "Other",
+        "label:zh-CN": "其他",
+        "sortNo": 50,
+        "color": "#d9d9d9",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      }
+    ]
+  },
+  {
+    "code": "thr_leave_status",
+    "name": "Leave Request Status",
+    "name:zh-CN": "请假状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "pending",
+        "label": "Pending",
+        "label:zh-CN": "待审批",
+        "sortNo": 10,
+        "color": "#fa8c16",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "approved",
+        "label": "Approved",
+        "label:zh-CN": "已批准",
+        "sortNo": 20,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "rejected",
+        "label": "Rejected",
+        "label:zh-CN": "已拒绝",
+        "sortNo": 30,
+        "color": "#f5222d",
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      },
+      {
+        "value": "cancelled",
+        "label": "Cancelled",
+        "label:zh-CN": "已取消",
+        "sortNo": 40,
+        "color": "#d9d9d9",
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      }
+    ]
+  }
+]

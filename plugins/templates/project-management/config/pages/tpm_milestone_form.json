@@ -1,0 +1,13 @@
+{
+  "pageKey": "tpm_milestone_form", "name:zh-CN": "里程碑表单", "name:en": "Milestone Form", "pageType": "form", "modelCode": "tpm_milestone",
+  "dslSchema": { "id": "form.tpm_milestone", "kind": "Form", "version": "1.0.0", "modelCode": "tpm_milestone",
+    "layout": { "areas": ["main", "footer"], "areasConfig": { "main": { "type": "grid", "cols": 12, "rowGap": 16, "colGap": 16 }, "footer": { "type": "flex", "direction": "row" } } },
+    "areas": {
+      "main": { "blocks": [{ "id": "basic", "blockType": "form-section", "title": { "zh-CN": "里程碑信息", "en-US": "Milestone Information" }, "fields": [
+        { "field": "tpm_ms_name", "colSpan": 12 }, { "field": "tpm_ms_project_id", "colSpan": 6 }, { "field": "tpm_ms_target_date", "colSpan": 6 },
+        { "field": "tpm_ms_description", "colSpan": 12 }
+      ] }] },
+      "footer": { "blocks": [{ "id": "buttons", "blockType": "form-buttons", "buttons": [{ "code": "submit", "action": "save", "commandCode": "tpm:update_milestone", "primary": true }, { "code": "cancel", "action": "cancel" }] }] }
+    }
+  }
+}

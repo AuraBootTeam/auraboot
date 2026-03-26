@@ -1,0 +1,61 @@
+{
+  "pageKey": "tcrm_lead_list",
+  "name:zh-CN": "线索列表",
+  "name:en": "Leads",
+  "pageType": "list",
+  "modelCode": "tcrm_lead",
+  "dslSchema": {
+    "id": "list.tcrm_lead",
+    "kind": "List",
+    "areas": {
+      "toolbar": {
+        "blocks": [{
+          "id": "tcrm_lead_toolbar",
+          "blockType": "toolbar",
+          "buttons": [
+            { "code": "create", "action": "create", "primary": true, "commandCode": "tcrm:create_lead", "navigateTo": "tcrm_lead_form", "permissionCode": "TCRM.lead.manage" }
+          ]
+        }]
+      },
+      "list-tabs": {
+        "blocks": [{
+          "id": "tcrm_lead_tabs",
+          "blockType": "list-tabs",
+          "tabs": [
+            { "key": "all", "label": { "en": "All", "zh-CN": "全部" }, "filter": null },
+            { "key": "new", "label": { "en": "New", "zh-CN": "新建" }, "filter": { "field": "tcrm_ld_status", "value": "new", "operator": "EQ" } },
+            { "key": "contacted", "label": { "en": "Contacted", "zh-CN": "已联系" }, "filter": { "field": "tcrm_ld_status", "value": "contacted", "operator": "EQ" } },
+            { "key": "qualified", "label": { "en": "Qualified", "zh-CN": "已合格" }, "filter": { "field": "tcrm_ld_status", "value": "qualified", "operator": "EQ" } },
+            { "key": "lost", "label": { "en": "Lost", "zh-CN": "已流失" }, "filter": { "field": "tcrm_ld_status", "value": "lost", "operator": "EQ" } }
+          ]
+        }]
+      },
+      "main": {
+        "blocks": [{
+          "id": "tcrm_lead_table",
+          "blockType": "data-table",
+          "columns": [
+            { "field": "tcrm_ld_code", "width": 160, "sortable": true },
+            { "field": "tcrm_ld_name", "width": 150, "sortable": true },
+            { "field": "tcrm_ld_company", "width": 150 },
+            { "field": "tcrm_ld_email", "width": 180 },
+            { "field": "tcrm_ld_source", "width": 110, "renderType": "tag", "dictCode": "tcrm_lead_source" },
+            { "field": "tcrm_ld_status", "width": 110, "renderType": "tag", "dictCode": "tcrm_lead_status" },
+            { "field": "tcrm_ld_assignee", "width": 120 },
+            {
+              "field": "actions",
+              "isActionColumn": true,
+              "buttons": [
+                { "code": "view", "action": "detail", "navigateTo": "tcrm_lead_detail" },
+                { "code": "edit", "action": "edit", "navigateTo": "tcrm_lead_form", "permissionCode": "TCRM.lead.manage" },
+                { "code": "delete", "action": "delete", "danger": true, "commandCode": "tcrm:delete_lead", "permissionCode": "TCRM.lead.manage", "confirmMessageKey": "delete.confirm" }
+              ]
+            }
+          ],
+          "searchFields": ["tcrm_ld_name", "tcrm_ld_code", "tcrm_ld_company", "tcrm_ld_email"],
+          "defaultSort": { "field": "created_at", "order": "desc" }
+        }]
+      }
+    }
+  }
+}

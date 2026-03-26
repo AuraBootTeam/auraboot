@@ -1,0 +1,29 @@
+# ============================================================
+# Monolith deployment profile (default)
+# ============================================================
+# All modules run in a single JVM. Event transport is local
+# (in-process). No external message broker required.
+#
+# Activate: --spring.profiles.active=monolith
+# ============================================================
+
+aura:
+  event:
+    transport: local
+
+  # All modules enabled — single process serves everything
+  modules:
+    meta-core: true
+    biz-runtime: true
+    bpm-engine: true
+    im-service: true
+    agent-runtime: true
+
+server:
+  port: 6443
+
+# Monolith-specific tuning
+spring:
+  threads:
+    virtual:
+      enabled: true

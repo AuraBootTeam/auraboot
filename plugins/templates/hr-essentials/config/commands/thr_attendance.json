@@ -1,0 +1,131 @@
+[
+  {
+    "code": "thr:create_attendance",
+    "displayName:zh-CN": "新建考勤",
+    "displayName:en": "Create Attendance",
+    "type": "create",
+    "modelCode": "thr_attendance",
+    "inputFields": [
+      "thr_at_employee_id",
+      "thr_at_date",
+      "thr_at_check_in",
+      "thr_at_check_out",
+      "thr_at_type",
+      "thr_at_notes"
+    ],
+    "autoSetFields": {
+      "thr_at_code": {
+        "strategy": "auto_generate",
+        "pattern": "ATT-{yyyyMMdd}-{seq}"
+      }
+    },
+    "permissions": [
+      "THR.attendance.manage"
+    ],
+    "agent_hint": "Create a new attendance record. Required: employee_id (reference to thr_employee), date. Optional: check_in, check_out, type (NORMAL/LATE/EARLY_LEAVE/ABSENT, defaults to NORMAL), notes. Auto-generated: code (ATT-yyyyMMdd-seq).",
+    "cmd_risk_level": "L1",
+    "precondition_description": "The referenced employee must exist.",
+    "side_effect_description": null,
+    "output_description": "Returns the created attendance record with auto-generated code.",
+    "example_input": {
+      "thr_at_employee_id": "<employee-pid>",
+      "thr_at_date": "2026-03-17",
+      "thr_at_check_in": "2026-03-17T09:00:00",
+      "thr_at_check_out": "2026-03-17T18:00:00",
+      "thr_at_type": "normal"
+    },
+    "idempotent": false,
+    "reversible": true
+  },
+  {
+    "code": "thr:update_attendance",
+    "displayName:zh-CN": "编辑考勤",
+    "displayName:en": "Update Attendance",
+    "type": "update",
+    "modelCode": "thr_attendance",
+    "inputFields": [
+      "thr_at_employee_id",
+      "thr_at_date",
+      "thr_at_check_in",
+      "thr_at_check_out",
+      "thr_at_type",
+      "thr_at_notes"
+    ],
+    "permissions": [
+      "THR.attendance.manage"
+    ],
+    "agent_hint": "Update an existing attendance record. All fields except code are editable: employee, date, check-in/out times, type, notes.",
+    "cmd_risk_level": "L1",
+    "precondition_description": "Attendance record must exist.",
+    "side_effect_description": null,
+    "output_description": "Returns the updated attendance record with all modified fields.",
+    "example_input": {
+      "thr_at_check_out": "2026-03-17T19:30:00",
+      "thr_at_notes": "Overtime approved"
+    },
+    "idempotent": true,
+    "reversible": true
+  },
+  {
+    "code": "thr:delete_attendance",
+    "displayName:zh-CN": "删除考勤",
+    "displayName:en": "Delete Attendance",
+    "type": "delete",
+    "modelCode": "thr_attendance",
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此考勤记录？",
+      "confirmMessage:en": "Confirm delete this attendance record?"
+    },
+    "permissions": [
+      "THR.attendance.manage"
+    ],
+    "agent_hint": "Delete an attendance record permanently. This is irreversible. No status preconditions — any attendance record can be deleted by users with manage permission.",
+    "cmd_risk_level": "L4",
+    "precondition_description": "Attendance record must exist.",
+    "side_effect_description": null,
+    "output_description": "Returns confirmation of deletion; the attendance record is permanently removed.",
+    "example_input": {},
+    "idempotent": false,
+    "reversible": false
+  },
+  {
+    "code": "thr:detail_attendance",
+    "displayName:zh-CN": "查看考勤",
+    "displayName:en": "View Attendance",
+    "type": "query",
+    "modelCode": "thr_attendance",
+    "permissions": [
+      "THR.attendance.read"
+    ],
+    "agent_hint": "Retrieve a single attendance record by ID. Returns all fields including employee, date, check-in/out times, and type.",
+    "cmd_risk_level": "L0",
+    "precondition_description": "Attendance record with the specified ID must exist.",
+    "side_effect_description": null,
+    "output_description": "Returns the full attendance record including all fields.",
+    "example_input": {},
+    "idempotent": true,
+    "reversible": true
+  },
+  {
+    "code": "thr:list_attendance",
+    "displayName:zh-CN": "考勤列表",
+    "displayName:en": "List Attendance",
+    "type": "query",
+    "modelCode": "thr_attendance",
+    "permissions": [
+      "THR.attendance.read"
+    ],
+    "agent_hint": "Query attendance records with pagination and filtering. Supports filters by employee, date, type. Supports keyword search on code.",
+    "cmd_risk_level": "L0",
+    "precondition_description": "No preconditions — returns empty list if no records match.",
+    "side_effect_description": null,
+    "output_description": "Returns a paginated list of attendance records matching the specified filters.",
+    "example_input": {
+      "pageNum": 1,
+      "pageSize": 20,
+      "filters": [{"fieldName": "thr_at_type", "operator": "EQ", "value": "late"}]
+    },
+    "idempotent": true,
+    "reversible": true
+  }
+]

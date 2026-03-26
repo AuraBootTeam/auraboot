@@ -1,0 +1,698 @@
+/**
+ * AuraBotProvider
+ *
+ * Global context provider for AuraBot AI assistant.
+ * Manages panel state (collapsed/expanded), messages, page context, and SSE chat.
+ *
+ * @since 2.0.0
+ */
+
+import React, {
+  createContext,
+  useContext,
+  useReducer,
+  useCallback,
+  useEffect,
+  useRef,
+} from 'react';
+import { useLocation, useParams } from 'react-router';
+import type { PageContext } from './hooks/usePageContext';
+import { auraBotApi } from './services/auraBotApi';
+
+// ============================================================================
+// State Types
+// ============================================================================
+
+type PanelState = 'collapsed' | 'expanded';
+
+interface SimpleMessage {
+  id: string;
+  type:
+    | 'text'
+    | 'error'
+    | 'tool_loading'
+    | 'tool_result'
+    | 'confirm_card'
+    | 'tool_executed'
+    | 'tool_cancelled';
+  sender: 'user' | 'bot' | 'system';
+  timestamp: number;
+  content: string;
+  toolId?: string;
+  toolName?: string;
+  toolInput?: Record<string, any>;
+  toolResult?: Record<string, any>;
+  traceId?: string;
+}
+
+interface KnowledgeBaseInfo {
+  pid: string;
+  name: string;
+  status: string;
+  docCount: number;
+}
+
+interface AuraBotState {
+  panelState: PanelState;
+  sessionId: string;
+  messages: SimpleMessage[];
+  isLoading: boolean;
+  pageContext: PageContext;
+  inputValue: string;
+  selectedAgentCode: string;
+  selectedKnowledgeBaseIds: string[];
+  knowledgeBases: KnowledgeBaseInfo[];
+}
+
+// ============================================================================
+// Actions
+// ============================================================================
+
+type AuraBotAction =
+  | { type: 'set_panel_state'; payload: PanelState }
+  | { type: 'toggle_panel' }
+  | { type: 'add_message'; payload: SimpleMessage }
+  | {
+      type: 'update_message';
+      payload: { id: string; content?: string; type?: SimpleMessage['type']; traceId?: string };
+    }
+  | { type: 'append_message_content'; payload: { id: string; chunk: string } }
+  | { type: 'add_tool_message'; payload: SimpleMessage }
+  | { type: 'update_tool_message'; payload: { toolId: string; updates: Partial<SimpleMessage> } }
+  | { type: 'clear_messages' }
+  | { type: 'set_input_value'; payload: string }
+  | { type: 'set_page_context'; payload: PageContext }
+  | { type: 'set_loading'; payload: boolean }
+  | { type: 'set_selected_agent'; payload: string }
+  | { type: 'new_session' }
+  | { type: 'toggle_knowledge_base'; payload: string }
+  | { type: 'set_knowledge_bases'; payload: KnowledgeBaseInfo[] };
+
+// ============================================================================
+// Reducer
+// ============================================================================
+
+function generateSessionId(): string {
+  return `session_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function generateMessageId(): string {
+  return `msg_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+}
+
+const defaultPageContext: PageContext = {
+  pageType: 'custom',
+  pageKey: '/',
+  modelCode: '',
+  breadcrumb: [],
+};
+
+const initialState: AuraBotState = {
+  panelState: 'collapsed',
+  sessionId: generateSessionId(),
+  messages: [],
+  isLoading: false,
+  pageContext: defaultPageContext,
+  inputValue: '',
+  selectedAgentCode: 'aurabot',
+  selectedKnowledgeBaseIds: [],
+  knowledgeBases: [],
+};
+
+function auraBotReducer(state: AuraBotState, action: AuraBotAction): AuraBotState {
+  switch (action.type) {
+    case 'set_panel_state':
+      return { ...state, panelState: action.payload };
+
+    case 'toggle_panel':
+      return {
+        ...state,
+        panelState: state.panelState === 'collapsed' ? 'expanded' : 'collapsed',
+      };
+
+    case 'add_message':
+      return { ...state, messages: [...state.messages, action.payload] };
+
+    case 'update_message':
+      return {
+        ...state,
+        messages: state.messages.map((msg) =>
+          msg.id === action.payload.id
+            ? {
+                ...msg,
+                ...(action.payload.content !== undefined
+                  ? { content: action.payload.content }
+                  : {}),
+                ...(action.payload.type !== undefined ? { type: action.payload.type } : {}),
+                ...(action.payload.traceId !== undefined
+                  ? { traceId: action.payload.traceId }
+                  : {}),
+              }
+            : msg,
+        ),
+      };
+
+    case 'append_message_content':
+      return {
+        ...state,
+        messages: state.messages.map((msg) =>
+          msg.id === action.payload.id
+            ? { ...msg, content: msg.content + action.payload.chunk }
+            : msg,
+        ),
+      };
+
+    case 'add_tool_message':
+      return { ...state, messages: [...state.messages, action.payload] };
+
+    case 'update_tool_message':
+      return {
+        ...state,
+        messages: state.messages.map((msg) =>
+          msg.toolId === action.payload.toolId ? { ...msg, ...action.payload.updates } : msg,
+        ),
+      };
+
+    case 'clear_messages':
+      return { ...state, messages: [] };
+
+    case 'set_input_value':
+      return { ...state, inputValue: action.payload };
+
+    case 'set_page_context':
+      return { ...state, pageContext: action.payload };
+
+    case 'set_loading':
+      return { ...state, isLoading: action.payload };
+
+    case 'set_selected_agent':
+      return {
+        ...state,
+        selectedAgentCode: action.payload,
+        // Start a new session when switching agents
+        sessionId: generateSessionId(),
+        messages: [],
+        inputValue: '',
+      };
+
+    case 'new_session':
+      return {
+        ...state,
+        sessionId: generateSessionId(),
+        messages: [],
+        inputValue: '',
+      };
+
+    case 'toggle_knowledge_base': {
+      const kbId = action.payload;
+      const current = state.selectedKnowledgeBaseIds;
+      const next = current.includes(kbId)
+        ? current.filter((id) => id !== kbId)
+        : [...current, kbId];
+      return { ...state, selectedKnowledgeBaseIds: next };
+    }
+
+    case 'set_knowledge_bases':
+      return { ...state, knowledgeBases: action.payload };
+
+    default:
+      return state;
+  }
+}
+
+// ============================================================================
+// Context
+// ============================================================================
+
+interface AuraBotContextValue {
+  state: AuraBotState;
+  openPanel: () => void;
+  closePanel: () => void;
+  togglePanel: () => void;
+  sendMessage: (content: string) => void;
+  confirmTool: (toolId: string) => void;
+  cancelTool: (toolId: string) => void;
+  clearMessages: () => void;
+  newSession: () => void;
+  setInputValue: (value: string) => void;
+  setPageContext: (ctx: Partial<PageContext>) => void;
+  setSelectedAgent: (agentCode: string) => void;
+  toggleKnowledgeBase: (kbPid: string) => void;
+}
+
+const AuraBotCtx = createContext<AuraBotContextValue | null>(null);
+
+// ============================================================================
+// Route-based PageContext derivation
+// ============================================================================
+
+function derivePageContextFromRoute(
+  pathname: string,
+  params: Record<string, string | undefined>,
+): PageContext {
+  // /dynamic/:tableName/view/:recordId → detail
+  if (pathname.match(/^\/dynamic\/[^/]+\/view\/[^/]+/)) {
+    const tableName = params.tableName || '';
+    return {
+      pageType: 'detail',
+      pageKey: tableName,
+      modelCode: tableName.replace(/-/g, '_'),
+      recordPid: params.recordId,
+      breadcrumb: [tableName],
+    };
+  }
+
+  // /dynamic/:tableName/:recordId/edit → form (edit)
+  if (pathname.match(/^\/dynamic\/[^/]+\/[^/]+\/edit/)) {
+    const tableName = params.tableName || '';
+    return {
+      pageType: 'form',
+      pageKey: tableName,
+      modelCode: tableName.replace(/-/g, '_'),
+      recordPid: params.recordId,
+      breadcrumb: [tableName],
+    };
+  }
+
+  // /dynamic/:tableName/new → form (create)
+  if (pathname.match(/^\/dynamic\/[^/]+\/new/)) {
+    const tableName = params.tableName || '';
+    return {
+      pageType: 'form',
+      pageKey: tableName,
+      modelCode: tableName.replace(/-/g, '_'),
+      breadcrumb: [tableName],
+    };
+  }
+
+  // /dynamic/:tableName → list
+  if (pathname.match(/^\/dynamic\/[^/]+$/)) {
+    const tableName = params.tableName || '';
+    return {
+      pageType: 'list',
+      pageKey: tableName,
+      modelCode: tableName.replace(/-/g, '_'),
+      breadcrumb: [tableName],
+    };
+  }
+
+  // Dashboard pages
+  if (pathname.includes('dashboard') || pathname.startsWith('/reports')) {
+    return {
+      pageType: 'dashboard',
+      pageKey: pathname.split('/').pop() || 'dashboard',
+      modelCode: '',
+      breadcrumb: ['Dashboard'],
+    };
+  }
+
+  // Default: custom page
+  return {
+    pageType: 'custom',
+    pageKey: pathname,
+    modelCode: '',
+    breadcrumb: pathname.split('/').filter(Boolean),
+  };
+}
+
+// ============================================================================
+// Provider Component
+// ============================================================================
+
+export interface AuraBotProviderProps {
+  children: React.ReactNode;
+}
+
+export function AuraBotProvider({ children }: AuraBotProviderProps) {
+  const [state, dispatch] = useReducer(auraBotReducer, initialState);
+  const location = useLocation();
+  const params = useParams();
+
+  // Sync pageContext from route changes
+  useEffect(() => {
+    const ctx = derivePageContextFromRoute(location.pathname, params);
+    dispatch({ type: 'set_page_context', payload: ctx });
+  }, [location.pathname, params]);
+
+  // Panel actions
+  const openPanel = useCallback(() => {
+    dispatch({ type: 'set_panel_state', payload: 'expanded' });
+  }, []);
+
+  const closePanel = useCallback(() => {
+    dispatch({ type: 'set_panel_state', payload: 'collapsed' });
+  }, []);
+
+  const togglePanel = useCallback(() => {
+    dispatch({ type: 'toggle_panel' });
+  }, []);
+
+  // Message actions
+  const clearMessages = useCallback(() => {
+    dispatch({ type: 'clear_messages' });
+  }, []);
+
+  // Input
+  const setInputValue = useCallback((value: string) => {
+    dispatch({ type: 'set_input_value', payload: value });
+  }, []);
+
+  // Session
+  const newSession = useCallback(() => {
+    dispatch({ type: 'new_session' });
+  }, []);
+
+  // Agent selector
+  const setSelectedAgent = useCallback((agentCode: string) => {
+    dispatch({ type: 'set_selected_agent', payload: agentCode });
+  }, []);
+
+  // Knowledge base selector
+  const toggleKnowledgeBase = useCallback((kbPid: string) => {
+    dispatch({ type: 'toggle_knowledge_base', payload: kbPid });
+  }, []);
+
+  // Load knowledge bases when panel expands
+  useEffect(() => {
+    if (state.panelState !== 'expanded') return;
+    const loadKbs = async () => {
+      try {
+        const res = await fetch('/api/ai/knowledge', { credentials: 'include' });
+        if (!res.ok) return;
+        const json = await res.json();
+        const kbs: KnowledgeBaseInfo[] = (json?.data || [])
+          .filter((kb: any) => kb.status === 'active')
+          .map((kb: any) => ({
+            pid: kb.pid,
+            name: kb.name,
+            status: kb.status,
+            docCount: kb.docCount || 0,
+          }));
+        dispatch({ type: 'set_knowledge_bases', payload: kbs });
+      } catch {
+        // KB list unavailable — no-op
+      }
+    };
+    loadKbs();
+  }, [state.panelState]);
+
+  // PageContext (manual override)
+  const setPageContext = useCallback(
+    (ctx: Partial<PageContext>) => {
+      dispatch({
+        type: 'set_page_context',
+        payload: { ...state.pageContext, ...ctx } as PageContext,
+      });
+    },
+    [state.pageContext],
+  );
+
+  // Send message — wired to SSE streaming
+  const sendMessage = useCallback(
+    async (content: string) => {
+      if (!content.trim() || state.isLoading) return;
+
+      // Add user message
+      const userMsgId = generateMessageId();
+      dispatch({
+        type: 'add_message',
+        payload: { id: userMsgId, type: 'text', sender: 'user', timestamp: Date.now(), content },
+      });
+      dispatch({ type: 'set_input_value', payload: '' });
+      dispatch({ type: 'set_loading', payload: true });
+
+      // Add empty bot message (will be filled by SSE chunks)
+      const botMsgId = generateMessageId();
+      dispatch({
+        type: 'add_message',
+        payload: { id: botMsgId, type: 'text', sender: 'bot', timestamp: Date.now(), content: '' },
+      });
+
+      try {
+        await auraBotApi.chatStream(
+          {
+            sessionId: state.sessionId,
+            message: content,
+            agentCode: state.selectedAgentCode,
+            pageContext: state.pageContext,
+            knowledgeBaseIds:
+              state.selectedKnowledgeBaseIds.length > 0
+                ? state.selectedKnowledgeBaseIds
+                : undefined,
+            history: state.messages
+              .filter((m) => m.type === 'text' && m.content)
+              .slice(-10)
+              .map((m) => ({
+                role: m.sender === 'user' ? 'user' : 'assistant',
+                content: m.content,
+              })),
+          },
+          {
+            onChunk: (chunk: string) => {
+              dispatch({ type: 'append_message_content', payload: { id: botMsgId, chunk } });
+            },
+            onDone: (fullContent: string, traceId?: string) => {
+              if (fullContent) {
+                dispatch({
+                  type: 'update_message',
+                  payload: { id: botMsgId, content: fullContent, traceId },
+                });
+              } else if (traceId) {
+                dispatch({ type: 'update_message', payload: { id: botMsgId, traceId } });
+              }
+              dispatch({ type: 'set_loading', payload: false });
+            },
+            onError: (error: string, traceId?: string) => {
+              dispatch({
+                type: 'update_message',
+                payload: { id: botMsgId, type: 'error', content: error, traceId },
+              });
+              dispatch({ type: 'set_loading', payload: false });
+            },
+            onToolStart: (toolId: string, toolName: string, input: Record<string, any>) => {
+              dispatch({
+                type: 'add_tool_message',
+                payload: {
+                  id: `tool-${toolId}`,
+                  type: 'tool_loading',
+                  sender: 'system',
+                  timestamp: Date.now(),
+                  content: `正在查询 ${toolName.replace(/^(nq__|cmd__|builtin__)/, '')}...`,
+                  toolId,
+                  toolName,
+                  toolInput: input,
+                },
+              });
+            },
+            onToolResult: (toolId: string, result: Record<string, any>, _success: boolean) => {
+              dispatch({
+                type: 'update_tool_message',
+                payload: {
+                  toolId,
+                  updates: { type: 'tool_result', content: '', toolResult: result },
+                },
+              });
+            },
+            onConfirmRequired: (
+              toolId: string,
+              toolName: string,
+              description: string,
+              input: Record<string, any>,
+            ) => {
+              dispatch({
+                type: 'add_tool_message',
+                payload: {
+                  id: `confirm-${toolId}`,
+                  type: 'confirm_card',
+                  sender: 'system',
+                  timestamp: Date.now(),
+                  content: description,
+                  toolId,
+                  toolName,
+                  toolInput: input,
+                },
+              });
+              dispatch({ type: 'set_loading', payload: false });
+            },
+          },
+        );
+      } catch (e: any) {
+        dispatch({
+          type: 'update_message',
+          payload: { id: botMsgId, type: 'error', content: e.message || 'Chat failed' },
+        });
+        dispatch({ type: 'set_loading', payload: false });
+      }
+    },
+    [state.isLoading, state.sessionId, state.selectedAgentCode, state.pageContext, state.messages, state.selectedKnowledgeBaseIds],
+  );
+
+  // Confirm a tool execution (user approved)
+  const confirmTool = useCallback(
+    async (toolId: string) => {
+      // Update confirm card to show "executing"
+      dispatch({
+        type: 'update_tool_message',
+        payload: { toolId, updates: { type: 'tool_executed', content: '正在执行...' } },
+      });
+      dispatch({ type: 'set_loading', payload: true });
+
+      // Add empty bot message for the streaming response
+      const botMsgId = 'bot-' + Date.now();
+      dispatch({
+        type: 'add_message',
+        payload: { id: botMsgId, type: 'text', sender: 'bot', timestamp: Date.now(), content: '' },
+      });
+
+      try {
+        await auraBotApi.executeStream(
+          { sessionId: state.sessionId, toolId, confirmed: true },
+          {
+            onChunk: (chunk: string) => {
+              dispatch({ type: 'append_message_content', payload: { id: botMsgId, chunk } });
+            },
+            onToolStart: (tid: string, tname: string, input: Record<string, any>) => {
+              dispatch({
+                type: 'add_tool_message',
+                payload: {
+                  id: `tool-${tid}`,
+                  type: 'tool_loading',
+                  sender: 'system',
+                  timestamp: Date.now(),
+                  content: `正在查询 ${tname.replace(/^(nq__|cmd__|builtin__)/, '')}...`,
+                  toolId: tid,
+                  toolName: tname,
+                  toolInput: input,
+                },
+              });
+            },
+            onToolResult: (tid: string, result: Record<string, any>, _success: boolean) => {
+              dispatch({
+                type: 'update_tool_message',
+                payload: {
+                  toolId: tid,
+                  updates: { type: 'tool_result', content: '', toolResult: result },
+                },
+              });
+            },
+            onConfirmRequired: (
+              tid: string,
+              tname: string,
+              desc: string,
+              input: Record<string, any>,
+            ) => {
+              dispatch({
+                type: 'add_tool_message',
+                payload: {
+                  id: `confirm-${tid}`,
+                  type: 'confirm_card',
+                  sender: 'system',
+                  timestamp: Date.now(),
+                  content: desc,
+                  toolId: tid,
+                  toolName: tname,
+                  toolInput: input,
+                },
+              });
+              dispatch({ type: 'set_loading', payload: false });
+            },
+            onDone: (full: string, traceId?: string) => {
+              if (full) {
+                dispatch({
+                  type: 'update_message',
+                  payload: { id: botMsgId, content: full, traceId },
+                });
+              } else if (traceId) {
+                dispatch({ type: 'update_message', payload: { id: botMsgId, traceId } });
+              }
+              dispatch({ type: 'set_loading', payload: false });
+            },
+            onError: (err: string, traceId?: string) => {
+              dispatch({
+                type: 'update_message',
+                payload: { id: botMsgId, content: err, type: 'error', traceId },
+              });
+              dispatch({ type: 'set_loading', payload: false });
+            },
+          },
+        );
+      } catch (e: any) {
+        dispatch({
+          type: 'update_message',
+          payload: { id: botMsgId, type: 'error', content: e.message || 'Execute failed' },
+        });
+        dispatch({ type: 'set_loading', payload: false });
+      }
+    },
+    [state.sessionId],
+  );
+
+  // Cancel a tool execution (user rejected)
+  const cancelTool = useCallback(
+    async (toolId: string) => {
+      dispatch({
+        type: 'update_tool_message',
+        payload: { toolId, updates: { type: 'tool_cancelled', content: '操作已取消' } },
+      });
+      // Fire and forget — tell backend user cancelled
+      auraBotApi.executeStream(
+        { sessionId: state.sessionId, toolId, confirmed: false },
+        { onChunk: () => {}, onDone: () => {}, onError: () => {} },
+      );
+    },
+    [state.sessionId],
+  );
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Cmd/Ctrl + J: Toggle panel
+      if ((e.metaKey || e.ctrlKey) && (e.key.toLowerCase() === 'j' || e.code === 'KeyJ')) {
+        e.preventDefault();
+        togglePanel();
+      }
+
+      // Escape: Close panel
+      if (e.key === 'Escape' && state.panelState === 'expanded') {
+        e.preventDefault();
+        closePanel();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [togglePanel, closePanel, state.panelState]);
+
+  const value: AuraBotContextValue = {
+    state,
+    openPanel,
+    closePanel,
+    togglePanel,
+    sendMessage,
+    confirmTool,
+    cancelTool,
+    clearMessages,
+    newSession,
+    setInputValue,
+    setPageContext,
+    setSelectedAgent,
+    toggleKnowledgeBase,
+  };
+
+  return <AuraBotCtx.Provider value={value}>{children}</AuraBotCtx.Provider>;
+}
+
+// ============================================================================
+// Hook
+// ============================================================================
+
+export function useAuraBot(): AuraBotContextValue {
+  const context = useContext(AuraBotCtx);
+  if (!context) {
+    throw new Error('useAuraBot must be used within AuraBotProvider');
+  }
+  return context;
+}
+
+export type { PanelState, SimpleMessage, AuraBotState, AuraBotContextValue, KnowledgeBaseInfo };
+export default AuraBotProvider;

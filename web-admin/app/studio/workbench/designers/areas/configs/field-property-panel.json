@@ -1,0 +1,200 @@
+{
+  "meta": {
+    "type": "property-panel",
+    "version": "4.0",
+    "component": "DslField",
+    "title": "字段属性"
+  },
+  "sections": [
+    {
+      "code": "basic",
+      "title": "基本属性",
+      "layout": { "columns": 1, "gap": "small" },
+      "fields": [
+        {
+          "field": "field",
+          "component": "SmartInput",
+          "props": { "label": "字段名", "disabled": true, "size": "small" }
+        },
+        {
+          "field": "label",
+          "component": "SmartInput",
+          "props": { "label": "标签", "placeholder": "覆盖字段标签", "size": "small" }
+        },
+        {
+          "field": "placeholder",
+          "component": "SmartInput",
+          "props": { "label": "占位符", "placeholder": "请输入...", "size": "small" },
+          "visible": "blockType !== 'data-table'"
+        },
+        {
+          "field": "component",
+          "component": "SmartSelect",
+          "props": {
+            "label": "组件类型",
+            "size": "small",
+            "allowClear": true,
+            "placeholder": "自动选择"
+          },
+          "optionsKey": "componentOptions",
+          "visible": "blockType !== 'data-table'"
+        }
+      ]
+    },
+    {
+      "code": "validation",
+      "title": "验证规则",
+      "layout": { "columns": 2, "gap": "small" },
+      "visible": "blockType !== 'data-table'",
+      "fields": [
+        {
+          "field": "required",
+          "component": "SmartSwitch",
+          "props": { "label": "必填" }
+        },
+        {
+          "field": "readonly",
+          "component": "SmartSwitch",
+          "props": { "label": "只读" }
+        },
+        {
+          "field": "maxLength",
+          "component": "SmartInput",
+          "props": { "label": "最大长度", "type": "number", "min": 1, "size": "small" },
+          "visible": "dataType === 'string' || dataType === 'text'",
+          "layout": { "colSpan": 1 }
+        },
+        {
+          "field": "minLength",
+          "component": "SmartInput",
+          "props": { "label": "最小长度", "type": "number", "min": 0, "size": "small" },
+          "visible": "dataType === 'string' || dataType === 'text'",
+          "layout": { "colSpan": 1 }
+        },
+        {
+          "field": "pattern",
+          "component": "SmartInput",
+          "props": { "label": "正则表达式", "placeholder": "^[A-Z]+$", "size": "small" },
+          "visible": "dataType === 'string'",
+          "layout": { "colSpan": 2 }
+        },
+        {
+          "field": "minValue",
+          "component": "SmartInput",
+          "props": { "label": "最小值", "type": "number", "size": "small" },
+          "visible": "dataType === 'integer' || dataType === 'decimal'",
+          "layout": { "colSpan": 1 }
+        },
+        {
+          "field": "maxValue",
+          "component": "SmartInput",
+          "props": { "label": "最大值", "type": "number", "size": "small" },
+          "visible": "dataType === 'integer' || dataType === 'decimal'",
+          "layout": { "colSpan": 1 }
+        }
+      ]
+    },
+    {
+      "code": "behavior",
+      "title": "行为控制",
+      "layout": { "columns": 2, "gap": "small" },
+      "fields": [
+        {
+          "field": "visible",
+          "component": "SmartInput",
+          "props": { "label": "可见性条件", "placeholder": "{{ ... }}", "size": "small" },
+          "layout": { "colSpan": 2 }
+        },
+        {
+          "field": "disabled",
+          "component": "SmartInput",
+          "props": { "label": "禁用条件", "placeholder": "{{ ... }}", "size": "small" },
+          "layout": { "colSpan": 2 }
+        },
+        {
+          "field": "advanced",
+          "component": "SmartSwitch",
+          "props": { "label": "高级筛选" },
+          "visible": "blockType === 'filter-form'"
+        },
+        {
+          "field": "sortable",
+          "component": "SmartSwitch",
+          "props": { "label": "可排序" },
+          "visible": "blockType === 'data-table'"
+        },
+        {
+          "field": "copyable",
+          "component": "SmartSwitch",
+          "props": { "label": "可复制" },
+          "visible": "blockType === 'data-table'"
+        },
+        {
+          "field": "ellipsis",
+          "component": "SmartSwitch",
+          "props": { "label": "省略文本" },
+          "visible": "blockType === 'data-table'"
+        }
+      ]
+    },
+    {
+      "code": "layout",
+      "title": "布局设置",
+      "layout": { "columns": 2, "gap": "small" },
+      "fields": [
+        {
+          "field": "span",
+          "component": "SmartSelect",
+          "props": {
+            "label": "跨列数",
+            "size": "small",
+            "options": [
+              { "label": "1列", "value": 1 },
+              { "label": "2列", "value": 2 },
+              { "label": "3列", "value": 3 },
+              { "label": "4列", "value": 4 }
+            ]
+          },
+          "visible": "blockType !== 'data-table'"
+        },
+        {
+          "field": "width",
+          "component": "SmartInput",
+          "props": { "label": "列宽 (px)", "type": "number", "min": 50, "size": "small" },
+          "visible": "blockType === 'data-table'"
+        },
+        {
+          "field": "fixed",
+          "component": "SmartSelect",
+          "props": {
+            "label": "固定列",
+            "size": "small",
+            "allowClear": true,
+            "options": [
+              { "label": "左侧", "value": "left" },
+              { "label": "右侧", "value": "right" }
+            ]
+          },
+          "visible": "blockType === 'data-table'"
+        },
+        {
+          "field": "render",
+          "component": "SmartSelect",
+          "props": {
+            "label": "渲染类型",
+            "size": "small",
+            "allowClear": true,
+            "options": [
+              { "label": "标签", "value": "tag" },
+              { "label": "日期时间", "value": "datetime" },
+              { "label": "货币", "value": "currency" },
+              { "label": "链接", "value": "link" },
+              { "label": "图片", "value": "image" }
+            ]
+          },
+          "visible": "blockType === 'data-table'"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,133 @@
+{
+  "kind": "Page",
+  "schemaVersion": "2.0.0",
+  "id": "page.store.main",
+  "meta": {
+    "schemaStage": "storage",
+    "title": "$i18n:page.store.main.title"
+  },
+  "mode": "runtime",
+  "stateBinding": {
+    "filters": "{{state.storeFilters}}",
+    "selection": "{{state.storeSelectedIds}}",
+    "formModel": "{{state.form}}"
+  },
+  "theme": {
+    "tokens": {
+      "sectionTitleColor": "$color-text-secondary",
+      "sectionTitleSize": "$font-size-md"
+    }
+  },
+  "layout": {
+    "areas": ["main"],
+    "areasConfig": {
+      "main": {
+        "type": "grid",
+        "cols": 12,
+        "rowGap": 16,
+        "colGap": 16
+      }
+    }
+  },
+  "areas": {
+    "main": {
+      "blocks": [
+        {
+          "id": "block_store_list_region",
+          "blockType": "list-region",
+          "title": "$i18n:page.store.main.block.list.title",
+          "layout": { "colSpan": 8, "rowSpan": 2 },
+          "listRef": "list.store"
+        },
+        {
+          "id": "block_store_form_region",
+          "blockType": "form-region",
+          "title": "$i18n:page.store.main.block.form.title",
+          "layout": { "colSpan": 4, "rowSpan": 2 },
+          "formRef": "form.store",
+          "container": {
+            "type": "drawer",
+            "placement": "right",
+            "width": 480
+          }
+        },
+        {
+          "id": "block_store_chart_region",
+          "blockType": "chart-region",
+          "title": "$i18n:page.store.main.block.chart.title",
+          "layout": { "colSpan": 12, "rowSpan": 1 },
+          "chart": {
+            "component": "BarChart",
+            "dataSource": "ds_storeStats",
+            "xField": "name",
+            "yField": "sales",
+            "style": {
+              "axisLabelColor": "$color-text-muted",
+              "axisLabelSize": "$font-size-sm"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "dataSources": {
+    "ds_storeList": {
+      "type": "api",
+      "endpoint": "/api/stores",
+      "method": "get",
+      "params": "{{state.storeFilters}}",
+      "pagination": true,
+      "autoFetch": true,
+      "adaptor": "table"
+    },
+    "ds_storeStats": {
+      "type": "api",
+      "endpoint": "/api/stores/stats",
+      "method": "get",
+      "params": "{{state.storeFilters}}",
+      "autoFetch": true,
+      "adaptor": "series"
+    }
+  },
+  "handlers": {
+    "submitStoreForm": {
+      "type": "flow",
+      "steps": [
+        { "action": "form.validate", "target": "form.store" },
+        {
+          "action": "api.request",
+          "method": "post",
+          "endpoint": "/api/stores",
+          "body": "{{state.form}}",
+          "next": "afterSubmit"
+        },
+        {
+          "id": "afterSubmit",
+          "action": "toast.show",
+          "level": "success",
+          "content": "$i18n:form.store.submit.success"
+        },
+        {
+          "action": "dataSource.fetch",
+          "target": "ds_storeList"
+        },
+        {
+          "action": "dataSource.fetch",
+          "target": "ds_storeStats"
+        }
+      ]
+    },
+    "reloadStoreData": {
+      "type": "flow",
+      "steps": [
+        { "action": "dataSource.fetch", "target": "ds_storeList" },
+        { "action": "dataSource.fetch", "target": "ds_storeStats" }
+      ]
+    }
+  },
+  "events": {
+    "onEnter": {
+      "handler": "reloadStoreData"
+    }
+  }
+}

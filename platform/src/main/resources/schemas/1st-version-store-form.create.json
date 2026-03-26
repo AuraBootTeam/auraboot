@@ -1,0 +1,36 @@
+{
+  "base": "form:store.form.base@^2",
+  "meta": {
+    "title": {
+      "zh-CN": "新建门店",
+      "en-US": "Create Store"
+    }
+  },
+  "props": {
+    "mode": "create"
+  },
+  "actions": [
+    {
+      "code": "create",
+      "label": {
+        "zh-CN": "保存并创建",
+        "en-US": "Create"
+      },
+      "props": {
+        "htmlType": "submit",
+        "loading": "${form.submitting}"
+      },
+      "permission": "store:create"
+
+    }
+  ],
+  "overrides": {
+    "fieldsByKey": {
+      "code": {
+        "props": {
+          "readOnly": false
+        }
+      }
+    }
+  }
+}

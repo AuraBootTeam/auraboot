@@ -1,0 +1,55 @@
+{
+  "pageKey": "gp_task_form",
+  "name:zh-CN": "任务表单",
+  "name:en": "Task Form",
+  "pageType": "form",
+  "modelCode": "gp_task",
+  "dslSchema": {
+    "id": "form.gp_task",
+    "kind": "Form",
+    "version": "1.0.0",
+    "modelCode": "gp_task",
+    "layout": {
+      "areas": ["main", "footer"],
+      "areasConfig": {
+        "main": { "type": "grid", "cols": 12, "rowGap": 16, "colGap": 16 },
+        "footer": { "type": "flex", "direction": "row" }
+      }
+    },
+    "areas": {
+      "main": {
+        "blocks": [
+          {
+            "id": "basic",
+            "blockType": "form-section",
+            "title": { "zh-CN": "基本信息", "en-US": "Basic Information" },
+            "fields": [
+              { "field": "gp_task_title", "colSpan": 12 },
+              { "field": "gp_task_priority", "colSpan": 6 },
+              { "field": "gp_task_assignee", "colSpan": 6 },
+              { "field": "gp_task_due_date", "colSpan": 6 }
+            ]
+          },
+          {
+            "id": "detail",
+            "blockType": "form-section",
+            "title": { "zh-CN": "详细信息", "en-US": "Details" },
+            "fields": [
+              { "field": "gp_task_description", "colSpan": 12 }
+            ]
+          }
+        ]
+      },
+      "footer": {
+        "blocks": [{
+          "id": "buttons",
+          "blockType": "form-buttons",
+          "buttons": [
+            { "code": "submit", "action": "save", "commandCode": "gp:update_task", "primary": true },
+            { "code": "cancel", "action": "cancel" }
+          ]
+        }]
+      }
+    }
+  }
+}

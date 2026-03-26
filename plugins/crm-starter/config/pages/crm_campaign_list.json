@@ -1,0 +1,204 @@
+{
+  "pageKey": "crm_campaign_list",
+  "name:zh-CN": "营销活动列表",
+  "name:en": "Campaigns",
+  "pageType": "list",
+  "modelCode": "crm_campaign",
+  "dslSchema": {
+    "id": "list.crm_campaign",
+    "kind": "List",
+    "areas": {
+      "toolbar": {
+        "blocks": [
+          {
+            "id": "crm_campaign_toolbar",
+            "blockType": "toolbar",
+            "buttons": [
+              {
+                "code": "create",
+                "primary": true,
+                "permissionCode": "CRMS.campaign.manage",
+                "label": "create",
+                "action": {
+                  "type": "navigate",
+                  "to": "crm_campaign_form",
+                  "command": "crms:create_campaign"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "list-tabs": {
+        "blocks": [
+          {
+            "id": "crm_campaign_tabs",
+            "blockType": "list-tabs",
+            "tabs": [
+              {
+                "key": "all",
+                "label": {
+                  "en": "All",
+                  "zh-CN": "全部"
+                },
+                "filter": null
+              },
+              {
+                "key": "planned",
+                "label": {
+                  "en": "Planned",
+                  "zh-CN": "计划中"
+                },
+                "filter": {
+                  "field": "crm_cpn_status",
+                  "value": "planned",
+                  "operator": "EQ"
+                }
+              },
+              {
+                "key": "active",
+                "label": {
+                  "en": "Active",
+                  "zh-CN": "进行中"
+                },
+                "filter": {
+                  "field": "crm_cpn_status",
+                  "value": "active",
+                  "operator": "EQ"
+                }
+              },
+              {
+                "key": "completed",
+                "label": {
+                  "en": "Completed",
+                  "zh-CN": "已完成"
+                },
+                "filter": {
+                  "field": "crm_cpn_status",
+                  "value": "completed",
+                  "operator": "EQ"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "main": {
+        "blocks": [
+          {
+            "id": "crm_campaign_table",
+            "blockType": "data-table",
+            "columns": [
+              {
+                "field": "crm_cpn_code",
+                "width": 140,
+                "sortable": true
+              },
+              {
+                "field": "crm_cpn_name",
+                "width": 200,
+                "sortable": true
+              },
+              {
+                "field": "crm_cpn_type",
+                "width": 120,
+                "renderType": "tag"
+              },
+              {
+                "field": "crm_cpn_status",
+                "width": 100,
+                "renderType": "tag"
+              },
+              {
+                "field": "crm_cpn_start_date",
+                "width": 120,
+                "sortable": true
+              },
+              {
+                "field": "crm_cpn_end_date",
+                "width": 120,
+                "sortable": true
+              },
+              {
+                "field": "crm_cpn_budget",
+                "width": 120,
+                "sortable": true
+              },
+              {
+                "field": "crm_cpn_owner",
+                "width": 120
+              },
+              {
+                "field": "actions",
+                "isActionColumn": true,
+                "buttons": [
+                  {
+                    "code": "view",
+                    "label": "detail",
+                    "action": {
+                      "type": "navigate",
+                      "to": "crm_campaign_detail"
+                    }
+                  },
+                  {
+                    "code": "edit",
+                    "permissionCode": "CRMS.campaign.manage",
+                    "label": "edit",
+                    "action": {
+                      "type": "navigate",
+                      "to": "crm_campaign_form"
+                    }
+                  },
+                  {
+                    "code": "delete",
+                    "danger": true,
+                    "permissionCode": "CRMS.campaign.manage",
+                    "label": "delete",
+                    "confirm": "delete.confirm",
+                    "action": {
+                      "type": "command",
+                      "command": "crms:delete_campaign"
+                    }
+                  }
+                ]
+              }
+            ],
+            "searchFields": [
+              "crm_cpn_name",
+              "crm_cpn_code"
+            ],
+            "defaultSort": {
+              "field": "created_at",
+              "order": "desc"
+            }
+          }
+        ]
+      }
+    },
+    "layout": {
+      "areas": [
+        "list-tabs",
+        "toolbar",
+        "main"
+      ],
+      "areasConfig": {
+        "list-tabs": {
+          "type": "flex",
+          "direction": "row"
+        },
+        "toolbar": {
+          "type": "flex",
+          "direction": "row",
+          "justify": "space-between",
+          "align": "center"
+        },
+        "main": {
+          "type": "grid",
+          "cols": 12,
+          "rowGap": 0,
+          "colGap": 0
+        }
+      }
+    }
+  }
+}

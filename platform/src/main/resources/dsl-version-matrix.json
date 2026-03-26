@@ -1,0 +1,18 @@
+{
+  "currentVersion": 1,
+  "versions": {
+    "1": {
+      "minPlatformVersion": "1.0.0",
+      "status": "current",
+      "blockTypes": [
+        "form", "form-section", "form-buttons", "form-wizard",
+        "table", "data-table", "filters", "filter-form",
+        "toolbar", "action", "description", "chart", "tabs",
+        "list-tabs", "sub-table", "monthly-grid", "custom"
+      ],
+      "kinds": ["Page", "List", "Form", "Detail", "PageLayout", "Dashboard"],
+      "deprecations": []
+    }
+  },
+  "migrationPaths": {}
+}

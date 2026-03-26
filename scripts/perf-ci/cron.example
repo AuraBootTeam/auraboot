@@ -1,0 +1,21 @@
+# AuraBoot Performance Regression — example crontab entries
+#
+# To install: crontab -e  (then paste the relevant lines)
+# To view:    crontab -l
+#
+# Required environment variables should be exported in the shell's profile
+# or injected via a wrapper script:
+#
+#   BASE_URL=http://your-server:6443
+#   PERF_BASELINE_DIR=/path/to/scripts/perf-ci/baseline
+#   PERF_ALERT_WEBHOOK=https://hooks.slack.com/services/XXX/YYY/ZZZ
+#   USERNAME=admin@auraboot.test
+#   PASSWORD=Test2026x
+#
+# Replace /path/to with the absolute path to your AuraMeta checkout.
+
+# Nightly perf smoke (2am local time) — fast, ~5 min
+0 2 * * * /path/to/scripts/perf-ci/run-perf-regression.sh --profile smoke >> /var/log/perf-ci.log 2>&1
+
+# Weekly full regression (Sunday 3am) — 3-run median per test, ~20 min
+0 3 * * 0 /path/to/scripts/perf-ci/run-perf-regression.sh --profile full >> /var/log/perf-ci.log 2>&1

@@ -1,0 +1,46 @@
+[
+  {
+    "code": "gp_task_summary",
+    "name:zh-CN": "任务状态统计",
+    "name:en": "Task Summary by Status",
+    "description": "Aggregate task counts grouped by status. Used for dashboard stat cards and pie charts.",
+    "purpose": "Provides a breakdown of how many tasks are in each status (NEW, in_progress, DONE, archived) for overview dashboards.",
+    "parameter_schema": {
+      "type": "object",
+      "properties": {
+        "tenantId": { "type": "string", "description": "Tenant ID (auto-injected)" }
+      },
+      "required": ["tenantId"]
+    },
+    "fromSql": "SELECT gp_task_status AS status, COUNT(*) AS count FROM mt_gp_task WHERE tenant_id = #{params.tenantId} GROUP BY gp_task_status ORDER BY CASE gp_task_status WHEN 'new' THEN 1 WHEN 'in_progress' THEN 2 WHEN 'done' THEN 3 WHEN 'archived' THEN 4 ELSE 5 END",
+    "outputFields": [
+      { "code": "status", "columnExpr": "status", "dataType": "string", "searchable": true },
+      { "code": "count", "columnExpr": "count", "dataType": "number", "sortable": true }
+    ]
+  },
+  {
+    "code": "gp_overdue_tasks",
+    "name:zh-CN": "逾期任务",
+    "name:en": "Overdue Tasks",
+    "description": "Lists all tasks that are past their due date and not yet completed or archived. Used for alerts and follow-up dashboards.",
+    "purpose": "Identifies tasks where due_date < today AND status is still NEW or in_progress, enabling proactive follow-up on overdue work items.",
+    "parameter_schema": {
+      "type": "object",
+      "properties": {
+        "tenantId": { "type": "string", "description": "Tenant ID (auto-injected)" },
+        "assignee": { "type": "string", "description": "Optional filter by assignee" }
+      },
+      "required": ["tenantId"]
+    },
+    "fromSql": "SELECT pid, gp_task_code, gp_task_title, gp_task_status, gp_task_priority, gp_task_assignee, gp_task_due_date FROM mt_gp_task WHERE tenant_id = #{params.tenantId} AND gp_task_due_date < CURRENT_DATE AND gp_task_status IN ('new', 'in_progress') AND (#{params.assignee} IS NULL OR #{params.assignee} = '' OR gp_task_assignee = #{params.assignee}) ORDER BY gp_task_due_date ASC",
+    "outputFields": [
+      { "code": "pid", "columnExpr": "pid", "dataType": "string" },
+      { "code": "gp_task_code", "columnExpr": "gp_task_code", "dataType": "string", "searchable": true },
+      { "code": "gp_task_title", "columnExpr": "gp_task_title", "dataType": "string", "searchable": true },
+      { "code": "gp_task_status", "columnExpr": "gp_task_status", "dataType": "string", "searchable": true },
+      { "code": "gp_task_priority", "columnExpr": "gp_task_priority", "dataType": "string", "searchable": true },
+      { "code": "gp_task_assignee", "columnExpr": "gp_task_assignee", "dataType": "string", "searchable": true },
+      { "code": "gp_task_due_date", "columnExpr": "gp_task_due_date", "dataType": "date", "sortable": true }
+    ]
+  }
+]

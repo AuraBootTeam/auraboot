@@ -1,0 +1,7 @@
+build/
+node_modules/
+.react-router/
+plugins/
+*.min.js
+*.min.css
+package-lock.json

@@ -1,0 +1,67 @@
+[
+  {
+    "code": "tinv_root",
+    "parentCode": null,
+    "name:zh-CN": "进销存",
+    "name:en": "Inventory",
+    "path": null,
+    "component": null,
+    "icon": "IconPackage",
+    "type": 0,
+    "permissionCode": null,
+    "orderNo": 830,
+    "visible": true
+  },
+  {
+    "code": "tinv_products",
+    "parentCode": "tinv_root",
+    "name:zh-CN": "产品",
+    "name:en": "Products",
+    "path": "/dynamic/tinv-product",
+    "component": null,
+    "icon": "IconBox",
+    "type": 1,
+    "permissionCode": "tinv.product.read",
+    "orderNo": 1,
+    "visible": true
+  },
+  {
+    "code": "tinv_warehouses",
+    "parentCode": "tinv_root",
+    "name:zh-CN": "仓库",
+    "name:en": "Warehouses",
+    "path": "/dynamic/tinv-warehouse",
+    "component": null,
+    "icon": "IconHome",
+    "type": 1,
+    "permissionCode": "tinv.warehouse.read",
+    "orderNo": 2,
+    "visible": true
+  },
+  {
+    "code": "tinv_stock_in",
+    "parentCode": "tinv_root",
+    "name:zh-CN": "入库",
+    "name:en": "Stock In",
+    "path": "/dynamic/tinv-stock-in",
+    "component": null,
+    "icon": "IconArrowDownCircle",
+    "type": 1,
+    "permissionCode": "tinv.stockin.read",
+    "orderNo": 3,
+    "visible": true
+  },
+  {
+    "code": "tinv_stock_out",
+    "parentCode": "tinv_root",
+    "name:zh-CN": "出库",
+    "name:en": "Stock Out",
+    "path": "/dynamic/tinv-stock-out",
+    "component": null,
+    "icon": "IconArrowUpCircle",
+    "type": 1,
+    "permissionCode": "tinv.stockout.read",
+    "orderNo": 4,
+    "visible": true
+  }
+]

@@ -1,0 +1,58 @@
+[
+  {
+    "code": "tinv.product.manage",
+    "name:zh-CN": "产品管理",
+    "name:en": "Product Management",
+    "resourceType": "operation",
+    "module": "tinv"
+  },
+  {
+    "code": "tinv.product.read",
+    "name:zh-CN": "查看产品",
+    "name:en": "View Products",
+    "resourceType": "data",
+    "module": "tinv"
+  },
+  {
+    "code": "tinv.warehouse.manage",
+    "name:zh-CN": "仓库管理",
+    "name:en": "Warehouse Management",
+    "resourceType": "operation",
+    "module": "tinv"
+  },
+  {
+    "code": "tinv.warehouse.read",
+    "name:zh-CN": "查看仓库",
+    "name:en": "View Warehouses",
+    "resourceType": "data",
+    "module": "tinv"
+  },
+  {
+    "code": "tinv.stockin.manage",
+    "name:zh-CN": "入库管理",
+    "name:en": "Stock In Management",
+    "resourceType": "operation",
+    "module": "tinv"
+  },
+  {
+    "code": "tinv.stockin.read",
+    "name:zh-CN": "查看入库",
+    "name:en": "View Stock In",
+    "resourceType": "data",
+    "module": "tinv"
+  },
+  {
+    "code": "tinv.stockout.manage",
+    "name:zh-CN": "出库管理",
+    "name:en": "Stock Out Management",
+    "resourceType": "operation",
+    "module": "tinv"
+  },
+  {
+    "code": "tinv.stockout.read",
+    "name:zh-CN": "查看出库",
+    "name:en": "View Stock Out",
+    "resourceType": "data",
+    "module": "tinv"
+  }
+]

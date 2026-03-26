@@ -1,0 +1,41 @@
+[
+  {
+    "code": "tpm_project",
+    "displayName:zh-CN": "项目",
+    "displayName:en": "Project",
+    "description": "Project entity for tracking initiatives with lifecycle and ownership.",
+    "modelType": "entity",
+    "modelCategory": "entity",
+    "semantic_description": "A project represents a planned initiative with start/end dates, ownership, and a lifecycle from planning through completion.",
+    "domain_category": "project",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "PLANNING → active → ON_HOLD (↔ active) → completed; also PLANNING/active → cancelled",
+    "extension": { "icon": "Briefcase", "category": "project-management", "titleField": "tpm_pj_name", "subtitleField": "tpm_pj_code" }
+  },
+  {
+    "code": "tpm_task",
+    "displayName:zh-CN": "任务",
+    "displayName:en": "Task",
+    "description": "Task within a project. Tracks work items with assignee and due date.",
+    "modelType": "entity",
+    "modelCategory": "entity",
+    "semantic_description": "A work item belonging to a project. Assigned to a team member with priority and due date tracking.",
+    "domain_category": "project",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "TODO → in_progress → in_review → DONE",
+    "extension": { "icon": "CheckSquare", "category": "project-management", "titleField": "tpm_ts_title", "subtitleField": "tpm_ts_code" }
+  },
+  {
+    "code": "tpm_milestone",
+    "displayName:zh-CN": "里程碑",
+    "displayName:en": "Milestone",
+    "description": "Project milestone marking key deliverables or deadlines.",
+    "modelType": "entity",
+    "modelCategory": "entity",
+    "semantic_description": "A significant checkpoint in a project timeline. Tracks whether key deliverables are reached on schedule.",
+    "domain_category": "project",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "pending → REACHED / MISSED",
+    "extension": { "icon": "Flag", "category": "project-management", "titleField": "tpm_ms_name", "subtitleField": "tpm_ms_code" }
+  }
+]

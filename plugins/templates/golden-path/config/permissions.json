@@ -1,0 +1,30 @@
+[
+  {
+    "code": "gp.task.manage",
+    "name:zh-CN": "任务管理",
+    "name:en": "Task Management",
+    "resourceType": "operation",
+    "module": "gp"
+  },
+  {
+    "code": "gp.task.read",
+    "name:zh-CN": "查看任务",
+    "name:en": "View Tasks",
+    "resourceType": "data",
+    "module": "gp"
+  },
+  {
+    "code": "gp.approval.manage",
+    "name:zh-CN": "审批管理",
+    "name:en": "Approval Management",
+    "resourceType": "operation",
+    "module": "gp"
+  },
+  {
+    "code": "gp.approval.read",
+    "name:zh-CN": "查看审批",
+    "name:en": "View Approvals",
+    "resourceType": "data",
+    "module": "gp"
+  }
+]

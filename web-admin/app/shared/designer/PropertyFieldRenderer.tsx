@@ -1,0 +1,280 @@
+/**
+ * PropertyFieldRenderer - Unified property field renderer for all designers.
+ *
+ * Accepts a FieldAdapter (value/setValue/error/required) and a PropertySchema,
+ * then renders the appropriate base-field component. This eliminates ~95%
+ * duplication between DashboardPropertyField and Flow PropertyField.
+ */
+
+import React from 'react';
+import {
+  BaseInput,
+  BaseSelect,
+  BaseSwitch,
+  BaseTextarea,
+  BaseFormulaEditor,
+  BaseResourceSelect,
+} from '~/components/base-fields';
+import {
+  fetchPageOptions,
+  fetchDashboardOptions,
+  fetchProcessOptions,
+  fetchAutomationOptions,
+  fetchCommandOptions,
+} from '~/services/resourceSelectService';
+import type { FieldAdapter } from '~/components/field-adapter';
+import type { PropertySchema, PropertyType } from './types';
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
+export interface PropertyFieldRendererProps {
+  /** Schema that describes the field type, label, options, etc. */
+  schema: PropertySchema<string>;
+  /** FieldAdapter that bridges the designer store with base-field components. */
+  adapter: FieldAdapter<unknown>;
+}
+
+/**
+ * Render a single property field based on its PropertySchema.
+ *
+ * The caller is responsible for:
+ *  - Resolving i18n labels to plain strings before passing `schema`
+ *  - Creating the appropriate FieldAdapter (flow, dashboard, etc.)
+ *  - Evaluating `dependsOn` visibility (keep at panel level)
+ */
+export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRendererProps) {
+  const label = schema.label as string;
+  const placeholder = schema.placeholder as string | undefined;
+  const helpText = schema.description as string | undefined;
+
+  switch (schema.type) {
+    // ---- Text-like inputs ----
+    case 'text':
+    case 'model':
+    case 'namedQuery':
+      return (
+        <BaseInput
+          adapter={adapter as any}
+          name={schema.key}
+          label={label}
+          placeholder={
+            placeholder ||
+            (schema.type === 'model'
+              ? 'Enter model code'
+              : schema.type === 'namedQuery'
+                ? 'Enter query code'
+                : undefined)
+          }
+          helpText={helpText}
+        />
+      );
+
+    case 'number':
+      return (
+        <BaseInput
+          adapter={adapter as any}
+          name={schema.key}
+          label={label}
+          placeholder={placeholder}
+          helpText={helpText}
+          type="number"
+        />
+      );
+
+    case 'textarea':
+      return (
+        <BaseTextarea
+          adapter={adapter as any}
+          name={schema.key}
+          label={label}
+          placeholder={placeholder}
+          helpText={helpText}
+          rows={4}
+        />
+      );
+
+    case 'json':
+      return <JsonField adapter={adapter} name={schema.key} label={label} helpText={helpText} />;
+
+    // ---- Selection fields ----
+    case 'select':
+    case 'multiselect':
+    case 'model-select':
+    case 'field-select':
+      return (
+        <BaseSelect
+          adapter={adapter as any}
+          name={schema.key}
+          label={label}
+          placeholder={placeholder}
+          helpText={helpText}
+          options={(schema.options || []).map((opt) => ({
+            label: opt.label as string,
+            value: opt.value,
+          }))}
+        />
+      );
+
+    case 'boolean':
+      return (
+        <BaseSwitch adapter={adapter as any} name={schema.key} label={label} helpText={helpText} />
+      );
+
+    // ---- Expression / formula ----
+    case 'expression':
+    case 'formula':
+      return (
+        <BaseFormulaEditor
+          adapter={adapter as any}
+          name={schema.key}
+          label={label}
+          placeholder={placeholder || 'Enter expression...'}
+          helpText={helpText}
+        />
+      );
+
+    // ---- Resource selects ----
+    case 'page-select':
+      return (
+        <ResourceSelectField
+          adapter={adapter}
+          label={label}
+          placeholder={placeholder || 'Select page...'}
+          helpText={helpText}
+          fetchOptions={fetchPageOptions}
+        />
+      );
+
+    case 'dashboard-select':
+      return (
+        <ResourceSelectField
+          adapter={adapter}
+          label={label}
+          placeholder={placeholder || 'Select dashboard...'}
+          helpText={helpText}
+          fetchOptions={fetchDashboardOptions}
+        />
+      );
+
+    case 'process-select':
+      return (
+        <ResourceSelectField
+          adapter={adapter}
+          label={label}
+          placeholder={placeholder || 'Select process...'}
+          helpText={helpText}
+          fetchOptions={fetchProcessOptions}
+        />
+      );
+
+    case 'automation-select':
+      return (
+        <ResourceSelectField
+          adapter={adapter}
+          label={label}
+          placeholder={placeholder || 'Select automation...'}
+          helpText={helpText}
+          fetchOptions={fetchAutomationOptions}
+        />
+      );
+
+    case 'command-select':
+      return (
+        <ResourceSelectField
+          adapter={adapter}
+          label={label}
+          placeholder={placeholder || 'Select command...'}
+          helpText={helpText}
+          fetchOptions={fetchCommandOptions}
+        />
+      );
+
+    default:
+      return (
+        <BaseInput
+          adapter={adapter as any}
+          name={schema.key}
+          label={label}
+          placeholder={placeholder}
+          helpText={helpText}
+        />
+      );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
+
+/** Wraps BaseResourceSelect with a label / helpText chrome. */
+function ResourceSelectField({
+  adapter,
+  label,
+  placeholder,
+  helpText,
+  fetchOptions,
+}: {
+  adapter: FieldAdapter<unknown>;
+  label?: string;
+  placeholder: string;
+  helpText?: string;
+  fetchOptions: () => Promise<{ label: string; value: string }[]>;
+}) {
+  return (
+    <div>
+      {label && <label className="mb-1 block text-sm font-medium text-gray-700">{label}</label>}
+      <BaseResourceSelect
+        value={(adapter.value as string) || ''}
+        onChange={adapter.setValue as any}
+        fetchOptions={fetchOptions}
+        placeholder={placeholder}
+      />
+      {helpText && <p className="mt-1 text-xs text-gray-500">{helpText}</p>}
+    </div>
+  );
+}
+
+/** JSON field - handles serialization/deserialization for object values. */
+function JsonField({
+  adapter,
+  name,
+  label,
+  helpText,
+}: {
+  adapter: FieldAdapter<unknown>;
+  name: string;
+  label?: string;
+  helpText?: string;
+}) {
+  const displayValue =
+    typeof adapter.value === 'string' ? adapter.value : JSON.stringify(adapter.value, null, 2);
+
+  const jsonAdapter = {
+    ...adapter,
+    value: displayValue,
+    setValue: (val: string) => {
+      try {
+        adapter.setValue(JSON.parse(val));
+      } catch {
+        // Keep raw string if not valid JSON
+        adapter.setValue(val);
+      }
+    },
+  };
+
+  return (
+    <BaseTextarea
+      adapter={jsonAdapter as any}
+      name={name}
+      label={label}
+      placeholder="{}"
+      helpText={helpText}
+      rows={4}
+      className="font-mono"
+    />
+  );
+}
+
+export default PropertyFieldRenderer;

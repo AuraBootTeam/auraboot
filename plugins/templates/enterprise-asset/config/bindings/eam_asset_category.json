@@ -1,0 +1,7 @@
+[
+  {"modelCode":"eam_asset_category","fieldCode":"eam_ct_code","sequence":1,"required":true,"visible":true,"editable":true,"displayConfig":{"searchable":true,"sortable":true}},
+  {"modelCode":"eam_asset_category","fieldCode":"eam_ct_name","sequence":2,"required":true,"visible":true,"editable":true,"displayConfig":{"searchable":true,"sortable":true}},
+  {"modelCode":"eam_asset_category","fieldCode":"eam_ct_parent_id","sequence":3,"required":false,"visible":true,"editable":true},
+  {"modelCode":"eam_asset_category","fieldCode":"eam_ct_depreciation_method","sequence":4,"required":false,"visible":true,"editable":true,"displayConfig":{"searchable":true}},
+  {"modelCode":"eam_asset_category","fieldCode":"eam_ct_description","sequence":5,"required":false,"visible":false,"editable":true}
+]

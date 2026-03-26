@@ -1,0 +1,93 @@
+[
+  {
+    "code": "crms_root",
+    "parentCode": null,
+    "name:zh-CN": "CRM 入门",
+    "name:en": "CRM Starter",
+    "path": null,
+    "component": null,
+    "icon": "IconUsers",
+    "type": 0,
+    "permissionCode": null,
+    "orderNo": 210,
+    "visible": true
+  },
+  {
+    "code": "crms_accounts",
+    "parentCode": "crms_root",
+    "name:zh-CN": "客户",
+    "name:en": "Accounts",
+    "path": "/dynamic/crm-account",
+    "component": null,
+    "icon": "IconBuilding",
+    "type": 1,
+    "permissionCode": "crms.account.read",
+    "orderNo": 1,
+    "visible": true
+  },
+  {
+    "code": "crms_contacts",
+    "parentCode": "crms_root",
+    "name:zh-CN": "联系人",
+    "name:en": "Contacts",
+    "path": "/dynamic/crm-contact",
+    "component": null,
+    "icon": "IconUser",
+    "type": 1,
+    "permissionCode": "crms.contact.read",
+    "orderNo": 2,
+    "visible": true
+  },
+  {
+    "code": "crms_leads",
+    "parentCode": "crms_root",
+    "name:zh-CN": "线索",
+    "name:en": "Leads",
+    "path": "/dynamic/crm-lead",
+    "component": null,
+    "icon": "IconRadar",
+    "type": 1,
+    "permissionCode": "crms.lead.read",
+    "orderNo": 3,
+    "visible": true
+  },
+  {
+    "code": "crms_opportunities",
+    "parentCode": "crms_root",
+    "name:zh-CN": "商机管理",
+    "name:en": "Opportunities",
+    "path": "/dynamic/crm-opportunity",
+    "component": null,
+    "icon": "IconTarget",
+    "type": 1,
+    "permissionCode": "crms.opportunity.read",
+    "orderNo": 4,
+    "visible": true
+  },
+  {
+    "code": "crms_activities",
+    "parentCode": "crms_root",
+    "name:zh-CN": "活动记录",
+    "name:en": "Activities",
+    "path": "/dynamic/crm-activity",
+    "component": null,
+    "icon": "IconActivity",
+    "type": 1,
+    "permissionCode": "crms.activity.read",
+    "orderNo": 5,
+    "visible": true
+  },
+  {
+    "code": "crms_campaigns",
+    "parentCode": "crms_root",
+    "name:zh-CN": "营销活动",
+    "name:en": "Campaigns",
+    "path": "/dynamic/crm-campaign",
+    "component": null,
+    "icon": "IconMegaphone",
+    "type": 1,
+    "permissionCode": "crms.campaign.read",
+    "orderNo": 6,
+    "visible": true
+  }
+]

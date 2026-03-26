@@ -1,0 +1,503 @@
+{
+  "kind": "Form",
+  "version": "4.0.0",
+  "id": "form.store",
+  "title": "$i18n:form.store.title",
+  "description": "$i18n:form.store.description",
+  "components": {
+    "Form": "@/components/form/Form",
+    "FormSection": "@/components/form/FormSection",
+    "FormButtons": "@/components/form/FormButtons",
+    "Input": "@/components/form/Input",
+    "Select": "@/components/form/Select",
+    "TextArea": "@/components/form/TextArea"
+  },
+  "stateBinding": {
+    "model": "{{state.form}}"
+  },
+  "layout": {
+    "areas": ["main"],
+    "areasConfig": {
+      "main": {
+        "type": "grid",
+        "cols": 12,
+        "rowGap": 12,
+        "colGap": 12
+      }
+    }
+  },
+  "areas": {
+    "main": {
+      "blocks": [
+        {
+          "id": "block_store_basic",
+          "blockType": "form-section",
+          "title": "$i18n:form.store.section.basic",
+          "layout": {
+            "colSpan": 12,
+            "rowSpan": 1
+          },
+          "fields": [
+            {
+              "field": "code",
+              "label": "$i18n:form.store.field.code.label",
+              "component": "Input",
+              "layout": {
+                "colSpan": 6,
+                "rowSpan": 1
+              },
+              "props": {
+                "placeholder": "$i18n:form.store.field.code.placeholder"
+              },
+              "validation": [
+                {
+                  "type": "required",
+                  "message": "$i18n:form.store.field.code.required"
+                }
+              ],
+              "readOnlyWhen": "${form.mode === 'edit'}"
+            },
+            {
+              "field": "name",
+              "label": "$i18n:form.store.field.name.label",
+              "component": "Input",
+              "layout": {
+                "colSpan": 6,
+                "rowSpan": 1
+              },
+              "props": {
+                "placeholder": "$i18n:form.store.field.name.placeholder"
+              },
+              "validation": [
+                {
+                  "type": "required",
+                  "message": "$i18n:form.store.field.name.required"
+                }
+              ]
+            },
+            {
+              "field": "type",
+              "label": "$i18n:form.store.field.type.label",
+              "component": "Select",
+              "layout": {
+                "colSpan": 6,
+                "rowSpan": 1
+              },
+              "dataSource": {
+                "id": "ds_storeTypes",
+                "valueField": "value",
+                "labelField": "label"
+              },
+              "props": {
+                "placeholder": "$i18n:form.store.field.type.placeholder"
+              },
+              "validation": [
+                {
+                  "type": "required",
+                  "message": "$i18n:form.store.field.type.required"
+                }
+              ]
+            },
+            {
+              "field": "status",
+              "label": "$i18n:form.store.field.status.label",
+              "component": "Select",
+              "layout": {
+                "colSpan": 6,
+                "rowSpan": 1
+              },
+              "dataSource": {
+                "id": "ds_storeStatuses",
+                "valueField": "value",
+                "labelField": "label"
+              },
+              "props": {
+                "placeholder": "$i18n:form.store.field.status.placeholder"
+              }
+            }
+          ]
+        },
+        {
+          "id": "block_store_contact",
+          "blockType": "form-section",
+          "title": "$i18n:form.store.section.contact",
+          "layout": {
+            "colSpan": 12,
+            "rowSpan": 1
+          },
+          "fields": [
+            {
+              "field": "contactPhone",
+              "label": "$i18n:form.store.field.contactPhone.label",
+              "component": "Input",
+              "layout": {
+                "colSpan": 6,
+                "rowSpan": 1
+              },
+              "props": {
+                "placeholder": "$i18n:form.store.field.contactPhone.placeholder"
+              },
+              "validation": [
+                {
+                  "type": "required",
+                  "message": "$i18n:form.store.field.contactPhone.required"
+                }
+              ]
+            },
+            {
+              "field": "contactEmail",
+              "label": "$i18n:form.store.field.contactEmail.label",
+              "component": "Input",
+              "layout": {
+                "colSpan": 6,
+                "rowSpan": 1
+              },
+              "props": {
+                "placeholder": "$i18n:form.store.field.contactEmail.placeholder"
+              },
+              "validation": [
+                {
+                  "type": "email",
+                  "message": "$i18n:form.store.field.contactEmail.invalid"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "block_store_location",
+          "blockType": "form-section",
+          "title": "$i18n:form.store.section.location",
+          "layout": {
+            "colSpan": 12,
+            "rowSpan": 1
+          },
+          "fields": [
+            {
+              "field": "address",
+              "label": "$i18n:form.store.field.address.label",
+              "component": "TextArea",
+              "layout": {
+                "colSpan": 12,
+                "rowSpan": 2
+              },
+              "props": {
+                "placeholder": "$i18n:form.store.field.address.placeholder",
+                "autoSize": {
+                  "minRows": 2,
+                  "maxRows": 4
+                }
+              },
+              "validation": [
+                {
+                  "type": "required",
+                  "message": "$i18n:form.store.field.address.required"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "block_cascade_static",
+          "blockType": "form-section",
+          "title": "$i18n:form.store.section.cascade.static",
+          "layout": {
+            "colSpan": 12,
+            "rowSpan": 1
+          },
+          "fields": [
+            {
+              "field": "province",
+              "label": "$i18n:form.store.field.province.label",
+              "component": "Select",
+              "layout": {
+                "colSpan": 6,
+                "rowSpan": 1
+              },
+              "props": {
+                "options": ["Zhejiang", "Guangdong"]
+              }
+            },
+            {
+              "field": "city_static",
+              "label": "$i18n:form.store.field.city_static.label",
+              "component": "Select",
+              "layout": {
+                "colSpan": 6,
+                "rowSpan": 1
+              },
+              "optionsWhen": "${dict.cityByProvince[form.province]}"
+            }
+          ]
+        },
+        {
+          "id": "block_cascade_dynamic",
+          "blockType": "form-section",
+          "title": "$i18n:form.store.section.cascade.dynamic",
+          "layout": {
+            "colSpan": 12,
+            "rowSpan": 1
+          },
+          "fields": [
+            {
+              "field": "country",
+              "label": "$i18n:form.store.field.country.label",
+              "component": "Select",
+              "layout": {
+                "colSpan": 6,
+                "rowSpan": 1
+              },
+              "dataSource": {
+                "id": "ds_countries",
+                "type": "api",
+                "endpoint": "/api/countries",
+                "method": "get",
+                "valueField": "code",
+                "labelField": "name",
+                "autoFetch": true
+              }
+            },
+            {
+              "field": "city",
+              "label": "$i18n:form.store.field.city.label",
+              "component": "Select",
+              "layout": {
+                "colSpan": 6,
+                "rowSpan": 1
+              },
+              "onChangeSource": "country",
+              "events": {
+                "onSourceChange": {
+                  "handler": "loadCitiesForCountry"
+                }
+              },
+              "disableWhen": "${!form.country}"
+            }
+          ]
+        },
+        {
+          "id": "block_store_advanced",
+          "blockType": "form-section",
+          "title": "$i18n:form.store.section.advanced",
+          "layout": {
+            "colSpan": 12,
+            "rowSpan": 1
+          },
+          "visibleWhen": "${hasPermission('store:viewAdvanced')}",
+          "fields": [
+            {
+              "field": "manager",
+              "label": "$i18n:form.store.field.manager.label",
+              "component": "Input",
+              "layout": {
+                "colSpan": 6,
+                "rowSpan": 1
+              },
+              "visibleWhen": "${form.type === 'direct'}",
+              "enableWhen": "${hasPermission('store:manage')}"
+            }
+          ]
+        },
+        {
+          "id": "block_store_buttons",
+          "blockType": "form-buttons",
+          "layout": {
+            "colSpan": 12,
+            "rowSpan": 1
+          },
+          "buttons": [
+            {
+              "code": "submit",
+              "content": "$i18n:form.store.btn.submit",
+              "primary": true,
+              "visibleWhen": "${hasPermission('store:create') || hasPermission('store:update')}",
+              "events": {
+                "onClick": {
+                  "handler": "submitStoreForm"
+                }
+              }
+            },
+            {
+              "code": "reset",
+              "content": "$i18n:form.store.btn.reset",
+              "events": {
+                "onClick": {
+                  "handler": "resetStoreForm"
+                }
+              }
+            },
+            {
+              "code": "cancel",
+              "content": "$i18n:form.store.btn.cancel",
+              "events": {
+                "onClick": {
+                  "handler": "cancelStoreForm"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "dataSources": {
+    "ds_storeTypes": {
+      "type": "dict",
+      "dictKey": "store.types",
+      "valueField": "value",
+      "labelField": "label"
+    },
+    "ds_storeStatuses": {
+      "type": "dict",
+      "dictKey": "store.statuses",
+      "valueField": "value",
+      "labelField": "label"
+    },
+    "ds_countries": {
+      "type": "api",
+      "endpoint": "/api/countries",
+      "method": "get",
+      "autoFetch": true,
+      "adaptor": "optionList",
+      "valueField": "code",
+      "labelField": "name"
+    },
+    "ds_citiesByCountry": {
+      "type": "api",
+      "endpoint": "/api/cities",
+      "method": "get",
+      "params": {
+        "country": "${form.country}"
+      },
+      "adaptor": "optionList",
+      "valueField": "code",
+      "labelField": "name"
+    }
+  },
+  "handlers": {
+    "submitStoreForm": {
+      "type": "flow",
+      "steps": [
+        {
+          "action": "form.validate",
+          "target": "form.store"
+        },
+        {
+          "action": "api.request",
+          "method": "post",
+          "endpoint": "/api/stores",
+          "body": "{{state.form}}",
+          "next": "afterSubmit"
+        },
+        {
+          "id": "afterSubmit",
+          "action": "toast.show",
+          "level": "success",
+          "content": "$i18n:form.store.submit.success"
+        },
+        {
+          "action": "notify",
+          "channel": "dataSource",
+          "payload": {
+            "id": "ds_storeList",
+            "event": "reload"
+          }
+        }
+      ]
+    },
+    "resetStoreForm": {
+      "type": "flow",
+      "steps": [
+        {
+          "action": "form.reset",
+          "target": "form.store"
+        }
+      ]
+    },
+    "cancelStoreForm": {
+      "type": "flow",
+      "steps": [
+        {
+          "action": "ui.closeContainer",
+          "target": "drawer.storeForm"
+        }
+      ]
+    },
+    "loadCitiesForCountry": {
+      "type": "flow",
+      "steps": [
+        {
+          "action": "dataSource.fetch",
+          "target": "ds_citiesByCountry"
+        },
+        {
+          "action": "form.setOptions",
+          "field": "city",
+          "fromDataSource": "ds_citiesByCountry"
+        }
+      ]
+    }
+  },
+  "schema": {
+    "type": "object",
+    "properties": {
+      "code": {
+        "type": "string",
+        "pattern": "^[A-Z0-9]{3,}$",
+        "description": "店铺编号"
+      },
+      "name": {
+        "type": "string",
+        "description": "店铺名称"
+      },
+      "type": {
+        "type": "string",
+        "enum": ["direct", "reseller"],
+        "description": "店铺类型",
+        "default": "direct"
+      },
+      "status": {
+        "type": "string",
+        "enum": ["active", "inactive"],
+        "description": "店铺状态",
+        "default": "active"
+      },
+      "contactPhone": {
+        "type": "string",
+        "pattern": "^\\d{7,15}$",
+        "description": "联系人电话"
+      },
+      "contactEmail": {
+        "type": "string",
+        "format": "email",
+        "description": "联系人邮箱"
+      },
+      "address": {
+        "type": "string",
+        "description": "地址"
+      },
+      "province": {
+        "type": "string",
+        "enum": ["Zhejiang", "Guangdong"],
+        "description": "所在省份"
+      },
+      "city_static": {
+        "type": "string",
+        "description": "所在城市（静态联动）"
+      },
+      "country": {
+        "type": "string",
+        "description": "所在国家"
+      },
+      "city": {
+        "type": "string",
+        "description": "所在城市（动态联动）"
+      },
+      "manager": {
+        "type": "string",
+        "description": "负责人"
+      }
+    },
+    "required": ["code", "name", "type", "status", "contactPhone", "address"]
+  }
+}

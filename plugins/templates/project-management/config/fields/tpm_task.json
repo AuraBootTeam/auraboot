@@ -1,0 +1,10 @@
+[
+  { "code": "tpm_ts_code", "displayName:zh-CN": "任务编号", "displayName:en": "Task Code", "dataType": "string", "description": "Auto-generated task code.", "constraints": { "required": true, "maxLength": 50 }, "feature": { "searchable": true, "sortable": true }, "extension": { "readOnly": true, "placeholder:zh-CN": "系统自动生成", "placeholder:en": "Auto generated" } },
+  { "code": "tpm_ts_title", "displayName:zh-CN": "任务标题", "displayName:en": "Title", "dataType": "string", "description": "Task title.", "constraints": { "required": true, "maxLength": 200 }, "feature": { "searchable": true, "sortable": true }, "extension": { "placeholder:zh-CN": "请输入任务标题", "placeholder:en": "Enter task title" } },
+  { "code": "tpm_ts_project_id", "displayName:zh-CN": "所属项目", "displayName:en": "Project", "dataType": "reference", "description": "The project this task belongs to.", "feature": { "searchable": true }, "extension": { "referenceModelCode": "tpm_project" } },
+  { "code": "tpm_ts_description", "displayName:zh-CN": "任务描述", "displayName:en": "Description", "dataType": "text", "description": "Detailed task description.", "constraints": { "maxLength": 5000 }, "extension": { "multiline": true } },
+  { "code": "tpm_ts_status", "displayName:zh-CN": "状态", "displayName:en": "Status", "dataType": "enum", "dictCode": "tpm_task_status", "defaultValue": "todo", "description": "Task lifecycle status.", "feature": { "searchable": true } },
+  { "code": "tpm_ts_priority", "displayName:zh-CN": "优先级", "displayName:en": "Priority", "dataType": "enum", "dictCode": "tpm_priority", "defaultValue": "medium", "description": "Task priority.", "feature": { "searchable": true } },
+  { "code": "tpm_ts_assignee", "displayName:zh-CN": "负责人", "displayName:en": "Assignee", "dataType": "string", "description": "Person assigned to the task.", "constraints": { "maxLength": 100 }, "feature": { "searchable": true } },
+  { "code": "tpm_ts_due_date", "displayName:zh-CN": "截止日期", "displayName:en": "Due Date", "dataType": "date", "description": "Task deadline.", "feature": { "sortable": true } }
+]

@@ -1,0 +1,44 @@
+[
+  {
+    "code": "tasset.asset.manage",
+    "name:zh-CN": "资产管理",
+    "name:en": "Asset Management",
+    "resourceType": "operation",
+    "module": "tasset"
+  },
+  {
+    "code": "tasset.asset.read",
+    "name:zh-CN": "查看资产",
+    "name:en": "View Assets",
+    "resourceType": "data",
+    "module": "tasset"
+  },
+  {
+    "code": "tasset.category.manage",
+    "name:zh-CN": "分类管理",
+    "name:en": "Category Management",
+    "resourceType": "operation",
+    "module": "tasset"
+  },
+  {
+    "code": "tasset.category.read",
+    "name:zh-CN": "查看分类",
+    "name:en": "View Categories",
+    "resourceType": "data",
+    "module": "tasset"
+  },
+  {
+    "code": "tasset.maintenance.manage",
+    "name:zh-CN": "维护管理",
+    "name:en": "Maintenance Management",
+    "resourceType": "operation",
+    "module": "tasset"
+  },
+  {
+    "code": "tasset.maintenance.read",
+    "name:zh-CN": "查看维护",
+    "name:en": "View Maintenance",
+    "resourceType": "data",
+    "module": "tasset"
+  }
+]

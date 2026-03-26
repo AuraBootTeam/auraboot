@@ -1,0 +1,160 @@
+{
+  "kind": "Form",
+  "id": "form_store_create",
+  "version": "3.0.0",
+  "title": "$i18n:form.store.title",
+
+  // === 状态与数据源 ===
+  "state": {
+    "formData": { "type": "direct", "status": "active" }, // 初始值
+    "dictionaries": {}
+  },
+
+  "dataSource": {
+    "dict_cities": {
+      "type": "api",
+      "url": "/api/dict/cities",
+      "autoFetch": false // 级联加载，不需要自动取
+    }
+  },
+
+  // === 逻辑流 ===
+  "handlers": {
+    // 方案2: 主动触发级联加载
+    "loadCities": {
+      "type": "flow",
+      "steps": [
+        {
+          "action": "dataSource.fetch",
+          "target": "dict_cities",
+          "args": { "params": { "provinceId": "${state.formData.province}" } }
+        }
+      ]
+    },
+    // 提交逻辑 (覆盖默认行为或链式调用)
+    "doSubmit": {
+      "type": "built-in",
+      "name": "form.submit", // 引用系统内置的 submit flow (validate -> api -> toast)
+      "args": {
+        "api": { "url": "/api/store/create", "method": "post" },
+        "successMessage": "$i18n:msg.create.success",
+        "nextAction": { "action": "router.back" }
+      }
+    }
+  },
+
+  // === 布局定义 (Area-Block 模式) ===
+  "layout": {
+    "type": "grid",
+    "columns": ["1fr"],
+    "areas": [["main_form"], ["actions"]],
+    "gap": "$spacing.md"
+  },
+
+  "blocks": [
+    // === 表单主体区块 ===
+    {
+      "id": "block_main_form",
+      "area": "main_form",
+      "type": "Form",
+      "props": {
+        "layout": "grid", // 表单内部网格布局
+        "columns": 3, // 内部 3 列
+        "gap": "$spacing.sm",
+        "labelCol": 4
+      },
+      // 表单字段定义 (Fields)
+      "fields": [
+        // 1. 基础信息
+        {
+          "field": "code",
+          "component": "Input",
+          "label": "$i18n:form.field.code",
+          "colSpan": 1,
+          "props": { "placeholder": "$i18n:ph.code" },
+          "rules": [{ "required": true, "message": "$i18n:rule.required" }],
+          // 编辑态只读
+          "readOnlyWhen": "${state.mode === 'edit'}"
+        },
+        {
+          "field": "name",
+          "component": "Input",
+          "label": "$i18n:form.field.name",
+          "colSpan": 2, // 跨 2 列
+          "rules": [{ "required": true }]
+        },
+        {
+          "field": "type",
+          "component": "Select",
+          "label": "$i18n:form.field.type",
+          "colSpan": 1,
+          "props": {
+            "options": [
+              { "label": "$i18n:opt.direct", "value": "direct" },
+              { "label": "$i18n:opt.franchise", "value": "franchise" }
+            ]
+          }
+        },
+        // 2. 联动显隐 (visibleWhen)
+        {
+          "field": "manager",
+          "component": "Input",
+          "label": "$i18n:form.field.manager",
+          "colSpan": 1,
+          // 只有类型是直营时才显示
+          "visibleWhen": "${state.formData.type === 'direct'}",
+          "rules": [{ "required": true }]
+        },
+
+        // 3. 级联选项 - 方案1 (optionsWhen - 静态字典或已加载的状态)
+        {
+          "field": "province",
+          "component": "Select",
+          "label": "$i18n:form.field.province",
+          "colSpan": 1,
+          "props": { "options": "$state.dictionaries.provinces" }, // 假设页面初始化已加载
+          // 事件触发方案2
+          "events": {
+            "onChange": { "handler": "loadCities" }
+          }
+        },
+        // 级联选项 - 方案2 (配合 onChangeSource 和 dataSource)
+        {
+          "field": "city",
+          "component": "Select",
+          "label": "$i18n:form.field.city",
+          "colSpan": 1,
+          // 依赖的数据源加载完成后，自动渲染 options
+          "props": {
+            "dataSource": "dict_cities", // 绑定数据源
+            "labelField": "name",
+            "valueField": "id"
+          },
+          // 当省份为空时禁用
+          "disableWhen": "${!state.formData.province}"
+        }
+      ]
+    },
+
+    // === 底部按钮区 ===
+    {
+      "id": "block_actions",
+      "area": "actions",
+      "type": "Toolbar",
+      "props": { "align": "center" },
+      "items": [
+        {
+          "code": "submit", // 内置 code，系统知道这是提交
+          "component": "Button",
+          "props": { "type": "primary", "text": "$i18n:btn.submit" },
+          "events": { "onClick": { "handler": "doSubmit" } }
+        },
+        {
+          "code": "cancel", // 内置 code，默认行为是 router.back()
+          "component": "Button",
+          "props": { "text": "$i18n:btn.cancel" }
+        }
+      ]
+    }
+  ]
+}

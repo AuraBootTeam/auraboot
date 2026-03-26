@@ -1,0 +1,24 @@
+[
+  {
+    "code": "thr_leave_summary_by_employee",
+    "name:zh-CN": "员工请假汇总",
+    "name:en": "Leave Summary by Employee",
+    "description": "Aggregate leave days grouped by employee and leave type. Used for HR dashboards and leave balance tracking.",
+    "purpose": "Provides a breakdown of total approved leave days per employee grouped by leave type, enabling HR managers to monitor leave utilization and remaining balances.",
+    "parameter_schema": {
+      "type": "object",
+      "properties": {
+        "tenantId": { "type": "string", "description": "Tenant ID (auto-injected)" },
+        "year": { "type": "string", "description": "Year filter (e.g. '2026'). If not provided, returns all years." }
+      },
+      "required": ["tenantId"]
+    },
+    "fromSql": "SELECT e.thr_em_name AS employee_name, lr.thr_lv_leave_type AS leave_type, COUNT(*) AS request_count, COALESCE(SUM(lr.thr_lv_days), 0) AS total_days FROM mt_thr_leave_request lr JOIN mt_thr_employee e ON lr.thr_lv_employee_id = e.pid AND e.tenant_id = #{params.tenantId} WHERE lr.tenant_id = #{params.tenantId} AND lr.thr_lv_status = 'approved' AND (#{params.year} IS NULL OR #{params.year} = '' OR EXTRACT(YEAR FROM lr.thr_lv_start_date) = CAST(#{params.year} AS INTEGER)) GROUP BY e.thr_em_name, lr.thr_lv_leave_type ORDER BY e.thr_em_name, lr.thr_lv_leave_type",
+    "outputFields": [
+      { "code": "employee_name", "columnExpr": "employee_name", "dataType": "string", "searchable": true },
+      { "code": "leave_type", "columnExpr": "leave_type", "dataType": "string", "searchable": true },
+      { "code": "request_count", "columnExpr": "request_count", "dataType": "number", "sortable": true },
+      { "code": "total_days", "columnExpr": "total_days", "dataType": "number", "sortable": true }
+    ]
+  }
+]

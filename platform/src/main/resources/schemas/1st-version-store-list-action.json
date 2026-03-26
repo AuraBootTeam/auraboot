@@ -1,0 +1,50 @@
+{
+  "meta": {
+    "blockCode": "store.list.action",
+    "version": "1.0.0",
+    "title": {
+      "zh-CN": "store.list.action_CN",
+      "en-US": "store.list.action"
+    },
+    "entityCode": "Store",
+    "type": "action"
+  },
+  "actions": [
+    {
+      "code": "search",
+      "label": {
+        "zh-CN": "查询",
+        "en-US": "Search"
+      },
+      "props": {
+        "primary": true
+      }
+    },
+    {
+      "code": "reset",
+      "label": {
+        "zh-CN": "重置",
+        "en-US": "Reset"
+      }
+    },
+    {
+      "code": "new",
+      "label": {
+        "zh-CN": "新建门店",
+        "en-US": "New Store"
+      },
+      "props": {
+        "primary": true
+      },
+      "permission": "store:create"
+    },
+    {
+      "code": "export",
+      "label": {
+        "zh-CN": "导出",
+        "en-US": "Export"
+      },
+      "permission": "store:export"
+    }
+  ]
+}

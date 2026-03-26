@@ -1,0 +1,184 @@
+[
+  {
+    "code": "tasset_category",
+    "name": "Asset Category",
+    "name:zh-CN": "资产类别",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "it_equipment",
+        "label": "IT Equipment",
+        "label:zh-CN": "IT设备",
+        "sortNo": 10,
+        "color": "#1890ff",
+        "status": "enabled"
+      },
+      {
+        "value": "furniture",
+        "label": "Furniture",
+        "label:zh-CN": "家具",
+        "sortNo": 20,
+        "color": "#fa8c16",
+        "status": "enabled"
+      },
+      {
+        "value": "vehicle",
+        "label": "Vehicle",
+        "label:zh-CN": "车辆",
+        "sortNo": 30,
+        "color": "#52c41a",
+        "status": "enabled"
+      },
+      {
+        "value": "software",
+        "label": "Software",
+        "label:zh-CN": "软件",
+        "sortNo": 40,
+        "color": "#722ed1",
+        "status": "enabled"
+      },
+      {
+        "value": "other",
+        "label": "Other",
+        "label:zh-CN": "其他",
+        "sortNo": 50,
+        "color": "#d9d9d9",
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "tasset_asset_status",
+    "name": "Asset Status",
+    "name:zh-CN": "资产状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "available",
+        "label": "Available",
+        "label:zh-CN": "可用",
+        "sortNo": 10,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "in_use",
+        "label": "In Use",
+        "label:zh-CN": "使用中",
+        "sortNo": 20,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "under_maintenance",
+        "label": "Under Maintenance",
+        "label:zh-CN": "维护中",
+        "sortNo": 30,
+        "color": "#fa8c16",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "retired",
+        "label": "Retired",
+        "label:zh-CN": "已报废",
+        "sortNo": 40,
+        "color": "#d9d9d9",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      }
+    ]
+  },
+  {
+    "code": "tasset_maint_type",
+    "name": "Maintenance Type",
+    "name:zh-CN": "维护类型",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "repair",
+        "label": "Repair",
+        "label:zh-CN": "维修",
+        "sortNo": 10,
+        "color": "#f5222d",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "inspection",
+        "label": "Inspection",
+        "label:zh-CN": "检查",
+        "sortNo": 20,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "upgrade",
+        "label": "Upgrade",
+        "label:zh-CN": "升级",
+        "sortNo": 30,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      }
+    ]
+  },
+  {
+    "code": "tasset_maint_status",
+    "name": "Maintenance Status",
+    "name:zh-CN": "维护状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "scheduled",
+        "label": "Scheduled",
+        "label:zh-CN": "已计划",
+        "sortNo": 10,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "in_progress",
+        "label": "In Progress",
+        "label:zh-CN": "进行中",
+        "sortNo": 20,
+        "color": "#fa8c16",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "completed",
+        "label": "Completed",
+        "label:zh-CN": "已完成",
+        "sortNo": 30,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      }
+    ]
+  }
+]

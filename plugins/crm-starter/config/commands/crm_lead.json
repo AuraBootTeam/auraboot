@@ -1,0 +1,188 @@
+[
+  {
+    "code": "crms:create_lead",
+    "displayName:zh-CN": "新建线索",
+    "displayName:en": "Create Lead",
+    "type": "create",
+    "modelCode": "crm_lead",
+    "inputFields": [
+      "crm_lead_company",
+      "crm_lead_contact_name",
+      "crm_lead_contact_phone",
+      "crm_lead_contact_email",
+      "crm_lead_source",
+      "crm_lead_industry",
+      "crm_lead_score",
+      "crm_lead_campaign",
+      "crm_lead_assigned_to",
+      "crm_lead_requirement"
+    ],
+    "autoSetFields": {
+      "crm_lead_code": {
+        "strategy": "auto_generate",
+        "pattern": "LEAD-{yyyyMMdd}-{seq}"
+      },
+      "crm_lead_status": {
+        "strategy": "fixed_value",
+        "value": "new"
+      }
+    },
+    "permissions": [
+      "CRMS.lead.manage"
+    ],
+    "agent_hint": "Create a new crm lead record. Key inputs: company, contact_name, contact_phone, contact_email, source. Auto-generated: code, status.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crms:update_lead",
+    "displayName:zh-CN": "编辑线索",
+    "displayName:en": "Update Lead",
+    "type": "update",
+    "modelCode": "crm_lead",
+    "inputFields": [
+      "crm_lead_company",
+      "crm_lead_contact_name",
+      "crm_lead_contact_phone",
+      "crm_lead_contact_email",
+      "crm_lead_source",
+      "crm_lead_industry",
+      "crm_lead_score",
+      "crm_lead_campaign",
+      "crm_lead_assigned_to",
+      "crm_lead_requirement"
+    ],
+    "permissions": [
+      "CRMS.lead.manage"
+    ],
+    "agent_hint": "Update an existing crm lead record. Editable fields: company, contact_name, contact_phone, contact_email, source.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crms:contact_lead",
+    "displayName:zh-CN": "标记已联系",
+    "displayName:en": "Mark Contacted",
+    "type": "state_transition",
+    "modelCode": "crm_lead",
+    "stateField": "crm_lead_status",
+    "fromStates": [
+      "new"
+    ],
+    "toState": "contacted",
+    "permissions": [
+      "CRMS.lead.manage"
+    ],
+    "agent_hint": "Transition crm lead status from NEW to CONTACTED.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crms:qualify_lead",
+    "displayName:zh-CN": "标记合格",
+    "displayName:en": "Qualify Lead",
+    "type": "state_transition",
+    "modelCode": "crm_lead",
+    "stateField": "crm_lead_status",
+    "fromStates": [
+      "new",
+      "contacted"
+    ],
+    "toState": "qualified",
+    "permissions": [
+      "CRMS.lead.manage"
+    ],
+    "agent_hint": "Transition crm lead status from NEW/CONTACTED to QUALIFIED.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crms:convert_lead",
+    "displayName:zh-CN": "转化线索",
+    "displayName:en": "Convert Lead",
+    "type": "state_transition",
+    "modelCode": "crm_lead",
+    "stateField": "crm_lead_status",
+    "fromStates": [
+      "qualified"
+    ],
+    "toState": "converted",
+    "extension": {
+      "confirmMessage:zh-CN": "确认将此线索标记为已转化？",
+      "confirmMessage:en": "Confirm marking this lead as converted?"
+    },
+    "permissions": [
+      "CRMS.lead.manage"
+    ],
+    "agent_hint": "Transition crm lead status from QUALIFIED to CONVERTED.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crms:lose_lead",
+    "displayName:zh-CN": "标记丢失",
+    "displayName:en": "Mark Lost",
+    "type": "state_transition",
+    "modelCode": "crm_lead",
+    "stateField": "crm_lead_status",
+    "fromStates": [
+      "new",
+      "contacted",
+      "qualified"
+    ],
+    "toState": "lost",
+    "inputFields": [
+      "crm_lead_lost_reason"
+    ],
+    "permissions": [
+      "CRMS.lead.manage"
+    ],
+    "agent_hint": "Transition crm lead status from NEW/CONTACTED/QUALIFIED to LOST.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crms:delete_lead",
+    "displayName:zh-CN": "删除线索",
+    "displayName:en": "Delete Lead",
+    "type": "delete",
+    "modelCode": "crm_lead",
+    "preconditions": [
+      {
+        "field": "crm_lead_status",
+        "operator": "IN",
+        "value": [
+          "new",
+          "contacted"
+        ]
+      }
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此线索？",
+      "confirmMessage:en": "Confirm delete this lead?"
+    },
+    "permissions": [
+      "CRMS.lead.manage"
+    ],
+    "agent_hint": "Delete crm lead record(s). This is irreversible. Preconditions: status IN [\"NEW\",\"CONTACTED\"].",
+    "cmd_risk_level": "L4"
+  },
+  {
+    "code": "crms:detail_lead",
+    "displayName:zh-CN": "查看线索",
+    "displayName:en": "View Lead",
+    "type": "query",
+    "modelCode": "crm_lead",
+    "permissions": [
+      "CRMS.lead.read"
+    ],
+    "agent_hint": "Query crm lead records.",
+    "cmd_risk_level": "L0"
+  },
+  {
+    "code": "crms:list_leads",
+    "displayName:zh-CN": "线索列表",
+    "displayName:en": "List Leads",
+    "type": "query",
+    "modelCode": "crm_lead",
+    "permissions": [
+      "CRMS.lead.read"
+    ],
+    "agent_hint": "Query crm lead records.",
+    "cmd_risk_level": "L0"
+  }
+]

@@ -1,0 +1,75 @@
+{
+  "pageKey": "thr_employee_detail",
+  "name:zh-CN": "员工详情",
+  "name:en": "Employee Detail",
+  "pageType": "detail",
+  "modelCode": "thr_employee",
+  "dslSchema": {
+    "id": "detail.thr_employee",
+    "kind": "Detail",
+    "version": "1.0.0",
+    "modelCode": "thr_employee",
+    "layout": {
+      "areas": ["header", "main", "sub-tables"],
+      "areasConfig": {
+        "header": { "type": "flex", "direction": "row" },
+        "main": { "type": "grid", "cols": 12, "rowGap": 16, "colGap": 16 },
+        "sub-tables": { "type": "stack" }
+      }
+    },
+    "areas": {
+      "header": {
+        "blocks": [{
+          "id": "action_bar",
+          "blockType": "toolbar",
+          "buttons": [
+            { "code": "edit", "action": "edit", "navigateTo": "thr_employee_form", "permissionCode": "THR.employee.manage" },
+            { "code": "on_leave", "commandCode": "thr:on_leave", "permissionCode": "THR.employee.manage" },
+            { "code": "return_from_leave", "commandCode": "thr:return_from_leave", "permissionCode": "THR.employee.manage" },
+            { "code": "resign", "commandCode": "thr:resign", "permissionCode": "THR.employee.manage" },
+            { "code": "delete", "action": "delete", "danger": true, "commandCode": "thr:delete_employee", "permissionCode": "THR.employee.manage", "confirmMessageKey": "delete.confirm" }
+          ]
+        }]
+      },
+      "main": {
+        "blocks": [{
+          "id": "info",
+          "blockType": "form-section",
+          "readOnly": true,
+          "title": { "zh-CN": "员工信息", "en-US": "Employee Information" },
+          "fields": [
+            { "field": "thr_em_code", "colSpan": 6 },
+            { "field": "thr_em_name", "colSpan": 6 },
+            { "field": "thr_em_department", "colSpan": 6 },
+            { "field": "thr_em_position", "colSpan": 6 },
+            { "field": "thr_em_email", "colSpan": 6 },
+            { "field": "thr_em_phone", "colSpan": 6 },
+            { "field": "thr_em_hire_date", "colSpan": 6 },
+            { "field": "thr_em_status", "colSpan": 6 },
+            { "field": "thr_em_notes", "colSpan": 12 }
+          ]
+        }]
+      },
+      "sub-tables": {
+        "blocks": [{
+          "id": "leave_requests",
+          "blockType": "sub-table",
+          "title": { "zh-CN": "请假记录", "en-US": "Leave Requests" },
+          "modelCode": "thr_leave_request",
+          "foreignKey": "thr_lv_employee_id",
+          "columns": [
+            { "field": "thr_lv_code", "width": 160 },
+            { "field": "thr_lv_leave_type", "width": 120, "renderType": "tag", "dictCode": "thr_leave_type" },
+            { "field": "thr_lv_start_date", "width": 130 },
+            { "field": "thr_lv_end_date", "width": 130 },
+            { "field": "thr_lv_days", "width": 80 },
+            { "field": "thr_lv_status", "width": 100, "renderType": "tag", "dictCode": "thr_leave_status" },
+            { "field": "created_at", "width": 180 }
+          ],
+          "createCommandCode": "thr:create_leave_request",
+          "deleteCommandCode": "thr:delete_leave_request"
+        }]
+      }
+    }
+  }
+}

@@ -1,0 +1,11 @@
+[
+  {"modelCode":"tasset_maintenance","fieldCode":"tasset_mn_code","sequence":1,"required":true,"visible":true,"editable":false,"displayConfig":{"searchable":true,"sortable":true}},
+  {"modelCode":"tasset_maintenance","fieldCode":"tasset_mn_asset_id","sequence":2,"required":true,"visible":true,"editable":true,"displayConfig":{"searchable":true}},
+  {"modelCode":"tasset_maintenance","fieldCode":"tasset_mn_type","sequence":3,"required":false,"visible":true,"editable":true,"displayConfig":{"searchable":true}},
+  {"modelCode":"tasset_maintenance","fieldCode":"tasset_mn_status","sequence":4,"required":false,"visible":true,"editable":false,"displayConfig":{"searchable":true}},
+  {"modelCode":"tasset_maintenance","fieldCode":"tasset_mn_scheduled_date","sequence":5,"required":false,"visible":true,"editable":true,"displayConfig":{"sortable":true}},
+  {"modelCode":"tasset_maintenance","fieldCode":"tasset_mn_completed_date","sequence":6,"required":false,"visible":true,"editable":true,"displayConfig":{"sortable":true}},
+  {"modelCode":"tasset_maintenance","fieldCode":"tasset_mn_cost","sequence":7,"required":false,"visible":true,"editable":true},
+  {"modelCode":"tasset_maintenance","fieldCode":"tasset_mn_technician","sequence":8,"required":false,"visible":true,"editable":true,"displayConfig":{"searchable":true}},
+  {"modelCode":"tasset_maintenance","fieldCode":"tasset_mn_notes","sequence":9,"required":false,"visible":false,"editable":true}
+]

@@ -1,0 +1,428 @@
+{
+  "meta": {
+    "title": {
+      "zh-CN": "门店表单",
+      "en-US": "Store Form"
+    },
+    "entityCode": "Store",
+    "dslVersion": "1.0.0",
+    "version": "2.0.0",
+    "pageKey": "store-form",
+    "schemaType": "form"
+  },
+  "endpoint": {
+    "create": {
+      "url": "/api/dynamic/Store",
+      "method": "post",
+      "permission": "store:create"
+    },
+    "update": {
+      "url": "/api/dynamic/Store/{id}",
+      "method": "put",
+      "permission": "store:update"
+    },
+    "get": {
+      "url": "/api/dynamic/Store/{id}",
+      "method": "get",
+      "permission": "store:read"
+    }
+  },
+  "regions": [
+    {
+      "type": "form",
+      "layout": {
+        "type": "grid",
+        "columns": 2,
+        "gap": 16
+      },
+      "fields": [
+        {
+          "code": "code",
+          "type": "input",
+          "props": {
+            "label": {
+              "zh-CN": "门店编码",
+              "en-US": "Store Code"
+            },
+            "placeholder": {
+              "zh-CN": "请输入门店编码",
+              "en-US": "Please enter store code"
+            },
+            "maxLength": 50
+          },
+          "validation": [
+            {
+              "type": "required",
+              "message": {
+                "zh-CN": "门店编码不能为空",
+                "en-US": "Store code is required"
+              }
+            },
+            {
+              "type": "pattern",
+              "pattern": "^[A-Z0-9]{3,20}$",
+              "message": {
+                "zh-CN": "门店编码只能包含大写字母和数字，长度3-20位",
+                "en-US": "Store code can only contain uppercase letters and numbers, 3-20 characters"
+              }
+            }
+          ],
+          "layout": {
+            "span": 1
+          }
+        },
+        {
+          "code": "name",
+          "type": "input",
+          "props": {
+            "label": {
+              "zh-CN": "门店名称",
+              "en-US": "Store Name"
+            },
+            "placeholder": {
+              "zh-CN": "请输入门店名称",
+              "en-US": "Please enter store name"
+            },
+            "maxLength": 100
+          },
+          "validation": [
+            {
+              "type": "required",
+              "message": {
+                "zh-CN": "门店名称不能为空",
+                "en-US": "Store name is required"
+              }
+            }
+          ],
+          "layout": {
+            "span": 1
+          }
+        },
+        {
+          "code": "type",
+          "type": "select",
+          "props": {
+            "label": {
+              "zh-CN": "门店类型",
+              "en-US": "Store Type"
+            },
+            "placeholder": {
+              "zh-CN": "请选择门店类型",
+              "en-US": "Please select store type"
+            },
+            "options": [
+              {
+                "value": "direct",
+                "label": {
+                  "zh-CN": "直营店",
+                  "en-US": "Direct Store"
+                }
+              },
+              {
+                "value": "franchise",
+                "label": {
+                  "zh-CN": "加盟店",
+                  "en-US": "Franchise Store"
+                }
+              },
+              {
+                "value": "flagship",
+                "label": {
+                  "zh-CN": "旗舰店",
+                  "en-US": "Flagship Store"
+                }
+              },
+              {
+                "value": "community",
+                "label": {
+                  "zh-CN": "社区店",
+                  "en-US": "Community Store"
+                }
+              }
+            ]
+          },
+          "validation": [
+            {
+              "type": "required",
+              "message": {
+                "zh-CN": "门店类型不能为空",
+                "en-US": "Store type is required"
+              }
+            }
+          ],
+          "layout": {
+            "span": 1
+          }
+        },
+        {
+          "code": "status",
+          "type": "select",
+          "props": {
+            "label": {
+              "zh-CN": "门店状态",
+              "en-US": "Store Status"
+            },
+            "placeholder": {
+              "zh-CN": "请选择门店状态",
+              "en-US": "Please select store status"
+            },
+            "options": [
+              {
+                "value": "active",
+                "label": {
+                  "zh-CN": "开业",
+                  "en-US": "Active"
+                }
+              },
+              {
+                "value": "inactive",
+                "label": {
+                  "zh-CN": "未开业",
+                  "en-US": "Inactive"
+                }
+              },
+              {
+                "value": "preparing",
+                "label": {
+                  "zh-CN": "筹备中",
+                  "en-US": "Preparing"
+                }
+              },
+              {
+                "value": "closed",
+                "label": {
+                  "zh-CN": "已关闭",
+                  "en-US": "Closed"
+                }
+              }
+            ]
+          },
+          "validation": [
+            {
+              "type": "required",
+              "message": {
+                "zh-CN": "门店状态不能为空",
+                "en-US": "Store status is required"
+              }
+            }
+          ],
+          "layout": {
+            "span": 1
+          }
+        },
+        {
+          "code": "address",
+          "type": "textarea",
+          "props": {
+            "label": {
+              "zh-CN": "门店地址",
+              "en-US": "Store Address"
+            },
+            "placeholder": {
+              "zh-CN": "请输入门店地址",
+              "en-US": "Please enter store address"
+            },
+            "rows": 3,
+            "maxLength": 500
+          },
+          "validation": [
+            {
+              "type": "required",
+              "message": {
+                "zh-CN": "门店地址不能为空",
+                "en-US": "Store address is required"
+              }
+            }
+          ],
+          "layout": {
+            "span": 2
+          }
+        },
+        {
+          "code": "contactPhone",
+          "type": "input",
+          "props": {
+            "label": {
+              "zh-CN": "联系电话",
+              "en-US": "Contact Phone"
+            },
+            "placeholder": {
+              "zh-CN": "请输入联系电话",
+              "en-US": "Please enter contact phone"
+            },
+            "maxLength": 20
+          },
+          "validation": [
+            {
+              "type": "required",
+              "message": {
+                "zh-CN": "联系电话不能为空",
+                "en-US": "Contact phone is required"
+              }
+            },
+            {
+              "type": "pattern",
+              "pattern": "^1[3-9]\\d{9}$|^0\\d{2,3}-?\\d{7,8}$",
+              "message": {
+                "zh-CN": "请输入正确的电话号码",
+                "en-US": "Please enter a valid phone number"
+              }
+            }
+          ],
+          "layout": {
+            "span": 1
+          }
+        },
+        {
+          "code": "manager",
+          "type": "input",
+          "props": {
+            "label": {
+              "zh-CN": "店长姓名",
+              "en-US": "Manager Name"
+            },
+            "placeholder": {
+              "zh-CN": "请输入店长姓名",
+              "en-US": "Please enter manager name"
+            },
+            "maxLength": 50
+          },
+          "validation": [
+            {
+              "type": "required",
+              "message": {
+                "zh-CN": "店长姓名不能为空",
+                "en-US": "Manager name is required"
+              }
+            }
+          ],
+          "layout": {
+            "span": 1
+          }
+        },
+        {
+          "code": "openingHours",
+          "type": "input",
+          "props": {
+            "label": {
+              "zh-CN": "营业时间",
+              "en-US": "Opening Hours"
+            },
+            "placeholder": {
+              "zh-CN": "例如：09:00-21:00",
+              "en-US": "e.g., 09:00-21:00"
+            },
+            "maxLength": 50
+          },
+          "layout": {
+            "span": 1
+          }
+        },
+        {
+          "code": "area",
+          "type": "number",
+          "props": {
+            "label": {
+              "zh-CN": "营业面积(㎡)",
+              "en-US": "Business Area (㎡)"
+            },
+            "placeholder": {
+              "zh-CN": "请输入营业面积",
+              "en-US": "Please enter business area"
+            },
+            "min": 0,
+            "precision": 2
+          },
+          "layout": {
+            "span": 1
+          }
+        },
+        {
+          "code": "description",
+          "type": "textarea",
+          "props": {
+            "label": {
+              "zh-CN": "门店描述",
+              "en-US": "Store Description"
+            },
+            "placeholder": {
+              "zh-CN": "请输入门店描述",
+              "en-US": "Please enter store description"
+            },
+            "rows": 4,
+            "maxLength": 1000
+          },
+          "layout": {
+            "span": 2
+          }
+        }
+      ]
+    },
+    {
+      "type": "action",
+      "actions": [
+        {
+          "code": "submit",
+          "props": {
+            "type": "primary",
+            "label": {
+              "zh-CN": "保存",
+              "en-US": "Save"
+            }
+          }
+        },
+        {
+          "code": "cancel",
+          "props": {
+            "label": {
+              "zh-CN": "取消",
+              "en-US": "Cancel"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "on": "form.submit",
+      "if": "${$form.valid}",
+      "do": [
+        {
+          "type": "apiCall",
+          "target": "${$route.params.id ? 'api.updateStore' : 'api.createStore'}",
+          "payload": "${$form.values}",
+          "assign": "saveResult"
+        },
+        {
+          "type": "toast",
+          "level": "success",
+          "message": {
+            "zh-CN": "保存成功",
+            "en-US": "Save successful"
+          }
+        },
+        {
+          "type": "navigate",
+          "to": "/dynamic/Store"
+        }
+      ],
+      "catch": [
+        {
+          "type": "toast",
+          "level": "error",
+          "message": "${$error.message}"
+        }
+      ]
+    },
+    {
+      "on": "cancel.click",
+      "do": [
+        {
+          "type": "navigate",
+          "to": "/dynamic/Store"
+        }
+      ]
+    }
+  ]
+}

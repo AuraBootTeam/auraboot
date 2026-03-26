@@ -1,0 +1,766 @@
+{
+  "version": "1.0.0",
+  "components": {
+    "input": {
+      "name": "Input",
+      "category": "form",
+      "description": "Single-line text input with validation support",
+      "compatibleDataTypes": ["string"],
+      "properties": [
+        { "key": "label", "label": "Label", "type": "string", "required": true, "group": "basic" },
+        { "key": "name", "label": "Field Name", "type": "string", "required": true, "group": "basic" },
+        { "key": "placeholder", "label": "Placeholder", "type": "string", "group": "basic" },
+        { "key": "defaultValue", "label": "Default Value", "type": "string", "group": "basic" },
+        { "key": "required", "label": "Required", "type": "boolean", "group": "validation" },
+        { "key": "disabled", "label": "Disabled", "type": "boolean", "group": "behavior" },
+        { "key": "maxLength", "label": "Max Length", "type": "number", "group": "validation", "min": 1 },
+        { "key": "minLength", "label": "Min Length", "type": "number", "group": "validation", "min": 0 },
+        { "key": "pattern", "label": "Regex Pattern", "type": "string", "group": "validation" },
+        { "key": "size", "label": "Size", "type": "select", "options": [
+          { "label": "Small", "value": "small" },
+          { "label": "Medium", "value": "medium" },
+          { "label": "Large", "value": "large" }
+        ], "group": "appearance" },
+        { "key": "variant", "label": "Variant", "type": "select", "options": [
+          { "label": "Default", "value": "default" },
+          { "label": "Outline", "value": "outline" },
+          { "label": "Filled", "value": "filled" }
+        ], "group": "appearance" }
+      ],
+      "tags": ["input", "text", "form", "basic"]
+    },
+    "textarea": {
+      "name": "Textarea",
+      "category": "form",
+      "description": "Multi-line text input for long text content",
+      "compatibleDataTypes": ["string", "text"],
+      "properties": [
+        { "key": "label", "label": "Label", "type": "string", "required": true, "group": "basic" },
+        { "key": "name", "label": "Field Name", "type": "string", "required": true, "group": "basic" },
+        { "key": "placeholder", "label": "Placeholder", "type": "string", "group": "basic" },
+        { "key": "defaultValue", "label": "Default Value", "type": "string", "group": "basic" },
+        { "key": "required", "label": "Required", "type": "boolean", "group": "validation" },
+        { "key": "disabled", "label": "Disabled", "type": "boolean", "group": "behavior" },
+        { "key": "rows", "label": "Rows", "type": "number", "group": "appearance", "min": 2, "max": 20 },
+        { "key": "maxLength", "label": "Max Length", "type": "number", "group": "validation", "min": 1 },
+        { "key": "resize", "label": "Resize", "type": "select", "options": [
+          { "label": "Vertical", "value": "vertical" },
+          { "label": "Horizontal", "value": "horizontal" },
+          { "label": "Both", "value": "both" },
+          { "label": "None", "value": "none" }
+        ], "group": "behavior" }
+      ],
+      "tags": ["textarea", "text", "multiline", "form"]
+    },
+    "select": {
+      "name": "Select",
+      "category": "form",
+      "description": "Dropdown select supporting single and multiple selection",
+      "compatibleDataTypes": ["string", "integer", "enum"],
+      "properties": [
+        { "key": "label", "label": "Label", "type": "string", "required": true, "group": "basic" },
+        { "key": "name", "label": "Field Name", "type": "string", "required": true, "group": "basic" },
+        { "key": "placeholder", "label": "Placeholder", "type": "string", "group": "basic" },
+        { "key": "required", "label": "Required", "type": "boolean", "group": "validation" },
+        { "key": "disabled", "label": "Disabled", "type": "boolean", "group": "behavior" },
+        { "key": "multiple", "label": "Multiple", "type": "boolean", "group": "behavior" },
+        { "key": "clearable", "label": "Clearable", "type": "boolean", "group": "behavior" },
+        { "key": "searchable", "label": "Searchable", "type": "boolean", "group": "behavior" },
+        { "key": "options", "label": "Options", "type": "array", "group": "basic", "description": "Format: [{\"label\": \"Display Text\", \"value\": \"value\"}]" }
+      ],
+      "tags": ["select", "dropdown", "options", "form"]
+    },
+    "checkbox": {
+      "name": "Checkbox",
+      "category": "form",
+      "description": "Checkbox for single or multiple boolean options",
+      "compatibleDataTypes": ["boolean"],
+      "properties": [
+        { "key": "label", "label": "Label", "type": "string", "required": true, "group": "basic" },
+        { "key": "name", "label": "Field Name", "type": "string", "required": true, "group": "basic" },
+        { "key": "required", "label": "Required", "type": "boolean", "group": "validation" },
+        { "key": "disabled", "label": "Disabled", "type": "boolean", "group": "behavior" },
+        { "key": "checked", "label": "Default Checked", "type": "boolean", "group": "basic" },
+        { "key": "indeterminate", "label": "Indeterminate", "type": "boolean", "group": "appearance" }
+      ],
+      "tags": ["checkbox", "check", "boolean", "form"]
+    },
+    "radio": {
+      "name": "Radio",
+      "category": "form",
+      "description": "Radio button group for single selection",
+      "compatibleDataTypes": ["string", "integer", "enum"],
+      "properties": [
+        { "key": "label", "label": "Label", "type": "string", "required": true, "group": "basic" },
+        { "key": "name", "label": "Field Name", "type": "string", "required": true, "group": "basic" },
+        { "key": "required", "label": "Required", "type": "boolean", "group": "validation" },
+        { "key": "disabled", "label": "Disabled", "type": "boolean", "group": "behavior" },
+        { "key": "direction", "label": "Direction", "type": "select", "options": [
+          { "label": "Horizontal", "value": "horizontal" },
+          { "label": "Vertical", "value": "vertical" }
+        ], "group": "appearance" },
+        { "key": "options", "label": "Options", "type": "array", "group": "basic", "description": "Format: [{\"label\": \"Display Text\", \"value\": \"value\"}]" }
+      ],
+      "tags": ["radio", "single", "options", "form"]
+    },
+    "datepicker": {
+      "name": "Date Picker",
+      "category": "form",
+      "description": "Date picker with multiple format support",
+      "compatibleDataTypes": ["date", "datetime"],
+      "properties": [
+        { "key": "label", "label": "Label", "type": "string", "required": true, "group": "basic" },
+        { "key": "name", "label": "Field Name", "type": "string", "required": true, "group": "basic" },
+        { "key": "placeholder", "label": "Placeholder", "type": "string", "group": "basic" },
+        { "key": "required", "label": "Required", "type": "boolean", "group": "validation" },
+        { "key": "disabled", "label": "Disabled", "type": "boolean", "group": "behavior" },
+        { "key": "showTime", "label": "Show Time", "type": "boolean", "group": "behavior" },
+        { "key": "clearable", "label": "Clearable", "type": "boolean", "group": "behavior" },
+        { "key": "format", "label": "Date Format", "type": "select", "options": [
+          { "label": "YYYY-MM-DD", "value": "YYYY-MM-DD" },
+          { "label": "YYYY/MM/DD", "value": "YYYY/MM/DD" },
+          { "label": "DD/MM/YYYY", "value": "DD/MM/YYYY" },
+          { "label": "MM/DD/YYYY", "value": "MM/DD/YYYY" }
+        ], "group": "appearance" }
+      ],
+      "tags": ["date", "picker", "calendar", "form"]
+    },
+    "formref": {
+      "name": "Form Reference",
+      "category": "form",
+      "description": "Embed or reference an independent form with multiple display modes",
+      "compatibleDataTypes": ["reference"],
+      "properties": [
+        { "key": "formRefId", "label": "Form ID", "type": "formref-select", "required": true, "group": "basic", "description": "Select the form to reference" },
+        { "key": "mode", "label": "Display Mode", "type": "select", "options": [
+          { "label": "Embedded", "value": "embedded" },
+          { "label": "Modal", "value": "modal" },
+          { "label": "Drawer", "value": "drawer" },
+          { "label": "Page", "value": "page" }
+        ], "group": "basic" },
+        { "key": "title", "label": "Title", "type": "string", "group": "basic" },
+        { "key": "showTitle", "label": "Show Title", "type": "boolean", "group": "appearance" },
+        { "key": "showBorder", "label": "Show Border", "type": "boolean", "group": "appearance" },
+        { "key": "padding", "label": "Padding", "type": "number", "group": "appearance", "min": 0, "max": 50 },
+        { "key": "width", "label": "Width", "type": "string", "group": "appearance", "description": "Only effective in modal/drawer mode" },
+        { "key": "height", "label": "Height", "type": "string", "group": "appearance" },
+        { "key": "closable", "label": "Closable", "type": "boolean", "group": "behavior" },
+        { "key": "maskClosable", "label": "Mask Closable", "type": "boolean", "group": "behavior" }
+      ],
+      "tags": ["formref", "reference", "embed", "modal"]
+    },
+    "timepicker": {
+      "name": "Time Picker",
+      "category": "form",
+      "description": "Time picker supporting hours, minutes and seconds",
+      "compatibleDataTypes": ["string", "datetime"],
+      "properties": [
+        { "key": "label", "label": "Label", "type": "string", "required": true, "group": "basic" },
+        { "key": "name", "label": "Field Name", "type": "string", "required": true, "group": "basic" },
+        { "key": "placeholder", "label": "Placeholder", "type": "string", "group": "basic" },
+        { "key": "defaultValue", "label": "Default Value", "type": "string", "group": "basic", "description": "Format: HH:mm or HH:mm:ss" },
+        { "key": "required", "label": "Required", "type": "boolean", "group": "validation" },
+        { "key": "disabled", "label": "Disabled", "type": "boolean", "group": "behavior" },
+        { "key": "clearable", "label": "Clearable", "type": "boolean", "group": "behavior" },
+        { "key": "format", "label": "Time Format", "type": "select", "options": [
+          { "label": "HH:mm", "value": "HH:mm" },
+          { "label": "HH:mm:ss", "value": "HH:mm:ss" },
+          { "label": "hh:mm A", "value": "hh:mm A" },
+          { "label": "hh:mm:ss A", "value": "hh:mm:ss A" }
+        ], "group": "appearance" },
+        { "key": "showSecond", "label": "Show Seconds", "type": "boolean", "group": "appearance" },
+        { "key": "use12Hours", "label": "12-Hour Format", "type": "boolean", "group": "appearance" },
+        { "key": "hourStep", "label": "Hour Step", "type": "number", "group": "behavior", "min": 1, "max": 12 },
+        { "key": "minuteStep", "label": "Minute Step", "type": "number", "group": "behavior", "min": 1, "max": 30 },
+        { "key": "secondStep", "label": "Second Step", "type": "number", "group": "behavior", "min": 1, "max": 30 }
+      ],
+      "tags": ["time", "picker", "clock", "form"]
+    },
+    "switch": {
+      "name": "Switch",
+      "category": "form",
+      "description": "Toggle switch for boolean state",
+      "compatibleDataTypes": ["boolean"],
+      "properties": [
+        { "key": "label", "label": "Label", "type": "string", "required": true, "group": "basic" },
+        { "key": "name", "label": "Field Name", "type": "string", "required": true, "group": "basic" },
+        { "key": "checked", "label": "Default Checked", "type": "boolean", "group": "basic" },
+        { "key": "required", "label": "Required", "type": "boolean", "group": "validation" },
+        { "key": "disabled", "label": "Disabled", "type": "boolean", "group": "behavior" },
+        { "key": "loading", "label": "Loading", "type": "boolean", "group": "behavior" },
+        { "key": "size", "label": "Size", "type": "select", "options": [
+          { "label": "Small", "value": "small" },
+          { "label": "Default", "value": "default" },
+          { "label": "Large", "value": "large" }
+        ], "group": "appearance" },
+        { "key": "checkedText", "label": "Checked Text", "type": "string", "group": "appearance" },
+        { "key": "uncheckedText", "label": "Unchecked Text", "type": "string", "group": "appearance" },
+        { "key": "checkedValue", "label": "Checked Value", "type": "string", "group": "basic" },
+        { "key": "uncheckedValue", "label": "Unchecked Value", "type": "string", "group": "basic" }
+      ],
+      "tags": ["switch", "toggle", "boolean", "form"]
+    },
+    "numberinput": {
+      "name": "Number Input",
+      "category": "form",
+      "description": "Number input with precision, range and step controls",
+      "compatibleDataTypes": ["integer", "decimal"],
+      "properties": [
+        { "key": "label", "label": "Label", "type": "string", "required": true, "group": "basic" },
+        { "key": "name", "label": "Field Name", "type": "string", "required": true, "group": "basic" },
+        { "key": "placeholder", "label": "Placeholder", "type": "string", "group": "basic" },
+        { "key": "defaultValue", "label": "Default Value", "type": "number", "group": "basic" },
+        { "key": "required", "label": "Required", "type": "boolean", "group": "validation" },
+        { "key": "disabled", "label": "Disabled", "type": "boolean", "group": "behavior" },
+        { "key": "min", "label": "Minimum", "type": "number", "group": "validation" },
+        { "key": "max", "label": "Maximum", "type": "number", "group": "validation" },
+        { "key": "step", "label": "Step", "type": "number", "group": "behavior", "min": 0.001 },
+        { "key": "precision", "label": "Decimal Places", "type": "number", "group": "behavior", "min": 0, "max": 10 },
+        { "key": "showButtons", "label": "Show Buttons", "type": "boolean", "group": "appearance" },
+        { "key": "size", "label": "Size", "type": "select", "options": [
+          { "label": "Small", "value": "small" },
+          { "label": "Medium", "value": "medium" },
+          { "label": "Large", "value": "large" }
+        ], "group": "appearance" },
+        { "key": "prefix", "label": "Prefix", "type": "string", "group": "appearance" },
+        { "key": "suffix", "label": "Suffix", "type": "string", "group": "appearance" }
+      ],
+      "tags": ["number", "input", "numeric", "form"]
+    },
+    "upload": {
+      "name": "File Upload",
+      "category": "form",
+      "description": "File upload with drag-and-drop, multiple files and image preview",
+      "compatibleDataTypes": ["string", "json"],
+      "properties": [
+        { "key": "label", "label": "Label", "type": "string", "required": true, "group": "basic" },
+        { "key": "name", "label": "Field Name", "type": "string", "required": true, "group": "basic" },
+        { "key": "required", "label": "Required", "type": "boolean", "group": "validation" },
+        { "key": "disabled", "label": "Disabled", "type": "boolean", "group": "behavior" },
+        { "key": "action", "label": "Upload URL", "type": "string", "group": "basic" },
+        { "key": "multiple", "label": "Multiple Files", "type": "boolean", "group": "behavior" },
+        { "key": "maxCount", "label": "Max File Count", "type": "number", "group": "validation", "min": 1, "max": 100 },
+        { "key": "maxSize", "label": "Max File Size (MB)", "type": "number", "group": "validation", "min": 0.1, "max": 1000 },
+        { "key": "accept", "label": "Accepted File Types", "type": "string", "group": "validation", "description": "e.g.: .jpg,.png,.pdf or image/*" },
+        { "key": "listType", "label": "List Type", "type": "select", "options": [
+          { "label": "Text", "value": "text" },
+          { "label": "Picture", "value": "picture" },
+          { "label": "Picture Card", "value": "picture-card" }
+        ], "group": "appearance" },
+        { "key": "draggable", "label": "Drag & Drop", "type": "boolean", "group": "behavior" },
+        { "key": "showUploadList", "label": "Show File List", "type": "boolean", "group": "appearance" },
+        { "key": "buttonText", "label": "Button Text", "type": "string", "group": "appearance" },
+        { "key": "hint", "label": "Hint Text", "type": "string", "group": "appearance" }
+      ],
+      "tags": ["upload", "file", "attachment", "form"]
+    },
+    "display": {
+      "name": "Text Display",
+      "category": "display",
+      "description": "Static text display component",
+      "compatibleDataTypes": ["string", "text", "integer", "decimal"],
+      "properties": [
+        { "key": "text", "label": "Display Text", "type": "string", "required": true, "group": "basic" },
+        { "key": "size", "label": "Font Size", "type": "select", "options": [
+          { "label": "Small", "value": "small" },
+          { "label": "Medium", "value": "medium" },
+          { "label": "Large", "value": "large" },
+          { "label": "Extra Large", "value": "xlarge" }
+        ], "group": "appearance" },
+        { "key": "weight", "label": "Font Weight", "type": "select", "options": [
+          { "label": "Normal", "value": "normal" },
+          { "label": "Bold", "value": "bold" },
+          { "label": "Light", "value": "light" }
+        ], "group": "appearance" },
+        { "key": "align", "label": "Alignment", "type": "select", "options": [
+          { "label": "Left", "value": "left" },
+          { "label": "Center", "value": "center" },
+          { "label": "Right", "value": "right" }
+        ], "group": "appearance" },
+        { "key": "color", "label": "Text Color", "type": "color", "group": "appearance" }
+      ],
+      "tags": ["text", "display", "content"]
+    },
+    "image": {
+      "name": "Image",
+      "category": "display",
+      "description": "Image display component with lazy loading",
+      "compatibleDataTypes": ["string"],
+      "properties": [
+        { "key": "src", "label": "Image URL", "type": "string", "required": true, "group": "basic" },
+        { "key": "alt", "label": "Alt Text", "type": "string", "group": "basic" },
+        { "key": "width", "label": "Width (Grid Columns)", "type": "number", "group": "basic", "min": 1, "max": 12 },
+        { "key": "height", "label": "Height", "type": "string", "group": "basic" },
+        { "key": "fit", "label": "Object Fit", "type": "select", "options": [
+          { "label": "Cover", "value": "cover" },
+          { "label": "Contain", "value": "contain" },
+          { "label": "Fill", "value": "fill" },
+          { "label": "Scale Down", "value": "scale-down" }
+        ], "group": "appearance" },
+        { "key": "lazy", "label": "Lazy Load", "type": "boolean", "group": "behavior" }
+      ],
+      "tags": ["image", "picture", "media", "display"]
+    },
+    "table": {
+      "name": "Table",
+      "category": "display",
+      "description": "Data table display component",
+      "compatibleDataTypes": ["json"],
+      "properties": [
+        { "key": "columns", "label": "Column Config", "type": "array", "group": "basic" },
+        { "key": "data", "label": "Data Source", "type": "array", "group": "basic" },
+        { "key": "pagination", "label": "Pagination", "type": "boolean", "group": "behavior" },
+        { "key": "pageSize", "label": "Page Size", "type": "number", "group": "behavior", "min": 1, "max": 100 },
+        { "key": "bordered", "label": "Bordered", "type": "boolean", "group": "appearance" },
+        { "key": "striped", "label": "Striped", "type": "boolean", "group": "appearance" }
+      ],
+      "tags": ["table", "data", "grid", "display"]
+    },
+    "button": {
+      "name": "Button",
+      "category": "interaction",
+      "description": "Interactive button component",
+      "compatibleDataTypes": [],
+      "properties": [
+        { "key": "text", "label": "Button Text", "type": "string", "required": true, "group": "basic" },
+        { "key": "type", "label": "Button Type", "type": "select", "options": [
+          { "label": "Primary", "value": "primary" },
+          { "label": "Secondary", "value": "secondary" },
+          { "label": "Success", "value": "success" },
+          { "label": "Warning", "value": "warning" },
+          { "label": "Danger", "value": "danger" },
+          { "label": "Link", "value": "link" }
+        ], "group": "appearance" },
+        { "key": "size", "label": "Size", "type": "select", "options": [
+          { "label": "Small", "value": "small" },
+          { "label": "Medium", "value": "medium" },
+          { "label": "Large", "value": "large" }
+        ], "group": "appearance" },
+        { "key": "disabled", "label": "Disabled", "type": "boolean", "group": "behavior" },
+        { "key": "loading", "label": "Loading", "type": "boolean", "group": "behavior" },
+        { "key": "block", "label": "Block Button", "type": "boolean", "group": "appearance" }
+      ],
+      "tags": ["button", "click", "action", "interaction"]
+    },
+    "div": {
+      "name": "Div Container",
+      "category": "layout",
+      "description": "Generic div container with grid support and style configuration",
+      "compatibleDataTypes": [],
+      "properties": [
+        { "key": "width", "label": "Width (Grid Columns)", "type": "number", "group": "basic", "min": 1, "max": 12 },
+        { "key": "height", "label": "Height", "type": "string", "group": "basic" },
+        { "key": "backgroundColor", "label": "Background Color", "type": "color", "group": "appearance" },
+        { "key": "borderRadius", "label": "Border Radius", "type": "number", "group": "appearance", "min": 0, "max": 50 },
+        { "key": "border", "label": "Border", "type": "string", "group": "appearance" },
+        { "key": "boxShadow", "label": "Box Shadow", "type": "string", "group": "appearance" },
+        { "key": "padding", "label": "Padding", "type": "number", "group": "spacing", "min": 0, "max": 100 },
+        { "key": "margin", "label": "Margin", "type": "number", "group": "spacing", "min": 0, "max": 100 },
+        { "key": "display", "label": "Display", "type": "select", "options": [
+          { "label": "Block", "value": "block" },
+          { "label": "Inline Block", "value": "inline-block" },
+          { "label": "Flex", "value": "flex" },
+          { "label": "Grid", "value": "grid" },
+          { "label": "None", "value": "none" }
+        ], "group": "layout" },
+        { "key": "position", "label": "Position", "type": "select", "options": [
+          { "label": "Static", "value": "static" },
+          { "label": "Relative", "value": "relative" },
+          { "label": "Absolute", "value": "absolute" },
+          { "label": "Fixed", "value": "fixed" },
+          { "label": "Sticky", "value": "sticky" }
+        ], "group": "layout" },
+        { "key": "zIndex", "label": "Z-Index", "type": "string", "group": "layout" },
+        { "key": "overflow", "label": "Overflow", "type": "select", "options": [
+          { "label": "Visible", "value": "visible" },
+          { "label": "Hidden", "value": "hidden" },
+          { "label": "Scroll", "value": "scroll" },
+          { "label": "Auto", "value": "auto" }
+        ], "group": "layout" }
+      ],
+      "tags": ["div", "container", "layout", "basic", "grid"]
+    },
+    "form": {
+      "name": "Form Container",
+      "category": "layout",
+      "description": "Form layout container",
+      "compatibleDataTypes": [],
+      "properties": [
+        { "key": "title", "label": "Form Title", "type": "string", "group": "basic" },
+        { "key": "layout", "label": "Layout", "type": "select", "options": [
+          { "label": "Vertical", "value": "vertical" },
+          { "label": "Horizontal", "value": "horizontal" },
+          { "label": "Inline", "value": "inline" }
+        ], "group": "appearance" },
+        { "key": "labelWidth", "label": "Label Width", "type": "string", "group": "appearance" },
+        { "key": "size", "label": "Size", "type": "select", "options": [
+          { "label": "Small", "value": "small" },
+          { "label": "Medium", "value": "medium" },
+          { "label": "Large", "value": "large" }
+        ], "group": "appearance" },
+        { "key": "bordered", "label": "Bordered", "type": "boolean", "group": "appearance" }
+      ],
+      "tags": ["form", "container", "layout"]
+    },
+    "navigation": {
+      "name": "Navigation",
+      "category": "layout",
+      "description": "Horizontal navigation bar with component binding and data source support",
+      "compatibleDataTypes": [],
+      "properties": [
+        { "key": "theme", "label": "Theme", "type": "select", "options": [
+          { "label": "Light", "value": "light" },
+          { "label": "Dark", "value": "dark" }
+        ], "group": "appearance" },
+        { "key": "items", "label": "Nav Items", "type": "array", "group": "basic" },
+        { "key": "selectedKey", "label": "Selected Key", "type": "string", "group": "behavior" },
+        { "key": "collapsed", "label": "Collapsed", "type": "boolean", "group": "behavior" },
+        { "key": "width", "label": "Width (Grid Columns)", "type": "number", "group": "basic", "min": 1, "max": 12 },
+        { "key": "height", "label": "Height", "type": "string", "group": "basic" },
+        { "key": "targetComponent", "label": "Target Component", "type": "component-select", "group": "behavior" },
+        { "key": "dataSource", "label": "Data Source", "type": "datasource-select", "group": "basic" }
+      ],
+      "tags": ["navigation", "menu", "nav", "layout"]
+    },
+    "container": {
+      "name": "Container",
+      "category": "layout",
+      "description": "Generic layout container with padding, border and shadow styles",
+      "compatibleDataTypes": [],
+      "properties": [
+        { "key": "padding", "label": "Padding", "type": "number", "group": "appearance", "min": 0, "max": 100 },
+        { "key": "margin", "label": "Margin", "type": "number", "group": "appearance", "min": 0, "max": 100 },
+        { "key": "backgroundColor", "label": "Background Color", "type": "color", "group": "appearance" },
+        { "key": "borderRadius", "label": "Border Radius", "type": "number", "group": "appearance", "min": 0, "max": 50 },
+        { "key": "bordered", "label": "Bordered", "type": "boolean", "group": "appearance" },
+        { "key": "shadow", "label": "Shadow", "type": "select", "options": [
+          { "label": "None", "value": "none" },
+          { "label": "Small", "value": "small" },
+          { "label": "Medium", "value": "medium" },
+          { "label": "Large", "value": "large" }
+        ], "group": "appearance" },
+        { "key": "width", "label": "Width (Grid Columns)", "type": "number", "group": "basic", "min": 1, "max": 12 },
+        { "key": "height", "label": "Height", "type": "string", "group": "basic" },
+        { "key": "minHeight", "label": "Min Height", "type": "string", "group": "appearance" }
+      ],
+      "tags": ["container", "wrapper", "box", "layout"]
+    },
+    "grid": {
+      "name": "Grid Layout",
+      "category": "layout",
+      "description": "Responsive grid layout container",
+      "compatibleDataTypes": [],
+      "properties": [
+        { "key": "columns", "label": "Columns", "type": "number", "group": "basic", "min": 1, "max": 24 },
+        { "key": "gutter", "label": "Gutter", "type": "number", "group": "appearance", "min": 0, "max": 48 },
+        { "key": "justify", "label": "Horizontal Align", "type": "select", "options": [
+          { "label": "Start", "value": "start" },
+          { "label": "Center", "value": "center" },
+          { "label": "End", "value": "end" },
+          { "label": "Space Between", "value": "space-between" },
+          { "label": "Space Around", "value": "space-around" }
+        ], "group": "appearance" },
+        { "key": "align", "label": "Vertical Align", "type": "select", "options": [
+          { "label": "Top", "value": "top" },
+          { "label": "Middle", "value": "middle" },
+          { "label": "Bottom", "value": "bottom" }
+        ], "group": "appearance" },
+        { "key": "wrap", "label": "Wrap", "type": "boolean", "group": "behavior" },
+        { "key": "responsive", "label": "Responsive", "type": "boolean", "group": "behavior" }
+      ],
+      "tags": ["grid", "layout", "responsive", "columns"]
+    },
+    "flex": {
+      "name": "Flex Layout",
+      "category": "layout",
+      "description": "Flexbox-based layout container",
+      "compatibleDataTypes": [],
+      "properties": [
+        { "key": "direction", "label": "Direction", "type": "select", "options": [
+          { "label": "Row", "value": "row" },
+          { "label": "Column", "value": "column" },
+          { "label": "Row Reverse", "value": "row-reverse" },
+          { "label": "Column Reverse", "value": "column-reverse" }
+        ], "group": "basic" },
+        { "key": "justify", "label": "Justify Content", "type": "select", "options": [
+          { "label": "Start", "value": "flex-start" },
+          { "label": "Center", "value": "center" },
+          { "label": "End", "value": "flex-end" },
+          { "label": "Space Between", "value": "space-between" },
+          { "label": "Space Around", "value": "space-around" },
+          { "label": "Space Evenly", "value": "space-evenly" }
+        ], "group": "appearance" },
+        { "key": "align", "label": "Align Items", "type": "select", "options": [
+          { "label": "Stretch", "value": "stretch" },
+          { "label": "Start", "value": "flex-start" },
+          { "label": "Center", "value": "center" },
+          { "label": "End", "value": "flex-end" },
+          { "label": "Baseline", "value": "baseline" }
+        ], "group": "appearance" },
+        { "key": "wrap", "label": "Wrap", "type": "select", "options": [
+          { "label": "No Wrap", "value": "nowrap" },
+          { "label": "Wrap", "value": "wrap" },
+          { "label": "Wrap Reverse", "value": "wrap-reverse" }
+        ], "group": "behavior" },
+        { "key": "gap", "label": "Gap", "type": "number", "group": "appearance", "min": 0, "max": 48 },
+        { "key": "flex", "label": "Flex", "type": "string", "group": "behavior" }
+      ],
+      "tags": ["flex", "flexbox", "layout", "responsive"]
+    },
+    "columns": {
+      "name": "Column Layout",
+      "category": "layout",
+      "description": "Multi-column layout with responsive breakpoints",
+      "compatibleDataTypes": [],
+      "properties": [
+        { "key": "count", "label": "Column Count", "type": "number", "group": "basic", "min": 1, "max": 6 },
+        { "key": "gutter", "label": "Column Gap", "type": "number", "group": "appearance", "min": 0, "max": 48 },
+        { "key": "split", "label": "Show Divider", "type": "boolean", "group": "appearance" },
+        { "key": "responsive", "label": "Responsive", "type": "boolean", "group": "behavior" },
+        { "key": "breakpoints", "label": "Breakpoint Config", "type": "object", "group": "behavior" }
+      ],
+      "tags": ["columns", "layout", "responsive", "multi-column"]
+    },
+    "card": {
+      "name": "Card",
+      "category": "layout",
+      "description": "Card container with header, body and footer sections",
+      "compatibleDataTypes": [],
+      "properties": [
+        { "key": "title", "label": "Card Title", "type": "string", "group": "basic" },
+        { "key": "showHeader", "label": "Show Header", "type": "boolean", "group": "appearance" },
+        { "key": "showFooter", "label": "Show Footer", "type": "boolean", "group": "appearance" },
+        { "key": "bordered", "label": "Bordered", "type": "boolean", "group": "appearance" },
+        { "key": "hoverable", "label": "Hoverable", "type": "boolean", "group": "behavior" },
+        { "key": "loading", "label": "Loading", "type": "boolean", "group": "behavior" },
+        { "key": "size", "label": "Size", "type": "select", "options": [
+          { "label": "Small", "value": "small" },
+          { "label": "Default", "value": "default" },
+          { "label": "Large", "value": "large" }
+        ], "group": "appearance" },
+        { "key": "bodyStyle", "label": "Body Style", "type": "object", "group": "appearance" }
+      ],
+      "tags": ["card", "container", "panel", "layout"]
+    },
+    "date": {
+      "name": "Date Display",
+      "category": "datetime",
+      "description": "Date display component with format options",
+      "compatibleDataTypes": ["date"],
+      "properties": [
+        { "key": "value", "label": "Date Value", "type": "date", "group": "basic" },
+        { "key": "format", "label": "Display Format", "type": "select", "options": [
+          { "label": "YYYY-MM-DD", "value": "YYYY-MM-DD" },
+          { "label": "YYYY/MM/DD", "value": "YYYY/MM/DD" },
+          { "label": "DD/MM/YYYY", "value": "DD/MM/YYYY" },
+          { "label": "MM/DD/YYYY", "value": "MM/DD/YYYY" }
+        ], "group": "appearance" },
+        { "key": "relative", "label": "Relative Time", "type": "boolean", "group": "behavior" }
+      ],
+      "tags": ["date", "time", "display"]
+    },
+    "datetime": {
+      "name": "DateTime Display",
+      "category": "datetime",
+      "description": "Date and time display component",
+      "compatibleDataTypes": ["datetime"],
+      "properties": [
+        { "key": "value", "label": "DateTime Value", "type": "string", "group": "basic" },
+        { "key": "format", "label": "Display Format", "type": "string", "group": "appearance" },
+        { "key": "showSeconds", "label": "Show Seconds", "type": "boolean", "group": "behavior" },
+        { "key": "relative", "label": "Relative Time", "type": "boolean", "group": "behavior" }
+      ],
+      "tags": ["datetime", "time", "display"]
+    },
+    "smart-number-card": {
+      "name": "Number Card",
+      "category": "chart",
+      "description": "KPI metric number display card",
+      "compatibleDataTypes": [],
+      "properties": [
+        { "key": "title", "label": "Title", "type": "string", "group": "basic" },
+        { "key": "icon", "label": "Icon", "type": "string", "group": "basic" },
+        { "key": "format", "label": "Format", "type": "select", "options": [
+          { "label": "Number", "value": "number" },
+          { "label": "Currency", "value": "currency" },
+          { "label": "Percent", "value": "percent" }
+        ], "group": "basic" },
+        { "key": "precision", "label": "Decimal Places", "type": "number", "group": "basic" },
+        { "key": "dataSource.type", "label": "Data Source Type", "type": "select", "options": [
+          { "label": "Aggregate", "value": "aggregate" },
+          { "label": "Named Query", "value": "namedQuery" }
+        ], "group": "advanced" },
+        { "key": "dataSource.modelCode", "label": "Data Model", "type": "string", "group": "advanced" },
+        { "key": "dataSource.metrics", "label": "Metrics Config", "type": "object", "group": "advanced" }
+      ],
+      "tags": ["chart", "kpi", "number", "card"]
+    },
+    "smart-bar-chart": {
+      "name": "Smart Bar Chart",
+      "category": "chart",
+      "description": "Bar/column chart for comparison analysis",
+      "compatibleDataTypes": [],
+      "properties": [
+        { "key": "title", "label": "Title", "type": "string", "group": "basic" },
+        { "key": "horizontal", "label": "Horizontal", "type": "boolean", "group": "appearance" },
+        { "key": "stacked", "label": "Stacked", "type": "boolean", "group": "appearance" },
+        { "key": "dataSource.type", "label": "Data Source Type", "type": "select", "options": [
+          { "label": "Aggregate", "value": "aggregate" },
+          { "label": "Named Query", "value": "namedQuery" }
+        ], "group": "advanced" },
+        { "key": "dataSource.modelCode", "label": "Data Model", "type": "string", "group": "advanced" },
+        { "key": "dataSource.dimensions", "label": "Dimensions", "type": "array", "group": "advanced" },
+        { "key": "dataSource.metrics", "label": "Metrics Config", "type": "object", "group": "advanced" },
+        { "key": "drillDown.enabled", "label": "Enable Drill Down", "type": "boolean", "group": "behavior" },
+        { "key": "linkage.enabled", "label": "Enable Linkage", "type": "boolean", "group": "behavior" },
+        { "key": "linkage.groupId", "label": "Linkage Group", "type": "string", "group": "behavior" }
+      ],
+      "tags": ["chart", "bar", "column", "comparison"]
+    },
+    "smart-line-chart": {
+      "name": "Smart Line Chart",
+      "category": "chart",
+      "description": "Line/area chart for trend analysis",
+      "compatibleDataTypes": [],
+      "properties": [
+        { "key": "title", "label": "Title", "type": "string", "group": "basic" },
+        { "key": "smooth", "label": "Smooth Curve", "type": "boolean", "group": "appearance" },
+        { "key": "area", "label": "Area Chart", "type": "boolean", "group": "appearance" },
+        { "key": "dataSource.type", "label": "Data Source Type", "type": "select", "options": [
+          { "label": "Aggregate", "value": "aggregate" },
+          { "label": "Named Query", "value": "namedQuery" }
+        ], "group": "advanced" },
+        { "key": "dataSource.modelCode", "label": "Data Model", "type": "string", "group": "advanced" },
+        { "key": "dataSource.dimensions", "label": "Dimensions", "type": "array", "group": "advanced" },
+        { "key": "dataSource.metrics", "label": "Metrics Config", "type": "object", "group": "advanced" },
+        { "key": "drillDown.enabled", "label": "Enable Drill Down", "type": "boolean", "group": "behavior" },
+        { "key": "linkage.enabled", "label": "Enable Linkage", "type": "boolean", "group": "behavior" },
+        { "key": "linkage.groupId", "label": "Linkage Group", "type": "string", "group": "behavior" }
+      ],
+      "tags": ["chart", "line", "trend"]
+    },
+    "smart-pie-chart": {
+      "name": "Smart Pie Chart",
+      "category": "chart",
+      "description": "Pie/donut chart for proportion analysis",
+      "compatibleDataTypes": [],
+      "properties": [
+        { "key": "title", "label": "Title", "type": "string", "group": "basic" },
+        { "key": "donut", "label": "Donut", "type": "boolean", "group": "appearance" },
+        { "key": "showLabel", "label": "Show Labels", "type": "boolean", "group": "appearance" },
+        { "key": "dataSource.type", "label": "Data Source Type", "type": "select", "options": [
+          { "label": "Aggregate", "value": "aggregate" },
+          { "label": "Named Query", "value": "namedQuery" }
+        ], "group": "advanced" },
+        { "key": "dataSource.modelCode", "label": "Data Model", "type": "string", "group": "advanced" },
+        { "key": "dataSource.dimensions", "label": "Dimensions", "type": "array", "group": "advanced" },
+        { "key": "dataSource.metrics", "label": "Metrics Config", "type": "object", "group": "advanced" },
+        { "key": "drillDown.enabled", "label": "Enable Drill Down", "type": "boolean", "group": "behavior" },
+        { "key": "linkage.enabled", "label": "Enable Linkage", "type": "boolean", "group": "behavior" },
+        { "key": "linkage.groupId", "label": "Linkage Group", "type": "string", "group": "behavior" }
+      ],
+      "tags": ["chart", "pie", "donut", "proportion"]
+    },
+    "smart-kanban": {
+      "name": "Kanban Board",
+      "category": "chart",
+      "description": "Kanban board view with drag-and-drop cards",
+      "compatibleDataTypes": [],
+      "properties": [
+        { "key": "title", "label": "Title", "type": "string", "group": "basic" },
+        { "key": "draggable", "label": "Draggable", "type": "boolean", "group": "basic" },
+        { "key": "showCount", "label": "Show Count", "type": "boolean", "group": "basic" },
+        { "key": "showAggregations", "label": "Show Aggregations", "type": "boolean", "group": "basic" },
+        { "key": "dataSource.type", "label": "Data Source Type", "type": "select", "options": [
+          { "label": "Aggregate", "value": "aggregate" }
+        ], "group": "dataSource" },
+        { "key": "dataSource.modelCode", "label": "Data Model", "type": "model-select", "group": "dataSource" },
+        { "key": "dataSource.groupByField", "label": "Group By Field", "type": "field-select", "group": "dataSource" },
+        { "key": "dataSource.titleField", "label": "Title Field", "type": "field-select", "group": "dataSource" },
+        { "key": "dataSource.descriptionField", "label": "Description Field", "type": "field-select", "group": "dataSource" }
+      ],
+      "tags": ["chart", "kanban", "board", "drag"]
+    },
+    "bar-chart": {
+      "name": "Bar Chart",
+      "category": "chart",
+      "description": "Basic bar chart for category data comparison",
+      "compatibleDataTypes": [],
+      "properties": [
+        { "key": "title", "label": "Chart Title", "type": "string", "group": "basic" },
+        { "key": "width", "label": "Width (Grid Columns)", "type": "number", "group": "basic", "min": 1, "max": 12 },
+        { "key": "height", "label": "Height", "type": "string", "group": "basic" },
+        { "key": "data", "label": "Data Source", "type": "array", "group": "basic" },
+        { "key": "xField", "label": "X-Axis Field", "type": "string", "group": "basic" },
+        { "key": "yField", "label": "Y-Axis Field", "type": "string", "group": "basic" },
+        { "key": "color", "label": "Color", "type": "color", "group": "appearance" },
+        { "key": "showLegend", "label": "Show Legend", "type": "boolean", "group": "appearance" },
+        { "key": "showGrid", "label": "Show Grid", "type": "boolean", "group": "appearance" },
+        { "key": "showTooltip", "label": "Show Tooltip", "type": "boolean", "group": "behavior" }
+      ],
+      "tags": ["chart", "bar", "column", "data", "visualization"]
+    },
+    "line-chart": {
+      "name": "Line Chart",
+      "category": "chart",
+      "description": "Basic line chart for trend visualization",
+      "compatibleDataTypes": [],
+      "properties": [
+        { "key": "title", "label": "Chart Title", "type": "string", "group": "basic" },
+        { "key": "width", "label": "Width (Grid Columns)", "type": "number", "group": "basic", "min": 1, "max": 12 },
+        { "key": "height", "label": "Height", "type": "string", "group": "basic" },
+        { "key": "data", "label": "Data Source", "type": "array", "group": "basic" },
+        { "key": "xField", "label": "X-Axis Field", "type": "string", "group": "basic" },
+        { "key": "yField", "label": "Y-Axis Field", "type": "string", "group": "basic" },
+        { "key": "color", "label": "Color", "type": "color", "group": "appearance" },
+        { "key": "smooth", "label": "Smooth Curve", "type": "boolean", "group": "appearance" },
+        { "key": "showPoints", "label": "Show Data Points", "type": "boolean", "group": "appearance" },
+        { "key": "showLegend", "label": "Show Legend", "type": "boolean", "group": "appearance" },
+        { "key": "showGrid", "label": "Show Grid", "type": "boolean", "group": "appearance" },
+        { "key": "showTooltip", "label": "Show Tooltip", "type": "boolean", "group": "behavior" }
+      ],
+      "tags": ["chart", "line", "trend", "data", "visualization"]
+    },
+    "pie-chart": {
+      "name": "Pie Chart",
+      "category": "chart",
+      "description": "Basic pie chart for proportion visualization",
+      "compatibleDataTypes": [],
+      "properties": [
+        { "key": "title", "label": "Chart Title", "type": "string", "group": "basic" },
+        { "key": "width", "label": "Width (Grid Columns)", "type": "number", "group": "basic", "min": 1, "max": 12 },
+        { "key": "height", "label": "Height", "type": "string", "group": "basic" },
+        { "key": "data", "label": "Data Source", "type": "array", "group": "basic" },
+        { "key": "angleField", "label": "Angle Field", "type": "string", "group": "basic" },
+        { "key": "colorField", "label": "Color Field", "type": "string", "group": "basic" },
+        { "key": "radius", "label": "Outer Radius", "type": "number", "group": "appearance", "min": 0.1, "max": 1 },
+        { "key": "innerRadius", "label": "Inner Radius", "type": "number", "group": "appearance", "min": 0, "max": 0.9 },
+        { "key": "showLegend", "label": "Show Legend", "type": "boolean", "group": "appearance" },
+        { "key": "showLabels", "label": "Show Labels", "type": "boolean", "group": "appearance" },
+        { "key": "showTooltip", "label": "Show Tooltip", "type": "boolean", "group": "behavior" }
+      ],
+      "tags": ["chart", "pie", "donut", "proportion", "data", "visualization"]
+    },
+    "area-chart": {
+      "name": "Area Chart",
+      "category": "chart",
+      "description": "Area chart for cumulative trend visualization",
+      "compatibleDataTypes": [],
+      "properties": [
+        { "key": "title", "label": "Chart Title", "type": "string", "group": "basic" },
+        { "key": "width", "label": "Width (Grid Columns)", "type": "number", "group": "basic", "min": 1, "max": 12 },
+        { "key": "height", "label": "Height", "type": "string", "group": "basic" },
+        { "key": "data", "label": "Data Source", "type": "array", "group": "basic" },
+        { "key": "xField", "label": "X-Axis Field", "type": "string", "group": "basic" },
+        { "key": "yField", "label": "Y-Axis Field", "type": "string", "group": "basic" },
+        { "key": "color", "label": "Color", "type": "color", "group": "appearance" },
+        { "key": "smooth", "label": "Smooth Curve", "type": "boolean", "group": "appearance" },
+        { "key": "fillOpacity", "label": "Fill Opacity", "type": "number", "group": "appearance", "min": 0, "max": 1 },
+        { "key": "showLegend", "label": "Show Legend", "type": "boolean", "group": "appearance" },
+        { "key": "showGrid", "label": "Show Grid", "type": "boolean", "group": "appearance" },
+        { "key": "showTooltip", "label": "Show Tooltip", "type": "boolean", "group": "behavior" }
+      ],
+      "tags": ["chart", "area", "filled", "trend", "data", "visualization"]
+    }
+  }
+}

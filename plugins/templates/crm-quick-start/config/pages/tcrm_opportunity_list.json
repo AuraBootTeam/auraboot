@@ -1,0 +1,62 @@
+{
+  "pageKey": "tcrm_opportunity_list",
+  "name:zh-CN": "商机列表",
+  "name:en": "Opportunities",
+  "pageType": "list",
+  "modelCode": "tcrm_opportunity",
+  "dslSchema": {
+    "id": "list.tcrm_opportunity",
+    "kind": "List",
+    "areas": {
+      "toolbar": {
+        "blocks": [{
+          "id": "tcrm_opp_toolbar",
+          "blockType": "toolbar",
+          "buttons": [
+            { "code": "create", "action": "create", "primary": true, "commandCode": "tcrm:create_opportunity", "navigateTo": "tcrm_opportunity_form", "permissionCode": "TCRM.opportunity.manage" }
+          ]
+        }]
+      },
+      "list-tabs": {
+        "blocks": [{
+          "id": "tcrm_opp_tabs",
+          "blockType": "list-tabs",
+          "tabs": [
+            { "key": "all", "label": { "en": "All", "zh-CN": "全部" }, "filter": null },
+            { "key": "prospecting", "label": { "en": "Prospecting", "zh-CN": "初步接洽" }, "filter": { "field": "tcrm_op_stage", "value": "prospecting", "operator": "EQ" } },
+            { "key": "proposal", "label": { "en": "Proposal", "zh-CN": "方案报价" }, "filter": { "field": "tcrm_op_stage", "value": "proposal", "operator": "EQ" } },
+            { "key": "negotiation", "label": { "en": "Negotiation", "zh-CN": "商务谈判" }, "filter": { "field": "tcrm_op_stage", "value": "negotiation", "operator": "EQ" } },
+            { "key": "won", "label": { "en": "Won", "zh-CN": "赢单" }, "filter": { "field": "tcrm_op_stage", "value": "closed_won", "operator": "EQ" } },
+            { "key": "lost", "label": { "en": "Lost", "zh-CN": "丢单" }, "filter": { "field": "tcrm_op_stage", "value": "closed_lost", "operator": "EQ" } }
+          ]
+        }]
+      },
+      "main": {
+        "blocks": [{
+          "id": "tcrm_opp_table",
+          "blockType": "data-table",
+          "columns": [
+            { "field": "tcrm_op_code", "width": 150, "sortable": true },
+            { "field": "tcrm_op_name", "width": 200, "sortable": true },
+            { "field": "tcrm_op_account_id", "width": 160 },
+            { "field": "tcrm_op_amount", "width": 120, "sortable": true },
+            { "field": "tcrm_op_stage", "width": 120, "renderType": "tag", "dictCode": "tcrm_opp_stage" },
+            { "field": "tcrm_op_expected_close", "width": 130, "sortable": true },
+            { "field": "tcrm_op_assignee", "width": 120 },
+            {
+              "field": "actions",
+              "isActionColumn": true,
+              "buttons": [
+                { "code": "view", "action": "detail", "navigateTo": "tcrm_opportunity_detail" },
+                { "code": "edit", "action": "edit", "navigateTo": "tcrm_opportunity_form", "permissionCode": "TCRM.opportunity.manage" },
+                { "code": "delete", "action": "delete", "danger": true, "commandCode": "tcrm:delete_opportunity", "permissionCode": "TCRM.opportunity.manage", "confirmMessageKey": "delete.confirm" }
+              ]
+            }
+          ],
+          "searchFields": ["tcrm_op_name", "tcrm_op_code"],
+          "defaultSort": { "field": "created_at", "order": "desc" }
+        }]
+      }
+    }
+  }
+}

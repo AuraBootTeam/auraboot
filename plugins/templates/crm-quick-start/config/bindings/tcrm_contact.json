@@ -1,0 +1,9 @@
+[
+  { "modelCode": "tcrm_contact", "fieldCode": "tcrm_ct_code", "sequence": 1, "required": true, "visible": true, "editable": false, "displayConfig": { "searchable": true, "sortable": true } },
+  { "modelCode": "tcrm_contact", "fieldCode": "tcrm_ct_name", "sequence": 2, "required": true, "visible": true, "editable": true, "displayConfig": { "searchable": true, "sortable": true } },
+  { "modelCode": "tcrm_contact", "fieldCode": "tcrm_ct_account_id", "sequence": 3, "required": false, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "tcrm_contact", "fieldCode": "tcrm_ct_title", "sequence": 4, "required": false, "visible": true, "editable": true },
+  { "modelCode": "tcrm_contact", "fieldCode": "tcrm_ct_email", "sequence": 5, "required": false, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "tcrm_contact", "fieldCode": "tcrm_ct_phone", "sequence": 6, "required": false, "visible": true, "editable": true },
+  { "modelCode": "tcrm_contact", "fieldCode": "tcrm_ct_notes", "sequence": 7, "required": false, "visible": false, "editable": true }
+]

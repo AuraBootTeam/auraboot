@@ -1,0 +1,9 @@
+[
+  {"code":"tinv_pd_code","displayName:zh-CN":"产品编号","displayName:en":"Product Code","dataType":"string","description":"Auto-generated.","constraints":{"required":true,"maxLength":50},"feature":{"searchable":true,"sortable":true},"extension":{"readOnly":true,"placeholder:zh-CN":"系统自动生成","placeholder:en":"Auto generated"}},
+  {"code":"tinv_pd_name","displayName:zh-CN":"产品名称","displayName:en":"Product Name","dataType":"string","description":"Product name.","constraints":{"required":true,"maxLength":200},"feature":{"searchable":true,"sortable":true}},
+  {"code":"tinv_pd_category","displayName:zh-CN":"类别","displayName:en":"Category","dataType":"enum","dictCode":"tinv_product_category","description":"Product category.","feature":{"searchable":true}},
+  {"code":"tinv_pd_unit","displayName:zh-CN":"单位","displayName:en":"Unit","dataType":"enum","dictCode":"tinv_unit","description":"Measurement unit.","feature":{"searchable":true}},
+  {"code":"tinv_pd_unit_price","displayName:zh-CN":"单价","displayName:en":"Unit Price","dataType":"decimal","description":"Default selling price.","extension":{"precision":2}},
+  {"code":"tinv_pd_description","displayName:zh-CN":"描述","displayName:en":"Description","dataType":"text","description":"Product description.","constraints":{"maxLength":5000},"extension":{"multiline":true}},
+  {"code":"tinv_pd_status","displayName:zh-CN":"状态","displayName:en":"Status","dataType":"enum","dictCode":"tinv_product_status","defaultValue":"active","description":"Product status.","feature":{"searchable":true}}
+]

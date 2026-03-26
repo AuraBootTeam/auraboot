@@ -1,0 +1,40 @@
+# Prometheus config — Microservice mode
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'meta-core'
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ['meta-core:6501']
+        labels:
+          service: meta-core
+
+  - job_name: 'biz-runtime'
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ['biz-runtime:6502']
+        labels:
+          service: biz-runtime
+
+  - job_name: 'bpm-engine'
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ['bpm-engine:6503']
+        labels:
+          service: bpm-engine
+
+  - job_name: 'im-service'
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ['im-service:6504']
+        labels:
+          service: im-service
+
+  - job_name: 'agent-runtime'
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ['agent-runtime:6505']
+        labels:
+          service: agent-runtime

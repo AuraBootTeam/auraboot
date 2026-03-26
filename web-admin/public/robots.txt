@@ -1,0 +1,14 @@
+User-agent: *
+Allow: /
+Disallow: /meta/
+Disallow: /admin/
+Disallow: /dynamic/
+Disallow: /settings/
+Disallow: /personal/
+Disallow: /aurabot/
+Disallow: /enterprise/
+Disallow: /bpm/
+Disallow: /api/
+Disallow: /marketplace/
+
+Sitemap: https://www.auraboot.com/sitemap.xml

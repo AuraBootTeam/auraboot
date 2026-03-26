@@ -1,0 +1,9 @@
+[
+  { "modelCode": "tcrm_account", "fieldCode": "tcrm_ac_code", "sequence": 1, "required": true, "visible": true, "editable": false, "displayConfig": { "searchable": true, "sortable": true } },
+  { "modelCode": "tcrm_account", "fieldCode": "tcrm_ac_name", "sequence": 2, "required": true, "visible": true, "editable": true, "displayConfig": { "searchable": true, "sortable": true } },
+  { "modelCode": "tcrm_account", "fieldCode": "tcrm_ac_industry", "sequence": 3, "required": false, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "tcrm_account", "fieldCode": "tcrm_ac_phone", "sequence": 4, "required": false, "visible": true, "editable": true },
+  { "modelCode": "tcrm_account", "fieldCode": "tcrm_ac_address", "sequence": 5, "required": false, "visible": false, "editable": true },
+  { "modelCode": "tcrm_account", "fieldCode": "tcrm_ac_website", "sequence": 6, "required": false, "visible": true, "editable": true },
+  { "modelCode": "tcrm_account", "fieldCode": "tcrm_ac_notes", "sequence": 7, "required": false, "visible": false, "editable": true }
+]

@@ -1,0 +1,1531 @@
+[
+  {
+    "key": "action.approve",
+    "zh-CN": "审批",
+    "en-US": "Approve",
+    "ja-JP": "承認",
+    "ko-KR": "승인"
+  },
+  {
+    "key": "action.back",
+    "zh-CN": "返回",
+    "en-US": "Back",
+    "ja-JP": "戻る",
+    "ko-KR": "돌아가기"
+  },
+  {
+    "key": "action.cancel",
+    "zh-CN": "取消",
+    "en-US": "Cancel",
+    "ja-JP": "キャンセル",
+    "ko-KR": "취소"
+  },
+  {
+    "key": "action.confirm",
+    "zh-CN": "确认",
+    "en-US": "Confirm",
+    "ja-JP": "確認",
+    "ko-KR": "확인"
+  },
+  {
+    "key": "action.copy",
+    "zh-CN": "复制",
+    "en-US": "Copy",
+    "ja-JP": "コピー",
+    "ko-KR": "복사"
+  },
+  {
+    "key": "action.create",
+    "zh-CN": "新建",
+    "en-US": "Create",
+    "ja-JP": "新規作成",
+    "ko-KR": "새로 만들기"
+  },
+  {
+    "key": "action.delete",
+    "zh-CN": "删除",
+    "en-US": "Delete",
+    "ja-JP": "削除",
+    "ko-KR": "삭제"
+  },
+  {
+    "key": "action.deleteSelected",
+    "zh-CN": "批量删除",
+    "en-US": "Delete Selected",
+    "ja-JP": "一括削除",
+    "ko-KR": "일괄 삭제"
+  },
+  {
+    "key": "action.disable",
+    "zh-CN": "禁用",
+    "en-US": "Disable",
+    "ja-JP": "無効化",
+    "ko-KR": "비활성화"
+  },
+  {
+    "key": "action.download",
+    "zh-CN": "下载",
+    "en-US": "Download",
+    "ja-JP": "ダウンロード",
+    "ko-KR": "다운로드"
+  },
+  {
+    "key": "action.enable",
+    "zh-CN": "启用",
+    "en-US": "Enable",
+    "ja-JP": "有効化",
+    "ko-KR": "활성화"
+  },
+  {
+    "key": "action.export",
+    "zh-CN": "导出",
+    "en-US": "Export",
+    "ja-JP": "エクスポート",
+    "ko-KR": "내보내기"
+  },
+  {
+    "key": "action.import",
+    "zh-CN": "导入",
+    "en-US": "Import",
+    "ja-JP": "インポート",
+    "ko-KR": "가져오기"
+  },
+  {
+    "key": "action.more",
+    "zh-CN": "更多",
+    "en-US": "More"
+  },
+  {
+    "key": "action.move",
+    "zh-CN": "移动",
+    "en-US": "Move",
+    "ja-JP": "移動",
+    "ko-KR": "이동"
+  },
+  {
+    "key": "action.print",
+    "zh-CN": "打印",
+    "en-US": "Print",
+    "ja-JP": "印刷",
+    "ko-KR": "인쇄"
+  },
+  {
+    "key": "action.publish",
+    "zh-CN": "发布",
+    "en-US": "Publish",
+    "ja-JP": "公開",
+    "ko-KR": "게시"
+  },
+  {
+    "key": "action.refresh",
+    "zh-CN": "刷新",
+    "en-US": "Refresh",
+    "ja-JP": "更新",
+    "ko-KR": "새로고침"
+  },
+  {
+    "key": "action.reject",
+    "zh-CN": "驳回",
+    "en-US": "Reject"
+  },
+  {
+    "key": "action.reset",
+    "zh-CN": "重置",
+    "en-US": "Reset",
+    "ja-JP": "リセット",
+    "ko-KR": "초기화"
+  },
+  {
+    "key": "action.save",
+    "zh-CN": "保存",
+    "en-US": "Save",
+    "ja-JP": "保存",
+    "ko-KR": "저장"
+  },
+  {
+    "key": "action.search",
+    "zh-CN": "搜索",
+    "en-US": "Search",
+    "ja-JP": "検索",
+    "ko-KR": "검색"
+  },
+  {
+    "key": "action.select",
+    "zh-CN": "请选择",
+    "en-US": "Select",
+    "ja-JP": "選択してください",
+    "ko-KR": "선택하세요"
+  },
+  {
+    "key": "action.share",
+    "zh-CN": "分享",
+    "en-US": "Share"
+  },
+  {
+    "key": "action.submit",
+    "zh-CN": "提交",
+    "en-US": "Submit",
+    "ja-JP": "送信",
+    "ko-KR": "제출"
+  },
+  {
+    "key": "action.unpublish",
+    "zh-CN": "取消发布",
+    "en-US": "Unpublish"
+  },
+  {
+    "key": "action.update",
+    "zh-CN": "编辑",
+    "en-US": "Edit",
+    "ja-JP": "編集",
+    "ko-KR": "편집"
+  },
+  {
+    "key": "action.upload",
+    "zh-CN": "上传",
+    "en-US": "Upload",
+    "ja-JP": "アップロード",
+    "ko-KR": "업로드"
+  },
+  {
+    "key": "action.view",
+    "zh-CN": "查看",
+    "en-US": "View",
+    "ja-JP": "表示",
+    "ko-KR": "보기"
+  },
+  {
+    "key": "admin.permission.assign.clearAll",
+    "zh-CN": "清除",
+    "en-US": "Clear All"
+  },
+  {
+    "key": "admin.permission.assign.description",
+    "zh-CN": "选择角色并为其分配相应的权限",
+    "en-US": "Select a role to assign permissions"
+  },
+  {
+    "key": "admin.permission.assign.forRole",
+    "zh-CN": "为角色 \"{name}\" 分配权限",
+    "en-US": "Assign permissions for role \"{name}\""
+  },
+  {
+    "key": "admin.permission.assign.loadError",
+    "zh-CN": "加载数据失败",
+    "en-US": "Failed to load data"
+  },
+  {
+    "key": "admin.permission.assign.permissionTree",
+    "zh-CN": "权限分配",
+    "en-US": "Permissions"
+  },
+  {
+    "key": "admin.permission.assign.roleList",
+    "zh-CN": "角色列表",
+    "en-US": "Roles"
+  },
+  {
+    "key": "admin.permission.assign.save",
+    "zh-CN": "保存权限",
+    "en-US": "Save Permissions"
+  },
+  {
+    "key": "admin.permission.assign.save.success",
+    "zh-CN": "权限分配成功",
+    "en-US": "Permissions saved"
+  },
+  {
+    "key": "admin.permission.assign.saveError",
+    "zh-CN": "保存失败",
+    "en-US": "Save failed",
+    "ja-JP": "保存に失敗しました",
+    "ko-KR": "저장에 실패했습니다"
+  },
+  {
+    "key": "admin.permission.assign.search",
+    "zh-CN": "搜索权限...",
+    "en-US": "Search permissions..."
+  },
+  {
+    "key": "admin.permission.assign.selectAll",
+    "zh-CN": "全选",
+    "en-US": "Select All",
+    "ja-JP": "すべて選択",
+    "ko-KR": "전체 선택"
+  },
+  {
+    "key": "admin.permission.assign.selectRole",
+    "zh-CN": "请选择一个角色来分配权限",
+    "en-US": "Select a role to assign permissions"
+  },
+  {
+    "key": "admin.permission.assign.selected",
+    "zh-CN": "已选 {count} 项",
+    "en-US": "{count} selected"
+  },
+  {
+    "key": "admin.permission.assign.title",
+    "zh-CN": "角色权限分配",
+    "en-US": "Role Permission Assignment"
+  },
+  {
+    "key": "admin.permission.description",
+    "zh-CN": "管理系统权限、角色和用户权限分配",
+    "en-US": "Manage permissions, roles and assignments"
+  },
+  {
+    "key": "admin.permission.empty.permissions",
+    "zh-CN": "暂无权限数据",
+    "en-US": "No permissions yet"
+  },
+  {
+    "key": "admin.permission.empty.roles",
+    "zh-CN": "暂无角色数据",
+    "en-US": "No roles yet"
+  },
+  {
+    "key": "admin.permission.loading",
+    "zh-CN": "加载中...",
+    "en-US": "Loading...",
+    "ja-JP": "読み込み中...",
+    "ko-KR": "로딩 중..."
+  },
+  {
+    "key": "admin.permission.perm.allModules",
+    "zh-CN": "所有模块",
+    "en-US": "All Modules"
+  },
+  {
+    "key": "admin.permission.perm.allStatus",
+    "zh-CN": "所有状态",
+    "en-US": "All Status"
+  },
+  {
+    "key": "admin.permission.perm.allTypes",
+    "zh-CN": "所有类型",
+    "en-US": "All Types"
+  },
+  {
+    "key": "admin.permission.perm.create",
+    "zh-CN": "新增权限",
+    "en-US": "Create Permission"
+  },
+  {
+    "key": "admin.permission.perm.delete.content",
+    "zh-CN": "确定要删除这个权限吗？",
+    "en-US": "Are you sure you want to delete this permission?"
+  },
+  {
+    "key": "admin.permission.perm.delete.title",
+    "zh-CN": "删除权限",
+    "en-US": "Delete Permission"
+  },
+  {
+    "key": "admin.permission.perm.info",
+    "zh-CN": "权限信息",
+    "en-US": "Permission Info"
+  },
+  {
+    "key": "admin.permission.perm.module",
+    "zh-CN": "模块",
+    "en-US": "Module"
+  },
+  {
+    "key": "admin.permission.perm.search",
+    "zh-CN": "搜索权限",
+    "en-US": "Search permissions"
+  },
+  {
+    "key": "admin.permission.role.assignPermission",
+    "zh-CN": "分配权限",
+    "en-US": "Assign Permissions"
+  },
+  {
+    "key": "admin.permission.role.code",
+    "zh-CN": "角色编码",
+    "en-US": "Role Code"
+  },
+  {
+    "key": "admin.permission.role.create",
+    "zh-CN": "新增角色",
+    "en-US": "Create Role"
+  },
+  {
+    "key": "admin.permission.role.create.success",
+    "zh-CN": "角色创建成功",
+    "en-US": "Role created"
+  },
+  {
+    "key": "admin.permission.role.delete.content",
+    "zh-CN": "确定要删除这个角色吗？此操作不可撤销。",
+    "en-US": "Are you sure you want to delete this role? This action cannot be undone."
+  },
+  {
+    "key": "admin.permission.role.delete.success",
+    "zh-CN": "删除成功",
+    "en-US": "Deleted",
+    "ja-JP": "削除しました",
+    "ko-KR": "삭제되었습니다"
+  },
+  {
+    "key": "admin.permission.role.delete.title",
+    "zh-CN": "删除角色",
+    "en-US": "Delete Role"
+  },
+  {
+    "key": "admin.permission.role.description",
+    "zh-CN": "角色描述",
+    "en-US": "Description"
+  },
+  {
+    "key": "admin.permission.role.disable.success",
+    "zh-CN": "禁用成功",
+    "en-US": "Disabled successfully"
+  },
+  {
+    "key": "admin.permission.role.edit",
+    "zh-CN": "编辑角色",
+    "en-US": "Edit Role"
+  },
+  {
+    "key": "admin.permission.role.enable.success",
+    "zh-CN": "启用成功",
+    "en-US": "Enabled successfully"
+  },
+  {
+    "key": "admin.permission.role.name",
+    "zh-CN": "角色名称",
+    "en-US": "Role Name"
+  },
+  {
+    "key": "admin.permission.role.status.active",
+    "zh-CN": "启用",
+    "en-US": "Active",
+    "ja-JP": "有効化",
+    "ko-KR": "활성화"
+  },
+  {
+    "key": "admin.permission.role.status.inactive",
+    "zh-CN": "禁用",
+    "en-US": "Inactive",
+    "ja-JP": "無効化",
+    "ko-KR": "비활성화"
+  },
+  {
+    "key": "admin.permission.role.type",
+    "zh-CN": "角色类型",
+    "en-US": "Role Type"
+  },
+  {
+    "key": "admin.permission.role.type.custom",
+    "zh-CN": "自定义角色",
+    "en-US": "Custom"
+  },
+  {
+    "key": "admin.permission.role.type.system",
+    "zh-CN": "系统角色",
+    "en-US": "System"
+  },
+  {
+    "key": "admin.permission.role.type.tenant",
+    "zh-CN": "租户角色",
+    "en-US": "Tenant"
+  },
+  {
+    "key": "admin.permission.role.update.success",
+    "zh-CN": "角色更新成功",
+    "en-US": "Role updated"
+  },
+  {
+    "key": "admin.permission.status",
+    "zh-CN": "状态",
+    "en-US": "Status",
+    "ja-JP": "ステータス",
+    "ko-KR": "상태"
+  },
+  {
+    "key": "admin.permission.tab.assignments",
+    "zh-CN": "权限分配",
+    "en-US": "Assignments"
+  },
+  {
+    "key": "admin.permission.tab.permissions",
+    "zh-CN": "权限列表",
+    "en-US": "Permissions"
+  },
+  {
+    "key": "admin.permission.tab.roles",
+    "zh-CN": "角色管理",
+    "en-US": "Roles"
+  },
+  {
+    "key": "admin.permission.title",
+    "zh-CN": "权限管理",
+    "en-US": "Permission Management"
+  },
+  {
+    "key": "admin.permission.type",
+    "zh-CN": "类型",
+    "en-US": "Type",
+    "ja-JP": "タイプ",
+    "ko-KR": "유형"
+  },
+  {
+    "key": "admin.permission.type.api",
+    "zh-CN": "api",
+    "en-US": "api"
+  },
+  {
+    "key": "admin.permission.type.button",
+    "zh-CN": "按钮",
+    "en-US": "Button"
+  },
+  {
+    "key": "admin.permission.type.menu",
+    "zh-CN": "菜单",
+    "en-US": "Menu"
+  },
+  {
+    "key": "auth.channel.emailCode",
+    "zh-CN": "邮箱验证码",
+    "en-US": "Email Code"
+  },
+  {
+    "key": "auth.channel.emailPassword",
+    "zh-CN": "邮箱密码",
+    "en-US": "Email & Password"
+  },
+  {
+    "key": "auth.channel.sms",
+    "zh-CN": "短信登录",
+    "en-US": "SMS Login"
+  },
+  {
+    "key": "auth.codePlaceholder",
+    "zh-CN": "请输入验证码",
+    "en-US": "Enter verification code"
+  },
+  {
+    "key": "auth.email",
+    "zh-CN": "邮箱",
+    "en-US": "Email",
+    "ja-JP": "メール",
+    "ko-KR": "이메일"
+  },
+  {
+    "key": "auth.emailPlaceholder",
+    "zh-CN": "请输入邮箱地址",
+    "en-US": "Enter your email"
+  },
+  {
+    "key": "auth.error.codeInvalid",
+    "zh-CN": "验证码无效或已过期",
+    "en-US": "The verification code is invalid or expired"
+  },
+  {
+    "key": "auth.error.codeRequired",
+    "zh-CN": "请输入验证码",
+    "en-US": "Verification code is required"
+  },
+  {
+    "key": "auth.error.invalidCredentials",
+    "zh-CN": "邮箱或密码错误，请重试",
+    "en-US": "Invalid email or password. Please try again."
+  },
+  {
+    "key": "auth.error.invalidMobile",
+    "zh-CN": "手机号格式不正确",
+    "en-US": "Invalid mobile number format"
+  },
+  {
+    "key": "auth.feature.dataModel",
+    "zh-CN": "灵活数据模型",
+    "en-US": "Flexible Data Model"
+  },
+  {
+    "key": "auth.feature.designer",
+    "zh-CN": "可视化页面设计器",
+    "en-US": "Visual Page Designer"
+  },
+  {
+    "key": "auth.feature.workflow",
+    "zh-CN": "工作流自动化",
+    "en-US": "Workflow Automation"
+  },
+  {
+    "key": "auth.forgotPassword",
+    "zh-CN": "忘记密码",
+    "en-US": "Forgot password?",
+    "ja-JP": "パスワードをお忘れですか",
+    "ko-KR": "비밀번호 찾기"
+  },
+  {
+    "key": "auth.getCode",
+    "zh-CN": "获取验证码",
+    "en-US": "Get Code"
+  },
+  {
+    "key": "auth.login",
+    "zh-CN": "登录",
+    "en-US": "Login",
+    "ja-JP": "ログイン",
+    "ko-KR": "로그인"
+  },
+  {
+    "key": "auth.loginNow",
+    "zh-CN": "立即登录",
+    "en-US": "Sign In"
+  },
+  {
+    "key": "auth.mobile",
+    "zh-CN": "手机号",
+    "en-US": "Mobile"
+  },
+  {
+    "key": "auth.mobilePlaceholder",
+    "zh-CN": "请输入手机号",
+    "en-US": "Enter your mobile number"
+  },
+  {
+    "key": "auth.noAccount",
+    "zh-CN": "还没有账号？",
+    "en-US": "No account yet?"
+  },
+  {
+    "key": "auth.password",
+    "zh-CN": "密码",
+    "en-US": "Password",
+    "ja-JP": "パスワード",
+    "ko-KR": "비밀번호"
+  },
+  {
+    "key": "auth.passwordPlaceholder",
+    "zh-CN": "请输入密码",
+    "en-US": "Enter your password"
+  },
+  {
+    "key": "auth.register",
+    "zh-CN": "注册",
+    "en-US": "Sign Up",
+    "ja-JP": "新規登録",
+    "ko-KR": "회원가입"
+  },
+  {
+    "key": "auth.registerNow",
+    "zh-CN": "立即注册",
+    "en-US": "Sign Up"
+  },
+  {
+    "key": "auth.rememberMe",
+    "zh-CN": "记住我",
+    "en-US": "Remember me"
+  },
+  {
+    "key": "auth.selectMethod",
+    "zh-CN": "请选择登录方式",
+    "en-US": "Choose your login method"
+  },
+  {
+    "key": "auth.sending",
+    "zh-CN": "发送中...",
+    "en-US": "Sending..."
+  },
+  {
+    "key": "auth.socialLogin",
+    "zh-CN": "或通过以下方式登录",
+    "en-US": "Or sign in with"
+  },
+  {
+    "key": "auth.tagline",
+    "zh-CN": "快速构建企业级应用的低代码平台",
+    "en-US": "Low-code platform for enterprise applications"
+  },
+  {
+    "key": "auth.verifyCode",
+    "zh-CN": "验证码",
+    "en-US": "Verification Code"
+  },
+  {
+    "key": "auth.welcome",
+    "zh-CN": "欢迎登录",
+    "en-US": "Welcome Back"
+  },
+  {
+    "key": "common.actions",
+    "zh-CN": "操作",
+    "en-US": "Actions",
+    "ja-JP": "操作",
+    "ko-KR": "작업"
+  },
+  {
+    "key": "common.cancel",
+    "zh-CN": "取消",
+    "en-US": "Cancel",
+    "ja-JP": "キャンセル",
+    "ko-KR": "취소"
+  },
+  {
+    "key": "common.collapseAll",
+    "zh-CN": "折叠全部",
+    "en-US": "Collapse All",
+    "ja-JP": "すべて折りたたむ",
+    "ko-KR": "모두 접기"
+  },
+  {
+    "key": "common.confirm",
+    "zh-CN": "确认",
+    "en-US": "Confirm",
+    "ja-JP": "確認",
+    "ko-KR": "확인"
+  },
+  {
+    "key": "common.delete",
+    "zh-CN": "删除",
+    "en-US": "Delete",
+    "ja-JP": "削除",
+    "ko-KR": "삭제"
+  },
+  {
+    "key": "common.disable",
+    "zh-CN": "禁用",
+    "en-US": "Disable",
+    "ja-JP": "無効化",
+    "ko-KR": "비활성화"
+  },
+  {
+    "key": "common.edit",
+    "zh-CN": "编辑",
+    "en-US": "Edit",
+    "ja-JP": "編集",
+    "ko-KR": "편집"
+  },
+  {
+    "key": "common.enable",
+    "zh-CN": "启用",
+    "en-US": "Enable",
+    "ja-JP": "有効化",
+    "ko-KR": "활성화"
+  },
+  {
+    "key": "common.expandAll",
+    "zh-CN": "展开全部",
+    "en-US": "Expand All",
+    "ja-JP": "すべて展開",
+    "ko-KR": "모두 펼치기"
+  },
+  {
+    "key": "common.field.code",
+    "zh-CN": "编码",
+    "en-US": "Code",
+    "ja-JP": "コード",
+    "ko-KR": "코드"
+  },
+  {
+    "key": "common.field.createdAt",
+    "zh-CN": "创建时间",
+    "en-US": "Created At",
+    "ja-JP": "作成日時",
+    "ko-KR": "생성일시"
+  },
+  {
+    "key": "common.field.createdBy",
+    "zh-CN": "创建人",
+    "en-US": "Created By",
+    "ja-JP": "作成者",
+    "ko-KR": "생성자"
+  },
+  {
+    "key": "common.field.description",
+    "zh-CN": "描述",
+    "en-US": "Description",
+    "ja-JP": "説明",
+    "ko-KR": "설명"
+  },
+  {
+    "key": "common.field.enabled",
+    "zh-CN": "是否启用",
+    "en-US": "Enabled"
+  },
+  {
+    "key": "common.field.id",
+    "zh-CN": "ID",
+    "en-US": "ID"
+  },
+  {
+    "key": "common.field.name",
+    "zh-CN": "名称",
+    "en-US": "Name",
+    "ja-JP": "名前",
+    "ko-KR": "이름"
+  },
+  {
+    "key": "common.field.remark",
+    "zh-CN": "备注",
+    "en-US": "Remark",
+    "ja-JP": "備考",
+    "ko-KR": "비고"
+  },
+  {
+    "key": "common.field.sort",
+    "zh-CN": "排序",
+    "en-US": "Sort Order"
+  },
+  {
+    "key": "common.field.status",
+    "zh-CN": "状态",
+    "en-US": "Status",
+    "ja-JP": "ステータス",
+    "ko-KR": "상태"
+  },
+  {
+    "key": "common.field.type",
+    "zh-CN": "类型",
+    "en-US": "Type",
+    "ja-JP": "タイプ",
+    "ko-KR": "유형"
+  },
+  {
+    "key": "common.field.updatedAt",
+    "zh-CN": "更新时间",
+    "en-US": "Updated At",
+    "ja-JP": "更新日時",
+    "ko-KR": "수정일시"
+  },
+  {
+    "key": "common.field.updatedBy",
+    "zh-CN": "更新人",
+    "en-US": "Updated By"
+  },
+  {
+    "key": "common.yes",
+    "zh-CN": "是",
+    "en-US": "Yes",
+    "ja-JP": "はい",
+    "ko-KR": "예"
+  },
+  {
+    "key": "common.no",
+    "zh-CN": "否",
+    "en-US": "No",
+    "ja-JP": "いいえ",
+    "ko-KR": "아니오"
+  },
+  {
+    "key": "common.noData",
+    "zh-CN": "暂无数据",
+    "en-US": "No data",
+    "ja-JP": "データがありません",
+    "ko-KR": "데이터가 없습니다"
+  },
+  {
+    "key": "common.noSearchResults",
+    "zh-CN": "无搜索结果",
+    "en-US": "No results"
+  },
+  {
+    "key": "common.saving",
+    "zh-CN": "保存中...",
+    "en-US": "Saving..."
+  },
+  {
+    "key": "message.create.failed",
+    "zh-CN": "创建失败",
+    "en-US": "Create failed"
+  },
+  {
+    "key": "message.create.success",
+    "zh-CN": "创建成功",
+    "en-US": "Created successfully"
+  },
+  {
+    "key": "message.delete.confirm.content",
+    "zh-CN": "确定要删除选中的记录吗？此操作不可恢复。",
+    "en-US": "Are you sure you want to delete the selected items? This action cannot be undone."
+  },
+  {
+    "key": "message.delete.confirm.title",
+    "zh-CN": "确认删除",
+    "en-US": "Confirm Delete"
+  },
+  {
+    "key": "message.delete.failed",
+    "zh-CN": "删除失败",
+    "en-US": "Delete failed"
+  },
+  {
+    "key": "message.delete.success",
+    "zh-CN": "删除成功",
+    "en-US": "Deleted successfully",
+    "ja-JP": "削除しました",
+    "ko-KR": "삭제되었습니다"
+  },
+  {
+    "key": "message.error.forbidden",
+    "zh-CN": "无权限执行此操作",
+    "en-US": "You do not have permission to perform this action"
+  },
+  {
+    "key": "message.error.network",
+    "zh-CN": "网络连接失败，请稍后重试",
+    "en-US": "Network error, please try again later"
+  },
+  {
+    "key": "message.error.notFound",
+    "zh-CN": "资源不存在",
+    "en-US": "Resource not found"
+  },
+  {
+    "key": "message.error.server",
+    "zh-CN": "服务器错误，请稍后重试",
+    "en-US": "Server error, please try again later"
+  },
+  {
+    "key": "message.error.unauthorized",
+    "zh-CN": "未授权，请重新登录",
+    "en-US": "Unauthorized, please login again"
+  },
+  {
+    "key": "message.loading",
+    "zh-CN": "加载中...",
+    "en-US": "Loading...",
+    "ja-JP": "読み込み中...",
+    "ko-KR": "로딩 중..."
+  },
+  {
+    "key": "message.operation.failed",
+    "zh-CN": "操作失败",
+    "en-US": "Operation failed",
+    "ja-JP": "操作に失敗しました",
+    "ko-KR": "작업에 실패했습니다"
+  },
+  {
+    "key": "message.operation.success",
+    "zh-CN": "操作成功",
+    "en-US": "Operation successful",
+    "ja-JP": "操作が完了しました",
+    "ko-KR": "작업이 완료되었습니다"
+  },
+  {
+    "key": "message.save.failed",
+    "zh-CN": "保存失败",
+    "en-US": "Save failed",
+    "ja-JP": "保存に失敗しました",
+    "ko-KR": "저장에 실패했습니다"
+  },
+  {
+    "key": "message.save.success",
+    "zh-CN": "保存成功",
+    "en-US": "Saved successfully",
+    "ja-JP": "保存しました",
+    "ko-KR": "저장되었습니다"
+  },
+  {
+    "key": "message.submitting",
+    "zh-CN": "提交中...",
+    "en-US": "Submitting..."
+  },
+  {
+    "key": "message.update.failed",
+    "zh-CN": "更新失败",
+    "en-US": "Update failed"
+  },
+  {
+    "key": "message.update.success",
+    "zh-CN": "更新成功",
+    "en-US": "Updated successfully"
+  },
+  {
+    "key": "message.validation.invalid",
+    "zh-CN": "输入格式不正确",
+    "en-US": "Invalid format"
+  },
+  {
+    "key": "message.validation.required",
+    "zh-CN": "此字段为必填项",
+    "en-US": "This field is required"
+  },
+  {
+    "key": "message.validation.tooLong",
+    "zh-CN": "输入内容过长",
+    "en-US": "Input is too long"
+  },
+  {
+    "key": "message.validation.tooShort",
+    "zh-CN": "输入内容过短",
+    "en-US": "Input is too short"
+  },
+  {
+    "key": "notification.title",
+    "zh-CN": "通知中心",
+    "en-US": "Notifications"
+  },
+  {
+    "key": "plugin.action.cancel",
+    "zh-CN": "取消",
+    "en-US": "Cancel",
+    "ja-JP": "キャンセル",
+    "ko-KR": "취소"
+  },
+  {
+    "key": "plugin.action.disable",
+    "zh-CN": "停用",
+    "en-US": "Disable"
+  },
+  {
+    "key": "plugin.action.enable",
+    "zh-CN": "启用",
+    "en-US": "Enable",
+    "ja-JP": "有効化",
+    "ko-KR": "활성화"
+  },
+  {
+    "key": "plugin.action.refresh",
+    "zh-CN": "刷新",
+    "en-US": "Refresh",
+    "ja-JP": "更新",
+    "ko-KR": "새로고침"
+  },
+  {
+    "key": "plugin.action.uninstall",
+    "zh-CN": "卸载",
+    "en-US": "Uninstall"
+  },
+  {
+    "key": "plugin.action.upload",
+    "zh-CN": "上传插件",
+    "en-US": "Upload Plugin"
+  },
+  {
+    "key": "plugin.action.viewDetail",
+    "zh-CN": "查看详情",
+    "en-US": "View Details"
+  },
+  {
+    "key": "plugin.column.actions",
+    "zh-CN": "操作",
+    "en-US": "Actions",
+    "ja-JP": "操作",
+    "ko-KR": "작업"
+  },
+  {
+    "key": "plugin.column.installedAt",
+    "zh-CN": "安装时间",
+    "en-US": "Installed At"
+  },
+  {
+    "key": "plugin.column.namespace",
+    "zh-CN": "命名空间",
+    "en-US": "Namespace"
+  },
+  {
+    "key": "plugin.column.plugin",
+    "zh-CN": "插件",
+    "en-US": "Plugin"
+  },
+  {
+    "key": "plugin.column.status",
+    "zh-CN": "状态",
+    "en-US": "Status",
+    "ja-JP": "ステータス",
+    "ko-KR": "상태"
+  },
+  {
+    "key": "plugin.column.version",
+    "zh-CN": "版本",
+    "en-US": "Version",
+    "ja-JP": "バージョン",
+    "ko-KR": "버전"
+  },
+  {
+    "key": "plugin.description",
+    "zh-CN": "管理系统插件的安装、启用和配置",
+    "en-US": "Manage plugin installation, activation and configuration"
+  },
+  {
+    "key": "plugin.detail.title",
+    "zh-CN": "插件详情",
+    "en-US": "Plugin Details"
+  },
+  {
+    "key": "plugin.empty.history",
+    "zh-CN": "暂无导入记录",
+    "en-US": "No import history"
+  },
+  {
+    "key": "plugin.empty.installed",
+    "zh-CN": "暂无已安装的插件",
+    "en-US": "No plugins installed"
+  },
+  {
+    "key": "plugin.empty.uploadFirst",
+    "zh-CN": "上传第一个插件",
+    "en-US": "Upload your first plugin"
+  },
+  {
+    "key": "plugin.field.author",
+    "zh-CN": "作者",
+    "en-US": "Author"
+  },
+  {
+    "key": "plugin.field.description",
+    "zh-CN": "描述",
+    "en-US": "Description",
+    "ja-JP": "説明",
+    "ko-KR": "설명"
+  },
+  {
+    "key": "plugin.field.name",
+    "zh-CN": "名称",
+    "en-US": "Name",
+    "ja-JP": "名前",
+    "ko-KR": "이름"
+  },
+  {
+    "key": "plugin.field.updatedAt",
+    "zh-CN": "更新时间",
+    "en-US": "Updated At",
+    "ja-JP": "更新日時",
+    "ko-KR": "수정일시"
+  },
+  {
+    "key": "plugin.import.column.source",
+    "zh-CN": "来源",
+    "en-US": "Source"
+  },
+  {
+    "key": "plugin.import.column.time",
+    "zh-CN": "时间",
+    "en-US": "Time"
+  },
+  {
+    "key": "plugin.import.column.type",
+    "zh-CN": "类型",
+    "en-US": "Type",
+    "ja-JP": "タイプ",
+    "ko-KR": "유형"
+  },
+  {
+    "key": "plugin.import.confirmInstall",
+    "zh-CN": "确认安装",
+    "en-US": "Confirm Install"
+  },
+  {
+    "key": "plugin.import.confirmUpgrade",
+    "zh-CN": "确认升级",
+    "en-US": "Confirm Upgrade"
+  },
+  {
+    "key": "plugin.import.importing",
+    "zh-CN": "导入中...",
+    "en-US": "Importing..."
+  },
+  {
+    "key": "plugin.import.status.rolledBack",
+    "zh-CN": "已回滚",
+    "en-US": "Rolled Back"
+  },
+  {
+    "key": "plugin.import.status.success",
+    "zh-CN": "成功",
+    "en-US": "Success"
+  },
+  {
+    "key": "plugin.import.type.install",
+    "zh-CN": "新安装",
+    "en-US": "Install"
+  },
+  {
+    "key": "plugin.import.type.upgrade",
+    "zh-CN": "升级",
+    "en-US": "Upgrade"
+  },
+  {
+    "key": "plugin.loading",
+    "zh-CN": "加载中...",
+    "en-US": "Loading...",
+    "ja-JP": "読み込み中...",
+    "ko-KR": "로딩 중..."
+  },
+  {
+    "key": "plugin.preview.actionsToPlan",
+    "zh-CN": "将执行的操作",
+    "en-US": "Planned Actions"
+  },
+  {
+    "key": "plugin.preview.info",
+    "zh-CN": "插件信息",
+    "en-US": "Plugin Info"
+  },
+  {
+    "key": "plugin.preview.title",
+    "zh-CN": "导入预览",
+    "en-US": "Import Preview"
+  },
+  {
+    "key": "plugin.preview.upgradeFrom",
+    "zh-CN": "升级自",
+    "en-US": "Upgrade From"
+  },
+  {
+    "key": "plugin.preview.validationErrors",
+    "zh-CN": "验证错误",
+    "en-US": "Validation Errors"
+  },
+  {
+    "key": "plugin.preview.warnings",
+    "zh-CN": "警告",
+    "en-US": "Warnings"
+  },
+  {
+    "key": "plugin.status.disabled",
+    "zh-CN": "已停用",
+    "en-US": "Stopped"
+  },
+  {
+    "key": "plugin.status.enabled",
+    "zh-CN": "运行中",
+    "en-US": "Running"
+  },
+  {
+    "key": "plugin.status.failed",
+    "zh-CN": "失败",
+    "en-US": "Failed"
+  },
+  {
+    "key": "plugin.status.installed",
+    "zh-CN": "已安装",
+    "en-US": "Installed"
+  },
+  {
+    "key": "plugin.tab.history",
+    "zh-CN": "导入历史",
+    "en-US": "Import History"
+  },
+  {
+    "key": "plugin.tab.installed",
+    "zh-CN": "已安装插件",
+    "en-US": "Installed Plugins"
+  },
+  {
+    "key": "plugin.title",
+    "zh-CN": "插件管理",
+    "en-US": "Plugin Management"
+  },
+  {
+    "key": "plugin.upload.dragHint",
+    "zh-CN": "拖拽文件到此处，或点击选择文件",
+    "en-US": "Drag file here, or click to select"
+  },
+  {
+    "key": "plugin.upload.formatHint",
+    "zh-CN": "支持 JSON 或 ZIP 格式的插件包",
+    "en-US": "Supports JSON or ZIP plugin packages"
+  },
+  {
+    "key": "plugin.upload.selectFile",
+    "zh-CN": "选择文件",
+    "en-US": "Select File"
+  },
+  {
+    "key": "plugin.upload.title",
+    "zh-CN": "上传插件",
+    "en-US": "Upload Plugin"
+  },
+  {
+    "key": "plugin.upload.uploading",
+    "zh-CN": "上传中...",
+    "en-US": "Uploading..."
+  },
+  {
+    "key": "table.actions",
+    "zh-CN": "操作",
+    "en-US": "Actions",
+    "ja-JP": "操作",
+    "ko-KR": "작업"
+  },
+  {
+    "key": "table.collapseAll",
+    "zh-CN": "收起全部",
+    "en-US": "Collapse All"
+  },
+  {
+    "key": "table.columns",
+    "zh-CN": "列设置",
+    "en-US": "Columns"
+  },
+  {
+    "key": "table.expandAll",
+    "zh-CN": "展开全部",
+    "en-US": "Expand All",
+    "ja-JP": "すべて展開",
+    "ko-KR": "모두 펼치기"
+  },
+  {
+    "key": "table.filter",
+    "zh-CN": "筛选",
+    "en-US": "Filter"
+  },
+  {
+    "key": "table.loading",
+    "zh-CN": "加载中...",
+    "en-US": "Loading...",
+    "ja-JP": "読み込み中...",
+    "ko-KR": "로딩 중..."
+  },
+  {
+    "key": "table.noData",
+    "zh-CN": "暂无数据",
+    "en-US": "No data",
+    "ja-JP": "データがありません",
+    "ko-KR": "데이터가 없습니다"
+  },
+  {
+    "key": "table.pageSize",
+    "zh-CN": "每页 {size} 条",
+    "en-US": "{size} per page"
+  },
+  {
+    "key": "table.selectAll",
+    "zh-CN": "全选",
+    "en-US": "Select All",
+    "ja-JP": "すべて選択",
+    "ko-KR": "전체 선택"
+  },
+  {
+    "key": "table.selected",
+    "zh-CN": "已选择 {count} 项",
+    "en-US": "{count} items selected"
+  },
+  {
+    "key": "table.sort",
+    "zh-CN": "排序",
+    "en-US": "Sort"
+  },
+  {
+    "key": "table.total",
+    "zh-CN": "共 {total} 条",
+    "en-US": "{total} items total"
+  },
+  {
+    "key": "table.unselectAll",
+    "zh-CN": "取消全选",
+    "en-US": "Deselect All",
+    "ja-JP": "選択解除",
+    "ko-KR": "선택 해제"
+  },
+  {
+    "key": "theme.auto",
+    "zh-CN": "跟随系统",
+    "en-US": "Auto"
+  },
+  {
+    "key": "theme.dark",
+    "zh-CN": "深色",
+    "en-US": "Dark"
+  },
+  {
+    "key": "theme.light",
+    "zh-CN": "浅色",
+    "en-US": "Light"
+  },
+  {
+    "key": "user.defaultName",
+    "zh-CN": "用户",
+    "en-US": "User"
+  },
+  {
+    "key": "user.logout",
+    "zh-CN": "退出登录",
+    "en-US": "Logout"
+  },
+  {
+    "key": "nlModeling.title",
+    "zh-CN": "AI 智能建模",
+    "en-US": "AI Modeling"
+  },
+  {
+    "key": "nlModeling.subtitle",
+    "zh-CN": "用自然语言描述你的业务模块，AI 自动生成完整配置",
+    "en-US": "Describe your business module in natural language, AI generates the complete configuration"
+  },
+  {
+    "key": "nlModeling.step.describe",
+    "zh-CN": "描述需求",
+    "en-US": "Describe"
+  },
+  {
+    "key": "nlModeling.step.generating",
+    "zh-CN": "生成中",
+    "en-US": "Generating"
+  },
+  {
+    "key": "nlModeling.step.preview",
+    "zh-CN": "预览与调整",
+    "en-US": "Preview & Refine"
+  },
+  {
+    "key": "nlModeling.step.deploy",
+    "zh-CN": "部署",
+    "en-US": "Deploy"
+  },
+  {
+    "key": "nlModeling.describeLabel",
+    "zh-CN": "描述你的业务模块",
+    "en-US": "Describe your business module"
+  },
+  {
+    "key": "nlModeling.describePlaceholder",
+    "zh-CN": "例如：我需要一个客户管理模块，包含公司名称、联系人、联系电话、邮箱、跟进记录...",
+    "en-US": "e.g., I need a customer management module with company name, contacts, phone, email, follow-up records..."
+  },
+  {
+    "key": "nlModeling.describeHint",
+    "zh-CN": "按 Ctrl+Enter 或 Cmd+Enter 快速生成",
+    "en-US": "Press Ctrl+Enter or Cmd+Enter to generate"
+  },
+  {
+    "key": "nlModeling.examples",
+    "zh-CN": "示例模板",
+    "en-US": "Example Templates"
+  },
+  {
+    "key": "nlModeling.example.customerMgmt",
+    "zh-CN": "客户管理",
+    "en-US": "Customer Management"
+  },
+  {
+    "key": "nlModeling.example.projectMgmt",
+    "zh-CN": "项目管理",
+    "en-US": "Project Management"
+  },
+  {
+    "key": "nlModeling.example.assetMgmt",
+    "zh-CN": "资产管理",
+    "en-US": "Asset Management"
+  },
+  {
+    "key": "nlModeling.optionsTitle",
+    "zh-CN": "生成选项",
+    "en-US": "Generation Options"
+  },
+  {
+    "key": "nlModeling.option.pages",
+    "zh-CN": "页面",
+    "en-US": "Pages"
+  },
+  {
+    "key": "nlModeling.option.commands",
+    "zh-CN": "命令",
+    "en-US": "Commands"
+  },
+  {
+    "key": "nlModeling.option.menus",
+    "zh-CN": "菜单",
+    "en-US": "Menus"
+  },
+  {
+    "key": "nlModeling.option.i18n",
+    "zh-CN": "多语言",
+    "en-US": "i18n"
+  },
+  {
+    "key": "nlModeling.option.bindings",
+    "zh-CN": "字段绑定",
+    "en-US": "Field Bindings"
+  },
+  {
+    "key": "nlModeling.generateBtn",
+    "zh-CN": "开始生成",
+    "en-US": "Generate"
+  },
+  {
+    "key": "nlModeling.generating",
+    "zh-CN": "AI 正在生成配置...",
+    "en-US": "AI is generating configuration..."
+  },
+  {
+    "key": "nlModeling.generatingHint",
+    "zh-CN": "这可能需要 10-30 秒，取决于模块复杂度",
+    "en-US": "This may take 10-30 seconds depending on complexity"
+  },
+  {
+    "key": "nlModeling.summary",
+    "zh-CN": "生成摘要",
+    "en-US": "Summary"
+  },
+  {
+    "key": "nlModeling.refineTitle",
+    "zh-CN": "调整优化",
+    "en-US": "Refine"
+  },
+  {
+    "key": "nlModeling.refinePlaceholder",
+    "zh-CN": "例如：添加一个邮箱字段、把状态改成下拉选择...",
+    "en-US": "e.g., Add an email field, change status to dropdown..."
+  },
+  {
+    "key": "nlModeling.refineBtn",
+    "zh-CN": "发送修改",
+    "en-US": "Send Refinement"
+  },
+  {
+    "key": "nlModeling.startOver",
+    "zh-CN": "重新开始",
+    "en-US": "Start Over"
+  },
+  {
+    "key": "nlModeling.applyBtn",
+    "zh-CN": "应用到系统",
+    "en-US": "Apply to System"
+  },
+  {
+    "key": "nlModeling.tab.models",
+    "zh-CN": "模型",
+    "en-US": "Models"
+  },
+  {
+    "key": "nlModeling.tab.fields",
+    "zh-CN": "字段",
+    "en-US": "Fields"
+  },
+  {
+    "key": "nlModeling.tab.commands",
+    "zh-CN": "命令",
+    "en-US": "Commands"
+  },
+  {
+    "key": "nlModeling.tab.pages",
+    "zh-CN": "页面",
+    "en-US": "Pages"
+  },
+  {
+    "key": "nlModeling.tab.menus",
+    "zh-CN": "菜单",
+    "en-US": "Menus"
+  },
+  {
+    "key": "nlModeling.tab.i18n",
+    "zh-CN": "多语言",
+    "en-US": "i18n"
+  },
+  {
+    "key": "nlModeling.deploySuccess",
+    "zh-CN": "部署成功",
+    "en-US": "Deployed Successfully"
+  },
+  {
+    "key": "nlModeling.deploySuccessHint",
+    "zh-CN": "你的业务模块已创建完成，可以在菜单中找到它",
+    "en-US": "Your business module has been created. Find it in the menu."
+  },
+  {
+    "key": "nlModeling.deployFailed",
+    "zh-CN": "部署失败",
+    "en-US": "Deploy Failed"
+  },
+  {
+    "key": "nlModeling.goToModule",
+    "zh-CN": "前往模块页面",
+    "en-US": "Go to Module"
+  }
+]

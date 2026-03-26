@@ -1,0 +1,10 @@
+[
+  { "code": "tpm_pj_code", "displayName:zh-CN": "项目编号", "displayName:en": "Project Code", "dataType": "string", "description": "Auto-generated project code.", "constraints": { "required": true, "maxLength": 50 }, "feature": { "searchable": true, "sortable": true }, "extension": { "readOnly": true, "placeholder:zh-CN": "系统自动生成", "placeholder:en": "Auto generated" } },
+  { "code": "tpm_pj_name", "displayName:zh-CN": "项目名称", "displayName:en": "Project Name", "dataType": "string", "description": "Project name.", "constraints": { "required": true, "maxLength": 200 }, "feature": { "searchable": true, "sortable": true }, "extension": { "placeholder:zh-CN": "请输入项目名称", "placeholder:en": "Enter project name" } },
+  { "code": "tpm_pj_description", "displayName:zh-CN": "项目描述", "displayName:en": "Description", "dataType": "text", "description": "Detailed project description.", "constraints": { "maxLength": 5000 }, "extension": { "multiline": true } },
+  { "code": "tpm_pj_status", "displayName:zh-CN": "状态", "displayName:en": "Status", "dataType": "enum", "dictCode": "tpm_project_status", "defaultValue": "planning", "description": "Project lifecycle status.", "feature": { "searchable": true } },
+  { "code": "tpm_pj_priority", "displayName:zh-CN": "优先级", "displayName:en": "Priority", "dataType": "enum", "dictCode": "tpm_priority", "defaultValue": "medium", "description": "Project priority.", "feature": { "searchable": true } },
+  { "code": "tpm_pj_owner", "displayName:zh-CN": "负责人", "displayName:en": "Owner", "dataType": "string", "description": "Project owner.", "constraints": { "maxLength": 100 }, "feature": { "searchable": true } },
+  { "code": "tpm_pj_start_date", "displayName:zh-CN": "开始日期", "displayName:en": "Start Date", "dataType": "date", "description": "Project start date.", "feature": { "sortable": true } },
+  { "code": "tpm_pj_end_date", "displayName:zh-CN": "结束日期", "displayName:en": "End Date", "dataType": "date", "description": "Project end date.", "feature": { "sortable": true } }
+]

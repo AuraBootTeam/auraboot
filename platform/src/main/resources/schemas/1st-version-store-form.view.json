@@ -1,0 +1,110 @@
+{
+  "base": "form:store.form.base@^2",
+  "meta": {
+    "title": {
+      "zh-CN": "门店详情",
+      "en-US": "Store Details"
+    }
+  },
+  "props": {
+    "mode": "view"
+  },
+
+  "actions": [
+    {
+      "code": "print",
+      "label": {
+        "zh-CN": "打印",
+        "en-US": "Print"
+      }
+    },
+    {
+      "code": "export",
+      "label": {
+        "zh-CN": "导出PDF",
+        "en-US": "Export PDF"
+      },
+      "permission": "store:export"
+    }
+  ],
+  "overrides": {
+    "fieldsByKey": {
+      "code": {
+        "component": "Text",
+        "props": {
+          "readOnly": true,
+          "copyable": true
+        }
+      },
+      "name": {
+        "props": {
+          "readOnly": true
+        }
+      },
+      "type": {
+        "component": "Tag",
+        "props": {
+          "binding": "store.type",
+          "readOnly": true
+        }
+      },
+      "status": {
+        "component": "Badge",
+        "props": {
+          "binding": "store.status",
+          "readOnly": true
+        }
+      },
+      "address": {
+        "props": {
+          "readOnly": true
+        }
+      },
+      "coordinates": {
+        "props": {
+          "readOnly": true
+        }
+      },
+      "contact_phone": {
+        "component": "Text",
+        "props": {
+          "readOnly": true,
+          "copyable": true
+        }
+      },
+      "contact_email": {
+        "component": "Text",
+        "props": {
+          "readOnly": true,
+          "copyable": true
+        }
+      },
+      "manager_id": {
+        "props": {
+          "readOnly": true
+        }
+      },
+      "organization_id": {
+        "props": {
+          "readOnly": true
+        }
+      },
+      "opening_hours": {
+        "component": "TimeRangeTable",
+        "props": {
+          "readOnly": true
+        }
+      },
+      "description": {
+        "props": {
+          "readOnly": true
+        }
+      },
+      "images": {
+        "props": {
+          "readOnly": true
+        }
+      }
+    }
+  }
+}

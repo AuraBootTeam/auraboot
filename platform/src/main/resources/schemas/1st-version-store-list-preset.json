@@ -1,0 +1,221 @@
+{
+  "meta": {
+    "blockCode": "store.list.preset",
+    "version": "1.0.0",
+    "title": {
+      "zh-CN": "门店列表默认预设",
+      "en-US": "Store List Default Preset"
+    },
+    "entityCode": "Store",
+    "type": "queryPreset"
+  },
+  "filters": {
+    "default": {
+      "status": ["active"],
+      "deleted_at": null
+    },
+    "contextual": [
+      {
+        "field": "tenant_id",
+        "op": "EQ",
+        "value": "${context.tenantId}",
+        "required": true
+      },
+      {
+        "field": "deleted_at",
+        "op": "is_null",
+        "value": null,
+        "required": true
+      }
+    ],
+    "security": [
+      {
+        "field": "organization_id",
+        "op": "IN",
+        "value": "${user.accessibleOrganizations}",
+        "if": "!hasRole('super_admin')"
+      }
+    ]
+  },
+  "selects": {
+    "fields": [
+      "id",
+      "pid",
+      "code",
+      "name",
+      "type",
+      "status",
+      "address",
+      "contact_phone",
+      "manager_name",
+      "manager_avatar",
+      "opening_hours",
+      "created_at",
+      "updated_at"
+    ],
+    "relations": [
+      {
+        "entity": "Organization",
+        "alias": "org",
+        "fields": ["name"],
+        "joinOn": "Store.organization_id = org.id"
+      },
+      {
+        "entity": "User",
+        "alias": "manager",
+        "fields": ["name", "avatar_url"],
+        "joinOn": "Store.manager_id = manager.id",
+        "optional": true
+      }
+    ]
+  },
+  "sorts": {
+    "default": [
+      {
+        "field": "created_at",
+        "direction": "desc"
+      },
+      {
+        "field": "code",
+        "direction": "asc"
+      }
+    ],
+    "available": [
+      {
+        "code": "name",
+        "field": "name->>'zh-CN'",
+        "label": {
+          "zh-CN": "门店名称",
+          "en-US": "Store Name"
+        }
+      },
+      {
+        "code": "code",
+        "field": "code",
+        "label": {
+          "zh-CN": "门店编码",
+          "en-US": "Store Code"
+        }
+      },
+      {
+        "code": "createdAt",
+        "field": "created_at",
+        "label": {
+          "zh-CN": "创建时间",
+          "en-US": "Created Time"
+        }
+      },
+      {
+        "code": "updatedAt",
+        "field": "updated_at",
+        "label": {
+          "zh-CN": "更新时间",
+          "en-US": "Updated Time"
+        }
+      }
+    ]
+  },
+  "pagination": {
+    "defaultPageSize": 20,
+    "maxPageSize": 100,
+    "pageSizeOptions": [10, 20, 50, 100]
+  },
+  "aggregations": {
+    "enabled": true,
+    "metrics": [
+      {
+        "code": "totalCount",
+        "type": "count",
+        "field": "*",
+        "label": {
+          "zh-CN": "总数",
+          "en-US": "Total Count"
+        }
+      },
+      {
+        "code": "activeCount",
+        "type": "count",
+        "field": "*",
+        "filter": {
+          "status": "active"
+        },
+        "label": {
+          "zh-CN": "启用门店数",
+          "en-US": "Active Stores"
+        }
+      },
+      {
+        "code": "inactiveCount",
+        "type": "count",
+        "field": "*",
+        "filter": {
+          "status": "inactive"
+        },
+        "label": {
+          "zh-CN": "停用门店数",
+          "en-US": "Inactive Stores"
+        }
+      },
+      {
+        "code": "typeDistribution",
+        "type": "groupBy",
+        "field": "type",
+        "label": {
+          "zh-CN": "类型分布",
+          "en-US": "Type Distribution"
+        }
+      }
+    ]
+  },
+  "cache": {
+    "enabled": true,
+    "strategy": "stale-while-revalidate",
+    "ttlSec": 300,
+    "tags": ["store", "organization"]
+  },
+  "optimization": {
+    "indexHints": [
+      "idx_store_tenant_status",
+      "idx_store_created_at",
+      "idx_store_code"
+    ],
+    "queryPlan": {
+      "useIndex": true,
+      "maxExecutionTime": 5000
+    }
+  },
+  "security": {
+    "dataFiltering": {
+      "enabled": true,
+      "rules": [
+        {
+          "role": "store_manager",
+          "filter": {
+            "manager_id": "${user.id}"
+          }
+        },
+        {
+          "role": "regional_manager",
+          "filter": {
+            "region_id": "${user.managedRegions}"
+          }
+        }
+      ]
+    },
+    "fieldMasking": {
+      "enabled": true,
+      "rules": [
+        {
+          "field": "contact_phone",
+          "mask": "phone",
+          "if": "!permission('store:view_sensitive')"
+        }
+      ]
+    }
+  },
+  "audit": {
+    "enabled": true,
+    "trackQueries": true,
+    "sensitiveFields": ["contact_phone", "address"]
+  }
+}

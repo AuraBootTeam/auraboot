@@ -1,0 +1,84 @@
+[
+  {
+    "code": "tcrm_op_code",
+    "displayName:zh-CN": "商机编号",
+    "displayName:en": "Opportunity Code",
+    "dataType": "string",
+    "description": "Auto-generated opportunity code.",
+    "constraints": { "required": true, "maxLength": 50 },
+    "feature": { "searchable": true, "sortable": true },
+    "extension": { "readOnly": true, "placeholder:zh-CN": "系统自动生成", "placeholder:en": "Auto generated" }
+  },
+  {
+    "code": "tcrm_op_name",
+    "displayName:zh-CN": "商机名称",
+    "displayName:en": "Opportunity Name",
+    "dataType": "string",
+    "description": "Short name for the deal.",
+    "constraints": { "required": true, "maxLength": 200 },
+    "feature": { "searchable": true, "sortable": true },
+    "extension": { "placeholder:zh-CN": "请输入商机名称", "placeholder:en": "Enter opportunity name" }
+  },
+  {
+    "code": "tcrm_op_account_id",
+    "displayName:zh-CN": "关联客户",
+    "displayName:en": "Account",
+    "dataType": "reference",
+    "description": "The account this opportunity is associated with.",
+    "feature": { "searchable": true },
+    "extension": { "referenceModelCode": "tcrm_account" }
+  },
+  {
+    "code": "tcrm_op_contact_id",
+    "displayName:zh-CN": "关联联系人",
+    "displayName:en": "Contact",
+    "dataType": "reference",
+    "description": "Primary contact for this opportunity.",
+    "extension": { "referenceModelCode": "tcrm_contact" }
+  },
+  {
+    "code": "tcrm_op_amount",
+    "displayName:zh-CN": "金额",
+    "displayName:en": "Amount",
+    "dataType": "decimal",
+    "description": "Expected deal value.",
+    "feature": { "sortable": true },
+    "extension": { "precision": 2, "placeholder:zh-CN": "预计金额", "placeholder:en": "Expected amount" }
+  },
+  {
+    "code": "tcrm_op_stage",
+    "displayName:zh-CN": "阶段",
+    "displayName:en": "Stage",
+    "dataType": "enum",
+    "dictCode": "tcrm_opp_stage",
+    "defaultValue": "prospecting",
+    "description": "Current pipeline stage. Managed by state transition commands.",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "tcrm_op_expected_close",
+    "displayName:zh-CN": "预计关闭日期",
+    "displayName:en": "Expected Close Date",
+    "dataType": "date",
+    "description": "When the deal is expected to close.",
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "tcrm_op_assignee",
+    "displayName:zh-CN": "负责人",
+    "displayName:en": "Assignee",
+    "dataType": "string",
+    "description": "Sales rep owning this opportunity.",
+    "constraints": { "maxLength": 100 },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "tcrm_op_notes",
+    "displayName:zh-CN": "备注",
+    "displayName:en": "Notes",
+    "dataType": "text",
+    "description": "Notes about the opportunity.",
+    "constraints": { "maxLength": 5000 },
+    "extension": { "multiline": true }
+  }
+]
