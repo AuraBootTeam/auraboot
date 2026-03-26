@@ -38,7 +38,7 @@ import com.auraboot.framework.common.constant.StatusConstants;
 public class AdminBootstrapRunner implements ApplicationRunner {
 
     private static final String ADMIN_EMAIL = "admin@example.com";
-    private static final String ADMIN_PASSWORD = "ChangeMeOnFirstLogin!";
+    private static final String ADMIN_PASSWORD = "AuraBoot2026!";
     private static final String ADMIN_DISPLAY_NAME = "Admin";
     private static final String TENANT_NAME = "AuraBoot Demo";
 
@@ -51,9 +51,13 @@ public class AdminBootstrapRunner implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        long userCount = userMapper.selectCount(null);
-        if (userCount > 0) {
-            log.info("AdminBootstrapRunner: skipped — {} user(s) already exist.", userCount);
+        // Check for real human users (exclude system/agent template users with @system.auraboot.local emails)
+        long humanUserCount = userMapper.selectCount(
+                new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<User>()
+                        .notLike("email", "@system.auraboot.local")
+        );
+        if (humanUserCount > 0) {
+            log.info("AdminBootstrapRunner: skipped — {} human user(s) already exist.", humanUserCount);
             return;
         }
 
