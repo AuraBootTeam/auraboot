@@ -15,8 +15,8 @@ import { join } from 'path';
  */
 
 const BASE_URL = process.env.BASE_URL || 'http://localhost:6443';
-const ADMIN_EMAIL = process.env.TEST_EMAIL || 'admin@auraboot.test';
-const ADMIN_PASSWORD = process.env.TEST_PASSWORD || 'Test2026x';
+const ADMIN_EMAIL = process.env.TEST_EMAIL || 'e2e@test.local';
+const ADMIN_PASSWORD = process.env.TEST_PASSWORD || 'E2eTestPass2026!';
 
 test.use({ storageState: 'tests/storage/admin.json' });
 

@@ -110,7 +110,7 @@ test.describe('CRM Email Log @smoke', () => {
         {
           crm_el_subject: `Test Email ${uid}`,
           crm_el_to_address: 'test@example.com',
-          crm_el_from_address: 'sender@auraboot.test',
+          crm_el_from_address: 'sender@example.com',
           crm_el_direction: 'outbound',
         },
         undefined,
@@ -228,7 +228,7 @@ test.describe('CRM Email Log Status Transitions @critical', () => {
         {
           crm_el_subject: `Send Test ${uid}`,
           crm_el_to_address: 'recipient@example.com',
-          crm_el_from_address: 'sender@auraboot.test',
+          crm_el_from_address: 'sender@example.com',
           crm_el_direction: 'outbound',
         },
         undefined,

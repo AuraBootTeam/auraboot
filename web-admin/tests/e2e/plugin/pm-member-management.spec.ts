@@ -95,7 +95,7 @@ test.describe('PM Member Management', () => {
       for (const member of tenantMembers) {
         if (
           member?.status === 'pending' &&
-          member?.user_email !== 'admin@auraboot.test' &&
+          member?.user_email !== 'e2e@test.local' &&
           !reservedEmails.includes(member?.user_email)
         ) {
           await page.request.post(`/api/tenant/members/${member.pid}/approve`, {

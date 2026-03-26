@@ -1,7 +1,9 @@
 import http from 'http';
 import fs from 'fs';
 
-const data = 'email=admin@auraboot.test&password=Test2026x&remember=on&redirectTo=/';
+const email = process.env.TEST_ADMIN_EMAIL || 'e2e@test.local';
+const password = process.env.TEST_ADMIN_PASSWORD || 'E2eTestPass2026!';
+const data = `email=${email}&password=${password}&remember=on&redirectTo=/`;
 const req = http.request({
   hostname: '127.0.0.1',
   port: 5173,

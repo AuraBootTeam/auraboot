@@ -24,8 +24,8 @@ const BASE_URL = 'http://localhost:5173';
 async function getAuthCookies(request: import('@playwright/test').APIRequestContext): Promise<string> {
   const loginRes = await request.post(`${BASE_URL}/api/auth/login`, {
     data: {
-      email: 'admin@auraboot.test',
-      password: 'Test2026x',
+      email: process.env.TEST_ADMIN_EMAIL || 'e2e@test.local',
+      password: process.env.TEST_ADMIN_PASSWORD || 'E2eTestPass2026!',
     },
   });
 

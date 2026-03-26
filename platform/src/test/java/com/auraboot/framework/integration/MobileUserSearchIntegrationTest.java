@@ -60,7 +60,7 @@ class MobileUserSearchIntegrationTest extends BaseIntegrationTest {
         tx.executeWithoutResult(status -> {
             User user = new User();
             user.setPid(UniqueIdGenerator.generate());
-            user.setEmail(UNIQUE_PREFIX + "@auraboot.test");
+            user.setEmail(UNIQUE_PREFIX + "@test.local");
             user.setNickName(UNIQUE_PREFIX + "_Alice");
             user.setUserName(UNIQUE_PREFIX + "_alice");
             user.setPassword("not-a-real-hash");
@@ -94,7 +94,7 @@ class MobileUserSearchIntegrationTest extends BaseIntegrationTest {
 
         assertThat(found).isNotNull();
         assertThat(found.getDisplayName()).isEqualTo(UNIQUE_PREFIX + "_Alice");
-        assertThat(found.getEmail()).isEqualTo(UNIQUE_PREFIX + "@auraboot.test");
+        assertThat(found.getEmail()).isEqualTo(UNIQUE_PREFIX + "@test.local");
         assertThat(found.getId()).isEqualTo(searchableUser.getId());
     }
 

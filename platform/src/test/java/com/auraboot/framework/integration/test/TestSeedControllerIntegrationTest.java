@@ -69,7 +69,7 @@ class TestSeedControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.userId").isNumber())
                 .andExpect(jsonPath("$.jwt").isString())
                 .andExpect(jsonPath("$.jwt", not(emptyString())))
-                .andExpect(jsonPath("$.email").value("e2e@auraboot.test"))
+                .andExpect(jsonPath("$.email").value("e2e@test.local"))
                 .andExpect(jsonPath("$.tenantName").value("e2e_test"))
                 .andReturn();
 
@@ -91,7 +91,7 @@ class TestSeedControllerIntegrationTest extends BaseIntegrationTest {
         MvcResult result = mockMvc.perform(post("/api/test/seed")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.email").value("e2e@auraboot.test"))
+                .andExpect(jsonPath("$.email").value("e2e@test.local"))
                 .andReturn();
 
         // Use Jackson's asLong() to avoid Long vs Integer type mismatch in jsonPath().value()
@@ -113,7 +113,7 @@ class TestSeedControllerIntegrationTest extends BaseIntegrationTest {
         MvcResult result = mockMvc.perform(get("/api/test/context"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.seeded").value(true))
-                .andExpect(jsonPath("$.email").value("e2e@auraboot.test"))
+                .andExpect(jsonPath("$.email").value("e2e@test.local"))
                 .andExpect(jsonPath("$.jwt").isString())
                 .andExpect(jsonPath("$.jwt", not(emptyString())))
                 .andReturn();
@@ -139,7 +139,7 @@ class TestSeedControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.userId").isNumber())
                 .andExpect(jsonPath("$.jwt").isString())
                 .andExpect(jsonPath("$.jwt", not(emptyString())))
-                .andExpect(jsonPath("$.email").value("e2e@auraboot.test"))
+                .andExpect(jsonPath("$.email").value("e2e@test.local"))
                 .andReturn();
 
         JsonNode body = objectMapper.readTree(result.getResponse().getContentAsString());

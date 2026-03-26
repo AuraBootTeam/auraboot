@@ -51,8 +51,8 @@ export async function publishCommand(dir: string, options: PublishOptions): Prom
     log.blank();
 
     // Step 1: Authenticate
-    const email = options.user || process.env.AURA_USER || 'admin@auraboot.test';
-    const password = options.password || process.env.AURA_PASSWORD || 'Test2026x';
+    const email = options.user || process.env.AURA_USER || 'admin@example.com';
+    const password = options.password || process.env.AURA_PASSWORD || '';
 
     log.info(`Authenticating as ${email}...`);
     const loginResp = await fetch(`${options.target}/api/auth/login`, {

@@ -29,7 +29,7 @@ class UserSignupStatusDefaultsIntegrationTest {
     @Test
     @DisplayName("signUp should create an enabled and non-locked account by default")
     void signUpShouldUseEnabledAccountDefaults() {
-        String email = "signup-defaults-" + System.currentTimeMillis() + "@auraboot.test";
+        String email = "signup-defaults-" + System.currentTimeMillis() + "@test.local";
         userService.signUp(email, "TestPass123!");
 
         User created = userService.findByEmail(email);
@@ -43,7 +43,7 @@ class UserSignupStatusDefaultsIntegrationTest {
     @Test
     @DisplayName("UserDetails should reflect persisted account status flags")
     void userDetailsShouldReflectPersistedStatusFlags() {
-        String email = "signup-status-flags-" + System.currentTimeMillis() + "@auraboot.test";
+        String email = "signup-status-flags-" + System.currentTimeMillis() + "@test.local";
         userService.signUp(email, "TestPass123!");
 
         User created = userService.findByEmail(email);
