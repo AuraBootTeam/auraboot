@@ -506,12 +506,15 @@ public class TestFixtureController {
                     .testRunId(runId)
                     .recordsCreated(conversationIds.size())
                     .recordIds(conversationIds)
-                    .metadata(Map.of(
+                    .metadata(new java.util.HashMap<>(Map.of(
                             "conversationIds", conversationIds,
+                            "directConvId", dmId != null ? dmId : "",
+                            "groupConvId", groupId != null ? groupId : "",
+                            "chatUserId", userId,
                             "totalMessages", totalMessages,
                             "tenantId", tenantId,
                             "userId", userId
-                    ))
+                    )))
                     .build();
         } catch (Exception e) {
             log.error("Failed to create chat fixture: {}", e.getMessage(), e);
