@@ -1,0 +1,8 @@
+{
+  "pluginId": "test-tampered-plugin",
+  "namespace": "ttp",
+  "version": "1.0.0",
+  "displayName": "Test Tampered Plugin",
+  "description": "Content was modified after signing",
+  "author": "Evil Publisher"
+}

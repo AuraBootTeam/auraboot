@@ -1,0 +1,8 @@
+{
+  "pluginId": "test-signed-plugin",
+  "namespace": "tsp",
+  "version": "1.0.0",
+  "displayName": "Test Signed Plugin",
+  "description": "A test plugin for signature verification",
+  "author": "AuraBoot Test"
+}

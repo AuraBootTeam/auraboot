@@ -10,4 +10,7 @@ import org.apache.ibatis.annotations.Select;
 public interface SystemConfigMapper extends BaseMapper<SystemConfigEntity> {
     @Select("SELECT * FROM ab_system_config WHERE config_key = #{key} LIMIT 1")
     SystemConfigEntity findByKey(@Param("key") String key);
+
+    @Select("SELECT gen_random_uuid()::text")
+    String generateDbUuid();
 }

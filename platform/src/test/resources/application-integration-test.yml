@@ -35,6 +35,8 @@ aura:
   plugins:
     temp:
       dir: /tmp/aura-plugins-test
+    signature:
+      enforce: false
   git:
     repos:
       base-path: ${java.io.tmpdir}/aura-test-repos  # 使用临时目录

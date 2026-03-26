@@ -9,6 +9,7 @@ import com.auraboot.framework.plugin.entity.PluginPackageHistory;
 import com.auraboot.framework.plugin.entity.PluginRecord;
 import com.auraboot.framework.plugin.entity.PluginResource;
 import com.auraboot.framework.plugin.exception.PluginException;
+import com.auraboot.framework.plugin.service.PluginSignatureVerifier;
 import com.auraboot.framework.plugin.mapper.PluginPackageHistoryMapper;
 import com.auraboot.framework.plugin.mapper.PluginRecordMapper;
 import com.auraboot.framework.plugin.mapper.PluginResourceMapper;
@@ -69,6 +70,7 @@ public class PluginPackageServiceImpl implements PluginPackageService {
     private final ExtensionRegistry extensionRegistry;
     private final PlatformTransactionManager transactionManager;
     private final PluginDirectoryLoader directoryLoader;
+    private final PluginSignatureVerifier signatureVerifier;
 
     @Value("${aura.plugins.dir:plugins}")
     private String pluginsDir;
@@ -198,6 +200,9 @@ public class PluginPackageServiceImpl implements PluginPackageService {
             if (!validationErrors.isEmpty()) {
                 return PackageParseResult.validationFailure(packageId, validationErrors);
             }
+
+            // Verify package signature (RSA-SHA256)
+            signatureVerifier.verify(directoryPath);
 
             // Detect components
             PackageParseResult.DetectedComponents detected = detectComponents(directoryPath, manifest);
