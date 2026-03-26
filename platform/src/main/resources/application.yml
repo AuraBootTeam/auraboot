@@ -80,32 +80,9 @@ auraboot:
       # private-key-path: classpath:license/private.pem  # Enterprise only — not included in open-source
       # jwks-url:                       # optional: https://license.auraboot.com/.well-known/jwks.json
       # jwks-refresh-interval: 24h      # optional: how often to refresh remote keys
-  payment:
-    enabled: false
-    stripe:
-      secret-key: ${STRIPE_SECRET_KEY:}
-      publishable-key: ${STRIPE_PUBLISHABLE_KEY:}
-      webhook-secret: ${STRIPE_WEBHOOK_SECRET:}
-    trial:
-      default-days: 30
-      require-payment-method: false
-    default-currency: USD
-    success-url: ${PAYMENT_SUCCESS_URL:http://localhost:5173/marketplace?payment=success}
-    cancel-url: ${PAYMENT_CANCEL_URL:http://localhost:5173/marketplace?payment=cancel}
   saas:
     bootstrap:
       mode: ${AURABOOT_BOOTSTRAP_MODE:none}   # setup | seed | none
-  crm:
-    calendar:
-      state-secret: ${CALENDAR_STATE_SECRET:dev-calendar-state-secret-32chars}
-      google:
-        enabled: true
-        client-id: ${GOOGLE_CALENDAR_CLIENT_ID:}
-        client-secret: ${GOOGLE_CALENDAR_CLIENT_SECRET:}
-      microsoft:
-        enabled: true
-        client-id: ${MICROSOFT_CALENDAR_CLIENT_ID:}
-        client-secret: ${MICROSOFT_CALENDAR_CLIENT_SECRET:}
   performance:
     # Queries taking longer than this threshold (ms) are logged at WARN level and metered.
     slow-query-threshold-ms: 500
