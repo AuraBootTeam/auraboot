@@ -5991,7 +5991,7 @@ COMMENT ON COLUMN ns_consistency_rule.operator IS 'Comparison: LE, LT, EQ, GE, G
 -- GL Entry (GAP-084)
 -- Double-entry general ledger journal lines
 -- ============================================================
-CREATE TABLE IF NOT EXISTS biz_gl_entry (
+CREATE TABLE IF NOT EXISTS ab_gl_entry (
     id              BIGSERIAL PRIMARY KEY,
     pid             VARCHAR(32) UNIQUE NOT NULL,
     tenant_id       BIGINT NOT NULL,
@@ -6011,16 +6011,16 @@ CREATE TABLE IF NOT EXISTS biz_gl_entry (
 );
 
 CREATE INDEX IF NOT EXISTS idx_gl_entry_account
-    ON biz_gl_entry(tenant_id, account_code, entry_date);
+    ON ab_gl_entry(tenant_id, account_code, entry_date);
 CREATE INDEX IF NOT EXISTS idx_gl_entry_period
-    ON biz_gl_entry(tenant_id, fiscal_period);
+    ON ab_gl_entry(tenant_id, fiscal_period);
 CREATE INDEX IF NOT EXISTS idx_gl_entry_journal
-    ON biz_gl_entry(tenant_id, journal_pid);
+    ON ab_gl_entry(tenant_id, journal_pid);
 
-COMMENT ON TABLE biz_gl_entry IS 'Double-entry GL journal lines — each journal post creates balanced debit/credit pairs';
-COMMENT ON COLUMN biz_gl_entry.journal_pid IS 'Groups multiple lines into one balanced journal entry';
-COMMENT ON COLUMN biz_gl_entry.fiscal_period IS 'YYYY-MM format fiscal period for period-end reporting';
-COMMENT ON COLUMN biz_gl_entry.debit_amount IS 'Debit side; credit_amount must be 0 when debit_amount > 0 and vice versa';
+COMMENT ON TABLE ab_gl_entry IS 'Double-entry GL journal lines — each journal post creates balanced debit/credit pairs';
+COMMENT ON COLUMN ab_gl_entry.journal_pid IS 'Groups multiple lines into one balanced journal entry';
+COMMENT ON COLUMN ab_gl_entry.fiscal_period IS 'YYYY-MM format fiscal period for period-end reporting';
+COMMENT ON COLUMN ab_gl_entry.debit_amount IS 'Debit side; credit_amount must be 0 when debit_amount > 0 and vice versa';
 
 -- ═══════════════════════════════════════════════════════════════
 -- Report Schedule (GAP-047)
@@ -6482,7 +6482,7 @@ CREATE INDEX IF NOT EXISTS idx_acp_user_profile_tenant ON acp_user_profile(tenan
 COMMENT ON TABLE acp_user_profile IS 'Per-user AI agent memory profile: communication style, role context, preferences, decision patterns';
 
 -- FX Revaluation audit log (IFRS IAS 21 / GAAP ASC 830)
-CREATE TABLE IF NOT EXISTS fin_fx_revaluation_log (
+CREATE TABLE IF NOT EXISTS ab_fx_revaluation_log (
     id                   BIGSERIAL PRIMARY KEY,
     pid                  VARCHAR(26) UNIQUE NOT NULL,
     tenant_id            BIGINT NOT NULL,
@@ -6499,8 +6499,8 @@ CREATE TABLE IF NOT EXISTS fin_fx_revaluation_log (
     created_at           TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_fin_fx_rev_tenant_date
-    ON fin_fx_revaluation_log(tenant_id, revaluation_date);
-COMMENT ON TABLE fin_fx_revaluation_log IS 'Period-end FX revaluation audit log (IFRS IAS 21 / GAAP ASC 830)';
+    ON ab_fx_revaluation_log(tenant_id, revaluation_date);
+COMMENT ON TABLE ab_fx_revaluation_log IS 'Period-end FX revaluation audit log (IFRS IAS 21 / GAAP ASC 830)';
 
 -- ============================================================
 -- Consolidated Reporting: Legal Entity & Intercompany Transactions
@@ -6524,8 +6524,8 @@ CREATE INDEX IF NOT EXISTS idx_legal_entity_tenant   ON ab_legal_entity(tenant_i
 CREATE UNIQUE INDEX IF NOT EXISTS idx_legal_entity_code ON ab_legal_entity(tenant_id, entity_code);
 COMMENT ON TABLE ab_legal_entity IS 'Legal entity (company) hierarchy for consolidated reporting';
 
--- fin_intercompany_txn: internal transactions pending elimination in consolidation
-CREATE TABLE IF NOT EXISTS fin_intercompany_txn (
+-- ab_intercompany_txn: internal transactions pending elimination in consolidation
+CREATE TABLE IF NOT EXISTS ab_intercompany_txn (
     id              BIGINT PRIMARY KEY,
     pid             VARCHAR(26) UNIQUE NOT NULL,
     tenant_id       BIGINT       NOT NULL,
@@ -6539,9 +6539,9 @@ CREATE TABLE IF NOT EXISTS fin_intercompany_txn (
     is_eliminated   BOOLEAN      DEFAULT FALSE,
     created_at      TIMESTAMPTZ  DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX IF NOT EXISTS idx_interco_txn_tenant_date ON fin_intercompany_txn(tenant_id, txn_date);
-CREATE INDEX IF NOT EXISTS idx_interco_txn_entities    ON fin_intercompany_txn(from_entity_id, to_entity_id);
-COMMENT ON TABLE fin_intercompany_txn IS 'Internal intercompany transactions pending elimination in consolidation';
+CREATE INDEX IF NOT EXISTS idx_interco_txn_tenant_date ON ab_intercompany_txn(tenant_id, txn_date);
+CREATE INDEX IF NOT EXISTS idx_interco_txn_entities    ON ab_intercompany_txn(from_entity_id, to_entity_id);
+COMMENT ON TABLE ab_intercompany_txn IS 'Internal intercompany transactions pending elimination in consolidation';
 
 -- ============================================================
 -- CRM Multi-Channel Ingestion (GAP-035) + CRM Ecosystem Integration (GAP-036)

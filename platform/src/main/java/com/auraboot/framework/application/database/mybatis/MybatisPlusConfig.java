@@ -58,7 +58,7 @@ public class MybatisPlusConfig {
 
                     // ── Consolidation (explicit tenantId in @Select queries) ──
                     || "ab_legal_entity".equals(tableName)
-                    || "fin_intercompany_txn".equals(tableName)
+                    || "ab_intercompany_txn".equals(tableName)
 
                     // ── RBAC (has tenant_id, but queried during login before MetaContext is set) ──
                     || "ab_user_role".equals(tableName)              // Login: countUserRolesInTenant passes tenantId explicitly
