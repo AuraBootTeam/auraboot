@@ -367,7 +367,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             try {
                 String targetTable = metadataService.getModelDefinition(targetModelCode)
                         .map(ModelDefinition::getTableName)
-                        .orElse(null);
+                        .orElse(resolveSystemTable(targetModelCode));
                 if (targetTable == null) continue;
 
                 String inClause = refIds.stream()
@@ -416,6 +416,15 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                         fieldCode, modelCode, e.getMessage());
             }
         }
+    }
+
+    private static final Map<String, String> SYSTEM_TABLE_MAP = Map.of(
+            "ns_user", "ab_user",
+            "ab_user", "ab_user"
+    );
+
+    private String resolveSystemTable(String modelCode) {
+        return SYSTEM_TABLE_MAP.get(modelCode);
     }
 
     @Override
