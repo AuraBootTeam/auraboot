@@ -62,9 +62,9 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
     @Autowired
     private ObjectMapper objectMapper;
 
-    @Autowired
+    @Autowired(required = false)
     @Lazy
-    private com.auraboot.module.finance.engine.MoneyFieldTypeHandler moneyFieldTypeHandler;
+    private com.auraboot.framework.meta.spi.MoneyFieldExpansionSpi moneyFieldTypeHandler;
 
     @Autowired
     private com.auraboot.framework.meta.handler.I18nFieldExpander i18nFieldExpander;
@@ -1678,15 +1678,18 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
             autoMarkSearchableFields(model.getId(), bindings);
 
             // Expand MONEY type fields (auto-create _base fields, currency headers, binding rules)
-            try {
-                List<String> expandedFields = moneyFieldTypeHandler.expandMoneyFields(model);
-                if (!expandedFields.isEmpty()) {
-                    log.info("MONEY field expansion created {} field(s) for model {}: {}",
-                            expandedFields.size(), model.getCode(), String.join(", ", expandedFields));
+            // moneyFieldTypeHandler is provided by the enterprise finance module; absent in core-only deploys.
+            if (moneyFieldTypeHandler != null) {
+                try {
+                    List<String> expandedFields = moneyFieldTypeHandler.expandMoneyFields(model);
+                    if (!expandedFields.isEmpty()) {
+                        log.info("MONEY field expansion created {} field(s) for model {}: {}",
+                                expandedFields.size(), model.getCode(), String.join(", ", expandedFields));
+                    }
+                } catch (Exception e) {
+                    log.warn("MONEY field expansion failed for model {} (non-blocking): {}",
+                            model.getCode(), e.getMessage());
                 }
-            } catch (Exception e) {
-                log.warn("MONEY field expansion failed for model {} (non-blocking): {}",
-                        model.getCode(), e.getMessage());
             }
 
             // Expand i18n-enabled fields (auto-create _en_us, _ja_jp, _ko_kr companion fields)
