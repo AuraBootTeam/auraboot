@@ -139,14 +139,14 @@ public class AgentPromptAssemblyService {
     }
 
     /**
-     * Load user profile from {@code acp_user_profile}.
+     * Load user profile from {@code ab_agent_user_profile}.
      * Formats the JSONB columns (communication, role_context, preferences) and
      * the text column decision_patterns into a human-readable block.
      */
     private String loadUserProfile(Long tenantId, Long userId) {
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(
                 "SELECT communication, role_context, preferences, decision_patterns "
-                + "FROM acp_user_profile "
+                + "FROM ab_agent_user_profile "
                 + "WHERE tenant_id = ? AND user_id = ? "
                 + "AND (deleted_flag IS NULL OR deleted_flag = FALSE) "
                 + "LIMIT 1",

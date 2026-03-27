@@ -18,7 +18,7 @@ public interface ConsistencyRuleMapper extends BaseMapper<ConsistencyRule> {
     /**
      * Find all enabled rules by source model
      */
-    @Select("SELECT * FROM ns_consistency_rule " +
+    @Select("SELECT * FROM ab_consistency_rule " +
             "WHERE source_model = #{sourceModel} " +
             "AND enabled = true " +
             "AND (deleted_flag = false OR deleted_flag IS NULL) " +
@@ -30,7 +30,7 @@ public interface ConsistencyRuleMapper extends BaseMapper<ConsistencyRule> {
     /**
      * Find rule by code within a tenant
      */
-    @Select("SELECT * FROM ns_consistency_rule " +
+    @Select("SELECT * FROM ab_consistency_rule " +
             "WHERE code = #{code} " +
             "AND tenant_id = #{tenantId} " +
             "AND (deleted_flag = false OR deleted_flag IS NULL)")

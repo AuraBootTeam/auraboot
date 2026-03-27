@@ -15,7 +15,7 @@ import java.time.Instant;
 @Data
 @EqualsAndHashCode(callSuper = false)
 @Accessors(chain = true)
-@TableName("ns_files")
+@TableName("ab_file")
 public class FileEntity implements Serializable {
 
     private static final long serialVersionUID = 1L;
