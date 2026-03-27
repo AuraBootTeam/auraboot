@@ -4,7 +4,7 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.tax.dto.EInvoiceGenerateRequest;
 import com.auraboot.framework.tax.mapper.TaxEInvoiceMapper;
-import com.auraboot.module.finance.engine.CurrencyConversionService;
+import com.auraboot.framework.currency.spi.CurrencyConversionSpi;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -32,7 +32,7 @@ public class TaxInvoiceService {
 
     private final TaxEInvoiceMapper einvoiceMapper;
     private final VatCalculationService vatCalculationService;
-    private final CurrencyConversionService currencyConversionService;
+    private final CurrencyConversionSpi currencyConversionService;
 
     /**
      * Generate e-invoice data from a source document or manual input.
