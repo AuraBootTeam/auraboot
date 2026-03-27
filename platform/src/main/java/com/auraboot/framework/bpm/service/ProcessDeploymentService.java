@@ -1,6 +1,6 @@
 package com.auraboot.framework.bpm.service;
 
-import com.alibaba.smart.framework.engine.SmartEngine;
+import com.auraboot.smart.framework.engine.SmartEngine;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.bpm.audit.BpmAuditService;
 import com.auraboot.framework.bpm.converter.JsonToBpmnConverter;
@@ -408,11 +408,11 @@ public class ProcessDeploymentService {
         }
 
         // Check for running instances
-        com.alibaba.smart.framework.engine.service.param.query.ProcessInstanceQueryParam queryParam =
-                new com.alibaba.smart.framework.engine.service.param.query.ProcessInstanceQueryParam();
+        com.auraboot.smart.framework.engine.service.param.query.ProcessInstanceQueryParam queryParam =
+                new com.auraboot.smart.framework.engine.service.param.query.ProcessInstanceQueryParam();
         queryParam.setTenantId(MetaContext.getCurrentTenantIdAsString());
         queryParam.setStatus("running");
-        List<com.alibaba.smart.framework.engine.model.instance.ProcessInstance> running =
+        List<com.auraboot.smart.framework.engine.model.instance.ProcessInstance> running =
                 smartEngine.getProcessQueryService().findList(queryParam);
         if (running != null) {
             long count = running.stream()

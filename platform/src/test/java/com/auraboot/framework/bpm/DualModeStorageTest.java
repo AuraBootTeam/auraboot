@@ -1,8 +1,8 @@
 package com.auraboot.framework.bpm;
 
-import com.alibaba.smart.framework.engine.SmartEngine;
-import com.alibaba.smart.framework.engine.persister.custom.session.PersisterSession;
-import com.alibaba.smart.framework.engine.storage.StorageModeHolder;
+import com.auraboot.smart.framework.engine.SmartEngine;
+import com.auraboot.smart.framework.engine.persister.custom.session.PersisterSession;
+import com.auraboot.smart.framework.engine.storage.StorageModeHolder;
 import com.auraboot.framework.bpm.service.ProcessDeploymentService;
 import com.auraboot.framework.bpm.service.ProcessEngineService;
 import com.auraboot.framework.integration.BaseIntegrationTest;
@@ -115,8 +115,8 @@ class DualModeStorageTest extends BaseIntegrationTest {
         assertNull(StorageModeHolder.get(), "StorageModeHolder should be null initially");
 
         // Set CUSTOM mode
-        StorageModeHolder.set(com.alibaba.smart.framework.engine.storage.StorageMode.CUSTOM);
-        assertEquals(com.alibaba.smart.framework.engine.storage.StorageMode.CUSTOM,
+        StorageModeHolder.set(com.auraboot.smart.framework.engine.storage.StorageMode.CUSTOM);
+        assertEquals(com.auraboot.smart.framework.engine.storage.StorageMode.CUSTOM,
                 StorageModeHolder.get(), "Should be CUSTOM after set");
 
         // Clear
@@ -124,8 +124,8 @@ class DualModeStorageTest extends BaseIntegrationTest {
         assertNull(StorageModeHolder.get(), "StorageModeHolder should be null after clear");
 
         // Set DATABASE mode
-        StorageModeHolder.set(com.alibaba.smart.framework.engine.storage.StorageMode.DATABASE);
-        assertEquals(com.alibaba.smart.framework.engine.storage.StorageMode.DATABASE,
+        StorageModeHolder.set(com.auraboot.smart.framework.engine.storage.StorageMode.DATABASE);
+        assertEquals(com.auraboot.smart.framework.engine.storage.StorageMode.DATABASE,
                 StorageModeHolder.get(), "Should be DATABASE after set");
 
         StorageModeHolder.clear();

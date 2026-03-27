@@ -28,14 +28,13 @@ publishing {
 }
 
 repositories {
-        maven {
+    mavenLocal()      // Must be first — SmartEngine fork jars only exist here
+    maven {
         url = 'https://maven.aliyun.com/repository/public'
     }
     maven {
         url = 'https://maven.aliyun.com/repository/spring'
     }
-
-    mavenLocal()      // 👈 必须放前面
     mavenCentral()
     // Apache repository for snapshots and releases
     maven {
@@ -196,6 +195,11 @@ dependencies {
     // Apache POI for Excel export
     implementation 'org.apache.poi:poi:5.3.0'
     implementation 'org.apache.poi:poi-ooxml:5.3.0'
+
+    // Firebase Admin SDK for FCM push notifications (APNs + FCM unified)
+    implementation('com.google.firebase:firebase-admin:9.3.0') {
+        exclude group: 'com.google.guava', module: 'listenablefuture'
+    }
 
     // Git集成
     implementation 'org.eclipse.jgit:org.eclipse.jgit:6.8.0.202311291450-r'

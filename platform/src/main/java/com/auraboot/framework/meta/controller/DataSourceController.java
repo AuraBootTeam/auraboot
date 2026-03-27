@@ -1,6 +1,6 @@
 package com.auraboot.framework.meta.controller;
 
-import com.alibaba.smart.framework.engine.common.util.CollectionUtil;
+import com.auraboot.smart.framework.engine.common.util.CollectionUtil;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.constant.ResponseCode;

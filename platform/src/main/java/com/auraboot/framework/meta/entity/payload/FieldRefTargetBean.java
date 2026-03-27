@@ -1,5 +1,6 @@
 package com.auraboot.framework.meta.entity.payload;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;
@@ -27,6 +28,7 @@ public class FieldRefTargetBean {
     /**
      * 目标实体名称
      */
+    @JsonAlias("targetModel")
     private String targetEntity;
     
     /**

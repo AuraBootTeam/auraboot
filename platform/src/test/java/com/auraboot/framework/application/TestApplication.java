@@ -10,7 +10,7 @@ import org.springframework.context.annotation.ComponentScan;
  */
 @SpringBootApplication
 @ComponentScan(basePackages = "com.auraboot.framework")
-@org.mybatis.spring.annotation.MapperScan({"com.auraboot.framework.*.mapper", "com.auraboot.framework.*.dao.mapper", "com.auraboot.framework.*.dao", "com.auraboot.framework.saas.config.mapper", "com.auraboot.framework.saas.account.mapper", "com.auraboot.framework.saas.license.mapper", "com.alibaba.smart.framework.engine.persister.database"})
+@org.mybatis.spring.annotation.MapperScan({"com.auraboot.framework.*.mapper", "com.auraboot.framework.*.dao.mapper", "com.auraboot.framework.*.dao", "com.auraboot.framework.saas.config.mapper", "com.auraboot.framework.saas.account.mapper", "com.auraboot.framework.saas.license.mapper", "com.auraboot.smart.framework.engine.persister.database"})
 @org.springframework.transaction.annotation.EnableTransactionManagement
 public class TestApplication {
     

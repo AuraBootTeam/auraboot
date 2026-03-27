@@ -1,6 +1,6 @@
 package com.auraboot.framework.bpm.config;
 
-import com.alibaba.smart.framework.engine.SmartEngine;
+import com.auraboot.smart.framework.engine.SmartEngine;
 import com.auraboot.framework.bpm.audit.BpmAuditService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

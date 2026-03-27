@@ -4,14 +4,15 @@ import com.auraboot.framework.notification.model.PushDeviceToken;
 import com.auraboot.framework.notification.service.DeviceTokenService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * Push notification channel (APNs/FCM).
- * Currently a stub that logs push payloads; real SDK integration will be added later.
+ * Uses Firebase Cloud Messaging when configured (push.fcm.enabled=true),
+ * otherwise falls back to stub logging mode.
  *
  * @since 6.4.0
  */
@@ -22,6 +23,9 @@ public class PushNotificationChannel implements NotificationChannel {
 
     private final DeviceTokenService deviceTokenService;
 
+    @Autowired(required = false)
+    private FcmPushService fcmPushService;
+
     @Override
     public String getChannelCode() {
         return "push";
@@ -29,37 +33,62 @@ public class PushNotificationChannel implements NotificationChannel {
 
     @Override
     public NotificationResult send(NotificationMessage message) {
-        try {
-            int totalTokens = 0;
-            for (Long userId : message.getRecipientUserIds()) {
-                List<PushDeviceToken> tokens = deviceTokenService.getValidTokens(
-                        message.getTenantId(), userId);
-                if (tokens.isEmpty()) {
-                    log.debug("No valid push tokens for user={}, skipping", userId);
-                    continue;
-                }
+        int totalSent = 0;
+        int totalFailed = 0;
 
-                for (PushDeviceToken token : tokens) {
-                    // Build push payload
-                    Map<String, Object> pushPayload = buildPushPayload(message, token);
-                    // Stub: log the payload instead of sending via APNs/FCM
+        for (Long userId : message.getRecipientUserIds()) {
+            List<PushDeviceToken> tokens = deviceTokenService.getValidTokens(
+                    message.getTenantId(), userId);
+            if (tokens.isEmpty()) {
+                log.debug("No valid push tokens for user={}, skipping", userId);
+                continue;
+            }
+
+            String deepLink = getDeepLink(message);
+            int badge = getBadge(message);
+
+            for (PushDeviceToken token : tokens) {
+                if (fcmPushService != null) {
+                    // Real FCM push
+                    try {
+                        boolean valid = fcmPushService.sendToDevice(
+                                token,
+                                message.getSubject() != null ? message.getSubject() : "",
+                                message.getBody() != null ? message.getBody() : "",
+                                deepLink,
+                                message.getCategory(),
+                                badge);
+                        if (!valid) {
+                            // Token is invalid, mark it
+                            deviceTokenService.invalidateToken(token.getId());
+                            totalFailed++;
+                        } else {
+                            totalSent++;
+                        }
+                    } catch (Exception e) {
+                        // CATCH: non-transactional — FCM HTTP call failure, log and continue to next token
+                        log.error("FCM send failed for token id={}, userId={}: {}",
+                                token.getId(), userId, e.getMessage());
+                        totalFailed++;
+                    }
+                } else {
+                    // Stub mode: log the payload
                     log.info("PUSH_STUB: platform={} tokenType={} userId={} title='{}' body='{}' deepLink={}",
                             token.getPlatform(),
                             token.getTokenType(),
                             userId,
                             message.getSubject(),
                             truncate(message.getBody(), 100),
-                            getDeepLink(message));
-                    totalTokens++;
+                            deepLink);
+                    totalSent++;
                 }
             }
-            log.info("Push channel dispatched to {} tokens for {} recipients",
-                    totalTokens, message.getRecipientUserIds().size());
-            return NotificationResult.ok();
-        } catch (Exception e) {
-            log.error("PushNotificationChannel send failed: {}", e.getMessage(), e);
-            return NotificationResult.fail(e.getMessage());
         }
+
+        log.info("Push channel: sent={}, failed={}, recipients={}",
+                totalSent, totalFailed, message.getRecipientUserIds().size());
+        return totalFailed == 0 ? NotificationResult.ok()
+                : NotificationResult.fail("Some push deliveries failed: " + totalFailed + " failures");
     }
 
     @Override
@@ -67,25 +96,21 @@ public class PushNotificationChannel implements NotificationChannel {
         return true;
     }
 
-    private Map<String, Object> buildPushPayload(NotificationMessage message, PushDeviceToken token) {
-        Map<String, Object> extras = message.getExtras() != null ? message.getExtras() : Map.of();
-        return Map.of(
-                "title", message.getSubject() != null ? message.getSubject() : "",
-                "body", message.getBody() != null ? message.getBody() : "",
-                "platform", token.getPlatform(),
-                "tokenType", token.getTokenType(),
-                "pushToken", token.getPushToken(),
-                "deepLink", getDeepLink(message),
-                "category", message.getCategory() != null ? message.getCategory() : "system",
-                "extras", extras
-        );
-    }
-
     private String getDeepLink(NotificationMessage message) {
         if (message.getExtras() != null && message.getExtras().containsKey("deep_link")) {
             return message.getExtras().get("deep_link").toString();
         }
         return "";
+    }
+
+    private int getBadge(NotificationMessage message) {
+        if (message.getExtras() != null && message.getExtras().containsKey("badge")) {
+            Object badge = message.getExtras().get("badge");
+            if (badge instanceof Number n) {
+                return n.intValue();
+            }
+        }
+        return 1;
     }
 
     private String truncate(String text, int maxLen) {

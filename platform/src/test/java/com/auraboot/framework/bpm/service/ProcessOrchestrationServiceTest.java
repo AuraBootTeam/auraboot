@@ -1,7 +1,7 @@
 package com.auraboot.framework.bpm.service;
 
-import com.alibaba.smart.framework.engine.model.instance.ProcessInstance;
-import com.alibaba.smart.framework.engine.model.instance.TaskInstance;
+import com.auraboot.smart.framework.engine.model.instance.ProcessInstance;
+import com.auraboot.smart.framework.engine.model.instance.TaskInstance;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.bpm.dto.ExecutionResult;
 import com.auraboot.framework.integration.BaseIntegrationTest;
@@ -150,7 +150,7 @@ class ProcessOrchestrationServiceTest extends BaseIntegrationTest {
             // Verify paused
             ProcessInstance paused = processEngineService.getProcessInstance(result.executionId());
             if (paused != null) {
-                assertEquals(com.alibaba.smart.framework.engine.model.instance.InstanceStatus.suspended,
+                assertEquals(com.auraboot.smart.framework.engine.model.instance.InstanceStatus.suspended,
                         paused.getStatus(), "Should be suspended after pause");
             }
 
@@ -160,7 +160,7 @@ class ProcessOrchestrationServiceTest extends BaseIntegrationTest {
             // Verify running
             ProcessInstance resumed = processEngineService.getProcessInstance(result.executionId());
             if (resumed != null) {
-                assertEquals(com.alibaba.smart.framework.engine.model.instance.InstanceStatus.running,
+                assertEquals(com.auraboot.smart.framework.engine.model.instance.InstanceStatus.running,
                         resumed.getStatus(), "Should be running after resume");
             }
 
@@ -192,7 +192,7 @@ class ProcessOrchestrationServiceTest extends BaseIntegrationTest {
             // Verify terminated
             ProcessInstance cancelled = processEngineService.getProcessInstance(result.executionId());
             if (cancelled != null) {
-                assertEquals(com.alibaba.smart.framework.engine.model.instance.InstanceStatus.aborted,
+                assertEquals(com.auraboot.smart.framework.engine.model.instance.InstanceStatus.aborted,
                         cancelled.getStatus(), "Should be aborted after cancel");
             }
 

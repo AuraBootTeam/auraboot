@@ -13,6 +13,7 @@ import com.auraboot.framework.meta.service.base.BaseMetaService;
 import com.auraboot.framework.meta.dto.*;
 import com.auraboot.framework.meta.constant.SystemFieldConstants;
 import com.auraboot.framework.meta.entity.payload.FieldFeatureBean;
+import com.auraboot.framework.meta.entity.payload.FieldRefTargetBean;
 import com.auraboot.framework.meta.mapper.MetaModelMapper;
 import com.auraboot.framework.meta.mapper.MetaFieldMapper;
 import com.auraboot.framework.meta.mapper.MetaModelFieldBindingMapper;
@@ -1024,10 +1025,19 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
                 .computeDependencies(feature != null ? feature.getComputeDependencies() : null)
                 .jsonbColumn((String) extensionMap.get("jsonbColumn"))
                 .jsonbPath((String) extensionMap.get("jsonbPath"))
+                .refTarget(convertRefTargetBeanToDto(field.getRefTarget()))
                 .extraProps(extensionMap)
                 .build();
     }
     
+    private FieldDefinition.RefTarget convertRefTargetBeanToDto(FieldRefTargetBean bean) {
+        if (bean == null || bean.getTargetEntity() == null) return null;
+        return FieldDefinition.RefTarget.builder()
+                .targetEntity(bean.getTargetEntity())
+                .displayField(bean.getDisplayField())
+                .build();
+    }
+
     /**
      * 根据字段键生成列名
      */
