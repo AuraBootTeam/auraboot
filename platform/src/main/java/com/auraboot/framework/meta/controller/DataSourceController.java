@@ -12,7 +12,7 @@ import com.auraboot.framework.meta.dto.*;
 import com.auraboot.framework.meta.entity.payload.DataSourceItemBean;
 import com.auraboot.framework.meta.service.DictService;
 import com.auraboot.framework.meta.service.NamedQueryService;
-import com.auraboot.module.finance.engine.CurrencyConversionService;
+import com.auraboot.framework.currency.spi.CurrencyConversionSpi;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
@@ -55,7 +55,7 @@ public class DataSourceController {
     private ReportingCurrencyConverter reportingCurrencyConverter;
 
     @Autowired(required = false)
-    private CurrencyConversionService currencyConversionService;
+    private CurrencyConversionSpi currencyConversionService;
 
     /**
      * 通用数据源列表查询

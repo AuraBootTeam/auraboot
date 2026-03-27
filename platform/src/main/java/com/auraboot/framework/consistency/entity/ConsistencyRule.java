@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
  * E.g. "shipment qty must not exceed order qty"
  */
 @Data
-@TableName(value = "ns_consistency_rule")
+@TableName(value = "ab_consistency_rule")
 public class ConsistencyRule {
 
     @TableId(value = "id", type = IdType.ASSIGN_ID)

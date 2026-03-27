@@ -177,7 +177,7 @@ public class AgentMemoryConsolidationTest extends BaseIntegrationTest {
 
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(
                 "SELECT communication, role_context, preferences, decision_patterns "
-                + "FROM acp_user_profile "
+                + "FROM ab_agent_user_profile "
                 + "WHERE tenant_id = ? AND user_id = ? AND (deleted_flag IS NULL OR deleted_flag = FALSE)",
                 tenantId, userId);
 
@@ -194,7 +194,7 @@ public class AgentMemoryConsolidationTest extends BaseIntegrationTest {
 
         List<Map<String, Object>> updated = jdbcTemplate.queryForList(
                 "SELECT communication, preferences, decision_patterns "
-                + "FROM acp_user_profile "
+                + "FROM ab_agent_user_profile "
                 + "WHERE tenant_id = ? AND user_id = ? AND (deleted_flag IS NULL OR deleted_flag = FALSE)",
                 tenantId, userId);
 

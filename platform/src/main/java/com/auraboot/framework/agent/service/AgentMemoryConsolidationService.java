@@ -19,7 +19,7 @@ import java.util.Map;
  *   <li>{@code agent}   — long-term knowledge owned by the agent itself</li>
  * </ul>
  *
- * <p>User preferences and context are persisted in {@code acp_user_profile}.
+ * <p>User preferences and context are persisted in {@code ab_agent_user_profile}.
  *
  * <p>Design constraint: DB row is the source of truth.
  * Vector index and prompt cache are derived artifacts, not authoritative.
@@ -129,7 +129,7 @@ public class AgentMemoryConsolidationService {
     // =========================================================================
 
     /**
-     * Create or update the AI-learned user profile in {@code acp_user_profile}.
+     * Create or update the AI-learned user profile in {@code ab_agent_user_profile}.
      *
      * <p>Uses PostgreSQL {@code INSERT ... ON CONFLICT DO UPDATE} semantics so the
      * operation is safe to call repeatedly without duplicates.
@@ -152,15 +152,15 @@ public class AgentMemoryConsolidationService {
         String preferencesJson = toJson(preferences);
 
         jdbcTemplate.update(
-                "INSERT INTO acp_user_profile "
+                "INSERT INTO ab_agent_user_profile "
                 + "  (pid, tenant_id, user_id, communication, role_context, preferences, decision_patterns, "
                 + "   created_at, updated_at, deleted_flag) "
                 + "VALUES (?, ?, ?, ?::jsonb, ?::jsonb, ?::jsonb, ?, NOW(), NOW(), FALSE) "
-                + "ON CONFLICT ON CONSTRAINT uq_acp_user_profile_user DO UPDATE SET "
-                + "  communication     = COALESCE(EXCLUDED.communication, acp_user_profile.communication), "
-                + "  role_context      = COALESCE(EXCLUDED.role_context, acp_user_profile.role_context), "
-                + "  preferences       = COALESCE(EXCLUDED.preferences, acp_user_profile.preferences), "
-                + "  decision_patterns = COALESCE(EXCLUDED.decision_patterns, acp_user_profile.decision_patterns), "
+                + "ON CONFLICT ON CONSTRAINT uq_ab_agent_user_profile_user DO UPDATE SET "
+                + "  communication     = COALESCE(EXCLUDED.communication, ab_agent_user_profile.communication), "
+                + "  role_context      = COALESCE(EXCLUDED.role_context, ab_agent_user_profile.role_context), "
+                + "  preferences       = COALESCE(EXCLUDED.preferences, ab_agent_user_profile.preferences), "
+                + "  decision_patterns = COALESCE(EXCLUDED.decision_patterns, ab_agent_user_profile.decision_patterns), "
                 + "  updated_at        = NOW()",
                 pid, tenantId, userId,
                 communicationJson, roleContextJson, preferencesJson, decisionPatterns);

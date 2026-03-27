@@ -1,6 +1,7 @@
 package com.auraboot.framework.currency.service;
 
-import com.auraboot.module.finance.engine.CurrencyConversionService;
+import com.auraboot.framework.currency.spi.CurrencyConversionSpi;
+import com.auraboot.framework.currency.spi.ExchangeRateResult;
 import com.auraboot.framework.exception.BusinessException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,7 +29,7 @@ import static org.mockito.Mockito.*;
 class ReportingCurrencyConverterTest {
 
     @Mock
-    private CurrencyConversionService currencyConversionService;
+    private CurrencyConversionSpi currencyConversionService;
 
     @InjectMocks
     private ReportingCurrencyConverter converter;
@@ -40,7 +41,7 @@ class ReportingCurrencyConverterTest {
         // Default: CNY→USD rate = 0.138
         lenient().when(currencyConversionService.getRate(
                 eq("cny"), eq("usd"), any(LocalDate.class), eq("spot")))
-                .thenReturn(new CurrencyConversionService.ExchangeRateResult(RATE_CNY_TO_USD, 1L, false));
+                .thenReturn(new ExchangeRateResult(RATE_CNY_TO_USD, 1L, false));
     }
 
     // ==================== Happy path ====================

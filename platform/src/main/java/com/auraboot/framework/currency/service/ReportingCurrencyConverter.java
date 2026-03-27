@@ -1,6 +1,6 @@
 package com.auraboot.framework.currency.service;
 
-import com.auraboot.module.finance.engine.CurrencyConversionService;
+import com.auraboot.framework.currency.spi.CurrencyConversionSpi;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -38,7 +38,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class ReportingCurrencyConverter {
 
-    private final CurrencyConversionService currencyConversionService;
+    private final CurrencyConversionSpi currencyConversionService;
 
     private static final int REPORTING_SCALE = 2;
 
