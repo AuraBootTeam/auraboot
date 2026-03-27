@@ -1,18 +1,20 @@
 package com.auraboot.framework.tenant.dto.bootstrap;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Data;
 import java.util.List;
 
 /**
  * 租户初始化模板
- * 
+ *
  * 定义租户创建时的默认角色、菜单、权限配置
  * 模板文件存储在 resources/tenant-templates/ 目录下
- * 
+ *
  * @author AuraBoot
  * @since 2.2.0
  */
 @Data
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class TenantBootstrapTemplate {
     
     /**
