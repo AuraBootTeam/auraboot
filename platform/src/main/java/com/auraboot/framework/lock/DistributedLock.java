@@ -3,14 +3,17 @@ package com.auraboot.framework.lock;
 import java.util.concurrent.TimeUnit;
 
 /**
- * 分布式锁接口
- *
- * 提供统一的分布式锁抽象，支持多种实现：
- * - DatabaseDistributedLock: 基于PostgreSQL的实现（当前）
- * - RedisDistributedLock: 基于Redis/Redisson的实现（未来）
+ * Distributed lock interface.
+ * <p>
+ * Implementations:
+ * <ul>
+ *   <li>{@link RedisDistributedLock} — Redis-based, cross-instance (default when Redis available)</li>
+ *   <li>{@link LocalDistributedLock} — JVM-local ReentrantLock fallback (single-instance only)</li>
+ * </ul>
  *
  * @author AuraBoot Framework
  * @since 3.3.0
+ * @see LockConfiguration
  */
 public interface DistributedLock {
 

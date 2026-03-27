@@ -1,7 +1,7 @@
 package com.auraboot.framework.bpm.config;
 
-import com.alibaba.smart.framework.engine.configuration.IdGenerator;
-import com.alibaba.smart.framework.engine.model.instance.Instance;
+import com.auraboot.smart.framework.engine.configuration.IdGenerator;
+import com.auraboot.smart.framework.engine.model.instance.Instance;
 
 import java.util.concurrent.atomic.AtomicLong;
 

@@ -162,4 +162,58 @@ class TestSeedControllerIntegrationTest extends BaseIntegrationTest {
 
         log.info("TS-05: context after reset shows seeded=true");
     }
+
+    @Test
+    @Order(6)
+    @DisplayName("TS-06: POST /api/test/seed with testRunId param echoes the same ID in response")
+    void seed_withTestRunId_echoesInResponse() throws Exception {
+        String customRunId = "xp_1234567890_abcd";
+        MvcResult result = mockMvc.perform(post("/api/test/seed")
+                        .param("testRunId", customRunId)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.testRunId").value(customRunId))
+                .andExpect(jsonPath("$.jwt").isString())
+                .andReturn();
+
+        log.info("TS-06: seed with testRunId={} returned matching ID", customRunId);
+    }
+
+    @Test
+    @Order(7)
+    @DisplayName("TS-07: POST /api/test/seed without testRunId auto-generates one")
+    void seed_withoutTestRunId_generatesOne() throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/test/seed")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.testRunId").isString())
+                .andExpect(jsonPath("$.testRunId", not(emptyString())))
+                .andReturn();
+
+        JsonNode body = objectMapper.readTree(result.getResponse().getContentAsString());
+        String generatedRunId = body.get("testRunId").asText();
+        // Auto-generated format: api_{unixSeconds}_{4-hex}
+        Assertions.assertTrue(generatedRunId.startsWith("api_"),
+                "Auto-generated testRunId should start with 'api_' prefix, got: " + generatedRunId);
+
+        log.info("TS-07: seed without testRunId generated: {}", generatedRunId);
+    }
+
+    @Test
+    @Order(8)
+    @DisplayName("TS-08: GET /api/test/run-id returns a valid testRunId with platform prefix")
+    void runId_endpoint_returnsValidFormat() throws Exception {
+        mockMvc.perform(get("/api/test/run-id")
+                        .param("platform", "xp"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.testRunId").isString())
+                .andExpect(jsonPath("$.testRunId", org.hamcrest.Matchers.startsWith("xp_")));
+
+        // Default platform
+        mockMvc.perform(get("/api/test/run-id"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.testRunId", org.hamcrest.Matchers.startsWith("api_")));
+
+        log.info("TS-08: run-id endpoint returns valid format");
+    }
 }

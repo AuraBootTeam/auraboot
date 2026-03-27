@@ -1,8 +1,8 @@
 package com.auraboot.framework.bpm.config;
 
-import com.alibaba.smart.framework.engine.SmartEngine;
-import com.alibaba.smart.framework.engine.service.command.RepositoryCommandService;
-import com.alibaba.smart.framework.engine.service.query.RepositoryQueryService;
+import com.auraboot.smart.framework.engine.SmartEngine;
+import com.auraboot.smart.framework.engine.service.command.RepositoryCommandService;
+import com.auraboot.smart.framework.engine.service.query.RepositoryQueryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Bean;

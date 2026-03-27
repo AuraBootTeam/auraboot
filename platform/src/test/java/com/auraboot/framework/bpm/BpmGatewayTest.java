@@ -1,7 +1,7 @@
 package com.auraboot.framework.bpm;
 
-import com.alibaba.smart.framework.engine.model.instance.ProcessInstance;
-import com.alibaba.smart.framework.engine.model.instance.TaskInstance;
+import com.auraboot.smart.framework.engine.model.instance.ProcessInstance;
+import com.auraboot.smart.framework.engine.model.instance.TaskInstance;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.bpm.dto.ProcessInstanceStatusDTO;
 import com.auraboot.framework.bpm.service.ProcessDeploymentService;
@@ -307,7 +307,7 @@ class BpmGatewayTest extends BaseIntegrationTest {
                 // SmartEngine uses InstanceStatus enum: running, completed, aborted, suspended
                 if (completed.getStatus() != null) {
                     assertEquals(
-                            com.alibaba.smart.framework.engine.model.instance.InstanceStatus.completed,
+                            com.auraboot.smart.framework.engine.model.instance.InstanceStatus.completed,
                             completed.getStatus(),
                             "Process should be COMPLETED after all tasks are done");
                 }

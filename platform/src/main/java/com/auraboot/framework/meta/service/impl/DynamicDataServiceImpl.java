@@ -317,10 +317,13 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         if (modelOpt.isEmpty()) return;
 
         ModelDefinition model = modelOpt.get();
-        // Reference config lives in extraProps.refTarget (Map with targetEntity, displayField)
+        // Reference config: prefer FieldDefinition.refTarget, fallback to extraProps.refTarget
         List<FieldDefinition> refFields = model.getFields().stream()
                 .filter(f -> "reference".equals(f.getDataType()))
-                .filter(f -> f.getExtraProps() != null && f.getExtraProps().get("refTarget") instanceof Map)
+                .filter(f -> {
+                    if (f.getRefTarget() != null && f.getRefTarget().getTargetEntity() != null) return true;
+                    return f.getExtraProps() != null && f.getExtraProps().get("refTarget") instanceof Map;
+                })
                 .toList();
 
         if (refFields.isEmpty()) return;
@@ -328,10 +331,22 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         for (FieldDefinition refField : refFields) {
             String fieldCode = refField.getCode();
             String columnName = refField.getColumnName() != null ? refField.getColumnName() : fieldCode;
-            Map<String, Object> refTargetMap = (Map<String, Object>) refField.getExtraProps().get("refTarget");
-            String targetModelCode = refTargetMap.get("targetEntity") instanceof String s ? s : null;
+
+            String targetModelCode;
+            String displayField;
+            if (refField.getRefTarget() != null && refField.getRefTarget().getTargetEntity() != null) {
+                targetModelCode = refField.getRefTarget().getTargetEntity();
+                displayField = refField.getRefTarget().getDisplayField();
+            } else {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> refTargetMap = (Map<String, Object>) refField.getExtraProps().get("refTarget");
+                targetModelCode = refTargetMap.get("targetEntity") instanceof String s ? s : null;
+                if (targetModelCode == null) {
+                    targetModelCode = refTargetMap.get("targetModel") instanceof String s2 ? s2 : null;
+                }
+                displayField = refTargetMap.get("displayField") instanceof String s3 ? s3 : null;
+            }
             if (targetModelCode == null || targetModelCode.isBlank()) continue;
-            String displayField = refTargetMap.get("displayField") instanceof String s2 ? s2 : null;
 
             // Default displayField to "name" if not configured
             if (displayField == null || displayField.isBlank()) {

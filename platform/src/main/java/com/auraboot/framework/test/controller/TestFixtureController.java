@@ -3,7 +3,9 @@ package com.auraboot.framework.test.controller;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.constant.StatusConstants;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
-import com.auraboot.framework.meta.service.DynamicDataService;
+import com.auraboot.framework.meta.dto.CommandExecuteRequest;
+import com.auraboot.framework.meta.dto.CommandExecuteResult;
+import com.auraboot.framework.meta.service.CommandExecutor;
 import com.auraboot.framework.tenant.service.TenantService;
 import com.auraboot.framework.test.dto.FixtureRequest;
 import com.auraboot.framework.test.dto.FixtureResult;
@@ -37,7 +39,7 @@ public class TestFixtureController {
     private static final Map<String, FixtureResult> activeFixtures = new ConcurrentHashMap<>();
 
     @Autowired
-    private DynamicDataService dynamicDataService;
+    private CommandExecutor commandExecutor;
 
     @Autowired
     private TenantService tenantService;
@@ -145,6 +147,26 @@ public class TestFixtureController {
         return ResponseEntity.ok(Map.of("testRunId", runId));
     }
 
+    // ── Private helpers ─────────────────────────────────────────────────────
+
+    private String executeCreateCommand(String modelCode, Map<String, Object> payload) {
+        String commandCode = modelCode + ".create";
+        CommandExecuteRequest request = new CommandExecuteRequest();
+        request.setPayload(payload);
+        request.setOperationType("CREATE");
+        CommandExecuteResult result = commandExecutor.execute(commandCode, request);
+        if (result.getData() != null) {
+            Object id = result.getData().get("recordId");
+            if (id == null) {
+                id = result.getData().get("pid");
+            }
+            if (id != null) {
+                return id.toString();
+            }
+        }
+        return null;
+    }
+
     // ── Private fixture builders ────────────────────────────────────────────
 
     private FixtureResult createRecordsFixture(String runId, Map<String, Object> params) {
@@ -161,10 +183,9 @@ public class TestFixtureController {
                 Map<String, Object> record = new HashMap<>();
                 record.put("e2et_order_title", "xp_" + runId + "_record_" + (i + 1));
                 record.put("e2et_order_status", "draft");
-                Map<String, Object> created = dynamicDataService.create(modelCode, record);
-                Object pid = created.get("pid");
+                String pid = executeCreateCommand(modelCode, record);
                 if (pid != null) {
-                    recordIds.add(pid.toString());
+                    recordIds.add(pid);
                 }
             }
             log.info("Records fixture created: runId={}, count={}, model={}", runId, count, modelCode);
@@ -335,10 +356,9 @@ public class TestFixtureController {
                 record.put("e2et_cust_code", "e2e_" + runId + "_" + (i + 1));
                 record.put("e2et_cust_name", "e2e_cust_" + runId + "_" + (i + 1));
                 record.put("e2et_cust_region", regions[i % regions.length]);
-                Map<String, Object> created = dynamicDataService.create("e2et_customer", record);
-                Object pid = created.get("pid");
+                String pid = executeCreateCommand("e2et_customer", record);
                 if (pid != null) {
-                    recordIds.add(pid.toString());
+                    recordIds.add(pid);
                 }
             }
             log.info("Customers fixture created: runId={}, count={}", runId, count);
@@ -390,10 +410,9 @@ public class TestFixtureController {
                 Map<String, Object> record = new HashMap<>();
                 record.put("e2et_order_title", "mv_" + runId + "_" + (i + 1));
                 record.put("e2et_order_status", statuses[i % statuses.length]);
-                Map<String, Object> created = dynamicDataService.create(modelCode, record);
-                Object pid = created.get("pid");
+                String pid = executeCreateCommand(modelCode, record);
                 if (pid != null) {
-                    recordIds.add(pid.toString());
+                    recordIds.add(pid);
                 }
             }
             log.info("Multiview fixture created: runId={}, count={}, model={}", runId, count, modelCode);
@@ -653,10 +672,9 @@ public class TestFixtureController {
                 // Store simulated native field values using the field codes expected by the plugin
                 record.put("e2et_order_photo", photoDataUri);
                 record.put("e2et_order_signature", signatureDataUri);
-                Map<String, Object> created = dynamicDataService.create(modelCode, record);
-                Object pid = created.get("pid");
+                String pid = executeCreateCommand(modelCode, record);
                 if (pid != null) {
-                    recordIds.add(pid.toString());
+                    recordIds.add(pid);
                 }
             }
             log.info("Native fields fixture created: runId={}, count={}, model={}", runId, count, modelCode);
@@ -699,10 +717,9 @@ public class TestFixtureController {
                 // Use valid status values from e2et_order_status dict
                 String[] statuses = {"draft", "submitted", "approved"};
                 record.put("e2et_order_status", statuses[i % 3]);
-                Map<String, Object> created = dynamicDataService.create("e2et_order", record);
-                Object pid = created.get("pid");
+                String pid = executeCreateCommand("e2et_order", record);
                 if (pid != null) {
-                    recordIds.add(pid.toString());
+                    recordIds.add(pid);
                 }
             }
             return FixtureResult.builder()

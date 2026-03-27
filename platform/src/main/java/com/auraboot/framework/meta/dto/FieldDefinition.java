@@ -1,5 +1,6 @@
 package com.auraboot.framework.meta.dto;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import lombok.Builder;
 import lombok.Data;
 import java.util.List;
@@ -252,6 +253,7 @@ public class FieldDefinition {
     @Builder
     public static class RefTarget {
         /** Model code of the referenced entity (e.g. "crm_account"). */
+        @JsonAlias("targetModel")
         private String targetEntity;
         /** Field code to display from the referenced entity (e.g. "name"). Defaults to "name". */
         private String displayField;
