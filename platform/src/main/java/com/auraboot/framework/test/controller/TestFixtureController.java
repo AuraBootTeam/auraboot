@@ -3,8 +3,10 @@ package com.auraboot.framework.test.controller;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.constant.StatusConstants;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
+import com.auraboot.framework.meta.entity.CommandDefinition;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.meta.dto.CommandExecuteResult;
+import com.auraboot.framework.meta.mapper.CommandDefinitionMapper;
 import com.auraboot.framework.meta.service.CommandExecutor;
 import com.auraboot.framework.tenant.service.TenantService;
 import com.auraboot.framework.test.dto.FixtureRequest;
@@ -40,6 +42,9 @@ public class TestFixtureController {
 
     @Autowired
     private CommandExecutor commandExecutor;
+
+    @Autowired
+    private CommandDefinitionMapper commandDefinitionMapper;
 
     @Autowired
     private TenantService tenantService;
@@ -150,7 +155,7 @@ public class TestFixtureController {
     // ── Private helpers ─────────────────────────────────────────────────────
 
     private String executeCreateCommand(String modelCode, Map<String, Object> payload) {
-        String commandCode = modelCode + ".create";
+        String commandCode = resolveCreateCommandCode(modelCode);
         CommandExecuteRequest request = new CommandExecuteRequest();
         request.setPayload(payload);
         request.setOperationType("CREATE");
@@ -165,6 +170,26 @@ public class TestFixtureController {
             }
         }
         return null;
+    }
+
+    /**
+     * Resolve the CREATE command code for a model by looking up the command_definition table.
+     * Plugins use namespace:create_model naming (e.g. "e2et:create_order" for model "e2et_order"),
+     * not the old "modelCode.create" format.
+     */
+    private String resolveCreateCommandCode(String modelCode) {
+        List<CommandDefinition> commands = commandDefinitionMapper.findByModelCode(modelCode);
+        // Find a command whose code contains "create" (case-insensitive)
+        for (CommandDefinition cmd : commands) {
+            String code = cmd.getCode().toLowerCase();
+            if (code.contains("create") && !code.contains("update")) {
+                log.debug("Resolved create command for model {}: {}", modelCode, cmd.getCode());
+                return cmd.getCode();
+            }
+        }
+        // Fallback to legacy format
+        log.warn("No create command found by DB lookup for model {}, falling back to {}.create", modelCode, modelCode);
+        return modelCode + ".create";
     }
 
     // ── Private fixture builders ────────────────────────────────────────────
