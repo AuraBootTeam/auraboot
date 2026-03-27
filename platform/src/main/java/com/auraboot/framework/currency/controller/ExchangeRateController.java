@@ -8,7 +8,7 @@ import com.auraboot.framework.currency.service.CurrencyService;
 import com.auraboot.framework.currency.service.TimezoneService;
 import com.auraboot.framework.currency.service.impl.EcbRateFetcher;
 import com.auraboot.framework.tenant.service.TenantPreferenceService;
-import com.auraboot.module.finance.engine.CurrencyConversionService;
+import com.auraboot.framework.currency.spi.CurrencyConversionSpi;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -34,7 +34,7 @@ public class ExchangeRateController {
 
     private final CurrencyService currencyService;
     private final TimezoneService timezoneService;
-    private final CurrencyConversionService currencyConversionService;
+    private final CurrencyConversionSpi currencyConversionService;
     private final TenantPreferenceService tenantPreferenceService;
 
     /** Injected as Optional because the bean may be absent when ecb.enabled=false */

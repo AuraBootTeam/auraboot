@@ -15,7 +15,7 @@ import java.util.Map;
  * Master data version entity - stores versioned snapshots of entity records.
  */
 @Data
-@TableName(value = "ns_governance_version", autoResultMap = true)
+@TableName(value = "ab_governance_version", autoResultMap = true)
 public class MasterDataVersion {
 
     @TableId(type = IdType.ASSIGN_ID)

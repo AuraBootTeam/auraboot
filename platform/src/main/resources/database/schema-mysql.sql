@@ -132,7 +132,7 @@ CREATE UNIQUE INDEX idx_ns_instance_pid ON ns_instance(pid);
 
 
 -- 创建文件信息表
-CREATE TABLE ns_files (
+CREATE TABLE ab_file (
     id BIGINT PRIMARY KEY,
     pid VARCHAR(26) UNIQUE NOT NULL DEFAULT '',
     file_name VARCHAR(255) NOT NULL,
@@ -159,12 +159,12 @@ CREATE TABLE ns_files (
 -- 添加列注释
 
 -- 创建索引
-CREATE INDEX idx_ns_files_created_by ON ns_files (created_by);
-CREATE INDEX idx_ns_files_storage_type ON ns_files (storage_type);
-CREATE INDEX idx_ns_files_status ON ns_files (status);
-CREATE INDEX idx_ns_files_upload_time ON ns_files (upload_time);
-CREATE INDEX idx_ns_files_created_time ON ns_files (created_time);
-CREATE UNIQUE INDEX idx_ns_files_pid ON ns_files(pid);
+CREATE INDEX idx_ab_file_created_by ON ab_file (created_by);
+CREATE INDEX idx_ab_file_storage_type ON ab_file (storage_type);
+CREATE INDEX idx_ab_file_status ON ab_file (status);
+CREATE INDEX idx_ab_file_upload_time ON ab_file (upload_time);
+CREATE INDEX idx_ab_file_created_time ON ab_file (created_time);
+CREATE UNIQUE INDEX idx_ab_file_pid ON ab_file(pid);
 
 
 -- ========================================
@@ -733,7 +733,7 @@ CREATE TABLE ns_content (
     updated_by BIGINT,
     
     FOREIGN KEY (tenant_id) REFERENCES ns_tenant(id),
-    FOREIGN KEY (file_id) REFERENCES ns_files(id)
+    FOREIGN KEY (file_id) REFERENCES ab_file(id)
 );
 
 

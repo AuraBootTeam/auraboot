@@ -16,7 +16,7 @@ import java.util.List;
  * Controls whether changes require approval and/or auto-snapshot.
  */
 @Data
-@TableName(value = "ns_governance_policy", autoResultMap = true)
+@TableName(value = "ab_governance_policy", autoResultMap = true)
 public class MasterDataPolicy {
 
     @TableId(type = IdType.ASSIGN_ID)
