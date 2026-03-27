@@ -16,7 +16,7 @@ import java.util.Map;
  * for changes to governed entity records.
  */
 @Data
-@TableName(value = "ns_governance_change_request", autoResultMap = true)
+@TableName(value = "ab_governance_change_request", autoResultMap = true)
 public class MasterDataChangeRequest {
 
     @TableId(type = IdType.ASSIGN_ID)

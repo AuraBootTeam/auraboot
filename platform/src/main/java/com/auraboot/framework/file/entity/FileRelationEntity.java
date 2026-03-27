@@ -15,7 +15,7 @@ import java.time.Instant;
 @Data
 @EqualsAndHashCode(callSuper = false)
 @Accessors(chain = true)
-@TableName("file_relations")
+@TableName("ab_file_relation")
 public class FileRelationEntity implements Serializable {
 
     private static final long serialVersionUID = 1L;
