@@ -1,5 +1,7 @@
 package com.auraboot.framework.tenant.dto;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Builder;
 import lombok.Data;
 
@@ -14,6 +16,7 @@ import java.util.List;
 @Data
 @Builder
 public class UserSpaceDTO {
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long tenantId;
     private String tenantName;
     private String tenantDisplayName;

@@ -1,13 +1,17 @@
 package com.auraboot.framework.auth.dto;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Data;
 
 @Data
 public class AuthenticationResponse {
     private final String jwt;
+    @JsonSerialize(using = ToStringSerializer.class)
     private final Long userId;
     private final String userPid;
     private final String username;
+    @JsonSerialize(using = ToStringSerializer.class)
     private final Long tenantId;
     private final String tenantStatus;  // "member", "pending", "none"
     private boolean mustChangePassword = false;

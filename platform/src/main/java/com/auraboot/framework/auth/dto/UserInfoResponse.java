@@ -1,6 +1,8 @@
 package com.auraboot.framework.auth.dto;
 
 import com.auraboot.framework.rbac.entity.Role;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Data;
 
 import java.util.List;
@@ -30,7 +32,9 @@ public class UserInfoResponse {
         private String name;         // 用户名称（nickName或userName）
         private String email;        // 邮箱
         private String mobile;       // 手机号
+        @JsonSerialize(using = ToStringSerializer.class)
         private Long tenantId;       // 当前租户ID
+        private String tenantName;   // 当前租户名称
         private String imgId;        // 头像ID
     }
     
