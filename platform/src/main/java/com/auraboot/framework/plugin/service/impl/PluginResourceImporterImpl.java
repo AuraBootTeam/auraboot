@@ -1010,6 +1010,15 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     @Override
     public PluginResource importMenu(MenuDefinitionDTO dto, String pluginPid, String importId,
                                       Long tenantId, ImportRequest.ConflictStrategy conflictStrategy) {
+        // Validate: dynamic menus must have pageKey
+        String path = dto.getPath();
+        if (path != null && path.startsWith("/dynamic/")
+                && (dto.getPageKey() == null || dto.getPageKey().isBlank())) {
+            throw new PluginException(
+                    "Menu '" + dto.getCode() + "' has dynamic path '" + path
+                    + "' but missing pageKey. Add pageKey to menus.json.");
+        }
+
         boolean exists = checkMenuExists(tenantId, dto.getCode());
 
         if (exists && conflictStrategy == ImportRequest.ConflictStrategy.ERROR) {
