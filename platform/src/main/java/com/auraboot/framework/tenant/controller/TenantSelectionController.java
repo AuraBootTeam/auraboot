@@ -1,6 +1,7 @@
 package com.auraboot.framework.tenant.controller;
 
 import com.auraboot.framework.application.annotation.CurrentUserId;
+import com.auraboot.framework.auth.service.SessionManagementService;
 import com.auraboot.framework.auth.util.JwtUtil;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.common.dto.ApiResponse;
@@ -55,6 +56,7 @@ public class TenantSelectionController {
     private final RoleService roleService;
     private final UserRoleService userRoleService;
     private final JwtUtil jwtUtil;
+    private final SessionManagementService sessionManagementService;
 
     /**
      * List all spaces (tenants) the current user belongs to.
@@ -149,6 +151,9 @@ public class TenantSelectionController {
                 Collections.singletonList(new SimpleGrantedAuthority("role_user")));
         int securityVersion = user.getSecurityVersion() != null ? user.getSecurityVersion() : 0;
         String jwt = jwtUtil.generateTokenWithTenantId(userDetails, user.getPid(), tenantId, securityVersion);
+
+        // Register new JWT in session store so JwtAuthenticationFilter.isSessionValid() passes
+        sessionManagementService.createSession(user.getId(), jwt, null, "space-switch");
 
         TenantSelectionResponse response = new TenantSelectionResponse();
         response.setStatus("success");
