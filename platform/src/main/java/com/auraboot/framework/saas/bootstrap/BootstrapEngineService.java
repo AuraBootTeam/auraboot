@@ -2,6 +2,8 @@ package com.auraboot.framework.saas.bootstrap;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
+import com.auraboot.framework.menu.entity.Menu;
+import com.auraboot.framework.menu.mapper.MenuMapper;
 import static com.auraboot.framework.saas.executor.SystemTenantContextExecutor.SYSTEM_TENANT_ID;
 import com.auraboot.framework.plugin.service.BuiltinPluginImportService;
 import com.auraboot.framework.saas.bootstrap.dto.BootstrapProgressResponse;
@@ -55,6 +57,7 @@ public class BootstrapEngineService {
     private final BuiltinPluginImportService builtinPluginImportService;
     private final RoleService roleService;
     private final ObjectMapper objectMapper;
+    private final MenuMapper menuMapper;
 
     // ── Public API ──────────────────────────────────────────────────────
 
@@ -221,8 +224,56 @@ public class BootstrapEngineService {
         // Assign platform_admin role to admin user in System Tenant
         roleService.assignRoleToUser(adminUserId, created.getId(), systemTenantId, null);
 
+        // Create Platform Console menus for System Tenant
+        createPlatformMenus(systemTenantId, adminUserId);
+        log.info("Platform Console menus created for System Tenant");
+
         log.info("platform_admin role created (id={}) and assigned to admin user (id={}) in System Tenant (id={})",
                 created.getId(), adminUserId, systemTenantId);
+    }
+
+    /**
+     * Create Platform Console menus for the System Tenant.
+     * These are fixed menus (not plugin-driven) for the L1 Control Plane.
+     */
+    private void createPlatformMenus(Long tenantId, Long adminUserId) {
+        // Top-level menus
+        createMenu(tenantId, null, "platform_overview", "Overview", "/platform/overview", 1, 10, "ChartBarIcon", adminUserId);
+        createMenu(tenantId, null, "platform_tenants", "Tenants", "/platform/tenants", 1, 20, "BuildingOfficeIcon", adminUserId);
+
+        // Commerce directory
+        Menu commerce = createMenu(tenantId, null, "platform_commerce", "Commerce", null, 0, 30, null, adminUserId);
+        createMenu(tenantId, commerce.getId(), "platform_marketplace", "Marketplace", "/platform/marketplace", 1, 31, "ShoppingBagIcon", adminUserId);
+        createMenu(tenantId, commerce.getId(), "platform_licenses", "Licenses", "/platform/licenses", 1, 32, "KeyIcon", adminUserId);
+
+        // Platform directory
+        Menu infra = createMenu(tenantId, null, "platform_infra", "Platform", null, 0, 40, null, adminUserId);
+        createMenu(tenantId, infra.getId(), "platform_cloud_config", "Cloud Config", "/platform/cloud-config", 1, 41, "CloudIcon", adminUserId);
+        createMenu(tenantId, infra.getId(), "platform_templates", "Templates", "/platform/templates", 1, 42, "DocumentDuplicateIcon", adminUserId);
+        createMenu(tenantId, infra.getId(), "platform_plugins", "Plugins", "/platform/plugins", 1, 43, "PuzzlePieceIcon", adminUserId);
+
+        // System directory
+        Menu system = createMenu(tenantId, null, "platform_system", "System", null, 0, 50, null, adminUserId);
+        createMenu(tenantId, system.getId(), "platform_audit_logs", "Audit Log", "/platform/audit-logs", 1, 51, "ClipboardDocumentListIcon", adminUserId);
+        createMenu(tenantId, system.getId(), "platform_settings", "Settings", "/platform/system-preferences", 1, 52, "Cog6ToothIcon", adminUserId);
+    }
+
+    private Menu createMenu(Long tenantId, Long parentId, String code, String name, String path, int type, int orderNo, String icon, Long adminUserId) {
+        Menu menu = new Menu();
+        menu.setTenantId(tenantId);
+        menu.setParentId(parentId);
+        menu.setPid(UniqueIdGenerator.generate());
+        menu.setCode(code);
+        menu.setName(name);
+        menu.setPath(path);
+        menu.setType(type);
+        menu.setOrderNo(orderNo);
+        menu.setIcon(icon);
+        menu.setVisible(true);
+        menu.setCreatedBy(adminUserId);
+        menu.setUpdatedBy(adminUserId);
+        menuMapper.insert(menu);
+        return menu;
     }
 
     // ── Layer B: Runtime Setup (Non-Transactional) ──────────────────────
