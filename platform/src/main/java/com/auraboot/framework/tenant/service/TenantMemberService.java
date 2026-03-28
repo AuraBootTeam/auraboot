@@ -97,4 +97,9 @@ public interface TenantMemberService extends IService<TenantMember> {
      * @return 租户成员信息，如果不存在则返回null
      */
     TenantMember findByTenantIdAndUserId(Long tenantId, Long userId);
+
+    /**
+     * Get tenant name by tenant ID.
+     */
+    String getTenantNameById(Long tenantId);
 }

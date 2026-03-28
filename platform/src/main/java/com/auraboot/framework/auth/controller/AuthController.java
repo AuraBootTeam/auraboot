@@ -193,6 +193,9 @@ public class AuthController {
             userDTO.setEmail(user.getEmail());
             userDTO.setMobile(user.getMobile());
             userDTO.setTenantId(tenantId);
+            if (tenantId != null && tenantMemberService != null) {
+                userDTO.setTenantName(tenantMemberService.getTenantNameById(tenantId));
+            }
             userDTO.setImgId(user.getImgId());
             
             // 4. 获取用户的实时角色和Permission

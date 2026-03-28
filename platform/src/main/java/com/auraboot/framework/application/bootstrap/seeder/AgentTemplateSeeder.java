@@ -1,6 +1,7 @@
 package com.auraboot.framework.application.bootstrap.seeder;
 
 import com.auraboot.framework.common.util.UniqueIdGenerator;
+import com.auraboot.framework.saas.executor.SystemTenantContextExecutor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -39,7 +40,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class AgentTemplateSeeder {
 
-    private static final long SYSTEM_TENANT_ID = 0L;
+    private static final long SYSTEM_TENANT_ID = SystemTenantContextExecutor.SYSTEM_TENANT_ID;
 
     /** Email domain for synthetic agent system users — never used for login. */
     public static final String AGENT_USER_EMAIL_DOMAIN = "@system.auraboot.local";

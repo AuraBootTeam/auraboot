@@ -2,6 +2,7 @@ package com.auraboot.framework.tenant.service.impl;
 
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.exception.BusinessException;
+import com.auraboot.framework.saas.config.service.SystemModeService;
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
 import com.auraboot.framework.tenant.dao.mapper.TenantMemberMapper;
 import com.auraboot.framework.tenant.service.TenantMemberService;
@@ -42,6 +43,8 @@ public class TenantMemberServiceImpl extends ServiceImpl<TenantMemberMapper, Ten
     private TenantMemberMapper tenantMemberMapper;
     @Autowired
     private ObjectMapper objectMapper;
+    @Autowired(required = false)
+    private SystemModeService systemModeService;
 
     private static final Set<String> TEAM_LIST_KEYS = Set.of("teamIds", "team_ids", "teams");
     private static final Set<String> TEAM_SINGLE_KEYS = Set.of("teamId", "team_id");
@@ -262,32 +265,34 @@ public class TenantMemberServiceImpl extends ServiceImpl<TenantMemberMapper, Ten
             return tenantId;
         }
 
-        // Multiple tenants — prefer the default business tenant (non-System).
-        // System Tenant is the Control Plane; daily login should resolve to the business tenant.
-        log.info("User {} belongs to {} tenants: {}, resolving default business tenant", userId, tenantIds.size(), tenantIds);
-
-        // Strategy 1: Pick the non-System tenant with role assignments
-        for (Long tid : tenantIds) {
-            if (isSystemTenant(tid)) continue;
-            long roleCount = baseMapper.countUserRolesInTenant(userId, tid);
-            if (roleCount > 0) {
-                log.info("Selected business tenant {} for user {} (has {} role(s))", tid, userId, roleCount);
-                return tid;
+        // Multiple tenants — behavior depends on system mode.
+        // SINGLE mode: auto-select the default business tenant (Space Selection not needed).
+        // MULTI mode: return null to trigger Space Selection UI on the frontend.
+        if (systemModeService != null && systemModeService.isSingleTenant()) {
+            Long defaultTenantId = systemModeService.getDefaultTenantId();
+            if (defaultTenantId != null && tenantIds.contains(defaultTenantId)) {
+                log.info("SINGLE mode: auto-selected default tenant {} for user {}", defaultTenantId, userId);
+                return defaultTenantId;
             }
+            // Fallback: pick first non-System tenant
+            for (Long tid : tenantIds) {
+                if (!isSystemTenant(tid)) {
+                    log.info("SINGLE mode fallback: selected non-System tenant {} for user {}", tid, userId);
+                    return tid;
+                }
+            }
+            return tenantIds.get(0);
         }
 
-        // Strategy 2: Any non-System tenant (even without roles yet)
-        for (Long tid : tenantIds) {
-            if (!isSystemTenant(tid)) {
-                log.info("Selected non-System tenant {} for user {} (no role bindings yet)", tid, userId);
-                return tid;
-            }
-        }
+        log.info("MULTI mode: user {} belongs to {} tenants: {}, returning null to trigger Space Selection",
+                userId, tenantIds.size(), tenantIds);
+        return null;
+    }
 
-        // Fallback: first tenant (should only happen if user is ONLY in System tenant)
-        Long tenantId = tenantIds.get(0);
-        log.info("Fallback to first tenant {} for user {}", tenantId, userId);
-        return tenantId;
+    @Override
+    public String getTenantNameById(Long tenantId) {
+        if (tenantId == null) return null;
+        return tenantMemberMapper.getTenantNameById(tenantId);
     }
 
     /**

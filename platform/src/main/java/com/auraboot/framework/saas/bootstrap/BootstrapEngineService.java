@@ -2,6 +2,7 @@ package com.auraboot.framework.saas.bootstrap;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
+import static com.auraboot.framework.saas.executor.SystemTenantContextExecutor.SYSTEM_TENANT_ID;
 import com.auraboot.framework.plugin.service.BuiltinPluginImportService;
 import com.auraboot.framework.saas.bootstrap.dto.BootstrapProgressResponse;
 import com.auraboot.framework.saas.bootstrap.dto.BootstrapRequest;
@@ -350,6 +351,7 @@ public class BootstrapEngineService {
         }
 
         Tenant systemTenant = new Tenant();
+        systemTenant.setId(SYSTEM_TENANT_ID);
         systemTenant.setPid(UniqueIdGenerator.generate());
         systemTenant.setName("System");
         systemTenant.setDisplayName("System");
