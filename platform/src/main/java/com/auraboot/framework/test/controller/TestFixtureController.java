@@ -536,26 +536,46 @@ public class TestFixtureController {
                         .build();
             }
 
-            // Create direct-message conversation
+            // Determine whether chatUserId is a distinct second user.
+            // Guard: if chatUserId is null or same as userId, treat as "no second user" so we
+            // skip alternate-sender messages (iOS would see 0 unread — still valid, just no badge).
+            boolean hasDistinctChatUser = chatUserId != null && !chatUserId.equals(userId);
+
+            // Create direct-message conversation.
+            // Send 2 messages from the primary user, then 1 message from chatUserId (if distinct).
+            // The 1 message from chatUserId will appear as "unread" for the test user.
             Object dmConv = invokeCreateConversation(createConv, conversationService,
                     tenantId, "direct", "dm_" + runId, userId, List.of(userId));
             String dmId = extractStringId(dmConv);
+            int dmUnreadCount = 0;
             if (dmId != null) {
                 conversationIds.add(dmId);
-                totalMessages += sendChatMessages(conversationService, tenantId, dmId, userId, runId, 3);
+                totalMessages += sendChatMessages(conversationService, tenantId, dmId, userId, runId, 2);
+                if (hasDistinctChatUser) {
+                    dmUnreadCount = sendChatMessages(conversationService, tenantId, dmId, chatUserId, runId + "-other", 1);
+                    totalMessages += dmUnreadCount;
+                }
             }
 
-            // Create group conversation with multiple members
+            // Create group conversation with multiple members.
+            // Send 2 messages from the primary user, then 2 messages from chatUserId (if distinct).
+            // The 2 messages from chatUserId will appear as "unread" for the test user.
             List<Long> groupMembers = Arrays.asList(userId, chatUserId);
             Object groupConv = invokeCreateConversation(createConv, conversationService,
                     tenantId, "group", "grp_" + runId, userId, groupMembers);
             String groupId = extractStringId(groupConv);
+            int groupUnreadCount = 0;
             if (groupId != null) {
                 conversationIds.add(groupId);
-                totalMessages += sendChatMessages(conversationService, tenantId, groupId, userId, runId, 3);
+                totalMessages += sendChatMessages(conversationService, tenantId, groupId, userId, runId, 2);
+                if (hasDistinctChatUser) {
+                    groupUnreadCount = sendChatMessages(conversationService, tenantId, groupId, chatUserId, runId + "-other", 2);
+                    totalMessages += groupUnreadCount;
+                }
             }
 
-            log.info("Chat fixture created: runId={}, conversations={}, messages={}", runId, conversationIds.size(), totalMessages);
+            log.info("Chat fixture created: runId={}, conversations={}, messages={}, dmUnread={}, groupUnread={}",
+                    runId, conversationIds.size(), totalMessages, dmUnreadCount, groupUnreadCount);
             return FixtureResult.builder()
                     .success(true)
                     .fixtureName("chat")
@@ -566,10 +586,12 @@ public class TestFixtureController {
                             "conversationIds", conversationIds,
                             "directConvId", dmId != null ? dmId : "",
                             "groupConvId", groupId != null ? groupId : "",
-                            "chatUserId", userId,
+                            "chatUserId", chatUserId != null ? chatUserId : userId,
                             "totalMessages", totalMessages,
                             "tenantId", tenantId,
-                            "userId", userId
+                            "userId", userId,
+                            "dmUnreadCount", dmUnreadCount,
+                            "groupUnreadCount", groupUnreadCount
                     )))
                     .build();
         } catch (Exception e) {
