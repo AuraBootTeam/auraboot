@@ -2926,7 +2926,7 @@ CREATE TABLE IF NOT EXISTS ab_dashboard (
     created_by VARCHAR(26),
     updated_by VARCHAR(26),
 
-    CONSTRAINT chk_dashboard_scope CHECK (scope IN ('personal', 'team', 'global')),
+    CONSTRAINT chk_dashboard_scope CHECK (scope IN ('personal', 'team', 'global', 'workbench')),
     CONSTRAINT chk_dashboard_status CHECK (status IN ('draft', 'published'))
 );
 
