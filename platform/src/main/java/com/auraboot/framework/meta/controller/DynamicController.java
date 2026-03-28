@@ -101,21 +101,24 @@ public class DynamicController {
             @Parameter(description = "排序方向: ASC or DESC")
             @RequestParam(required = false) String sortOrder,
 
+            @Parameter(description = "Multi-field sort, comma-separated field:direction pairs, e.g. created_at:desc,price:asc. Takes precedence over sortField/sortOrder when provided. Max 5 fields.")
+            @RequestParam(required = false) String sortFields,
+
             @Parameter(description = "NamedQuery code — when provided, data is fetched from a NamedQuery instead of the model table")
             @RequestParam(required = false) String queryCode) {
 
-        log.info("分页查询数据: pageKey={}, pageNum={}, pageSize={}, keyword={}, filters={}, queryCode={}",
-            pageKey, pageNum, pageSize, keyword, filters, queryCode);
+        log.info("分页查询数据: pageKey={}, pageNum={}, pageSize={}, keyword={}, filters={}, sortFields={}, queryCode={}",
+            pageKey, pageNum, pageSize, keyword, filters, sortFields, queryCode);
 
         List<QueryCondition> conditions = parseFilters(filters);
-        List<SortField> sortFields = parseSortField(sortField, sortOrder);
+        List<SortField> parsedSortFields = parseSortFields(sortFields, sortField, sortOrder);
 
         DynamicQueryRequest queryRequest = DynamicQueryRequest.builder()
                 .pageNum(pageNum)
                 .pageSize(pageSize)
                 .keyword(keyword)
                 .conditions(conditions.isEmpty() ? null : conditions)
-                .sortFields(sortFields.isEmpty() ? null : sortFields)
+                .sortFields(parsedSortFields.isEmpty() ? null : parsedSortFields)
                 .build();
 
         // Resolve model code from pageKey.
@@ -213,7 +216,26 @@ public class DynamicController {
         }
     }
 
-    private List<SortField> parseSortField(String sortField, String sortOrder) {
+    static final int MAX_SORT_FIELDS = 5;
+
+    /**
+     * Parse sort parameters into a list of SortField.
+     * <p>
+     * When {@code sortFields} is provided (comma-separated "field:direction" pairs),
+     * it takes precedence over the legacy single {@code sortField}/{@code sortOrder} parameters.
+     * Max {@value MAX_SORT_FIELDS} fields to prevent abuse.
+     *
+     * @param sortFields  multi-field sort string, e.g. "created_at:desc,price:asc"
+     * @param sortField   legacy single sort field
+     * @param sortOrder   legacy single sort direction
+     * @return parsed list of SortField (may be empty)
+     */
+    private List<SortField> parseSortFields(String sortFields, String sortField, String sortOrder) {
+        // Multi-field sort takes precedence
+        if (sortFields != null && !sortFields.isBlank()) {
+            return parseMultiSortFields(sortFields);
+        }
+        // Fallback to legacy single-field sort
         if (sortField == null || sortField.isBlank()) {
             return Collections.emptyList();
         }
@@ -222,6 +244,57 @@ public class DynamicController {
                 .direction("asc".equalsIgnoreCase(sortOrder) ? SortField.SortDirection.ASC : SortField.SortDirection.DESC)
                 .build();
         return List.of(sf);
+    }
+
+    /**
+     * Parse multi-field sort string: "field1:dir1,field2:dir2,...".
+     * Validates field count and direction values.
+     */
+    private List<SortField> parseMultiSortFields(String sortFields) {
+        String[] pairs = sortFields.split(",");
+        if (pairs.length > MAX_SORT_FIELDS) {
+            throw new com.auraboot.framework.meta.exception.MetaServiceException(
+                    "Too many sort fields. Maximum allowed: " + MAX_SORT_FIELDS);
+        }
+        List<SortField> result = new ArrayList<>();
+        Set<String> seen = new LinkedHashSet<>();
+        for (int i = 0; i < pairs.length; i++) {
+            String pair = pairs[i].trim();
+            if (pair.isEmpty()) {
+                continue;
+            }
+            String[] parts = pair.split(":");
+            String fieldName = parts[0].trim();
+            if (fieldName.isEmpty()) {
+                throw new com.auraboot.framework.meta.exception.MetaServiceException(
+                        "Empty field name in sortFields at position " + (i + 1));
+            }
+            // Validate field name: only allow alphanumeric and underscore to prevent SQL injection
+            if (!fieldName.matches("[a-zA-Z_][a-zA-Z0-9_]*")) {
+                throw new com.auraboot.framework.meta.exception.MetaServiceException(
+                        "Invalid sort field name: " + fieldName);
+            }
+            // Deduplicate: keep only the first occurrence of each field
+            if (!seen.add(fieldName.toLowerCase())) {
+                continue;
+            }
+            SortField.SortDirection direction = SortField.SortDirection.DESC;
+            if (parts.length > 1) {
+                String dir = parts[1].trim().toLowerCase();
+                if ("asc".equals(dir)) {
+                    direction = SortField.SortDirection.ASC;
+                } else if (!"desc".equals(dir)) {
+                    throw new com.auraboot.framework.meta.exception.MetaServiceException(
+                            "Invalid sort direction '" + parts[1].trim() + "' for field '" + fieldName + "'. Must be 'asc' or 'desc'.");
+                }
+            }
+            result.add(SortField.builder()
+                    .fieldName(fieldName)
+                    .direction(direction)
+                    .priority(i)
+                    .build());
+        }
+        return result;
     }
     /**
      * 根据ID获取单条数据
