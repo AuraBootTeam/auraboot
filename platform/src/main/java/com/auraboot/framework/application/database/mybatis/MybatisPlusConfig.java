@@ -25,8 +25,11 @@ public class MybatisPlusConfig {
             @Override
             public Expression getTenantId() {
                 Long tenantId = MetaContext.getCurrentTenantId();
+                // When user has no tenant context (e.g., multi-tenant login before space selection),
+                // return -1 so tenant-filtered queries return empty results instead of throwing.
+                // Tables like ab_user are already in ignoreTable and won't be affected.
                 if (tenantId == null) {
-                    throw new IllegalStateException("Tenant context is required but not found");
+                    return new LongValue(-1);
                 }
                 return new LongValue(tenantId);
             }
@@ -52,6 +55,7 @@ public class MybatisPlusConfig {
                     || "ab_platform_account".equals(tableName)      // G1: no tenant_id
                     || "ab_platform_license".equals(tableName)      // G1: no tenant_id
                     || "ab_api_connector_endpoint".equals(tableName)  // No tenant_id
+                    || "ab_mkt_publisher_payout".equals(tableName)    // No tenant_id, publisher-scoped (not tenant-scoped)
 
                     // ── Currency (has tenant_id, but all queries pass it explicitly as @Param) ──
                     || "ab_exchange_rate".equals(tableName)           // ExchangeRateMapper passes tenantId explicitly
