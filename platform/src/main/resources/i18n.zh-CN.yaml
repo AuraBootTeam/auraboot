@@ -569,3 +569,122 @@ ai:
     title: AI 设置
     subtitle: 配置提供商、工具和 AI 中心治理策略
   retry: 重试
+
+# Workbench widgets
+workbench:
+  stats:
+    title: 统计概览
+    inbox_pending: 待办事项
+    inbox_urgent: 紧急待办
+    crm_opportunity_amount: 活跃商机
+    crm_account_active: 活跃客户
+    bpm_running: 运行中流程
+    bpm_completed_week: 本周完成
+    this_week: 本周
+    this_month: 本月
+  inbox:
+    title: 待办事项
+    all: 全部
+    approval: 审批
+    task: 任务
+    alert: 提醒
+    view_all: 查看全部
+    viewAll: 查看全部
+    urgent: 紧急
+    approve: 同意
+    view: 查看
+    empty: 暂无待办事项
+    justNow: 刚刚
+    hoursAgo: "{hours}小时前"
+    daysAgo: "{days}天前"
+  shortcuts:
+    title: 快捷操作
+    edit: 编辑
+    add: 添加
+    customize_hint: 点击编辑自定义
+  recent:
+    title: 最近访问
+    empty: 暂无访问记录
+  category:
+    stats: 统计指标
+    tasks: 待办与任务
+    crm: CRM 销售
+    bpm: 流程管理
+    general: 通用组件
+  widget:
+    stats_row: 指标行
+    stats_row_desc: 一行展示多个统计指标
+    stats_card: 统计卡片
+    stats_card_desc: 单个统计指标
+    inbox: 待办事项
+    inbox_desc: 审批/任务/提醒列表
+    calendar: 日程视图
+    calendar_desc: 月历视图标记待办日期
+    pipeline: 商机漏斗
+    pipeline_desc: 各阶段商机数量与金额
+    leads: 最新线索
+    leads_desc: 最新线索列表
+    activities: 活动记录
+    activities_desc: 近期跟进活动时间线
+    my_process: 我的流程
+    my_process_desc: 我发起的流程状态
+    process_stats: 流程统计
+    process_stats_desc: 完成率/平均耗时
+    shortcuts: 快捷操作
+    shortcuts_desc: 常用操作快捷入口
+    recent: 最近访问
+    recent_desc: 最近访问的页面
+    announcement: 公告通知
+    announcement_desc: 系统公告和团队通知
+    quick_note: 快速备忘
+    quick_note_desc: 个人备忘录
+  activities:
+    title: 近期活动
+    empty: 暂无活动记录
+    justNow: 刚刚
+    minutesAgo: "{minutes}分钟前"
+    hoursAgo: "{hours}小时前"
+    daysAgo: "{days}天前"
+  announcement:
+    title: 公告通知
+    empty: 暂无公告
+    pinned: 置顶
+    urgent: 紧急
+  pipeline:
+    title: 商机漏斗
+    empty: 暂无商机数据
+    goToCrm: 前往 CRM
+    total: 合计
+  leads:
+    title: 最新线索
+    empty: 暂无线索
+    viewAll: 查看全部
+    unnamed: 未命名线索
+    justNow: 刚刚
+    hoursAgo: "{hours}小时前"
+    daysAgo: "{days}天前"
+  processStats:
+    title: 流程统计
+    noData: 暂无数据
+    completionRate: 完成率
+    hours: 小时
+    avgDuration: 平均耗时
+    processes: 个流程
+    running: 运行中
+    completedThisWeek: 本周完成
+  process:
+    title: 我的流程
+    empty: 暂无发起的流程
+    viewAll: 查看全部
+    justNow: 刚刚
+    hoursAgo: "{hours}小时前"
+    daysAgo: "{days}天前"
+  quickNote:
+    title: 快速备忘
+    placeholder: 写下备忘内容…
+    saving: 保存中…
+    justSaved: 刚刚保存
+    lastSaved: 上次保存
+  calendar:
+    title: 日程
+    today: 今天

@@ -549,3 +549,122 @@ ai:
     title: AI Settings
     subtitle: Configure providers, tools, and governance for the AI center
   retry: Retry
+
+# Workbench widgets
+workbench:
+  stats:
+    title: Statistics
+    inbox_pending: Pending Tasks
+    inbox_urgent: Urgent Tasks
+    crm_opportunity_amount: Active Opportunities
+    crm_account_active: Active Accounts
+    bpm_running: Running Processes
+    bpm_completed_week: Completed This Week
+    this_week: this week
+    this_month: this month
+  inbox:
+    title: Tasks
+    all: All
+    approval: Approvals
+    task: Tasks
+    alert: Alerts
+    view_all: View All
+    viewAll: View All
+    urgent: urgent
+    approve: Approve
+    view: View
+    empty: No pending tasks
+    justNow: Just now
+    hoursAgo: "{hours}h ago"
+    daysAgo: "{days}d ago"
+  shortcuts:
+    title: Quick Actions
+    edit: Edit
+    add: Add
+    customize_hint: Click Edit to customize
+  recent:
+    title: Recent Visits
+    empty: No recent visits
+  category:
+    stats: Statistics
+    tasks: Tasks
+    crm: CRM
+    bpm: BPM
+    general: General
+  widget:
+    stats_row: Stats Row
+    stats_row_desc: Multiple stats in a row
+    stats_card: Stats Card
+    stats_card_desc: Single stat metric
+    inbox: Inbox
+    inbox_desc: Pending approvals and tasks
+    calendar: Calendar
+    calendar_desc: Monthly calendar with task markers
+    pipeline: Sales Pipeline
+    pipeline_desc: Opportunity stages overview
+    leads: New Leads
+    leads_desc: Recent leads list
+    activities: Activities
+    activities_desc: Recent CRM activities
+    my_process: My Processes
+    my_process_desc: Processes you started
+    process_stats: Process Stats
+    process_stats_desc: BPM completion and duration
+    shortcuts: Quick Actions
+    shortcuts_desc: Favorite shortcuts
+    recent: Recent
+    recent_desc: Recently visited pages
+    announcement: Announcements
+    announcement_desc: System announcements
+    quick_note: Quick Note
+    quick_note_desc: Personal notepad
+  activities:
+    title: Recent Activities
+    empty: No recent activities
+    justNow: Just now
+    minutesAgo: "{minutes}m ago"
+    hoursAgo: "{hours}h ago"
+    daysAgo: "{days}d ago"
+  announcement:
+    title: Announcements
+    empty: No announcements
+    pinned: Pinned
+    urgent: Urgent
+  pipeline:
+    title: Sales Pipeline
+    empty: No opportunity data
+    goToCrm: Go to CRM
+    total: Total
+  leads:
+    title: New Leads
+    empty: No leads yet
+    viewAll: View All
+    unnamed: Unnamed Lead
+    justNow: Just now
+    hoursAgo: "{hours}h ago"
+    daysAgo: "{days}d ago"
+  processStats:
+    title: Process Stats
+    noData: No data available
+    completionRate: Completion Rate
+    hours: hours
+    avgDuration: Avg Duration
+    processes: processes
+    running: Running
+    completedThisWeek: completed this week
+  process:
+    title: My Processes
+    empty: No processes started
+    viewAll: View All
+    justNow: Just now
+    hoursAgo: "{hours}h ago"
+    daysAgo: "{days}d ago"
+  quickNote:
+    title: Quick Note
+    placeholder: "Write a quick note..."
+    saving: "Saving..."
+    justSaved: Just saved
+    lastSaved: Last saved
+  calendar:
+    title: Calendar
+    today: Today
