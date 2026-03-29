@@ -160,12 +160,14 @@ spring:
       exclude: static/**,public/**
     livereload:
       enabled: true
-  data:
-    redis:
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
-      database: 0
-      timeout: 5000ms
+  # Redis is optional — set SPRING_DATA_REDIS_HOST env var to enable.
+  # When not set, the app runs without Redis (local locks, in-process data sync).
+  # data:
+  #   redis:
+  #     host: ${REDIS_HOST:localhost}
+  #     port: ${REDIS_PORT:6379}
+  #     database: 0
+  #     timeout: 5000ms
   datasource:
     url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/aura_boot?charSet=UTF8}
     driver-class-name: org.postgresql.Driver

@@ -2,7 +2,8 @@
 
 ## Quick Start (Docker)
 
-The fastest way to run the full AuraBoot platform is with Docker Compose:
+The fastest way to run the full AuraBoot platform is with Docker Compose.
+Only PostgreSQL is required — Redis and MinIO are optional.
 
 ```bash
 # Clone the repository
@@ -11,7 +12,7 @@ cd auraboot
 
 # Configure environment (optional — defaults work for evaluation)
 cp .env.example .env
-# Edit .env with your settings (at minimum, change JWT_SECRET)
+# Edit .env with your settings (at minimum, change JWT_SECRET for production)
 
 # Start the full stack (first run builds images — allow 5-10 min)
 docker compose --profile full up --build -d
@@ -23,10 +24,10 @@ open http://localhost:3000
 
 ## Infrastructure Only (Local Development)
 
-For local development, start only the databases and run services locally:
+For local development, start only PostgreSQL and run services locally:
 
 ```bash
-# Start PostgreSQL + Redis + MinIO
+# Start PostgreSQL only
 docker compose up -d
 
 # Run backend (port 6443)
@@ -40,10 +41,52 @@ cd web-admin && npm run dev:full
 
 | Profile | Command | What It Starts |
 |---------|---------|----------------|
-| Default | `docker compose up -d` | PostgreSQL, Redis, MinIO |
-| Full | `docker compose --profile full up -d` | + Backend (6443), Frontend (3000) |
-| Monitoring | `docker compose --profile monitoring up -d` | + Prometheus (9090), Grafana (3001) |
-| Full + Monitoring | `docker compose --profile full --profile monitoring up -d` | Everything |
+| Default | `docker compose up -d` | PostgreSQL |
+| Full | `--profile full` | + Backend (6443), Frontend (3000) |
+| Cache | `--profile cache` | + Redis (6379) — for multi-instance deployments |
+| Storage | `--profile storage` | + MinIO (9000/9001) — for S3 file storage |
+| Monitoring | `--profile monitoring` | + Prometheus (9090), Grafana (3001) |
+
+Combine profiles as needed:
+
+```bash
+# Minimal (PostgreSQL + app)
+docker compose --profile full up --build -d
+
+# With Redis (multi-instance / distributed lock / real-time sync)
+docker compose --profile full --profile cache up --build -d
+
+# With MinIO (S3 file storage)
+docker compose --profile full --profile storage up --build -d
+
+# Everything
+docker compose --profile full --profile cache --profile storage --profile monitoring up --build -d
+```
+
+### When to enable Redis
+
+Redis is **not required** for single-instance deployments. Without Redis:
+- Distributed locks use JVM-local locking
+- Data sync SSE events are pushed in-process
+- Event bus uses in-memory transport
+- Message queue uses in-memory provider
+
+Enable Redis (`--profile cache`) when:
+- Running multiple backend instances behind a load balancer
+- You need cross-instance real-time data sync
+- You need distributed locking
+
+To connect the backend to Redis, set `REDIS_HOST` in `.env`:
+```bash
+REDIS_HOST=redis
+```
+
+### When to enable MinIO
+
+File storage defaults to local filesystem (`./data/files`). Enable MinIO (`--profile storage`) when:
+- You need S3-compatible object storage
+- Files need to survive container restarts without volume mounts
+- You want a web UI for file management
 
 ## Environment Variables
 
@@ -56,9 +99,9 @@ Copy `.env.example` to `.env` and configure:
 | `POSTGRES_USER` | `auraboot` | No | Database user |
 | `POSTGRES_PASSWORD` | `auraboot_dev` | **Yes (prod)** | Database password |
 | `JWT_SECRET` | (weak default) | **Yes (prod)** | JWT signing secret (min 32 chars) |
+| `REDIS_HOST` | (empty) | No | Set to `redis` to enable Redis |
 | `ANTHROPIC_API_KEY` | — | No | Enable AI/AuraBot features |
 | `OPENAI_API_KEY` | — | No | OpenAI provider (alternative LLM) |
-| `MINIMAX_API_KEY` | — | No | MiniMax provider (alternative LLM) |
 | `MINIO_ROOT_USER` | `minioadmin` | No | MinIO admin username |
 | `MINIO_ROOT_PASSWORD` | `minioadmin` | **Yes (prod)** | MinIO admin password |
 | `GF_ADMIN_USER` | `admin` | No | Grafana admin username |
@@ -79,9 +122,9 @@ Once the stack is running, verify all services are healthy:
 | Frontend | http://localhost:3000 | Login page |
 | Backend health | http://localhost:6443/actuator/health | `{"status":"UP"}` |
 | Backend API | http://localhost:6443/api/meta/models | JSON response |
-| MinIO console | http://localhost:9001 | MinIO web UI |
-| Prometheus | http://localhost:9090 | Prometheus UI |
-| Grafana | http://localhost:3001 | Grafana dashboards |
+| MinIO console | http://localhost:9001 | MinIO web UI (if enabled) |
+| Prometheus | http://localhost:9090 | Prometheus UI (if enabled) |
+| Grafana | http://localhost:3001 | Grafana dashboards (if enabled) |
 
 Quick health check via curl:
 ```bash
@@ -120,7 +163,8 @@ Before going to production:
 
 - [ ] Change `JWT_SECRET` to a cryptographically random value (`openssl rand -hex 32`)
 - [ ] Change `POSTGRES_PASSWORD` to a strong password
-- [ ] Change `MINIO_ROOT_PASSWORD` to a strong password
+- [ ] Set `REDIS_HOST=redis` and enable `--profile cache` for multi-instance
+- [ ] Change `MINIO_ROOT_PASSWORD` if using MinIO
 - [ ] Set `ANTHROPIC_API_KEY` if you want AI features
 - [ ] Put a reverse proxy (nginx / Cloudflare) in front for TLS termination
 - [ ] Configure SMTP settings for email notifications
@@ -185,7 +229,7 @@ If running backend locally against Docker postgres, use `localhost:5432`.
 
 ### Port conflicts
 
-If ports 3000, 6443, 5432, or 6379 are in use, change `AURABOOT_PORT` in `.env`
+If ports 3000, 6443, or 5432 are in use, change `AURABOOT_PORT` in `.env`
 or stop the conflicting processes.
 
 ### Rebuilding after code changes

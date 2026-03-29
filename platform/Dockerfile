@@ -29,8 +29,8 @@ RUN ./gradlew dependencies --no-daemon || true
 COPY src ./src
 COPY platform-plugin-api/src platform-plugin-api/src
 
-# Copy vendor dependencies if present
-COPY vendor ./vendor
+# Copy vendor dependencies if present (use glob pattern to make optional)
+COPY vendor* ./vendor/
 
 # Build the application (skip tests for faster builds)
 RUN ./gradlew bootJar --no-daemon -x test

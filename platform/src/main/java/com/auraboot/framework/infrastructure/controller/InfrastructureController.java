@@ -7,6 +7,7 @@ import com.auraboot.framework.infrastructure.storage.StorageProperties;
 import com.auraboot.framework.infrastructure.storage.StorageProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.bind.annotation.*;
@@ -29,7 +30,9 @@ public class InfrastructureController {
     private final StorageProperties storageProperties;
     private final MqProvider mqProvider;
     private final MqProperties mqProperties;
-    private final StringRedisTemplate redisTemplate;
+
+    @Autowired(required = false)
+    private StringRedisTemplate redisTemplate;
 
     @Value("${spring.datasource.url:}")
     private String datasourceUrl;
@@ -56,17 +59,21 @@ public class InfrastructureController {
 
         // Redis
         Map<String, Object> redis = new LinkedHashMap<>();
-        try {
-            String pong = redisTemplate.execute(
-                    (org.springframework.data.redis.core.RedisCallback<String>) connection -> connection.ping());
-            redis.put("connected", "pong".equals(pong));
-            // Get version via INFO command
-            Properties info = redisTemplate.execute(
-                    (org.springframework.data.redis.core.RedisCallback<Properties>) connection -> connection.info("server"));
-            redis.put("version", info != null ? info.getProperty("redis_version", "unknown") : "unknown");
-        } catch (Exception e) {
+        if (redisTemplate != null) {
+            try {
+                String pong = redisTemplate.execute(
+                        (org.springframework.data.redis.core.RedisCallback<String>) connection -> connection.ping());
+                redis.put("connected", "pong".equals(pong));
+                Properties info = redisTemplate.execute(
+                        (org.springframework.data.redis.core.RedisCallback<Properties>) connection -> connection.info("server"));
+                redis.put("version", info != null ? info.getProperty("redis_version", "unknown") : "unknown");
+            } catch (Exception e) {
+                redis.put("connected", false);
+                redis.put("error", e.getMessage());
+            }
+        } else {
             redis.put("connected", false);
-            redis.put("error", e.getMessage());
+            redis.put("status", "not-configured");
         }
         result.put("redis", redis);
 
@@ -133,6 +140,10 @@ public class InfrastructureController {
     @PostMapping("/test/redis")
     public ApiResponse<Map<String, Object>> testRedis() {
         Map<String, Object> result = new LinkedHashMap<>();
+        if (redisTemplate == null) {
+            result.put("status", "not-configured");
+            return ApiResponse.success(result);
+        }
         try {
             redisTemplate.hasKey("__health_check__");
             result.put("status", "ok");

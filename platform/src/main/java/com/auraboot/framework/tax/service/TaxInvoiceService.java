@@ -7,6 +7,7 @@ import com.auraboot.framework.tax.mapper.TaxEInvoiceMapper;
 import com.auraboot.framework.currency.spi.CurrencyConversionSpi;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -32,7 +33,9 @@ public class TaxInvoiceService {
 
     private final TaxEInvoiceMapper einvoiceMapper;
     private final VatCalculationService vatCalculationService;
-    private final CurrencyConversionSpi currencyConversionService;
+
+    @Autowired(required = false)
+    private CurrencyConversionSpi currencyConversionService;
 
     /**
      * Generate e-invoice data from a source document or manual input.

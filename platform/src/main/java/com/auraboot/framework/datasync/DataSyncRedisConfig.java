@@ -1,5 +1,6 @@
 package com.auraboot.framework.datasync;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
@@ -8,8 +9,10 @@ import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 
 /**
  * Redis Pub/Sub configuration for data sync cross-instance broadcasting.
+ * Only activated when {@code spring.data.redis.host} is explicitly set.
  */
 @Configuration
+@ConditionalOnExpression("!'${spring.data.redis.host:}'.isEmpty()")
 public class DataSyncRedisConfig {
 
     @Bean
