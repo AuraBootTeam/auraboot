@@ -581,7 +581,15 @@ workbench:
     title: Quick Actions
     edit: Edit
     add: Add
+    done: Done
+    customize: Click Edit to customize shortcuts
     customize_hint: Click Edit to customize
+    newLead: New Lead
+    newAccount: New Account
+    newOpportunity: New Opportunity
+    startProcess: Start Process
+    newContract: New Contract
+    reports: Reports
   recent:
     title: Recent Visits
     empty: No recent visits
@@ -656,6 +664,9 @@ workbench:
     title: My Processes
     empty: No processes started
     viewAll: View All
+    filterAll: All
+    filterRunning: Running
+    filterCompleted: Completed
     justNow: Just now
     hoursAgo: "{hours}h ago"
     daysAgo: "{days}d ago"
@@ -668,3 +679,10 @@ workbench:
   calendar:
     title: Calendar
     today: Today
+    mon: Mon
+    tue: Tue
+    wed: Wed
+    thu: Thu
+    fri: Fri
+    sat: Sat
+    sun: Sun

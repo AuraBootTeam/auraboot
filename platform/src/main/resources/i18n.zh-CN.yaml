@@ -601,7 +601,15 @@ workbench:
     title: 快捷操作
     edit: 编辑
     add: 添加
+    done: 完成
+    customize: 点击编辑自定义快捷操作
     customize_hint: 点击编辑自定义
+    newLead: 新建线索
+    newAccount: 新建客户
+    newOpportunity: 新建商机
+    startProcess: 发起流程
+    newContract: 新建合同
+    reports: 报表
   recent:
     title: 最近访问
     empty: 暂无访问记录
@@ -676,6 +684,9 @@ workbench:
     title: 我的流程
     empty: 暂无发起的流程
     viewAll: 查看全部
+    filterAll: 全部
+    filterRunning: 运行中
+    filterCompleted: 已完成
     justNow: 刚刚
     hoursAgo: "{hours}小时前"
     daysAgo: "{days}天前"
@@ -688,3 +699,10 @@ workbench:
   calendar:
     title: 日程
     today: 今天
+    mon: 一
+    tue: 二
+    wed: 三
+    thu: 四
+    fri: 五
+    sat: 六
+    sun: 日
