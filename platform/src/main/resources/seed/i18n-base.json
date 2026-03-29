@@ -1527,5 +1527,515 @@
     "key": "nlModeling.goToModule",
     "zh-CN": "前往模块页面",
     "en-US": "Go to Module"
+  },
+  {
+    "key": "workbench.stats.title",
+    "zh-CN": "统计概览",
+    "en-US": "Statistics"
+  },
+  {
+    "key": "workbench.stats.inbox_pending",
+    "zh-CN": "待办事项",
+    "en-US": "Pending Tasks"
+  },
+  {
+    "key": "workbench.stats.inbox_urgent",
+    "zh-CN": "紧急待办",
+    "en-US": "Urgent Tasks"
+  },
+  {
+    "key": "workbench.stats.crm_opportunity_amount",
+    "zh-CN": "活跃商机",
+    "en-US": "Active Opportunities"
+  },
+  {
+    "key": "workbench.stats.crm_account_active",
+    "zh-CN": "活跃客户",
+    "en-US": "Active Accounts"
+  },
+  {
+    "key": "workbench.stats.bpm_running",
+    "zh-CN": "运行中流程",
+    "en-US": "Running Processes"
+  },
+  {
+    "key": "workbench.stats.bpm_completed_week",
+    "zh-CN": "本周完成",
+    "en-US": "Completed This Week"
+  },
+  {
+    "key": "workbench.stats.this_week",
+    "zh-CN": "本周",
+    "en-US": "this week"
+  },
+  {
+    "key": "workbench.stats.this_month",
+    "zh-CN": "本月",
+    "en-US": "this month"
+  },
+  {
+    "key": "workbench.inbox.title",
+    "zh-CN": "待办事项",
+    "en-US": "Tasks"
+  },
+  {
+    "key": "workbench.inbox.all",
+    "zh-CN": "全部",
+    "en-US": "All"
+  },
+  {
+    "key": "workbench.inbox.approval",
+    "zh-CN": "审批",
+    "en-US": "Approvals"
+  },
+  {
+    "key": "workbench.inbox.task",
+    "zh-CN": "任务",
+    "en-US": "Tasks"
+  },
+  {
+    "key": "workbench.inbox.alert",
+    "zh-CN": "提醒",
+    "en-US": "Alerts"
+  },
+  {
+    "key": "workbench.inbox.view_all",
+    "zh-CN": "查看全部",
+    "en-US": "View All"
+  },
+  {
+    "key": "workbench.inbox.viewAll",
+    "zh-CN": "查看全部",
+    "en-US": "View All"
+  },
+  {
+    "key": "workbench.inbox.justNow",
+    "zh-CN": "刚刚",
+    "en-US": "Just now"
+  },
+  {
+    "key": "workbench.inbox.hoursAgo",
+    "zh-CN": "{hours}小时前",
+    "en-US": "{hours}h ago"
+  },
+  {
+    "key": "workbench.inbox.daysAgo",
+    "zh-CN": "{days}天前",
+    "en-US": "{days}d ago"
+  },
+  {
+    "key": "workbench.inbox.urgent",
+    "zh-CN": "紧急",
+    "en-US": "urgent"
+  },
+  {
+    "key": "workbench.inbox.approve",
+    "zh-CN": "同意",
+    "en-US": "Approve"
+  },
+  {
+    "key": "workbench.inbox.view",
+    "zh-CN": "查看",
+    "en-US": "View"
+  },
+  {
+    "key": "workbench.inbox.empty",
+    "zh-CN": "暂无待办事项",
+    "en-US": "No pending tasks"
+  },
+  {
+    "key": "workbench.shortcuts.title",
+    "zh-CN": "快捷操作",
+    "en-US": "Quick Actions"
+  },
+  {
+    "key": "workbench.shortcuts.edit",
+    "zh-CN": "编辑",
+    "en-US": "Edit"
+  },
+  {
+    "key": "workbench.shortcuts.add",
+    "zh-CN": "添加",
+    "en-US": "Add"
+  },
+  {
+    "key": "workbench.shortcuts.customize_hint",
+    "zh-CN": "点击编辑自定义",
+    "en-US": "Click Edit to customize"
+  },
+  {
+    "key": "workbench.recent.title",
+    "zh-CN": "最近访问",
+    "en-US": "Recent Visits"
+  },
+  {
+    "key": "workbench.recent.empty",
+    "zh-CN": "暂无访问记录",
+    "en-US": "No recent visits"
+  },
+  {
+    "key": "workbench.category.stats",
+    "zh-CN": "统计指标",
+    "en-US": "Statistics"
+  },
+  {
+    "key": "workbench.category.tasks",
+    "zh-CN": "待办与任务",
+    "en-US": "Tasks"
+  },
+  {
+    "key": "workbench.category.crm",
+    "zh-CN": "CRM 销售",
+    "en-US": "CRM"
+  },
+  {
+    "key": "workbench.category.bpm",
+    "zh-CN": "流程管理",
+    "en-US": "BPM"
+  },
+  {
+    "key": "workbench.category.general",
+    "zh-CN": "通用组件",
+    "en-US": "General"
+  },
+  {
+    "key": "workbench.widget.stats_row",
+    "zh-CN": "指标行",
+    "en-US": "Stats Row"
+  },
+  {
+    "key": "workbench.widget.stats_row_desc",
+    "zh-CN": "一行展示多个统计指标",
+    "en-US": "Multiple stats in a row"
+  },
+  {
+    "key": "workbench.widget.stats_card",
+    "zh-CN": "统计卡片",
+    "en-US": "Stats Card"
+  },
+  {
+    "key": "workbench.widget.stats_card_desc",
+    "zh-CN": "单个统计指标",
+    "en-US": "Single stat metric"
+  },
+  {
+    "key": "workbench.widget.inbox",
+    "zh-CN": "待办事项",
+    "en-US": "Inbox"
+  },
+  {
+    "key": "workbench.widget.inbox_desc",
+    "zh-CN": "审批/任务/提醒列表",
+    "en-US": "Pending approvals and tasks"
+  },
+  {
+    "key": "workbench.widget.calendar",
+    "zh-CN": "日程视图",
+    "en-US": "Calendar"
+  },
+  {
+    "key": "workbench.widget.calendar_desc",
+    "zh-CN": "月历视图标记待办日期",
+    "en-US": "Monthly calendar with task markers"
+  },
+  {
+    "key": "workbench.widget.pipeline",
+    "zh-CN": "商机漏斗",
+    "en-US": "Sales Pipeline"
+  },
+  {
+    "key": "workbench.widget.pipeline_desc",
+    "zh-CN": "各阶段商机数量与金额",
+    "en-US": "Opportunity stages overview"
+  },
+  {
+    "key": "workbench.widget.leads",
+    "zh-CN": "最新线索",
+    "en-US": "New Leads"
+  },
+  {
+    "key": "workbench.widget.leads_desc",
+    "zh-CN": "最新线索列表",
+    "en-US": "Recent leads list"
+  },
+  {
+    "key": "workbench.widget.activities",
+    "zh-CN": "活动记录",
+    "en-US": "Activities"
+  },
+  {
+    "key": "workbench.widget.activities_desc",
+    "zh-CN": "近期跟进活动时间线",
+    "en-US": "Recent CRM activities"
+  },
+  {
+    "key": "workbench.widget.my_process",
+    "zh-CN": "我的流程",
+    "en-US": "My Processes"
+  },
+  {
+    "key": "workbench.widget.my_process_desc",
+    "zh-CN": "我发起的流程状态",
+    "en-US": "Processes you started"
+  },
+  {
+    "key": "workbench.widget.process_stats",
+    "zh-CN": "流程统计",
+    "en-US": "Process Stats"
+  },
+  {
+    "key": "workbench.widget.process_stats_desc",
+    "zh-CN": "完成率/平均耗时",
+    "en-US": "BPM completion and duration"
+  },
+  {
+    "key": "workbench.widget.shortcuts",
+    "zh-CN": "快捷操作",
+    "en-US": "Quick Actions"
+  },
+  {
+    "key": "workbench.widget.shortcuts_desc",
+    "zh-CN": "常用操作快捷入口",
+    "en-US": "Favorite shortcuts"
+  },
+  {
+    "key": "workbench.widget.recent",
+    "zh-CN": "最近访问",
+    "en-US": "Recent"
+  },
+  {
+    "key": "workbench.widget.recent_desc",
+    "zh-CN": "最近访问的页面",
+    "en-US": "Recently visited pages"
+  },
+  {
+    "key": "workbench.widget.announcement",
+    "zh-CN": "公告通知",
+    "en-US": "Announcements"
+  },
+  {
+    "key": "workbench.widget.announcement_desc",
+    "zh-CN": "系统公告和团队通知",
+    "en-US": "System announcements"
+  },
+  {
+    "key": "workbench.widget.quick_note",
+    "zh-CN": "快速备忘",
+    "en-US": "Quick Note"
+  },
+  {
+    "key": "workbench.widget.quick_note_desc",
+    "zh-CN": "个人备忘录",
+    "en-US": "Personal notepad"
+  },
+  {
+    "key": "workbench.activities.title",
+    "zh-CN": "近期活动",
+    "en-US": "Recent Activities"
+  },
+  {
+    "key": "workbench.activities.empty",
+    "zh-CN": "暂无活动记录",
+    "en-US": "No recent activities"
+  },
+  {
+    "key": "workbench.activities.justNow",
+    "zh-CN": "刚刚",
+    "en-US": "Just now"
+  },
+  {
+    "key": "workbench.activities.minutesAgo",
+    "zh-CN": "{minutes}分钟前",
+    "en-US": "{minutes}m ago"
+  },
+  {
+    "key": "workbench.activities.hoursAgo",
+    "zh-CN": "{hours}小时前",
+    "en-US": "{hours}h ago"
+  },
+  {
+    "key": "workbench.activities.daysAgo",
+    "zh-CN": "{days}天前",
+    "en-US": "{days}d ago"
+  },
+  {
+    "key": "workbench.announcement.title",
+    "zh-CN": "公告通知",
+    "en-US": "Announcements"
+  },
+  {
+    "key": "workbench.announcement.empty",
+    "zh-CN": "暂无公告",
+    "en-US": "No announcements"
+  },
+  {
+    "key": "workbench.announcement.pinned",
+    "zh-CN": "置顶",
+    "en-US": "Pinned"
+  },
+  {
+    "key": "workbench.announcement.urgent",
+    "zh-CN": "紧急",
+    "en-US": "Urgent"
+  },
+  {
+    "key": "workbench.pipeline.title",
+    "zh-CN": "商机漏斗",
+    "en-US": "Sales Pipeline"
+  },
+  {
+    "key": "workbench.pipeline.empty",
+    "zh-CN": "暂无商机数据",
+    "en-US": "No opportunity data"
+  },
+  {
+    "key": "workbench.pipeline.goToCrm",
+    "zh-CN": "前往 CRM",
+    "en-US": "Go to CRM"
+  },
+  {
+    "key": "workbench.pipeline.total",
+    "zh-CN": "合计",
+    "en-US": "Total"
+  },
+  {
+    "key": "workbench.leads.title",
+    "zh-CN": "最新线索",
+    "en-US": "New Leads"
+  },
+  {
+    "key": "workbench.leads.empty",
+    "zh-CN": "暂无线索",
+    "en-US": "No leads yet"
+  },
+  {
+    "key": "workbench.leads.viewAll",
+    "zh-CN": "查看全部",
+    "en-US": "View All"
+  },
+  {
+    "key": "workbench.leads.unnamed",
+    "zh-CN": "未命名线索",
+    "en-US": "Unnamed Lead"
+  },
+  {
+    "key": "workbench.leads.justNow",
+    "zh-CN": "刚刚",
+    "en-US": "Just now"
+  },
+  {
+    "key": "workbench.leads.hoursAgo",
+    "zh-CN": "{hours}小时前",
+    "en-US": "{hours}h ago"
+  },
+  {
+    "key": "workbench.leads.daysAgo",
+    "zh-CN": "{days}天前",
+    "en-US": "{days}d ago"
+  },
+  {
+    "key": "workbench.processStats.title",
+    "zh-CN": "流程统计",
+    "en-US": "Process Stats"
+  },
+  {
+    "key": "workbench.processStats.noData",
+    "zh-CN": "暂无数据",
+    "en-US": "No data available"
+  },
+  {
+    "key": "workbench.processStats.completionRate",
+    "zh-CN": "完成率",
+    "en-US": "Completion Rate"
+  },
+  {
+    "key": "workbench.processStats.hours",
+    "zh-CN": "小时",
+    "en-US": "hours"
+  },
+  {
+    "key": "workbench.processStats.avgDuration",
+    "zh-CN": "平均耗时",
+    "en-US": "Avg Duration"
+  },
+  {
+    "key": "workbench.processStats.processes",
+    "zh-CN": "个流程",
+    "en-US": "processes"
+  },
+  {
+    "key": "workbench.processStats.running",
+    "zh-CN": "运行中",
+    "en-US": "Running"
+  },
+  {
+    "key": "workbench.processStats.completedThisWeek",
+    "zh-CN": "本周完成",
+    "en-US": "completed this week"
+  },
+  {
+    "key": "workbench.process.title",
+    "zh-CN": "我的流程",
+    "en-US": "My Processes"
+  },
+  {
+    "key": "workbench.process.empty",
+    "zh-CN": "暂无发起的流程",
+    "en-US": "No processes started"
+  },
+  {
+    "key": "workbench.process.viewAll",
+    "zh-CN": "查看全部",
+    "en-US": "View All"
+  },
+  {
+    "key": "workbench.process.justNow",
+    "zh-CN": "刚刚",
+    "en-US": "Just now"
+  },
+  {
+    "key": "workbench.process.hoursAgo",
+    "zh-CN": "{hours}小时前",
+    "en-US": "{hours}h ago"
+  },
+  {
+    "key": "workbench.process.daysAgo",
+    "zh-CN": "{days}天前",
+    "en-US": "{days}d ago"
+  },
+  {
+    "key": "workbench.quickNote.title",
+    "zh-CN": "快速备忘",
+    "en-US": "Quick Note"
+  },
+  {
+    "key": "workbench.quickNote.placeholder",
+    "zh-CN": "写下备忘内容…",
+    "en-US": "Write a quick note..."
+  },
+  {
+    "key": "workbench.quickNote.saving",
+    "zh-CN": "保存中…",
+    "en-US": "Saving..."
+  },
+  {
+    "key": "workbench.quickNote.justSaved",
+    "zh-CN": "刚刚保存",
+    "en-US": "Just saved"
+  },
+  {
+    "key": "workbench.quickNote.lastSaved",
+    "zh-CN": "上次保存",
+    "en-US": "Last saved"
+  },
+  {
+    "key": "workbench.calendar.title",
+    "zh-CN": "日程",
+    "en-US": "Calendar"
+  },
+  {
+    "key": "workbench.calendar.today",
+    "zh-CN": "今天",
+    "en-US": "Today"
   }
 ]
