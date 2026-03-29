@@ -136,6 +136,11 @@ public class FileServiceImpl implements FileService {
 
     @Override
     public FileEntity getFileById(String fileId) {
+        // Try PID lookup first (ULID string), fallback to numeric ID
+        FileEntity entity = findByPid(fileId);
+        if (entity != null) {
+            return entity;
+        }
         return fileMapper.selectById(fileId);
     }
 
