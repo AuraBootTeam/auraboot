@@ -1,31 +1,24 @@
 package com.auraboot.framework.datasync;
 
 import com.auraboot.module.meta.event.CommandCompletedEvent;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
-import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
- * Listens to CommandCompletedEvent and publishes DataSyncMessage
- * to Redis Pub/Sub for cross-instance data change notification.
- * Runs AFTER_COMMIT to guarantee data is persisted before push.
- * Only activated when Redis is configured.
+ * Local (in-process) fallback for data sync when Redis is not available.
+ * Pushes events directly to SSE registry — suitable for single-instance deployments.
  */
 @Slf4j
 @Component
-@ConditionalOnExpression("!'${spring.data.redis.host:}'.isEmpty()")
+@ConditionalOnMissingBean(DataSyncEventListener.class)
 @RequiredArgsConstructor
-public class DataSyncEventListener {
+public class DataSyncLocalEventListener {
 
-    private final StringRedisTemplate redisTemplate;
-    private final ObjectMapper objectMapper;
-
-    public static final String CHANNEL = "data-sync";
+    private final DataSyncSseRegistry sseRegistry;
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onCommandCompleted(CommandCompletedEvent event) {
@@ -46,12 +39,11 @@ public class DataSyncEventListener {
                 actorId
             );
 
-            String json = objectMapper.writeValueAsString(message);
-            redisTemplate.convertAndSend(CHANNEL, json);
+            sseRegistry.pushToSubscribers(message);
 
-            log.debug("DataSync: published change for model={} op={}", event.getModelCode(), event.getOperationType());
+            log.debug("DataSync(local): pushed change for model={} op={}", event.getModelCode(), event.getOperationType());
         } catch (Exception e) {
-            log.warn("DataSync: failed to publish data sync message for model={}: {}",
+            log.warn("DataSync(local): failed to push data sync for model={}: {}",
                 event.getModelCode(), e.getMessage());
         }
     }

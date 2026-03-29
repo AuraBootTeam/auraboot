@@ -1,11 +1,13 @@
-# AuraBoot — Infrastructure for Local Development
-# Starts PostgreSQL, Redis, and MinIO (optional file storage).
-# Backend and frontend are run locally, or use --profile full for complete stack.
+# AuraBoot — Docker Deployment
+# Only PostgreSQL is required. Redis and MinIO are optional.
 #
 # Usage:
-#   docker compose up -d          # start all infrastructure
-#   docker compose up -d postgres redis  # start only DB + cache
-#   docker compose down           # stop
+#   docker compose --profile full up --build -d        # minimal: PostgreSQL + backend + frontend
+#   docker compose --profile full --profile cache up --build -d   # + Redis (multi-instance)
+#   docker compose --profile full --profile storage up --build -d # + MinIO (S3 file storage)
+#   docker compose --profile full --profile cache --profile storage --profile monitoring up --build -d  # everything
+#   docker compose up -d                               # infrastructure only (for local dev)
+#   docker compose down                                # stop
 
 services:
   # ─── PostgreSQL 16 ────────────────────────────────────────────────────────
@@ -29,8 +31,9 @@ services:
       retries: 10
       start_period: 10s
 
-  # ─── Redis 7 ──────────────────────────────────────────────────────────────
+  # ─── Redis 7 (optional — needed for multi-instance deployments) ────────────
   redis:
+    profiles: [cache]
     image: redis:7-alpine
     container_name: auraboot-redis
     restart: unless-stopped
@@ -39,14 +42,15 @@ services:
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["cmd", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 10
       start_period: 5s
 
-  # ─── MinIO (optional — only needed for file upload features) ───────────────
+  # ─── MinIO (optional — needed for S3-compatible file storage) ──────────────
   minio:
+    profiles: [storage]
     image: minio/minio:latest
     container_name: auraboot-minio
     restart: unless-stopped
@@ -60,7 +64,7 @@ services:
     volumes:
       - minio_data:/data
     healthcheck:
-      test: ["cmd", "mc", "ready", "local"]
+      test: ["CMD", "mc", "ready", "local"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -78,8 +82,6 @@ services:
       DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-aura_boot}?charSet=UTF8
       DATABASE_USERNAME: ${POSTGRES_USER:-auraboot}
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-auraboot_dev}
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
       JWT_SECRET: ${JWT_SECRET:-docker-eval-secret-change-in-production-min-32-chars}
       FRONTEND_BASE_URL: http://localhost:${AURABOOT_PORT:-3000}
       SPRING_PROFILES_ACTIVE: community
@@ -89,10 +91,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
-        condition: service_healthy
     healthcheck:
-      test: ["cmd", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:6443/actuator/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:6443/actuator/health"]
       interval: 15s
       timeout: 10s
       retries: 10

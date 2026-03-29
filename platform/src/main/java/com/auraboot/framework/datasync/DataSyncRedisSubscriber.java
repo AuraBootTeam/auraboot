@@ -3,6 +3,7 @@ package com.auraboot.framework.datasync;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.data.redis.connection.Message;
 import org.springframework.data.redis.connection.MessageListener;
 import org.springframework.stereotype.Component;
@@ -10,9 +11,11 @@ import org.springframework.stereotype.Component;
 /**
  * Subscribes to Redis Pub/Sub 'data-sync' channel and pushes
  * events to locally connected SSE clients via DataSyncSseRegistry.
+ * Only activated when Redis is configured.
  */
 @Slf4j
 @Component
+@ConditionalOnExpression("!'${spring.data.redis.host:}'.isEmpty()")
 @RequiredArgsConstructor
 public class DataSyncRedisSubscriber implements MessageListener {
 

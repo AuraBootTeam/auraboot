@@ -3,6 +3,7 @@ package com.auraboot.framework.currency.service;
 import com.auraboot.framework.currency.spi.CurrencyConversionSpi;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -35,6 +36,7 @@ import java.util.Map;
  */
 @Slf4j
 @Service
+@ConditionalOnBean(CurrencyConversionSpi.class)
 @RequiredArgsConstructor
 public class ReportingCurrencyConverter {
 

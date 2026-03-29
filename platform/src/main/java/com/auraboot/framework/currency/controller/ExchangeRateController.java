@@ -34,7 +34,7 @@ public class ExchangeRateController {
 
     private final CurrencyService currencyService;
     private final TimezoneService timezoneService;
-    private final CurrencyConversionSpi currencyConversionService;
+    private final Optional<CurrencyConversionSpi> currencyConversionService;
     private final TenantPreferenceService tenantPreferenceService;
 
     /** Injected as Optional because the bean may be absent when ecb.enabled=false */
@@ -49,7 +49,7 @@ public class ExchangeRateController {
      */
     @GetMapping("/base-currency")
     public ResponseEntity<Map<String, String>> getBaseCurrency() {
-        String base = currencyConversionService.getBaseCurrency();
+        String base = currencyConversionService.map(CurrencyConversionSpi::getBaseCurrency).orElse("CNY");
         return ResponseEntity.ok(Map.of("baseCurrency", base));
     }
 

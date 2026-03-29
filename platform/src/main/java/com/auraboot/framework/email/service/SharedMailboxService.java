@@ -8,6 +8,7 @@ import com.auraboot.framework.email.model.EmailConstants;
 import com.auraboot.framework.email.model.EmailMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -36,7 +37,9 @@ public class SharedMailboxService {
 
     private final EmailAccountMemberMapper emailAccountMemberMapper;
     private final EmailMessageMapper       emailMessageMapper;
-    private final StringRedisTemplate      stringRedisTemplate;
+
+    @Autowired(required = false)
+    private StringRedisTemplate stringRedisTemplate;
 
     // ──────────────────────────────────────────────────────────────────────────
     // Assign
@@ -81,11 +84,15 @@ public class SharedMailboxService {
             return null;
         }
 
-        // Atomically increment the Redis counter and pick a slot
+        // Atomically increment the counter and pick a slot
         String redisKey = RR_KEY_PREFIX + account.getId();
-        Long counter    = stringRedisTemplate.opsForValue().increment(redisKey);
-        if (counter == null) {
-            counter = 0L;
+        Long counter;
+        if (stringRedisTemplate != null) {
+            counter = stringRedisTemplate.opsForValue().increment(redisKey);
+            if (counter == null) counter = 0L;
+        } else {
+            // Fallback without Redis: use simple counter (not distributed-safe)
+            counter = System.nanoTime();
         }
 
         int slotIndex    = (int) (Math.abs(counter - 1) % slots.size());
