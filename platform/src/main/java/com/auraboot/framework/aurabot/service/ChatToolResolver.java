@@ -96,9 +96,12 @@ public class ChatToolResolver {
                     tenantId, grounding.candidateSkills(),
                     grounding.object(), grounding.intent(), MAX_TOOLS);
 
-            List<LlmChatRequest.Tool> llmTools = toolDefs.stream()
+            List<LlmChatRequest.Tool> llmTools = new ArrayList<>(toolDefs.stream()
                     .map(this::convertToolDef)
-                    .toList();
+                    .toList());
+
+            // Ensure platform tools are always available (grounding may filter them out)
+            ensurePlatformTools(llmTools);
 
             log.info("AuraBot D1: resolved {} tools via ToolDiscoveryPort", llmTools.size());
             return new ResolvedTools(llmTools, grounding.intent(), grounding.object(), grounding.readOnly());
@@ -123,6 +126,58 @@ public class ChatToolResolver {
             return !toolName.equals("platform_create_model");
         }
         return false;
+    }
+
+    // ==================== Platform Tool Injection ====================
+
+    /** Platform tools that should always be available regardless of grounding result */
+    private static final List<LlmChatRequest.Tool> ALWAYS_AVAILABLE_PLATFORM_TOOLS = List.of(
+            LlmChatRequest.Tool.builder()
+                    .name("platform_fill_form")
+                    .description("Extract structured data from text (chat transcript, email, notes) "
+                            + "and fill the current page's form fields. Use when user asks to populate "
+                            + "a form from unstructured text. The 'fields' parameter must use the "
+                            + "model's field codes as keys.")
+                    .inputSchema(Map.of("type", "object",
+                            "properties", Map.of(
+                                    "fields", Map.of("type", "object",
+                                            "description", "Map of fieldCode → value extracted from text"),
+                                    "source", Map.of("type", "string",
+                                            "description", "Brief description of source text"),
+                                    "confidence", Map.of("type", "number",
+                                            "description", "Overall confidence 0.0-1.0")),
+                            "required", List.of("fields")))
+                    .build(),
+            LlmChatRequest.Tool.builder()
+                    .name("platform_execute_sql")
+                    .description("Execute a read-only SQL SELECT query with safety validation and tenant isolation. "
+                            + "Use the model schema from the system prompt to write SQL directly.")
+                    .inputSchema(Map.of("type", "object",
+                            "properties", Map.of(
+                                    "sql", Map.of("type", "string",
+                                            "description", "PostgreSQL SELECT query. Include tenant_id = #{params.tenantId}."),
+                                    "chartType", Map.of("type", "string",
+                                            "enum", List.of("table", "bar", "pie", "line")),
+                                    "interpretation", Map.of("type", "string",
+                                            "description", "Brief interpretation")),
+                            "required", List.of("sql")))
+                    .build()
+    );
+
+    /**
+     * Ensure platform tools are present in the tool list.
+     * Grounding may filter them out based on intent, but these should always be available.
+     */
+    private void ensurePlatformTools(List<LlmChatRequest.Tool> tools) {
+        Set<String> existing = tools.stream()
+                .map(LlmChatRequest.Tool::getName)
+                .collect(java.util.stream.Collectors.toSet());
+
+        for (LlmChatRequest.Tool pt : ALWAYS_AVAILABLE_PLATFORM_TOOLS) {
+            if (!existing.contains(pt.getName())) {
+                tools.add(pt);
+            }
+        }
     }
 
     // ==================== Tool Conversion ====================
