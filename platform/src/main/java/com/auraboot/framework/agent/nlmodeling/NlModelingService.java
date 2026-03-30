@@ -405,7 +405,7 @@ public class NlModelingService {
                       "content": {
                         "blocks": [{
                           "id": "table",
-                          "blockType": "data-table",
+                          "blockType": "table",
                           "columns": [
                             { "field": "<field_code>", "width": 200, "sortable": true }
                           ],
@@ -419,7 +419,7 @@ public class NlModelingService {
                   }
                 }
                 ```
-                - List page: toolbar (create button) + data-table with columns and row actions
+                - List page: toolbar (create button) + table with columns and row actions
                 - Form page: kind=form, layout with form-section blocks
 
                 ### Form Page Schema
@@ -774,7 +774,7 @@ public class NlModelingService {
                       "layout": { "areas": ["toolbar", "content"], "areasConfig": { "toolbar": { "type": "flex", "direction": "row" }, "content": { "type": "flex", "direction": "column" } } },
                       "areas": {
                         "toolbar": { "blocks": [{ "id": "toolbar", "blockType": "toolbar", "buttons": [{ "code": "create", "variant": "primary", "label": "create", "action": { "type": "navigate", "to": "book_form", "command": "book_mgmt:create_book" } }] }] },
-                        "content": { "blocks": [{ "id": "table", "blockType": "data-table", "columns": [ { "field": "title", "width": 200, "sortable": true }, { "field": "author", "width": 150 }, { "field": "isbn", "width": 150 }, { "field": "price", "width": 100 }, { "field": "published_date", "width": 120 } ], "rowActions": [ { "code": "edit", "label": "edit", "action": { "type": "navigate", "to": "book_form", "command": "book_mgmt:update_book" } }, { "code": "delete", "label": "delete", "variant": "danger", "action": { "type": "command", "command": "book_mgmt:delete_book" } } ] }] }
+                        "content": { "blocks": [{ "id": "table", "blockType": "table", "columns": [ { "field": "title", "width": 200, "sortable": true }, { "field": "author", "width": 150 }, { "field": "isbn", "width": 150 }, { "field": "price", "width": 100 }, { "field": "published_date", "width": 120 } ], "rowActions": [ { "code": "edit", "label": "edit", "action": { "type": "navigate", "to": "book_form", "command": "book_mgmt:update_book" } }, { "code": "delete", "label": "delete", "variant": "danger", "action": { "type": "command", "command": "book_mgmt:delete_book" } } ] }] }
                       }
                     }
                   },

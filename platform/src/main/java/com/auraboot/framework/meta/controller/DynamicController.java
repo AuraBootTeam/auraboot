@@ -851,7 +851,7 @@ public class DynamicController {
 
     /**
      * Derive available view types from page schema by scanning top-level blocks for
-     * recognized view-type indicators (data-table, kanban, calendar, gallery, gantt, tree).
+     * recognized view-type indicators (table, kanban, calendar, gallery, gantt, tree).
      */
     private List<String> deriveAvailableViews(PageSchemaDTO pageSchema) {
         Set<String> views = new LinkedHashSet<>();
@@ -873,7 +873,7 @@ public class DynamicController {
                                 case "gallery" -> views.add("gallery");
                                 case "gantt" -> views.add("gantt");
                                 case "tree" -> views.add("tree");
-                                default -> {} // data-table → TABLE already included
+                                default -> {} // table → TABLE already included
                             }
                         }
                     }

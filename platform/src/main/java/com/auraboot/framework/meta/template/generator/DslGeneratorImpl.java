@@ -232,7 +232,7 @@ public class DslGeneratorImpl implements DslGenerator {
 
         Map<String, Object> filterBlock = new LinkedHashMap<>();
         filterBlock.put("id", "block_" + model.getCode() + "_filters");
-        filterBlock.put("blockType", "filter-form");
+        filterBlock.put("blockType", "filters");
 
         Map<String, Object> layout = new LinkedHashMap<>();
         layout.put("colSpan", 12);
@@ -472,7 +472,7 @@ public class DslGeneratorImpl implements DslGenerator {
 
         Map<String, Object> tableBlock = new LinkedHashMap<>();
         tableBlock.put("id", "block_" + model.getCode() + "_table");
-        tableBlock.put("blockType", "data-table");
+        tableBlock.put("blockType", "table");
 
         Map<String, Object> layout = new LinkedHashMap<>();
         layout.put("colSpan", 12);

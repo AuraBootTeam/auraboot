@@ -116,9 +116,9 @@ public class DslRegistryInitializer {
         reg.register(new BlockRendererRegistry.RendererMeta("form-buttons", "platform", "Form button bar renderer"));
         reg.register(new BlockRendererRegistry.RendererMeta("form-wizard", "platform", "Multi-step form wizard renderer"));
         reg.register(new BlockRendererRegistry.RendererMeta("table", "platform", "Table renderer"));
-        reg.register(new BlockRendererRegistry.RendererMeta("data-table", "platform", "Data table renderer"));
+        reg.register(new BlockRendererRegistry.RendererMeta("table", "platform", "Data table renderer"));
         reg.register(new BlockRendererRegistry.RendererMeta("filters", "platform", "Filter panel renderer"));
-        reg.register(new BlockRendererRegistry.RendererMeta("filter-form", "platform", "Filter form renderer"));
+        reg.register(new BlockRendererRegistry.RendererMeta("filters", "platform", "Filter form renderer"));
         reg.register(new BlockRendererRegistry.RendererMeta("toolbar", "platform", "Toolbar renderer"));
         reg.register(new BlockRendererRegistry.RendererMeta("action", "platform", "Action button renderer"));
         reg.register(new BlockRendererRegistry.RendererMeta("description", "platform", "Description/detail renderer"));
