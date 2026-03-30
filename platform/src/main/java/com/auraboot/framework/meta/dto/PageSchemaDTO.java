@@ -5,6 +5,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -41,10 +42,16 @@ public class PageSchemaDTO extends AbstractResponse {
     private String modelCategory;
 
     /**
-     * 页面分类
+     * Page kind (list, form, detail, dashboard).
      */
-    @JsonProperty("pageCategory")
-    private String pageCategory;
+    @JsonProperty("kind")
+    private String kind;
+
+    /**
+     * Page profile (sub-type within a kind).
+     */
+    @JsonProperty("profile")
+    private String profile;
 
     /**
      * 页面名称
@@ -53,10 +60,10 @@ public class PageSchemaDTO extends AbstractResponse {
     private String name;
 
     /**
-     * 页面标题
+     * Localized page title (JSONB map, e.g. {"en":"Contracts","zh-CN":"合同"}).
      */
     @JsonProperty("title")
-    private String title;
+    private Map<String, Object> title;
 
     /**
      * 页面描述
@@ -65,16 +72,16 @@ public class PageSchemaDTO extends AbstractResponse {
     private String description;
 
     /**
-     * 页面类型
+     * Layout configuration (JSON object for page-level layout settings).
      */
-    @JsonProperty("pageType")
-    private String pageType;
+    @JsonProperty("layout")
+    private Map<String, Object> layout;
 
     /**
-     * DSL Schema定义（JSON格式）
+     * Ordered list of page blocks (toolbar, filter-bar, data-table, form-section, etc.).
      */
-    @JsonProperty("dslSchema")
-    private Map<String, Object> dslSchema;
+    @JsonProperty("blocks")
+    private List<Object> blocks;
 
     /**
      * DSL schema format version (single integer).
