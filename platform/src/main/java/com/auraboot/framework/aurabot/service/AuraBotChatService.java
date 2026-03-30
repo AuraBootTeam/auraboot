@@ -179,6 +179,8 @@ public class AuraBotChatService {
             sendError(emitter, "No LLM provider configured. Please configure an API key in Cloud Config.");
             return;
         }
+        // Use the resolved provider code (may differ from input when auto-discovered)
+        providerCode = config.getProviderCode();
 
         // --- Trace: create trace ---
         Map<String, Object> traceMetadata = new HashMap<>();
