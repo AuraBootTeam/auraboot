@@ -82,11 +82,18 @@ public class LlmProviderFactory {
      */
     @SuppressWarnings("unchecked")
     public ProviderConfig resolveConfig(Long tenantId, String providerCode) {
+        // No provider specified — find the first enabled provider with an API key
         if (providerCode == null || providerCode.isBlank()) {
-            providerCode = "anthropic";
+            List<ProviderInfo> configured = listConfiguredProviders(tenantId);
+            if (configured.isEmpty()) {
+                log.warn("No LLM provider configured for tenant {}", tenantId);
+                return null;
+            }
+            providerCode = configured.get(0).getProviderCode();
+            log.debug("Auto-resolved LLM provider: {}", providerCode);
         }
 
-        // 1. Try CloudConfig (ab_cloud_config with service_type='llm')
+        // Look up the specific provider in CloudConfig
         try {
             CloudConfig cc = cloudConfigService.getEffectiveConfig(tenantId, "llm", providerCode);
             if (cc != null && cc.getConfig() != null && !cc.getConfig().isBlank()) {
@@ -106,21 +113,8 @@ public class LlmProviderFactory {
             log.debug("CloudConfig lookup failed for LLM/{}: {}", providerCode, e.getMessage());
         }
 
-        // 2. Fallback to application.yml (backward compat, anthropic only)
-        if ("anthropic".equals(providerCode)) {
-            AgentProperties.Anthropic anthropic = agentProperties.getAnthropic();
-            if (anthropic.getApiKey() != null && !anthropic.getApiKey().isBlank()) {
-                return ProviderConfig.builder()
-                        .providerCode("anthropic")
-                        .apiKey(anthropic.getApiKey())
-                        .baseUrl(anthropic.getBaseUrl())
-                        .defaultModel(anthropic.getDefaultModel())
-                        .maxTokens(anthropic.getMaxTokens())
-                        .build();
-            }
-        }
-
-        return null; // No configuration found
+        log.warn("LLM provider '{}' not configured or missing API key for tenant {}", providerCode, tenantId);
+        return null;
     }
 
     /**

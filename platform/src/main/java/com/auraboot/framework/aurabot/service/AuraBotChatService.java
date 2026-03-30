@@ -793,14 +793,8 @@ public class AuraBotChatService {
             if (inferred != null) return inferred;
         }
 
-        // 3. First configured provider
-        List<ProviderInfo> configured = llmProviderFactory.listConfiguredProviders(tenantId);
-        if (!configured.isEmpty()) {
-            return configured.get(0).getProviderCode();
-        }
-
-        // 4. Ultimate fallback
-        return "anthropic";
+        // 3. No explicit provider — return null, let resolveConfig auto-discover
+        return null;
     }
 
     /**
