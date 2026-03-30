@@ -404,10 +404,7 @@ public class RecordCapabilityServiceImpl implements RecordCapabilityService {
                 .orElse(null);
 
         if (detailPage != null && detailPage.getBlocks() != null) {
-            // V2: blocks are top-level; wrap in areas.main.blocks for extractTabsFromSchema
-            Map<String, Object> schemaMap = Map.of(
-                    "areas", Map.of("main", Map.of("blocks", detailPage.getBlocks())));
-            List<TabCapability> tabs = extractTabsFromSchema(schemaMap);
+            List<TabCapability> tabs = extractTabsFromBlocks(detailPage.getBlocks());
             if (!tabs.isEmpty()) return tabs;
         }
 
@@ -421,18 +418,13 @@ public class RecordCapabilityServiceImpl implements RecordCapabilityService {
     }
 
     /**
-     * Walk the detail page DSL schema to extract tab definitions.
-     * Schema structure: {@code areas.main.blocks[].tabs[{key, label}]}.
+     * Walk the flat blocks list to extract tab definitions.
+     * V2 structure: {@code blocks[].tabs[{key, label}]} (no areas wrapper).
      */
     @SuppressWarnings("unchecked")
-    private List<TabCapability> extractTabsFromSchema(Map<String, Object> dslSchema) {
+    private List<TabCapability> extractTabsFromBlocks(List<Object> blocks) {
         List<TabCapability> result = new ArrayList<>();
         try {
-            Map<String, Object> areas = asMap(dslSchema.get("areas"));
-            if (areas == null) return result;
-            Map<String, Object> main = asMap(areas.get("main"));
-            if (main == null) return result;
-            List<?> blocks = asList(main.get("blocks"));
             if (blocks == null) return result;
 
             for (Object blockObj : blocks) {
@@ -456,7 +448,7 @@ public class RecordCapabilityServiceImpl implements RecordCapabilityService {
                 }
             }
         } catch (Exception e) {
-            log.debug("Failed to extract tabs from schema: {}", e.getMessage());
+            log.debug("Failed to extract tabs from blocks: {}", e.getMessage());
         }
         return result;
     }

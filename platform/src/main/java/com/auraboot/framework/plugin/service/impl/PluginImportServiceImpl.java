@@ -2130,7 +2130,7 @@ public class PluginImportServiceImpl implements PluginImportService {
         if (manifest.getPages() != null) {
             for (PageSchemaDTO page : manifest.getPages()) {
                 if (page == null || isBlank(page.getPageKey())) continue;
-                // kind is optional for pages that use dslSchema (auto-detected)
+                // kind is required in V2 format
             }
         }
 
