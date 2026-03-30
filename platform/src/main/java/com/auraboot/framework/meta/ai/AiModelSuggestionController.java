@@ -30,6 +30,9 @@ public class AiModelSuggestionController {
     public ApiResponse<AiModelSuggestionService.ModelSuggestion> suggestModel(@RequestBody SuggestModelRequest request) {
         AiModelSuggestionService.ModelSuggestion suggestion =
                 aiModelSuggestionService.suggestModel(request.getDescription(), request.getLanguage());
+        if (suggestion == null) {
+            return ApiResponse.error("AI model suggestion is not available. Please configure an LLM provider.");
+        }
         return ApiResponse.ok(suggestion);
     }
 
