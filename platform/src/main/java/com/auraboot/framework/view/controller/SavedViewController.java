@@ -44,7 +44,7 @@ public class SavedViewController {
 
     @PostMapping
     @Operation(summary = "Create saved view", description = "Create a new user-defined view")
-    @RequirePermission(MetaPermission.VIEW_MANAGE)
+    @RequirePermission(value = MetaPermission.VIEW_MANAGE, optional = true)
     public ApiResponse<SavedViewDTO> create(
             @Valid @RequestBody SavedViewCreateRequest request) {
         log.info("Creating saved view: name={}, modelCode={}", request.getName(), request.getModelCode());
@@ -57,7 +57,7 @@ public class SavedViewController {
 
     @GetMapping("/{pid}")
     @Operation(summary = "Get saved view", description = "Get a saved view by PID")
-    @RequirePermission(MetaPermission.VIEW_READ)
+    @RequirePermission(value = MetaPermission.VIEW_READ, optional = true)
     public ApiResponse<SavedViewDTO> getByPid(
             @Parameter(description = "View PID") @PathVariable @NotBlank String pid) {
         log.info("Getting saved view: pid={}", pid);
@@ -72,7 +72,7 @@ public class SavedViewController {
 
     @PutMapping("/{pid}")
     @Operation(summary = "Update saved view", description = "Update an existing saved view")
-    @RequirePermission(MetaPermission.VIEW_MANAGE)
+    @RequirePermission(value = MetaPermission.VIEW_MANAGE, optional = true)
     public ApiResponse<SavedViewDTO> update(
             @Parameter(description = "View PID") @PathVariable @NotBlank String pid,
             @Valid @RequestBody SavedViewUpdateRequest request) {
@@ -86,7 +86,7 @@ public class SavedViewController {
 
     @DeleteMapping("/{pid}")
     @Operation(summary = "Delete saved view", description = "Delete a saved view")
-    @RequirePermission(MetaPermission.VIEW_MANAGE)
+    @RequirePermission(value = MetaPermission.VIEW_MANAGE, optional = true)
     public ApiResponse<Void> delete(
             @Parameter(description = "View PID") @PathVariable @NotBlank String pid) {
         log.info("Deleting saved view: pid={}", pid);
@@ -102,7 +102,7 @@ public class SavedViewController {
     @GetMapping("/accessible")
     @Operation(summary = "Get accessible views",
             description = "Get all views accessible to current user (personal + team + global)")
-    @RequirePermission(MetaPermission.VIEW_READ)
+    @RequirePermission(value = MetaPermission.VIEW_READ, optional = true)
     public ApiResponse<List<SavedViewDTO>> getAccessibleViews(
             @Parameter(description = "Model code") @RequestParam @NotBlank String modelCode,
             @Parameter(description = "Page key (optional)") @RequestParam(required = false) String pageKey) {
@@ -117,7 +117,7 @@ public class SavedViewController {
     @GetMapping("/personal")
     @Operation(summary = "Get personal views",
             description = "Get personal views for current user")
-    @RequirePermission(MetaPermission.VIEW_READ)
+    @RequirePermission(value = MetaPermission.VIEW_READ, optional = true)
     public ApiResponse<List<SavedViewDTO>> getPersonalViews(
             @Parameter(description = "Model code") @RequestParam @NotBlank String modelCode,
             @Parameter(description = "Page key (optional)") @RequestParam(required = false) String pageKey) {
@@ -132,7 +132,7 @@ public class SavedViewController {
     @GetMapping("/team")
     @Operation(summary = "Get team views",
             description = "Get views shared with the current user's teams (scope=TEAM)")
-    @RequirePermission(MetaPermission.VIEW_READ)
+    @RequirePermission(value = MetaPermission.VIEW_READ, optional = true)
     public ApiResponse<List<SavedViewDTO>> getTeamViews(
             @Parameter(description = "Model code") @RequestParam @NotBlank String modelCode,
             @Parameter(description = "Page key (optional)") @RequestParam(required = false) String pageKey) {
@@ -150,7 +150,7 @@ public class SavedViewController {
     @GetMapping("/global")
     @Operation(summary = "Get global views",
             description = "Get global views available to all users")
-    @RequirePermission(MetaPermission.VIEW_READ)
+    @RequirePermission(value = MetaPermission.VIEW_READ, optional = true)
     public ApiResponse<List<SavedViewDTO>> getGlobalViews(
             @Parameter(description = "Model code") @RequestParam @NotBlank String modelCode,
             @Parameter(description = "Page key (optional)") @RequestParam(required = false) String pageKey) {
@@ -167,7 +167,7 @@ public class SavedViewController {
     @GetMapping("/default")
     @Operation(summary = "Get default view",
             description = "Get the default view for current user and model/page")
-    @RequirePermission(MetaPermission.VIEW_READ)
+    @RequirePermission(value = MetaPermission.VIEW_READ, optional = true)
     public ApiResponse<SavedViewDTO> getDefaultView(
             @Parameter(description = "Model code") @RequestParam @NotBlank String modelCode,
             @Parameter(description = "Page key (optional)") @RequestParam(required = false) String pageKey) {
@@ -181,7 +181,7 @@ public class SavedViewController {
     @PostMapping("/{pid}/set-default")
     @Operation(summary = "Set as default view",
             description = "Set a view as the default for current user")
-    @RequirePermission(MetaPermission.VIEW_MANAGE)
+    @RequirePermission(value = MetaPermission.VIEW_MANAGE, optional = true)
     public ApiResponse<SavedViewDTO> setAsDefault(
             @Parameter(description = "View PID") @PathVariable @NotBlank String pid) {
         log.info("Setting view as default: pid={}", pid);
@@ -197,7 +197,7 @@ public class SavedViewController {
     @PostMapping("/{pid}/duplicate")
     @Operation(summary = "Duplicate view",
             description = "Create a copy of an existing view")
-    @RequirePermission(MetaPermission.VIEW_MANAGE)
+    @RequirePermission(value = MetaPermission.VIEW_MANAGE, optional = true)
     public ApiResponse<SavedViewDTO> duplicate(
             @Parameter(description = "Source view PID") @PathVariable @NotBlank String pid,
             @RequestBody Map<String, String> request) {
@@ -217,7 +217,7 @@ public class SavedViewController {
     @GetMapping("/my-teams")
     @Operation(summary = "Get current user's teams",
             description = "Get teams the current user belongs to, for team view scope selection")
-    @RequirePermission(MetaPermission.VIEW_READ)
+    @RequirePermission(value = MetaPermission.VIEW_READ, optional = true)
     public ApiResponse<List<Map<String, Object>>> getMyTeams() {
         log.info("Getting current user's teams for view scope");
         List<Map<String, Object>> teams = currentUserTeamResolver.resolveCurrentUserTeamMemberships();
@@ -227,7 +227,7 @@ public class SavedViewController {
     @GetMapping("/check-name")
     @Operation(summary = "Check name uniqueness",
             description = "Check if a view name is unique for current user")
-    @RequirePermission(MetaPermission.VIEW_READ)
+    @RequirePermission(value = MetaPermission.VIEW_READ, optional = true)
     public ApiResponse<Boolean> checkNameUnique(
             @Parameter(description = "Model code") @RequestParam @NotBlank String modelCode,
             @Parameter(description = "Page key (optional)") @RequestParam(required = false) String pageKey,
