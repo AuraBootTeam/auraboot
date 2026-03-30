@@ -66,6 +66,10 @@ public class AuraBotChatService {
     @Autowired(required = false)
     private com.auraboot.framework.agent.port.AgentChatPort agentChatPort;
 
+    /** Optional chat run persistence — available when enterprise-ai module is loaded. */
+    @Autowired(required = false)
+    private ChatRunPersistencePort chatRunPersistencePort;
+
     private static final HttpClient HTTP_CLIENT = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
             .build();
@@ -219,7 +223,7 @@ public class AuraBotChatService {
 
         // 5. Route: tool loop (sync) vs text-only streaming
         if (!tools.isEmpty()) {
-            doToolLoop(providerCode, config, model, systemPrompt, maxTokens,
+            doToolLoop(tenantId, providerCode, config, model, systemPrompt, maxTokens,
                     request.getHistory(), request.getMessage(), tools,
                     modelCode, request.getSessionId(), emitter, trace);
         } else {
@@ -246,7 +250,7 @@ public class AuraBotChatService {
     // Tool loop (synchronous LlmProvider.chat)
     // =========================================================================
 
-    private void doToolLoop(String providerCode, ProviderConfig config, String model,
+    private void doToolLoop(Long tenantId, String providerCode, ProviderConfig config, String model,
                             String systemPrompt, int maxTokens,
                             List<ChatMessage> history, String userMessage,
                             List<LlmChatRequest.Tool> tools, String modelCode,
@@ -257,6 +261,13 @@ public class AuraBotChatService {
             sendError(emitter, "LLM provider not available: " + providerCode, trace != null ? trace.getTraceId() : null);
             return;
         }
+
+        // Persist run record
+        String runPid = null;
+        if (chatRunPersistencePort != null) {
+            runPid = chatRunPersistencePort.createRun(tenantId, model, userMessage);
+        }
+        int totalInputTokens = 0, totalOutputTokens = 0;
 
         // Build conversation messages
         List<LlmChatRequest.Message> messages = buildLlmMessages(history, userMessage);
@@ -281,6 +292,10 @@ public class AuraBotChatService {
                 aiTraceService.endSpan(llmSpan, Map.of("error", e.getMessage()), "error");
                 aiTraceService.endTraceWithError(trace, e.getMessage());
                 log.error("Tool loop LLM call failed (round {}): {}", round, e.getMessage(), e);
+                if (chatRunPersistencePort != null && runPid != null) {
+                    chatRunPersistencePort.completeRun(runPid, false, totalInputTokens, totalOutputTokens,
+                            0, null, "LLM request failed: " + e.getMessage());
+                }
                 sendError(emitter, "LLM request failed: " + e.getMessage(), trace != null ? trace.getTraceId() : null);
                 return;
             }
@@ -291,8 +306,16 @@ public class AuraBotChatService {
                     null, response.getStopReason(), null, null);
             aiTraceService.endSpan(llmSpan, null, "success");
 
+            // Accumulate token counts
+            totalInputTokens += response.getInputTokens();
+            totalOutputTokens += response.getOutputTokens();
+
             if (response == null || response.getContent() == null || response.getContent().isEmpty()) {
                 aiTraceService.endTraceWithError(trace, "Empty response from LLM");
+                if (chatRunPersistencePort != null && runPid != null) {
+                    chatRunPersistencePort.completeRun(runPid, false, totalInputTokens, totalOutputTokens,
+                            0, null, "Empty response from LLM");
+                }
                 sendError(emitter, "Empty response from LLM", trace != null ? trace.getTraceId() : null);
                 return;
             }
@@ -303,6 +326,10 @@ public class AuraBotChatService {
                 // Final text response — stream it via SSE
                 String finalText = extractTextFromResponse(response);
                 aiTraceService.endTrace(trace, finalText, "success");
+                if (chatRunPersistencePort != null && runPid != null) {
+                    chatRunPersistencePort.completeRun(runPid, true, totalInputTokens, totalOutputTokens,
+                            0, finalText, null);
+                }
                 streamFinalResponse(response, emitter, trace != null ? trace.getTraceId() : null);
                 return;
             }
@@ -342,6 +369,9 @@ public class AuraBotChatService {
                         Map<String, Object> result = chatToolExecutor.execute(toolName, input, modelCode);
                         boolean success = Boolean.TRUE.equals(result.get("success"));
                         aiTraceService.endSpan(toolSpan, result, success ? "success" : "error");
+                        if (chatRunPersistencePort != null && runPid != null) {
+                            chatRunPersistencePort.recordToolCall(runPid, toolName, input, result, success);
+                        }
 
                         sendToolResult(emitter, toolId, result, success);
 
@@ -392,13 +422,22 @@ public class AuraBotChatService {
 
             // Unknown stop reason — treat as end_turn
             log.warn("Unknown stop reason from LLM: {}", stopReason);
-            aiTraceService.endTrace(trace, extractTextFromResponse(response), "success");
+            String unknownText = extractTextFromResponse(response);
+            aiTraceService.endTrace(trace, unknownText, "success");
+            if (chatRunPersistencePort != null && runPid != null) {
+                chatRunPersistencePort.completeRun(runPid, true, totalInputTokens, totalOutputTokens,
+                        0, unknownText, null);
+            }
             streamFinalResponse(response, emitter, trace != null ? trace.getTraceId() : null);
             return;
         }
 
         // Exceeded max rounds — send what we have
         aiTraceService.endTraceWithError(trace, "Tool loop exceeded maximum rounds");
+        if (chatRunPersistencePort != null && runPid != null) {
+            chatRunPersistencePort.completeRun(runPid, false, totalInputTokens, totalOutputTokens,
+                    0, null, "Tool loop exceeded maximum rounds");
+        }
         sendError(emitter, "Tool loop exceeded maximum rounds (" + MAX_TOOL_ROUNDS + ")", trace != null ? trace.getTraceId() : null);
     }
 
