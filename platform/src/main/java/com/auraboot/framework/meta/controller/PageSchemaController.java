@@ -56,7 +56,7 @@ public class PageSchemaController {
     /**
      * 分页查询页面配置列表
      *
-     * @param pageType 页面类型
+     * @param kind 页面类型
      * @param isTemplate 是否为模板
      * @param isPublished 是否已发布 (maps to status=PUBLISHED/DRAFT internally)
      * @param keyword 关键词
@@ -67,16 +67,16 @@ public class PageSchemaController {
     @Operation(summary = "分页查询页面配置", description = "根据条件分页查询页面配置列表（不包含 dslSchema）")
     @RequirePermission("page.page.read")
     public ApiResponse<PaginationResult<PageSchemaListDTO>> list(
-            @RequestParam(required = false) String pageType,
+            @RequestParam(required = false) String kind,
             @RequestParam(required = false) Boolean isTemplate,
             @RequestParam(required = false) Boolean isPublished,
             @RequestParam(required = false) String keyword,
             @Parameter(description = "分页请求参数") @Valid PaginationRequest request) {
-        log.info("分页查询页面配置: pageType={}, isTemplate={}, isPublished={}, keyword={}, request={}",
-                pageType, isTemplate, isPublished, keyword, request);
+        log.info("分页查询页面配置: kind={}, isTemplate={}, isPublished={}, keyword={}, request={}",
+                kind, isTemplate, isPublished, keyword, request);
         // isPublished param is kept for API compatibility; internally maps to status filter
         PaginationResult<PageSchemaListDTO> result = pageSchemaService.findPageWithConditions(
-                pageType, isTemplate, isPublished, keyword, request);
+                kind, isTemplate, isPublished, keyword, request);
         return ApiResponse.success(result);
     }
 
@@ -312,16 +312,16 @@ public class PageSchemaController {
     /**
      * 根据页面类型查询配置
      *
-     * @param type 页面类型
+     * @param kind 页面类型
      * @return 页面配置列表
      */
-    @GetMapping("/by-type/{type}")
+    @GetMapping("/by-kind/{kind}")
     @Operation(summary = "根据类型查询", description = "根据页面类型查询配置信息")
     @RequirePermission("page.page.read")
-    public ApiResponse<List<PageSchemaDTO>> findByType(
-            @Parameter(description = "页面类型") @PathVariable String type) {
-        log.info("根据类型查询页面配置，类型：{}", type);
-        List<PageSchemaDTO> result = pageSchemaService.findByPageType(type);
+    public ApiResponse<List<PageSchemaDTO>> findByKind(
+            @Parameter(description = "页面类型") @PathVariable String kind) {
+        log.info("根据类型查询页面配置: kind={}", kind);
+        List<PageSchemaDTO> result = pageSchemaService.findByKind(kind);
         return ApiResponse.success(result);
     }
 
@@ -438,25 +438,6 @@ public class PageSchemaController {
             return ApiResponse.error("Page not found: " + pageKey);
         }
         return ApiResponse.success(schema);
-    }
-
-    /**
-     * 根据实体编码获取页面Schema配置（兼容旧接口，推荐使用 /key/{pageKey}）
-     *
-     * @deprecated 使用 /key/{modelCode}_{schemaType} 替代
-     */
-    @Deprecated
-    @GetMapping("/entity/{entityCode}")
-    @Operation(summary = "根据实体编码获取Schema（已废弃）",
-               description = "请使用 /key/{modelCode}_{schemaType} 替代",
-               deprecated = true)
-    @RequirePermission("page.page.read")
-    public ApiResponse<PageSchemaDTO> getByEntityCode(
-            @Parameter(description = "实体编码") @PathVariable String entityCode,
-            @Parameter(description = "Schema类型") @RequestParam String schemaType) {
-        // 转换为 pageKey 格式调用
-        String pageKey = entityCode + "_" + schemaType;
-        return getByPageKey(pageKey);
     }
 
     // ==================== Mobile Sync Endpoints ====================
