@@ -141,9 +141,12 @@ public class ChatToolResolver {
         if (toolName == null) return true;
         // Legacy naming: nq__*, builtin__*
         if (toolName.startsWith(TOOL_PREFIX_NQ) || toolName.startsWith(TOOL_PREFIX_BUILTIN)) return true;
-        // Provider naming (from ToolDiscoveryPort, sanitized): nq_*, list_*, get_*, platform_*
-        if (toolName.startsWith("nq_") || toolName.startsWith("list_") || toolName.startsWith("get_")
-                || toolName.startsWith("platform_")) return true;
+        // Provider naming (from ToolDiscoveryPort, sanitized): nq_*, list_*, get_*
+        if (toolName.startsWith("nq_") || toolName.startsWith("list_") || toolName.startsWith("get_")) return true;
+        // Platform tools: all read-only EXCEPT create_model (write operation needs confirmation)
+        if (toolName.startsWith("platform_")) {
+            return !toolName.equals("platform_create_model");
+        }
         return false;
     }
 
