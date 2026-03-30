@@ -1193,7 +1193,6 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                                       Long tenantId, ImportRequest.ConflictStrategy conflictStrategy,
                                       Boolean autoPublish) {
         boolean exists = checkPageExists(tenantId, dto.getPageKey());
-        Map<String, Object> normalizedDslSchema = normalizePageDslSchema(dto);
 
         if (exists && conflictStrategy == ImportRequest.ConflictStrategy.ERROR) {
             throw new PluginException("Page already exists: " + dto.getPageKey());
@@ -1210,22 +1209,25 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                     null, null, dto.getPageKey(), dto.getEffectiveName(), ResourceAction.SKIP, null, null);
         }
 
+        // V2 flat format: kind/profile/title/layout/blocks directly on DTO
+        String kind = dto.getKind() != null ? dto.getKind() : "list";
+        String profile = dto.getProfile() != null ? dto.getProfile() : "admin";
+        String titleJson = dto.getTitle() != null ? toJson(dto.getTitle()) : null;
+        String layoutJson = dto.getLayout() != null ? toJson(dto.getLayout()) : null;
+        String blocksJson = dto.getBlocks() != null ? toJson(dto.getBlocks()) : "[]";
+        String titleDisplay = dto.getEffectiveName();
+        boolean isTemplate = dto.getIsTemplate() != null && dto.getIsTemplate();
+        int sortWeight = dto.getSortWeight() != null ? dto.getSortWeight() : 0;
+        int schemaVersion = 2;
+
         if (exists) {
             // Update existing page via direct SQL to bypass service-layer name uniqueness validation
             com.auraboot.framework.meta.dto.PageSchemaDTO existingPage = pageSchemaService.findAnyByPageKey(dto.getPageKey());
-            String dslSchemaJson = normalizedDslSchema.isEmpty() ? "{}" : toJson(normalizedDslSchema);
-            String pageType = dto.getPageType() != null ? dto.getPageType() : "list";
-            String title = dto.getTitle() != null ? dto.getTitle() : dto.getEffectiveName();
-            String pageCategory = dto.getPageCategory() != null ? dto.getPageCategory() : "model";
-            boolean isTemplate = dto.getIsTemplate() != null && dto.getIsTemplate();
-            int sortWeight = dto.getSortWeight() != null ? dto.getSortWeight() : 0;
 
-            int schemaVersion = dto.getSchemaVersion() != null ? dto.getSchemaVersion() : 1;
             pageSchemaMapper.updateForPluginImport(
-                dto.getEffectiveName(), title, dto.getDescription(), pageType,
-                pageCategory, dto.getModelCode(), dslSchemaJson,
-                schemaVersion,
-                isTemplate, dto.getTemplateCategory(), sortWeight,
+                titleDisplay, titleJson, dto.getDescription(), kind, profile,
+                dto.getModelCode(), layoutJson, blocksJson,
+                schemaVersion, isTemplate, dto.getTemplateCategory(), sortWeight,
                 pluginPid, existingPage.getPid(), tenantId);
 
             if (autoPublish != null && autoPublish && !StatusConstants.PUBLISHED.equals(existingPage.getStatus())) {
@@ -1238,20 +1240,13 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         } else {
             // Create new page via direct SQL to bypass service-layer name uniqueness validation
             String pid = UlidGenerator.generate();
-            String dslSchemaJson = normalizedDslSchema.isEmpty() ? "{}" : toJson(normalizedDslSchema);
-            String pageType = dto.getPageType() != null ? dto.getPageType() : "list";
-            String title = dto.getTitle() != null ? dto.getTitle() : dto.getEffectiveName();
-            String pageCategory = dto.getPageCategory() != null ? dto.getPageCategory() : "model";
-            boolean isTemplate = dto.getIsTemplate() != null && dto.getIsTemplate();
-            int sortWeight = dto.getSortWeight() != null ? dto.getSortWeight() : 0;
             boolean publish = autoPublish != null && autoPublish;
 
-            int schemaVersion = dto.getSchemaVersion() != null ? dto.getSchemaVersion() : 1;
             pageSchemaMapper.insertForPluginImport(
                 pid, tenantId, publish ? "published" : "draft",
-                dto.getPageKey(), dto.getModelCode(), pageCategory,
-                dto.getEffectiveName(), title, dto.getDescription(), pageType, dslSchemaJson,
-                schemaVersion,
+                dto.getPageKey(), dto.getModelCode(),
+                titleDisplay, titleJson, dto.getDescription(), kind, profile,
+                layoutJson, blocksJson, schemaVersion,
                 isTemplate, dto.getTemplateCategory(),
                 publish ? java.time.Instant.now() : null,
                 sortWeight, pluginPid);
@@ -1260,18 +1255,6 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                     pid, null, dto.getPageKey(), dto.getEffectiveName(),
                     ResourceAction.CREATE, null, null);
         }
-    }
-
-    private Map<String, Object> normalizePageDslSchema(PageSchemaDTO dto) {
-        Map<String, Object> normalized = new LinkedHashMap<>();
-        if (dto.getDslSchema() != null) {
-            normalized.putAll(dto.getDslSchema());
-        }
-        String commandCode = dto.getCommandCode();
-        if (commandCode != null && !commandCode.isBlank() && !normalized.containsKey("commandCode")) {
-            normalized.put("commandCode", commandCode);
-        }
-        return normalized;
     }
 
     @Override

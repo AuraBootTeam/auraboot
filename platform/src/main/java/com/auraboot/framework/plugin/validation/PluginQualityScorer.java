@@ -77,9 +77,9 @@ public class PluginQualityScorer {
             for (PageSchemaDTO page : pages) {
                 String mc = page.getModelCode();
                 if (mc == null) continue;
-                String pt = page.getPageType();
-                if ("list".equals(pt)) hasListPage.add(mc);
-                else if ("form".equals(pt) || "detail".equals(pt)) hasFormPage.add(mc);
+                String pk = page.getKind();
+                if ("list".equals(pk)) hasListPage.add(mc);
+                else if ("form".equals(pk) || "detail".equals(pk)) hasFormPage.add(mc);
             }
         }
 

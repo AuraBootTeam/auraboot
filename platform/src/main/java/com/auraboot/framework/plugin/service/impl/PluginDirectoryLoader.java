@@ -327,39 +327,16 @@ public class PluginDirectoryLoader {
     }
 
     /**
-     * Convert page DSL format to platform PageSchemaDTO format if needed.
-     * This handles the conversion from:
-     * - pageKey, displayName, modelCode, type, schema -> pageKey, name, modelCode, pageType, dslSchema
+     * Normalize page DTO after loading from plugin directory (V2 format only).
+     * Ensures name is populated from localized names if missing.
      */
-    @SuppressWarnings("unchecked")
     private PageSchemaDTO convertPageDslIfNeeded(PageSchemaDTO page) {
-        // Check if this is the old format (has displayName instead of name, or type instead of pageType)
-        Map<String, Object> rawDsl = page.getDslSchema();
-
-        // If dslSchema is null but we have an old-format page, convert it
-        if (rawDsl == null) {
-            // The page might be in old format with schema field embedded
-            // In this case, the objectMapper already parsed it, but we need to check fields
-            return page;
-        }
-
-        // Check if pageType is already set or needs conversion from type
-        if (page.getPageType() == null || page.getPageType().isBlank()) {
-            // Try to infer from dslSchema if it has a "type" field
-            Object type = rawDsl.get("type");
-            if (type instanceof String typeStr) {
-                page.setPageType(typeStr.toLowerCase());
-            }
-        }
-
-        // Ensure name is set
+        // V2 format: kind and blocks are top-level fields on the DTO.
+        // No conversion needed — just ensure name is set.
         if ((page.getName() == null || page.getName().isBlank())
                 && (page.getNameZhCN() == null || page.getNameZhCN().isBlank())) {
-            // Check if displayName exists in the raw map
-            Object displayName = rawDsl.get("displayName");
-            if (displayName instanceof String) {
-                page.setNameZhCN((String) displayName);
-            }
+            // Fall back to pageKey as name if nothing else is set
+            page.setName(page.getPageKey());
         }
 
         return page;

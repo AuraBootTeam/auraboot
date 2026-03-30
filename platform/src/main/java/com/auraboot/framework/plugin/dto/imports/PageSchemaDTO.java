@@ -10,6 +10,7 @@ import lombok.NoArgsConstructor;
 
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -42,41 +43,39 @@ public class PageSchemaDTO {
     private String nameEn;
 
     /**
-     * Page title.
-     */
-    private String title;
-
-    /**
      * Page description.
      */
     private String description;
 
     /**
-     * Page type: LIST, DETAIL, FORM, DASHBOARD, CUSTOM, etc.
+     * Page kind: list, form, detail, dashboard.
      */
-    private String pageType;
+    private String kind;
 
     /**
-     * Page category: MODEL, SYSTEM, CUSTOM, etc.
+     * Render profile. Default: admin.
      */
-    @Builder.Default
-    private String pageCategory = "model";
+    private String profile;
+
+    /**
+     * Localized title as map.
+     */
+    private Map<String, Object> title;
+
+    /**
+     * Layout config.
+     */
+    private Map<String, Object> layout;
+
+    /**
+     * Content blocks array.
+     */
+    private List<Object> blocks;
 
     /**
      * Associated model code (for MODEL category pages).
      */
     private String modelCode;
-
-    /**
-     * Optional command code for COMMAND category pages.
-     * Keep this as a first-class import field to avoid relying on pageKey inference.
-     */
-    private String commandCode;
-
-    /**
-     * DSL schema defining page structure.
-     */
-    private Map<String, Object> dslSchema;
 
     /**
      * DSL schema format version (single integer).
@@ -164,7 +163,7 @@ public class PageSchemaDTO {
      */
     public boolean isValid() {
         return pageKey != null && !pageKey.isBlank()
-                && pageType != null && !pageType.isBlank();
+                && kind != null && !kind.isBlank();
     }
 
     /**

@@ -2081,8 +2081,8 @@ public class PluginImportServiceImpl implements PluginImportService {
                 if (page == null || isBlank(page.getPageKey())) {
                     continue;
                 }
-                if (isBlank(page.getPageType())) {
-                    errors.add("Page '" + page.getPageKey() + "' has missing pageType");
+                if (isBlank(page.getKind())) {
+                    errors.add("Page '" + page.getPageKey() + "' has missing kind");
                 }
             }
         }

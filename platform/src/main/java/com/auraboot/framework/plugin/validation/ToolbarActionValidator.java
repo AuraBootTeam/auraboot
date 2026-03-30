@@ -73,7 +73,7 @@ public class ToolbarActionValidator implements PluginValidator {
         if (manifest.getPages() != null) {
             for (int i = 0; i < manifest.getPages().size(); i++) {
                 PageSchemaDTO page = manifest.getPages().get(i);
-                if (page == null || page.getDslSchema() == null) continue;
+                if (page == null || page.getBlocks() == null) continue;
                 String pagePath = "pages[" + i + "]";
                 validatePageToolbarButtons(page, pagePath, commandTypeByCode, pluginPageKeys, messages);
             }
@@ -139,37 +139,31 @@ public class ToolbarActionValidator implements PluginValidator {
 
     /**
      * Validate all toolbar buttons on a single page.
-     * Toolbar buttons are located at: dslSchema -> areas -> toolbar -> blocks -> [n] -> buttons -> [m]
-     * Also checks action-column buttons in data-table blocks (inline row actions).
+     * V2 flat format: blocks are directly on the DTO. Toolbar blocks have blockType="toolbar"
+     * and contain a "buttons" array.
      */
     @SuppressWarnings("unchecked")
     private void validatePageToolbarButtons(PageSchemaDTO page, String pagePath,
                                             Map<String, String> commandTypeByCode,
                                             Set<String> pluginPageKeys,
                                             List<PluginValidationMessage> messages) {
-        Map<String, Object> dsl = page.getDslSchema();
-        Object areasObj = dsl.get("areas");
-        if (!(areasObj instanceof Map)) return;
+        List<Object> blocks = page.getBlocks();
+        if (blocks == null) return;
 
-        Map<String, Object> areas = (Map<String, Object>) areasObj;
-        Object toolbarAreaObj = areas.get("toolbar");
-        if (!(toolbarAreaObj instanceof Map)) return;
-
-        Map<String, Object> toolbarArea = (Map<String, Object>) toolbarAreaObj;
-        Object blocksObj = toolbarArea.get("blocks");
-        if (!(blocksObj instanceof List)) return;
-
-        List<Object> blocks = (List<Object>) blocksObj;
         for (int bi = 0; bi < blocks.size(); bi++) {
             Object blockObj = blocks.get(bi);
             if (!(blockObj instanceof Map)) continue;
             Map<String, Object> block = (Map<String, Object>) blockObj;
 
+            // Only check toolbar blocks
+            Object blockType = block.get("blockType");
+            if (!"toolbar".equals(blockType)) continue;
+
             Object buttonsObj = block.get("buttons");
             if (!(buttonsObj instanceof List)) continue;
 
             List<Object> buttons = (List<Object>) buttonsObj;
-            String blockPath = pagePath + ".dslSchema.areas.toolbar.blocks[" + bi + "]";
+            String blockPath = pagePath + ".blocks[" + bi + "]";
 
             for (int bti = 0; bti < buttons.size(); bti++) {
                 Object buttonObj = buttons.get(bti);
