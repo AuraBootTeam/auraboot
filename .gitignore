@@ -96,3 +96,4 @@ tests/load/results/
 CLAUDE.md
 AGENTS.md
 .claude/.worktrees/
+.worktrees/
