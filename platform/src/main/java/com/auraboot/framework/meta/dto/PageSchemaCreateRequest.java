@@ -5,6 +5,7 @@ import jakarta.validation.constraints.*;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -34,14 +35,6 @@ public class PageSchemaCreateRequest {
     private String modelCode;
 
     /**
-     * 页面分类
-     * MODEL, DASHBOARD, SETTINGS, REPORT, TOOL, CUSTOM
-     */
-    @Pattern(regexp = "^(?i)(model|dashboard|settings|report|tool|custom)$", message = "Invalid page category")
-    @JsonProperty("pageCategory")
-    private String pageCategory = "model";
-
-    /**
      * 页面名称（显示名称）
      * 必填，长度限制
      */
@@ -68,21 +61,31 @@ public class PageSchemaCreateRequest {
     private String description;
 
     /**
-     * 页面类型
-     * 必填，枚举值验证
+     * Page kind (list, form, detail, dashboard).
      */
-    @NotBlank(message = "{page.schema.page.type.not.blank}")
-    @Pattern(regexp = "^(?i)(form|list|detail|dashboard|custom)$", message = "{page.schema.page.type.pattern}")
-    @JsonProperty("pageType")
-    private String pageType;
+    @NotBlank(message = "Page kind is required")
+    @Pattern(regexp = "^(list|form|detail|dashboard)$", message = "Invalid kind. Must be: list, form, detail, or dashboard")
+    @JsonProperty("kind")
+    private String kind;
 
     /**
-     * DSL Schema定义（JSON格式）
-     * 必填，JSON格式验证
+     * Page profile (sub-type within a kind).
      */
-    @NotNull(message = "{page.schema.dsl.schema.not.null}")
-    @JsonProperty("dslSchema")
-    private Map<String, Object> dslSchema;
+    @JsonProperty("profile")
+    private String profile;
+
+    /**
+     * Layout configuration (JSON object for page-level layout settings).
+     */
+    @JsonProperty("layout")
+    private Map<String, Object> layout;
+
+    /**
+     * Ordered list of page blocks (toolbar, filter-bar, data-table, form-section, etc.).
+     */
+    @NotNull(message = "Blocks array is required")
+    @JsonProperty("blocks")
+    private List<Object> blocks;
 
     /**
      * 元信息（JSON格式）

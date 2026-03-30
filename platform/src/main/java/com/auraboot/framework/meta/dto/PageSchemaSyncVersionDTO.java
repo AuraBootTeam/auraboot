@@ -22,8 +22,8 @@ public class PageSchemaSyncVersionDTO {
     @JsonProperty("updatedAt")
     private Instant updatedAt;
 
-    @JsonProperty("pageType")
-    private String pageType;
+    @JsonProperty("kind")
+    private String kind;
 
     @JsonProperty("modelCode")
     private String modelCode;

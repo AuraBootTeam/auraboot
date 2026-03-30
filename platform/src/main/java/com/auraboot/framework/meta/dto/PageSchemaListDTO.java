@@ -34,10 +34,10 @@ public class PageSchemaListDTO extends AbstractResponse {
     private String modelCode;
 
     /**
-     * Page category
+     * Page kind (list, form, detail, dashboard).
      */
-    @JsonProperty("pageCategory")
-    private String pageCategory;
+    @JsonProperty("kind")
+    private String kind;
 
     /**
      * Page name
@@ -56,12 +56,6 @@ public class PageSchemaListDTO extends AbstractResponse {
      */
     @JsonProperty("description")
     private String description;
-
-    /**
-     * Page type
-     */
-    @JsonProperty("pageType")
-    private String pageType;
 
     /**
      * Meta info (JSON format) - lightweight metadata for list display

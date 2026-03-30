@@ -5,6 +5,7 @@ import jakarta.validation.constraints.*;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -31,13 +32,6 @@ public class PageSchemaUpdateRequest extends AbstractUpdateRequest {
     private String modelCode;
 
     /**
-     * 页面分类
-     */
-    @Pattern(regexp = "^(?i)(model|dashboard|settings|report|tool|custom)$", message = "Invalid page category")
-    @JsonProperty("pageCategory")
-    private String pageCategory;
-
-    /**
      * 页面名称（显示名称）
      * 可选，长度限制
      */
@@ -62,19 +56,29 @@ public class PageSchemaUpdateRequest extends AbstractUpdateRequest {
     private String description;
 
     /**
-     * 页面类型
-     * 可选，枚举值验证
+     * Page kind (list, form, detail, dashboard).
      */
-    @Pattern(regexp = "^(?i)(form|list|detail|dashboard|custom)$", message = "{page.schema.page.type.pattern}")
-    @JsonProperty("pageType")
-    private String pageType;
+    @Pattern(regexp = "^(list|form|detail|dashboard)$", message = "Invalid kind")
+    @JsonProperty("kind")
+    private String kind;
 
     /**
-     * DSL Schema定义（JSON格式）
-     * 可选，JSON格式验证
+     * Page profile (sub-type within a kind).
      */
-    @JsonProperty("dslSchema")
-    private Map<String, Object> dslSchema;
+    @JsonProperty("profile")
+    private String profile;
+
+    /**
+     * Layout configuration (JSON object for page-level layout settings).
+     */
+    @JsonProperty("layout")
+    private Map<String, Object> layout;
+
+    /**
+     * Ordered list of page blocks.
+     */
+    @JsonProperty("blocks")
+    private List<Object> blocks;
 
     /**
      * 元信息（JSON格式）
