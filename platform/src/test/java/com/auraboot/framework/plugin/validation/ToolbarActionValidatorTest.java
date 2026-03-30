@@ -274,7 +274,7 @@ class ToolbarActionValidatorTest {
     void validate_pageWithNoDslSchema_returnsEmpty() {
         PageSchemaDTO page = new PageSchemaDTO();
         page.setPageKey("item_list");
-        page.setPageType("list");
+        page.setKind("list");
         PluginManifestExtended manifest = buildManifest(List.of(), List.of(page));
         var messages = validator.validate(ctx(manifest));
         assertTrue(messages.isEmpty());
@@ -284,8 +284,8 @@ class ToolbarActionValidatorTest {
     void validate_pageWithNoToolbarArea_returnsEmpty() {
         PageSchemaDTO page = new PageSchemaDTO();
         page.setPageKey("item_list");
-        page.setPageType("list");
-        page.setDslSchema(Map.of("areas", Map.of("main", Map.of())));
+        page.setKind("list");
+        page.setBlocks(List.of(Map.of("blockType", "other")));
         PluginManifestExtended manifest = buildManifest(List.of(), List.of(page));
         var messages = validator.validate(ctx(manifest));
         assertTrue(messages.isEmpty());
@@ -336,24 +336,20 @@ class ToolbarActionValidatorTest {
                                                   List<Map<String, Object>> buttons) {
         Map<String, Object> block = mapOf("id", pageKey + "_toolbar", "blockType", "toolbar",
                 "buttons", buttons);
-        Map<String, Object> toolbarArea = mapOf("blocks", List.of(block));
-        Map<String, Object> areas = mapOf("toolbar", toolbarArea);
-        Map<String, Object> dsl = mapOf("kind", "List", "areas", areas);
 
         PageSchemaDTO page = new PageSchemaDTO();
         page.setPageKey(pageKeyActual);
-        page.setPageType("list");
-        page.setDslSchema(dsl);
+        page.setKind("list");
+        page.setBlocks(List.of(block));
         return page;
     }
 
     /** Build a page DSL with no toolbar (used as a navigate target). */
     private PageSchemaDTO emptyPage(String pageKey) {
-        Map<String, Object> dsl = mapOf("kind", "Form", "areas", Map.of());
         PageSchemaDTO page = new PageSchemaDTO();
         page.setPageKey(pageKey);
-        page.setPageType("form");
-        page.setDslSchema(dsl);
+        page.setKind("form");
+        page.setBlocks(List.of());
         return page;
     }
 

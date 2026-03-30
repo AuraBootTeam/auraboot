@@ -75,7 +75,7 @@ class PageSchemaMapperTest extends BaseIntegrationTest {
         assertEquals(testPageSchema.getPid(), found.getPid());
         assertEquals(testPageSchema.getName(), found.getName());
         assertEquals(testPageSchema.getTitle(), found.getTitle());
-        assertEquals(testPageSchema.getPageType(), found.getPageType());
+        assertEquals(testPageSchema.getKind(), found.getKind());
     }
 
     @Test
@@ -98,13 +98,13 @@ class PageSchemaMapperTest extends BaseIntegrationTest {
     void testFindByPageType() {
         // Given
         PageSchema formSchema = createTestPageSchema();
-        formSchema.setPageType("form");
+        formSchema.setKind("form");
         formSchema.setName("test-form");
         formSchema.setPid(UniqueIdGenerator.generate());
         formSchema.setSortWeight(100);
 
         PageSchema listSchema = createTestPageSchema();
-        listSchema.setPageType("list");
+        listSchema.setKind("list");
         listSchema.setName("test-list");
         listSchema.setPid(UniqueIdGenerator.generate());
         listSchema.setSortWeight(200);
@@ -113,15 +113,15 @@ class PageSchemaMapperTest extends BaseIntegrationTest {
         pageSchemaMapper.insert(listSchema);
 
         // When
-        List<PageSchema> formSchemas = pageSchemaMapper.selectByPageType("form");
-        List<PageSchema> listSchemas = pageSchemaMapper.selectByPageType("list");
+        List<PageSchema> formSchemas = pageSchemaMapper.selectByKind("form");
+        List<PageSchema> listSchemas = pageSchemaMapper.selectByKind("list");
 
         // Then
         assertFalse(formSchemas.isEmpty());
         assertFalse(listSchemas.isEmpty());
         
-        assertTrue(formSchemas.stream().allMatch(schema -> "form".equals(schema.getPageType())));
-        assertTrue(listSchemas.stream().allMatch(schema -> "list".equals(schema.getPageType())));
+        assertTrue(formSchemas.stream().allMatch(schema -> "form".equals(schema.getKind())));
+        assertTrue(listSchemas.stream().allMatch(schema -> "list".equals(schema.getKind())));
     }
 
     @Test
@@ -277,11 +277,11 @@ class PageSchemaMapperTest extends BaseIntegrationTest {
     @DisplayName("测试JSON字段存储和查询")
     void testJsonFields() throws Exception {
         // Given
-        String dslSchema = "{\"type\":\"form\",\"title\":\"测试表单\",\"fields\":{\"name\":{\"type\":\"input\",\"label\":\"姓名\",\"required\":true}}}";
+        String blocksJson = "[{\"blockType\":\"form-section\",\"title\":\"basic_info\",\"fields\":[{\"field\":\"name\",\"type\":\"input\",\"label\":\"姓名\",\"required\":true}]}]";
         String metaInfo = "{\"author\":\"test-user\",\"version\":\"1.0.0\",\"lastModified\":\"2024-01-01T00:00:00Z\"}";
         String tags = "[\"form\",\"user\",\"test\"]";
 
-        testPageSchema.setDslSchema(dslSchema);
+        testPageSchema.setBlocks(blocksJson);
         testPageSchema.setMetaInfo(metaInfo);
         testPageSchema.setTags(tags);
 
@@ -291,22 +291,19 @@ class PageSchemaMapperTest extends BaseIntegrationTest {
 
         // Then
         assertNotNull(found);
-        assertNotNull(found.getDslSchema());
+        assertNotNull(found.getBlocks());
         assertNotNull(found.getMetaInfo());
         assertNotNull(found.getTags());
 
         // Use ObjectMapper to parse and validate JSON content
         ObjectMapper objectMapper = new ObjectMapper();
-        
-        // Validate dslSchema JSON structure
-        JsonNode dslSchemaNode = objectMapper.readTree(found.getDslSchema());
-        assertEquals("form", dslSchemaNode.get("type").asText());
-        assertEquals("测试表单", dslSchemaNode.get("title").asText());
-        assertTrue(dslSchemaNode.has("fields"));
-        assertTrue(dslSchemaNode.get("fields").has("name"));
-        assertEquals("input", dslSchemaNode.get("fields").get("name").get("type").asText());
-        assertEquals("姓名", dslSchemaNode.get("fields").get("name").get("label").asText());
-        assertTrue(dslSchemaNode.get("fields").get("name").get("required").asBoolean());
+
+        // Validate blocks JSON structure
+        JsonNode blocksNode = objectMapper.readTree(found.getBlocks());
+        assertTrue(blocksNode.isArray());
+        assertEquals("form-section", blocksNode.get(0).get("blockType").asText());
+        assertEquals("姓名", blocksNode.get(0).get("fields").get(0).get("label").asText());
+        assertTrue(blocksNode.get(0).get("fields").get(0).get("required").asBoolean());
 
         // Validate metaInfo JSON structure
         JsonNode metaInfoNode = objectMapper.readTree(found.getMetaInfo());
@@ -343,7 +340,7 @@ class PageSchemaMapperTest extends BaseIntegrationTest {
         schema.setName("test-page-schema");
         schema.setTitle("测试页面Schema");
         schema.setDescription("这是一个测试页面Schema");
-        schema.setPageType("form");
+        schema.setKind("form");
         schema.setIsTemplate(false);
         schema.setSortWeight(100);
         schema.setVersion(1);
@@ -363,7 +360,7 @@ class PageSchemaMapperTest extends BaseIntegrationTest {
         PageSchema formTemplate = createTestPageSchema();
         formTemplate.setName("form-template");
         formTemplate.setTitle("表单模板");
-        formTemplate.setPageType("form");
+        formTemplate.setKind("form");
         formTemplate.setIsTemplate(true);
         formTemplate.setTemplateCategory("business");
         formTemplate.setPid(UniqueIdGenerator.generate());
@@ -374,7 +371,7 @@ class PageSchemaMapperTest extends BaseIntegrationTest {
         PageSchema listPage = createTestPageSchema();
         listPage.setName("list-page");
         listPage.setTitle("列表页面");
-        listPage.setPageType("list");
+        listPage.setKind("list");
         listPage.setIsTemplate(false);
         listPage.setStatus("published");
         listPage.setPublishedAt(Instant.now());
@@ -386,7 +383,7 @@ class PageSchemaMapperTest extends BaseIntegrationTest {
         PageSchema detailPage = createTestPageSchema();
         detailPage.setName("detail-page");
         detailPage.setTitle("详情页面");
-        detailPage.setPageType("detail");
+        detailPage.setKind("detail");
         detailPage.setIsTemplate(false);
         detailPage.setStatus("draft");
         detailPage.setPid(UniqueIdGenerator.generate());

@@ -1057,8 +1057,8 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         if (dto.getModelCode() != null && !dto.getModelCode().isBlank()) {
             extension.put("modelCode", dto.getModelCode());
         }
-        if (dto.getPageType() != null && !dto.getPageType().isBlank()) {
-            extension.put("pageType", dto.getPageType());
+        if (dto.getKind() != null && !dto.getKind().isBlank()) {
+            extension.put("pageType", dto.getKind());
         }
         String extensionJson = extension.isEmpty() ? null : toJson(extension);
         String pageKey = dto.getPageKey() != null && !dto.getPageKey().isBlank() ? dto.getPageKey() : null;

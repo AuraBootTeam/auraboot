@@ -241,7 +241,7 @@ public class PageSchemaVersionServiceImpl implements PageSchemaVersionService {
             }
             
             // 检查是否有必要的字段
-            return snapshot.containsKey("name") && snapshot.containsKey("dslSchema");
+            return snapshot.containsKey("name") && snapshot.containsKey("blocks");
             
         } catch (Exception e) {
             log.error("检查回滚条件时发生错误: pagePid={}, historyId={}", pagePid, historyId, e);
@@ -396,18 +396,18 @@ public class PageSchemaVersionServiceImpl implements PageSchemaVersionService {
             }
             
             // 验证必要字段
-            String[] requiredFields = {"name", "title", "pageType", "dslSchema"};
+            String[] requiredFields = {"name", "title", "kind", "blocks"};
             for (String field : requiredFields) {
                 if (!snapshot.containsKey(field) || snapshot.get(field) == null) {
                     return false;
                 }
             }
-            
+
             // 验证JSON格式
-            Object dslSchema = snapshot.get("dslSchema");
-            if (dslSchema instanceof String) {
+            Object blocks = snapshot.get("blocks");
+            if (blocks instanceof String) {
                 try {
-                    objectMapper.readTree((String) dslSchema);
+                    objectMapper.readTree((String) blocks);
                 } catch (Exception e) {
                     return false;
                 }
@@ -489,10 +489,11 @@ public class PageSchemaVersionServiceImpl implements PageSchemaVersionService {
         snapshot.put("name", schema.getName());
         snapshot.put("title", schema.getTitle());
         snapshot.put("description", schema.getDescription());
-        snapshot.put("pageType", schema.getPageType());
-        
+        snapshot.put("kind", schema.getKind());
+
         // Schema内容
-        snapshot.put("dslSchema", schema.getDslSchema());
+        snapshot.put("blocks", schema.getBlocks());
+        snapshot.put("layout", schema.getLayout());
         snapshot.put("metaInfo", schema.getMetaInfo());
         snapshot.put("tags", schema.getTags());
         
@@ -525,10 +526,11 @@ public class PageSchemaVersionServiceImpl implements PageSchemaVersionService {
         schema.setName((String) snapshot.get("name"));
         schema.setTitle((String) snapshot.get("title"));
         schema.setDescription((String) snapshot.get("description"));
-        schema.setPageType((String) snapshot.get("pageType"));
-        
+        schema.setKind((String) snapshot.get("kind"));
+
         // Schema内容
-        schema.setDslSchema((String) snapshot.get("dslSchema"));
+        schema.setBlocks((String) snapshot.get("blocks"));
+        schema.setLayout((String) snapshot.get("layout"));
         schema.setMetaInfo((String) snapshot.get("metaInfo"));
         schema.setTags((String) snapshot.get("tags"));
         
@@ -730,7 +732,7 @@ public class PageSchemaVersionServiceImpl implements PageSchemaVersionService {
      * 判断是否有重大变更
      */
     private boolean hasMajorChanges(List<PageSchemaVersionComparisonDTO.FieldDifference> differences) {
-        String[] majorFields = {"name", "pageType", "dslSchema"};
+        String[] majorFields = {"name", "kind", "blocks"};
         
         return differences.stream()
                 .anyMatch(diff -> Arrays.asList(majorFields).contains(diff.getFieldPath()));
@@ -744,7 +746,7 @@ public class PageSchemaVersionServiceImpl implements PageSchemaVersionService {
             Map<String, Object> currentSnapshot = createSchemaSnapshot(currentSchema);
             
             // 比较关键字段
-            String[] keyFields = {"name", "title", "pageType", "dslSchema", "version"};
+            String[] keyFields = {"name", "title", "kind", "blocks", "version"};
             for (String field : keyFields) {
                 if (!Objects.equals(currentSnapshot.get(field), targetSnapshot.get(field))) {
                     return false;

@@ -40,7 +40,7 @@ public class SchemaAccessProjectorImpl implements SchemaAccessProjector {
             PageSchema filteredSchema = cloneSchema(schema);
 
             // 获取Schema的字段定义
-            Map<String, Object> schemaContent = parseSchemaContent(schema.getDslSchema());
+            Map<String, Object> schemaContent = parseSchemaContent(schema.getBlocks());
             Map<String, Object> fields = (Map<String, Object>) schemaContent.get("fields");
 
             if (fields != null) {
@@ -74,7 +74,7 @@ public class SchemaAccessProjectorImpl implements SchemaAccessProjector {
                 }
 
                 schemaContent.put("fields", filteredFields);
-                filteredSchema.setDslSchema(serializeSchemaContent(schemaContent));
+                filteredSchema.setBlocks(serializeSchemaContent(schemaContent));
             }
 
             return filteredSchema;
@@ -216,7 +216,7 @@ public class SchemaAccessProjectorImpl implements SchemaAccessProjector {
         Map<String, FieldAccessInfo> fieldAccess = new HashMap<>();
         
         try {
-            Map<String, Object> schemaContent = parseSchemaContent(schema.getDslSchema());
+            Map<String, Object> schemaContent = parseSchemaContent(schema.getBlocks());
             Map<String, Object> fields = (Map<String, Object>) schemaContent.get("fields");
             
             if (fields != null) {
@@ -327,8 +327,9 @@ public class SchemaAccessProjectorImpl implements SchemaAccessProjector {
         clone.setName(original.getName());
         clone.setTitle(original.getTitle());
         clone.setDescription(original.getDescription());
-        clone.setPageType(original.getPageType());
-        clone.setDslSchema(original.getDslSchema());
+        clone.setKind(original.getKind());
+        clone.setBlocks(original.getBlocks());
+        clone.setLayout(original.getLayout());
         clone.setMetaInfo(original.getMetaInfo());
         clone.setIsTemplate(original.getIsTemplate());
         clone.setTemplateCategory(original.getTemplateCategory());
@@ -364,7 +365,7 @@ public class SchemaAccessProjectorImpl implements SchemaAccessProjector {
 
     private int getFieldCount(PageSchema schema) {
         try {
-            Map<String, Object> schemaContent = parseSchemaContent(schema.getDslSchema());
+            Map<String, Object> schemaContent = parseSchemaContent(schema.getBlocks());
             Map<String, Object> fields = (Map<String, Object>) schemaContent.get("fields");
             return fields != null ? fields.size() : 0;
         } catch (Exception e) {
@@ -423,10 +424,11 @@ public class SchemaAccessProjectorImpl implements SchemaAccessProjector {
         entity.setId(Long.parseLong(dto.getPid())); // 使用PID作为ID
         entity.setPid("0"); // 简化处理，使用String类型
         entity.setName(dto.getName());
-        entity.setTitle(dto.getTitle());
+        entity.setTitle(dto.getTitle() != null ? dto.getTitle().toString() : null);
         entity.setDescription(dto.getDescription());
-        entity.setPageType(dto.getPageType());
-        entity.setDslSchema(dto.getDslSchema() != null ? dto.getDslSchema().toString() : "{}");
+        entity.setKind(dto.getKind());
+        entity.setBlocks(dto.getBlocks() != null ? dto.getBlocks().toString() : "[]");
+        entity.setLayout(dto.getLayout() != null ? dto.getLayout().toString() : null);
         entity.setMetaInfo(dto.getMetaInfo() != null ? dto.getMetaInfo().toString() : "{}");
         entity.setIsTemplate(dto.getIsTemplate());
         entity.setTemplateCategory(dto.getTemplateCategory());

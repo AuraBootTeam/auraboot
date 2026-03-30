@@ -273,9 +273,8 @@ class ReportRenderServiceIntegrationTest extends BaseIntegrationTest {
         schema.setTenantId(getTestTenant().getId());
         schema.setName(name);
         schema.setTitle(name);
-        schema.setPageType("custom");
-        schema.setPageCategory("report");
-        schema.setDslSchema(dslJson);
+        schema.setKind("custom");
+        schema.setBlocks(dslJson);
         schema.setSchemaVersion(1);
         schema.setStatus("published");
         schema.setDeletedFlag(false);

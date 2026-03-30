@@ -104,8 +104,8 @@ public class DslIntrospectionResponse {
     public static class PageIntrospection {
         private String pageKey;
         private String name;
-        private String pageType;
-        private String pageCategory;
+        private String kind;
+        private String profile;
         private String modelCode;
         private String status;
         private Integer schemaVersion;

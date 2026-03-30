@@ -87,8 +87,8 @@ class ModelExportServiceTest {
         PageSchemaDTO pageDTO = new PageSchemaDTO();
         pageDTO.setPageKey("e2et_order_list");
         pageDTO.setModelCode(modelCode);
-        pageDTO.setPageType("list");
-        pageDTO.setDslSchema(Map.of("columns", List.of()));
+        pageDTO.setKind("list");
+        pageDTO.setBlocks(List.of(Map.of("blockType", "data-table", "columns", List.of())));
 
         when(metaModelService.findByCode(modelCode)).thenReturn(modelDTO);
         when(modelFieldBindingService.getModelFields(modelPid)).thenReturn(List.of(fieldDTO));

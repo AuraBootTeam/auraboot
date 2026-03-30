@@ -49,7 +49,7 @@ public class DashboardDataServiceImpl implements DashboardDataService {
         }
 
         Map<String, Object> dashboardConfig;
-        Object rawData = schema.getDslSchema();
+        Object rawData = schema.getBlocks();
         try {
             if (rawData instanceof String dataJson) {
                 dashboardConfig = JsonUtil.parse(dataJson, new TypeReference<>() {});

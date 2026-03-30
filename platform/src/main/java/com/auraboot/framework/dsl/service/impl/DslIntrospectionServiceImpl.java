@@ -208,11 +208,11 @@ public class DslIntrospectionServiceImpl implements DslIntrospectionService {
         if (pages == null || pages.isEmpty()) {
             return Collections.emptyList();
         }
-        return pages.stream().map(p -> PageIntrospection.builder()
+        return pages.stream().map(p -> (PageIntrospection) PageIntrospection.builder()
                 .pageKey(p.getPageKey())
                 .name(p.getName())
-                .pageType(p.getPageType())
-                .pageCategory(p.getPageCategory())
+                .kind(p.getKind())
+                .profile(p.getProfile())
                 .modelCode(p.getModelCode())
                 .status(p.getStatus())
                 .schemaVersion(p.getSchemaVersion())

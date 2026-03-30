@@ -40,8 +40,8 @@ class SimplePageSchemaMapperTest extends BaseIntegrationTest {
         testPageSchema.setName("test_schema");
         testPageSchema.setTitle("测试Schema");
         testPageSchema.setDescription("测试描述");
-        testPageSchema.setPageType("form");
-        testPageSchema.setDslSchema("{\"type\":\"form\"}");
+        testPageSchema.setKind("form");
+        testPageSchema.setBlocks("{\"type\":\"form\"}");
         testPageSchema.setMetaInfo("{\"version\":\"1.0\"}");
         testPageSchema.setTags("[\"test\"]");
         testPageSchema.setIsTemplate(false);

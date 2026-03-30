@@ -28,9 +28,9 @@ public class GeneratedPage {
     private String pageName;
     
     /**
-     * Page type (list/form/detail)
+     * Page kind (list/form/detail)
      */
-    private String pageType;
+    private String kind;
     
     /**
      * Route path

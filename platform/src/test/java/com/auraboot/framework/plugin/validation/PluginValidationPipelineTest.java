@@ -314,13 +314,8 @@ class PluginValidationPipelineTest {
         PluginManifestExtended manifest = new PluginManifestExtended();
         PageSchemaDTO page = new PageSchemaDTO();
         page.setPageKey("pe_order_list");
-        page.setDslSchema(Map.of(
-                "kind", "List",
-                "layout", Map.of("areas", List.of("main")),
-                "areas", Map.of("main", Map.of("blocks", List.of(
-                        Map.of("blockType", "table")
-                )))
-        ));
+        page.setKind("list");
+        page.setBlocks(List.of(Map.of("blockType", "table")));
         manifest.setPages(List.of(page));
 
         PluginValidationContext ctx = PluginValidationContext.builder()
@@ -340,10 +335,8 @@ class PluginValidationPipelineTest {
         PluginManifestExtended manifest = new PluginManifestExtended();
         PageSchemaDTO page = new PageSchemaDTO();
         page.setPageKey("pe_order_form");
-        page.setDslSchema(Map.of(
-                "layout", Map.of("areas", List.of("main")),
-                "areas", Map.of("main", Map.of("blocks", List.of()))
-        ));
+        // kind intentionally omitted
+        page.setBlocks(List.of());
         manifest.setPages(List.of(page));
 
         PluginValidationContext ctx = PluginValidationContext.builder()
@@ -363,13 +356,8 @@ class PluginValidationPipelineTest {
         PluginManifestExtended manifest = new PluginManifestExtended();
         PageSchemaDTO page = new PageSchemaDTO();
         page.setPageKey("pe_order_list");
-        page.setDslSchema(Map.of(
-                "kind", "List",
-                "layout", Map.of("areas", List.of("main")),
-                "areas", Map.of("main", Map.of("blocks", List.of(
-                        Map.of("blockType", "unknown-block")
-                )))
-        ));
+        page.setKind("list");
+        page.setBlocks(List.of(Map.of("blockType", "unknown-block")));
         manifest.setPages(List.of(page));
 
         PluginValidationContext ctx = PluginValidationContext.builder()

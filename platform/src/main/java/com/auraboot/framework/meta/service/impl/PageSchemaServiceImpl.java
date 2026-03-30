@@ -369,7 +369,12 @@ public class PageSchemaServiceImpl implements PageSchemaService {
             throw new ValidationException(ResponseCode.CommonValidationFailed, "实体编码和Schema类型不能为空");
         }
         
-        PageSchema pageSchema = pageSchemaMapper.selectByEntityCodeAndType(entityCode, schemaType);
+        PageSchema pageSchema = pageSchemaMapper.selectOne(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<PageSchema>()
+                        .eq(PageSchema::getModelCode, entityCode)
+                        .eq(PageSchema::getKind, schemaType)
+                        .eq(PageSchema::getDeletedFlag, false)
+                        .last("LIMIT 1"));
         return pageSchema != null ? pageSchemaConverter.toDTO(pageSchema) : null;
     }
 

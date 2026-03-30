@@ -241,7 +241,7 @@ class TemplateGeneratorIntegrationTest extends BaseIntegrationTest {
 
         // Verify page type
         assertTrue(result.getGeneratedResources().getPages().stream()
-                .anyMatch(p -> "list".equals(p.getPageType())));
+                .anyMatch(p -> "list".equals(p.getKind())));
     }
 
     @Test
@@ -262,7 +262,7 @@ class TemplateGeneratorIntegrationTest extends BaseIntegrationTest {
         assertNotNull(result);
         assertEquals(1, result.getGeneratedResources().getPages().size());
         assertTrue(result.getGeneratedResources().getPages().stream()
-                .anyMatch(p -> "form".equals(p.getPageType())));
+                .anyMatch(p -> "form".equals(p.getKind())));
     }
 
     @Test

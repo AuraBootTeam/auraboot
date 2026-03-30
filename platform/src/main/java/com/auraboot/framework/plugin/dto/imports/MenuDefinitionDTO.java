@@ -113,12 +113,12 @@ public class MenuDefinitionDTO {
     private String modelCode;
 
     /**
-     * Page type for dynamic rendering.
+     * Page kind for dynamic rendering.
      * Supported values: list, detail, form, dashboard.
      * Default: list.
      */
     @Builder.Default
-    private String pageType = "list";
+    private String kind = "list";
 
     /**
      * Child menus.
