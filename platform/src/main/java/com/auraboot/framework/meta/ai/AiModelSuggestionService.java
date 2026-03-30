@@ -49,10 +49,12 @@ public class AiModelSuggestionService {
             if (suggestion != null) {
                 return suggestion;
             }
+            log.warn("AI returned content but parsing failed for description: {}", description);
         }
 
-        // Return a fallback suggestion if AI is not available or parsing fails
-        return buildFallbackSuggestion(description);
+        // AI unavailable or parsing failed — return null, caller handles error
+        log.warn("AI model suggestion unavailable for: {}", description);
+        return null;
     }
 
     private String buildModelSuggestionPrompt(String description, String language) {
@@ -94,25 +96,6 @@ public class AiModelSuggestionService {
             log.warn("Failed to parse AI model suggestion response: {}", e.getMessage());
         }
         return null;
-    }
-
-    private ModelSuggestion buildFallbackSuggestion(String description) {
-        ModelSuggestion suggestion = new ModelSuggestion();
-        String code = description.replaceAll("[^a-zA-Z0-9\\u4e00-\\u9fff]", "_")
-                .replaceAll("_+", "_")
-                .toLowerCase();
-        if (code.length() > 30) code = code.substring(0, 30);
-        suggestion.setModelCode(code);
-        suggestion.setModelName(description.length() > 50 ? description.substring(0, 50) : description);
-        suggestion.setDescription(description);
-        suggestion.setFields(List.of(
-                new FieldSuggestion("name", "Name", "string", true, "Record name"),
-                new FieldSuggestion("status", "Status", "enum", false, "Record status"),
-                new FieldSuggestion("description", "Description", "text", false, "Record description"),
-                new FieldSuggestion("created_date", "Created Date", "datetime", false, "Creation date")
-        ));
-        suggestion.setSuggestedViews(List.of("table"));
-        return suggestion;
     }
 
     @Data
