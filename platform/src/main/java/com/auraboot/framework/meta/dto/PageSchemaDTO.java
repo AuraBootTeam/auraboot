@@ -78,7 +78,7 @@ public class PageSchemaDTO extends AbstractResponse {
     private Map<String, Object> layout;
 
     /**
-     * Ordered list of page blocks (toolbar, filter-bar, data-table, form-section, etc.).
+     * Ordered list of page blocks (toolbar, filters, table, form-section, etc.).
      */
     @JsonProperty("blocks")
     private List<Object> blocks;
