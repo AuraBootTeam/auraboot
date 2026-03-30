@@ -13,112 +13,114 @@ import java.util.List;
 /**
  * 页面Schema Mapper接口
  * 对应表：ab_page_schema
- * 
+ *
  * 重构说明：
  * - 统一使用幂等insert方法，Service层和ProjectionEngine共享
  * - 删除ProjectionMapper，所有ab_page_schema操作集中在此
+ * - v2: page_type→kind, removed dsl_schema/page_category, added profile/layout/blocks/title(jsonb)
  */
 @Mapper
 public interface PageSchemaMapper extends BaseMapper<PageSchema> {
 
     // ==================== 幂等INSERT方法（统一使用） ====================
-    
+
     /**
      * 插入页面Schema（幂等） - 用于Service层
-     * 
+     *
      * 使用 ON CONFLICT DO NOTHING 保证幂等性
-     * 
+     *
      * @param pageSchema 页面Schema实体
      * @return 实际插入的行数（0=已存在跳过, 1=新插入成功）
      */
     @Insert("""
         INSERT INTO ab_page_schema
-        (pid, tenant_id,   name, page_type, dsl_schema,
+        (pid, tenant_id, name, kind, profile,
+         title, layout, blocks,
          version, semver, is_current, row_version, status, deleted_flag,
          release_id, release_pid, projected_at, created_at, updated_at)
         VALUES
-        (#{pid}, #{tenantId},   #{name}, #{pageType},
-         #{dslSchema, typeHandler=com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler},
+        (#{pid}, #{tenantId}, #{name}, #{kind}, #{profile},
+         #{title, typeHandler=com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler},
+         #{layout, typeHandler=com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler},
+         #{blocks, typeHandler=com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler},
          #{version}, #{semver}, #{isCurrent}, #{rowVersion}, #{status}, #{deletedFlag},
          #{releaseId}, #{releasePid}, #{projectedAt}, #{createdAt}, #{updatedAt})
-        ON CONFLICT (tenant_id,   name, version) DO NOTHING
+        ON CONFLICT (tenant_id, name, version) DO NOTHING
         """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insertIdempotent(PageSchema pageSchema);
-    
+
     /**
      * 插入页面Schema（幂等） - 用于ProjectionEngine
-     * 
+     *
      * 接受散列参数
-     * 
+     *
      * @return 实际插入的行数（0=已存在跳过, 1=新插入成功）
      */
     @Insert("""
         INSERT INTO ab_page_schema
-        (pid, tenant_id,   name, page_type, dsl_schema,
+        (pid, tenant_id, name, kind, profile,
+         title, layout, blocks,
          version, semver, is_current, row_version, status, deleted_flag,
          release_id, release_pid, projected_at, created_at, updated_at)
         VALUES
-        (#{pid}, #{tenantId},   #{name}, #{pageType},
-         #{dslSchema, typeHandler=com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler},
+        (#{pid}, #{tenantId}, #{name}, #{kind}, #{profile},
+         #{title, typeHandler=com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler},
+         #{layout, typeHandler=com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler},
+         #{blocks, typeHandler=com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler},
          #{version}, #{semver}, true, 1, 'draft', false,
          #{releaseId}, #{releasePid}, NOW(), NOW(), NOW())
-        ON CONFLICT (tenant_id,   name, version) DO NOTHING
+        ON CONFLICT (tenant_id, name, version) DO NOTHING
         """)
     int insertForProjection(
         @Param("pid") String pid,
         @Param("tenantId") Long tenantId,
-             
-             
         @Param("name") String name,
-        @Param("pageType") String pageType,
-        @Param("dslSchema") String dslSchema,
+        @Param("kind") String kind,
+        @Param("profile") String profile,
+        @Param("title") String title,
+        @Param("layout") String layout,
+        @Param("blocks") String blocks,
         @Param("version") Integer version,
         @Param("semver") String semver,
         @Param("releaseId") Long releaseId,
         @Param("releasePid") String releasePid
     );
-    
+
     // ==================== 投影辅助方法 ====================
-    
+
     /**
      * 标记旧版本为非当前
      */
     @Update("UPDATE ab_page_schema SET is_current = false " +
-            "WHERE tenant_id = #{tenantId}    " +
+            "WHERE tenant_id = #{tenantId} " +
             "AND name = #{name}")
     int markAsNotCurrent(
         @Param("tenantId") Long tenantId,
-             
-             
         @Param("name") String name
     );
-    
+
     /**
      * 检查指定版本是否已存在
      */
     @Select("SELECT COUNT(*) FROM ab_page_schema " +
-            "WHERE tenant_id = #{tenantId}    " +
+            "WHERE tenant_id = #{tenantId} " +
             "AND name = #{name} AND version = #{version}")
     int countByVersion(
         @Param("tenantId") Long tenantId,
-             
-             
         @Param("name") String name,
         @Param("version") Integer version
     );
-    
+
     /**
-     * 获取当前版本的PageSchema数据（JSON格式）
+     * 获取当前版本的PageSchema blocks数据（JSON格式）
      * 用于依赖分析和回滚
      */
-    @Select("SELECT dsl_schema::text FROM ab_page_schema " +
-            "WHERE tenant_id = #{tenantId}    " +
+    @Select("SELECT blocks::text FROM ab_page_schema " +
+            "WHERE tenant_id = #{tenantId} " +
             "AND name = #{name} AND is_current = true")
     String getCurrentPageSchemaAsJson(
         @Param("tenantId") Long tenantId,
-             
-             
         @Param("name") String name
     );
 
@@ -133,14 +135,13 @@ public interface PageSchemaMapper extends BaseMapper<PageSchema> {
     PageSchema selectByPid(@Param("pid") String pid);
 
     /**
-     * Load only the dsl_schema JSON by PID.
-     * Avoids the version column type mismatch (varchar in DB vs Integer in entity).
+     * Load only the blocks JSON by PID.
      *
      * @param pid business key
-     * @return DSL JSON string, or null if not found / deleted
+     * @return blocks JSON string, or null if not found / deleted
      */
-    @Select("SELECT dsl_schema::text FROM ab_page_schema WHERE pid = #{pid} AND deleted_flag = FALSE")
-    String selectDslSchemaByPid(@Param("pid") String pid);
+    @Select("SELECT blocks::text FROM ab_page_schema WHERE pid = #{pid} AND deleted_flag = FALSE")
+    String selectBlocksByPid(@Param("pid") String pid);
 
     /**
      * 根据名称查询页面Schema
@@ -151,12 +152,12 @@ public interface PageSchemaMapper extends BaseMapper<PageSchema> {
     PageSchema selectByName(@Param("name") String name);
 
     /**
-     * 根据页面类型查询页面Schema列表
-     * @param pageType 页面类型
+     * 根据页面kind查询页面Schema列表
+     * @param kind 页面kind
      * @return 页面Schema列表
      */
-    @Select("SELECT * FROM ab_page_schema WHERE page_type = #{pageType} AND deleted_flag = false ORDER BY sort_weight ASC")
-    List<PageSchema> selectByPageType(@Param("pageType") String pageType);
+    @Select("SELECT * FROM ab_page_schema WHERE kind = #{kind} AND deleted_flag = false ORDER BY sort_weight ASC")
+    List<PageSchema> selectByKind(@Param("kind") String kind);
 
     /**
      * 查询已发布的页面Schema列表
@@ -194,7 +195,7 @@ public interface PageSchemaMapper extends BaseMapper<PageSchema> {
         WHERE deleted_flag = false
         <if test="keyword != null and keyword != ''">
           AND (name LIKE CONCAT('%', #{keyword}, '%')
-            OR title LIKE CONCAT('%', #{keyword}, '%')
+            OR title::text LIKE CONCAT('%', #{keyword}, '%')
             OR description LIKE CONCAT('%', #{keyword}, '%'))
         </if>
         ORDER BY updated_at DESC
@@ -203,8 +204,8 @@ public interface PageSchemaMapper extends BaseMapper<PageSchema> {
     List<PageSchema> selectByKeyword(@Param("keyword") String keyword);
 
     /**
-     * 分页查询页面Schema列表（不包含 dsl_schema 字段以提升性能）
-     * @param pageType 页面类型（可选）
+     * 分页查询页面Schema列表（不包含 blocks 字段以提升性能）
+     * @param kind 页面kind（可选）
      * @param isTemplate 是否模板（可选）
      * @param isPublished 是否发布（可选）
      * @param keyword 关键词（可选）
@@ -212,16 +213,16 @@ public interface PageSchemaMapper extends BaseMapper<PageSchema> {
      */
     @Select("""
         <script>
-        SELECT id, pid, tenant_id, page_key, model_code, page_category,
-               name, title, description, page_type, meta_info,
+        SELECT id, pid, tenant_id, page_key, model_code,
+               name, title, description, kind, profile, meta_info,
                is_template, template_category, sort_weight,
                published_at, tags,
                version, semver, row_version, is_current,
                status, deleted_flag, created_at, updated_at
         FROM ab_page_schema
         WHERE deleted_flag = false
-        <if test="pageType != null and pageType != ''">
-          AND page_type = #{pageType}
+        <if test="kind != null and kind != ''">
+          AND kind = #{kind}
         </if>
         <if test="isTemplate != null">
           AND is_template = #{isTemplate}
@@ -231,7 +232,7 @@ public interface PageSchemaMapper extends BaseMapper<PageSchema> {
         </if>
         <if test="keyword != null and keyword != ''">
           AND (name LIKE CONCAT('%', #{keyword}, '%')
-            OR title LIKE CONCAT('%', #{keyword}, '%')
+            OR title::text LIKE CONCAT('%', #{keyword}, '%')
             OR description LIKE CONCAT('%', #{keyword}, '%'))
         </if>
         ORDER BY updated_at DESC
@@ -239,7 +240,7 @@ public interface PageSchemaMapper extends BaseMapper<PageSchema> {
         """)
     IPage<PageSchema> selectPageList(
         Page<?> page,
-        @Param("pageType") String pageType,
+        @Param("kind") String kind,
         @Param("isTemplate") Boolean isTemplate,
         @Param("isPublished") Boolean isPublished,
         @Param("keyword") String keyword
@@ -247,7 +248,7 @@ public interface PageSchemaMapper extends BaseMapper<PageSchema> {
 
     /**
      * 统计页面Schema数量（支持动态条件）
-     * @param pageType 页面类型（可选）
+     * @param kind 页面kind（可选）
      * @param isTemplate 是否模板（可选）
      * @param isPublished 是否发布（可选）
      * @param keyword 关键词（可选）
@@ -257,8 +258,8 @@ public interface PageSchemaMapper extends BaseMapper<PageSchema> {
         <script>
         SELECT COUNT(*) FROM ab_page_schema
         WHERE deleted_flag = false
-        <if test="pageType != null and pageType != ''">
-          AND page_type = #{pageType}
+        <if test="kind != null and kind != ''">
+          AND kind = #{kind}
         </if>
         <if test="isTemplate != null">
           AND is_template = #{isTemplate}
@@ -268,13 +269,13 @@ public interface PageSchemaMapper extends BaseMapper<PageSchema> {
         </if>
         <if test="keyword != null and keyword != ''">
           AND (name LIKE CONCAT('%', #{keyword}, '%')
-            OR title LIKE CONCAT('%', #{keyword}, '%')
+            OR title::text LIKE CONCAT('%', #{keyword}, '%')
             OR description LIKE CONCAT('%', #{keyword}, '%'))
         </if>
         </script>
         """)
     long countByConditions(
-        @Param("pageType") String pageType,
+        @Param("kind") String kind,
         @Param("isTemplate") Boolean isTemplate,
         @Param("isPublished") Boolean isPublished,
         @Param("keyword") String keyword
@@ -348,27 +349,8 @@ public interface PageSchemaMapper extends BaseMapper<PageSchema> {
      * @param modelCode 模型编码
      * @return 页面Schema列表
      */
-    @Select("SELECT * FROM ab_page_schema WHERE model_code = #{modelCode} AND status = 'published' AND deleted_flag = false ORDER BY page_type")
+    @Select("SELECT * FROM ab_page_schema WHERE model_code = #{modelCode} AND status = 'published' AND deleted_flag = false ORDER BY kind")
     List<PageSchema> selectByModelCode(@Param("modelCode") String modelCode);
-
-    /**
-     * 根据页面分类查询
-     * @param pageCategory 页面分类
-     * @return 页面Schema列表
-     */
-    @Select("SELECT * FROM ab_page_schema WHERE page_category = #{pageCategory} AND status = 'published' AND deleted_flag = false ORDER BY sort_weight")
-    List<PageSchema> selectByPageCategory(@Param("pageCategory") String pageCategory);
-
-    /**
-     * 根据实体编码和Schema类型查询（兼容旧逻辑，内部转换为 page_key 查询）
-     * @param entityCode 实体编码
-     * @param schemaType Schema类型
-     * @return 页面Schema
-     * @deprecated Use selectByPageKey instead
-     */
-    @Deprecated
-    @Select("SELECT * FROM ab_page_schema WHERE page_key = CONCAT(#{entityCode}, '_', #{schemaType}) AND status = 'published' AND deleted_flag = false")
-    PageSchema selectByEntityCodeAndType(@Param("entityCode") String entityCode, @Param("schemaType") String schemaType);
 
     /**
      * 检查 page_key 唯一性
@@ -403,19 +385,19 @@ public interface PageSchemaMapper extends BaseMapper<PageSchema> {
     // ==================== Field Usage Support ====================
 
     /**
-     * Count pages referencing a field code in their DSL schema
+     * Count pages referencing a field code in their blocks
      * @param fieldCode Field code to search for
      * @return Number of pages referencing this field
      */
-    @Select("SELECT COUNT(*) FROM ab_page_schema WHERE deleted_flag = false AND is_current = true AND dsl_schema::text LIKE CONCAT('%', #{fieldCode}, '%')")
+    @Select("SELECT COUNT(*) FROM ab_page_schema WHERE deleted_flag = false AND is_current = true AND blocks::text LIKE CONCAT('%', #{fieldCode}, '%')")
     int countByFieldCodeInDsl(@Param("fieldCode") String fieldCode);
 
     /**
-     * Find page names referencing a field code in their DSL schema
+     * Find page names referencing a field code in their blocks
      * @param fieldCode Field code to search for
      * @return List of page names
      */
-    @Select("SELECT name FROM ab_page_schema WHERE deleted_flag = false AND is_current = true AND dsl_schema::text LIKE CONCAT('%', #{fieldCode}, '%')")
+    @Select("SELECT name FROM ab_page_schema WHERE deleted_flag = false AND is_current = true AND blocks::text LIKE CONCAT('%', #{fieldCode}, '%')")
     List<String> findPageNamesByFieldCodeInDsl(@Param("fieldCode") String fieldCode);
 
     // ==================== Plugin Import Support ====================
@@ -425,9 +407,9 @@ public interface PageSchemaMapper extends BaseMapper<PageSchema> {
      */
     @Update("""
         UPDATE ab_page_schema SET
-            name = #{name}, title = #{title}, description = #{description}, page_type = #{pageType},
-            page_category = #{pageCategory}, model_code = #{modelCode}, dsl_schema = #{dslSchema}::jsonb,
-            schema_version = #{schemaVersion},
+            name = #{name}, title = #{title}::jsonb, description = #{description}, kind = #{kind},
+            profile = #{profile}, model_code = #{modelCode}, layout = #{layout}::jsonb,
+            blocks = #{blocks}::jsonb, schema_version = #{schemaVersion},
             is_template = #{isTemplate}, template_category = #{templateCategory}, sort_weight = #{sortWeight},
             plugin_pid = #{pluginPid}, updated_at = NOW()
         WHERE pid = #{pid} AND tenant_id = #{tenantId}
@@ -435,10 +417,11 @@ public interface PageSchemaMapper extends BaseMapper<PageSchema> {
     int updateForPluginImport(@Param("name") String name,
                               @Param("title") String title,
                               @Param("description") String description,
-                              @Param("pageType") String pageType,
-                              @Param("pageCategory") String pageCategory,
+                              @Param("kind") String kind,
+                              @Param("profile") String profile,
                               @Param("modelCode") String modelCode,
-                              @Param("dslSchema") String dslSchema,
+                              @Param("layout") String layout,
+                              @Param("blocks") String blocks,
                               @Param("schemaVersion") int schemaVersion,
                               @Param("isTemplate") boolean isTemplate,
                               @Param("templateCategory") String templateCategory,
@@ -459,16 +442,16 @@ public interface PageSchemaMapper extends BaseMapper<PageSchema> {
     @Insert("""
         INSERT INTO ab_page_schema (
             pid, tenant_id, namespace, env, is_current, status,
-            extension, page_key, model_code, page_category,
-            name, title, description, page_type, dsl_schema,
-            schema_version,
+            extension, page_key, model_code,
+            name, title, description, kind, profile,
+            layout, blocks, schema_version,
             is_template, template_category, published_at,
             version, sort_weight, plugin_pid, created_at, updated_at
         ) VALUES (
             #{pid}, #{tenantId}, 'default', 'prod', true, #{status},
-            '{}'::jsonb, #{pageKey}, #{modelCode}, #{pageCategory},
-            #{name}, #{title}, #{description}, #{pageType}, #{dslSchema}::jsonb,
-            #{schemaVersion},
+            '{}'::jsonb, #{pageKey}, #{modelCode},
+            #{name}, #{title}::jsonb, #{description}, #{kind}, #{profile},
+            #{layout}::jsonb, #{blocks}::jsonb, #{schemaVersion},
             #{isTemplate}, #{templateCategory}, #{publishedAt},
             '1', #{sortWeight}, #{pluginPid}, NOW(), NOW()
         )
@@ -478,12 +461,13 @@ public interface PageSchemaMapper extends BaseMapper<PageSchema> {
                               @Param("status") String status,
                               @Param("pageKey") String pageKey,
                               @Param("modelCode") String modelCode,
-                              @Param("pageCategory") String pageCategory,
                               @Param("name") String name,
                               @Param("title") String title,
                               @Param("description") String description,
-                              @Param("pageType") String pageType,
-                              @Param("dslSchema") String dslSchema,
+                              @Param("kind") String kind,
+                              @Param("profile") String profile,
+                              @Param("layout") String layout,
+                              @Param("blocks") String blocks,
                               @Param("schemaVersion") int schemaVersion,
                               @Param("isTemplate") boolean isTemplate,
                               @Param("templateCategory") String templateCategory,
@@ -506,7 +490,7 @@ public interface PageSchemaMapper extends BaseMapper<PageSchema> {
      * @param since timestamp threshold
      * @return lightweight version DTOs
      */
-    @Select("SELECT page_key, schema_version, updated_at, page_type, model_code " +
+    @Select("SELECT page_key, schema_version, updated_at, kind, model_code " +
             "FROM ab_page_schema " +
             "WHERE updated_at > #{since} AND status = 'published' " +
             "AND (deleted_flag = FALSE OR deleted_flag IS NULL) " +
@@ -515,7 +499,7 @@ public interface PageSchemaMapper extends BaseMapper<PageSchema> {
         @Result(column = "page_key", property = "pageKey"),
         @Result(column = "schema_version", property = "schemaVersion"),
         @Result(column = "updated_at", property = "updatedAt"),
-        @Result(column = "page_type", property = "pageType"),
+        @Result(column = "kind", property = "kind"),
         @Result(column = "model_code", property = "modelCode")
     })
     List<PageSchemaSyncVersionDTO> selectVersionsSince(@Param("since") Instant since);
