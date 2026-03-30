@@ -57,6 +57,7 @@ import { statusCommand as platformStatusCommand } from './commands/status.js';
 import { queryCommand } from './commands/pipeline/query.js';
 import { analyzeCommand } from './commands/pipeline/analyze.js';
 import { createCommand } from './commands/pipeline/create.js';
+import { execCommand } from './commands/pipeline/exec.js';
 
 // ── Pipe workflow commands ────────────────────────────────────────────────
 import { pipeRunCommand } from './commands/pipe/run.js';
@@ -532,6 +533,19 @@ program
   .option('--dry-run', 'Preview without creating')
   .action(async (entity: string, cmdOpts: any) => {
     await createCommand(entity, { ...program.opts(), ...cmdOpts });
+  });
+
+program
+  .command('exec <commandCode>')
+  .description('Execute a DSL Command (e.g. sc:create_showcase)')
+  .option('--set <expr...>', 'Set field: key=value or key:type=value (int/float/bool/json/null)')
+  .option('--target <pid>', 'Target record PID (for update/status commands)')
+  .option('--operation <type>', 'Operation type hint')
+  .option('--from <file>', 'Read payload from JSON file (object or array for batch)')
+  .option('--stdin', 'Read payload from stdin JSON')
+  .option('--dry-run', 'Preview request body without executing')
+  .action(async (commandCode: string, cmdOpts: any) => {
+    await execCommand(commandCode, { ...program.opts(), ...cmdOpts });
   });
 
 // ── status ──────────────────────────────────────────────────────────────────
