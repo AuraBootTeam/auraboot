@@ -21,7 +21,7 @@ public class PageDefinitionValidationRequest {
     
     private String name;
     
-    private String pageType;
+    private String kind;
     
     private Map<String, Object> pageConfig;
     

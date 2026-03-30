@@ -4,7 +4,7 @@ import lombok.Data;
 
 /**
  * Configuration for a page's data source.
- * Can be embedded in a PageSchema's dslSchema to specify a NamedQuery data source
+ * Can be embedded in a PageSchema's blocks to specify a NamedQuery data source
  * instead of the default model-based table query.
  *
  * Usage in page DSL:

@@ -17,9 +17,9 @@ import java.util.Map;
 public class PageDefinitionBean {
     
     /**
-     * 页面类型
+     * Page kind: list, form, detail, dashboard
      */
-    private String pageType;
+    private String kind;
     
     /**
      * 页面标题

@@ -37,14 +37,14 @@ class BpmFormBindingControllerTest extends BaseIntegrationTest {
         // Get all published schemas and filter form-type ones (same logic as controller)
         List<PageSchemaDTO> allPublished = pageSchemaService.findPublishedSchemas();
         long formCount = allPublished.stream()
-                .filter(p -> "form".equalsIgnoreCase(p.getPageType()))
+                .filter(p -> "form".equalsIgnoreCase(p.getKind()))
                 .count();
 
         log.info("BIND-01: Found {} total published schemas, {} are form-type", allPublished.size(), formCount);
 
         // Verify form pages can be listed (controller logic)
         List<PageSchemaDTO> formPages = allPublished.stream()
-                .filter(p -> "form".equalsIgnoreCase(p.getPageType()))
+                .filter(p -> "form".equalsIgnoreCase(p.getKind()))
                 .toList();
 
         // Each form page should have pageKey and name
@@ -65,7 +65,7 @@ class BpmFormBindingControllerTest extends BaseIntegrationTest {
         // Find a published form page that has a modelCode
         List<PageSchemaDTO> allPublished = pageSchemaService.findPublishedSchemas();
         Optional<PageSchemaDTO> formPageOpt = allPublished.stream()
-                .filter(p -> "form".equalsIgnoreCase(p.getPageType()))
+                .filter(p -> "form".equalsIgnoreCase(p.getKind()))
                 .filter(p -> p.getModelCode() != null && !p.getModelCode().isBlank())
                 .findFirst();
 
@@ -120,11 +120,11 @@ class BpmFormBindingControllerTest extends BaseIntegrationTest {
         List<PageSchemaDTO> allPublished = pageSchemaService.findPublishedSchemas();
 
         List<PageSchemaDTO> formPages = allPublished.stream()
-                .filter(p -> "form".equalsIgnoreCase(p.getPageType()))
+                .filter(p -> "form".equalsIgnoreCase(p.getKind()))
                 .toList();
 
         List<PageSchemaDTO> nonFormPages = allPublished.stream()
-                .filter(p -> !"form".equalsIgnoreCase(p.getPageType()))
+                .filter(p -> !"form".equalsIgnoreCase(p.getKind()))
                 .toList();
 
         // If there are non-form pages, verify they are properly excluded

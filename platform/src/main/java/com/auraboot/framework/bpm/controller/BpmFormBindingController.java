@@ -34,20 +34,20 @@ public class BpmFormBindingController {
 
     /**
      * List published form-type pages for the page picker in BPMN designer.
-     * Returns a lightweight list (no dslSchema) suitable for dropdown/selector UI.
+     * Returns a lightweight list (no blocks) suitable for dropdown/selector UI.
      */
     @GetMapping("/pages")
     public ApiResponse<List<Map<String, Object>>> listFormPages() {
         List<PageSchemaDTO> published = pageSchemaService.findPublishedSchemas();
 
         List<Map<String, Object>> formPages = published.stream()
-                .filter(p -> PAGE_TYPE_FORM.equalsIgnoreCase(p.getPageType()))
+                .filter(p -> PAGE_TYPE_FORM.equalsIgnoreCase(p.getKind()))
                 .map(p -> {
                     Map<String, Object> item = new LinkedHashMap<>();
                     item.put("pageKey", p.getPageKey());
                     item.put("name", p.getName());
                     item.put("modelCode", p.getModelCode());
-                    item.put("pageType", p.getPageType());
+                    item.put("kind", p.getKind());
                     return item;
                 })
                 .collect(Collectors.toList());

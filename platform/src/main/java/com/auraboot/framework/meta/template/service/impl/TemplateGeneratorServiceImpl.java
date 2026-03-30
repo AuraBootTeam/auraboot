@@ -156,36 +156,46 @@ public class TemplateGeneratorServiceImpl implements TemplateGeneratorService {
     private PageSchemaDTO saveGeneratedPageSchema(PageSchema pageSchema, MetaModelDTO model) {
         PageSchemaCreateRequest request = new PageSchemaCreateRequest();
 
-        // pageType should be lowercase: list, form, detail, view
-        String pageType = pageSchema.getPageType() != null ? pageSchema.getPageType().toLowerCase() : "list";
+        // kind should be lowercase: list, form, detail
+        String kind = pageSchema.getKind() != null ? pageSchema.getKind().toLowerCase() : "list";
 
-        // Set pageKey as {modelCode}_{pageType}, e.g., "device_list"
-        String pageKey = model.getCode() + "_" + pageType;
+        // Set pageKey as {modelCode}_{kind}, e.g., "device_list"
+        String pageKey = model.getCode() + "_" + kind;
         request.setPageKey(pageKey);
 
         // Set modelCode for model association
         request.setModelCode(model.getCode());
 
-        // Set pageCategory as MODEL for model-related pages
-        request.setPageCategory("model");
-
         request.setName(pageSchema.getName());
         request.setTitle(pageSchema.getTitle());
-        request.setPageType(pageType);
+        request.setKind(kind);
+        request.setProfile(pageSchema.getProfile());
         request.setDescription(pageSchema.getDescription() != null
                 ? pageSchema.getDescription()
                 : "Auto-generated page for " + model.getDisplayName());
         request.setIsTemplate(false);
 
-        // Convert DSL JSON string to Map
-        if (pageSchema.getDslSchema() != null) {
+        // Convert V2 blocks JSON string to List
+        if (pageSchema.getBlocks() != null) {
             try {
-                Map<String, Object> dslMap = objectMapper.readValue(
-                        pageSchema.getDslSchema(), new TypeReference<Map<String, Object>>() {});
-                request.setDslSchema(dslMap);
+                List<Object> blocksList = objectMapper.readValue(
+                        pageSchema.getBlocks(), new TypeReference<List<Object>>() {});
+                request.setBlocks(blocksList);
             } catch (Exception e) {
-                log.error("Failed to parse DSL schema JSON for page: {}", pageSchema.getName(), e);
-                throw new BusinessException(ResponseCode.BadParam, "Invalid DSL schema generated");
+                log.error("Failed to parse blocks JSON for page: {}", pageSchema.getName(), e);
+                throw new BusinessException(ResponseCode.BadParam, "Invalid blocks generated");
+            }
+        }
+
+        // Convert V2 layout JSON string to Map
+        if (pageSchema.getLayout() != null) {
+            try {
+                Map<String, Object> layoutMap = objectMapper.readValue(
+                        pageSchema.getLayout(), new TypeReference<Map<String, Object>>() {});
+                request.setLayout(layoutMap);
+            } catch (Exception e) {
+                log.error("Failed to parse layout JSON for page: {}", pageSchema.getName(), e);
+                throw new BusinessException(ResponseCode.BadParam, "Invalid layout generated");
             }
         }
 
@@ -197,12 +207,12 @@ public class TemplateGeneratorServiceImpl implements TemplateGeneratorService {
         return page;
     }
     
-    private GeneratedPage buildGeneratedPage(PageSchemaDTO page, String modelCode, String pageType) {
+    private GeneratedPage buildGeneratedPage(PageSchemaDTO page, String modelCode, String kind) {
         return GeneratedPage.builder()
             .id(page.getId().toString())
             .pid(page.getPid())
             .pageName(page.getName())
-            .pageType(pageType)
+            .kind(kind)
             .route("/dynamic/" + modelCode)
             .createdAt(page.getCreatedAt() != null ? page.getCreatedAt().toString() : Instant.now().toString())
             .build();

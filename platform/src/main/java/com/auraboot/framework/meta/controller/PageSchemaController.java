@@ -61,10 +61,10 @@ public class PageSchemaController {
      * @param isPublished 是否已发布 (maps to status=PUBLISHED/DRAFT internally)
      * @param keyword 关键词
      * @param request 分页请求参数
-     * @return 分页结果（使用 PageSchemaListDTO，不包含 dslSchema 以提升性能）
+     * @return 分页结果（使用 PageSchemaListDTO，不包含 blocks 以提升性能）
      */
     @GetMapping
-    @Operation(summary = "分页查询页面配置", description = "根据条件分页查询页面配置列表（不包含 dslSchema）")
+    @Operation(summary = "分页查询页面配置", description = "根据条件分页查询页面配置列表（不包含 blocks）")
     @RequirePermission("page.page.read")
     public ApiResponse<PaginationResult<PageSchemaListDTO>> list(
             @RequestParam(required = false) String kind,
@@ -420,7 +420,7 @@ public class PageSchemaController {
      * 根据页面键获取页面Schema配置（推荐使用）
      *
      * 统一的页面获取端点，支持：
-     * - Model 相关页面：pageKey 格式为 "{modelCode}_{pageType}"，如 "device_list", "store_form"
+     * - Model 相关页面：pageKey 格式为 "{modelCode}_{kind}"，如 "device_list", "store_form"
      * - Model 无关页面：pageKey 为自定义标识，如 "dashboard_main", "settings_general"
      *
      * @param pageKey 页面唯一标识
@@ -428,7 +428,7 @@ public class PageSchemaController {
      */
     @GetMapping("/key/{pageKey}")
     @Operation(summary = "根据页面键获取Schema",
-               description = "统一的页面获取端点。Model相关页面使用 {modelCode}_{pageType} 格式，如 device_list；独立页面使用自定义 key，如 dashboard_main")
+               description = "统一的页面获取端点。Model相关页面使用 {modelCode}_{kind} 格式，如 device_list；独立页面使用自定义 key，如 dashboard_main")
     @RequirePermission("page.page.read")
     public ApiResponse<PageSchemaDTO> getByPageKey(
             @Parameter(description = "页面唯一标识，如 device_list, dashboard_main") @PathVariable String pageKey) {
@@ -447,7 +447,7 @@ public class PageSchemaController {
      * Mobile clients use this to determine which schemas need re-fetching.
      *
      * @param since ISO-8601 timestamp (optional, defaults to epoch)
-     * @return list of lightweight version metadata (no dslSchema)
+     * @return list of lightweight version metadata (no blocks)
      */
     @GetMapping("/versions")
     @Operation(summary = "Get schema versions since timestamp",

@@ -145,11 +145,10 @@ class PageSchemaSystemTabIntegrationTest extends BaseIntegrationTest {
         PageSchemaCreateRequest pageRequest = new PageSchemaCreateRequest();
         pageRequest.setPageKey(pageKey);
         pageRequest.setModelCode(modelCode);
-        pageRequest.setPageCategory("model");
         pageRequest.setName("Page Tab Test " + suffix);
         pageRequest.setTitle("Page Tab Test " + suffix);
-        pageRequest.setPageType("detail");
-        pageRequest.setDslSchema(createTabsDsl());
+        pageRequest.setKind("detail");
+        pageRequest.setBlocks(createTabsBlocks());
         pageRequest.setSortWeight(0);
 
         PageSchemaDTO created = pageSchemaService.create(pageRequest);
@@ -158,7 +157,7 @@ class PageSchemaSystemTabIntegrationTest extends BaseIntegrationTest {
         return pageKey;
     }
 
-    private Map<String, Object> createTabsDsl() {
+    private List<Object> createTabsBlocks() {
         Map<String, Object> tab = new LinkedHashMap<>();
         tab.put("key", "overview");
         tab.put("system", false);
@@ -169,32 +168,18 @@ class PageSchemaSystemTabIntegrationTest extends BaseIntegrationTest {
         tabsBlock.put("blockType", "tabs");
         tabsBlock.put("tabs", new ArrayList<>(List.of(tab)));
 
-        Map<String, Object> area = new LinkedHashMap<>();
-        area.put("blocks", List.of(tabsBlock));
-
-        Map<String, Object> areas = new LinkedHashMap<>();
-        areas.put("main", area);
-
-        Map<String, Object> dsl = new LinkedHashMap<>();
-        dsl.put("areas", areas);
-        return dsl;
+        return List.of(tabsBlock);
     }
 
     @SuppressWarnings("unchecked")
     private List<Map<String, Object>> extractTabs(PageSchemaDTO dto) {
-        Map<String, Object> dsl = dto.getDslSchema();
-        if (dsl == null) return null;
-        Map<String, Object> areas = (Map<String, Object>) dsl.get("areas");
-        if (areas == null) return null;
-        for (Object areaObj : areas.values()) {
-            if (!(areaObj instanceof Map)) continue;
-            Map<String, Object> area = (Map<String, Object>) areaObj;
-            List<Map<String, Object>> blocks = (List<Map<String, Object>>) area.get("blocks");
-            if (blocks == null) continue;
-            for (Map<String, Object> block : blocks) {
-                if ("tabs".equals(block.get("blockType")) || block.containsKey("tabs")) {
-                    return (List<Map<String, Object>>) block.get("tabs");
-                }
+        List<Object> blocksList = dto.getBlocks();
+        if (blocksList == null) return null;
+        for (Object blockObj : blocksList) {
+            if (!(blockObj instanceof Map)) continue;
+            Map<String, Object> block = (Map<String, Object>) blockObj;
+            if ("tabs".equals(block.get("blockType")) || block.containsKey("tabs")) {
+                return (List<Map<String, Object>>) block.get("tabs");
             }
         }
         return null;

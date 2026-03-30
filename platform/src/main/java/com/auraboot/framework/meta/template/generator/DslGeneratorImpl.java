@@ -80,40 +80,25 @@ public class DslGeneratorImpl implements DslGenerator {
         // Load dictionary bindings for fields
         Map<Long, String> dictBindings = loadDictBindings(fields);
 
-        // Build UnifiedSchema JSON
-        Map<String, Object> schema = new LinkedHashMap<>();
-        schema.put("kind", "List");
-        schema.put("version", "1.0.0");
-        schema.put("id", "list." + model.getCode());
-        schema.put("modelCode", model.getCode());
-        // Title resolved by frontend: page.list.{modelCode}.title -> model.{modelCode}._meta.label + "列表"
+        // Build V2 flat blocks list
+        List<Map<String, Object>> blocks = new ArrayList<>();
 
-        // Build state binding
-        Map<String, String> stateBinding = new LinkedHashMap<>();
-        stateBinding.put("filters", "{{state.filters}}");
-        stateBinding.put("selection", "{{state.selectedIds}}");
-        schema.put("stateBinding", stateBinding);
+        // Collect blocks from filter, toolbar, and table areas
+        Map<String, Object> filterArea = buildFilterArea(model, bindings, fields, dictBindings);
+        addBlocksFromArea(blocks, filterArea);
 
-        // Build layout
-        schema.put("layout", buildListLayout());
+        Map<String, Object> toolbarArea = buildToolbarArea(model, config);
+        addBlocksFromArea(blocks, toolbarArea);
 
-        // Build areas
-        Map<String, Object> areas = new LinkedHashMap<>();
-        areas.put("filters", buildFilterArea(model, bindings, fields, dictBindings));
-        areas.put("toolbar", buildToolbarArea(model, config));
-        areas.put("main", buildTableArea(model, bindings, fields, config, dictBindings));
-        schema.put("areas", areas);
+        Map<String, Object> tableArea = buildTableArea(model, bindings, fields, config, dictBindings);
+        addBlocksFromArea(blocks, tableArea);
 
-        // Build dataSources
-        schema.put("dataSources", buildListDataSources(model));
-
-        // Build handlers
-        schema.put("handlers", buildListHandlers(model));
-
-        // Convert to JSON string
-        String dslJson;
+        // Convert blocks to JSON string
+        String blocksJson;
+        String layoutJson;
         try {
-            dslJson = objectMapper.writeValueAsString(schema);
+            blocksJson = objectMapper.writeValueAsString(blocks);
+            layoutJson = objectMapper.writeValueAsString(Map.of("type", "stack"));
         } catch (JsonProcessingException e) {
             log.error("Failed to generate list page DSL for model: {}", model.getCode(), e);
             throw new BusinessException("Failed to generate list page DSL", e);
@@ -124,12 +109,14 @@ public class DslGeneratorImpl implements DslGenerator {
         pageSchema.setPid(UniqueIdGenerator.generate());
         pageSchema.setName(model.getCode() + "_list");
         pageSchema.setTitle(model.getDisplayName() + "列表");
-        pageSchema.setPageType("list");
-        pageSchema.setDslSchema(dslJson);
+        pageSchema.setKind("list");
+        pageSchema.setSchemaVersion(2);
+        pageSchema.setProfile("admin");
+        pageSchema.setBlocks(blocksJson);
+        pageSchema.setLayout(layoutJson);
         pageSchema.setStatus(StatusConstants.PUBLISHED);
         pageSchema.setVersion(1);
         pageSchema.setIsCurrent(true);
-        // status already set to PUBLISHED above
 
         return pageSchema;
     }
@@ -144,37 +131,18 @@ public class DslGeneratorImpl implements DslGenerator {
         // Load dictionary bindings for fields
         Map<Long, String> dictBindings = loadDictBindings(fields);
 
-        // Build UnifiedSchema JSON
-        Map<String, Object> schema = new LinkedHashMap<>();
-        schema.put("kind", "Form");
-        schema.put("version", "1.0.0");
-        schema.put("id", "form." + model.getCode());
-        schema.put("modelCode", model.getCode());
-        // Title/description resolved by frontend: page.form.{modelCode}.title
+        // Build V2 flat blocks list
+        List<Map<String, Object>> blocks = new ArrayList<>();
 
-        // Build state binding
-        Map<String, String> stateBinding = new LinkedHashMap<>();
-        stateBinding.put("model", "{{state.form}}");
-        schema.put("stateBinding", stateBinding);
+        Map<String, Object> formMainArea = buildFormMainArea(model, bindings, fields, config, dictBindings);
+        addBlocksFromArea(blocks, formMainArea);
 
-        // Build layout
-        schema.put("layout", buildFormLayout());
-
-        // Build areas
-        Map<String, Object> areas = new LinkedHashMap<>();
-        areas.put("main", buildFormMainArea(model, bindings, fields, config, dictBindings));
-        schema.put("areas", areas);
-
-        // Build dataSources
-        schema.put("dataSources", buildFormDataSources(model, bindings, fields));
-
-        // Build handlers
-        schema.put("handlers", buildFormHandlers(model));
-
-        // Convert to JSON string
-        String dslJson;
+        // Convert blocks to JSON string
+        String blocksJson;
+        String layoutJson;
         try {
-            dslJson = objectMapper.writeValueAsString(schema);
+            blocksJson = objectMapper.writeValueAsString(blocks);
+            layoutJson = objectMapper.writeValueAsString(Map.of("type", "stack"));
         } catch (JsonProcessingException e) {
             log.error("Failed to generate form page DSL for model: {}", model.getCode(), e);
             throw new BusinessException("Failed to generate form page DSL", e);
@@ -185,12 +153,14 @@ public class DslGeneratorImpl implements DslGenerator {
         pageSchema.setPid(UniqueIdGenerator.generate());
         pageSchema.setName(model.getCode() + "_form");
         pageSchema.setTitle(model.getDisplayName() + "表单");
-        pageSchema.setPageType("form");
-        pageSchema.setDslSchema(dslJson);
+        pageSchema.setKind("form");
+        pageSchema.setSchemaVersion(2);
+        pageSchema.setProfile("admin");
+        pageSchema.setBlocks(blocksJson);
+        pageSchema.setLayout(layoutJson);
         pageSchema.setStatus(StatusConstants.PUBLISHED);
         pageSchema.setVersion(1);
         pageSchema.setIsCurrent(true);
-        // status already set to PUBLISHED above
 
         return pageSchema;
     }
@@ -205,37 +175,18 @@ public class DslGeneratorImpl implements DslGenerator {
         // Load dictionary bindings for fields
         Map<Long, String> dictBindings = loadDictBindings(fields);
 
-        // Build UnifiedSchema JSON
-        Map<String, Object> schema = new LinkedHashMap<>();
-        schema.put("kind", "Detail");
-        schema.put("version", "1.0.0");
-        schema.put("id", "detail." + model.getCode());
-        schema.put("modelCode", model.getCode());
-        // Title resolved by frontend: page.detail.{modelCode}.title
+        // Build V2 flat blocks list
+        List<Map<String, Object>> blocks = new ArrayList<>();
 
-        // Build state binding
-        Map<String, String> stateBinding = new LinkedHashMap<>();
-        stateBinding.put("data", "{{state.detail}}");
-        schema.put("stateBinding", stateBinding);
+        Map<String, Object> detailMainArea = buildDetailMainArea(model, bindings, fields, config, dictBindings);
+        addBlocksFromArea(blocks, detailMainArea);
 
-        // Build layout
-        schema.put("layout", buildDetailLayout());
-
-        // Build areas
-        Map<String, Object> areas = new LinkedHashMap<>();
-        areas.put("main", buildDetailMainArea(model, bindings, fields, config, dictBindings));
-        schema.put("areas", areas);
-
-        // Build dataSources
-        schema.put("dataSources", buildDetailDataSources(model));
-
-        // Build handlers
-        schema.put("handlers", buildDetailHandlers(model));
-
-        // Convert to JSON string
-        String dslJson;
+        // Convert blocks to JSON string
+        String blocksJson;
+        String layoutJson;
         try {
-            dslJson = objectMapper.writeValueAsString(schema);
+            blocksJson = objectMapper.writeValueAsString(blocks);
+            layoutJson = objectMapper.writeValueAsString(Map.of("type", "stack"));
         } catch (JsonProcessingException e) {
             log.error("Failed to generate detail page DSL for model: {}", model.getCode(), e);
             throw new BusinessException("Failed to generate detail page DSL", e);
@@ -246,48 +197,28 @@ public class DslGeneratorImpl implements DslGenerator {
         pageSchema.setPid(UniqueIdGenerator.generate());
         pageSchema.setName(model.getCode() + "_detail");
         pageSchema.setTitle(model.getDisplayName() + "详情");
-        pageSchema.setPageType("detail");
-        pageSchema.setDslSchema(dslJson);
+        pageSchema.setKind("detail");
+        pageSchema.setSchemaVersion(2);
+        pageSchema.setProfile("admin");
+        pageSchema.setBlocks(blocksJson);
+        pageSchema.setLayout(layoutJson);
         pageSchema.setStatus(StatusConstants.PUBLISHED);
         pageSchema.setVersion(1);
         pageSchema.setIsCurrent(true);
-        // status already set to PUBLISHED above
 
         return pageSchema;
     }
 
-    private Map<String, Object> buildListLayout() {
-        Map<String, Object> layout = new LinkedHashMap<>();
-        layout.put("areas", Arrays.asList("filters", "toolbar", "main"));
-
-        Map<String, Object> areasConfig = new LinkedHashMap<>();
-
-        // Filters area config
-        Map<String, Object> filtersConfig = new LinkedHashMap<>();
-        filtersConfig.put("type", "grid");
-        filtersConfig.put("cols", 12);
-        filtersConfig.put("rowGap", 8);
-        filtersConfig.put("colGap", 8);
-        areasConfig.put("filters", filtersConfig);
-
-        // Toolbar area config
-        Map<String, Object> toolbarConfig = new LinkedHashMap<>();
-        toolbarConfig.put("type", "flex");
-        toolbarConfig.put("direction", "row");
-        toolbarConfig.put("justify", "space-between");
-        toolbarConfig.put("align", "center");
-        areasConfig.put("toolbar", toolbarConfig);
-
-        // Main area config
-        Map<String, Object> mainConfig = new LinkedHashMap<>();
-        mainConfig.put("type", "grid");
-        mainConfig.put("cols", 12);
-        mainConfig.put("rowGap", 0);
-        mainConfig.put("colGap", 0);
-        areasConfig.put("main", mainConfig);
-
-        layout.put("areasConfig", areasConfig);
-        return layout;
+    /**
+     * Extract blocks from a V1 area map and add them to the flat blocks list.
+     * Each area has a "blocks" key containing a list of block maps.
+     */
+    @SuppressWarnings("unchecked")
+    private void addBlocksFromArea(List<Map<String, Object>> target, Map<String, Object> area) {
+        Object areaBlocks = area.get("blocks");
+        if (areaBlocks instanceof List) {
+            target.addAll((List<Map<String, Object>>) areaBlocks);
+        }
     }
 
     private Map<String, Object> buildFilterArea(
@@ -717,215 +648,6 @@ public class DslGeneratorImpl implements DslGenerator {
         return column;
     }
 
-    private Map<String, Object> buildListDataSources(Model model) {
-        Map<String, Object> dataSources = new LinkedHashMap<>();
-
-        // Main list data source
-        Map<String, Object> listDs = new LinkedHashMap<>();
-        listDs.put("type", "api");
-        listDs.put("endpoint", "/api/dynamic/" + model.getCode() + "/list");
-        listDs.put("method", "get");
-        listDs.put("params", "{{state.filters}}");
-        listDs.put("pagination", true);
-        listDs.put("autoFetch", true);
-        listDs.put("adaptor", "table");
-
-        dataSources.put("ds_" + model.getCode() + "List", listDs);
-
-        return dataSources;
-    }
-
-    private Map<String, Object> buildListHandlers(Model model) {
-        Map<String, Object> handlers = new LinkedHashMap<>();
-
-        // Search handler
-        Map<String, Object> searchHandler = new LinkedHashMap<>();
-        searchHandler.put("type", "flow");
-        List<Map<String, Object>> searchSteps = new ArrayList<>();
-        Map<String, Object> searchStep = new LinkedHashMap<>();
-        searchStep.put("action", "dataSource.fetch");
-        searchStep.put("target", "ds_" + model.getCode() + "List");
-        searchSteps.add(searchStep);
-        searchHandler.put("steps", searchSteps);
-        handlers.put("search", searchHandler);
-
-        // Reset handler
-        Map<String, Object> resetHandler = new LinkedHashMap<>();
-        resetHandler.put("type", "flow");
-        List<Map<String, Object>> resetSteps = new ArrayList<>();
-        Map<String, Object> resetStep1 = new LinkedHashMap<>();
-        resetStep1.put("action", "state.reset");
-        resetStep1.put("target", "state.filters");
-        resetSteps.add(resetStep1);
-        Map<String, Object> resetStep2 = new LinkedHashMap<>();
-        resetStep2.put("action", "dataSource.fetch");
-        resetStep2.put("target", "ds_" + model.getCode() + "List");
-        resetSteps.add(resetStep2);
-        resetHandler.put("steps", resetSteps);
-        handlers.put("reset", resetHandler);
-
-        // Open create form handler
-        Map<String, Object> createHandler = new LinkedHashMap<>();
-        createHandler.put("type", "flow");
-        List<Map<String, Object>> createSteps = new ArrayList<>();
-        Map<String, Object> createStep = new LinkedHashMap<>();
-        createStep.put("action", "ui.openContainer");
-        createStep.put("target", "drawer.form");
-        Map<String, Object> createArgs = new LinkedHashMap<>();
-        createArgs.put("mode", "create");
-        createStep.put("args", createArgs);
-        createSteps.add(createStep);
-        createHandler.put("steps", createSteps);
-        handlers.put("openCreateForm", createHandler);
-
-        // Open edit form handler
-        Map<String, Object> editHandler = new LinkedHashMap<>();
-        editHandler.put("type", "flow");
-        List<Map<String, Object>> editSteps = new ArrayList<>();
-        Map<String, Object> editStep1 = new LinkedHashMap<>();
-        editStep1.put("action", "state.set");
-        editSteps.add(editStep1);
-        Map<String, Object> editStep2 = new LinkedHashMap<>();
-        editStep2.put("action", "ui.openContainer");
-        editStep2.put("target", "drawer.form");
-        Map<String, Object> editArgs = new LinkedHashMap<>();
-        editArgs.put("mode", "edit");
-        editArgs.put("id", "${args.id}");
-        editStep2.put("args", editArgs);
-        editSteps.add(editStep2);
-        editHandler.put("steps", editSteps);
-        handlers.put("openEditForm", editHandler);
-
-        // Open detail drawer handler
-        Map<String, Object> detailHandler = new LinkedHashMap<>();
-        detailHandler.put("type", "flow");
-        List<Map<String, Object>> detailSteps = new ArrayList<>();
-        Map<String, Object> detailStep1 = new LinkedHashMap<>();
-        detailStep1.put("action", "state.set");
-        detailSteps.add(detailStep1);
-        Map<String, Object> detailStep2 = new LinkedHashMap<>();
-        detailStep2.put("action", "ui.openContainer");
-        detailStep2.put("target", "drawer.detail");
-        Map<String, Object> detailArgs = new LinkedHashMap<>();
-        detailArgs.put("id", "${args.id}");
-        detailStep2.put("args", detailArgs);
-        detailSteps.add(detailStep2);
-        detailHandler.put("steps", detailSteps);
-        handlers.put("openDetailDrawer", detailHandler);
-
-        // Delete selected handler
-        handlers.put("deleteSelected", buildDeleteSelectedHandler(model));
-
-        // Delete single handler
-        handlers.put("deleteSingle", buildDeleteSingleHandler(model));
-
-        return handlers;
-    }
-
-    private Map<String, Object> buildDeleteSelectedHandler(Model model) {
-        Map<String, Object> handler = new LinkedHashMap<>();
-        handler.put("type", "flow");
-        List<Map<String, Object>> steps = new ArrayList<>();
-
-        // Confirm step
-        Map<String, Object> confirmStep = new LinkedHashMap<>();
-        confirmStep.put("action", "dialog.confirm");
-        Map<String, Object> confirmArgs = new LinkedHashMap<>();
-        confirmArgs.put("messageKey", "delete.confirm");
-        // Title/content resolved by frontend: message.delete.confirm.title / message.delete.confirm.content
-        confirmStep.put("args", confirmArgs);
-        confirmStep.put("next", "doDelete");
-        steps.add(confirmStep);
-
-        // Delete step
-        Map<String, Object> deleteStep = new LinkedHashMap<>();
-        deleteStep.put("id", "doDelete");
-        deleteStep.put("action", "api.request");
-        deleteStep.put("method", "post");
-        // 后端 API 格式: DELETE /api/dynamic/{modelCode}/batch
-        deleteStep.put("endpoint", "/api/dynamic/" + model.getCode() + "/batch");
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("ids", "{{state.selectedIds}}");
-        deleteStep.put("body", body);
-        deleteStep.put("next", "afterDelete");
-        steps.add(deleteStep);
-
-        // Success toast step
-        Map<String, Object> toastStep = new LinkedHashMap<>();
-        toastStep.put("id", "afterDelete");
-        toastStep.put("action", "toast.show");
-        toastStep.put("level", "success");
-        toastStep.put("messageKey", "delete.success");
-        // Content resolved by frontend: message.delete.success
-        steps.add(toastStep);
-
-        // Refresh step
-        Map<String, Object> refreshStep = new LinkedHashMap<>();
-        refreshStep.put("action", "dataSource.fetch");
-        refreshStep.put("target", "ds_" + model.getCode() + "List");
-        steps.add(refreshStep);
-
-        handler.put("steps", steps);
-        return handler;
-    }
-
-    private Map<String, Object> buildDeleteSingleHandler(Model model) {
-        Map<String, Object> handler = new LinkedHashMap<>();
-        handler.put("type", "flow");
-        List<Map<String, Object>> steps = new ArrayList<>();
-
-        // Confirm step
-        Map<String, Object> confirmStep = new LinkedHashMap<>();
-        confirmStep.put("action", "dialog.confirm");
-        Map<String, Object> confirmArgs = new LinkedHashMap<>();
-        confirmArgs.put("messageKey", "delete.confirm");
-        // Title/content resolved by frontend: message.delete.confirm.title / message.delete.confirm.content
-        confirmStep.put("args", confirmArgs);
-        confirmStep.put("next", "doDelete");
-        steps.add(confirmStep);
-
-        // Delete step
-        Map<String, Object> deleteStep = new LinkedHashMap<>();
-        deleteStep.put("id", "doDelete");
-        deleteStep.put("action", "api.request");
-        deleteStep.put("method", "delete");
-        deleteStep.put("endpoint", "/api/dynamic/" + model.getCode() + "/${args.id}");
-        steps.add(deleteStep);
-
-        // Success toast step
-        Map<String, Object> toastStep = new LinkedHashMap<>();
-        toastStep.put("action", "toast.show");
-        toastStep.put("level", "success");
-        toastStep.put("messageKey", "delete.success");
-        // Content resolved by frontend: message.delete.success
-        steps.add(toastStep);
-
-        // Refresh step
-        Map<String, Object> refreshStep = new LinkedHashMap<>();
-        refreshStep.put("action", "dataSource.fetch");
-        refreshStep.put("target", "ds_" + model.getCode() + "List");
-        steps.add(refreshStep);
-
-        handler.put("steps", steps);
-        return handler;
-    }
-
-    private Map<String, Object> buildFormLayout() {
-        Map<String, Object> layout = new LinkedHashMap<>();
-        layout.put("areas", Collections.singletonList("main"));
-
-        Map<String, Object> areasConfig = new LinkedHashMap<>();
-        Map<String, Object> mainConfig = new LinkedHashMap<>();
-        mainConfig.put("type", "grid");
-        mainConfig.put("cols", 12);
-        mainConfig.put("rowGap", 12);
-        mainConfig.put("colGap", 12);
-        areasConfig.put("main", mainConfig);
-
-        layout.put("areasConfig", areasConfig);
-        return layout;
-    }
-
     private Map<String, Object> buildFormMainArea(
             Model model,
             List<ModelFieldBinding> bindings,
@@ -1119,112 +841,6 @@ public class DslGeneratorImpl implements DslGenerator {
         return buttonsBlock;
     }
 
-    private Map<String, Object> buildFormDataSources(
-            Model model,
-            List<ModelFieldBinding> bindings,
-            List<Field> fields
-    ) {
-        Map<String, Object> dataSources = new LinkedHashMap<>();
-
-        // Add data sources for enum/reference fields
-        for (ModelFieldBinding binding : bindings) {
-            Field field = fields.stream()
-                    .filter(f -> f.getId().equals(binding.getFieldId()))
-                    .findFirst()
-                    .orElse(null);
-
-            if (field != null && ("enum".equals(field.getDataType()) || "reference".equals(field.getDataType()))) {
-                Map<String, Object> ds = new LinkedHashMap<>();
-                ds.put("valueField", "value");
-                ds.put("labelField", "label");
-                dataSources.put("ds_" + field.getCode(), ds);
-            }
-        }
-
-        return dataSources;
-    }
-
-    private Map<String, Object> buildFormHandlers(Model model) {
-        Map<String, Object> handlers = new LinkedHashMap<>();
-
-        // Submit form handler
-        Map<String, Object> submitHandler = new LinkedHashMap<>();
-        submitHandler.put("type", "flow");
-        List<Map<String, Object>> submitSteps = new ArrayList<>();
-
-        Map<String, Object> validateStep = new LinkedHashMap<>();
-        validateStep.put("action", "form.validate");
-        validateStep.put("target", "form." + model.getCode());
-        submitSteps.add(validateStep);
-
-        Map<String, Object> apiStep = new LinkedHashMap<>();
-        apiStep.put("action", "api.request");
-        apiStep.put("method", "post");
-        // 后端 API 格式: /api/dynamic/{modelCode}/create
-        apiStep.put("endpoint", "/api/dynamic/" + model.getCode() + "/create");
-        // 使用 {{form}} 而非 {{state.form}}，因为 ExpressionContext 中 form 是顶层属性
-        apiStep.put("body", "{{form}}");
-        apiStep.put("next", "afterSubmit");
-        submitSteps.add(apiStep);
-
-        Map<String, Object> toastStep = new LinkedHashMap<>();
-        toastStep.put("id", "afterSubmit");
-        toastStep.put("action", "toast.show");
-        toastStep.put("level", "success");
-        toastStep.put("messageKey", "save.success");
-        // Content resolved by frontend: message.save.success
-        submitSteps.add(toastStep);
-
-        // Navigate back to list page after successful submission
-        Map<String, Object> backStep = new LinkedHashMap<>();
-        backStep.put("action", "router.back");
-        submitSteps.add(backStep);
-
-        submitHandler.put("steps", submitSteps);
-        handlers.put("submitForm", submitHandler);
-
-        // Reset form handler
-        Map<String, Object> resetHandler = new LinkedHashMap<>();
-        resetHandler.put("type", "flow");
-        List<Map<String, Object>> resetSteps = new ArrayList<>();
-        Map<String, Object> resetStep = new LinkedHashMap<>();
-        resetStep.put("action", "form.reset");
-        resetStep.put("target", "form." + model.getCode());
-        resetSteps.add(resetStep);
-        resetHandler.put("steps", resetSteps);
-        handlers.put("resetForm", resetHandler);
-
-        // Cancel form handler
-        Map<String, Object> cancelHandler = new LinkedHashMap<>();
-        cancelHandler.put("type", "flow");
-        List<Map<String, Object>> cancelSteps = new ArrayList<>();
-        Map<String, Object> cancelStep = new LinkedHashMap<>();
-        cancelStep.put("action", "ui.closeContainer");
-        cancelStep.put("target", "drawer.form");
-        cancelSteps.add(cancelStep);
-        cancelHandler.put("steps", cancelSteps);
-        handlers.put("cancelForm", cancelHandler);
-
-        return handlers;
-    }
-
-
-    private Map<String, Object> buildDetailLayout() {
-        Map<String, Object> layout = new LinkedHashMap<>();
-        layout.put("areas", Collections.singletonList("main"));
-
-        Map<String, Object> areasConfig = new LinkedHashMap<>();
-        Map<String, Object> mainConfig = new LinkedHashMap<>();
-        mainConfig.put("type", "grid");
-        mainConfig.put("cols", 12);
-        mainConfig.put("rowGap", 12);
-        mainConfig.put("colGap", 12);
-        areasConfig.put("main", mainConfig);
-
-        layout.put("areasConfig", areasConfig);
-        return layout;
-    }
-
     private Map<String, Object> buildDetailMainArea(
             Model model,
             List<ModelFieldBinding> bindings,
@@ -1370,53 +986,6 @@ public class DslGeneratorImpl implements DslGenerator {
 
         buttonsBlock.put("buttons", buttons);
         return buttonsBlock;
-    }
-
-    private Map<String, Object> buildDetailDataSources(Model model) {
-        Map<String, Object> dataSources = new LinkedHashMap<>();
-
-        // Detail data source
-        Map<String, Object> detailDs = new LinkedHashMap<>();
-        detailDs.put("type", "api");
-        detailDs.put("endpoint", "/api/dynamic/" + model.getCode() + "/${state.id}");
-        detailDs.put("method", "get");
-        detailDs.put("autoFetch", true);
-
-        dataSources.put("ds_" + model.getCode() + "Detail", detailDs);
-
-        return dataSources;
-    }
-
-    private Map<String, Object> buildDetailHandlers(Model model) {
-        Map<String, Object> handlers = new LinkedHashMap<>();
-
-        // Open edit form handler
-        Map<String, Object> editHandler = new LinkedHashMap<>();
-        editHandler.put("type", "flow");
-        List<Map<String, Object>> editSteps = new ArrayList<>();
-        Map<String, Object> editStep = new LinkedHashMap<>();
-        editStep.put("action", "ui.openContainer");
-        editStep.put("target", "drawer.form");
-        Map<String, Object> editArgs = new LinkedHashMap<>();
-        editArgs.put("mode", "edit");
-        editArgs.put("id", "${state.id}");
-        editStep.put("args", editArgs);
-        editSteps.add(editStep);
-        editHandler.put("steps", editSteps);
-        handlers.put("openEditForm", editHandler);
-
-        // Go back handler
-        Map<String, Object> backHandler = new LinkedHashMap<>();
-        backHandler.put("type", "flow");
-        List<Map<String, Object>> backSteps = new ArrayList<>();
-        Map<String, Object> backStep = new LinkedHashMap<>();
-        backStep.put("action", "ui.closeContainer");
-        backStep.put("target", "drawer.detail");
-        backSteps.add(backStep);
-        backHandler.put("steps", backSteps);
-        handlers.put("goBack", backHandler);
-
-        return handlers;
     }
 
 }

@@ -9,7 +9,7 @@ import java.util.Map;
 
 /**
  * Page Schema List DTO
- * Used for list API responses, excludes large fields like dslSchema for better performance
+ * Used for list API responses, excludes large fields like blocks for better performance
  */
 @Data
 @EqualsAndHashCode(callSuper = true)

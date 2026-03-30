@@ -55,7 +55,7 @@ class PageSchemaVersionSyncIntegrationTest extends BaseIntegrationTest {
                 .findFirst()
                 .orElseThrow();
         assertThat(found.getSchemaVersion()).isEqualTo(1);
-        assertThat(found.getPageType()).isEqualTo("list");
+        assertThat(found.getKind()).isEqualTo("list");
         assertThat(found.getModelCode()).isEqualTo("sync_model_" + suffix);
         assertThat(found.getUpdatedAt()).isNotNull();
         assertThat(found.getUpdatedAt()).isAfter(beforeCreate);
@@ -107,7 +107,7 @@ class PageSchemaVersionSyncIntegrationTest extends BaseIntegrationTest {
                 .filter(d -> pageKey1.equals(d.getPageKey()))
                 .findFirst()
                 .orElseThrow();
-        assertThat(dto.getPageType()).isEqualTo("list");
+        assertThat(dto.getKind()).isEqualTo("list");
         assertThat(dto.getModelCode()).isEqualTo("batch_model_" + suffix);
         assertThat(dto.getName()).isNotBlank();
     }

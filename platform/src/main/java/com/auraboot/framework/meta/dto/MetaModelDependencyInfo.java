@@ -189,9 +189,9 @@ public class MetaModelDependencyInfo {
         private String dependencyType;
 
         /**
-         * 页面类型
+         * Page kind
          */
-        private String pageType;
+        private String kind;
 
         /**
          * 创建时间
@@ -277,9 +277,9 @@ public class MetaModelDependencyInfo {
      * @param pageCode 页面编码
      * @param pageTitle 页面标题
      * @param dependencyType 依赖类型
-     * @param pageType 页面类型
+     * @param kind page kind
      */
-    public void addPageDependency(String pagePid, String pageCode, String pageTitle, String dependencyType, String pageType) {
+    public void addPageDependency(String pagePid, String pageCode, String pageTitle, String dependencyType, String kind) {
         if (pageDependencies == null) {
             pageDependencies = new ArrayList<>();
         }
@@ -288,7 +288,7 @@ public class MetaModelDependencyInfo {
             .pageCode(pageCode)
             .pageTitle(pageTitle)
             .dependencyType(dependencyType)
-            .pageType(pageType)
+            .kind(kind)
             .createdAt(System.currentTimeMillis())
             .build());
     }

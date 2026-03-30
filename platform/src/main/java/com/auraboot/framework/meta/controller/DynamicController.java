@@ -25,6 +25,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -784,7 +785,11 @@ public class DynamicController {
         try {
             PageSchemaDTO pageSchema = pageSchemaService.findByPageKey(pageKey);
             if (pageSchema != null) {
-                schemaJson = pageSchema.getDslSchema();
+                // Build a composite schema map from V2 flat fields
+                schemaJson = new LinkedHashMap<>();
+                if (pageSchema.getBlocks() != null) schemaJson.put("blocks", pageSchema.getBlocks());
+                if (pageSchema.getLayout() != null) schemaJson.put("layout", pageSchema.getLayout());
+                if (pageSchema.getTitle() != null) schemaJson.put("title", pageSchema.getTitle());
                 availableViews = deriveAvailableViews(pageSchema);
             }
         } catch (Exception e) {
@@ -853,10 +858,10 @@ public class DynamicController {
         views.add("table"); // TABLE is always available
 
         try {
-            Map<String, Object> dslSchema = pageSchema.getDslSchema();
-            if (dslSchema == null) return new ArrayList<>(views);
+            List<Object> blocksList = pageSchema.getBlocks();
+            if (blocksList == null) return new ArrayList<>(views);
 
-            Object blocksObj = dslSchema.get("blocks");
+            Object blocksObj = blocksList;
             if (blocksObj instanceof List<?> blockList) {
                 for (Object block : blockList) {
                     if (block instanceof Map<?, ?> blockMap) {

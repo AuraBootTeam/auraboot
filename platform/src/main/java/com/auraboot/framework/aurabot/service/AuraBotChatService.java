@@ -185,7 +185,7 @@ public class AuraBotChatService {
         traceMetadata.put("provider_code", providerCode);
         if (request.getPageContext() != null) {
             traceMetadata.put("page_context", Map.of(
-                    "pageType", Objects.toString(request.getPageContext().getPageType(), ""),
+                    "kind", Objects.toString(request.getPageContext().getKind(), ""),
                     "modelCode", Objects.toString(request.getPageContext().getModelCode(), ""),
                     "recordPid", Objects.toString(request.getPageContext().getRecordPid(), "")));
         }
@@ -833,7 +833,7 @@ public class AuraBotChatService {
         ChatRequest.PageContext ctx = request.getPageContext();
         if (ctx != null) {
             vars.put("hasPageContext", true);
-            vars.put("pageType", ctx.getPageType());
+            vars.put("pageType", ctx.getKind());
             vars.put("pageKey", ctx.getPageKey());
             vars.put("modelCode", ctx.getModelCode());
             vars.put("recordPid", ctx.getRecordPid());
@@ -866,7 +866,7 @@ public class AuraBotChatService {
         }
         if (ctx != null) {
             sb.append("\n\n## Current Page Context");
-            if (ctx.getPageType() != null) sb.append("\n- Page Type: ").append(ctx.getPageType());
+            if (ctx.getKind() != null) sb.append("\n- Page Kind: ").append(ctx.getKind());
             if (ctx.getPageKey() != null) sb.append("\n- Page Key: ").append(ctx.getPageKey());
             if (ctx.getModelCode() != null) sb.append("\n- Model: ").append(ctx.getModelCode());
             if (ctx.getRecordPid() != null) sb.append("\n- Record PID: ").append(ctx.getRecordPid());

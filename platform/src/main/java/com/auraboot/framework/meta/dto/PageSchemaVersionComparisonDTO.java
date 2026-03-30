@@ -58,7 +58,7 @@ public class PageSchemaVersionComparisonDTO {
     @Data
     public static class FieldDifference {
         /**
-         * 字段路径，如 "name", "dslSchema.fields[0].label"
+         * 字段路径，如 "name", "blocks[0].fields[0].label"
          */
         private String fieldPath;
 

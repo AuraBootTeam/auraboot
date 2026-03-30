@@ -7,7 +7,7 @@ import java.time.Instant;
 
 /**
  * Lightweight DTO for mobile schema sync.
- * Returns only version metadata (no dslSchema) so clients can decide
+ * Returns only version metadata (no blocks) so clients can decide
  * which schemas need re-fetching.
  */
 @Data

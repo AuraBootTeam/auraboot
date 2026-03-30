@@ -63,7 +63,7 @@ class DashboardDataServiceTest {
                 }
                 """;
         PageSchema schema = new PageSchema();
-        schema.setDslSchema(dashboardJson);
+        schema.setBlocks(dashboardJson);
         when(formSchemaMapper.selectById("dash-001")).thenReturn(schema);
 
         // Act
@@ -93,7 +93,7 @@ class DashboardDataServiceTest {
                 }
                 """;
         PageSchema schema = new PageSchema();
-        schema.setDslSchema(dashboardJson);
+        schema.setBlocks(dashboardJson);
         when(formSchemaMapper.selectById("dash-002")).thenReturn(schema);
         when(dynamicQueryMapper.queryData(anyString())).thenReturn(
                 List.of(Map.of("cnt", 25L))
@@ -118,7 +118,7 @@ class DashboardDataServiceTest {
                 }
                 """;
         PageSchema schema = new PageSchema();
-        schema.setDslSchema(dashboardJson);
+        schema.setBlocks(dashboardJson);
         when(formSchemaMapper.selectById("dash-003")).thenReturn(schema);
 
         // First call - hits DB
@@ -141,7 +141,7 @@ class DashboardDataServiceTest {
                 }
                 """;
         PageSchema schema = new PageSchema();
-        schema.setDslSchema(dashboardJson);
+        schema.setBlocks(dashboardJson);
         when(formSchemaMapper.selectById("dash-004")).thenReturn(schema);
 
         // First call

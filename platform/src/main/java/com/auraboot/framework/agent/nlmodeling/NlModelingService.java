@@ -371,9 +371,9 @@ public class NlModelingService {
                   "pageKey": "<model_code>_list",
                   "name:zh-CN": "<Chinese name>",
                   "name:en": "<English name>",
-                  "pageType": "LIST|FORM|DETAIL",
+                  "kind": "LIST|FORM|DETAIL",
                   "modelCode": "<model_code>",
-                  "dslSchema": {
+                  "blocks": {
                     "kind": "List",
                     "version": "1.0.0",
                     "id": "list.<model_code>",
@@ -420,7 +420,7 @@ public class NlModelingService {
                 }
                 ```
                 - List page: toolbar (create button) + data-table with columns and row actions
-                - Form page: pageType=FORM, kind=Form, layout with form-section blocks
+                - Form page: kind=form, layout with form-section blocks
 
                 ### Form Page Schema
                 ```json
@@ -428,9 +428,9 @@ public class NlModelingService {
                   "pageKey": "<model_code>_form",
                   "name:zh-CN": "<Chinese form name>",
                   "name:en": "<English form name>",
-                  "pageType": "form",
+                  "kind": "form",
                   "modelCode": "<model_code>",
-                  "dslSchema": {
+                  "blocks": {
                     "kind": "Form",
                     "version": "1.0.0",
                     "id": "form.<model_code>",
@@ -764,9 +764,9 @@ public class NlModelingService {
                     "pageKey": "book_list",
                     "name:zh-CN": "图书列表",
                     "name:en": "Book List",
-                    "pageType": "list",
+                    "kind": "list",
                     "modelCode": "book",
-                    "dslSchema": {
+                    "blocks": {
                       "kind": "List",
                       "version": "1.0.0",
                       "id": "list.book",
@@ -782,9 +782,9 @@ public class NlModelingService {
                     "pageKey": "book_form",
                     "name:zh-CN": "图书表单",
                     "name:en": "Book Form",
-                    "pageType": "form",
+                    "kind": "form",
                     "modelCode": "book",
-                    "dslSchema": {
+                    "blocks": {
                       "kind": "Form",
                       "version": "1.0.0",
                       "id": "form.book",

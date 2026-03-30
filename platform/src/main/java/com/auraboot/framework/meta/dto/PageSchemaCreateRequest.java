@@ -17,7 +17,7 @@ public class PageSchemaCreateRequest {
 
     /**
      * 页面唯一标识
-     * 必填，格式：{modelCode}_{pageType} 或自定义 key
+     * 必填，格式：{modelCode}_{kind} 或自定义 key
      * 例如：device_list, dashboard_main
      */
     @NotBlank(message = "Page key is required")

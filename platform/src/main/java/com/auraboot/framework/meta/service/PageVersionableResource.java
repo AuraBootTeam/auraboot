@@ -43,14 +43,20 @@ public class PageVersionableResource implements VersionableResource {
         snapshot.put("name", page.getName());
         snapshot.put("title", page.getTitle());
         snapshot.put("description", page.getDescription());
-        snapshot.put("pageType", page.getPageType());
-        snapshot.put("pageCategory", page.getPageCategory());
+        snapshot.put("kind", page.getKind());
         snapshot.put("schemaVersion", page.getSchemaVersion());
-        if (page.getDslSchema() != null) {
+        if (page.getBlocks() != null) {
             try {
-                snapshot.set("dslSchema", objectMapper.readTree(page.getDslSchema()));
+                snapshot.set("blocks", objectMapper.readTree(page.getBlocks()));
             } catch (Exception e) {
-                snapshot.put("dslSchema", page.getDslSchema());
+                snapshot.put("blocks", page.getBlocks());
+            }
+        }
+        if (page.getLayout() != null) {
+            try {
+                snapshot.set("layout", objectMapper.readTree(page.getLayout()));
+            } catch (Exception e) {
+                snapshot.put("layout", page.getLayout());
             }
         }
         if (page.getMetaInfo() != null) {
@@ -73,9 +79,12 @@ public class PageVersionableResource implements VersionableResource {
 
         if (snapshot.has("title")) page.setTitle(snapshot.get("title").asText());
         if (snapshot.has("description")) page.setDescription(snapshot.path("description").asText(null));
-        if (snapshot.has("pageType")) page.setPageType(snapshot.get("pageType").asText());
-        if (snapshot.has("dslSchema")) {
-            page.setDslSchema(snapshot.get("dslSchema").toString());
+        if (snapshot.has("kind")) page.setKind(snapshot.get("kind").asText());
+        if (snapshot.has("blocks")) {
+            page.setBlocks(snapshot.get("blocks").toString());
+        }
+        if (snapshot.has("layout")) {
+            page.setLayout(snapshot.get("layout").toString());
         }
         if (snapshot.has("metaInfo")) {
             page.setMetaInfo(snapshot.get("metaInfo").toString());

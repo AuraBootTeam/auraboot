@@ -399,12 +399,15 @@ public class RecordCapabilityServiceImpl implements RecordCapabilityService {
 
         List<PageSchemaDTO> pages = pageSchemaService.findByModelCode(modelCode);
         PageSchemaDTO detailPage = pages.stream()
-                .filter(p -> "detail".equals(p.getPageType()))
+                .filter(p -> "detail".equals(p.getKind()))
                 .findFirst()
                 .orElse(null);
 
-        if (detailPage != null && detailPage.getDslSchema() != null) {
-            List<TabCapability> tabs = extractTabsFromSchema(detailPage.getDslSchema());
+        if (detailPage != null && detailPage.getBlocks() != null) {
+            // V2: blocks are top-level; wrap in areas.main.blocks for extractTabsFromSchema
+            Map<String, Object> schemaMap = Map.of(
+                    "areas", Map.of("main", Map.of("blocks", detailPage.getBlocks())));
+            List<TabCapability> tabs = extractTabsFromSchema(schemaMap);
             if (!tabs.isEmpty()) return tabs;
         }
 

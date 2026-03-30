@@ -57,8 +57,8 @@ public class ChatRequest {
 
     @Data
     public static class PageContext {
-        /** Page type: list, detail, form, dashboard, custom */
-        private String pageType;
+        /** Page kind: list, detail, form, dashboard */
+        private String kind;
         /** DSL page slug */
         private String pageKey;
         /** Model code */

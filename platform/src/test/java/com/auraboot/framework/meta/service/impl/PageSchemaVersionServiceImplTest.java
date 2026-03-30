@@ -66,8 +66,8 @@ class PageSchemaVersionServiceImplTest {
         schema.setTenantId(1L);
         schema.setName("test-page");
         schema.setTitle("Test Page");
-        schema.setPageType("form");
-        schema.setDslSchema("{\"type\":\"form\",\"fields\":[]}");
+        schema.setKind("form");
+        schema.setBlocks("{\"type\":\"form\",\"fields\":[]}");
         schema.setVersion(1);
         schema.setStatus("draft");
         schema.setDeletedFlag(false);

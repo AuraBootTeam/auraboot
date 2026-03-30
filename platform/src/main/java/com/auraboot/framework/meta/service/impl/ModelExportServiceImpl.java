@@ -134,8 +134,9 @@ public class ModelExportServiceImpl implements ModelExportService {
             Map<String, Object> map = new LinkedHashMap<>();
             map.put("code", page.getPageKey());
             map.put("modelCode", page.getModelCode());
-            map.put("pageType", page.getPageType());
-            map.put("schema", page.getDslSchema());
+            map.put("kind", page.getKind());
+            map.put("blocks", page.getBlocks());
+            map.put("layout", page.getLayout());
             result.add(map);
         }
         return result;
