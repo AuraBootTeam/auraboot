@@ -708,19 +708,23 @@ CREATE TABLE ab_page_schema (
     extension JSONB NOT NULL DEFAULT '{}'::jsonb,
 
     -- Page identification
-    page_key VARCHAR(100) ,
+    page_key VARCHAR(200) NOT NULL,
     model_code VARCHAR(100),
-    page_category VARCHAR(50) DEFAULT 'model',
 
     -- Basic info
     name VARCHAR(200) NOT NULL,
-    title VARCHAR(500),
     description TEXT,
-    page_type VARCHAR(50) NOT NULL,
 
-    -- Schema content
-    dsl_schema JSONB,
-    schema_version INTEGER NOT NULL DEFAULT 1,  -- DSL schema format version (single integer, incremented on breaking changes)
+    -- Page kind (replaces page_type + page_category)
+    kind VARCHAR(50) NOT NULL,              -- list/form/detail/dashboard
+
+    -- Flat schema fields (replaces dsl_schema JSONB blob)
+    schema_version INTEGER NOT NULL DEFAULT 2,
+    profile VARCHAR(50) DEFAULT 'admin',
+    title JSONB,                            -- { "zh-CN": "...", "en": "..." }
+    layout JSONB,                           -- { "type": "stack" } or { "type": "grid", "cols": 12 }
+    blocks JSONB NOT NULL DEFAULT '[]',     -- [{ "blockType": "...", ... }]
+
     meta_info JSONB,
 
     -- Template support
@@ -752,7 +756,6 @@ CREATE TABLE ab_page_schema (
     CONSTRAINT uk_page_schema_pid UNIQUE (pid)
 );
 
-
 -- Partial unique index (logical delete friendly)
 CREATE UNIQUE INDEX uk_page_schema_page_key
 ON ab_page_schema (tenant_id, namespace, page_key)
@@ -766,17 +769,13 @@ CREATE INDEX idx_page_schema_model_code
 ON ab_page_schema(tenant_id, model_code)
 WHERE deleted_flag = FALSE AND model_code IS NOT NULL;
 
-CREATE INDEX idx_page_schema_category
-ON ab_page_schema(tenant_id, page_category)
+CREATE INDEX idx_page_schema_kind
+ON ab_page_schema(tenant_id, kind)
 WHERE deleted_flag = FALSE;
 
-CREATE INDEX idx_page_schema_type
-ON ab_page_schema(tenant_id, page_type)
-WHERE deleted_flag = FALSE;
-
--- Limit dsl_schema JSONB size to 512KB (defense in depth — service layer also validates)
-ALTER TABLE ab_page_schema ADD CONSTRAINT chk_dsl_schema_size
-    CHECK (dsl_schema IS NULL OR octet_length(dsl_schema::text) <= 524288);
+-- Limit blocks JSONB size to 512KB
+ALTER TABLE ab_page_schema ADD CONSTRAINT chk_blocks_size
+    CHECK (blocks IS NULL OR octet_length(blocks::text) <= 524288);
 
 
 -- =====================================================================
