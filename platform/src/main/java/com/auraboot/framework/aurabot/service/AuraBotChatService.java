@@ -38,8 +38,8 @@ import java.util.concurrent.Executor;
  * and {@link PromptTemplateService} for system prompt rendering.
  * <p>
  * When tools are available (based on model context), enters a synchronous tool loop
- * (max 5 rounds) using {@link LlmProvider#chat}. Read-only tools (nq__, builtin__)
- * are auto-executed; write tools (cmd__) require user confirmation via SSE events.
+ * (max 5 rounds) using {@link LlmProvider#chat}. Read-only tools (nq_*, list_*, get_*, platform_*)
+ * are auto-executed; write tools (cmd_*) require user confirmation via SSE events.
  *
  * @since 6.5.0
  */
@@ -92,11 +92,11 @@ public class AuraBotChatService {
         hint.append("\n\nYou have access to tools. Follow this strategy:\n");
 
         if (resolved.isReadOnly()) {
-            hint.append("- The user wants to QUERY data. Prefer nq__* (named query) tools — they are pre-built and optimized.\n");
-            hint.append("- Use builtin__execute_query ONLY if no named query matches the question.\n");
-            hint.append("- Call builtin__list_models at most ONCE if you need to learn table schemas.\n");
+            hint.append("- The user wants to QUERY data. Prefer nq_* (named query) tools — they are pre-built and optimized.\n");
+            hint.append("- Use platform_execute_sql ONLY if no named query matches the question.\n");
+            hint.append("- Call platform_list_models at most ONCE if you need to learn table schemas.\n");
         } else {
-            hint.append("- The user wants to MODIFY data. Use the cmd__* tools to execute the operation.\n");
+            hint.append("- The user wants to MODIFY data. Use the cmd_* tools to execute the operation.\n");
             hint.append("- Describe what you will do BEFORE calling the tool.\n");
         }
 

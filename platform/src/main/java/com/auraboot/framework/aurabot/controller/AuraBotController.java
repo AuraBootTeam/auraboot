@@ -90,9 +90,10 @@ public class AuraBotController {
      */
     private String deriveToolType(String toolName) {
         if (toolName == null) return "unknown";
-        if (toolName.startsWith("cmd__")) return "command";
-        if (toolName.startsWith("nq__")) return "query";
-        if (toolName.startsWith("builtin__")) return "builtin";
+        if (toolName.startsWith("cmd_")) return "command";
+        if (toolName.startsWith("nq_")) return "query";
+        if (toolName.startsWith("list_") || toolName.startsWith("get_")) return "query";
+        if (toolName.startsWith("platform_")) return "platform";
         return "unknown";
     }
 }
