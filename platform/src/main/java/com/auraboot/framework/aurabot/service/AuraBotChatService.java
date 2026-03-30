@@ -11,7 +11,11 @@ import com.auraboot.framework.agent.trace.SpanContext;
 import com.auraboot.framework.agent.trace.TraceContext;
 import com.auraboot.framework.aurabot.dto.ChatMessage;
 import com.auraboot.framework.aurabot.dto.ChatRequest;
+import com.auraboot.framework.meta.constant.SystemFieldConstants;
+import com.auraboot.framework.meta.dto.ModelDefinition;
+import com.auraboot.framework.meta.service.MetaModelService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Value;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -55,6 +59,7 @@ public class AuraBotChatService {
     private final ChatSessionStore chatSessionStore;
     private final ObjectMapper objectMapper;
     private final AiTraceService aiTraceService;
+    private final MetaModelService metaModelService;
     @Qualifier("asyncTaskExecutor")
     private final Executor asyncTaskExecutor;
 
@@ -70,11 +75,12 @@ public class AuraBotChatService {
     @Autowired(required = false)
     private ChatRunPersistencePort chatRunPersistencePort;
 
+    @Value("${aurabot.max-tool-rounds:20}")
+    private int maxToolRounds;
+
     private static final HttpClient HTTP_CLIENT = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
             .build();
-
-    private static final int MAX_TOOL_ROUNDS = 5;
 
     private static final String DEFAULT_SYSTEM_PROMPT =
             "You are AuraBot, an intelligent assistant for the AuraBoot platform. " +
@@ -275,7 +281,7 @@ public class AuraBotChatService {
         List<LlmChatRequest.Message> messages = buildLlmMessages(history, userMessage);
 
         Map<String, Integer> toolCallCounts = new HashMap<>();
-        for (int round = 0; round < MAX_TOOL_ROUNDS; round++) {
+        for (int round = 0; round < maxToolRounds; round++) {
             LlmChatRequest request = LlmChatRequest.builder()
                     .model(model)
                     .systemPrompt(systemPrompt)
@@ -440,7 +446,7 @@ public class AuraBotChatService {
             chatRunPersistencePort.completeRun(runPid, false, totalInputTokens, totalOutputTokens,
                     0, null, "Tool loop exceeded maximum rounds");
         }
-        sendError(emitter, "Tool loop exceeded maximum rounds (" + MAX_TOOL_ROUNDS + ")", trace != null ? trace.getTraceId() : null);
+        sendError(emitter, "Tool loop exceeded maximum rounds (" + maxToolRounds + ")", trace != null ? trace.getTraceId() : null);
     }
 
     // =========================================================================
@@ -498,7 +504,7 @@ public class AuraBotChatService {
         List<LlmChatRequest.Tool> tools = resolved.tools();
 
         // Continue tool loop from where we left off
-        int remainingRounds = MAX_TOOL_ROUNDS - pending.getCurrentLoop() - 1;
+        int remainingRounds = maxToolRounds - pending.getCurrentLoop() - 1;
         for (int round = 0; round <= remainingRounds; round++) {
             LlmChatRequest request = LlmChatRequest.builder()
                     .model(pending.getModel())
@@ -832,6 +838,8 @@ public class AuraBotChatService {
             vars.put("pageType", ctx.getKind());
             vars.put("pageKey", ctx.getPageKey());
             vars.put("modelCode", ctx.getModelCode());
+            vars.put("tableName", "mt_" + ctx.getModelCode());
+            vars.put("modelSchema", buildModelSchemaText(ctx.getModelCode()));
             vars.put("recordPid", ctx.getRecordPid());
             if (ctx.getRecordData() != null && !ctx.getRecordData().isEmpty()) {
                 vars.put("hasRecordData", true);
@@ -864,7 +872,11 @@ public class AuraBotChatService {
             sb.append("\n\n## Current Page Context");
             if (ctx.getKind() != null) sb.append("\n- Page Kind: ").append(ctx.getKind());
             if (ctx.getPageKey() != null) sb.append("\n- Page Key: ").append(ctx.getPageKey());
-            if (ctx.getModelCode() != null) sb.append("\n- Model: ").append(ctx.getModelCode());
+            if (ctx.getModelCode() != null) {
+                sb.append("\n- Model: ").append(ctx.getModelCode());
+                sb.append("\n- Table: mt_").append(ctx.getModelCode());
+                appendModelSchema(sb, ctx.getModelCode());
+            }
             if (ctx.getRecordPid() != null) sb.append("\n- Record PID: ").append(ctx.getRecordPid());
             if (ctx.getBreadcrumb() != null && !ctx.getBreadcrumb().isEmpty()) {
                 sb.append("\n- Breadcrumb: ").append(String.join(" > ", ctx.getBreadcrumb()));
@@ -887,6 +899,45 @@ public class AuraBotChatService {
     // Keep backward-compatible overload for existing callers/tests
     String buildSystemPrompt(Long tenantId, ChatRequest request) {
         return buildSystemPrompt(tenantId, request, (ChatToolResolver.ResolvedTools) null);
+    }
+
+    /**
+     * Build model schema text for system prompt injection.
+     * Provides field names, column names, and data types so LLM can write SQL directly
+     * without needing to call list_models or information_schema queries.
+     */
+    private String buildModelSchemaText(String modelCode) {
+        if (modelCode == null || modelCode.isBlank()) return "";
+        try {
+            Optional<ModelDefinition> opt = metaModelService.getModelDefinition(modelCode);
+            if (opt.isEmpty() || opt.get().getFields() == null) return "";
+            var fields = opt.get().getFields();
+            StringBuilder schema = new StringBuilder();
+            for (var f : fields) {
+                if (SystemFieldConstants.isSystemField(f.getCode())) continue;
+                String col = f.getColumnName() != null ? f.getColumnName() : f.getCode();
+                schema.append(col).append(" (").append(f.getDataType());
+                if (f.getDisplayName() != null) schema.append(", ").append(f.getDisplayName());
+                schema.append("), ");
+            }
+            return schema.length() > 2 ? schema.substring(0, schema.length() - 2) : "";
+        } catch (Exception e) {
+            log.debug("Failed to build model schema for {}: {}", modelCode, e.getMessage());
+            return "";
+        }
+    }
+
+    /**
+     * Append model schema to system prompt StringBuilder.
+     */
+    private void appendModelSchema(StringBuilder sb, String modelCode) {
+        String schema = buildModelSchemaText(modelCode);
+        if (!schema.isEmpty()) {
+            sb.append("\n\n## Model Schema (mt_").append(modelCode).append(")\n");
+            sb.append("Columns: ").append(schema);
+            sb.append("\nSystem columns (always available): id, pid, tenant_id, created_at, updated_at, created_by, updated_by");
+            sb.append("\nIMPORTANT: Use these column names directly in SQL. No need to call list_models or query information_schema.");
+        }
     }
 
     /**
