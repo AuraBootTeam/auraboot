@@ -36,13 +36,8 @@ public class PageSchemaHistory {
     private String pid;
 
     /**
-     * 页面Schema全量快照
-     * 存储完整的页面配置信息，包括：
-     * - 基础信息（name, title, description, page_type等）
-     * - Schema内容（dsl_schema, meta_info, extension）
-     * - 版本信息（version, semver, row_version）
-     * - 发布信息（is_published, published_at, published_by）
-     * - 其他配置信息
+     * Full snapshot of the page schema at the time of the operation.
+     * Contains: kind, profile, layout, blocks, meta_info, version info, etc.
      */
     @TableField(value = "snapshot", typeHandler = JsonbStringTypeHandler.class, jdbcType = JdbcType.OTHER)
     private Map<String, Object> snapshot;
