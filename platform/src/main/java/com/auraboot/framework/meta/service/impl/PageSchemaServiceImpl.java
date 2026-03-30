@@ -170,12 +170,12 @@ public class PageSchemaServiceImpl implements PageSchemaService {
     }
 
     @Override
-    public List<PageSchemaDTO> findByPageType(String pageType) {
-        if (!StringUtils.hasText(pageType)) {
-            throw new ValidationException(ResponseCode.CommonValidationFailed, "页面类型不能为空");
+    public List<PageSchemaDTO> findByKind(String kind) {
+        if (!StringUtils.hasText(kind)) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed, "Page kind must not be empty");
         }
-        
-        List<PageSchema> schemas = pageSchemaMapper.selectByPageType(pageType);
+
+        List<PageSchema> schemas = pageSchemaMapper.selectByKind(kind);
         return schemas.stream()
                 .map(pageSchemaConverter::toDTO)
                 .collect(Collectors.toList());
@@ -214,16 +214,16 @@ public class PageSchemaServiceImpl implements PageSchemaService {
 
     @Override
     public PaginationResult<PageSchemaListDTO> findPageWithConditions(
-            String pageType, Boolean isTemplate, Boolean isPublished, String keyword, PaginationRequest request) {
+            String kind, Boolean isTemplate, Boolean isPublished, String keyword, PaginationRequest request) {
 
         Page<PageSchema> pageRequest = new Page<>(request.getPageNum(), request.getPageSize());
         IPage<PageSchema> pageResult = pageSchemaMapper.selectPageList(
-            pageRequest, pageType, isTemplate, isPublished, keyword
+            pageRequest, kind, isTemplate, isPublished, keyword
         );
         List<PageSchema> schemas = pageResult.getRecords();
         long total = pageResult.getTotal();
 
-        // 转换为列表 DTO（不包含 dslSchema）
+        // Convert to lightweight list DTO (no blocks/layout)
         List<PageSchemaListDTO> dtoList = schemas.stream()
                 .map(pageSchemaConverter::toListDTO)
                 .collect(Collectors.toList());
@@ -331,35 +331,32 @@ public class PageSchemaServiceImpl implements PageSchemaService {
     }
 
     @Override
-    public boolean validateDslSchema(Object dslSchema) {
-        if (dslSchema == null) {
+    public boolean validateBlocks(Object blocks) {
+        if (blocks == null) {
             return false;
         }
 
         try {
-            // Basic structural validation for DSL Schema
-            if (dslSchema instanceof Map) {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> schema = (Map<String, Object>) dslSchema;
-                // Must not be empty
-                if (schema.isEmpty()) {
-                    log.warn("DSL Schema validation failed: empty schema");
+            if (blocks instanceof List) {
+                List<?> blockList = (List<?>) blocks;
+                if (blockList.isEmpty()) {
+                    log.warn("Blocks validation failed: empty list");
                     return false;
                 }
-                // Size limit: max 512KB serialized (prevent oversized schemas)
-                String json = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(schema);
+                // Size limit: max 512KB serialized
+                String json = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(blockList);
                 if (json.length() > 512 * 1024) {
-                    log.warn("DSL Schema validation failed: schema exceeds 512KB limit ({}KB)", json.length() / 1024);
+                    log.warn("Blocks validation failed: exceeds 512KB limit ({}KB)", json.length() / 1024);
                     return false;
                 }
                 return true;
-            } else if (dslSchema instanceof String) {
-                String str = (String) dslSchema;
+            } else if (blocks instanceof String) {
+                String str = (String) blocks;
                 return !str.isBlank() && str.length() <= 512 * 1024;
             }
             return true;
         } catch (Exception e) {
-            log.warn("DSL Schema validation failed: {}", e.getMessage());
+            log.warn("Blocks validation failed: {}", e.getMessage());
             return false;
         }
     }
@@ -417,46 +414,35 @@ public class PageSchemaServiceImpl implements PageSchemaService {
     }
 
     /**
-     * Inject system tabs into the dsl_schema tabs block based on modelCategory.
-     * System tabs are appended to the end of existing tabs, with deduplication by key.
-     * Note: Jackson deserializes dsl_schema maps as mutable LinkedHashMap instances.
+     * Inject system tabs into the blocks list based on modelCategory.
+     * Finds a block with blockType "tabs" in the flat blocks list and appends
+     * system tabs with deduplication by key.
      */
     @SuppressWarnings("unchecked")
     private PageSchemaDTO injectSystemTabs(PageSchemaDTO dto) {
-        if (dto == null || dto.getDslSchema() == null) {
+        if (dto == null || dto.getBlocks() == null || dto.getBlocks().isEmpty()) {
             return dto;
         }
-        // Only inject for DETAIL pages (null pageType is treated as injectable for legacy schemas)
-        String pageType = dto.getPageType();
-        if (pageType != null && !"detail".equalsIgnoreCase(pageType)) {
-            return dto;
-        }
-
-        Map<String, Object> dsl = dto.getDslSchema();
-        Map<String, Object> areas = (Map<String, Object>) dsl.get("areas");
-        if (areas == null) {
+        // Only inject for detail pages
+        String kind = dto.getKind();
+        if (kind != null && !"detail".equalsIgnoreCase(kind)) {
             return dto;
         }
 
-        // Find the tabs block across all areas
+        // Find the tabs block in the flat blocks list
         List<Map<String, Object>> tabsList = null;
         Map<String, Object> tabsBlock = null;
-        for (Object areaObj : areas.values()) {
-            if (!(areaObj instanceof Map)) continue;
-            Map<String, Object> area = (Map<String, Object>) areaObj;
-            List<Map<String, Object>> blocks = (List<Map<String, Object>>) area.get("blocks");
-            if (blocks == null) continue;
-            for (Map<String, Object> block : blocks) {
-                if ("tabs".equals(block.get("blockType")) || block.containsKey("tabs")) {
-                    Object tabs = block.get("tabs");
-                    if (tabs instanceof List) {
-                        tabsBlock = block;
-                        tabsList = (List<Map<String, Object>>) tabs;
-                        break;
-                    }
+        for (Object blockObj : dto.getBlocks()) {
+            if (!(blockObj instanceof Map)) continue;
+            Map<String, Object> block = (Map<String, Object>) blockObj;
+            if ("tabs".equals(block.get("blockType")) || block.containsKey("tabs")) {
+                Object tabs = block.get("tabs");
+                if (tabs instanceof List) {
+                    tabsBlock = block;
+                    tabsList = (List<Map<String, Object>>) tabs;
+                    break;
                 }
             }
-            if (tabsList != null) break;
         }
 
         if (tabsList == null) {
@@ -525,16 +511,16 @@ public class PageSchemaServiceImpl implements PageSchemaService {
             throw new ValidationException(ResponseCode.CommonValidationFailed, "页面名称不能为空");
         }
 
-        if (!StringUtils.hasText(request.getPageType())) {
-            throw new ValidationException(ResponseCode.CommonValidationFailed, "页面类型不能为空");
+        if (!StringUtils.hasText(request.getKind())) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed, "Page kind must not be empty");
         }
 
-        if (request.getDslSchema() == null || request.getDslSchema().isEmpty()) {
-            throw new ValidationException(ResponseCode.CommonValidationFailed, "DSL Schema 不能为空");
+        if (request.getBlocks() == null || request.getBlocks().isEmpty()) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed, "Blocks must not be empty");
         }
 
-        if (!validateDslSchema(request.getDslSchema())) {
-            throw new ValidationException(ResponseCode.CommonValidationFailed, "DSL Schema 格式无效");
+        if (!validateBlocks(request.getBlocks())) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed, "Blocks format is invalid");
         }
     }
 
@@ -546,9 +532,9 @@ public class PageSchemaServiceImpl implements PageSchemaService {
             throw new ValidationException(ResponseCode.CommonValidationFailed, "更新请求不能为空");
         }
         
-        if (request.getDslSchema() != null && !request.getDslSchema().isEmpty() && 
-            !validateDslSchema(request.getDslSchema())) {
-            throw new ValidationException(ResponseCode.CommonValidationFailed, "DSL Schema 格式无效");
+        if (request.getBlocks() != null && !request.getBlocks().isEmpty() &&
+            !validateBlocks(request.getBlocks())) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed, "Blocks format is invalid");
         }
     }
 
@@ -598,9 +584,9 @@ public class PageSchemaServiceImpl implements PageSchemaService {
                 "页面配置已经发布");
         }
         
-        if (!validateDslSchema(pageSchema.getDslSchema())) {
-            throw new ValidationException(ResponseCode.CommonValidationFailed, 
-                "DSL Schema 格式无效，无法发布");
+        if (!validateBlocks(pageSchema.getBlocks())) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                "Blocks format is invalid, cannot publish");
         }
     }
 
@@ -625,8 +611,10 @@ public class PageSchemaServiceImpl implements PageSchemaService {
         newVersion.setName(original.getName());
         newVersion.setTitle(original.getTitle());
         newVersion.setDescription(original.getDescription());
-        newVersion.setPageType(original.getPageType());
-        newVersion.setDslSchema(original.getDslSchema());
+        newVersion.setKind(original.getKind());
+        newVersion.setProfile(original.getProfile());
+        newVersion.setLayout(original.getLayout());
+        newVersion.setBlocks(original.getBlocks());
         newVersion.setMetaInfo(original.getMetaInfo());
         newVersion.setIsTemplate(original.getIsTemplate());
         newVersion.setTemplateCategory(original.getTemplateCategory());
