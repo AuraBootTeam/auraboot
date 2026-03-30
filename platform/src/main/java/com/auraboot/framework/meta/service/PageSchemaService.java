@@ -65,12 +65,12 @@ public interface PageSchemaService {
     PageSchemaDTO findByName(String name);
 
     /**
-     * 根据页面类型查询页面配置列表
-     * 
-     * @param pageType 页面类型（FORM、LIST、DETAIL、DASHBOARD、CUSTOM）
-     * @return 页面配置DTO列表
+     * Find page schemas by kind.
+     *
+     * @param kind page kind (list, form, detail, dashboard)
+     * @return matching page schema DTOs
      */
-    List<PageSchemaDTO> findByPageType(String pageType);
+    List<PageSchemaDTO> findByKind(String kind);
 
     /**
      * 查询指定分类的模板页面配置
@@ -97,17 +97,17 @@ public interface PageSchemaService {
     List<PageSchemaDTO> searchByKeyword(String keyword);
 
     /**
-     * 条件分页查询页面配置（列表视图，不包含 dslSchema）
+     * Paginated query with optional filters (list view, lightweight DTO).
      *
-     * @param pageType 页面类型（可选）
-     * @param isTemplate 是否为模板（可选）
-     * @param isPublished 是否已发布（可选）
-     * @param keyword 搜索关键词（可选）
-     * @param request 分页请求参数
-     * @return 分页查询结果（使用 PageSchemaListDTO，不包含 dslSchema 以提升性能）
+     * @param kind page kind filter (optional)
+     * @param isTemplate template filter (optional)
+     * @param isPublished published filter (optional)
+     * @param keyword search keyword (optional)
+     * @param request pagination params
+     * @return paginated result
      */
     PaginationResult<PageSchemaListDTO> findPageWithConditions(
-            String pageType,
+            String kind,
             Boolean isTemplate,
             Boolean isPublished,
             String keyword,
@@ -189,12 +189,12 @@ public interface PageSchemaService {
     boolean isNameUnique(String name, String excludePid);
 
     /**
-     * 验证DSL Schema的有效性
-     * 
-     * @param dslSchema DSL Schema对象
-     * @return 是否有效
+     * Validate the blocks list structure.
+     *
+     * @param blocks ordered list of page blocks
+     * @return true if valid
      */
-    boolean validateDslSchema(Object dslSchema);
+    boolean validateBlocks(Object blocks);
 
     // ==================== 统一控制器支持方法 ====================
 
@@ -241,7 +241,7 @@ public interface PageSchemaService {
      * Used by mobile clients to determine which schemas need re-fetching.
      *
      * @param since timestamp threshold (only schemas updated after this time are returned)
-     * @return list of version metadata DTOs (no dslSchema included)
+     * @return list of version metadata DTOs (lightweight, no blocks)
      */
     List<PageSchemaSyncVersionDTO> getVersionsSince(Instant since);
 
