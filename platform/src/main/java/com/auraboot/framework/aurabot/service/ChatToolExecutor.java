@@ -11,16 +11,16 @@ import java.util.Map;
 /**
  * Routes LLM tool calls to the appropriate backend service via ToolDiscoveryPort.
  *
- * <p>Converts AuraBot tool naming conventions (cmd__, nq__, builtin__, and sanitized provider names)
- * to ToolProvider codes, then delegates execution to ToolProviderRegistry through ToolDiscoveryPort.
+ * <p>Converts sanitized LLM tool names back to ToolProvider codes,
+ * then delegates execution to ToolProviderRegistry through ToolDiscoveryPort.
  *
- * <p>Tool name conventions (from {@link ChatToolResolver}):
+ * <p>Tool name de-sanitization (from {@link ChatToolResolver}):
  * <ul>
- *   <li>{@code cmd__{modelCode}__{commandCode}} → {@code cmd:{commandCode}}</li>
- *   <li>{@code nq__{queryCode}} → {@code nq:{queryCode}}</li>
- *   <li>{@code builtin__execute_query} → {@code platform.execute_sql}</li>
- *   <li>{@code builtin__list_models} → {@code platform.list_models}</li>
- *   <li>{@code builtin__get_record} → {@code get:{modelCode}}</li>
+ *   <li>{@code platform_*} → {@code platform.*}</li>
+ *   <li>{@code cmd_*} → {@code cmd:*}</li>
+ *   <li>{@code nq_*} → {@code nq:*}</li>
+ *   <li>{@code list_*} → {@code list:*}</li>
+ *   <li>{@code get_*} → {@code get:*}</li>
  * </ul>
  *
  * @author AuraBoot Team
@@ -29,13 +29,6 @@ import java.util.Map;
 @Slf4j
 @Service
 public class ChatToolExecutor {
-
-    private static final String PREFIX_CMD = "cmd__";
-    private static final String PREFIX_NQ = "nq__";
-    private static final String BUILTIN_GET_RECORD = "builtin__get_record";
-    private static final String BUILTIN_EXECUTE_QUERY = "builtin__execute_query";
-    private static final String BUILTIN_LIST_MODELS = "builtin__list_models";
-    private static final String BUILTIN_MODEL_SUGGEST = "builtin__model_suggest";
 
     private final ToolDiscoveryPort toolDiscoveryPort;
 
@@ -50,7 +43,7 @@ public class ChatToolExecutor {
      * <p>
      * Routes through ToolProviderRegistry via ToolDiscoveryPort (enterprise-ai module).
      *
-     * @param toolName  the tool name (e.g., "cmd__crm_lead__advance_stage")
+     * @param toolName  the tool name (e.g., "cmd_crm_update_lead")
      * @param input     the tool input parameters from the LLM
      * @param modelCode the current model context code
      * @return result map with either "success" data or "error" details
@@ -79,46 +72,35 @@ public class ChatToolExecutor {
     }
 
     /**
-     * Convert AuraBot tool naming convention to ToolProvider code convention.
+     * De-sanitize LLM tool names back to ToolProvider code convention.
      * <p>
-     * AuraBot naming: {@code cmd__{modelCode}__{commandCode}}, {@code nq__{queryCode}}, {@code builtin__*}
-     * Provider naming: {@code cmd:{commandCode}}, {@code nq:{queryCode}}, {@code platform.*}, {@code get:{modelCode}}
+     * LLM tool names use underscores (LLM function-name compatible),
+     * provider codes use colons/dots as namespace separators.
      */
     private String toProviderToolCode(String toolName, String modelCode) {
-        if (toolName.startsWith(PREFIX_CMD)) {
-            // cmd__crm_lead__crm_update_lead → extract commandCode after last __
-            String remainder = toolName.substring(PREFIX_CMD.length());
-            int separatorIdx = remainder.indexOf("__");
-            if (separatorIdx >= 0) {
-                String commandCode = remainder.substring(separatorIdx + 2);
-                return "cmd:" + commandCode;
-            }
-            return "cmd:" + remainder;
-        }
-        if (toolName.startsWith(PREFIX_NQ)) {
-            return "nq:" + toolName.substring(PREFIX_NQ.length());
-        }
-        if (BUILTIN_EXECUTE_QUERY.equals(toolName)) {
-            return "platform.execute_sql";
-        }
-        if (BUILTIN_LIST_MODELS.equals(toolName)) {
-            return "platform.list_models";
-        }
-        if (BUILTIN_MODEL_SUGGEST.equals(toolName)) {
-            return "platform.model_suggest";
-        }
-        if (BUILTIN_GET_RECORD.equals(toolName)) {
-            return "get:" + (modelCode != null ? modelCode : "unknown");
-        }
-        // Provider-style sanitized names (from ToolDiscoveryPort: code.replace(':','_').replace('.','_'))
-        // e.g., platform_execute_sql → platform.execute_sql, nq_crm_lead_stats → nq:crm_lead_stats
-        if (toolName.startsWith("platform_")) return "platform." + toolName.substring("platform_".length());
-        if (toolName.startsWith("nq_"))       return "nq:" + toolName.substring("nq_".length());
-        if (toolName.startsWith("cmd_"))      return "cmd:" + toolName.substring("cmd_".length());
-        if (toolName.startsWith("list_"))     return "list:" + toolName.substring("list_".length());
-        if (toolName.startsWith("get_"))      return "get:" + toolName.substring("get_".length());
+        if (toolName == null) return toolName;
 
-        // Pass-through for unknown tools
+        // Provider naming: platform_* → platform.*
+        if (toolName.startsWith("platform_")) {
+            return "platform." + toolName.substring("platform_".length());
+        }
+        // Provider naming: cmd_* → cmd:*
+        if (toolName.startsWith("cmd_")) {
+            return "cmd:" + toolName.substring(4);
+        }
+        // Provider naming: nq_* → nq:*
+        if (toolName.startsWith("nq_")) {
+            return "nq:" + toolName.substring(3);
+        }
+        // Provider naming: list_* → list:*
+        if (toolName.startsWith("list_")) {
+            return "list:" + toolName.substring(5);
+        }
+        // Provider naming: get_* → get:*
+        if (toolName.startsWith("get_")) {
+            return "get:" + toolName.substring(4);
+        }
+        // Pass-through for unknown patterns
         return toolName;
     }
 

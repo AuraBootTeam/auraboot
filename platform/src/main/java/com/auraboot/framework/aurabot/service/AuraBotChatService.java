@@ -38,8 +38,8 @@ import java.util.concurrent.Executor;
  * and {@link PromptTemplateService} for system prompt rendering.
  * <p>
  * When tools are available (based on model context), enters a synchronous tool loop
- * (max 5 rounds) using {@link LlmProvider#chat}. Read-only tools (nq__, builtin__)
- * are auto-executed; write tools (cmd__) require user confirmation via SSE events.
+ * (max 5 rounds) using {@link LlmProvider#chat}. Read-only tools (nq_*, list_*, get_*, platform_*)
+ * are auto-executed; write tools (cmd_*) require user confirmation via SSE events.
  *
  * @since 6.5.0
  */
@@ -66,6 +66,10 @@ public class AuraBotChatService {
     @Autowired(required = false)
     private com.auraboot.framework.agent.port.AgentChatPort agentChatPort;
 
+    /** Optional chat run persistence — available when enterprise-ai module is loaded. */
+    @Autowired(required = false)
+    private ChatRunPersistencePort chatRunPersistencePort;
+
     private static final HttpClient HTTP_CLIENT = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
             .build();
@@ -88,11 +92,11 @@ public class AuraBotChatService {
         hint.append("\n\nYou have access to tools. Follow this strategy:\n");
 
         if (resolved.isReadOnly()) {
-            hint.append("- The user wants to QUERY data. Prefer nq__* (named query) tools — they are pre-built and optimized.\n");
-            hint.append("- Use builtin__execute_query ONLY if no named query matches the question.\n");
-            hint.append("- Call builtin__list_models at most ONCE if you need to learn table schemas.\n");
+            hint.append("- The user wants to QUERY data. Prefer nq_* (named query) tools — they are pre-built and optimized.\n");
+            hint.append("- Use platform_execute_sql ONLY if no named query matches the question.\n");
+            hint.append("- Call platform_list_models at most ONCE if you need to learn table schemas.\n");
         } else {
-            hint.append("- The user wants to MODIFY data. Use the cmd__* tools to execute the operation.\n");
+            hint.append("- The user wants to MODIFY data. Use the cmd_* tools to execute the operation.\n");
             hint.append("- Describe what you will do BEFORE calling the tool.\n");
         }
 
@@ -219,7 +223,7 @@ public class AuraBotChatService {
 
         // 5. Route: tool loop (sync) vs text-only streaming
         if (!tools.isEmpty()) {
-            doToolLoop(providerCode, config, model, systemPrompt, maxTokens,
+            doToolLoop(tenantId, providerCode, config, model, systemPrompt, maxTokens,
                     request.getHistory(), request.getMessage(), tools,
                     modelCode, request.getSessionId(), emitter, trace);
         } else {
@@ -246,7 +250,7 @@ public class AuraBotChatService {
     // Tool loop (synchronous LlmProvider.chat)
     // =========================================================================
 
-    private void doToolLoop(String providerCode, ProviderConfig config, String model,
+    private void doToolLoop(Long tenantId, String providerCode, ProviderConfig config, String model,
                             String systemPrompt, int maxTokens,
                             List<ChatMessage> history, String userMessage,
                             List<LlmChatRequest.Tool> tools, String modelCode,
@@ -257,6 +261,13 @@ public class AuraBotChatService {
             sendError(emitter, "LLM provider not available: " + providerCode, trace != null ? trace.getTraceId() : null);
             return;
         }
+
+        // Persist run record
+        String runPid = null;
+        if (chatRunPersistencePort != null) {
+            runPid = chatRunPersistencePort.createRun(tenantId, model, userMessage);
+        }
+        int totalInputTokens = 0, totalOutputTokens = 0;
 
         // Build conversation messages
         List<LlmChatRequest.Message> messages = buildLlmMessages(history, userMessage);
@@ -281,6 +292,10 @@ public class AuraBotChatService {
                 aiTraceService.endSpan(llmSpan, Map.of("error", e.getMessage()), "error");
                 aiTraceService.endTraceWithError(trace, e.getMessage());
                 log.error("Tool loop LLM call failed (round {}): {}", round, e.getMessage(), e);
+                if (chatRunPersistencePort != null && runPid != null) {
+                    chatRunPersistencePort.completeRun(runPid, false, totalInputTokens, totalOutputTokens,
+                            0, null, "LLM request failed: " + e.getMessage());
+                }
                 sendError(emitter, "LLM request failed: " + e.getMessage(), trace != null ? trace.getTraceId() : null);
                 return;
             }
@@ -291,8 +306,16 @@ public class AuraBotChatService {
                     null, response.getStopReason(), null, null);
             aiTraceService.endSpan(llmSpan, null, "success");
 
+            // Accumulate token counts
+            totalInputTokens += response.getInputTokens();
+            totalOutputTokens += response.getOutputTokens();
+
             if (response == null || response.getContent() == null || response.getContent().isEmpty()) {
                 aiTraceService.endTraceWithError(trace, "Empty response from LLM");
+                if (chatRunPersistencePort != null && runPid != null) {
+                    chatRunPersistencePort.completeRun(runPid, false, totalInputTokens, totalOutputTokens,
+                            0, null, "Empty response from LLM");
+                }
                 sendError(emitter, "Empty response from LLM", trace != null ? trace.getTraceId() : null);
                 return;
             }
@@ -303,6 +326,10 @@ public class AuraBotChatService {
                 // Final text response — stream it via SSE
                 String finalText = extractTextFromResponse(response);
                 aiTraceService.endTrace(trace, finalText, "success");
+                if (chatRunPersistencePort != null && runPid != null) {
+                    chatRunPersistencePort.completeRun(runPid, true, totalInputTokens, totalOutputTokens,
+                            0, finalText, null);
+                }
                 streamFinalResponse(response, emitter, trace != null ? trace.getTraceId() : null);
                 return;
             }
@@ -342,6 +369,9 @@ public class AuraBotChatService {
                         Map<String, Object> result = chatToolExecutor.execute(toolName, input, modelCode);
                         boolean success = Boolean.TRUE.equals(result.get("success"));
                         aiTraceService.endSpan(toolSpan, result, success ? "success" : "error");
+                        if (chatRunPersistencePort != null && runPid != null) {
+                            chatRunPersistencePort.recordToolCall(runPid, toolName, input, result, success);
+                        }
 
                         sendToolResult(emitter, toolId, result, success);
 
@@ -392,13 +422,22 @@ public class AuraBotChatService {
 
             // Unknown stop reason — treat as end_turn
             log.warn("Unknown stop reason from LLM: {}", stopReason);
-            aiTraceService.endTrace(trace, extractTextFromResponse(response), "success");
+            String unknownText = extractTextFromResponse(response);
+            aiTraceService.endTrace(trace, unknownText, "success");
+            if (chatRunPersistencePort != null && runPid != null) {
+                chatRunPersistencePort.completeRun(runPid, true, totalInputTokens, totalOutputTokens,
+                        0, unknownText, null);
+            }
             streamFinalResponse(response, emitter, trace != null ? trace.getTraceId() : null);
             return;
         }
 
         // Exceeded max rounds — send what we have
         aiTraceService.endTraceWithError(trace, "Tool loop exceeded maximum rounds");
+        if (chatRunPersistencePort != null && runPid != null) {
+            chatRunPersistencePort.completeRun(runPid, false, totalInputTokens, totalOutputTokens,
+                    0, null, "Tool loop exceeded maximum rounds");
+        }
         sendError(emitter, "Tool loop exceeded maximum rounds (" + MAX_TOOL_ROUNDS + ")", trace != null ? trace.getTraceId() : null);
     }
 

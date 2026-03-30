@@ -3,6 +3,7 @@ package com.auraboot.framework.integration.ai;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.meta.ai.AiModelSuggestionController;
 import com.auraboot.framework.meta.ai.AiModelSuggestionController.SuggestModelRequest;
+import com.auraboot.framework.meta.ai.AiModelSuggestionService;
 import com.auraboot.framework.meta.ai.AiModelSuggestionService.ModelSuggestion;
 import com.auraboot.framework.meta.ai.AiModelSuggestionService.FieldSuggestion;
 import com.auraboot.framework.common.dto.ApiResponse;
@@ -14,11 +15,10 @@ import org.springframework.beans.factory.annotation.Value;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Integration tests for AiModelSuggestionController.
- * Tests the suggest-model endpoint and fallback behavior.
+ * Integration tests for AiModelSuggestionController and AiModelSuggestionService.
  *
- * When AI is disabled, the controller returns a fallback suggestion.
- * When AI is enabled, it parses the AI response into ModelSuggestion.
+ * When AI is disabled (default in tests), the service returns null and
+ * the controller returns an error response. No fallback data is generated.
  */
 @Slf4j
 @DisplayName("AiModelSuggestion - Integration Tests")
@@ -28,15 +28,53 @@ class AiModelSuggestionIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private AiModelSuggestionController controller;
 
+    @Autowired
+    private AiModelSuggestionService service;
+
     @Value("${ai.service.enabled:false}")
     private boolean aiEnabled;
 
-    // ==================== Fallback Suggestion Tests ====================
+    // ==================== Service Layer Tests ====================
 
     @Test
     @Order(1)
-    @DisplayName("Suggest model returns fallback when AI is disabled")
-    void test01_suggestModelFallback() {
+    @DisplayName("Service returns null when AI is disabled")
+    void test01_serviceReturnsNullWhenAiDisabled() {
+        if (aiEnabled) {
+            log.info("Skipping test — AI is enabled, service may return real data");
+            return;
+        }
+
+        ModelSuggestion result = service.suggestModel("Customer management system", "en");
+        assertNull(result, "Service should return null when AI is disabled");
+    }
+
+    @Test
+    @Order(2)
+    @DisplayName("Service returns null for various descriptions when AI disabled")
+    void test02_serviceReturnsNullForAllDescriptions() {
+        if (aiEnabled) {
+            log.info("Skipping test — AI is enabled");
+            return;
+        }
+
+        assertNull(service.suggestModel("Project task tracking", "en"));
+        assertNull(service.suggestModel("Employee Leave Management", "en"));
+        assertNull(service.suggestModel("客户关系管理系统", "zh"));
+        assertNull(service.suggestModel("Simple data", null));
+    }
+
+    // ==================== Controller Layer Tests ====================
+
+    @Test
+    @Order(3)
+    @DisplayName("Controller returns error response when AI is disabled")
+    void test03_controllerReturnsErrorWhenAiDisabled() {
+        if (aiEnabled) {
+            log.info("Skipping test — AI is enabled");
+            return;
+        }
+
         SuggestModelRequest request = new SuggestModelRequest();
         request.setDescription("Customer management system");
         request.setLanguage("en");
@@ -44,189 +82,66 @@ class AiModelSuggestionIntegrationTest extends BaseIntegrationTest {
         ApiResponse<ModelSuggestion> response = controller.suggestModel(request);
 
         assertNotNull(response);
-        assertNotNull(response.getData(), "Should return a suggestion even when AI is disabled");
+        assertNull(response.getData(), "Data should be null when AI is unavailable");
+        assertNotEquals("0", response.getCode(), "Response code should indicate error");
 
-        ModelSuggestion suggestion = response.getData();
-        assertNotNull(suggestion.getModelCode(), "Model code should not be null");
-        assertNotNull(suggestion.getModelName(), "Model name should not be null");
-        assertNotNull(suggestion.getFields(), "Fields should not be null");
-        assertFalse(suggestion.getFields().isEmpty(), "Should have at least one field");
-        assertNotNull(suggestion.getSuggestedViews(), "Views should not be null");
-
-        log.info("Fallback suggestion: code={}, name={}, fields={}, views={}",
-                suggestion.getModelCode(),
-                suggestion.getModelName(),
-                suggestion.getFields().size(),
-                suggestion.getSuggestedViews());
-    }
-
-    @Test
-    @Order(2)
-    @DisplayName("Fallback suggestion contains standard fields")
-    void test02_fallbackStandardFields() {
-        SuggestModelRequest request = new SuggestModelRequest();
-        request.setDescription("Project task tracking");
-
-        ApiResponse<ModelSuggestion> response = controller.suggestModel(request);
-
-        ModelSuggestion suggestion = response.getData();
-        assertNotNull(suggestion);
-
-        // Fallback always generates 4 standard fields
-        if (!aiEnabled) {
-            assertEquals(4, suggestion.getFields().size(),
-                    "Fallback should have exactly 4 standard fields");
-
-            // Verify standard field codes
-            assertTrue(suggestion.getFields().stream()
-                            .anyMatch(f -> "name".equals(f.getFieldCode())),
-                    "Should have 'name' field");
-            assertTrue(suggestion.getFields().stream()
-                            .anyMatch(f -> "status".equals(f.getFieldCode())),
-                    "Should have 'status' field");
-            assertTrue(suggestion.getFields().stream()
-                            .anyMatch(f -> "description".equals(f.getFieldCode())),
-                    "Should have 'description' field");
-            assertTrue(suggestion.getFields().stream()
-                            .anyMatch(f -> "created_date".equals(f.getFieldCode())),
-                    "Should have 'created_date' field");
-        }
-    }
-
-    @Test
-    @Order(3)
-    @DisplayName("Fallback model code is derived from description")
-    void test03_fallbackModelCodeDerivation() {
-        SuggestModelRequest request = new SuggestModelRequest();
-        request.setDescription("Employee Leave Management");
-
-        ApiResponse<ModelSuggestion> response = controller.suggestModel(request);
-
-        ModelSuggestion suggestion = response.getData();
-        assertNotNull(suggestion);
-
-        if (!aiEnabled) {
-            // Model code should be lowercase, derived from description
-            String code = suggestion.getModelCode();
-            assertNotNull(code);
-            assertEquals(code, code.toLowerCase(),
-                    "Model code should be lowercase");
-            assertFalse(code.contains(" "),
-                    "Model code should not contain spaces");
-            log.info("Derived model code: {}", code);
-        }
+        log.info("Controller error response: code={}, message={}", response.getCode(), response.getMessage());
     }
 
     @Test
     @Order(4)
-    @DisplayName("Fallback handles long description truncation")
-    void test04_fallbackLongDescription() {
-        String longDesc = "A very detailed and comprehensive enterprise resource planning system that handles " +
-                "inventory management, order processing, supplier management, warehouse logistics, " +
-                "financial reporting, and human resources administration for multinational corporations";
+    @DisplayName("Controller error message mentions LLM configuration")
+    void test04_controllerErrorMessageIsHelpful() {
+        if (aiEnabled) {
+            log.info("Skipping test — AI is enabled");
+            return;
+        }
 
         SuggestModelRequest request = new SuggestModelRequest();
-        request.setDescription(longDesc);
+        request.setDescription("Inventory tracking");
 
         ApiResponse<ModelSuggestion> response = controller.suggestModel(request);
 
-        ModelSuggestion suggestion = response.getData();
-        assertNotNull(suggestion);
-
-        if (!aiEnabled) {
-            // Model code should be truncated to max 30 chars
-            assertTrue(suggestion.getModelCode().length() <= 30,
-                    "Model code should be max 30 chars");
-            // Model name should be truncated to max 50 chars
-            assertTrue(suggestion.getModelName().length() <= 50,
-                    "Model name should be max 50 chars");
-        }
+        assertNotNull(response.getMessage());
+        assertTrue(response.getMessage().contains("LLM"),
+                "Error message should mention LLM provider: " + response.getMessage());
     }
 
     @Test
     @Order(5)
-    @DisplayName("Suggest model with Chinese description")
-    void test05_chineseDescription() {
+    @DisplayName("Controller handles Chinese description gracefully")
+    void test05_controllerHandlesChineseDescription() {
+        if (aiEnabled) {
+            log.info("Skipping test — AI is enabled");
+            return;
+        }
+
         SuggestModelRequest request = new SuggestModelRequest();
         request.setDescription("客户关系管理系统");
         request.setLanguage("zh");
 
         ApiResponse<ModelSuggestion> response = controller.suggestModel(request);
 
-        ModelSuggestion suggestion = response.getData();
-        assertNotNull(suggestion);
-        assertNotNull(suggestion.getModelCode());
-        assertNotNull(suggestion.getFields());
-        assertFalse(suggestion.getFields().isEmpty());
-
-        log.info("Chinese description suggestion: code={}, fields={}",
-                suggestion.getModelCode(), suggestion.getFields().size());
+        assertNotNull(response);
+        assertNull(response.getData(), "Data should be null when AI is unavailable");
     }
 
     @Test
     @Order(6)
-    @DisplayName("Suggest model with null language defaults to zh")
-    void test06_nullLanguageDefault() {
+    @DisplayName("Controller handles null language parameter")
+    void test06_controllerHandlesNullLanguage() {
+        if (aiEnabled) {
+            log.info("Skipping test — AI is enabled");
+            return;
+        }
+
         SuggestModelRequest request = new SuggestModelRequest();
         request.setDescription("Inventory tracking");
         request.setLanguage(null);
 
         ApiResponse<ModelSuggestion> response = controller.suggestModel(request);
 
-        assertNotNull(response);
-        assertNotNull(response.getData());
-        log.info("Null language suggestion: {}", response.getData().getModelCode());
-    }
-
-    // ==================== FieldSuggestion Tests ====================
-
-    @Test
-    @Order(7)
-    @DisplayName("FieldSuggestion has correct data types")
-    void test07_fieldSuggestionDataTypes() {
-        SuggestModelRequest request = new SuggestModelRequest();
-        request.setDescription("Test model");
-
-        ApiResponse<ModelSuggestion> response = controller.suggestModel(request);
-
-        ModelSuggestion suggestion = response.getData();
-        assertNotNull(suggestion);
-
-        if (!aiEnabled) {
-            for (FieldSuggestion field : suggestion.getFields()) {
-                assertNotNull(field.getFieldCode(), "Field code should not be null");
-                assertNotNull(field.getFieldName(), "Field name should not be null");
-                assertNotNull(field.getDataType(), "Data type should not be null");
-                assertNotNull(field.getDescription(), "Description should not be null");
-
-                // Validate data types are recognized types
-                String dataType = field.getDataType();
-                assertTrue(
-                        dataType.equals("string") || dataType.equals("integer") ||
-                                dataType.equals("decimal") || dataType.equals("date") ||
-                                dataType.equals("datetime") || dataType.equals("boolean") ||
-                                dataType.equals("text") || dataType.equals("enum"),
-                        "Data type should be a valid type: " + dataType);
-            }
-        }
-    }
-
-    @Test
-    @Order(8)
-    @DisplayName("Fallback suggested views contain TABLE")
-    void test08_fallbackSuggestedViews() {
-        SuggestModelRequest request = new SuggestModelRequest();
-        request.setDescription("Simple data");
-
-        ApiResponse<ModelSuggestion> response = controller.suggestModel(request);
-
-        ModelSuggestion suggestion = response.getData();
-        assertNotNull(suggestion);
-
-        if (!aiEnabled) {
-            assertTrue(suggestion.getSuggestedViews().contains("table"),
-                    "Fallback should always suggest TABLE view");
-        }
+        assertNotNull(response, "Response should not be null even when AI is unavailable");
     }
 
     // ==================== DTO Tests ====================
