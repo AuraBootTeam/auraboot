@@ -6,6 +6,10 @@ import com.auraboot.smart.framework.engine.pvm.event.EventConstant;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.bpm.event.BpmEvent;
 import com.auraboot.framework.bpm.event.EventBusService;
+import com.auraboot.framework.plugin.entity.BpmProcessDefinition;
+import com.auraboot.framework.plugin.mapper.BpmProcessDefinitionMapper;
+import com.auraboot.framework.user.dao.entity.User;
+import com.auraboot.framework.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -33,6 +37,8 @@ import java.util.Map;
 public class AuraTaskEventPublisher implements TaskEventPublisher {
 
     private final EventBusService eventBusService;
+    private final BpmProcessDefinitionMapper processDefinitionMapper;
+    private final UserService userService;
 
     @Override
     public void publish(EventConstant event, TaskInstance taskInstance,
@@ -80,6 +86,12 @@ public class AuraTaskEventPublisher implements TaskEventPublisher {
             tenantIdLong = 0L;
         }
 
+        // Enrich with process display name from BpmProcessDefinition
+        enrichWithProcessName(payload, processKey, tenantIdLong);
+
+        // Enrich with initiator display name if startUserId is available
+        enrichWithInitiatorName(payload);
+
         BpmEvent bpmEvent = new BpmEvent(
                 tenantIdLong, eventType, "bpm",
                 processKey, processInstanceId,
@@ -90,5 +102,63 @@ public class AuraTaskEventPublisher implements TaskEventPublisher {
 
         log.debug("Task event published: event={}, taskId={}, processInstance={}",
                 eventType, taskInstance.getInstanceId(), processInstanceId);
+    }
+
+    /**
+     * Look up the human-readable process name from ab_bpm_process_definition
+     * and add it to the payload as "processName".
+     */
+    private void enrichWithProcessName(Map<String, Object> payload, String processKeyWithVersion, Long tenantId) {
+        if (processKeyWithVersion == null || tenantId == null || tenantId == 0L) return;
+        try {
+            // processKey from SmartEngine includes version suffix (e.g. "pr_xxx:1.0.0")
+            // Strip version to get the base process key
+            String baseKey = processKeyWithVersion.contains(":")
+                    ? processKeyWithVersion.substring(0, processKeyWithVersion.indexOf(':'))
+                    : processKeyWithVersion;
+
+            BpmProcessDefinition definition = processDefinitionMapper.selectOne(
+                    new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<BpmProcessDefinition>()
+                            .eq("tenant_id", tenantId)
+                            .eq("process_key", baseKey)
+                            .eq("is_current", true)
+                            .eq("deleted_flag", false));
+
+            if (definition != null && definition.getProcessName() != null) {
+                payload.put("processName", definition.getProcessName());
+            }
+        } catch (Exception e) {
+            // CATCH: non-transactional enrichment, safe to handle — do not block event publishing
+            log.debug("Could not enrich process name for key={}: {}", processKeyWithVersion, e.getMessage());
+        }
+    }
+
+    /**
+     * If the payload contains a startUserId, resolve the user's display name
+     * and add it as "initiatorName".
+     */
+    private void enrichWithInitiatorName(Map<String, Object> payload) {
+        Object startUserId = payload.get("startUserId");
+        if (startUserId == null) return;
+        try {
+            String userIdStr = startUserId.toString();
+            User user = null;
+            try {
+                Long userId = Long.parseLong(userIdStr);
+                user = userService.findByUserId(userId);
+            } catch (NumberFormatException nfe) {
+                // Could be a ULID/PID — try findByPid
+                user = userService.findByPid(userIdStr);
+            }
+            if (user != null) {
+                String name = user.getNickName() != null ? user.getNickName() : user.getUserName();
+                if (name != null) {
+                    payload.put("initiatorName", name);
+                }
+            }
+        } catch (Exception e) {
+            // CATCH: non-transactional enrichment, safe to handle
+            log.debug("Could not enrich initiator name for startUserId={}: {}", startUserId, e.getMessage());
+        }
     }
 }
