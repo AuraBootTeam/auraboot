@@ -44,15 +44,15 @@ public class CompletenessValidator implements PluginValidator {
             return messages;
         }
 
-        // Build page index: modelCode -> set of pageTypes
+        // Build page index: modelCode -> set of page kinds
         Map<String, Set<String>> modelPageTypes = new HashMap<>();
         if (manifest.getPages() != null) {
             for (PageSchemaDTO page : manifest.getPages()) {
                 String mc = page.getModelCode();
-                String pt = page.getPageType();
-                if (mc != null && pt != null) {
+                String pk = page.getKind();
+                if (mc != null && pk != null) {
                     modelPageTypes.computeIfAbsent(mc, k -> new HashSet<>())
-                            .add(pt.toLowerCase());
+                            .add(pk.toLowerCase());
                 }
             }
         }

@@ -49,10 +49,10 @@ public class DesignRuleValidator implements PluginValidator {
             for (PageSchemaDTO page : pages) {
                 String modelCode = page.getModelCode();
                 if (modelCode == null) continue;
-                String pageType = page.getPageType();
-                if ("list".equals(pageType)) {
+                String kind = page.getKind();
+                if ("list".equals(kind)) {
                     modelCodesWithListPage.add(modelCode);
-                } else if ("form".equals(pageType) || "detail".equals(pageType)) {
+                } else if ("form".equals(kind) || "detail".equals(kind)) {
                     modelCodesWithFormPage.add(modelCode);
                 }
             }
