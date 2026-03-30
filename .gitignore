@@ -95,4 +95,4 @@ tests/load/results/
 # Shared Claude Code config (symlinks to auraboot-enterprise)
 CLAUDE.md
 AGENTS.md
-.claude/
+.claude/.worktrees/
