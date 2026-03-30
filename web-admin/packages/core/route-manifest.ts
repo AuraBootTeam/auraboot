@@ -145,7 +145,13 @@ export function coreRoutes() {
     route('/aurabot/knowledge', './routes/aurabot/knowledge.tsx'),
     route('/aurabot/knowledge/:kbPid', './routes/aurabot/knowledge.$kbPid.tsx'),
 
-    // Dynamic CRUD routes — table-name based dynamic pages
+    // Page routes — /p/:pageKey based (V2, underscores)
+    route('/p/:pageKey', './routes/p.$pageKey.tsx'),
+    route('/p/:pageKey/new', './routes/p.$pageKey.new.tsx'),
+    route('/p/:pageKey/view/:recordId', './routes/p.$pageKey.view.tsx'),
+    route('/p/:pageKey/:recordId/edit', './routes/p.$pageKey.edit.tsx'),
+
+    // Legacy dynamic routes — redirect to /p/ prefix
     route('/dynamic/:tableName', './routes/dynamic.$tableName.tsx'),
     route('/dynamic/:tableName/new', './routes/dynamic.$tableName.new.tsx'),
     route('/dynamic/:tableName/view/:recordId', './routes/dynamic.$tableName.view.tsx'),
