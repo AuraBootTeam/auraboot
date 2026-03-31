@@ -1,6 +1,10 @@
 package com.auraboot.framework.meta.ai;
 
+import com.auraboot.framework.meta.dto.MetaModelDTO;
 import com.auraboot.framework.meta.service.DynamicDataService;
+import com.auraboot.framework.meta.service.MetaModelService;
+import com.auraboot.framework.saas.config.service.SystemConfigService;
+import com.auraboot.framework.saas.constant.SystemConfigKeys;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.AllArgsConstructor;
@@ -34,6 +38,8 @@ public class NbaService {
     private final AiFieldProcessor aiFieldProcessor;
     private final DynamicDataService dynamicDataService;
     private final ObjectMapper objectMapper;
+    private final SystemConfigService systemConfigService;
+    private final MetaModelService metaModelService;
 
     /**
      * Generate next best action suggestions for a specific record.
@@ -43,6 +49,11 @@ public class NbaService {
      * @return list of action suggestions, max 3
      */
     public List<NbaSuggestion> suggest(String modelCode, String recordPid) {
+        // Check NBA toggle: model-level > global > default(false)
+        if (!isNbaEnabled(modelCode)) {
+            return Collections.emptyList();
+        }
+
         // Fetch record data
         Map<String, Object> record;
         try {
@@ -72,6 +83,27 @@ public class NbaService {
         }
 
         return parseSuggestions(result.getContent());
+    }
+
+    /**
+     * Determine if NBA is enabled for the given model.
+     * Priority: model extension.enableNba > global ai.nba.enabled > false
+     */
+    private boolean isNbaEnabled(String modelCode) {
+        // 1. Check model-level override
+        MetaModelDTO model = metaModelService.findByCode(modelCode);
+        if (model != null && model.getExtension() != null) {
+            Object modelFlag = model.getExtension().get("enableNba");
+            if (modelFlag instanceof Boolean b) {
+                return b;
+            }
+            if (modelFlag != null) {
+                return Boolean.parseBoolean(modelFlag.toString());
+            }
+        }
+
+        // 2. Fall back to global config (default: false)
+        return systemConfigService.getBoolean(SystemConfigKeys.AI_NBA_ENABLED, false);
     }
 
     private String buildNbaPrompt(String modelCode, Map<String, Object> record) {
