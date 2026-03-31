@@ -78,7 +78,8 @@ public class ExtensionBean {
     private static final Set<String> MODEL_KNOWN_KEYS = Set.of(
             "displayName", "description", "modelType", "modelCategory", "icon", "category",
             "tableName", "modelCode", "pageType", "schemaType",
-            "uiSchema", "querySchema", "tags", "metadata");
+            "uiSchema", "querySchema", "tags", "metadata",
+            "enableNba");
 
     /**
      * Validate extension content: key count limit and value size limit.

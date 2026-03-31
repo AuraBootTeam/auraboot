@@ -16,6 +16,9 @@ public final class SystemConfigKeys {
     public static final String SYSTEM_PLATFORM_NAME = "system.platform_name";
     public static final String SYSTEM_ALLOW_SELF_REGISTRATION = "system.allow_self_registration";
 
+    // AI scope (mutable)
+    public static final String AI_NBA_ENABLED = "ai.nba.enabled";
+
     // Marketplace scope
     public static final String MARKETPLACE_URL = "marketplace.url";
     public static final String MARKETPLACE_MODE = "marketplace.mode";
