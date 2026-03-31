@@ -1,0 +1,182 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "title": "API P95 Latency (seconds)",
+      "type": "timeseries",
+      "id": 1,
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, rate(http_server_requests_seconds_bucket[5m]))",
+          "legendFormat": "P95",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] }
+    },
+    {
+      "title": "SQL Count per Request (P95)",
+      "type": "timeseries",
+      "id": 2,
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "auraboot_request_sql_count{quantile=\"0.95\"}",
+          "legendFormat": "P95",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
+    },
+    {
+      "title": "JVM Heap Usage",
+      "type": "gauge",
+      "id": 3,
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "jvm_memory_used_bytes{area=\"heap\"} / jvm_memory_max_bytes{area=\"heap\"}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.7 },
+              { "color": "red", "value": 0.85 }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "title": "Node.js Event Loop Lag",
+      "type": "timeseries",
+      "id": 4,
+      "gridPos": { "h": 8, "w": 6, "x": 6, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "bff_nodejs_eventloop_lag_p99_seconds",
+          "legendFormat": "p99",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] }
+    },
+    {
+      "title": "HikariCP Connections",
+      "type": "timeseries",
+      "id": 5,
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "hikaricp_connections_active",
+          "legendFormat": "active",
+          "refId": "A"
+        },
+        {
+          "expr": "hikaricp_connections_idle",
+          "legendFormat": "idle",
+          "refId": "B"
+        },
+        {
+          "expr": "hikaricp_connections_max",
+          "legendFormat": "max",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
+    },
+    {
+      "title": "Thread Pool Queue Depth",
+      "type": "timeseries",
+      "id": 6,
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "executor_queued_tasks",
+          "legendFormat": "{{name}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
+    },
+    {
+      "title": "Slow Queries / min",
+      "type": "stat",
+      "id": 7,
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "rate(auraboot_sql_slow_query_count_total[5m]) * 60",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
+    },
+    {
+      "title": "BFF Proxy Duration P95",
+      "type": "timeseries",
+      "id": 8,
+      "gridPos": { "h": 8, "w": 6, "x": 6, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, rate(bff_proxy_duration_seconds_bucket[5m]))",
+          "legendFormat": "P95",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] }
+    },
+    {
+      "title": "Caffeine Cache Hit Rate",
+      "type": "timeseries",
+      "id": 9,
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "rate(cache_gets_total{result=\"hit\"}[5m]) / rate(cache_gets_total[5m])",
+          "legendFormat": "{{cache}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "percentunit", "min": 0, "max": 1 },
+        "overrides": []
+      }
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": ["auraboot", "performance"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "AuraBoot Performance Overview",
+  "uid": "auraboot-perf-overview",
+  "version": 1
+}
