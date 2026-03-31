@@ -137,6 +137,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     private final MetaFieldMapper metaFieldMapper;
     private final ExtensionConverter extensionConverter;
     private final PluginResourceMapper pluginResourceMapper;
+    private final com.auraboot.framework.meta.service.impl.CommandMetadataCacheService commandMetadataCache;
 
     // Optional dependency - may not be configured in all environments
     @org.springframework.beans.factory.annotation.Autowired(required = false)
@@ -733,6 +734,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                 existingCmd.getPid(),
                 tenantId);
 
+            commandMetadataCache.evictAll();
             log.info("Command updated in place for plugin reimport: code={}, pid={}",
                      dto.getCode(), existingCmd.getPid());
 

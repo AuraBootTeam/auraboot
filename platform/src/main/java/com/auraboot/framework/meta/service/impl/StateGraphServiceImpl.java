@@ -15,6 +15,8 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -40,6 +42,7 @@ public class StateGraphServiceImpl implements StateGraphService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "stateGraphDefinitions", allEntries = true)
     public StateGraphDefinition create(StateGraphCreateRequest request) {
         Long tenantId = MetaContext.getCurrentTenantId();
 
@@ -91,6 +94,8 @@ public class StateGraphServiceImpl implements StateGraphService {
     }
 
     @Override
+    @Cacheable(value = "stateGraphDefinitions",
+            key = "T(com.auraboot.framework.meta.cache.MetaCacheKeyGenerator).getTenantContextSuffix() + ':' + #modelCode")
     public List<StateGraphDefinition> listByModelCode(String modelCode) {
         // tenant_id is automatically added by TenantLineInnerInterceptor
         return stateGraphMapper.findByModelCode(modelCode);
@@ -98,6 +103,7 @@ public class StateGraphServiceImpl implements StateGraphService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "stateGraphDefinitions", allEntries = true)
     public StateGraphDefinition update(String pid, StateGraphCreateRequest request) {
         StateGraphDefinition existing = getByPid(pid);
 
@@ -125,6 +131,7 @@ public class StateGraphServiceImpl implements StateGraphService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "stateGraphDefinitions", allEntries = true)
     public void publish(String pid) {
         StateGraphDefinition definition = getByPid(pid);
 
@@ -143,6 +150,7 @@ public class StateGraphServiceImpl implements StateGraphService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "stateGraphDefinitions", allEntries = true)
     public void delete(String pid) {
         StateGraphDefinition definition = getByPid(pid);
         stateGraphMapper.softDelete(pid);

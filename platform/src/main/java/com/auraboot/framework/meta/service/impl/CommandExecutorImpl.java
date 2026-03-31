@@ -58,6 +58,7 @@ import org.springframework.util.StringUtils;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 /**
  * Command Executor implementation.
@@ -74,6 +75,7 @@ public class CommandExecutorImpl implements CommandExecutor {
 
     private final CommandDefinitionMapper commandDefinitionMapper;
     private final BindingRuleMapper bindingRuleMapper;
+    private final CommandMetadataCacheService commandMetadataCache;
     private final DynamicDataMapper dynamicDataMapper;
     private final DynamicDataService dynamicDataService;
     private final ApplicationContext applicationContext;
@@ -144,7 +146,7 @@ public class CommandExecutorImpl implements CommandExecutor {
             phaseTimings.put(phaseReached, System.currentTimeMillis() - lastPhaseTime[0]);
             lastPhaseTime[0] = System.currentTimeMillis();
             phaseReached = "load";
-            CommandDefinition command = commandDefinitionMapper.findCurrentByCode(commandCode);
+            CommandDefinition command = commandMetadataCache.findCurrentCommandByCode(commandCode);
             if (command == null) {
                 throw new BusinessException(ResponseCode.BadParam, "Command not found: " + commandCode);
             }
@@ -219,6 +221,12 @@ public class CommandExecutorImpl implements CommandExecutor {
             final Map<String, Object> finalPayload = payload;
             final Map<String, Object> finalExecConfig = execConfig;
 
+            // Batch-load all binding rules for this command (N+1 fix: 6 queries → 1)
+            List<BindingRule> allBindingRules = commandMetadataCache.findBindingRulesByCommandId(command.getId());
+            Map<String, List<BindingRule>> rulesByType = allBindingRules.stream()
+                    .filter(r -> r.getEnabled() != null && r.getEnabled())
+                    .collect(Collectors.groupingBy(BindingRule::getRuleType));
+
             java.util.function.Supplier<CommandExecuteResult> pipeline = () -> {
 
                 // 4.5. SOD_CHECK Phase: Separation of Duties enforcement
@@ -244,7 +252,7 @@ public class CommandExecutorImpl implements CommandExecutor {
 
                 // 6. ASSERT Phase (includes preconditions from executionConfig)
                 transitionPhase(phaseRef, phaseStartRef, finalPhaseTimings, "assert");
-                List<BindingRule> assertRules = bindingRuleMapper.findByCommandIdAndType(finalCommand.getId(), "assert");
+                List<BindingRule> assertRules = rulesByType.getOrDefault("assert", Collections.emptyList());
                 executeAssertPhase(assertRules, finalPayload);
                 executePreconditionsPhase(execConfig, finalPayload, tenantId, finalCommand, request);
                 executeValidationPhase(execConfig, finalPayload, tenantId, finalCommand, request);
@@ -295,7 +303,7 @@ public class CommandExecutorImpl implements CommandExecutor {
                     fieldMapResults = new HashMap<>();
                     log.info("Skipping FIELD_MAP for plugin-handled command: {}", finalCommand.getCode());
                 } else {
-                    List<BindingRule> fieldMapRules = bindingRuleMapper.findByCommandIdAndType(finalCommand.getId(), "field_map");
+                    List<BindingRule> fieldMapRules = rulesByType.getOrDefault("field_map", Collections.emptyList());
                     boolean noBindingRules = (fieldMapRules == null || fieldMapRules.isEmpty());
                     boolean hasInputFields = (execConfig != null && execConfig.containsKey("inputFields"));
                     boolean hasAutoSetFields = (execConfig != null && execConfig.containsKey("autoSetFields"));
@@ -320,12 +328,12 @@ public class CommandExecutorImpl implements CommandExecutor {
 
                 // 8. HANDLER Phase
                 transitionPhase(phaseRef, phaseStartRef, finalPhaseTimings, "handler");
-                List<BindingRule> handlerRules = bindingRuleMapper.findByCommandIdAndType(finalCommand.getId(), "handler");
+                List<BindingRule> handlerRules = rulesByType.getOrDefault("handler", Collections.emptyList());
                 Map<String, Object> handlerResults = executeHandlerPhase(handlerRules, finalCommand, finalPayload, fieldMapResults, tenantId, userId, request, finalExecConfig);
                 persistHandlerResults(finalCommand.getModelCode(), finalPayload, handlerResults, tenantId, request, fieldMapResults);
 
                 // 8.5. API_CALL Phase: collect rules inside transaction (query DB)
-                List<BindingRule> apiCallRules = bindingRuleMapper.findByCommandIdAndType(finalCommand.getId(), "api_call");
+                List<BindingRule> apiCallRules = rulesByType.getOrDefault("api_call", Collections.emptyList());
 
                 // 8.7. CONSISTENCY_CHECK Phase: validate cross-document constraints (e.g., shipment qty <= order qty)
                 transitionPhase(phaseRef, phaseStartRef, finalPhaseTimings, "consistency_check");
@@ -347,7 +355,7 @@ public class CommandExecutorImpl implements CommandExecutor {
 
                 // 9. EFFECT Phase
                 transitionPhase(phaseRef, phaseStartRef, finalPhaseTimings, "effect");
-                List<BindingRule> effectRules = bindingRuleMapper.findByCommandIdAndType(finalCommand.getId(), "effect");
+                List<BindingRule> effectRules = rulesByType.getOrDefault("effect", Collections.emptyList());
                 effectExecutor.executeEffectPhase(effectRules, finalCommand, finalPayload, fieldMapResults, tenantId, userId, request, targetState);
 
                 // 9.1. DOMAIN_EVENT Phase: publish for in-process listeners (e.g., finance voucher engine)
@@ -372,7 +380,7 @@ public class CommandExecutorImpl implements CommandExecutor {
                 }
 
                 // 9.2. WEBHOOK Phase: collect rules inside transaction (query DB)
-                List<BindingRule> webhookRules = bindingRuleMapper.findByCommandIdAndType(finalCommand.getId(), "webhook");
+                List<BindingRule> webhookRules = rulesByType.getOrDefault("webhook", Collections.emptyList());
 
                 // 9.3. Schedule API_CALL and WEBHOOK for after-commit execution
                 // External HTTP calls must NOT block the database transaction.

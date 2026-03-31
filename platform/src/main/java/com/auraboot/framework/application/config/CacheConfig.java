@@ -111,7 +111,12 @@ public class CacheConfig {
 
             // Data permission caches
             "dataPermissionRowFilter",
-            "dataPermissionMaskRules"
+            "dataPermissionMaskRules",
+
+            // Command execution caches (N+1 optimization)
+            "commandDefinitions",
+            "bindingRules",
+            "stateGraphDefinitions"
         ));
 
         cacheManager.setAllowNullValues(false);
