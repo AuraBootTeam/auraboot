@@ -1,5 +1,6 @@
 package com.auraboot.framework.view.service;
 
+import com.auraboot.framework.view.dto.AutoSaveViewRequest;
 import com.auraboot.framework.view.dto.SavedViewCreateRequest;
 import com.auraboot.framework.view.dto.SavedViewDTO;
 import com.auraboot.framework.view.dto.SavedViewUpdateRequest;
@@ -99,6 +100,16 @@ public interface SavedViewService {
      * @return duplicated view DTO
      */
     SavedViewDTO duplicate(String pid, String newName);
+
+    /**
+     * Auto-save view configuration with atomic upsert.
+     * Finds existing implicit view for current user/model/page and updates its config,
+     * or creates a new implicit view if none exists.
+     *
+     * @param request auto-save request with modelCode, pageKey, viewConfig
+     * @return saved view DTO
+     */
+    SavedViewDTO autoSave(AutoSaveViewRequest request);
 
     /**
      * Check if view name is unique for current user
