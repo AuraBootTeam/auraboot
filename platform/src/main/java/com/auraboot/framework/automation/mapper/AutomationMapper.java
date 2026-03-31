@@ -18,12 +18,14 @@ public interface AutomationMapper extends BaseMapper<Automation> {
     /**
      * Find automation by PID
      */
+    @ResultMap("mybatis-plus_Automation")
     @Select("SELECT * FROM ab_automation WHERE pid = #{pid} AND deleted_flag = false")
     Automation findByPid(@Param("pid") String pid);
 
     /**
      * Find enabled automations for a model
      */
+    @ResultMap("mybatis-plus_Automation")
     @Select("""
         SELECT * FROM ab_automation
         WHERE model_code = #{modelCode}
@@ -36,6 +38,7 @@ public interface AutomationMapper extends BaseMapper<Automation> {
     /**
      * Find enabled automations by trigger type for a model
      */
+    @ResultMap("mybatis-plus_Automation")
     @Select("""
         SELECT * FROM ab_automation
         WHERE model_code = #{modelCode}
@@ -51,6 +54,7 @@ public interface AutomationMapper extends BaseMapper<Automation> {
     /**
      * Find all automations for a model
      */
+    @ResultMap("mybatis-plus_Automation")
     @Select("""
         SELECT * FROM ab_automation
         WHERE model_code = #{modelCode}
@@ -62,6 +66,7 @@ public interface AutomationMapper extends BaseMapper<Automation> {
     /**
      * Find all scheduled automations that are enabled
      */
+    @ResultMap("mybatis-plus_Automation")
     @Select("""
         SELECT * FROM ab_automation
         WHERE trigger_type = 'scheduled'
@@ -74,6 +79,7 @@ public interface AutomationMapper extends BaseMapper<Automation> {
     /**
      * Find all inactivity-triggered automations that are enabled
      */
+    @ResultMap("mybatis-plus_Automation")
     @Select("""
         SELECT * FROM ab_automation
         WHERE trigger_type = 'on_inactivity'
