@@ -152,7 +152,18 @@ export const useBPMNStore = create<BPMNStore>()(
         history: BPMNSnapshot[];
         historyIndex: number;
       }) {
-        const snapshot: BPMNSnapshot = structuredClone({ nodes: draft.nodes, edges: draft.edges });
+        let snapshot: BPMNSnapshot;
+        try {
+          snapshot = structuredClone({ nodes: draft.nodes, edges: draft.edges });
+        } catch {
+          // Fallback for environments where structuredClone fails on Proxy objects (e.g. Immer drafts)
+          try {
+            snapshot = JSON.parse(JSON.stringify({ nodes: draft.nodes, edges: draft.edges }));
+          } catch {
+            // Last resort: skip snapshot but don't block the state update
+            return;
+          }
+        }
         draft.history = draft.history.slice(0, draft.historyIndex + 1);
         draft.history.push(snapshot);
         if (draft.history.length > BPMN_MAX_HISTORY) {
