@@ -61,7 +61,7 @@ public class SqlCountFilter extends OncePerRequestFilter {
         } finally {
             int count = SqlCountHolder.get();
 
-            if (headerEnabled) {
+            if (headerEnabled && !response.isCommitted()) {
                 response.setIntHeader(HEADER_SQL_COUNT, count);
             }
 
