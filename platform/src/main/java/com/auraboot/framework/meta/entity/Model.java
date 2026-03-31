@@ -136,6 +136,23 @@ public class Model extends AbstractMultiVersionEntity {
     }
 
     /**
+     * Check if table creation should be skipped during publish.
+     * Used for models backed by existing tables (e.g., BPM system tables with se_ prefix)
+     * that are managed outside the DSL schema management.
+     * Set via extension: {"skipTableCreation": true}
+     */
+    public boolean isSkipTableCreation() {
+        Object val = getExtensionValue("skipTableCreation");
+        if (val instanceof Boolean b) {
+            return b;
+        }
+        if (val != null) {
+            return Boolean.parseBoolean(val.toString());
+        }
+        return false;
+    }
+
+    /**
      * Get model category, falling back to extension then defaulting to ENTITY.
      */
     public String getEffectiveModelCategory() {
