@@ -3,6 +3,10 @@
 server:
   address: 0.0.0.0
   port: 6443
+  compression:
+    enabled: true
+    min-response-size: 1024
+    mime-types: application/json,text/html,text/xml,text/plain,text/css,application/javascript,application/xml
   ssl:
     enabled: false
     bundle: web-server
