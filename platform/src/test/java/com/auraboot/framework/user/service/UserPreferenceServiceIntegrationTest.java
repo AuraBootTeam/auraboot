@@ -9,6 +9,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Map;
+
 import static org.assertj.core.api.Assertions.*;
 
 /**
@@ -98,5 +100,34 @@ class UserPreferenceServiceIntegrationTest extends BaseIntegrationTest {
         assertThat(retrieved).isNotNull();
         assertThat(retrieved.get("theme").asText()).isEqualTo("dark");
         assertThat(retrieved.get("lang").asText()).isEqualTo("zh-CN");
+    }
+
+    @Test
+    @Order(10)
+    @DisplayName("UP-10: getPreferencesByPrefix returns matching entries")
+    void getPreferencesByPrefix_returnsMatchingEntries() throws Exception {
+        String prefix = "ui.test." + System.currentTimeMillis() + ".";
+        JsonNode tz = objectMapper.readTree("\"Asia/Shanghai\"");
+        JsonNode fmt = objectMapper.readTree("\"YYYY-MM-DD\"");
+
+        userPreferenceService.setPreference(getTestUser().getId(), prefix + "timezone", tz);
+        userPreferenceService.setPreference(getTestUser().getId(), prefix + "date.format", fmt);
+
+        Map<String, JsonNode> result = userPreferenceService.getPreferencesByPrefix(
+                getTestUser().getId(), prefix);
+
+        assertThat(result).hasSize(2);
+        assertThat(result.get(prefix + "timezone").asText()).isEqualTo("Asia/Shanghai");
+        assertThat(result.get(prefix + "date.format").asText()).isEqualTo("YYYY-MM-DD");
+    }
+
+    @Test
+    @Order(11)
+    @DisplayName("UP-11: getPreferencesByPrefix returns empty map when no matches")
+    void getPreferencesByPrefix_noMatches_returnsEmptyMap() {
+        Map<String, JsonNode> result = userPreferenceService.getPreferencesByPrefix(
+                getTestUser().getId(), "nonexistent.prefix.");
+
+        assertThat(result).isEmpty();
     }
 }
