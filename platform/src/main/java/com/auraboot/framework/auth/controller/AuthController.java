@@ -26,8 +26,13 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.web.bind.annotation.*;
 
+import com.auraboot.framework.user.service.UserPreferenceService;
+import com.auraboot.framework.tenant.service.TenantPreferenceService;
+import com.fasterxml.jackson.databind.JsonNode;
+
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -59,6 +64,12 @@ public class AuthController {
 
     @Autowired(required = false)
     private TenantMemberService tenantMemberService;
+
+    @Autowired
+    private UserPreferenceService userPreferenceService;
+
+    @Autowired
+    private TenantPreferenceService tenantPreferenceService;
 
     @Autowired
     private JwtUtil jwtUtil;
@@ -243,8 +254,24 @@ public class AuthController {
                 permissionCodes
             );
             
-            // 6. 构建响应
-            UserInfoResponse response = new UserInfoResponse(userDTO, permissionsDTO);
+            // 6. Resolve UI preferences: user > tenant > default
+            Map<String, JsonNode> userPrefs = userPreferenceService.getPreferencesByPrefix(userId, "ui.");
+            Map<String, JsonNode> tenantPrefs = tenantId != null
+                    ? tenantPreferenceService.getPreferencesByPrefix(tenantId, "ui.")
+                    : Map.of();
+
+            UserInfoResponse.PreferencesDTO preferencesDTO = new UserInfoResponse.PreferencesDTO();
+            preferencesDTO.setTimezone(resolvePreference(userPrefs, tenantPrefs, "ui.timezone",
+                    UserInfoResponse.PreferencesDTO.DEFAULT_TIMEZONE));
+            preferencesDTO.setDateFormat(resolvePreference(userPrefs, tenantPrefs, "ui.date.format",
+                    UserInfoResponse.PreferencesDTO.DEFAULT_DATE_FORMAT));
+            preferencesDTO.setDatetimeFormat(resolvePreference(userPrefs, tenantPrefs, "ui.datetime.format",
+                    UserInfoResponse.PreferencesDTO.DEFAULT_DATETIME_FORMAT));
+            preferencesDTO.setTimeFormat(resolvePreference(userPrefs, tenantPrefs, "ui.time.format",
+                    UserInfoResponse.PreferencesDTO.DEFAULT_TIME_FORMAT));
+
+            // 7. 构建响应
+            UserInfoResponse response = new UserInfoResponse(userDTO, permissionsDTO, preferencesDTO);
 
             return ApiResponse.success(response);
     }
@@ -262,5 +289,21 @@ public class AuthController {
     public ApiResponse<Void> resetPassword(@jakarta.validation.Valid @RequestBody ResetPasswordRequest request) {
         passwordManagementService.resetPasswordWithToken(request.getToken(), request.getNewPassword());
         return ApiResponse.success(null);
+    }
+
+    private String resolvePreference(Map<String, JsonNode> userPrefs,
+                                      Map<String, JsonNode> tenantPrefs,
+                                      String key, String defaultValue) {
+        JsonNode userVal = userPrefs.get(key);
+        if (userVal != null && !userVal.isNull()) {
+            String text = userVal.asText().trim();
+            if (!text.isEmpty()) return text;
+        }
+        JsonNode tenantVal = tenantPrefs.get(key);
+        if (tenantVal != null && !tenantVal.isNull()) {
+            String text = tenantVal.asText().trim();
+            if (!text.isEmpty()) return text;
+        }
+        return defaultValue;
     }
 }
