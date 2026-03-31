@@ -226,7 +226,7 @@ export default defineConfig({
     ? {}
     : {
         webServer: {
-          command: 'npm run dev:full',
+          command: 'pnpm dev:full',
           url: baseURL,
           reuseExistingServer: process.env.E2E_COVERAGE === '1' ? false : !process.env.CI,
           timeout: process.env.E2E_COVERAGE === '1' ? 30000 : 10000,

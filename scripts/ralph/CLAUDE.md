@@ -132,7 +132,7 @@ cd /Users/ghj/work/startup/phenix/AuraMeta/platform
 **Frontend** (if frontend files changed):
 ```bash
 cd /Users/ghj/work/startup/phenix/AuraMeta/web-admin
-npm run typecheck 2>&1 | tail -20
+pnpm typecheck 2>&1 | tail -20
 npx vitest run 2>&1 | tail -20
 ```
 

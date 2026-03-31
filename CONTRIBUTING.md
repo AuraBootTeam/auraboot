@@ -18,7 +18,7 @@ All participants are expected to follow our [Code of Conduct](CODE_OF_CONDUCT.md
 | Node.js    | 18+     | LTS version preferred          |
 | PostgreSQL | 14+     | Running on default port 5432   |
 | Redis      | 7+      | Running on default port 6379   |
-| npm        | 10+     | Ships with Node.js             |
+| pnpm       | 9+      | Install via `npm install -g pnpm` |
 | Git        | 2.30+   |                                |
 
 ### Getting Started
@@ -35,7 +35,7 @@ cd auraboot
 cd platform && ./gradlew bootRun
 
 # 4. In a separate terminal, start the frontend (Vite + BFF on port 5173)
-cd web-admin && npm install && npm run dev:full
+cd web-admin && pnpm install && pnpm dev:full
 ```
 
 Open [http://localhost:5173](http://localhost:5173) in your browser.
@@ -68,7 +68,7 @@ cd web-admin && NO_PROXY=localhost npx playwright test
 
 ### TypeScript (Frontend)
 
-- ESLint and Prettier are configured in the project. Run `npm run lint` before committing.
+- ESLint and Prettier are configured in the project. Run `pnpm lint` before committing.
 - Use TypeScript strict mode. Avoid `any` unless absolutely necessary.
 - Use functional components with hooks. No class components.
 - All user-facing text must be internationalized (i18n). No hardcoded strings.

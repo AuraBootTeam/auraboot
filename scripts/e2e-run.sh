@@ -252,7 +252,7 @@ header "Pre-flight Checks"
 
 # Check node_modules
 if [[ ! -d "${WEB_DIR}/node_modules" ]]; then
-  err "node_modules not found in web-admin/. Run: cd web-admin && npm install"
+  err "node_modules not found in web-admin/. Run: cd web-admin && pnpm install"
   exit 1
 fi
 ok "node_modules present"

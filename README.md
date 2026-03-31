@@ -102,8 +102,8 @@ cd platform
 
 # 4. In a new terminal — start the frontend (Vite + BFF, port 5173)
 cd web-admin
-npm install
-npm run dev:full
+pnpm install
+pnpm dev:full
 ```
 
 Open [http://localhost:5173](http://localhost:5173) in your browser.

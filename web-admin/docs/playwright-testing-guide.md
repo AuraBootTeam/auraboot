@@ -483,7 +483,7 @@ jobs:
           node-version: '20'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
         working-directory: web-admin
 
       - name: Install Playwright browsers

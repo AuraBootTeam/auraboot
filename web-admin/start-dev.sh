@@ -44,7 +44,7 @@ echo "   NODE_ENV=$NODE_ENV"
 # 检查依赖
 if [ ! -d "node_modules" ]; then
     echo "📦 Installing dependencies..."
-    npm install
+    pnpm install
 fi
 
 # 启动BFF服务器（后台运行）
@@ -77,4 +77,4 @@ trap cleanup EXIT INT TERM
 
 # 启动Vite开发服务器（前台）
 echo "🚀 Starting Vite Dev Server..."
-npm run dev
+pnpm dev

@@ -102,7 +102,7 @@ React.useEffect(() => {
 
 ## 测试步骤
 
-1. 启动BPMN设计器: `npm run dev`
+1. 启动BPMN设计器: `pnpm dev`
 2. 访问 `/bpmn-designer`
 3. 从组件库拖拽一个"用户任务"节点到画布
 4. 点击选中该节点

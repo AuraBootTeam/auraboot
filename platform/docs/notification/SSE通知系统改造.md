@@ -120,7 +120,7 @@ EventSource 原生支持断线自动重连，无需额外代码。
 
 2. **启动前端服务**
    ```bash
-   cd web-admin && npm run dev
+   cd web-admin && pnpm dev
    ```
 
 3. **手动验证**

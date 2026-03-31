@@ -175,7 +175,7 @@ if [ "$BACKEND_OK" = "no" ] || [ "$FRONTEND_OK" = "no" ]; then
   echo "   Frontend (5173): $FRONTEND_OK"
   echo "   E2E stories will fail without running services."
   echo "   Start with: cd platform && ./gradlew bootRun"
-  echo "              cd web-admin && npm run dev:full"
+  echo "              cd web-admin && pnpm dev:full"
   echo ""
   if [ "$SKIP_CONFIRM" = true ]; then
     echo "  --yes flag set, continuing..."

@@ -147,7 +147,7 @@ async function testHealth() {
     
   } catch (error) {
     console.log('❌ Health check failed:', error.message);
-    console.log('💡 Make sure the BFF server is running with: npm run dev:full');
+    console.log('💡 Make sure the BFF server is running with: pnpm dev:full');
   }
 }
 

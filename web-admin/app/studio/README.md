@@ -79,7 +79,7 @@ app/studio
 | SDK / Integration | ⚙️ `sdk/index.ts` 暴露 store/schema/layout/command 等管理器，未来可扩展 useSchemaRuntime 等 API |
 | Testing | 🚧 Vitest 覆盖 canvas/runtime/services，仍需扩充 workbench panels/工具栏等测试 |
 
-> 提示：`npm run typecheck` 仍会因 app 中其它旧模块（auth、BPMN 等）报错，Studio
+> 提示：`pnpm typecheck` 仍会因 app 中其它旧模块（auth、BPMN 等）报错，Studio
 > 子目录的类型/路径问题需优先清理；完成后再整体修复仓库级别的错误。
 
 欢迎在此目录继续迁移剩余模块，遵循上述分层即可快速定位职责并保证运行时可复用。***

@@ -3,7 +3,7 @@
  * Generate JSON Schema from TypeScript DSL types.
  *
  * Usage:  node scripts/generate-dsl-schema.mjs          (from web-admin/)
- *    or:  npm run generate:dsl-schema                    (from web-admin/)
+ *    or:  pnpm generate:dsl-schema                    (from web-admin/)
  *
  * Reads:  app/meta/schemas/dsl-schema-types.ts
  * Writes: ../plugins/schemas/dsl-schema.generated.json
@@ -178,7 +178,7 @@ addPageTypeDiscriminator(output);
 
 // Add metadata
 output.$comment =
-  'Auto-generated from web-admin/app/meta/schemas/dsl-schema-types.ts — DO NOT EDIT MANUALLY. Run: cd web-admin && npm run generate:dsl-schema';
+  'Auto-generated from web-admin/app/meta/schemas/dsl-schema-types.ts — DO NOT EDIT MANUALLY. Run: cd web-admin && pnpm generate:dsl-schema';
 
 const outPath = resolve(ROOT, 'plugins/schemas/dsl-schema.generated.json');
 writeFileSync(outPath, JSON.stringify(output, null, 2) + '\n');

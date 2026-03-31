@@ -159,7 +159,7 @@ Smart 组件渲染（共享 useSmartComponent hook）
 1. 在 `app/studio/workbench/components/smart-components/...` 中实现组件。  
 2. 在 `ComponentConfigs.ts` 中添加类型描述（名称、分类、属性 schema）。  
 3. 在 `ComponentRuntimeManifest.ts` 中登记模块路径、导出名和别名。  
-4. 运行 `npm run dev` 或相关构建任务，即可通过 `ComponentLoader` 在运行期使用。
+4. 运行 `pnpm dev` 或相关构建任务，即可通过 `ComponentLoader` 在运行期使用。
 
 ### 4.2 新增数据源
 
