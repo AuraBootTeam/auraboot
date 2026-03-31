@@ -159,4 +159,19 @@ public class Model extends AbstractMultiVersionEntity {
     public boolean isMaster() {
         return "master".equals(getEffectiveModelCategory());
     }
+
+    /**
+     * Check if AI NBA (Next Best Action) suggestions are enabled for this model.
+     * Returns null if not configured (caller should fall back to global config).
+     */
+    public Boolean isNbaEnabled() {
+        Object val = getExtensionValue("enableNba");
+        if (val instanceof Boolean b) {
+            return b;
+        }
+        if (val != null) {
+            return Boolean.parseBoolean(val.toString());
+        }
+        return null;
+    }
 }
