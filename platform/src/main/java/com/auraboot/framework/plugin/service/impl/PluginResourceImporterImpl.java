@@ -4,6 +4,7 @@ import com.auraboot.framework.menu.constant.MenuStatus;
 import com.auraboot.framework.menu.entity.Menu;
 import com.auraboot.framework.menu.service.MenuService;
 import com.auraboot.framework.meta.converter.ExtensionConverter;
+import com.auraboot.framework.meta.entity.payload.ExtensionBean;
 import com.auraboot.framework.meta.dto.CommandDefinitionCreateRequest;
 import com.auraboot.framework.meta.dto.DictCreateRequest;
 import com.auraboot.framework.meta.dto.DictDTO;
@@ -274,6 +275,8 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         if (dto.getModelCategory() != null) {
             extension.put("modelCategory", dto.getModelCategory());
         }
+        // Warn on unknown extension keys (informational, does not block)
+        ExtensionBean.warnUnknownModelKeys(dto.getCode(), extension.keySet(), log);
         // tableName is a first-class column. Extract from extension as fallback (legacy format).
         String effectiveTableName = dto.getTableName();
         if (effectiveTableName == null && extension.containsKey("tableName")) {
