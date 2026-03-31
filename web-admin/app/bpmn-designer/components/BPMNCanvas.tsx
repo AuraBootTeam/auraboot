@@ -272,7 +272,7 @@ export function BPMNCanvas({ onNodeClick, onEdgeClick }: BPMNCanvasProps) {
       if (event.key === 'Delete' || event.key === 'Backspace') {
         // 防止在输入框中删除
         const target = event.target as HTMLElement;
-        if (target.tagName === 'input' || target.tagName === 'textarea') {
+        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
           return;
         }
 
