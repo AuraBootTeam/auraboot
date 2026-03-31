@@ -2,6 +2,7 @@
  * Property editor for ReceiveTask nodes.
  */
 
+import { useI18n } from '~/contexts/I18nContext';
 import type { ReceiveTaskConfig } from '~/bpmn-designer/types';
 
 export function ReceiveTaskEditor({
@@ -11,6 +12,7 @@ export function ReceiveTaskEditor({
   config?: ReceiveTaskConfig;
   onChange: (config: ReceiveTaskConfig) => void;
 }) {
+  const { t } = useI18n();
   const handleChange = (field: keyof ReceiveTaskConfig, value: any) => {
     onChange({ ...config, [field]: value } as ReceiveTaskConfig);
   };
@@ -18,7 +20,7 @@ export function ReceiveTaskEditor({
   return (
     <>
       <div className="mb-4">
-        <label className="mb-1 block text-sm font-medium text-gray-700">描述</label>
+        <label className="mb-1 block text-sm font-medium text-gray-700">{t('bpmn.common.description')}</label>
         <textarea
           value={config?.description || ''}
           onChange={(e) => handleChange('description', e.target.value)}
@@ -28,7 +30,7 @@ export function ReceiveTaskEditor({
       </div>
 
       <div className="mb-4">
-        <label className="mb-1 block text-sm font-medium text-gray-700">消息引用</label>
+        <label className="mb-1 block text-sm font-medium text-gray-700">{t('bpmn.prop.receivetask.messageRef')}</label>
         <input
           type="text"
           value={config?.messageRef || ''}
@@ -38,7 +40,7 @@ export function ReceiveTaskEditor({
       </div>
 
       <div className="mb-4">
-        <label className="mb-1 block text-sm font-medium text-gray-700">消息类型</label>
+        <label className="mb-1 block text-sm font-medium text-gray-700">{t('bpmn.prop.receivetask.messageType')}</label>
         <input
           type="text"
           value={config?.messageType || ''}

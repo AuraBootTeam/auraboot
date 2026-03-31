@@ -2,6 +2,8 @@
  * BPMN Property Panel — dispatcher that delegates to per-node-type editors.
  */
 
+import { useMemo } from 'react';
+import { useI18n } from '~/contexts/I18nContext';
 import { useBPMNStore } from '~/bpmn-designer/store/useBPMNStore';
 import { BPMNNodeType } from '~/bpmn-designer/types';
 import { confirmDialog } from '~/utils/confirmDialog';
@@ -20,7 +22,9 @@ import {
   UserTaskEditor,
   ServiceTaskEditor,
   ReceiveTaskEditor,
-  GatewayEditor,
+  ExclusiveGatewayEditor,
+  ParallelGatewayEditor,
+  InclusiveGatewayEditor,
   StartEventEditor,
   EndEventEditor,
   CallActivityEditor,
@@ -40,9 +44,11 @@ export interface ProcessMetadataProps {
 }
 
 export function BPMNPropertyPanel({ processMetadata }: { processMetadata?: ProcessMetadataProps }) {
+  const { t } = useI18n();
   const {
     selectedNodeId,
     selectedEdgeId,
+    edges,
     getNodeById,
     getEdgeById,
     updateNode,
@@ -54,10 +60,22 @@ export function BPMNPropertyPanel({ processMetadata }: { processMetadata?: Proce
   const selectedNode = selectedNodeId ? getNodeById(selectedNodeId) : null;
   const selectedEdge = selectedEdgeId ? getEdgeById(selectedEdgeId) : null;
 
+  // Compute outgoing edges for gateway editors
+  const outgoingEdges = useMemo(() => {
+    if (!selectedNodeId) return [];
+    return edges
+      .filter((e) => e.source === selectedNodeId)
+      .map((e) => ({
+        id: e.id,
+        label: e.data?.label,
+        condition: e.data?.condition?.content,
+      }));
+  }, [selectedNodeId, edges]);
+
   const handleDeleteNode = async () => {
     if (
       selectedNodeId &&
-      (await confirmDialog({ content: '确定要删除这个节点吗？', variant: 'danger' }))
+      (await confirmDialog({ content: t('bpmn.prop.confirmDeleteNode'), variant: 'danger' }))
     ) {
       deleteNode(selectedNodeId);
     }
@@ -66,7 +84,7 @@ export function BPMNPropertyPanel({ processMetadata }: { processMetadata?: Proce
   const handleDeleteEdge = async () => {
     if (
       selectedEdgeId &&
-      (await confirmDialog({ content: '确定要删除这条连线吗？', variant: 'danger' }))
+      (await confirmDialog({ content: t('bpmn.prop.confirmDeleteEdge'), variant: 'danger' }))
     ) {
       deleteEdge(selectedEdgeId);
     }
@@ -76,10 +94,10 @@ export function BPMNPropertyPanel({ processMetadata }: { processMetadata?: Proce
   if (!selectedNode && !selectedEdge) {
     return (
       <div className="w-80 overflow-y-auto border-l border-gray-200 bg-white p-4">
-        <h2 className="mb-4 text-lg font-semibold">流程属性</h2>
+        <h2 className="mb-4 text-lg font-semibold">{t('bpmn.prop.processProperties')}</h2>
         {processMetadata && <ProcessMetadataPanel metadata={processMetadata} />}
         {!processMetadata && (
-          <div className="mt-4 text-center text-gray-500">请选择一个节点或连线以配置属性</div>
+          <div className="mt-4 text-center text-gray-500">{t('bpmn.prop.selectNodeOrEdge')}</div>
         )}
       </div>
     );
@@ -93,24 +111,26 @@ export function BPMNPropertyPanel({ processMetadata }: { processMetadata?: Proce
     return (
       <div className="w-80 overflow-y-auto border-l border-gray-200 bg-white p-4">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">节点属性</h2>
+          <h2 className="text-lg font-semibold">{t('bpmn.prop.nodeProperties')}</h2>
           <button
             onClick={handleDeleteNode}
             className="rounded-md px-3 py-1 text-sm text-red-600 transition-colors hover:bg-red-50 hover:text-red-800"
-            title="删除节点 (Delete键)"
+            title={t('bpmn.prop.deleteNodeTitle')}
+            data-testid="delete-node-btn"
           >
-            删除
+            {t('bpmn.common.delete')}
           </button>
         </div>
 
         {/* Common label field */}
         <div className="mb-4">
-          <label className="mb-1 block text-sm font-medium text-gray-700">节点标签</label>
+          <label className="mb-1 block text-sm font-medium text-gray-700">{t('bpmn.prop.nodeLabel')}</label>
           <input
             type="text"
             value={selectedNode.data.label}
             onChange={(e) => updateNode(selectedNode.id, { label: e.target.value })}
             className="w-full rounded-md border border-gray-300 px-3 py-2"
+            data-testid="node-label-input"
           />
         </div>
 
@@ -151,23 +171,25 @@ export function BPMNPropertyPanel({ processMetadata }: { processMetadata?: Proce
         )}
 
         {nodeType === BPMNNodeType.EXCLUSIVE_GATEWAY && (
-          <GatewayEditor
+          <ExclusiveGatewayEditor
             config={selectedNode.data.config as ExclusiveGatewayConfig}
             onChange={handleConfigChange}
+            outgoingEdges={outgoingEdges}
           />
         )}
 
         {nodeType === BPMNNodeType.PARALLEL_GATEWAY && (
-          <GatewayEditor
+          <ParallelGatewayEditor
             config={selectedNode.data.config as ParallelGatewayConfig}
             onChange={handleConfigChange}
           />
         )}
 
         {nodeType === BPMNNodeType.INCLUSIVE_GATEWAY && (
-          <GatewayEditor
+          <InclusiveGatewayEditor
             config={selectedNode.data.config as InclusiveGatewayConfig}
             onChange={handleConfigChange}
+            outgoingEdges={outgoingEdges}
           />
         )}
 
@@ -186,13 +208,14 @@ export function BPMNPropertyPanel({ processMetadata }: { processMetadata?: Proce
     return (
       <div className="w-80 overflow-y-auto border-l border-gray-200 bg-white p-4">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">连线属性</h2>
+          <h2 className="text-lg font-semibold">{t('bpmn.prop.edgeProperties')}</h2>
           <button
             onClick={handleDeleteEdge}
             className="rounded-md px-3 py-1 text-sm text-red-600 transition-colors hover:bg-red-50 hover:text-red-800"
-            title="删除连线 (Delete键)"
+            title={t('bpmn.prop.deleteEdgeTitle')}
+            data-testid="delete-edge-btn"
           >
-            删除
+            {t('bpmn.common.delete')}
           </button>
         </div>
 

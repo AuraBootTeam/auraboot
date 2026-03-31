@@ -84,66 +84,66 @@ export const BPMN_NODE_STYLES = {
 export const BPMN_PALETTE_ITEMS: BPMNPaletteItem[] = [
   {
     type: BPMNNodeType.START_EVENT,
-    label: '开始事件',
+    label: '开始事件', // i18n: bpmn.palette.startEvent
     icon: '▶',
     category: 'event',
-    description: '流程的开始节点',
+    description: '流程的开始节点', // i18n: bpmn.palette.startEventDesc
   },
   {
     type: BPMNNodeType.END_EVENT,
-    label: '结束事件',
+    label: '结束事件', // i18n: bpmn.palette.endEvent
     icon: '⬛',
     category: 'event',
-    description: '流程的结束节点',
+    description: '流程的结束节点', // i18n: bpmn.palette.endEventDesc
   },
   {
     type: BPMNNodeType.USER_TASK,
-    label: '用户任务',
+    label: '用户任务', // i18n: bpmn.palette.userTask
     icon: '👤',
     category: 'task',
-    description: '需要人工处理的任务',
+    description: '需要人工处理的任务', // i18n: bpmn.palette.userTaskDesc
   },
   {
     type: BPMNNodeType.SERVICE_TASK,
-    label: '服务任务',
+    label: '服务任务', // i18n: bpmn.palette.serviceTask
     icon: '⚙',
     category: 'task',
-    description: '自动执行的服务任务',
+    description: '自动执行的服务任务', // i18n: bpmn.palette.serviceTaskDesc
   },
   {
     type: BPMNNodeType.RECEIVE_TASK,
-    label: '接收任务',
+    label: '接收任务', // i18n: bpmn.palette.receiveTask
     icon: '📨',
     category: 'task',
-    description: '等待接收消息的任务',
+    description: '等待接收消息的任务', // i18n: bpmn.palette.receiveTaskDesc
   },
   {
     type: BPMNNodeType.EXCLUSIVE_GATEWAY,
-    label: '排他网关',
+    label: '排他网关', // i18n: bpmn.palette.exclusiveGateway
     icon: '◆',
     category: 'gateway',
-    description: '条件分支，只能选择一条路径',
+    description: '条件分支，只能选择一条路径', // i18n: bpmn.palette.exclusiveGatewayDesc
   },
   {
     type: BPMNNodeType.PARALLEL_GATEWAY,
-    label: '并行网关',
+    label: '并行网关', // i18n: bpmn.palette.parallelGateway
     icon: '＋',
     category: 'gateway',
-    description: '并行分支，所有路径同时执行',
+    description: '并行分支，所有路径同时执行', // i18n: bpmn.palette.parallelGatewayDesc
   },
   {
     type: BPMNNodeType.INCLUSIVE_GATEWAY,
-    label: '包容网关',
+    label: '包容网关', // i18n: bpmn.palette.inclusiveGateway
     icon: '○',
     category: 'gateway',
-    description: '条件分支，满足条件的路径都执行',
+    description: '条件分支，满足条件的路径都执行', // i18n: bpmn.palette.inclusiveGatewayDesc
   },
   {
     type: BPMNNodeType.CALL_ACTIVITY,
-    label: '子流程',
+    label: '子流程', // i18n: bpmn.palette.callActivity
     icon: '⧉',
     category: 'task' as const,
-    description: '调用另一个流程定义',
+    description: '调用另一个流程定义', // i18n: bpmn.palette.callActivityDesc
   },
 ];
 

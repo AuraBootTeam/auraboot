@@ -4,6 +4,7 @@
 
 import { useState } from 'react';
 import type { MultiInstanceConfig, FormBindingEntry, NodeHookEntry } from '~/bpmn-designer/types';
+import { useI18n } from '~/contexts/I18nContext';
 import { PagePickerSelect } from '~/bpm/components/PagePickerSelect';
 import { VariableMappingEditor } from '~/bpm/components/VariableMappingEditor';
 import { FieldPermissionMatrix } from '~/bpm/components/FieldPermissionMatrix';
@@ -16,6 +17,7 @@ export function MultiInstanceSection({
   config?: MultiInstanceConfig;
   onChange: (config: MultiInstanceConfig) => void;
 }) {
+  const { t } = useI18n();
   const [expanded, setExpanded] = useState(config?.enabled || false);
 
   const handleChange = (field: keyof MultiInstanceConfig, value: any) => {
@@ -34,7 +36,7 @@ export function MultiInstanceSection({
         onClick={() => setExpanded(!expanded)}
         className="flex w-full items-center justify-between px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
       >
-        <span>多实例配置</span>
+        <span>{t('bpmn.prop.multiInstance.title')}</span>
         <span className="text-gray-400">{expanded ? '▾' : '▸'}</span>
       </button>
       {expanded && (
@@ -47,14 +49,14 @@ export function MultiInstanceSection({
                 onChange={(e) => handleChange('enabled', e.target.checked)}
                 className="mr-2"
               />
-              <span className="text-sm font-medium text-gray-700">启用多实例</span>
+              <span className="text-sm font-medium text-gray-700">{t('bpmn.prop.multiInstance.enable')}</span>
             </label>
           </div>
 
           {config?.enabled && (
             <>
               <div className="mb-3">
-                <label className="mb-1 block text-sm font-medium text-gray-700">执行方式</label>
+                <label className="mb-1 block text-sm font-medium text-gray-700">{t('bpmn.prop.multiInstance.executionMode')}</label>
                 <div className="flex gap-4">
                   <label className="flex items-center">
                     <input
@@ -64,7 +66,7 @@ export function MultiInstanceSection({
                       onChange={() => handleChange('sequential', true)}
                       className="mr-1"
                     />
-                    <span className="text-sm text-gray-700">串行</span>
+                    <span className="text-sm text-gray-700">{t('bpmn.prop.multiInstance.sequential')}</span>
                   </label>
                   <label className="flex items-center">
                     <input
@@ -74,13 +76,13 @@ export function MultiInstanceSection({
                       onChange={() => handleChange('sequential', false)}
                       className="mr-1"
                     />
-                    <span className="text-sm text-gray-700">并行</span>
+                    <span className="text-sm text-gray-700">{t('bpmn.prop.multiInstance.parallel')}</span>
                   </label>
                 </div>
               </div>
 
               <div className="mb-3">
-                <label className="mb-1 block text-sm font-medium text-gray-700">集合变量</label>
+                <label className="mb-1 block text-sm font-medium text-gray-700">{t('bpmn.prop.multiInstance.collection')}</label>
                 <input
                   type="text"
                   value={config?.collection || ''}
@@ -91,7 +93,7 @@ export function MultiInstanceSection({
               </div>
 
               <div className="mb-3">
-                <label className="mb-1 block text-sm font-medium text-gray-700">元素变量</label>
+                <label className="mb-1 block text-sm font-medium text-gray-700">{t('bpmn.prop.multiInstance.elementVariable')}</label>
                 <input
                   type="text"
                   value={config?.elementVariable || ''}
@@ -102,7 +104,7 @@ export function MultiInstanceSection({
               </div>
 
               <div className="mb-3">
-                <label className="mb-1 block text-sm font-medium text-gray-700">完成条件</label>
+                <label className="mb-1 block text-sm font-medium text-gray-700">{t('bpmn.prop.multiInstance.completionCondition')}</label>
                 <textarea
                   value={config?.completionCondition || ''}
                   onChange={(e) => handleChange('completionCondition', e.target.value)}
@@ -113,7 +115,7 @@ export function MultiInstanceSection({
               </div>
 
               <div className="mb-3">
-                <label className="mb-1 block text-sm font-medium text-gray-700">循环基数</label>
+                <label className="mb-1 block text-sm font-medium text-gray-700">{t('bpmn.prop.multiInstance.loopCardinality')}</label>
                 <input
                   type="number"
                   value={config?.loopCardinality ?? ''}
@@ -125,7 +127,7 @@ export function MultiInstanceSection({
                   }
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                   min="1"
-                  placeholder="留空则使用集合变量"
+                  placeholder={t('bpmn.prop.multiInstance.loopCardinalityPlaceholder')}
                 />
               </div>
             </>
@@ -144,6 +146,7 @@ export function FormBindingSection({
   bindings: FormBindingEntry[];
   onChange: (bindings: FormBindingEntry[]) => void;
 }) {
+  const { t } = useI18n();
   const [expanded, setExpanded] = useState(bindings.length > 0);
   const [mappingExpanded, setMappingExpanded] = useState(false);
   const [permissionExpanded, setPermissionExpanded] = useState(false);
@@ -177,16 +180,14 @@ export function FormBindingSection({
         onClick={() => setExpanded(!expanded)}
         className="flex w-full items-center justify-between px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
       >
-        {/* TODO: i18n */}
-        <span>Form Binding {hasFormRef ? '(1)' : ''}</span>
+        <span>{t('bpmn.prop.formBinding.title')} {hasFormRef ? '(1)' : ''}</span>
         <span className="text-gray-400">{expanded ? '▾' : '▸'}</span>
       </button>
       {expanded && (
         <div className="space-y-3 px-3 pb-3">
           {/* Page Picker */}
           <div>
-            {/* TODO: i18n */}
-            <label className="mb-1 block text-xs font-medium text-gray-600">Form Page</label>
+            <label className="mb-1 block text-xs font-medium text-gray-600">{t('bpmn.prop.formBinding.formPage')}</label>
             <PagePickerSelect
               value={binding.formRef || ''}
               onChange={(pageKey) =>
@@ -209,9 +210,8 @@ export function FormBindingSection({
             <>
               {/* Save Strategy */}
               <div>
-                {/* TODO: i18n */}
                 <label className="mb-1 block text-xs font-medium text-gray-600">
-                  Save Strategy
+                  {t('bpmn.prop.formBinding.saveStrategy')}
                 </label>
                 <select
                   value={binding.saveStrategy || 'business_only'}
@@ -222,18 +222,16 @@ export function FormBindingSection({
                   }
                   className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm"
                 >
-                  {/* TODO: i18n */}
-                  <option value="business_only">Business Only</option>
-                  <option value="dual_write">Dual Write (Business + Variables)</option>
-                  <option value="variable_only">Variable Only</option>
+                  <option value="business_only">{t('bpmn.prop.formBinding.saveBusinessOnly')}</option>
+                  <option value="dual_write">{t('bpmn.prop.formBinding.saveDualWrite')}</option>
+                  <option value="variable_only">{t('bpmn.prop.formBinding.saveVariableOnly')}</option>
                 </select>
               </div>
 
               {/* Version Strategy */}
               <div>
-                {/* TODO: i18n */}
                 <label className="mb-1 block text-xs font-medium text-gray-600">
-                  Version Strategy
+                  {t('bpmn.prop.formBinding.versionStrategy')}
                 </label>
                 <div className="flex gap-4">
                   <label className="flex items-center text-sm text-gray-700">
@@ -241,11 +239,12 @@ export function FormBindingSection({
                       type="radio"
                       name="versionStrategy"
                       checked={binding.versionStrategy !== 'fixed'}
-                      onChange={() => updateBinding({ versionStrategy: 'latest', fixedVersion: undefined })}
+                      onChange={() =>
+                        updateBinding({ versionStrategy: 'latest', fixedVersion: undefined })
+                      }
                       className="mr-1.5"
                     />
-                    {/* TODO: i18n */}
-                    Latest
+                    {t('bpmn.prop.formBinding.versionLatest')}
                   </label>
                   <label className="flex items-center text-sm text-gray-700">
                     <input
@@ -255,8 +254,7 @@ export function FormBindingSection({
                       onChange={() => updateBinding({ versionStrategy: 'fixed' })}
                       className="mr-1.5"
                     />
-                    {/* TODO: i18n */}
-                    Fixed
+                    {t('bpmn.prop.formBinding.versionFixed')}
                   </label>
                 </div>
                 {binding.versionStrategy === 'fixed' && (
@@ -269,7 +267,7 @@ export function FormBindingSection({
                       })
                     }
                     className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm"
-                    placeholder="Version number" // TODO: i18n
+                    placeholder={t('bpmn.prop.formBinding.versionPlaceholder')}
                     min="1"
                   />
                 )}
@@ -282,8 +280,7 @@ export function FormBindingSection({
                   onClick={() => setMappingExpanded(!mappingExpanded)}
                   className="flex w-full items-center justify-between px-2 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
                 >
-                  {/* TODO: i18n */}
-                  <span>Variable Mapping</span>
+                  <span>{t('bpmn.prop.formBinding.variableMapping')}</span>
                   <span className="text-gray-400">{mappingExpanded ? '▾' : '▸'}</span>
                 </button>
                 {mappingExpanded && (
@@ -304,8 +301,7 @@ export function FormBindingSection({
                   onClick={() => setPermissionExpanded(!permissionExpanded)}
                   className="flex w-full items-center justify-between px-2 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
                 >
-                  {/* TODO: i18n */}
-                  <span>Field Permissions</span>
+                  <span>{t('bpmn.prop.formBinding.fieldPermissions')}</span>
                   <span className="text-gray-400">{permissionExpanded ? '▾' : '▸'}</span>
                 </button>
                 {permissionExpanded && (
@@ -326,6 +322,122 @@ export function FormBindingSection({
   );
 }
 
+// Hook action type configuration sub-components
+function HttpCallbackConfig({
+  config,
+  onChange,
+}: {
+  config: Record<string, unknown>;
+  onChange: (config: Record<string, unknown>) => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <div className="mt-2 space-y-2 rounded border border-gray-200 bg-white p-2">
+      <div>
+        <label className="mb-0.5 block text-xs text-gray-500">{t('bpmn.hook.httpUrl')}</label>
+        <input
+          type="text"
+          value={(config.url as string) || ''}
+          onChange={(e) => onChange({ ...config, url: e.target.value })}
+          className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
+          placeholder="https://example.com/webhook"
+        />
+      </div>
+      <div>
+        <label className="mb-0.5 block text-xs text-gray-500">{t('bpmn.hook.httpMethod')}</label>
+        <select
+          value={(config.method as string) || 'POST'}
+          onChange={(e) => onChange({ ...config, method: e.target.value })}
+          className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
+        >
+          <option value="POST">POST</option>
+          <option value="GET">GET</option>
+          <option value="PUT">PUT</option>
+        </select>
+      </div>
+      <div>
+        <label className="mb-0.5 block text-xs text-gray-500">{t('bpmn.hook.httpHeaders')}</label>
+        <textarea
+          value={(config.headers as string) || ''}
+          onChange={(e) => onChange({ ...config, headers: e.target.value })}
+          className="w-full rounded border border-gray-300 px-2 py-1 font-mono text-xs"
+          rows={2}
+          placeholder='{"Content-Type": "application/json"}'
+        />
+      </div>
+    </div>
+  );
+}
+
+function ScriptActionConfig({
+  config,
+  onChange,
+}: {
+  config: Record<string, unknown>;
+  onChange: (config: Record<string, unknown>) => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <div className="mt-2 space-y-2 rounded border border-gray-200 bg-white p-2">
+      <div>
+        <label className="mb-0.5 block text-xs text-gray-500">{t('bpmn.hook.scriptLanguage')}</label>
+        <select
+          value={(config.language as string) || 'javascript'}
+          onChange={(e) => onChange({ ...config, language: e.target.value })}
+          className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
+        >
+          <option value="javascript">JavaScript</option>
+          <option value="groovy">Groovy</option>
+        </select>
+      </div>
+      <div>
+        <label className="mb-0.5 block text-xs text-gray-500">{t('bpmn.hook.scriptContent')}</label>
+        <textarea
+          value={(config.script as string) || ''}
+          onChange={(e) => onChange({ ...config, script: e.target.value })}
+          className="w-full rounded border border-gray-300 px-2 py-1 font-mono text-xs"
+          rows={4}
+          placeholder="// your script here"
+        />
+      </div>
+    </div>
+  );
+}
+
+function CommandActionConfig({
+  config,
+  onChange,
+}: {
+  config: Record<string, unknown>;
+  onChange: (config: Record<string, unknown>) => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <div className="mt-2 space-y-2 rounded border border-gray-200 bg-white p-2">
+      <div>
+        <label className="mb-0.5 block text-xs text-gray-500">{t('bpmn.hook.commandCode')}</label>
+        <input
+          type="text"
+          value={(config.commandCode as string) || ''}
+          onChange={(e) => onChange({ ...config, commandCode: e.target.value })}
+          className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
+          placeholder="namespace:command_code"
+        />
+      </div>
+      <div>
+        <label className="mb-0.5 block text-xs text-gray-500">{t('bpmn.hook.commandParams')}</label>
+        <textarea
+          value={(config.params as string) || ''}
+          onChange={(e) => onChange({ ...config, params: e.target.value })}
+          className="w-full rounded border border-gray-300 px-2 py-1 font-mono text-xs"
+          rows={2}
+          placeholder='{"key": "${variable}"}'
+        />
+      </div>
+    </div>
+  );
+}
+
 // Hook configuration section
 export function HookConfigSection({
   hooks,
@@ -334,6 +446,7 @@ export function HookConfigSection({
   hooks: NodeHookEntry[];
   onChange: (hooks: NodeHookEntry[]) => void;
 }) {
+  const { t } = useI18n();
   const [expanded, setExpanded] = useState(hooks.length > 0);
 
   const addHook = () => {
@@ -342,7 +455,7 @@ export function HookConfigSection({
       {
         hookType: 'pre_execute',
         executionOrder: hooks.length,
-        hookConfig: {},
+        hookConfig: { actionType: 'http_callback' },
         failStrategy: 'block',
         async: false,
         enabled: true,
@@ -360,6 +473,15 @@ export function HookConfigSection({
     onChange(updated);
   };
 
+  const updateHookConfig = (index: number, config: Record<string, unknown>) => {
+    const updated = [...hooks];
+    updated[index] = { ...updated[index], hookConfig: config };
+    onChange(updated);
+  };
+
+  const getActionType = (hook: NodeHookEntry): string =>
+    (hook.hookConfig?.actionType as string) || 'http_callback';
+
   return (
     <div className="mb-4 rounded-md border border-gray-200">
       <button
@@ -367,7 +489,7 @@ export function HookConfigSection({
         onClick={() => setExpanded(!expanded)}
         className="flex w-full items-center justify-between px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
       >
-        <span>节点钩子 ({hooks.length})</span>
+        <span>{t('bpmn.hook.title')} ({hooks.length})</span>
         <span className="text-gray-400">{expanded ? '▾' : '▸'}</span>
       </button>
       {expanded && (
@@ -375,38 +497,73 @@ export function HookConfigSection({
           {hooks.map((hook, index) => (
             <div key={index} className="mb-3 rounded border border-gray-100 bg-gray-50 p-2">
               <div className="mb-2 flex items-center justify-between">
-                <span className="text-xs font-medium text-gray-500">钩子 #{index + 1}</span>
+                <span className="text-xs font-medium text-gray-500">{t('bpmn.hook.hookNumber')} #{index + 1}</span>
                 <button
                   type="button"
                   onClick={() => removeHook(index)}
                   className="text-xs text-red-500 hover:text-red-700"
                 >
-                  移除
+                  {t('bpmn.common.remove')}
                 </button>
               </div>
               <div className="mb-2">
-                <label className="mb-1 block text-xs text-gray-600">钩子类型</label>
+                <label className="mb-1 block text-xs text-gray-600">{t('bpmn.hook.hookType')}</label>
                 <select
                   value={hook.hookType}
                   onChange={(e) => updateHook(index, 'hookType', e.target.value)}
                   className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
                 >
-                  <option value="pre_execute">执行前</option>
-                  <option value="post_execute">执行后</option>
-                  <option value="pre_complete">完成前</option>
-                  <option value="post_complete">完成后</option>
+                  <option value="pre_execute">{t('bpmn.hook.typePreExecute')}</option>
+                  <option value="post_execute">{t('bpmn.hook.typePostExecute')}</option>
+                  <option value="pre_complete">{t('bpmn.hook.typePreComplete')}</option>
+                  <option value="post_complete">{t('bpmn.hook.typePostComplete')}</option>
                 </select>
               </div>
               <div className="mb-2">
-                <label className="mb-1 block text-xs text-gray-600">失败策略</label>
+                <label className="mb-1 block text-xs text-gray-600">{t('bpmn.hook.actionType')}</label>
+                <select
+                  value={getActionType(hook)}
+                  onChange={(e) =>
+                    updateHookConfig(index, { actionType: e.target.value })
+                  }
+                  className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
+                >
+                  <option value="http_callback">{t('bpmn.hook.actionHttpCallback')}</option>
+                  <option value="script">{t('bpmn.hook.actionScript')}</option>
+                  <option value="command">{t('bpmn.hook.actionCommand')}</option>
+                </select>
+              </div>
+
+              {/* Action-type-specific config */}
+              {getActionType(hook) === 'http_callback' && (
+                <HttpCallbackConfig
+                  config={hook.hookConfig}
+                  onChange={(config) => updateHookConfig(index, { ...config, actionType: 'http_callback' })}
+                />
+              )}
+              {getActionType(hook) === 'script' && (
+                <ScriptActionConfig
+                  config={hook.hookConfig}
+                  onChange={(config) => updateHookConfig(index, { ...config, actionType: 'script' })}
+                />
+              )}
+              {getActionType(hook) === 'command' && (
+                <CommandActionConfig
+                  config={hook.hookConfig}
+                  onChange={(config) => updateHookConfig(index, { ...config, actionType: 'command' })}
+                />
+              )}
+
+              <div className="mb-2">
+                <label className="mb-1 block text-xs text-gray-600">{t('bpmn.hook.failStrategy')}</label>
                 <select
                   value={hook.failStrategy || 'block'}
                   onChange={(e) => updateHook(index, 'failStrategy', e.target.value)}
                   className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
                 >
-                  <option value="block">阻断</option>
-                  <option value="ignore">忽略</option>
-                  <option value="retry">重试</option>
+                  <option value="block">{t('bpmn.hook.failBlock')}</option>
+                  <option value="ignore">{t('bpmn.hook.failIgnore')}</option>
+                  <option value="retry">{t('bpmn.hook.failRetry')}</option>
                 </select>
               </div>
               <div className="mb-2 flex items-center gap-4">
@@ -417,7 +574,7 @@ export function HookConfigSection({
                     onChange={(e) => updateHook(index, 'async', e.target.checked)}
                     className="mr-1"
                   />
-                  <span className="text-xs text-gray-600">异步</span>
+                  <span className="text-xs text-gray-600">{t('bpmn.hook.async')}</span>
                 </label>
                 <label className="flex items-center">
                   <input
@@ -426,11 +583,11 @@ export function HookConfigSection({
                     onChange={(e) => updateHook(index, 'enabled', e.target.checked)}
                     className="mr-1"
                   />
-                  <span className="text-xs text-gray-600">启用</span>
+                  <span className="text-xs text-gray-600">{t('bpmn.hook.enabled')}</span>
                 </label>
               </div>
               <div className="mb-2">
-                <label className="mb-1 block text-xs text-gray-600">执行顺序</label>
+                <label className="mb-1 block text-xs text-gray-600">{t('bpmn.hook.executionOrder')}</label>
                 <input
                   type="number"
                   value={hook.executionOrder ?? index}
@@ -448,7 +605,7 @@ export function HookConfigSection({
             onClick={addHook}
             className="w-full rounded border border-dashed border-blue-300 py-1 text-sm text-blue-600 hover:bg-blue-50 hover:text-blue-800"
           >
-            + 添加钩子
+            {t('bpmn.hook.addHook')}
           </button>
         </div>
       )}
