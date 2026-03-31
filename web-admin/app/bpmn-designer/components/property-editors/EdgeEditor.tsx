@@ -44,27 +44,6 @@ export function EdgeEditor({
       </div>
 
       <div className="mb-4">
-        <label className="mb-1 block text-sm font-medium text-gray-700">规则引用</label>
-        <input
-          type="text"
-          value={data?.condition?.ruleCode || ''}
-          onChange={(e) =>
-            onUpdate(edgeId, {
-              condition: {
-                ...data?.condition,
-                type: data?.condition?.type || 'expression',
-                content: data?.condition?.content || '',
-                ruleCode: e.target.value || undefined,
-              },
-            })
-          }
-          className="w-full rounded-md border border-gray-300 px-3 py-2"
-          placeholder="BPM规则编码 (可选)"
-        />
-        <p className="mt-1 text-xs text-gray-500">关联BPM规则引擎中的规则</p>
-      </div>
-
-      <div className="mb-4">
         <label className="flex items-center">
           <input
             type="checkbox"
@@ -74,6 +53,7 @@ export function EdgeEditor({
           />
           <span className="text-sm font-medium text-gray-700">默认流向</span>
         </label>
+        <p className="mt-1 text-xs text-gray-500">默认流向在其他条件均不满足时执行</p>
       </div>
     </>
   );

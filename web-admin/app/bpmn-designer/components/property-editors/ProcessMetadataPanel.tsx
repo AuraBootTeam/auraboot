@@ -4,7 +4,7 @@
 
 import type { ProcessMetadataProps } from '../BPMNPropertyPanel';
 
-const CATEGORY_OPTIONS = ['finance', 'HR', 'procurement', 'sales', 'general', 'e2e-test'];
+const CATEGORY_OPTIONS = ['finance', 'HR', 'procurement', 'sales', 'general'];
 
 export function ProcessMetadataPanel({ metadata }: { metadata: ProcessMetadataProps }) {
   return (
