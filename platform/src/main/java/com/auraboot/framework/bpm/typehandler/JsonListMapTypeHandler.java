@@ -6,7 +6,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.apache.ibatis.type.BaseTypeHandler;
 import org.apache.ibatis.type.JdbcType;
-import org.apache.ibatis.type.MappedTypes;
 import org.postgresql.util.PGobject;
 
 import java.sql.CallableStatement;
@@ -19,7 +18,6 @@ import java.util.Map;
 /**
  * TypeHandler for List<Map<String, Object>> <-> PostgreSQL JSONB.
  */
-@MappedTypes(List.class)
 public class JsonListMapTypeHandler extends BaseTypeHandler<List<Map<String, Object>>> {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()

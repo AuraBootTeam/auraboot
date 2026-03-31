@@ -6,7 +6,6 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.ibatis.type.BaseTypeHandler;
 import org.apache.ibatis.type.JdbcType;
-import org.apache.ibatis.type.MappedTypes;
 import org.postgresql.util.PGobject;
 
 import java.sql.CallableStatement;
@@ -21,7 +20,6 @@ import java.util.List;
  * @author AuraBoot Team
  * @since 2.3.0
  */
-@MappedTypes(List.class)
 public class BreakpointsTypeHandler extends BaseTypeHandler<List<Integer>> {
 
     private static final ObjectMapper objectMapper;
