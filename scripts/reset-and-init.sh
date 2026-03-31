@@ -200,7 +200,7 @@ echo -e "${YELLOW}Step 5: Starting frontend...${NC}"
 cd "$WEB_ADMIN_DIR"
 
 # Start frontend+BFF in persistent background process
-nohup npm run dev:full > /tmp/aura-frontend.log 2>&1 &
+nohup pnpm dev:full > /tmp/aura-frontend.log 2>&1 &
 FRONTEND_PID=$!
 
 echo "   Frontend starting (PID: $FRONTEND_PID)..."

@@ -2518,5 +2518,5 @@
       ]
     }
   },
-  "$comment": "Auto-generated from web-admin/app/meta/schemas/dsl-schema-types.ts — DO NOT EDIT MANUALLY. Run: cd web-admin && npm run generate:dsl-schema"
+  "$comment": "Auto-generated from web-admin/app/meta/schemas/dsl-schema-types.ts — DO NOT EDIT MANUALLY. Run: cd web-admin && pnpm generate:dsl-schema"
 }

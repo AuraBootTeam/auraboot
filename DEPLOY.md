@@ -34,7 +34,7 @@ docker compose up -d
 cd platform && ./gradlew bootRun
 
 # Run frontend (port 5173)
-cd web-admin && npm run dev:full
+cd web-admin && pnpm dev:full
 ```
 
 ## Profiles

@@ -170,19 +170,19 @@ elif [ -d "$PLUGIN_SRC_DIR/frontend" ]; then
   if [ -f "package.json" ]; then
     # Install dependencies if node_modules doesn't exist
     if [ ! -d "node_modules" ]; then
-      echo "       Installing npm dependencies..."
-      npm install --silent 2>/dev/null || {
-        echo "       ⚠ npm install failed, creating placeholder"
+      echo "       Installing dependencies..."
+      pnpm install --silent 2>/dev/null || {
+        echo "       ⚠ pnpm install failed, creating placeholder"
         mkdir -p dist
         echo "// Placeholder remoteEntry.js" > dist/remoteEntry.js
       }
     fi
 
     # Build
-    npm run build --silent 2>/dev/null || {
-      echo "       ⚠ npm build failed, creating placeholder"
+    pnpm build --silent 2>/dev/null || {
+      echo "       ⚠ pnpm build failed, creating placeholder"
       mkdir -p dist
-      echo "// Placeholder remoteEntry.js - requires npm build" > dist/remoteEntry.js
+      echo "// Placeholder remoteEntry.js - requires pnpm build" > dist/remoteEntry.js
     }
   else
     echo "       ⚠ No package.json found, creating placeholder"

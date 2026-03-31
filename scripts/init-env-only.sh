@@ -52,7 +52,7 @@ echo -e "${GREEN}   Backend: OK${NC}"
 
 if [ "$FRONTEND_STATUS" != "200" ] && [ "$FRONTEND_STATUS" != "302" ] && [ "$FRONTEND_STATUS" != "304" ]; then
     echo -e "${RED}Frontend not running (port 5173)${NC}"
-    echo "Please start frontend first: cd web-admin && npm run dev:full"
+    echo "Please start frontend first: cd web-admin && pnpm dev:full"
     exit 1
 fi
 echo -e "${GREEN}   Frontend: OK${NC}"

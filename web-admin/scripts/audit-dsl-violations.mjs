@@ -20,7 +20,7 @@ const ROOT = resolve(__dirname, '..', '..');
 
 const schemaPath = resolve(ROOT, 'plugins/schemas/dsl-schema.generated.json');
 if (!existsSync(schemaPath)) {
-  console.error('ERROR: dsl-schema.generated.json not found. Run: cd web-admin && npm run generate:dsl-schema');
+  console.error('ERROR: dsl-schema.generated.json not found. Run: cd web-admin && pnpm generate:dsl-schema');
   process.exit(1);
 }
 const fullSchema = JSON.parse(readFileSync(schemaPath, 'utf-8'));

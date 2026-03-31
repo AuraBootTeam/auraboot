@@ -6,7 +6,7 @@ AuraBoot Plugin CLI — scaffold, validate, build, and publish plugins.
 
 ```bash
 # Run directly via npx (no install needed)
-cd plugins/cli && npm install
+cd plugins/cli && pnpm install
 npx tsx src/index.ts plugin <command>
 
 # Or install globally
@@ -115,8 +115,8 @@ Both flat file mode (single JSON array per resource type) and directory mode (on
 
 ```bash
 cd plugins/cli
-npm install
-npm run build       # Compile TypeScript
-npm run lint        # Type-check without emitting
+pnpm install
+pnpm build       # Compile TypeScript
+pnpm lint        # Type-check without emitting
 npx tsx src/index.ts plugin validate ../pcba-base  # Run directly
 ```

@@ -446,7 +446,7 @@ flow-designer-sdk/
 
 ```bash
 cd web-admin
-npm test -- --grep "flow-designer-sdk"
+pnpm test -- --grep "flow-designer-sdk"
 ```
 
 ### E2E Tests
