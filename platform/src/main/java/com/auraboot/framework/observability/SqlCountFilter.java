@@ -12,6 +12,7 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.util.ContentCachingResponseWrapper;
 
 import java.io.IOException;
 
@@ -56,13 +57,19 @@ public class SqlCountFilter extends OncePerRequestFilter {
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
         SqlCountHolder.reset();
+        // Wrap response to buffer output, allowing header injection after chain completes
+        ContentCachingResponseWrapper wrappedResponse = headerEnabled
+                ? new ContentCachingResponseWrapper(response)
+                : null;
+        HttpServletResponse effectiveResponse = wrappedResponse != null ? wrappedResponse : response;
         try {
-            filterChain.doFilter(request, response);
+            filterChain.doFilter(request, effectiveResponse);
         } finally {
             int count = SqlCountHolder.get();
 
-            if (headerEnabled && !response.isCommitted()) {
-                response.setIntHeader(HEADER_SQL_COUNT, count);
+            if (wrappedResponse != null) {
+                wrappedResponse.setIntHeader(HEADER_SQL_COUNT, count);
+                wrappedResponse.copyBodyToResponse();
             }
 
             if (count > 0) {
