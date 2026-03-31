@@ -64,7 +64,7 @@ public class PageSchemaCreateRequest {
      * Page kind (list, form, detail, dashboard).
      */
     @NotBlank(message = "Page kind is required")
-    @Pattern(regexp = "^(list|form|detail|dashboard)$", message = "Invalid kind. Must be: list, form, detail, or dashboard")
+    @Pattern(regexp = "^(list|form|detail|dashboard|composite)$", message = "Invalid kind. Must be: list, form, detail, dashboard, or composite")
     @JsonProperty("kind")
     private String kind;
 

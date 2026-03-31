@@ -298,3 +298,16 @@ dashboard:
   refresh: 새로고침
   refreshed: 데이터가 새로고침되었습니다
   retry: 다시 시도
+search:
+  placeholder: 검색...
+  title: 전체 검색
+  inputPlaceholder: 페이지, 레코드, 문서 검색...
+  noResults: 결과를 찾을 수 없습니다
+  hint: 페이지, 레코드, 문서를 검색하세요
+  recent: 최근
+  pages: 페이지
+  records: 레코드
+  docs: 문서
+  navigate: 이동
+  open: 열기
+  close: 닫기

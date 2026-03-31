@@ -1,5 +1,6 @@
 package com.auraboot.framework.meta.controller;
 
+import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.meta.registry.DslRegistryExporter;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -23,7 +24,7 @@ public class DslRegistryController {
 
     @GetMapping("/registry")
     @Operation(summary = "Export full DSL registry", description = "Returns all closed enums, open extension registries, and default mappings")
-    public Map<String, Object> getRegistry() {
-        return exporter.export();
+    public ApiResponse<Map<String, Object>> getRegistry() {
+        return ApiResponse.ok(exporter.export());
     }
 }
