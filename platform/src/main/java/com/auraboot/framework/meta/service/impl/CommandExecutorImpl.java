@@ -430,10 +430,24 @@ public class CommandExecutorImpl implements CommandExecutor {
                     idempotencyService.recordOutcome(request.getClientRequestId(), commandCode, finalPayload, resultData, tenantId);
                 }
 
-                // 12. Audit log
+                // 12. Audit log (after-commit to shorten transaction duration)
                 long execTimeMs = System.currentTimeMillis() - startTime;
                 finalPhaseTimings.put(phaseRef[0], System.currentTimeMillis() - phaseStartRef[0]);
-                effectExecutor.saveAuditLog(tenantId, commandCode, finalCommand.getPid(), userId, finalPayload, resultData, true, null, execTimeMs, phaseRef[0], finalPhaseTimings);
+                final long afterCommitExecTimeMs = execTimeMs;
+                final String afterCommitPhase = phaseRef[0];
+                final Map<String, Long> afterCommitPhaseTimings = new java.util.LinkedHashMap<>(finalPhaseTimings);
+                final Map<String, Object> afterCommitPayloadForAudit = new HashMap<>(finalPayload);
+                final Map<String, Object> afterCommitResultForAudit = new HashMap<>(resultData);
+                TransactionSynchronizationManager.registerSynchronization(
+                    new TransactionSynchronization() {
+                        @Override
+                        public void afterCommit() {
+                            effectExecutor.saveAuditLog(tenantId, commandCode, finalCommand.getPid(), userId,
+                                    afterCommitPayloadForAudit, afterCommitResultForAudit, true, null,
+                                    afterCommitExecTimeMs, afterCommitPhase, afterCommitPhaseTimings);
+                        }
+                    }
+                );
 
                 log.info("Command {} executed successfully in {}ms", commandCode, execTimeMs);
 

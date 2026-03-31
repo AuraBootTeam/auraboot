@@ -183,11 +183,13 @@ spring:
     username: ${DATABASE_USERNAME:auraboot}
     password: ${DATABASE_PASSWORD:}
     hikari:
-      maximum-pool-size: 20
-      minimum-idle: 5
+      maximum-pool-size: ${HIKARI_MAX_POOL_SIZE:20}
+      minimum-idle: ${HIKARI_MIN_IDLE:5}
       connection-timeout: 30000
       idle-timeout: 600000
       max-lifetime: 1800000
+      leak-detection-threshold: 30000
+      pool-name: AuraBootPool
 
 # Spring Boot Actuator configuration
 # Security: Only expose safe endpoints by default
