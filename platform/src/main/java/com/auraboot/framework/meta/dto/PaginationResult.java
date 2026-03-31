@@ -13,6 +13,14 @@ public class PaginationResult<T> {
     private Integer pageSize;
     private Integer totalPages;
 
+    /**
+     * Cursor for keyset pagination.
+     * Contains the last record's ID from this page.
+     * Pass this value as the "cursor" parameter to fetch the next page.
+     * Null when using traditional offset pagination or when there are no more results.
+     */
+    private Long nextCursor;
+
     public PaginationResult() {}
 
     public PaginationResult(List<T> records, Long total, Integer page, Integer pageSize) {
@@ -25,6 +33,15 @@ public class PaginationResult<T> {
 
     public static <T> PaginationResult<T> of(List<T> records, Long total, Integer page, Integer pageSize) {
         return new PaginationResult<>(records, total, page, pageSize);
+    }
+
+    /**
+     * Create a PaginationResult with keyset cursor.
+     */
+    public static <T> PaginationResult<T> ofCursor(List<T> records, Long total, Integer pageSize, Long nextCursor) {
+        PaginationResult<T> result = new PaginationResult<>(records, total, 0, pageSize);
+        result.setNextCursor(nextCursor);
+        return result;
     }
 
     public static <T> PaginationResult<T> empty(Integer page, Integer pageSize) {

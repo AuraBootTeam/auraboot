@@ -49,4 +49,11 @@ public class DynamicQueryRequest {
      * When provided, applies the saved view's filter, sort, and column configurations
      */
     private String viewId;
+
+    /**
+     * Cursor for keyset pagination (optional).
+     * When provided, uses WHERE id > cursor instead of OFFSET for efficient deep pagination.
+     * The value is the last record's ID from the previous page.
+     */
+    private Long cursor;
 }
