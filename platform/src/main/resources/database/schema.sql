@@ -4646,6 +4646,10 @@ CREATE TABLE IF NOT EXISTS ab_agent_definition (
   max_concurrent_runs INTEGER NOT NULL DEFAULT 3,    -- Max simultaneous runs for this agent
   execution_timeout_seconds INTEGER DEFAULT 300,     -- Per-run timeout (default 5 min)
   event_triggers JSONB,                             -- Event-driven dispatch config: {"triggers":[{eventType,modelCode,condition}]}
+  -- AI Employee fields
+  is_employee        BOOLEAN DEFAULT FALSE,                   -- true = acts as a virtual team member in group chats
+  employee_title     VARCHAR(200),                            -- displayed job title, e.g. "AI Sales Assistant"
+  auto_reply_mode    VARCHAR(20) DEFAULT 'mention',           -- mention | always | off
   status        VARCHAR(20) DEFAULT 'active',
   stats         TEXT,
   visibility    VARCHAR(20) DEFAULT 'private',                -- private | team | tenant
