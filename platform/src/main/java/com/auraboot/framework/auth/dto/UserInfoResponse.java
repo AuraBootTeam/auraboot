@@ -16,10 +16,12 @@ public class UserInfoResponse {
     
     private UserDTO user;
     private PermissionsDTO permissions;
-    
-    public UserInfoResponse(UserDTO user, PermissionsDTO permissions) {
+    private PreferencesDTO preferences;
+
+    public UserInfoResponse(UserDTO user, PermissionsDTO permissions, PreferencesDTO preferences) {
         this.user = user;
         this.permissions = permissions;
+        this.preferences = preferences;
     }
     
     /**
@@ -52,6 +54,22 @@ public class UserInfoResponse {
         }
     }
     
+    /**
+     * Resolved UI preferences (user > tenant > default cascade).
+     */
+    @Data
+    public static class PreferencesDTO {
+        private String timezone;
+        private String dateFormat;
+        private String datetimeFormat;
+        private String timeFormat;
+
+        public static final String DEFAULT_TIMEZONE = "UTC";
+        public static final String DEFAULT_DATE_FORMAT = "YYYY-MM-DD";
+        public static final String DEFAULT_DATETIME_FORMAT = "YYYY-MM-DD HH:mm:ss";
+        public static final String DEFAULT_TIME_FORMAT = "HH:mm:ss";
+    }
+
     /**
      * 角色DTO
      */
