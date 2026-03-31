@@ -10,6 +10,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 @Service
 @RequiredArgsConstructor
 public class TenantPreferenceServiceImpl implements TenantPreferenceService {
@@ -47,5 +51,19 @@ public class TenantPreferenceServiceImpl implements TenantPreferenceService {
         pref.setPreferenceKey(key);
         pref.setPreferenceValue(value);
         preferenceMapper.insert(pref);
+    }
+
+    @Override
+    public Map<String, JsonNode> getPreferencesByPrefix(Long tenantId, String prefix) {
+        List<TenantPreference> prefs = preferenceMapper.selectList(
+                new QueryWrapper<TenantPreference>()
+                        .eq("tenant_id", tenantId)
+                        .likeRight("preference_key", prefix)
+        );
+        Map<String, JsonNode> result = new HashMap<>();
+        for (TenantPreference pref : prefs) {
+            result.put(pref.getPreferenceKey(), pref.getPreferenceValue());
+        }
+        return result;
     }
 }
