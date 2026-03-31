@@ -1218,6 +1218,8 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         String titleJson = dto.getTitle() != null ? toJson(dto.getTitle()) : null;
         String layoutJson = dto.getLayout() != null ? toJson(dto.getLayout()) : null;
         String blocksJson = dto.getBlocks() != null ? toJson(dto.getBlocks()) : "[]";
+        String extensionJson = dto.getExtension() != null && !dto.getExtension().isEmpty()
+                ? toJson(dto.getExtension()) : "{}";
         String titleDisplay = dto.getEffectiveName();
         boolean isTemplate = dto.getIsTemplate() != null && dto.getIsTemplate();
         int sortWeight = dto.getSortWeight() != null ? dto.getSortWeight() : 0;
@@ -1231,7 +1233,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                 titleDisplay, titleJson, dto.getDescription(), kind, profile,
                 dto.getModelCode(), layoutJson, blocksJson,
                 schemaVersion, isTemplate, dto.getTemplateCategory(), sortWeight,
-                pluginPid, existingPage.getPid(), tenantId);
+                extensionJson, pluginPid, existingPage.getPid(), tenantId);
 
             if (autoPublish != null && autoPublish && !StatusConstants.PUBLISHED.equals(existingPage.getStatus())) {
                 pageSchemaMapper.publishByPid(existingPage.getPid());
@@ -1252,7 +1254,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                 layoutJson, blocksJson, schemaVersion,
                 isTemplate, dto.getTemplateCategory(),
                 publish ? java.time.Instant.now() : null,
-                sortWeight, pluginPid);
+                sortWeight, extensionJson, pluginPid);
 
             return createResourceRecord(pluginPid, importId, tenantId, ResourceType.PAGE,
                     pid, null, dto.getPageKey(), dto.getEffectiveName(),

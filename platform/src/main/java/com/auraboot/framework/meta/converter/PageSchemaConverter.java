@@ -6,11 +6,13 @@ import com.auraboot.framework.meta.dto.PageSchemaDTO;
 import com.auraboot.framework.meta.dto.PageSchemaListDTO;
 import com.auraboot.framework.meta.dto.PageSchemaUpdateRequest;
 import com.auraboot.framework.meta.entity.PageSchema;
+import com.auraboot.framework.meta.entity.payload.ExtensionBean;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.mapstruct.*;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -48,7 +50,7 @@ public abstract class PageSchemaConverter {
     @Mapping(target = "isCurrent", source = "isCurrent")
     @Mapping(target = "schemaVersion", source = "schemaVersion")
     @Mapping(target = "modelCategory", ignore = true) // enriched at query time
-    @Mapping(target = "extension", ignore = true)
+    @Mapping(target = "extension", source = "extension", qualifiedByName = "extensionBeanToMap")
     @Mapping(target = "deletedFlag", source = "deletedFlag")
     @Mapping(target = "createdAt", source = "createdAt")
     @Mapping(target = "updatedAt", source = "updatedAt")
@@ -244,5 +246,21 @@ public abstract class PageSchemaConverter {
             return null;
         }
         return value ? 1 : 0;
+    }
+
+    @Named("extensionBeanToMap")
+    public Map<String, Object> extensionBeanToMap(ExtensionBean bean) {
+        if (bean == null) {
+            return null;
+        }
+        // ExtensionBean stores data in nested "extension" map or flat "dynamicProperties"
+        Map<String, Object> result = new HashMap<>();
+        if (bean.getExtension() != null) {
+            result.putAll(bean.getExtension());
+        }
+        if (bean.getDynamicProperties() != null) {
+            result.putAll(bean.getDynamicProperties());
+        }
+        return result.isEmpty() ? null : result;
     }
 }

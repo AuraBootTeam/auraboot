@@ -411,6 +411,7 @@ public interface PageSchemaMapper extends BaseMapper<PageSchema> {
             profile = #{profile}, model_code = #{modelCode}, layout = #{layout}::jsonb,
             blocks = #{blocks}::jsonb, schema_version = #{schemaVersion},
             is_template = #{isTemplate}, template_category = #{templateCategory}, sort_weight = #{sortWeight},
+            extension = #{extension}::jsonb,
             plugin_pid = #{pluginPid}, updated_at = NOW()
         WHERE pid = #{pid} AND tenant_id = #{tenantId}
         """)
@@ -426,6 +427,7 @@ public interface PageSchemaMapper extends BaseMapper<PageSchema> {
                               @Param("isTemplate") boolean isTemplate,
                               @Param("templateCategory") String templateCategory,
                               @Param("sortWeight") int sortWeight,
+                              @Param("extension") String extension,
                               @Param("pluginPid") String pluginPid,
                               @Param("pid") String pid,
                               @Param("tenantId") Long tenantId);
@@ -449,7 +451,7 @@ public interface PageSchemaMapper extends BaseMapper<PageSchema> {
             version, sort_weight, plugin_pid, created_at, updated_at
         ) VALUES (
             #{pid}, #{tenantId}, 'default', 'prod', true, #{status},
-            '{}'::jsonb, #{pageKey}, #{modelCode},
+            #{extension}::jsonb, #{pageKey}, #{modelCode},
             #{name}, #{title}::jsonb, #{description}, #{kind}, #{profile},
             #{layout}::jsonb, #{blocks}::jsonb, #{schemaVersion},
             #{isTemplate}, #{templateCategory}, #{publishedAt},
@@ -473,6 +475,7 @@ public interface PageSchemaMapper extends BaseMapper<PageSchema> {
                               @Param("templateCategory") String templateCategory,
                               @Param("publishedAt") Instant publishedAt,
                               @Param("sortWeight") int sortWeight,
+                              @Param("extension") String extension,
                               @Param("pluginPid") String pluginPid);
 
     /**
