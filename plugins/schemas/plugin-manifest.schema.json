@@ -788,6 +788,10 @@
                   "dependsOn": { "type": "array", "items": { "type": "string" } }
                 }
               }
+            },
+            "enableNba": {
+              "type": "boolean",
+              "description": "Enable AI Next Best Action suggestions on detail pages for this model. Overrides global ai.nba.enabled config."
             }
           }
         }
