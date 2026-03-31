@@ -97,4 +97,22 @@ public class ExtensionBean {
                     "Extension has too many keys (" + totalKeys + "), max allowed: " + MAX_KEYS);
         }
     }
+
+    /**
+     * Log warnings for unknown extension keys on a model.
+     * Does NOT block import — informational only.
+     *
+     * @param modelCode the model code (for log context)
+     * @param keys      the extension keys to check
+     * @param logger    the SLF4J logger to use
+     */
+    public static void warnUnknownModelKeys(String modelCode, java.util.Set<String> keys, org.slf4j.Logger logger) {
+        if (keys == null || keys.isEmpty()) return;
+        for (String key : keys) {
+            if (!MODEL_KNOWN_KEYS.contains(key)) {
+                logger.warn("Model [{}]: unknown extension key '{}' — not in MODEL_KNOWN_KEYS. "
+                        + "Consider registering it if intentional.", modelCode, key);
+            }
+        }
+    }
 }
