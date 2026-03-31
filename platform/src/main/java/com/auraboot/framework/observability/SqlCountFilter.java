@@ -24,7 +24,7 @@ import java.io.IOException;
  *   <li>Sets the {@code X-SQL-Count} response header (configurable)</li>
  *   <li>Logs a warning if count exceeds the warn threshold</li>
  *   <li>Logs an error if count exceeds the error threshold</li>
- *   <li>Records the count as a Prometheus distribution summary metric</li>
+ *   <li>Records the count as a Prometheus distribution summary metric with endpoint tags</li>
  * </ul>
  */
 @Slf4j
@@ -38,7 +38,7 @@ public class SqlCountFilter extends OncePerRequestFilter {
     private final int warnThreshold;
     private final int errorThreshold;
     private final boolean headerEnabled;
-    private final DistributionSummary sqlCountSummary;
+    private final MeterRegistry meterRegistry;
 
     public SqlCountFilter(
             MeterRegistry meterRegistry,
@@ -48,10 +48,7 @@ public class SqlCountFilter extends OncePerRequestFilter {
         this.warnThreshold = warnThreshold;
         this.errorThreshold = errorThreshold;
         this.headerEnabled = headerEnabled;
-        this.sqlCountSummary = DistributionSummary.builder(METRIC_NAME)
-                .description("Number of SQL statements executed per HTTP request")
-                .publishPercentiles(0.5, 0.9, 0.95, 0.99)
-                .register(meterRegistry);
+        this.meterRegistry = meterRegistry;
     }
 
     @Override
@@ -68,7 +65,18 @@ public class SqlCountFilter extends OncePerRequestFilter {
                 response.setIntHeader(HEADER_SQL_COUNT, count);
             }
 
-            sqlCountSummary.record(count);
+            if (count > 0) {
+                String method = request.getMethod();
+                String path = normalizePath(request.getRequestURI());
+
+                DistributionSummary.builder(METRIC_NAME)
+                        .description("Number of SQL statements executed per HTTP request")
+                        .publishPercentiles(0.5, 0.9, 0.95, 0.99)
+                        .tag("method", method)
+                        .tag("path", path)
+                        .register(meterRegistry)
+                        .record(count);
+            }
 
             if (count >= errorThreshold) {
                 log.error("Excessive SQL count: {} queries for {} {}",
@@ -80,5 +88,22 @@ public class SqlCountFilter extends OncePerRequestFilter {
 
             SqlCountHolder.reset();
         }
+    }
+
+    /**
+     * Normalize request paths to reduce cardinality.
+     * Replaces numeric/UUID/ULID path segments with placeholders.
+     */
+    static String normalizePath(String uri) {
+        if (uri == null) return "unknown";
+        // Replace UUIDs first (before numeric, to avoid partial matches)
+        String normalized = uri.replaceAll(
+                "/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}",
+                "/{uuid}");
+        // Replace ULIDs (26 chars, base32)
+        normalized = normalized.replaceAll("/[0-9A-Z]{26}", "/{ulid}");
+        // Replace pure numeric IDs (whole path segments only)
+        normalized = normalized.replaceAll("/\\d+(?=/|$)", "/{id}");
+        return normalized;
     }
 }
