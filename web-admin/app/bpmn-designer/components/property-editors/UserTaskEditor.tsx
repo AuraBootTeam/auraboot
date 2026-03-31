@@ -1,10 +1,13 @@
 /**
  * Property editor for UserTask nodes.
+ * Uses AssigneePicker for user/role/dept selection instead of raw text inputs.
  */
 
 import { AssigneeType } from '~/bpmn-designer/types';
 import type { UserTaskConfig, AssigneeConfig } from '~/bpmn-designer/types';
+import { AssigneePicker } from './AssigneePicker';
 import { MultiInstanceSection, FormBindingSection, HookConfigSection } from './shared';
+import { useI18n } from '~/contexts/I18nContext';
 
 export function UserTaskEditor({
   config,
@@ -13,6 +16,8 @@ export function UserTaskEditor({
   config?: UserTaskConfig;
   onChange: (config: UserTaskConfig) => void;
 }) {
+  const { t } = useI18n();
+
   const handleChange = (field: keyof UserTaskConfig, value: any) => {
     onChange({ ...config, [field]: value } as UserTaskConfig);
   };
@@ -24,106 +29,109 @@ export function UserTaskEditor({
     } as UserTaskConfig);
   };
 
+  const assigneeType = config?.assignee?.type || AssigneeType.USER;
+
   return (
     <>
       <div className="mb-4">
-        <label className="mb-1 block text-sm font-medium text-gray-700">描述</label>
+        <label className="mb-1 block text-sm font-medium text-gray-700">{t('bpmn.common.description')}</label>
         <textarea
           value={config?.description || ''}
           onChange={(e) => handleChange('description', e.target.value)}
           className="w-full rounded-md border border-gray-300 px-3 py-2"
           rows={2}
+          data-testid="usertask-description"
         />
       </div>
 
       <div className="mb-4">
-        <label className="mb-1 block text-sm font-medium text-gray-700">人员分配类型</label>
+        <label className="mb-1 block text-sm font-medium text-gray-700">{t('bpmn.prop.usertask.assigneeType')}</label>
         <select
-          value={config?.assignee?.type || AssigneeType.USER}
+          value={assigneeType}
           onChange={(e) => handleAssigneeChange('type', e.target.value)}
           className="w-full rounded-md border border-gray-300 px-3 py-2"
+          data-testid="usertask-assignee-type"
         >
-          <option value={AssigneeType.USER}>指定用户</option>
-          <option value={AssigneeType.ROLE}>指定角色</option>
-          <option value={AssigneeType.DEPT}>指定部门</option>
-          <option value={AssigneeType.STARTER}>流程发起人</option>
-          <option value={AssigneeType.EXPRESSION}>表达式</option>
+          <option value={AssigneeType.USER}>{t('bpmn.prop.usertask.assignUser')}</option>
+          <option value={AssigneeType.ROLE}>{t('bpmn.prop.usertask.assignRole')}</option>
+          <option value={AssigneeType.DEPT}>{t('bpmn.prop.usertask.assignDept')}</option>
+          <option value={AssigneeType.STARTER}>{t('bpmn.prop.usertask.assignStarter')}</option>
+          <option value={AssigneeType.EXPRESSION}>{t('bpmn.prop.usertask.assignExpression')}</option>
         </select>
       </div>
 
-      {config?.assignee?.type === AssigneeType.USER && (
+      {assigneeType === AssigneeType.USER && (
         <div className="mb-4">
-          <label className="mb-1 block text-sm font-medium text-gray-700">用户ID（逗号分隔）</label>
-          <input
-            type="text"
-            value={config?.assignee?.userIds?.join(',') || ''}
-            onChange={(e) =>
-              handleAssigneeChange('userIds', e.target.value.split(',').filter(Boolean))
-            }
-            className="w-full rounded-md border border-gray-300 px-3 py-2"
-            placeholder="user1,user2"
+          <AssigneePicker
+            type="user"
+            value={config?.assignee?.userIds || []}
+            onChange={(ids) => handleAssigneeChange('userIds', ids)}
+            placeholder={t('bpmn.prop.usertask.searchUser')}
           />
         </div>
       )}
 
-      {config?.assignee?.type === AssigneeType.ROLE && (
+      {assigneeType === AssigneeType.ROLE && (
         <div className="mb-4">
-          <label className="mb-1 block text-sm font-medium text-gray-700">角色ID（逗号分隔）</label>
-          <input
-            type="text"
-            value={config?.assignee?.roleIds?.join(',') || ''}
-            onChange={(e) =>
-              handleAssigneeChange('roleIds', e.target.value.split(',').filter(Boolean))
-            }
-            className="w-full rounded-md border border-gray-300 px-3 py-2"
-            placeholder="role1,role2"
+          <AssigneePicker
+            type="role"
+            value={config?.assignee?.roleIds || []}
+            onChange={(ids) => handleAssigneeChange('roleIds', ids)}
+            placeholder={t('bpmn.prop.usertask.searchRole')}
           />
         </div>
       )}
 
-      {config?.assignee?.type === AssigneeType.DEPT && (
+      {assigneeType === AssigneeType.DEPT && (
         <div className="mb-4">
-          <label className="mb-1 block text-sm font-medium text-gray-700">部门ID（逗号分隔）</label>
-          <input
-            type="text"
-            value={config?.assignee?.deptIds?.join(',') || ''}
-            onChange={(e) =>
-              handleAssigneeChange('deptIds', e.target.value.split(',').filter(Boolean))
-            }
-            className="w-full rounded-md border border-gray-300 px-3 py-2"
-            placeholder="dept1,dept2"
+          <AssigneePicker
+            type="dept"
+            value={config?.assignee?.deptIds || []}
+            onChange={(ids) => handleAssigneeChange('deptIds', ids)}
+            placeholder={t('bpmn.prop.usertask.searchDept')}
           />
         </div>
       )}
 
-      {config?.assignee?.type === AssigneeType.EXPRESSION && (
+      {assigneeType === AssigneeType.STARTER && (
         <div className="mb-4">
-          <label className="mb-1 block text-sm font-medium text-gray-700">表达式</label>
+          <p className="text-xs text-gray-500">{t('bpmn.prop.usertask.starterHint')}</p>
+        </div>
+      )}
+
+      {assigneeType === AssigneeType.EXPRESSION && (
+        <div className="mb-4">
+          <label className="mb-1 block text-sm font-medium text-gray-700">{t('bpmn.prop.usertask.expressionLabel')}</label>
           <textarea
             value={config?.assignee?.expression || ''}
             onChange={(e) => handleAssigneeChange('expression', e.target.value)}
             className="w-full rounded-md border border-gray-300 px-3 py-2"
             rows={2}
             placeholder="${user.manager}"
+            data-testid="usertask-expression"
           />
+          <p className="mt-1 text-xs text-gray-400">
+            {t('bpmn.prop.usertask.expressionHint')}
+          </p>
         </div>
       )}
 
       <div className="mb-4">
-        <label className="mb-1 block text-sm font-medium text-gray-700">审批模式</label>
+        <label className="mb-1 block text-sm font-medium text-gray-700">{t('bpmn.prop.usertask.approvalMode')}</label>
         <select
           value={config?.assignee?.assigneeMode || 'single'}
           onChange={(e) => handleAssigneeChange('assigneeMode', e.target.value)}
           className="w-full rounded-md border border-gray-300 px-3 py-2"
+          data-testid="usertask-approval-mode"
         >
-          <option value="single">单人审批</option>
-          <option value="multi">会签（所有人）</option>
-          <option value="sequential">依次审批</option>
+          <option value="single">{t('bpmn.prop.usertask.modeSingle')}</option>
+          <option value="multi">{t('bpmn.prop.usertask.modeMulti')}</option>
+          <option value="sequential">{t('bpmn.prop.usertask.modeSequential')}</option>
         </select>
       </div>
 
       <div className="mb-4">
-        <label className="mb-1 block text-sm font-medium text-gray-700">优先级</label>
+        <label className="mb-1 block text-sm font-medium text-gray-700">{t('bpmn.prop.usertask.priority')}</label>
         <input
           type="number"
           value={config?.priority || 50}
@@ -131,6 +139,7 @@ export function UserTaskEditor({
           className="w-full rounded-md border border-gray-300 px-3 py-2"
           min="0"
           max="100"
+          data-testid="usertask-priority"
         />
       </div>
 
@@ -141,9 +150,24 @@ export function UserTaskEditor({
             checked={config?.skipable || false}
             onChange={(e) => handleChange('skipable', e.target.checked)}
             className="mr-2"
+            data-testid="usertask-skipable"
           />
-          <span className="text-sm font-medium text-gray-700">允许跳过</span>
+          <span className="text-sm font-medium text-gray-700">{t('bpmn.prop.usertask.skipable')}</span>
         </label>
+      </div>
+
+      {/* Due date expression */}
+      <div className="mb-4">
+        <label className="mb-1 block text-sm font-medium text-gray-700">{t('bpmn.prop.usertask.dueDate')}</label>
+        <input
+          type="text"
+          value={config?.dueDate || ''}
+          onChange={(e) => handleChange('dueDate', e.target.value)}
+          className="w-full rounded-md border border-gray-300 px-3 py-2"
+          placeholder={t('bpmn.prop.usertask.dueDatePlaceholder')}
+          data-testid="usertask-duedate"
+        />
+        <p className="mt-1 text-xs text-gray-400">{t('bpmn.prop.usertask.dueDateHint')}</p>
       </div>
 
       {/* Multi-instance configuration */}
