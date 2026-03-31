@@ -4,7 +4,6 @@ import com.auraboot.framework.meta.entity.payload.DataSourceItemBean;
 import com.fasterxml.jackson.databind.JavaType;
 import org.apache.ibatis.type.JdbcType;
 import org.apache.ibatis.type.MappedJdbcTypes;
-import org.apache.ibatis.type.MappedTypes;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -17,7 +16,6 @@ import java.util.List;
  * @since 1.0.0
  */
 @Component
-@MappedTypes({List.class})
     public class DataSourceItemBeanTypeHandler extends GenericJavaTypeJacksonTypeHandler<List<DataSourceItemBean>> {
 
         private static final JavaType JAVA_TYPE =
