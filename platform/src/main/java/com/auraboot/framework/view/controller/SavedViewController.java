@@ -3,6 +3,7 @@ package com.auraboot.framework.view.controller;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
+import com.auraboot.framework.view.dto.AutoSaveViewRequest;
 import com.auraboot.framework.view.dto.SavedViewCreateRequest;
 import com.auraboot.framework.view.dto.SavedViewDTO;
 import com.auraboot.framework.view.dto.SavedViewUpdateRequest;
@@ -53,6 +54,16 @@ public class SavedViewController {
 
         log.info("Saved view created: pid={}", result.getPid());
         return ApiResponse.success("View created successfully", result);
+    }
+
+    @PostMapping("/auto-save")
+    @Operation(summary = "Auto-save view config",
+            description = "Atomic upsert: updates existing implicit view or creates one")
+    @RequirePermission(MetaPermission.VIEW_MANAGE)
+    public ApiResponse<SavedViewDTO> autoSave(
+            @Valid @RequestBody AutoSaveViewRequest request) {
+        SavedViewDTO result = savedViewService.autoSave(request);
+        return ApiResponse.success(result);
     }
 
     @GetMapping("/{pid}")

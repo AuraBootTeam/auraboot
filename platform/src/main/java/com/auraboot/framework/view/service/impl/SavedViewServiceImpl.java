@@ -11,6 +11,7 @@ import com.auraboot.framework.permission.service.UserPermissionService;
 import com.auraboot.framework.organization.mapper.TeamMapper;
 import com.auraboot.framework.organization.entity.Team;
 import com.auraboot.framework.tenant.service.CurrentUserTeamResolver;
+import com.auraboot.framework.view.dto.AutoSaveViewRequest;
 import com.auraboot.framework.view.dto.SavedViewCreateRequest;
 import com.auraboot.framework.view.dto.SavedViewDTO;
 import com.auraboot.framework.view.dto.SavedViewUpdateRequest;
@@ -311,6 +312,66 @@ public class SavedViewServiceImpl implements SavedViewService {
         request.setSortOrder(sourceView.getSortOrder());
 
         return create(request);
+    }
+
+    @Override
+    public SavedViewDTO autoSave(AutoSaveViewRequest request) {
+        String currentUserPid = MetaContext.getCurrentUserPid();
+        Long tenantId = MetaContext.getCurrentTenantId();
+
+        // Look for existing implicit view for this user/model/page
+        SavedView existing = savedViewMapper.findImplicitView(
+                request.getModelCode(), request.getPageKey(), currentUserPid);
+
+        if (existing != null) {
+            // Merge new config into existing
+            ViewConfig merged = existing.getViewConfig() != null ? existing.getViewConfig() : new ViewConfig();
+            ViewConfig incoming = request.getViewConfig();
+            if (incoming != null) {
+                if (incoming.getColumns() != null) merged.setColumns(incoming.getColumns());
+                if (incoming.getSorts() != null) merged.setSorts(incoming.getSorts());
+                if (incoming.getFilters() != null) merged.setFilters(incoming.getFilters());
+                if (incoming.getGroupBy() != null) merged.setGroupBy(incoming.getGroupBy());
+                if (incoming.getPagination() != null) merged.setPagination(incoming.getPagination());
+                if (incoming.getDensity() != null) merged.setDensity(incoming.getDensity());
+                if (incoming.getRowHeight() != null) merged.setRowHeight(incoming.getRowHeight());
+                if (incoming.getConditionalFormats() != null) merged.setConditionalFormats(incoming.getConditionalFormats());
+            }
+            existing.setViewConfig(merged);
+            existing.setUpdatedAt(Instant.now());
+            existing.setUpdatedBy(currentUserPid);
+            savedViewMapper.updateSavedView(existing);
+            return toDTO(existing);
+        }
+
+        // Create new implicit view
+        SavedView savedView = new SavedView();
+        savedView.setPid(UniqueIdGenerator.generate());
+        savedView.setTenantId(tenantId);
+        savedView.setName("Default View");
+        savedView.setModelCode(request.getModelCode());
+        savedView.setPageKey(request.getPageKey());
+        savedView.setScope("personal");
+        savedView.setViewType("table");
+        savedView.setOwnerId(currentUserPid);
+        savedView.setViewConfig(request.getViewConfig() != null ? request.getViewConfig() : new ViewConfig());
+        savedView.setAllowFullModel(false);
+        savedView.setIsDefault(true);
+        savedView.setIsImplicit(true);
+        savedView.setSortOrder(0);
+        savedView.setDeletedFlag(false);
+        savedView.setCreatedAt(Instant.now());
+        savedView.setUpdatedAt(Instant.now());
+        savedView.setCreatedBy(currentUserPid);
+        savedView.setUpdatedBy(currentUserPid);
+
+        // Clear other personal defaults before inserting
+        savedViewMapper.clearPersonalDefaultFlag(request.getModelCode(), request.getPageKey(), currentUserPid);
+        savedViewMapper.insertSavedView(savedView);
+
+        log.info("Auto-created implicit view: pid={}, modelCode={}, pageKey={}",
+                savedView.getPid(), request.getModelCode(), request.getPageKey());
+        return toDTO(savedView);
     }
 
     @Override

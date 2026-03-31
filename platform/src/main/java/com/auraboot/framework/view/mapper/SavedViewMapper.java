@@ -279,6 +279,32 @@ public interface SavedViewMapper extends BaseMapper<SavedView> {
             @Param("pageKey") String pageKey);
 
     /**
+     * Find the implicit auto-saved view for a user on a specific model/page
+     */
+    @ResultMap(RESULT_MAP_ID)
+    @Select("""
+        <script>
+        SELECT * FROM ab_saved_view
+        WHERE model_code = #{modelCode}
+          AND scope = 'personal'
+          AND owner_id = #{ownerId}
+          AND is_implicit = true
+          AND deleted_flag = false
+        <if test="pageKey != null">
+          AND page_key = #{pageKey}
+        </if>
+        <if test="pageKey == null">
+          AND page_key IS NULL
+        </if>
+        LIMIT 1
+        </script>
+        """)
+    SavedView findImplicitView(
+            @Param("modelCode") String modelCode,
+            @Param("pageKey") String pageKey,
+            @Param("ownerId") String ownerId);
+
+    /**
      * Check if view name exists for user
      */
     @Select("""
@@ -314,13 +340,13 @@ public interface SavedViewMapper extends BaseMapper<SavedView> {
         INSERT INTO ab_saved_view (
             pid, tenant_id, name, description, model_code, page_key,
             scope, view_type, owner_id, team_id, view_config, allow_full_model,
-            is_default, sort_order, deleted_flag, created_at, updated_at,
+            is_default, is_implicit, sort_order, deleted_flag, created_at, updated_at,
             created_by, updated_by
         ) VALUES (
             #{pid}, #{tenantId}, #{name}, #{description}, #{modelCode}, #{pageKey},
             #{scope}, #{viewType}, #{ownerId}, #{teamId},
             #{viewConfig, typeHandler=com.auraboot.framework.view.typehandler.ViewConfigTypeHandler},
-            #{allowFullModel}, #{isDefault}, #{sortOrder}, #{deletedFlag},
+            #{allowFullModel}, #{isDefault}, #{isImplicit}, #{sortOrder}, #{deletedFlag},
             #{createdAt}, #{updatedAt}, #{createdBy}, #{updatedBy}
         )
         """)
