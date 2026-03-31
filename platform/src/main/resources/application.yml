@@ -88,6 +88,11 @@ auraboot:
     slow-query-threshold-ms: 500
     # When true, the trimmed SQL text is included in the log line. Set false to reduce log volume.
     slow-query-log-params: true
+    # Per-request SQL count thresholds. WARN when count >= warn, ERROR when count >= error.
+    sql-count-warn-threshold: 10
+    sql-count-error-threshold: 50
+    # When true, adds X-SQL-Count response header with the SQL statement count.
+    sql-count-header-enabled: true
 
 # OpenAPI / Swagger UI
 springdoc:
