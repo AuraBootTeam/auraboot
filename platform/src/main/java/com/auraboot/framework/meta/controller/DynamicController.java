@@ -106,10 +106,13 @@ public class DynamicController {
             @RequestParam(required = false) String sortFields,
 
             @Parameter(description = "NamedQuery code — when provided, data is fetched from a NamedQuery instead of the model table")
-            @RequestParam(required = false) String queryCode) {
+            @RequestParam(required = false) String queryCode,
 
-        log.info("分页查询数据: pageKey={}, pageNum={}, pageSize={}, keyword={}, filters={}, sortFields={}, queryCode={}",
-            pageKey, pageNum, pageSize, keyword, filters, sortFields, queryCode);
+            @Parameter(description = "Cursor for keyset pagination. Pass the nextCursor value from the previous response to fetch the next page efficiently. When provided, pageNum is ignored and WHERE id > cursor is used instead of OFFSET.")
+            @RequestParam(required = false) Long cursor) {
+
+        log.info("分页查询数据: pageKey={}, pageNum={}, pageSize={}, keyword={}, filters={}, sortFields={}, queryCode={}, cursor={}",
+            pageKey, pageNum, pageSize, keyword, filters, sortFields, queryCode, cursor);
 
         List<QueryCondition> conditions = parseFilters(filters);
         List<SortField> parsedSortFields = parseSortFields(sortFields, sortField, sortOrder);
@@ -120,6 +123,7 @@ public class DynamicController {
                 .keyword(keyword)
                 .conditions(conditions.isEmpty() ? null : conditions)
                 .sortFields(parsedSortFields.isEmpty() ? null : parsedSortFields)
+                .cursor(cursor)
                 .build();
 
         // Resolve model code from pageKey.

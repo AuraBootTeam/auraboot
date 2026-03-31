@@ -102,13 +102,16 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         // 构建查询
         QueryBuilderService.QueryBuilder queryBuilder = queryBuilderService.buildConditionQuery(
                 model, request.getConditions());
-        
-        // 添加排序
-        if (request.getSortFields() != null && !request.getSortFields().isEmpty()) {
+
+        // Keyset pagination flag — when cursor is present, sort is forced to ORDER BY id ASC
+        boolean useCursor = request.getCursor() != null;
+
+        // 添加排序 (skipped in cursor mode — cursor pagination requires ORDER BY id ASC)
+        if (!useCursor && request.getSortFields() != null && !request.getSortFields().isEmpty()) {
             List<SortField> mappedSortFields = mapSortFields(model, request.getSortFields());
             queryBuilder = queryBuilderService.buildOrderQuery(queryBuilder, mappedSortFields, model);
         }
-        
+
         // 添加租户条件
         Long tenantId = getCurrentTenantId();
         queryBuilder.addCondition("tenant_id", QueryCondition.Operator.EQ.name(), tenantId);
@@ -142,13 +145,22 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             queryBuilder = queryBuilderService.buildKeywordSearch(queryBuilder, request.getKeyword(), model);
         }
 
-        // 添加分页
-        PaginationRequest pageRequest = new PaginationRequest(
-                request.getPageNum(),
-                request.getPageSize(),
-                request.getKeyword()
-        );
-        queryBuilder = queryBuilderService.buildPaginationQuery(queryBuilder, pageRequest);
+        // Keyset (cursor-based) pagination: when cursor is provided, use WHERE id > cursor
+        // instead of OFFSET for O(1) deep pagination performance.
+        if (useCursor) {
+            queryBuilder.addCondition("id", "GT", request.getCursor());
+            // Force ORDER BY id ASC for consistent cursor traversal
+            queryBuilder.addOrderBy("id", "ASC");
+            queryBuilder.setLimit(Math.min(request.getPageSize(), 1000));
+        } else {
+            // Traditional offset pagination
+            PaginationRequest pageRequest = new PaginationRequest(
+                    request.getPageNum(),
+                    request.getPageSize(),
+                    request.getKeyword()
+            );
+            queryBuilder = queryBuilderService.buildPaginationQuery(queryBuilder, pageRequest);
+        }
         
         // 验证查询安全性
         QueryValidationResult validation = queryBuilderService.validateQuery(queryBuilder);
@@ -225,6 +237,23 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         }
 
         records = enrichListRecords(modelCode, records);
+
+        if (useCursor) {
+            // Extract nextCursor from the last record's id
+            Long nextCursor = null;
+            if (!records.isEmpty()) {
+                Object lastId = records.get(records.size() - 1).get("id");
+                if (lastId instanceof Number) {
+                    nextCursor = ((Number) lastId).longValue();
+                }
+            }
+            return PaginationResult.ofCursor(
+                    records,
+                    total,
+                    request.getPageSize(),
+                    nextCursor
+            );
+        }
 
         return PaginationResult.of(
                 records,
