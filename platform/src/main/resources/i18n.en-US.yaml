@@ -686,3 +686,16 @@ workbench:
     fri: Fri
     sat: Sat
     sun: Sun
+search:
+  placeholder: Search...
+  title: Global Search
+  inputPlaceholder: Search pages, records, docs...
+  noResults: No results found
+  hint: Type to search pages, records and docs
+  recent: Recent
+  pages: Pages
+  records: Records
+  docs: Docs
+  navigate: Navigate
+  open: Open
+  close: Close

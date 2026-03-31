@@ -298,3 +298,16 @@ dashboard:
   refresh: 更新
   refreshed: データを更新しました
   retry: リトライ
+search:
+  placeholder: 検索...
+  title: グローバル検索
+  inputPlaceholder: ページ、レコード、ドキュメントを検索...
+  noResults: 結果が見つかりません
+  hint: ページ、レコード、ドキュメントを検索
+  recent: 最近
+  pages: ページ
+  records: レコード
+  docs: ドキュメント
+  navigate: ナビゲート
+  open: 開く
+  close: 閉じる

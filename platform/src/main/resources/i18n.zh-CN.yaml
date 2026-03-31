@@ -706,3 +706,16 @@ workbench:
     fri: 五
     sat: 六
     sun: 日
+search:
+  placeholder: 搜索...
+  title: 全局搜索
+  inputPlaceholder: 搜索页面、记录、文档...
+  noResults: 未找到结果
+  hint: 输入关键词搜索页面、记录和文档
+  recent: 最近访问
+  pages: 页面
+  records: 记录
+  docs: 文档
+  navigate: 导航
+  open: 打开
+  close: 关闭

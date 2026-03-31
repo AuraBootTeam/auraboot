@@ -58,7 +58,7 @@ public class PageSchemaUpdateRequest extends AbstractUpdateRequest {
     /**
      * Page kind (list, form, detail, dashboard).
      */
-    @Pattern(regexp = "^(list|form|detail|dashboard)$", message = "Invalid kind")
+    @Pattern(regexp = "^(list|form|detail|dashboard|composite)$", message = "Invalid kind")
     @JsonProperty("kind")
     private String kind;
 
