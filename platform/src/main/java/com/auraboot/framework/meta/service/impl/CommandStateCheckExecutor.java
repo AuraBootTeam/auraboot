@@ -29,7 +29,7 @@ import com.auraboot.framework.common.constant.StatusConstants;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-class CommandStateCheckExecutor {
+public class CommandStateCheckExecutor {
 
     private final DynamicDataMapper dynamicDataMapper;
     private final MetaModelService metaModelService;
@@ -107,7 +107,7 @@ class CommandStateCheckExecutor {
         return targetState;
     }
 
-    String getStateFieldForModel(String modelCode) {
+    public String getStateFieldForModel(String modelCode) {
         if (!StringUtils.hasText(modelCode)) {
             return null;
         }
