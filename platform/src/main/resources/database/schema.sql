@@ -988,6 +988,7 @@ CREATE INDEX IF NOT EXISTS idx_ab_role_tenant_id ON ab_role (tenant_id);
 CREATE INDEX IF NOT EXISTS idx_ab_role_status ON ab_role (status);
 CREATE INDEX IF NOT EXISTS idx_ab_role_type ON ab_role (type);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_ab_role_pid ON ab_role(pid);
+CREATE INDEX IF NOT EXISTS idx_role_tenant_code ON ab_role(tenant_id, code) WHERE deleted_flag = false;
 
 -- Role Permission Indexes (old table)
 
@@ -1449,6 +1450,10 @@ CREATE TABLE IF NOT EXISTS ab_binding_rule (
 
 CREATE INDEX IF NOT EXISTS idx_binding_rule_command
     ON ab_binding_rule(command_id, rule_type, sequence);
+CREATE INDEX IF NOT EXISTS idx_binding_rule_tenant_model
+    ON ab_binding_rule(tenant_id, target_model) WHERE deleted_flag = false;
+CREATE INDEX IF NOT EXISTS idx_binding_rule_tenant_type
+    ON ab_binding_rule(tenant_id, rule_type) WHERE deleted_flag = false;
 
 -- Idempotency Record
 CREATE TABLE IF NOT EXISTS ab_idempotency_record (
