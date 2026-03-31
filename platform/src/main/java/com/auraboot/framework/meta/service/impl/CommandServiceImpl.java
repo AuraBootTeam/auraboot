@@ -39,6 +39,7 @@ import com.auraboot.framework.common.constant.StatusConstants;
 public class CommandServiceImpl implements CommandService {
     private final CommandDefinitionMapper commandDefinitionMapper;
     private final BindingRuleMapper bindingRuleMapper;
+    private final CommandMetadataCacheService commandMetadataCache;
 
     @Override
     @Transactional
@@ -78,6 +79,7 @@ public class CommandServiceImpl implements CommandService {
         }
 
         commandDefinitionMapper.insertIdempotent(entity);
+        commandMetadataCache.evictCommandDefinitions();
 
         return toDTO(entity);
     }
@@ -111,6 +113,7 @@ public class CommandServiceImpl implements CommandService {
         entity.setUpdatedAt(Instant.now());
 
         commandDefinitionMapper.updateById(entity);
+        commandMetadataCache.evictCommandDefinitions();
 
         return toDTO(entity);
     }
@@ -154,6 +157,7 @@ public class CommandServiceImpl implements CommandService {
             throw new BusinessException(ResponseCode.BadParam, "Command not found: " + pid);
         }
         commandDefinitionMapper.softDelete(pid);
+        commandMetadataCache.evictAll();
     }
 
     // ==================== Binding Rules ====================
@@ -189,6 +193,7 @@ public class CommandServiceImpl implements CommandService {
         rule.setUpdatedAt(Instant.now());
 
         bindingRuleMapper.insertRule(rule);
+        commandMetadataCache.evictBindingRules();
 
         return toRuleDTO(rule);
     }
@@ -198,6 +203,7 @@ public class CommandServiceImpl implements CommandService {
     public void removeBindingRule(String rulePid) {
         log.info("Removing binding rule: {}", rulePid);
         bindingRuleMapper.softDelete(rulePid);
+        commandMetadataCache.evictBindingRules();
     }
 
     @Override
@@ -216,6 +222,7 @@ public class CommandServiceImpl implements CommandService {
         for (int i = 0; i < rulePids.size(); i++) {
             bindingRuleMapper.updateSequence(rulePids.get(i), i);
         }
+        commandMetadataCache.evictBindingRules();
     }
 
     // ==================== Publish ====================
@@ -246,6 +253,7 @@ public class CommandServiceImpl implements CommandService {
 
         commandDefinitionMapper.updateStatus(entity.getId(), Status.PUBLISHED.getCode());
         entity.setStatus(Status.PUBLISHED.getCode());
+        commandMetadataCache.evictCommandDefinitions();
 
         return toDTO(entity);
     }
