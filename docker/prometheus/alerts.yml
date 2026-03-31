@@ -1,0 +1,84 @@
+groups:
+  - name: auraboot_infrastructure
+    rules:
+      - alert: HighCpuUsage
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage on {{ $labels.instance }}"
+
+      - alert: HighJvmHeapUsage
+        expr: jvm_memory_used_bytes{area="heap"} / jvm_memory_max_bytes{area="heap"} > 0.85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "JVM heap usage above 85%"
+
+      - alert: HighEventLoopLag
+        expr: bff_nodejs_eventloop_lag_p99_seconds > 0.1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Node.js event loop lag p99 > 100ms"
+
+      - alert: HighApiP95Latency
+        expr: histogram_quantile(0.95, rate(http_server_requests_seconds_bucket[5m])) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "API P95 latency > 500ms"
+
+      - alert: HighErrorRate
+        expr: rate(http_server_requests_seconds_count{status=~"5.."}[5m]) / rate(http_server_requests_seconds_count[5m]) > 0.01
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Error rate > 1%"
+
+      - alert: HighSqlCountPerRequest
+        expr: auraboot_request_sql_count{quantile="0.99"} > 50
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "P99 SQL count per request > 50 (N+1 likely)"
+
+      - alert: HikariConnectionPoolExhaustion
+        expr: hikaricp_connections_active / hikaricp_connections_max > 0.8
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "HikariCP connection pool > 80% utilized"
+
+      - alert: ThreadPoolQueueSaturation
+        expr: executor_queue_remaining_tasks < 20
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Thread pool queue nearly full on {{ $labels.name }}"
+
+  - name: auraboot_database
+    rules:
+      - alert: HighSlowQueryRate
+        expr: rate(auraboot_sql_slow_query_count_total[5m]) > 0.17
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "More than 10 slow queries per minute"
+
+      - alert: LowCacheHitRatio
+        expr: pg_stat_user_tables_heap_blks_hit / (pg_stat_user_tables_heap_blks_hit + pg_stat_user_tables_heap_blks_read) < 0.99
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PostgreSQL buffer cache hit ratio below 99%"

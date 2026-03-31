@@ -38,4 +38,14 @@ public class ObservabilityConfig implements WebMvcConfigurer {
             @Value("${auraboot.performance.slow-query-log-params:true}") boolean logParams) {
         return new SlowQueryInterceptor(thresholdMs, logParams, registry);
     }
+
+    /**
+     * Registers the SQL count interceptor as a Spring bean.
+     * Increments {@link SqlCountHolder} on every query/update execution,
+     * enabling per-request SQL count tracking via {@link SqlCountFilter}.
+     */
+    @Bean
+    public SqlCountInterceptor sqlCountInterceptor() {
+        return new SqlCountInterceptor();
+    }
 }
