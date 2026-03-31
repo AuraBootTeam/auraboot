@@ -12,6 +12,7 @@ import com.auraboot.framework.meta.service.SchemaManagementService;
 import com.auraboot.framework.meta.service.base.BaseMetaService;
 import com.auraboot.framework.meta.dto.*;
 import com.auraboot.framework.meta.constant.SystemFieldConstants;
+import com.auraboot.framework.meta.entity.payload.ExtensionBean;
 import com.auraboot.framework.meta.entity.payload.FieldFeatureBean;
 import com.auraboot.framework.meta.entity.payload.FieldRefTargetBean;
 import com.auraboot.framework.meta.mapper.MetaModelMapper;
@@ -975,12 +976,29 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
                 .modelType(model.getModelType())
                 .modelCategory(model.getEffectiveModelCategory())
                 .tableName(resolveTableName(model))
+                .extension(convertExtensionToMap(model.getExtension()))
                 .version(model.getVersion())
                 .isCurrent(model.getIsCurrent())
                 .status(model.getStatus() != null ? model.getStatus() : null)
                 .createdAt(DateUtil.toUtcLocalDateTime(model.getCreatedAt()))
                 .updatedAt(DateUtil.toUtcLocalDateTime(model.getUpdatedAt()))
                 .build();
+    }
+
+    /**
+     * Convert ExtensionBean to a flat Map for DTO.
+     * Merges nested "extension" sub-map and top-level dynamic properties.
+     */
+    private Map<String, Object> convertExtensionToMap(ExtensionBean bean) {
+        if (bean == null) return null;
+        Map<String, Object> result = new HashMap<>();
+        if (bean.getExtension() != null) {
+            result.putAll(bean.getExtension());
+        }
+        if (bean.getDynamicProperties() != null) {
+            result.putAll(bean.getDynamicProperties());
+        }
+        return result.isEmpty() ? null : result;
     }
 
     /**

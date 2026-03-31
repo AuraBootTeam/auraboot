@@ -90,10 +90,16 @@ public class NbaService {
      * Priority: model extension.enableNba > global ai.nba.enabled > false
      */
     private boolean isNbaEnabled(String modelCode) {
-        // 1. Check model-level override
+        // 1. Check model-level override (supports flat and nested extension format)
         MetaModelDTO model = metaModelService.findByCode(modelCode);
         if (model != null && model.getExtension() != null) {
-            Object modelFlag = model.getExtension().get("enableNba");
+            Map<String, Object> ext = model.getExtension();
+            // Try flat format: {"enableNba": true}
+            Object modelFlag = ext.get("enableNba");
+            // Try nested format: {"extension": {"enableNba": true}}
+            if (modelFlag == null && ext.get("extension") instanceof Map<?, ?> nested) {
+                modelFlag = nested.get("enableNba");
+            }
             if (modelFlag instanceof Boolean b) {
                 return b;
             }
