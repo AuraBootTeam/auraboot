@@ -68,6 +68,28 @@ services:
       - /var/lib/docker/:/var/lib/docker:ro
     restart: unless-stopped
 
+  # Optional: containerized PostgreSQL with pg_stat_statements enabled
+  # Enable with: --profile db
+  postgres:
+    image: postgres:16-alpine
+    profiles:
+      - db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ghj
+      POSTGRES_DB: aura_boot
+      POSTGRES_HOST_AUTH_METHOD: trust
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init-extensions.sql:/docker-entrypoint-initdb.d/10-extensions.sql
+    command: >
+      postgres
+      -c shared_preload_libraries='pg_stat_statements'
+      -c pg_stat_statements.track=all
+      -c pg_stat_statements.max=10000
+    restart: unless-stopped
+
   jaeger:
     image: jaegertracing/all-in-one:1.56
     ports:
@@ -81,3 +103,4 @@ services:
 volumes:
   prometheus_data:
   grafana_data:
+  postgres_data:
