@@ -1682,9 +1682,12 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
             throw new MetaServiceException("Only DRAFT models can be published, current status: " + model.getStatus());
         }
 
-        // VIEW models: skip table creation but still update status and create permissions
-        if (model.isViewType()) {
-            log.info("Publishing VIEW model (no table creation): pid={}, code={}", pid, model.getCode());
+        // Skip table creation for VIEW models and models with skipTableCreation flag
+        // (e.g., BPM system tables managed outside DSL schema management)
+        if (model.isViewType() || model.isSkipTableCreation()) {
+            log.info("Publishing model (no table creation): pid={}, code={}, reason={}",
+                    pid, model.getCode(),
+                    model.isViewType() ? "VIEW model" : "skipTableCreation=true");
         } else {
             // Validate: must have at least one field binding
             List<ModelFieldBinding> bindings = fieldBindingMapper.findByModelId(model.getId());
