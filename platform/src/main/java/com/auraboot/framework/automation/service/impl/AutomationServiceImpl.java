@@ -84,7 +84,13 @@ public class AutomationServiceImpl implements AutomationService {
 
     @Override
     public AutomationDTO findByPid(String pid) {
-        Automation automation = automationMapper.findByPid(pid);
+        // Use LambdaQueryWrapper instead of @Select findByPid to ensure
+        // autoResultMap = true applies typeHandlers for JSONB columns
+        // (flowConfig, triggerConfig, actions).
+        LambdaQueryWrapper<Automation> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Automation::getPid, pid)
+               .eq(Automation::getDeletedFlag, false);
+        Automation automation = automationMapper.selectOne(wrapper);
         return automation != null ? toDTO(automation) : null;
     }
 
