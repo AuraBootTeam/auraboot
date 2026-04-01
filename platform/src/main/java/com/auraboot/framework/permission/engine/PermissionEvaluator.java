@@ -1,6 +1,7 @@
 package com.auraboot.framework.permission.engine;
 
 import com.auraboot.framework.permission.engine.model.DataScopeCondition;
+import com.auraboot.framework.permission.engine.model.PermissionExplanation;
 import com.auraboot.framework.permission.engine.model.PermissionResult;
 
 /**
@@ -56,4 +57,18 @@ public interface PermissionEvaluator {
      * @return detailed permission result with all evaluation steps
      */
     PermissionResult canOperate(Long memberId, String resource, String action, Object record);
+
+    /**
+     * Audit/compliance — explain WHY a permission decision was made.
+     *
+     * <p>Runs the full evaluation pipeline and wraps the result in a
+     * {@link PermissionExplanation} with all evaluation steps traced.
+     *
+     * @param memberId member (user) ID
+     * @param resource resource identifier
+     * @param action   action identifier
+     * @param recordId target record ID (nullable for non-record operations)
+     * @return full explanation with member, resource, action, result, and steps
+     */
+    PermissionExplanation explain(Long memberId, String resource, String action, Long recordId);
 }

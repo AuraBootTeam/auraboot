@@ -3,6 +3,8 @@ package com.auraboot.framework.permission.controller;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.exception.RootUnCheckedException;
+import com.auraboot.framework.permission.engine.PermissionEvaluator;
+import com.auraboot.framework.permission.engine.model.PermissionExplanation;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.permission.dto.DataScopeUpdateRequest;
@@ -55,6 +57,7 @@ public class PermissionMatrixController {
     private final DataScopeService dataScopeService;
     private final PermissionPolicyService policyService;
     private final PermissionMapper permissionMapper;
+    private final PermissionEvaluator permissionEvaluator;
 
     /**
      * Get the full permission matrix (no role context, all granted=false).
@@ -166,6 +169,24 @@ public class PermissionMatrixController {
                 rolePid, permissionPid, policyValues.keySet());
         policyService.setPolicy(role.getId(), permission.getId(), policyValues);
         return ApiResponse.success();
+    }
+
+    /**
+     * Explain WHY a permission decision was made — for audit/compliance.
+     *
+     * @param memberId member (user) ID
+     * @param resource resource identifier (e.g. model code)
+     * @param action   action identifier (e.g. "view", "create", "edit", "delete")
+     * @param recordId optional target record ID
+     */
+    @GetMapping("/explain")
+    @Operation(summary = "Explain permission decision for audit")
+    public ApiResponse<PermissionExplanation> explain(
+            @RequestParam Long memberId,
+            @RequestParam String resource,
+            @RequestParam String action,
+            @RequestParam(required = false) Long recordId) {
+        return ApiResponse.success(permissionEvaluator.explain(memberId, resource, action, recordId));
     }
 
     private Permission findPermissionByPid(String permissionPid) {
