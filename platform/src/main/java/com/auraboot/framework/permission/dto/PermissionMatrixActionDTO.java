@@ -12,5 +12,7 @@ public record PermissionMatrixActionDTO(
     String action,
     String label,
     boolean granted,
-    boolean supported
+    boolean supported,
+    String scopeType,       // current scope for this role+action (null if not configured)
+    String mergeStrategy    // MAX or MIN (null if not configured)
 ) {}
