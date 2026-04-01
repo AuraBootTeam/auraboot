@@ -353,7 +353,7 @@ export function BPMNDesigner() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-gray-50">
+    <div className="flex h-screen flex-col bg-gray-50">
       {/* Toolbar */}
       <BPMNToolbar
         processName={processName}
