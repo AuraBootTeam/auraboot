@@ -6,11 +6,11 @@ import java.util.List;
 /**
  * Data scope condition used to filter records in SQL queries.
  *
- * @param scopeType       scope type (e.g. "all", "none", "self", "dept", "dept_and_below")
+ * @param scopeType       scope type (e.g. "all", "none", "self", "dept", "dept_and_sub")
  * @param ownerField      field name for owner filtering (e.g. "created_by")
  * @param ownerValue      owner user/member ID
- * @param deptField       field name for department filtering
- * @param deptIds         list of department IDs within scope
+ * @param deptField       field name for department filtering on target model
+ * @param deptPids        list of department PIDs within scope (string-based, from dynamic tables)
  * @param sharedRecordIds record IDs explicitly shared via ReBAC
  */
 public record DataScopeCondition(
@@ -18,7 +18,7 @@ public record DataScopeCondition(
         String ownerField,
         Long ownerValue,
         String deptField,
-        List<Long> deptIds,
+        List<String> deptPids,
         List<Long> sharedRecordIds
 ) {
 

@@ -6,6 +6,8 @@ import com.auraboot.framework.meta.entity.DataPermissionPolicy;
 import com.auraboot.framework.meta.mapper.DataPermissionPolicyMapper;
 import com.auraboot.framework.meta.security.SqlSafetyUtils;
 import com.auraboot.framework.meta.service.DataPermissionEngine;
+import com.auraboot.framework.permission.engine.evaluator.DataScopeEvaluator;
+import com.auraboot.framework.permission.engine.model.DataScopeCondition;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
@@ -45,6 +47,7 @@ import java.util.stream.Collectors;
 public class DataPermissionEngineImpl implements DataPermissionEngine {
 
     private final DataPermissionPolicyMapper policyMapper;
+    private final DataScopeEvaluator dataScopeEvaluator;
 
     // ==================== Row-Level Filtering ====================
 
@@ -59,6 +62,31 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
             // No memberId available — no policies can match via role binding
             return "";
         }
+
+        // 1. Build policy-based row filter (legacy DataPermissionPolicy)
+        String policyFilter = buildPolicyRowFilter(tenantId, modelCode, userId, memberId);
+
+        // 2. Build data scope filter (new ab_role_data_scope)
+        String dataScopeFilter = buildDataScopeFilter(memberId, modelCode);
+
+        // 3. Combine: both are AND conditions, concatenate them
+        StringBuilder result = new StringBuilder();
+        if (policyFilter != null && !policyFilter.isBlank()) {
+            result.append(policyFilter);
+        }
+        if (dataScopeFilter != null && !dataScopeFilter.isBlank()) {
+            if (result.length() > 0) {
+                result.append(" ");
+            }
+            result.append(dataScopeFilter);
+        }
+        return result.toString();
+    }
+
+    /**
+     * Build row filter from legacy DataPermissionPolicy table.
+     */
+    private String buildPolicyRowFilter(Long tenantId, String modelCode, Long userId, Long memberId) {
         List<DataPermissionPolicy> policies = policyMapper.findEffectivePolicies(tenantId, modelCode, memberId);
 
         List<DataPermissionPolicy> rowPolicies = policies.stream()
@@ -66,7 +94,6 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
                 .collect(Collectors.toList());
 
         if (rowPolicies.isEmpty()) {
-            // No row policies defined — allow all (default permissive)
             return "";
         }
 
@@ -90,11 +117,9 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
             return "";
         }
 
-        // Combine multiple fragments with OR logic (most permissive union)
         if (fragments.size() == 1) {
             return "AND " + fragments.get(0);
         }
-
         return "AND (" + String.join(" OR ", fragments) + ")";
     }
 
@@ -222,6 +247,50 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
     @CacheEvict(value = {"dataPermissionRowFilter", "dataPermissionMaskRules"}, allEntries = true)
     public void evictCache() {
         log.info("Evicted all data permission engine caches");
+    }
+
+    // ==================== Private: Data Scope SQL Generation ====================
+
+    /**
+     * Build SQL fragment from ab_role_data_scope via DataScopeEvaluator.
+     *
+     * @param memberId  tenant member ID
+     * @param modelCode model code (used as resource code)
+     * @return SQL fragment like "AND created_by = 123" or empty string
+     */
+    private String buildDataScopeFilter(Long memberId, String modelCode) {
+        DataScopeCondition condition = dataScopeEvaluator.getCondition(memberId, modelCode, "read");
+        String sql = dataScopeConditionToSql(condition);
+        if (sql != null && !sql.isBlank()) {
+            return "AND " + sql;
+        }
+        return "";
+    }
+
+    /**
+     * Convert a DataScopeCondition to a raw SQL condition fragment (without AND prefix).
+     */
+    private String dataScopeConditionToSql(DataScopeCondition condition) {
+        if (condition == null || "all".equals(condition.scopeType())) {
+            return null;
+        }
+        if ("none".equals(condition.scopeType())) {
+            return "1 = 0";
+        }
+        if ("self".equals(condition.scopeType())) {
+            return condition.ownerField() + " = " + condition.ownerValue();
+        }
+        if ("dept".equals(condition.scopeType()) || "dept_and_sub".equals(condition.scopeType())) {
+            if (condition.deptPids() == null || condition.deptPids().isEmpty()) {
+                return "1 = 0";
+            }
+            // Department PIDs are strings, need quoting for SQL
+            String pidList = condition.deptPids().stream()
+                    .map(pid -> "'" + pid.replace("'", "''") + "'")
+                    .collect(Collectors.joining(","));
+            return condition.deptField() + " IN (" + pidList + ")";
+        }
+        return null;
     }
 
     // ==================== Private: Row Filter SQL Generation ====================

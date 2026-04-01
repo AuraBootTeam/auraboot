@@ -112,6 +112,7 @@ public class CacheConfig {
             // Data permission caches
             "dataPermissionRowFilter",
             "dataPermissionMaskRules",
+            "dataScopeCondition",
 
             // Command execution caches (N+1 optimization)
             "commandDefinitions",
