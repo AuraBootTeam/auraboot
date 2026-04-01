@@ -456,7 +456,19 @@ public interface RolePermissionMapper extends BaseMapper<RolePermission> {
     int deleteByRoleId(
         @Param("roleId") Long roleId,
         @Param("tenantId") Long tenantId
-             
-         
+
+
     );
+
+    /**
+     * Get conditions JSONB as raw string — bypasses type handler issues.
+     */
+    @Select("SELECT conditions::text FROM ab_role_permission WHERE id = #{id} AND deleted_flag = false")
+    String getConditionsById(@Param("id") Long id);
+
+    /**
+     * Update conditions JSONB directly — bypasses type handler serialization issues.
+     */
+    @Update("UPDATE ab_role_permission SET conditions = #{json}::jsonb, updated_at = NOW() WHERE id = #{id}")
+    void updateConditionsById(@Param("id") Long id, @Param("json") String json);
 }

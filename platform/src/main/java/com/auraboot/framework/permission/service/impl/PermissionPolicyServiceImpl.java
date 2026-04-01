@@ -52,13 +52,17 @@ public class PermissionPolicyServiceImpl implements PermissionPolicyService {
         }
 
         // Collect conditions from all role-permission bindings
+        // Use direct SQL to read JSONB reliably (type handler on Object field is unreliable)
         List<Map<String, Object>> allPolicies = new ArrayList<>();
         for (Long roleId : roleIds) {
-            RolePermission rp = rolePermissionMapper.findByRoleAndPermission(roleId, permission.getId());
-            if (rp != null && rp.getConditions() != null) {
-                Map<String, Object> parsed = convertToMap(rp.getConditions());
-                if (parsed != null && !parsed.isEmpty()) {
-                    allPolicies.add(parsed);
+            Long rpId = findRolePermissionId(roleId, permission.getId());
+            if (rpId != null) {
+                String conditionsJson = rolePermissionMapper.getConditionsById(rpId);
+                if (conditionsJson != null && !conditionsJson.isBlank()) {
+                    Map<String, Object> parsed = convertToMap(conditionsJson);
+                    if (parsed != null && !parsed.isEmpty()) {
+                        allPolicies.add(parsed);
+                    }
                 }
             }
         }
@@ -86,15 +90,22 @@ public class PermissionPolicyServiceImpl implements PermissionPolicyService {
     @Override
     @Transactional
     public void setPolicy(Long roleId, Long permissionId, Map<String, Object> policyValues) {
-        RolePermission rp = rolePermissionMapper.findByRoleAndPermission(roleId, permissionId);
+        RolePermission rp = findRolePermission(roleId, permissionId);
         if (rp == null) {
             log.warn("No role-permission binding found: roleId={}, permissionId={}", roleId, permissionId);
             return;
         }
 
-        rp.setConditions(policyValues);
-        rp.setUpdatedAt(java.time.Instant.now());
-        rolePermissionMapper.updateById(rp);
+        // Use direct SQL update for JSONB column — MyBatis-Plus updateById
+        // with JacksonTypeHandler on Object type doesn't reliably serialize JSONB.
+        String jsonStr;
+        try {
+            jsonStr = objectMapper.writeValueAsString(policyValues);
+        } catch (Exception e) {
+            log.error("Failed to serialize policy values", e);
+            return;
+        }
+        rolePermissionMapper.updateConditionsById(rp.getId(), jsonStr);
 
         log.info("Updated policy for role-permission: roleId={}, permissionId={}, keys={}",
                 roleId, permissionId, policyValues.keySet());
@@ -102,11 +113,17 @@ public class PermissionPolicyServiceImpl implements PermissionPolicyService {
 
     @Override
     public Map<String, Object> getPolicy(Long roleId, Long permissionId) {
-        RolePermission rp = rolePermissionMapper.findByRoleAndPermission(roleId, permissionId);
-        if (rp == null || rp.getConditions() == null) {
+        String conditionsJson = rolePermissionMapper.getConditionsById(
+                findRolePermissionId(roleId, permissionId));
+        if (conditionsJson == null || conditionsJson.isBlank()) {
             return null;
         }
-        return convertToMap(rp.getConditions());
+        return convertToMap(conditionsJson);
+    }
+
+    private Long findRolePermissionId(Long roleId, Long permissionId) {
+        RolePermission rp = findRolePermission(roleId, permissionId);
+        return rp != null ? rp.getId() : null;
     }
 
     // ========================================================================
@@ -195,6 +212,20 @@ public class PermissionPolicyServiceImpl implements PermissionPolicyService {
     // ========================================================================
     // Helpers
     // ========================================================================
+
+    /**
+     * Find role-permission using LambdaQueryWrapper (not @Select) to ensure
+     * JacksonTypeHandler is applied to the 'conditions' JSONB column.
+     */
+    private RolePermission findRolePermission(Long roleId, Long permissionId) {
+        return rolePermissionMapper.selectOne(
+            new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<RolePermission>()
+                .eq(RolePermission::getRoleId, roleId)
+                .eq(RolePermission::getPermissionId, permissionId)
+                .eq(RolePermission::getDeletedFlag, false)
+                .last("LIMIT 1")
+        );
+    }
 
     @SuppressWarnings("unchecked")
     private Map<String, Object> convertToMap(Object value) {
