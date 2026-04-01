@@ -9,7 +9,8 @@ public class AgentMemberDto {
     private Long agentId;
     private String agentCode;
     private String name;
-    private String employeeTitle;
+    private String employeeTitle;   // resolved from org_employee position/name, kept for DTO compatibility
+    private Long employeeId;        // FK to mt_org_employee
     private String avatarUrl;
     private String autoReplyMode;   // mention | always | off
     private String systemPrompt;
