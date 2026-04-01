@@ -14,8 +14,10 @@ import com.auraboot.framework.tenant.dao.mapper.TenantMemberMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -33,6 +35,9 @@ import java.util.stream.Collectors;
  *   <li>Default merge strategy is MAX (most permissive wins)</li>
  *   <li>If any role sets merge_strategy='MIN', the least permissive scope is used</li>
  * </ul>
+ *
+ * <p>Note: OrganizationService is @Lazy-injected to break circular dependency:
+ * DynamicDataService → DataPermissionEngine → DataScopeEvaluator → DataScopeService → OrganizationService → DynamicDataService
  */
 @Slf4j
 @Service
@@ -42,7 +47,9 @@ public class DataScopeServiceImpl implements DataScopeService {
     private final RoleDataScopeMapper roleDataScopeMapper;
     private final UserRoleMapper userRoleMapper;
     private final TenantMemberMapper tenantMemberMapper;
-    private final OrganizationService organizationService;
+
+    @Autowired @Lazy
+    private OrganizationService organizationService;
 
     @Override
     @Cacheable(value = "dataScopeCondition",
