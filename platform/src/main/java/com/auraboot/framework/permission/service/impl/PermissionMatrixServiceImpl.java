@@ -1,6 +1,8 @@
 package com.auraboot.framework.permission.service.impl;
 
 import com.auraboot.framework.permission.dto.*;
+import com.auraboot.framework.permission.entity.RoleDataScope;
+import com.auraboot.framework.permission.service.DataScopeService;
 import com.auraboot.framework.permission.service.PermissionMatrixService;
 import com.auraboot.framework.permission.service.PermissionService;
 import com.auraboot.framework.permission.service.RolePermissionService;
@@ -28,6 +30,7 @@ public class PermissionMatrixServiceImpl implements PermissionMatrixService {
 
     private final PermissionService permissionService;
     private final RolePermissionService rolePermissionService;
+    private final DataScopeService dataScopeService;
 
     /**
      * Standard action ordering. Actions in this list appear first in fixed order;
@@ -40,14 +43,23 @@ public class PermissionMatrixServiceImpl implements PermissionMatrixService {
     @Override
     public PermissionMatrixDTO getMatrix(Long tenantId) {
         List<PermissionDTO> allActive = permissionService.findAllActive();
-        return buildMatrix(allActive, Collections.emptySet());
+        return buildMatrix(allActive, Collections.emptySet(), Collections.emptyMap());
     }
 
     @Override
     public PermissionMatrixDTO getMatrixForRole(Long tenantId, Long roleId) {
         List<PermissionDTO> allActive = permissionService.findAllActive();
         Set<Long> grantedIds = rolePermissionService.getPermissionIdsByRoleId(roleId);
-        return buildMatrix(allActive, grantedIds);
+
+        // Build a lookup map: "resourceCode:actionCode" -> RoleDataScope
+        List<RoleDataScope> scopes = dataScopeService.getScopesByRole(tenantId, roleId);
+        Map<String, RoleDataScope> scopeMap = new HashMap<>();
+        for (RoleDataScope scope : scopes) {
+            String key = scope.getResourceCode() + ":" + scope.getActionCode();
+            scopeMap.put(key, scope);
+        }
+
+        return buildMatrix(allActive, grantedIds, scopeMap);
     }
 
     @Override
@@ -84,7 +96,9 @@ public class PermissionMatrixServiceImpl implements PermissionMatrixService {
     // Matrix Building
     // ========================================================================
 
-    private PermissionMatrixDTO buildMatrix(List<PermissionDTO> allPermissions, Set<Long> grantedIds) {
+    private PermissionMatrixDTO buildMatrix(List<PermissionDTO> allPermissions,
+                                             Set<Long> grantedIds,
+                                             Map<String, RoleDataScope> scopeMap) {
         // Build parent lookup: id -> PermissionDTO
         Map<Long, PermissionDTO> byId = new LinkedHashMap<>();
         for (PermissionDTO p : allPermissions) {
@@ -110,11 +124,11 @@ public class PermissionMatrixServiceImpl implements PermissionMatrixService {
 
         // If we have a clean hierarchy (level 1 + level 2 + leaves), use it
         if (!level1.isEmpty() && !level2.isEmpty()) {
-            return buildHierarchicalMatrix(level1, level2, leaves, byId, grantedIds);
+            return buildHierarchicalMatrix(level1, level2, leaves, byId, grantedIds, scopeMap);
         }
 
         // Fallback: group by resourceType + resourceCode
-        return buildFlatMatrix(allPermissions, grantedIds);
+        return buildFlatMatrix(allPermissions, grantedIds, scopeMap);
     }
 
     private PermissionMatrixDTO buildHierarchicalMatrix(
@@ -122,7 +136,8 @@ public class PermissionMatrixServiceImpl implements PermissionMatrixService {
             List<PermissionDTO> resources,
             List<PermissionDTO> actions,
             Map<Long, PermissionDTO> byId,
-            Set<Long> grantedIds) {
+            Set<Long> grantedIds,
+            Map<String, RoleDataScope> scopeMap) {
 
         // Group resources by parent (module) ID
         Map<Long, List<PermissionDTO>> resourcesByModule = resources.stream()
@@ -142,7 +157,7 @@ public class PermissionMatrixServiceImpl implements PermissionMatrixService {
             List<PermissionMatrixResourceDTO> resourceDTOs = new ArrayList<>();
             for (PermissionDTO resource : moduleResources) {
                 List<PermissionDTO> resourceActions = actionsByResource.getOrDefault(resource.getId(), Collections.emptyList());
-                List<PermissionMatrixActionDTO> actionDTOs = buildActionDTOs(resourceActions, grantedIds);
+                List<PermissionMatrixActionDTO> actionDTOs = buildActionDTOs(resourceActions, grantedIds, scopeMap);
                 resourceDTOs.add(new PermissionMatrixResourceDTO(
                     resource.getResourceCode() != null ? resource.getResourceCode() : resource.getCode(),
                     resource.getName() != null ? resource.getName() : resource.getCode(),
@@ -164,7 +179,9 @@ public class PermissionMatrixServiceImpl implements PermissionMatrixService {
         return new PermissionMatrixDTO(moduleDTOs);
     }
 
-    private PermissionMatrixDTO buildFlatMatrix(List<PermissionDTO> allPermissions, Set<Long> grantedIds) {
+    private PermissionMatrixDTO buildFlatMatrix(List<PermissionDTO> allPermissions,
+                                                 Set<Long> grantedIds,
+                                                 Map<String, RoleDataScope> scopeMap) {
         // Group by resourceType as module, then by resourceCode as resource
         Map<String, Map<String, List<PermissionDTO>>> grouped = new LinkedHashMap<>();
 
@@ -184,7 +201,7 @@ public class PermissionMatrixServiceImpl implements PermissionMatrixService {
             List<PermissionMatrixResourceDTO> resourceDTOs = new ArrayList<>();
 
             for (Map.Entry<String, List<PermissionDTO>> resourceEntry : moduleEntry.getValue().entrySet()) {
-                List<PermissionMatrixActionDTO> actionDTOs = buildActionDTOs(resourceEntry.getValue(), grantedIds);
+                List<PermissionMatrixActionDTO> actionDTOs = buildActionDTOs(resourceEntry.getValue(), grantedIds, scopeMap);
                 resourceDTOs.add(new PermissionMatrixResourceDTO(
                     resourceEntry.getKey(),
                     resourceEntry.getKey(),
@@ -203,7 +220,9 @@ public class PermissionMatrixServiceImpl implements PermissionMatrixService {
     }
 
     private List<PermissionMatrixActionDTO> buildActionDTOs(
-            List<PermissionDTO> actions, Set<Long> grantedIds) {
+            List<PermissionDTO> actions,
+            Set<Long> grantedIds,
+            Map<String, RoleDataScope> scopeMap) {
 
         // Sort: standard actions first in fixed order, custom actions alphabetically after
         List<PermissionDTO> sorted = new ArrayList<>(actions);
@@ -220,15 +239,22 @@ public class PermissionMatrixServiceImpl implements PermissionMatrixService {
         });
 
         return sorted.stream()
-            .map(p -> new PermissionMatrixActionDTO(
-                p.getId(),
-                p.getPid(),
-                p.getCode() != null ? p.getCode() : "unknown",
-                p.getAction() != null ? p.getAction() : "unknown",
-                p.getName() != null ? p.getName() : (p.getAction() != null ? p.getAction() : p.getCode()),
-                grantedIds.contains(p.getId()),
-                true
-            ))
+            .map(p -> {
+                String resourceCode = p.getResourceCode() != null ? p.getResourceCode() : "";
+                String actionCode = p.getAction() != null ? p.getAction() : "";
+                RoleDataScope scope = scopeMap.get(resourceCode + ":" + actionCode);
+                return new PermissionMatrixActionDTO(
+                    p.getId(),
+                    p.getPid(),
+                    p.getCode() != null ? p.getCode() : "unknown",
+                    actionCode.isEmpty() ? "unknown" : actionCode,
+                    p.getName() != null ? p.getName() : (actionCode.isEmpty() ? p.getCode() : actionCode),
+                    grantedIds.contains(p.getId()),
+                    true,
+                    scope != null ? scope.getScopeType() : null,
+                    scope != null ? scope.getMergeStrategy() : null
+                );
+            })
             .toList();
     }
 }

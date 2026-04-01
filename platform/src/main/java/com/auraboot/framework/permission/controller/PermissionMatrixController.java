@@ -5,8 +5,10 @@ import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
+import com.auraboot.framework.permission.dto.DataScopeUpdateRequest;
 import com.auraboot.framework.permission.dto.PermissionGrantRequest;
 import com.auraboot.framework.permission.dto.PermissionMatrixDTO;
+import com.auraboot.framework.permission.service.DataScopeService;
 import com.auraboot.framework.permission.service.PermissionMatrixService;
 import com.auraboot.framework.rbac.entity.Role;
 import com.auraboot.framework.rbac.service.RoleService;
@@ -46,6 +48,7 @@ public class PermissionMatrixController {
 
     private final PermissionMatrixService matrixService;
     private final RoleService roleService;
+    private final DataScopeService dataScopeService;
 
     /**
      * Get the full permission matrix (no role context, all granted=false).
@@ -90,6 +93,28 @@ public class PermissionMatrixController {
         }
         log.info("Batch updating permissions for role: rolePid={}, count={}", rolePid, grants.size());
         matrixService.batchUpdateRolePermissions(role.getId(), grants);
+        return ApiResponse.success();
+    }
+
+    /**
+     * Update data scope configuration for a specific role+resource+action combination.
+     *
+     * @param rolePid Role PID (string identifier, avoids BigInt precision loss)
+     * @param request Scope update request containing resourceCode, actionCode, scopeType, mergeStrategy
+     */
+    @PutMapping("/{rolePid}/scope")
+    @Operation(summary = "Update data scope for role+resource+action")
+    public ApiResponse<Void> updateScope(
+            @PathVariable String rolePid,
+            @RequestBody DataScopeUpdateRequest request) {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        Role role = roleService.findByPid(rolePid);
+        if (role == null) {
+            throw new RootUnCheckedException(BadParam, "Role not found by PID: " + rolePid);
+        }
+        dataScopeService.setScope(tenantId, role.getId(),
+            request.resourceCode(), request.actionCode(),
+            request.scopeType(), request.mergeStrategy());
         return ApiResponse.success();
     }
 }
