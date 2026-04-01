@@ -12,6 +12,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 
 import java.time.Duration;
+import java.util.Arrays;
 
 /**
  * 缓存配置类
@@ -50,7 +51,7 @@ public class CacheConfig {
             .recordStats());
 
         // Pre-create cache regions
-        cacheManager.setCacheNames(java.util.Arrays.asList(
+        cacheManager.setCacheNames(Arrays.asList(
             // Dict caches
             "dictData",
             "cascadeDict",
@@ -112,7 +113,6 @@ public class CacheConfig {
             // Data permission caches
             "dataPermissionRowFilter",
             "dataPermissionMaskRules",
-            "dataScopeCondition",
 
             // Command execution caches (N+1 optimization)
             "commandDefinitions",
@@ -122,6 +122,32 @@ public class CacheConfig {
 
         cacheManager.setAllowNullValues(false);
 
+        return cacheManager;
+    }
+
+    /**
+     * Dedicated cache manager for security-sensitive permission data.
+     *
+     * <p>Uses a shorter 5-minute TTL to ensure that permission changes (role assignments,
+     * data scope updates) take effect promptly. Security-sensitive caches must not linger
+     * for the global 30-minute TTL.
+     *
+     * <p>Caches that use this manager:
+     * <ul>
+     *   <li>{@code dataScopeCondition} — resolved data scope per member/resource/action</li>
+     * </ul>
+     */
+    @Bean
+    public CacheManager permissionCacheManager() {
+        CaffeineCacheManager cacheManager = new CaffeineCacheManager();
+        cacheManager.setCaffeine(Caffeine.newBuilder()
+                .maximumSize(5_000)
+                .expireAfterWrite(Duration.ofMinutes(5))
+                .recordStats());
+        cacheManager.setCacheNames(Arrays.asList(
+                "dataScopeCondition"
+        ));
+        cacheManager.setAllowNullValues(false);
         return cacheManager;
     }
 

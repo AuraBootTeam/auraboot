@@ -35,4 +35,17 @@ public record DataScopeCondition(
     public static DataScopeCondition none() {
         return new DataScopeCondition("none", null, null, null, Collections.emptyList(), Collections.emptyList());
     }
+
+    /**
+     * Data scope not configured for this resource — the model does not participate in data scope.
+     *
+     * <p>Semantically distinct from {@link #all()}: "all" means an explicit grant of full access,
+     * while "not_configured" means the data scope layer is not applicable for this resource.
+     * The evaluator returns NOT_APPLICABLE for this condition, preserving deny-by-default semantics
+     * in the permission pipeline. SQL generation still produces no filter (equivalent to all rows),
+     * because no data scope restriction was configured for the model.
+     */
+    public static DataScopeCondition notConfigured() {
+        return new DataScopeCondition("not_configured", null, null, null, Collections.emptyList(), Collections.emptyList());
+    }
 }
