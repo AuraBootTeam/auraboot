@@ -33,6 +33,13 @@ public class UpdateRecordExecutor implements ActionExecutor {
         String modelCode = (String) config.get("modelCode");
         String recordId = (String) config.get("recordId");
 
+        // Resolve variable substitution in recordId (e.g., ${trigger.recordId})
+        if (recordId != null && recordId.startsWith("${") && recordId.endsWith("}")) {
+            String varName = recordId.substring(2, recordId.length() - 1);
+            Object resolved = resolveVariable(varName, context);
+            recordId = resolved != null ? resolved.toString() : null;
+        }
+
         // If recordId not specified, use the triggering record
         if (recordId == null || recordId.isBlank()) {
             recordId = (String) context.get("recordId");
