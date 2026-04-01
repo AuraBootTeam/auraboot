@@ -36,13 +36,13 @@ public interface RecordShareMapper extends BaseMapper<RecordShare> {
             @Param("now") Instant now);
 
     /**
-     * Find shares where a specific user is the direct subject.
+     * Find shares where a specific member is the direct subject.
      */
     @Select("""
         SELECT * FROM ab_record_share
         WHERE tenant_id = #{tenantId}
           AND resource_code = #{resourceCode}
-          AND subject_type = 'user'
+          AND subject_type = 'member'
           AND subject_id = #{userId}
           AND (expires_at IS NULL OR expires_at > #{now})
         """)
@@ -75,14 +75,14 @@ public interface RecordShareMapper extends BaseMapper<RecordShare> {
             @Param("now") Instant now);
 
     /**
-     * Check if a specific record is shared with a user directly.
+     * Check if a specific record is shared with a member directly.
      */
     @Select("""
         SELECT COUNT(*) FROM ab_record_share
         WHERE tenant_id = #{tenantId}
           AND resource_code = #{resourceCode}
           AND record_id = #{recordId}
-          AND subject_type = 'user'
+          AND subject_type = 'member'
           AND subject_id = #{userId}
           AND (expires_at IS NULL OR expires_at > #{now})
         """)
@@ -136,7 +136,7 @@ public interface RecordShareMapper extends BaseMapper<RecordShare> {
             @Param("subjectId") Long subjectId);
 
     /**
-     * Get all record IDs shared with a user (directly or via roles).
+     * Get all record IDs shared with a member (directly or via roles).
      */
     @Select("""
         <script>
@@ -145,7 +145,7 @@ public interface RecordShareMapper extends BaseMapper<RecordShare> {
           AND resource_code = #{resourceCode}
           AND (expires_at IS NULL OR expires_at > #{now})
           AND (
-            (subject_type = 'user' AND subject_id = #{userId})
+            (subject_type = 'member' AND subject_id = #{userId})
             <if test="roleIds != null and roleIds.size() > 0">
             OR (subject_type = 'role' AND subject_id IN
               <foreach item='id' collection='roleIds' open='(' separator=',' close=')'>

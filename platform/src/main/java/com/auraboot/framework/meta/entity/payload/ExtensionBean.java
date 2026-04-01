@@ -79,7 +79,8 @@ public class ExtensionBean {
             "displayName", "description", "modelType", "modelCategory", "icon", "category",
             "tableName", "modelCode", "pageType", "schemaType",
             "uiSchema", "querySchema", "tags", "metadata",
-            "enableNba", "skipTableCreation");
+            "enableNba", "skipTableCreation", "dataScope",
+            "titleField", "subtitleField");
 
     /**
      * Validate extension content: key count limit and value size limit.

@@ -2,6 +2,7 @@ package com.auraboot.framework.permission.service.impl;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
+import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.organization.service.OrganizationService;
 import com.auraboot.framework.permission.engine.model.DataScopeCondition;
 import com.auraboot.framework.permission.entity.RoleDataScope;
@@ -51,6 +52,9 @@ public class DataScopeServiceImpl implements DataScopeService {
     @Autowired @Lazy
     private OrganizationService organizationService;
 
+    @Autowired @Lazy
+    private MetaModelService metaModelService;
+
     @Override
     @Cacheable(value = "dataScopeCondition",
             cacheManager = "permissionCacheManager",
@@ -74,8 +78,8 @@ public class DataScopeServiceImpl implements DataScopeService {
         // 3. Merge across roles
         DataScopeType merged = mergeScopes(scopes);
 
-        // 4. Resolve concrete condition
-        return resolveCondition(memberId, merged);
+        // 4. Resolve concrete condition (pass resourceCode for model-specific field config)
+        return resolveCondition(memberId, merged, resourceCode);
     }
 
     @Override
@@ -157,32 +161,34 @@ public class DataScopeServiceImpl implements DataScopeService {
     /**
      * Convert a merged scope type into a concrete DataScopeCondition.
      */
-    private DataScopeCondition resolveCondition(Long memberId, DataScopeType scopeType) {
+    private DataScopeCondition resolveCondition(Long memberId, DataScopeType scopeType, String resourceCode) {
         switch (scopeType) {
             case ALL:
                 return DataScopeCondition.all();
             case NONE:
                 return DataScopeCondition.none();
             case SELF:
-                return buildSelfCondition();
+                return buildSelfCondition(resourceCode);
             case DEPT:
-                return buildDeptCondition(memberId, false);
+                return buildDeptCondition(memberId, false, resourceCode);
             case DEPT_AND_SUB:
-                return buildDeptCondition(memberId, true);
+                return buildDeptCondition(memberId, true, resourceCode);
             default:
                 return DataScopeCondition.all();
         }
     }
 
     /**
-     * SELF scope: filter by created_by = current userId.
+     * SELF scope: filter by ownerField = current userId.
+     * Reads ownerField from model extension.dataScope config; defaults to "created_by".
      * Note: created_by stores userId, not memberId.
      */
-    private DataScopeCondition buildSelfCondition() {
+    private DataScopeCondition buildSelfCondition(String resourceCode) {
         Long userId = MetaContext.getCurrentUserId();
+        String ownerField = getDataScopeOwnerField(resourceCode);
         return new DataScopeCondition(
                 DataScopeType.SELF.code(),
-                "created_by",
+                ownerField,
                 userId,
                 null,
                 Collections.emptyList(),
@@ -192,28 +198,29 @@ public class DataScopeServiceImpl implements DataScopeService {
 
     /**
      * DEPT / DEPT_AND_SUB scope: find member's employee -> department -> dept IDs.
+     * Reads ownerField and departmentField from model extension.dataScope config.
      * Falls back to SELF if member has no linked employee.
      */
-    private DataScopeCondition buildDeptCondition(Long memberId, boolean includeSub) {
+    private DataScopeCondition buildDeptCondition(Long memberId, boolean includeSub, String resourceCode) {
         // Get member's PID to find linked employee
         TenantMember member = tenantMemberMapper.selectById(memberId);
         if (member == null || member.getPid() == null) {
             log.warn("Member {} not found, falling back to SELF scope", memberId);
-            return buildSelfCondition();
+            return buildSelfCondition(resourceCode);
         }
 
         Map<String, Object> employee = organizationService.getEmployeeByMemberPid(member.getPid());
         if (employee == null) {
             log.warn("No employee linked to member {} (pid={}), falling back to SELF scope",
                     memberId, member.getPid());
-            return buildSelfCondition();
+            return buildSelfCondition(resourceCode);
         }
 
         // Get department PID from employee record
         Object deptPidObj = employee.get("org_emp_dept_id");
         if (deptPidObj == null) {
             log.warn("Employee for member {} has no department, falling back to SELF scope", memberId);
-            return buildSelfCondition();
+            return buildSelfCondition(resourceCode);
         }
         String deptPid = String.valueOf(deptPidObj);
 
@@ -226,17 +233,95 @@ public class DataScopeServiceImpl implements DataScopeService {
 
         if (deptPids.isEmpty()) {
             log.warn("No departments resolved for member {}, falling back to SELF scope", memberId);
-            return buildSelfCondition();
+            return buildSelfCondition(resourceCode);
         }
 
+        String ownerField = getDataScopeOwnerField(resourceCode);
+        String deptField = getDataScopeDeptField(resourceCode);
         String scopeTypeCode = includeSub ? DataScopeType.DEPT_AND_SUB.code() : DataScopeType.DEPT.code();
         return new DataScopeCondition(
                 scopeTypeCode,
-                "created_by",
+                ownerField,
                 MetaContext.getCurrentUserId(),
-                "org_emp_dept_id",
+                deptField,
                 deptPids,
                 Collections.emptyList()
         );
+    }
+
+    // ========================================================================
+    // Model dataScope config helpers
+    // ========================================================================
+
+    /** Default owner field when no dataScope config is present on the model */
+    private static final String DEFAULT_OWNER_FIELD = "created_by";
+
+    /** Default department field when no dataScope config is present on the model */
+    private static final String DEFAULT_DEPT_FIELD = "org_emp_dept_id";
+
+    /**
+     * Read the ownerField from model extension.dataScope config.
+     * Falls back to "created_by" if not configured.
+     *
+     * <p>Expected model extension format:
+     * <pre>
+     * {
+     *   "dataScope": {
+     *     "ownerField": "crm_account_owner_id",
+     *     "departmentField": "crm_account_dept_id"
+     *   }
+     * }
+     * </pre>
+     */
+    @SuppressWarnings("unchecked")
+    private String getDataScopeOwnerField(String resourceCode) {
+        Map<String, Object> dataScopeConfig = getDataScopeConfig(resourceCode);
+        if (dataScopeConfig == null) {
+            return DEFAULT_OWNER_FIELD;
+        }
+        Object ownerField = dataScopeConfig.get("ownerField");
+        return ownerField != null ? ownerField.toString() : DEFAULT_OWNER_FIELD;
+    }
+
+    /**
+     * Read the departmentField from model extension.dataScope config.
+     * Falls back to "org_emp_dept_id" if not configured.
+     */
+    @SuppressWarnings("unchecked")
+    private String getDataScopeDeptField(String resourceCode) {
+        Map<String, Object> dataScopeConfig = getDataScopeConfig(resourceCode);
+        if (dataScopeConfig == null) {
+            return DEFAULT_DEPT_FIELD;
+        }
+        Object deptField = dataScopeConfig.get("departmentField");
+        return deptField != null ? deptField.toString() : DEFAULT_DEPT_FIELD;
+    }
+
+    /**
+     * Get the dataScope config map from the model's extension.
+     * Returns null if model not found or dataScope not configured.
+     */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> getDataScopeConfig(String resourceCode) {
+        // CATCH: non-transactional helper, safe to handle — model lookup may fail for non-existent codes
+        try {
+            var modelOpt = metaModelService.getModelDefinition(resourceCode);
+            if (modelOpt.isEmpty()) {
+                return null;
+            }
+            // ModelDefinition doesn't carry extension; look up the raw Model entity
+            var modelDto = metaModelService.findByCode(resourceCode);
+            if (modelDto == null || modelDto.getExtension() == null) {
+                return null;
+            }
+            Object dataScopeObj = modelDto.getExtension().get("dataScope");
+            if (dataScopeObj instanceof Map) {
+                return (Map<String, Object>) dataScopeObj;
+            }
+            return null;
+        } catch (Exception e) {
+            log.debug("Could not load dataScope config for model {}: {}", resourceCode, e.getMessage());
+            return null;
+        }
     }
 }
