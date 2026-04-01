@@ -80,8 +80,8 @@ public class RoleMemberServiceImpl implements RoleMemberService {
 
     @Override
     @Transactional
-    public void addMembers(Long roleId, List<Long> memberIds) {
-        if (CollectionUtils.isEmpty(memberIds)) {
+    public void addMembers(Long roleId, List<String> memberPids) {
+        if (CollectionUtils.isEmpty(memberPids)) {
             return;
         }
 
@@ -93,16 +93,16 @@ public class RoleMemberServiceImpl implements RoleMemberService {
             throw new BusinessException("Role not found: " + roleId);
         }
 
-        // Convert member IDs to user IDs and assign
-        for (Long memberId : memberIds) {
-            TenantMember member = tenantMemberService.getById(memberId);
+        // Resolve member PIDs to TenantMember objects and assign
+        for (String memberPid : memberPids) {
+            TenantMember member = tenantMemberService.findByPid(memberPid);
             if (member == null || member.getUserId() == null) {
-                log.warn("Skipping invalid member ID {} — member not found or no userId", memberId);
+                log.warn("Skipping invalid member PID {} — member not found or no userId", memberPid);
                 continue;
             }
             // Verify member belongs to current tenant
             if (!tenantId.equals(member.getTenantId())) {
-                log.warn("Skipping member ID {} — belongs to different tenant", memberId);
+                log.warn("Skipping member PID {} — belongs to different tenant", memberPid);
                 continue;
             }
             userRoleService.assignRolesToUser(member.getUserId(), List.of(roleId), tenantId, operatorId);
@@ -111,15 +111,15 @@ public class RoleMemberServiceImpl implements RoleMemberService {
 
     @Override
     @Transactional
-    public void removeMembers(Long roleId, List<Long> memberIds) {
-        if (CollectionUtils.isEmpty(memberIds)) {
+    public void removeMembers(Long roleId, List<String> memberPids) {
+        if (CollectionUtils.isEmpty(memberPids)) {
             return;
         }
 
         Long tenantId = MetaContext.getCurrentTenantId();
 
-        for (Long memberId : memberIds) {
-            TenantMember member = tenantMemberService.getById(memberId);
+        for (String memberPid : memberPids) {
+            TenantMember member = tenantMemberService.findByPid(memberPid);
             if (member == null || member.getUserId() == null) {
                 continue;
             }

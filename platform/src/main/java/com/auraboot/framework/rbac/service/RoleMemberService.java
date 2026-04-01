@@ -20,18 +20,18 @@ public interface RoleMemberService {
     /**
      * Add members to a role (batch). Skips already-assigned members.
      *
-     * @param roleId    role ID
-     * @param memberIds list of tenant member IDs
+     * @param roleId     role ID
+     * @param memberPids list of tenant member PIDs (string)
      */
-    void addMembers(Long roleId, List<Long> memberIds);
+    void addMembers(Long roleId, List<String> memberPids);
 
     /**
      * Remove members from a role (batch).
      *
-     * @param roleId    role ID
-     * @param memberIds list of tenant member IDs
+     * @param roleId     role ID
+     * @param memberPids list of tenant member PIDs (string)
      */
-    void removeMembers(Long roleId, List<Long> memberIds);
+    void removeMembers(Long roleId, List<String> memberPids);
 
     /**
      * Get candidate members (not yet assigned to this role) for the "Add Member" dialog.
