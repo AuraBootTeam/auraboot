@@ -53,20 +53,22 @@ public class DataScopeServiceImpl implements DataScopeService {
 
     @Override
     @Cacheable(value = "dataScopeCondition",
+            cacheManager = "permissionCacheManager",
             key = "#memberId + ':' + #resourceCode + ':' + #actionCode")
     public DataScopeCondition resolveScope(Long memberId, String resourceCode, String actionCode) {
         // 1. Get member's role IDs
         List<Long> roleIds = userRoleMapper.findRoleIdsByMemberId(memberId);
         if (roleIds == null || roleIds.isEmpty()) {
-            // No roles assigned — full access (model not participating)
-            return DataScopeCondition.all();
+            // No roles assigned — data scope not configured for this member
+            return DataScopeCondition.notConfigured();
         }
 
         // 2. Query matching data scope entries
         List<RoleDataScope> scopes = roleDataScopeMapper.findByRoleIdsAndResource(roleIds, resourceCode, actionCode);
         if (scopes == null || scopes.isEmpty()) {
-            // No data scope configured for this resource/action — full access
-            return DataScopeCondition.all();
+            // No data scope configured for this resource/action — NOT_APPLICABLE, not ALL.
+            // This preserves deny-by-default: "not configured" != "explicitly allowed all".
+            return DataScopeCondition.notConfigured();
         }
 
         // 3. Merge across roles
@@ -77,7 +79,7 @@ public class DataScopeServiceImpl implements DataScopeService {
     }
 
     @Override
-    @CacheEvict(value = "dataScopeCondition", allEntries = true)
+    @CacheEvict(value = "dataScopeCondition", cacheManager = "permissionCacheManager", allEntries = true)
     public void setScope(Long tenantId, Long roleId, String resourceCode, String actionCode,
                          String scopeType, String mergeStrategy) {
         LambdaQueryWrapper<RoleDataScope> query = new LambdaQueryWrapper<RoleDataScope>()
@@ -108,7 +110,7 @@ public class DataScopeServiceImpl implements DataScopeService {
     }
 
     @Override
-    @CacheEvict(value = "dataScopeCondition", allEntries = true)
+    @CacheEvict(value = "dataScopeCondition", cacheManager = "permissionCacheManager", allEntries = true)
     public void removeScope(Long tenantId, Long roleId, String resourceCode, String actionCode) {
         LambdaQueryWrapper<RoleDataScope> query = new LambdaQueryWrapper<RoleDataScope>()
                 .eq(RoleDataScope::getTenantId, tenantId)

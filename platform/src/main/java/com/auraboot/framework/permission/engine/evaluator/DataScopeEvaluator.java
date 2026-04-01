@@ -38,6 +38,11 @@ public class DataScopeEvaluator {
 
         String scopeType = condition.scopeType();
 
+        if ("not_configured".equals(scopeType)) {
+            return new EvaluationStep(NAME, EvaluationVerdict.NOT_APPLICABLE,
+                    "Scope: not_configured — data scope not enabled for this resource");
+        }
+
         if ("all".equals(scopeType)) {
             return new EvaluationStep(NAME, EvaluationVerdict.NOT_APPLICABLE, "Scope: all — no restriction");
         }
@@ -70,13 +75,24 @@ public class DataScopeEvaluator {
     /**
      * Get the SQL-level data scope condition for list queries.
      *
+     * <p>When scope is "not_configured", no data scope is enabled for this resource and
+     * we return {@link DataScopeCondition#all()} so the SQL layer applies no row filter.
+     * This is semantically distinct from an explicit "all" grant: the evaluator step
+     * returns NOT_APPLICABLE (not ALLOW), preserving deny-by-default in the pipeline.
+     *
      * @param memberId member (tenant member) ID
      * @param resource resource identifier (model code)
      * @param action   action identifier
      * @return data scope condition for SQL generation
      */
     public DataScopeCondition getCondition(Long memberId, String resource, String action) {
-        return dataScopeService.resolveScope(memberId, resource, action);
+        DataScopeCondition condition = dataScopeService.resolveScope(memberId, resource, action);
+        if ("not_configured".equals(condition.scopeType())) {
+            // Data scope is not configured for this resource — no SQL filtering needed.
+            // The RBAC layer is still responsible for overall access control.
+            return DataScopeCondition.all();
+        }
+        return condition;
     }
 
     // ========================================================================
