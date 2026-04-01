@@ -60,7 +60,7 @@ public class RoleMemberController {
         return ApiResponse.success();
     }
 
-    @DeleteMapping
+    @PostMapping("/remove")
     @RequirePermission(MetaPermission.USER_ROLE_MANAGE)
     @Operation(summary = "Remove members from a role")
     public ApiResponse<Void> removeMembers(
