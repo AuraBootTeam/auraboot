@@ -55,8 +55,8 @@ public class RoleMemberController {
     @Operation(summary = "Add members to a role")
     public ApiResponse<Void> addMembers(
             @PathVariable String rolePid,
-            @RequestBody List<Long> memberIds) {
-        roleMemberService.addMembers(resolveRoleId(rolePid), memberIds);
+            @RequestBody List<String> memberPids) {
+        roleMemberService.addMembers(resolveRoleId(rolePid), memberPids);
         return ApiResponse.success();
     }
 
@@ -65,8 +65,8 @@ public class RoleMemberController {
     @Operation(summary = "Remove members from a role")
     public ApiResponse<Void> removeMembers(
             @PathVariable String rolePid,
-            @RequestBody List<Long> memberIds) {
-        roleMemberService.removeMembers(resolveRoleId(rolePid), memberIds);
+            @RequestBody List<String> memberPids) {
+        roleMemberService.removeMembers(resolveRoleId(rolePid), memberPids);
         return ApiResponse.success();
     }
 
