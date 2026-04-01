@@ -238,7 +238,7 @@ public class OrganizationServiceImpl implements OrganizationService {
         return countMap;
     }
 
-    OrgEmployeeDTO toEmployeeDTO(Map<String, Object> record) {
+    public OrgEmployeeDTO toEmployeeDTO(Map<String, Object> record) {
         String deptPid = asString(record.get(EMP_DEPT_ID));
         String deptName = resolveDeptName(deptPid);
         String positionPid = asString(record.get(EMP_POSITION_ID));
