@@ -86,6 +86,13 @@ public class JwtUtil {
         });
     }
 
+    public Long extractMemberId(String token) {
+        return extractClaim(token, claims -> {
+            Object memberId = claims.get("memberId");
+            return memberId != null ? Long.valueOf(memberId.toString()) : null;
+        });
+    }
+
     /**
      * Extract security version from token. Returns 0 if not present (backward compatible).
      */
@@ -108,14 +115,21 @@ public class JwtUtil {
     }
 
     public String generateTokenWithTenantId(UserDetails userDetails, String userPid, Long tenantId) {
-        return generateTokenWithTenantId(userDetails, userPid, tenantId, 0);
+        return generateTokenWithTenantId(userDetails, userPid, tenantId, null, 0);
     }
 
     public String generateTokenWithTenantId(UserDetails userDetails, String userPid, Long tenantId, int securityVersion) {
+        return generateTokenWithTenantId(userDetails, userPid, tenantId, null, securityVersion);
+    }
+
+    public String generateTokenWithTenantId(UserDetails userDetails, String userPid, Long tenantId, Long memberId, int securityVersion) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("name", userDetails.getUsername());
         if (tenantId != null) {
             claims.put("tenantId", tenantId);
+        }
+        if (memberId != null) {
+            claims.put("memberId", memberId);
         }
         if (securityVersion > 0) {
             claims.put("sv", securityVersion);

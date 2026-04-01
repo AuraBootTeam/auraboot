@@ -93,34 +93,35 @@ public class UserPermissionServiceImpl implements UserPermissionService {
             return Collections.emptySet();
         }
 
-        // 1. Query roles assigned to the user in current tenant only
-        List<UserRole> userRoles = userRoleMapper.findByUserIdAndTenantId(userId, tenantId);
+        // Phase 2: ab_user_role uses member_id. Get memberId from MetaContext.
+        Long memberId = MetaContext.getCurrentMemberId();
+        if (memberId == null) {
+            log.warn("MemberId not available in MetaContext for userId={}, cannot resolve permissions", userId);
+            return Collections.emptySet();
+        }
+
+        // 1. Query roles assigned to the member in current tenant
+        List<UserRole> userRoles = userRoleMapper.findByMemberIdAndTenantId(memberId, tenantId);
         List<Long> roleIds = userRoles.stream()
             .map(UserRole::getRoleId)
             .filter(Objects::nonNull)
             .distinct()
             .collect(Collectors.toList());
-        
+
         if (roleIds.isEmpty()) {
-            log.debug("User has no roles: userId={}", userId);
+            log.debug("Member has no roles: memberId={}, userId={}", memberId, userId);
             return Collections.emptySet();
         }
-        
-        log.debug("User has {} roles: userId={}, roleIds={}", 
-            roleIds.size(), userId, roleIds);
-        
+
+        log.debug("Member has {} roles: memberId={}, userId={}, roleIds={}",
+            roleIds.size(), memberId, userId, roleIds);
+
         // 2. Query all permissions bound to those roles
-        // Note: RolePermissionMapper should filter by:
-        //   - grant_type = 'grant'
-        //   - effective_date <= now()
-        //   - expiry_date > now() OR expiry_date IS NULL
-        //   - status = 'active'
-        //   - deleted_flag = FALSE
         Set<Long> permissionIds = rolePermissionMapper.findPermissionIdsByRoles(roleIds);
-        
-        log.debug("User has {} permissions: userId={}, count={}", 
-            userId, permissionIds.size());
-        
+
+        log.debug("Member has {} permissions: memberId={}, userId={}, count={}",
+            memberId, userId, permissionIds.size());
+
         return permissionIds;
     }
     
@@ -170,29 +171,25 @@ public class UserPermissionServiceImpl implements UserPermissionService {
     public void evictRoleUsers(Long roleId) {
         log.info("Evicting permissions cache for all users of role: roleId={}", roleId);
         
-        // 1. Query all users assigned to the role
-        List<Long> userIds = userRoleMapper.findUserIdsByRoleId(roleId);
-        
-        if (userIds.isEmpty()) {
-            log.debug("Role has no users: roleId={}", roleId);
+        // 1. Query all members assigned to the role
+        List<Long> memberIds = userRoleMapper.findMemberIdsByRoleId(roleId);
+
+        if (memberIds.isEmpty()) {
+            log.debug("Role has no members: roleId={}", roleId);
             return;
         }
-        
-        log.info("Role has {} users, evicting their caches: roleId={}, userCount={}", 
-            userIds.size(), roleId, userIds.size());
-        
-        // 2. Evict each user's permission cache
+
+        log.info("Role has {} members, evicting their caches: roleId={}, memberCount={}",
+            memberIds.size(), roleId, memberIds.size());
+
+        // 2. Evict each member's permission cache
+        // Note: cache key still uses userId for backward compatibility with hasPermission(userId, ...)
+        // The cache eviction here is best-effort; a full cache clear may be needed
         Cache cache = cacheManager.getCache(CACHE_NAME);
         if (cache != null) {
-            String tenantSuffix = MetaCacheKeyGenerator.getTenantContextSuffix();
-            userIds.forEach(userId -> {
-                String cacheKey = tenantSuffix + ":" + userId;
-                cache.evict(cacheKey);
-                log.debug("Evicted user permission cache: userId={}, key={}", userId, cacheKey);
-            });
-            
-            log.info("Evicted {} users' permissions cache for role: roleId={}, userCount={}", 
-                roleId, userIds.size());
+            // Clear all entries since we can't easily map memberId back to userId for cache keys
+            cache.clear();
+            log.info("Cleared all permission caches for role change: roleId={}", roleId);
         } else {
             log.warn("Cache not found: {}", CACHE_NAME);
         }

@@ -12,6 +12,7 @@ public class CustomUserDetails implements UserDetails {
     private final String password;
     private final Long userId;
     private final String userPid;
+    private Long memberId;
 
     private final Collection<? extends GrantedAuthority> authorities;
     private final boolean accountNonExpired;
@@ -20,7 +21,7 @@ public class CustomUserDetails implements UserDetails {
     private final boolean enabled;
 
     public CustomUserDetails(
-            String username, 
+            String username,
             String password,
             Long userId,
             String userPid,

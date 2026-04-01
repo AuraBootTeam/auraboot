@@ -27,7 +27,7 @@ import java.util.stream.Collectors;
 
 /**
  * Role member management service implementation.
- * Phase 1: ab_user_role uses user_id, so we convert between member IDs and user IDs.
+ * Phase 2: ab_user_role uses member_id directly — no userId↔memberId bridging needed.
  */
 @Slf4j
 @Service
@@ -44,20 +44,20 @@ public class RoleMemberServiceImpl implements RoleMemberService {
     public PaginationResult<RoleMemberDTO> getMembers(Long roleId, int pageNum, int pageSize) {
         Long tenantId = MetaContext.getCurrentTenantId();
 
-        // 1. Find all user_ids assigned to this role in current tenant
+        // 1. Find all UserRole entries for this role in the current tenant
         List<UserRole> userRoles = findUserRolesByRoleId(roleId, tenantId);
         if (userRoles.isEmpty()) {
             return PaginationResult.empty(pageNum, pageSize);
         }
 
-        // 2. Build userId -> UserRole map (for assignedAt)
-        Map<Long, UserRole> userIdToUserRole = userRoles.stream()
-            .collect(Collectors.toMap(UserRole::getUserId, ur -> ur, (a, b) -> a));
+        // 2. Build memberId -> UserRole map
+        Map<Long, UserRole> memberIdToUserRole = userRoles.stream()
+            .collect(Collectors.toMap(UserRole::getMemberId, ur -> ur, (a, b) -> a));
 
-        // 3. Find corresponding tenant members
-        List<TenantMember> allMembers = tenantMemberService.findByTenantId(tenantId);
-        List<TenantMember> assignedMembers = allMembers.stream()
-            .filter(m -> m.getUserId() != null && userIdToUserRole.containsKey(m.getUserId()))
+        // 3. Load TenantMember objects for the assigned member IDs
+        List<TenantMember> assignedMembers = memberIdToUserRole.keySet().stream()
+            .map(tenantMemberService::getById)
+            .filter(Objects::nonNull)
             .sorted(Comparator.comparing(TenantMember::getId))
             .collect(Collectors.toList());
 
@@ -72,7 +72,7 @@ public class RoleMemberServiceImpl implements RoleMemberService {
 
         // 5. Enrich with user + employee data
         List<RoleMemberDTO> dtos = pageMembers.stream()
-            .map(member -> buildRoleMemberDTO(member, userIdToUserRole.get(member.getUserId())))
+            .map(member -> buildRoleMemberDTO(member, memberIdToUserRole.get(member.getId())))
             .collect(Collectors.toList());
 
         return PaginationResult.of(dtos, total, pageNum, pageSize);
@@ -88,24 +88,22 @@ public class RoleMemberServiceImpl implements RoleMemberService {
         Long tenantId = MetaContext.getCurrentTenantId();
         Long operatorId = MetaContext.getCurrentUserId();
 
-        // Validate role exists
         if (roleService.getById(roleId) == null) {
             throw new BusinessException("Role not found: " + roleId);
         }
 
-        // Resolve member PIDs to TenantMember objects and assign
         for (String memberPid : memberPids) {
             TenantMember member = tenantMemberService.findByPid(memberPid);
-            if (member == null || member.getUserId() == null) {
-                log.warn("Skipping invalid member PID {} — member not found or no userId", memberPid);
+            if (member == null) {
+                log.warn("Skipping invalid member PID {} — member not found", memberPid);
                 continue;
             }
-            // Verify member belongs to current tenant
             if (!tenantId.equals(member.getTenantId())) {
                 log.warn("Skipping member PID {} — belongs to different tenant", memberPid);
                 continue;
             }
-            userRoleService.assignRolesToUser(member.getUserId(), List.of(roleId), tenantId, operatorId);
+            // Phase 2: directly use member.getId() as the subject
+            userRoleService.assignRolesToMember(member.getId(), List.of(roleId), tenantId, operatorId);
         }
     }
 
@@ -120,13 +118,13 @@ public class RoleMemberServiceImpl implements RoleMemberService {
 
         for (String memberPid : memberPids) {
             TenantMember member = tenantMemberService.findByPid(memberPid);
-            if (member == null || member.getUserId() == null) {
+            if (member == null) {
                 continue;
             }
             if (!tenantId.equals(member.getTenantId())) {
                 continue;
             }
-            userRoleService.removeRolesFromUser(member.getUserId(), List.of(roleId), tenantId);
+            userRoleService.removeRolesFromMember(member.getId(), List.of(roleId), tenantId);
         }
     }
 
@@ -134,10 +132,10 @@ public class RoleMemberServiceImpl implements RoleMemberService {
     public List<RoleMemberDTO> getCandidates(Long roleId, String keyword) {
         Long tenantId = MetaContext.getCurrentTenantId();
 
-        // 1. Get all user IDs already assigned to this role
+        // 1. Get all member IDs already assigned to this role
         List<UserRole> existingAssignments = findUserRolesByRoleId(roleId, tenantId);
-        Set<Long> assignedUserIds = existingAssignments.stream()
-            .map(UserRole::getUserId)
+        Set<Long> assignedMemberIds = existingAssignments.stream()
+            .map(UserRole::getMemberId)
             .collect(Collectors.toSet());
 
         // 2. Get all active tenant members
@@ -145,8 +143,7 @@ public class RoleMemberServiceImpl implements RoleMemberService {
 
         // 3. Filter out already-assigned and inactive members
         List<TenantMember> candidates = allMembers.stream()
-            .filter(m -> m.getUserId() != null)
-            .filter(m -> !assignedUserIds.contains(m.getUserId()))
+            .filter(m -> !assignedMemberIds.contains(m.getId()))
             .filter(m -> !Boolean.TRUE.equals(m.getDeletedFlag()))
             .collect(Collectors.toList());
 
@@ -158,7 +155,7 @@ public class RoleMemberServiceImpl implements RoleMemberService {
                 .collect(Collectors.toList());
         }
 
-        // 5. Limit results (avoid returning thousands)
+        // 5. Limit results
         int limit = 50;
         List<TenantMember> limited = candidates.stream()
             .limit(limit)
@@ -172,9 +169,6 @@ public class RoleMemberServiceImpl implements RoleMemberService {
 
     // --- private helpers ---
 
-    /**
-     * Find all UserRole entries for a given roleId in the current tenant.
-     */
     private List<UserRole> findUserRolesByRoleId(Long roleId, Long tenantId) {
         QueryWrapper<UserRole> wrapper = new QueryWrapper<>();
         wrapper.eq("role_id", roleId)
@@ -182,16 +176,12 @@ public class RoleMemberServiceImpl implements RoleMemberService {
         return userRoleService.list(wrapper);
     }
 
-    /**
-     * Build a RoleMemberDTO from a TenantMember, enriching with user and employee data.
-     */
     private RoleMemberDTO buildRoleMemberDTO(TenantMember member, UserRole userRole) {
         String userName = null;
         String email = null;
         String departmentName = null;
         String positionName = null;
 
-        // Get user info
         if (member.getUserId() != null) {
             User user = userService.findByUserId(member.getUserId());
             if (user != null) {
@@ -200,16 +190,13 @@ public class RoleMemberServiceImpl implements RoleMemberService {
             }
         }
 
-        // Get employee info (department, position) via OrganizationService
         if (member.getPid() != null) {
             Map<String, Object> empRecord = organizationService.getEmployeeByMemberPid(member.getPid());
             if (empRecord != null) {
-                // Override name from employee record if available
                 Object empName = empRecord.get("org_emp_name");
                 if (empName != null && StringUtils.hasText(empName.toString())) {
                     userName = empName.toString();
                 }
-
                 departmentName = resolveRefName(empRecord, "org_emp_dept_id");
                 positionName = resolveRefName(empRecord, "org_emp_position_id");
             }
@@ -226,9 +213,6 @@ public class RoleMemberServiceImpl implements RoleMemberService {
         );
     }
 
-    /**
-     * Check if a member matches the keyword by user name or email.
-     */
     private boolean matchesKeyword(TenantMember member, String lowerKeyword) {
         if (member.getUserId() == null) {
             return false;
@@ -247,18 +231,11 @@ public class RoleMemberServiceImpl implements RoleMemberService {
         return false;
     }
 
-    /**
-     * Resolve a reference field's display name from a dynamic record.
-     * Reference fields in dynamic records store the PID, but may also have
-     * a resolved display value under "{fieldCode}_display" or similar patterns.
-     */
     private String resolveRefName(Map<String, Object> record, String fieldCode) {
-        // Try common display-name patterns for reference fields
         Object displayValue = record.get(fieldCode + "_display");
         if (displayValue != null && StringUtils.hasText(displayValue.toString())) {
             return displayValue.toString();
         }
-        // Fallback: return the raw value (usually a PID)
         Object rawValue = record.get(fieldCode);
         return rawValue != null ? rawValue.toString() : null;
     }

@@ -293,23 +293,20 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
 
     @Override
     @Transactional
-    public boolean assignRoleToUser(Long userId, Long roleId, Long tenantId, Long storeId) {
-        log.info("Assigning role {} to user {} in tenant {}", roleId, userId, tenantId);
+    public boolean assignRoleToMember(Long memberId, Long roleId, Long tenantId) {
+        log.info("Assigning role {} to member {} in tenant {}", roleId, memberId, tenantId);
 
-        
         UserRole userRole = new UserRole();
-        userRole.setUserId(userId);
+        userRole.setMemberId(memberId);
         userRole.setPid(UniqueIdGenerator.generate());
-
         userRole.setTenantId(tenantId);
         userRole.setRoleId(roleId);
         userRole.setAssignType("direct");
-
         userRole.setStatus(StatusConstants.ACTIVE);
         userRole.setCreatedAt(Instant.now());
-            userRole.setUpdatedAt(Instant.now());
+        userRole.setUpdatedAt(Instant.now());
         userRole.setDeletedFlag(false);
-        
+
         return userRoleService.save(userRole);
     }
 
@@ -317,10 +314,10 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
 
     @Override
     @Transactional
-    public boolean removeRoleFromUser(Long userId, Long roleId, Long tenantId) {
-        log.info("Removing role {} from user {} in tenant {}", roleId, userId, tenantId);
-        
-        return userRoleService.removeUserRole(userId, roleId, tenantId);
+    public boolean removeRoleFromMember(Long memberId, Long roleId, Long tenantId) {
+        log.info("Removing role {} from member {} in tenant {}", roleId, memberId, tenantId);
+
+        return userRoleService.removeMemberRole(memberId, roleId, tenantId);
     }
 
     @Override

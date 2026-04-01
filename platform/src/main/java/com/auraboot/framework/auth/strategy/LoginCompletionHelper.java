@@ -61,28 +61,33 @@ public class LoginCompletionHelper {
                 user.isEnabled()
         );
 
-        // 2. Resolve tenant info
+        // 2. Resolve tenant info and member ID
         Long tenantId = null;
+        Long memberId = null;
         String tenantStatus = "none";
         try {
             tenantId = tenantMemberService.getTenantIdByUserId(user.getId());
             if (tenantId != null) {
                 TenantMember tenantMember = tenantMemberService.findByTenantIdAndUserId(tenantId, user.getId());
                 if (tenantMember != null) {
+                    memberId = tenantMember.getId();
                     tenantStatus = tenantMember.getStatus();
                     if ("active".equalsIgnoreCase(tenantStatus)) {
                         tenantStatus = "member";
                     }
                 }
             }
-            log.info("Found tenant {} with status {} for user {}", tenantId, tenantStatus, user.getId());
+            log.info("Found tenant {} with status {} and memberId {} for user {}", tenantId, tenantStatus, memberId, user.getId());
         } catch (Exception e) {
             log.warn("Failed to get tenant for user {}: {}", user.getId(), e.getMessage());
         }
 
-        // 3. Generate JWT with security version
+        // Set memberId on userDetails for downstream use
+        userDetails.setMemberId(memberId);
+
+        // 3. Generate JWT with security version and memberId
         int securityVersion = user.getSecurityVersion() != null ? user.getSecurityVersion() : 0;
-        String jwt = jwtUtil.generateTokenWithTenantId(userDetails, user.getPid(), tenantId, securityVersion);
+        String jwt = jwtUtil.generateTokenWithTenantId(userDetails, user.getPid(), tenantId, memberId, securityVersion);
 
         // 4. Create session record
         try {

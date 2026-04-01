@@ -2,6 +2,7 @@ package com.auraboot.framework.application.web.config;
 
 import com.auraboot.framework.application.security.WhiteList;
 import com.auraboot.framework.application.web.inteceptor.TenantInterceptor;
+import com.auraboot.framework.application.web.resolver.CurrentMemberIdResolver;
 import com.auraboot.framework.application.web.resolver.CurrentUserIdResolver;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
@@ -16,7 +17,10 @@ import java.util.List;
 public class WebConfig implements WebMvcConfigurer {
 
     @Autowired
-    private  CurrentUserIdResolver currentUserIdResolver;
+    private CurrentUserIdResolver currentUserIdResolver;
+
+    @Autowired
+    private CurrentMemberIdResolver currentMemberIdResolver;
 
 //    @Autowired
 //    private QueryRequestArgumentResolver queryRequestArgumentResolver;
@@ -40,6 +44,7 @@ public class WebConfig implements WebMvcConfigurer {
     @Override
     public void addArgumentResolvers(List<HandlerMethodArgumentResolver> resolvers) {
         resolvers.add(currentUserIdResolver);
+        resolvers.add(currentMemberIdResolver);
 //        resolvers.add(queryRequestArgumentResolver);
     }
 

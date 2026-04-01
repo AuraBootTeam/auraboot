@@ -91,8 +91,11 @@ public class UserProvisioningService {
                     request.getEmail(), tenantId);
         }
 
-        // 4. Assign roles
-        List<String> assignedRoles = assignRoles(request, user.getId(), tenantId);
+        // 4. Resolve member ID and assign roles
+        com.auraboot.framework.tenant.dao.entity.TenantMember tenantMember =
+                tenantMemberService.findByTenantIdAndUserId(tenantId, user.getId());
+        Long memberId = tenantMember != null ? tenantMember.getId() : null;
+        List<String> assignedRoles = assignRoles(request, memberId, tenantId);
 
         log.info("User provisioned: email={}, userId={}, tenantId={}, roles={}",
                 request.getEmail(), user.getId(), tenantId, assignedRoles);
@@ -109,19 +112,22 @@ public class UserProvisioningService {
                 .build();
     }
 
-    private List<String> assignRoles(UserProvisionRequest request, Long userId, Long tenantId) {
+    private List<String> assignRoles(UserProvisionRequest request, Long memberId, Long tenantId) {
         List<String> assigned = new ArrayList<>();
+        if (memberId == null) {
+            log.warn("Cannot assign roles: memberId is null for tenant {}", tenantId);
+            return assigned;
+        }
+
         List<String> roleCodes = request.getRoleCodes();
 
         if (roleCodes == null || roleCodes.isEmpty()) {
-            // Assign default role
             Role defaultRole = roleService.findDefaultRole(tenantId);
             if (defaultRole != null) {
-                roleService.assignRoleToUser(userId, defaultRole.getId(), tenantId, null);
+                roleService.assignRoleToMember(memberId, defaultRole.getId(), tenantId);
                 assigned.add(defaultRole.getCode());
             }
         } else {
-            // Assign specified roles by code
             List<Role> tenantRoles = roleService.findByTenantId(tenantId);
             for (String code : roleCodes) {
                 Role role = tenantRoles.stream()
@@ -129,7 +135,7 @@ public class UserProvisioningService {
                         .findFirst()
                         .orElse(null);
                 if (role != null) {
-                    roleService.assignRoleToUser(userId, role.getId(), tenantId, null);
+                    roleService.assignRoleToMember(memberId, role.getId(), tenantId);
                     assigned.add(code);
                 } else {
                     log.warn("Role code '{}' not found in tenant {}, skipping", code, tenantId);

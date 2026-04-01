@@ -64,6 +64,7 @@ public class TenantBootstrapServiceImpl implements TenantBootstrapService {
     private final RolePermissionService rolePermissionService;
     private final AutoPermissionAssignmentService autoPermissionAssignmentService;
     private final UserRoleService userRoleService;
+    private final com.auraboot.framework.tenant.service.TenantMemberService tenantMemberService;
     private final com.auraboot.framework.permission.service.SystemPermissionInitializer systemPermissionInitializer;
     private final PermissionMapper permissionMapper;
     private final I18nResourceService i18nResourceService;
@@ -709,11 +710,20 @@ public class TenantBootstrapServiceImpl implements TenantBootstrapService {
             log.debug("分配tenant_admin角色: userId={}", userId);
         }
         
-        // 创建用户-角色关联
+        // Resolve memberId from userId + tenantId
+        com.auraboot.framework.tenant.dao.entity.TenantMember member =
+                tenantMemberService.findByTenantIdAndUserId(tenantId, userId);
+        if (member == null) {
+            throw new BootstrapException(
+                String.format("TenantMember not found for userId=%d, tenantId=%d", userId, tenantId)
+            );
+        }
+
+        // Create user-role association with member_id
         Instant now = Instant.now();
         UserRole userRole = new UserRole();
         userRole.setPid(UniqueIdGenerator.generate());
-        userRole.setUserId(userId);
+        userRole.setMemberId(member.getId());
         userRole.setRoleId(role.getId());
         userRole.setTenantId(tenantId);
         userRole.setStatus(StatusConstants.ACTIVE);
@@ -722,7 +732,6 @@ public class TenantBootstrapServiceImpl implements TenantBootstrapService {
         userRole.setCreatedBy(userId);
         userRole.setUpdatedBy(userId);
 
-        // 保存用户-角色关联
         userRoleService.save(userRole);
         
         log.info("用户角色分配成功: userId={}, roleCode={}, roleId={}",

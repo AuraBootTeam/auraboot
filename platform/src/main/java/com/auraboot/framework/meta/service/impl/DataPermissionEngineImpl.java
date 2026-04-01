@@ -12,6 +12,8 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
+import com.auraboot.framework.application.tenant.MetaContext;
+
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -50,7 +52,14 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
     @Cacheable(value = "dataPermissionRowFilter",
             key = "#tenantId + ':' + #modelCode + ':' + #userId")
     public String buildRowFilter(Long tenantId, String modelCode, Long userId) {
-        List<DataPermissionPolicy> policies = policyMapper.findEffectivePolicies(tenantId, modelCode, userId);
+        // Phase 2: findEffectivePolicies joins ab_user_role on member_id.
+        // Get memberId from MetaContext; fall back to userId for backward compat (scheduled tasks etc.)
+        Long memberId = MetaContext.exists() ? MetaContext.getCurrentMemberId() : null;
+        if (memberId == null) {
+            // No memberId available — no policies can match via role binding
+            return "";
+        }
+        List<DataPermissionPolicy> policies = policyMapper.findEffectivePolicies(tenantId, modelCode, memberId);
 
         List<DataPermissionPolicy> rowPolicies = policies.stream()
                 .filter(p -> "row".equals(p.getPolicyType()))
@@ -96,7 +105,11 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
             return records;
         }
 
-        List<DataPermissionPolicy> policies = policyMapper.findEffectivePolicies(tenantId, modelCode, userId);
+        Long memberId = MetaContext.exists() ? MetaContext.getCurrentMemberId() : null;
+        if (memberId == null) {
+            return records;
+        }
+        List<DataPermissionPolicy> policies = policyMapper.findEffectivePolicies(tenantId, modelCode, memberId);
         List<DataPermissionPolicy> rowPolicies = policies.stream()
                 .filter(p -> "row".equals(p.getPolicyType()))
                 .collect(Collectors.toList());
@@ -127,7 +140,11 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
             return false;
         }
 
-        List<DataPermissionPolicy> policies = policyMapper.findEffectivePolicies(tenantId, modelCode, userId);
+        Long memberId = MetaContext.exists() ? MetaContext.getCurrentMemberId() : null;
+        if (memberId == null) {
+            return true; // No member context = allow (backward compat)
+        }
+        List<DataPermissionPolicy> policies = policyMapper.findEffectivePolicies(tenantId, modelCode, memberId);
         List<DataPermissionPolicy> rowPolicies = policies.stream()
                 .filter(p -> "row".equals(p.getPolicyType()))
                 .collect(Collectors.toList());
@@ -155,7 +172,11 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
     @Cacheable(value = "dataPermissionMaskRules",
             key = "#tenantId + ':' + #modelCode + ':' + #userId")
     public List<FieldMaskRule> getFieldMaskRules(Long tenantId, String modelCode, Long userId) {
-        List<DataPermissionPolicy> policies = policyMapper.findEffectivePolicies(tenantId, modelCode, userId);
+        Long memberId = MetaContext.exists() ? MetaContext.getCurrentMemberId() : null;
+        if (memberId == null) {
+            return Collections.emptyList();
+        }
+        List<DataPermissionPolicy> policies = policyMapper.findEffectivePolicies(tenantId, modelCode, memberId);
 
         return policies.stream()
                 .filter(p -> "column".equals(p.getPolicyType()))

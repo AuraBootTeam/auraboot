@@ -135,6 +135,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 }
 
                 MetaContext.setContext(tenantId, userDetails.getUserId(), userPid, userDetails.getUsername());
+
+                // Set memberId in MetaContext from JWT claim
+                Long memberId = jwtUtil.extractMemberId(jwt);
+                if (memberId != null) {
+                    MetaContext.setMemberId(memberId);
+                }
+
                 setAuthenticationContext(request, userDetails);
             }
         }

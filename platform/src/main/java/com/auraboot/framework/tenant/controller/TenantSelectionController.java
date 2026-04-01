@@ -76,11 +76,15 @@ public class TenantSelectionController {
 
             boolean isSystem = "System".equals(tenant.getName());
 
-            // Get user's roles in this tenant (resolve roleId → role code)
-            List<UserRole> userRoles = userRoleService.list(new LambdaQueryWrapper<UserRole>()
-                    .eq(UserRole::getUserId, userId)
-                    .eq(UserRole::getTenantId, tenantId)
-                    .eq(UserRole::getDeletedFlag, false));
+            // Get member's roles in this tenant (resolve memberId → roleId → role code)
+            TenantMember tenantMember = tenantMemberService.findByTenantIdAndUserId(tenantId, userId);
+            Long memberId = tenantMember != null ? tenantMember.getId() : null;
+            List<UserRole> userRoles = memberId != null
+                    ? userRoleService.list(new LambdaQueryWrapper<UserRole>()
+                        .eq(UserRole::getMemberId, memberId)
+                        .eq(UserRole::getTenantId, tenantId)
+                        .eq(UserRole::getDeletedFlag, false))
+                    : Collections.emptyList();
             List<Long> roleIds = userRoles.stream().map(UserRole::getRoleId).toList();
             List<String> roleCodes;
             if (roleIds.isEmpty()) {
@@ -145,12 +149,12 @@ public class TenantSelectionController {
             throw new RootUnCheckedException(ResponseCode.NOT_FOUND, "Tenant not found");
         }
 
-        // Generate new JWT with selected tenantId
+        // Generate new JWT with selected tenantId and memberId
         UserDetails userDetails = new org.springframework.security.core.userdetails.User(
                 user.getEmail(), "",
                 Collections.singletonList(new SimpleGrantedAuthority("role_user")));
         int securityVersion = user.getSecurityVersion() != null ? user.getSecurityVersion() : 0;
-        String jwt = jwtUtil.generateTokenWithTenantId(userDetails, user.getPid(), tenantId, securityVersion);
+        String jwt = jwtUtil.generateTokenWithTenantId(userDetails, user.getPid(), tenantId, member.getId(), securityVersion);
 
         // Register new JWT in session store so JwtAuthenticationFilter.isSessionValid() passes
         sessionManagementService.createSession(user.getId(), jwt, null, "space-switch");

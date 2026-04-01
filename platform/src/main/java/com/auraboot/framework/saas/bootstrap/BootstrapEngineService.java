@@ -221,8 +221,12 @@ public class BootstrapEngineService {
 
         Role created = roleService.createRole(platformAdmin);
 
-        // Assign platform_admin role to admin user in System Tenant
-        roleService.assignRoleToUser(adminUserId, created.getId(), systemTenantId, null);
+        // Assign platform_admin role to admin member in System Tenant
+        com.auraboot.framework.tenant.dao.entity.TenantMember adminMember =
+                tenantMemberService.findByTenantIdAndUserId(systemTenantId, adminUserId);
+        if (adminMember != null) {
+            roleService.assignRoleToMember(adminMember.getId(), created.getId(), systemTenantId);
+        }
 
         // Create Platform Console menus for System Tenant
         createPlatformMenus(systemTenantId, adminUserId);
