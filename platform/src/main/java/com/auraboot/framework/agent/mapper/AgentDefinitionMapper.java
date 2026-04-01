@@ -11,6 +11,6 @@ import java.util.List;
 @Mapper
 public interface AgentDefinitionMapper extends BaseMapper<AgentDefinition> {
 
-    @Select("SELECT * FROM ab_agent_definition WHERE tenant_id = #{tenantId} AND is_employee = TRUE AND status = 'active' AND (deleted_flag = FALSE OR deleted_flag IS NULL) ORDER BY name")
+    @Select("SELECT * FROM ab_agent_definition WHERE tenant_id = #{tenantId} AND employee_id IS NOT NULL AND status = 'active' AND (deleted_flag = FALSE OR deleted_flag IS NULL) ORDER BY name")
     List<AgentDefinition> findEmployees(@Param("tenantId") Long tenantId);
 }

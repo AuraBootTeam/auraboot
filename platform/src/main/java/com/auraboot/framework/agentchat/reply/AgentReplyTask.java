@@ -102,7 +102,7 @@ public class AgentReplyTask {
                 .agentId(agentId)
                 .agentCode(agent.getAgentCode())
                 .name(agent.getName())
-                .employeeTitle(agent.getEmployeeTitle())
+                .employeeId(agent.getEmployeeId())
                 .systemPrompt(agent.getSystemPrompt())
                 .soulProfile(agent.getSoulProfile() != null ? agent.getSoulProfile().toString() : null)
                 .tools(agent.getTools())

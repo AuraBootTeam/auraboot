@@ -58,11 +58,8 @@ public class AgentDefinition {
     private Map<String, Object> eventTriggers;
 
     // AI Employee fields
-    @TableField("is_employee")
-    private Boolean isEmployee;
-
-    @TableField("employee_title")
-    private String employeeTitle;
+    @TableField("employee_id")
+    private Long employeeId;
 
     @TableField("auto_reply_mode")
     private String autoReplyMode;
