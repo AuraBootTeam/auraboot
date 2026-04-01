@@ -27,6 +27,7 @@ public class TenantMember {
     
     private Long tenantId;              // 租户ID
     private Long userId;              // 用户ID
+    private Long employeeId;          // 关联员工ID
 
     private String status;              // 状态：ACTIVE, INACTIVE, PENDING
     
