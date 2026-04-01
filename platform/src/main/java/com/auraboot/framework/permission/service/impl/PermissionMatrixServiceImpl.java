@@ -152,9 +152,10 @@ public class PermissionMatrixServiceImpl implements PermissionMatrixService {
 
             // Only include modules that have resources
             if (!resourceDTOs.isEmpty()) {
+                String moduleCode = module.getCode() != null ? module.getCode() : "module-" + module.getId();
                 moduleDTOs.add(new PermissionMatrixModuleDTO(
-                    module.getCode(),
-                    module.getName() != null ? module.getName() : module.getCode(),
+                    moduleCode,
+                    module.getName() != null ? module.getName() : moduleCode,
                     resourceDTOs
                 ));
             }
@@ -207,23 +208,24 @@ public class PermissionMatrixServiceImpl implements PermissionMatrixService {
         // Sort: standard actions first in fixed order, custom actions alphabetically after
         List<PermissionDTO> sorted = new ArrayList<>(actions);
         sorted.sort((a, b) -> {
-            int idxA = STANDARD_ACTION_ORDER.indexOf(a.getAction());
-            int idxB = STANDARD_ACTION_ORDER.indexOf(b.getAction());
+            String actionA = a.getAction();
+            String actionB = b.getAction();
+            // ImmutableCollections$ListN.indexOf(null) throws NPE, so guard against null action
+            int idxA = actionA != null ? STANDARD_ACTION_ORDER.indexOf(actionA) : -1;
+            int idxB = actionB != null ? STANDARD_ACTION_ORDER.indexOf(actionB) : -1;
             if (idxA >= 0 && idxB >= 0) return Integer.compare(idxA, idxB);
             if (idxA >= 0) return -1;
             if (idxB >= 0) return 1;
-            String actionA = a.getAction() != null ? a.getAction() : "";
-            String actionB = b.getAction() != null ? b.getAction() : "";
-            return actionA.compareTo(actionB);
+            return (actionA != null ? actionA : "").compareTo(actionB != null ? actionB : "");
         });
 
         return sorted.stream()
             .map(p -> new PermissionMatrixActionDTO(
                 p.getId(),
                 p.getPid(),
-                p.getCode(),
+                p.getCode() != null ? p.getCode() : "unknown",
                 p.getAction() != null ? p.getAction() : "unknown",
-                p.getName() != null ? p.getName() : p.getAction(),
+                p.getName() != null ? p.getName() : (p.getAction() != null ? p.getAction() : p.getCode()),
                 grantedIds.contains(p.getId()),
                 true
             ))
