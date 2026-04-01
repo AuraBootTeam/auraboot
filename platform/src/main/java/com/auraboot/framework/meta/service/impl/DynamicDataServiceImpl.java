@@ -13,6 +13,8 @@ import com.auraboot.framework.meta.ddl.TableMetadataService;
 import com.auraboot.framework.meta.exception.MetaServiceException;
 import com.auraboot.framework.meta.util.JsonbFieldHelper;
 import com.auraboot.framework.file.service.FileService;
+import com.auraboot.framework.permission.engine.model.FieldPermissionSet;
+import com.auraboot.framework.permission.service.FieldPermissionService;
 import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.mapper.UserMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -62,6 +64,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     private final MetaModelMapper metaModelMapper;
     private final ApplicationContext applicationContext;
     private final PayloadTemporalNormalizer payloadTemporalNormalizer;
+    private final FieldPermissionService fieldPermissionService;
     private static final Set<String> SYSTEM_COLUMNS = SystemFieldConstants.QUERY_TRANSPARENT;
 
     /**
@@ -236,6 +239,9 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             throw new MetaServiceException("Configurable field masking failed for model: " + modelCode);
         }
 
+        // Apply field-level permission filtering — remove hidden fields from results
+        records = applyFieldPermissionFilter(modelCode, records);
+
         records = enrichListRecords(modelCode, records);
 
         if (useCursor) {
@@ -261,6 +267,50 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 request.getPageNum(),
                 request.getPageSize()
         );
+    }
+
+    /**
+     * Apply field-level permission filtering to a list of records.
+     * Removes keys that are in the hiddenFields set.
+     */
+    private List<Map<String, Object>> applyFieldPermissionFilter(String modelCode, List<Map<String, Object>> records) {
+        if (records == null || records.isEmpty()) {
+            return records;
+        }
+        try {
+            Long userId = getCurrentUserId();
+            FieldPermissionSet fieldPerms = fieldPermissionService.getFieldPermissions(userId, modelCode);
+            if (fieldPerms.hiddenFields().isEmpty()) {
+                return records;
+            }
+            Set<String> hidden = fieldPerms.hiddenFields();
+            for (Map<String, Object> record : records) {
+                hidden.forEach(record::remove);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to apply field permission filter for model {}: {}", modelCode, e.getMessage());
+        }
+        return records;
+    }
+
+    /**
+     * Apply field-level permission filtering to a single record.
+     */
+    private Map<String, Object> applyFieldPermissionFilterSingle(String modelCode, Map<String, Object> record) {
+        if (record == null) {
+            return record;
+        }
+        try {
+            Long userId = getCurrentUserId();
+            FieldPermissionSet fieldPerms = fieldPermissionService.getFieldPermissions(userId, modelCode);
+            if (fieldPerms.hiddenFields().isEmpty()) {
+                return record;
+            }
+            fieldPerms.hiddenFields().forEach(record::remove);
+        } catch (Exception e) {
+            log.warn("Failed to apply field permission filter for model {}: {}", modelCode, e.getMessage());
+        }
+        return record;
     }
 
     private List<Map<String, Object>> enrichListRecords(String modelCode, List<Map<String, Object>> records) {
@@ -595,6 +645,9 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         } catch (Exception e) {
             log.warn("Failed to apply configurable field masking for model {} record {}: {}", modelCode, recordId, e.getMessage());
         }
+
+        // Apply field-level permission filtering — remove hidden fields
+        record = applyFieldPermissionFilterSingle(modelCode, record);
 
         return record;
     }
