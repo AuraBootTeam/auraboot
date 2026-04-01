@@ -231,6 +231,7 @@ CREATE TABLE IF NOT EXISTS ab_tenant_member (
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     tenant_id BIGINT NOT NULL,
     user_id BIGINT,
+    employee_id BIGINT,
     status VARCHAR(20) DEFAULT 'active',
     join_date DATE,
     leave_date DATE,
