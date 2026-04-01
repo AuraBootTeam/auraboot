@@ -342,7 +342,7 @@ CREATE TABLE IF NOT EXISTS ab_user_role (
     pid VARCHAR(26) UNIQUE NOT NULL DEFAULT '',
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    user_id BIGINT NOT NULL,
+    member_id BIGINT NOT NULL,
     tenant_id BIGINT NOT NULL,
     role_id BIGINT NOT NULL,
     assign_type VARCHAR(20) DEFAULT 'direct',
@@ -1002,7 +1002,7 @@ CREATE INDEX IF NOT EXISTS idx_role_permission_expiry ON ab_role_permission(expi
 CREATE INDEX IF NOT EXISTS idx_role_permission_priority ON ab_role_permission(priority DESC);
 
 -- User Role Indexes
-CREATE INDEX IF NOT EXISTS idx_ab_user_role_user_id ON ab_user_role (user_id);
+CREATE INDEX IF NOT EXISTS idx_ab_user_role_member_id ON ab_user_role (member_id);
 CREATE INDEX IF NOT EXISTS idx_ab_user_role_role_id ON ab_user_role (role_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_ab_user_role_pid ON ab_user_role(pid);
 

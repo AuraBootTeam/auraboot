@@ -23,7 +23,7 @@ import java.time.Instant;
         private Instant createdAt;             // 创建时间
         private Instant updatedAt;             // 更新时间
 
-        private Long userId;              // 用户ID
+        private Long memberId;            // Tenant member ID
         private Long roleId;                // 角色ID
 
         private String assignType;          // 分配类型：DIRECT, INHERITED

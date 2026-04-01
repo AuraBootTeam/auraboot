@@ -2,6 +2,8 @@ package com.auraboot.framework.bpm.service;
 
 import com.auraboot.framework.bpm.rule.DroolsEngineService;
 import com.auraboot.framework.rbac.mapper.UserRoleMapper;
+import com.auraboot.framework.tenant.dao.entity.TenantMember;
+import com.auraboot.framework.tenant.service.TenantMemberService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.expression.ExpressionParser;
@@ -12,6 +14,7 @@ import org.springframework.stereotype.Service;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Assignee resolver service.
@@ -23,6 +26,7 @@ import java.util.Map;
 public class AssigneeResolverService {
 
     private final UserRoleMapper userRoleMapper;
+    private final TenantMemberService tenantMemberService;
     private final DroolsEngineService droolsEngineService;
     private final ExpressionParser spelParser = new SpelExpressionParser();
 
@@ -69,26 +73,35 @@ public class AssigneeResolverService {
 
     private List<String> resolveByRole(Map<String, Object> config) {
         Object roleIds = config.get("roleIds");
+        List<Long> memberIds;
         if (roleIds instanceof List<?> list) {
-            return list.stream()
+            memberIds = list.stream()
                     .map(id -> Long.parseLong(id.toString()))
-                    .flatMap(roleId -> userRoleMapper.findUserIdsByRoleId(roleId).stream())
+                    .flatMap(roleId -> userRoleMapper.findMemberIdsByRoleId(roleId).stream())
                     .distinct()
-                    .map(Object::toString)
                     .toList();
-        }
-        if (roleIds instanceof String str) {
-            return Arrays.stream(str.split(","))
+        } else if (roleIds instanceof String str) {
+            memberIds = Arrays.stream(str.split(","))
                     .map(String::trim)
                     .filter(s -> !s.isEmpty())
                     .map(Long::parseLong)
-                    .flatMap(roleId -> userRoleMapper.findUserIdsByRoleId(roleId).stream())
+                    .flatMap(roleId -> userRoleMapper.findMemberIdsByRoleId(roleId).stream())
                     .distinct()
-                    .map(Object::toString)
                     .toList();
+        } else {
+            log.warn("ROLE assignee rule: no roleIds provided in config: {}", config);
+            return List.of();
         }
-        log.warn("ROLE assignee rule: no roleIds provided in config: {}", config);
-        return List.of();
+
+        // Convert memberIds to userIds for BPM assignee resolution
+        return memberIds.stream()
+                .map(tenantMemberService::getById)
+                .filter(Objects::nonNull)
+                .map(TenantMember::getUserId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .map(Object::toString)
+                .toList();
     }
 
     private List<String> resolveByDepartment(Map<String, Object> config) {

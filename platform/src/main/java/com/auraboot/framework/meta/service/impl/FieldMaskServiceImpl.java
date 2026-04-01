@@ -251,7 +251,11 @@ public class FieldMaskServiceImpl implements FieldMaskService {
     private Set<String> getUserRoleCodes(Long userId) {
         try {
             Long tenantId = MetaContext.getCurrentTenantId();
-            List<Role> roles = roleMapper.findByUserIdAndTenantId(userId, tenantId);
+            Long memberId = MetaContext.getCurrentMemberId();
+            if (memberId == null) {
+                return Collections.emptySet();
+            }
+            List<Role> roles = roleMapper.findByMemberIdAndTenantId(memberId, tenantId);
             return roles.stream()
                     .map(Role::getCode)
                     .collect(Collectors.toSet());

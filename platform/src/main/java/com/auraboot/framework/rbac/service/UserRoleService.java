@@ -8,168 +8,153 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 用户角色关联服务接口
+ * User-role association service interface.
+ * Phase 2: all subject references use memberId (tenant_member.id).
  */
 public interface UserRoleService extends IService<UserRole> {
 
     /**
-     * 为用户分配角色
+     * Assign roles to a member
      */
-    boolean assignRolesToUser(Long userId, List<Long> roleIds, Long tenantId, Long operatorId);
+    boolean assignRolesToMember(Long memberId, List<Long> roleIds, Long tenantId, Long operatorId);
 
     /**
-     * 移除用户的角色
+     * Remove roles from a member
      */
-    boolean removeRolesFromUser(Long userId, List<Long> roleIds, Long tenantId);
+    boolean removeRolesFromMember(Long memberId, List<Long> roleIds, Long tenantId);
 
     /**
-     * 移除用户的单个角色
+     * Remove a single role from a member
      */
-    boolean removeUserRole(Long userId, Long roleId, Long tenantId);
-
+    boolean removeMemberRole(Long memberId, Long roleId, Long tenantId);
 
     /**
-     * 移除用户在指定租户下的所有角色
+     * Remove all roles from a member in a tenant
      */
-    boolean removeAllRolesFromUserInTenant(Long userId, Long tenantId);
-
-
+    boolean removeAllRolesFromMemberInTenant(Long memberId, Long tenantId);
 
     /**
-     * 根据用户ID和租户ID查询角色关联列表
+     * Find role associations by member ID and tenant ID
      */
-    List<UserRole> findByUserIdAndTenantId(Long userId, Long tenantId);
+    List<UserRole> findByMemberIdAndTenantId(Long memberId, Long tenantId);
 
     /**
-     * 根据用户ID、角色ID和租户ID查询关联关系
+     * Find association by member ID, role ID, and tenant ID
      */
-    UserRole findByUserIdAndRoleIdAndTenantId(Long userId, Long roleId, Long tenantId);
+    UserRole findByMemberIdAndRoleIdAndTenantId(Long memberId, Long roleId, Long tenantId);
 
     /**
-     * 根据PID查询用户角色关联
+     * Find by PID
      */
     UserRole findByPid(String pid);
 
-
-
     /**
-     * 分页查询用户角色关联列表
+     * Paginated query
      */
-    Page<UserRole> findUserRoles(int pageNum, int pageSize, Long userId, Long roleId, Long tenantId, Long storeId);
-
-
-
+    Page<UserRole> findUserRoles(int pageNum, int pageSize, Long memberId, Long roleId, Long tenantId, Long storeId);
 
     /**
-     * 统计用户角色数量
+     * Count roles for a member
      */
-    long countByUserId(Long userId);
+    long countByMemberId(Long memberId);
 
     /**
-     * 统计角色被分配的用户数量
+     * Count members for a role
      */
     long countByRoleId(Long roleId);
 
     /**
-     * 统计租户下的用户角色数量
+     * Count user-role associations in a tenant
      */
     long countByTenantId(Long tenantId);
 
     /**
-     * 批量分配角色给用户
+     * Batch assign roles
      */
     int batchAssignRoles(List<UserRole> userRoles);
 
     /**
-     * 批量移除用户角色
+     * Batch remove roles
      */
     int batchRemoveRoles(List<Long> userRoleIds);
 
     /**
-     * 复制用户角色到另一个用户
+     * Copy roles from one member to another
      */
-    boolean copyUserRoles(Long sourceUserId, Long targetUserId, Long tenantId);
-
-
+    boolean copyMemberRoles(Long sourceMemberId, Long targetMemberId, Long tenantId);
 
     /**
-     * 同步用户角色
-     * 根据提供的角色ID列表，同步用户在指定租户下的角色配置
+     * Sync member roles
      */
-    boolean syncUserRoles(Long userId, List<Long> roleIds, Long tenantId, Long operatorId);
-
-
+    boolean syncMemberRoles(Long memberId, List<Long> roleIds, Long tenantId, Long operatorId);
 
     /**
-     * 获取用户在指定租户下的角色ID列表
+     * Get role IDs for a member in a tenant
      */
-    List<Long> getRoleIdsByUserIdAndTenantId(Long userId, Long tenantId);
-
-
+    List<Long> getRoleIdsByMemberIdAndTenantId(Long memberId, Long tenantId);
 
     /**
-     * 检查角色是否被任何用户使用
+     * Check if a role is in use
      */
     boolean isRoleInUse(Long roleId);
 
     /**
-     * 检查角色在指定租户下是否被任何用户使用
+     * Check if a role is in use in a tenant
      */
     boolean isRoleInUseInTenant(Long roleId, Long tenantId);
 
-
     /**
-     * 获取租户下所有用户的角色信息
+     * Get all user role info for a tenant
      */
     List<Map<String, Object>> getTenantUserRoles(Long tenantId);
 
     /**
-     * 验证用户角色配置
+     * Validate member roles
      */
-    Map<String, Object> validateUserRoles(Long userId, Long tenantId);
+    Map<String, Object> validateMemberRoles(Long memberId, Long tenantId);
 
     /**
-     * 清理无效的用户角色关联
+     * Cleanup invalid user-role associations
      */
     int cleanupInvalidUserRoles();
 
     /**
-     * 根据多个用户ID查询角色关联列表
+     * Find by multiple member IDs
      */
-    List<UserRole> findByUserIds(List<Long> userIds);
+    List<UserRole> findByMemberIds(List<Long> memberIds);
 
     /**
-     * 根据多个角色ID查询用户关联列表
+     * Find by multiple role IDs
      */
     List<UserRole> findByRoleIds(List<Long> roleIds);
 
     /**
-     * 获取用户角色变更历史
+     * Get member role history
      */
-    List<Map<String, Object>> getUserRoleHistory(Long userId, Long tenantId, int days);
+    List<Map<String, Object>> getMemberRoleHistory(Long memberId, Long tenantId, int days);
 
     /**
-     * 转移用户角色到新租户
+     * Transfer member roles to a new tenant
      */
-    boolean transferUserRolesToTenant(Long userId, Long fromTenantId, Long toTenantId);
+    boolean transferMemberRolesToTenant(Long memberId, Long fromTenantId, Long toTenantId);
 
     /**
-     * 激活用户角色
+     * Activate a user-role association
      */
     boolean activateUserRole(Long userRoleId);
 
     /**
-     * 停用用户角色
+     * Deactivate a user-role association
      */
     boolean deactivateUserRole(Long userRoleId);
 
     /**
-     * 批量激活用户角色
+     * Batch activate user-role associations
      */
     int batchActivateUserRoles(List<Long> userRoleIds);
 
     /**
-     * 批量停用用户角色
+     * Batch deactivate user-role associations
      */
     int batchDeactivateUserRoles(List<Long> userRoleIds);
 }

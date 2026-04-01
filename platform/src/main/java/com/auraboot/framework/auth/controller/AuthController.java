@@ -215,7 +215,8 @@ public class AuthController {
             
             if (tenantId != null) {
                 // 有租户：获取该租户下的角色和Permission
-                roles = roleMapper.findByUserIdAndTenantId(user.getId(), tenantId);
+                Long memberId = MetaContext.getCurrentMemberId();
+                roles = memberId != null ? roleMapper.findByMemberIdAndTenantId(memberId, tenantId) : List.of();
 
                 // Check for SUPER_ADMIN or TENANT_ADMIN roles
                 boolean isSuperAdmin = roles.stream()

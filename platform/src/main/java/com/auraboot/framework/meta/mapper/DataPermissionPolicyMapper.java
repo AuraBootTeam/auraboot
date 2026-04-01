@@ -36,7 +36,7 @@ public interface DataPermissionPolicyMapper extends BaseMapper<DataPermissionPol
     List<DataPermissionPolicy> findAllEnabled(@Param("tenantId") Long tenantId);
 
     /**
-     * Find effective policies for a user through their roles.
+     * Find effective policies for a member through their roles.
      */
     @Select("""
         SELECT DISTINCT p.* FROM ab_data_permission_policy p
@@ -46,12 +46,12 @@ public interface DataPermissionPolicyMapper extends BaseMapper<DataPermissionPol
         WHERE p.tenant_id = #{tenantId}
           AND p.model_code = #{modelCode}
           AND p.enabled = TRUE
-          AND ur.user_id = #{userId}
+          AND ur.member_id = #{memberId}
         ORDER BY p.priority DESC, p.created_at ASC
         """)
     List<DataPermissionPolicy> findEffectivePolicies(@Param("tenantId") Long tenantId,
                                                      @Param("modelCode") String modelCode,
-                                                     @Param("userId") Long userId);
+                                                     @Param("memberId") Long memberId);
 
     @Update("""
         UPDATE ab_data_permission_policy

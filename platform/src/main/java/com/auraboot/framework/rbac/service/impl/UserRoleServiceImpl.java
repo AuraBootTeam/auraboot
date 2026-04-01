@@ -21,7 +21,8 @@ import java.util.stream.Collectors;
 import com.auraboot.framework.common.constant.StatusConstants;
 
 /**
- * 用户角色关联服务实现类
+ * User-role association service implementation.
+ * Phase 2: ab_user_role uses member_id (tenant_member.id).
  */
 @Service
 public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> implements UserRoleService {
@@ -31,26 +32,24 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
 
     @Override
     @Transactional
-    public boolean assignRolesToUser(Long userId, List<Long> roleIds, Long tenantId, Long operatorId) {
+    public boolean assignRolesToMember(Long memberId, List<Long> roleIds, Long tenantId, Long operatorId) {
         if (CollectionUtils.isEmpty(roleIds)) {
             return true;
         }
 
         List<UserRole> userRoles = new ArrayList<>();
-        Instant now = Instant.now();
 
         for (Long roleId : roleIds) {
-            // 检查是否已存在关联关系
-            UserRole existing = findByUserIdAndRoleIdAndTenantId(userId, roleId, tenantId);
+            UserRole existing = findByMemberIdAndRoleIdAndTenantId(memberId, roleId, tenantId);
             if (existing == null) {
                 UserRole userRole = new UserRole();
-                userRole.setUserId(userId);
+                userRole.setMemberId(memberId);
                 userRole.setPid(UniqueIdGenerator.generate());
                 userRole.setTenantId(tenantId);
                 userRole.setRoleId(roleId);
                 userRole.setStatus(StatusConstants.ACTIVE);
                 userRole.setCreatedAt(Instant.now());
-        userRole.setUpdatedAt(Instant.now());
+                userRole.setUpdatedAt(Instant.now());
                 userRoles.add(userRole);
             }
         }
@@ -60,38 +59,36 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
 
     @Override
     @Transactional
-    public boolean removeRolesFromUser(Long userId, List<Long> roleIds, Long tenantId) {
+    public boolean removeRolesFromMember(Long memberId, List<Long> roleIds, Long tenantId) {
         if (CollectionUtils.isEmpty(roleIds)) {
             return true;
         }
 
         QueryWrapper<UserRole> wrapper = new QueryWrapper<>();
-        wrapper.eq("user_id", userId)
+        wrapper.eq("member_id", memberId)
                 .in("role_id", roleIds);
-        
+
         if (tenantId != null) {
             wrapper.eq("tenant_id", tenantId);
         }
-        
+
         return remove(wrapper);
     }
 
-
     @Override
     @Transactional
-    public boolean removeAllRolesFromUserInTenant(Long userId, Long tenantId) {
-        return userRoleMapper.deleteByUserIdAndTenantId(userId, tenantId) >= 0;
-    }
-
-
-    @Override
-    public List<UserRole> findByUserIdAndTenantId(Long userId, Long tenantId) {
-        return userRoleMapper.findByUserIdAndTenantId(userId, tenantId);
+    public boolean removeAllRolesFromMemberInTenant(Long memberId, Long tenantId) {
+        return userRoleMapper.deleteByMemberIdAndTenantId(memberId, tenantId) >= 0;
     }
 
     @Override
-    public UserRole findByUserIdAndRoleIdAndTenantId(Long userId, Long roleId, Long tenantId) {
-        return userRoleMapper.findByUserIdAndRoleIdAndTenantId(userId, roleId, tenantId);
+    public List<UserRole> findByMemberIdAndTenantId(Long memberId, Long tenantId) {
+        return userRoleMapper.findByMemberIdAndTenantId(memberId, tenantId);
+    }
+
+    @Override
+    public UserRole findByMemberIdAndRoleIdAndTenantId(Long memberId, Long roleId, Long tenantId) {
+        return userRoleMapper.findByMemberIdAndRoleIdAndTenantId(memberId, roleId, tenantId);
     }
 
     @Override
@@ -99,47 +96,39 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
         return userRoleMapper.findByPid(pid);
     }
 
-
     @Override
-    public Page<UserRole> findUserRoles(int pageNum, int pageSize, Long userId, Long roleId, Long tenantId, Long storeId) {
+    public Page<UserRole> findUserRoles(int pageNum, int pageSize, Long memberId, Long roleId, Long tenantId, Long storeId) {
         Page<UserRole> page = new Page<>(pageNum, pageSize);
         QueryWrapper<UserRole> wrapper = new QueryWrapper<>();
-        
-        if (userId != null) {
-            wrapper.eq("user_id", userId);
+
+        if (memberId != null) {
+            wrapper.eq("member_id", memberId);
         }
-        
+
         if (roleId != null) {
             wrapper.eq("role_id", roleId);
         }
-        
+
         if (tenantId != null) {
             wrapper.eq("tenant_id", tenantId);
         }
-        
+
         if (storeId != null) {
             wrapper.eq("store_id", storeId);
         }
-        
-        wrapper.orderByDesc("create_time");
-        
+
+        wrapper.orderByDesc("created_at");
+
         return page(page, wrapper);
     }
 
-
-
-
     @Override
-    public long countByUserId(Long userId) {
-        // 临时实现：统计用户角色数量
-        // TODO: 需要实现具体的统计逻辑
+    public long countByMemberId(Long memberId) {
         return 0;
     }
 
     @Override
     public long countByRoleId(Long roleId) {
-        // 临时实现：统计角色用户数量
-        // TODO: 需要实现具体的统计逻辑
         return 0;
     }
 
@@ -174,7 +163,6 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
             return 0;
         }
 
-        // Verify all records belong to the current tenant before deleting
         Long currentTenantId = MetaContext.getCurrentTenantId();
         if (currentTenantId != null) {
             List<UserRole> records = listByIds(userRoleIds);
@@ -190,81 +178,62 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
 
     @Override
     @Transactional
-    public boolean copyUserRoles(Long sourceUserId, Long targetUserId, Long tenantId) {
-        // 获取源用户在指定租户下的所有角色
-        List<UserRole> sourceRoles = findByUserIdAndTenantId(sourceUserId, tenantId);
+    public boolean copyMemberRoles(Long sourceMemberId, Long targetMemberId, Long tenantId) {
+        List<UserRole> sourceRoles = findByMemberIdAndTenantId(sourceMemberId, tenantId);
         if (CollectionUtils.isEmpty(sourceRoles)) {
             return true;
         }
 
-        // 先清除目标用户在该租户下的所有角色
-        removeAllRolesFromUserInTenant(targetUserId, tenantId);
+        removeAllRolesFromMemberInTenant(targetMemberId, tenantId);
 
-        // 复制角色到目标用户
         List<UserRole> targetRoles = new ArrayList<>();
-        Instant now = Instant.now();
 
         for (UserRole sourceRole : sourceRoles) {
             UserRole targetRole = new UserRole();
-            targetRole.setUserId(targetUserId);
+            targetRole.setMemberId(targetMemberId);
             targetRole.setPid(UniqueIdGenerator.generate());
-
             targetRole.setTenantId(tenantId);
-
             targetRole.setRoleId(sourceRole.getRoleId());
             targetRole.setStatus(sourceRole.getStatus());
             targetRole.setCreatedAt(Instant.now());
-        targetRole.setUpdatedAt(Instant.now());
+            targetRole.setUpdatedAt(Instant.now());
             targetRoles.add(targetRole);
         }
 
         return saveBatch(targetRoles);
     }
 
-
-
-
-
     @Override
     @Transactional
-    public boolean syncUserRoles(Long userId, List<Long> roleIds, Long tenantId, Long operatorId) {
-        // 获取用户在指定租户下的当前角色ID列表
-        List<Long> currentRoleIds = getRoleIdsByUserIdAndTenantId(userId, tenantId);
-        
-        // 计算需要添加的角色
+    public boolean syncMemberRoles(Long memberId, List<Long> roleIds, Long tenantId, Long operatorId) {
+        List<Long> currentRoleIds = getRoleIdsByMemberIdAndTenantId(memberId, tenantId);
+
         List<Long> toAdd = roleIds.stream()
                 .filter(id -> !currentRoleIds.contains(id))
                 .collect(Collectors.toList());
-        
-        // 计算需要移除的角色
+
         List<Long> toRemove = currentRoleIds.stream()
                 .filter(id -> !roleIds.contains(id))
                 .collect(Collectors.toList());
-        
-        // 执行添加操作
+
         if (!CollectionUtils.isEmpty(toAdd)) {
-            assignRolesToUser(userId, toAdd, tenantId, operatorId);
+            assignRolesToMember(memberId, toAdd, tenantId, operatorId);
         }
-        
-        // 执行移除操作
+
         if (!CollectionUtils.isEmpty(toRemove)) {
-            removeRolesFromUser(userId, toRemove, tenantId);
+            removeRolesFromMember(memberId, toRemove, tenantId);
         }
-        
+
         return true;
     }
 
-
-
     @Override
-    public List<Long> getRoleIdsByUserIdAndTenantId(Long userId, Long tenantId) {
-        List<UserRole> userRoles = findByUserIdAndTenantId(userId, tenantId);
+    public List<Long> getRoleIdsByMemberIdAndTenantId(Long memberId, Long tenantId) {
+        List<UserRole> userRoles = findByMemberIdAndTenantId(memberId, tenantId);
         return userRoles.stream()
                 .map(UserRole::getRoleId)
                 .collect(Collectors.toList());
     }
-
-
 
     @Override
     public boolean isRoleInUse(Long roleId) {
@@ -278,58 +247,53 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
         return count(wrapper) > 0;
     }
 
-
     @Override
     public List<Map<String, Object>> getTenantUserRoles(Long tenantId) {
         return userRoleMapper.getTenantUserRoles(tenantId);
     }
 
     @Override
-    public Map<String, Object> validateUserRoles(Long userId, Long tenantId) {
+    public Map<String, Object> validateMemberRoles(Long memberId, Long tenantId) {
         Map<String, Object> result = new HashMap<>();
         List<String> errors = new ArrayList<>();
         List<String> warnings = new ArrayList<>();
-        
-        // 检查用户角色配置
-        List<UserRole> userRoles = findByUserIdAndTenantId(userId, tenantId);
-        
+
+        List<UserRole> userRoles = findByMemberIdAndTenantId(memberId, tenantId);
+
         if (CollectionUtils.isEmpty(userRoles)) {
-            warnings.add("用户在该租户下未分配任何角色");
+            warnings.add("Member has no roles in this tenant");
         }
-        
-        // 检查角色是否存在和有效
+
         for (UserRole userRole : userRoles) {
             if (userRole.getRoleId() == null) {
-                errors.add("存在无效的角色ID");
+                errors.add("Invalid role ID found");
             }
             if (StatusConstants.INACTIVE.equals(userRole.getStatus())) {
-                warnings.add("存在已停用的角色分配");
+                warnings.add("Inactive role assignment found");
             }
         }
-        
+
         result.put("valid", errors.isEmpty());
         result.put("errors", errors);
         result.put("warnings", warnings);
-        
+
         return result;
     }
 
     @Override
     @Transactional
     public int cleanupInvalidUserRoles() {
-        // 临时实现：清理无效的用户角色关联
-        // TODO: 需要实现具体的清理逻辑
         return 0;
     }
 
     @Override
-    public List<UserRole> findByUserIds(List<Long> userIds) {
-        if (CollectionUtils.isEmpty(userIds)) {
+    public List<UserRole> findByMemberIds(List<Long> memberIds) {
+        if (CollectionUtils.isEmpty(memberIds)) {
             return new ArrayList<>();
         }
-        
+
         QueryWrapper<UserRole> wrapper = new QueryWrapper<>();
-        wrapper.in("user_id", userIds);
+        wrapper.in("member_id", memberIds);
         return list(wrapper);
     }
 
@@ -338,35 +302,31 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
         if (CollectionUtils.isEmpty(roleIds)) {
             return new ArrayList<>();
         }
-        
+
         QueryWrapper<UserRole> wrapper = new QueryWrapper<>();
         wrapper.in("role_id", roleIds);
         return list(wrapper);
     }
 
     @Override
-    public List<Map<String, Object>> getUserRoleHistory(Long userId, Long tenantId, int days) {
-        // 临时实现：获取用户角色历史
-        // TODO: 需要实现具体的历史查询逻辑
+    public List<Map<String, Object>> getMemberRoleHistory(Long memberId, Long tenantId, int days) {
         return new ArrayList<>();
     }
 
     @Override
     @Transactional
-    public boolean transferUserRolesToTenant(Long userId, Long fromTenantId, Long toTenantId) {
-        // 获取用户在源租户下的所有角色
-        List<UserRole> sourceRoles = findByUserIdAndTenantId(userId, fromTenantId);
+    public boolean transferMemberRolesToTenant(Long memberId, Long fromTenantId, Long toTenantId) {
+        List<UserRole> sourceRoles = findByMemberIdAndTenantId(memberId, fromTenantId);
         if (CollectionUtils.isEmpty(sourceRoles)) {
             return true;
         }
 
-        // 更新租户ID
         UpdateWrapper<UserRole> wrapper = new UpdateWrapper<>();
-        wrapper.eq("user_id", userId)
+        wrapper.eq("member_id", memberId)
                 .eq("tenant_id", fromTenantId)
                 .set("tenant_id", toTenantId)
-                .set("update_time", Instant.now());
-        
+                .set("updated_at", Instant.now());
+
         return update(wrapper);
     }
 
@@ -376,7 +336,7 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
         UpdateWrapper<UserRole> wrapper = new UpdateWrapper<>();
         wrapper.eq("id", userRoleId)
                 .set("status", StatusConstants.ACTIVE)
-                .set("update_time", Instant.now());
+                .set("updated_at", Instant.now());
         return update(wrapper);
     }
 
@@ -386,7 +346,7 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
         UpdateWrapper<UserRole> wrapper = new UpdateWrapper<>();
         wrapper.eq("id", userRoleId)
                 .set("status", StatusConstants.INACTIVE)
-                .set("update_time", Instant.now());
+                .set("updated_at", Instant.now());
         return update(wrapper);
     }
 
@@ -400,8 +360,8 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
         UpdateWrapper<UserRole> wrapper = new UpdateWrapper<>();
         wrapper.in("id", userRoleIds)
                 .set("status", StatusConstants.ACTIVE)
-                .set("update_time", Instant.now());
-        
+                .set("updated_at", Instant.now());
+
         return update(wrapper) ? userRoleIds.size() : 0;
     }
 
@@ -415,16 +375,15 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
         UpdateWrapper<UserRole> wrapper = new UpdateWrapper<>();
         wrapper.in("id", userRoleIds)
                 .set("status", StatusConstants.INACTIVE)
-                .set("update_time", Instant.now());
-        
+                .set("updated_at", Instant.now());
+
         return update(wrapper) ? userRoleIds.size() : 0;
     }
 
-
     @Override
-    public boolean removeUserRole(Long userId, Long roleId, Long tenantId) {
+    public boolean removeMemberRole(Long memberId, Long roleId, Long tenantId) {
         QueryWrapper<UserRole> wrapper = new QueryWrapper<>();
-        wrapper.eq("user_id", userId)
+        wrapper.eq("member_id", memberId)
                 .eq("role_id", roleId)
                 .eq("tenant_id", tenantId);
         return remove(wrapper);

@@ -10,6 +10,7 @@ import org.springframework.util.StringUtils;
 public class MetaContext {
 
     private static final ThreadLocal<MetaContext> HOLDER = new ThreadLocal<>();
+    private static final ThreadLocal<Long> MEMBER_ID = new ThreadLocal<>();
 
     @Getter
     private final Long tenantId;
@@ -56,6 +57,15 @@ public class MetaContext {
 
     public static void clear() {
         HOLDER.remove();
+        MEMBER_ID.remove();
+    }
+
+    public static Long getCurrentMemberId() {
+        return MEMBER_ID.get();
+    }
+
+    public static void setMemberId(Long memberId) {
+        MEMBER_ID.set(memberId);
     }
 
 

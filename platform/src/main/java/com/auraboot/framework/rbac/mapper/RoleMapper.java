@@ -80,12 +80,12 @@ public interface RoleMapper extends BaseMapper<Role> {
 //    List<Role> findUserRoles(@Param("userId") Long userId);
 
     /**
-     * 根据用户ID和租户ID查询用户在该租户下的角色列表
+     * Find roles for a member in a tenant.
      */
     @Select("SELECT r.* FROM ab_role r INNER JOIN ab_user_role ur ON r.id = ur.role_id " +
-            "WHERE ur.user_id = #{userId} AND ur.tenant_id = #{tenantId} AND ur.status = 'active' " +
+            "WHERE ur.member_id = #{memberId} AND ur.tenant_id = #{tenantId} AND ur.status = 'active' " +
             "AND r.deleted_flag = false AND ur.deleted_flag = false ORDER BY r.priority ASC")
-    List<Role> findByUserIdAndTenantId(@Param("userId") Long userId, @Param("tenantId") Long tenantId);
+    List<Role> findByMemberIdAndTenantId(@Param("memberId") Long memberId, @Param("tenantId") Long tenantId);
 
 //    /**
 //     * 根据用户ID和租户ID查找用户角色

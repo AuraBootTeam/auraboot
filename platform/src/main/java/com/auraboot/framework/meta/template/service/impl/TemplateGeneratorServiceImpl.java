@@ -362,7 +362,8 @@ public class TemplateGeneratorServiceImpl implements TemplateGeneratorService {
                 return;
             }
 
-            List<UserRole> userRoles = userRoleService.findByUserIdAndTenantId(userId, tenantId);
+            Long memberId = MetaContext.getCurrentMemberId();
+            List<UserRole> userRoles = memberId != null ? userRoleService.findByMemberIdAndTenantId(memberId, tenantId) : List.of();
             if (userRoles.isEmpty()) {
                 log.warn("User has no roles, cannot auto-assign permissions: userId={}", userId);
                 return;

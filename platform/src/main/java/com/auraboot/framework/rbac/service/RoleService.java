@@ -89,14 +89,14 @@ public interface RoleService extends IService<Role> {
     List<Long> getRolePermissionIds(Long roleId);
 
     /**
-     * 为用户分配角色
+     * Assign a role to a tenant member.
      */
-    boolean assignRoleToUser(Long userId, Long roleId, Long tenantId, Long storeId);
+    boolean assignRoleToMember(Long memberId, Long roleId, Long tenantId);
 
     /**
-     * 移除用户角色
+     * Remove a role from a tenant member.
      */
-    boolean removeRoleFromUser(Long userId, Long roleId, Long tenantId);
+    boolean removeRoleFromMember(Long memberId, Long roleId, Long tenantId);
 
     /**
      * 统计租户角色数量

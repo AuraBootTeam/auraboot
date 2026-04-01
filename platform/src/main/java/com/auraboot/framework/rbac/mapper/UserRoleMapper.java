@@ -12,117 +12,57 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 用户角色关联数据访问层
+ * User-role association data access layer.
+ * Phase 2: ab_user_role uses member_id (tenant_member.id) instead of user_id.
  */
 @Mapper
 public interface UserRoleMapper extends BaseMapper<UserRole> {
 
-//    /**
-//     * 根据用户ID查询角色关联列表
-//     */
-//    @Select("SELECT * FROM ab_user_role WHERE user_id = #{userId}   ORDER BY created_at DESC")
-//    List<UserRole> findByUserId(@Param("userId") String userId);
-//
-//    /**
-//     * 根据角色ID查询用户关联列表
-//     */
-//    @Select("SELECT * FROM ab_user_role WHERE role_id = #{roleId}   ORDER BY created_at DESC")
-//    List<UserRole> findByRoleId(@Param("roleId") Long roleId);
-
-//    /**
-//     * 根据租户ID查询用户角色关联列表
-//     */
-//    @Select("SELECT * FROM ab_user_role WHERE tenant_id = #{tenantId}   ORDER BY created_at DESC")
-//    List<UserRole> findByTenantId(@Param("tenantId") Long tenantId);
+    /**
+     * Find role associations by member ID
+     */
+    @Select("SELECT * FROM ab_user_role WHERE member_id = #{memberId} AND status = 'active' ORDER BY created_at DESC")
+    List<UserRole> findByMemberId(@Param("memberId") Long memberId);
 
     /**
-     * 根据用户ID查询角色关联列表
+     * Find role associations by member ID and tenant ID
      */
-    @Select("SELECT * FROM ab_user_role WHERE user_id = #{userId} AND status = 'active' ORDER BY created_at DESC")
-    List<UserRole> findByUserId(@Param("userId") Long userId);
+    @Select("SELECT * FROM ab_user_role WHERE member_id = #{memberId} AND tenant_id = #{tenantId} AND status = 'active' AND deleted_flag = false")
+    List<UserRole> findByMemberIdAndTenantId(@Param("memberId") Long memberId, @Param("tenantId") Long tenantId);
 
     /**
-     * 根据用户ID和租户ID查询角色关联列表
+     * Find association by member ID, role ID, and tenant ID
      */
-    @Select("SELECT * FROM ab_user_role WHERE user_id = #{userId} AND tenant_id = #{tenantId} AND status = 'active' AND deleted_flag = false")
-    List<UserRole> findByUserIdAndTenantId(@Param("userId") Long userId, @Param("tenantId") Long tenantId);
-
-    /**
-     * 根据用户ID、角色ID和租户ID查询关联关系
-     */
-    @Select("SELECT * FROM ab_user_role WHERE user_id = #{userId} AND role_id = #{roleId} AND tenant_id = #{tenantId} AND deleted_flag = false LIMIT 1")
+    @Select("SELECT * FROM ab_user_role WHERE member_id = #{memberId} AND role_id = #{roleId} AND tenant_id = #{tenantId} AND deleted_flag = false LIMIT 1")
     @InterceptorIgnore(tenantLine = "true")
-    UserRole findByUserIdAndRoleIdAndTenantId(@Param("userId") Long userId, @Param("roleId") Long roleId, @Param("tenantId") Long tenantId);
+    UserRole findByMemberIdAndRoleIdAndTenantId(@Param("memberId") Long memberId, @Param("roleId") Long roleId, @Param("tenantId") Long tenantId);
 
     /**
-     * 根据PID查询用户角色关联
+     * Find by PID
      */
     @Select("SELECT * FROM ab_user_role WHERE pid = #{pid} AND deleted_flag = false")
     UserRole findByPid(@Param("pid") String pid);
 
-//    /**
-//     * 根据门店ID查询用户角色关联列表
-//     */
-//    @Select("SELECT * FROM ab_user_role WHERE store_id = #{storeId} AND status = 'active'  ")
-//    List<UserRole> findByStoreId(@Param("storeId") Long storeId);
-
-//    /**
-//     * 根据用户ID和门店ID查询角色关联列表
-//     */
-//    @Select("SELECT * FROM ab_user_role WHERE user_id = #{userId} AND store_id = #{storeId} AND status = 'active'  ")
-//    List<UserRole> findByUserIdAndStoreId(@Param("userId") String userId, @Param("storeId") Long storeId);
-
-//    /**
-//     * 批量删除用户的所有角色关联
-//     */
-//    @Delete("UPDATE ab_user_role SET deleted_flag = true, updated_at = CURRENT_TIMESTAMP WHERE user_id = #{userId}")
-//    int deleteByUserId(@Param("userId") String userId);
+    /**
+     * Soft-delete all role associations for a member in a tenant
+     */
+    @Delete("UPDATE ab_user_role SET deleted_flag = true, updated_at = CURRENT_TIMESTAMP WHERE member_id = #{memberId} AND tenant_id = #{tenantId}")
+    int deleteByMemberIdAndTenantId(@Param("memberId") Long memberId, @Param("tenantId") Long tenantId);
 
     /**
-     * 批量删除用户在指定租户下的所有角色关联
+     * Count role associations for a member in a tenant
      */
-    @Delete("UPDATE ab_user_role SET deleted_flag = true, updated_at = CURRENT_TIMESTAMP WHERE user_id = #{userId} AND tenant_id = #{tenantId}")
-    int deleteByUserIdAndTenantId(@Param("userId") Long userId, @Param("tenantId") Long tenantId);
-
-//    /**
-//     * 检查用户是否拥有指定角色
-//     */
-//    @Select("SELECT COUNT(*) > 0 FROM ab_user_role WHERE user_id = #{userId} AND role_id = #{roleId} " +
-//            "AND status = 'active'  ")
-//    boolean hasRole(@Param("userId") String userId, @Param("roleId") Long roleId);
-
-//    /**
-//     * 检查用户在指定租户下是否拥有指定角色
-//     */
-//    @Select("SELECT COUNT(*) > 0 FROM ab_user_role WHERE user_id = #{userId} AND role_id = #{roleId} AND tenant_id = #{tenantId} " +
-//            "AND status = 'active'  ")
-//    boolean hasRoleInTenant(@Param("userId") String userId, @Param("roleId") Long roleId, @Param("tenantId") Long tenantId);
-
-    /**
-     * 统计用户角色数量
-     */
-    @Select("SELECT COUNT(*) FROM ab_user_role WHERE user_id = #{userId} AND tenant_id = #{tenantId} " +
+    @Select("SELECT COUNT(*) FROM ab_user_role WHERE member_id = #{memberId} AND tenant_id = #{tenantId} " +
             "AND status = 'active'  ")
-    long countByUserIdAndTenantId(@Param("userId") Long userId, @Param("tenantId") Long tenantId);
-
-//    /**
-//     * 获取用户在所有租户中的角色信息
-//     */
-//    @Select("SELECT ur.tenant_id, t.name as tenant_name, r.name as role_name, r.code as role_code " +
-//            "FROM ab_user_role ur " +
-//            "LEFT JOIN ab_tenant t ON ur.tenant_id = t.id " +
-//            "LEFT JOIN ab_role r ON ur.role_id = r.id " +
-//            "WHERE ur.user_id = #{userId} AND ur.status = 'active' AND ur.deleted_flag = false " +
-//            "AND t.deleted_flag = false AND r.deleted_flag = false " +
-//            "ORDER BY t.name, r.name")
-//    List<Map<String, Object>> getUserRolesInAllTenants(@Param("userId") Long userId);
+    long countByMemberIdAndTenantId(@Param("memberId") Long memberId, @Param("tenantId") Long tenantId);
 
     /**
-     * 获取租户下的所有用户角色信息
+     * Get all user role info for a tenant (joins with ab_user and ab_role via member)
      */
-    @Select("SELECT ur.user_id, u.user_name, u.nick_name, r.name as role_name, r.code as role_code " +
+    @Select("SELECT ur.member_id, u.user_name, u.nick_name, r.name as role_name, r.code as role_code " +
             "FROM ab_user_role ur " +
-            "LEFT JOIN ab_user u ON ur.user_id = u.id " +
+            "LEFT JOIN ab_tenant_member tm ON ur.member_id = tm.id " +
+            "LEFT JOIN ab_user u ON tm.user_id = u.id " +
             "LEFT JOIN ab_role r ON ur.role_id = r.id " +
             "WHERE ur.tenant_id = #{tenantId} AND ur.status = 'active' AND ur.deleted_flag = false " +
             "AND u.deleted_flag = false AND r.deleted_flag = false " +
@@ -131,24 +71,18 @@ public interface UserRoleMapper extends BaseMapper<UserRole> {
 
     @Select("SELECT COUNT(*) FROM ab_user_role WHERE tenant_id = #{tenantId}  ")
     int countByTenantId(@Param("tenantId") Long tenantId);
-    
+
     /**
-     * Get all role IDs for a user
-     * 
-     * @param userId User ID
-     * @return List of role IDs
+     * Get all role IDs for a member
      */
     @Select("SELECT DISTINCT role_id FROM ab_user_role " +
-            "WHERE user_id = #{userId} AND status = 'active' AND deleted_flag = false")
-    List<Long> findRoleIdsByUserId(@Param("userId") Long userId);
-    
+            "WHERE member_id = #{memberId} AND status = 'active' AND deleted_flag = false")
+    List<Long> findRoleIdsByMemberId(@Param("memberId") Long memberId);
+
     /**
-     * Get all user IDs for a role
-     * 
-     * @param roleId Role ID
-     * @return List of user IDs
+     * Get all member IDs for a role
      */
-    @Select("SELECT DISTINCT user_id FROM ab_user_role " +
+    @Select("SELECT DISTINCT member_id FROM ab_user_role " +
             "WHERE role_id = #{roleId} AND status = 'active' AND deleted_flag = false")
-    List<Long> findUserIdsByRoleId(@Param("roleId") Long roleId);
+    List<Long> findMemberIdsByRoleId(@Param("roleId") Long roleId);
 }
