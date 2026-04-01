@@ -2,11 +2,14 @@ package com.auraboot.framework.permission.controller;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.permission.dto.PermissionGrantRequest;
 import com.auraboot.framework.permission.dto.PermissionMatrixDTO;
 import com.auraboot.framework.permission.service.PermissionMatrixService;
+import com.auraboot.framework.rbac.entity.Role;
+import com.auraboot.framework.rbac.service.RoleService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -14,6 +17,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+
+import static com.auraboot.framework.common.constant.ResponseCode.BadParam;
 
 import java.util.List;
 
@@ -40,6 +45,7 @@ import java.util.List;
 public class PermissionMatrixController {
 
     private final PermissionMatrixService matrixService;
+    private final RoleService roleService;
 
     /**
      * Get the full permission matrix (no role context, all granted=false).
@@ -54,28 +60,36 @@ public class PermissionMatrixController {
     /**
      * Get the permission matrix for a specific role, with granted flags set.
      *
-     * @param roleId Role ID
+     * @param rolePid Role PID (string identifier, avoids BigInt precision loss)
      */
-    @GetMapping("/{roleId}")
+    @GetMapping("/{rolePid}")
     @Operation(summary = "Get permission matrix for role")
-    public ApiResponse<PermissionMatrixDTO> getMatrixForRole(@PathVariable Long roleId) {
+    public ApiResponse<PermissionMatrixDTO> getMatrixForRole(@PathVariable String rolePid) {
         Long tenantId = MetaContext.getCurrentTenantId();
-        return ApiResponse.success(matrixService.getMatrixForRole(tenantId, roleId));
+        Role role = roleService.findByPid(rolePid);
+        if (role == null) {
+            throw new RootUnCheckedException(BadParam, "Role not found by PID: " + rolePid);
+        }
+        return ApiResponse.success(matrixService.getMatrixForRole(tenantId, role.getId()));
     }
 
     /**
      * Batch update role permissions from matrix checkbox changes.
      *
-     * @param roleId Role ID
+     * @param rolePid Role PID (string identifier, avoids BigInt precision loss)
      * @param grants List of grant/revoke requests
      */
-    @PutMapping("/{roleId}/batch")
+    @PutMapping("/{rolePid}/batch")
     @Operation(summary = "Batch update role permissions")
     public ApiResponse<Void> batchUpdate(
-            @PathVariable Long roleId,
+            @PathVariable String rolePid,
             @RequestBody @Valid List<PermissionGrantRequest> grants) {
-        log.info("Batch updating permissions for role: roleId={}, count={}", roleId, grants.size());
-        matrixService.batchUpdateRolePermissions(roleId, grants);
+        Role role = roleService.findByPid(rolePid);
+        if (role == null) {
+            throw new RootUnCheckedException(BadParam, "Role not found by PID: " + rolePid);
+        }
+        log.info("Batch updating permissions for role: rolePid={}, count={}", rolePid, grants.size());
+        matrixService.batchUpdateRolePermissions(role.getId(), grants);
         return ApiResponse.success();
     }
 }
