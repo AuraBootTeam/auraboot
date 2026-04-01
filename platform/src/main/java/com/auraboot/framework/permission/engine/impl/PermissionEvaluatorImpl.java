@@ -93,4 +93,12 @@ public class PermissionEvaluatorImpl implements PermissionEvaluator {
 
         return PermissionResult.allow(steps);
     }
+
+    @Override
+    public PermissionExplanation explain(Long memberId, String resource, String action, Long recordId) {
+        // Run the full pipeline with null record — evaluators already handle null records gracefully.
+        // Loading the actual record would require DynamicDataService which introduces circular dependency risk.
+        PermissionResult result = canOperate(memberId, resource, action, null);
+        return new PermissionExplanation(memberId, resource, action, recordId, result.granted(), result.steps());
+    }
 }
