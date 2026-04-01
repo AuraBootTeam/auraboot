@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
 import lombok.Data;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Map;
 
 /**
  * Role-Permission Entity - Role-Permission绑定表 (V4)
@@ -22,7 +23,7 @@ import java.time.LocalDate;
  * @since 2025-01-07
  */
 @Data
-@TableName("ab_role_permission")
+@TableName(value = "ab_role_permission", autoResultMap = true)
 public class RolePermission {
     
     /**
@@ -100,7 +101,8 @@ public class RolePermission {
     
     /**
      * Conditions (条件, JSONB)
-     * 用于高级授权场景，如基于IP、时间段等条件的授权
+     * Stores policy parameter values for Permission Policy (Phase 4).
+     * E.g. {"maxApprovalAmount": 100000, "allowBulkApprove": true}
      */
     @TableField(typeHandler = JacksonTypeHandler.class)
     private Object conditions;
