@@ -17,7 +17,7 @@ public interface RecordShareService {
      * @param tenantId       tenant ID
      * @param resourceCode   model/resource code
      * @param recordId       record ID
-     * @param subjectType    subject type ("user", "role", "dept")
+     * @param subjectType    subject type ("member", "role", "dept")
      * @param subjectId      subject ID
      * @param permissionMask optional permission mask (e.g. "read", "read,update")
      * @param expiresAt      optional expiration time

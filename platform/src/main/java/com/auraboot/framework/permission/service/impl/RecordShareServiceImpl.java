@@ -58,7 +58,7 @@ public class RecordShareServiceImpl implements RecordShareService {
     public boolean isShared(Long tenantId, String resourceCode, Long recordId, Long memberId) {
         Instant now = Instant.now();
 
-        // Check direct user share
+        // Check direct member share
         int directCount = recordShareMapper.countByRecordAndUser(
                 tenantId, resourceCode, recordId, memberId, now);
         if (directCount > 0) {

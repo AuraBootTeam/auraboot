@@ -30,7 +30,7 @@ public class RecordShare {
     /** The ID of the shared record */
     private Long recordId;
 
-    /** Subject type: "user", "role", "dept" */
+    /** Subject type: "member", "role", "dept" */
     private String subjectType;
 
     /** Subject ID (user ID, role ID, or department ID) */
