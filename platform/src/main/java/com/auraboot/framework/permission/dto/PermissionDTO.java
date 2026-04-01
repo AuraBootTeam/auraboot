@@ -49,6 +49,9 @@ public class PermissionDTO {
     // Metadata
     private Map<String, Object> extension;
     private String[] tags;
+
+    // Policy Schema (configurable parameters for this permission)
+    private Object policySchema;
     
     // Lifecycle Status
     private String status;

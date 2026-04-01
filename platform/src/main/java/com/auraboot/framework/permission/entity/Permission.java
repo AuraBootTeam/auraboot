@@ -150,11 +150,18 @@ public class Permission {
      */
     @TableField(typeHandler = JacksonTypeHandler.class)
     private Object extension;
-    
+
     /**
      * Tags (标签数组)
      */
     private String[] tags;
+
+    /**
+     * Policy Schema (JSONB) - defines configurable parameters for this permission.
+     * Example: {"maxApprovalAmount": {"type": "number", "label": "Max Approval Amount"}}
+     */
+    @TableField(typeHandler = JacksonTypeHandler.class)
+    private Object policySchema;
 
     /**
      * 插件PID（用于标识资源来源的插件）

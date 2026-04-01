@@ -8,8 +8,11 @@ import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.permission.dto.DataScopeUpdateRequest;
 import com.auraboot.framework.permission.dto.PermissionGrantRequest;
 import com.auraboot.framework.permission.dto.PermissionMatrixDTO;
+import com.auraboot.framework.permission.entity.Permission;
+import com.auraboot.framework.permission.mapper.PermissionMapper;
 import com.auraboot.framework.permission.service.DataScopeService;
 import com.auraboot.framework.permission.service.PermissionMatrixService;
+import com.auraboot.framework.permission.service.PermissionPolicyService;
 import com.auraboot.framework.rbac.entity.Role;
 import com.auraboot.framework.rbac.service.RoleService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -23,6 +26,7 @@ import org.springframework.web.bind.annotation.*;
 import static com.auraboot.framework.common.constant.ResponseCode.BadParam;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Permission Matrix Controller
@@ -49,6 +53,8 @@ public class PermissionMatrixController {
     private final PermissionMatrixService matrixService;
     private final RoleService roleService;
     private final DataScopeService dataScopeService;
+    private final PermissionPolicyService policyService;
+    private final PermissionMapper permissionMapper;
 
     /**
      * Get the full permission matrix (no role context, all granted=false).
@@ -116,5 +122,57 @@ public class PermissionMatrixController {
             request.resourceCode(), request.actionCode(),
             request.scopeType(), request.mergeStrategy());
         return ApiResponse.success();
+    }
+
+    /**
+     * Get policy values for a specific role+permission combination.
+     *
+     * @param rolePid       Role PID
+     * @param permissionPid Permission PID
+     */
+    @GetMapping("/{rolePid}/policy/{permissionPid}")
+    @Operation(summary = "Get policy values for role+permission")
+    public ApiResponse<Map<String, Object>> getPolicy(
+            @PathVariable String rolePid,
+            @PathVariable String permissionPid) {
+        Role role = roleService.findByPid(rolePid);
+        if (role == null) {
+            throw new RootUnCheckedException(BadParam, "Role not found by PID: " + rolePid);
+        }
+        Permission permission = findPermissionByPid(permissionPid);
+        Map<String, Object> policy = policyService.getPolicy(role.getId(), permission.getId());
+        return ApiResponse.success(policy);
+    }
+
+    /**
+     * Set policy values for a specific role+permission combination.
+     *
+     * @param rolePid       Role PID
+     * @param permissionPid Permission PID
+     * @param policyValues  Policy parameter values
+     */
+    @PutMapping("/{rolePid}/policy/{permissionPid}")
+    @Operation(summary = "Set policy values for role+permission")
+    public ApiResponse<Void> setPolicy(
+            @PathVariable String rolePid,
+            @PathVariable String permissionPid,
+            @RequestBody Map<String, Object> policyValues) {
+        Role role = roleService.findByPid(rolePid);
+        if (role == null) {
+            throw new RootUnCheckedException(BadParam, "Role not found by PID: " + rolePid);
+        }
+        Permission permission = findPermissionByPid(permissionPid);
+        log.info("Setting policy for role+permission: rolePid={}, permissionPid={}, keys={}",
+                rolePid, permissionPid, policyValues.keySet());
+        policyService.setPolicy(role.getId(), permission.getId(), policyValues);
+        return ApiResponse.success();
+    }
+
+    private Permission findPermissionByPid(String permissionPid) {
+        List<Permission> permissions = permissionMapper.findByPids(List.of(permissionPid));
+        if (permissions.isEmpty()) {
+            throw new RootUnCheckedException(BadParam, "Permission not found by PID: " + permissionPid);
+        }
+        return permissions.get(0);
     }
 }

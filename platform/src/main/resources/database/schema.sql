@@ -208,6 +208,7 @@ CREATE TABLE IF NOT EXISTS ab_permission (
     data_scope_config JSONB,
     extension JSONB,
     tags TEXT[],
+    policy_schema JSONB,
     status TEXT NOT NULL DEFAULT 'active',
     deprecated_at TIMESTAMPTZ,
     archived_at TIMESTAMPTZ,
