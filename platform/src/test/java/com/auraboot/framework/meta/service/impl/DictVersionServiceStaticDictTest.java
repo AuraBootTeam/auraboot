@@ -61,9 +61,7 @@ class DictVersionServiceStaticDictTest {
         objectMapper = new ObjectMapper();
         
         // 设置租户上下文
-        MetaContext.setCurrentTenantId(1L);
-
-        MetaContext.setCurrentUserId(100L);
+        MetaContext.setContext(1L, 100L, null, null);
     }
     
     // ==================== STATIC字典加载测试 ====================

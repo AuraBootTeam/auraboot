@@ -48,7 +48,7 @@ class CacheKeyGenerationTest {
         // Given: 设置租户上下文
         Long tenantId = 100L;
 
-        MetaContext.setCurrentTenantId(tenantId);
+        MetaContext.setSystemTenantContext(tenantId);
           
 
         
@@ -84,7 +84,7 @@ class CacheKeyGenerationTest {
     @DisplayName("测试2: 不同租户生成不同缓存键")
     void testDifferentTenantsGenerateDifferentCacheKeys() {
         // Given: 租户1的上下文
-        MetaContext.setCurrentTenantId(100L);
+        MetaContext.setSystemTenantContext(100L);
 
         
         String dictCode = "test_dict";
@@ -95,7 +95,7 @@ class CacheKeyGenerationTest {
         
         // Given: 切换到租户2
         MetaContext.clear();
-        MetaContext.setCurrentTenantId(200L);
+        MetaContext.setSystemTenantContext(200L);
 
         
         // When: 生成租户2的缓存键
@@ -121,7 +121,7 @@ class CacheKeyGenerationTest {
     @DisplayName("测试3: 缓存键包含所有必要参数")
     void testCacheKeyIncludesAllNecessaryParameters() {
         // Given: 设置租户上下文
-        MetaContext.setCurrentTenantId(100L);
+        MetaContext.setSystemTenantContext(100L);
 
         
         String dictCode = "test_dict";
@@ -154,7 +154,7 @@ class CacheKeyGenerationTest {
     @DisplayName("测试4: 缓存键处理null值")
     void testCacheKeyHandlesNullValues() {
         // Given: 设置租户上下文
-        MetaContext.setCurrentTenantId(100L);
+        MetaContext.setSystemTenantContext(100L);
 
         
         String dictCode = "test_dict";
@@ -181,7 +181,7 @@ class CacheKeyGenerationTest {
     @DisplayName("测试5: 缓存键不包含敏感信息")
     void testCacheKeyDoesNotContainSensitiveInfo() {
         // Given: 设置租户上下文
-        MetaContext.setCurrentTenantId(100L);
+        MetaContext.setSystemTenantContext(100L);
 
         
         String dictCode = "user_dict";
@@ -209,7 +209,7 @@ class CacheKeyGenerationTest {
     @DisplayName("测试6: 缓存键长度合理")
     void testCacheKeyLengthIsReasonable() {
         // Given: 设置租户上下文
-        MetaContext.setCurrentTenantId(100L);
+        MetaContext.setSystemTenantContext(100L);
 
         String dictCode = "very_long_dictionary_code_name";
         String versionStrategy = "pinned";
@@ -237,7 +237,7 @@ class CacheKeyGenerationTest {
     @DisplayName("测试7: 缓存键一致性")
     void testCacheKeyConsistency() {
         // Given: 设置租户上下文
-        MetaContext.setCurrentTenantId(100L);
+        MetaContext.setSystemTenantContext(100L);
 
         
         String dictCode = "test_dict";
@@ -266,7 +266,7 @@ class CacheKeyGenerationTest {
     @DisplayName("测试8: 缓存键特殊字符处理")
     void testCacheKeyHandlesSpecialCharacters() {
         // Given: 设置包含特殊字符的租户上下文
-        MetaContext.setCurrentTenantId(999L);
+        MetaContext.setSystemTenantContext(999L);
 
         
         String dictCode = "dict_with-special.chars";
@@ -292,7 +292,7 @@ class CacheKeyGenerationTest {
     @DisplayName("测试9: 级联字典缓存键生成")
     void testCascadeDictCacheKeyGeneration() {
         // Given: 设置租户上下文
-        MetaContext.setCurrentTenantId(100L);
+        MetaContext.setSystemTenantContext(100L);
 
         
         String dictCode = "cascade_dict";
@@ -321,7 +321,7 @@ class CacheKeyGenerationTest {
     @DisplayName("测试10: 缓存键分隔符一致性")
     void testCacheKeySeparatorConsistency() {
         // Given: 设置租户上下文
-        MetaContext.setCurrentTenantId(100L);
+        MetaContext.setSystemTenantContext(100L);
 
         
         String dictCode = "test_dict";

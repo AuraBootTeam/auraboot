@@ -116,7 +116,7 @@ public class MybatisPlusConfigTest {
     public void testGetTenantIdWithContext() {
         // Given
         Long expectedTenantId = 12345L;
-        MetaContext.setCurrentTenantId(expectedTenantId);
+        MetaContext.setSystemTenantContext(expectedTenantId);
 
         // When
         MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect);
@@ -294,7 +294,6 @@ public class MybatisPlusConfigTest {
     @DisplayName("验证已恢复租户隔离的表不被忽略")
     public void testRestoredTenantIsolationTables() {
         String[] restoredTables = {
-                "ab_user_role",
                 "ab_plugin_import_log",
                 "ab_review"
         };
@@ -314,6 +313,32 @@ public class MybatisPlusConfigTest {
             }
         } catch (Exception e) {
             fail("Failed to test restored tenant isolation tables: " + e.getMessage());
+        }
+    }
+
+    @Test
+    @DisplayName("验证登录前显式tenant查询表仍被忽略")
+    public void testExplicitTenantLookupTablesStillIgnored() {
+        String[] explicitTenantLookupTables = {
+                "ab_user_role",
+                "ab_role"
+        };
+
+        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect);
+        TenantLineInnerInterceptor tenantInterceptor =
+                (TenantLineInnerInterceptor) interceptor.getInterceptors().get(0);
+
+        try {
+            var field = TenantLineInnerInterceptor.class.getDeclaredField("tenantLineHandler");
+            field.setAccessible(true);
+            TenantLineHandler handler = (TenantLineHandler) field.get(tenantInterceptor);
+
+            for (String tableName : explicitTenantLookupTables) {
+                assertTrue(handler.ignoreTable(tableName),
+                        "Table '" + tableName + "' should remain ignored because queries pass tenantId explicitly");
+            }
+        } catch (Exception e) {
+            fail("Failed to test explicit tenant lookup tables: " + e.getMessage());
         }
     }
 
