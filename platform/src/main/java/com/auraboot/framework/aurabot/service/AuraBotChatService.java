@@ -64,15 +64,15 @@ public class AuraBotChatService {
     @Qualifier("asyncTaskExecutor")
     private final Executor asyncTaskExecutor;
 
-    /** Optional RAG context provider — available when enterprise-ai module is loaded. */
+    /** Optional RAG context provider from the shared AI runtime. */
     @Autowired(required = false)
     private RagContextProvider ragContextProvider;
 
-    /** Optional ACP Agent chat port — available when enterprise-ai module is loaded. */
+    /** Optional ACP agent chat port from the shared AI runtime. */
     @Autowired(required = false)
     private com.auraboot.framework.agent.port.AgentChatPort agentChatPort;
 
-    /** Optional chat run persistence — available when enterprise-ai module is loaded. */
+    /** Optional chat run persistence from the shared AI runtime. */
     @Autowired(required = false)
     private ChatRunPersistencePort chatRunPersistencePort;
 
@@ -181,8 +181,7 @@ public class AuraBotChatService {
         String agentCode = request.getAgentCode();
         if (agentCode != null && !agentCode.isBlank() && !"aurabot".equals(agentCode)) {
             if (agentChatPort == null) {
-                // Enterprise-AI module not loaded — fall through to AuraBot
-                log.warn("agentCode='{}' requested but AgentChatPort is not available (enterprise-ai module not loaded). " +
+                log.warn("agentCode='{}' requested but AgentChatPort is not available in the current runtime. " +
                         "Falling back to AuraBot.", agentCode);
             } else if (!agentChatPort.agentExists(tenantId, agentCode)) {
                 sendError(emitter, "Agent not found or inactive: " + agentCode);

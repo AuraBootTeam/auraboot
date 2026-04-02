@@ -375,7 +375,7 @@ public class DeviceModelTestHelpers {
         // 为测试用户分配设备管理员角色
         UserRole userRole = new UserRole();
         userRole.setPid(generatePid()); // 设置PID避免唯一约束冲突
-        userRole.setUserId(Long.valueOf(userPid.hashCode())); // 简化处理
+        userRole.setMemberId(Long.valueOf(userPid.hashCode())); // Simplified synthetic member ID for test fixtures
         userRole.setRoleId(roleIdMap.get("device_admin"));
         userRole.setTenantId(tenantId);
         userRole.setStatus("active");

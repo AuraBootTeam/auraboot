@@ -42,17 +42,19 @@ class SchemaPublishedEventIntegrationTest extends BaseIntegrationTest {
                 "draft",
                 pageKey,
                 "event_model_" + suffix,
-                "model",
                 "Event Test Page " + pageKey,
-                "Event Test Title",
+                "\"Event Test Title\"",
                 "Event test description",
                 "list",
+                "default",
+                "{}",
                 "{\"blocks\":[]}",
                 3,
                 false,
                 null,
                 null,
                 0,
+                "{}",
                 null
         );
 

@@ -87,6 +87,7 @@ class SubjectPermissionServiceIntegrationTest {
     private String testSuffix;
     private User testUser;
     private Tenant testTenant;
+    private TenantMember testTenantMember;
     private Role testRole;
     private Permission testPermission1;
     private Permission testPermission2;
@@ -100,7 +101,7 @@ class SubjectPermissionServiceIntegrationTest {
     void setupTestData() {
         testUser = ensureTestUser();
         testTenant = ensureTestTenant();
-        ensureTestTenantMember();
+        testTenantMember = ensureTestTenantMember();
         
         // Set MetaContext BEFORE creating any entities that need tenant_id
         MetaContext.setContext(
@@ -163,12 +164,13 @@ class SubjectPermissionServiceIntegrationTest {
         return tenantService.createTenant(tenant);
     }
 
-    private void ensureTestTenantMember() {
+    private TenantMember ensureTestTenantMember() {
         TenantMember existing = tenantMemberService.findByTenantIdAndUserId(
             testTenant.getId(), testUser.getId());
         if (existing == null) {
-            tenantMemberService.addMember(testUser.getId(), testTenant.getId(), "active");
+            return tenantMemberService.addMember(testUser.getId(), testTenant.getId(), "active");
         }
+        return existing;
     }
 
     private Role createFreshRole() {
@@ -193,8 +195,8 @@ class SubjectPermissionServiceIntegrationTest {
     }
 
     private void ensureUserRoleBinding() {
-        userRoleService.assignRolesToUser(
-            testUser.getId(),
+        userRoleService.assignRolesToMember(
+            testTenantMember.getId(),
             Arrays.asList(testRole.getId()),
             testTenant.getId(),
             null

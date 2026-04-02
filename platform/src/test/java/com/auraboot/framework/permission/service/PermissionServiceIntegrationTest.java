@@ -82,6 +82,7 @@ class PermissionServiceIntegrationTest {
     private String testSuffix;
     private User testUser;
     private Tenant testTenant;
+    private TenantMember testTenantMember;
     private Role testRole;
 
     // State shared between ordered tests
@@ -92,7 +93,7 @@ class PermissionServiceIntegrationTest {
         testSuffix = "_" + System.currentTimeMillis();
         testUser = ensureTestUser();
         testTenant = ensureTestTenant();
-        ensureTestTenantMember();
+        testTenantMember = ensureTestTenantMember();
 
         MetaContext.setContext(
             testTenant.getId(),
@@ -140,12 +141,13 @@ class PermissionServiceIntegrationTest {
         return tenantService.createTenant(tenant);
     }
 
-    private void ensureTestTenantMember() {
+    private TenantMember ensureTestTenantMember() {
         TenantMember existing = tenantMemberService.findByTenantIdAndUserId(
             testTenant.getId(), testUser.getId());
         if (existing == null) {
-            tenantMemberService.addMember(testUser.getId(), testTenant.getId(), "active");
+            return tenantMemberService.addMember(testUser.getId(), testTenant.getId(), "active");
         }
+        return existing;
     }
 
     private Role createFreshRole() {
@@ -170,8 +172,8 @@ class PermissionServiceIntegrationTest {
     }
 
     private void ensureUserRoleBinding() {
-        userRoleService.assignRolesToUser(
-            testUser.getId(),
+        userRoleService.assignRolesToMember(
+            testTenantMember.getId(),
             Arrays.asList(testRole.getId()),
             testTenant.getId(),
             null

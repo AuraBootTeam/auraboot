@@ -69,6 +69,7 @@ class DataPermissionEngineIntegrationTest {
     private String testSuffix;
     private User localUser;
     private Tenant localTenant;
+    private TenantMember localTenantMember;
     private Role localRole;
     
     @BeforeAll
@@ -80,7 +81,7 @@ class DataPermissionEngineIntegrationTest {
     void setUp() {
         localUser = ensureTestUser();
         localTenant = ensureTestTenant();
-        ensureTestTenantMember();
+        localTenantMember = ensureTestTenantMember();
         localRole = createFreshRole();
         ensureUserRoleBinding();
         
@@ -121,12 +122,13 @@ class DataPermissionEngineIntegrationTest {
         return tenantService.createTenant(tenant);
     }
     
-    private void ensureTestTenantMember() {
+    private TenantMember ensureTestTenantMember() {
         TenantMember existing = tenantMemberService.findByTenantIdAndUserId(
             localTenant.getId(), localUser.getId());
         if (existing == null) {
-            tenantMemberService.addMember(localUser.getId(), localTenant.getId(), "active");
+            return tenantMemberService.addMember(localUser.getId(), localTenant.getId(), "active");
         }
+        return existing;
     }
     
     private Role createFreshRole() {
@@ -149,11 +151,11 @@ class DataPermissionEngineIntegrationTest {
     }
     
     private void ensureUserRoleBinding() {
-        UserRole existing = userRoleService.findByUserIdAndRoleIdAndTenantId(
-            localUser.getId(), localRole.getId(), localTenant.getId());
+        UserRole existing = userRoleService.findByMemberIdAndRoleIdAndTenantId(
+            localTenantMember.getId(), localRole.getId(), localTenant.getId());
         if (existing == null) {
-            userRoleService.assignRolesToUser(
-                localUser.getId(),
+            userRoleService.assignRolesToMember(
+                localTenantMember.getId(),
                 Arrays.asList(localRole.getId()),
                 localTenant.getId(),
                 null

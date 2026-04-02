@@ -3,11 +3,10 @@ package com.auraboot.framework.agent.port;
 import java.util.Map;
 
 /**
- * Port interface for tool execution — defined in core module, implemented in enterprise-ai module.
- * Allows AuraBotChatService to delegate tool execution to ToolLoopService without compile-time dependency.
+ * Port interface for tool execution in the shared AI runtime.
+ * Allows AuraBotChatService to delegate tool execution to ToolLoopService without compile-time coupling.
  *
- * When enterprise-ai module is loaded, ToolLoopService implements this interface.
- * When not loaded, AuraBotChatService falls back to ChatToolExecutor.
+ * ToolLoopService is the primary implementation.
  */
 public interface ToolExecutionPort {
 

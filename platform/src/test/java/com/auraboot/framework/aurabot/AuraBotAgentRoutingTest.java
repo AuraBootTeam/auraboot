@@ -89,7 +89,12 @@ public class AuraBotAgentRoutingTest extends BaseIntegrationTest {
     @DisplayName("agentCode=null routes to AuraBot (AgentChatPort not called)")
     void nullAgentCode_usesAuraBot() throws Exception {
         Long tenantId = getTestTenant().getId();
-        MetaContext.setCurrentTenantId(tenantId);
+        Long userId = getTestUser().getId();
+        String userPid = getTestUser().getPid();
+        String username = getTestUser().getUserName();
+        Long memberId = getTestTenantMember().getId();
+        MetaContext.setContext(tenantId, userId, userPid, username);
+        MetaContext.setMemberId(memberId);
         try {
             ChatRequest request = buildRequest("Hello AuraBot", null);
 
@@ -99,7 +104,7 @@ public class AuraBotAgentRoutingTest extends BaseIntegrationTest {
 
             // This will attempt to call LLM (which has no real key) and will send an error via SSE.
             // What matters is that agentChatPort is never called.
-            auraBotChatService.streamChat(tenantId, request, emitter);
+            auraBotChatService.streamChat(tenantId, userId, userPid, username, memberId, request, emitter);
 
             // Give the async task a moment to start
             Thread.sleep(200);
@@ -120,12 +125,17 @@ public class AuraBotAgentRoutingTest extends BaseIntegrationTest {
     @DisplayName("agentCode='aurabot' routes to AuraBot (AgentChatPort not called)")
     void aurabotAgentCode_usesAuraBot() throws Exception {
         Long tenantId = getTestTenant().getId();
-        MetaContext.setCurrentTenantId(tenantId);
+        Long userId = getTestUser().getId();
+        String userPid = getTestUser().getPid();
+        String username = getTestUser().getUserName();
+        Long memberId = getTestTenantMember().getId();
+        MetaContext.setContext(tenantId, userId, userPid, username);
+        MetaContext.setMemberId(memberId);
         try {
             ChatRequest request = buildRequest("Hello AuraBot", "aurabot");
 
             SseEmitter emitter = new SseEmitter(1_000L);
-            auraBotChatService.streamChat(tenantId, request, emitter);
+            auraBotChatService.streamChat(tenantId, userId, userPid, username, memberId, request, emitter);
 
             Thread.sleep(200);
 
@@ -145,14 +155,19 @@ public class AuraBotAgentRoutingTest extends BaseIntegrationTest {
     @DisplayName("agentCode='nonexistent' with missing agent → agentExists checked, streamAgentChat not called")
     void nonexistentAgentCode_sendsErrorAndDoesNotDelegate() throws Exception {
         Long tenantId = getTestTenant().getId();
-        MetaContext.setCurrentTenantId(tenantId);
+        Long userId = getTestUser().getId();
+        String userPid = getTestUser().getPid();
+        String username = getTestUser().getUserName();
+        Long memberId = getTestTenantMember().getId();
+        MetaContext.setContext(tenantId, userId, userPid, username);
+        MetaContext.setMemberId(memberId);
         try {
             // Configure mock: agent does NOT exist
             when(agentChatPort.agentExists(eq(tenantId), eq("nonexistent"))).thenReturn(false);
 
             SseEmitter emitter = new SseEmitter(1_000L);
             ChatRequest request = buildRequest("Hello", "nonexistent");
-            auraBotChatService.streamChat(tenantId, request, emitter);
+            auraBotChatService.streamChat(tenantId, userId, userPid, username, memberId, request, emitter);
 
             // Wait for async routing to execute
             awaitAsyncRouting(1000);
@@ -176,7 +191,12 @@ public class AuraBotAgentRoutingTest extends BaseIntegrationTest {
     @DisplayName("agentCode='test_agent' with existing agent → delegates to AgentChatPort.streamAgentChat")
     void existingAgentCode_delegatesToAgentChatPort() throws Exception {
         Long tenantId = getTestTenant().getId();
-        MetaContext.setCurrentTenantId(tenantId);
+        Long userId = getTestUser().getId();
+        String userPid = getTestUser().getPid();
+        String username = getTestUser().getUserName();
+        Long memberId = getTestTenantMember().getId();
+        MetaContext.setContext(tenantId, userId, userPid, username);
+        MetaContext.setMemberId(memberId);
         try {
             String agentCode = "test_agent";
 
@@ -186,7 +206,7 @@ public class AuraBotAgentRoutingTest extends BaseIntegrationTest {
 
             SseEmitter emitter = new SseEmitter(1_000L);
             ChatRequest request = buildRequest("Hello agent", agentCode);
-            auraBotChatService.streamChat(tenantId, request, emitter);
+            auraBotChatService.streamChat(tenantId, userId, userPid, username, memberId, request, emitter);
 
             // Wait for async routing to execute
             awaitAsyncRouting(1000);
@@ -212,12 +232,17 @@ public class AuraBotAgentRoutingTest extends BaseIntegrationTest {
     @DisplayName("agentCode='' (blank) routes to AuraBot (AgentChatPort not called)")
     void blankAgentCode_usesAuraBot() throws Exception {
         Long tenantId = getTestTenant().getId();
-        MetaContext.setCurrentTenantId(tenantId);
+        Long userId = getTestUser().getId();
+        String userPid = getTestUser().getPid();
+        String username = getTestUser().getUserName();
+        Long memberId = getTestTenantMember().getId();
+        MetaContext.setContext(tenantId, userId, userPid, username);
+        MetaContext.setMemberId(memberId);
         try {
             ChatRequest request = buildRequest("Hello", "   ");
 
             SseEmitter emitter = new SseEmitter(1_000L);
-            auraBotChatService.streamChat(tenantId, request, emitter);
+            auraBotChatService.streamChat(tenantId, userId, userPid, username, memberId, request, emitter);
 
             Thread.sleep(200);
 

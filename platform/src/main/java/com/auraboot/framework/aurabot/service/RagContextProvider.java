@@ -4,7 +4,7 @@ import java.util.List;
 
 /**
  * SPI interface for RAG context injection into AuraBot.
- * Implemented by RagRetrievalService in the enterprise-ai module.
+ * Implemented by RagRetrievalService in the shared AI runtime.
  * Optional — when no implementation is available, AuraBot works without RAG.
  */
 public interface RagContextProvider {

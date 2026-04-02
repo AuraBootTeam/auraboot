@@ -34,8 +34,10 @@ dependencies {
     // SLF4J for @Slf4j
     compileOnly 'org.slf4j:slf4j-api:2.0.12'
 
-    // Test — use platform JAR directly (avoids pulling in root project's transitive BOM deps)
-    testImplementation files("${project(':').buildDir}/libs/AuraBoot-1.0.0-SNAPSHOT-plain.jar")
+    // Test against root platform classes only; avoid pulling the full root runtime graph
+    testImplementation(project(':')) {
+        transitive = false
+    }
     testImplementation 'org.springframework:spring-beans:6.2.6'
     testImplementation 'org.springframework.boot:spring-boot:3.5.6'
     testImplementation 'org.slf4j:slf4j-api:2.0.12'
@@ -51,6 +53,4 @@ compileJava {
 
 test {
     useJUnitPlatform()
-    // Ensure root project JAR is built before running tests
-    dependsOn ':jar'
 }
