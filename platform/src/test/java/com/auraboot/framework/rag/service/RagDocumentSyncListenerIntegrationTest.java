@@ -6,8 +6,8 @@ import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.module.meta.event.CommandCompletedEvent;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.util.List;
 import java.util.Map;
@@ -30,10 +30,10 @@ class RagDocumentSyncListenerIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
-    @MockBean
+    @MockitoBean
     private EmbeddingService embeddingService;
 
-    @MockBean
+    @MockitoBean
     private FileService fileService;
 
     @BeforeEach

@@ -10,8 +10,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.annotation.Rollback;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -51,7 +51,7 @@ public class AuraBotAgentRoutingTest extends BaseIntegrationTest {
      * Mock the AgentChatPort so we can control its behaviour without the
      * full AI execution stack (which needs real agent DB rows, LLM keys, etc.).
      */
-    @MockBean
+    @MockitoBean
     private AgentChatPort agentChatPort;
 
     // =========================================================================

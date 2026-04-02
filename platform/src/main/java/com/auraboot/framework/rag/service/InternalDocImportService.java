@@ -73,7 +73,7 @@ public class InternalDocImportService {
         int failed = 0;
 
         for (Path file : mdFiles) {
-            String relativePath = basePath.getParent().relativize(file).toString();
+            String relativePath = basePath.relativize(file).toString();
             try {
                 String content = Files.readString(file);
                 String hash = sha256(content);

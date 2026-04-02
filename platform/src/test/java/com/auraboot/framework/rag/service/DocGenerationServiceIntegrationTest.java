@@ -5,7 +5,7 @@ import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.rag.service.DocGenerationService.GenerationResult;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -23,10 +23,10 @@ class DocGenerationServiceIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private DocGenerationService docGenerationService;
 
-    @MockBean
+    @MockitoBean
     private EmbeddingService embeddingService;
 
-    @MockBean
+    @MockitoBean
     private FileService fileService;
 
     @Test
