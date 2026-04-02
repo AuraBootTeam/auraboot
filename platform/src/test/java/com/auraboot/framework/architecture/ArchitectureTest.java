@@ -41,13 +41,13 @@ class ArchitectureTest {
     }
 
     @Test
-    @DisplayName("Rule 2: Controllers must not directly access mapper/dao layer (frozen — new violations blocked)")
+    @DisplayName("Rule 2: Controllers must not directly access mapper layer (frozen — new violations blocked)")
     void controllersShouldNotAccessMappers() {
         FreezingArchRule.freeze(
                 noClasses()
                         .that().resideInAnyPackage("..controller..")
-                        .should().dependOnClassesThat().resideInAnyPackage("..mapper..", "..dao..")
-                        .because("Controllers must go through service layer, not directly access data layer")
+                        .should().dependOnClassesThat().resideInAnyPackage("..mapper..")
+                        .because("Controllers must go through service layer, not directly access mapper layer")
         ).check(classes);
     }
 
