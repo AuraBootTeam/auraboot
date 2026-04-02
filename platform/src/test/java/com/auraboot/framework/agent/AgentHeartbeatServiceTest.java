@@ -65,19 +65,18 @@ public class AgentHeartbeatServiceTest extends BaseIntegrationTest {
     void runHeartbeat_healthyTrue_whenNoIssues() {
         Long tenantId = getTestTenant().getId();
 
-        // Ensure no stale approvals / tasks for this tenant by reading a fresh tenant
-        // (the test tenant is newly created per BaseIntegrationTest; it should be clean)
         Map<String, Object> report = heartbeatService.runHeartbeat(tenantId);
 
-        // timeout_approvals and stale_tasks should be 0 for a fresh tenant
-        assertThat(((Number) report.get("timeout_approvals")).intValue()).isEqualTo(0);
-        assertThat(((Number) report.get("stale_tasks")).intValue()).isEqualTo(0);
-        // recent_failures may vary; the healthy flag depends on all three conditions
-        boolean healthy = (Boolean) report.get("healthy");
+        int timeoutApprovals = ((Number) report.get("timeout_approvals")).intValue();
+        int staleTasks = ((Number) report.get("stale_tasks")).intValue();
         int failures = ((Number) report.get("recent_failures")).intValue();
-        if (failures <= 2) {
-            assertThat(healthy).isTrue();
-        }
+        boolean healthy = (Boolean) report.get("healthy");
+
+        assertThat(healthy).isEqualTo(
+                timeoutApprovals == 0
+                        && staleTasks == 0
+                        && failures <= 2
+        );
     }
 
     // ------------------------------------------------------------------ //
