@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Locale;
 
 /**
  * CRUD service for knowledge bases, documents, and chunks.
@@ -125,13 +126,14 @@ public class KnowledgeBaseService {
     public KbDocument createDocument(Long tenantId, Long userId, String kbPid,
                                       String docName, String docType, String filePid,
                                       Long fileSize, String sourceType, String sourceEntityId) {
+        String normalizedDocType = normalizeDocTypeForStorage(docType);
         KbDocument doc = KbDocument.builder()
                 .pid(UniqueIdGenerator.generate())
                 .tenantId(tenantId)
                 .kbId(kbPid)
                 .filePid(filePid)
                 .docName(docName)
-                .docType(docType.toLowerCase())
+                .docType(normalizedDocType)
                 .fileSize(fileSize != null ? fileSize : 0L)
                 .charCount(0)
                 .chunkCount(0)
@@ -145,6 +147,7 @@ public class KnowledgeBaseService {
         jdbcTemplate.update(
                 "UPDATE ab_knowledge_base SET doc_count = doc_count + 1, updated_at = NOW() WHERE pid = ?",
                 kbPid);
+        doc.setDocType(formatDocTypeForDisplay(doc.getDocType()));
         return doc;
     }
 
@@ -243,7 +246,7 @@ public class KnowledgeBaseService {
                 .pid(doc.getPid())
                 .kbId(doc.getKbId())
                 .docName(doc.getDocName())
-                .docType(doc.getDocType())
+                .docType(formatDocTypeForDisplay(doc.getDocType()))
                 .fileSize(doc.getFileSize())
                 .charCount(doc.getCharCount())
                 .chunkCount(doc.getChunkCount())
@@ -254,5 +257,13 @@ public class KnowledgeBaseService {
                 .processCompletedAt(doc.getProcessCompletedAt())
                 .createdAt(doc.getCreatedAt())
                 .build();
+    }
+
+    private String normalizeDocTypeForStorage(String docType) {
+        return docType == null ? null : docType.toLowerCase(Locale.ROOT);
+    }
+
+    private String formatDocTypeForDisplay(String docType) {
+        return docType == null ? null : docType.toUpperCase(Locale.ROOT);
     }
 }
