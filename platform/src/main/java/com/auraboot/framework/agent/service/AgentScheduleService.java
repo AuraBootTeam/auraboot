@@ -7,6 +7,7 @@ import com.auraboot.framework.agent.provider.ToolProviderRegistry;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,6 +28,8 @@ import java.util.concurrent.ScheduledFuture;
 @Service
 @RequiredArgsConstructor
 public class AgentScheduleService {
+
+    private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
 
     /** Cron expression for the HEARTBEAT schedule: every 30 minutes. */
     public static final String HEARTBEAT_CRON = "0 */30 * * * *";
@@ -112,7 +115,7 @@ public class AgentScheduleService {
         try {
             String templateJson = (String) schedule.get("task_template");
             Map<String, Object> template = templateJson != null && !templateJson.isBlank()
-                    ? objectMapper.readValue(templateJson, Map.class)
+                    ? objectMapper.readValue(templateJson, MAP_TYPE)
                     : Map.of();
 
             String taskPid = UniqueIdGenerator.generate();
