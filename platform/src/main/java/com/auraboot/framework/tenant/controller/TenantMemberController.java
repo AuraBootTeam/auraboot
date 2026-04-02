@@ -8,11 +8,18 @@ import com.auraboot.framework.meta.dto.PaginationResult;
 import com.auraboot.framework.tenant.controller.request.ApproveRequest;
 import com.auraboot.framework.tenant.dto.MemberQueryRequest;
 import com.auraboot.framework.tenant.dto.MemberResponse;
+import com.auraboot.framework.tenant.dto.TenantMemberImportRow;
+import com.auraboot.framework.tenant.dto.TenantMemberImportResult;
 import com.auraboot.framework.tenant.service.CurrentUserTeamResolver;
 import com.auraboot.framework.tenant.service.TenantMemberApplicationService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
@@ -90,6 +97,32 @@ public class TenantMemberController {
     @ResponseBody
     public ApiResponse<List<Map<String, Object>>> getMemberTeams(@PathVariable String memberPid) {
         return ApiResponse.success(memberApplicationService.getMemberTeams(memberPid));
+    }
+
+    @GetMapping("/import/template")
+    @ResponseBody
+    public ResponseEntity<Resource> downloadImportTemplate() {
+        Resource resource = memberApplicationService.downloadImportTemplate();
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"tenant-members-import-template.xlsx\"")
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(resource);
+    }
+
+    @PostMapping("/import")
+    @ResponseBody
+    public ApiResponse<TenantMemberImportResult> importMembers(
+            @RequestParam("file") MultipartFile file,
+            @CurrentUserId Long userId) {
+        return ApiResponse.success(memberApplicationService.importMembers(file, userId));
+    }
+
+    @PostMapping("/import-rows")
+    @ResponseBody
+    public ApiResponse<TenantMemberImportResult> importMembersFromRows(
+            @RequestBody List<TenantMemberImportRow> rows,
+            @CurrentUserId Long userId) {
+        return ApiResponse.success(memberApplicationService.importMembers(rows, userId));
     }
 
     @PostMapping("/batch-delete")
