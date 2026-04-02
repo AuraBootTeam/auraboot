@@ -46,7 +46,7 @@ class AuraBotToolRoutingIntegrationTest extends BaseIntegrationTest {
     @BeforeEach
     void setUpContext() {
         tenantId = getTestTenant().getId();
-        MetaContext.setCurrentTenantId(tenantId);
+        MetaContext.setSystemTenantContext(tenantId);
     }
 
     @AfterEach
