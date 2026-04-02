@@ -159,7 +159,7 @@ public class CustomerServiceAgentIntegrationTest extends BaseIntegrationTest {
         await().atMost(30, TimeUnit.SECONDS)
                 .pollInterval(2, TimeUnit.SECONDS)
                 .untilAsserted(() -> {
-                    MetaContext.setCurrentTenantId(tenantId);
+                    MetaContext.setSystemTenantContext(tenantId);
                     String sql = "SELECT pid, task_status, title FROM ab_agent_task " +
                             "WHERE tenant_id = #{params.tenantId} " +
                             "AND assignee_id = 'cs_agent' " +
@@ -180,7 +180,7 @@ public class CustomerServiceAgentIntegrationTest extends BaseIntegrationTest {
         await().atMost(120, TimeUnit.SECONDS)
                 .pollInterval(5, TimeUnit.SECONDS)
                 .untilAsserted(() -> {
-                    MetaContext.setCurrentTenantId(tenantId);
+                    MetaContext.setSystemTenantContext(tenantId);
                     String sql = "SELECT pid, run_status, error_message FROM ab_agent_run " +
                             "WHERE tenant_id = #{params.tenantId} " +
                             "AND task_id = #{params.taskPid} " +
@@ -253,7 +253,7 @@ public class CustomerServiceAgentIntegrationTest extends BaseIntegrationTest {
         await().atMost(120, TimeUnit.SECONDS)
                 .pollInterval(5, TimeUnit.SECONDS)
                 .untilAsserted(() -> {
-                    MetaContext.setCurrentTenantId(tenantId);
+                    MetaContext.setSystemTenantContext(tenantId);
                     String sql = "SELECT run_status FROM ab_agent_run " +
                             "WHERE tenant_id = #{params.tenantId} " +
                             "AND task_id = #{params.taskPid} " +
@@ -312,7 +312,7 @@ public class CustomerServiceAgentIntegrationTest extends BaseIntegrationTest {
         await().atMost(120, TimeUnit.SECONDS)
                 .pollInterval(5, TimeUnit.SECONDS)
                 .untilAsserted(() -> {
-                    MetaContext.setCurrentTenantId(tenantId);
+                    MetaContext.setSystemTenantContext(tenantId);
                     String sql = "SELECT run_status, error_message FROM ab_agent_run " +
                             "WHERE tenant_id = #{params.tenantId} " +
                             "AND task_id = #{params.taskPid} " +
