@@ -50,7 +50,7 @@ class CacheIsolationPropertyTest {
         initContext();
         
         // Given: 设置租户1的上下文
-        MetaContext.setCurrentTenantId(tenant1.getTenantId());
+        MetaContext.setSystemTenantContext(tenant1.getTenantId());
 
         
         // When: 生成租户1的缓存键
@@ -58,7 +58,7 @@ class CacheIsolationPropertyTest {
         
         // Given: 切换到租户2的上下文
         MetaContext.clear();
-        MetaContext.setCurrentTenantId(tenant2.getTenantId());
+        MetaContext.setSystemTenantContext(tenant2.getTenantId());
 
         // When: 生成租户2的缓存键
         String cacheKey2 = generateDictCacheKey(dictCode, versionStrategy, null);
@@ -100,7 +100,7 @@ class CacheIsolationPropertyTest {
         initContext();
         
         // Given: 设置租户上下文
-        MetaContext.setCurrentTenantId(tenant.getTenantId());
+        MetaContext.setSystemTenantContext(tenant.getTenantId());
 
         
         // When: 生成缓存键
@@ -137,7 +137,7 @@ class CacheIsolationPropertyTest {
         // Setup: 初始化上下文
         initContext();
         
-        MetaContext.setCurrentTenantId(tenantId1);
+        MetaContext.setSystemTenantContext(tenantId1);
           
 
         // When: 生成租户1的缓存键
@@ -145,7 +145,7 @@ class CacheIsolationPropertyTest {
         
         // Given: 只改变tenantId
         MetaContext.clear();
-        MetaContext.setCurrentTenantId(tenantId2);
+        MetaContext.setSystemTenantContext(tenantId2);
           
 
         // When: 生成租户2的缓存键
@@ -193,7 +193,7 @@ class CacheIsolationPropertyTest {
         
         for (TenantContext context : contexts) {
             MetaContext.clear();
-            MetaContext.setCurrentTenantId(context.getTenantId());
+            MetaContext.setSystemTenantContext(context.getTenantId());
             
             
             String cacheKey = generateDictCacheKey(dictCode, "latest", null);
