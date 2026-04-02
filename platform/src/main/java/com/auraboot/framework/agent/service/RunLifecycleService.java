@@ -405,7 +405,7 @@ public class RunLifecycleService {
                 log.warn("Stale run detected: pid={}, marking as FAILED", pid);
                 stopHeartbeat(pid); // Clean up any orphaned heartbeat
 
-                MetaContext.setCurrentTenantId(tenantId);
+                MetaContext.setSystemTenantContext(tenantId);
                 try {
                     failRun(tenantId, pid, taskPid, startedAt,
                             "Run stalled — no heartbeat for " + STALE_RUN_THRESHOLD_MINUTES + " minutes");

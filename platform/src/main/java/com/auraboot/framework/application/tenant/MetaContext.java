@@ -68,6 +68,13 @@ public class MetaContext {
         MEMBER_ID.set(memberId);
     }
 
+    /**
+     * Set tenant-scoped context for system/background work with no user identity.
+     */
+    public static void setSystemTenantContext(Long tenantId) {
+        HOLDER.set(new MetaContext(tenantId, null, null, null));
+    }
+
 
     public static   Long getCurrentTenantId() {
         return get().getTenantId();
@@ -102,9 +109,9 @@ public class MetaContext {
         MetaContext current = HOLDER.get();
         if (current != null) {
             HOLDER.set(new MetaContext(tenantId, current.userId, current.userPid, current.username));
-        } else {
-            HOLDER.set(new MetaContext(tenantId,  null, null, null));
+            return;
         }
+        setSystemTenantContext(tenantId);
     }
 
 
