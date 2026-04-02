@@ -8,7 +8,7 @@ import com.auraboot.framework.meta.exception.TemporalParseException;
 import com.auraboot.framework.meta.service.MetaModelService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.mock.mockito.SpyBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -26,7 +26,7 @@ class PayloadTemporalNormalizerTest extends BaseIntegrationTest {
     @Autowired
     PayloadTemporalNormalizer normalizer;
 
-    @SpyBean
+    @MockitoSpyBean
     MetaModelService metaModelService;
 
     private ModelDefinition modelWithFields(FieldDefinition... fields) {

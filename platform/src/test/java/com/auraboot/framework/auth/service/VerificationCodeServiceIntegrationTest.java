@@ -12,7 +12,7 @@ import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.time.Instant;
 
@@ -24,7 +24,7 @@ import static org.mockito.Mockito.*;
  * VerificationCodeService integration tests.
  *
  * <p>DB: real PostgreSQL (verification_code table).
- * External channels (SMS, Email): mocked via @MockBean.
+ * External channels (SMS, Email): mocked via @MockitoBean.
  *
  * <p>Covers:
  * <ul>
@@ -46,10 +46,10 @@ class VerificationCodeServiceIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private VerificationCodeMapper verificationCodeMapper;
 
-    @MockBean
+    @MockitoBean
     private SmsSenderRouter smsSenderRouter;
 
-    @MockBean
+    @MockitoBean
     private EmailSender emailSender;
 
     private final String runId = String.valueOf(System.currentTimeMillis());

@@ -11,7 +11,7 @@ import com.auraboot.framework.i18n.service.I18nResourceService;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,7 +24,7 @@ import static org.mockito.Mockito.*;
 /**
  * Integration tests for {@link AiTranslationService}.
  *
- * <p>Uses {@code @MockBean} for LLM infrastructure (provider factory and provider)
+ * <p>Uses {@code @MockitoBean} for LLM infrastructure (provider factory and provider)
  * while exercising real PostgreSQL for translation storage.
  *
  * <p>Test scenarios:
@@ -47,10 +47,10 @@ class AiTranslationServiceIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private I18nResourceService i18nResourceService;
 
-    @MockBean
+    @MockitoBean
     private LlmProviderFactory llmProviderFactory;
 
-    @MockBean(name = "anthropicLlmProvider")
+    @MockitoBean(name = "anthropicLlmProvider")
     private LlmProvider llmProvider;
 
     /** Unique prefix per test run to avoid key collisions */
