@@ -195,7 +195,8 @@ public class StepLoopService {
                                                       String systemPrompt, String userMessage,
                                                       List<AgentToolDefinition> tools, Map<String, Object> agentDef,
                                                       LlmProvider provider, LlmProviderFactory.ProviderConfig config,
-                                                      TraceContext traceCtx) throws Exception {
+                                                      TraceContext traceCtx,
+                                                      boolean skipApprovalForResumedStep) throws Exception {
         String model = resolveModel(agentDef, config.getProviderCode());
         int maxTokens = config.getMaxTokens() > 0 ? config.getMaxTokens() : 4096;
 
@@ -234,7 +235,7 @@ public class StepLoopService {
             long stepStart = System.currentTimeMillis();
 
             // Check approval gate for this step
-            if (step.isRequiresApproval()) {
+            if (step.isRequiresApproval() && !(skipApprovalForResumedStep && i == startStep)) {
                 String approvalPid = approvalGate.checkAndRequestApproval(
                         tenantId, runPid, taskPid, step.getToolCode() != null ? step.getToolCode() : "step_" + i,
                         step.getDescription(), Map.of("stepIndex", i), true);

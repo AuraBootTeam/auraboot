@@ -54,7 +54,7 @@ public class AgentPromptAssemblyService {
 
         // 1. SOUL — always first (persona, expertise, style, boundaries, goals)
         String soulSection = loadSoulProfile(tenantId, agentCode);
-        appendSection(sb, "identity", soulSection, SOUL_MAX_CHARS);
+        appendSection(sb, "IDENTITY", soulSection, SOUL_MAX_CHARS);
 
         // 2. USER PROFILE — communication preferences and role context
         if (userId != null) {

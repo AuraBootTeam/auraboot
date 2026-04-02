@@ -51,8 +51,11 @@ public class AgentScheduleApprovalGateTest extends BaseIntegrationTest {
 
     // ========== Setup: create agent definitions and their tools ==========
 
-    @BeforeAll
+    @BeforeEach
     void setup() {
+        if (safeAgentPid != null && riskyAgentPid != null) {
+            return;
+        }
         Long tenantId = getTestTenant().getId();
         LocalDateTime now = LocalDateTime.now();
 

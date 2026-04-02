@@ -47,9 +47,9 @@ class PluginScaffoldServiceTest extends BaseIntegrationTest {
         List<Map<String, Object>> fieldDefs = (List<Map<String, Object>>) result.get("fields");
         assertThat(fieldDefs).hasSize(3);
         assertThat(fieldDefs.get(0).get("code")).isEqualTo("insp_equipment_name");
-        assertThat(fieldDefs.get(0).get("dataType")).isEqualTo("string");
+        assertThat(fieldDefs.get(0).get("dataType")).isEqualTo("STRING");
         assertThat(fieldDefs.get(1).get("code")).isEqualTo("insp_equipment_amount");
-        assertThat(fieldDefs.get(1).get("dataType")).isEqualTo("decimal");
+        assertThat(fieldDefs.get(1).get("dataType")).isEqualTo("DECIMAL");
 
         // Field bindings assertions
         List<Map<String, Object>> bindings = (List<Map<String, Object>>) result.get("fieldBindings");

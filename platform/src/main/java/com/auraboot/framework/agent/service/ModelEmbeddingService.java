@@ -24,7 +24,7 @@ public class ModelEmbeddingService {
     private final DynamicDataMapper dynamicDataMapper;
 
     private static final String DEFAULT_PROVIDER = "openai";
-    private static final double SIMILARITY_THRESHOLD = 0.7;
+    private static final double SIMILARITY_THRESHOLD = 0.92;
 
     /**
      * Embed a model's display name and store the vector in ab_meta_model.display_name_embedding.

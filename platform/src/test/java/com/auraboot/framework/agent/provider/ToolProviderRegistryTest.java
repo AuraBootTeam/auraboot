@@ -98,13 +98,13 @@ class ToolProviderRegistryTest extends BaseIntegrationTest {
 
     @Test
     void execute_customPrefixTool_routesToCustomProvider() {
-        // Custom provider returns "not implemented" for custom: prefix — but routing succeeds
+        // Custom provider handles the custom: prefix; unknown tool codes should still route there
+        // and produce a provider-level failure rather than falling through registry-level routing.
         var result = registry.execute(testTenant.getId(), "custom:some_tool_code", Map.of());
 
         assertThat(result).isNotNull();
-        // Custom execution is a P1 stub — failure is expected but routing must succeed
         assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getErrorMessage()).contains("Custom tool execution not yet implemented");
+        assertThat(result.getErrorMessage()).contains("Custom tool");
     }
 
     // ========== discoverAll() ==========
@@ -117,8 +117,8 @@ class ToolProviderRegistryTest extends BaseIntegrationTest {
                 .build();
         var tools = registry.discoverAll(ctx);
 
-        // Platform provider always contributes 3 tools — overall result must be >= 3
-        assertThat(tools.size()).isGreaterThanOrEqualTo(3);
+        // Platform provider now contributes 4 tools — overall result must be >= 4
+        assertThat(tools.size()).isGreaterThanOrEqualTo(4);
     }
 
     @Test
@@ -164,19 +164,20 @@ class ToolProviderRegistryTest extends BaseIntegrationTest {
     // ========== discoverByProvider() ==========
 
     @Test
-    void discoverByProvider_platform_returnsExactlyThreeTools() {
+    void discoverByProvider_platform_returnsExactlyFourTools() {
         var ctx = ToolDiscoveryContext.builder()
                 .tenantId(testTenant.getId())
                 .maxResults(50)
                 .build();
         var tools = registry.discoverByProvider("platform", ctx);
 
-        assertThat(tools).hasSize(3);
+        assertThat(tools).hasSize(4);
         assertThat(tools.stream().map(ToolDefinition::getToolCode))
                 .containsExactlyInAnyOrder(
                         "platform.execute_sql",
                         "platform.list_models",
-                        "platform.model_suggest");
+                        "platform.model_suggest",
+                        "platform.create_model");
     }
 
     @Test

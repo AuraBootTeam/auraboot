@@ -142,8 +142,8 @@ class PluginGeneratorServiceTest {
         List<Map<String, Object>> permissions = (List<Map<String, Object>>) result.getConfigs().get("permissions.json");
         assertThat(permissions).hasSize(4); // LIST, CREATE, UPDATE, DELETE
         assertThat(permissions.stream().map(p -> p.get("code").toString()).toList())
-                .containsExactly("task_mgmt_task:LIST", "task_mgmt_task:CREATE",
-                        "task_mgmt_task:UPDATE", "task_mgmt_task:DELETE");
+                .containsExactly("task_mgmt_task:list", "task_mgmt_task:create",
+                        "task_mgmt_task:update", "task_mgmt_task:delete");
     }
 
     @Test

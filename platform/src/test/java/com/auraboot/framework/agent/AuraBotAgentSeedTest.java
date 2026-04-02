@@ -2,6 +2,8 @@ package com.auraboot.framework.agent;
 
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
+import com.auraboot.framework.tenant.service.TenantBootstrapService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -19,6 +21,14 @@ class AuraBotAgentSeedTest extends BaseIntegrationTest {
 
     @Autowired
     private DynamicDataMapper dynamicDataMapper;
+
+    @Autowired
+    private TenantBootstrapService tenantBootstrapService;
+
+    @BeforeEach
+    void bootstrapTestTenant() {
+        tenantBootstrapService.bootstrapTenant(testTenant.getId(), testUser.getId());
+    }
 
     @Test
     void aurabotAgentDefinition_existsForActiveTenants() {

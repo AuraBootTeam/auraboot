@@ -78,7 +78,7 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
         body.put("messages", messages);
 
         // Tools
-        if (request.getTools() != null && !request.getTools().isEmpty()) {
+        if (request.getTools() != null && !request.getTools().isEmpty() && !isToolUnsupportedProvider(request.getModel())) {
             List<Map<String, Object>> tools = new ArrayList<>();
             for (LlmChatRequest.Tool t : request.getTools()) {
                 if (t.getNativeToolConfig() != null) {
@@ -95,6 +95,8 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
                 }
             }
             body.put("tools", tools);
+        } else if (request.getTools() != null && !request.getTools().isEmpty()) {
+            log.debug("Skipping tool payload for model '{}' because provider compatibility is disabled", request.getModel());
         }
 
         // Strip trailing /v1 or /v1/ from baseUrl to avoid double path segments
@@ -152,6 +154,14 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
             inputRate = 2.5; outputRate = 10.0;
         }
         return (inputTokens * inputRate + outputTokens * outputRate) / 1_000_000.0;
+    }
+
+    private boolean isToolUnsupportedProvider(String model) {
+        if (model == null || model.isBlank()) {
+            return false;
+        }
+        String normalized = model.toLowerCase(Locale.ROOT);
+        return normalized.contains("minimax") || normalized.contains("abab");
     }
 
     // =========================================================================

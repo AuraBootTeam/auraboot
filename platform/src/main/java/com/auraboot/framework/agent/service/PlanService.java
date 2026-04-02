@@ -38,7 +38,8 @@ public class PlanService {
                 + "Respond with a JSON array of steps. Each step has:\n"
                 + "- \"description\": what this step does (concise)\n"
                 + "- \"toolCode\": which tool to use (from available tools), or null for reasoning-only steps\n"
-                + "- \"requiresApproval\": true if this step modifies data or calls external APIs\n\n"
+                + "- \"requiresApproval\": true only for reasoning-only checkpoints that need human sign-off;\n"
+                + "  tool-specific approval is enforced separately at execution time, so ordinary tool steps should use false\n\n"
                 + "Available tools: " + toolNames + "\n\n"
                 + "Respond ONLY with the JSON array. Example:\n"
                 + "[{\"description\":\"Search for data\",\"toolCode\":\"nq_active_projects\",\"requiresApproval\":false}]\n"
@@ -93,20 +94,37 @@ public class PlanService {
 
         for (AgentPlanStep step : plan) {
             String toolCode = step.getToolCode();
+            boolean requestedPlanApproval = step.isRequiresApproval();
             if (toolCode != null && !toolCode.isBlank() && !validToolCodes.contains(toolCode)) {
                 log.warn("Plan validation: step {} references non-existent tool '{}', clearing", step.getStepIndex(), toolCode);
                 step.setToolCode(null); // Clear hallucinated tool code
                 invalidCount++;
+                toolCode = null;
             }
 
-            // Check risk level of referenced tool
+            // Approval is enforced at tool execution time. Do not let the plan layer introduce
+            // non-deterministic extra approval gates for ordinary steps.
+            step.setRequiresApproval(false);
+
+            if (requestedPlanApproval) {
+                if (toolCode != null) {
+                    log.info("Plan step {} requested approval for tool '{}'; deferring to tool-level approval",
+                            step.getStepIndex(), toolCode);
+                } else {
+                    log.info("Plan step {} requested plan-level approval without a tool; ignoring to keep runtime deterministic",
+                            step.getStepIndex());
+                }
+            }
+
             if (toolCode != null) {
+                final String validatedToolCode = toolCode;
                 tools.stream()
-                        .filter(t -> t.getName().equals(toolCode))
+                        .filter(t -> t.getName().equals(validatedToolCode))
                         .findFirst()
                         .ifPresent(t -> {
                             if ("high".equals(t.getRiskLevel())) {
-                                step.setRequiresApproval(true);
+                                log.info("Plan step {} uses high-risk tool '{}'; approval will be enforced at tool execution time",
+                                        step.getStepIndex(), validatedToolCode);
                             }
                         });
             }

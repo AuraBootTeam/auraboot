@@ -9,7 +9,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -529,11 +528,16 @@ public class AgentApprovalGateIntegrationTest extends BaseIntegrationTest {
         policy.put("pid", policyPid);
         policy.put("tenant_id", tenantId);
         policy.put("policy_name", "test-policy-" + policyPid);
+        policy.put("description", "Test approval policy for integration tests");
+        policy.put("trigger_rules", "[]");
         policy.put("approver_rules", approverRulesJson);
+        policy.put("auto_approve", false);
+        policy.put("timeout_hours", 24);
+        policy.put("timeout_action", "reject");
         policy.put("policy_status", "active");
         policy.put("deleted_flag", false);
-        policy.put("created_at", Instant.now());
-        policy.put("updated_at", Instant.now());
+        policy.put("created_at", LocalDateTime.now());
+        policy.put("updated_at", LocalDateTime.now());
         dynamicDataMapper.insert("ab_approval_policy", policy);
         return policyPid;
     }
@@ -552,8 +556,8 @@ public class AgentApprovalGateIntegrationTest extends BaseIntegrationTest {
         approval.put("approval_title", "Security test approval");
         approval.put("approval_status", "pending");
         approval.put("policy_id", policyPid);
-        approval.put("created_at", Instant.now());
-        approval.put("updated_at", Instant.now());
+        approval.put("created_at", LocalDateTime.now());
+        approval.put("updated_at", LocalDateTime.now());
         dynamicDataMapper.insert("ab_agent_approval", approval);
         return approvalPid;
     }

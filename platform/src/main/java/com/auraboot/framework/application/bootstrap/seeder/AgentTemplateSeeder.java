@@ -10,8 +10,8 @@ import org.springframework.stereotype.Component;
 /**
  * Seeds platform-level built-in Agent Skills and Agent Profile templates.
  * <p>
- * Uses tenant_id = 0 (system level, same convention as i18n base resources).
- * AgentSkillService.listSkills() includes tenant_id = 0 skills as platform defaults.
+ * Uses the system tenant (tenant_id = 1).
+ * AgentSkillService.listSkills() includes system-tenant skills as platform defaults.
  * <p>
  * Skills:
  * - approval_workflow  : approve/reject BPM tasks, query pending approvals
@@ -59,8 +59,9 @@ public class AgentTemplateSeeder {
 
     private void seedSkills() {
         Integer existing = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM ab_agent_skill WHERE tenant_id = 0 AND is_builtin = TRUE",
-                Integer.class);
+                "SELECT COUNT(*) FROM ab_agent_skill WHERE tenant_id = ? AND is_builtin = TRUE",
+                Integer.class,
+                SYSTEM_TENANT_ID);
         if (existing != null && existing > 0) {
             log.info("AgentTemplateSeeder: skipped skills (already seeded: {})", existing);
             return;
@@ -167,9 +168,10 @@ public class AgentTemplateSeeder {
 
     private void seedAgentProfiles() {
         Integer existing = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM ab_agent_definition WHERE tenant_id = 0 " +
+                "SELECT COUNT(*) FROM ab_agent_definition WHERE tenant_id = ? " +
                 "AND deleted_flag = FALSE",
-                Integer.class);
+                Integer.class,
+                SYSTEM_TENANT_ID);
         if (existing != null && existing > 0) {
             log.info("AgentTemplateSeeder: skipped agent profiles (already seeded: {})", existing);
             return;
@@ -309,7 +311,8 @@ public class AgentTemplateSeeder {
         // Load all agent templates that don't yet have a system_user_id
         var agentsToProcess = jdbcTemplate.queryForList(
                 "SELECT id, agent_code, name FROM ab_agent_definition " +
-                "WHERE tenant_id = 0 AND deleted_flag = FALSE AND system_user_id IS NULL");
+                "WHERE tenant_id = ? AND deleted_flag = FALSE AND system_user_id IS NULL",
+                SYSTEM_TENANT_ID);
 
         if (agentsToProcess.isEmpty()) {
             log.info("AgentTemplateSeeder: skipped system user binding (all agents already bound)");

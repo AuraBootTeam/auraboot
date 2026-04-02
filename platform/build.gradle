@@ -300,6 +300,13 @@ bootRun {
     jvmArgs = ['-Xms2g', '-Xmx8g','-XX:+UseG1GC', '-Duser.timezone=UTC']
 }
 
+tasks.withType(Test).configureEach {
+    reports.junitXml {
+        includeSystemOutLog = false
+        includeSystemErrLog = false
+    }
+}
+
 // 配置测试任务使用JUnit Platform
 test {
     useJUnitPlatform()
