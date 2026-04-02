@@ -18,7 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.*;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.util.*;
 
@@ -42,12 +42,12 @@ class BpmFormServiceIntegrationTest extends BaseIntegrationTest {
 
     // CommandExecutor is mocked because executing real commands requires
     // full model/command definitions in the database, which is complex to set up.
-    @MockBean
+    @MockitoBean
     private CommandExecutor commandExecutor;
 
     // ProcessEngineService is mocked because starting real processes requires
     // deployed BPMN definitions in SmartEngine.
-    @MockBean
+    @MockitoBean
     private ProcessEngineService processEngineService;
 
     @Autowired
