@@ -1,10 +1,16 @@
 package com.auraboot.framework.observability;
 
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class SqlCountHolderTest {
+
+    @BeforeEach
+    void setUp() {
+        SqlCountHolder.reset();
+    }
 
     @AfterEach
     void cleanup() {

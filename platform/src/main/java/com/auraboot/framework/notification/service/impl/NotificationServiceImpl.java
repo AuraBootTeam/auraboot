@@ -11,6 +11,7 @@ import com.auraboot.framework.notification.entity.NotificationTemplate;
 import com.auraboot.framework.notification.mapper.NotificationSendLogMapper;
 import com.auraboot.framework.notification.service.NotificationService;
 import com.auraboot.framework.notification.service.NotificationTemplateService;
+import com.auraboot.framework.notification.service.EmailSender;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,14 +33,17 @@ public class NotificationServiceImpl implements NotificationService {
 
     private final NotificationTemplateService templateService;
     private final NotificationSendLogMapper sendLogMapper;
+    private final EmailSender emailSender;
     private final Map<String, NotificationChannel> channelMap;
 
     public NotificationServiceImpl(
             NotificationTemplateService templateService,
             NotificationSendLogMapper sendLogMapper,
+            EmailSender emailSender,
             List<NotificationChannel> channels) {
         this.templateService = templateService;
         this.sendLogMapper = sendLogMapper;
+        this.emailSender = emailSender;
         this.channelMap = channels.stream()
                 .collect(Collectors.toMap(NotificationChannel::getChannelCode, c -> c));
         log.info("NotificationService initialized with {} channels: {}",
@@ -60,14 +64,25 @@ public class NotificationServiceImpl implements NotificationService {
         String renderedBody = renderTemplate(template.getBodyTemplate(), request.getVariables());
 
         String channelCode = template.getChannel();
+        if ("email".equals(channelCode)) {
+            handleEmailSend(tenantId, request, renderedSubject, renderedBody);
+            return;
+        }
+
         NotificationChannel channel = channelMap.get(channelCode);
 
         if (channel == null) {
             log.warn("No channel implementation for: {}", channelCode);
+            logSend(tenantId, request.getTemplateCode(), channelCode,
+                    request.getRecipientId(), renderedSubject, renderedBody,
+                    "failed", "No channel implementation available");
             return;
         }
         if (!channel.isAvailable()) {
             log.warn("Channel {} is not available (not configured)", channelCode);
+            logSend(tenantId, request.getTemplateCode(), channelCode,
+                    request.getRecipientId(), renderedSubject, renderedBody,
+                    "failed", "Channel is not available");
             return;
         }
 
@@ -114,6 +129,21 @@ public class NotificationServiceImpl implements NotificationService {
         String renderedBody = renderTemplate(template.getBodyTemplate(), variables);
 
         String channelCode = template.getChannel();
+        if ("email".equals(channelCode)) {
+            for (NotificationRecipient recipient : recipients) {
+                String email = recipient.getEmail();
+                if (email == null || email.isBlank()) {
+                    logSend(tenantId, templateCode, "email", email,
+                            renderedSubject, renderedBody, "failed", "No email address available");
+                    continue;
+                }
+                emailSender.send(email, renderedSubject, renderedBody);
+                logSend(tenantId, templateCode, "email", email,
+                        renderedSubject, renderedBody, "sent", null);
+            }
+            return;
+        }
+
         NotificationChannel channel = channelMap.get(channelCode);
 
         if (channel == null) {
@@ -168,6 +198,20 @@ public class NotificationServiceImpl implements NotificationService {
                     break;
             }
         }
+    }
+
+    private void handleEmailSend(Long tenantId, NotificationSendRequest request,
+                                 String renderedSubject, String renderedBody) {
+        String recipient = request.getRecipientId();
+        if (recipient == null || recipient.isBlank()) {
+            logSend(tenantId, request.getTemplateCode(), "email", recipient,
+                    renderedSubject, renderedBody, "failed", "No email address available");
+            return;
+        }
+
+        emailSender.send(recipient, renderedSubject, renderedBody);
+        logSend(tenantId, request.getTemplateCode(), "email", recipient,
+                renderedSubject, renderedBody, "sent", null);
     }
 
     @Override

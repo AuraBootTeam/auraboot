@@ -92,8 +92,8 @@ class PageSchemaVersionServiceImplTest {
         Map<String, Object> snapshot = new HashMap<>();
         snapshot.put("name", "test-page");
         snapshot.put("title", "Test Page");
-        snapshot.put("pageType", "form");
-        snapshot.put("dslSchema", "{\"type\":\"form\",\"fields\":[]}");
+        snapshot.put("kind", "form");
+        snapshot.put("blocks", "{\"type\":\"form\",\"fields\":[]}");
         snapshot.put("version", 1);
         snapshot.put("status", "draft");
         return snapshot;
