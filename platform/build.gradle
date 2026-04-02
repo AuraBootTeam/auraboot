@@ -387,6 +387,26 @@ tasks.register('testAgent', Test) {
     }
 }
 
+// Dedicated task for running AI runtime tests excluded from the default test task
+tasks.register('testAi', Test) {
+    useJUnitPlatform()
+    include '**/agent/**'
+    include '**/aurabot/**'
+    include '**/rag/**'
+    include '**/intent/**'
+    jvmArgs "-javaagent:${configurations.mockitoAgent.singleFile}"
+    jvmArgs "-Djavax.xml.parsers.SAXParserFactory=com.sun.org.apache.xerces.internal.jaxp.SAXParserFactoryImpl"
+    jvmArgs '-Duser.timezone=UTC'
+    jvmArgs '-Xmx6g', '-Xms2g', '-XX:+UseG1GC'
+    maxParallelForks = 1
+    testLogging {
+        events "passed", "skipped", "failed"
+    }
+    jacoco {
+        excludes = ['net.sf.jsqlparser.parser.CCJSqlParserTokenManager']
+    }
+}
+
 // Dedicated task for running plugin validation unit tests (pure-function, no Spring context needed)
 tasks.register('testPlugin', Test) {
     useJUnitPlatform()
