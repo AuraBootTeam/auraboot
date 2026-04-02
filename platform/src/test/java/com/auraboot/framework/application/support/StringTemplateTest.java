@@ -1,11 +1,12 @@
 package com.auraboot.framework.application.support;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import java.util.HashMap;
+import java.util.Map;
 
 public class StringTemplateTest {
     @Test
@@ -22,7 +23,7 @@ public class StringTemplateTest {
         System.out.println(data.stripIndent());
         System.out.println(data.stripTrailing());
 
-        HashMap hashMap = new ObjectMapper().readValue(data, HashMap.class);
+        Map<String, Object> hashMap = new ObjectMapper().readValue(data, new TypeReference<>() {});
 
         Assertions.assertNotNull(hashMap);
 
