@@ -4,6 +4,7 @@ import com.auraboot.framework.agent.event.AgentApprovalEvent;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.event.AuraEventBus;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
@@ -17,6 +18,9 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 public class AgentApprovalGateService {
+
+    private static final TypeReference<List<Map<String, Object>>> RULE_LIST_TYPE =
+            new TypeReference<>() {};
 
     private final DynamicDataMapper dynamicDataMapper;
     private final ObjectMapper objectMapper;
@@ -115,7 +119,7 @@ public class AgentApprovalGateService {
             String triggerRulesJson = (String) policy.get("trigger_rules");
             if (triggerRulesJson == null) continue;
             try {
-                List<Map<String, Object>> rules = objectMapper.readValue(triggerRulesJson, List.class);
+                List<Map<String, Object>> rules = objectMapper.readValue(triggerRulesJson, RULE_LIST_TYPE);
                 boolean matched = false;
                 for (Map<String, Object> rule : rules) {
                     String type = (String) rule.get("type");
@@ -526,7 +530,7 @@ public class AgentApprovalGateService {
             String triggerRulesJson = (String) policy.get("trigger_rules");
             if (triggerRulesJson == null) continue;
             try {
-                List<Map<String, Object>> rules = objectMapper.readValue(triggerRulesJson, List.class);
+                List<Map<String, Object>> rules = objectMapper.readValue(triggerRulesJson, RULE_LIST_TYPE);
                 for (Map<String, Object> rule : rules) {
                     String type = (String) rule.get("type");
                     if ("tool_call".equals(type)) {

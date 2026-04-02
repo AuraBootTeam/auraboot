@@ -21,7 +21,7 @@ import static org.mockito.Mockito.*;
 
 /**
  * Unit tests for ReportDeliveryService.
- * Uses @MockBean for JavaMailSender as per project constraints.
+ * Uses Mockito mocks for JavaMailSender as per project constraints.
  */
 @ExtendWith(MockitoExtension.class)
 class ReportDeliveryServiceTest {

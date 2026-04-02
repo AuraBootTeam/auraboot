@@ -14,6 +14,7 @@ import com.auraboot.framework.meta.dto.PaginationResult;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.service.CommandExecutor;
 import com.auraboot.framework.meta.service.NamedQueryService;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,6 +39,7 @@ import java.util.stream.Collectors;
 public class ToolLoopService implements ToolExecutionPort {
 
     private static final int MAX_HALLUCINATION_COUNT = 3;
+    private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
 
     private final ActionRecorder actionRecorder;
     private final AgentApprovalGateService approvalGate;
@@ -362,7 +364,7 @@ public class ToolLoopService implements ToolExecutionPort {
     public Map<String, Object> executeDslCommand(Long tenantId, String runId, String commandCode, Map<String, Object> input) {
         try {
             String result = executeDslCommandWithAction(commandCode, input, tenantId, runId, null);
-            return objectMapper.readValue(result, Map.class);
+            return objectMapper.readValue(result, MAP_TYPE);
         } catch (Exception e) {
             return Map.of("success", false, "error", e.getMessage());
         }
@@ -372,7 +374,7 @@ public class ToolLoopService implements ToolExecutionPort {
     public Map<String, Object> executeDslQuery(Long tenantId, String runId, String queryCode, Map<String, Object> input) {
         try {
             String result = executeDslQueryWithAction(queryCode, input, tenantId, runId, null);
-            return objectMapper.readValue(result, Map.class);
+            return objectMapper.readValue(result, MAP_TYPE);
         } catch (Exception e) {
             return Map.of("success", false, "error", e.getMessage());
         }
