@@ -40,10 +40,10 @@ class DataSyncIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private DataSyncSseRegistry sseRegistry;
 
-    @Autowired
+    @Autowired(required = false)
     private DataSyncRedisSubscriber redisSubscriber;
 
-    @Autowired
+    @Autowired(required = false)
     private StringRedisTemplate redisTemplate;
 
     @Autowired
@@ -127,6 +127,8 @@ class DataSyncIntegrationTest extends BaseIntegrationTest {
     @Order(4)
     @DisplayName("DS-04: Redis subscriber deserializes valid JSON and routes to registry")
     void redisSubscriber_validJson_routesToRegistry() throws Exception {
+        Assumptions.assumeTrue(redisSubscriber != null, "Redis subscriber bean unavailable in this environment");
+
         DataSyncMessage message = new DataSyncMessage(
                 getTestTenant().getId(), "quote", "delete", "rec-789", getTestUser().getId());
         String json = objectMapper.writeValueAsString(message);
@@ -141,6 +143,8 @@ class DataSyncIntegrationTest extends BaseIntegrationTest {
     @Order(5)
     @DisplayName("DS-04b: Redis subscriber handles malformed JSON gracefully")
     void redisSubscriber_malformedJson_doesNotThrow() {
+        Assumptions.assumeTrue(redisSubscriber != null, "Redis subscriber bean unavailable in this environment");
+
         assertThatCode(() ->
                 redisSubscriber.onMessage(mockRedisMessage("{not-valid-json}"), null))
                 .doesNotThrowAnyException();
@@ -152,6 +156,8 @@ class DataSyncIntegrationTest extends BaseIntegrationTest {
     @Order(6)
     @DisplayName("DS-05: Redis publish to data-sync channel is received by the subscriber")
     void redisPublish_receivedBySubscriber() throws Exception {
+        Assumptions.assumeTrue(redisTemplate != null, "Redis template unavailable in this environment");
+
         // Publish a message to the real Redis channel
         DataSyncMessage msg = new DataSyncMessage(
                 getTestTenant().getId(), "contact", "create", "rec-e2e", getTestUser().getId());
