@@ -53,13 +53,13 @@ class TaxInvoiceServiceIntegrationTest extends BaseIntegrationTest {
                 "INSERT INTO mt_tax_vat_rate " +
                         "(pid, tenant_id, tax_vr_code, tax_vr_name, tax_vr_rate_pct, " +
                         "tax_vr_category, tax_vr_tax_type, tax_vr_effective_date, " +
-                        "tax_vr_is_default, tax_vr_is_active, deleted_flag) " +
-                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        "tax_vr_is_default, tax_vr_is_active) " +
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 vatRatePid, tenantId, testVatRateCode,
                 "General VAT 13%", new BigDecimal("13.00"),
                 "output_tax", "general_vat",
                 LocalDate.of(2024, 1, 1),
-                true, true, false
+                true, true
         );
 
         // Create test e-invoice
@@ -69,13 +69,13 @@ class TaxInvoiceServiceIntegrationTest extends BaseIntegrationTest {
                         "(pid, tenant_id, tax_ei_einvoice_no, tax_ei_invoice_type, " +
                         "tax_ei_buyer_name, tax_ei_seller_name, tax_ei_status, " +
                         "tax_ei_subtotal_amount, tax_ei_tax_total_amount, tax_ei_total_amount, " +
-                        "tax_ei_is_redline, tax_ei_currency_code, deleted_flag) " +
-                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        "tax_ei_is_redline, tax_ei_currency_code) " +
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 testEInvoicePid, tenantId,
                 "INV-" + System.currentTimeMillis(), "special_vat",
                 "Test Buyer Co.", "Test Seller Co.", "draft",
                 new BigDecimal("10000.00"), new BigDecimal("1300.00"), new BigDecimal("11300.00"),
-                false, "cny", false
+                false, "cny"
         );
 
         // Create test invoice line
@@ -85,12 +85,12 @@ class TaxInvoiceServiceIntegrationTest extends BaseIntegrationTest {
                         "(pid, tenant_id, tax_eil_einvoice_id, tax_eil_line_no, " +
                         "tax_eil_item_name, tax_eil_item_code, tax_eil_unit, " +
                         "tax_eil_quantity, tax_eil_unit_price, tax_eil_amount, " +
-                        "tax_eil_vat_rate_pct, tax_eil_vat_amount, deleted_flag) " +
-                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        "tax_eil_vat_rate_pct, tax_eil_vat_amount) " +
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 linePid, tenantId, testEInvoicePid, 1,
                 "Test Product", "tp001", "pcs",
                 new BigDecimal("100"), new BigDecimal("100.00"), new BigDecimal("10000.00"),
-                new BigDecimal("13.00"), new BigDecimal("1300.00"), false
+                new BigDecimal("13.00"), new BigDecimal("1300.00")
         );
     }
 

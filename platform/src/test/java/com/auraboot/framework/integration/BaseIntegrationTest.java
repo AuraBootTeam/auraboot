@@ -121,6 +121,7 @@ public class BaseIntegrationTest {
                     testUser.getPid(),
                     testUser.getUserName()
             );
+            MetaContext.setMemberId(testTenantMember.getId());
             return;
         }
 
@@ -137,6 +138,7 @@ public class BaseIntegrationTest {
                         testUser.getPid(),
                         testUser.getUserName()
                 );
+                MetaContext.setMemberId(testTenantMember.getId());
                 return;
             }
 
@@ -154,6 +156,7 @@ public class BaseIntegrationTest {
                             testUser.getPid(),
                             testUser.getUserName()
                     );
+                    MetaContext.setMemberId(testTenantMember.getId());
 
                     // 创建测试角色并为用户分配角色，仅初始化一次。
                     testRole = createTestRole();
