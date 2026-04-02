@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.core.type.TypeReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -1132,8 +1133,7 @@ class JsonToBpmnConverterTest {
         edges.add(edge);
         processMap.set("edges", edges);
 
-        @SuppressWarnings("unchecked")
-        Map<String, Object> map = objectMapper.convertValue(processMap, Map.class);
+        Map<String, Object> map = objectMapper.convertValue(processMap, new TypeReference<>() {});
 
         String xml = jsonToBpmn.convertFromMap(map);
         assertNotNull(xml);

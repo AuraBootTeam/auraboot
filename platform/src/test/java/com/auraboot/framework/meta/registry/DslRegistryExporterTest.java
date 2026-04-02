@@ -1,5 +1,6 @@
 package com.auraboot.framework.meta.registry;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import org.junit.jupiter.api.BeforeEach;
@@ -62,8 +63,7 @@ class DslRegistryExporterTest {
 
         // Verify it's parseable JSON
         ObjectMapper mapper = new ObjectMapper();
-        @SuppressWarnings("unchecked")
-        Map<String, Object> parsed = mapper.readValue(json, Map.class);
+        Map<String, Object> parsed = mapper.readValue(json, new TypeReference<>() {});
         assertThat(parsed).containsKey("version");
         assertThat(parsed).containsKey("enums");
         assertThat(parsed).containsKey("extensions");

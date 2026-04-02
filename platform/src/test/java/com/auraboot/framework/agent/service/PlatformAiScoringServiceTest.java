@@ -50,6 +50,11 @@ class PlatformAiScoringServiceTest {
     private static final String TABLE_NAME = "mt_test_model";
     private static final String SCORE_FIELD = "ai_score";
 
+    @SuppressWarnings("unchecked")
+    private ArgumentCaptor<Map<String, Object>> mapCaptor() {
+        return ArgumentCaptor.forClass(Map.class);
+    }
+
     @BeforeEach
     void setUp() {
         service = new PlatformAiScoringServiceImpl(
@@ -131,8 +136,8 @@ class PlatformAiScoringServiceTest {
         assertThat(result.getScoreField()).isEqualTo(SCORE_FIELD);
 
         // Verify update was called with correct args
-        ArgumentCaptor<Map> updateDataCaptor = ArgumentCaptor.forClass(Map.class);
-        ArgumentCaptor<Map> conditionsCaptor = ArgumentCaptor.forClass(Map.class);
+        ArgumentCaptor<Map<String, Object>> updateDataCaptor = mapCaptor();
+        ArgumentCaptor<Map<String, Object>> conditionsCaptor = mapCaptor();
         verify(dynamicDataMapper).update(eq(TABLE_NAME), updateDataCaptor.capture(), conditionsCaptor.capture());
 
         assertThat(updateDataCaptor.getValue()).containsEntry(SCORE_FIELD, 85);
