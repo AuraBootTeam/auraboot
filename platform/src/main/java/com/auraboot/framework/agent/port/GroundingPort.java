@@ -3,14 +3,12 @@ package com.auraboot.framework.agent.port;
 import java.util.List;
 
 /**
- * Port interface for D1 Grounding — lightweight intent + object resolution from user message.
- * Defined in core module, implemented in enterprise-ai module.
+ * Port interface for D1 grounding — lightweight intent + object resolution from user message.
  * <p>
- * Allows AuraBotChatService to resolve user intent and target object before tool selection,
- * without a compile-time dependency on the enterprise-ai module.
+ * Allows AuraBotChatService to resolve user intent and target object before tool selection
+ * without compile-time coupling to a specific grounding implementation.
  * <p>
- * When enterprise-ai module is loaded, the grounding implementation registers as a Spring bean.
- * When not loaded, AuraBotChatService skips grounding and uses the default chat path.
+ * The grounding implementation registers as a Spring bean in the shared AI runtime.
  */
 public interface GroundingPort {
 

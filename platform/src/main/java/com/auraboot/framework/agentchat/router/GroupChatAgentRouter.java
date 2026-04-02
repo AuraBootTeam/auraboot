@@ -4,7 +4,9 @@ import com.auraboot.framework.agentchat.event.ImMessageSentEvent;
 import com.auraboot.framework.agentchat.reply.AgentReplyTask;
 import com.auraboot.framework.agentchat.spi.AgentMemberDto;
 import com.auraboot.framework.agentchat.spi.GroupChatMessagePort;
+import com.auraboot.framework.agentchat.spi.NoOpGroupChatMessagePort;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
@@ -31,8 +33,9 @@ public class GroupChatAgentRouter {
     private final GroupChatMessagePort messagePort;
     private final AgentReplyTask agentReplyTask;
 
-    public GroupChatAgentRouter(GroupChatMessagePort messagePort, AgentReplyTask agentReplyTask) {
-        this.messagePort = messagePort;
+    public GroupChatAgentRouter(ObjectProvider<GroupChatMessagePort> messagePortProvider,
+                                AgentReplyTask agentReplyTask) {
+        this.messagePort = messagePortProvider.getIfAvailable(NoOpGroupChatMessagePort::new);
         this.agentReplyTask = agentReplyTask;
     }
 

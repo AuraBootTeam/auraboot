@@ -2,7 +2,7 @@ package com.auraboot.framework.aurabot.service;
 
 /**
  * Port for persisting AuraBot chat runs to ab_agent_run.
- * Implemented by enterprise-ai module when loaded.
+ * Implemented by the shared AI runtime when enabled.
  *
  * @since 6.5.0
  */

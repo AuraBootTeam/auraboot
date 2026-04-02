@@ -41,7 +41,7 @@ public class ChatToolExecutor {
     /**
      * Execute a tool call and return the result as a map.
      * <p>
-     * Routes through ToolProviderRegistry via ToolDiscoveryPort (enterprise-ai module).
+     * Routes through ToolProviderRegistry via ToolDiscoveryPort in the shared AI runtime.
      *
      * @param toolName  the tool name (e.g., "cmd_crm_update_lead")
      * @param input     the tool input parameters from the LLM
@@ -57,7 +57,7 @@ public class ChatToolExecutor {
         }
 
         if (toolDiscoveryPort == null) {
-            return errorResult("ToolDiscoveryPort is not available. Ensure enterprise-ai module is loaded.");
+            return errorResult("ToolDiscoveryPort is not available in the current runtime.");
         }
 
         try {

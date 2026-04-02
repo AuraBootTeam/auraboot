@@ -5,13 +5,11 @@ import java.util.Map;
 
 /**
  * Port interface for tool discovery and execution via ToolProviderRegistry.
- * Defined in core module, implemented in enterprise-ai module.
  * <p>
  * Allows AuraBotChatService to discover and execute tools from the provider-aware
- * registry without a compile-time dependency on the enterprise-ai module.
+ * registry without compile-time coupling to a specific registry implementation.
  * <p>
- * When enterprise-ai module is loaded, the registry implementation registers as a Spring bean.
- * When not loaded, AuraBotChatService falls back to ChatToolExecutor.
+ * The registry-backed implementation registers as a Spring bean in the shared AI runtime.
  */
 public interface ToolDiscoveryPort {
 

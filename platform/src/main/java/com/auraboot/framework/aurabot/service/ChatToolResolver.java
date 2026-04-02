@@ -34,7 +34,7 @@ public class ChatToolResolver {
 
     private static final int MAX_TOOLS = 15;
 
-    // SPI ports — only available when enterprise-ai module is loaded
+    // SPI ports from the shared AI runtime
     private final GroundingPort groundingPort;
     private final ToolDiscoveryPort toolDiscoveryPort;
 

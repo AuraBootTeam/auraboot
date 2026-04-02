@@ -10,9 +10,11 @@ import com.auraboot.framework.agentchat.handoff.HandoffResult;
 import com.auraboot.framework.agentchat.handoff.HandoffToolProvider;
 import com.auraboot.framework.agentchat.spi.AgentMemberDto;
 import com.auraboot.framework.agentchat.spi.GroupChatMessagePort;
+import com.auraboot.framework.agentchat.spi.NoOpGroupChatMessagePort;
 import com.auraboot.framework.agentchat.sse.SseEmitterManager;
 import com.auraboot.framework.agentchat.sse.SseEventType;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
@@ -41,13 +43,13 @@ public class AgentReplyTask {
     private final LlmProviderFactory llmProviderFactory;
 
     public AgentReplyTask(AgentDefinitionMapper agentDefinitionMapper,
-                          GroupChatMessagePort messagePort,
+                          ObjectProvider<GroupChatMessagePort> messagePortProvider,
                           AgentReplyContext replyContext,
                           SseEmitterManager sseEmitterManager,
                           HandoffToolProvider handoffToolProvider,
                           LlmProviderFactory llmProviderFactory) {
         this.agentDefinitionMapper = agentDefinitionMapper;
-        this.messagePort = messagePort;
+        this.messagePort = messagePortProvider.getIfAvailable(NoOpGroupChatMessagePort::new);
         this.replyContext = replyContext;
         this.sseEmitterManager = sseEmitterManager;
         this.handoffToolProvider = handoffToolProvider;

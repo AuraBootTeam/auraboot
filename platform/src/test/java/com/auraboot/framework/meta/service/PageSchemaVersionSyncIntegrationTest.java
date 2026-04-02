@@ -135,17 +135,19 @@ class PageSchemaVersionSyncIntegrationTest extends BaseIntegrationTest {
                 "published",
                 pageKey,
                 modelCode,
-                "model",
                 "Test Page " + pageKey,
-                "Test Title",
+                "\"Test Title\"",
                 "Test description",
                 pageType,
+                "default",
+                "{}",
                 "{\"blocks\":[]}",
                 1,
                 false,
                 null,
                 Instant.now(),
                 0,
+                "{}",
                 null
         );
     }
@@ -158,17 +160,19 @@ class PageSchemaVersionSyncIntegrationTest extends BaseIntegrationTest {
                 "draft",
                 pageKey,
                 modelCode,
-                "model",
                 "Draft Page " + pageKey,
-                "Draft Title",
+                "\"Draft Title\"",
                 "Draft description",
                 pageType,
+                "default",
+                "{}",
                 "{\"blocks\":[]}",
                 1,
                 false,
                 null,
                 null,
                 0,
+                "{}",
                 null
         );
     }

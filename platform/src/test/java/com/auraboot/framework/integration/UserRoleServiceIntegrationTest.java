@@ -70,61 +70,61 @@ class UserRoleServiceIntegrationTest extends BaseIntegrationTest {
     }
 
     // ======================================================================
-    // assignRolesToUser / findByUserIdAndTenantId
+    // assignRolesToMember / findByMemberIdAndTenantId
     // ======================================================================
 
     @Test
     @Order(2)
-    void assignRolesToUser_addsRoles() {
-        boolean result = userRoleService.assignRolesToUser(
-                testUser.getId(), List.of(roleAId), testTenant.getId(), null);
+    void assignRolesToMember_addsRoles() {
+        boolean result = userRoleService.assignRolesToMember(
+                testTenantMember.getId(), List.of(roleAId), testTenant.getId(), null);
         assertThat(result).isTrue();
 
-        List<Long> roleIds = userRoleService.getRoleIdsByUserIdAndTenantId(
-                testUser.getId(), testTenant.getId());
+        List<Long> roleIds = userRoleService.getRoleIdsByMemberIdAndTenantId(
+                testTenantMember.getId(), testTenant.getId());
         assertThat(roleIds).contains(roleAId);
     }
 
     @Test
     @Order(3)
-    void assignRolesToUser_idempotent_doesNotDuplicate() {
+    void assignRolesToMember_idempotent_doesNotDuplicate() {
         // Assign roleA twice — should not create a duplicate
-        userRoleService.assignRolesToUser(testUser.getId(), List.of(roleAId), testTenant.getId(), null);
-        userRoleService.assignRolesToUser(testUser.getId(), List.of(roleAId), testTenant.getId(), null);
+        userRoleService.assignRolesToMember(testTenantMember.getId(), List.of(roleAId), testTenant.getId(), null);
+        userRoleService.assignRolesToMember(testTenantMember.getId(), List.of(roleAId), testTenant.getId(), null);
 
-        List<Long> roleIds = userRoleService.getRoleIdsByUserIdAndTenantId(
-                testUser.getId(), testTenant.getId());
+        List<Long> roleIds = userRoleService.getRoleIdsByMemberIdAndTenantId(
+                testTenantMember.getId(), testTenant.getId());
         long count = roleIds.stream().filter(id -> id.equals(roleAId)).count();
         assertThat(count).isEqualTo(1);
     }
 
     @Test
     @Order(4)
-    void assignRolesToUser_emptyList_returnsTrue() {
-        boolean result = userRoleService.assignRolesToUser(
-                testUser.getId(), List.of(), testTenant.getId(), null);
+    void assignRolesToMember_emptyList_returnsTrue() {
+        boolean result = userRoleService.assignRolesToMember(
+                testTenantMember.getId(), List.of(), testTenant.getId(), null);
         assertThat(result).isTrue();
     }
 
     // ======================================================================
-    // findByUserIdAndRoleIdAndTenantId
+    // findByMemberIdAndRoleIdAndTenantId
     // ======================================================================
 
     @Test
     @Order(5)
-    void findByUserIdAndRoleIdAndTenantId_returnsRecord() {
-        UserRole ur = userRoleService.findByUserIdAndRoleIdAndTenantId(
-                testUser.getId(), roleAId, testTenant.getId());
+    void findByMemberIdAndRoleIdAndTenantId_returnsRecord() {
+        UserRole ur = userRoleService.findByMemberIdAndRoleIdAndTenantId(
+                testTenantMember.getId(), roleAId, testTenant.getId());
         assertThat(ur).isNotNull();
         assertThat(ur.getRoleId()).isEqualTo(roleAId);
-        assertThat(ur.getUserId()).isEqualTo(testUser.getId());
+        assertThat(ur.getMemberId()).isEqualTo(testTenantMember.getId());
     }
 
     @Test
     @Order(6)
-    void findByUserIdAndRoleIdAndTenantId_notFound_returnsNull() {
-        UserRole ur = userRoleService.findByUserIdAndRoleIdAndTenantId(
-                testUser.getId(), 999999L, testTenant.getId());
+    void findByMemberIdAndRoleIdAndTenantId_notFound_returnsNull() {
+        UserRole ur = userRoleService.findByMemberIdAndRoleIdAndTenantId(
+                testTenantMember.getId(), 999999L, testTenant.getId());
         assertThat(ur).isNull();
     }
 
@@ -135,8 +135,8 @@ class UserRoleServiceIntegrationTest extends BaseIntegrationTest {
     @Test
     @Order(7)
     void findByPid_returnsRecord() {
-        UserRole ur = userRoleService.findByUserIdAndRoleIdAndTenantId(
-                testUser.getId(), roleAId, testTenant.getId());
+        UserRole ur = userRoleService.findByMemberIdAndRoleIdAndTenantId(
+                testTenantMember.getId(), roleAId, testTenant.getId());
         assertThat(ur).isNotNull();
 
         UserRole byPid = userRoleService.findByPid(ur.getPid());
@@ -150,91 +150,91 @@ class UserRoleServiceIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @Order(8)
-    void syncUserRoles_addsAndRemovesRoles() {
+    void syncMemberRoles_addsAndRemovesRoles() {
         // Start: user has roleA
         // Sync to: [roleB] — should add roleB, remove roleA
-        boolean result = userRoleService.syncUserRoles(
-                testUser.getId(), List.of(roleBId), testTenant.getId(), null);
+        boolean result = userRoleService.syncMemberRoles(
+                testTenantMember.getId(), List.of(roleBId), testTenant.getId(), null);
         assertThat(result).isTrue();
 
-        List<Long> roleIds = userRoleService.getRoleIdsByUserIdAndTenantId(
-                testUser.getId(), testTenant.getId());
+        List<Long> roleIds = userRoleService.getRoleIdsByMemberIdAndTenantId(
+                testTenantMember.getId(), testTenant.getId());
         assertThat(roleIds).contains(roleBId);
         assertThat(roleIds).doesNotContain(roleAId);
     }
 
     @Test
     @Order(9)
-    void syncUserRoles_toEmpty_removesAllRoles() {
-        userRoleService.syncUserRoles(testUser.getId(), List.of(), testTenant.getId(), null);
-        List<Long> roleIds = userRoleService.getRoleIdsByUserIdAndTenantId(
-                testUser.getId(), testTenant.getId());
+    void syncMemberRoles_toEmpty_removesAllRoles() {
+        userRoleService.syncMemberRoles(testTenantMember.getId(), List.of(), testTenant.getId(), null);
+        List<Long> roleIds = userRoleService.getRoleIdsByMemberIdAndTenantId(
+                testTenantMember.getId(), testTenant.getId());
         // The role from BaseIntegrationTest (testRole) is assigned in @BeforeEach
         // but syncUserRoles should remove roleB that we just added
         assertThat(roleIds).doesNotContain(roleBId);
     }
 
     // ======================================================================
-    // removeRolesFromUser
+    // removeRolesFromMember
     // ======================================================================
 
     @Test
     @Order(10)
-    void removeRolesFromUser_removesSpecificRole() {
+    void removeRolesFromMember_removesSpecificRole() {
         // testRole is freshly assigned in @BeforeEach (status=ACTIVE, deleted_flag=false)
         // Verify it's in the active role list
-        List<Long> before = userRoleService.getRoleIdsByUserIdAndTenantId(
-                testUser.getId(), testTenant.getId());
+        List<Long> before = userRoleService.getRoleIdsByMemberIdAndTenantId(
+                testTenantMember.getId(), testTenant.getId());
         assertThat(before).contains(testRole.getId());
 
         // Remove testRole
-        userRoleService.removeRolesFromUser(
-                testUser.getId(), List.of(testRole.getId()), testTenant.getId());
+        userRoleService.removeRolesFromMember(
+                testTenantMember.getId(), List.of(testRole.getId()), testTenant.getId());
 
         // After remove, testRole should no longer appear in active roles
-        List<Long> after = userRoleService.getRoleIdsByUserIdAndTenantId(
-                testUser.getId(), testTenant.getId());
+        List<Long> after = userRoleService.getRoleIdsByMemberIdAndTenantId(
+                testTenantMember.getId(), testTenant.getId());
         assertThat(after).doesNotContain(testRole.getId());
     }
 
     @Test
     @Order(11)
-    void removeRolesFromUser_emptyList_returnsTrue() {
-        boolean result = userRoleService.removeRolesFromUser(
-                testUser.getId(), List.of(), testTenant.getId());
+    void removeRolesFromMember_emptyList_returnsTrue() {
+        boolean result = userRoleService.removeRolesFromMember(
+                testTenantMember.getId(), List.of(), testTenant.getId());
         assertThat(result).isTrue();
     }
 
     // ======================================================================
-    // removeAllRolesFromUserInTenant
+    // removeAllRolesFromMemberInTenant
     // ======================================================================
 
     @Test
     @Order(12)
-    void removeAllRolesFromUserInTenant_removesAll() {
-        userRoleService.assignRolesToUser(
-                testUser.getId(), List.of(roleAId, roleBId), testTenant.getId(), null);
+    void removeAllRolesFromMemberInTenant_removesAll() {
+        userRoleService.assignRolesToMember(
+                testTenantMember.getId(), List.of(roleAId, roleBId), testTenant.getId(), null);
 
-        boolean result = userRoleService.removeAllRolesFromUserInTenant(
-                testUser.getId(), testTenant.getId());
+        boolean result = userRoleService.removeAllRolesFromMemberInTenant(
+                testTenantMember.getId(), testTenant.getId());
         assertThat(result).isTrue();
 
-        List<Long> roleIds = userRoleService.getRoleIdsByUserIdAndTenantId(
-                testUser.getId(), testTenant.getId());
+        List<Long> roleIds = userRoleService.getRoleIdsByMemberIdAndTenantId(
+                testTenantMember.getId(), testTenant.getId());
         assertThat(roleIds).doesNotContain(roleAId, roleBId);
     }
 
     // ======================================================================
-    // copyUserRoles
+    // copyMemberRoles
     // ======================================================================
 
     @Test
     @Order(13)
-    void copyUserRoles_emptySource_returnsTrue() {
-        // removeAllRolesFromUserInTenant (test 12) cleared the user's roles
+    void copyMemberRoles_emptySource_returnsTrue() {
+        // removeAllRolesFromMemberInTenant (test 12) cleared the member's roles
         // Verify that copying from a user with no roles returns true
-        boolean result = userRoleService.copyUserRoles(
-                testUser.getId(), testUser.getId(), testTenant.getId());
+        boolean result = userRoleService.copyMemberRoles(
+                testTenantMember.getId(), testTenantMember.getId(), testTenant.getId());
         assertThat(result).isTrue();
     }
 
@@ -254,7 +254,7 @@ class UserRoleServiceIntegrationTest extends BaseIntegrationTest {
     @Test
     @Order(15)
     void isRoleInUseInTenant_roleNotInUse_returnsFalse() {
-        userRoleService.removeRolesFromUser(testUser.getId(), List.of(roleBId), testTenant.getId());
+        userRoleService.removeRolesFromMember(testTenantMember.getId(), List.of(roleBId), testTenant.getId());
         boolean inUse = userRoleService.isRoleInUseInTenant(roleBId, testTenant.getId());
         assertThat(inUse).isFalse();
     }
@@ -266,25 +266,25 @@ class UserRoleServiceIntegrationTest extends BaseIntegrationTest {
     @Test
     @Order(16)
     void getTenantUserRoles_returnsData() {
-        userRoleService.assignRolesToUser(
-                testUser.getId(), List.of(roleAId), testTenant.getId(), null);
+        userRoleService.assignRolesToMember(
+                testTenantMember.getId(), List.of(roleAId), testTenant.getId(), null);
 
         List<Map<String, Object>> data = userRoleService.getTenantUserRoles(testTenant.getId());
         assertThat(data).isNotNull();
     }
 
     // ======================================================================
-    // validateUserRoles
+    // validateMemberRoles
     // ======================================================================
 
     @Test
     @Order(17)
-    void validateUserRoles_userWithRoles_valid() {
-        userRoleService.assignRolesToUser(
-                testUser.getId(), List.of(roleAId), testTenant.getId(), null);
+    void validateMemberRoles_userWithRoles_valid() {
+        userRoleService.assignRolesToMember(
+                testTenantMember.getId(), List.of(roleAId), testTenant.getId(), null);
 
-        Map<String, Object> result = userRoleService.validateUserRoles(
-                testUser.getId(), testTenant.getId());
+        Map<String, Object> result = userRoleService.validateMemberRoles(
+                testTenantMember.getId(), testTenant.getId());
         assertThat(result).containsKey("valid");
         assertThat(result).containsKey("errors");
         assertThat(result).containsKey("warnings");
@@ -292,36 +292,36 @@ class UserRoleServiceIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @Order(18)
-    void validateUserRoles_userWithoutRoles_hasWarning() {
+    void validateMemberRoles_userWithoutRoles_hasWarning() {
         // Remove all roles first
-        userRoleService.removeAllRolesFromUserInTenant(testUser.getId(), testTenant.getId());
+        userRoleService.removeAllRolesFromMemberInTenant(testTenantMember.getId(), testTenant.getId());
 
-        Map<String, Object> result = userRoleService.validateUserRoles(
-                testUser.getId(), testTenant.getId());
+        Map<String, Object> result = userRoleService.validateMemberRoles(
+                testTenantMember.getId(), testTenant.getId());
         @SuppressWarnings("unchecked")
         List<String> warnings = (List<String>) result.get("warnings");
         assertThat(warnings).anyMatch(w -> w.contains("未分配任何角色"));
     }
 
     // ======================================================================
-    // findByUserIds / findByRoleIds
+    // findByMemberIds / findByRoleIds
     // ======================================================================
 
     @Test
     @Order(19)
-    void findByUserIds_returnsAssignments() {
-        userRoleService.assignRolesToUser(
-                testUser.getId(), List.of(roleAId), testTenant.getId(), null);
+    void findByMemberIds_returnsAssignments() {
+        userRoleService.assignRolesToMember(
+                testTenantMember.getId(), List.of(roleAId), testTenant.getId(), null);
 
-        List<UserRole> results = userRoleService.findByUserIds(List.of(testUser.getId()));
+        List<UserRole> results = userRoleService.findByMemberIds(List.of(testTenantMember.getId()));
         assertThat(results).isNotNull();
-        assertThat(results).anyMatch(ur -> ur.getUserId().equals(testUser.getId()));
+        assertThat(results).anyMatch(ur -> ur.getMemberId().equals(testTenantMember.getId()));
     }
 
     @Test
     @Order(20)
-    void findByUserIds_emptyInput_returnsEmpty() {
-        List<UserRole> results = userRoleService.findByUserIds(List.of());
+    void findByMemberIds_emptyInput_returnsEmpty() {
+        List<UserRole> results = userRoleService.findByMemberIds(List.of());
         assertThat(results).isEmpty();
     }
 
@@ -353,14 +353,14 @@ class UserRoleServiceIntegrationTest extends BaseIntegrationTest {
     }
 
     // ======================================================================
-    // getUserRoleHistory / cleanupInvalidUserRoles (stub implementations)
+    // getMemberRoleHistory / cleanupInvalidUserRoles (stub implementations)
     // ======================================================================
 
     @Test
     @Order(24)
-    void getUserRoleHistory_returnsEmptyList() {
-        List<Map<String, Object>> history = userRoleService.getUserRoleHistory(
-                testUser.getId(), testTenant.getId(), 30);
+    void getMemberRoleHistory_returnsEmptyList() {
+        List<Map<String, Object>> history = userRoleService.getMemberRoleHistory(
+                testTenantMember.getId(), testTenant.getId(), 30);
         assertThat(history).isNotNull();
         assertThat(history).isEmpty();
     }
@@ -379,7 +379,7 @@ class UserRoleServiceIntegrationTest extends BaseIntegrationTest {
     @Test
     @Order(99)
     void cleanup_deleteTestRoles() {
-        userRoleService.removeAllRolesFromUserInTenant(testUser.getId(), testTenant.getId());
+        userRoleService.removeAllRolesFromMemberInTenant(testTenantMember.getId(), testTenant.getId());
         if (roleAId != null) roleService.deleteRole(roleAId);
         if (roleBId != null) roleService.deleteRole(roleBId);
     }

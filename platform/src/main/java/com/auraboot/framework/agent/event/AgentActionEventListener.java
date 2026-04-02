@@ -7,10 +7,8 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 /**
- * Listens for AgentActionEvent from ChatToolExecutor (core module)
- * and delegates to ActionRecorder (enterprise-ai module).
- *
- * This bridges the module boundary: core publishes events, enterprise-ai records Actions.
+ * Listens for AgentActionEvent from ChatToolExecutor
+ * and delegates to ActionRecorder in the shared AI runtime.
  */
 @Slf4j
 @Component

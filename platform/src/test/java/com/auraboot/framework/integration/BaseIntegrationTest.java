@@ -267,23 +267,23 @@ public class BaseIntegrationTest {
      */
     private UserRole createTestUserRole() {
         // 先检查是否已存在关系
-        UserRole existingUserRole = userRoleService.findByUserIdAndRoleIdAndTenantId(
-            testUser.getId(), testRole.getId(), testTenant.getId());
+        UserRole existingUserRole = userRoleService.findByMemberIdAndRoleIdAndTenantId(
+            testTenantMember.getId(), testRole.getId(), testTenant.getId());
         if (existingUserRole != null) {
             return existingUserRole;
         }
 
         // 为用户分配角色
-        boolean success = userRoleService.assignRolesToUser(
-            testUser.getId(), 
+        boolean success = userRoleService.assignRolesToMember(
+            testTenantMember.getId(),
             Arrays.asList(testRole.getId()), 
             testTenant.getId(), 
             null
         );
 
         if (success) {
-            return userRoleService.findByUserIdAndRoleIdAndTenantId(
-                testUser.getId(), testRole.getId(), testTenant.getId());
+            return userRoleService.findByMemberIdAndRoleIdAndTenantId(
+                testTenantMember.getId(), testRole.getId(), testTenant.getId());
         }
 
         return null;

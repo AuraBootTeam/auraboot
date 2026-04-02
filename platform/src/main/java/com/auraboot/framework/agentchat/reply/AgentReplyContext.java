@@ -4,7 +4,9 @@ import com.auraboot.framework.agent.dto.LlmChatRequest;
 import com.auraboot.framework.agentchat.spi.AgentMemberDto;
 import com.auraboot.framework.agentchat.spi.ChatMessageDto;
 import com.auraboot.framework.agentchat.spi.GroupChatMessagePort;
+import com.auraboot.framework.agentchat.spi.NoOpGroupChatMessagePort;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -24,8 +26,8 @@ public class AgentReplyContext {
 
     private final GroupChatMessagePort messagePort;
 
-    public AgentReplyContext(GroupChatMessagePort messagePort) {
-        this.messagePort = messagePort;
+    public AgentReplyContext(ObjectProvider<GroupChatMessagePort> messagePortProvider) {
+        this.messagePort = messagePortProvider.getIfAvailable(NoOpGroupChatMessagePort::new);
     }
 
     /**

@@ -7,14 +7,13 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.util.List;
 
 /**
- * Port interface for ACP Agent chat streaming — defined in core module,
- * implemented in enterprise-ai module.
+ * Port interface for ACP agent chat streaming.
  * <p>
- * Allows AuraBotChatService to delegate streaming chat to a named ACP Agent
- * without a compile-time dependency on the enterprise-ai module.
+ * Allows AuraBotChatService to delegate streaming chat to a named ACP agent
+ * without compile-time coupling to a specific runtime implementation.
  * <p>
- * When enterprise-ai module is loaded, AgentChatPortImpl implements this interface.
- * When not loaded, AuraBotChatService falls through to the default AuraBot path.
+ * AgentChatPortImpl is the primary implementation. When unavailable, AuraBot falls through
+ * to the default chat path.
  */
 public interface AgentChatPort {
 
