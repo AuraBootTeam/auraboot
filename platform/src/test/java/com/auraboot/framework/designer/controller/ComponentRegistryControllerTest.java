@@ -38,7 +38,7 @@
 //    @Autowired
 //    private MockMvc mockMvc;
 //
-//    @MockBean
+//    @MockitoBean
 //    private ComponentRegistryService componentRegistryService;
 //
 //    @Autowired

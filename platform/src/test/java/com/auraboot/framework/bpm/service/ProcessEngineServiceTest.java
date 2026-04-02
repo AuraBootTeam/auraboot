@@ -69,9 +69,6 @@
 //
 //    @BeforeEach
 //    void setUp() {
-//        // 设置租户上下文
-//        MetaContext.setCurrentTenantId(TEST_TENANT_ID);
-//
 //        // 设置安全上下文
 //        SecurityContextHolder.setContext(securityContext);
 //        when(securityContext.getAuthentication()).thenReturn(authentication);
