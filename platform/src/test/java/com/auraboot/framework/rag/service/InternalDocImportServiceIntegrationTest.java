@@ -8,8 +8,8 @@ import com.auraboot.framework.rag.entity.KbChunk;
 import com.auraboot.framework.rag.service.InternalDocImportService.ImportResult;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -35,10 +35,10 @@ class InternalDocImportServiceIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
-    @MockBean
+    @MockitoBean
     private EmbeddingService embeddingService;
 
-    @MockBean
+    @MockitoBean
     private FileService fileService;
 
     // =========================================================================

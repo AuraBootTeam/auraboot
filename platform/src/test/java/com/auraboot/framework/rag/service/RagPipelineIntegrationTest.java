@@ -11,8 +11,8 @@ import com.auraboot.framework.rag.entity.KbDocument;
 import com.auraboot.framework.rag.util.VectorUtils;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -50,10 +50,10 @@ class RagPipelineIntegrationTest extends BaseIntegrationTest {
     private JdbcTemplate jdbcTemplate;
 
     // Mock external dependencies per AGENTS.md: LLM/AI providers and file storage
-    @MockBean
+    @MockitoBean
     private EmbeddingService embeddingService;
 
-    @MockBean
+    @MockitoBean
     private FileService fileService;
 
     // =========================================================================
