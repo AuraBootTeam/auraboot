@@ -8,8 +8,8 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 
 /**
- * Enterprise implementation of RagContextProvider.
- * Bridges AuraBot (core) with RagRetrievalService (enterprise-ai).
+ * Core implementation of RagContextProvider.
+ * Bridges AuraBot chat flows with RagRetrievalService inside the core AI runtime.
  */
 @Component
 @RequiredArgsConstructor

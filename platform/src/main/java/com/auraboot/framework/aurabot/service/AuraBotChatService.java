@@ -956,7 +956,7 @@ public class AuraBotChatService {
 
     /**
      * Resolve RAG context from knowledge bases if available.
-     * Uses the optional RagContextProvider (enterprise-ai module).
+     * Uses the optional RagContextProvider from the core AI runtime.
      */
     private String resolveRagContext(Long tenantId, ChatRequest request) {
         if (ragContextProvider == null) return "";
