@@ -108,6 +108,23 @@ pnpm dev:full
 
 Open [http://localhost:5173](http://localhost:5173) in your browser.
 
+### Verify Your Setup
+
+```bash
+# Backend baseline tests
+cd platform
+./gradlew test
+
+# AI runtime regression tests (AuraBot / Agent / RAG / Intent)
+./gradlew testAi
+
+# Frontend E2E smoke
+cd ../web-admin
+NO_PROXY=localhost npx playwright test
+```
+
+If you are working on AI features, run both `test` and `testAi`. The AI stack lives in core, but its regression suite is split into a dedicated Gradle task so it can run with a heavier test profile without slowing every default backend run.
+
 ## Tech Stack
 
 | Layer | Technology |

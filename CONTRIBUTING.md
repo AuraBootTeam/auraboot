@@ -51,9 +51,14 @@ curl -s http://localhost:6443/actuator/health
 # Run backend tests
 cd platform && ./gradlew test
 
+# Run AI runtime regression tests (AuraBot / Agent / RAG / Intent)
+cd platform && ./gradlew testAi
+
 # Run E2E tests
 cd web-admin && NO_PROXY=localhost npx playwright test
 ```
+
+`./gradlew test` covers the main backend suite, but AI runtime packages are intentionally isolated behind `./gradlew testAi` because they require a heavier Spring context and additional fixtures. If your change touches AuraBot, agents, RAG, intent routing, or shared AI infrastructure, run both commands before opening a PR.
 
 ---
 
