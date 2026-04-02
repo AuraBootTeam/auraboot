@@ -91,6 +91,7 @@ class DataPermissionEngineIntegrationTest {
             localUser.getPid(),
             localUser.getUserName()
         );
+        MetaContext.setMemberId(localTenantMember.getId());
     }
     
     private User ensureTestUser() {

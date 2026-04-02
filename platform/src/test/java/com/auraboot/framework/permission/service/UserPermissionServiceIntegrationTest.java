@@ -111,6 +111,7 @@ class UserPermissionServiceIntegrationTest {
             testUser.getPid(),
             testUser.getUserName()
         );
+        MetaContext.setMemberId(testTenantMember.getId());
 
         testRole = createFreshRole();
         ensureUserRoleBinding();

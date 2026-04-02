@@ -13,6 +13,8 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Service for shared mailbox assignment and claim operations.
@@ -34,6 +36,7 @@ public class SharedMailboxService {
 
     /** Redis key prefix for round-robin counter: {@code email:rr:account:{accountId}}. */
     private static final String RR_KEY_PREFIX = "email:rr:account:";
+    private static final ConcurrentHashMap<Long, AtomicLong> LOCAL_COUNTERS = new ConcurrentHashMap<>();
 
     private final EmailAccountMemberMapper emailAccountMemberMapper;
     private final EmailMessageMapper       emailMessageMapper;
@@ -91,8 +94,10 @@ public class SharedMailboxService {
             counter = stringRedisTemplate.opsForValue().increment(redisKey);
             if (counter == null) counter = 0L;
         } else {
-            // Fallback without Redis: use simple counter (not distributed-safe)
-            counter = System.nanoTime();
+            // Fallback without Redis: keep deterministic in-process round-robin semantics.
+            counter = LOCAL_COUNTERS
+                    .computeIfAbsent(account.getId(), ignored -> new AtomicLong(0))
+                    .incrementAndGet();
         }
 
         int slotIndex    = (int) (Math.abs(counter - 1) % slots.size());

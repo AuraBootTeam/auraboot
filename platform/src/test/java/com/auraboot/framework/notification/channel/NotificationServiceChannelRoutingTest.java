@@ -6,6 +6,7 @@ import com.auraboot.framework.notification.dto.NotificationSendRequest;
 import com.auraboot.framework.notification.entity.NotificationSendLog;
 import com.auraboot.framework.notification.entity.NotificationTemplate;
 import com.auraboot.framework.notification.mapper.NotificationSendLogMapper;
+import com.auraboot.framework.notification.service.EmailSender;
 import com.auraboot.framework.notification.service.NotificationTemplateService;
 import com.auraboot.framework.notification.service.impl.NotificationServiceImpl;
 import org.junit.jupiter.api.*;
@@ -43,6 +44,9 @@ class NotificationServiceChannelRoutingTest {
     @Mock
     private NotificationChannel emailChannel;
 
+    @Mock
+    private EmailSender emailSender;
+
     private NotificationServiceImpl notificationService;
 
     private MockedStatic<MetaContext> metaContextMock;
@@ -59,7 +63,7 @@ class NotificationServiceChannelRoutingTest {
         when(emailChannel.send(any())).thenReturn(NotificationResult.ok());
 
         notificationService = new NotificationServiceImpl(
-                templateService, sendLogMapper, List.of(inAppChannel, emailChannel));
+                templateService, sendLogMapper, emailSender, List.of(inAppChannel, emailChannel));
 
         // Mock MetaContext
         metaContextMock = Mockito.mockStatic(MetaContext.class);
@@ -98,7 +102,7 @@ class NotificationServiceChannelRoutingTest {
     }
 
     @Test
-    @DisplayName("send() routes EMAIL template to EmailChannel")
+    @DisplayName("send() routes EMAIL template to EmailSender")
     void sendRoutesToEmailChannel() {
         NotificationTemplate template = createTemplate("email_tpl", "email");
         when(templateService.getByCode("email_tpl")).thenReturn(template);
@@ -111,15 +115,9 @@ class NotificationServiceChannelRoutingTest {
 
         notificationService.send(request);
 
-        ArgumentCaptor<NotificationMessage> captor = ArgumentCaptor.forClass(NotificationMessage.class);
-        verify(emailChannel).send(captor.capture());
+        verify(emailSender).send("user@test.com", "Subject ${key}", "Body with ${key}");
         verify(inAppChannel, never()).send(any());
-
-        NotificationMessage msg = captor.getValue();
-        // Non-numeric recipientId resolves to empty user list
-        assertTrue(msg.getRecipientUserIds().isEmpty());
-        // Email is passed via extras
-        assertEquals("user@test.com", msg.getExtras().get("email"));
+        verify(emailChannel, never()).send(any());
     }
 
     @Test

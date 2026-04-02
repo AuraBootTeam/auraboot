@@ -150,8 +150,8 @@ class ModelExportServiceTest {
         Map<String, Object> exportedPage = pages.get(0);
         assertEquals("e2et_order_list", exportedPage.get("code"));
         assertEquals(modelCode, exportedPage.get("modelCode"));
-        assertEquals("list", exportedPage.get("pageType"));
-        assertNotNull(exportedPage.get("schema"));
+        assertEquals("list", exportedPage.get("kind"));
+        assertNotNull(exportedPage.get("blocks"));
     }
 
     @Test
