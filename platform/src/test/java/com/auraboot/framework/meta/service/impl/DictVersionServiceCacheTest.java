@@ -70,7 +70,7 @@ class DictVersionServiceCacheTest {
     @Test
     void testCacheKeyIncludesTenantContext() {
         // Given: 设置租户上下文
-        MetaContext.setCurrentTenantId(1001L);
+        MetaContext.setSystemTenantContext(1001L);
 
         
         // Mock字典数据
@@ -100,7 +100,7 @@ class DictVersionServiceCacheTest {
     @Test
     void testCacheIsolationBetweenTenants() {
         // Given: 租户1的上下文
-        MetaContext.setCurrentTenantId(1001L);
+        MetaContext.setSystemTenantContext(1001L);
 
         
         Dict dict1 = createMockDict("user_status", "static");
@@ -112,7 +112,7 @@ class DictVersionServiceCacheTest {
         
         // Given: 切换到租户2
         MetaContext.clear();
-        MetaContext.setCurrentTenantId(2002L);
+        MetaContext.setSystemTenantContext(2002L);
 
         
         Dict dict2 = createMockDict("user_status", "static");
@@ -140,7 +140,7 @@ class DictVersionServiceCacheTest {
     @Test
     void testCacheIsolationBetweenEnvironments() {
         // Given: 开发环境
-        MetaContext.setCurrentTenantId(1001L);
+        MetaContext.setSystemTenantContext(1001L);
 
         
         Dict devDict = createMockDict("user_status", "static");
@@ -175,7 +175,7 @@ class DictVersionServiceCacheTest {
     @Test
     void testCacheIsolationBetweenVersionStrategies() {
         // Given: 设置租户上下文
-        MetaContext.setCurrentTenantId(1001L);
+        MetaContext.setSystemTenantContext(1001L);
 
         
         // Mock LATEST策略
@@ -213,7 +213,7 @@ class DictVersionServiceCacheTest {
     @Test
     void testClearDictCache() {
         // Given: 设置租户上下文
-        MetaContext.setCurrentTenantId(1001L);
+        MetaContext.setSystemTenantContext(1001L);
 
         
         Dict dict = createMockDict("user_status", "static");
@@ -240,7 +240,7 @@ class DictVersionServiceCacheTest {
     @Test
     void testSwitchCurrentVersionClearsCache() {
         // Given: 设置租户上下文
-        MetaContext.setCurrentTenantId(1001L);
+        MetaContext.setSystemTenantContext(1001L);
 
         
         Dict dict = createMockDict("user_status", "static");

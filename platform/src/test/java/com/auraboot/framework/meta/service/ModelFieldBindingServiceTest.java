@@ -55,7 +55,7 @@ class ModelFieldBindingServiceTest {
     @BeforeEach
     void setUp() {
         // Setup tenant context
-        MetaContext.setCurrentTenantId(1L);
+        MetaContext.setSystemTenantContext(1L);
 
         // Setup test model
         testModel = new Model();

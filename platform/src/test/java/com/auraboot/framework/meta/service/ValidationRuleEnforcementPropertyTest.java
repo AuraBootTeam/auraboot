@@ -43,9 +43,7 @@ public class ValidationRuleEnforcementPropertyTest {
     @BeforeEach
     void setUp() {
         // 设置租户上下文
-        MetaContext.setCurrentTenantId(1L);
-          
-        MetaContext.setCurrentUserId(1L);
+        MetaContext.setContext(1L, 1L, null, null);
     }
 
     @AfterEach
@@ -168,7 +166,7 @@ public class ValidationRuleEnforcementPropertyTest {
             
             // 设置当前租户ID
             Long currentTenantId = 1L + (i % 10);
-            MetaContext.setCurrentTenantId(currentTenantId);
+            MetaContext.setSystemTenantContext(currentTenantId);
             
             // 测试1: 数据中的tenant_id与当前租户一致
             data.put("tenant_id", currentTenantId);
