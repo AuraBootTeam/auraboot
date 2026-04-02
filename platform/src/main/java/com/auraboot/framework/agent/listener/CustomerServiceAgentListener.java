@@ -37,7 +37,7 @@ public class CustomerServiceAgentListener {
         log.info("CS Agent: received InboundEmailEvent from {} (tenant={})", event.getSenderEmail(), tenantId);
 
         try {
-            MetaContext.setCurrentTenantId(tenantId);
+            MetaContext.setSystemTenantContext(tenantId);
 
             // Check if cs_agent is configured and active for this tenant
             Map<String, Object> agentDef = findAgentDefinition(tenantId, CS_AGENT_CODE);

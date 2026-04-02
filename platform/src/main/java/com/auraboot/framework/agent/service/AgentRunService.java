@@ -66,7 +66,7 @@ public class AgentRunService {
 
     @Async
     public void executeTask(Long tenantId, String taskPid, String agentCode) {
-        MetaContext.setCurrentTenantId(tenantId);
+        MetaContext.setSystemTenantContext(tenantId);
         try {
             doExecuteTask(tenantId, taskPid, agentCode, null);
         } finally {
@@ -76,7 +76,7 @@ public class AgentRunService {
 
     @Async
     public void executeTaskWithResume(Long tenantId, String taskPid, String agentCode, String resumeFromRunPid) {
-        MetaContext.setCurrentTenantId(tenantId);
+        MetaContext.setSystemTenantContext(tenantId);
         try {
             doExecuteTask(tenantId, taskPid, agentCode, resumeFromRunPid);
         } finally {

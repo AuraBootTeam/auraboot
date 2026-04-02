@@ -37,7 +37,7 @@ public class SkillBootstrapRunner implements ApplicationRunner {
                 Long tenantId = ((Number) tenant.get("id")).longValue();
                 try {
                     // Set MetaContext for tenant-scoped queries (MyBatis TenantLineInterceptor requires it)
-                    MetaContext.setCurrentTenantId(tenantId);
+                    MetaContext.setSystemTenantContext(tenantId);
                     var result = skillAutoGenerator.syncSkills(tenantId);
                     synced++;
                     if (result.created() > 0) {

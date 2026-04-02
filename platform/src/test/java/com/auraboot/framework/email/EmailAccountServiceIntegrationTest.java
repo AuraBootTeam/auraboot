@@ -13,7 +13,7 @@ import com.auraboot.framework.integration.BaseIntegrationTest;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,7 +44,7 @@ import static org.mockito.Mockito.*;
 class EmailAccountServiceIntegrationTest extends BaseIntegrationTest {
 
     // ── Mocked (cannot call real Gmail API) ──────────────────────────────────
-    @MockBean
+    @MockitoBean
     private GmailApiClient gmailApiClient;
 
     // ── Real beans ───────────────────────────────────────────────────────────

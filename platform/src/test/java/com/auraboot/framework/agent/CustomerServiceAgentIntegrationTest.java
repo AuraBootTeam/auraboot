@@ -12,8 +12,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,7 +38,7 @@ import static org.awaitility.Awaitility.await;
  * <p>Design decisions:
  * <ul>
  *   <li>NOT_SUPPORTED propagation: data must persist across ordered test methods</li>
- *   <li>@MockBean EmailSender: do not actually send emails</li>
+ *   <li>@MockitoBean EmailSender: do not actually send emails</li>
  *   <li>Awaitility for async polling: AgentRunService.executeTask() is @Async</li>
  *   <li>Real LLM required: tests will fail without configured LLM API keys</li>
  * </ul>
@@ -64,7 +64,7 @@ public class CustomerServiceAgentIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    @MockBean
+    @MockitoBean
     private EmailSender emailSender;
 
     // Shared state across ordered tests
