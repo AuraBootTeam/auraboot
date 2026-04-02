@@ -249,7 +249,7 @@ class MetaFieldValidatorTest {
     void testValidateCreateRequest_DuplicateCode_Fails() {
         // Arrange - Setup MetaContext
         try {
-            com.auraboot.framework.application.tenant.MetaContext.setCurrentTenantId(1L);
+            com.auraboot.framework.application.tenant.MetaContext.setSystemTenantContext(1L);
 
             MetaFieldCreateRequest request = new MetaFieldCreateRequest();
             request.setCode("existing_field");
