@@ -245,7 +245,15 @@ public class BaseIntegrationTest {
      * 创建测试角色
      */
     private Role createTestRole() {
-        // 直接创建新角色，不查找现有角色（避免租户上下文问题）
+        java.util.List<Role> existingRoles = roleService.lambdaQuery()
+                .eq(Role::getTenantId, testTenant.getId())
+                .eq(Role::getCode, "test_user")
+                .eq(Role::getDeletedFlag, false)
+                .list();
+        if (!existingRoles.isEmpty()) {
+            return existingRoles.get(0);
+        }
+
         Role role = new Role();
         role.setPid(UniqueIdGenerator.generate());
         role.setName("test_user");
