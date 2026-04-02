@@ -7,8 +7,7 @@ import java.util.Map;
 
 /**
  * Published when a tool execution completes (command or query).
- * Consumed by ActionRecorder in platform-enterprise-ai to create ab_agent_action records.
- * Decouples the core module from the enterprise-ai module.
+ * Consumed by ActionRecorder in the core AI runtime to create ab_agent_action records.
  */
 @Getter
 public class AgentActionEvent extends ApplicationEvent {
