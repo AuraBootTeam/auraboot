@@ -33,6 +33,16 @@ common:
   search: 查询
   query: 查询
   operation: 操作
+  actions: 操作
+  confirm: 确认
+  cancel: 取消
+  saving: 保存中...
+
+  field:
+    status: 状态
+  status:
+    active: 激活
+    inactive: 未激活
 
   items_per_page: 每页显示
   items_total: "共 {total} 条"
@@ -45,6 +55,7 @@ common:
   please_input: "请输入{field}"
   please_select: "请选择{field}"
   all: 全部
+  currentTenant: 当前租户
 
   start_date: 开始日期
   end_date: 结束日期
@@ -719,3 +730,57 @@ search:
   navigate: 导航
   open: 打开
   close: 关闭
+admin:
+  org:
+    title: 组织管理
+    description: 管理部门与员工
+    department:
+      title: 部门
+      create: 新建部门
+      edit: 编辑部门
+      addChild: 新增子部门
+      name: 部门名称
+      namePlaceholder: 请输入部门名称
+      parent: 上级部门
+      parentNone: -- 根部门 --
+      sortOrder: 排序
+      search: 搜索部门...
+      empty: 暂无部门，点击 + 创建
+      noSearchResults: 未找到匹配的部门
+      createSuccess: 部门创建成功
+      updateSuccess: 部门更新成功
+      deleteTitle: 删除部门
+      deleteContent: 确认删除部门“{name}”吗？
+      deleteSuccess: 部门删除成功
+    employee:
+      add: 成员入职
+      addFirst: 点击入职一名成员
+      create: 邀请并办理入职
+      createNew: 邀请并入职
+      linkExisting: 关联已有租户成员
+      edit: 编辑员工
+      name: 姓名
+      phone: 电话
+      email: 邮箱
+      gender: 性别
+      position: 职位
+      onboardingTitle: 此操作会完成完整入职
+      onboardingHint: 在这里提交会同时创建登录用户、租户成员和当前部门下的员工档案。如果对方已经加入当前租户，请改用“关联已有租户成员”。
+      entryHint: 租户准入和邀请码在“企业成员”中管理，组织架构这里只负责入职和组织归属。
+      memberEntry: 前往企业成员
+      selectDepartment: 请先从左侧组织树选择部门后查看员工
+      search: 搜索员工...
+      empty: 当前部门暂无员工
+      emptyTenant: 当前租户暂无员工
+      noUnlinked: 未找到可关联的成员
+      selected: 已选择 {count} 项
+      linkConfirm: 确认关联
+      linkSuccess: 已关联 {count} 个成员
+      createSuccess: 员工创建成功
+      updateSuccess: 员工更新成功
+      deleteTitle: 移除员工
+      deleteContent: 确认移除员工“{name}”吗？
+      deleteSuccess: 员工移除成功
+      genderMale: 男
+      genderFemale: 女
+      positionNone: -- 无职位 --

@@ -25,6 +25,7 @@ import com.auraboot.framework.common.constant.StatusConstants;
  * - admin:restore_member  → restore a suspended member
  * - admin:leave_member    → mark a member as left (INACTIVE + set leave_date)
  * - admin:delete_member   → remove a member from the tenant
+ * - admin:reset_member_password → send password reset email to the member
  *
  * @author AuraBoot Team
  * @since 4.0.0
@@ -59,6 +60,7 @@ public class TenantMemberCommandHandler implements CommandHandler {
                 case "admin:restore_member" -> handleRestore(memberPid, userId, result);
                 case "admin:leave_member" -> handleLeave(memberPid, userId, result);
                 case "admin:delete_member" -> handleDelete(memberPid, userId, result);
+                case "admin:reset_member_password" -> handleResetPassword(memberPid, userId, result);
                 default -> {
                     log.warn("Unknown command code for TenantMemberCommandHandler: {}", commandCode);
                     result.put("handlerExecuted", false);
@@ -121,6 +123,12 @@ public class TenantMemberCommandHandler implements CommandHandler {
         tenantMemberApplicationService.removeMember(memberPid, userId);
         result.put("action", "delete");
         result.put("removed", true);
+    }
+
+    private void handleResetPassword(String memberPid, Long userId, Map<String, Object> result) {
+        tenantMemberApplicationService.sendPasswordResetEmail(memberPid, userId);
+        result.put("action", "reset_password");
+        result.put("emailSent", true);
     }
 
     /**

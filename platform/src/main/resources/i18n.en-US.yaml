@@ -699,3 +699,68 @@ search:
   navigate: Navigate
   open: Open
   close: Close
+common:
+  field:
+    status: Status
+  status:
+    active: Active
+    inactive: Inactive
+  actions: Actions
+  confirm: Confirm
+  cancel: Cancel
+  saving: Saving...
+  currentTenant: Current Tenant
+admin:
+  org:
+    title: Organization Management
+    description: Manage departments and employees
+    department:
+      title: Departments
+      create: Create Department
+      edit: Edit Department
+      addChild: Add Sub-department
+      name: Department Name
+      namePlaceholder: Enter department name
+      parent: Parent Department
+      parentNone: -- Root Department --
+      sortOrder: Sort Order
+      search: Search departments...
+      empty: No departments yet. Click + to create one.
+      noSearchResults: No matching departments
+      createSuccess: Department created
+      updateSuccess: Department updated
+      deleteTitle: Delete Department
+      deleteContent: Are you sure you want to delete department "{name}"?
+      deleteSuccess: Department deleted
+    employee:
+      add: Onboard Member
+      addFirst: Click to onboard one
+      create: Invite and Onboard Member
+      createNew: Invite and Onboard
+      linkExisting: Link Existing Tenant Member
+      edit: Edit Employee
+      name: Name
+      phone: Phone
+      email: Email
+      gender: Gender
+      position: Position
+      onboardingTitle: This creates a full onboarded member
+      onboardingHint: Submitting here will create a login user, a tenant member, and an employee record in the selected department. If the person has already joined the tenant, use "Link Existing Member" instead.
+      entryHint: Tenant access is managed in Tenant Members. Organization only handles onboarding and org assignment.
+      memberEntry: Go to Tenant Members
+      selectDepartment: Select a department from the tree to view employees
+      search: Search employees...
+      empty: No employees in this department
+      emptyTenant: No employees in the current tenant
+      noUnlinked: No unlinked members found
+      selected: "{count} selected"
+      linkConfirm: Link Selected
+      linkSuccess: "{count} member(s) linked"
+      createSuccess: Employee created
+      updateSuccess: Employee updated
+      deleteTitle: Remove Employee
+      deleteContent: Are you sure you want to remove employee "{name}"?
+      deleteSuccess: Employee removed
+      genderMale: Male
+      genderFemale: Female
+      positionNone: -- No Position --

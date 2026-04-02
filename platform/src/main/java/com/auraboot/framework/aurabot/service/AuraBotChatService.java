@@ -11,6 +11,7 @@ import com.auraboot.framework.agent.trace.SpanContext;
 import com.auraboot.framework.agent.trace.TraceContext;
 import com.auraboot.framework.aurabot.dto.ChatMessage;
 import com.auraboot.framework.aurabot.dto.ChatRequest;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.constant.SystemFieldConstants;
 import com.auraboot.framework.meta.dto.ModelDefinition;
 import com.auraboot.framework.meta.service.MetaModelService;
@@ -123,13 +124,20 @@ public class AuraBotChatService {
      * @param request  the chat request with message, history, page context, and options
      * @param emitter  the SSE emitter to stream events to
      */
-    public void streamChat(Long tenantId, ChatRequest request, SseEmitter emitter) {
+    public void streamChat(Long tenantId, Long userId, String userPid, String username,
+                           Long memberId, ChatRequest request, SseEmitter emitter) {
         asyncTaskExecutor.execute(() -> {
             try {
+                MetaContext.setContext(tenantId, userId, userPid, username);
+                if (memberId != null) {
+                    MetaContext.setMemberId(memberId);
+                }
                 doStreamChat(tenantId, request, emitter);
             } catch (Exception e) {
                 log.error("Chat stream failed: {}", e.getMessage(), e);
                 sendError(emitter, e.getMessage());
+            } finally {
+                MetaContext.clear();
             }
         });
     }
@@ -144,14 +152,22 @@ public class AuraBotChatService {
      * @param confirmed true if user confirmed, false if cancelled
      * @param emitter   the SSE emitter for the new stream
      */
-    public void resumeAfterConfirmation(Long tenantId, String sessionId, String toolId,
+    public void resumeAfterConfirmation(Long tenantId, Long userId, String userPid,
+                                         String username, Long memberId,
+                                         String sessionId, String toolId,
                                          boolean confirmed, SseEmitter emitter) {
         asyncTaskExecutor.execute(() -> {
             try {
+                MetaContext.setContext(tenantId, userId, userPid, username);
+                if (memberId != null) {
+                    MetaContext.setMemberId(memberId);
+                }
                 doResumeAfterConfirmation(tenantId, sessionId, toolId, confirmed, emitter);
             } catch (Exception e) {
                 log.error("Resume after confirmation failed: {}", e.getMessage(), e);
                 sendError(emitter, e.getMessage());
+            } finally {
+                MetaContext.clear();
             }
         });
     }
@@ -198,7 +214,7 @@ public class AuraBotChatService {
                     "recordPid", Objects.toString(request.getPageContext().getRecordPid(), "")));
         }
         TraceContext trace = aiTraceService.createTrace(tenantId, request.getSessionId(),
-                request.getMessage(), null, traceMetadata);
+                request.getMessage(), MetaContext.getCurrentUserId(), traceMetadata);
 
         // 2. Resolve model and options
         ChatRequest.ChatOptions options = request.getOptions() != null ? request.getOptions() : new ChatRequest.ChatOptions();
@@ -273,7 +289,7 @@ public class AuraBotChatService {
         // Persist run record
         String runPid = null;
         if (chatRunPersistencePort != null) {
-            runPid = chatRunPersistencePort.createRun(tenantId, model, userMessage);
+            runPid = chatRunPersistencePort.createRun(tenantId, sessionId, model, userMessage);
         }
         int totalInputTokens = 0, totalOutputTokens = 0;
 
@@ -302,7 +318,8 @@ public class AuraBotChatService {
                 log.error("Tool loop LLM call failed (round {}): {}", round, e.getMessage(), e);
                 if (chatRunPersistencePort != null && runPid != null) {
                     chatRunPersistencePort.completeRun(runPid, false, totalInputTokens, totalOutputTokens,
-                            0, null, "LLM request failed: " + e.getMessage());
+                            0, null, "LLM request failed: " + e.getMessage(),
+                            trace != null ? trace.getTraceId() : null);
                 }
                 sendError(emitter, "LLM request failed: " + e.getMessage(), trace != null ? trace.getTraceId() : null);
                 return;
@@ -322,7 +339,8 @@ public class AuraBotChatService {
                 aiTraceService.endTraceWithError(trace, "Empty response from LLM");
                 if (chatRunPersistencePort != null && runPid != null) {
                     chatRunPersistencePort.completeRun(runPid, false, totalInputTokens, totalOutputTokens,
-                            0, null, "Empty response from LLM");
+                            0, null, "Empty response from LLM",
+                            trace != null ? trace.getTraceId() : null);
                 }
                 sendError(emitter, "Empty response from LLM", trace != null ? trace.getTraceId() : null);
                 return;
@@ -336,7 +354,7 @@ public class AuraBotChatService {
                 aiTraceService.endTrace(trace, finalText, "success");
                 if (chatRunPersistencePort != null && runPid != null) {
                     chatRunPersistencePort.completeRun(runPid, true, totalInputTokens, totalOutputTokens,
-                            0, finalText, null);
+                            0, finalText, null, trace != null ? trace.getTraceId() : null);
                 }
                 streamFinalResponse(response, emitter, trace != null ? trace.getTraceId() : null);
                 return;
@@ -434,7 +452,7 @@ public class AuraBotChatService {
             aiTraceService.endTrace(trace, unknownText, "success");
             if (chatRunPersistencePort != null && runPid != null) {
                 chatRunPersistencePort.completeRun(runPid, true, totalInputTokens, totalOutputTokens,
-                        0, unknownText, null);
+                        0, unknownText, null, trace != null ? trace.getTraceId() : null);
             }
             streamFinalResponse(response, emitter, trace != null ? trace.getTraceId() : null);
             return;
@@ -444,7 +462,8 @@ public class AuraBotChatService {
         aiTraceService.endTraceWithError(trace, "Tool loop exceeded maximum rounds");
         if (chatRunPersistencePort != null && runPid != null) {
             chatRunPersistencePort.completeRun(runPid, false, totalInputTokens, totalOutputTokens,
-                    0, null, "Tool loop exceeded maximum rounds");
+                    0, null, "Tool loop exceeded maximum rounds",
+                    trace != null ? trace.getTraceId() : null);
         }
         sendError(emitter, "Tool loop exceeded maximum rounds (" + maxToolRounds + ")", trace != null ? trace.getTraceId() : null);
     }
@@ -757,21 +776,17 @@ public class AuraBotChatService {
                 sb.append(block.getText());
             }
         }
-        return sb.isEmpty() ? null : sb.toString();
+        return sb.isEmpty() ? null : sanitizeAssistantText(sb.toString());
     }
 
     /**
      * Stream the final text from an LLM response as SSE chunks + done.
      */
     private void streamFinalResponse(LlmChatResponse response, SseEmitter emitter, String traceId) {
-        StringBuilder fullText = new StringBuilder();
-        for (LlmChatResponse.ContentBlock block : response.getContent()) {
-            if ("text".equals(block.getType()) && block.getText() != null) {
-                fullText.append(block.getText());
-            }
+        String text = extractTextFromResponse(response);
+        if (text == null) {
+            text = "";
         }
-
-        String text = fullText.toString();
         if (!text.isEmpty()) {
             // Send as a single chunk (sync response, no streaming needed)
             sendChunk(emitter, text);
@@ -961,6 +976,18 @@ public class AuraBotChatService {
             log.debug("RAG context resolution failed: {}", e.getMessage());
             return "";
         }
+    }
+
+    private String sanitizeAssistantText(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return raw;
+        }
+        String cleaned = raw
+                .replaceAll("(?is)<think>.*?</think>", "")
+                .replaceAll("(?im)^\\s*<think>\\s*$", "")
+                .replaceAll("(?im)^\\s*</think>\\s*$", "")
+                .trim();
+        return cleaned.isBlank() ? raw.trim() : cleaned;
     }
 
     // =========================================================================

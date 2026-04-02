@@ -6,6 +6,7 @@ import com.auraboot.framework.auth.service.PasswordManagementService;
 import com.auraboot.framework.auth.service.PasswordPolicyService;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.RootUnCheckedException;
+import com.auraboot.framework.notification.service.EmailSender;
 import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.mapper.UserMapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -34,6 +35,7 @@ public class PasswordManagementServiceImpl implements PasswordManagementService 
     private final PasswordEncoder passwordEncoder;
     private final PasswordPolicyService passwordPolicyService;
     private final PasswordHistoryMapper passwordHistoryMapper;
+    private final EmailSender emailSender;
 
     @Value("${security.lockout.max-attempts:5}")
     private int maxAttempts;
@@ -151,18 +153,17 @@ public class PasswordManagementServiceImpl implements PasswordManagementService 
             return;
         }
 
-        // Generate cryptographically secure token (32 bytes = 64 hex chars)
-        String token = generateSecureToken();
-        // Store SHA-256 hash of token — never store plaintext
-        user.setResetPasswordToken(hashToken(token));
-        user.setResetPasswordSentAt(Instant.now());
-        user.setUpdatedAt(Instant.now());
-        userMapper.updateById(user);
+        sendResetEmail(user);
+    }
 
-        String resetLink = frontendBaseUrl + "/reset-password?token=" + token;
-        // TODO: Send email via NotificationChannel when SMTP is configured
-        // Only log token hash for audit trail, never the full link/token
-        log.debug("Password reset initiated for {} — token hash: {}", email, hashToken(token));
+    @Override
+    @Transactional
+    public void sendPasswordResetEmail(Long userId) {
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new RootUnCheckedException(ResponseCode.NOT_FOUND, "User not found");
+        }
+        sendResetEmail(user);
     }
 
     @Override
@@ -239,6 +240,36 @@ public class PasswordManagementServiceImpl implements PasswordManagementService 
         byte[] bytes = new byte[32];
         random.nextBytes(bytes);
         return HexFormat.of().formatHex(bytes);
+    }
+
+    private void sendResetEmail(User user) {
+        if (user.getEmail() == null || user.getEmail().isBlank()) {
+            throw new RootUnCheckedException(ResponseCode.BadParam, "User email is required for password reset");
+        }
+
+        String token = generateSecureToken();
+        String tokenHash = hashToken(token);
+        user.setResetPasswordToken(tokenHash);
+        user.setResetPasswordSentAt(Instant.now());
+        user.setUpdatedAt(Instant.now());
+        userMapper.updateById(user);
+
+        String resetLink = frontendBaseUrl + "/reset-password?token=" + token;
+        String subject = "Reset your AuraBoot password";
+        String displayName = user.getNickName() != null && !user.getNickName().isBlank()
+            ? user.getNickName()
+            : (user.getUserName() != null && !user.getUserName().isBlank() ? user.getUserName() : user.getEmail());
+        String htmlBody = """
+            <p>Hello %s,</p>
+            <p>We received a request to reset your AuraBoot password.</p>
+            <p><a href="%s">Click here to reset your password</a></p>
+            <p>This link will expire in %d minutes.</p>
+            <p>If you did not request this change, you can ignore this email.</p>
+            """.formatted(displayName, resetLink, resetTokenExpiryMinutes);
+
+        emailSender.send(user.getEmail(), subject, htmlBody);
+        log.info("Password reset email sent to user {}", user.getId());
+        log.debug("Password reset initiated for {} — token hash: {}", user.getEmail(), tokenHash);
     }
 
     private static String hashToken(String token) {

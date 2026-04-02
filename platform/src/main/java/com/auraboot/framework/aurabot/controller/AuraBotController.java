@@ -29,8 +29,12 @@ public class AuraBotController {
     @PostMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamChat(@RequestBody ChatRequest request) {
         Long tenantId = MetaContext.getCurrentTenantId();
+        Long userId = MetaContext.getCurrentUserId();
+        String userPid = MetaContext.getCurrentUserPid();
+        String username = MetaContext.getCurrentUsername();
+        Long memberId = MetaContext.getCurrentMemberId();
         SseEmitter emitter = new SseEmitter(300_000L); // 5 min timeout
-        chatService.streamChat(tenantId, request, emitter);
+        chatService.streamChat(tenantId, userId, userPid, username, memberId, request, emitter);
         return emitter;
     }
 
@@ -49,8 +53,13 @@ public class AuraBotController {
     @PostMapping(value = "/execute", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter executeAction(@RequestBody ChatRequest.ExecuteRequest request) {
         Long tenantId = MetaContext.getCurrentTenantId();
+        Long userId = MetaContext.getCurrentUserId();
+        String userPid = MetaContext.getCurrentUserPid();
+        String username = MetaContext.getCurrentUsername();
+        Long memberId = MetaContext.getCurrentMemberId();
         SseEmitter emitter = new SseEmitter(300_000L); // 5 min timeout
-        chatService.resumeAfterConfirmation(tenantId, request.getSessionId(),
+        chatService.resumeAfterConfirmation(tenantId, userId, userPid, username, memberId,
+                request.getSessionId(),
                 request.getToolId(), request.isConfirmed(), emitter);
         return emitter;
     }

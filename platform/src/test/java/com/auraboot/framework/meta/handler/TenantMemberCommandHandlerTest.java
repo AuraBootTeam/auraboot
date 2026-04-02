@@ -140,13 +140,24 @@ class TenantMemberCommandHandlerTest {
         verify(tenantMemberApplicationService).removeMember("mbr-007", 100L);
     }
 
+    @Test
+    void execute_resetPassword_callsServiceAndMarksEmailSent() {
+        CommandHandlerContext ctx = buildContext("admin:reset_member_password", "mbr-008", 100L, null);
+
+        Map<String, Object> result = handler.execute(ctx);
+
+        assertThat(result.get("action")).isEqualTo("reset_password");
+        assertThat(result.get("emailSent")).isEqualTo(true);
+        verify(tenantMemberApplicationService).sendPasswordResetEmail("mbr-008", 100L);
+    }
+
     // =========================================================
     // Unknown command
     // =========================================================
 
     @Test
     void execute_unknownCommand_returnsHandlerExecutedFalse() {
-        CommandHandlerContext ctx = buildContext("admin:unknown_op", "mbr-008", 100L, null);
+        CommandHandlerContext ctx = buildContext("admin:unknown_op", "mbr-009", 100L, null);
 
         Map<String, Object> result = handler.execute(ctx);
 
