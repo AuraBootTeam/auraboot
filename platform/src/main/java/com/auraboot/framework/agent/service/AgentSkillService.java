@@ -2,6 +2,7 @@ package com.auraboot.framework.agent.service;
 
 import com.auraboot.framework.agent.dto.AgentToolDefinition;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
+import com.auraboot.framework.saas.executor.SystemTenantContextExecutor;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +25,8 @@ import java.util.*;
 @RequiredArgsConstructor
 public class AgentSkillService {
 
+    private static final Long PLATFORM_TENANT_ID = SystemTenantContextExecutor.SYSTEM_TENANT_ID;
+
     private final DynamicDataMapper dynamicDataMapper;
     private final AgentObservationService observationService;
     private final ObjectMapper objectMapper;
@@ -32,20 +35,20 @@ public class AgentSkillService {
      * Load a skill definition by code.
      */
     public Map<String, Object> loadSkill(Long tenantId, String skillCode) {
-        // First try tenant-specific skill, then fall back to platform built-in (tenant_id = 0)
+        // First try tenant-specific skill, then fall back to platform built-in skills.
         String sql = "SELECT * FROM ab_agent_skill " +
-                "WHERE (tenant_id = #{params.tenantId} OR (tenant_id = 0 AND is_builtin = TRUE)) " +
+                "WHERE (tenant_id = #{params.tenantId} OR (tenant_id = #{params.platformTenantId} AND is_builtin = TRUE)) " +
                 "AND skill_code = #{params.skillCode} AND skill_status = 'active' " +
                 "AND deleted_flag = FALSE " +
                 "ORDER BY tenant_id DESC LIMIT 1";
         List<Map<String, Object>> rows = dynamicDataMapper.selectByQuery(sql,
-                Map.of("tenantId", tenantId, "skillCode", skillCode));
+                Map.of("tenantId", tenantId, "platformTenantId", PLATFORM_TENANT_ID, "skillCode", skillCode));
         return rows.isEmpty() ? null : rows.get(0);
     }
 
     /**
      * List active skills, optionally filtered by category and/or level.
-     * Includes platform-level built-in skills (tenant_id = 0) merged with tenant-specific skills.
+     * Includes platform-level built-in skills merged with tenant-specific skills.
      * Tenant-specific skills with the same skill_code override built-in ones.
      */
     public List<Map<String, Object>> listSkills(Long tenantId, String category, String level) {
@@ -54,10 +57,11 @@ public class AgentSkillService {
                 "pid, skill_code, skill_name, skill_description, skill_level, " +
                 "skill_category, skill_icon, skill_tools, skill_input_schema, usage_count, avg_rating, is_builtin " +
                 "FROM ab_agent_skill " +
-                "WHERE (tenant_id = #{params.tenantId} OR (tenant_id = 0 AND is_builtin = TRUE)) " +
+                "WHERE (tenant_id = #{params.tenantId} OR (tenant_id = #{params.platformTenantId} AND is_builtin = TRUE)) " +
                 "AND skill_status = 'active' AND deleted_flag = FALSE");
         Map<String, Object> params = new HashMap<>();
         params.put("tenantId", tenantId);
+        params.put("platformTenantId", PLATFORM_TENANT_ID);
 
         if (category != null && !category.isBlank()) {
             sql.append(" AND skill_category = #{params.category}");

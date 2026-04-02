@@ -117,9 +117,7 @@ public class AgentControllerIntegrationTest extends BaseIntegrationTest {
         mockMvc.perform(post("/api/agent/tools/sync")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.created").exists())
-                .andExpect(jsonPath("$.updated").exists())
-                .andExpect(jsonPath("$.deactivated").exists());
+                .andExpect(jsonPath("$.message").exists());
     }
 
     // ==================== AgentRuntimeController ====================

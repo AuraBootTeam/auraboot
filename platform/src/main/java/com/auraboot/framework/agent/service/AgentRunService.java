@@ -239,7 +239,12 @@ public class AgentRunService {
             if (resumeFromRunPid != null) {
                 plan = planService.loadPlanFromRun(resumeFromRunPid);
                 startStep = planService.findFirstPendingStep(plan);
+                boolean resumedAwaitingApproval = startStep < plan.size()
+                        && plan.get(startStep).getStatus() == AgentPlanStep.StepStatus.AWAITING_APPROVAL;
                 log.info("Resuming from step {} of {} (previous run: {})", startStep, plan.size(), resumeFromRunPid);
+                if (resumedAwaitingApproval) {
+                    log.info("Skipping approval gate for resumed step {} on run {}", startStep, runPid);
+                }
             } else {
                 plan = planService.generatePlan(provider, config, model, systemPrompt, userMessage, tools);
                 log.info("Generated execution plan with {} steps", plan.size());
@@ -254,8 +259,12 @@ public class AgentRunService {
             runLifecycleService.startHeartbeat(runPid);
             try {
                 // Execute plan steps (replaces executeAgentLoop for multi-step plans)
+                boolean skipApprovalForResumedStep = resumeFromRunPid != null
+                        && startStep < plan.size()
+                        && plan.get(startStep).getStatus() == AgentPlanStep.StepStatus.AWAITING_APPROVAL;
                 AgentLoopResult result = stepLoopService.executePlanSteps(plan, startStep, tenantId, runPid, taskPid, agentCode,
-                        systemPrompt, userMessage, tools, agentDef, provider, config, traceCtx);
+                        systemPrompt, userMessage, tools, agentDef, provider, config, traceCtx,
+                        skipApprovalForResumedStep);
 
                 // Persist final plan state
                 planService.persistPlan(runPid, plan, plan.size());

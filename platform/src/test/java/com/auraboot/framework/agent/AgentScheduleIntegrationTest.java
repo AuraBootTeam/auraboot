@@ -51,10 +51,10 @@ public class AgentScheduleIntegrationTest extends BaseIntegrationTest {
         // Seed 1 schedule (CRON type, schedule_status=ACTIVE, max_runs=3, run_count=0)
         jdbcTemplate.update(
                 "INSERT INTO ab_agent_schedule "
-                + "(pid, tenant_id, title, schedule_type, cron_expression, "
+                + "(pid, tenant_id, title, schedule_type, cron_expression, task_template, "
                 + " schedule_status, max_runs, run_count, deleted_flag) "
-                + "VALUES (?, ?, ?, 'cron', '*/1 * * * *', 'active', 3, 0, FALSE)",
-                schedPid, tenantId, "Test Schedule " + testRunId);
+                + "VALUES (?, ?, ?, 'cron', '*/1 * * * *', ?::text, 'active', 3, 0, FALSE)",
+                schedPid, tenantId, "Test Schedule " + testRunId, "{}");
     }
 
     // ========== Test 1: schedule exists and is ACTIVE with run_count=0 ==========

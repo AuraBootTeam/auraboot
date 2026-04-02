@@ -41,15 +41,12 @@ public class ToolDryRunServiceTest extends BaseIntegrationTest {
     /** A real ACTIVE tool code loaded from ab_agent_tool for the test tenant. */
     private String testToolCode;
 
-    @BeforeAll
+    @BeforeEach
     void setup() {
         tenantId = getTestTenant().getId();
 
-        // Ensure capabilities exist for this tenant
-        capabilityViewService.syncCapabilities(tenantId).join();
-
         // Find a real ACTIVE tool to use in tests
-        List<Map<String, Object>> tools = dynamicDataMapper.selectByQuery(
+        List<Map<String, Object>> tools = dynamicDataMapper.selectByQueryWithoutTenant(
                 "SELECT tool_code FROM ab_agent_tool " +
                 "WHERE tenant_id = #{params.tenantId} " +
                 "AND tool_status = 'active' " +
@@ -318,7 +315,7 @@ public class ToolDryRunServiceTest extends BaseIntegrationTest {
     // ──────────────────────────────────────────────────────────────────────────
 
     private long countObservations() {
-        List<Map<String, Object>> rows = dynamicDataMapper.selectByQuery(
+        List<Map<String, Object>> rows = dynamicDataMapper.selectByQueryWithoutTenant(
                 "SELECT COUNT(*) AS cnt FROM ab_agent_observation " +
                 "WHERE tenant_id = #{params.tenantId}",
                 Map.of("tenantId", tenantId)

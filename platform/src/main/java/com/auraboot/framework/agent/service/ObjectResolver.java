@@ -158,22 +158,24 @@ public class ObjectResolver {
 
         // Phase 2: Fuzzy matching — check if any display name partially contains/is contained by user input
         List<String> candidates = new ArrayList<>();
-        for (Map.Entry<String, String> entry : searchDisplayNames.entrySet()) {
-            String modelCode = entry.getKey();
-            String displayName = entry.getValue();
-            // Check if user message contains part of display name, or display name contains part of message words
-            if (fuzzyContains(lower, displayName)) {
-                candidates.add(modelCode);
+        if (shouldUsePhraseFallback(lower)) {
+            for (Map.Entry<String, String> entry : searchDisplayNames.entrySet()) {
+                String modelCode = entry.getKey();
+                String displayName = entry.getValue();
+                // Check if user message contains part of display name, or display name contains part of message words
+                if (fuzzyContains(lower, displayName)) {
+                    candidates.add(modelCode);
+                }
             }
-        }
 
-        // Also check model codes for partial match (e.g., "account" matches "crm_account")
-        for (Map.Entry<String, String> entry : searchIndex.entrySet()) {
-            String alias = entry.getKey();
-            String modelCode = entry.getValue();
-            // Check if any word in user message is a substring of the alias or vice versa
-            if (!candidates.contains(modelCode) && fuzzyContains(lower, alias)) {
-                candidates.add(modelCode);
+            // Also check model codes for partial match (e.g., "account" matches "crm_account")
+            for (Map.Entry<String, String> entry : searchIndex.entrySet()) {
+                String alias = entry.getKey();
+                String modelCode = entry.getValue();
+                // Check if any word in user message is a substring of the alias or vice versa
+                if (!candidates.contains(modelCode) && fuzzyContains(lower, alias)) {
+                    candidates.add(modelCode);
+                }
             }
         }
 
@@ -185,7 +187,7 @@ public class ObjectResolver {
         }
 
         // Phase 3: Embedding similarity (optional, if ModelEmbeddingService available)
-        if (modelEmbeddingService != null) {
+        if (modelEmbeddingService != null && shouldUseEmbeddingFallback(lower)) {
             try {
                 List<String> embeddingMatches = modelEmbeddingService.findSimilarModels(tenantId, lower, 3);
                 if (embeddingMatches.size() == 1) {
@@ -199,6 +201,35 @@ public class ObjectResolver {
         }
 
         return new ObjectResult(null, 0.0, "none", List.of());
+    }
+
+    private boolean shouldUseEmbeddingFallback(String query) {
+        if (!shouldUsePhraseFallback(query)) {
+            return false;
+        }
+        boolean hasCjk = query.chars().anyMatch(c ->
+                Character.UnicodeBlock.of(c) == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS);
+        if (hasCjk) {
+            return true;
+        }
+        long lexicalTokens = Arrays.stream(query.split("[\\s,;.!?，。！？、_]+"))
+                .map(String::trim)
+                .filter(token -> token.length() >= 3)
+                .count();
+        return lexicalTokens <= 2;
+    }
+
+    private boolean shouldUsePhraseFallback(String query) {
+        boolean hasCjk = query.chars().anyMatch(c ->
+                Character.UnicodeBlock.of(c) == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS);
+        if (hasCjk) {
+            return true;
+        }
+        long lexicalTokens = Arrays.stream(query.split("[\\s,;.!?，。！？、_]+"))
+                .map(String::trim)
+                .filter(token -> token.length() >= 3)
+                .count();
+        return lexicalTokens <= 2;
     }
 
     /**

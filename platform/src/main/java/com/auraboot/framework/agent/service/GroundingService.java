@@ -145,7 +145,7 @@ public class GroundingService {
      * Returns null if quality is acceptable, or a reason string if fallback is needed.
      */
     public String checkQualityGate(BusinessIntentFrame bif) {
-        if (bif.getConfidence().getOverall() < 0.30) {
+        if (bif.getConfidence().getOverall() < 0.50) {
             return "low_confidence: " + String.format("%.2f", bif.getConfidence().getOverall());
         }
         if (bif.getObject() == null) {

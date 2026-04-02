@@ -553,8 +553,8 @@ class NlModelingServiceIntegrationTest extends BaseIntegrationTest {
         // Verify pages have dslSchema
         for (Map<String, Object> page : response.getResources().getPages()) {
             assertThat(page).containsKey("pageKey");
-            assertThat(page).containsKey("pageType");
-            assertThat(page).containsKey("dslSchema");
+            assertThat(page).containsKey("kind");
+            assertThat(page).containsKey("blocks");
         }
 
         // Verify bindings match models and fields

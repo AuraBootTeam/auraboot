@@ -244,12 +244,13 @@ public class AgentApprovalGateService {
     private boolean evaluateApproverRules(Long tenantId, Long userId, List<Map<String, Object>> rules) {
         for (Map<String, Object> rule : rules) {
             String type = (String) rule.get("type");
-            if ("user".equals(type)) {
+            String normalizedType = type == null ? null : type.toLowerCase(Locale.ROOT);
+            if ("user".equals(normalizedType)) {
                 Object ruleUserId = rule.get("userId");
                 if (ruleUserId != null && userId.equals(toLong(ruleUserId))) {
                     return true;
                 }
-            } else if ("role".equals(type)) {
+            } else if ("role".equals(normalizedType)) {
                 String roleCode = (String) rule.get("roleCode");
                 if (roleCode != null && userHasRole(tenantId, userId, roleCode)) {
                     return true;
@@ -263,9 +264,11 @@ public class AgentApprovalGateService {
      * Check whether a user has a given role (by role code) in the specified tenant.
      */
     private boolean userHasRole(Long tenantId, Long userId, String roleCode) {
-        String sql = "SELECT r.code FROM ab_user_role ur " +
+        String sql = "SELECT r.code FROM ab_tenant_member tm " +
+                "JOIN ab_user_role ur ON ur.member_id = tm.id " +
                 "JOIN ab_role r ON r.id = ur.role_id " +
-                "WHERE ur.user_id = #{params.userId} AND ur.tenant_id = #{params.tenantId} " +
+                "WHERE tm.user_id = #{params.userId} AND tm.tenant_id = #{params.tenantId} " +
+                "AND tm.status = 'active' AND tm.deleted_flag = FALSE " +
                 "AND ur.status = 'active' AND ur.deleted_flag = FALSE " +
                 "AND r.deleted_flag = FALSE AND r.status = 'active'";
         List<Map<String, Object>> rows = dynamicDataMapper.selectByQuery(

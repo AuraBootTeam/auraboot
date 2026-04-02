@@ -59,7 +59,7 @@ class SkillAutoGeneratorIntegrationTest extends BaseIntegrationTest {
     void testSyncSkills_generatesAtomicSkills() {
         SkillAutoGenerator.SyncResult result = skillAutoGenerator.syncSkills(tenantId);
 
-        assertThat(result.created()).isGreaterThan(0);
+        assertThat(result.created() + result.updated()).isEqualTo(2);
 
         String sql = "SELECT COUNT(*) AS cnt FROM ab_agent_skill " +
                 "WHERE tenant_id = #{params.tenantId} AND skill_code LIKE '%.%'";
@@ -74,12 +74,12 @@ class SkillAutoGeneratorIntegrationTest extends BaseIntegrationTest {
     void testSyncSkills_idempotent() {
         // First sync — creates skills
         SkillAutoGenerator.SyncResult first = skillAutoGenerator.syncSkills(tenantId);
-        assertThat(first.created()).isGreaterThan(0);
+        assertThat(first.created() + first.updated()).isEqualTo(2);
 
         // Second sync — should only update, not create
         SkillAutoGenerator.SyncResult second = skillAutoGenerator.syncSkills(tenantId);
         assertThat(second.created()).isEqualTo(0);
-        assertThat(second.updated()).isGreaterThan(0);
+        assertThat(second.updated()).isEqualTo(2);
     }
 
     @Test

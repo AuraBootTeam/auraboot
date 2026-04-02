@@ -183,7 +183,7 @@ public class AgentEventDispatchService {
         String key = condition.substring(0, idx).trim();
         String expectedValue = condition.substring(idx + 1).trim();
         Object actual = eventData.get(key);
-        return actual != null && expectedValue.equals(actual.toString());
+        return actual != null && expectedValue.equalsIgnoreCase(actual.toString().trim());
     }
 
     // ──────────────────────────────────────────────────────────────────────────

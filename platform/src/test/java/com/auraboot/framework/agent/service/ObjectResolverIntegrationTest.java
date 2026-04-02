@@ -29,6 +29,8 @@ class ObjectResolverIntegrationTest extends BaseIntegrationTest {
 
     // Tenant that owns published commands (may differ from test tenant)
     private Long commandTenantId;
+    private String sampleDisplayName;
+    private String sampleDisplayModelCode;
 
     @BeforeEach
     void ensureIndexBuilt() {
@@ -42,6 +44,18 @@ class ObjectResolverIntegrationTest extends BaseIntegrationTest {
         List<Map<String, Object>> rows = dynamicDataMapper.selectByQueryWithoutTenant(sql, Map.of());
         if (!rows.isEmpty()) {
             commandTenantId = ((Number) rows.get(0).get("tenant_id")).longValue();
+        }
+
+        String displaySql = "SELECT code, extension->>'displayName' AS display_name FROM ab_meta_model " +
+                "WHERE extension->>'displayName' IS NOT NULL " +
+                "AND extension->>'displayName' <> '' " +
+                "AND status = 'published' " +
+                "AND (deleted_flag = FALSE OR deleted_flag IS NULL) " +
+                "ORDER BY code ASC LIMIT 1";
+        List<Map<String, Object>> displayRows = dynamicDataMapper.selectByQueryWithoutTenant(displaySql, Map.of());
+        if (!displayRows.isEmpty()) {
+            sampleDisplayModelCode = (String) displayRows.get(0).get("code");
+            sampleDisplayName = (String) displayRows.get(0).get("display_name");
         }
     }
 
@@ -77,12 +91,13 @@ class ObjectResolverIntegrationTest extends BaseIntegrationTest {
     @Test
     @Order(3)
     void resolve_exactMatch_displayName() {
-        // Models with display names like "部门" → org_department
+        Assumptions.assumeTrue(sampleDisplayModelCode != null && sampleDisplayName != null,
+                "No published model with displayName found");
         ObjectResolver.ObjectResult result = objectResolver.resolve(
-                getTestTenant().getId(), "我想看部门列表");
+                getTestTenant().getId(), sampleDisplayName);
 
         assertThat(result).isNotNull();
-        assertThat(result.getModelCode()).isEqualTo("org_department");
+        assertThat(result.getModelCode()).isEqualTo(sampleDisplayModelCode);
         assertThat(result.getMatchType()).isEqualTo("alias");
         assertThat(result.getConfidence()).isGreaterThanOrEqualTo(0.70);
     }

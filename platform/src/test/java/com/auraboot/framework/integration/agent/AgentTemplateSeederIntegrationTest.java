@@ -2,6 +2,8 @@ package com.auraboot.framework.integration.agent;
 
 import com.auraboot.framework.application.bootstrap.seeder.AgentTemplateSeeder;
 import com.auraboot.framework.integration.BaseIntegrationTest;
+import com.auraboot.framework.saas.executor.SystemTenantContextExecutor;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,11 +21,18 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
 
+    private static final Long SYSTEM_TENANT_ID = SystemTenantContextExecutor.SYSTEM_TENANT_ID;
+
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
     @Autowired
     private AgentTemplateSeeder agentTemplateSeeder;
+
+    @BeforeEach
+    void ensureSeeded() {
+        agentTemplateSeeder.seed();
+    }
 
     // =========================================================================
     // Skills
@@ -33,27 +42,34 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
     @Order(1)
     void builtinSkills_areSeeded_withExpectedCount() {
         Integer count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM ab_agent_skill WHERE tenant_id = 0 AND is_builtin = TRUE",
-                Integer.class);
-        assertThat(count).isEqualTo(5);
+                "SELECT COUNT(*) FROM ab_agent_skill WHERE tenant_id = ? AND is_builtin = TRUE",
+                Integer.class,
+                SYSTEM_TENANT_ID);
+        assertThat(count).isEqualTo(7);
     }
 
     @Test
     @Order(2)
     void builtinSkills_allHaveRequiredFields() {
         List<Map<String, Object>> skills = jdbcTemplate.queryForList(
-                "SELECT * FROM ab_agent_skill WHERE tenant_id = 0 AND is_builtin = TRUE ORDER BY skill_code");
+                "SELECT * FROM ab_agent_skill WHERE tenant_id = ? AND is_builtin = TRUE ORDER BY skill_code",
+                SYSTEM_TENANT_ID);
 
-        assertThat(skills).hasSize(5);
+        assertThat(skills).hasSize(7);
         for (Map<String, Object> skill : skills) {
             assertThat(skill.get("skill_code")).isNotNull();
             assertThat(skill.get("skill_name")).isNotNull();
             assertThat(skill.get("skill_description")).isNotNull();
-            assertThat(skill.get("skill_level")).isEqualTo("workflow");
             assertThat(skill.get("skill_category")).isNotNull();
-            assertThat(skill.get("skill_tools")).isNotNull();
-            assertThat(skill.get("prompt_template")).isNotNull();
             assertThat(skill.get("skill_status")).isEqualTo("active");
+            String skillCode = (String) skill.get("skill_code");
+            if ("dsl.command".equals(skillCode) || "dsl.query".equals(skillCode)) {
+                assertThat(skill.get("skill_level")).isEqualTo("atomic");
+            } else {
+                assertThat(skill.get("skill_level")).isEqualTo("workflow");
+                assertThat(skill.get("skill_tools")).isNotNull();
+                assertThat(skill.get("prompt_template")).isNotNull();
+            }
         }
     }
 
@@ -61,14 +77,17 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
     @Order(3)
     void builtinSkills_containExpectedCodes() {
         List<String> codes = jdbcTemplate.queryForList(
-                "SELECT skill_code FROM ab_agent_skill WHERE tenant_id = 0 AND is_builtin = TRUE ORDER BY skill_code",
-                String.class);
+                "SELECT skill_code FROM ab_agent_skill WHERE tenant_id = ? AND is_builtin = TRUE ORDER BY skill_code",
+                String.class,
+                SYSTEM_TENANT_ID);
         assertThat(codes).containsExactlyInAnyOrder(
                 "approval_workflow",
                 "data_entry_assistant",
                 "report_analysis",
                 "crm_operations",
-                "ops_inspector"
+                "ops_inspector",
+                "dsl.command",
+                "dsl.query"
         );
     }
 
@@ -77,12 +96,14 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
     void builtinSkills_idempotent_noduplicatesOnRerun() {
         // Calling seed() a second time should not insert duplicates (ON CONFLICT DO NOTHING)
         Integer beforeCount = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM ab_agent_skill WHERE tenant_id = 0 AND is_builtin = TRUE",
-                Integer.class);
+                "SELECT COUNT(*) FROM ab_agent_skill WHERE tenant_id = ? AND is_builtin = TRUE",
+                Integer.class,
+                SYSTEM_TENANT_ID);
         // Re-run the seeder via direct SQL to simulate re-seed
         Integer afterCount = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM ab_agent_skill WHERE tenant_id = 0 AND is_builtin = TRUE",
-                Integer.class);
+                "SELECT COUNT(*) FROM ab_agent_skill WHERE tenant_id = ? AND is_builtin = TRUE",
+                Integer.class,
+                SYSTEM_TENANT_ID);
         assertThat(afterCount).isEqualTo(beforeCount);
     }
 
@@ -94,9 +115,10 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
     @Order(5)
     void agentTemplates_areSeeded_withExpectedCount() {
         Integer count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM ab_agent_definition WHERE tenant_id = 0 " +
+                "SELECT COUNT(*) FROM ab_agent_definition WHERE tenant_id = ? " +
                 "AND deleted_flag = FALSE",
-                Integer.class);
+                Integer.class,
+                SYSTEM_TENANT_ID);
         assertThat(count).isEqualTo(3);
     }
 
@@ -104,9 +126,10 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
     @Order(6)
     void agentTemplates_containExpectedCodes() {
         List<String> codes = jdbcTemplate.queryForList(
-                "SELECT agent_code FROM ab_agent_definition WHERE tenant_id = 0 " +
+                "SELECT agent_code FROM ab_agent_definition WHERE tenant_id = ? " +
                 "AND deleted_flag = FALSE ORDER BY agent_code",
-                String.class);
+                String.class,
+                SYSTEM_TENANT_ID);
         assertThat(codes).containsExactlyInAnyOrder(
                 "tpl_aurabot_internal",
                 "tpl_approval_assistant",
@@ -119,7 +142,8 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
     void agentTemplates_allHaveSoulProfile() {
         List<Map<String, Object>> agents = jdbcTemplate.queryForList(
                 "SELECT agent_code, soul_profile, skills, system_prompt FROM ab_agent_definition " +
-                "WHERE tenant_id = 0 AND deleted_flag = FALSE");
+                "WHERE tenant_id = ? AND deleted_flag = FALSE",
+                SYSTEM_TENANT_ID);
 
         for (Map<String, Object> agent : agents) {
             String code = (String) agent.get("agent_code");
@@ -132,8 +156,9 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
     @Order(8)
     void agentTemplate_aurabotInternal_hasAllSkills() {
         String skills = jdbcTemplate.queryForObject(
-                "SELECT skills FROM ab_agent_definition WHERE tenant_id = 0 AND agent_code = 'tpl_aurabot_internal'",
-                String.class);
+                "SELECT skills FROM ab_agent_definition WHERE tenant_id = ? AND agent_code = 'tpl_aurabot_internal'",
+                String.class,
+                SYSTEM_TENANT_ID);
         assertThat(skills).contains("approval_workflow");
         assertThat(skills).contains("data_entry_assistant");
         assertThat(skills).contains("report_analysis");
@@ -145,8 +170,9 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
     @Order(9)
     void agentTemplate_approvalAssistant_hasCorrectSkills() {
         String skills = jdbcTemplate.queryForObject(
-                "SELECT skills FROM ab_agent_definition WHERE tenant_id = 0 AND agent_code = 'tpl_approval_assistant'",
-                String.class);
+                "SELECT skills FROM ab_agent_definition WHERE tenant_id = ? AND agent_code = 'tpl_approval_assistant'",
+                String.class,
+                SYSTEM_TENANT_ID);
         assertThat(skills).contains("approval_workflow");
         // Should NOT include CRM or full ops skills
         assertThat(skills).doesNotContain("crm_operations");
@@ -156,8 +182,9 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
     @Order(10)
     void agentTemplate_aurabotInternal_soulProfile_isStructuredJson() {
         String soulProfileJson = jdbcTemplate.queryForObject(
-                "SELECT soul_profile::text FROM ab_agent_definition WHERE tenant_id = 0 AND agent_code = 'tpl_aurabot_internal'",
-                String.class);
+                "SELECT soul_profile::text FROM ab_agent_definition WHERE tenant_id = ? AND agent_code = 'tpl_aurabot_internal'",
+                String.class,
+                SYSTEM_TENANT_ID);
 
         assertThat(soulProfileJson).isNotNull();
         java.util.Map<String, Object> profile =
@@ -178,8 +205,9 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
     @Order(11)
     void agentTemplate_approvalAssistant_soulProfile_toneIsFormal() {
         String soulProfileJson = jdbcTemplate.queryForObject(
-                "SELECT soul_profile::text FROM ab_agent_definition WHERE tenant_id = 0 AND agent_code = 'tpl_approval_assistant'",
-                String.class);
+                "SELECT soul_profile::text FROM ab_agent_definition WHERE tenant_id = ? AND agent_code = 'tpl_approval_assistant'",
+                String.class,
+                SYSTEM_TENANT_ID);
 
         assertThat(soulProfileJson).isNotNull();
         java.util.Map<String, Object> profile =
@@ -196,8 +224,9 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
     @Order(12)
     void agentTemplate_customerService_soulProfile_toneIsFriendly() {
         String soulProfileJson = jdbcTemplate.queryForObject(
-                "SELECT soul_profile::text FROM ab_agent_definition WHERE tenant_id = 0 AND agent_code = 'tpl_customer_service'",
-                String.class);
+                "SELECT soul_profile::text FROM ab_agent_definition WHERE tenant_id = ? AND agent_code = 'tpl_customer_service'",
+                String.class,
+                SYSTEM_TENANT_ID);
 
         assertThat(soulProfileJson).isNotNull();
         java.util.Map<String, Object> profile =
@@ -219,7 +248,8 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
     void agentTemplates_allHaveSystemUserId() {
         List<Map<String, Object>> agents = jdbcTemplate.queryForList(
                 "SELECT agent_code, system_user_id FROM ab_agent_definition " +
-                "WHERE tenant_id = 0 AND deleted_flag = FALSE ORDER BY agent_code");
+                "WHERE tenant_id = ? AND deleted_flag = FALSE ORDER BY agent_code",
+                SYSTEM_TENANT_ID);
 
         assertThat(agents).hasSize(3);
         for (Map<String, Object> agent : agents) {
@@ -235,7 +265,8 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
     void agentTemplates_systemUserExists_inAbUser() {
         List<Map<String, Object>> agents = jdbcTemplate.queryForList(
                 "SELECT agent_code, system_user_id FROM ab_agent_definition " +
-                "WHERE tenant_id = 0 AND deleted_flag = FALSE");
+                "WHERE tenant_id = ? AND deleted_flag = FALSE",
+                SYSTEM_TENANT_ID);
 
         for (Map<String, Object> agent : agents) {
             String code = (String) agent.get("agent_code");
@@ -260,7 +291,8 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
                 "SELECT a.agent_code, u.email " +
                 "FROM ab_agent_definition a " +
                 "JOIN ab_user u ON u.id = a.system_user_id " +
-                "WHERE a.tenant_id = 0 AND a.deleted_flag = FALSE ORDER BY a.agent_code");
+                "WHERE a.tenant_id = ? AND a.deleted_flag = FALSE ORDER BY a.agent_code",
+                SYSTEM_TENANT_ID);
 
         assertThat(agents).hasSize(3);
         for (Map<String, Object> row : agents) {
@@ -280,7 +312,8 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
                 "SELECT a.name AS agent_name, u.nick_name " +
                 "FROM ab_agent_definition a " +
                 "JOIN ab_user u ON u.id = a.system_user_id " +
-                "WHERE a.tenant_id = 0 AND a.deleted_flag = FALSE");
+                "WHERE a.tenant_id = ? AND a.deleted_flag = FALSE",
+                SYSTEM_TENANT_ID);
 
         for (Map<String, Object> row : agents) {
             String agentName = (String) row.get("agent_name");
@@ -319,9 +352,10 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
                 "SELECT COUNT(*) FROM ab_user WHERE user_type = 'system_agent' AND deleted_flag = FALSE",
                 Integer.class);
         Integer agentsWithUserBefore = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM ab_agent_definition WHERE tenant_id = 0 " +
+                "SELECT COUNT(*) FROM ab_agent_definition WHERE tenant_id = ? " +
                 "AND deleted_flag = FALSE AND system_user_id IS NOT NULL",
-                Integer.class);
+                Integer.class,
+                SYSTEM_TENANT_ID);
 
         // Re-run the seeder — should be a no-op for identity binding
         agentTemplateSeeder.seed();
@@ -330,9 +364,10 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
                 "SELECT COUNT(*) FROM ab_user WHERE user_type = 'system_agent' AND deleted_flag = FALSE",
                 Integer.class);
         Integer agentsWithUserAfter = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM ab_agent_definition WHERE tenant_id = 0 " +
+                "SELECT COUNT(*) FROM ab_agent_definition WHERE tenant_id = ? " +
                 "AND deleted_flag = FALSE AND system_user_id IS NOT NULL",
-                Integer.class);
+                Integer.class,
+                SYSTEM_TENANT_ID);
 
         assertThat(userCountAfter).isEqualTo(userCountBefore);
         assertThat(agentsWithUserAfter).isEqualTo(agentsWithUserBefore);

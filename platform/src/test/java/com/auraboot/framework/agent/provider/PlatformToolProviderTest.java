@@ -63,12 +63,13 @@ class PlatformToolProviderTest extends BaseIntegrationTest {
         var ctx = ToolDiscoveryContext.builder().tenantId(testTenant.getId()).build();
         var tools = provider.discover(ctx);
 
-        assertThat(tools).hasSize(3);
+        assertThat(tools).hasSize(4);
         assertThat(tools.stream().map(ToolDefinition::getToolCode))
                 .containsExactlyInAnyOrder(
                         "platform.execute_sql",
                         "platform.list_models",
-                        "platform.model_suggest");
+                        "platform.model_suggest",
+                        "platform.create_model");
     }
 
     @Test

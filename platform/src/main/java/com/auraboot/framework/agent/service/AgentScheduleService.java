@@ -181,14 +181,37 @@ public class AgentScheduleService {
      * Uses ToolProviderRegistry to discover the agent's effective tool set.
      */
     public boolean agentHasApprovalRequiredTools(Long tenantId, String agentCode) {
-        ToolDiscoveryContext ctx = ToolDiscoveryContext.builder()
-                .tenantId(tenantId)
-                .agentCode(agentCode)
-                .build();
-        List<ToolDefinition> tools = toolProviderRegistry.discoverAll(ctx);
-        // ToolDefinition does not carry requiresApproval — for now, return false
-        // (approval enforcement is handled at execution time by ToolProvider)
-        return false;
+        if (tenantId == null || agentCode == null || agentCode.isBlank()) {
+            return false;
+        }
+        String sql = """
+                SELECT COUNT(*) AS cnt
+                FROM ab_agent_definition a
+                JOIN ab_agent_tool t
+                  ON t.tenant_id = a.tenant_id
+                 AND t.tool_code IN (
+                     SELECT jsonb_array_elements_text(
+                         CASE
+                             WHEN a.tools IS NULL OR a.tools = '' THEN '[]'::jsonb
+                             ELSE a.tools::jsonb
+                         END
+                     )
+                 )
+                WHERE a.tenant_id = #{params.tenantId}
+                  AND a.agent_code = #{params.agentCode}
+                  AND a.status = 'active'
+                  AND (a.deleted_flag = FALSE OR a.deleted_flag IS NULL)
+                  AND t.tool_status = 'active'
+                  AND (t.deleted_flag = FALSE OR t.deleted_flag IS NULL)
+                  AND t.requires_approval = TRUE
+                """;
+        List<Map<String, Object>> rows = dynamicDataMapper.selectByQueryWithoutTenant(
+                sql, Map.of("tenantId", tenantId, "agentCode", agentCode));
+        if (rows.isEmpty()) {
+            return false;
+        }
+        Object cnt = rows.get(0).get("cnt");
+        return cnt instanceof Number n && n.longValue() > 0;
     }
 
     /**
