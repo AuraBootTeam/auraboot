@@ -12,6 +12,7 @@ import com.auraboot.framework.meta.dto.CommandExecuteResult;
 import com.auraboot.framework.meta.service.CommandExecutor;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,6 +30,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@SuppressWarnings("deprecation")
 class ApprovalChainExecutorTest {
 
     @Mock private ChainExecutionMapper chainExecutionMapper;
@@ -46,6 +48,26 @@ class ApprovalChainExecutorTest {
         executor = new ApprovalChainExecutor(
                 chainExecutionMapper, approvalTaskMapper, assigneeResolverService,
                 commandExecutor, executionLogService, eventPublisher, objectMapper);
+    }
+
+    @SuppressWarnings("unchecked")
+    private QueryWrapper<ApprovalTask> anyApprovalTaskQuery() {
+        return any(QueryWrapper.class);
+    }
+
+    @SuppressWarnings("unchecked")
+    private UpdateWrapper<ApprovalTask> anyApprovalTaskUpdate() {
+        return any(UpdateWrapper.class);
+    }
+
+    @SuppressWarnings("unchecked")
+    private QueryWrapper<ChainExecution> anyChainExecutionQuery() {
+        return any(QueryWrapper.class);
+    }
+
+    @SuppressWarnings("unchecked")
+    private UpdateWrapper<ChainExecution> anyChainExecutionUpdate() {
+        return any(UpdateWrapper.class);
     }
 
     // ==================== Helper methods ====================
@@ -255,12 +277,12 @@ class ApprovalChainExecutorTest {
                     .assigneeUserIds(List.of(100L))
                     .assigneeStrategy("any")
                     .build();
-            when(approvalTaskMapper.selectOne(any(QueryWrapper.class))).thenReturn(task);
-            when(approvalTaskMapper.update(isNull(), any(UpdateWrapper.class))).thenReturn(1);
+            when(approvalTaskMapper.selectOne(anyApprovalTaskQuery())).thenReturn(task);
+            when(approvalTaskMapper.update(isNull(), anyApprovalTaskUpdate())).thenReturn(1);
 
             // Setup chain execution
             CommandChainDefinition chain = buildSimpleChainWithUserTask();
-            Map<String, Object> chainDef = objectMapper.convertValue(chain, Map.class);
+            Map<String, Object> chainDef = objectMapper.convertValue(chain, new TypeReference<>() {});
             ChainExecution exec = ChainExecution.builder()
                     .pid("EXEC-001")
                     .tenantId(1L)
@@ -271,8 +293,8 @@ class ApprovalChainExecutorTest {
                     .stepResults(new HashMap<>())
                     .chainDefinition(chainDef)
                     .build();
-            when(chainExecutionMapper.selectOne(any(QueryWrapper.class))).thenReturn(exec);
-            when(chainExecutionMapper.update(isNull(), any(UpdateWrapper.class))).thenReturn(1);
+            when(chainExecutionMapper.selectOne(anyChainExecutionQuery())).thenReturn(exec);
+            when(chainExecutionMapper.update(isNull(), anyChainExecutionUpdate())).thenReturn(1);
 
             CommandChainResult result = executor.handleApproval(
                     "TASK-001", 100L, "approved", "Looks good", null);
@@ -298,11 +320,11 @@ class ApprovalChainExecutorTest {
                     .assigneeUserIds(List.of(100L))
                     .assigneeStrategy("any")
                     .build();
-            when(approvalTaskMapper.selectOne(any(QueryWrapper.class))).thenReturn(task);
-            when(approvalTaskMapper.update(isNull(), any(UpdateWrapper.class))).thenReturn(1);
+            when(approvalTaskMapper.selectOne(anyApprovalTaskQuery())).thenReturn(task);
+            when(approvalTaskMapper.update(isNull(), anyApprovalTaskUpdate())).thenReturn(1);
 
             CommandChainDefinition chain = buildSimpleChainWithUserTask();
-            Map<String, Object> chainDef = objectMapper.convertValue(chain, Map.class);
+            Map<String, Object> chainDef = objectMapper.convertValue(chain, new TypeReference<>() {});
             ChainExecution exec = ChainExecution.builder()
                     .pid("EXEC-002")
                     .tenantId(1L)
@@ -313,8 +335,8 @@ class ApprovalChainExecutorTest {
                     .stepResults(new HashMap<>())
                     .chainDefinition(chainDef)
                     .build();
-            when(chainExecutionMapper.selectOne(any(QueryWrapper.class))).thenReturn(exec);
-            when(chainExecutionMapper.update(isNull(), any(UpdateWrapper.class))).thenReturn(1);
+            when(chainExecutionMapper.selectOne(anyChainExecutionQuery())).thenReturn(exec);
+            when(chainExecutionMapper.update(isNull(), anyChainExecutionUpdate())).thenReturn(1);
 
             CommandChainResult result = executor.handleApproval(
                     "TASK-002", 100L, "rejected", "Not approved", null);
@@ -332,8 +354,8 @@ class ApprovalChainExecutorTest {
                 .status("pending")
                 .assigneeUserIds(List.of(100L))
                 .build();
-        when(approvalTaskMapper.selectOne(any(QueryWrapper.class))).thenReturn(task);
-        when(approvalTaskMapper.update(isNull(), any(UpdateWrapper.class))).thenReturn(0); // Already completed
+        when(approvalTaskMapper.selectOne(anyApprovalTaskQuery())).thenReturn(task);
+        when(approvalTaskMapper.update(isNull(), anyApprovalTaskUpdate())).thenReturn(0); // Already completed
 
         assertThrows(IllegalStateException.class, () ->
                 executor.handleApproval("TASK-003", 100L, "approved", "OK", null));
@@ -346,8 +368,8 @@ class ApprovalChainExecutorTest {
                 .status("pending")
                 .assigneeUserIds(List.of(200L)) // Different user
                 .build();
-        when(approvalTaskMapper.selectOne(any(QueryWrapper.class))).thenReturn(task);
-        when(approvalTaskMapper.update(isNull(), any(UpdateWrapper.class))).thenReturn(1);
+        when(approvalTaskMapper.selectOne(anyApprovalTaskQuery())).thenReturn(task);
+        when(approvalTaskMapper.update(isNull(), anyApprovalTaskUpdate())).thenReturn(1);
 
         assertThrows(SecurityException.class, () ->
                 executor.handleApproval("TASK-004", 100L, "approved", "OK", null));
@@ -520,12 +542,12 @@ class ApprovalChainExecutorTest {
                 .chainExecutionId("EXEC-R1")
                 .chainNodeId("ut1")
                 .build();
-        when(approvalTaskMapper.selectOne(any(QueryWrapper.class))).thenReturn(task);
-        when(approvalTaskMapper.update(isNull(), any(UpdateWrapper.class))).thenReturn(1);
+        when(approvalTaskMapper.selectOne(anyApprovalTaskQuery())).thenReturn(task);
+        when(approvalTaskMapper.update(isNull(), anyApprovalTaskUpdate())).thenReturn(1);
 
         executor.reassignTask("TASK-R1", 100L, List.of(200L, 300L));
 
-        verify(approvalTaskMapper).update(isNull(), any(UpdateWrapper.class));
+        verify(approvalTaskMapper).update(isNull(), anyApprovalTaskUpdate());
         verify(eventPublisher).publishEvent(any());
     }
 
@@ -536,7 +558,7 @@ class ApprovalChainExecutorTest {
                 .status("approved")
                 .assigneeUserIds(List.of(100L))
                 .build();
-        when(approvalTaskMapper.selectOne(any(QueryWrapper.class))).thenReturn(task);
+        when(approvalTaskMapper.selectOne(anyApprovalTaskQuery())).thenReturn(task);
 
         assertThrows(IllegalStateException.class, () ->
                 executor.reassignTask("TASK-R2", 100L, List.of(200L)));
@@ -558,8 +580,8 @@ class ApprovalChainExecutorTest {
                     .assigneeUserIds(List.of(100L))
                     .assigneeStrategy("any")
                     .build();
-            when(approvalTaskMapper.selectOne(any(QueryWrapper.class))).thenReturn(task);
-            when(approvalTaskMapper.update(isNull(), any(UpdateWrapper.class))).thenReturn(1);
+            when(approvalTaskMapper.selectOne(anyApprovalTaskQuery())).thenReturn(task);
+            when(approvalTaskMapper.update(isNull(), anyApprovalTaskUpdate())).thenReturn(1);
 
             // Build chain with onReject callback
             CommandChainDefinition chain = buildSimpleChainWithUserTask();
@@ -569,14 +591,14 @@ class ApprovalChainExecutorTest {
                     "params", Map.of("status", "rejected")
             ));
 
-            Map<String, Object> chainDef = objectMapper.convertValue(chain, Map.class);
+            Map<String, Object> chainDef = objectMapper.convertValue(chain, new TypeReference<>() {});
             ChainExecution exec = ChainExecution.builder()
                     .pid("EXEC-REJ").tenantId(1L).processKey("test_approval")
                     .status("suspended").currentNodeId("approval_1")
                     .processVariables(Map.of()).stepResults(new HashMap<>())
                     .chainDefinition(chainDef).build();
-            when(chainExecutionMapper.selectOne(any(QueryWrapper.class))).thenReturn(exec);
-            when(chainExecutionMapper.update(isNull(), any(UpdateWrapper.class))).thenReturn(1);
+            when(chainExecutionMapper.selectOne(anyChainExecutionQuery())).thenReturn(exec);
+            when(chainExecutionMapper.update(isNull(), anyChainExecutionUpdate())).thenReturn(1);
 
             CommandExecuteResult cmdResult = CommandExecuteResult.builder().build();
             when(commandExecutor.execute(eq("test:reject_order"), any())).thenReturn(cmdResult);
