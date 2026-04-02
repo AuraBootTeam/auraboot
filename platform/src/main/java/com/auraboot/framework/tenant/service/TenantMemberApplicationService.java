@@ -3,6 +3,10 @@ package com.auraboot.framework.tenant.service;
 import com.auraboot.framework.meta.dto.PaginationResult;
 import com.auraboot.framework.tenant.dto.MemberQueryRequest;
 import com.auraboot.framework.tenant.dto.MemberResponse;
+import com.auraboot.framework.tenant.dto.TenantMemberImportResult;
+import com.auraboot.framework.tenant.dto.TenantMemberImportRow;
+import org.springframework.core.io.Resource;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -64,9 +68,29 @@ public interface TenantMemberApplicationService {
     boolean batchRemoveMembers(List<String> memberPids, Long userId);
 
     /**
+     * Send a password reset email to the user's mailbox for this tenant member.
+     */
+    boolean sendPasswordResetEmail(String memberPid, Long userId);
+
+    /**
      * Get team memberships for a specific member
      * @param memberPid member's business ID
      * @return list of team membership info
      */
     List<java.util.Map<String, Object>> getMemberTeams(String memberPid);
+
+    /**
+     * Download the tenant member Excel import template.
+     */
+    Resource downloadImportTemplate();
+
+    /**
+     * Batch import tenant members from Excel.
+     */
+    TenantMemberImportResult importMembers(MultipartFile file, Long userId);
+
+    /**
+     * Batch import tenant members from already parsed rows.
+     */
+    TenantMemberImportResult importMembers(List<TenantMemberImportRow> rows, Long userId);
 }
