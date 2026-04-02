@@ -49,7 +49,7 @@ public class AuraBotAgentRoutingTest extends BaseIntegrationTest {
 
     /**
      * Mock the AgentChatPort so we can control its behaviour without the
-     * full enterprise-ai execution stack (which needs real agent DB rows, LLM keys, etc.).
+     * full AI execution stack (which needs real agent DB rows, LLM keys, etc.).
      */
     @MockBean
     private AgentChatPort agentChatPort;

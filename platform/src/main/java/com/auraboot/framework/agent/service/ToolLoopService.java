@@ -30,7 +30,7 @@ import java.util.stream.Collectors;
  * dsl_command, dsl_query, api_call, llm_native.
  *
  * Implements ToolExecutionPort so AuraBotChatService (core module) can delegate
- * tool execution here without compile-time dependency on enterprise-ai.
+ * tool execution here without depending on any external distribution boundary.
  */
 @Slf4j
 @Service
