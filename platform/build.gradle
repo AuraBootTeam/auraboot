@@ -195,6 +195,7 @@ dependencies {
     // Apache POI for Excel export
     implementation 'org.apache.poi:poi:5.3.0'
     implementation 'org.apache.poi:poi-ooxml:5.3.0'
+    implementation 'org.apache.pdfbox:pdfbox:2.0.32'
 
     // Firebase Admin SDK for FCM push notifications (APNs + FCM unified)
     implementation('com.google.firebase:firebase-admin:9.3.0') {

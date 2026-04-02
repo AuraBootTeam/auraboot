@@ -153,7 +153,6 @@ sync_enterprise() {
     log "Syncing auraboot-enterprise (private)..."
     local dst="${DIR_ENTERPRISE}"
 
-    sync_file "${MONO_ROOT}/platform/platform-enterprise-ai" "${dst}/platform-enterprise-ai"
     sync_file "${MONO_ROOT}/platform/platform-enterprise-comm" "${dst}/platform-enterprise-comm"
     sync_file "${MONO_ROOT}/platform/platform-enterprise-infra" "${dst}/platform-enterprise-infra"
 
