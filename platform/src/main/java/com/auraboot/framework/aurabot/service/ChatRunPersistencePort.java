@@ -11,7 +11,7 @@ public interface ChatRunPersistencePort {
     /**
      * Create a new run record. Returns runPid (null if persistence fails).
      */
-    String createRun(Long tenantId, String model, String userMessage);
+    String createRun(Long tenantId, String sessionId, String model, String userMessage);
 
     /**
      * Append a tool call record to the run.
@@ -22,5 +22,5 @@ public interface ChatRunPersistencePort {
      * Mark run as completed with token counts.
      */
     void completeRun(String runPid, boolean success, int inputTokens, int outputTokens,
-                     double cost, String finalResponse, String errorMessage);
+                     double cost, String finalResponse, String errorMessage, String traceId);
 }

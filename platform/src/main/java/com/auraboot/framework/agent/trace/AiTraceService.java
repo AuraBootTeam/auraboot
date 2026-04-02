@@ -8,6 +8,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -29,6 +30,7 @@ public class AiTraceService {
 
     private final AiTraceMapper traceMapper;
     private final AiTraceSpanMapper spanMapper;
+    private final ObjectMapper objectMapper;
 
     // =========================================================================
     // Trace lifecycle
@@ -40,20 +42,17 @@ public class AiTraceService {
             Instant now = Instant.now();
             String traceId = UUID.randomUUID().toString();
 
-            AiTrace trace = new AiTrace();
-            trace.setTraceId(traceId);
-            trace.setTenantId(tenantId);
-            trace.setSessionId(sessionId);
-            trace.setName("chat");
-            trace.setUserId(userId);
-            trace.setInput(userMessage);
-            trace.setStatus(StatusConstants.IN_PROGRESS);
-            trace.setMetadata(metadata);
-            trace.setStartTime(now);
-            trace.setTotalInputTokens(0);
-            trace.setTotalOutputTokens(0);
-            trace.setTotalCost(BigDecimal.ZERO);
-            traceMapper.insert(trace);
+            traceMapper.insertTraceRecord(
+                    traceId,
+                    tenantId,
+                    sessionId,
+                    "chat",
+                    userId,
+                    userMessage,
+                    StatusConstants.IN_PROGRESS,
+                    toJson(metadata),
+                    now
+            );
 
             return TraceContext.builder()
                     .traceId(traceId)
@@ -73,13 +72,7 @@ public class AiTraceService {
             Instant now = Instant.now();
             long duration = Duration.between(ctx.getStartTime(), now).toMillis();
 
-            traceMapper.update(null,
-                    new LambdaUpdateWrapper<AiTrace>()
-                            .eq(AiTrace::getTraceId, ctx.getTraceId())
-                            .set(AiTrace::getOutput, output)
-                            .set(AiTrace::getStatus, status)
-                            .set(AiTrace::getEndTime, now)
-                            .set(AiTrace::getDurationMs, duration));
+            traceMapper.finishTraceSuccess(ctx.getTraceId(), output, status, now, duration);
         } catch (Exception e) {
             log.warn("Failed to end trace {}: {}", ctx.getTraceId(), e.getMessage());
         }
@@ -91,13 +84,7 @@ public class AiTraceService {
             Instant now = Instant.now();
             long duration = Duration.between(ctx.getStartTime(), now).toMillis();
 
-            traceMapper.update(null,
-                    new LambdaUpdateWrapper<AiTrace>()
-                            .eq(AiTrace::getTraceId, ctx.getTraceId())
-                            .set(AiTrace::getStatus, "error")
-                            .set(AiTrace::getErrorMessage, errorMessage)
-                            .set(AiTrace::getEndTime, now)
-                            .set(AiTrace::getDurationMs, duration));
+            traceMapper.finishTraceError(ctx.getTraceId(), errorMessage, now, duration);
         } catch (Exception e) {
             log.warn("Failed to end trace with error {}: {}", ctx.getTraceId(), e.getMessage());
         }
@@ -115,18 +102,19 @@ public class AiTraceService {
             String spanId = UUID.randomUUID().toString();
             int seq = ctx.nextSequence();
 
-            AiTraceSpan span = new AiTraceSpan();
-            span.setSpanId(spanId);
-            span.setTraceId(ctx.getTraceId());
-            span.setParentSpanId(parentSpanId);
-            span.setType(type);
-            span.setName(name);
-            span.setInput(input);
-            span.setStatus(StatusConstants.IN_PROGRESS);
-            span.setLevel("default");
-            span.setStartTime(now);
-            span.setSequenceOrder(seq);
-            spanMapper.insert(span);
+            spanMapper.insertSpanRecord(
+                    spanId,
+                    ctx.getTraceId(),
+                    parentSpanId,
+                    ctx.getTenantId(),
+                    type,
+                    name,
+                    toJson(input),
+                    StatusConstants.IN_PROGRESS,
+                    "default",
+                    now,
+                    seq
+            );
 
             return SpanContext.builder()
                     .spanId(spanId)
@@ -148,14 +136,7 @@ public class AiTraceService {
         try {
             Instant now = Instant.now();
             long duration = Duration.between(ctx.getStartTime(), now).toMillis();
-
-            spanMapper.update(null,
-                    new LambdaUpdateWrapper<AiTraceSpan>()
-                            .eq(AiTraceSpan::getSpanId, ctx.getSpanId())
-                            .set(AiTraceSpan::getOutput, output)
-                            .set(AiTraceSpan::getStatus, status)
-                            .set(AiTraceSpan::getEndTime, now)
-                            .set(AiTraceSpan::getDurationMs, duration));
+            spanMapper.finishSpan(ctx.getSpanId(), toJson(output), status, now, duration);
         } catch (Exception e) {
             log.warn("Failed to end span {}: {}", ctx.getSpanId(), e.getMessage());
         }
@@ -167,16 +148,16 @@ public class AiTraceService {
                                   Object toolCalls) {
         if (ctx == null) return;
         try {
-            spanMapper.update(null,
-                    new LambdaUpdateWrapper<AiTraceSpan>()
-                            .eq(AiTraceSpan::getSpanId, ctx.getSpanId())
-                            .set(AiTraceSpan::getModel, model)
-                            .set(AiTraceSpan::getInputTokens, inputTokens)
-                            .set(AiTraceSpan::getOutputTokens, outputTokens)
-                            .set(AiTraceSpan::getCost, cost)
-                            .set(AiTraceSpan::getStopReason, stopReason)
-                            .set(AiTraceSpan::getToolDefinitions, toolDefinitions)
-                            .set(AiTraceSpan::getToolCalls, toolCalls));
+            spanMapper.updateGeneration(
+                    ctx.getSpanId(),
+                    model,
+                    inputTokens,
+                    outputTokens,
+                    cost,
+                    stopReason,
+                    toJson(toolDefinitions),
+                    toJson(toolCalls)
+            );
 
             // Update trace aggregates
             if (inputTokens != null || outputTokens != null) {
@@ -195,10 +176,7 @@ public class AiTraceService {
     public void updateSpanStatus(String spanId, String status) {
         if (spanId == null) return;
         try {
-            spanMapper.update(null,
-                    new LambdaUpdateWrapper<AiTraceSpan>()
-                            .eq(AiTraceSpan::getSpanId, spanId)
-                            .set(AiTraceSpan::getStatus, status));
+            spanMapper.updateSpanStatusExplicit(spanId, status);
         } catch (Exception e) {
             log.warn("Failed to update span status {}: {}", spanId, e.getMessage());
         }
@@ -279,5 +257,17 @@ public class AiTraceService {
 
     private static long toLong(Object val) {
         return val != null ? ((Number) val).longValue() : 0L;
+    }
+
+    private String toJson(Object value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return objectMapper.writeValueAsString(value);
+        } catch (Exception e) {
+            log.warn("Failed to serialize trace payload: {}", e.getMessage());
+            return null;
+        }
     }
 }

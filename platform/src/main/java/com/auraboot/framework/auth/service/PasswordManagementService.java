@@ -39,6 +39,11 @@ public interface PasswordManagementService {
     void initiatePasswordReset(String email);
 
     /**
+     * Send a password reset email to an existing user.
+     */
+    void sendPasswordResetEmail(Long userId);
+
+    /**
      * Reset password using a valid reset token.
      */
     void resetPasswordWithToken(String token, String newPassword);

@@ -5191,6 +5191,7 @@ CREATE TABLE IF NOT EXISTS ab_ai_trace_span (
     span_id                 VARCHAR(36) NOT NULL UNIQUE,
     trace_id                VARCHAR(36) NOT NULL,
     parent_span_id          VARCHAR(36),
+    tenant_id               BIGINT NOT NULL,
     type                    VARCHAR(20) NOT NULL,
     name                    VARCHAR(200),
     input                   JSONB,
@@ -5215,9 +5216,11 @@ CREATE TABLE IF NOT EXISTS ab_ai_trace_span (
     created_at              TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
+ALTER TABLE ab_ai_trace_span ADD COLUMN IF NOT EXISTS tenant_id BIGINT;
 CREATE INDEX IF NOT EXISTS idx_ai_span_trace ON ab_ai_trace_span(trace_id, sequence_order);
 CREATE INDEX IF NOT EXISTS idx_ai_span_parent ON ab_ai_trace_span(parent_span_id);
 CREATE INDEX IF NOT EXISTS idx_ai_span_type ON ab_ai_trace_span(trace_id, type);
+CREATE INDEX IF NOT EXISTS idx_ai_span_tenant ON ab_ai_trace_span(tenant_id, trace_id);
 
 -- ============================================================
 -- Plugin Marketplace

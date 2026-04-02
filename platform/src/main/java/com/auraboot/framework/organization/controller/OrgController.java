@@ -104,6 +104,19 @@ public class OrgController {
     /**
      * List employees in a department, optionally including sub-departments.
      */
+    @GetMapping("/employees")
+    public ApiResponse<PaginationResult<OrgEmployeeDTO>> getEmployeesByTenant(
+            @RequestParam(defaultValue = "1") int pageNum,
+            @RequestParam(defaultValue = "20") int pageSize,
+            @RequestParam(required = false) String keyword) {
+        PaginationResult<OrgEmployeeDTO> result = organizationService.getEmployeesByTenant(
+            pageNum, pageSize, keyword);
+        return ApiResponse.success(result);
+    }
+
+    /**
+     * List employees in a department, optionally including sub-departments.
+     */
     @GetMapping("/departments/{pid}/employees")
     public ApiResponse<PaginationResult<OrgEmployeeDTO>> getEmployeesByDept(
             @PathVariable String pid,

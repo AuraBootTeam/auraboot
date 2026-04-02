@@ -179,6 +179,22 @@ public class OrganizationServiceImpl implements OrganizationService {
         return PaginationResult.of(dtos, result.getTotal(), result.getPage(), result.getPageSize());
     }
 
+    @Override
+    public PaginationResult<OrgEmployeeDTO> getEmployeesByTenant(int pageNum, int pageSize, String keyword) {
+        DynamicQueryRequest request = DynamicQueryRequest.builder()
+            .pageNum(pageNum)
+            .pageSize(pageSize)
+            .keyword(keyword)
+            .build();
+
+        PaginationResult<Map<String, Object>> result = dynamicDataService.list(MODEL_EMPLOYEE, request);
+        List<OrgEmployeeDTO> dtos = result.getRecords().stream()
+            .map(this::toEmployeeDTO)
+            .collect(Collectors.toList());
+
+        return PaginationResult.of(dtos, result.getTotal(), result.getPage(), result.getPageSize());
+    }
+
     // ======================== Private helpers ========================
 
     private DepartmentTreeNode buildTreeNode(

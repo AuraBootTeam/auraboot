@@ -22,6 +22,7 @@ public class AiTraceSpan {
     private String spanId;
     private String traceId;
     private String parentSpanId;
+    private Long tenantId;
 
     private String type;
     private String name;

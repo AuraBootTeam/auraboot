@@ -57,4 +57,9 @@ public interface OrganizationService {
      */
     PaginationResult<OrgEmployeeDTO> getEmployeesByDept(
         String deptPid, boolean recursive, int pageNum, int pageSize, String keyword);
+
+    /**
+     * Query all employees in the current tenant.
+     */
+    PaginationResult<OrgEmployeeDTO> getEmployeesByTenant(int pageNum, int pageSize, String keyword);
 }

@@ -427,11 +427,6 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             }
             if (targetModelCode == null || targetModelCode.isBlank()) continue;
 
-            // Default displayField to "name" if not configured
-            if (displayField == null || displayField.isBlank()) {
-                displayField = "name";
-            }
-
             // Collect unique reference IDs
             Set<String> refIds = new java.util.LinkedHashSet<>();
             for (Map<String, Object> record : records) {
@@ -444,7 +439,8 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
             // Batch lookup: query target model for display values
             try {
-                String targetTable = metadataService.getModelDefinition(targetModelCode)
+                Optional<ModelDefinition> targetModelOpt = metadataService.getModelDefinition(targetModelCode);
+                String targetTable = targetModelOpt
                         .map(ModelDefinition::getTableName)
                         .orElse(resolveSystemTable(targetModelCode));
                 if (targetTable == null) continue;
@@ -453,21 +449,12 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                         .map(id -> "'" + id.replace("'", "''") + "'")
                         .collect(java.util.stream.Collectors.joining(","));
 
-                // Resolve display column name from field code
-                String displayColumnName = displayField;
-                Optional<ModelDefinition> targetModelOpt = metadataService.getModelDefinition(targetModelCode);
-                if (targetModelOpt.isPresent()) {
-                    for (FieldDefinition tf : targetModelOpt.get().getFields()) {
-                        if (displayField.equals(tf.getCode())) {
-                            displayColumnName = tf.getColumnName() != null ? tf.getColumnName() : tf.getCode();
-                            break;
-                        }
-                    }
-                }
+                // Resolve display column name from field code or target model display field metadata.
+                String displayColumnName = resolveReferenceDisplayColumn(targetModelOpt.orElse(null), displayField);
 
                 String sql = "SELECT pid, " + displayColumnName + " FROM " + targetTable
                         + " WHERE pid IN (" + inClause + ")"
-                        + " AND (deleted_flag = FALSE OR deleted_flag IS NULL)";
+                        + buildSoftDeleteClause(targetModelOpt.orElse(null));
 
                 List<Map<String, Object>> targetRows = dynamicDataMapper.selectByQuery(sql, java.util.Collections.emptyMap());
                 Map<String, String> displayMap = new java.util.HashMap<>();
@@ -504,6 +491,47 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
     private String resolveSystemTable(String modelCode) {
         return SYSTEM_TABLE_MAP.get(modelCode);
+    }
+
+    private String buildSoftDeleteClause(ModelDefinition modelDefinition) {
+        if (modelDefinition != null && modelDefinition.isSoftDelete()) {
+            return " AND (deleted_flag = FALSE OR deleted_flag IS NULL)";
+        }
+        return "";
+    }
+
+    private String resolveReferenceDisplayColumn(ModelDefinition targetModel, String configuredDisplayField) {
+        List<FieldDefinition> fields = targetModel != null && targetModel.getFields() != null
+                ? targetModel.getFields()
+                : java.util.Collections.emptyList();
+
+        if (configuredDisplayField != null && !configuredDisplayField.isBlank()) {
+            for (FieldDefinition field : fields) {
+                if (configuredDisplayField.equals(field.getCode())) {
+                    return field.getColumnName() != null ? field.getColumnName() : field.getCode();
+                }
+            }
+            return configuredDisplayField;
+        }
+
+        if (targetModel != null) {
+            for (FieldDefinition field : metadataService.getDisplayFields(targetModel.getCode())) {
+                if (!field.isPrimaryKey()) {
+                    return field.getColumnName() != null ? field.getColumnName() : field.getCode();
+                }
+            }
+        }
+
+        for (FieldDefinition field : fields) {
+            String columnName = field.getColumnName() != null ? field.getColumnName() : field.getCode();
+            String normalized = columnName.toLowerCase(java.util.Locale.ROOT);
+            if (normalized.endsWith("_name") || "name".equals(normalized) || normalized.endsWith("_title")
+                    || "title".equals(normalized) || normalized.endsWith("_code") || "code".equals(normalized)) {
+                return columnName;
+            }
+        }
+
+        return "pid";
     }
 
     @Override
