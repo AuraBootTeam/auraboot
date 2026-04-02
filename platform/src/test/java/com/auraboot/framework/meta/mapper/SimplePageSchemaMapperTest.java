@@ -24,6 +24,8 @@ import static org.junit.jupiter.api.Assertions.*;
 @DisplayName("PageSchemaMapper简化测试")
 class SimplePageSchemaMapperTest extends BaseIntegrationTest {
 
+    private static final String TEST_TITLE_JSON = "{\"zh-CN\":\"测试Schema\"}";
+
     @Autowired
     private PageSchemaMapper pageSchemaMapper;
 
@@ -37,8 +39,9 @@ class SimplePageSchemaMapperTest extends BaseIntegrationTest {
         // 创建简单的测试数据
         testPageSchema = new PageSchema();
         testPageSchema.setPid(UniqueIdGenerator.generate());
+        testPageSchema.setPageKey("test_page_key_" + UniqueIdGenerator.generate());
         testPageSchema.setName("test_schema");
-        testPageSchema.setTitle("测试Schema");
+        testPageSchema.setTitle(TEST_TITLE_JSON);
         testPageSchema.setDescription("测试描述");
         testPageSchema.setKind("form");
         testPageSchema.setBlocks("{\"type\":\"form\"}");

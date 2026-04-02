@@ -29,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * @since 2.1.0
  */
 @SpringBootTest(classes = TestApplication.class)
-@ActiveProfiles("test")
+@ActiveProfiles("integration-test")
 @DisplayName("Property 6: Primary Key Type System Consistency")
 public class PrimaryKeyTypeSystemPropertyTest {
 

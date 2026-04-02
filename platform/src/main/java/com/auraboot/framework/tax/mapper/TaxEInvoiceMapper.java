@@ -16,8 +16,7 @@ public interface TaxEInvoiceMapper {
 
     @Select("SELECT * FROM mt_tax_einvoice " +
             "WHERE pid = #{pid} " +
-            "AND tenant_id = #{tenantId} " +
-            "AND deleted_flag = FALSE")
+            "AND tenant_id = #{tenantId}")
     Map<String, Object> findByPid(
             @Param("tenantId") Long tenantId,
             @Param("pid") String pid
@@ -26,7 +25,6 @@ public interface TaxEInvoiceMapper {
     @Select("SELECT * FROM mt_tax_einvoice_line " +
             "WHERE tax_eil_einvoice_id = #{einvoicePid} " +
             "AND tenant_id = #{tenantId} " +
-            "AND deleted_flag = FALSE " +
             "ORDER BY tax_eil_line_no ASC")
     List<Map<String, Object>> findLinesByEInvoicePid(
             @Param("tenantId") Long tenantId,
@@ -39,8 +37,7 @@ public interface TaxEInvoiceMapper {
             "    tax_ei_issue_date = CURRENT_DATE, " +
             "    updated_at = NOW() " +
             "WHERE pid = #{pid} " +
-            "AND tenant_id = #{tenantId} " +
-            "AND deleted_flag = FALSE")
+            "AND tenant_id = #{tenantId}")
     int updateStatusAndQrCode(
             @Param("tenantId") Long tenantId,
             @Param("pid") String pid,
@@ -51,7 +48,6 @@ public interface TaxEInvoiceMapper {
     @Select("SELECT * FROM mt_tax_einvoice " +
             "WHERE tax_ei_status = #{status} " +
             "AND tenant_id = #{tenantId} " +
-            "AND deleted_flag = FALSE " +
             "ORDER BY created_at DESC")
     List<Map<String, Object>> findByStatus(
             @Param("tenantId") Long tenantId,

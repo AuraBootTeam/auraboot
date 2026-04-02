@@ -31,6 +31,8 @@ import static org.junit.jupiter.api.Assertions.*;
 @DisplayName("PageSchemaMapper测试")
 class PageSchemaMapperTest extends BaseIntegrationTest {
 
+    private static final String TEST_TITLE_JSON = "{\"zh-CN\":\"测试页面Schema\"}";
+
     @Autowired
     private PageSchemaMapper pageSchemaMapper;
 
@@ -63,7 +65,7 @@ class PageSchemaMapperTest extends BaseIntegrationTest {
 
     @Test
     @DisplayName("测试根据业务主键查询")
-    void testFindByPid() {
+    void testFindByPid() throws Exception {
         // Given
         pageSchemaMapper.insert(testPageSchema);
 
@@ -74,7 +76,10 @@ class PageSchemaMapperTest extends BaseIntegrationTest {
         assertNotNull(found);
         assertEquals(testPageSchema.getPid(), found.getPid());
         assertEquals(testPageSchema.getName(), found.getName());
-        assertEquals(testPageSchema.getTitle(), found.getTitle());
+        assertEquals(
+                new ObjectMapper().readTree(TEST_TITLE_JSON),
+                new ObjectMapper().readTree(found.getTitle())
+        );
         assertEquals(testPageSchema.getKind(), found.getKind());
     }
 
@@ -225,19 +230,19 @@ class PageSchemaMapperTest extends BaseIntegrationTest {
         
         PageSchema schema1 = createTestPageSchema();
         schema1.setName("user-management" + uniqueSuffix);
-        schema1.setTitle("特殊用户管理" + uniqueSuffix);
+        schema1.setTitle("{\"zh-CN\":\"特殊用户管理" + uniqueSuffix + "\"}");
         schema1.setDescription("特殊用户管理页面" + uniqueSuffix);
         schema1.setPid(UniqueIdGenerator.generate());
 
         PageSchema schema2 = createTestPageSchema();
         schema2.setName("product-list" + uniqueSuffix);
-        schema2.setTitle("特殊产品列表" + uniqueSuffix);
+        schema2.setTitle("{\"zh-CN\":\"特殊产品列表" + uniqueSuffix + "\"}");
         schema2.setDescription("特殊产品管理列表页面" + uniqueSuffix);
         schema2.setPid(UniqueIdGenerator.generate());
 
         PageSchema schema3 = createTestPageSchema();
         schema3.setName("order-form" + uniqueSuffix);
-        schema3.setTitle("特殊订单表单" + uniqueSuffix);
+        schema3.setTitle("{\"zh-CN\":\"特殊订单表单" + uniqueSuffix + "\"}");
         schema3.setDescription("特殊订单创建表单" + uniqueSuffix);
         schema3.setPid(UniqueIdGenerator.generate());
 
@@ -335,10 +340,11 @@ class PageSchemaMapperTest extends BaseIntegrationTest {
     private PageSchema createTestPageSchema() {
         PageSchema schema = new PageSchema();
         schema.setPid(UniqueIdGenerator.generate());
+        schema.setPageKey("test_page_key_" + UniqueIdGenerator.generate());
         // 使用MetaContext中的租户ID，而不是硬编码-1L
         schema.setTenantId(MetaContext.getCurrentTenantId());
         schema.setName("test-page-schema");
-        schema.setTitle("测试页面Schema");
+        schema.setTitle(TEST_TITLE_JSON);
         schema.setDescription("这是一个测试页面Schema");
         schema.setKind("form");
         schema.setIsTemplate(false);

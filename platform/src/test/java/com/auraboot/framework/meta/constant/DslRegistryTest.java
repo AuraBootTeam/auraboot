@@ -118,23 +118,21 @@ class DslRegistryTest {
     // ── 4.3 Page/View Layer ─────────────────────────────────────
 
     @Test
-    void pageKind_has6ValuesWithMixedCaseCodes() {
-        assertEquals(6, DslRegistry.PageKind.values().length);
+    void pageKind_has5Values() {
+        assertEquals(5, DslRegistry.PageKind.values().length);
         Set<String> codes = DslRegistry.PageKind.codes();
         assertTrue(codes.containsAll(Set.of(
-                "Page", "List", "Form", "Detail", "PageLayout", "Dashboard")));
+                "list", "form", "detail", "dashboard", "composite")));
     }
 
     @Test
-    void blockType_has18Values() {
-        assertEquals(18, DslRegistry.BlockType.values().length);
+    void blockType_has14Values() {
+        assertEquals(14, DslRegistry.BlockType.values().length);
         Set<String> codes = DslRegistry.BlockType.codes();
         assertTrue(codes.containsAll(Set.of(
                 "form", "form-section", "form-buttons", "form-wizard",
-                "table", "data-table", "filters", "filter-form",
-                "toolbar", "action", "description", "chart",
-                "tabs", "list-tabs", "sub-table", "monthly-grid",
-                "stat-card", "custom")));
+                "table", "filters", "toolbar", "description", "chart",
+                "tabs", "sub-table", "monthly-grid", "stat-card", "custom")));
     }
 
     @Test

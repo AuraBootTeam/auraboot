@@ -62,7 +62,11 @@ public class TaxInvoiceService {
         einvoice.put("tax_ei_seller_uscc", request.getSellerUscc());
         einvoice.put("tax_ei_seller_address", request.getSellerAddress());
         einvoice.put("tax_ei_seller_bank", request.getSellerBank());
-        einvoice.put("tax_ei_currency_code", request.getCurrencyCode() != null ? request.getCurrencyCode() : currencyConversionService.getBaseCurrency());
+        String currencyCode = request.getCurrencyCode();
+        if (currencyCode == null || currencyCode.isBlank()) {
+            currencyCode = currencyConversionService != null ? currencyConversionService.getBaseCurrency() : "cny";
+        }
+        einvoice.put("tax_ei_currency_code", currencyCode);
         einvoice.put("tax_ei_remarks", request.getRemarks());
         einvoice.put("tax_ei_status", "draft");
         einvoice.put("tax_ei_is_redline", false);

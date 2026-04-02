@@ -55,10 +55,11 @@ public class RecordCapabilityIntegrationTest extends BaseIntegrationTest {
     private static final String MODEL_CODE = "showcase_all_fields";
 
     /**
-     * "My Company" tenant that has the showcase commands, records, and permissions.
+     * Resolved from seeded showcase command data at runtime to avoid stale fixed IDs.
      */
-    private static final Long ADMIN_TENANT_ID = 295067508556304384L;
-    private static final Long ADMIN_USER_ID = 295067508531138560L;
+    private Long adminTenantId;
+    private Long adminUserId;
+    private Long adminMemberId;
 
     /** Record ID created by this test. */
     private String testRecordId;
@@ -66,7 +67,36 @@ public class RecordCapabilityIntegrationTest extends BaseIntegrationTest {
     @BeforeAll
     void createTestRecord() {
         // Must set context before any DB operation (TenantLineInterceptor needs it)
-        MetaContext.setContext(ADMIN_TENANT_ID, ADMIN_USER_ID, "admin", "admin@test.local");
+        adminTenantId = jdbcTemplate.queryForObject(
+                """
+                SELECT tenant_id
+                FROM ab_command_definition
+                WHERE model_code = ? AND deleted_flag = FALSE
+                GROUP BY tenant_id
+                ORDER BY COUNT(*) DESC
+                LIMIT 1
+                """,
+                Long.class,
+                MODEL_CODE
+        );
+        Map<String, Object> adminIdentity = jdbcTemplate.queryForMap(
+                """
+                SELECT tm.id AS member_id, tm.user_id
+                FROM ab_tenant_member tm
+                LEFT JOIN ab_user u ON u.id = tm.user_id
+                WHERE tm.tenant_id = ?
+                  AND tm.status = 'active'
+                  AND tm.deleted_flag = FALSE
+                ORDER BY CASE WHEN u.email = 'admin@example.com' THEN 0 ELSE 1 END,
+                         tm.created_at ASC
+                LIMIT 1
+                """,
+                adminTenantId
+        );
+        adminMemberId = ((Number) adminIdentity.get("member_id")).longValue();
+        adminUserId = ((Number) adminIdentity.get("user_id")).longValue();
+        MetaContext.setContext(adminTenantId, adminUserId, "admin", "admin@test.local");
+        MetaContext.setMemberId(adminMemberId);
 
         // Insert a test record directly via SQL to bypass DynamicDataService permissions.
         String pid = "cap_test_" + System.currentTimeMillis();
@@ -75,7 +105,7 @@ public class RecordCapabilityIntegrationTest extends BaseIntegrationTest {
         jdbcTemplate.update(
                 "INSERT INTO mt_showcase_all_fields (pid, tenant_id, sc_status, sc_name, sc_code, created_at, updated_at) "
                 + "VALUES (?, ?, 'draft', ?, ?, NOW(), NOW())",
-                pid, ADMIN_TENANT_ID, name, code
+                pid, adminTenantId, name, code
         );
         // Get the created record's ID
         testRecordId = jdbcTemplate.queryForObject(
@@ -87,7 +117,8 @@ public class RecordCapabilityIntegrationTest extends BaseIntegrationTest {
     @BeforeEach
     public void switchToAdminTenant() {
         // Override the default test context to use the admin tenant
-        MetaContext.setContext(ADMIN_TENANT_ID, ADMIN_USER_ID, "admin", "admin@test.local");
+        MetaContext.setContext(adminTenantId, adminUserId, "admin", "admin@test.local");
+        MetaContext.setMemberId(adminMemberId);
     }
 
     // ==================== Service-Level Tests ====================
@@ -97,7 +128,7 @@ public class RecordCapabilityIntegrationTest extends BaseIntegrationTest {
     @DisplayName("Service: returns capabilities with correct envelope fields")
     void getCapabilities_returnsCorrectEnvelope() {
         RecordCapabilities result = recordCapabilityService.getRecordCapabilities(
-                MODEL_CODE, testRecordId, "web", "detail", ADMIN_USER_ID);
+                MODEL_CODE, testRecordId, "web", "detail", adminUserId);
 
         assertThat(result).isNotNull();
         assertThat(result.getModelCode()).isEqualTo(MODEL_CODE);
@@ -115,7 +146,7 @@ public class RecordCapabilityIntegrationTest extends BaseIntegrationTest {
     @DisplayName("Service: returns update and delete commands (contextual types)")
     void getCapabilities_returnsContextualTypes() {
         RecordCapabilities result = recordCapabilityService.getRecordCapabilities(
-                MODEL_CODE, testRecordId, "web", "detail", ADMIN_USER_ID);
+                MODEL_CODE, testRecordId, "web", "detail", adminUserId);
 
         Set<String> actionCodes = extractCodes(result.getCapabilities());
 
@@ -129,7 +160,7 @@ public class RecordCapabilityIntegrationTest extends BaseIntegrationTest {
     @DisplayName("Service: excludes query and create commands (not contextual)")
     void getCapabilities_excludesNonContextualTypes() {
         RecordCapabilities result = recordCapabilityService.getRecordCapabilities(
-                MODEL_CODE, testRecordId, "web", "detail", ADMIN_USER_ID);
+                MODEL_CODE, testRecordId, "web", "detail", adminUserId);
 
         Set<String> actionCodes = extractCodes(result.getCapabilities());
 
@@ -144,7 +175,7 @@ public class RecordCapabilityIntegrationTest extends BaseIntegrationTest {
     @DisplayName("Service: actions are sorted by priority ascending")
     void getCapabilities_sortedByPriority() {
         RecordCapabilities result = recordCapabilityService.getRecordCapabilities(
-                MODEL_CODE, testRecordId, "web", "detail", ADMIN_USER_ID);
+                MODEL_CODE, testRecordId, "web", "detail", adminUserId);
 
         List<ActionCapability> actions = result.getCapabilities();
         assertThat(actions).isNotEmpty();
@@ -161,7 +192,7 @@ public class RecordCapabilityIntegrationTest extends BaseIntegrationTest {
     @DisplayName("Service: delete action has danger style and destructive=true")
     void getCapabilities_deleteProperties() {
         RecordCapabilities result = recordCapabilityService.getRecordCapabilities(
-                MODEL_CODE, testRecordId, "web", "detail", ADMIN_USER_ID);
+                MODEL_CODE, testRecordId, "web", "detail", adminUserId);
 
         ActionCapability delete = findAction(result, "sc:delete_showcase");
 
@@ -182,7 +213,7 @@ public class RecordCapabilityIntegrationTest extends BaseIntegrationTest {
     @DisplayName("Service: update action has edit_field type and form schema with fields")
     void getCapabilities_updateProperties() {
         RecordCapabilities result = recordCapabilityService.getRecordCapabilities(
-                MODEL_CODE, testRecordId, "web", "detail", ADMIN_USER_ID);
+                MODEL_CODE, testRecordId, "web", "detail", adminUserId);
 
         ActionCapability update = findAction(result, "sc:update_showcase");
 
@@ -205,7 +236,7 @@ public class RecordCapabilityIntegrationTest extends BaseIntegrationTest {
     @DisplayName("Service: showInActionBar marks top 2 non-destructive actions")
     void getCapabilities_actionBarVisibility() {
         RecordCapabilities result = recordCapabilityService.getRecordCapabilities(
-                MODEL_CODE, testRecordId, "web", "detail", ADMIN_USER_ID);
+                MODEL_CODE, testRecordId, "web", "detail", adminUserId);
 
         List<ActionCapability> actions = result.getCapabilities();
         long actionBarCount = actions.stream().filter(ActionCapability::isShowInActionBar).count();
@@ -226,7 +257,7 @@ public class RecordCapabilityIntegrationTest extends BaseIntegrationTest {
     @DisplayName("Service: list context returns only low-priority actions, no tabs")
     void getCapabilities_listContextFilter() {
         RecordCapabilities result = recordCapabilityService.getRecordCapabilities(
-                MODEL_CODE, testRecordId, "web", "list", ADMIN_USER_ID);
+                MODEL_CODE, testRecordId, "web", "list", adminUserId);
 
         List<ActionCapability> actions = result.getCapabilities();
 
@@ -248,7 +279,7 @@ public class RecordCapabilityIntegrationTest extends BaseIntegrationTest {
     @DisplayName("Service: detail context returns tabs with code and label")
     void getCapabilities_detailContextReturnsTabs() {
         RecordCapabilities result = recordCapabilityService.getRecordCapabilities(
-                MODEL_CODE, testRecordId, "web", "detail", ADMIN_USER_ID);
+                MODEL_CODE, testRecordId, "web", "detail", adminUserId);
 
         List<TabCapability> tabs = result.getTabs();
         assertThat(tabs).isNotEmpty();
@@ -266,7 +297,7 @@ public class RecordCapabilityIntegrationTest extends BaseIntegrationTest {
     @DisplayName("Service: inbox context limits action bar to max 2, no tabs")
     void getCapabilities_inboxContext() {
         RecordCapabilities result = recordCapabilityService.getRecordCapabilities(
-                MODEL_CODE, testRecordId, "web", "inbox", ADMIN_USER_ID);
+                MODEL_CODE, testRecordId, "web", "inbox", adminUserId);
 
         long barCount = result.getCapabilities().stream()
                 .filter(ActionCapability::isShowInActionBar)
@@ -282,7 +313,7 @@ public class RecordCapabilityIntegrationTest extends BaseIntegrationTest {
     @DisplayName("Service: non-existent record returns no state_transition actions")
     void getCapabilities_nonExistentRecord() {
         RecordCapabilities result = recordCapabilityService.getRecordCapabilities(
-                MODEL_CODE, "99999999", "web", "detail", ADMIN_USER_ID);
+                MODEL_CODE, "99999999", "web", "detail", adminUserId);
 
         assertThat(result).isNotNull();
         assertThat(result.getModelCode()).isEqualTo(MODEL_CODE);
@@ -315,7 +346,7 @@ public class RecordCapabilityIntegrationTest extends BaseIntegrationTest {
     @DisplayName("Service: each action has a non-null commandCode")
     void getCapabilities_allActionsHaveCommandCode() {
         RecordCapabilities result = recordCapabilityService.getRecordCapabilities(
-                MODEL_CODE, testRecordId, "web", "detail", ADMIN_USER_ID);
+                MODEL_CODE, testRecordId, "web", "detail", adminUserId);
 
         for (ActionCapability action : result.getCapabilities()) {
             assertThat(action.getCommandCode())
@@ -331,11 +362,11 @@ public class RecordCapabilityIntegrationTest extends BaseIntegrationTest {
         // Direct SQL query to verify the record state
         String status = jdbcTemplate.queryForObject(
                 "SELECT sc_status FROM mt_showcase_all_fields WHERE id = ? AND tenant_id = ?",
-                String.class, Long.parseLong(testRecordId), ADMIN_TENANT_ID);
+                String.class, Long.parseLong(testRecordId), adminTenantId);
         assertThat(status).isEqualTo("draft");
 
         RecordCapabilities result = recordCapabilityService.getRecordCapabilities(
-                MODEL_CODE, testRecordId, "web", "detail", ADMIN_USER_ID);
+                MODEL_CODE, testRecordId, "web", "detail", adminUserId);
 
         Set<String> actionCodes = extractCodes(result.getCapabilities());
 
