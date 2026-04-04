@@ -15,6 +15,8 @@ import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -57,6 +59,9 @@ public class OrgEmployeeServiceImpl implements OrgEmployeeService {
     private final UserService userService;
     private final TenantMemberService tenantMemberService;
     private final OrganizationServiceImpl organizationService;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @Override
     @Transactional
@@ -152,19 +157,19 @@ public class OrgEmployeeServiceImpl implements OrgEmployeeService {
 
         String memberPid = (String) employee.get(EMP_MEMBER_ID);
 
-        // Clear employee side
-        Map<String, Object> updateData = new HashMap<>();
-        updateData.put(EMP_MEMBER_ID, null);
-        updateData.put(EMP_USER_ID, null);
-        dynamicDataService.update(MODEL_EMPLOYEE, employeePid, updateData);
+        // Clear employee side — only clear member link, keep user link
+        // (org_emp_user_id has NOT NULL constraint per plugin definition)
+        // Use direct SQL because DynamicDataService.update() ignores null values
+        jdbcTemplate.update(
+                "UPDATE mt_org_employee SET org_emp_member_id = NULL, updated_at = NOW() WHERE pid = ?",
+                employeePid);
 
-        // Clear member side
+        // Clear member side — use direct SQL to avoid tenant-scope issues
+        // (member may belong to a different tenant than current context)
         if (memberPid != null) {
-            TenantMember member = tenantMemberService.findByPid(memberPid);
-            if (member != null) {
-                member.setEmployeeId(null);
-                tenantMemberService.updateMember(member);
-            }
+            jdbcTemplate.update(
+                    "UPDATE ab_tenant_member SET employee_id = NULL, updated_at = NOW() WHERE pid = ?",
+                    memberPid);
         }
 
         log.info("Unlinked member from employee: employeePid={}, memberPid={}", employeePid, memberPid);
