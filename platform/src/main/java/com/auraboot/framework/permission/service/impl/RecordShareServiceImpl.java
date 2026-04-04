@@ -1,6 +1,7 @@
 package com.auraboot.framework.permission.service.impl;
 
 import com.auraboot.framework.common.util.UniqueIdGenerator;
+import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.permission.entity.RecordShare;
 import com.auraboot.framework.permission.mapper.RecordShareMapper;
 import com.auraboot.framework.permission.service.RecordShareService;
@@ -11,6 +12,8 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.List;
+
+import static com.auraboot.framework.common.constant.ResponseCode.BadParam;
 
 /**
  * Record Share Service implementation.
@@ -83,5 +86,23 @@ public class RecordShareServiceImpl implements RecordShareService {
                 tenantId, resourceCode, memberId,
                 roleIds != null ? roleIds : List.of(),
                 Instant.now());
+    }
+
+    @Override
+    public List<RecordShare> listByRecord(Long tenantId, String resourceCode, Long recordId) {
+        return recordShareMapper.findByRecord(tenantId, resourceCode, recordId, Instant.now());
+    }
+
+    @Override
+    public void removeById(Long tenantId, Long shareId) {
+        RecordShare share = recordShareMapper.selectById(shareId);
+        if (share == null) {
+            throw new RootUnCheckedException(BadParam, "Share not found: " + shareId);
+        }
+        if (!tenantId.equals(share.getTenantId())) {
+            throw new RootUnCheckedException(BadParam, "Share not found: " + shareId);
+        }
+        recordShareMapper.deleteById(shareId);
+        log.info("Removed share id={} for resource={} record={}", shareId, share.getResourceCode(), share.getRecordId());
     }
 }
