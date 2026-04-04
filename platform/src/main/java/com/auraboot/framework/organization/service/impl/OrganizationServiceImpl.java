@@ -7,6 +7,12 @@ import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.organization.dto.DepartmentTreeNode;
 import com.auraboot.framework.organization.dto.OrgEmployeeDTO;
 import com.auraboot.framework.organization.service.OrganizationService;
+import com.auraboot.framework.rbac.entity.Role;
+import com.auraboot.framework.rbac.entity.UserRole;
+import com.auraboot.framework.rbac.service.RoleService;
+import com.auraboot.framework.rbac.service.UserRoleService;
+import com.auraboot.framework.tenant.dao.entity.TenantMember;
+import com.auraboot.framework.tenant.service.TenantMemberService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -45,10 +51,19 @@ public class OrganizationServiceImpl implements OrganizationService {
     private static final String EMP_MEMBER_ID = "org_emp_member_id";
     private static final String EMP_USER_ID = "org_emp_user_id";
 
+    private static final String EMP_REPORT_TO = "org_emp_report_to";
+
     // Position field codes
     private static final String POS_NAME = "org_pos_name";
+    private static final String POS_CODE = "org_pos_code";
+
+    private static final int MAX_SUBORDINATE_DEPTH = 10;
+    private static final int MAX_QUERY_PAGE_SIZE = 500;
 
     private final DynamicDataService dynamicDataService;
+    private final RoleService roleService;
+    private final UserRoleService userRoleService;
+    private final TenantMemberService tenantMemberService;
 
     @Override
     public List<DepartmentTreeNode> getDepartmentTree(Long tenantId) {
@@ -119,7 +134,7 @@ public class OrganizationServiceImpl implements OrganizationService {
             return null;
         }
 
-        String reportTo = asString(employee.get("org_emp_report_to"));
+        String reportTo = asString(employee.get(EMP_REPORT_TO));
         if (reportTo != null) {
             return dynamicDataService.getById(MODEL_EMPLOYEE, reportTo);
         }
@@ -193,6 +208,252 @@ public class OrganizationServiceImpl implements OrganizationService {
             .collect(Collectors.toList());
 
         return PaginationResult.of(dtos, result.getTotal(), result.getPage(), result.getPageSize());
+    }
+
+    // ======================== BPM / Approval Extension Methods ========================
+
+    @Override
+    public List<Map<String, Object>> getManagersUpToLevel(String employeePid, int level) {
+        if (employeePid == null || level <= 0) {
+            return List.of();
+        }
+
+        List<Map<String, Object>> managers = new ArrayList<>();
+        String currentPid = employeePid;
+
+        for (int i = 0; i < level; i++) {
+            Map<String, Object> current = dynamicDataService.getById(MODEL_EMPLOYEE, currentPid);
+            if (current == null) {
+                break;
+            }
+            String reportTo = asString(current.get(EMP_REPORT_TO));
+            if (reportTo == null || reportTo.isBlank()) {
+                break;
+            }
+            Map<String, Object> manager = dynamicDataService.getById(MODEL_EMPLOYEE, reportTo);
+            if (manager == null) {
+                break;
+            }
+            managers.add(manager);
+            currentPid = reportTo;
+        }
+
+        return managers;
+    }
+
+    @Override
+    public Map<String, Object> getDeptLeader(String deptPid) {
+        if (deptPid == null) {
+            return null;
+        }
+        Map<String, Object> dept = dynamicDataService.getById(MODEL_DEPARTMENT, deptPid);
+        if (dept == null) {
+            return null;
+        }
+        String managerId = asString(dept.get(DEPT_MANAGER_ID));
+        if (managerId == null || managerId.isBlank()) {
+            return null;
+        }
+        return dynamicDataService.getById(MODEL_EMPLOYEE, managerId);
+    }
+
+    @Override
+    public List<Map<String, Object>> getEmployeesByRole(Long tenantId, String roleCode) {
+        if (tenantId == null || roleCode == null || roleCode.isBlank()) {
+            return List.of();
+        }
+
+        // Find the role by code in this tenant
+        List<Role> roles = roleService.findByTenantId(tenantId);
+        Role matchedRole = roles.stream()
+            .filter(r -> roleCode.equals(r.getCode()))
+            .findFirst()
+            .orElse(null);
+        if (matchedRole == null) {
+            log.debug("Role not found: code={}, tenantId={}", roleCode, tenantId);
+            return List.of();
+        }
+
+        // Find all members with this role
+        List<UserRole> userRoles = userRoleService.findByRoleIds(List.of(matchedRole.getId()));
+        if (userRoles == null || userRoles.isEmpty()) {
+            return List.of();
+        }
+
+        // For each member, find the linked employee
+        List<Map<String, Object>> employees = new ArrayList<>();
+        for (UserRole ur : userRoles) {
+            if (ur.getMemberId() == null) {
+                continue;
+            }
+            TenantMember member = tenantMemberService.getById(ur.getMemberId());
+            if (member == null || member.getPid() == null) {
+                continue;
+            }
+            Map<String, Object> emp = getEmployeeByMemberPid(member.getPid());
+            if (emp != null) {
+                employees.add(emp);
+            }
+        }
+        return employees;
+    }
+
+    @Override
+    public List<Map<String, Object>> getEmployeesByPosition(Long tenantId, String positionCode) {
+        if (positionCode == null || positionCode.isBlank()) {
+            return List.of();
+        }
+
+        // Find position by code
+        DynamicQueryRequest posRequest = DynamicQueryRequest.builder()
+            .pageNum(1)
+            .pageSize(1)
+            .conditions(List.of(
+                QueryCondition.builder()
+                    .fieldName(POS_CODE)
+                    .operator(QueryCondition.Operator.EQ)
+                    .value(positionCode)
+                    .build()
+            ))
+            .build();
+        PaginationResult<Map<String, Object>> posResult = dynamicDataService.list(MODEL_POSITION, posRequest);
+        List<Map<String, Object>> positions = posResult.getRecords();
+        if (positions == null || positions.isEmpty()) {
+            log.debug("Position not found: code={}", positionCode);
+            return List.of();
+        }
+        String positionPid = asString(positions.get(0).get("pid"));
+
+        // Find employees with this position
+        DynamicQueryRequest empRequest = DynamicQueryRequest.builder()
+            .pageNum(1)
+            .pageSize(MAX_QUERY_PAGE_SIZE)
+            .conditions(List.of(
+                QueryCondition.builder()
+                    .fieldName(EMP_POSITION_ID)
+                    .operator(QueryCondition.Operator.EQ)
+                    .value(positionPid)
+                    .build()
+            ))
+            .build();
+        PaginationResult<Map<String, Object>> empResult = dynamicDataService.list(MODEL_EMPLOYEE, empRequest);
+        return empResult.getRecords() != null ? empResult.getRecords() : List.of();
+    }
+
+    @Override
+    public List<Map<String, Object>> getPeers(String employeePid) {
+        if (employeePid == null) {
+            return List.of();
+        }
+        Map<String, Object> employee = dynamicDataService.getById(MODEL_EMPLOYEE, employeePid);
+        if (employee == null) {
+            return List.of();
+        }
+        String deptId = asString(employee.get(EMP_DEPT_ID));
+        if (deptId == null || deptId.isBlank()) {
+            return List.of();
+        }
+
+        // Get all employees in the same department
+        DynamicQueryRequest request = DynamicQueryRequest.builder()
+            .pageNum(1)
+            .pageSize(MAX_QUERY_PAGE_SIZE)
+            .conditions(List.of(
+                QueryCondition.builder()
+                    .fieldName(EMP_DEPT_ID)
+                    .operator(QueryCondition.Operator.EQ)
+                    .value(deptId)
+                    .build()
+            ))
+            .build();
+        PaginationResult<Map<String, Object>> result = dynamicDataService.list(MODEL_EMPLOYEE, request);
+        List<Map<String, Object>> records = result.getRecords();
+        if (records == null) {
+            return List.of();
+        }
+
+        // Exclude self
+        return records.stream()
+            .filter(r -> !employeePid.equals(asString(r.get("pid"))))
+            .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<Map<String, Object>> getSubordinates(String employeePid) {
+        if (employeePid == null) {
+            return List.of();
+        }
+
+        List<Map<String, Object>> allSubordinates = new ArrayList<>();
+        Set<String> visited = new HashSet<>();
+        visited.add(employeePid);
+
+        List<String> currentLevel = List.of(employeePid);
+
+        for (int depth = 0; depth < MAX_SUBORDINATE_DEPTH && !currentLevel.isEmpty(); depth++) {
+            List<String> nextLevel = new ArrayList<>();
+
+            for (String managerPid : currentLevel) {
+                DynamicQueryRequest request = DynamicQueryRequest.builder()
+                    .pageNum(1)
+                    .pageSize(MAX_QUERY_PAGE_SIZE)
+                    .conditions(List.of(
+                        QueryCondition.builder()
+                            .fieldName(EMP_REPORT_TO)
+                            .operator(QueryCondition.Operator.EQ)
+                            .value(managerPid)
+                            .build()
+                    ))
+                    .build();
+                PaginationResult<Map<String, Object>> result = dynamicDataService.list(MODEL_EMPLOYEE, request);
+                List<Map<String, Object>> directReports = result.getRecords();
+                if (directReports == null) {
+                    continue;
+                }
+
+                for (Map<String, Object> sub : directReports) {
+                    String subPid = asString(sub.get("pid"));
+                    if (subPid != null && visited.add(subPid)) {
+                        allSubordinates.add(sub);
+                        nextLevel.add(subPid);
+                    }
+                }
+            }
+
+            currentLevel = nextLevel;
+        }
+
+        return allSubordinates;
+    }
+
+    @Override
+    public List<Map<String, Object>> getOrgPath(String employeePid) {
+        if (employeePid == null) {
+            return List.of();
+        }
+        Map<String, Object> employee = dynamicDataService.getById(MODEL_EMPLOYEE, employeePid);
+        if (employee == null) {
+            return List.of();
+        }
+        String deptPid = asString(employee.get(EMP_DEPT_ID));
+        if (deptPid == null || deptPid.isBlank()) {
+            return List.of();
+        }
+
+        List<Map<String, Object>> path = new ArrayList<>();
+        Set<String> visited = new HashSet<>();
+        String currentDeptPid = deptPid;
+
+        while (currentDeptPid != null && !currentDeptPid.isBlank() && visited.add(currentDeptPid)) {
+            Map<String, Object> dept = dynamicDataService.getById(MODEL_DEPARTMENT, currentDeptPid);
+            if (dept == null) {
+                break;
+            }
+            path.add(dept);
+            currentDeptPid = asString(dept.get(DEPT_PARENT_ID));
+        }
+
+        return path;
     }
 
     // ======================== Private helpers ========================

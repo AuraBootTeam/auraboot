@@ -57,8 +57,18 @@ public class SqlCountFilter extends OncePerRequestFilter {
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
         SqlCountHolder.reset();
+
+        // SSE (text/event-stream) endpoints use async streaming — ContentCachingResponseWrapper
+        // would buffer the empty initial response, set Content-Length: 0, and close the connection
+        // before the async thread can send any events. Skip wrapping for SSE endpoints.
+        String accept = request.getHeader("Accept");
+        boolean isSse = accept != null && accept.contains("text/event-stream");
+        boolean isStreamProducer = "text/event-stream".equals(request.getContentType())
+                || request.getRequestURI().contains("/stream");
+        boolean skipWrapping = isSse || isStreamProducer;
+
         // Wrap response to buffer output, allowing header injection after chain completes
-        ContentCachingResponseWrapper wrappedResponse = headerEnabled
+        ContentCachingResponseWrapper wrappedResponse = (headerEnabled && !skipWrapping)
                 ? new ContentCachingResponseWrapper(response)
                 : null;
         HttpServletResponse effectiveResponse = wrappedResponse != null ? wrappedResponse : response;
@@ -70,6 +80,8 @@ public class SqlCountFilter extends OncePerRequestFilter {
             if (wrappedResponse != null) {
                 wrappedResponse.setIntHeader(HEADER_SQL_COUNT, count);
                 wrappedResponse.copyBodyToResponse();
+            } else if (headerEnabled && !skipWrapping) {
+                response.setIntHeader(HEADER_SQL_COUNT, count);
             }
 
             if (count > 0) {

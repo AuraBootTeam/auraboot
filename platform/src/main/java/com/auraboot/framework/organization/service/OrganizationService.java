@@ -62,4 +62,65 @@ public interface OrganizationService {
      * Query all employees in the current tenant.
      */
     PaginationResult<OrgEmployeeDTO> getEmployeesByTenant(int pageNum, int pageSize, String keyword);
+
+    // ======================== BPM / Approval Extension Methods ========================
+
+    /**
+     * Walk up the report-to chain from the given employee, collecting managers.
+     *
+     * @param employeePid starting employee PID
+     * @param level       max number of managers to collect
+     * @return ordered list of manager records (direct manager first)
+     */
+    List<Map<String, Object>> getManagersUpToLevel(String employeePid, int level);
+
+    /**
+     * Get the designated leader/manager of a department.
+     *
+     * @param deptPid department PID
+     * @return the manager employee record, or null if department has no manager
+     */
+    Map<String, Object> getDeptLeader(String deptPid);
+
+    /**
+     * Find all employees whose linked tenant member has the given role code.
+     *
+     * @param tenantId tenant ID
+     * @param roleCode role code to match
+     * @return list of employee dynamic records
+     */
+    List<Map<String, Object>> getEmployeesByRole(Long tenantId, String roleCode);
+
+    /**
+     * Find all employees holding the given position (by position code).
+     *
+     * @param tenantId     tenant ID (unused — tenant isolation is automatic)
+     * @param positionCode position code to match
+     * @return list of employee dynamic records
+     */
+    List<Map<String, Object>> getEmployeesByPosition(Long tenantId, String positionCode);
+
+    /**
+     * Get all employees in the same department as the given employee (excluding self).
+     *
+     * @param employeePid employee PID
+     * @return list of peer employee records
+     */
+    List<Map<String, Object>> getPeers(String employeePid);
+
+    /**
+     * Get all subordinates of an employee (recursive, via report-to chain).
+     *
+     * @param employeePid employee PID
+     * @return list of all subordinate employee records (breadth-first)
+     */
+    List<Map<String, Object>> getSubordinates(String employeePid);
+
+    /**
+     * Get the organizational path from the employee's department up to the root.
+     *
+     * @param employeePid employee PID
+     * @return ordered list of department records [current_dept, parent_dept, ..., root_dept]
+     */
+    List<Map<String, Object>> getOrgPath(String employeePid);
 }
