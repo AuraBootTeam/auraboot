@@ -231,10 +231,7 @@ public class AiTraceService {
     }
 
     public List<AiTraceSpan> getSpans(String traceId) {
-        return spanMapper.selectList(
-                new LambdaQueryWrapper<AiTraceSpan>()
-                        .eq(AiTraceSpan::getTraceId, traceId)
-                        .orderByAsc(AiTraceSpan::getSequenceOrder));
+        return spanMapper.selectByTraceId(traceId);
     }
 
     public TraceStatsResponse getStats(Long tenantId) {
