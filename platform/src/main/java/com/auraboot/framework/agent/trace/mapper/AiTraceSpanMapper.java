@@ -3,16 +3,27 @@ package com.auraboot.framework.agent.trace.mapper;
 import com.auraboot.framework.agent.trace.entity.AiTraceSpan;
 import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import org.apache.ibatis.annotations.Insert;
-import org.apache.ibatis.annotations.Mapper;
-import org.apache.ibatis.annotations.Param;
-import org.apache.ibatis.annotations.Update;
+import org.apache.ibatis.annotations.*;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 
 @Mapper
 public interface AiTraceSpanMapper extends BaseMapper<AiTraceSpan> {
+
+    /**
+     * Select spans by traceId using @ResultMap to ensure JSONB typeHandlers are applied.
+     * LambdaQueryWrapper + selectList does NOT apply autoResultMap typeHandlers.
+     */
+    @Select("""
+        SELECT * FROM ab_ai_trace_span
+        WHERE trace_id = #{traceId}
+        ORDER BY sequence_order ASC
+    """)
+    @InterceptorIgnore(tenantLine = "true")
+    @ResultMap("mybatis-plus_AiTraceSpan")
+    List<AiTraceSpan> selectByTraceId(@Param("traceId") String traceId);
 
     @Insert("""
         INSERT INTO ab_ai_trace_span (

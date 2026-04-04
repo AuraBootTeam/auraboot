@@ -95,8 +95,8 @@ class TenantBootstrapAuraBotIntegrationTest extends BaseIntegrationTest {
             .as("agent_type must be 'reactive'")
             .isEqualTo("reactive");
         assertThat(agent.get("model"))
-            .as("model must be set to claude-sonnet-4-6")
-            .isEqualTo("claude-sonnet-4-6");
+            .as("model should be null (resolved at runtime from first enabled LLM provider)")
+            .isNull();
         assertThat(((Number) agent.get("max_concurrent_runs")).intValue())
             .as("max_concurrent_runs must be > 0")
             .isGreaterThan(0);
