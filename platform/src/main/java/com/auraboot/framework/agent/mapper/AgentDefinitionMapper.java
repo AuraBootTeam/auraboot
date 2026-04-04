@@ -13,4 +13,7 @@ public interface AgentDefinitionMapper extends BaseMapper<AgentDefinition> {
 
     @Select("SELECT * FROM ab_agent_definition WHERE tenant_id = #{tenantId} AND employee_id IS NOT NULL AND status = 'active' AND (deleted_flag = FALSE OR deleted_flag IS NULL) ORDER BY name")
     List<AgentDefinition> findEmployees(@Param("tenantId") Long tenantId);
+
+    @Select("SELECT * FROM ab_agent_definition WHERE pid = #{pid} AND (deleted_flag = FALSE OR deleted_flag IS NULL)")
+    AgentDefinition findByPid(@Param("pid") String pid);
 }
