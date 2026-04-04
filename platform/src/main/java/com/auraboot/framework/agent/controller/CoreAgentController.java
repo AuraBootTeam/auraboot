@@ -1,8 +1,11 @@
 package com.auraboot.framework.agent.controller;
 
 import com.auraboot.framework.agent.config.AgentProperties;
+import com.auraboot.framework.agent.entity.AgentDefinition;
+import com.auraboot.framework.agent.mapper.AgentDefinitionMapper;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
 import com.auraboot.framework.agent.service.AgentEventDispatchService;
+import com.auraboot.framework.agent.service.AgentOrganizationService;
 import com.auraboot.framework.agent.service.McpServerConfigService;
 import com.auraboot.framework.agent.spi.AgentExecutionService;
 import com.auraboot.framework.application.tenant.MetaContext;
@@ -25,6 +28,8 @@ public class CoreAgentController {
     private final AgentExecutionService agentExecutionService;
     private final McpServerConfigService mcpServerConfigService;
     private final AgentEventDispatchService agentEventDispatchService;
+    private final AgentOrganizationService agentOrganizationService;
+    private final AgentDefinitionMapper agentDefinitionMapper;
 
     @GetMapping("/status")
     public ResponseEntity<Map<String, Object>> getStatus() {
@@ -170,6 +175,59 @@ public class CoreAgentController {
         result.put("matchedAgents", matched);
         result.put("createdTaskPids", taskPids);
         return ResponseEntity.ok(ApiResponse.success(result));
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // Agent Organization Enrollment (Phase 6 — AI Employee)
+    // ──────────────────────────────────────────────────────────────
+
+    /**
+     * Enroll an agent as a digital employee in the organization.
+     *
+     * <p>The agent must have a {@code system_user_id} (set during bootstrap seeding).
+     * Creates an {@code org_employee} record (type=ai) and links it to a service
+     * {@code tenant_member}. Returns the enrolled employee PID for confirmation.</p>
+     *
+     * <p>Request body:
+     * <ul>
+     *   <li>{@code departmentPid} — required, target department PID</li>
+     *   <li>{@code positionPid}   — optional, position PID within the department</li>
+     * </ul>
+     */
+    @PostMapping("/definitions/{agentPid}/enroll-employee")
+    @SuppressWarnings("unchecked")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> enrollAsEmployee(
+            @PathVariable String agentPid,
+            @RequestBody Map<String, Object> body) {
+        AgentDefinition agent = agentDefinitionMapper.findByPid(agentPid);
+        if (agent == null) {
+            return ResponseEntity.ok(ApiResponse.error("Agent not found: " + agentPid));
+        }
+        String departmentPid = (String) body.get("departmentPid");
+        if (departmentPid == null || departmentPid.isBlank()) {
+            return ResponseEntity.ok(ApiResponse.error("departmentPid is required"));
+        }
+        String positionPid = (String) body.get("positionPid");
+
+        agentOrganizationService.enrollAsEmployee(agent.getId(), departmentPid, positionPid);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("agentPid", agentPid);
+        result.put("enrolled", true);
+        return ResponseEntity.ok(ApiResponse.success(result));
+    }
+
+    /**
+     * Remove an agent from the org chart, deactivating its employee record.
+     */
+    @DeleteMapping("/definitions/{agentPid}/enroll-employee")
+    public ResponseEntity<ApiResponse<Void>> removeFromOrg(@PathVariable String agentPid) {
+        AgentDefinition agent = agentDefinitionMapper.findByPid(agentPid);
+        if (agent == null) {
+            return ResponseEntity.ok(ApiResponse.error("Agent not found: " + agentPid));
+        }
+        agentOrganizationService.removeFromOrg(agent.getId());
+        return ResponseEntity.ok(ApiResponse.success());
     }
 
 }
