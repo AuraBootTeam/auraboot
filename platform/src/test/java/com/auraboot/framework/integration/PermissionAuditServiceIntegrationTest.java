@@ -58,7 +58,7 @@ class PermissionAuditServiceIntegrationTest extends BaseIntegrationTest {
         List<PermissionAuditLog> logs = permissionAuditService.getRecentLogs(tenantId, 50);
 
         PermissionAuditLog entry = logs.stream()
-                .filter(l -> TEST_RESOURCE.equals(l.getResourceCode()) && TEST_MEMBER_ID.equals(l.getMemberId()))
+                .filter(l -> TEST_RESOURCE.equals(l.getResourceCode()) && TEST_MEMBER_ID == l.getMemberId())
                 .findFirst()
                 .orElse(null);
 

@@ -113,6 +113,11 @@ public class AuraBotChatService {
         hint.append("- NEVER call the same tool with identical parameters twice.\n");
         hint.append("- Present results as tables in Chinese.\n");
         hint.append("- If a tool fails, explain the error clearly.\n");
+        hint.append("- When using platform_execute_sql for analytics/statistics, ALWAYS set chartType:\n");
+        hint.append("  - 'pie' for distribution/proportion queries (e.g., group by category)\n");
+        hint.append("  - 'bar' for comparison/ranking queries (e.g., top N, amount by stage)\n");
+        hint.append("  - 'line' for time-series/trend queries (e.g., monthly revenue)\n");
+        hint.append("  - 'table' only for raw detail listings\n");
 
         return hint.toString();
     }
