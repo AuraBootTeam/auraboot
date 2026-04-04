@@ -3,6 +3,8 @@ package com.auraboot.framework.permission.engine.impl;
 import com.auraboot.framework.permission.engine.PermissionEvaluator;
 import com.auraboot.framework.permission.engine.evaluator.*;
 import com.auraboot.framework.permission.engine.model.*;
+import com.auraboot.framework.permission.service.PermissionAuditService;
+import com.auraboot.framework.application.tenant.MetaContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -34,6 +36,7 @@ public class PermissionEvaluatorImpl implements PermissionEvaluator {
     private final DataScopeEvaluator dataScopeEvaluator;
     private final PolicyEvaluator policyEvaluator;
     private final FieldPermissionEvaluator fieldPermissionEvaluator;
+    private final PermissionAuditService permissionAuditService;
 
     @Override
     public boolean canAction(Long memberId, String resource, String action) {
@@ -63,7 +66,9 @@ public class PermissionEvaluatorImpl implements PermissionEvaluator {
         EvaluationStep rbacStep = rolePermissionEvaluator.evaluate(memberId, resource, action);
         steps.add(rbacStep);
         if (rbacStep.verdict() == EvaluationVerdict.DENY) {
-            return PermissionResult.deny(rbacStep.reason(), steps);
+            PermissionResult denied = PermissionResult.deny(rbacStep.reason(), steps);
+            auditDeny(memberId, resource, action, null, denied);
+            return denied;
         }
 
         // Step 2: ReBAC (Record Share)
@@ -76,7 +81,9 @@ public class PermissionEvaluatorImpl implements PermissionEvaluator {
             EvaluationStep dataScopeStep = dataScopeEvaluator.evaluate(memberId, resource, action, record);
             steps.add(dataScopeStep);
             if (dataScopeStep.verdict() == EvaluationVerdict.DENY) {
-                return PermissionResult.deny(dataScopeStep.reason(), steps);
+                PermissionResult denied = PermissionResult.deny(dataScopeStep.reason(), steps);
+                auditDeny(memberId, resource, action, null, denied);
+                return denied;
             }
         }
 
@@ -84,7 +91,9 @@ public class PermissionEvaluatorImpl implements PermissionEvaluator {
         EvaluationStep policyStep = policyEvaluator.evaluate(memberId, resource, action, record);
         steps.add(policyStep);
         if (policyStep.verdict() == EvaluationVerdict.DENY) {
-            return PermissionResult.deny(policyStep.reason(), steps);
+            PermissionResult denied = PermissionResult.deny(policyStep.reason(), steps);
+            auditDeny(memberId, resource, action, null, denied);
+            return denied;
         }
 
         // Step 5: FieldPermission (informational only, does not affect grant/deny)
@@ -92,6 +101,24 @@ public class PermissionEvaluatorImpl implements PermissionEvaluator {
         steps.add(fieldStep);
 
         return PermissionResult.allow(steps);
+    }
+
+    /**
+     * Fire-and-forget audit for DENY decisions.
+     *
+     * <p>Never throws — audit must not interfere with the hot-path result.
+     */
+    private void auditDeny(Long memberId, String resource, String action,
+                           Long recordId, PermissionResult denied) {
+        try {
+            Long tenantId = MetaContext.getCurrentTenantId();
+            PermissionExplanation explanation = new PermissionExplanation(
+                    memberId, resource, action, recordId, false, denied.steps());
+            permissionAuditService.logEvaluation(tenantId, explanation);
+        } catch (Exception e) {
+            // CATCH: MetaContext may be unavailable in background / test call paths; audit must never block
+            log.debug("Skipping permission audit — MetaContext unavailable: {}", e.getMessage());
+        }
     }
 
     @Override

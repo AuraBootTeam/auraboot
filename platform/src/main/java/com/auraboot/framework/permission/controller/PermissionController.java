@@ -2,6 +2,7 @@ package com.auraboot.framework.permission.controller;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.permission.dto.PermissionBindRequest;
 import com.auraboot.framework.permission.dto.PermissionCreateRequest;
@@ -9,6 +10,8 @@ import com.auraboot.framework.permission.dto.PermissionDTO;
 import com.auraboot.framework.permission.dto.PermissionReferenceDTO;
 import com.auraboot.framework.permission.dto.PermissionTreeNodeDTO;
 import com.auraboot.framework.permission.dto.PermissionUpdateRequest;
+import com.auraboot.framework.permission.entity.PermissionAuditLog;
+import com.auraboot.framework.permission.service.PermissionAuditService;
 import com.auraboot.framework.permission.service.PermissionService;
 import com.auraboot.framework.plugin.dto.imports.ResourceType;
 import com.auraboot.framework.plugin.service.PluginResourceTracker;
@@ -58,6 +61,7 @@ public class PermissionController {
     
     private final PermissionService permissionService;
     private final PluginResourceTracker pluginResourceTracker;
+    private final PermissionAuditService permissionAuditService;
     
     /**
      * Get permission tree
@@ -370,8 +374,40 @@ public class PermissionController {
     }
     
     /**
+     * Query permission audit log.
+     *
+     * <p>Returns DENY decisions logged by the evaluation pipeline, filtered
+     * by optional memberId or resourceCode. Useful for compliance review.
+     *
+     * @param memberId     optional — filter by member (user) ID
+     * @param resourceCode optional — filter by resource code
+     * @param limit        max results to return (default 50, max 500)
+     * @return list of audit entries, newest first
+     */
+    @GetMapping("/audit")
+    public ApiResponse<List<PermissionAuditLog>> getAuditLog(
+            @RequestParam(required = false) Long memberId,
+            @RequestParam(required = false) String resourceCode,
+            @RequestParam(defaultValue = "50") int limit) {
+
+        int safeLimit = Math.min(limit, 500);
+        Long tenantId = MetaContext.getCurrentTenantId();
+
+        List<PermissionAuditLog> logs;
+        if (memberId != null) {
+            logs = permissionAuditService.getLogsByMember(tenantId, memberId, safeLimit);
+        } else if (resourceCode != null && !resourceCode.isBlank()) {
+            logs = permissionAuditService.getLogsByResource(tenantId, resourceCode, safeLimit);
+        } else {
+            logs = permissionAuditService.getRecentLogs(tenantId, safeLimit);
+        }
+
+        return ApiResponse.success(logs);
+    }
+
+    /**
      * Get permission references
-     * 
+     *
      * <p>Returns all roles that reference this permission.
      * 
      * @param permissionId Permission ID
