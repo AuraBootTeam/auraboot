@@ -2,6 +2,8 @@ package com.auraboot.framework.permission.engine.evaluator;
 
 import com.auraboot.framework.permission.engine.model.EvaluationStep;
 import com.auraboot.framework.permission.engine.model.EvaluationVerdict;
+import com.auraboot.framework.permission.engine.policy.PolicyExpressionEvaluator;
+import com.auraboot.framework.permission.engine.policy.PolicyViolation;
 import com.auraboot.framework.permission.service.PermissionPolicyService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -11,11 +13,19 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Policy evaluator — checks parameter limits and business rules.
+ * Policy evaluator -- checks parameter limits and business rules.
  *
  * <p>Evaluates ABAC-style policies such as amount limits, discount caps, etc.
  * Policies are configured per role+permission in ab_role_permission.conditions JSONB,
  * and merged across roles using permissive rules (max for limits, OR for booleans).
+ *
+ * <p>Supports two evaluation modes:
+ * <ul>
+ *   <li><b>Expression-based</b>: when policy_schema defines operator + field, delegates
+ *       to {@link PolicyExpressionEvaluator} for operator evaluation</li>
+ *   <li><b>Legacy convention</b>: when no schema or no operator defined, uses
+ *       maxXxx/minXxx naming convention</li>
+ * </ul>
  */
 @Component
 @RequiredArgsConstructor
@@ -24,6 +34,7 @@ public class PolicyEvaluator {
     private static final String NAME = "Policy";
 
     private final PermissionPolicyService policyService;
+    private final PolicyExpressionEvaluator expressionEvaluator;
 
     /**
      * Evaluate whether the operation satisfies policy constraints.
@@ -44,7 +55,8 @@ public class PolicyEvaluator {
 
         // If record is provided, validate against policy constraints
         if (record instanceof Map<?, ?> recordMap) {
-            List<String> violations = validateRecord(recordMap, policy);
+            Map<String, Object> policySchema = policyService.getPolicySchema(permissionCode);
+            List<String> violations = validateRecord(recordMap, policy, policySchema);
             if (!violations.isEmpty()) {
                 return new EvaluationStep(NAME, EvaluationVerdict.DENY,
                         "Policy violations: " + String.join(", ", violations));
@@ -57,36 +69,47 @@ public class PolicyEvaluator {
     /**
      * Validate a record against policy constraints.
      *
-     * <p>For max* policy keys, checks if the corresponding record field exceeds the limit.
-     * The field name is derived by removing the "max" prefix and lowering the first char.
-     * e.g., maxApprovalAmount -> approvalAmount
+     * <p>For each policy key:
+     * <ol>
+     *   <li>If policySchema defines a rule with operator + field for this key,
+     *       delegate to {@link PolicyExpressionEvaluator}</li>
+     *   <li>Otherwise, fall back to legacy maxXxx/minXxx naming convention</li>
+     * </ol>
      */
-    private List<String> validateRecord(Map<?, ?> record, Map<String, Object> policy) {
+    @SuppressWarnings("unchecked")
+    private List<String> validateRecord(Map<?, ?> record, Map<String, Object> policy,
+                                         Map<String, Object> policySchema) {
         List<String> violations = new ArrayList<>();
 
         for (Map.Entry<String, Object> entry : policy.entrySet()) {
             String key = entry.getKey();
-            Object limit = entry.getValue();
+            Object policyValue = entry.getValue();
 
-            if (key.startsWith("max") && key.length() > 3 && limit instanceof Number maxVal) {
-                // Derive field name: maxApprovalAmount -> approvalAmount
-                String fieldKey = key.substring(3, 4).toLowerCase() + key.substring(4);
-                Object recordVal = record.get(fieldKey);
-                if (recordVal instanceof Number numVal && numVal.doubleValue() > maxVal.doubleValue()) {
-                    violations.add(key + ": " + numVal + " exceeds limit " + maxVal);
-                }
-            }
+            // Try expression-based evaluation if schema defines this rule
+            Map<String, Object> rule = getSchemaRule(policySchema, key);
 
-            if (key.startsWith("min") && key.length() > 3 && limit instanceof Number minVal) {
-                // Derive field name: minOrderQuantity -> orderQuantity
-                String fieldKey = key.substring(3, 4).toLowerCase() + key.substring(4);
-                Object recordVal = record.get(fieldKey);
-                if (recordVal instanceof Number numVal && numVal.doubleValue() < minVal.doubleValue()) {
-                    violations.add(key + ": " + numVal + " below minimum " + minVal);
-                }
+            PolicyViolation violation = expressionEvaluator.evaluate(key, rule, policyValue, record);
+            if (violation != null) {
+                violations.add(violation.message());
             }
         }
 
         return violations;
+    }
+
+    /**
+     * Get the schema rule definition for a given policy key.
+     * Returns an empty map if no schema or no rule defined (triggers legacy evaluation).
+     */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> getSchemaRule(Map<String, Object> policySchema, String key) {
+        if (policySchema != null) {
+            Object ruleDef = policySchema.get(key);
+            if (ruleDef instanceof Map<?, ?> ruleMap) {
+                return (Map<String, Object>) ruleMap;
+            }
+        }
+        // No schema or no rule for this key -- return empty map to trigger legacy evaluation
+        return Map.of();
     }
 }
