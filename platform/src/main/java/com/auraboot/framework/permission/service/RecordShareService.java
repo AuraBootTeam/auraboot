@@ -59,4 +59,23 @@ public interface RecordShareService {
      * @return list of record IDs
      */
     List<Long> getSharedRecordIds(Long tenantId, String resourceCode, Long memberId, String action);
+
+    /**
+     * List all shares for a specific record.
+     *
+     * @param tenantId     tenant ID
+     * @param resourceCode model/resource code
+     * @param recordId     record ID
+     * @return list of share entries (non-expired)
+     */
+    java.util.List<com.auraboot.framework.permission.entity.RecordShare> listByRecord(
+            Long tenantId, String resourceCode, Long recordId);
+
+    /**
+     * Remove a share by its ID.
+     *
+     * @param tenantId tenant ID (for security verification)
+     * @param shareId  share record ID
+     */
+    void removeById(Long tenantId, Long shareId);
 }
