@@ -157,11 +157,9 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
     }
 
     private boolean isToolUnsupportedProvider(String model) {
-        if (model == null || model.isBlank()) {
-            return false;
-        }
-        String normalized = model.toLowerCase(Locale.ROOT);
-        return normalized.contains("minimax") || normalized.contains("abab");
+        // MiniMax-M2.5+ supports OpenAI-compatible function calling.
+        // Only disable for truly unsupported providers if discovered later.
+        return false;
     }
 
     // =========================================================================

@@ -770,7 +770,7 @@ public class TenantBootstrapServiceImpl implements TenantBootstrapService {
         agent.put("description",
             "Platform-native AI assistant with full access to all models, commands, and tools.");
         agent.put("agent_type", "reactive");
-        agent.put("model", "claude-sonnet-4-6");
+        agent.put("model", null); // resolved at runtime from the first enabled LLM provider
         agent.put("system_prompt",
             "You are AuraBot, the intelligent assistant for this platform. " +
             "Help users accomplish their tasks efficiently.");
