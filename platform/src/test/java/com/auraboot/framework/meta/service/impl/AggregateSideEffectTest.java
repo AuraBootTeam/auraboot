@@ -45,6 +45,11 @@ class AggregateSideEffectTest {
     private static final Long TENANT_ID = 1L;
     private static final Long USER_ID = 100L;
 
+    @SuppressWarnings("unchecked")
+    private ArgumentCaptor<Map<String, Object>> mapCaptor() {
+        return ArgumentCaptor.forClass(Map.class);
+    }
+
     @BeforeEach
     void setUp() {
         executor = new CommandSideEffectExecutor(dynamicDataMapper, dynamicDataService, metaModelService, spelEvaluator, documentFlowService, objectMapper);
@@ -91,7 +96,7 @@ class AggregateSideEffectTest {
 
         executeAggregate(currentRecord, Map.of(), children);
 
-        ArgumentCaptor<Map<String, Object>> dataCaptor = ArgumentCaptor.forClass(Map.class);
+        ArgumentCaptor<Map<String, Object>> dataCaptor = mapCaptor();
         verify(dynamicDataMapper).update(eq("mt_pm_order"), dataCaptor.capture(), anyMap());
 
         Map<String, Object> updateData = dataCaptor.getValue();
@@ -106,7 +111,7 @@ class AggregateSideEffectTest {
 
         executeAggregate(currentRecord, Map.of(), List.of());
 
-        ArgumentCaptor<Map<String, Object>> dataCaptor = ArgumentCaptor.forClass(Map.class);
+        ArgumentCaptor<Map<String, Object>> dataCaptor = mapCaptor();
         verify(dynamicDataMapper).update(eq("mt_pm_order"), dataCaptor.capture(), anyMap());
 
         assertEquals(BigDecimal.ZERO, dataCaptor.getValue().get("total_amount"));
@@ -129,7 +134,7 @@ class AggregateSideEffectTest {
 
         executeAggregate(currentRecord, Map.of(), children);
 
-        ArgumentCaptor<Map<String, Object>> dataCaptor = ArgumentCaptor.forClass(Map.class);
+        ArgumentCaptor<Map<String, Object>> dataCaptor = mapCaptor();
         verify(dynamicDataMapper).update(eq("mt_pm_order"), dataCaptor.capture(), anyMap());
 
         assertEquals(new BigDecimal("200"), dataCaptor.getValue().get("total_amount"));
@@ -165,7 +170,7 @@ class AggregateSideEffectTest {
         Map<String, Object> execConfig = Map.of("sideEffects", List.of(effect));
         executor.executeSideEffectPhase(execConfig, currentRecord, TENANT_ID, USER_ID, null, null, null);
 
-        ArgumentCaptor<Map<String, Object>> dataCaptor = ArgumentCaptor.forClass(Map.class);
+        ArgumentCaptor<Map<String, Object>> dataCaptor = mapCaptor();
         verify(dynamicDataMapper).update(eq("mt_pm_purchase_order"), dataCaptor.capture(), anyMap());
 
         // 500 as integer -> BigDecimal.valueOf(500.0)

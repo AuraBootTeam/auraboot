@@ -595,7 +595,7 @@ public class TenantMemberApplicationServiceImpl implements TenantMemberApplicati
         employeeData.put(EMP_EMAIL, email);
         employeeData.put(EMP_PHONE, phone);
         employeeData.put(EMP_STATUS, memberStatus);
-        employeeData.put(EMP_TYPE, "full_time");
+        employeeData.put(EMP_TYPE, "human");
         employeeData.put(EMP_MEMBER_ID, member.getPid());
         employeeData.put(EMP_USER_ID, user.getPid());
         if (deptPid != null) {

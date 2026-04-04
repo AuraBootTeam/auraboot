@@ -49,6 +49,11 @@ class CommandSideEffectAggregateTest {
     private static final Long TENANT_ID = 1L;
     private static final Long USER_ID = 100L;
 
+    @SuppressWarnings("unchecked")
+    private ArgumentCaptor<Map<String, Object>> mapCaptor() {
+        return ArgumentCaptor.forClass(Map.class);
+    }
+
     @BeforeEach
     void setUp() {
         executor = new CommandSideEffectExecutor(dynamicDataMapper, dynamicDataService, metaModelService, spelEvaluator, documentFlowService, objectMapper);
@@ -83,7 +88,7 @@ class CommandSideEffectAggregateTest {
         Map<String, Object> execConfig = Map.of("sideEffects", List.of(effect));
         executor.executeSideEffectPhase(execConfig, currentRecord, TENANT_ID, USER_ID, null, null, null);
 
-        ArgumentCaptor<Map<String, Object>> dataCaptor = ArgumentCaptor.forClass(Map.class);
+        ArgumentCaptor<Map<String, Object>> dataCaptor = mapCaptor();
         verify(dynamicDataMapper).update(eq("mt_pm_order"), dataCaptor.capture(), anyMap());
         return dataCaptor.getValue();
     }

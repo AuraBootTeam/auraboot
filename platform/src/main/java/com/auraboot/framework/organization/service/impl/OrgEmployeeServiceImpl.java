@@ -76,7 +76,7 @@ public class OrgEmployeeServiceImpl implements OrgEmployeeService {
         empData.put(EMP_USER_ID, user.getPid());
         empData.put(EMP_MEMBER_ID, member.getPid());
         empData.put(EMP_STATUS, StatusConstants.ACTIVE);
-        empData.put(EMP_TYPE, "full_time");
+        empData.put(EMP_TYPE, "human");
 
         Map<String, Object> created = dynamicDataService.create(MODEL_EMPLOYEE, empData);
         String employeePid = (String) created.get("pid");
@@ -121,7 +121,7 @@ public class OrgEmployeeServiceImpl implements OrgEmployeeService {
         empData.put(EMP_MEMBER_ID, member.getPid());
         empData.put(EMP_USER_ID, user.getPid());
         empData.put(EMP_STATUS, StatusConstants.ACTIVE);
-        empData.put(EMP_TYPE, "full_time");
+        empData.put(EMP_TYPE, "human");
 
         if (request.getPositionPid() != null) {
             empData.put(EMP_POSITION_ID, request.getPositionPid());
