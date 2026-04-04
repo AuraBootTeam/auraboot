@@ -6,15 +6,15 @@ import com.auraboot.framework.permission.engine.model.FieldPermissionSet;
 import com.auraboot.framework.permission.engine.model.PermissionExplanation;
 import com.auraboot.framework.permission.engine.model.PermissionResult;
 import com.auraboot.framework.permission.service.FieldPermissionService;
+import com.auraboot.framework.permission.service.PermissionFacade;
 import com.auraboot.framework.permission.service.PermissionPolicyService;
-import com.auraboot.framework.permission.service.UnifiedPermissionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
 
 /**
- * Default implementation of {@link UnifiedPermissionService}.
+ * Default implementation of {@link PermissionFacade}.
  *
  * <p>Simple facade that delegates to the appropriate specialized service:
  * <ul>
@@ -25,7 +25,7 @@ import java.util.Map;
  */
 @Service
 @RequiredArgsConstructor
-public class UnifiedPermissionServiceImpl implements UnifiedPermissionService {
+public class PermissionFacadeImpl implements PermissionFacade {
 
     private final PermissionEvaluator evaluator;
     private final PermissionPolicyService policyService;

@@ -8,7 +8,7 @@ import com.auraboot.framework.permission.engine.model.PermissionResult;
 import java.util.Map;
 
 /**
- * Unified permission facade — single entry point for all permission capabilities.
+ * Permission facade — single entry point for all permission capabilities.
  *
  * <p>Wraps the following services into one cohesive API:
  * <ul>
@@ -16,11 +16,8 @@ import java.util.Map;
  *   <li>{@code PermissionPolicyService} — parameterized policy values</li>
  *   <li>{@code FieldPermissionService} — field-level visibility/editability</li>
  * </ul>
- *
- * <p>Named {@code UnifiedPermissionService} to avoid conflict with the existing
- * {@code PermissionService} which is CRUD-focused on permission entity management.
  */
-public interface UnifiedPermissionService {
+public interface PermissionFacade {
 
     /**
      * Action-level check — does the member have the action permission via RBAC?
