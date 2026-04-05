@@ -282,13 +282,11 @@ public class AutoPermissionAssignmentService {
     }
 
     /**
-     * VIEWER gets only read actions, others get all.
+     * Delegate to template's filter-based shouldAssign method.
+     * VIEWER gets read actions + non-leaf nodes; others get all.
      */
     private boolean shouldAssignPermission(RolePermissionTemplate template, Permission permission) {
-        if (template == RolePermissionTemplate.VIEWER) {
-            return "read".equals(permission.getAction());
-        }
-        return true;
+        return template.shouldAssign(permission);
     }
 
     private void bindPermissionToRole(Long roleId, Long permissionId) {
