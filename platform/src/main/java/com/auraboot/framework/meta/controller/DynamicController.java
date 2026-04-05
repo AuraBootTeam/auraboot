@@ -79,7 +79,7 @@ public class DynamicController {
 
     @GetMapping("/{pageKey}/list")
     @Operation(summary = "分页查询数据", description = "根据页面定义进行分页查询。当页面DSL指定dataSource.type='namedQuery'时，前端传入queryCode参数直接执行NamedQuery。")
-    @RequirePermission("dynamic.{pageKey}.read")
+    @RequirePermission("model.{pageKey}.read")
     public ApiResponse<PaginationResult<Map<String, Object>>> list(
             @Parameter(description = "页面Key")
             @PathVariable String pageKey,
@@ -164,7 +164,7 @@ public class DynamicController {
      */
     @GetMapping("/{pageKey}/filter-schema")
     @Operation(summary = "获取过滤器Schema", description = "返回页面的过滤字段定义，用于自动生成搜索面板")
-    @RequirePermission("dynamic.{pageKey}.read")
+    @RequirePermission("model.{pageKey}.read")
     public ApiResponse<List<NamedQueryFieldDTO>> getFilterSchema(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @Parameter(description = "NamedQuery code") @RequestParam String queryCode) {
@@ -306,7 +306,7 @@ public class DynamicController {
      */
     @GetMapping("/{pageKey}/{recordId}")
     @Operation(summary = "获取单条数据", description = "根据ID获取单条数据")
-    @RequirePermission("dynamic.{pageKey}.read")
+    @RequirePermission("model.{pageKey}.read")
     public ApiResponse<Map<String, Object>> getById(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @Parameter(description = "记录ID") @PathVariable String recordId) {
@@ -324,7 +324,7 @@ public class DynamicController {
     @GetMapping("/{pageKey}/{recordId}/capabilities")
     @Operation(summary = "Get record capabilities",
             description = "Returns available actions for a record, filtered by user permissions, record state, platform, and context")
-    @RequirePermission("dynamic.{pageKey}.read")
+    @RequirePermission("model.{pageKey}.read")
     public ApiResponse<RecordCapabilities> getRecordCapabilities(
             @Parameter(description = "Page key") @PathVariable String pageKey,
             @Parameter(description = "Record ID") @PathVariable String recordId,
@@ -345,7 +345,7 @@ public class DynamicController {
      */
     @PostMapping("/{pageKey}/create")
     @Operation(summary = "创建数据", description = "根据页面定义创建新数据")
-    @RequirePermission("dynamic.{pageKey}.create")
+    @RequirePermission("model.{pageKey}.create")
     public ApiResponse<Object> create(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @RequestBody Map<String, Object> data) {
@@ -361,7 +361,7 @@ public class DynamicController {
      */
     @PostMapping("/{pageKey}")
     @Operation(summary = "创建数据（兼容）", description = "根据页面定义创建新数据（兼容旧DSL格式）")
-    @RequirePermission("dynamic.{pageKey}.create")
+    @RequirePermission("model.{pageKey}.create")
     public ApiResponse<Object> createCompat(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @RequestBody Map<String, Object> data) {
@@ -373,7 +373,7 @@ public class DynamicController {
      */
     @PutMapping("/{pageKey}/{recordId}")
     @Operation(summary = "更新数据", description = "根据页面定义更新数据")
-    @RequirePermission("dynamic.{pageKey}.manage")
+    @RequirePermission("model.{pageKey}.update")
     public ApiResponse<Map<String, Object>> update(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @Parameter(description = "记录ID") @PathVariable String recordId,
@@ -389,7 +389,7 @@ public class DynamicController {
      */
     @DeleteMapping("/{pageKey}/{recordId}")
     @Operation(summary = "删除数据", description = "根据页面定义删除数据")
-    @RequirePermission("dynamic.{pageKey}.manage")
+    @RequirePermission("model.{pageKey}.delete")
     public ApiResponse<Void> delete(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @Parameter(description = "记录ID") @PathVariable String recordId) {
@@ -404,7 +404,7 @@ public class DynamicController {
      */
     @PostMapping("/{pageKey}/batch")
     @Operation(summary = "批量创建数据", description = "根据页面定义批量创建数据")
-    @RequirePermission("dynamic.{pageKey}.manage")
+    @RequirePermission("model.{pageKey}.create")
     public ApiResponse<DynamicBatchResponse> batchCreate(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @RequestBody List<Map<String, Object>> dataList) {
@@ -422,7 +422,7 @@ public class DynamicController {
      */
     @PutMapping("/{pageKey}/batch")
     @Operation(summary = "批量更新数据", description = "根据页面定义批量更新数据")
-    @RequirePermission("dynamic.{pageKey}.manage")
+    @RequirePermission("model.{pageKey}.update")
     public ApiResponse<DynamicBatchResponse> batchUpdate(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @RequestBody List<Map<String, Object>> dataList) {
@@ -440,7 +440,7 @@ public class DynamicController {
      */
     @DeleteMapping("/{pageKey}/batch")
     @Operation(summary = "批量删除数据", description = "根据页面定义批量删除数据")
-    @RequirePermission("dynamic.{pageKey}.manage")
+    @RequirePermission("model.{pageKey}.delete")
     public ApiResponse<Void> batchDelete(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @RequestBody List<String> recordIds) {
@@ -458,7 +458,7 @@ public class DynamicController {
      */
     @PostMapping("/{pageKey}/validate")
     @Operation(summary = "验证数据", description = "根据页面定义验证数据")
-    @RequirePermission("dynamic.{pageKey}.read")
+    @RequirePermission("model.{pageKey}.read")
     public ApiResponse<Map<String, Object>> validate(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @RequestBody Map<String, Object> data) {
@@ -484,7 +484,7 @@ public class DynamicController {
      */
     @GetMapping("/{pageKey}/field-options/{fieldName}")
     @Operation(summary = "获取字段选项", description = "获取指定字段的选项列表")
-    @RequirePermission("dynamic.{pageKey}.read")
+    @RequirePermission("model.{pageKey}.read")
     public ApiResponse<List<Map<String, Object>>> getFieldOptions(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @Parameter(description = "字段名称") @PathVariable String fieldName,
@@ -517,7 +517,7 @@ public class DynamicController {
      */
     @PostMapping("/{pageKey}/query/{queryName}")
     @Operation(summary = "执行自定义查询", description = "执行页面定义的自定义查询")
-    @RequirePermission("dynamic.{pageKey}.read")
+    @RequirePermission("model.{pageKey}.read")
     public ApiResponse<List<Map<String, Object>>> executeCustomQuery(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @Parameter(description = "查询名称") @PathVariable String queryName,
@@ -533,7 +533,7 @@ public class DynamicController {
      */
     @PostMapping("/{pageKey}/action/{actionName}")
     @Operation(summary = "执行自定义操作", description = "执行页面定义的自定义操作")
-    @RequirePermission("dynamic.{pageKey}.manage")
+    @RequirePermission("model.{pageKey}.update")
     public ApiResponse<Map<String, Object>> executeCustomAction(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @Parameter(description = "操作名称") @PathVariable String actionName,
@@ -559,7 +559,7 @@ public class DynamicController {
      */
     @PostMapping("/{pageKey}/export")
     @Operation(summary = "导出数据", description = "根据页面定义导出数据")
-    @RequirePermission("dynamic.{pageKey}.read")
+    @RequirePermission("model.{pageKey}.export")
     public ApiResponse<Map<String, Object>> exportData(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @RequestBody(required = false) Map<String, Object> exportParams) {
@@ -640,7 +640,7 @@ public class DynamicController {
      */
     @GetMapping("/{pageKey}/download")
     @Operation(summary = "下载导出文件", description = "下载导出的CSV文件")
-    @RequirePermission("dynamic.{pageKey}.read")
+    @RequirePermission("model.{pageKey}.export")
     public void downloadExport(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @Parameter(description = "文件路径") @RequestParam String file,
@@ -693,7 +693,7 @@ public class DynamicController {
      */
     @PostMapping("/{pageKey}/import")
     @Operation(summary = "导入数据", description = "根据页面定义导入数据")
-    @RequirePermission("dynamic.{pageKey}.manage")
+    @RequirePermission("model.{pageKey}.import")
     public ApiResponse<Map<String, Object>> importData(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @RequestBody(required = false) Map<String, Object> importParams) {
@@ -725,7 +725,7 @@ public class DynamicController {
      */
     @PostMapping("/{pageKey}/stats")
     @Operation(summary = "获取统计信息", description = "获取页面数据的统计信息")
-    @RequirePermission("dynamic.{pageKey}.read")
+    @RequirePermission("model.{pageKey}.read")
     public ApiResponse<Map<String, Object>> getStats(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @RequestBody(required = false) Map<String, Object> statsParams) {
@@ -742,7 +742,7 @@ public class DynamicController {
      */
     @GetMapping("/{pageKey}/{recordId}/relations/{relationName}")
     @Operation(summary = "获取关联数据", description = "获取指定记录的关联数据")
-    @RequirePermission("dynamic.{pageKey}.read")
+    @RequirePermission("model.{pageKey}.read")
     public ApiResponse<List<Map<String, Object>>> getRelationData(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @Parameter(description = "记录ID") @PathVariable String recordId,
@@ -766,7 +766,7 @@ public class DynamicController {
     @GetMapping("/{pageKey}/meta")
     @Operation(summary = "Rich page metadata for mobile/external integrations",
             description = "Returns model fields, DSL schema, user permissions, and available view types for a page")
-    @RequirePermission("dynamic.{pageKey}.read")
+    @RequirePermission("model.{pageKey}.read")
     public ApiResponse<PageMetaResponse> getMeta(
             @Parameter(description = "页面Key") @PathVariable String pageKey) {
 
@@ -899,21 +899,23 @@ public class DynamicController {
                     .build();
         }
 
-        boolean canRead   = userPermissionService.hasPermission(userId, "dynamic." + pageKey + ".read");
-        boolean canCreate = userPermissionService.hasPermission(userId, "dynamic." + pageKey + ".create");
-        boolean canManage = userPermissionService.hasPermission(userId, "dynamic." + pageKey + ".manage");
+        boolean canRead   = userPermissionService.hasPermission(userId, "model." + pageKey + ".read");
+        boolean canCreate = userPermissionService.hasPermission(userId, "model." + pageKey + ".create");
+        boolean canUpdate = userPermissionService.hasPermission(userId, "model." + pageKey + ".update");
+        boolean canDelete = userPermissionService.hasPermission(userId, "model." + pageKey + ".delete");
+        boolean canExport = userPermissionService.hasPermission(userId, "model." + pageKey + ".export");
 
         return PageMetaResponse.Permissions.builder()
-                .canCreate(canCreate || canManage)
-                .canUpdate(canManage)
-                .canDelete(canManage)
-                .canExport(canRead || canManage)
+                .canCreate(canCreate)
+                .canUpdate(canUpdate)
+                .canDelete(canDelete)
+                .canExport(canRead || canExport)
                 .build();
     }
 
     @GetMapping("/{pageKey}/metadata")
     @Operation(summary = "获取页面元数据", description = "根据模型元数据返回页面基础字段信息")
-    @RequirePermission("dynamic.{pageKey}.read")
+    @RequirePermission("model.{pageKey}.read")
     public ApiResponse<Map<String, Object>> getPageMetadata(
             @Parameter(description = "页面Key") @PathVariable String pageKey) {
         log.info("获取页面元数据: {}", pageKey);
@@ -977,7 +979,7 @@ public class DynamicController {
      */
     @PostMapping("/{pageKey}/joint-save")
     @Operation(summary = "联合保存主表和子表", description = "在单个事务中保存主表及其关联的子表数据")
-    @RequirePermission("dynamic.{pageKey}.manage")
+    @RequirePermission("model.{pageKey}.update")
     public ApiResponse<JointSubTableSaveResponse> saveWithRelations(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @RequestBody JointSubTableSaveRequest request) {
