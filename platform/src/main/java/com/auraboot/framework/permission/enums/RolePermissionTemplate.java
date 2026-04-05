@@ -1,140 +1,73 @@
 package com.auraboot.framework.permission.enums;
 
+import com.auraboot.framework.permission.entity.Permission;
 import lombok.Getter;
 
-import java.util.List;
-import java.util.stream.Collectors;
+import java.util.function.Predicate;
 
 /**
  * Role Permission Template Enum
- * 
- * <p>Defines permission templates for different role types.
- * When a new resource is created, permissions are automatically
- * generated and assigned to roles based on these templates.
- * 
- * <p>Template Variables:
+ *
+ * <p>Defines permission assignment filters for different role types.
+ * Uses filter-based approach: each role has a predicate that determines
+ * whether a given permission should be assigned to that role.
+ *
+ * <p>Filter types:
  * <ul>
- *   <li>{@code {resource_type}} - Resource type (e.g., MODEL, PAGE)</li>
- *   <li>{@code {resource_code}} - Resource code (e.g., model, publish)</li>
+ *   <li>ALL — assign all permissions (module, resource, action nodes)</li>
+ *   <li>READ_ONLY — assign only "read" action nodes + all non-leaf nodes (modules, resources)</li>
  * </ul>
- * 
- * <p>Role Types:
- * <ul>
- *   <li>TENANT_ADMIN - Full access to all resources</li>
- *   <li>DEVELOPER - Full access to development resources</li>
- *   <li>VIEWER - Read-only access to all resources</li>
- * </ul>
- * 
+ *
  * @author AuraBoot Platform
- * @version 1.0.0
+ * @version 2.0.0
  * @since 2025-01-08
  */
 @Getter
 public enum RolePermissionTemplate {
-    
+
     /**
-     * Tenant Admin Role Template
-     * 
-     * <p>Full access to all resources within the tenant.
-     * 
-     * <p>permissions:
-     * <ul>
-     *   <li>manage - Full CRUD access</li>
-     *   <li>read - Read access</li>
-     * </ul>
+     * Tenant Admin Role — full access to all permissions.
      */
-    TENANT_ADMIN("tenant_admin", List.of(
-        "{resource_type}.{resource_code}.manage",
-        "{resource_type}.{resource_code}.read"
-    )),
-    
+    TENANT_ADMIN("tenant_admin", PermissionFilter.ALL),
+
     /**
-     * Developer Role Template
-     * 
-     * <p>Full access to development resources.
-     * 
-     * <p>permissions:
-     * <ul>
-     *   <li>manage - Full CRUD access</li>
-     *   <li>read - Read access</li>
-     * </ul>
+     * Developer Role — full access to all permissions.
      */
-    DEVELOPER("developer", List.of(
-        "{resource_type}.{resource_code}.manage",
-        "{resource_type}.{resource_code}.read"
-    )),
-    
+    DEVELOPER("developer", PermissionFilter.ALL),
+
     /**
-     * Viewer Role Template
-     * 
-     * <p>Read-only access to all resources.
-     * 
-     * <p>permissions:
-     * <ul>
-     *   <li>read - Read access only</li>
-     * </ul>
+     * Viewer Role — read-only action nodes + all non-leaf (module/resource) nodes.
      */
-    VIEWER("viewer", List.of(
-        "{resource_type}.{resource_code}.read"
-    ));
-    
+    VIEWER("viewer", PermissionFilter.READ_ONLY);
+
     /**
-     * Role code (matches role code in database)
+     * Role code (matches role code in database).
      */
     private final String roleCode;
-    
+
     /**
-     * Permission code templates
-     * 
-     * <p>Templates use placeholders:
-     * <ul>
-     *   <li>{@code {resource_type}} - Will be replaced with actual resource type</li>
-     *   <li>{@code {resource_code}} - Will be replaced with actual resource code</li>
-     * </ul>
+     * Permission filter predicate.
      */
-    private final List<String> permissionTemplates;
-    
-    /**
-     * Constructor
-     * 
-     * @param roleCode Role code
-     * @param permissionTemplates Permission code templates
-     */
-    RolePermissionTemplate(String roleCode, List<String> permissionTemplates) {
+    private final Predicate<Permission> filter;
+
+    RolePermissionTemplate(String roleCode, Predicate<Permission> filter) {
         this.roleCode = roleCode;
-        this.permissionTemplates = permissionTemplates;
+        this.filter = filter;
     }
-    
+
     /**
-     * Generate permission codes for a specific resource
-     * 
-     * <p>Replaces template variables with actual values:
-     * <ul>
-     *   <li>{@code {resource_type}} → resourceType</li>
-     *   <li>{@code {resource_code}} → resourceCode</li>
-     * </ul>
-     * 
-     * <p>Example:
-     * <pre>
-     * RolePermissionTemplate.TENANT_ADMIN.generatePermissions("model", "user_model")
-     * → ["model.user_model.manage", "model.user_model.read"]
-     * </pre>
-     * 
-     * @param resourceType Resource type (e.g., "model")
-     * @param resourceCode Resource code (e.g., "user_model")
-     * @return List of permission codes
+     * Determine whether a permission should be assigned to this role.
+     *
+     * @param permission Permission to check
+     * @return true if the permission should be assigned
      */
-    public List<String> generatePermissions(String resourceType, String resourceCode) {
-        return permissionTemplates.stream()
-            .map(template -> template
-                .replace("{resource_type}", resourceType)
-                .replace("{resource_code}", resourceCode))
-            .collect(Collectors.toList());
+    public boolean shouldAssign(Permission permission) {
+        return filter.test(permission);
     }
-    
+
     /**
-     * Find template by role code
-     * 
+     * Find template by role code.
+     *
      * @param roleCode Role code to search for
      * @return RolePermissionTemplate or null if not found
      */
@@ -142,23 +75,51 @@ public enum RolePermissionTemplate {
         if (roleCode == null) {
             return null;
         }
-        
         for (RolePermissionTemplate template : values()) {
             if (template.roleCode.equalsIgnoreCase(roleCode)) {
                 return template;
             }
         }
-        
         return null;
     }
-    
+
     /**
-     * Check if role code has a template
-     * 
+     * Check if role code has a template.
+     *
      * @param roleCode Role code to check
-     * @return true if template exists, false otherwise
+     * @return true if template exists
      */
     public static boolean hasTemplate(String roleCode) {
         return findByRoleCode(roleCode) != null;
+    }
+
+    // ========================================================================
+    // Permission Filters
+    // ========================================================================
+
+    /**
+     * Permission filter predicates for role assignment.
+     */
+    private static final class PermissionFilter {
+
+        /**
+         * ALL — always returns true, assigns all permissions.
+         */
+        static final Predicate<Permission> ALL = permission -> true;
+
+        /**
+         * READ_ONLY — assigns "read" action nodes + all non-leaf nodes.
+         * Non-leaf nodes (level != 3 or level == null) are always included
+         * so the hierarchy tree remains navigable for viewers.
+         */
+        static final Predicate<Permission> READ_ONLY = permission -> {
+            Integer level = permission.getLevel();
+            // Non-leaf nodes (module/resource) are always assigned
+            if (level == null || level != 3) {
+                return true;
+            }
+            // Leaf nodes: only "read" action
+            return "read".equals(permission.getAction());
+        };
     }
 }

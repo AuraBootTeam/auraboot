@@ -1,6 +1,7 @@
 package com.auraboot.framework.tenant.service.impl;
 
 import com.auraboot.framework.common.util.UniqueIdGenerator;
+import com.auraboot.framework.permission.enums.RolePermissionTemplate;
 import com.auraboot.framework.i18n.entity.I18nResource;
 import com.auraboot.framework.i18n.service.I18nResourceService;
 import com.auraboot.framework.menu.constant.MenuStatus;
@@ -563,56 +564,30 @@ public class TenantBootstrapServiceImpl implements TenantBootstrapService {
     private int assignSystemPermissionsToRoles(
             Map<String, Role> roleMap,
             List<com.auraboot.framework.permission.entity.Permission> systemPermissions) {
-        
-        log.info("开始分配系统级Permission给角色: roleCount={}, permissionCount={}", 
+
+        log.info("开始分配系统级Permission给角色: roleCount={}, permissionCount={}",
             roleMap.size(), systemPermissions.size());
-        
+
         int totalAssigned = 0;
-        
-        // 提取所有Permission IDs
-        List<Long> allPermissionIds = systemPermissions.stream()
-            .map(com.auraboot.framework.permission.entity.Permission::getId)
-            .toList();
-        
-        // 提取read Permission IDs
-        List<Long> readPermissionIds = systemPermissions.stream()
-            .filter(c -> c.getCode().endsWith(".read"))
-            .map(com.auraboot.framework.permission.entity.Permission::getId)
-            .toList();
-        
-        // tenant_admin: all system permissions
-        Role tenantAdmin = roleMap.get("tenant_admin");
-        if (tenantAdmin != null) {
-            rolePermissionService.assignPermissionsToRole(
-                tenantAdmin.getId(),
-                allPermissionIds
-            );
-            totalAssigned += allPermissionIds.size();
-            log.info("tenant_admin角色Permission分配完成: count={}", allPermissionIds.size());
-        } else {
-            log.warn("tenant_admin角色不存在,跳过Permission分配");
-        }
 
-        // developer: all system permissions
-        Role developer = roleMap.get("developer");
-        if (developer != null) {
-            rolePermissionService.assignPermissionsToRole(
-                developer.getId(),
-                allPermissionIds
-            );
-            totalAssigned += allPermissionIds.size();
-            log.info("developer角色Permission分配完成: count={}", allPermissionIds.size());
-        }
+        for (Map.Entry<String, Role> entry : roleMap.entrySet()) {
+            Role role = entry.getValue();
+            RolePermissionTemplate template = RolePermissionTemplate.findByRoleCode(entry.getKey());
+            if (template == null) {
+                log.debug("No template for role: {}", entry.getKey());
+                continue;
+            }
 
-        // viewer: read-only permissions
-        Role viewer = roleMap.get("viewer");
-        if (viewer != null && !readPermissionIds.isEmpty()) {
-            rolePermissionService.assignPermissionsToRole(
-                viewer.getId(),
-                readPermissionIds
-            );
-            totalAssigned += readPermissionIds.size();
-            log.info("VIEWER角色Permission分配完成: count={}", readPermissionIds.size());
+            List<Long> filteredIds = systemPermissions.stream()
+                .filter(template::shouldAssign)
+                .map(com.auraboot.framework.permission.entity.Permission::getId)
+                .toList();
+
+            if (!filteredIds.isEmpty()) {
+                rolePermissionService.assignPermissionsToRole(role.getId(), filteredIds);
+                totalAssigned += filteredIds.size();
+                log.info("{}角色Permission分配完成: count={}", entry.getKey(), filteredIds.size());
+            }
         }
 
         log.info("系统级Permission分配完成: totalAssigned={}", totalAssigned);
