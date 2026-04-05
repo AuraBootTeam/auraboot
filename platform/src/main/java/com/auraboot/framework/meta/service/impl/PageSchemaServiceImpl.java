@@ -77,8 +77,8 @@ public class PageSchemaServiceImpl implements PageSchemaService {
         // 自动分配 permissions
         try {
             autoPermissionAssignmentService.autoAssignPermissions(
-                "page",
-                pageSchema.getName() // 使用页面名称作为resource_code
+                pageSchema.getName(), // modelCode (page name as resource code)
+                null
             );
             log.info("Auto permission assignment completed for page: {}", pageSchema.getName());
         } catch (Exception e) {

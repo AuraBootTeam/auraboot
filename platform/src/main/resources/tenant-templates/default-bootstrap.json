@@ -55,6 +55,26 @@
       "resourceType": "menu"
     },
     {
+      "code": "page.page.read",
+      "name": "页面配置读取",
+      "description": "读取和查看页面配置（Schema）",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:page-schema",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "page.page.manage",
+      "name": "页面配置管理",
+      "description": "创建、更新、删除和发布页面配置（Schema）",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:page-schema",
+      "action": "manage",
+      "resourceType": "function"
+    },
+    {
       "code": "named_query_management",
       "name": "命名查询管理",
       "description": "访问和管理命名查询",
