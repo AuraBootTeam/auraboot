@@ -1136,7 +1136,7 @@ public class PluginImportServiceImpl implements PluginImportService {
         }
 
         // Post-processing: Auto-publish DRAFT models and sync PUBLISHED models
-        autoPublishAndSyncModels(importedModelCodes, request);
+        autoPublishAndSyncModels(importedModelCodes, request, manifest.getNamespace());
 
         // Post-processing: Auto-link menus to pages by pageKey
         linkMenusToPages(pluginPid, tenantId);
@@ -1149,7 +1149,7 @@ public class PluginImportServiceImpl implements PluginImportService {
      * For DRAFT models: publish.
      * For PUBLISHED ENTITY models: sync schema (adds any new columns from new field bindings).
      */
-    private void autoPublishAndSyncModels(List<String> modelCodes, ImportRequest request) {
+    private void autoPublishAndSyncModels(List<String> modelCodes, ImportRequest request, String pluginNamespace) {
         if (modelCodes.isEmpty() || !Boolean.TRUE.equals(request.getAutoPublishModels())) {
             return;
         }
@@ -1179,8 +1179,8 @@ public class PluginImportServiceImpl implements PluginImportService {
                     log.warn("Schema sync failed for {}: {}", modelCode, syncResult.getErrorMessage());
                 }
 
-                // Ensure DYNAMIC permissions exist (idempotent — skips if already created)
-                autoPermissionAssignmentService.autoAssignPermissions("dynamic", modelCode);
+                // Ensure hierarchical permissions exist (idempotent — skips if already created)
+                autoPermissionAssignmentService.autoAssignPermissions(modelCode, pluginNamespace);
             }
         }
     }

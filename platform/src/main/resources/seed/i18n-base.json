@@ -486,6 +486,106 @@
     "en-US": "Menu"
   },
   {
+    "key": "permission.module.platform",
+    "zh-CN": "平台管理",
+    "en-US": "Platform"
+  },
+  {
+    "key": "permission.module.rbac",
+    "zh-CN": "角色权限",
+    "en-US": "Roles & Permissions"
+  },
+  {
+    "key": "permission.module.tenant",
+    "zh-CN": "租户管理",
+    "en-US": "Tenant"
+  },
+  {
+    "key": "permission.module.devops",
+    "zh-CN": "开发运维",
+    "en-US": "DevOps"
+  },
+  {
+    "key": "permission.module.automation",
+    "zh-CN": "自动化",
+    "en-US": "Automation"
+  },
+  {
+    "key": "permission.module.analytics",
+    "zh-CN": "数据分析",
+    "en-US": "Analytics"
+  },
+  {
+    "key": "permission.module.dynamic",
+    "zh-CN": "动态数据",
+    "en-US": "Dynamic Data"
+  },
+  {
+    "key": "permission.module.crm",
+    "zh-CN": "CRM",
+    "en-US": "CRM"
+  },
+  {
+    "key": "permission.module.pm",
+    "zh-CN": "项目管理",
+    "en-US": "Project Management"
+  },
+  {
+    "key": "permission.module.thr",
+    "zh-CN": "人力资源",
+    "en-US": "HR"
+  },
+  {
+    "key": "permission.module.cc",
+    "zh-CN": "合同管理",
+    "en-US": "Contract"
+  },
+  {
+    "key": "permission.module.other",
+    "zh-CN": "其他",
+    "en-US": "Other"
+  },
+  {
+    "key": "admin.permission.matrix.action.approve",
+    "zh-CN": "审批",
+    "en-US": "Approve"
+  },
+  {
+    "key": "admin.permission.matrix.action.reject",
+    "zh-CN": "驳回",
+    "en-US": "Reject"
+  },
+  {
+    "key": "admin.permission.matrix.action.submit",
+    "zh-CN": "提交",
+    "en-US": "Submit"
+  },
+  {
+    "key": "admin.permission.matrix.action.qualify",
+    "zh-CN": "资质审查",
+    "en-US": "Qualify"
+  },
+  {
+    "key": "admin.permission.matrix.action.convert",
+    "zh-CN": "转化",
+    "en-US": "Convert"
+  },
+  {
+    "key": "admin.permission.matrix.action.execute",
+    "zh-CN": "执行",
+    "en-US": "Execute"
+  },
+  {
+    "key": "admin.permission.matrix.action.admin",
+    "zh-CN": "管理",
+    "en-US": "Admin"
+  },
+  {
+    "key": "admin.permission.matrix.action.generate",
+    "zh-CN": "生成",
+    "en-US": "Generate"
+  },
+  {
     "key": "admin.permission.role.search",
     "zh-CN": "搜索角色...",
     "en-US": "Search roles..."

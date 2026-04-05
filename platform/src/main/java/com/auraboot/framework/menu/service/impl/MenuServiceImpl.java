@@ -178,7 +178,7 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements Me
                 // Convert path to valid resourceCode: /meta/models -> meta_models
                 String resourceCode = convertPathToResourceCode(menu.getPath());
                 if (resourceCode != null) {
-                    autoPermissionAssignmentService.autoAssignPermissions("menu", resourceCode);
+                    autoPermissionAssignmentService.autoAssignPermissions(resourceCode, null);
                     log.info("Auto-assigned permissions for menu: menuId={}, resourceCode={}",
                         menu.getId(), resourceCode);
                 } else {
