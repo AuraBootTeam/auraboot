@@ -59,7 +59,7 @@ class AutoPermissionHierarchyIntegrationTest extends BaseIntegrationTest {
     void autoAssign_createsModuleAtLevel1() {
         autoPermissionAssignmentService.autoAssignPermissions(testModelCode, testModuleCode);
 
-        Permission module = permissionMapper.findByCode("module." + testModuleCode + ".manage");
+        Permission module = permissionMapper.findByCode("module." + testModuleCode);
         assertThat(module).isNotNull();
         assertThat(module.getLevel()).isEqualTo(1);
         assertThat(module.getParentId()).isNull();
@@ -73,8 +73,8 @@ class AutoPermissionHierarchyIntegrationTest extends BaseIntegrationTest {
     void autoAssign_createsResourceAtLevel2_withParentPointingToModule() {
         autoPermissionAssignmentService.autoAssignPermissions(testModelCode, testModuleCode);
 
-        Permission module = permissionMapper.findByCode("module." + testModuleCode + ".manage");
-        Permission resource = permissionMapper.findByCode("model." + testModelCode + ".manage");
+        Permission module = permissionMapper.findByCode("module." + testModuleCode);
+        Permission resource = permissionMapper.findByCode("model." + testModelCode);
 
         assertThat(resource).isNotNull();
         assertThat(resource.getLevel()).isEqualTo(2);
@@ -88,7 +88,7 @@ class AutoPermissionHierarchyIntegrationTest extends BaseIntegrationTest {
     void autoAssign_createsActionNodesAtLevel3_withDerivedActions() {
         autoPermissionAssignmentService.autoAssignPermissions(testModelCode, testModuleCode);
 
-        Permission resource = permissionMapper.findByCode("model." + testModelCode + ".manage");
+        Permission resource = permissionMapper.findByCode("model." + testModelCode);
 
         // Verify action permissions exist with correct hierarchy
         for (String action : List.of("read", "create", "update", "delete", "qualify")) {
@@ -108,12 +108,15 @@ class AutoPermissionHierarchyIntegrationTest extends BaseIntegrationTest {
     void autoAssign_noManageActionAtLevel3() {
         autoPermissionAssignmentService.autoAssignPermissions(testModelCode, testModuleCode);
 
-        // "manage" exists at level=2 (resource node), but should NOT exist as a separate level=3 action
-        // unless a command explicitly produces "manage" as a verb
-        Permission resourceManage = permissionMapper.findByCode("model." + testModelCode + ".manage");
-        assertThat(resourceManage).isNotNull();
-        assertThat(resourceManage.getLevel()).isEqualTo(2);
-        // No separate "manage" action at level=3 since no command produces "manage"
+        // Resource node (level=2) exists without action suffix
+        Permission resource = permissionMapper.findByCode("model." + testModelCode);
+        assertThat(resource).isNotNull();
+        assertThat(resource.getLevel()).isEqualTo(2);
+        assertThat(resource.getAction()).isNull();
+
+        // No "manage" action permission at level=3
+        Permission manageAction = permissionMapper.findByCode("model." + testModelCode + ".manage");
+        assertThat(manageAction).isNull();
     }
 
     @Test
@@ -121,8 +124,8 @@ class AutoPermissionHierarchyIntegrationTest extends BaseIntegrationTest {
         autoPermissionAssignmentService.autoAssignPermissions(testModelCode, testModuleCode);
 
         // Count permissions after first call
-        Permission module1 = permissionMapper.findByCode("module." + testModuleCode + ".manage");
-        Permission resource1 = permissionMapper.findByCode("model." + testModelCode + ".manage");
+        Permission module1 = permissionMapper.findByCode("module." + testModuleCode);
+        Permission resource1 = permissionMapper.findByCode("model." + testModelCode);
         Permission read1 = permissionMapper.findByCode("model." + testModelCode + ".read");
 
         assertThat(module1).isNotNull();
@@ -136,8 +139,8 @@ class AutoPermissionHierarchyIntegrationTest extends BaseIntegrationTest {
         // Call again — should be idempotent
         autoPermissionAssignmentService.autoAssignPermissions(testModelCode, testModuleCode);
 
-        Permission module2 = permissionMapper.findByCode("module." + testModuleCode + ".manage");
-        Permission resource2 = permissionMapper.findByCode("model." + testModelCode + ".manage");
+        Permission module2 = permissionMapper.findByCode("module." + testModuleCode);
+        Permission resource2 = permissionMapper.findByCode("model." + testModelCode);
         Permission read2 = permissionMapper.findByCode("model." + testModelCode + ".read");
 
         // Same IDs = no duplicates
@@ -151,7 +154,7 @@ class AutoPermissionHierarchyIntegrationTest extends BaseIntegrationTest {
         autoPermissionAssignmentService.autoAssignPermissions(testModelCode, null);
 
         // testModelCode starts with "tmod_" so module should be "tmod"
-        Permission module = permissionMapper.findByCode("module.tmod.manage");
+        Permission module = permissionMapper.findByCode("module.tmod");
         assertThat(module).isNotNull();
         assertThat(module.getResourceCode()).isEqualTo("tmod");
     }
@@ -161,7 +164,7 @@ class AutoPermissionHierarchyIntegrationTest extends BaseIntegrationTest {
         // Model with underscore: "crm_test_xxx" → module "crm"
         String modelWithPrefix = "crm_test_" + System.currentTimeMillis();
         autoPermissionAssignmentService.autoAssignPermissions(modelWithPrefix, null);
-        Permission crmModule = permissionMapper.findByCode("module.crm.manage");
+        Permission crmModule = permissionMapper.findByCode("module.crm");
         assertThat(crmModule).isNotNull();
         assertThat(crmModule.getResourceCode()).isEqualTo("crm");
 
@@ -171,7 +174,7 @@ class AutoPermissionHierarchyIntegrationTest extends BaseIntegrationTest {
         // For truly no-underscore: use a simple code
         String noUnderscoreModel = "noprefix";
         autoPermissionAssignmentService.autoAssignPermissions(noUnderscoreModel, null);
-        Permission noUnderscoreModule = permissionMapper.findByCode("module.noprefix.manage");
+        Permission noUnderscoreModule = permissionMapper.findByCode("module.noprefix");
         assertThat(noUnderscoreModule).isNotNull();
         assertThat(noUnderscoreModule.getResourceCode()).isEqualTo("noprefix");
     }
@@ -194,9 +197,9 @@ class AutoPermissionHierarchyIntegrationTest extends BaseIntegrationTest {
         autoPermissionAssignmentService.autoAssignPermissions(modelCode2, testModuleCode);
 
         // Both models share the same module node
-        Permission module = permissionMapper.findByCode("module." + testModuleCode + ".manage");
-        Permission resource1 = permissionMapper.findByCode("model." + testModelCode + ".manage");
-        Permission resource2 = permissionMapper.findByCode("model." + modelCode2 + ".manage");
+        Permission module = permissionMapper.findByCode("module." + testModuleCode);
+        Permission resource1 = permissionMapper.findByCode("model." + testModelCode);
+        Permission resource2 = permissionMapper.findByCode("model." + modelCode2);
 
         assertThat(resource1.getParentId()).isEqualTo(module.getId());
         assertThat(resource2.getParentId()).isEqualTo(module.getId());
