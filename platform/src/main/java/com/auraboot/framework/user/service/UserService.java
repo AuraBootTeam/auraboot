@@ -3,6 +3,9 @@ package com.auraboot.framework.user.service;
 import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.exception.UserException;
 
+import java.util.Collection;
+import java.util.List;
+
 /**
  * @author 高海军 帝奇 Apr 6, 2015 5:07:09 PM
  */
@@ -36,4 +39,9 @@ public interface UserService {
      * @return 用户信息
      */
     User findByPid(String pid);
+
+    /**
+     * Batch find users by IDs.
+     */
+    List<User> findByUserIds(Collection<Long> userIds);
 }

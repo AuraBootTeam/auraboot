@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.Collection;
 
 /**
  * Organization Engine implementation.
@@ -125,6 +126,38 @@ public class OrganizationServiceImpl implements OrganizationService {
         PaginationResult<Map<String, Object>> result = dynamicDataService.list(MODEL_EMPLOYEE, request);
         List<Map<String, Object>> records = result.getRecords();
         return (records == null || records.isEmpty()) ? null : records.get(0);
+    }
+
+    @Override
+    public Map<String, Map<String, Object>> getEmployeesByMemberPids(Collection<String> memberPids) {
+        if (memberPids == null || memberPids.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        List<Object> memberPidValues = new ArrayList<>(memberPids);
+        DynamicQueryRequest request = DynamicQueryRequest.builder()
+            .pageNum(1)
+            .pageSize(memberPids.size())
+            .conditions(List.of(
+                QueryCondition.builder()
+                    .fieldName(EMP_MEMBER_ID)
+                    .operator(QueryCondition.Operator.IN)
+                    .values(memberPidValues)
+                    .build()
+            ))
+            .build();
+        PaginationResult<Map<String, Object>> result = dynamicDataService.list(MODEL_EMPLOYEE, request);
+        List<Map<String, Object>> records = result.getRecords();
+        if (records == null || records.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Map<String, Map<String, Object>> map = new HashMap<>();
+        for (Map<String, Object> record : records) {
+            Object memberIdValue = record.get(EMP_MEMBER_ID);
+            if (memberIdValue != null) {
+                map.put(memberIdValue.toString(), record);
+            }
+        }
+        return map;
     }
 
     @Override

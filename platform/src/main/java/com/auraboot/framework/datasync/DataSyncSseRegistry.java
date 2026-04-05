@@ -37,14 +37,15 @@ public class DataSyncSseRegistry {
 
     /**
      * Register a new SSE connection. Returns connectionId for subscription binding.
+     *
+     * NOTE: lifecycle callbacks (onCompletion/onTimeout/onError) are NOT registered here.
+     * The controller sets unified callbacks that clean up both NotificationSseService
+     * and DataSyncSseRegistry, avoiding the dual-callback overwrite problem where
+     * the second registration silently replaces the first.
      */
     public Long registerEmitter(Long userId, Long tenantId, SseEmitter emitter) {
         Long connId = connectionIdSeq.incrementAndGet();
         connections.put(connId, new ConnectionInfo(connId, userId, tenantId, emitter, ConcurrentHashMap.newKeySet()));
-
-        emitter.onCompletion(() -> removeConnection(connId));
-        emitter.onTimeout(() -> removeConnection(connId));
-        emitter.onError(e -> removeConnection(connId));
 
         log.debug("DataSync: registered connection {} for user {}", connId, userId);
         return connId;
@@ -110,9 +111,9 @@ public class DataSyncSseRegistry {
 
     /**
      * Remove a connection and clean up all subscriptions.
-     * Package-private for testing.
+     * Called by the controller's unified lifecycle callbacks.
      */
-    void removeConnection(Long connId) {
+    public void removeConnection(Long connId) {
         ConnectionInfo conn = connections.remove(connId);
         if (conn == null) return;
         for (String mc : conn.modelCodes()) {

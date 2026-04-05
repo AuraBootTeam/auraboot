@@ -121,6 +121,26 @@ public class PermissionPolicyServiceImpl implements PermissionPolicyService {
         return convertToMap(conditionsJson);
     }
 
+    @Override
+    public Map<Long, Map<String, Object>> getPoliciesByRoleId(Long roleId) {
+        List<RolePermissionMapper.RolePermissionConditionsRow> rows =
+            rolePermissionMapper.findConditionsByRoleId(roleId);
+        if (rows == null || rows.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Map<Long, Map<String, Object>> result = new HashMap<>();
+        for (var row : rows) {
+            String json = row.getConditionsJson();
+            if (json != null && !json.isBlank()) {
+                Map<String, Object> map = convertToMap(json);
+                if (map != null) {
+                    result.put(row.getPermissionId(), map);
+                }
+            }
+        }
+        return result;
+    }
+
     private Long findRolePermissionId(Long roleId, Long permissionId) {
         RolePermission rp = findRolePermission(roleId, permissionId);
         return rp != null ? rp.getId() : null;

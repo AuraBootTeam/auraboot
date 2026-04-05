@@ -54,9 +54,9 @@ public class RoleMemberServiceImpl implements RoleMemberService {
         Map<Long, UserRole> memberIdToUserRole = userRoles.stream()
             .collect(Collectors.toMap(UserRole::getMemberId, ur -> ur, (a, b) -> a));
 
-        // 3. Load TenantMember objects for the assigned member IDs
-        List<TenantMember> assignedMembers = memberIdToUserRole.keySet().stream()
-            .map(tenantMemberService::getById)
+        // 3. Batch load TenantMember objects for the assigned member IDs
+        List<TenantMember> assignedMembers = tenantMemberService.listByIds(memberIdToUserRole.keySet())
+            .stream()
             .filter(Objects::nonNull)
             .sorted(Comparator.comparing(TenantMember::getId))
             .collect(Collectors.toList());
@@ -70,9 +70,27 @@ public class RoleMemberServiceImpl implements RoleMemberService {
         int toIndex = Math.min(fromIndex + pageSize, (int) total);
         List<TenantMember> pageMembers = assignedMembers.subList(fromIndex, toIndex);
 
-        // 5. Enrich with user + employee data
+        // 5. Batch pre-fetch users and employees for this page
+        Set<Long> userIds = pageMembers.stream()
+            .map(TenantMember::getUserId)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+        Map<Long, User> userMap = new HashMap<>();
+        if (!userIds.isEmpty()) {
+            for (User u : userService.findByUserIds(userIds)) {
+                userMap.put(u.getId(), u);
+            }
+        }
+
+        Set<String> memberPids = pageMembers.stream()
+            .map(TenantMember::getPid)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+        Map<String, Map<String, Object>> empMap = organizationService.getEmployeesByMemberPids(memberPids);
+
+        // 6. Build DTOs from pre-fetched data
         List<RoleMemberDTO> dtos = pageMembers.stream()
-            .map(member -> buildRoleMemberDTO(member, memberIdToUserRole.get(member.getId())))
+            .map(member -> buildRoleMemberDTO(member, memberIdToUserRole.get(member.getId()), userMap, empMap))
             .collect(Collectors.toList());
 
         return PaginationResult.of(dtos, total, pageNum, pageSize);
@@ -147,23 +165,42 @@ public class RoleMemberServiceImpl implements RoleMemberService {
             .filter(m -> !Boolean.TRUE.equals(m.getDeletedFlag()))
             .collect(Collectors.toList());
 
-        // 4. If keyword provided, filter by name/email
+        // 4. Batch pre-fetch users for all candidates (needed for keyword filter and DTO building)
+        Set<Long> candidateUserIds = candidates.stream()
+            .map(TenantMember::getUserId)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+        Map<Long, User> candidateUserMap = new HashMap<>();
+        if (!candidateUserIds.isEmpty()) {
+            for (User u : userService.findByUserIds(candidateUserIds)) {
+                candidateUserMap.put(u.getId(), u);
+            }
+        }
+
+        // 5. If keyword provided, filter by name/email using pre-fetched user map
         if (StringUtils.hasText(keyword)) {
             String lowerKeyword = keyword.toLowerCase();
             candidates = candidates.stream()
-                .filter(m -> matchesKeyword(m, lowerKeyword))
+                .filter(m -> matchesKeyword(m, lowerKeyword, candidateUserMap))
                 .collect(Collectors.toList());
         }
 
-        // 5. Limit results
+        // 6. Limit results
         int limit = 50;
         List<TenantMember> limited = candidates.stream()
             .limit(limit)
             .collect(Collectors.toList());
 
-        // 6. Enrich with user + employee data
+        // 7. Batch pre-fetch employees for the limited set
+        Set<String> limitedMemberPids = limited.stream()
+            .map(TenantMember::getPid)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+        Map<String, Map<String, Object>> limitedEmpMap = organizationService.getEmployeesByMemberPids(limitedMemberPids);
+
+        // 8. Enrich with pre-fetched data
         return limited.stream()
-            .map(member -> buildRoleMemberDTO(member, null))
+            .map(member -> buildRoleMemberDTO(member, null, candidateUserMap, limitedEmpMap))
             .collect(Collectors.toList());
     }
 
@@ -176,14 +213,16 @@ public class RoleMemberServiceImpl implements RoleMemberService {
         return userRoleService.list(wrapper);
     }
 
-    private RoleMemberDTO buildRoleMemberDTO(TenantMember member, UserRole userRole) {
+    private RoleMemberDTO buildRoleMemberDTO(TenantMember member, UserRole userRole,
+                                              Map<Long, User> userMap,
+                                              Map<String, Map<String, Object>> empMap) {
         String userName = null;
         String email = null;
         String departmentName = null;
         String positionName = null;
 
         if (member.getUserId() != null) {
-            User user = userService.findByUserId(member.getUserId());
+            User user = userMap.get(member.getUserId());
             if (user != null) {
                 userName = user.getNickName() != null ? user.getNickName() : user.getUserName();
                 email = user.getEmail();
@@ -191,7 +230,7 @@ public class RoleMemberServiceImpl implements RoleMemberService {
         }
 
         if (member.getPid() != null) {
-            Map<String, Object> empRecord = organizationService.getEmployeeByMemberPid(member.getPid());
+            Map<String, Object> empRecord = empMap.get(member.getPid());
             if (empRecord != null) {
                 Object empName = empRecord.get("org_emp_name");
                 if (empName != null && StringUtils.hasText(empName.toString())) {
@@ -213,11 +252,11 @@ public class RoleMemberServiceImpl implements RoleMemberService {
         );
     }
 
-    private boolean matchesKeyword(TenantMember member, String lowerKeyword) {
+    private boolean matchesKeyword(TenantMember member, String lowerKeyword, Map<Long, User> userMap) {
         if (member.getUserId() == null) {
             return false;
         }
-        User user = userService.findByUserId(member.getUserId());
+        User user = userMap.get(member.getUserId());
         if (user == null) {
             return false;
         }

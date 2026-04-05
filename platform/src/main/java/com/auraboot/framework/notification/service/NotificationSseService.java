@@ -27,6 +27,15 @@ public interface NotificationSseService {
     void pushUnreadCount(Long userId, int count);
 
     /**
+     * Remove an emitter from the user's connection list.
+     * Called by the controller's unified lifecycle callbacks.
+     *
+     * @param userId the user ID
+     * @param emitter the emitter to remove
+     */
+    void removeEmitter(Long userId, SseEmitter emitter);
+
+    /**
      * Get the number of active connections for a user.
      *
      * @param userId the user ID

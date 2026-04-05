@@ -4,6 +4,8 @@ import com.auraboot.framework.auth.service.PasswordManagementService;
 import com.auraboot.framework.auth.service.PasswordPolicyService;
 import com.auraboot.framework.common.constant.ResponseCode;
 import java.time.Instant;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.event.user.UserRegisteredEvent;
@@ -33,6 +35,19 @@ public class UserServiceImpl implements UserService {
     private final UserMapper userMapper;
     private final PasswordManagementService passwordManagementService;
     private final PasswordPolicyService passwordPolicyService;
+
+    @Override
+    public List<User> findByUserIds(Collection<Long> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<User> users = userMapper.selectBatchIds(userIds);
+        // Clear passwords before returning
+        if (users != null) {
+            users.forEach(u -> u.setPassword(null));
+        }
+        return users != null ? users : Collections.emptyList();
+    }
 
     @Override
     public User findByPid(String pid) {

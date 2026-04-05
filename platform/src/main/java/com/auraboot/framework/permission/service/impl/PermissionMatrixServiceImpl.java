@@ -47,7 +47,7 @@ public class PermissionMatrixServiceImpl implements PermissionMatrixService {
     @Override
     public PermissionMatrixDTO getMatrix(Long tenantId) {
         List<PermissionDTO> allActive = permissionService.findAllActive();
-        return buildMatrix(allActive, Collections.emptySet(), Collections.emptyMap(), null);
+        return buildMatrix(allActive, Collections.emptySet(), Collections.emptyMap(), Collections.emptyMap());
     }
 
     @Override
@@ -63,7 +63,10 @@ public class PermissionMatrixServiceImpl implements PermissionMatrixService {
             scopeMap.put(key, scope);
         }
 
-        return buildMatrix(allActive, grantedIds, scopeMap, roleId);
+        // Batch-fetch all policy values for this role in a single SQL query
+        Map<Long, Map<String, Object>> policyMap = policyService.getPoliciesByRoleId(roleId);
+
+        return buildMatrix(allActive, grantedIds, scopeMap, policyMap);
     }
 
     @Override
@@ -103,7 +106,7 @@ public class PermissionMatrixServiceImpl implements PermissionMatrixService {
     private PermissionMatrixDTO buildMatrix(List<PermissionDTO> allPermissions,
                                              Set<Long> grantedIds,
                                              Map<String, RoleDataScope> scopeMap,
-                                             Long roleId) {
+                                             Map<Long, Map<String, Object>> policyMap) {
         // Build parent lookup: id -> PermissionDTO
         Map<Long, PermissionDTO> byId = new LinkedHashMap<>();
         for (PermissionDTO p : allPermissions) {
@@ -129,11 +132,11 @@ public class PermissionMatrixServiceImpl implements PermissionMatrixService {
 
         // If we have a clean hierarchy (level 1 + level 2 + leaves), use it
         if (!level1.isEmpty() && !level2.isEmpty()) {
-            return buildHierarchicalMatrix(level1, level2, leaves, byId, grantedIds, scopeMap, roleId);
+            return buildHierarchicalMatrix(level1, level2, leaves, byId, grantedIds, scopeMap, policyMap);
         }
 
         // Fallback: group by resourceType + resourceCode
-        return buildFlatMatrix(allPermissions, grantedIds, scopeMap, roleId);
+        return buildFlatMatrix(allPermissions, grantedIds, scopeMap, policyMap);
     }
 
     private PermissionMatrixDTO buildHierarchicalMatrix(
@@ -143,7 +146,7 @@ public class PermissionMatrixServiceImpl implements PermissionMatrixService {
             Map<Long, PermissionDTO> byId,
             Set<Long> grantedIds,
             Map<String, RoleDataScope> scopeMap,
-            Long roleId) {
+            Map<Long, Map<String, Object>> policyMap) {
 
         // Group resources by parent (module) ID
         Map<Long, List<PermissionDTO>> resourcesByModule = resources.stream()
@@ -163,7 +166,7 @@ public class PermissionMatrixServiceImpl implements PermissionMatrixService {
             List<PermissionMatrixResourceDTO> resourceDTOs = new ArrayList<>();
             for (PermissionDTO resource : moduleResources) {
                 List<PermissionDTO> resourceActions = actionsByResource.getOrDefault(resource.getId(), Collections.emptyList());
-                List<PermissionMatrixActionDTO> actionDTOs = buildActionDTOs(resourceActions, grantedIds, scopeMap, roleId);
+                List<PermissionMatrixActionDTO> actionDTOs = buildActionDTOs(resourceActions, grantedIds, scopeMap, policyMap);
                 resourceDTOs.add(new PermissionMatrixResourceDTO(
                     resource.getResourceCode() != null ? resource.getResourceCode() : resource.getCode(),
                     resource.getName() != null ? resource.getName() : resource.getCode(),
@@ -188,7 +191,7 @@ public class PermissionMatrixServiceImpl implements PermissionMatrixService {
     private PermissionMatrixDTO buildFlatMatrix(List<PermissionDTO> allPermissions,
                                                  Set<Long> grantedIds,
                                                  Map<String, RoleDataScope> scopeMap,
-                                                 Long roleId) {
+                                                 Map<Long, Map<String, Object>> policyMap) {
         // Group by resourceType as module, then by resourceCode as resource
         Map<String, Map<String, List<PermissionDTO>>> grouped = new LinkedHashMap<>();
 
@@ -208,7 +211,7 @@ public class PermissionMatrixServiceImpl implements PermissionMatrixService {
             List<PermissionMatrixResourceDTO> resourceDTOs = new ArrayList<>();
 
             for (Map.Entry<String, List<PermissionDTO>> resourceEntry : moduleEntry.getValue().entrySet()) {
-                List<PermissionMatrixActionDTO> actionDTOs = buildActionDTOs(resourceEntry.getValue(), grantedIds, scopeMap, roleId);
+                List<PermissionMatrixActionDTO> actionDTOs = buildActionDTOs(resourceEntry.getValue(), grantedIds, scopeMap, policyMap);
                 resourceDTOs.add(new PermissionMatrixResourceDTO(
                     resourceEntry.getKey(),
                     resourceEntry.getKey(),
@@ -230,7 +233,7 @@ public class PermissionMatrixServiceImpl implements PermissionMatrixService {
             List<PermissionDTO> actions,
             Set<Long> grantedIds,
             Map<String, RoleDataScope> scopeMap,
-            Long roleId) {
+            Map<Long, Map<String, Object>> policyMap) {
 
         // Sort: standard actions first in fixed order, custom actions alphabetically after
         List<PermissionDTO> sorted = new ArrayList<>(actions);
@@ -255,11 +258,8 @@ public class PermissionMatrixServiceImpl implements PermissionMatrixService {
                 // Policy schema from permission definition
                 String policySchemaJson = serializePolicySchema(p.getPolicySchema());
 
-                // Policy values for this role+permission (only when roleId is available)
-                Map<String, Object> policyValues = null;
-                if (roleId != null && p.getId() != null) {
-                    policyValues = policyService.getPolicy(roleId, p.getId());
-                }
+                // Policy values: O(1) lookup from pre-fetched batch map
+                Map<String, Object> policyValues = policyMap.get(p.getId());
 
                 return new PermissionMatrixActionDTO(
                     p.getId(),
