@@ -211,22 +211,22 @@ public final class MetaPermission {
     /**
      * Role management permission (create, update, delete, assign permissions)
      */
-    public static final String ROLE_MANAGE = "system.role.update";
+    public static final String ROLE_MANAGE = "system.rbac_role.update";
 
     /**
      * Role read permission (query, list, view)
      */
-    public static final String ROLE_READ = "system.role.read";
+    public static final String ROLE_READ = "system.rbac_role.read";
 
     /**
      * User-Role binding management permission
      */
-    public static final String USER_ROLE_MANAGE = "system.user_role.update";
+    public static final String USER_ROLE_MANAGE = "system.rbac_user_role.update";
 
     /**
      * User-Role binding read permission
      */
-    public static final String USER_ROLE_READ = "system.user_role.read";
+    public static final String USER_ROLE_READ = "system.rbac_user_role.read";
 
     /**
      * Permission calculation read permission
