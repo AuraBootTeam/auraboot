@@ -117,7 +117,7 @@ public class AutoPermissionAssignmentService {
      * Code format: "module.{moduleCode}"
      */
     private Permission ensureModulePermission(String moduleCode) {
-        String code = "module." + moduleCode + ".manage";
+        String code = "module." + moduleCode;
         Permission existing = permissionMapper.findByCode(code);
         if (existing != null) {
             log.debug("Module permission already exists: code={}, id={}", code, existing.getId());
@@ -131,7 +131,7 @@ public class AutoPermissionAssignmentService {
         permission.setDescription("Module: " + moduleCode);
         permission.setResourceType("module");
         permission.setResourceCode(moduleCode);
-        permission.setAction("manage");
+        permission.setAction(null);
         permission.setSource("generated");
         permission.setSourceRef(moduleCode);
         permission.setLevel(1);
@@ -147,10 +147,10 @@ public class AutoPermissionAssignmentService {
 
     /**
      * Ensure a Resource permission node exists at level=2.
-     * Code format: "model.{modelCode}.manage"
+     * Code format: "model.{modelCode}"
      */
     private Permission ensureResourcePermission(String modelCode, Permission modulePermission, String moduleCode) {
-        String code = PermissionCodeValidator.build("model", modelCode, "manage", null);
+        String code = "model." + modelCode;
         Permission existing = permissionMapper.findByCode(code);
         if (existing != null) {
             log.debug("Resource permission already exists: code={}, id={}", code, existing.getId());
@@ -164,7 +164,7 @@ public class AutoPermissionAssignmentService {
         permission.setDescription("Resource: " + modelCode);
         permission.setResourceType("model");
         permission.setResourceCode(modelCode);
-        permission.setAction("manage");
+        permission.setAction(null);
         permission.setSource("generated");
         permission.setSourceRef(moduleCode);
         permission.setLevel(2);
