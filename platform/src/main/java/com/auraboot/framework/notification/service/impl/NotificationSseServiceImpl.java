@@ -29,10 +29,17 @@ public class NotificationSseServiceImpl implements NotificationSseService {
     private final Map<Long, CopyOnWriteArrayList<SseEmitter>> userEmitters = new ConcurrentHashMap<>();
 
     /**
-     * SSE connection timeout: 30 minutes. Clients should auto-reconnect.
-     * Prevents zombie connections from accumulating when clients disconnect abnormally.
+     * SSE connection timeout: 5 minutes. Aligned with BFF connectionTimeout.
+     * Clients auto-reconnect via EventSource. Short timeout prevents zombie connections
+     * when BFF/client disconnects without clean close.
      */
-    private static final long SSE_TIMEOUT = 30 * 60 * 1000L;
+    private static final long SSE_TIMEOUT = 5 * 60 * 1000L;
+
+    /**
+     * Maximum SSE connections per user. When exceeded, the oldest connection is completed
+     * to make room for the new one. Prevents resource exhaustion from stale tabs.
+     */
+    private static final int MAX_CONNECTIONS_PER_USER = 3;
 
     @Override
     public SseEmitter subscribe(Long userId) {
@@ -50,17 +57,23 @@ public class NotificationSseServiceImpl implements NotificationSseService {
 
         SseEmitter emitter = new SseEmitter(SSE_TIMEOUT);
 
-        userEmitters.computeIfAbsent(userId, k -> new CopyOnWriteArrayList<>()).add(emitter);
+        CopyOnWriteArrayList<SseEmitter> emitters =
+                userEmitters.computeIfAbsent(userId, k -> new CopyOnWriteArrayList<>());
+
+        // Enforce per-user connection limit: complete oldest connections first
+        while (emitters.size() >= MAX_CONNECTIONS_PER_USER) {
+            SseEmitter oldest = emitters.remove(0);
+            log.info("SSE connection limit reached for user {}, completing oldest connection", userId);
+            oldest.complete();
+        }
+
+        emitters.add(emitter);
         log.debug("SSE connection established for user {}, total connections: {}",
                 userId, getActiveConnectionCount(userId));
 
-        // Register cleanup callbacks
-        emitter.onCompletion(() -> removeEmitter(userId, emitter));
-        emitter.onTimeout(() -> removeEmitter(userId, emitter));
-        emitter.onError(e -> {
-            log.debug("SSE connection error for user {}: {}", userId, e.getMessage());
-            removeEmitter(userId, emitter);
-        });
+        // NOTE: lifecycle callbacks (onCompletion/onTimeout/onError) are NOT registered here.
+        // The controller sets unified callbacks that clean up both NotificationSseService
+        // and DataSyncSseRegistry, avoiding the dual-callback overwrite problem.
 
         // Send initial connection confirmation
         try {
@@ -137,8 +150,9 @@ public class NotificationSseServiceImpl implements NotificationSseService {
 
     /**
      * Remove an emitter from the user's connection list.
+     * Called by the controller's unified lifecycle callbacks.
      */
-    private void removeEmitter(Long userId, SseEmitter emitter) {
+    public void removeEmitter(Long userId, SseEmitter emitter) {
         CopyOnWriteArrayList<SseEmitter> emitters = userEmitters.get(userId);
         if (emitters != null) {
             emitters.remove(emitter);

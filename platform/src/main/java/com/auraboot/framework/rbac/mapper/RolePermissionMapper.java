@@ -471,4 +471,35 @@ public interface RolePermissionMapper extends BaseMapper<RolePermission> {
      */
     @Update("UPDATE ab_role_permission SET conditions = #{json}::jsonb, updated_at = NOW() WHERE id = #{id}")
     void updateConditionsById(@Param("id") Long id, @Param("json") String json);
+
+    /**
+     * Batch fetch conditions for all permissions of a role.
+     * Returns permission_id and conditions as raw JSON text (bypasses JacksonTypeHandler).
+     */
+    @Select("""
+        SELECT permission_id, conditions::text as conditions_json
+        FROM ab_role_permission
+        WHERE role_id = #{roleId}
+          AND deleted_flag = false
+          AND conditions IS NOT NULL
+          AND conditions::text != 'null'
+        """)
+    @Results({
+        @Result(property = "permissionId", column = "permission_id"),
+        @Result(property = "conditionsJson", column = "conditions_json")
+    })
+    List<RolePermissionConditionsRow> findConditionsByRoleId(@Param("roleId") Long roleId);
+
+    /**
+     * Simple row type for batch conditions query.
+     */
+    class RolePermissionConditionsRow {
+        private Long permissionId;
+        private String conditionsJson;
+
+        public Long getPermissionId() { return permissionId; }
+        public void setPermissionId(Long permissionId) { this.permissionId = permissionId; }
+        public String getConditionsJson() { return conditionsJson; }
+        public void setConditionsJson(String conditionsJson) { this.conditionsJson = conditionsJson; }
+    }
 }

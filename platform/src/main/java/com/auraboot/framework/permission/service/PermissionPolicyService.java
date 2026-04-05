@@ -60,4 +60,13 @@ public interface PermissionPolicyService {
      * @return policy values map, or null if not configured
      */
     Map<String, Object> getPolicy(Long roleId, Long permissionId);
+
+    /**
+     * Batch get all policy values for a role, keyed by permission ID.
+     * Single SQL query replaces N per-permission lookups.
+     *
+     * @param roleId role ID
+     * @return map of permissionId -> policy values, empty map if none
+     */
+    Map<Long, Map<String, Object>> getPoliciesByRoleId(Long roleId);
 }

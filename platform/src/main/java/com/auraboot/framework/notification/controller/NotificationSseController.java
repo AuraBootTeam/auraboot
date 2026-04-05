@@ -39,6 +39,8 @@ public class NotificationSseController {
      * - "connected": Connection established confirmation
      * - "unread-count": Updated unread notification count
      * - "heartbeat": Keep-alive ping (every 30 seconds)
+     * - "data-sync-connected": ConnectionId for data sync subscription binding
+     * - "data:changed": Real-time data change notifications (via DataSyncSseRegistry)
      */
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter stream() {
@@ -50,6 +52,21 @@ public class NotificationSseController {
 
         // Register for data sync and get connectionId
         Long connectionId = dataSyncSseRegistry.registerEmitter(userId, tenantId, emitter);
+
+        // Set unified lifecycle callbacks that clean up BOTH services.
+        // SseEmitter only keeps the last callback per type, so we must set them
+        // in one place after all registrations are done.
+        Runnable cleanup = () -> {
+            notificationSseService.removeEmitter(userId, emitter);
+            dataSyncSseRegistry.removeConnection(connectionId);
+            log.debug("SSE connection cleaned up for user {}, connectionId {}", userId, connectionId);
+        };
+        emitter.onCompletion(cleanup);
+        emitter.onTimeout(cleanup);
+        emitter.onError(e -> {
+            log.debug("SSE connection error for user {}: {}", userId, e.getMessage());
+            cleanup.run();
+        });
 
         // Send initial unread count immediately after connection
         try {

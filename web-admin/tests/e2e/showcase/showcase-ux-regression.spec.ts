@@ -85,16 +85,6 @@ test.describe('Showcase UX Regression', () => {
     await expect(page.locator('body')).not.toContainText('Page not found');
   });
 
-  // ─── C6: Org chart page loads ────────────────────────────────────────
-
-  test('C6: Org chart page loads without error', async ({ page }) => {
-    await page.goto('/org-chart');
-    await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(3000);
-    await expect(page.locator('body')).not.toContainText('Page not found');
-    await expect(page.locator('body')).not.toContainText('Access forbidden');
-  });
-
   // ─── A1: Marketplace has data ────────────────────────────────────────
 
   test('A1: Marketplace page loads', async ({ page }) => {

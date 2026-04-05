@@ -486,6 +486,156 @@
     "en-US": "Menu"
   },
   {
+    "key": "admin.permission.role.search",
+    "zh-CN": "搜索角色...",
+    "en-US": "Search roles..."
+  },
+  {
+    "key": "admin.permission.role.searchEmpty",
+    "zh-CN": "未找到匹配的角色",
+    "en-US": "No matching roles"
+  },
+  {
+    "key": "admin.permission.role.type.system.short",
+    "zh-CN": "系统",
+    "en-US": "Sys"
+  },
+  {
+    "key": "admin.permission.role.type.custom.short",
+    "zh-CN": "自定义",
+    "en-US": "Cust"
+  },
+  {
+    "key": "admin.permission.role.type.tenant.short",
+    "zh-CN": "租户",
+    "en-US": "Tenant"
+  },
+  {
+    "key": "admin.permission.tab.members",
+    "zh-CN": "成员管理",
+    "en-US": "Members"
+  },
+  {
+    "key": "admin.permission.matrix.module",
+    "zh-CN": "模块",
+    "en-US": "Module"
+  },
+  {
+    "key": "admin.permission.matrix.resource",
+    "zh-CN": "资源",
+    "en-US": "Resource"
+  },
+  {
+    "key": "admin.permission.matrix.action.read",
+    "zh-CN": "查看",
+    "en-US": "View"
+  },
+  {
+    "key": "admin.permission.matrix.action.create",
+    "zh-CN": "新增",
+    "en-US": "Add"
+  },
+  {
+    "key": "admin.permission.matrix.action.update",
+    "zh-CN": "编辑",
+    "en-US": "Edit"
+  },
+  {
+    "key": "admin.permission.matrix.action.delete",
+    "zh-CN": "删除",
+    "en-US": "Delete"
+  },
+  {
+    "key": "admin.permission.matrix.action.import",
+    "zh-CN": "导入",
+    "en-US": "Import"
+  },
+  {
+    "key": "admin.permission.matrix.action.export",
+    "zh-CN": "导出",
+    "en-US": "Export"
+  },
+  {
+    "key": "admin.permission.matrix.selectRole",
+    "zh-CN": "请选择一个角色以查看权限",
+    "en-US": "Select a role to view permissions"
+  },
+  {
+    "key": "admin.permission.matrix.loadError",
+    "zh-CN": "加载权限矩阵失败",
+    "en-US": "Failed to load permission matrix"
+  },
+  {
+    "key": "admin.permission.matrix.updateSuccess",
+    "zh-CN": "权限已更新",
+    "en-US": "Permission updated"
+  },
+  {
+    "key": "admin.permission.matrix.updateError",
+    "zh-CN": "更新权限失败",
+    "en-US": "Failed to update permission"
+  },
+  {
+    "key": "admin.permission.matrix.empty",
+    "zh-CN": "暂无可用权限",
+    "en-US": "No permissions available"
+  },
+  {
+    "key": "admin.permission.matrix.noData",
+    "zh-CN": "暂无数据",
+    "en-US": "No data available"
+  },
+  {
+    "key": "admin.permission.matrix.collapsed",
+    "zh-CN": "已折叠",
+    "en-US": "Collapsed"
+  },
+  {
+    "key": "admin.permission.scope.label",
+    "zh-CN": "数据范围",
+    "en-US": "Data Scope"
+  },
+  {
+    "key": "admin.permission.scope.all",
+    "zh-CN": "全部数据",
+    "en-US": "All Data"
+  },
+  {
+    "key": "admin.permission.scope.dept_and_sub",
+    "zh-CN": "本部门及下级",
+    "en-US": "Dept & Sub"
+  },
+  {
+    "key": "admin.permission.scope.dept",
+    "zh-CN": "仅本部门",
+    "en-US": "Dept Only"
+  },
+  {
+    "key": "admin.permission.scope.self",
+    "zh-CN": "仅本人",
+    "en-US": "Self Only"
+  },
+  {
+    "key": "admin.permission.scope.none",
+    "zh-CN": "无权访问",
+    "en-US": "No Access"
+  },
+  {
+    "key": "admin.permission.scope.updateSuccess",
+    "zh-CN": "数据范围已更新",
+    "en-US": "Data scope updated"
+  },
+  {
+    "key": "admin.permission.scope.updateError",
+    "zh-CN": "更新数据范围失败",
+    "en-US": "Failed to update data scope"
+  },
+  {
+    "key": "admin.permission.policy.configure",
+    "zh-CN": "配置策略参数",
+    "en-US": "Configure policy"
+  },
+  {
     "key": "auth.channel.emailCode",
     "zh-CN": "邮箱验证码",
     "en-US": "Email Code"

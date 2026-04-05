@@ -1434,20 +1434,6 @@
           "web"
         ]
       }
-    },
-    {
-      "code": "org_chart",
-      "parentCode": "org_management",
-      "name": "组织架构图",
-      "name:zh-CN": "组织架构图",
-      "name:en": "Organization Chart",
-      "path": "/org-chart",
-      "component": null,
-      "icon": "partition",
-      "type": 1,
-      "permissionCode": "org_management",
-      "orderNo": 60,
-      "visible": true
     }
   ],
   "rolePermissionBindings": [

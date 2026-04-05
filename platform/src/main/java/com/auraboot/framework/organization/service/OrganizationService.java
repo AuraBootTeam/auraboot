@@ -4,6 +4,7 @@ import com.auraboot.framework.meta.dto.PaginationResult;
 import com.auraboot.framework.organization.dto.DepartmentTreeNode;
 import com.auraboot.framework.organization.dto.OrgEmployeeDTO;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
@@ -36,6 +37,14 @@ public interface OrganizationService {
      * @return employee dynamic record, or null if not linked
      */
     Map<String, Object> getEmployeeByMemberPid(String memberPid);
+
+    /**
+     * Batch find employees by member PIDs.
+     *
+     * @param memberPids collection of member PIDs
+     * @return map of memberPid -> employee record
+     */
+    Map<String, Map<String, Object>> getEmployeesByMemberPids(Collection<String> memberPids);
 
     /**
      * Get the manager (report-to) of an employee.

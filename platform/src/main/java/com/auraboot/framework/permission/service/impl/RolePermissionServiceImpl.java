@@ -44,27 +44,21 @@ public class RolePermissionServiceImpl implements RolePermissionService {
                   
                   
             
-            // 批量插入Role-Permission绑定
-            List<RolePermission> bindings = new ArrayList<>();
+            // Build bindings — batchInsert uses ON CONFLICT DO UPDATE for duplicates
+            Instant now = Instant.now();
+            List<RolePermission> bindings = new ArrayList<>(permissionIds.size());
             for (Long permissionId : permissionIds) {
-                // 检查是否已存在
-                int existingCount = rolePermissionMapper.countByRoleAndPermission(
-                    roleId, permissionId, tenantId);
-                
-                if (existingCount == 0) {
-                    RolePermission binding = new RolePermission();
-                    binding.setPid(UniqueIdGenerator.generate());
-                    binding.setRoleId(roleId);
-                    binding.setPermissionId(permissionId);
-                    binding.setGrantType(StatusConstants.GRANT);
-                    binding.setStatus(StatusConstants.ACTIVE);
-                    binding.setDeletedFlag(false);
-                    binding.setTenantId(tenantId);
-
-                    binding.setCreatedAt(Instant.now());
-                    binding.setUpdatedAt(Instant.now());
-                    bindings.add(binding);
-                }
+                RolePermission binding = new RolePermission();
+                binding.setPid(UniqueIdGenerator.generate());
+                binding.setRoleId(roleId);
+                binding.setPermissionId(permissionId);
+                binding.setGrantType(StatusConstants.GRANT);
+                binding.setStatus(StatusConstants.ACTIVE);
+                binding.setDeletedFlag(false);
+                binding.setTenantId(tenantId);
+                binding.setCreatedAt(now);
+                binding.setUpdatedAt(now);
+                bindings.add(binding);
             }
             
             if (!bindings.isEmpty()) {
