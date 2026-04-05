@@ -72,7 +72,9 @@ public class SystemPermissionInitializer {
         // Workflow resources (BPM)
         "workflow",
         // Dynamic data resources (auto-created on model publish)
-        "dynamic"
+        "dynamic",
+        // Module grouping (auto-created for hierarchical permissions)
+        "module"
     };
     
     /**
