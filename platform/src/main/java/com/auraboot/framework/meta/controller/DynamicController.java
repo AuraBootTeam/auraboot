@@ -69,6 +69,9 @@ public class DynamicController {
 
     @Autowired
     private RecordCapabilityService recordCapabilityService;
+
+    @Autowired
+    private com.auraboot.framework.meta.service.ModelFieldBindingService modelFieldBindingService;
     /**
      * 分页查询数据
      *
@@ -954,6 +957,27 @@ public class DynamicController {
         legacyResult.put("fields", fields);
 
         return ApiResponse.success(legacyResult);
+    }
+
+    /**
+     * Get field metadata for rendering (extension, dictCode, refTarget, etc.)
+     *
+     * This endpoint provides field-level metadata needed by detail/form page renderers
+     * to correctly display rich text, attachments, ratings, color pickers, etc.
+     * Uses model-level read permission (not management permission).
+     */
+    @GetMapping("/{pageKey}/field-meta")
+    @Operation(summary = "Get field metadata for rendering", description = "Returns field metadata including extension, dictCode, refTarget for page rendering")
+    @RequirePermission("model.{pageKey}.read")
+    public ApiResponse<List<com.auraboot.framework.meta.dto.MetaFieldDTO>> getFieldMeta(
+            @Parameter(description = "Page key") @PathVariable String pageKey) {
+        String modelCode = resolveModelCode(pageKey);
+        com.auraboot.framework.meta.dto.MetaModelDTO model = metaModelService.findByCode(modelCode);
+        if (model == null) {
+            return ApiResponse.error("Model not found: " + modelCode);
+        }
+        List<com.auraboot.framework.meta.dto.MetaFieldDTO> fields = modelFieldBindingService.getModelFields(model.getPid());
+        return ApiResponse.success(fields);
     }
 
     /**
