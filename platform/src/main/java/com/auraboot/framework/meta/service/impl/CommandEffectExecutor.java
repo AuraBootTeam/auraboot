@@ -31,7 +31,7 @@ import java.util.Map;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-class CommandEffectExecutor {
+public class CommandEffectExecutor {
 
     private final OutboxWriter outboxWriter;
     private final EventStore eventStore;
@@ -40,7 +40,7 @@ class CommandEffectExecutor {
     private final MetaModelService metaModelService;
     private final ObjectMapper objectMapper;
 
-    void executeEffectPhase(List<BindingRule> effectRules,
+    public void executeEffectPhase(List<BindingRule> effectRules,
                             CommandDefinition command,
                             Map<String, Object> payload,
                             Map<String, Object> results,
@@ -71,7 +71,7 @@ class CommandEffectExecutor {
         }
     }
 
-    void saveAuditLog(Long tenantId, String commandCode, String commandPid,
+    public void saveAuditLog(Long tenantId, String commandCode, String commandPid,
                       Long userId, Map<String, Object> requestPayload,
                       Map<String, Object> executionResult,
                       boolean success, String errorMessage,

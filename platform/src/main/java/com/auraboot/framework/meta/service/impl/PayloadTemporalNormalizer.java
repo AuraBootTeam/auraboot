@@ -33,7 +33,7 @@ import java.util.Set;
  */
 @Slf4j
 @Component
-class PayloadTemporalNormalizer {
+public class PayloadTemporalNormalizer {
 
     private static final Set<String> DATE_TYPES = Set.of(
         "date", "localdate"
@@ -63,7 +63,7 @@ class PayloadTemporalNormalizer {
      * @param model   model definition providing field type info
      * @throws TemporalParseException if a field value cannot be parsed
      */
-    void normalize(Map<String, Object> payload, ModelDefinition model) {
+    public void normalize(Map<String, Object> payload, ModelDefinition model) {
         normalizeRecursive(payload, model, 0);
     }
 
