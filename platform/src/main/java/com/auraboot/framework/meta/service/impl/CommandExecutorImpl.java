@@ -56,6 +56,9 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.util.StringUtils;
 
 
+import com.auraboot.framework.meta.service.impl.pipeline.CommandPipeline;
+import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
+
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -71,7 +74,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class CommandExecutorImpl implements CommandExecutor {
+public class CommandExecutorImpl implements CommandExecutor, CommandExecutorDelegate {
 
     private final CommandDefinitionMapper commandDefinitionMapper;
     private final BindingRuleMapper bindingRuleMapper;
@@ -101,6 +104,7 @@ public class CommandExecutorImpl implements CommandExecutor {
     private final RollUpFieldRegistry rollUpFieldRegistry;
     private final RollUpSummaryService rollUpSummaryService;
     private final PayloadTemporalNormalizer payloadTemporalNormalizer;
+    private final CommandPipeline commandPipeline;
 
     @Autowired(required = false)
     private I18nService i18nService;
@@ -134,350 +138,46 @@ public class CommandExecutorImpl implements CommandExecutor {
         log.info("Executing command: {}", commandCode);
         long startTime = System.currentTimeMillis();
         io.micrometer.core.instrument.Timer.Sample metricsSample = commandMetrics != null ? commandMetrics.startTimer() : null;
-        String phaseReached = "init";
-        Map<String, Long> phaseTimings = new java.util.LinkedHashMap<>();
-        long[] lastPhaseTime = {startTime};
 
         Long tenantId = MetaContext.getCurrentTenantId();
         Long userId = MetaContext.getCurrentUserId();
 
+        CommandPipelineContext ctx = CommandPipelineContext.builder()
+                .commandCode(commandCode)
+                .request(request)
+                .tenantId(tenantId)
+                .userId(userId)
+                .startTime(startTime)
+                .build();
+
         try {
-            // 1. Load CommandDefinition (tenant_id is automatically added by TenantLineInnerInterceptor)
-            phaseTimings.put(phaseReached, System.currentTimeMillis() - lastPhaseTime[0]);
-            lastPhaseTime[0] = System.currentTimeMillis();
-            phaseReached = "load";
-            CommandDefinition command = commandMetadataCache.findCurrentCommandByCode(commandCode);
-            if (command == null) {
-                throw new BusinessException(ResponseCode.BadParam, "Command not found: " + commandCode);
-            }
-            if (!Status.PUBLISHED.getCode().equals(command.getStatus())) {
-                throw new BusinessException(ResponseCode.BadParam, "Command is not published: " + commandCode);
+            // Pre-guard phases: Load, SchemaValidate, Idempotency, Entitlement
+            CommandExecuteResult shortCircuit = commandPipeline.executePreGuardPhases(ctx);
+            if (shortCircuit != null) {
+                return shortCircuit;
             }
 
-            // 2. Schema Validate (basic payload check)
-            phaseTimings.put(phaseReached, System.currentTimeMillis() - lastPhaseTime[0]);
-            lastPhaseTime[0] = System.currentTimeMillis();
-            phaseReached = "schema_validate";
-            Map<String, Object> payload = request.getPayload() != null ? request.getPayload() : new HashMap<>();
-
-            // 2.1. Temporal Normalization — convert date/datetime strings to typed Java objects
-            if (command.getModelCode() != null) {
-                metaModelService.getModelDefinition(command.getModelCode())
-                        .ifPresent(modelDef -> payloadTemporalNormalizer.normalize(payload, modelDef));
-            }
-
-            // 3. Idempotency Check
-            phaseTimings.put(phaseReached, System.currentTimeMillis() - lastPhaseTime[0]);
-            lastPhaseTime[0] = System.currentTimeMillis();
-            phaseReached = "idempotency_check";
-            if (StringUtils.hasText(request.getClientRequestId())) {
-                Map<String, Object> cachedResult = idempotencyService.checkIdempotency(request.getClientRequestId(), tenantId);
-                if (cachedResult != null) {
-                    log.info("Idempotent replay for command {} with clientRequestId {}", commandCode, request.getClientRequestId());
-                    return CommandExecuteResult.builder()
-                            .commandCode(commandCode)
-                            .phaseReached("completed")
-                            .data(cachedResult)
-                            .executionTimeMs(System.currentTimeMillis() - startTime)
-                            .idempotentReplay(true)
-                            .build();
-                }
-            }
-
-            // 3.5. ENTITLEMENT_CHECK Phase
-            if (entitlementChecker.isEnabled()) {
-                phaseTimings.put(phaseReached, System.currentTimeMillis() - lastPhaseTime[0]);
-                lastPhaseTime[0] = System.currentTimeMillis();
-                phaseReached = "entitlement_check";
-                String modelCode = command.getModelCode();
-                if (modelCode != null) {
-                    String namespace = modelCode.contains("_")
-                            ? modelCode.substring(0, modelCode.indexOf('_'))
-                            : modelCode;
-                    if (!entitlementChecker.isPluginActive(namespace)) {
-                        throw new BusinessException(ResponseCode.FORBIDDEN,
-                                "Plugin entitlement required for command: " + commandCode);
-                    }
-                    if (command.getRequiredFeature() != null && !command.getRequiredFeature().isEmpty()) {
-                        if (!entitlementChecker.hasFeature(namespace, command.getRequiredFeature())) {
-                            throw new BusinessException(ResponseCode.FORBIDDEN,
-                                    "Feature entitlement required: " + command.getRequiredFeature());
-                        }
-                    }
-                }
-            }
-
-            // 4. Parse executionConfig once and reuse throughout
-            Map<String, Object> execConfig = parseExecutionConfig(command);
-            String concurrencyKey = resolveConcurrencyKeyFromConfig(execConfig, payload);
-            long lockTimeoutMs = resolveLockTimeoutFromConfig(execConfig);
-
-            // Execute pipeline (optionally wrapped in concurrency guard)
-            final CommandDefinition finalCommand = command;
-            phaseTimings.put(phaseReached, System.currentTimeMillis() - lastPhaseTime[0]);
-            final String[] phaseRef = {phaseReached};
-            final long[] phaseStartRef = {System.currentTimeMillis()};
-            final Map<String, Long> finalPhaseTimings = phaseTimings;
-            final Map<String, Object> finalPayload = payload;
-            final Map<String, Object> finalExecConfig = execConfig;
-
-            // Batch-load all binding rules for this command (N+1 fix: 6 queries → 1)
-            List<BindingRule> allBindingRules = commandMetadataCache.findBindingRulesByCommandId(command.getId());
-            Map<String, List<BindingRule>> rulesByType = allBindingRules.stream()
-                    .filter(r -> r.getEnabled() != null && r.getEnabled())
-                    .collect(Collectors.groupingBy(BindingRule::getRuleType));
-
-            java.util.function.Supplier<CommandExecuteResult> pipeline = () -> {
-
-                // 4.5. SOD_CHECK Phase: Separation of Duties enforcement
-                transitionPhase(phaseRef, phaseStartRef, finalPhaseTimings, "sod_check");
-                if (sodService != null) {
-                    String entityType = finalCommand.getModelCode();
-                    Long entityId = null;
-                    if (request != null && StringUtils.hasText(request.getTargetRecordId())) {
-                        try {
-                            entityId = Long.parseLong(request.getTargetRecordId());
-                        } catch (NumberFormatException e) {
-                            // Non-numeric record IDs (e.g. PIDs) — skip entity-level SoD
-                        }
-                    }
-                    String actorName = MetaContext.exists() ? MetaContext.getCurrentUsername() : null;
-                    // checkSod will throw SodViolationException for HARD enforcement
-                    sodService.checkSod(commandCode, userId, actorName, entityType, entityId);
-                }
-
-                // 5. STATE_CHECK Phase (enhanced with multi-branch stateTransitionRules)
-                transitionPhase(phaseRef, phaseStartRef, finalPhaseTimings, "state_check");
-                String targetState = stateCheckExecutor.executeStateCheckPhase(finalCommand, finalPayload, tenantId, request, execConfig);
-
-                // 6. ASSERT Phase (includes preconditions from executionConfig)
-                transitionPhase(phaseRef, phaseStartRef, finalPhaseTimings, "assert");
-                List<BindingRule> assertRules = rulesByType.getOrDefault("assert", Collections.emptyList());
-                executeAssertPhase(assertRules, finalPayload);
-                executePreconditionsPhase(execConfig, finalPayload, tenantId, finalCommand, request);
-                executeValidationPhase(execConfig, finalPayload, tenantId, finalCommand, request);
-
-                // 6.5. PRE_INVARIANT Phase
-                transitionPhase(phaseRef, phaseStartRef, finalPhaseTimings, "pre_invariant");
-                String stateFieldForInvariant = stateCheckExecutor.getStateFieldForModel(finalCommand.getModelCode());
-                String currentStateForInvariant = (request != null && StringUtils.hasText(request.getTargetRecordId()) && stateFieldForInvariant != null)
-                        ? stateCheckExecutor.readCurrentState(tenantId, finalCommand.getModelCode(), request.getTargetRecordId(), stateFieldForInvariant)
-                        : null;
-                invariantEngine.evaluatePreInvariants(
-                        tenantId, finalCommand.getCode(), finalCommand.getModelCode(),
-                        finalPayload, request != null ? request.getTargetRecordId() : null,
-                        currentStateForInvariant);
-
-                // 6.6. Cross-field validation rules (after invariants)
-                executeCrossFieldRules(finalCommand, finalPayload, execConfig);
-
-                boolean hasPluginHandler = hasPluginHandler(finalCommand.getCode());
-                boolean pluginRequiresDslPersistence = hasPluginHandler
-                        && shouldExecuteDslPersistenceWithPlugin(execConfig, request);
-
-                // 6.8. AUTO_SET Phase: inject auto-generated values into payload
-                if (!hasPluginHandler || pluginRequiresDslPersistence) {
-                    transitionPhase(phaseRef, phaseStartRef, finalPhaseTimings, "auto_set");
-                    autoSetExecutor.executeAutoSetPhase(execConfig, finalPayload, tenantId, userId, finalCommand);
-                    executeCommandFieldValidationPhase(execConfig, finalPayload, finalCommand, request);
-                } else {
-                    log.info("Skipping AUTO_SET for plugin-handled command: {}", finalCommand.getCode());
-                }
-
-                // 7. FIELD_MAP Phase
-                transitionPhase(phaseRef, phaseStartRef, finalPhaseTimings, "field_map");
-                // Capture before-snapshot for change tracking (UPDATE/DELETE)
-                Map<String, Object> beforeSnapshot = null;
-                if (request != null && StringUtils.hasText(request.getTargetRecordId())
-                        && StringUtils.hasText(finalCommand.getModelCode())) {
-                    beforeSnapshot = readRecordSnapshot(tenantId, finalCommand.getModelCode(), request.getTargetRecordId());
-                }
-
-                // Execute cascade delete before the main delete (if applicable)
-                if ("delete".equalsIgnoreCase(request.getOperationType())) {
-                    cascadeDeleteExecutor.executeCascadeDeletePhase(execConfig, tenantId, request);
-                }
-
-                Map<String, Object> fieldMapResults;
-                if (hasPluginHandler && !pluginRequiresDslPersistence) {
-                    fieldMapResults = new HashMap<>();
-                    log.info("Skipping FIELD_MAP for plugin-handled command: {}", finalCommand.getCode());
-                } else {
-                    List<BindingRule> fieldMapRules = rulesByType.getOrDefault("field_map", Collections.emptyList());
-                    boolean noBindingRules = (fieldMapRules == null || fieldMapRules.isEmpty());
-                    boolean hasInputFields = (execConfig != null && execConfig.containsKey("inputFields"));
-                    boolean hasAutoSetFields = (execConfig != null && execConfig.containsKey("autoSetFields"));
-                    boolean isDeleteOp = "delete".equalsIgnoreCase(request.getOperationType());
-                    String cmdType = execConfig != null ? (String) execConfig.get("type") : null;
-                    boolean isStateTransition = "state_transition".equalsIgnoreCase(cmdType);
-                    boolean isCreateOrUpdate = "create".equalsIgnoreCase(cmdType) || "update".equalsIgnoreCase(cmdType);
-                    if (noBindingRules && (hasInputFields || hasAutoSetFields || isDeleteOp || isStateTransition || isCreateOrUpdate)) {
-                        fieldMapResults = fieldMapExecutor.executeImplicitFieldMapPhase(execConfig, finalPayload, tenantId, request, finalCommand);
-                    } else {
-                        fieldMapResults = fieldMapExecutor.executeFieldMapPhase(fieldMapRules, finalPayload, tenantId, request);
-                    }
-                }
-                propagateFieldMapRecordId(request, fieldMapResults);
-
-                // 7.3. COMPUTED_FIELDS Phase: calculate SpEL formula fields
-                transitionPhase(phaseRef, phaseStartRef, finalPhaseTimings, "computed_fields");
-                executeComputedFieldsPhase(execConfig, finalPayload, tenantId, finalCommand, request, fieldMapResults);
-
-                // 7.5. Change Tracking: record field-level changes after FIELD_MAP
-                recordChangeTracking(finalCommand, request, tenantId, userId, beforeSnapshot);
-
-                // 8. HANDLER Phase
-                transitionPhase(phaseRef, phaseStartRef, finalPhaseTimings, "handler");
-                List<BindingRule> handlerRules = rulesByType.getOrDefault("handler", Collections.emptyList());
-                Map<String, Object> handlerResults = executeHandlerPhase(handlerRules, finalCommand, finalPayload, fieldMapResults, tenantId, userId, request, finalExecConfig);
-                persistHandlerResults(finalCommand.getModelCode(), finalPayload, handlerResults, tenantId, request, fieldMapResults);
-
-                // 8.5. API_CALL Phase: collect rules inside transaction (query DB)
-                List<BindingRule> apiCallRules = rulesByType.getOrDefault("api_call", Collections.emptyList());
-
-                // 8.7. CONSISTENCY_CHECK Phase: validate cross-document constraints (e.g., shipment qty <= order qty)
-                transitionPhase(phaseRef, phaseStartRef, finalPhaseTimings, "consistency_check");
-                executeConsistencyCheckPhase(finalCommand, finalPayload, fieldMapResults, tenantId, execConfig);
-
-                // 8.8. SIDE_EFFECT Phase: create/update related records based on conditions
-                transitionPhase(phaseRef, phaseStartRef, finalPhaseTimings, "side_effect");
-                sideEffectExecutor.executeSideEffectPhase(execConfig, finalPayload, tenantId, userId, finalCommand, request, fieldMapResults);
-
-                // 8.8.1. ROLL_UP Phase: auto-recalculate parent roll-up fields when child records change
-                executeRollUpRecalculation(finalCommand.getModelCode(), finalPayload, fieldMapResults, tenantId);
-
-                // 8.8.2. GOVERNANCE_SNAPSHOT Phase: auto-capture version snapshot for governed models
-                executeGovernanceSnapshot(finalCommand.getModelCode(), finalPayload, fieldMapResults, tenantId, userId);
-
-                // 8.9. POST_ACTION Phase: create child records or other post-processing
-                transitionPhase(phaseRef, phaseStartRef, finalPhaseTimings, "post_action");
-                executePostActionPhase(execConfig, finalPayload, tenantId, userId, finalCommand, request, fieldMapResults);
-
-                // 9. EFFECT Phase
-                transitionPhase(phaseRef, phaseStartRef, finalPhaseTimings, "effect");
-                List<BindingRule> effectRules = rulesByType.getOrDefault("effect", Collections.emptyList());
-                effectExecutor.executeEffectPhase(effectRules, finalCommand, finalPayload, fieldMapResults, tenantId, userId, request, targetState);
-
-                // 9.1. DOMAIN_EVENT Phase: publish for in-process listeners (e.g., finance voucher engine)
-                // NOTE: This runs inside the @Transactional boundary — listeners share the same DB transaction.
-                // If a listener needs to run after commit, use @TransactionalEventListener(phase = AFTER_COMMIT).
-                try {
-                    String recordId = request != null ? request.getTargetRecordId() : null;
-                    String actorName = MetaContext.exists() ? MetaContext.getCurrentUsername() : null;
-                    // Pass beforeSnapshot via extra metadata for field change auditing
-                    Map<String, Object> extraMeta = null;
-                    if (beforeSnapshot != null) {
-                        extraMeta = Map.of("beforeSnapshot", beforeSnapshot);
-                    }
-                    domainEventPublisher.publishCommandCompleted(
-                            finalCommand.getCode(),
-                            request != null ? request.getOperationType() : "unknown",
-                            tenantId, recordId, finalCommand.getModelCode(), finalPayload,
-                            userId, actorName, extraMeta);
-                } catch (Exception e) {
-                    log.warn("Failed to publish domain event for command {}: {}",
-                            finalCommand.getCode(), e.getMessage());
-                }
-
-                // 9.2. WEBHOOK Phase: collect rules inside transaction (query DB)
-                List<BindingRule> webhookRules = rulesByType.getOrDefault("webhook", Collections.emptyList());
-
-                // 9.3. Schedule API_CALL and WEBHOOK for after-commit execution
-                // External HTTP calls must NOT block the database transaction.
-                if ((apiCallRules != null && !apiCallRules.isEmpty()) || (webhookRules != null && !webhookRules.isEmpty())) {
-                    final Map<String, Object> afterCommitPayload = new HashMap<>(finalPayload);
-                    final Map<String, Object> afterCommitResults = new HashMap<>(handlerResults);
-                    final CommandDefinition afterCommitCommand = finalCommand;
-                    final Long afterCommitTenantId = tenantId;
-                    final List<BindingRule> afterCommitApiCallRules = apiCallRules;
-                    final List<BindingRule> afterCommitWebhookRules = webhookRules;
-
-                    TransactionSynchronizationManager.registerSynchronization(
-                        new TransactionSynchronization() {
-                            @Override
-                            public void afterCommit() {
-                                try {
-                                    if (afterCommitApiCallRules != null && !afterCommitApiCallRules.isEmpty()) {
-                                        executeApiCallPhase(afterCommitApiCallRules, afterCommitPayload, afterCommitResults);
-                                    }
-                                    if (afterCommitWebhookRules != null && !afterCommitWebhookRules.isEmpty()) {
-                                        executeWebhookPhase(afterCommitWebhookRules, afterCommitCommand, afterCommitPayload, afterCommitResults, afterCommitTenantId);
-                                    }
-                                } catch (Exception e) {
-                                    log.warn("After-commit API_CALL/WEBHOOK execution failed: {}", e.getMessage());
-                                }
-                            }
-                        }
-                    );
-                }
-
-                // 9.5. POST_INVARIANT Phase
-                transitionPhase(phaseRef, phaseStartRef, finalPhaseTimings, "post_invariant");
-                invariantEngine.evaluatePostInvariants(
-                        tenantId, finalCommand.getCode(), finalCommand.getModelCode(),
-                        finalPayload, request != null ? request.getTargetRecordId() : null,
-                        targetState);
-
-                // 10. Build result
-                transitionPhase(phaseRef, phaseStartRef, finalPhaseTimings, "completed");
-                Map<String, Object> resultData = new HashMap<>();
-                resultData.putAll(fieldMapResults);
-                resultData.putAll(handlerResults);
-                mergeEffectiveRecordId(resultData, request);
-
-                // 11. Save idempotency record
-                if (StringUtils.hasText(request.getClientRequestId())) {
-                    idempotencyService.recordOutcome(request.getClientRequestId(), commandCode, finalPayload, resultData, tenantId);
-                }
-
-                // 12. Audit log (after-commit to shorten transaction duration)
-                long execTimeMs = System.currentTimeMillis() - startTime;
-                finalPhaseTimings.put(phaseRef[0], System.currentTimeMillis() - phaseStartRef[0]);
-                final long afterCommitExecTimeMs = execTimeMs;
-                final String afterCommitPhase = phaseRef[0];
-                final Map<String, Long> afterCommitPhaseTimings = new java.util.LinkedHashMap<>(finalPhaseTimings);
-                final Map<String, Object> afterCommitPayloadForAudit = new HashMap<>(finalPayload);
-                final Map<String, Object> afterCommitResultForAudit = new HashMap<>(resultData);
-                TransactionSynchronizationManager.registerSynchronization(
-                    new TransactionSynchronization() {
-                        @Override
-                        public void afterCommit() {
-                            effectExecutor.saveAuditLog(tenantId, commandCode, finalCommand.getPid(), userId,
-                                    afterCommitPayloadForAudit, afterCommitResultForAudit, true, null,
-                                    afterCommitExecTimeMs, afterCommitPhase, afterCommitPhaseTimings);
-                        }
-                    }
-                );
-
-                log.info("Command {} executed successfully in {}ms", commandCode, execTimeMs);
-
-                return CommandExecuteResult.builder()
-                        .commandCode(commandCode)
-                        .phaseReached(phaseRef[0])
-                        .data(resultData)
-                        .executionTimeMs(execTimeMs)
-                        .idempotentReplay(false)
-                        .build();
-            };
+            // Execute guarded phases (optionally wrapped in concurrency guard)
+            java.util.function.Supplier<CommandExecuteResult> guardedPipeline =
+                    () -> commandPipeline.executeGuardedPhases(ctx);
 
             CommandExecuteResult result;
-            if (concurrencyKey != null) {
-                result = concurrencyGuard.executeWithLock(concurrencyKey, lockTimeoutMs, pipeline);
+            if (ctx.getConcurrencyKey() != null) {
+                result = concurrencyGuard.executeWithLock(ctx.getConcurrencyKey(), ctx.getLockTimeoutMs(), guardedPipeline);
             } else {
-                result = pipeline.get();
+                result = guardedPipeline.get();
             }
 
             // Record success metrics
             if (metricsSample != null && commandMetrics != null) {
                 commandMetrics.recordCommandExecution(metricsSample, commandCode, result.getCommandCode(), true);
-                metricsSample = null;
             }
 
-            phaseReached = phaseRef[0];
             return result;
 
         } catch (Exception e) {
             long executionTimeMs = System.currentTimeMillis() - startTime;
+            String phaseReached = ctx.getCurrentPhase() != null ? ctx.getCurrentPhase() : "init";
             log.error("Command {} failed at phase {}: {}", commandCode, phaseReached, e.getMessage());
 
             // Record failure metrics
@@ -485,8 +185,11 @@ public class CommandExecutorImpl implements CommandExecutor {
                 commandMetrics.recordCommandExecution(metricsSample, "unknown", "unknown", false);
             }
 
-            // Audit log for failure (record current phase timing before saving)
-            phaseTimings.put(phaseReached, System.currentTimeMillis() - lastPhaseTime[0]);
+            // Audit log for failure
+            Map<String, Long> phaseTimings = ctx.getPhaseTimings();
+            if (ctx.getCurrentPhase() != null) {
+                phaseTimings.put(ctx.getCurrentPhase(), System.currentTimeMillis() - ctx.getCurrentPhaseStart());
+            }
             effectExecutor.saveAuditLog(tenantId, commandCode, null, userId,
                     request.getPayload(), null, false, e.getMessage(), executionTimeMs, phaseReached, phaseTimings);
 
@@ -499,7 +202,8 @@ public class CommandExecutorImpl implements CommandExecutor {
 
     // ==================== Phase Implementations ====================
 
-    private void executeAssertPhase(List<BindingRule> assertRules, Map<String, Object> payload) {
+    @Override
+    public void executeAssertPhase(List<BindingRule> assertRules, Map<String, Object> payload) {
         for (BindingRule rule : assertRules) {
             if (!StringUtils.hasText(rule.getExpression())) {
                 continue;
@@ -513,7 +217,8 @@ public class CommandExecutorImpl implements CommandExecutor {
         }
     }
 
-    private Map<String, Object> executeHandlerPhase(List<BindingRule> handlerRules,
+    @Override
+    public Map<String, Object> executeHandlerPhase(List<BindingRule> handlerRules,
                                                      CommandDefinition command,
                                                      Map<String, Object> payload,
                                                      Map<String, Object> fieldMapResults,
@@ -696,11 +401,13 @@ public class CommandExecutorImpl implements CommandExecutor {
         }
     }
 
-    private boolean hasPluginHandler(String commandCode) {
+    @Override
+    public boolean hasPluginHandler(String commandCode) {
         return extensionRegistry != null && extensionRegistry.getCommandHandler(commandCode).isPresent();
     }
 
-    private boolean shouldExecuteDslPersistenceWithPlugin(Map<String, Object> execConfig, CommandExecuteRequest request) {
+    @Override
+    public boolean shouldExecuteDslPersistenceWithPlugin(Map<String, Object> execConfig, CommandExecuteRequest request) {
         if (execConfig == null || execConfig.isEmpty()) {
             return false;
         }
@@ -718,7 +425,8 @@ public class CommandExecutorImpl implements CommandExecutor {
         return execConfig.containsKey("inputFields") || execConfig.containsKey("autoSetFields");
     }
 
-    private void propagateFieldMapRecordId(CommandExecuteRequest request, Map<String, Object> fieldMapResults) {
+    @Override
+    public void propagateFieldMapRecordId(CommandExecuteRequest request, Map<String, Object> fieldMapResults) {
         if (request == null || fieldMapResults == null || StringUtils.hasText(request.getTargetRecordId())) {
             return;
         }
@@ -773,7 +481,8 @@ public class CommandExecutorImpl implements CommandExecutor {
     // ==================== Preconditions & Validation Phase ====================
 
     @SuppressWarnings("unchecked")
-    private void executePreconditionsPhase(Map<String, Object> execConfig, Map<String, Object> payload,
+    @Override
+    public void executePreconditionsPhase(Map<String, Object> execConfig, Map<String, Object> payload,
                                            Long tenantId, CommandDefinition command,
                                            CommandExecuteRequest request) {
         if (execConfig == null || !execConfig.containsKey("preconditions")) {
@@ -922,7 +631,8 @@ public class CommandExecutorImpl implements CommandExecutor {
     }
 
     @SuppressWarnings("unchecked")
-    private void executeValidationPhase(Map<String, Object> execConfig, Map<String, Object> payload,
+    @Override
+    public void executeValidationPhase(Map<String, Object> execConfig, Map<String, Object> payload,
                                          Long tenantId, CommandDefinition command,
                                          CommandExecuteRequest request) {
         if (execConfig == null || !execConfig.containsKey("validation")) {
@@ -962,7 +672,8 @@ public class CommandExecutorImpl implements CommandExecutor {
      * Loads model-level rules and merges with command-level ruleOverrides.
      */
     @SuppressWarnings("unchecked")
-    private void executeCrossFieldRules(CommandDefinition command,
+    @Override
+    public void executeCrossFieldRules(CommandDefinition command,
                                          Map<String, Object> payload,
                                          Map<String, Object> execConfig) {
         // Load model rules
@@ -1013,7 +724,8 @@ public class CommandExecutorImpl implements CommandExecutor {
     }
 
     @SuppressWarnings("unchecked")
-    private void executeCommandFieldValidationPhase(Map<String, Object> execConfig,
+    @Override
+    public void executeCommandFieldValidationPhase(Map<String, Object> execConfig,
                                                     Map<String, Object> payload,
                                                     CommandDefinition command,
                                                     CommandExecuteRequest request) {
@@ -1255,7 +967,8 @@ public class CommandExecutorImpl implements CommandExecutor {
     // ==================== Computed Fields Phase ====================
 
     @SuppressWarnings("unchecked")
-    private void executeComputedFieldsPhase(Map<String, Object> execConfig, Map<String, Object> payload,
+    @Override
+    public void executeComputedFieldsPhase(Map<String, Object> execConfig, Map<String, Object> payload,
                                               Long tenantId, CommandDefinition command,
                                               CommandExecuteRequest request,
                                               Map<String, Object> fieldMapResults) {
@@ -1339,7 +1052,8 @@ public class CommandExecutorImpl implements CommandExecutor {
 
     // ==================== Post Action Phase ====================
 
-    private void persistHandlerResults(String modelCode,
+    @Override
+    public void persistHandlerResults(String modelCode,
                                        Map<String, Object> payload,
                                        Map<String, Object> handlerResults,
                                        Long tenantId,
@@ -1410,7 +1124,8 @@ public class CommandExecutorImpl implements CommandExecutor {
     }
 
     @SuppressWarnings("unchecked")
-    private void executePostActionPhase(Map<String, Object> execConfig, Map<String, Object> payload,
+    @Override
+    public void executePostActionPhase(Map<String, Object> execConfig, Map<String, Object> payload,
                                          Long tenantId, Long userId, CommandDefinition command,
                                          CommandExecuteRequest request,
                                          Map<String, Object> fieldMapResults) {
@@ -1658,7 +1373,8 @@ public class CommandExecutorImpl implements CommandExecutor {
     // ==================== API Call & Webhook ====================
 
     @SuppressWarnings("unchecked")
-    private Map<String, Object> executeApiCallPhase(List<BindingRule> apiCallRules,
+    @Override
+    public Map<String, Object> executeApiCallPhase(List<BindingRule> apiCallRules,
                                                       Map<String, Object> payload,
                                                       Map<String, Object> handlerResults) {
         Map<String, Object> apiResults = new HashMap<>();
@@ -1690,7 +1406,8 @@ public class CommandExecutorImpl implements CommandExecutor {
     }
 
     @SuppressWarnings("unchecked")
-    private void executeWebhookPhase(List<BindingRule> webhookRules,
+    @Override
+    public void executeWebhookPhase(List<BindingRule> webhookRules,
                                       CommandDefinition command,
                                       Map<String, Object> payload,
                                       Map<String, Object> results,
@@ -1722,7 +1439,8 @@ public class CommandExecutorImpl implements CommandExecutor {
 
     // ==================== Change Tracking ====================
 
-    private Map<String, Object> readRecordSnapshot(Long tenantId, String modelCode, String recordId) {
+    @Override
+    public Map<String, Object> readRecordSnapshot(Long tenantId, String modelCode, String recordId) {
         try {
             String tableName = metaModelService.getTableName(modelCode);
             CommandExecutorUtils.validateSqlIdentifier(tableName, "snapshot tableName");
@@ -1740,7 +1458,8 @@ public class CommandExecutorImpl implements CommandExecutor {
         return null;
     }
 
-    private void recordChangeTracking(CommandDefinition command, CommandExecuteRequest request,
+    @Override
+    public void recordChangeTracking(CommandDefinition command, CommandExecuteRequest request,
                                        Long tenantId, Long userId, Map<String, Object> beforeSnapshot) {
         try {
             String modelCode = command.getModelCode();
@@ -1795,7 +1514,8 @@ public class CommandExecutorImpl implements CommandExecutor {
      * the current command's model as a child, then recalculates each matching roll-up.
      */
     @SuppressWarnings("unchecked")
-    private void executeRollUpRecalculation(String modelCode, Map<String, Object> payload,
+    @Override
+    public void executeRollUpRecalculation(String modelCode, Map<String, Object> payload,
                                              Map<String, Object> fieldMapResults, Long tenantId) {
         List<RollUpFieldRegistry.RollUpTarget> targets = rollUpFieldRegistry.getTargets(modelCode);
         if (targets.isEmpty()) return;
@@ -1842,7 +1562,8 @@ public class CommandExecutorImpl implements CommandExecutor {
      * Auto-capture a governance version snapshot after successful command execution
      * on models with autoSnapshot policy enabled.
      */
-    private void executeGovernanceSnapshot(String modelCode, Map<String, Object> payload,
+    @Override
+    public void executeGovernanceSnapshot(String modelCode, Map<String, Object> payload,
                                             Map<String, Object> fieldMapResults, Long tenantId, Long userId) {
         if (governanceSnapshotService == null) return;
 
@@ -1879,7 +1600,8 @@ public class CommandExecutorImpl implements CommandExecutor {
      * WARNING-severity violations are logged but don't block.
      * Only active when the command type is CREATE or UPDATE.
      */
-    private void executeConsistencyCheckPhase(
+    @Override
+    public void executeConsistencyCheckPhase(
             com.auraboot.framework.meta.entity.CommandDefinition command,
             Map<String, Object> payload,
             Map<String, Object> fieldMapResults,
@@ -1940,5 +1662,43 @@ public class CommandExecutorImpl implements CommandExecutor {
         phaseTimings.put(phaseRef[0], now - phaseStartRef[0]);
         phaseStartRef[0] = now;
         phaseRef[0] = newPhase;
+    }
+
+    // ==================== CommandExecutorDelegate bridge methods ====================
+
+    @Override
+    public void saveAuditLog(Long tenantId, String commandCode, String commandPid, Long userId,
+                              Map<String, Object> payload, Map<String, Object> result,
+                              boolean success, String errorMessage, long executionTimeMs,
+                              String phaseReached, Map<String, Long> phaseTimings) {
+        effectExecutor.saveAuditLog(tenantId, commandCode, commandPid, userId,
+                payload, result, success, errorMessage, executionTimeMs, phaseReached, phaseTimings);
+    }
+
+    @Override
+    public void saveIdempotencyRecord(String clientRequestId, String commandCode,
+                                       Map<String, Object> payload, Map<String, Object> resultData, Long tenantId) {
+        idempotencyService.recordOutcome(clientRequestId, commandCode, payload, resultData, tenantId);
+    }
+
+    @Override
+    public void publishDomainEvent(CommandDefinition command, CommandExecuteRequest request,
+                                    Map<String, Object> payload, Long tenantId, Long userId,
+                                    Map<String, Object> beforeSnapshot) {
+        try {
+            String recordId = request != null ? request.getTargetRecordId() : null;
+            String actorName = MetaContext.exists() ? MetaContext.getCurrentUsername() : null;
+            Map<String, Object> extraMeta = null;
+            if (beforeSnapshot != null) {
+                extraMeta = Map.of("beforeSnapshot", beforeSnapshot);
+            }
+            domainEventPublisher.publishCommandCompleted(
+                    command.getCode(),
+                    request != null ? request.getOperationType() : "unknown",
+                    tenantId, recordId, command.getModelCode(), payload,
+                    userId, actorName, extraMeta);
+        } catch (Exception e) {
+            log.warn("Failed to publish domain event for command {}: {}", command.getCode(), e.getMessage());
+        }
     }
 }

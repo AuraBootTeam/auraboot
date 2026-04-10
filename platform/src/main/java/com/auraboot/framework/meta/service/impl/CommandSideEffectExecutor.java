@@ -34,7 +34,7 @@ import java.util.Set;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-class CommandSideEffectExecutor {
+public class CommandSideEffectExecutor {
 
     private final DynamicDataMapper dynamicDataMapper;
     private final DynamicDataService dynamicDataService;
@@ -47,7 +47,7 @@ class CommandSideEffectExecutor {
      * Execute side effect phase based on executionConfig.sideEffects configuration.
      */
     @SuppressWarnings("unchecked")
-    void executeSideEffectPhase(Map<String, Object> execConfig, Map<String, Object> payload,
+    public void executeSideEffectPhase(Map<String, Object> execConfig, Map<String, Object> payload,
                                 Long tenantId, Long userId, CommandDefinition command,
                                 CommandExecuteRequest request,
                                 Map<String, Object> fieldMapResults) {

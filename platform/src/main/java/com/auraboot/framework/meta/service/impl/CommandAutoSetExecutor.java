@@ -22,14 +22,14 @@ import java.util.Map;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-class CommandAutoSetExecutor {
+public class CommandAutoSetExecutor {
 
     private final DynamicDataMapper dynamicDataMapper;
     private final MetaModelService metaModelService;
     private final TenantClock tenantClock;
 
     @SuppressWarnings("unchecked")
-    void executeAutoSetPhase(Map<String, Object> execConfig, Map<String, Object> payload,
+    public void executeAutoSetPhase(Map<String, Object> execConfig, Map<String, Object> payload,
                               Long tenantId, Long userId, CommandDefinition command) {
         if (execConfig == null || !execConfig.containsKey("autoSetFields")) {
             return;

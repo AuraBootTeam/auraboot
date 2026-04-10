@@ -38,7 +38,7 @@ public class CommandStateCheckExecutor {
     private final CommandSpelEvaluator spelEvaluator;
 
     @SuppressWarnings("unchecked")
-    String executeStateCheckPhase(CommandDefinition command,
+    public String executeStateCheckPhase(CommandDefinition command,
                                    Map<String, Object> payload,
                                    Long tenantId,
                                    CommandExecuteRequest request,
@@ -151,7 +151,7 @@ public class CommandStateCheckExecutor {
         }
     }
 
-    String readCurrentState(Long tenantId, String modelCode,
+    public String readCurrentState(Long tenantId, String modelCode,
                              String recordId, String stateField) {
         try {
             // Security: validate stateField and tableName to prevent SQL injection

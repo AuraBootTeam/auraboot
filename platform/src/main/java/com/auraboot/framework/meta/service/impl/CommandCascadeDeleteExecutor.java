@@ -24,7 +24,7 @@ import java.util.Map;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-class CommandCascadeDeleteExecutor {
+public class CommandCascadeDeleteExecutor {
 
     private final DynamicDataMapper dynamicDataMapper;
     private final MetaModelService metaModelService;
@@ -37,7 +37,7 @@ class CommandCascadeDeleteExecutor {
      * @param request    the command execute request (must have targetRecordId)
      */
     @SuppressWarnings("unchecked")
-    void executeCascadeDeletePhase(Map<String, Object> execConfig, Long tenantId,
+    public void executeCascadeDeletePhase(Map<String, Object> execConfig, Long tenantId,
                                    CommandExecuteRequest request) {
         if (execConfig == null || !execConfig.containsKey("cascadeDelete")) {
             return;

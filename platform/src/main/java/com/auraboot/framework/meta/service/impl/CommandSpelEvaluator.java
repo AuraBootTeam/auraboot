@@ -20,7 +20,7 @@ import java.util.Map;
  */
 @Slf4j
 @Component
-class CommandSpelEvaluator {
+public class CommandSpelEvaluator {
 
     private final ExpressionParser spelParser = new SpelExpressionParser();
 
@@ -29,7 +29,7 @@ class CommandSpelEvaluator {
      * Uses SimpleEvaluationContext to prevent arbitrary method invocation (RCE risk).
      * Only allows property reads on Maps — no T() operator, no method calls.
      */
-    EvaluationContext buildSpelContext(Map<String, Object> payload) {
+    public EvaluationContext buildSpelContext(Map<String, Object> payload) {
         SimpleEvaluationContext context = SimpleEvaluationContext
                 .forPropertyAccessors(new org.springframework.context.expression.MapAccessor())
                 .withRootObject(payload)
@@ -49,14 +49,14 @@ class CommandSpelEvaluator {
      * @param resultType the expected result type
      * @return the evaluation result, or null on failure
      */
-    <T> T evaluate(String expression, EvaluationContext context, Class<T> resultType) {
+    public <T> T evaluate(String expression, EvaluationContext context, Class<T> resultType) {
         return spelParser.parseExpression(expression).getValue(context, resultType);
     }
 
     /**
      * Evaluate a SpEL expression and return the raw result.
      */
-    Object evaluate(String expression, EvaluationContext context) {
+    public Object evaluate(String expression, EvaluationContext context) {
         return spelParser.parseExpression(expression).getValue(context);
     }
 

@@ -32,12 +32,12 @@ import java.util.stream.Collectors;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-class CommandFieldMapExecutor {
+public class CommandFieldMapExecutor {
 
     private final DynamicDataMapper dynamicDataMapper;
     private final MetaModelService metaModelService;
 
-    Map<String, Object> executeFieldMapPhase(List<BindingRule> fieldMapRules,
+    public Map<String, Object> executeFieldMapPhase(List<BindingRule> fieldMapRules,
                                               Map<String, Object> payload,
                                               Long tenantId,
                                               CommandExecuteRequest request) {
@@ -135,7 +135,7 @@ class CommandFieldMapExecutor {
      * to build the data map and persist to the command's target model.
      */
     @SuppressWarnings("unchecked")
-    Map<String, Object> executeImplicitFieldMapPhase(Map<String, Object> execConfig,
+    public Map<String, Object> executeImplicitFieldMapPhase(Map<String, Object> execConfig,
                                                       Map<String, Object> payload,
                                                       Long tenantId,
                                                       CommandExecuteRequest request,
@@ -279,7 +279,7 @@ class CommandFieldMapExecutor {
     /**
      * Convert a field value to the appropriate Java type based on the model field's data type.
      */
-    Object convertFieldValue(String dataType, Object value) {
+    public Object convertFieldValue(String dataType, Object value) {
         if (value == null || dataType == null) return value;
         String dt = dataType.toUpperCase();
         return switch (dt) {
