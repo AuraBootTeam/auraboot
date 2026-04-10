@@ -313,21 +313,17 @@ test {
     exclude '**/agent/**'
     exclude '**/bpm/**'
     exclude '**/controller/**'
-    exclude '**/currency/EcbRateFetcherTest.class'
+    // i18n: needs enterprise plugin dirs on disk
     exclude '**/i18n/I18nPluginImportTest.class'
-    exclude '**/integration/CheckinIntegrationTest.class'
+    // integration: permission/bootstrap data issues
     exclude '**/integration/ModelPermissionIntegrationTest.class'
     exclude '**/integration/TenantBootstrapMetaContextTest.class'
     exclude '**/integration/TenantBootstrapIntegrationTest.class'
     exclude '**/integration/UserRoleServiceIntegrationTest.class'
     exclude '**/integration/view/TeamScopeControllerIntegrationTest.class'
-    exclude '**/intent/PluginGeneratorServiceTest.class'
-    exclude '**/menu/MenuSystemTest.class'
+    // Mockito spy on @Cacheable proxy causes UnfinishedStubbingException
     exclude '**/meta/service/impl/PayloadTemporalNormalizerTest.class'
-    exclude '**/governance/service/MasterDataGovernanceServiceTest.class'
-    exclude '**/governance/service/MasterDataPolicyServiceIntegrationTest.class'
-    exclude '**/permission/controller/PermissionControllerUnitTest.class'
-    // plugin tests: re-enabled 170+ tests; excluded classes that need enterprise plugin dirs on disk
+    // plugin tests: need enterprise plugin dirs on disk
     exclude '**/plugin/integration/AssetCommandExecutionTest.class'
     exclude '**/plugin/integration/AssetPermissionTest.class'
     exclude '**/plugin/integration/AssetPluginInstallTest.class'
@@ -337,9 +333,8 @@ test {
     exclude '**/plugin/service/PluginImportIntegrationTest.class'
     exclude '**/plugin/service/PluginTransactionalImportServiceIntegrationTest.class'
     exclude '**/plugin/template/TemplateControllerIntegrationTest.class'
-    exclude '**/rag/**'
+    // ApplicationContext fails with @ActiveProfiles("test") instead of "integration-test"
     exclude '**/tenant/service/TenantBootstrapServiceTest.class'
-    exclude '**/finance/engine/CurrencyConversionHandlerIntegrationTest.class'
     jvmArgs "-Djavax.xml.parsers.SAXParserFactory=com.sun.org.apache.xerces.internal.jaxp.SAXParserFactoryImpl"
     jvmArgs '-Duser.timezone=UTC'
     jvmArgs '-Xmx6g', '-Xms2g', '-XX:+UseG1GC'
