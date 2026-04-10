@@ -314,7 +314,7 @@ test {
     exclude '**/bpm/**'
     exclude '**/controller/**'
     exclude '**/currency/EcbRateFetcherTest.class'
-    exclude '**/i18n/**'
+    exclude '**/i18n/I18nPluginImportTest.class'
     exclude '**/integration/CheckinIntegrationTest.class'
     exclude '**/integration/ModelPermissionIntegrationTest.class'
     exclude '**/integration/TenantBootstrapMetaContextTest.class'
@@ -331,7 +331,6 @@ test {
     exclude '**/rag/**'
     exclude '**/tenant/service/TenantBootstrapServiceTest.class'
     exclude '**/finance/engine/CurrencyConversionHandlerIntegrationTest.class'
-    jvmArgs "-javaagent:${configurations.mockitoAgent.singleFile}"
     jvmArgs "-Djavax.xml.parsers.SAXParserFactory=com.sun.org.apache.xerces.internal.jaxp.SAXParserFactoryImpl"
     jvmArgs '-Duser.timezone=UTC'
     jvmArgs '-Xmx6g', '-Xms2g', '-XX:+UseG1GC'
@@ -357,7 +356,10 @@ test {
     // Spring context initialization failures (IllegalStateException) in tests.
     jacoco {
         excludes = ['net.sf.jsqlparser.parser.CCJSqlParserTokenManager']
+        classDumpDir = file("${buildDir}/jacoco-classdump")
     }
+
+    jvmArgs "-javaagent:${configurations.mockitoAgent.singleFile}"
 }
 
 // Dedicated task for running BPM tests (excluded from the default test task)
@@ -505,9 +507,18 @@ def jacocoExcludes = [
 jacocoTestReport {
     dependsOn test
     afterEvaluate {
-        classDirectories.setFrom(files(classDirectories.files.collect {
+        // Include both compiled classes AND JaCoCo classdump (runtime-generated CGLIB proxies).
+        // Spring Boot uses CGLIB proxies for @Transactional/@Async beans. JaCoCo probes fire
+        // on the proxy class, not the original. Without the classdump, coverage for all
+        // Spring-managed service beans shows as 0%.
+        def classDumpDir = file("${buildDir}/jacoco-classdump")
+        def allClassDirs = classDirectories.files.collect {
             fileTree(dir: it, exclude: jacocoExcludes)
-        }))
+        }
+        if (classDumpDir.exists()) {
+            allClassDirs.add(fileTree(dir: classDumpDir, exclude: jacocoExcludes))
+        }
+        classDirectories.setFrom(files(allClassDirs))
     }
     reports {
         xml.required = true
@@ -519,9 +530,14 @@ jacocoTestReport {
 jacocoTestCoverageVerification {
     dependsOn jacocoTestReport
     afterEvaluate {
-        classDirectories.setFrom(files(classDirectories.files.collect {
+        def classDumpDir = file("${buildDir}/jacoco-classdump")
+        def allClassDirs = classDirectories.files.collect {
             fileTree(dir: it, exclude: jacocoExcludes)
-        }))
+        }
+        if (classDumpDir.exists()) {
+            allClassDirs.add(fileTree(dir: classDumpDir, exclude: jacocoExcludes))
+        }
+        classDirectories.setFrom(files(allClassDirs))
     }
     violationRules {
         rule {
