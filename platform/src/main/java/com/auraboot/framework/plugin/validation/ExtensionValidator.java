@@ -159,7 +159,7 @@ public class ExtensionValidator implements PluginValidator {
         String renderComponent = renderComponentObj.toString();
         if (dataType == null || dataType.isBlank() || renderComponent.isBlank()) return;
 
-        List<String> compatible = TYPE_COMPATIBLE_COMPONENTS.get(dataType.toUpperCase());
+        List<String> compatible = TYPE_COMPATIBLE_COMPONENTS.get(dataType.toLowerCase());
         if (compatible == null) return; // Unknown dataType — skip check
 
         boolean isCompatible = compatible.stream()
