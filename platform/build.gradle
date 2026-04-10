@@ -520,7 +520,8 @@ jacocoTestReport {
             fileTree(dir: it, exclude: jacocoExcludes)
         }
         if (classDumpDir.exists()) {
-            allClassDirs.add(fileTree(dir: classDumpDir, exclude: jacocoExcludes))
+            // Only include project classes from classdump (exclude third-party libs)
+            allClassDirs.add(fileTree(dir: classDumpDir, include: 'com/auraboot/**', exclude: jacocoExcludes))
         }
         classDirectories.setFrom(files(allClassDirs))
     }
@@ -539,7 +540,7 @@ jacocoTestCoverageVerification {
             fileTree(dir: it, exclude: jacocoExcludes)
         }
         if (classDumpDir.exists()) {
-            allClassDirs.add(fileTree(dir: classDumpDir, exclude: jacocoExcludes))
+            allClassDirs.add(fileTree(dir: classDumpDir, include: 'com/auraboot/**', exclude: jacocoExcludes))
         }
         classDirectories.setFrom(files(allClassDirs))
     }
@@ -550,7 +551,7 @@ jacocoTestCoverageVerification {
             limit {
                 counter = 'LINE'
                 value = 'COVEREDRATIO'
-                minimum = 0.15
+                minimum = 0.50
             }
         }
     }
