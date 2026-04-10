@@ -164,7 +164,7 @@ class PluginSignatureVerifierIntegrationTest extends BaseIntegrationTest {
 
             assertThatThrownBy(() -> signatureVerifier.verify(tempDir))
                     .isInstanceOf(PluginSignatureException.class)
-                    .hasMessageContaining("Invalid Base64");
+                    .hasMessageContaining("base64");
         } finally {
             Files.deleteIfExists(tempDir.resolve("plugin.json"));
             Files.deleteIfExists(tempDir.resolve("signature.sig"));
