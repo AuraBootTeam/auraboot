@@ -64,7 +64,7 @@ public class PermissionAuditServiceImpl implements PermissionAuditService {
             entry.setEvaluationTrace(trace);
 
             entry.setCreatedAt(Instant.now());
-            auditLogMapper.insert(entry);
+            auditLogMapper.insertAuditLog(entry);
         } catch (Exception e) {
             // CATCH: non-transactional async write — safe to swallow; must not affect caller
             log.warn("Failed to persist permission audit log: memberId={}, resource={}, action={}: {}",
