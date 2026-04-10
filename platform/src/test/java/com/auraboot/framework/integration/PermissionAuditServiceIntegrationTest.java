@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.*;
 
@@ -52,15 +53,14 @@ class PermissionAuditServiceIntegrationTest extends BaseIntegrationTest {
 
         permissionAuditService.logEvaluation(tenantId, explanation);
 
-        // @Async — wait briefly for the write to complete
-        Thread.sleep(300);
+        // @Async — poll until the write completes (up to 3s)
+        List<PermissionAuditLog> logs = pollForResults(
+                () -> permissionAuditService.getRecentLogs(tenantId, 50).stream()
+                        .filter(l -> TEST_RESOURCE.equals(l.getResourceCode()) && TEST_MEMBER_ID == l.getMemberId())
+                        .toList(),
+                3000);
 
-        List<PermissionAuditLog> logs = permissionAuditService.getRecentLogs(tenantId, 50);
-
-        PermissionAuditLog entry = logs.stream()
-                .filter(l -> TEST_RESOURCE.equals(l.getResourceCode()) && TEST_MEMBER_ID == l.getMemberId())
-                .findFirst()
-                .orElse(null);
+        PermissionAuditLog entry = logs.isEmpty() ? null : logs.get(0);
 
         assertThat(entry).as("Audit log entry should be persisted for DENY").isNotNull();
         assertThat(entry.getTenantId()).isEqualTo(tenantId);
@@ -82,7 +82,9 @@ class PermissionAuditServiceIntegrationTest extends BaseIntegrationTest {
                 TEST_MEMBER_ID, TEST_RESOURCE + "_allow", "edit", null, true, List.of(allowStep));
 
         permissionAuditService.logEvaluation(tenantId, allowExplanation);
-        Thread.sleep(300);
+
+        // @Async — wait enough time for the async task to complete, then verify nothing was written
+        Thread.sleep(1500);
 
         List<PermissionAuditLog> logs = permissionAuditService.getLogsByResource(
                 tenantId, TEST_RESOURCE + "_allow", 50);
@@ -104,10 +106,11 @@ class PermissionAuditServiceIntegrationTest extends BaseIntegrationTest {
                 denyExplanation(TEST_MEMBER_ID, TEST_RESOURCE + "_m1", "delete"));
         permissionAuditService.logEvaluation(tenantId,
                 denyExplanation(otherMember, TEST_RESOURCE + "_m2", "delete"));
-        Thread.sleep(300);
 
-        List<PermissionAuditLog> memberLogs =
-                permissionAuditService.getLogsByMember(tenantId, TEST_MEMBER_ID, 100);
+        // @Async — poll until the write completes (up to 3s)
+        List<PermissionAuditLog> memberLogs = pollForResults(
+                () -> permissionAuditService.getLogsByMember(tenantId, TEST_MEMBER_ID, 100),
+                3000);
 
         assertThat(memberLogs).isNotEmpty();
         memberLogs.forEach(l ->
@@ -128,10 +131,11 @@ class PermissionAuditServiceIntegrationTest extends BaseIntegrationTest {
 
         permissionAuditService.logEvaluation(tenantId,
                 denyExplanation(TEST_MEMBER_ID, specificResource, "create"));
-        Thread.sleep(300);
 
-        List<PermissionAuditLog> resourceLogs =
-                permissionAuditService.getLogsByResource(tenantId, specificResource, 100);
+        // @Async — poll until the write completes (up to 3s)
+        List<PermissionAuditLog> resourceLogs = pollForResults(
+                () -> permissionAuditService.getLogsByResource(tenantId, specificResource, 100),
+                3000);
 
         assertThat(resourceLogs).isNotEmpty();
         resourceLogs.forEach(l ->
@@ -153,17 +157,36 @@ class PermissionAuditServiceIntegrationTest extends BaseIntegrationTest {
             permissionAuditService.logEvaluation(tenantId,
                     denyExplanation(TEST_MEMBER_ID, TEST_RESOURCE + "_lim" + i, "view"));
         }
-        Thread.sleep(300);
+
+        // @Async — wait for all writes to complete
+        Thread.sleep(2000);
 
         List<PermissionAuditLog> logs = permissionAuditService.getRecentLogs(tenantId, 2);
         assertThat(logs).hasSizeLessThanOrEqualTo(2);
     }
 
     // ======================================================================
-    // Helper
+    // Helpers
     // ======================================================================
 
     private Long getTenantId() {
         return testTenant != null ? testTenant.getId() : 1L;
+    }
+
+    /**
+     * Poll until the supplier returns a non-empty list, or timeout after maxWaitMs.
+     * Needed because logEvaluation is @Async and runs on a separate thread.
+     */
+    private <T> List<T> pollForResults(Supplier<List<T>> query, long maxWaitMs) throws InterruptedException {
+        long deadline = System.currentTimeMillis() + maxWaitMs;
+        List<T> results = List.of();
+        while (System.currentTimeMillis() < deadline) {
+            results = query.get();
+            if (!results.isEmpty()) {
+                return results;
+            }
+            Thread.sleep(100);
+        }
+        return results;
     }
 }

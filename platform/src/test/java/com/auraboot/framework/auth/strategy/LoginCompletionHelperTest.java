@@ -131,13 +131,14 @@ class LoginCompletionHelperTest {
 
         when(tenantMemberService.getTenantIdByUserId(6L)).thenReturn(null);
         when(jwtUtil.generateTokenWithTenantId(any(), any(), any(), any(), anyInt())).thenReturn("jwt-fallback");
+        when(passwordManagementService.isPasswordExpired(user)).thenReturn(false);
         doThrow(new RuntimeException("DB down")).when(sessionManagementService)
                 .createSession(anyLong(), anyString(), any(), any());
-        when(passwordManagementService.isPasswordExpired(user)).thenReturn(false);
 
-        // Should NOT propagate the exception
+        // Session creation is non-fatal — login should succeed even if session persistence fails
         AuthenticationResponse result = helper.completeLogin(user, "10.0.0.1", "curl");
 
+        assertThat(result).isNotNull();
         assertThat(result.getJwt()).isEqualTo("jwt-fallback");
     }
 

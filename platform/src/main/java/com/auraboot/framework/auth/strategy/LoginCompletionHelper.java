@@ -89,11 +89,13 @@ public class LoginCompletionHelper {
         int securityVersion = user.getSecurityVersion() != null ? user.getSecurityVersion() : 0;
         String jwt = jwtUtil.generateTokenWithTenantId(userDetails, user.getPid(), tenantId, memberId, securityVersion);
 
-        // 4. Create session record
+        // 4. Create session record — non-fatal; login should succeed even if session persistence fails
+        // CATCH: non-transactional auxiliary operation — session creation failure must not block login
         try {
             sessionManagementService.createSession(user.getId(), jwt, ipAddress, userAgent);
         } catch (Exception e) {
-            log.warn("Failed to create session record: {}", e.getMessage());
+            log.warn("Session creation failed for user {} — login will proceed without session record: {}",
+                    user.getId(), e.getMessage());
         }
 
         // 5. Build response and check password status

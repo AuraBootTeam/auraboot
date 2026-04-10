@@ -2,8 +2,8 @@ package com.auraboot.framework.agent.controller;
 
 import com.auraboot.framework.agent.config.AgentProperties;
 import com.auraboot.framework.agent.entity.AgentDefinition;
-import com.auraboot.framework.agent.mapper.AgentDefinitionMapper;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
+import com.auraboot.framework.agent.service.AgentDefinitionService;
 import com.auraboot.framework.agent.service.AgentEventDispatchService;
 import com.auraboot.framework.agent.service.AgentOrganizationService;
 import com.auraboot.framework.agent.service.McpServerConfigService;
@@ -29,7 +29,7 @@ public class CoreAgentController {
     private final McpServerConfigService mcpServerConfigService;
     private final AgentEventDispatchService agentEventDispatchService;
     private final AgentOrganizationService agentOrganizationService;
-    private final AgentDefinitionMapper agentDefinitionMapper;
+    private final AgentDefinitionService agentDefinitionService;
 
     @GetMapping("/status")
     public ResponseEntity<Map<String, Object>> getStatus() {
@@ -199,7 +199,7 @@ public class CoreAgentController {
     public ResponseEntity<ApiResponse<Map<String, Object>>> enrollAsEmployee(
             @PathVariable String agentPid,
             @RequestBody Map<String, Object> body) {
-        AgentDefinition agent = agentDefinitionMapper.findByPid(agentPid);
+        AgentDefinition agent = agentDefinitionService.findByPid(agentPid);
         if (agent == null) {
             return ResponseEntity.ok(ApiResponse.error("Agent not found: " + agentPid));
         }
@@ -222,7 +222,7 @@ public class CoreAgentController {
      */
     @DeleteMapping("/definitions/{agentPid}/enroll-employee")
     public ResponseEntity<ApiResponse<Void>> removeFromOrg(@PathVariable String agentPid) {
-        AgentDefinition agent = agentDefinitionMapper.findByPid(agentPid);
+        AgentDefinition agent = agentDefinitionService.findByPid(agentPid);
         if (agent == null) {
             return ResponseEntity.ok(ApiResponse.error("Agent not found: " + agentPid));
         }

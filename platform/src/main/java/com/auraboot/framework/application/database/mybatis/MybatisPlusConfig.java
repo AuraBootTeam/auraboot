@@ -76,6 +76,9 @@ public class MybatisPlusConfig {
                     || "ab_marketplace_solution_install".equals(tableName)
                     || "ab_tenant_login_channel".equals(tableName)    // Queried by explicit tenantId before auth
 
+                    // ── Permission audit (has tenant_id, but @Async writes run without MetaContext) ──
+                    || "ab_permission_audit_log".equals(tableName)
+
                     // ── Scheduler/async context (has tenant_id, but accessed without MetaContext) ──
                     || "ab_i18n_resource".equals(tableName)           // Startup seeder writes tenantId=0 without context
                     || "ab_outbox".equals(tableName)                  // Outbox processor runs without tenant context
