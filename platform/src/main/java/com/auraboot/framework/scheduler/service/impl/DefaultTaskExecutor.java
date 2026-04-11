@@ -88,9 +88,26 @@ public class DefaultTaskExecutor implements TaskExecutor {
         taskMapper.updateRunTimes(task.getPid(), now, null);
     }
 
+    /**
+     * Allowed handler bean name prefix. Only beans whose name starts with one of these
+     * prefixes can be invoked as scheduled task handlers — prevents arbitrary bean invocation.
+     */
+    private static final java.util.Set<String> ALLOWED_HANDLER_PREFIXES = java.util.Set.of(
+            "scheduledTask", "taskHandler", "jobHandler", "cronHandler",
+            "idempotent", "cleanup", "sync", "digest", "sla", "decisionAlarm", "invariantAlarm"
+    );
+
     private void invokeHandler(ScheduledTask task) {
         String beanName = task.getHandlerBean();
         String methodName = task.getHandlerMethod() != null ? task.getHandlerMethod() : "execute";
+
+        // Security: only allow whitelisted handler bean prefixes to prevent arbitrary bean invocation
+        boolean allowed = ALLOWED_HANDLER_PREFIXES.stream()
+                .anyMatch(prefix -> beanName.startsWith(prefix));
+        if (!allowed) {
+            throw new BusinessException("Scheduled task handler not in allowlist: " + beanName
+                    + ". Handler bean names must start with one of: " + ALLOWED_HANDLER_PREFIXES);
+        }
 
         Object bean = applicationContext.getBean(beanName);
         try {

@@ -595,9 +595,13 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         Map<String, NamedQueryField> fieldMap = fields.stream()
                 .collect(Collectors.toMap(NamedQueryField::getFieldCode, f -> f));
 
-        // 4. Build SELECT columns
+        // 4. Build SELECT columns (validate expressions to prevent SQL injection via admin config)
         List<String> selectColumns = fields.stream()
-                .map(f -> f.getColumnExpr() + " AS " + f.getFieldCode())
+                .map(f -> {
+                    SqlSafetyUtils.validateSqlFragment(f.getColumnExpr());
+                    SqlSafetyUtils.validateIdentifier(f.getFieldCode(), "NQ field code");
+                    return f.getColumnExpr() + " AS " + f.getFieldCode();
+                })
                 .collect(Collectors.toList());
 
         if (selectColumns.isEmpty()) {
@@ -717,9 +721,13 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
                         .collect(Collectors.toList());
             }
 
-            // 4. Build SELECT columns
+            // 4. Build SELECT columns (validate expressions for defense-in-depth)
             List<String> selectColumns = exportFieldCodes.stream()
-                    .map(fc -> fieldMap.get(fc).getColumnExpr() + " AS " + fc)
+                    .map(fc -> {
+                        SqlSafetyUtils.validateSqlFragment(fieldMap.get(fc).getColumnExpr());
+                        SqlSafetyUtils.validateIdentifier(fc, "NQ export field code");
+                        return fieldMap.get(fc).getColumnExpr() + " AS " + fc;
+                    })
                     .collect(Collectors.toList());
 
             // 5. Build SQL — wrap subquery fromSql in parentheses

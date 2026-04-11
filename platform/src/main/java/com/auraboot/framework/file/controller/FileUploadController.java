@@ -138,6 +138,7 @@ public class FileUploadController {
      * 解析存储类型
      */
     private StorageType parseStorageType(String storageTypeStr) {
+        if (storageTypeStr == null) return StorageType.LOCAL;
         switch (storageTypeStr.toLowerCase()) {
             case "local":
                 return StorageType.LOCAL;
