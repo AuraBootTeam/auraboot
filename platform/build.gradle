@@ -310,24 +310,10 @@ tasks.withType(Test).configureEach {
 // 配置测试任务使用JUnit Platform
 test {
     useJUnitPlatform()
-    // BPM integration tests use @ActiveProfiles("test") which requires a different DB role
-    exclude '**/bpm/integration/DatabaseIntegrationTest.class'
-    exclude '**/bpm/integration/DatabaseModeProcessTest.class'
-    exclude '**/bpm/integration/DualModeCoexistenceTest.class'
-    // Note: InvitationControllerTest and ComponentRegistryControllerTest are fully
-    // commented out (no compilable code). Active controller tests: ModelControllerTest,
-    // ChartDataControllerTest, PermissionControllerUnitTest.
-    // i18n: needs enterprise plugin dirs on disk
+    // --- Tests needing enterprise plugin directories on disk ---
+    // These reference plugins/asset-management, plugins/e2e-test-order, plugins/project-management,
+    // or plugins/templates/ which only exist in the auraboot-enterprise repo.
     exclude '**/i18n/I18nPluginImportTest.class'
-    // integration: permission/bootstrap data issues
-    exclude '**/integration/ModelPermissionIntegrationTest.class'
-    exclude '**/integration/TenantBootstrapMetaContextTest.class'
-    exclude '**/integration/TenantBootstrapIntegrationTest.class'
-    exclude '**/integration/UserRoleServiceIntegrationTest.class'
-    exclude '**/integration/view/TeamScopeControllerIntegrationTest.class'
-    // Mockito spy on @Cacheable proxy causes UnfinishedStubbingException
-    exclude '**/meta/service/impl/PayloadTemporalNormalizerTest.class'
-    // plugin tests: need enterprise plugin dirs on disk
     exclude '**/plugin/integration/AssetCommandExecutionTest.class'
     exclude '**/plugin/integration/AssetPermissionTest.class'
     exclude '**/plugin/integration/AssetPluginInstallTest.class'
@@ -335,10 +321,13 @@ test {
     exclude '**/plugin/integration/PluginConflictStrategyTest.class'
     exclude '**/plugin/integration/PluginLifecycleTest.class'
     exclude '**/plugin/service/PluginImportIntegrationTest.class'
-    exclude '**/plugin/service/PluginTransactionalImportServiceIntegrationTest.class'
     exclude '**/plugin/template/TemplateControllerIntegrationTest.class'
-    // ApplicationContext fails with @ActiveProfiles("test") instead of "integration-test"
-    exclude '**/tenant/service/TenantBootstrapServiceTest.class'
+    // --- Tests using outdated UPPERCASE permission code format (MODEL.xxx.manage) ---
+    // Current system uses lowercase (model.xxx.manage). These need a permission-format refactor.
+    exclude '**/integration/ModelPermissionIntegrationTest.class'
+    exclude '**/integration/TenantBootstrapMetaContextTest.class'
+    exclude '**/integration/TenantBootstrapIntegrationTest.class'
+    exclude '**/integration/view/TeamScopeControllerIntegrationTest.class'
     jvmArgs "-Djavax.xml.parsers.SAXParserFactory=com.sun.org.apache.xerces.internal.jaxp.SAXParserFactoryImpl"
     jvmArgs '-Duser.timezone=UTC'
     jvmArgs '-Xmx6g', '-Xms2g', '-XX:+UseG1GC'
