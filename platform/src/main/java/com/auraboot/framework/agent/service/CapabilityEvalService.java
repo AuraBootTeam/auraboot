@@ -16,7 +16,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -327,7 +327,7 @@ public class CapabilityEvalService {
             AbCapabilityEvalRun run = new AbCapabilityEvalRun();
             run.setPid(UniqueIdGenerator.generate());
             run.setTenantId(tenantId);
-            run.setRunAt(LocalDateTime.now());
+            run.setRunAt(Instant.now());
             run.setEvalMode(evalMode);
             run.setTotalCases((Integer) report.get("totalCases"));
             run.setToolSelectionAccuracy((Double) report.get("toolSelectionAccuracy"));
@@ -336,7 +336,7 @@ public class CapabilityEvalService {
             run.setComposabilityScore((Double) report.get("composabilityScore"));
             run.setHallucinationRate((Double) report.get("hallucinationRate"));
             run.setReport(report);
-            run.setCreatedAt(LocalDateTime.now());
+            run.setCreatedAt(Instant.now());
             evalRunMapper.insert(run);
 
             // Regression detection against the previous run
