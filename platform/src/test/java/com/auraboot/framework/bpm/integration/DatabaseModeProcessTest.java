@@ -14,10 +14,13 @@ import com.auraboot.framework.application.TestApplication;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import com.auraboot.framework.application.tenant.MetaContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.util.HashMap;
 import java.util.List;
@@ -31,9 +34,12 @@ import static org.junit.jupiter.api.Assertions.*;
  * tasks are created, and data persists to PostgreSQL.
  */
 @SpringBootTest(classes = TestApplication.class)
-@ActiveProfiles("test")
+@ActiveProfiles("integration-test")
 @DisplayName("SmartEngine Database Mode Process Tests")
 class DatabaseModeProcessTest {
+
+    @MockitoBean
+    private JavaMailSender mailSender;
 
     @Autowired
     private SmartEngine smartEngine;
@@ -49,6 +55,9 @@ class DatabaseModeProcessTest {
 
     @BeforeEach
     void setUp() {
+        // Set up minimal MetaContext so tenant-filtered queries don't fail
+        MetaContext.setContext(1L, 1L, "bpm-test-user", "bpm-test");
+
         // Clean SmartEngine tables to avoid PK collisions from previous runs
         jdbcTemplate.execute("DELETE FROM se_task_assignee_instance");
         jdbcTemplate.execute("DELETE FROM se_task_instance");
@@ -97,7 +106,7 @@ class DatabaseModeProcessTest {
         assertNotNull(found);
 
         PendingTaskQueryParam taskQuery = new PendingTaskQueryParam();
-        taskQuery.setAssigneeUserId("testuser1");
+        taskQuery.setAssigneeUserId("approver1");
         List<TaskInstance> tasks = taskQueryService
                 .findPendingTaskList(taskQuery);
         assertFalse(tasks.isEmpty(), "Should have pending tasks");
@@ -114,7 +123,7 @@ class DatabaseModeProcessTest {
                 "simple-approval", "1", variables);
 
         PendingTaskQueryParam taskQuery = new PendingTaskQueryParam();
-        taskQuery.setAssigneeUserId("testuser1");
+        taskQuery.setAssigneeUserId("approver1");
         List<TaskInstance> tasks = taskQueryService
                 .findPendingTaskList(taskQuery);
         assertFalse(tasks.isEmpty());
