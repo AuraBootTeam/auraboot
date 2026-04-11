@@ -97,7 +97,7 @@ test.describe('Showcase UX Regression', () => {
   // ─── A2: Dashboard widget types correct ──────────────────────────────
 
   test('A2: Arsenal dashboard page loads with chart blocks', async ({ page }) => {
-    await page.goto('/p/sc_arsenal_dashboard');
+    await page.goto('/p/c/sc_arsenal_dashboard');
     await page.waitForLoadState('domcontentloaded');
     // Dashboard should render chart blocks, not show errors
     await expect(page.locator('[data-testid*="dashboard-block-"]').first()).toBeVisible({ timeout: 10000 });
