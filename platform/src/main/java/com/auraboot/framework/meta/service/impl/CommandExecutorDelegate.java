@@ -18,9 +18,6 @@ import java.util.Map;
 public interface CommandExecutorDelegate {
 
 
-    Map<String, Object> readRecordSnapshot(Long tenantId, String modelCode, String recordId);
-
-    void propagateFieldMapRecordId(CommandExecuteRequest request, Map<String, Object> fieldMapResults);
 
     void executeComputedFieldsPhase(Map<String, Object> execConfig, Map<String, Object> payload,
                                      Long tenantId, CommandDefinition command,
