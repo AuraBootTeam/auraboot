@@ -1376,72 +1376,6 @@ public class CommandExecutorImpl implements CommandExecutor, CommandExecutorDele
         return 5000L;
     }
 
-    // ==================== API Call & Webhook ====================
-
-    @SuppressWarnings("unchecked")
-    @Override
-    public Map<String, Object> executeApiCallPhase(List<BindingRule> apiCallRules,
-                                                      Map<String, Object> payload,
-                                                      Map<String, Object> handlerResults) {
-        Map<String, Object> apiResults = new HashMap<>();
-        for (BindingRule rule : apiCallRules) {
-            if (rule.getEnabled() != null && !rule.getEnabled()) {
-                continue;
-            }
-            try {
-                // Config format: {"connectorPid":"xxx", "endpointCode":"yyy", "paramMapping":{...}}
-                Map<String, Object> config = objectMapper.readValue(rule.getConfig(), Map.class);
-                String connectorPid = (String) config.get("connectorPid");
-                String endpointCode = (String) config.get("endpointCode");
-
-                // Build params from payload + handlerResults
-                Map<String, Object> params = new HashMap<>(payload);
-                params.putAll(handlerResults);
-
-                Map<String, Object> result = apiConnectorService.invoke(connectorPid, endpointCode, params);
-                if (result != null) {
-                    apiResults.putAll(result);
-                }
-                log.debug("API_CALL rule executed: connector={}, endpoint={}", connectorPid, endpointCode);
-            } catch (Exception e) {
-                log.warn("API_CALL rule execution failed: {}", e.getMessage());
-                // API_CALL failures are non-fatal by default
-            }
-        }
-        return apiResults;
-    }
-
-    @SuppressWarnings("unchecked")
-    @Override
-    public void executeWebhookPhase(List<BindingRule> webhookRules,
-                                      CommandDefinition command,
-                                      Map<String, Object> payload,
-                                      Map<String, Object> results,
-                                      Long tenantId) {
-        for (BindingRule rule : webhookRules) {
-            if (rule.getEnabled() != null && !rule.getEnabled()) {
-                continue;
-            }
-            try {
-                // Determine event type from rule config or use command code
-                String eventType = StringUtils.hasText(rule.getEventType())
-                        ? rule.getEventType()
-                        : command.getCode();
-
-                // Build webhook payload
-                Map<String, Object> webhookPayload = new HashMap<>();
-                webhookPayload.put("commandCode", command.getCode());
-                webhookPayload.put("modelCode", command.getModelCode());
-                webhookPayload.put("payload", payload);
-                webhookPayload.put("result", results);
-
-                webhookDispatcher.dispatch(eventType, webhookPayload, tenantId);
-                log.debug("WEBHOOK rule dispatched: eventType={}", eventType);
-            } catch (Exception e) {
-                log.warn("WEBHOOK rule dispatch failed: {}", e.getMessage());
-            }
-        }
-    }
 
     // ==================== Change Tracking ====================
 
@@ -1670,41 +1604,4 @@ public class CommandExecutorImpl implements CommandExecutor, CommandExecutorDele
         phaseRef[0] = newPhase;
     }
 
-    // ==================== CommandExecutorDelegate bridge methods ====================
-
-    @Override
-    public void saveAuditLog(Long tenantId, String commandCode, String commandPid, Long userId,
-                              Map<String, Object> payload, Map<String, Object> result,
-                              boolean success, String errorMessage, long executionTimeMs,
-                              String phaseReached, Map<String, Long> phaseTimings) {
-        effectExecutor.saveAuditLog(tenantId, commandCode, commandPid, userId,
-                payload, result, success, errorMessage, executionTimeMs, phaseReached, phaseTimings);
-    }
-
-    @Override
-    public void saveIdempotencyRecord(String clientRequestId, String commandCode,
-                                       Map<String, Object> payload, Map<String, Object> resultData, Long tenantId) {
-        idempotencyService.recordOutcome(clientRequestId, commandCode, payload, resultData, tenantId);
-    }
-
-    @Override
-    public void publishDomainEvent(CommandDefinition command, CommandExecuteRequest request,
-                                    Map<String, Object> payload, Long tenantId, Long userId,
-                                    Map<String, Object> beforeSnapshot) {
-        try {
-            String recordId = request != null ? request.getTargetRecordId() : null;
-            String actorName = MetaContext.exists() ? MetaContext.getCurrentUsername() : null;
-            Map<String, Object> extraMeta = null;
-            if (beforeSnapshot != null) {
-                extraMeta = Map.of("beforeSnapshot", beforeSnapshot);
-            }
-            domainEventPublisher.publishCommandCompleted(
-                    command.getCode(),
-                    request != null ? request.getOperationType() : "unknown",
-                    tenantId, recordId, command.getModelCode(), payload,
-                    userId, actorName, extraMeta);
-        } catch (Exception e) {
-            log.warn("Failed to publish domain event for command {}: {}", command.getCode(), e.getMessage());
-        }
-    }
 }
