@@ -772,7 +772,7 @@ CREATE TABLE ab_page_schema (
     published_at TIMESTAMPTZ,
 
     -- Versioning
-    version VARCHAR(50) DEFAULT '1.0.0',
+    version INTEGER DEFAULT 1,
     semver VARCHAR(50),
     row_version INTEGER DEFAULT 1,
 
