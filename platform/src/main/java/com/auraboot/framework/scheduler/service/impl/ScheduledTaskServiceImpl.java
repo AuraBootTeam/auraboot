@@ -32,6 +32,15 @@ public class ScheduledTaskServiceImpl implements ScheduledTaskService {
     @Override
     @Transactional
     public ScheduledTask create(ScheduledTaskCreateRequest request) {
+        // Validate cron expression syntax before persisting
+        if ("cron".equals(request.getTaskType()) && request.getCronExpression() != null) {
+            try {
+                org.springframework.scheduling.support.CronExpression.parse(request.getCronExpression());
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException("Invalid cron expression: " + e.getMessage());
+            }
+        }
+
         ScheduledTask entity = new ScheduledTask();
         entity.setPid(UniqueIdGenerator.generate());
         entity.setName(request.getName());
