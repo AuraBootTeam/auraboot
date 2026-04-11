@@ -4,11 +4,10 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
-import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
+import com.auraboot.framework.application.database.mybatis.JsonbMapTypeHandler;
 import lombok.Data;
-import org.apache.ibatis.type.JdbcType;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Map;
 
 @Data
@@ -20,7 +19,7 @@ public class AbCapabilityEvalRun {
 
     private String pid;
     private Long tenantId;
-    private LocalDateTime runAt;
+    private Instant runAt;
     private String evalMode;
     private String scope;
     private Integer totalCases;
@@ -30,8 +29,8 @@ public class AbCapabilityEvalRun {
     private Double composabilityScore;
     private Double hallucinationRate;
 
-    @TableField(typeHandler = JacksonTypeHandler.class, jdbcType = JdbcType.OTHER)
+    @TableField(typeHandler = JsonbMapTypeHandler.class)
     private Map<String, Object> report;
 
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 }

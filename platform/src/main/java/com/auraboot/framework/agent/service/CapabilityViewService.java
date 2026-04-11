@@ -14,7 +14,7 @@ import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
@@ -110,8 +110,8 @@ public class CapabilityViewService {
                     cap.setId(existing.getId());
                     cap.setPid(existing.getPid());
                     cap.setVersion(existing.getVersion() + 1);
-                    cap.setLastSyncedAt(LocalDateTime.now());
-                    cap.setUpdatedAt(LocalDateTime.now());
+                    cap.setLastSyncedAt(Instant.now());
+                    cap.setUpdatedAt(Instant.now());
                     capabilityMapper.updateById(cap);
                     count++;
                 } else {
@@ -119,9 +119,9 @@ public class CapabilityViewService {
                     cap.setPid(generatePid());
                     cap.setVersion(1);
                     cap.setStatus("active");
-                    cap.setLastSyncedAt(LocalDateTime.now());
-                    cap.setCreatedAt(LocalDateTime.now());
-                    cap.setUpdatedAt(LocalDateTime.now());
+                    cap.setLastSyncedAt(Instant.now());
+                    cap.setCreatedAt(Instant.now());
+                    cap.setUpdatedAt(Instant.now());
                     capabilityMapper.insert(cap);
                     count++;
                 }
@@ -137,7 +137,7 @@ public class CapabilityViewService {
             for (AbCapability existing : allActive) {
                 if (!syncedCodes.contains(existing.getCode())) {
                     existing.setStatus("deprecated");
-                    existing.setUpdatedAt(LocalDateTime.now());
+                    existing.setUpdatedAt(Instant.now());
                     capabilityMapper.updateById(existing);
                 }
             }
@@ -178,16 +178,16 @@ public class CapabilityViewService {
             cap.setId(existing.getId());
             cap.setPid(existing.getPid());
             cap.setVersion(existing.getVersion() + 1);
-            cap.setLastSyncedAt(LocalDateTime.now());
-            cap.setUpdatedAt(LocalDateTime.now());
+            cap.setLastSyncedAt(Instant.now());
+            cap.setUpdatedAt(Instant.now());
             capabilityMapper.updateById(cap);
         } else {
             cap.setPid(generatePid());
             cap.setVersion(1);
             cap.setStatus("active");
-            cap.setLastSyncedAt(LocalDateTime.now());
-            cap.setCreatedAt(LocalDateTime.now());
-            cap.setUpdatedAt(LocalDateTime.now());
+            cap.setLastSyncedAt(Instant.now());
+            cap.setCreatedAt(Instant.now());
+            cap.setUpdatedAt(Instant.now());
             capabilityMapper.insert(cap);
         }
     }
@@ -203,13 +203,12 @@ public class CapabilityViewService {
         );
         if (cap != null) {
             cap.setStatus("deprecated");
-            cap.setUpdatedAt(LocalDateTime.now());
+            cap.setUpdatedAt(Instant.now());
             capabilityMapper.updateById(cap);
             // Mark linked agent_tool as STALE
-            dynamicDataMapper.selectByQuery(
-                    "UPDATE ab_agent_tool SET contract_status = 'stale' " +
-                    "WHERE tenant_id = #{params.tenantId} AND capability_pid = #{params.capPid}",
-                    Map.of("tenantId", tenantId, "capPid", cap.getPid())
+            dynamicDataMapper.update("ab_agent_tool",
+                    Map.of("contract_status", "stale"),
+                    Map.of("tenant_id", tenantId, "capability_pid", cap.getPid())
             );
         }
     }

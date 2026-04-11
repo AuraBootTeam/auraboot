@@ -37,6 +37,8 @@ public class CapabilityViewServiceTest extends BaseIntegrationTest {
 
     @BeforeAll
     void setup() {
+        // Ensure test data is initialized before @BeforeAll (parent's @BeforeEach hasn't run yet)
+        setupTenantContext();
         tenantId = getTestTenant().getId();
     }
 
