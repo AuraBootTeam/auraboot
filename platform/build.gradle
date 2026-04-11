@@ -314,7 +314,9 @@ test {
     exclude '**/bpm/integration/DatabaseIntegrationTest.class'
     exclude '**/bpm/integration/DatabaseModeProcessTest.class'
     exclude '**/bpm/integration/DualModeCoexistenceTest.class'
-    exclude '**/controller/**'
+    // Note: InvitationControllerTest and ComponentRegistryControllerTest are fully
+    // commented out (no compilable code). Active controller tests: ModelControllerTest,
+    // ChartDataControllerTest, PermissionControllerUnitTest.
     // i18n: needs enterprise plugin dirs on disk
     exclude '**/i18n/I18nPluginImportTest.class'
     // integration: permission/bootstrap data issues
