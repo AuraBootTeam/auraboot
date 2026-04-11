@@ -49,7 +49,8 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        boolean isDevOrTest = activeProfile.contains("dev") || activeProfile.contains("test") || activeProfile.contains("default");
+        boolean isDevOrTest = activeProfile.contains("dev") || activeProfile.contains("local")
+                || activeProfile.contains("test") || "default".equals(activeProfile);
 
         http
                 .csrf(AbstractHttpConfigurer::disable)

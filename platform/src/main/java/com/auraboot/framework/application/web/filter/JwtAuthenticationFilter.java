@@ -188,7 +188,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (Arrays.stream(WhiteList.whiteList).anyMatch(matchesPath)) {
             return true;
         }
-        if (Arrays.stream(WhiteList.swaggerWhiteList).anyMatch(matchesPath)) {
+        // Swagger endpoints — only skip auth in dev/test profiles
+        if (isDevOrTestProfile() && Arrays.stream(WhiteList.swaggerWhiteList).anyMatch(matchesPath)) {
             return true;
         }
         // Test seed endpoints — skip JWT filter when test profile is active
@@ -196,5 +197,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return true;
         }
         return false;
+    }
+
+    private boolean isDevOrTestProfile() {
+        return activeProfile != null && (activeProfile.contains("dev") || activeProfile.contains("local")
+                || activeProfile.contains("test") || activeProfile.contains("integration-test"));
     }
 }
