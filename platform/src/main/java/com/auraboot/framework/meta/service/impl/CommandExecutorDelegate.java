@@ -19,12 +19,6 @@ public interface CommandExecutorDelegate {
 
 
 
-    void executeComputedFieldsPhase(Map<String, Object> execConfig, Map<String, Object> payload,
-                                     Long tenantId, CommandDefinition command,
-                                     CommandExecuteRequest request, Map<String, Object> fieldMapResults);
-
-    void recordChangeTracking(CommandDefinition command, CommandExecuteRequest request,
-                               Long tenantId, Long userId, Map<String, Object> beforeSnapshot);
 
     Map<String, Object> executeHandlerPhase(List<BindingRule> handlerRules, CommandDefinition command,
                                              Map<String, Object> payload, Map<String, Object> fieldMapResults,
