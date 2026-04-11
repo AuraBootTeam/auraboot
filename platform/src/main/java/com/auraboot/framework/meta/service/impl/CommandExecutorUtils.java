@@ -11,7 +11,7 @@ import java.util.Map;
  * @author AuraBoot Team
  * @since 2.4.0
  */
-final class CommandExecutorUtils {
+public final class CommandExecutorUtils {
 
     private CommandExecutorUtils() {
         // utility class
@@ -21,7 +21,7 @@ final class CommandExecutorUtils {
      * Validate that a string is a safe SQL identifier (column/table name).
      * Delegates to centralized {@link SqlSafetyUtils#validateIdentifier}.
      */
-    static void validateSqlIdentifier(String identifier, String context) {
+    public static void validateSqlIdentifier(String identifier, String context) {
         SqlSafetyUtils.validateIdentifier(identifier, context);
     }
 
@@ -29,7 +29,7 @@ final class CommandExecutorUtils {
      * Validate that a string is a safe SQL fragment (WHERE clause, expression, etc.).
      * Delegates to centralized {@link SqlSafetyUtils#validateSqlFragment}.
      */
-    static void validateSqlFragment(String fragment, String context) {
+    public static void validateSqlFragment(String fragment, String context) {
         try {
             SqlSafetyUtils.validateSqlFragment(fragment);
         } catch (IllegalArgumentException e) {
@@ -45,7 +45,7 @@ final class CommandExecutorUtils {
      * @param dataType the DSL field dataType string (e.g. "datetime", "integer", "text")
      * @return true if the value's Java type is compatible with the dataType
      */
-    static boolean isTypeCompatible(Object value, String dataType) {
+    public static boolean isTypeCompatible(Object value, String dataType) {
         return switch (dataType.toLowerCase()) {
             case "datetime", "date", "timestamp" ->
                 value instanceof java.util.Date
@@ -63,7 +63,7 @@ final class CommandExecutorUtils {
      * Build record ID lookup condition. If recordId is numeric, use "id" column;
      * otherwise use "pid" column (for ULID-style identifiers).
      */
-    static Map.Entry<String, Object> resolveRecordIdColumn(String recordId) {
+    public static Map.Entry<String, Object> resolveRecordIdColumn(String recordId) {
         try {
             return Map.entry("id", (Object) Long.parseLong(recordId));
         } catch (NumberFormatException e) {
