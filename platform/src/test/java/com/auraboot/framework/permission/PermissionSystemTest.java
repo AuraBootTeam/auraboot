@@ -39,6 +39,7 @@ import static org.assertj.core.api.Assertions.*;
  */
 @Slf4j
 @DisplayName("Permission System Integration Tests")
+@org.springframework.test.annotation.DirtiesContext(classMode = org.springframework.test.annotation.DirtiesContext.ClassMode.BEFORE_CLASS)
 class PermissionSystemTest extends BaseIntegrationTest {
 
     @Autowired

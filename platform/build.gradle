@@ -310,18 +310,6 @@ tasks.withType(Test).configureEach {
 // 配置测试任务使用JUnit Platform
 test {
     useJUnitPlatform()
-    // --- Tests needing enterprise plugin directories on disk ---
-    // These reference plugins/asset-management, plugins/e2e-test-order, plugins/project-management,
-    // or plugins/templates/ which only exist in the auraboot-enterprise repo.
-    exclude '**/i18n/I18nPluginImportTest.class'
-    exclude '**/plugin/integration/AssetCommandExecutionTest.class'
-    exclude '**/plugin/integration/AssetPermissionTest.class'
-    exclude '**/plugin/integration/AssetPluginInstallTest.class'
-    exclude '**/plugin/integration/PluginAutoPublishTest.class'
-    exclude '**/plugin/integration/PluginConflictStrategyTest.class'
-    exclude '**/plugin/integration/PluginLifecycleTest.class'
-    exclude '**/plugin/service/PluginImportIntegrationTest.class'
-    exclude '**/plugin/template/TemplateControllerIntegrationTest.class'
     jvmArgs "-Djavax.xml.parsers.SAXParserFactory=com.sun.org.apache.xerces.internal.jaxp.SAXParserFactoryImpl"
     jvmArgs '-Duser.timezone=UTC'
     jvmArgs '-Xmx6g', '-Xms2g', '-XX:+UseG1GC'
