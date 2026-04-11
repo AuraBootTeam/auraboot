@@ -176,7 +176,7 @@ public class CommandSideEffectExecutor {
      * Create a new record as a side effect.
      * Also used by PostActionExecutor for CREATE_RECORD post actions.
      */
-    void executeSideEffectCreate(String targetModel, Map<String, Object> fieldMapping,
+    public void executeSideEffectCreate(String targetModel, Map<String, Object> fieldMapping,
                                   Map<String, Object> currentRecord,
                                   Long tenantId, Long userId) {
         if (fieldMapping == null) return;
@@ -633,7 +633,7 @@ public class CommandSideEffectExecutor {
      * Combines payload with existing record data from DB.
      * For CREATE commands, merges fieldMapResults so ${recordId} resolves to the newly created record's pid.
      */
-    Map<String, Object> buildCurrentRecordContext(Map<String, Object> payload,
+    public Map<String, Object> buildCurrentRecordContext(Map<String, Object> payload,
                                                     Long tenantId, CommandDefinition command,
                                                     CommandExecuteRequest request) {
         return buildCurrentRecordContext(payload, tenantId, command, request, null);
