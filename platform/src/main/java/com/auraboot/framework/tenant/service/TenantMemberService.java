@@ -102,4 +102,9 @@ public interface TenantMemberService extends IService<TenantMember> {
      * Get tenant name by tenant ID.
      */
     String getTenantNameById(Long tenantId);
+
+    /**
+     * Count active members in a tenant (for quota enforcement).
+     */
+    long countByTenantId(Long tenantId);
 }

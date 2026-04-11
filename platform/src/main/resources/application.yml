@@ -149,6 +149,8 @@ springdoc:
 spring:
   application:
     name: auraboot-platform
+  config:
+    import: optional:classpath:aurabot/synonyms.yml
   profiles:
     active: dev,local,test  # dev + local (local for secrets, gitignored) + test (enables TestSeedController for E2E)
   servlet:

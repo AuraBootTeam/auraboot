@@ -38,10 +38,12 @@ public class TenantServiceImpl extends ServiceImpl<TenantMapper, Tenant> impleme
     @Transactional
     public Tenant createTenant(Tenant tenant) {
         log.info("Creating tenant: {}", tenant.getName());
-        
+
+        // Quota enforcement is handled by QuotaEnforcementAspect (AOP)
+        // when auraboot.quota.enforcement.enabled=true
+
         // 检查租户名称是否已存在
         if (!isNameAvailable(tenant.getName())) {
-            //todo  exception
             throw new BusinessException("租户名称已存在: " + tenant.getName());
         }
         

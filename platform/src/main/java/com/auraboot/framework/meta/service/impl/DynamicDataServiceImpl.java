@@ -20,6 +20,7 @@ import com.auraboot.framework.user.mapper.UserMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.auraboot.framework.automation.trigger.AutomationTriggerService;
 import com.auraboot.framework.meta.constant.SystemFieldConstants;
+import io.micrometer.observation.annotation.Observed;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationContext;
@@ -90,6 +91,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     }
 
     @Override
+    @Observed(name = "dynamic_data.list", contextualName = "dynamic-data-list")
     public PaginationResult<Map<String, Object>> list(String modelCode, DynamicQueryRequest request) {
         validateModelCode(modelCode);
         logOperation("list", modelCode, request);
@@ -603,6 +605,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     }
 
     @Override
+    @Observed(name = "dynamic_data.get_by_id", contextualName = "dynamic-data-get-by-id")
     public Map<String, Object> getById(String modelCode, String recordId) {
         validateModelCode(modelCode);
         if (recordId == null || recordId.trim().isEmpty()) {

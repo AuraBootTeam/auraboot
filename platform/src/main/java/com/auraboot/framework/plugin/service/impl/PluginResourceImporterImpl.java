@@ -378,6 +378,19 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             }
         }
 
+        // Auto-publish updated fields that are still in draft
+        if (Boolean.TRUE.equals(autoPublish) && result != null && result.getResourcePid() != null) {
+            MetaFieldDTO field = metaFieldService.findCurrentByCode(dto.getCode()).orElse(null);
+            if (field != null && "draft".equalsIgnoreCase(field.getStatus())) {
+                try {
+                    metaFieldService.publishVersion(field.getPid());
+                    log.info("Auto-published field after import: {}", dto.getCode());
+                } catch (Exception e) {
+                    log.warn("Failed to auto-publish field {}: {}", dto.getCode(), e.getMessage());
+                }
+            }
+        }
+
         // Bind dictionary if dictCode is specified
         if (dto.getDictCode() != null && !dto.getDictCode().isBlank()) {
             MetaFieldDTO field = metaFieldService.findCurrentByCode(dto.getCode()).orElse(null);

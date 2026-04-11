@@ -1,0 +1,58 @@
+aurabot:
+  synonyms:
+    # Domain-specific query expansion map for AuraBoot RAG retrieval.
+    # Key: trigger term (lowercase), Value: list of expansion terms to OR-join.
+    expansions:
+      permission:
+        - rbac
+        - role
+        - access
+        - menu
+      bpm:
+        - workflow
+        - process
+        - approval
+        - task
+      plugin:
+        - module
+        - extension
+        - package
+      dsl:
+        - model
+        - field
+        - command
+        - page
+        - configuration
+      rag:
+        - knowledge
+        - embedding
+        - vector
+        - retrieval
+        - chunk
+      auth:
+        - login
+        - token
+        - jwt
+        - session
+        - password
+      tenant:
+        - multi-tenant
+        - isolation
+        - organization
+      i18n:
+        - internationalization
+        - locale
+        - translation
+        - language
+      crm:
+        - lead
+        - opportunity
+        - account
+        - contact
+        - sales
+      agent:
+        - aurabot
+        - ai
+        - llm
+        - tool
+        - autonomous

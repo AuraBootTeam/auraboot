@@ -53,6 +53,9 @@ public class UserProvisioningService {
      */
     @Transactional(rollbackFor = Exception.class)
     public UserProvisionResponse provision(UserProvisionRequest request, Long tenantId, Long creatorId) {
+        // Quota enforcement is handled by QuotaEnforcementAspect (AOP) on addMember()
+        // when auraboot.quota.enforcement.enabled=true
+
         // 1. Determine password
         String password = request.getInitialPassword();
         String temporaryPassword = null;
