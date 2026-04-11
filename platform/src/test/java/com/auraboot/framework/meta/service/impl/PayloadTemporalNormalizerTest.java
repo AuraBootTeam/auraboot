@@ -8,7 +8,7 @@ import com.auraboot.framework.meta.exception.TemporalParseException;
 import com.auraboot.framework.meta.service.MetaModelService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -19,14 +19,14 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.*;
-import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.when;
 
 class PayloadTemporalNormalizerTest extends BaseIntegrationTest {
 
     @Autowired
     PayloadTemporalNormalizer normalizer;
 
-    @MockitoSpyBean
+    @MockitoBean
     MetaModelService metaModelService;
 
     private ModelDefinition modelWithFields(FieldDefinition... fields) {
@@ -158,8 +158,8 @@ class PayloadTemporalNormalizerTest extends BaseIntegrationTest {
             .code("test_order_line")
             .fields(List.of(dateField("delivery_date")))
             .build();
-        doReturn(Optional.of(childModel))
-            .when(metaModelService).getModelDefinition("test_order_line");
+        when(metaModelService.getModelDefinition("test_order_line"))
+            .thenReturn(Optional.of(childModel));
 
         // Set up parent model with ONE_TO_MANY relation
         RelationDefinition relation = RelationDefinition.builder()
@@ -201,8 +201,8 @@ class PayloadTemporalNormalizerTest extends BaseIntegrationTest {
             .code("test_activity_log")
             .fields(List.of(datetimeField("logged_at")))
             .build();
-        doReturn(Optional.of(childModel))
-            .when(metaModelService).getModelDefinition("test_activity_log");
+        when(metaModelService.getModelDefinition("test_activity_log"))
+            .thenReturn(Optional.of(childModel));
 
         RelationDefinition relation = RelationDefinition.builder()
             .name("logs")
@@ -234,8 +234,8 @@ class PayloadTemporalNormalizerTest extends BaseIntegrationTest {
             .code("test_activity_log")
             .fields(List.of(datetimeField("logged_at")))
             .build();
-        doReturn(Optional.of(childModel))
-            .when(metaModelService).getModelDefinition("test_activity_log");
+        when(metaModelService.getModelDefinition("test_activity_log"))
+            .thenReturn(Optional.of(childModel));
 
         RelationDefinition relation = RelationDefinition.builder()
             .name("logs")
@@ -262,8 +262,8 @@ class PayloadTemporalNormalizerTest extends BaseIntegrationTest {
     @Test
     void normalize_missingChildModel_subTableSkippedGracefully() {
         // MetaModelService returns empty for unknown model
-        doReturn(Optional.empty())
-            .when(metaModelService).getModelDefinition("unknown_child_model");
+        when(metaModelService.getModelDefinition("unknown_child_model"))
+            .thenReturn(Optional.empty());
 
         RelationDefinition relation = RelationDefinition.builder()
             .name("items")
@@ -328,8 +328,8 @@ class PayloadTemporalNormalizerTest extends BaseIntegrationTest {
             .code("test_order_line")
             .fields(List.of(dateField("delivery_date")))
             .build();
-        doReturn(Optional.of(childModel))
-            .when(metaModelService).getModelDefinition("test_order_line");
+        when(metaModelService.getModelDefinition("test_order_line"))
+            .thenReturn(Optional.of(childModel));
 
         RelationDefinition relation = RelationDefinition.builder()
             .name("lines")

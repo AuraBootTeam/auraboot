@@ -18,7 +18,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -36,9 +38,12 @@ import static org.junit.jupiter.api.Assertions.*;
  * Custom Mode uses simple-flow.bpmn20.xml (start → end, no userTask).
  */
 @SpringBootTest(classes = TestApplication.class)
-@ActiveProfiles("test")
+@ActiveProfiles("integration-test")
 @DisplayName("SmartEngine Dual-Mode Coexistence")
 class DualModeCoexistenceTest {
+
+    @MockitoBean
+    private JavaMailSender mailSender;
 
     @Autowired
     private SmartEngine databaseEngine;

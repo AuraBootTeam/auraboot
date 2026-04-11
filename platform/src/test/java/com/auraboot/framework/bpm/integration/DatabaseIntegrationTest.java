@@ -6,7 +6,9 @@ import com.auraboot.framework.application.TestApplication;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.sql.DataSource;
@@ -23,10 +25,13 @@ import static org.junit.jupiter.api.Assertions.*;
  * 
  * @author AuraBoot Team
  */
-@ActiveProfiles("test")
+@ActiveProfiles("integration-test")
 @SpringBootTest(classes = TestApplication.class)
 @Transactional
 class DatabaseIntegrationTest {
+
+    @MockitoBean
+    private JavaMailSender mailSender;
 
     @Autowired
     private DataSource dataSource;

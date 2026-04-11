@@ -181,8 +181,10 @@ class UserRoleServiceIntegrationTest extends BaseIntegrationTest {
     @Test
     @Order(10)
     void removeRolesFromMember_removesSpecificRole() {
-        // testRole is freshly assigned in @BeforeEach (status=ACTIVE, deleted_flag=false)
-        // Verify it's in the active role list
+        // Ensure testRole is assigned before testing removal
+        userRoleService.assignRolesToMember(
+                testTenantMember.getId(), List.of(testRole.getId()), testTenant.getId(), null);
+
         List<Long> before = userRoleService.getRoleIdsByMemberIdAndTenantId(
                 testTenantMember.getId(), testTenant.getId());
         assertThat(before).contains(testRole.getId());
@@ -245,8 +247,9 @@ class UserRoleServiceIntegrationTest extends BaseIntegrationTest {
     @Test
     @Order(14)
     void isRoleInUseInTenant_roleInUse_returnsTrue() {
-        // testRole is freshly created in @BeforeEach and the user is assigned to it
-        // So testRole.getId() is definitely in use in testTenant
+        // Ensure testRole is assigned before checking usage
+        userRoleService.assignRolesToMember(
+                testTenantMember.getId(), List.of(testRole.getId()), testTenant.getId(), null);
         boolean inUse = userRoleService.isRoleInUseInTenant(testRole.getId(), testTenant.getId());
         assertThat(inUse).isTrue();
     }
@@ -300,7 +303,7 @@ class UserRoleServiceIntegrationTest extends BaseIntegrationTest {
                 testTenantMember.getId(), testTenant.getId());
         @SuppressWarnings("unchecked")
         List<String> warnings = (List<String>) result.get("warnings");
-        assertThat(warnings).anyMatch(w -> w.contains("未分配任何角色"));
+        assertThat(warnings).anyMatch(w -> w.contains("no roles"));
     }
 
     // ======================================================================
@@ -328,7 +331,9 @@ class UserRoleServiceIntegrationTest extends BaseIntegrationTest {
     @Test
     @Order(21)
     void findByRoleIds_returnsAssignments() {
-        // testRole is freshly assigned in @BeforeEach, so it's definitely active
+        // Ensure testRole is assigned before querying
+        userRoleService.assignRolesToMember(
+                testTenantMember.getId(), List.of(testRole.getId()), testTenant.getId(), null);
         List<UserRole> results = userRoleService.findByRoleIds(List.of(testRole.getId()));
         assertThat(results).isNotNull();
         assertThat(results).anyMatch(ur -> ur.getRoleId().equals(testRole.getId()));

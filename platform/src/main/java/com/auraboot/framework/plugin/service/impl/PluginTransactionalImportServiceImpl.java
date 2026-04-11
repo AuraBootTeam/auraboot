@@ -226,7 +226,8 @@ public class PluginTransactionalImportServiceImpl implements PluginTransactional
                                           List<Map<String, Object>> resources, String errorMessage) {
         PluginImportLog importLog = new PluginImportLog();
         importLog.setPid(UniqueIdGenerator.generate());
-        importLog.setTenantId(0L); // plugin import is tenant-agnostic for now
+        Long tenantId = com.auraboot.framework.application.tenant.MetaContext.getCurrentTenantId();
+        importLog.setTenantId(tenantId != null ? tenantId : 0L);
         importLog.setPluginCode(request.getPluginCode());
         importLog.setPluginVersion(request.getPluginVersion());
         importLog.setStatus(status);
