@@ -11,12 +11,13 @@ import com.auraboot.framework.file.dto.FileRelationRequestDTO;
 import com.auraboot.framework.file.dto.FileUploadResponseDTO;
 import com.auraboot.framework.file.entity.FileEntity;
 import com.auraboot.framework.file.service.FileService;
+import com.auraboot.framework.infrastructure.storage.StorageProvider;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -24,7 +25,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.File;
+import java.io.InputStream;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -45,6 +46,8 @@ public class FileUploadController {
     private FileMapper fileMapper;
     @Autowired
     private FileService fileService;
+    @Autowired
+    private StorageProvider storageProvider;
     
     /**
      * Single file upload via multipart
@@ -220,27 +223,39 @@ public class FileUploadController {
     }
     
     /**
-     * 文件下载
+     * File download — delegates to StorageProvider which validates path traversal.
+     * TenantLineInterceptor ensures the file belongs to the current tenant.
      */
     @GetMapping("/download/{fileId}")
     public ResponseEntity<Resource> downloadFile(@PathVariable String fileId) {
         FileEntity fileEntity = fileService.getFileById(fileId);
-        if (fileEntity == null || fileEntity.getLocalPath() == null) {
+        if (fileEntity == null) {
             return ResponseEntity.notFound().build();
         }
-        
-        File file = new File(fileEntity.getLocalPath());
-        if (!file.exists()) {
+
+        // Determine the storage key: localPath for LOCAL, cloudKey for cloud providers
+        String storageKey = fileEntity.getLocalPath();
+        if (storageKey == null || storageKey.isBlank()) {
+            storageKey = fileEntity.getCloudKey();
+        }
+        if (storageKey == null || storageKey.isBlank()) {
             return ResponseEntity.notFound().build();
         }
-        
-        Resource resource = new FileSystemResource(file);
-        String encodedFilename = URLEncoder.encode(fileEntity.getOriginalName(), StandardCharsets.UTF_8);
-        
-        return ResponseEntity.ok()
-                .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + encodedFilename + "\"")
-                .body(resource);
+
+        try {
+            // StorageProvider.download() validates path traversal for local storage
+            InputStream stream = storageProvider.download(storageKey);
+            Resource resource = new InputStreamResource(stream);
+            String encodedFilename = URLEncoder.encode(fileEntity.getOriginalName(), StandardCharsets.UTF_8);
+
+            return ResponseEntity.ok()
+                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + encodedFilename + "\"")
+                    .body(resource);
+        } catch (SecurityException e) {
+            LOG.warn("Path traversal attempt blocked for file {}: {}", fileId, e.getMessage());
+            return ResponseEntity.notFound().build();
+        }
     }
 
 /**
@@ -253,7 +268,7 @@ private FileUploadResponseDTO buildUploadResponse(FileEntity fileEntity) {
     response.setOriginalName(fileEntity.getOriginalName());
     response.setFileSize(fileEntity.getFileSize());
     response.setMimeType(fileEntity.getMimeType());
-    response.setLocalPath(fileEntity.getLocalPath());
+    // Security: never expose server-side storage paths to clients
     response.setCloudPath(fileEntity.getCloudPath());
     response.setStorageType(fileEntity.getStorageType());
     response.setStatus(fileEntity.getStatus());

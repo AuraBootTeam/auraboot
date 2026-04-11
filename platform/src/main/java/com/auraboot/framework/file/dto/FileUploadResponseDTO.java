@@ -36,11 +36,6 @@ public class FileUploadResponseDTO {
     private String mimeType;
     
     /**
-     * 本地路径
-     */
-    private String localPath;
-    
-    /**
      * 云存储路径
      */
     private String cloudPath;
@@ -89,10 +84,6 @@ public class FileUploadResponseDTO {
     
     public void setMimeType(String mimeType) {
         this.mimeType = mimeType;
-    }
-    
-    public void setLocalPath(String localPath) {
-        this.localPath = localPath;
     }
     
     public void setCloudPath(String cloudPath) {

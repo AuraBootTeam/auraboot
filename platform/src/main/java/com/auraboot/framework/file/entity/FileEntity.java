@@ -2,6 +2,7 @@ package com.auraboot.framework.file.entity;
 
 import com.auraboot.framework.file.constant.StorageType;
 import com.baomidou.mybatisplus.annotation.*;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.experimental.Accessors;
@@ -69,9 +70,10 @@ public class FileEntity implements Serializable {
     private StorageType storageType;
 
     /**
-     * 本地存储路径
+     * Server-side storage path — never expose to clients.
      */
     @TableField("local_path")
+    @JsonIgnore
     private String localPath;
 
     /**
