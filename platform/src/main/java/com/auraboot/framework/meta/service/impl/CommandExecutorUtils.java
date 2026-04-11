@@ -38,6 +38,28 @@ final class CommandExecutorUtils {
     }
 
     /**
+     * Check whether a Java value is type-compatible with the declared DSL field dataType.
+     * Used to prevent passing wrong-typed handler results into SQL updates.
+     *
+     * @param value    the Java object to check (must not be null)
+     * @param dataType the DSL field dataType string (e.g. "datetime", "integer", "text")
+     * @return true if the value's Java type is compatible with the dataType
+     */
+    static boolean isTypeCompatible(Object value, String dataType) {
+        return switch (dataType.toLowerCase()) {
+            case "datetime", "date", "timestamp" ->
+                value instanceof java.util.Date
+                    || value instanceof java.time.temporal.Temporal
+                    || value instanceof java.sql.Timestamp
+                    || value instanceof java.sql.Date;
+            case "integer", "int" -> value instanceof Number;
+            case "decimal", "float", "double", "money" -> value instanceof Number;
+            case "boolean" -> value instanceof Boolean;
+            default -> true;  // text, enum, json, reference — accept any
+        };
+    }
+
+    /**
      * Build record ID lookup condition. If recordId is numeric, use "id" column;
      * otherwise use "pid" column (for ULID-style identifiers).
      */
