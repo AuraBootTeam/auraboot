@@ -50,7 +50,7 @@
       "description": "访问页面配置列表和页面设计器",
       "type": "menu",
       "module": "meta",
-      "resource": "/p/page_schema_list",
+      "resource": "/p/page_schema",
       "action": "view",
       "resourceType": "menu"
     },
@@ -814,7 +814,7 @@
       "name": "页面配置",
       "name:zh-CN": "页面配置",
       "name:en": "Page Configuration",
-      "path": "/p/page_schema_list",
+      "path": "/p/page_schema",
       "pageKey": "page_schema_list",
       "component": null,
       "icon": "layout",
