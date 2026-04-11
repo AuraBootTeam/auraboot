@@ -43,8 +43,10 @@ class I18nCoverageIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private I18nResourceService i18nResourceService;
 
-    /** Unique prefix isolates keys from other test runs */
-    private final String pfx = "cov-" + System.currentTimeMillis();
+    /** Unique prefix isolates keys from other test runs.
+     *  Starts with '!' so it sorts FIRST in i18n_key ORDER BY, ensuring our test keys
+     *  appear within MAX_MISSING_KEYS (50) even when 200+ pre-existing keys are missing. */
+    private final String pfx = "!" + System.currentTimeMillis();
 
     // =========================================================================
     // Helpers
