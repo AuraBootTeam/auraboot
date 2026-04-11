@@ -310,7 +310,6 @@ tasks.withType(Test).configureEach {
 // 配置测试任务使用JUnit Platform
 test {
     useJUnitPlatform()
-    exclude '**/agent/**'
     exclude '**/bpm/**'
     exclude '**/controller/**'
     // i18n: needs enterprise plugin dirs on disk
