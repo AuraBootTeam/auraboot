@@ -1,6 +1,7 @@
 package com.auraboot.framework.agent.provider;
 
 import com.auraboot.framework.agent.tool.SendCustomerReplyToolHandler;
+import com.auraboot.framework.common.util.SsrfValidator;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -134,6 +135,9 @@ public class CustomToolProvider implements ToolProvider {
             method = parts[0].toUpperCase();
             url = parts[1].trim();
         }
+
+        // SSRF protection: validate URL before making server-side request
+        SsrfValidator.validateUrl(url);
 
         HttpClient httpClient = HttpClient.newHttpClient();
         String bodyJson = objectMapper.writeValueAsString(params != null ? params : Map.of());
