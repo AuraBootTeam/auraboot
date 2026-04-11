@@ -95,6 +95,58 @@ public class AuraBotController {
     }
 
     /**
+     * Proactive context-aware suggestions based on page context.
+     * Returns rule-based suggestion chips (no LLM call, lightweight).
+     */
+    @PostMapping("/suggest")
+    public Map<String, Object> suggest(@RequestBody ChatRequest.PageContext context) {
+        if (context == null || context.getModelCode() == null) {
+            return Map.of("code", "0", "data", List.of());
+        }
+
+        List<Map<String, String>> suggestions = new ArrayList<>();
+
+        // Rule: if on a list page, suggest creating a new record
+        if ("list".equals(context.getKind())) {
+            suggestions.add(Map.of(
+                    "text", "Create a new " + humanize(context.getModelCode()),
+                    "action", "chat",
+                    "prompt", "Create a new " + humanize(context.getModelCode()) + " record"
+            ));
+            suggestions.add(Map.of(
+                    "text", "Show statistics for " + humanize(context.getModelCode()),
+                    "action", "chat",
+                    "prompt", "Give me a summary of " + humanize(context.getModelCode()) + " data — total count, status breakdown, recent trends"
+            ));
+        }
+
+        // Rule: if on a detail page, suggest related actions
+        if ("detail".equals(context.getKind()) && context.getRecordPid() != null) {
+            suggestions.add(Map.of(
+                    "text", "Analyze this record",
+                    "action", "chat",
+                    "prompt", "Analyze the " + humanize(context.getModelCode()) + " record " + context.getRecordPid() + " — show key fields and suggest next actions"
+            ));
+        }
+
+        // Rule: if on a dashboard page, suggest data insights
+        if ("dashboard".equals(context.getKind())) {
+            suggestions.add(Map.of(
+                    "text", "Explain this dashboard",
+                    "action", "chat",
+                    "prompt", "Explain what this dashboard shows and highlight any important trends or anomalies"
+            ));
+        }
+
+        return Map.of("code", "0", "data", suggestions);
+    }
+
+    private String humanize(String modelCode) {
+        if (modelCode == null) return "record";
+        return modelCode.replace("_", " ");
+    }
+
+    /**
      * Derive a human-readable tool type from the tool name prefix.
      */
     private String deriveToolType(String toolName) {

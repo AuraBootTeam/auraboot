@@ -286,17 +286,17 @@ public final class MetaPermission {
     /**
      * Saved view management permission (create, update, delete)
      */
-    public static final String VIEW_MANAGE = "system.saved_view.update";
+    public static final String VIEW_MANAGE = "system.view_saved_view.update";
 
     /**
      * Saved view TEAM-scope management permission.
      */
-    public static final String VIEW_TEAM_MANAGE = "system.saved_view.team.update";
+    public static final String VIEW_TEAM_MANAGE = "system.view_saved_view.team.update";
 
     /**
      * Saved view read permission (query, list, view)
      */
-    public static final String VIEW_READ = "system.saved_view.read";
+    public static final String VIEW_READ = "system.view_saved_view.read";
 
     // ==================== AUTOMATION permissions ====================
 

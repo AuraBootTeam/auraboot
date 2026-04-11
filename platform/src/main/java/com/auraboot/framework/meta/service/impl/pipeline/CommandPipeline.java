@@ -1,6 +1,7 @@
 package com.auraboot.framework.meta.service.impl.pipeline;
 
 import com.auraboot.framework.meta.dto.CommandExecuteResult;
+import io.micrometer.observation.annotation.Observed;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -42,6 +43,7 @@ public class CommandPipeline {
      *
      * @return the short-circuit result if any phase triggered early return, otherwise null
      */
+    @Observed(name = "command.pipeline.pre_guard", contextualName = "command-pipeline-pre-guard")
     public CommandExecuteResult executePreGuardPhases(CommandPipelineContext ctx) {
         for (CommandPhase phase : preGuardPhases) {
             executePhase(phase, ctx);
@@ -57,6 +59,7 @@ public class CommandPipeline {
      *
      * @return the final result
      */
+    @Observed(name = "command.pipeline.guarded", contextualName = "command-pipeline-guarded")
     public CommandExecuteResult executeGuardedPhases(CommandPipelineContext ctx) {
         for (CommandPhase phase : guardedPhases) {
             executePhase(phase, ctx);

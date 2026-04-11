@@ -3,6 +3,7 @@
   "name:zh-CN": "分类详情",
   "name:en": "Category Detail",
   "pageType": "detail",
+  "kind": "detail",
   "modelCode": "tasset_category",
   "dslSchema": {
     "id": "detail.tasset_category",

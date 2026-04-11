@@ -1,5 +1,9 @@
 package com.auraboot.framework.rag.service;
 
+import com.auraboot.framework.agent.dto.LlmChatRequest;
+import com.auraboot.framework.agent.dto.LlmChatResponse;
+import com.auraboot.framework.agent.provider.LlmProvider;
+import com.auraboot.framework.agent.provider.LlmProviderFactory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -23,6 +27,15 @@ public class DocTranslationService {
 
     private static final List<String> TARGET_LOCALES = List.of("en-US", "ja-JP", "ko-KR");
     private static final String SOURCE_LOCALE = "zh-CN";
+
+    private static final Map<String, String> LOCALE_DISPLAY_NAMES = Map.of(
+            "en-US", "English",
+            "ja-JP", "Japanese",
+            "ko-KR", "Korean",
+            "zh-CN", "Simplified Chinese"
+    );
+
+    private final LlmProviderFactory llmProviderFactory;
 
     /**
      * Scan source docs and check translation status for all target locales.
@@ -123,6 +136,134 @@ public class DocTranslationService {
 
         log.info("Generated {} translation stubs for {} locales", created, TARGET_LOCALES.size());
         return created;
+    }
+
+    /**
+     * Translate a single document to the target locale using the configured LLM provider.
+     * Preserves all Markdown formatting, code blocks, and technical terms.
+     *
+     * @param sourceContent  the source document content (zh-CN)
+     * @param targetLocale   target locale, e.g. "en-US", "ja-JP", "ko-KR"
+     * @param tenantId       tenant ID for provider resolution
+     * @return translated content, or null if no LLM provider is configured
+     */
+    public String translateDocument(String sourceContent, String targetLocale, Long tenantId) {
+        LlmProviderFactory.ProviderConfig config = llmProviderFactory.resolveConfig(tenantId, null);
+        if (config == null) {
+            log.warn("No LLM provider configured for tenant {}; skipping translation to {}", tenantId, targetLocale);
+            return null;
+        }
+
+        String langName = LOCALE_DISPLAY_NAMES.getOrDefault(targetLocale, targetLocale);
+        String systemPrompt = String.format(
+                "You are a technical documentation translator. "
+                + "Translate the following document to %s. "
+                + "Preserve all formatting, code blocks, headings, links, and technical terms exactly as they appear. "
+                + "Only translate the human-readable prose text.",
+                langName);
+
+        LlmChatRequest chatRequest = LlmChatRequest.builder()
+                .providerCode(config.getProviderCode())
+                .model(config.getDefaultModel())
+                .systemPrompt(systemPrompt)
+                .maxTokens(8192)
+                .messages(List.of(
+                        LlmChatRequest.Message.builder()
+                                .role("user")
+                                .content(sourceContent)
+                                .build()
+                ))
+                .build();
+
+        try {
+            LlmProvider provider = llmProviderFactory.getProvider(config.getProviderCode());
+            LlmChatResponse response = provider.chat(chatRequest, config.getApiKey(), config.getBaseUrl());
+
+            if (response == null || response.getContent() == null || response.getContent().isEmpty()) {
+                log.warn("LLM returned empty response for translation to {}", targetLocale);
+                return null;
+            }
+
+            // Extract text from first content block
+            return response.getContent().stream()
+                    .filter(b -> "text".equals(b.getType()) && b.getText() != null)
+                    .map(LlmChatResponse.ContentBlock::getText)
+                    .findFirst()
+                    .orElse(null);
+
+        } catch (Exception e) {
+            log.error("LLM translation failed for locale {}: {}", targetLocale, e.getMessage(), e);
+            return null;
+        }
+    }
+
+    /**
+     * Translate all missing/stale documents using LLM and write the translated files.
+     * Adds YAML frontmatter with sourceHash to enable staleness detection on next run.
+     *
+     * @param sourceDir        source docs directory
+     * @param translateBaseDir base directory for translations
+     * @param tenantId         tenant ID for LLM provider resolution
+     * @param overwriteStale   if true, re-translates stale (outdated) files too
+     * @return number of files translated
+     */
+    public int translateMissing(String sourceDir, String translateBaseDir, Long tenantId, boolean overwriteStale)
+            throws IOException {
+        Path sourcePath = Path.of(sourceDir);
+        Path basePath = Path.of(translateBaseDir);
+        List<Path> sourceFiles = collectMarkdownFiles(sourcePath);
+        int translated = 0;
+
+        for (Path sourceFile : sourceFiles) {
+            String relativePath = sourcePath.relativize(sourceFile).toString();
+            String sourceHash = hashFile(sourceFile);
+            String sourceContent = Files.readString(sourceFile);
+            String title = extractTitle(sourceContent);
+
+            for (String locale : TARGET_LOCALES) {
+                Path translatedFile = basePath.resolve(locale).resolve(relativePath);
+
+                boolean shouldTranslate = false;
+                if (!Files.exists(translatedFile)) {
+                    shouldTranslate = true;
+                } else if (overwriteStale) {
+                    String existingContent = Files.readString(translatedFile);
+                    String savedHash = extractFrontmatterValue(existingContent, "sourceHash");
+                    shouldTranslate = !sourceHash.equals(savedHash);
+                }
+
+                if (!shouldTranslate) {
+                    continue;
+                }
+
+                log.info("Translating {} → {} ({})", relativePath, locale, title);
+                String translatedBody = translateDocument(sourceContent, locale, tenantId);
+                if (translatedBody == null) {
+                    log.warn("Translation skipped for {} → {} (no LLM provider or error)", relativePath, locale);
+                    continue;
+                }
+
+                Files.createDirectories(translatedFile.getParent());
+                StringBuilder output = new StringBuilder();
+                output.append("---\n");
+                output.append("title: ").append(title).append("\n");
+                output.append("translatedFrom: ").append(SOURCE_LOCALE).append("\n");
+                output.append("translationStatus: MACHINE_TRANSLATED\n");
+                output.append("sourceHash: ").append(sourceHash).append("\n");
+                output.append("sourceFile: ").append(relativePath).append("\n");
+                output.append("locale: ").append(locale).append("\n");
+                output.append("generatedAt: ").append(LocalDate.now()).append("\n");
+                output.append("---\n\n");
+                output.append(translatedBody);
+
+                Files.writeString(translatedFile, output.toString());
+                translated++;
+                log.info("Translated {} → {} successfully ({} chars)", relativePath, locale, translatedBody.length());
+            }
+        }
+
+        log.info("LLM translation complete: {} files translated across {} locales", translated, TARGET_LOCALES.size());
+        return translated;
     }
 
     private List<Path> collectMarkdownFiles(Path basePath) throws IOException {

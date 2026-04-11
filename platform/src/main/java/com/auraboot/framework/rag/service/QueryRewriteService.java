@@ -1,6 +1,8 @@
 package com.auraboot.framework.rag.service;
 
+import com.auraboot.framework.rag.config.SynonymConfig;
 import com.auraboot.framework.rag.dto.RetrievalResult;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -10,29 +12,16 @@ import java.util.stream.Collectors;
 /**
  * Query rewrite and result reranking for RAG retrieval.
  * <p>
- * Query expansion: adds related terms for short/ambiguous queries.
+ * Query expansion: adds related terms for short/ambiguous queries using a
+ * configurable synonym map loaded from {@code aurabot/synonyms.yml}.
  * Reranking: boosts results whose content has higher term overlap with the query.
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class QueryRewriteService {
 
-    /**
-     * Domain-specific synonym/expansion map for AuraBoot concepts.
-     * Key: trigger term (lowercase), Value: expansion terms to OR-join.
-     */
-    private static final Map<String, List<String>> EXPANSIONS = Map.ofEntries(
-            Map.entry("permission", List.of("rbac", "role", "access", "menu")),
-            Map.entry("bpm", List.of("workflow", "process", "approval", "task")),
-            Map.entry("plugin", List.of("module", "extension", "package")),
-            Map.entry("dsl", List.of("model", "field", "command", "page", "configuration")),
-            Map.entry("rag", List.of("knowledge", "embedding", "vector", "retrieval", "chunk")),
-            Map.entry("auth", List.of("login", "token", "jwt", "session", "password")),
-            Map.entry("tenant", List.of("multi-tenant", "isolation", "organization")),
-            Map.entry("i18n", List.of("internationalization", "locale", "translation", "language")),
-            Map.entry("crm", List.of("lead", "opportunity", "account", "contact", "sales")),
-            Map.entry("agent", List.of("aurabot", "ai", "llm", "tool", "autonomous"))
-    );
+    private final SynonymConfig synonymConfig;
 
     /**
      * Expand a query by adding related terms for short or domain-specific queries.
@@ -56,8 +45,9 @@ public class QueryRewriteService {
             return new QueryRewriteResult(query, query, false);
         }
 
+        Map<String, List<String>> expansions = synonymConfig.getExpansions();
         for (String word : words) {
-            List<String> related = EXPANSIONS.get(word);
+            List<String> related = expansions.get(word);
             if (related != null) {
                 expansionTerms.addAll(related);
             }

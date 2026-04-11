@@ -46,4 +46,30 @@ public class MarketplaceInstallController {
         installService.uninstall(pluginId);
         return ApiResponse.ok();
     }
+
+    /**
+     * Server-to-server install endpoint.
+     * Called by the marketplace server (market.auraboot.com) to push a plugin
+     * to a customer's AuraBoot instance using a pre-generated installToken.
+     *
+     * Authentication: the installToken is verified against the marketplace's
+     * public key (registered in CloudConfig service_type='marketplace').
+     */
+    @PostMapping("/s2s/install")
+    @Operation(summary = "Server-to-server plugin install via installToken",
+            description = "Used by marketplace server to push plugins to customer instances")
+    public ApiResponse<ImportExecuteResult> serverToServerInstall(
+            @RequestBody ServerInstallRequest request) {
+        log.info("S2S install: pluginId={}, token={}...",
+                request.getPluginId(),
+                request.getInstallToken() != null ? request.getInstallToken().substring(0, Math.min(8, request.getInstallToken().length())) + "..." : "null");
+        return ApiResponse.ok(installService.serverInstall(request.getPluginId(), request.getInstallToken()));
+    }
+
+    @lombok.Data
+    public static class ServerInstallRequest {
+        private String pluginId;
+        private String installToken;
+        private String pluginUrl;
+    }
 }

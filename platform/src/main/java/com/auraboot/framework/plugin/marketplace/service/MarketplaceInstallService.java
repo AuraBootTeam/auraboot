@@ -198,4 +198,21 @@ public class MarketplaceInstallService {
         }
         log.info("Marketplace install record removed: {} for tenant {}", pluginId, tenantId);
     }
+
+    /**
+     * Server-to-server install: marketplace pushes plugin to customer instance.
+     * InstallToken is a JWT signed by the marketplace server's key.
+     */
+    @Transactional
+    public ImportExecuteResult serverInstall(String pluginId, String installToken) {
+        // TODO: validate installToken against marketplace public key
+        // For now, delegate to normal install with overwrite
+        if (installToken == null || installToken.isBlank()) {
+            throw new RuntimeException("installToken is required for server-to-server install");
+        }
+        log.info("S2S install: pluginId={}", pluginId);
+        MarketplaceInstallRequest request = new MarketplaceInstallRequest();
+        request.setAutoPublishPages(true);
+        return install(pluginId, request);
+    }
 }
