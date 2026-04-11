@@ -695,6 +695,15 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     public PluginResource importCommand(CommandDefinitionDTO dto, String pluginPid, String importId,
                                          Long tenantId, ImportRequest.ConflictStrategy conflictStrategy,
                                          Boolean autoPublish) {
+        // Warn about inline bindingRules — they are silently ignored during command import.
+        // Binding rules must be in a separate bindingRules.json registered in plugin.json resourceDirs.
+        if (dto.getBindingRules() != null && !dto.getBindingRules().isEmpty()) {
+            log.warn("Command '{}' has inline 'bindingRules' in commands.json — "
+                    + "this field is ignored during import. "
+                    + "Use a separate bindingRules.json file registered in plugin.json resourceDirs.bindingRules.",
+                    dto.getCode());
+        }
+
         boolean exists = checkCommandExists(tenantId, dto.getCode());
 
         if (exists && conflictStrategy == ImportRequest.ConflictStrategy.ERROR) {
