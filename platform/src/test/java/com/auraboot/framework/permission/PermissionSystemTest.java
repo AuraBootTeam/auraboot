@@ -62,6 +62,19 @@ class PermissionSystemTest extends BaseIntegrationTest {
     @Autowired
     private DataPermissionPolicyMapper dataPermissionPolicyMapper;
 
+    @Autowired
+    private org.springframework.cache.CacheManager cacheManager;
+
+    @BeforeEach
+    void evictAllPermissionCaches() {
+        // Other test classes may have populated permission caches with stale data.
+        // Evict all caches to ensure this test class starts with a clean slate.
+        cacheManager.getCacheNames().forEach(name -> {
+            var cache = cacheManager.getCache(name);
+            if (cache != null) cache.clear();
+        });
+    }
+
     // ========================================================================
     // Helper Methods
     // ========================================================================
