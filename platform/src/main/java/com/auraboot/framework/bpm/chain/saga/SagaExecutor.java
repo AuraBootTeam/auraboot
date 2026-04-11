@@ -54,7 +54,7 @@ public class SagaExecutor {
         if (saga == null) {
             throw new IllegalArgumentException("Saga not found: " + sagaId);
         }
-        if (!SagaStatus.FAILED.name().equals(saga.getStatus())) {
+        if (!SagaStatus.FAILED.name().toLowerCase().equals(saga.getStatus())) {
             throw new IllegalStateException("Saga is not in FAILED status: " + saga.getStatus());
         }
 
@@ -75,7 +75,7 @@ public class SagaExecutor {
         processVars.put("_chain_business_key", saga.getBusinessKey());
 
         for (SagaStep step : steps) {
-            if (SagaStatus.COMPLETED.name().equals(step.getStatus()) && step.getOutputData() != null) {
+            if (SagaStatus.COMPLETED.name().toLowerCase().equals(step.getStatus()) && step.getOutputData() != null) {
                 processVars.put("_step_" + step.getNodeId() + "_result", step.getOutputData());
                 if (step.getRecordId() != null) {
                     processVars.put("_step_" + step.getNodeId() + "_recordId", step.getRecordId());
@@ -86,7 +86,7 @@ public class SagaExecutor {
 
         // Increment retry count on failed step
         failedStep.setRetryCount(failedStep.getRetryCount() + 1);
-        failedStep.setStatus(SagaStatus.PENDING.name());
+        failedStep.setStatus(SagaStatus.PENDING.name().toLowerCase());
         failedStep.setErrorMessage(null);
         stateManager.updateStepOutput(failedStep);
 
@@ -101,7 +101,7 @@ public class SagaExecutor {
                                              long startTime, CommandChainDefinition chain) {
         for (int i = startFromIndex; i < steps.size(); i++) {
             SagaStep step = steps.get(i);
-            if (SagaStatus.COMPLETED.name().equals(step.getStatus())) {
+            if (SagaStatus.COMPLETED.name().toLowerCase().equals(step.getStatus())) {
                 continue; // Skip already completed steps (retry scenario)
             }
 
@@ -159,7 +159,7 @@ public class SagaExecutor {
                 .processKey(saga.getChainCode())
                 .businessKey(saga.getBusinessKey())
                 .chainMode(ChainMode.SAGA)
-                .status(SagaStatus.COMPLETED.name())
+                .status(SagaStatus.COMPLETED.name().toLowerCase())
                 .durationMs(durationMs)
                 .build();
     }

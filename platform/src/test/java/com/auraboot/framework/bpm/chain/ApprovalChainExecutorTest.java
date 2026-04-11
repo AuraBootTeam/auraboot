@@ -369,7 +369,6 @@ class ApprovalChainExecutorTest {
                 .assigneeUserIds(List.of(200L)) // Different user
                 .build();
         when(approvalTaskMapper.selectOne(anyApprovalTaskQuery())).thenReturn(task);
-        when(approvalTaskMapper.update(isNull(), anyApprovalTaskUpdate())).thenReturn(1);
 
         assertThrows(SecurityException.class, () ->
                 executor.handleApproval("TASK-004", 100L, "approved", "OK", null));

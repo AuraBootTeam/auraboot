@@ -46,7 +46,7 @@ public class TriggerService {
                 .pid(UlidGenerator.generate())
                 .tenantId(tenantId)
                 .processKey(processKey)
-                .triggerType(type.name())
+                .triggerType(type.name().toLowerCase())
                 .triggerConfig(configMap)
                 .status(StatusConstants.DISABLED)
                 .createdAt(Instant.now())
