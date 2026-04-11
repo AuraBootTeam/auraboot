@@ -2,8 +2,10 @@ package com.auraboot.framework.auth.util;
 
 import com.auraboot.framework.auth.dto.CustomUserDetails;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Header;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
@@ -12,11 +14,24 @@ import jakarta.annotation.PostConstruct;
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
 
+/**
+ * JWT utility with dual-key rotation support via kid (Key ID) header.
+ *
+ * <p>Rotation flow:
+ * <ol>
+ *   <li>Normal: single key (secret + kid) signs and verifies all tokens</li>
+ *   <li>Rotate: set previous-secret/previous-kid, deploy — new tokens use new key,
+ *       old tokens still verify against previous key</li>
+ *   <li>After one token lifetime (expiration), remove previous-secret/previous-kid</li>
+ * </ol>
+ */
+@Slf4j
 @Component
 public class JwtUtil {
 
@@ -26,34 +41,114 @@ public class JwtUtil {
     @Value("${security.jwt.secret}")
     private String secret;
 
+    @Value("${security.jwt.kid:key-1}")
+    private String kid;
+
     @Value("${security.jwt.expiration}")
     private Long expiration;
+
+    @Value("${security.jwt.previous-secret:}")
+    private String previousSecret;
+
+    @Value("${security.jwt.previous-kid:}")
+    private String previousKid;
+
+    private SecretKey currentKey;
+    private SecretKey previousKey; // null when not in rotation
 
     @PostConstruct
     void validateConfiguration() {
         if (secret == null || secret.isBlank()) {
             throw new IllegalStateException("JWT secret must not be blank. Set security.jwt.secret in application.yml or environment.");
         }
-        int keyBytes = secret.getBytes(StandardCharsets.UTF_8).length;
-        if (keyBytes < MIN_SECRET_BYTES) {
-            throw new IllegalStateException(
-                String.format("JWT secret too short: %d bytes (minimum %d bytes / 256 bits). "
-                    + "Use a cryptographically random string of at least 32 characters.", keyBytes, MIN_SECRET_BYTES));
-        }
+        validateKeyLength(secret, "security.jwt.secret");
         if (expiration != null && expiration > MAX_EXPIRATION_SECONDS) {
             throw new IllegalStateException(
                 String.format("JWT expiration %d seconds exceeds maximum allowed %d seconds (7 days).", expiration, MAX_EXPIRATION_SECONDS));
         }
+
+        currentKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+
+        if (previousSecret != null && !previousSecret.isBlank()) {
+            validateKeyLength(previousSecret, "security.jwt.previous-secret");
+            previousKey = Keys.hmacShaKeyFor(previousSecret.getBytes(StandardCharsets.UTF_8));
+            log.info("JWT key rotation active: current kid={}, previous kid={}", kid, previousKid);
+        } else {
+            previousKey = null;
+        }
     }
 
-    private SecretKey getSigningKey() {
-        byte[] keyBytes = secret.getBytes(StandardCharsets.UTF_8);
-        return Keys.hmacShaKeyFor(keyBytes);
+    private void validateKeyLength(String key, String configName) {
+        int keyBytes = key.getBytes(StandardCharsets.UTF_8).length;
+        if (keyBytes < MIN_SECRET_BYTES) {
+            throw new IllegalStateException(
+                String.format("%s too short: %d bytes (minimum %d bytes / 256 bits). "
+                    + "Use a cryptographically random string of at least 32 characters.", configName, keyBytes, MIN_SECRET_BYTES));
+        }
+    }
+
+    /**
+     * Resolve the signing key for verification based on the token's kid header.
+     * Tokens without kid are treated as current key (backward compatible with pre-rotation tokens).
+     */
+    SecretKey resolveSigningKey(String token) {
+        String tokenKid = parseKidFromHeader(token);
+
+        // No kid in token — legacy token, verify with current key
+        if (tokenKid == null) {
+            return currentKey;
+        }
+        if (kid.equals(tokenKid)) {
+            return currentKey;
+        }
+        if (previousKey != null && tokenKid.equals(previousKid)) {
+            return previousKey;
+        }
+        throw new io.jsonwebtoken.security.SignatureException("Unknown kid: " + tokenKid);
+    }
+
+    /**
+     * Parse kid from JWT header without verifying signature.
+     * Safe because kid is only used to select which key to verify with —
+     * a tampered kid simply causes signature verification to fail.
+     */
+    static String parseKidFromHeader(String token) {
+        int firstDot = token.indexOf('.');
+        if (firstDot <= 0) {
+            return null;
+        }
+        try {
+            String headerJson = new String(
+                Base64.getUrlDecoder().decode(token.substring(0, firstDot)),
+                StandardCharsets.UTF_8);
+            // Minimal JSON parsing for {"...","kid":"value","..."}
+            int kidIdx = headerJson.indexOf("\"kid\"");
+            if (kidIdx < 0) {
+                return null;
+            }
+            int colonIdx = headerJson.indexOf(':', kidIdx + 5);
+            if (colonIdx < 0) {
+                return null;
+            }
+            int quoteStart = headerJson.indexOf('"', colonIdx + 1);
+            if (quoteStart < 0) {
+                return null;
+            }
+            int quoteEnd = headerJson.indexOf('"', quoteStart + 1);
+            if (quoteEnd < 0) {
+                return null;
+            }
+            return headerJson.substring(quoteStart + 1, quoteEnd);
+        } catch (IllegalArgumentException e) {
+            // Malformed Base64
+            return null;
+        }
     }
 
     private Claims extractAllClaims(String token) {
+        SecretKey key = resolveSigningKey(token);
         return Jwts.parser()
-                .verifyWith(getSigningKey())
+                .verifyWith(key)
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
@@ -64,7 +159,6 @@ public class JwtUtil {
         return claimsResolver.apply(claims);
     }
 
-
     public Date extractExpiration(String token) {
         return extractClaim(token, Claims::getExpiration);
     }
@@ -74,9 +168,7 @@ public class JwtUtil {
     }
 
     public String extractUserPid(String token) {
-        String subject = extractIdentifier(token);
-        return subject;
-
+        return extractIdentifier(token);
     }
 
     public Long extractTenantId(String token) {
@@ -103,14 +195,14 @@ public class JwtUtil {
         });
     }
 
-
     private String createToken(Map<String, Object> claims, String subjectByUserPid) {
         return Jwts.builder()
+                .header().keyId(kid).and()
                 .claims(claims)
                 .subject(subjectByUserPid)
                 .issuedAt(Date.from(Instant.now()))
                 .expiration(Date.from(Instant.now().plusSeconds(expiration)))
-                .signWith(getSigningKey())
+                .signWith(currentKey)
                 .compact();
     }
 
@@ -137,22 +229,23 @@ public class JwtUtil {
         return createToken(claims, userPid);
     }
 
-
-
     public Boolean validateToken(String token, UserDetails userDetails) {
-        // 使用userPid进行验证，而不是username
         final String tokenUserPid = extractUserPid(token);
         final String userPid = ((CustomUserDetails) userDetails).getUserPid();
         return (tokenUserPid.equals(userPid) && !isTokenExpired(token));
     }
 
-
     private Boolean isTokenExpired(String token) {
         return extractExpiration(token).before(Date.from(Instant.now()));
     }
 
+    /** Visible for testing — returns the current kid. */
+    String getCurrentKid() {
+        return kid;
+    }
 
-
-
-
+    /** Visible for testing — returns whether rotation is active. */
+    boolean isRotationActive() {
+        return previousKey != null;
+    }
 }
