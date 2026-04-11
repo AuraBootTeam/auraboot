@@ -37,9 +37,13 @@ public class JwtUtil {
 
     private static final int MIN_SECRET_BYTES = 32; // 256 bits for HMAC-SHA256
     private static final long MAX_EXPIRATION_SECONDS = 7 * 24 * 3600; // 7 days
+    private static final String DEV_DEFAULT_SECRET = "dev-only-secret-key-replace-in-production-min-32-chars";
 
     @Value("${security.jwt.secret}")
     private String secret;
+
+    @Value("${spring.profiles.active:}")
+    private String activeProfile;
 
     @Value("${security.jwt.kid:key-1}")
     private String kid;
@@ -60,6 +64,15 @@ public class JwtUtil {
     void validateConfiguration() {
         if (secret == null || secret.isBlank()) {
             throw new IllegalStateException("JWT secret must not be blank. Set security.jwt.secret in application.yml or environment.");
+        }
+        // Reject the default dev key in non-dev profiles
+        if (DEV_DEFAULT_SECRET.equals(secret) && !isDevProfile()) {
+            throw new IllegalStateException(
+                "JWT secret is the default dev key. Set JWT_SECRET environment variable for non-dev profiles. "
+                + "Generate with: openssl rand -base64 64");
+        }
+        if (DEV_DEFAULT_SECRET.equals(secret)) {
+            log.warn("Using default dev JWT secret — DO NOT use in production.");
         }
         validateKeyLength(secret, "security.jwt.secret");
         if (expiration != null && expiration > MAX_EXPIRATION_SECONDS) {
@@ -247,5 +260,13 @@ public class JwtUtil {
     /** Visible for testing — returns whether rotation is active. */
     boolean isRotationActive() {
         return previousKey != null;
+    }
+
+    private boolean isDevProfile() {
+        if (activeProfile == null || activeProfile.isBlank()) {
+            return true; // No profile = local dev
+        }
+        return activeProfile.contains("dev") || activeProfile.contains("local")
+                || activeProfile.contains("test") || activeProfile.contains("integration-test");
     }
 }
