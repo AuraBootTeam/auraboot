@@ -65,6 +65,7 @@ import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import com.auraboot.framework.common.constant.StatusConstants;
+import io.micrometer.observation.annotation.Observed;
 
 /**
  * Implementation of plugin import service.
@@ -179,6 +180,26 @@ public class PluginImportServiceImpl implements PluginImportService {
             ImportPreviewResult result = new ImportPreviewResult();
             result.setValid(false);
             result.addError("Failed to load plugin from directory: " + e.getMessage());
+            return result;
+        }
+    }
+
+    @Override
+    public ImportPreviewResult parseSource(com.auraboot.framework.plugin.source.PluginSource source) {
+        if (!source.isValidPlugin()) {
+            ImportPreviewResult result = new ImportPreviewResult();
+            result.setValid(false);
+            result.addError("Source does not contain plugin.json: " + source.getSourceId());
+            return result;
+        }
+
+        try {
+            PluginManifestExtended manifest = directoryLoader.loadFromSource(source);
+            return createPreviewFromManifest(manifest, source.getSourceId(), "source");
+        } catch (PluginException e) {
+            ImportPreviewResult result = new ImportPreviewResult();
+            result.setValid(false);
+            result.addError("Failed to load plugin from source: " + e.getMessage());
             return result;
         }
     }
@@ -781,6 +802,7 @@ public class PluginImportServiceImpl implements PluginImportService {
     // ==================== Execute ====================
 
     @Override
+    @Observed(name = "plugin.import.execute", contextualName = "plugin-import-execute")
     public ImportExecuteResult execute(String importId, ImportRequest request) {
         ImportContext context = importContextCache.get(importId);
         if (context == null) {
@@ -821,6 +843,10 @@ public class PluginImportServiceImpl implements PluginImportService {
      * rows to be visible — hence the lock must not be inside @Transactional scope.
      */
     private ImportExecuteResult executeWithLock(ImportContext context, ImportRequest request) {
+        // Merge manifest importOptions as defaults before applying hard defaults.
+        // Manifest options only take effect when the request field is null (i.e., not explicitly set by caller).
+        mergeManifestImportOptions(context.getManifest(), request);
+
         // Apply defaults for any null fields (Jackson + Lombok @ConstructorProperties pitfall)
         request.applyDefaults();
         String pluginId = context.getManifest().getPluginId();
@@ -857,6 +883,32 @@ public class PluginImportServiceImpl implements PluginImportService {
             throw new PluginException("Import failed: " + rootErrorMessage(e), e);
         } finally {
             distributedLock.unlock(lockKey);
+        }
+    }
+
+    /**
+     * Merge importOptions from plugin.json manifest into ImportRequest as defaults.
+     * Only sets request fields that are still null (caller-provided values take precedence).
+     */
+    private void mergeManifestImportOptions(PluginManifestExtended manifest, ImportRequest request) {
+        if (manifest == null || manifest.getImportOptions() == null) {
+            return;
+        }
+        PluginManifestExtended.ImportOptions opts = manifest.getImportOptions();
+        if (request.getAutoPublishModels() == null && opts.getAutoPublishModels() != null) {
+            request.setAutoPublishModels(opts.getAutoPublishModels());
+        }
+        if (request.getAutoPublishFields() == null && opts.getAutoPublishFields() != null) {
+            request.setAutoPublishFields(opts.getAutoPublishFields());
+        }
+        if (request.getAutoPublishCommands() == null && opts.getAutoPublishCommands() != null) {
+            request.setAutoPublishCommands(opts.getAutoPublishCommands());
+        }
+        if (request.getAutoPublishPages() == null && opts.getAutoPublishPages() != null) {
+            request.setAutoPublishPages(opts.getAutoPublishPages());
+        }
+        if (request.getAutoDeployProcesses() == null && opts.getAutoDeployProcesses() != null) {
+            request.setAutoDeployProcesses(opts.getAutoDeployProcesses());
         }
     }
 
