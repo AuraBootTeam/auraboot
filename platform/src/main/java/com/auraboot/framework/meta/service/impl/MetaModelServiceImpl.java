@@ -78,6 +78,10 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
     @Autowired
     private RollUpFieldRegistry rollUpFieldRegistry;
 
+    @Autowired
+    @Lazy
+    private com.auraboot.framework.meta.mapper.PageSchemaMapper pageSchemaMapper;
+
     @Override
     @Cacheable(value = "modelDefinitions", key = "#modelCode + '_' + T(com.auraboot.framework.meta.cache.MetaCacheKeyGenerator).getTenantContextSuffix()", unless = "#result == null")
     public Optional<ModelDefinition> getModelDefinition(String modelCode) {
@@ -1768,7 +1772,77 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
         // Invalidate roll-up field registry (model fields may include rollUp config)
         rollUpFieldRegistry.invalidateModel(model.getCode());
 
+        // Auto-create standard CRUD page schemas (list/form/detail) if they don't exist
+        autoCreateDefaultPages(model);
+
         return convertToMetaModelDTO(model);
+    }
+
+    /**
+     * Auto-creates standard CRUD page schemas (list, form, detail) for a newly published model.
+     * Only creates pages that do not already exist — fully idempotent.
+     *
+     * <p>Pages are created as 'published' so they are immediately accessible via /api/pages/key/{pageKey}.
+     * Blocks follow the V2 flat format (kind + blocks array, no dslSchema nesting).</p>
+     *
+     * @param model the published model
+     */
+    private void autoCreateDefaultPages(Model model) {
+        String modelCode = model.getCode();
+        Long tenantId = model.getTenantId();
+        Instant now = Instant.now();
+
+        record PageSpec(String kind, String pageKey, String blocks) {}
+
+        List<PageSpec> specs = List.of(
+            new PageSpec("list", modelCode + "_list",
+                "[{\"blockType\":\"toolbar\"},{\"blockType\":\"filters\"},{\"blockType\":\"table\"}]"),
+            new PageSpec("form", modelCode + "_form",
+                "[{\"blockType\":\"form-section\"}]"),
+            new PageSpec("detail", modelCode + "_detail",
+                "[{\"blockType\":\"form-section\"},{\"blockType\":\"tabs\"}]")
+        );
+
+        for (PageSpec spec : specs) {
+            // Check existence by page_key (unique per tenant+namespace)
+            com.auraboot.framework.meta.entity.PageSchema existing =
+                pageSchemaMapper.selectAnyByPageKey(spec.pageKey());
+            if (existing != null) {
+                log.debug("Page schema already exists, skipping auto-create: pageKey={}", spec.pageKey());
+                continue;
+            }
+
+            // Build title JSONB: {"en": "<ModelCode> <Kind>", "zh-CN": "<ModelCode> <Kind>"}
+            String titleLabel = modelCode + " " + spec.kind();
+            String titleJson = "{\"en\":\"" + titleLabel + "\",\"zh-CN\":\"" + titleLabel + "\"}";
+
+            int inserted = pageSchemaMapper.insertForPluginImport(
+                UniqueIdGenerator.generate(),   // pid
+                tenantId,                        // tenantId
+                "published",                     // status
+                spec.pageKey(),                  // pageKey
+                modelCode,                       // modelCode
+                spec.pageKey(),                  // name (same as pageKey)
+                titleJson,                       // title
+                null,                            // description
+                spec.kind(),                     // kind
+                "admin",                         // profile
+                "{\"type\":\"stack\"}",          // layout
+                spec.blocks(),                   // blocks
+                2,                               // schemaVersion (V2 flat format)
+                false,                           // isTemplate
+                null,                            // templateCategory
+                now,                             // publishedAt
+                0,                               // sortWeight
+                "{}",                            // extension
+                null                             // pluginPid
+            );
+
+            if (inserted > 0) {
+                log.info("Auto-created default page schema: pageKey={}, kind={}, modelCode={}",
+                    spec.pageKey(), spec.kind(), modelCode);
+            }
+        }
     }
 
     /**
