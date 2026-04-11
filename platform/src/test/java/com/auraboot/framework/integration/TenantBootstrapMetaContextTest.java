@@ -55,9 +55,10 @@ class TenantBootstrapMetaContextTest extends BaseIntegrationTest {
         // 验证系统级Permission被创建（需要重新设置MetaContext才能查询）
         MetaContext.setContext(tenantId,   userId, null, null);
         try {
-            Permission modelManage = permissionMapper.findByCode("MODEL.model.manage");
-            assertNotNull(modelManage, 
-                "MODEL.model.manage permission should exist - MetaContext was available during creation");
+            // System permissions follow format: system.{resourceCode}.{action}
+            Permission modelCreate = permissionMapper.findByCode("system.model.create");
+            assertNotNull(modelCreate,
+                "system.model.create permission should exist - MetaContext was available during creation");
         } finally {
             MetaContext.clear();
         }

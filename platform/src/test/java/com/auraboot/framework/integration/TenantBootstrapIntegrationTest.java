@@ -63,12 +63,13 @@ class TenantBootstrapIntegrationTest extends BaseIntegrationTest {
         // 预期: 10种资源类型 * 2种操作(manage, read) = 20个Permission被创建
         
         // 验证具体的Permission存在
-        Permission modelManage = permissionMapper.findByCode("MODEL.model.manage");
-        assertNotNull(modelManage, "MODEL.model.manage permission should exist");
+        // System permissions follow format: system.{resourceCode}.{action}
+        Permission modelManage = permissionMapper.findByCode("system.model.create");
+        assertNotNull(modelManage, "system.model.create permission should exist");
         assertEquals("system", modelManage.getSource(), "Should be system-level permission");
-        
-        Permission modelRead = permissionMapper.findByCode("MODEL.model.read");
-        assertNotNull(modelRead, "MODEL.model.read permission should exist");
+
+        Permission modelRead = permissionMapper.findByCode("system.model.read");
+        assertNotNull(modelRead, "system.model.read permission should exist");
         assertEquals("system", modelRead.getSource(), "Should be system-level permission");
     }
     
@@ -178,16 +179,16 @@ class TenantBootstrapIntegrationTest extends BaseIntegrationTest {
             "Permissions assigned should be non-negative");
         
         // 验证核心资源类型的Permission都被创建
-        // Note: 使用 SystemPermissionInitializer.RESOURCE_TYPES 中定义的标准资源类型
-        // 一些资源类型有特殊处理（如 RBAC、PAGE、GIT 有多个子资源），这里只验证基础的
-        String[] basicResourceTypes = {"model", "component", "dict", "field",
+        // System permissions follow format: system.{resourceCode}.{action}
+        // For resources where resourceType == resourceCode, code is system.{code}.{action}
+        // For sub-resources (e.g., rbac/role), code is system.{type}_{subCode}.{action}
+        String[] basicResourceCodes = {"model", "component", "dict", "field",
                                         "query", "form", "menu"};
-        String[] actions = {"manage", "read"};
+        String[] actions = {"create", "read"};
 
-        for (String resourceType : basicResourceTypes) {
-            String resourceCode = resourceType.toLowerCase();
+        for (String resourceCode : basicResourceCodes) {
             for (String action : actions) {
-                String code = resourceType + "." + resourceCode + "." + action;
+                String code = "system." + resourceCode + "." + action;
                 Permission permission = permissionMapper.findByCode(code);
                 assertNotNull(permission,
                     "Permission should exist: " + code);
@@ -196,12 +197,12 @@ class TenantBootstrapIntegrationTest extends BaseIntegrationTest {
             }
         }
 
-        // 验证 RBAC 子资源的 Permission (role, user_role)
-        Permission roleManage = permissionMapper.findByCode("RBAC.role.manage");
-        assertNotNull(roleManage, "Permission should exist: RBAC.role.manage");
+        // 验证 RBAC 子资源的 Permission (rbac_role, rbac_user_role)
+        Permission roleCreate = permissionMapper.findByCode("system.rbac_role.create");
+        assertNotNull(roleCreate, "Permission should exist: system.rbac_role.create");
 
-        // 验证 PAGE 子资源的 Permission (page, designer, publish)
-        Permission pageManage = permissionMapper.findByCode("PAGE.page.manage");
-        assertNotNull(pageManage, "Permission should exist: PAGE.page.manage");
+        // 验证 PAGE 子资源的 Permission (page, page_designer, page_publish)
+        Permission pageCreate = permissionMapper.findByCode("system.page.create");
+        assertNotNull(pageCreate, "Permission should exist: system.page.create");
     }
 }
