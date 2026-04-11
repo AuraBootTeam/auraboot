@@ -7,7 +7,6 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.apache.ibatis.type.BaseTypeHandler;
 import org.apache.ibatis.type.JdbcType;
 import org.apache.ibatis.type.MappedJdbcTypes;
-import org.apache.ibatis.type.MappedTypes;
 import org.postgresql.util.PGobject;
 
 import java.sql.CallableStatement;
@@ -19,7 +18,6 @@ import java.util.Map;
 /**
  * MyBatis TypeHandler for plugin settings Map <-> PostgreSQL JSONB.
  */
-@MappedTypes(Map.class)
 @MappedJdbcTypes(JdbcType.OTHER)
 public class PluginSettingsTypeHandler extends BaseTypeHandler<Map<String, Object>> {
 

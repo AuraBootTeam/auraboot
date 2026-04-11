@@ -155,18 +155,18 @@ public class FileUploadController {
      * 获取文件信息
      */
     @GetMapping("/{fileId}")
-    public ApiResponse<FileEntity> getFile(@PathVariable String fileId) {
+    public ApiResponse<FileUploadResponseDTO> getFile(@PathVariable String fileId) {
         FileEntity fileEntity = fileService.getFileById(fileId);
-        return ApiResponse.success(fileEntity);
+        return ApiResponse.success(toDto(fileEntity));
     }
-    
+
     /**
      * 获取用户文件列表
      */
     @GetMapping("/list")
-    public ApiResponse<List<FileEntity>> getUserFiles(@CurrentUserId Long userId) {
+    public ApiResponse<List<FileUploadResponseDTO>> getUserFiles(@CurrentUserId Long userId) {
         List<FileEntity> files = fileService.getFilesByUserId(userId);
-        return ApiResponse.success(files);
+        return ApiResponse.success(files.stream().map(this::toDto).toList());
     }
     
     /**
@@ -204,23 +204,23 @@ public class FileUploadController {
      * 获取实体关联的文件
      */
     @GetMapping("/relation/{entityType}/{entityId}")
-    public ApiResponse<List<FileEntity>> getEntityFiles(
+    public ApiResponse<List<FileUploadResponseDTO>> getEntityFiles(
             @PathVariable String entityType,
             @PathVariable String entityId) {
         List<FileEntity> files = fileService.getFilesByEntity(entityType, entityId);
-        return ApiResponse.success(files);
+        return ApiResponse.success(files.stream().map(this::toDto).toList());
     }
-    
+
     /**
      * 获取实体指定字段关联的文件
      */
     @GetMapping("/relation/{entityType}/{entityId}/{fieldName}")
-    public ApiResponse<List<FileEntity>> getEntityFieldFiles(
+    public ApiResponse<List<FileUploadResponseDTO>> getEntityFieldFiles(
             @PathVariable String entityType,
             @PathVariable String entityId,
             @PathVariable String fieldName) {
         List<FileEntity> files = fileService.getFilesByEntityAndField(entityType, entityId, fieldName);
-        return ApiResponse.success(files);
+        return ApiResponse.success(files.stream().map(this::toDto).toList());
     }
     
     /**
@@ -280,6 +280,10 @@ private FileUploadResponseDTO buildUploadResponse(FileEntity fileEntity) {
     response.setUrl(downloadUrl);
     
     return response;
+}
+
+private FileUploadResponseDTO toDto(FileEntity fileEntity) {
+    return buildUploadResponse(fileEntity);
 }
 
 /**

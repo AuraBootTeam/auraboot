@@ -58,7 +58,7 @@ public class OrgController {
      * Create a new department.
      */
     @PostMapping("/departments")
-    public ApiResponse<Map<String, Object>> createDepartment(@RequestBody Map<String, Object> data) {
+    public ApiResponse<Map<String, Object>> createDepartment(@RequestBody @jakarta.validation.constraints.NotEmpty Map<String, Object> data) {
         Map<String, Object> created = dynamicDataService.create(MODEL_ORG_DEPARTMENT, data);
         return ApiResponse.success(created);
     }
@@ -69,7 +69,7 @@ public class OrgController {
     @PutMapping("/departments/{pid}")
     public ApiResponse<Void> updateDepartment(
             @PathVariable String pid,
-            @RequestBody Map<String, Object> data) {
+            @RequestBody @jakarta.validation.constraints.NotEmpty Map<String, Object> data) {
         dynamicDataService.update(MODEL_ORG_DEPARTMENT, pid, data);
         return ApiResponse.success();
     }
@@ -153,7 +153,7 @@ public class OrgController {
     @PutMapping("/employees/{pid}")
     public ApiResponse<Void> updateEmployee(
             @PathVariable String pid,
-            @RequestBody Map<String, Object> data) {
+            @RequestBody @jakarta.validation.constraints.NotEmpty Map<String, Object> data) {
         dynamicDataService.update("org_employee", pid, data);
         return ApiResponse.success();
     }
