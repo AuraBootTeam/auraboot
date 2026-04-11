@@ -520,8 +520,12 @@ jacocoTestReport {
             fileTree(dir: it, exclude: jacocoExcludes)
         }
         if (classDumpDir.exists()) {
-            // Only include project classes from classdump (exclude third-party libs)
-            allClassDirs.add(fileTree(dir: classDumpDir, include: 'com/auraboot/**', exclude: jacocoExcludes))
+            // Only include CGLIB proxy classes from classdump — these are runtime-generated
+            // and have no .class on disk. Original classes are already in build/classes.
+            // Including both would cause "Can't add different class with same name" errors.
+            allClassDirs.add(fileTree(dir: classDumpDir,
+                include: 'com/auraboot/**/*$$SpringCGLIB$$0.*.class',
+                exclude: jacocoExcludes + ['**/*FastClass*']))
         }
         classDirectories.setFrom(files(allClassDirs))
     }
@@ -535,14 +539,12 @@ jacocoTestReport {
 jacocoTestCoverageVerification {
     dependsOn jacocoTestReport
     afterEvaluate {
-        def classDumpDir = file("${buildDir}/jacoco-classdump")
-        def allClassDirs = classDirectories.files.collect {
+        // Use only compiled classes for verification (not classdump).
+        // The jacocoTestReport includes CGLIB classdump for accurate XML reporting,
+        // but verification uses the simpler set to avoid class ID conflicts.
+        classDirectories.setFrom(files(classDirectories.files.collect {
             fileTree(dir: it, exclude: jacocoExcludes)
-        }
-        if (classDumpDir.exists()) {
-            allClassDirs.add(fileTree(dir: classDumpDir, include: 'com/auraboot/**', exclude: jacocoExcludes))
-        }
-        classDirectories.setFrom(files(allClassDirs))
+        }))
     }
     violationRules {
         rule {
