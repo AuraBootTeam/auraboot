@@ -116,7 +116,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         // Update last active time (throttled)
                         sessionManagementService.updateLastActive(jwt);
                     } catch (Exception e) {
-                        log.warn("Session check failed, allowing request: {}", e.getMessage());
+                        // SECURITY: fail-closed — reject request when session check errors
+                        // (e.g. Redis/DB unavailable). Do not silently allow.
+                        log.error("Session check failed, rejecting request: {}", e.getMessage());
+                        ApiResponse<?> apiResponse = ApiResponse.errorWithContext(ResponseCode.Unauthorized, request.getRequestURI());
+                        reject(request, response, apiResponse);
+                        return;
                     }
                 }
 

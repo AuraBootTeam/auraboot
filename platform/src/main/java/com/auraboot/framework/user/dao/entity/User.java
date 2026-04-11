@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
 
 import java.time.Instant;
@@ -28,8 +29,10 @@ public class User {
     private String mobile;
     private String email;
 
-    private String password;           // 加密后的密码
+    @JsonIgnore
+    private String password;
 
+    @JsonIgnore
     private String resetPasswordToken;
     private Instant resetPasswordSentAt;
     private Instant rememberCreatedAt;
@@ -45,10 +48,15 @@ public class User {
     private boolean isAccountNonLocked = true;
     private boolean isCredentialsNonExpired = true;
 
+    @JsonIgnore
     private Integer failedLoginAttempts = 0;
+    @JsonIgnore
     private Instant lockedAt;
+    @JsonIgnore
     private Instant passwordChangedAt;
+    @JsonIgnore
     private Boolean mustChangePassword = false;
+    @JsonIgnore
     private Integer securityVersion = 0;
 
     private Boolean phoneVerified = false;
