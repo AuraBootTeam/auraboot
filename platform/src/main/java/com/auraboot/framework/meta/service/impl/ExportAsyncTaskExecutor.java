@@ -132,21 +132,36 @@ public class ExportAsyncTaskExecutor implements AsyncTaskExecutor {
             // Data
             for (Map<String, Object> row : data) {
                 List<String> values = columns.stream()
-                        .map(col -> {
-                            Object val = row.get(col);
-                            if (val == null) return "";
-                            String str = val.toString();
-                            if (str.contains(",") || str.contains("\"") || str.contains("\n")) {
-                                return "\"" + str.replace("\"", "\"\"") + "\"";
-                            }
-                            return str;
-                        })
+                        .map(col -> escapeCsvCell(row.get(col)))
                         .toList();
                 writer.write(String.join(",", values));
                 writer.newLine();
             }
         }
         return tempFile;
+    }
+
+    /**
+     * Escape a CSV cell value to prevent:
+     * 1. Standard CSV escaping (commas, quotes, newlines)
+     * 2. CSV formula injection (cells starting with =, +, -, @, TAB, CR)
+     *    which Excel/Sheets may execute as formulas.
+     */
+    private static String escapeCsvCell(Object val) {
+        if (val == null) return "";
+        String str = val.toString();
+        // Neutralize formula injection: prefix with single-quote (tab-separated safe)
+        if (!str.isEmpty()) {
+            char first = str.charAt(0);
+            if (first == '=' || first == '+' || first == '-' || first == '@'
+                    || first == '\t' || first == '\r') {
+                str = "'" + str;
+            }
+        }
+        if (str.contains(",") || str.contains("\"") || str.contains("\n") || str.contains("'")) {
+            return "\"" + str.replace("\"", "\"\"") + "\"";
+        }
+        return str;
     }
 
     private Path writeJson(List<Map<String, Object>> data, String fileName) throws Exception {
