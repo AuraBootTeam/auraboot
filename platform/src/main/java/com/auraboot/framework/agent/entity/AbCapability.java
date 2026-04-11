@@ -9,7 +9,7 @@ import com.auraboot.framework.application.database.mybatis.JsonbMapTypeHandler;
 import com.auraboot.framework.application.database.mybatis.JsonbObjectTypeHandler;
 import lombok.Data;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
@@ -62,9 +62,9 @@ public class AbCapability {
     private Integer version;
     private String status;
     private String contractHash;
-    private LocalDateTime lastSyncedAt;
+    private Instant lastSyncedAt;
     private Long publishedBy;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
+    private Instant createdAt;
+    private Instant updatedAt;
     private Boolean deletedFlag;
 }

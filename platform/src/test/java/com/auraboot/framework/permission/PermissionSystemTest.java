@@ -183,6 +183,9 @@ class PermissionSystemTest extends BaseIntegrationTest {
         PermissionDTO perm = createUniquePermission("e1_userperm");
         bindPermissionToTestRole(perm.getId());
 
+        // Evict cached user permissions to ensure fresh DB query
+        userPermissionService.evictUserPermissions(getTestUser().getId());
+
         // When
         List<PermissionDTO> userPerms = permissionService.findUserPermissions(getTestUser().getId());
 
