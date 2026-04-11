@@ -69,21 +69,4 @@ public interface CommandExecutorDelegate {
                                  Long tenantId, Long userId, CommandDefinition command,
                                  CommandExecuteRequest request, Map<String, Object> fieldMapResults);
 
-    Map<String, Object> executeApiCallPhase(List<BindingRule> apiCallRules,
-                                             Map<String, Object> payload, Map<String, Object> handlerResults);
-
-    void executeWebhookPhase(List<BindingRule> webhookRules, CommandDefinition command,
-                              Map<String, Object> payload, Map<String, Object> results, Long tenantId);
-
-    void saveAuditLog(Long tenantId, String commandCode, String commandPid, Long userId,
-                       Map<String, Object> payload, Map<String, Object> result,
-                       boolean success, String errorMessage, long executionTimeMs,
-                       String phaseReached, Map<String, Long> phaseTimings);
-
-    void saveIdempotencyRecord(String clientRequestId, String commandCode,
-                                Map<String, Object> payload, Map<String, Object> resultData, Long tenantId);
-
-    void publishDomainEvent(CommandDefinition command, CommandExecuteRequest request,
-                             Map<String, Object> payload, Long tenantId, Long userId,
-                             Map<String, Object> beforeSnapshot);
 }
