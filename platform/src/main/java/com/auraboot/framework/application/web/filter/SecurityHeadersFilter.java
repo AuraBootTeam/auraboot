@@ -34,6 +34,13 @@ public class SecurityHeadersFilter extends OncePerRequestFilter {
         // Restrict browser features (camera, mic, geolocation) unless explicitly needed
         response.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
 
+        // Basic CSP for API responses — prevents script execution if a browser
+        // directly opens an API endpoint. Frontend CSP should be set at the
+        // BFF/CDN layer with nonce-based script-src.
+        if (request.getServletPath().startsWith("/api/")) {
+            response.setHeader("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'");
+        }
+
         filterChain.doFilter(request, response);
     }
 }
