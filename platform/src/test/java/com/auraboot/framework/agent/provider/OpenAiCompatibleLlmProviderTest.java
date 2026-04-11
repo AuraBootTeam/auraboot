@@ -31,14 +31,15 @@ class OpenAiCompatibleLlmProviderTest {
     }
 
     @Test
-    void minimaxModelsAreToolUnsupported() throws Exception {
+    void minimaxModelsAreToolSupported() throws Exception {
+        // MiniMax-M2.5+ supports OpenAI-compatible function calling
         OpenAiCompatibleLlmProvider provider = createProvider();
 
-        assertThat(isToolUnsupported(provider, "MiniMax-M2.5")).isTrue();
-        assertThat(isToolUnsupported(provider, "MiniMax-Text-01")).isTrue();
-        assertThat(isToolUnsupported(provider, "minimax-m2.5")).isTrue();
-        assertThat(isToolUnsupported(provider, "abab6.5s-chat")).isTrue();
-        assertThat(isToolUnsupported(provider, "ABAB7-chat")).isTrue();
+        assertThat(isToolUnsupported(provider, "MiniMax-M2.5")).isFalse();
+        assertThat(isToolUnsupported(provider, "MiniMax-Text-01")).isFalse();
+        assertThat(isToolUnsupported(provider, "minimax-m2.5")).isFalse();
+        assertThat(isToolUnsupported(provider, "abab6.5s-chat")).isFalse();
+        assertThat(isToolUnsupported(provider, "ABAB7-chat")).isFalse();
     }
 
     @Test
