@@ -1089,7 +1089,7 @@ public class CommandExecutorImpl implements CommandExecutor, CommandExecutorDele
                 continue;
             }
             String dataType = fieldDataTypes.getOrDefault(key, "text");
-            if (!isTypeCompatible(value, dataType)) {
+            if (!CommandExecutorUtils.isTypeCompatible(value, dataType)) {
                 log.warn("HANDLER: skipping field '{}' — Java type {} is not compatible with dataType '{}'. "
                         + "Handler should return correct types or exclude this field from result map.",
                         key, value.getClass().getSimpleName(), dataType);
@@ -1127,20 +1127,6 @@ public class CommandExecutorImpl implements CommandExecutor, CommandExecutorDele
 
         dynamicDataMapper.update(tableName, persistable, conditions);
         log.debug("HANDLER: wrote {} fields to {} (pid={})", persistable.size(), tableName, recordIdStr);
-    }
-
-    private boolean isTypeCompatible(Object value, String dataType) {
-        return switch (dataType.toLowerCase()) {
-            case "datetime", "date", "timestamp" ->
-                value instanceof java.util.Date
-                    || value instanceof java.time.temporal.Temporal
-                    || value instanceof java.sql.Timestamp
-                    || value instanceof java.sql.Date;
-            case "integer", "int" -> value instanceof Number;
-            case "decimal", "float", "double", "money" -> value instanceof Number;
-            case "boolean" -> value instanceof Boolean;
-            default -> true;  // text, enum, json, reference — accept any
-        };
     }
 
     @SuppressWarnings("unchecked")
