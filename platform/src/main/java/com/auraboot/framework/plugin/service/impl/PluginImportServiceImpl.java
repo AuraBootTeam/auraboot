@@ -86,6 +86,8 @@ public class PluginImportServiceImpl implements PluginImportService {
     private final PluginDirectoryLoader directoryLoader;
     private final MenuMapper menuMapper;
     private final MetaModelService metaModelService;
+    private final com.auraboot.framework.meta.service.MetaFieldService metaFieldService;
+    private final com.auraboot.framework.meta.service.CommandService commandService;
     private final SchemaManagementService schemaManagementService;
     private final PermissionService permissionService;
     private final RoleService roleService;
@@ -1189,6 +1191,44 @@ public class PluginImportServiceImpl implements PluginImportService {
 
         // Post-processing: Auto-publish DRAFT models and sync PUBLISHED models
         autoPublishAndSyncModels(importedModelCodes, request, manifest.getNamespace());
+
+        // Post-processing: Auto-publish DRAFT fields and commands for newly published models.
+        // Fields are imported BEFORE models (importOrder FIELD=20 < MODEL=30), so field autoPublish
+        // at create time skips fields whose model is still draft. Publish them now.
+        if (Boolean.TRUE.equals(request.getAutoPublishFields())) {
+            int fieldCount = 0;
+            for (String modelCode : importedModelCodes) {
+                for (var field : metaFieldService.findByStatus("draft")) {
+                    if (field.getCode() != null && field.getCode().startsWith(manifest.getNamespace() + "_")) {
+                        try {
+                            metaFieldService.publishVersion(field.getPid());
+                            fieldCount++;
+                        } catch (Exception e) {
+                            log.warn("Failed to auto-publish field {}: {}", field.getCode(), e.getMessage());
+                        }
+                    }
+                }
+                break; // Only need one iteration to get all namespace fields
+            }
+            if (fieldCount > 0) log.info("Post-import: auto-published {} draft fields", fieldCount);
+        }
+
+        if (Boolean.TRUE.equals(request.getAutoPublishCommands())) {
+            int cmdCount = 0;
+            for (String modelCode : importedModelCodes) {
+                for (var cmd : commandService.listByModelCode(modelCode)) {
+                    if ("draft".equalsIgnoreCase(cmd.getStatus())) {
+                        try {
+                            commandService.publish(cmd.getPid());
+                            cmdCount++;
+                        } catch (Exception e) {
+                            log.warn("Failed to auto-publish command {}: {}", cmd.getCode(), e.getMessage());
+                        }
+                    }
+                }
+            }
+            if (cmdCount > 0) log.info("Post-import: auto-published {} draft commands", cmdCount);
+        }
 
         // Post-processing: Auto-link menus to pages by pageKey
         linkMenusToPages(pluginPid, tenantId);
