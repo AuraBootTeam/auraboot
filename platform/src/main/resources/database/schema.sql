@@ -4937,7 +4937,8 @@ CREATE INDEX IF NOT EXISTS idx_agent_memory_tenant ON ab_agent_memory (tenant_id
 CREATE INDEX IF NOT EXISTS idx_agent_memory_agent ON ab_agent_memory (memory_agent_id);
 CREATE INDEX IF NOT EXISTS idx_agent_memory_type ON ab_agent_memory (memory_type);
 CREATE INDEX IF NOT EXISTS idx_agent_memory_shareable ON ab_agent_memory (tenant_id, shareable) WHERE shareable = TRUE;
-CREATE INDEX IF NOT EXISTS idx_agent_memory_embedding ON ab_agent_memory USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+-- HNSW index: better recall than IVFFlat, no pre-training needed
+CREATE INDEX IF NOT EXISTS idx_agent_memory_embedding ON ab_agent_memory USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
 COMMENT ON TABLE ab_agent_memory IS 'Agent long-term memory — facts, preferences, lessons, decisions';
 
 -- Agent observation (activity stream, metrics, cost tracking)
@@ -5791,7 +5792,8 @@ CREATE TABLE IF NOT EXISTS ab_kb_chunk (
 );
 CREATE INDEX IF NOT EXISTS idx_kb_chunk_doc ON ab_kb_chunk (doc_id);
 CREATE INDEX IF NOT EXISTS idx_kb_chunk_kb ON ab_kb_chunk (kb_id);
-CREATE INDEX IF NOT EXISTS idx_kb_chunk_embedding ON ab_kb_chunk USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+-- HNSW index: better recall than IVFFlat for <100K vectors, no training needed
+CREATE INDEX IF NOT EXISTS idx_kb_chunk_embedding ON ab_kb_chunk USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
 CREATE INDEX IF NOT EXISTS idx_kb_chunk_tsv ON ab_kb_chunk USING gin (tsv);
 
 -- Category — two-level tree for product/asset categorization

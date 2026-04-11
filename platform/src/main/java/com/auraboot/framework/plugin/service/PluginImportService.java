@@ -1,6 +1,7 @@
 package com.auraboot.framework.plugin.service;
 
 import com.auraboot.framework.plugin.dto.imports.*;
+import com.auraboot.framework.plugin.source.PluginSource;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
@@ -62,6 +63,18 @@ public interface PluginImportService {
      * @return parsed manifest with preview information
      */
     ImportPreviewResult parseDirectory(String directoryPath);
+
+    /**
+     * Parse a plugin from any PluginSource abstraction.
+     * Supports filesystem, URL, S3, and other source types.
+     *
+     * @param source the plugin source
+     * @return parsed manifest with preview information
+     * @since 7.2.0
+     */
+    default ImportPreviewResult parseSource(PluginSource source) {
+        throw new UnsupportedOperationException("parseSource not implemented");
+    }
 
     // ==================== Preview ====================
 

@@ -2,6 +2,7 @@ package com.auraboot.framework.plugin.template;
 
 import org.springframework.stereotype.Component;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
@@ -42,11 +43,36 @@ public class TemplateRegistry {
             return null;
         }
 
-        Path path = Paths.get(def.relativePath());
-        if (!path.isAbsolute()) {
-            path = Paths.get(System.getProperty("user.dir")).resolve(def.relativePath());
+        Path configuredPath = Paths.get(def.relativePath());
+        if (configuredPath.isAbsolute()) {
+            return configuredPath.normalize().toString();
         }
-        return path.normalize().toString();
+
+        Path workingDir = Paths.get(System.getProperty("user.dir")).normalize();
+        String relativePath = def.relativePath();
+
+        List<Path> candidates = new ArrayList<>();
+        candidates.add(workingDir.resolve(relativePath));
+
+        Path parent = workingDir.getParent();
+        if (parent != null) {
+            candidates.add(parent.resolve(relativePath));
+
+            Path grandParent = parent.getParent();
+            if (grandParent != null) {
+                candidates.add(grandParent.resolve(relativePath));
+                candidates.add(grandParent.resolve("auraboot").resolve(relativePath));
+            }
+        }
+
+        for (Path candidate : candidates) {
+            Path normalized = candidate.normalize();
+            if (Files.isDirectory(normalized)) {
+                return normalized.toString();
+            }
+        }
+
+        return candidates.getFirst().normalize().toString();
     }
 
     /**

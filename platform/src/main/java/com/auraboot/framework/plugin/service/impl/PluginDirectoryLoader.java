@@ -2,6 +2,8 @@ package com.auraboot.framework.plugin.service.impl;
 
 import com.auraboot.framework.plugin.dto.imports.*;
 import com.auraboot.framework.plugin.exception.PluginException;
+import com.auraboot.framework.plugin.source.PluginSource;
+import com.auraboot.framework.plugin.source.FileSystemPluginSource;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JavaType;
@@ -11,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.*;
 import java.util.*;
 import java.util.stream.Stream;
@@ -90,6 +93,37 @@ public class PluginDirectoryLoader {
 
         } catch (IOException e) {
             throw new PluginException("Failed to load plugin from directory: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Load plugin manifest from a PluginSource abstraction.
+     * Supports any source type (filesystem, URL, S3, etc.).
+     *
+     * @param source the plugin source to load from
+     * @return extended manifest with all resources loaded
+     * @since 7.2.0
+     */
+    public PluginManifestExtended loadFromSource(PluginSource source) {
+        if (!source.isValidPlugin()) {
+            throw new PluginException("plugin.json not found in source: " + source.getSourceId());
+        }
+
+        try {
+            String manifestJson = source.readString("plugin.json");
+            PluginManifestExtended manifest = objectMapper.readValue(manifestJson, PluginManifestExtended.class);
+
+            Map<String, String> resourceDirs = manifest.getResourceDirs();
+            if (resourceDirs != null && !resourceDirs.isEmpty()) {
+                loadResourcesFromSource(source, manifest, resourceDirs);
+            }
+
+            log.info("Loaded plugin from source: {} v{}, resources: {}",
+                    manifest.getPluginId(), manifest.getVersion(), manifest.getResourceCounts());
+
+            return manifest;
+        } catch (IOException e) {
+            throw new PluginException("Failed to load plugin from source " + source.getSourceId() + ": " + e.getMessage(), e);
         }
     }
 
@@ -353,4 +387,105 @@ public class PluginDirectoryLoader {
         result.addAll(newItems);
         return result;
     }
+
+    // ==================== PluginSource-based loading ====================
+
+    private void loadResourcesFromSource(PluginSource source, PluginManifestExtended manifest,
+                                          Map<String, String> resourceDirs) throws IOException {
+        loadSourceResource(source, resourceDirs, "models", ModelDefinitionDTO.class,
+                manifest::getModels, manifest::setModels);
+        loadSourceResource(source, resourceDirs, "fields", FieldDefinitionDTO.class,
+                manifest::getFields, manifest::setFields);
+
+        String bindingsKey = resourceDirs.containsKey("modelFieldBindings") ? "modelFieldBindings" : "bindings";
+        loadSourceResource(source, resourceDirs, bindingsKey, ModelFieldBindingDTO.class,
+                manifest::getModelFieldBindings, manifest::setModelFieldBindings);
+
+        loadSourceResource(source, resourceDirs, "dicts", DictDefinitionDTO.class,
+                manifest::getDicts, manifest::setDicts);
+        loadSourceResource(source, resourceDirs, "commands", CommandDefinitionDTO.class,
+                manifest::getCommands, manifest::setCommands);
+        loadSourceResource(source, resourceDirs, "bindingRules", BindingRuleDTO.class,
+                manifest::getBindingRules, manifest::setBindingRules);
+        loadSourceResource(source, resourceDirs, "menus", MenuDefinitionDTO.class,
+                manifest::getMenus, manifest::setMenus);
+        loadSourceResource(source, resourceDirs, "permissions", PermissionDefinitionDTO.class,
+                manifest::getPermissions, manifest::setPermissions);
+        loadSourceResource(source, resourceDirs, "roles", RoleDefinitionDTO.class,
+                manifest::getRoles, manifest::setRoles);
+
+        // Pages need conversion
+        if (resourceDirs.containsKey("pages")) {
+            List<PageSchemaDTO> pages = loadResourceListFromSource(source, resourceDirs.get("pages"), PageSchemaDTO.class);
+            if (!pages.isEmpty()) {
+                List<PageSchemaDTO> converted = pages.stream().map(this::convertPageDslIfNeeded).toList();
+                manifest.setPages(mergeList(manifest.getPages(), converted));
+            }
+        }
+
+        loadSourceResource(source, resourceDirs, "processes", ProcessDefinitionDTO.class,
+                manifest::getProcesses, manifest::setProcesses);
+        loadSourceResource(source, resourceDirs, "i18n", I18nDefinitionDTO.class,
+                manifest::getI18nResources, manifest::setI18nResources);
+        loadSourceResource(source, resourceDirs, "namedQueries", NamedQueryDefinitionDTO.class,
+                manifest::getNamedQueries, manifest::setNamedQueries);
+        loadSourceResource(source, resourceDirs, "savedViews", SavedViewDefinitionDTO.class,
+                manifest::getSavedViews, manifest::setSavedViews);
+    }
+
+    @FunctionalInterface
+    private interface ListGetter<T> { List<T> get(); }
+
+    @FunctionalInterface
+    private interface ListSetter<T> { void set(List<T> items); }
+
+    private <T> void loadSourceResource(PluginSource source, Map<String, String> resourceDirs,
+                                         String key, Class<T> clazz,
+                                         ListGetter<T> getter, ListSetter<T> setter) throws IOException {
+        if (!resourceDirs.containsKey(key)) return;
+        List<T> items = loadResourceListFromSource(source, resourceDirs.get(key), clazz);
+        if (!items.isEmpty()) {
+            setter.set(mergeList(getter.get(), items));
+        }
+    }
+
+    private <T> List<T> loadResourceListFromSource(PluginSource source, String relativeDir, Class<T> clazz) throws IOException {
+        // Check if it's a single file (e.g., "models.json") or a directory
+        String jsonPath = relativeDir.endsWith(".json") ? relativeDir : relativeDir + ".json";
+        if (source.exists(jsonPath) && !relativeDir.endsWith(".json")) {
+            // Try as single JSON array file
+            String json = source.readString(jsonPath);
+            JavaType listType = objectMapper.getTypeFactory().constructCollectionType(List.class, clazz);
+            return objectMapper.readValue(json, listType);
+        }
+
+        if (source.exists(relativeDir + ".json") && relativeDir.endsWith(".json")) {
+            String json = source.readString(relativeDir);
+            JavaType listType = objectMapper.getTypeFactory().constructCollectionType(List.class, clazz);
+            return objectMapper.readValue(json, listType);
+        }
+
+        // Load from directory of individual JSON files
+        List<String> files = source.listFiles(relativeDir, ".json");
+        if (files.isEmpty()) return List.of();
+
+        List<T> result = new ArrayList<>();
+        for (String filePath : files) {
+            try {
+                String json = source.readString(filePath);
+                var node = objectMapper.readTree(json);
+                if (node == null || node.isNull()) continue;
+                if (node.isArray()) {
+                    JavaType listType = objectMapper.getTypeFactory().constructCollectionType(List.class, clazz);
+                    result.addAll(objectMapper.convertValue(node, listType));
+                } else {
+                    result.add(objectMapper.convertValue(node, clazz));
+                }
+            } catch (Exception e) {
+                log.warn("Failed to load resource from source {}/{}: {}", source.getSourceId(), filePath, e.getMessage());
+            }
+        }
+        return result;
+    }
 }
+

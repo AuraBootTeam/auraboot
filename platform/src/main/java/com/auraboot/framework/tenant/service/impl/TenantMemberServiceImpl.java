@@ -295,6 +295,12 @@ public class TenantMemberServiceImpl extends ServiceImpl<TenantMemberMapper, Ten
         return tenantMemberMapper.getTenantNameById(tenantId);
     }
 
+    @Override
+    public long countByTenantId(Long tenantId) {
+        if (tenantId == null) return 0;
+        return tenantMemberMapper.countByTenantIdAndStatus(tenantId, "active");
+    }
+
     /**
      * Check if a tenant is the System Tenant (Control Plane).
      * System tenant is identified by name "System" (created during bootstrap).

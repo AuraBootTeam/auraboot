@@ -31,7 +31,7 @@ public class TenantInviteServiceImpl  extends ServiceImpl<InvitationMapper, Invi
 
     @Autowired
     private TenantMemberService tenantMemberService;
-    
+
     @Autowired
     private UserService userService;
 
@@ -127,6 +127,9 @@ public class TenantInviteServiceImpl  extends ServiceImpl<InvitationMapper, Invi
                 return false;
             }
             
+            // Quota enforcement is handled by QuotaEnforcementAspect (AOP)
+            // when auraboot.quota.enforcement.enabled=true
+
             // 检查用户是否已经是该租户的成员
             TenantMember existingMember = tenantMemberService.findByTenantIdAndUserId(
                 invitation.getTenantId(), userId);

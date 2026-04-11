@@ -72,7 +72,7 @@ class TeamScopeControllerIntegrationTest extends BaseIntegrationTest {
             if (cache != null) cache.clear();
         });
 
-        grantPermission("system.saved_view.update", "system", "saved_view", "update", "Saved View Update");
+        grantPermission("system.view_saved_view.update", "system", "view_saved_view", "update", "Saved View Update");
         userPermissionService.evictUserPermissions(getTestUser().getId());
 
         ensureUserInSingleTeam(getTestUser().getId(), TEAM_ALPHA);
