@@ -166,9 +166,15 @@ public class ApprovalChainExecutor {
             throw new IllegalArgumentException("Approval task not found: " + taskPid);
         }
 
-        // Optimistic lock: only update if still PENDING
+        // 2. Verify approver is in assignee list — must check BEFORE any state mutation
+        if (!task.getAssigneeUserIds().contains(approverId)) {
+            throw new SecurityException("User " + approverId + " is not an assignee of task " + taskPid);
+        }
+
+        // 3. Optimistic lock: only update if still PENDING
+        String resolvedStatus = "approved".equals(outcome) ? "approved" : "rejected";
         UpdateWrapper<ApprovalTask> updateWrapper = new UpdateWrapper<ApprovalTask>()
-                .set("status", outcome.equals("approved") ? "approved" : "rejected")
+                .set("status", resolvedStatus)
                 .set("actual_approver_id", approverId)
                 .set("approval_comment", comment)
                 .set("approval_data", formData != null ? toJsonString(formData) : null)
@@ -184,12 +190,7 @@ public class ApprovalChainExecutor {
             throw new IllegalStateException("Task already completed or does not exist: " + taskPid);
         }
 
-        // 2. Verify approver is in assignee list
-        if (!task.getAssigneeUserIds().contains(approverId)) {
-            throw new SecurityException("User " + approverId + " is not an assignee of task " + taskPid);
-        }
-
-        // 3. Handle ALL strategy — check if all assignees approved
+        // 4. Handle ALL strategy — check if all assignees approved
         if ("all".equals(task.getAssigneeStrategy()) && StatusConstants.APPROVED.equals(outcome)) {
             // Reload to check approval_data for tracking
             // For simplicity in Phase 1: ALL requires sequential re-approval by each user
@@ -197,7 +198,7 @@ public class ApprovalChainExecutor {
             log.info("ALL strategy approval by user {} for task {}", approverId, taskPid);
         }
 
-        // 4. Load chain execution
+        // 5. Load chain execution
         ChainExecution exec = chainExecutionMapper.selectOne(
                 new QueryWrapper<ChainExecution>().eq("pid", task.getChainExecutionId()));
         if (exec == null) {

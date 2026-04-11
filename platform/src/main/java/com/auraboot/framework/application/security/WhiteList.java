@@ -28,8 +28,6 @@ public class WhiteList {
 
             "/api/im/ws",
 
-            "/api/dsl/**",
-
             "/api/reviews",
             "/api/reviews/summary",
 

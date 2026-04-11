@@ -45,7 +45,9 @@ public class DynamicSqlProvider {
      */
     @Deprecated
     public static String executeCustomSql(Map<String, Object> params) {
-        return requireSql(params);
+        String sql = requireSql(params);
+        SqlSafetyUtils.validateSelectOnlySql(sql);
+        return sql;
     }
 
     public static String insert(Map<String, Object> params) {

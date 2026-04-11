@@ -96,13 +96,13 @@ test.describe('Showcase UX Regression', () => {
 
   // ─── A2: Dashboard widget types correct ──────────────────────────────
 
-  test('A2: Arsenal dashboard page loads without Unknown widget', async ({ page }) => {
-    await page.goto('/dashboards?code=arsenal_capability_dashboard');
+  test('A2: Arsenal dashboard page loads with chart blocks', async ({ page }) => {
+    await page.goto('/p/sc_arsenal_dashboard');
     await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(5000);
-    // Should not show "Unknown widget" error
+    // Dashboard should render chart blocks, not show errors
+    await expect(page.locator('[data-testid*="dashboard-block-"]').first()).toBeVisible({ timeout: 10000 });
     const content = await page.textContent('body');
-    expect(content).not.toContain('Unknown widget');
+    expect(content).not.toContain('Page not found');
   });
 
   // ─── Seed data quality checks ────────────────────────────────────────

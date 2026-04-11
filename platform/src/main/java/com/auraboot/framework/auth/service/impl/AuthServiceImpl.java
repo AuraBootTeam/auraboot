@@ -91,11 +91,7 @@ public class AuthServiceImpl implements AuthService {
         final String jwt = jwtUtil.generateTokenWithTenantId(userDetails, user.getPid().toString(), null);
 
         // Register server-side session so the JWT passes session validation
-        try {
-            sessionManagementService.createSession(user.getId(), jwt, null, null);
-        } catch (Exception e) {
-            log.warn("Failed to create session for registered user: {}", e.getMessage());
-        }
+        sessionManagementService.createSession(user.getId(), jwt, null, null);
 
         return new AuthenticationResponse(jwt, user.getId(), user.getPid(), user.getNickName());
     }

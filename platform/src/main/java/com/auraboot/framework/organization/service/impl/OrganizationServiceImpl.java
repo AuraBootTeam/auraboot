@@ -172,13 +172,13 @@ public class OrganizationServiceImpl implements OrganizationService {
             return dynamicDataService.getById(MODEL_EMPLOYEE, reportTo);
         }
 
-        // Fallback: department manager
+        // Fallback: department manager (skip if the employee IS the department manager)
         String deptId = asString(employee.get(EMP_DEPT_ID));
         if (deptId != null) {
             Map<String, Object> dept = dynamicDataService.getById(MODEL_DEPARTMENT, deptId);
             if (dept != null) {
                 String managerId = asString(dept.get(DEPT_MANAGER_ID));
-                if (managerId != null) {
+                if (managerId != null && !managerId.equals(employeePid)) {
                     return dynamicDataService.getById(MODEL_EMPLOYEE, managerId);
                 }
             }
