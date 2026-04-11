@@ -1072,9 +1072,12 @@ public class CommandExecutorImpl implements CommandExecutor, CommandExecutorDele
         }
 
         Set<String> modelFieldCodes = new HashSet<>();
+        Map<String, String> fieldDataTypes = new HashMap<>();
         for (FieldDefinition fieldDefinition : modelDef.getFields()) {
             if (fieldDefinition != null && StringUtils.hasText(fieldDefinition.getCode())) {
                 modelFieldCodes.add(fieldDefinition.getCode());
+                fieldDataTypes.put(fieldDefinition.getCode(),
+                        StringUtils.hasText(fieldDefinition.getDataType()) ? fieldDefinition.getDataType() : "text");
             }
         }
 
@@ -1086,6 +1089,13 @@ public class CommandExecutorImpl implements CommandExecutor, CommandExecutorDele
             }
             Object value = entry.getValue();
             if (value == null) {
+                continue;
+            }
+            String dataType = fieldDataTypes.getOrDefault(key, "text");
+            if (!isTypeCompatible(value, dataType)) {
+                log.warn("HANDLER: skipping field '{}' — Java type {} is not compatible with dataType '{}'. "
+                        + "Handler should return correct types or exclude this field from result map.",
+                        key, value.getClass().getSimpleName(), dataType);
                 continue;
             }
             persistable.put(key, value);
@@ -1102,28 +1112,38 @@ public class CommandExecutorImpl implements CommandExecutor, CommandExecutorDele
             return;
         }
 
-        try {
-            String tableName = metaModelService.getTableName(modelCode);
-            CommandExecutorUtils.validateSqlIdentifier(tableName, "handler field tableName");
+        String tableName = metaModelService.getTableName(modelCode);
+        CommandExecutorUtils.validateSqlIdentifier(tableName, "handler field tableName");
 
-            Map<String, Object> conditions;
-            String sql = "SELECT id FROM " + tableName
-                    + " WHERE tenant_id = #{params.tenantId} AND pid = #{params.pid}";
-            Map<String, Object> lookupParams = Map.of("tenantId", tenantId, "pid", recordIdStr);
-            List<Map<String, Object>> rows = dynamicDataMapper.selectByQuery(sql, lookupParams);
-            if (rows != null && !rows.isEmpty()) {
-                Long dbId = ((Number) rows.get(0).get("id")).longValue();
-                conditions = Map.of("tenant_id", tenantId, "id", dbId);
-            } else {
-                var fallbackEntry = CommandExecutorUtils.resolveRecordIdColumn(recordIdStr);
-                conditions = Map.of("tenant_id", tenantId, fallbackEntry.getKey(), fallbackEntry.getValue());
-            }
-
-            dynamicDataMapper.update(tableName, persistable, conditions);
-            log.debug("HANDLER: wrote {} fields to {} (pid={})", persistable.size(), tableName, recordIdStr);
-        } catch (Exception e) {
-            log.warn("Failed to persist handler results for model {}: {}", modelCode, e.getMessage());
+        Map<String, Object> conditions;
+        String sql = "SELECT id FROM " + tableName
+                + " WHERE tenant_id = #{params.tenantId} AND pid = #{params.pid}";
+        Map<String, Object> lookupParams = Map.of("tenantId", tenantId, "pid", recordIdStr);
+        List<Map<String, Object>> rows = dynamicDataMapper.selectByQuery(sql, lookupParams);
+        if (rows != null && !rows.isEmpty()) {
+            Long dbId = ((Number) rows.get(0).get("id")).longValue();
+            conditions = Map.of("tenant_id", tenantId, "id", dbId);
+        } else {
+            var fallbackEntry = CommandExecutorUtils.resolveRecordIdColumn(recordIdStr);
+            conditions = Map.of("tenant_id", tenantId, fallbackEntry.getKey(), fallbackEntry.getValue());
         }
+
+        dynamicDataMapper.update(tableName, persistable, conditions);
+        log.debug("HANDLER: wrote {} fields to {} (pid={})", persistable.size(), tableName, recordIdStr);
+    }
+
+    private boolean isTypeCompatible(Object value, String dataType) {
+        return switch (dataType.toLowerCase()) {
+            case "datetime", "date", "timestamp" ->
+                value instanceof java.util.Date
+                    || value instanceof java.time.temporal.Temporal
+                    || value instanceof java.sql.Timestamp
+                    || value instanceof java.sql.Date;
+            case "integer", "int" -> value instanceof Number;
+            case "decimal", "float", "double", "money" -> value instanceof Number;
+            case "boolean" -> value instanceof Boolean;
+            default -> true;  // text, enum, json, reference — accept any
+        };
     }
 
     @SuppressWarnings("unchecked")
