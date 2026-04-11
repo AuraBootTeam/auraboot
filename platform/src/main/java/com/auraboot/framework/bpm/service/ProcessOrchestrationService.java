@@ -65,13 +65,13 @@ public class ProcessOrchestrationService {
 
             // Log the execution start
             executionLogService.logStateChange(executionId, null,
-                    ExecutionState.RUNNING.name(), "Execution started");
+                    ExecutionState.RUNNING.name().toLowerCase(), "Execution started");
 
             log.info("Orchestrated execution started: executionId={}, processKey={}",
                     executionId, processKey);
 
             return new ExecutionResult(executionId, processKey,
-                    ExecutionState.RUNNING.name(), Instant.now());
+                    ExecutionState.RUNNING.name().toLowerCase(), Instant.now());
         });
     }
 
@@ -126,7 +126,7 @@ public class ProcessOrchestrationService {
             processEngineService.suspendProcessInstance(executionId, Map.of());
 
             executionLogService.logStateChange(executionId,
-                    ExecutionState.RUNNING.name(), ExecutionState.PAUSED.name(), reason);
+                    ExecutionState.RUNNING.name().toLowerCase(), ExecutionState.PAUSED.name().toLowerCase(), reason);
 
             log.info("Execution paused: executionId={}", executionId);
             return null;
@@ -151,7 +151,7 @@ public class ProcessOrchestrationService {
             processEngineService.resumeProcessInstance(executionId, userId);
 
             executionLogService.logStateChange(executionId,
-                    ExecutionState.PAUSED.name(), ExecutionState.RUNNING.name(), "Resumed by user");
+                    ExecutionState.PAUSED.name().toLowerCase(), ExecutionState.RUNNING.name().toLowerCase(), "Resumed by user");
 
             log.info("Execution resumed: executionId={}", executionId);
             return null;
@@ -181,7 +181,7 @@ public class ProcessOrchestrationService {
             processEngineService.terminateProcessInstance(executionId, userId, reason);
 
             executionLogService.logStateChange(executionId,
-                    ExecutionState.RUNNING.name(), ExecutionState.CANCELLED.name(), reason);
+                    ExecutionState.RUNNING.name().toLowerCase(), ExecutionState.CANCELLED.name().toLowerCase(), reason);
 
             log.info("Execution cancelled: executionId={}", executionId);
             return null;
@@ -226,7 +226,7 @@ public class ProcessOrchestrationService {
                     tenantId
             );
 
-            executionLogService.logStateChange(executionId, null, ExecutionState.RUNNING.name(),
+            executionLogService.logStateChange(executionId, null, ExecutionState.RUNNING.name().toLowerCase(),
                     "Retried from node: " + nodeId);
 
             log.info("Retry from node completed: executionId={}, nodeId={}", executionId, nodeId);
@@ -379,17 +379,17 @@ public class ProcessOrchestrationService {
 
     private String resolveState(ProcessInstance instance) {
         if (instance.isSuspend()) {
-            return ExecutionState.PAUSED.name();
+            return ExecutionState.PAUSED.name().toLowerCase();
         }
         var status = instance.getStatus();
         if (status == null) {
-            return ExecutionState.RUNNING.name();
+            return ExecutionState.RUNNING.name().toLowerCase();
         }
         return switch (status) {
-            case running -> ExecutionState.RUNNING.name();
-            case completed -> ExecutionState.COMPLETED.name();
-            case aborted -> ExecutionState.CANCELLED.name();
-            case suspended -> ExecutionState.PAUSED.name();
+            case running -> ExecutionState.RUNNING.name().toLowerCase();
+            case completed -> ExecutionState.COMPLETED.name().toLowerCase();
+            case aborted -> ExecutionState.CANCELLED.name().toLowerCase();
+            case suspended -> ExecutionState.PAUSED.name().toLowerCase();
         };
     }
 }

@@ -1,5 +1,6 @@
 package com.auraboot.framework.bpm;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.bpm.entity.BpmNotifyRecord;
 import com.auraboot.framework.bpm.entity.SlaConfigEntity;
 import com.auraboot.framework.bpm.entity.SlaRecordEntity;
@@ -85,6 +86,21 @@ class SlaSchedulerServiceTest extends BaseIntegrationTest {
         return slaRecordMapper.findByPid(pid, getTestTenant().getId());
     }
 
+    /**
+     * scanSlaRecords() sets/clears MetaContext per-record internally.
+     * After it returns, MetaContext is cleared, so we must re-establish
+     * the test tenant context for subsequent assertions.
+     */
+    private void scanAndRestoreContext() {
+        slaSchedulerService.scanSlaRecords();
+        MetaContext.setContext(
+                getTestTenant().getId(),
+                getTestUser().getId(),
+                getTestUser().getPid(),
+                getTestUser().getUserName()
+        );
+    }
+
     // ==================== Test Cases ====================
 
     @Test
@@ -92,7 +108,7 @@ class SlaSchedulerServiceTest extends BaseIntegrationTest {
     @DisplayName("SLA-SCHED-01: Scan empty records - no active records does not throw")
     void slaSched01_scanEmptyRecordsDoesNotThrow() {
         // No records inserted — scanSlaRecords should simply return without error
-        assertDoesNotThrow(() -> slaSchedulerService.scanSlaRecords());
+        assertDoesNotThrow(() -> scanAndRestoreContext());
 
         log.info("SLA-SCHED-01 PASSED: scanSlaRecords with no active records completes without error");
     }
@@ -115,7 +131,7 @@ class SlaSchedulerServiceTest extends BaseIntegrationTest {
                 Instant.now().plus(Duration.ofMinutes(20)),
                 "running", 0, 0L);
 
-        slaSchedulerService.scanSlaRecords();
+        scanAndRestoreContext();
 
         // Verify record updated
         SlaRecordEntity reloaded = reloadRecord(record.getPid());
@@ -148,7 +164,7 @@ class SlaSchedulerServiceTest extends BaseIntegrationTest {
                 Instant.now().minus(Duration.ofMinutes(60)),
                 "running", 0, 0L);
 
-        slaSchedulerService.scanSlaRecords();
+        scanAndRestoreContext();
 
         SlaRecordEntity reloaded = reloadRecord(record.getPid());
         assertNotNull(reloaded, "Record should exist after scan");
@@ -177,7 +193,7 @@ class SlaSchedulerServiceTest extends BaseIntegrationTest {
                 Instant.now().plus(Duration.ofMinutes(20)),
                 "running", 0, 0L);
 
-        slaSchedulerService.scanSlaRecords();
+        scanAndRestoreContext();
 
         SlaRecordEntity reloaded = reloadRecord(record.getPid());
         assertNotNull(reloaded, "Record should exist after scan");
@@ -211,7 +227,7 @@ class SlaSchedulerServiceTest extends BaseIntegrationTest {
                 getTestTenant().getId(), 994L, "urge");
         int countBefore = before.size();
 
-        slaSchedulerService.scanSlaRecords();
+        scanAndRestoreContext();
 
         // Verify level not re-triggered — no new notification
         List<BpmNotifyRecord> after = notifyRecordMapper.findByRecipient(
@@ -254,7 +270,7 @@ class SlaSchedulerServiceTest extends BaseIntegrationTest {
                 .build();
         slaRecordMapper.insert(record);
 
-        slaSchedulerService.scanSlaRecords();
+        scanAndRestoreContext();
 
         SlaRecordEntity reloaded = reloadRecord(record.getPid());
         assertNotNull(reloaded, "Paused record should still exist");
@@ -282,7 +298,7 @@ class SlaSchedulerServiceTest extends BaseIntegrationTest {
                 Instant.now().plus(Duration.ofMinutes(20)),
                 "running", 0, 0L);
 
-        slaSchedulerService.scanSlaRecords();
+        scanAndRestoreContext();
 
         List<BpmNotifyRecord> notifications = notifyRecordMapper.findByRecipient(
                 getTestTenant().getId(), recipientId, "urge");
@@ -315,14 +331,14 @@ class SlaSchedulerServiceTest extends BaseIntegrationTest {
                 Instant.now().plus(Duration.ofMinutes(20)),
                 "running", 0, 0L);
 
-        slaSchedulerService.scanSlaRecords();
+        scanAndRestoreContext();
 
         List<BpmNotifyRecord> notifications = notifyRecordMapper.findByRecipient(
                 getTestTenant().getId(), recipientId, "urge");
         assertFalse(notifications.isEmpty(), "URGE notification should exist for ESCALATE action");
 
         BpmNotifyRecord notification = notifications.get(0);
-        assertTrue(notification.getContent().contains("escalation"),
+        assertTrue(notification.getContent().toLowerCase().contains("escalation"),
                 "ESCALATE content should contain 'escalation', got: " + notification.getContent());
 
         log.info("SLA-SCHED-08 PASSED: ESCALATE action created notification with ESCALATION content");
@@ -346,7 +362,7 @@ class SlaSchedulerServiceTest extends BaseIntegrationTest {
                 "running", 0, 0L);
 
         // Should not throw — AUTO_TRANSFER has try/catch internally
-        assertDoesNotThrow(() -> slaSchedulerService.scanSlaRecords(),
+        assertDoesNotThrow(() -> scanAndRestoreContext(),
                 "AUTO_TRANSFER should not crash even if task does not exist in engine");
 
         // Verify the warning was still recorded even though transfer failed
@@ -374,7 +390,7 @@ class SlaSchedulerServiceTest extends BaseIntegrationTest {
                 "running", 0, 0L);
 
         // Should not throw — AUTO_TERMINATE has try/catch internally
-        assertDoesNotThrow(() -> slaSchedulerService.scanSlaRecords(),
+        assertDoesNotThrow(() -> scanAndRestoreContext(),
                 "AUTO_TERMINATE should not crash even if process does not exist");
 
         SlaRecordEntity reloaded = reloadRecord(record.getPid());
@@ -401,7 +417,7 @@ class SlaSchedulerServiceTest extends BaseIntegrationTest {
                 Instant.now().plus(Duration.ofMinutes(20)),
                 "running", 0, 0L);
 
-        slaSchedulerService.scanSlaRecords();
+        scanAndRestoreContext();
 
         SlaRecordEntity reloaded = reloadRecord(record.getPid());
         assertEquals(1, reloaded.getCurrentWarningLevel(),
@@ -431,7 +447,7 @@ class SlaSchedulerServiceTest extends BaseIntegrationTest {
                 Instant.now().plus(Duration.ofMinutes(20)),
                 "running", 0, 0L);
 
-        slaSchedulerService.scanSlaRecords();
+        scanAndRestoreContext();
 
         List<BpmNotifyRecord> notifications = notifyRecordMapper.findByRecipient(
                 getTestTenant().getId(), targetUserId, "urge");
@@ -459,7 +475,7 @@ class SlaSchedulerServiceTest extends BaseIntegrationTest {
                 "running", 0, 0L);
 
         // Should not throw — starter resolves to empty list, no notification sent
-        assertDoesNotThrow(() -> slaSchedulerService.scanSlaRecords(),
+        assertDoesNotThrow(() -> scanAndRestoreContext(),
                 "NOTIFY with 'starter' recipient should not crash");
 
         // Warning level should still be updated (the action executed, just no recipients)
@@ -488,7 +504,7 @@ class SlaSchedulerServiceTest extends BaseIntegrationTest {
                 Instant.now().plus(Duration.ofMinutes(20)),
                 "running", 0, 0L);
 
-        slaSchedulerService.scanSlaRecords();
+        scanAndRestoreContext();
 
         SlaRecordEntity reloaded = reloadRecord(record.getPid());
         assertNotNull(reloaded, "Record should exist after scan");

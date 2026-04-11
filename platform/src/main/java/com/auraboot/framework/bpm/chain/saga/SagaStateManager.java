@@ -42,7 +42,7 @@ public class SagaStateManager {
                 .tenantId(MetaContext.getCurrentTenantId())
                 .chainCode(chain.getProcessKey())
                 .businessKey(businessKey)
-                .status(SagaStatus.RUNNING.name())
+                .status(SagaStatus.RUNNING.name().toLowerCase())
                 .totalSteps(totalSteps)
                 .completedSteps(0)
                 .payload(payload)
@@ -71,7 +71,7 @@ public class SagaStateManager {
                     .nodeId(node.getId())
                     .commandCode(data.getCommandCode())
                     .compensationCommand(data.getCompensationCommand())
-                    .status(SagaStatus.PENDING.name())
+                    .status(SagaStatus.PENDING.name().toLowerCase())
                     .inputParams(data.getParams())
                     .retryCount(0)
                     .build();
@@ -85,21 +85,21 @@ public class SagaStateManager {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void markStepRunning(SagaStep step) {
-        step.setStatus(SagaStatus.RUNNING.name());
+        step.setStatus(SagaStatus.RUNNING.name().toLowerCase());
         step.setStartedAt(Instant.now());
         stepMapper.updateById(step);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void markStepCompleted(SagaStep step) {
-        step.setStatus(SagaStatus.COMPLETED.name());
+        step.setStatus(SagaStatus.COMPLETED.name().toLowerCase());
         step.setCompletedAt(Instant.now());
         stepMapper.updateById(step);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void markStepFailed(SagaStep step, String errorMessage) {
-        step.setStatus(SagaStatus.FAILED.name());
+        step.setStatus(SagaStatus.FAILED.name().toLowerCase());
         step.setErrorMessage(errorMessage);
         step.setCompletedAt(Instant.now());
         stepMapper.updateById(step);
@@ -107,19 +107,19 @@ public class SagaStateManager {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void markStepCompensating(SagaStep step) {
-        step.setStatus(SagaStatus.COMPENSATING.name());
+        step.setStatus(SagaStatus.COMPENSATING.name().toLowerCase());
         stepMapper.updateById(step);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void markStepCompensated(SagaStep step) {
-        step.setStatus(SagaStatus.COMPENSATED.name());
+        step.setStatus(SagaStatus.COMPENSATED.name().toLowerCase());
         stepMapper.updateById(step);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void markStepCompensationFailed(SagaStep step, String errorMessage) {
-        step.setStatus(SagaStatus.COMPENSATION_FAILED.name());
+        step.setStatus(SagaStatus.COMPENSATION_FAILED.name().toLowerCase());
         step.setErrorMessage(errorMessage);
         stepMapper.updateById(step);
     }
@@ -141,7 +141,7 @@ public class SagaStateManager {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void markSagaCompleted(SagaExecution saga) {
-        saga.setStatus(SagaStatus.COMPLETED.name());
+        saga.setStatus(SagaStatus.COMPLETED.name().toLowerCase());
         saga.setCompletedAt(Instant.now());
         saga.setUpdatedAt(Instant.now());
         executionMapper.updateById(saga);
@@ -149,7 +149,7 @@ public class SagaStateManager {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void markSagaFailed(SagaExecution saga, String nodeId, String error) {
-        saga.setStatus(SagaStatus.FAILED.name());
+        saga.setStatus(SagaStatus.FAILED.name().toLowerCase());
         saga.setCurrentStep(nodeId);
         saga.setErrorMessage(error);
         saga.setUpdatedAt(Instant.now());
@@ -158,14 +158,14 @@ public class SagaStateManager {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void markSagaCompensating(SagaExecution saga) {
-        saga.setStatus(SagaStatus.COMPENSATING.name());
+        saga.setStatus(SagaStatus.COMPENSATING.name().toLowerCase());
         saga.setUpdatedAt(Instant.now());
         executionMapper.updateById(saga);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void markSagaCompensated(SagaExecution saga) {
-        saga.setStatus(SagaStatus.COMPENSATED.name());
+        saga.setStatus(SagaStatus.COMPENSATED.name().toLowerCase());
         saga.setCompletedAt(Instant.now());
         saga.setUpdatedAt(Instant.now());
         executionMapper.updateById(saga);
@@ -173,14 +173,14 @@ public class SagaStateManager {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void markSagaCompensationFailed(SagaExecution saga) {
-        saga.setStatus(SagaStatus.COMPENSATION_FAILED.name());
+        saga.setStatus(SagaStatus.COMPENSATION_FAILED.name().toLowerCase());
         saga.setUpdatedAt(Instant.now());
         executionMapper.updateById(saga);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void markSagaRunning(SagaExecution saga) {
-        saga.setStatus(SagaStatus.RUNNING.name());
+        saga.setStatus(SagaStatus.RUNNING.name().toLowerCase());
         saga.setErrorMessage(null);
         saga.setUpdatedAt(Instant.now());
         executionMapper.updateById(saga);
@@ -203,7 +203,7 @@ public class SagaStateManager {
         return stepMapper.selectOne(
                 new QueryWrapper<SagaStep>()
                         .eq("saga_execution_id", sagaId)
-                        .eq("status", SagaStatus.FAILED.name())
+                        .eq("status", SagaStatus.FAILED.name().toLowerCase())
                         .last("LIMIT 1"));
     }
 }

@@ -122,9 +122,9 @@ public class ExecutionLogService {
             return null;
         }
 
-        int completedNodes = executionLogMapper.countByEventType(executionId, ExecutionEventType.NODE_COMPLETE.name());
-        int failedNodes = executionLogMapper.countByEventType(executionId, ExecutionEventType.NODE_FAILURE.name());
-        int totalNodes = executionLogMapper.countByEventType(executionId, ExecutionEventType.NODE_START.name());
+        int completedNodes = executionLogMapper.countByEventType(executionId, ExecutionEventType.NODE_COMPLETE.name().toLowerCase());
+        int failedNodes = executionLogMapper.countByEventType(executionId, ExecutionEventType.NODE_FAILURE.name().toLowerCase());
+        int totalNodes = executionLogMapper.countByEventType(executionId, ExecutionEventType.NODE_START.name().toLowerCase());
 
         long totalDuration = logs.stream()
                 .filter(l -> l.getDurationMs() != null)
@@ -154,7 +154,7 @@ public class ExecutionLogService {
                 .executionId(executionId)
                 .nodeId(nodeId)
                 .nodeType(nodeType)
-                .eventType(eventType.name())
+                .eventType(eventType.name().toLowerCase())
                 .inputData(inputData)
                 .outputData(outputData)
                 .errorMessage(errorMessage)

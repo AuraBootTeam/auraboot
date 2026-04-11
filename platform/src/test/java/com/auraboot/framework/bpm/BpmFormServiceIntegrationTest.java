@@ -14,6 +14,7 @@ import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.meta.dto.CommandExecuteResult;
 import com.auraboot.framework.meta.service.CommandExecutor;
+import com.auraboot.framework.meta.service.impl.CommandExecutorDelegate;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.*;
 import org.mockito.ArgumentCaptor;
@@ -44,6 +45,12 @@ class BpmFormServiceIntegrationTest extends BaseIntegrationTest {
     // full model/command definitions in the database, which is complex to set up.
     @MockitoBean
     private CommandExecutor commandExecutor;
+
+    // CommandExecutorDelegate must also be mocked because CommandExecutorImpl
+    // implements both interfaces; mocking CommandExecutor alone causes
+    // AssertPhase (which depends on CommandExecutorDelegate) to fail.
+    @MockitoBean
+    private CommandExecutorDelegate commandExecutorDelegate;
 
     // ProcessEngineService is mocked because starting real processes requires
     // deployed BPMN definitions in SmartEngine.
