@@ -13,6 +13,7 @@ import com.auraboot.framework.meta.service.base.BaseMetaService;
 import com.auraboot.framework.meta.dto.*;
 import com.auraboot.framework.meta.constant.SystemFieldConstants;
 import com.auraboot.framework.meta.entity.payload.ExtensionBean;
+import com.auraboot.framework.meta.security.SqlSafetyUtils;
 import com.auraboot.framework.meta.entity.payload.FieldFeatureBean;
 import com.auraboot.framework.meta.entity.payload.FieldRefTargetBean;
 import com.auraboot.framework.meta.mapper.MetaModelMapper;
@@ -36,6 +37,7 @@ import org.springframework.util.StringUtils;
 
 import java.time.Instant;
 import java.util.*;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import com.auraboot.framework.common.constant.StatusConstants;
 
@@ -49,6 +51,9 @@ import com.auraboot.framework.common.constant.StatusConstants;
 @Service
 @RequiredArgsConstructor
 public class MetaModelServiceImpl extends BaseMetaService implements MetaModelService {
+
+    private static final Pattern MODEL_CODE_PATTERN = Pattern.compile("^[a-z][a-z0-9_]*$");
+    private static final int MAX_MODEL_CODE_LENGTH = 64;
 
     private final MetaModelMapper metaModelMapper;
     private final MetaFieldMapper metaFieldMapper;
@@ -111,9 +116,13 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
 
     @Override
     public String getTableName(String modelCode) {
-        return getModelDefinition(modelCode)
+        String tableName = getModelDefinition(modelCode)
                 .map(ModelDefinition::getTableName)
                 .orElseThrow(() -> new MetaServiceException("Model not found: " + modelCode));
+        // Defense-in-depth: validate table name to prevent DDL/SQL injection
+        // even though table names are admin-configured, not user-input
+        SqlSafetyUtils.validateIdentifier(tableName, "table name for model " + modelCode);
+        return tableName;
     }
 
     @Override
@@ -418,6 +427,17 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
         // Validate code is non-blank
         if (!StringUtils.hasText(request.getCode())) {
             throw new ValidationException(ResponseCode.CommonValidationFailed, "模型编码不能为空");
+        }
+
+        // Validate code format: lowercase letters, numbers, underscores only
+        String code = request.getCode();
+        if (code.length() > MAX_MODEL_CODE_LENGTH) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                "Model code must not exceed " + MAX_MODEL_CODE_LENGTH + " characters");
+        }
+        if (!MODEL_CODE_PATTERN.matcher(code).matches()) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                "Model code must start with a lowercase letter and contain only lowercase letters, numbers, and underscores: " + code);
         }
 
         // Check code uniqueness
