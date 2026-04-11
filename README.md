@@ -193,8 +193,15 @@ auraboot/
 │   ├── sales/                #   Sales management
 │   ├── procurement/          #   Procurement
 │   └── ...
-├── docs/                     # Documentation
-│   └── system-reference/     #   Architecture and subsystem docs
+├── docs/                     # Documentation (54 files)
+│   ├── getting-started/      #   Quick start and tutorials
+│   ├── core-concepts/        #   DSL, models, commands, pages, permissions
+│   ├── guides/               #   Feature how-to guides
+│   ├── use-cases/            #   15 industry solution walkthroughs
+│   ├── plugin-development/   #   Plugin development guides
+│   ├── api-reference/        #   REST API documentation
+│   ├── deployment/           #   Docker, K8s, configuration
+│   └── architecture/         #   System design and data model
 ├── scripts/                  # Build, seed, and CI scripts
 ├── docker/                   # Docker configuration
 └── docker-compose.yml        # One-command infrastructure
@@ -202,13 +209,37 @@ auraboot/
 
 ## Documentation
 
-- [Architecture Guide](docs/system-reference/) — System design and subsystem documentation
-- [Plugin Development Guide](docs/system-reference/plugins/02-插件开发指南.md) — Build and publish plugins
-- [DSL Reference](docs/system-reference/core/09-DSL能力边界完整参考.md) — Complete DSL capability map
-- [Command System](docs/system-reference/core/06-Command系统.md) — 20-stage pipeline reference
-- [Database Schema](docs/system-reference/reference/01-数据库关键表Schema速查.md) — Table and column reference
+**[Full Documentation →](docs/README.md)**
 
-<!-- TODO: Replace with https://docs.auraboot.com when documentation site is live -->
+### Getting Started
+- [Introduction](docs/getting-started/introduction.md) — What is AuraBoot, who it's for
+- [Quick Start](docs/getting-started/quick-start.md) — Docker Compose setup in 5 minutes
+- [Installation](docs/getting-started/installation.md) — Detailed installation guide
+- [Build Your First App](docs/getting-started/first-app.md) — 30-minute tutorial
+
+### Core Concepts
+- [DSL Engine](docs/core-concepts/dsl-engine.md) — Declarative configuration philosophy
+- [Models & Fields](docs/core-concepts/models-and-fields.md) — 22 field types, relations, formulas
+- [Commands](docs/core-concepts/commands.md) — 20-stage pipeline reference
+- [Pages & Layouts](docs/core-concepts/pages-and-layouts.md) — Page kinds, blocks, designers
+- [Permissions](docs/core-concepts/permissions.md) — RBAC, multi-tenant, data-level security
+- [State Machines](docs/core-concepts/state-machines.md) — Status flows and transitions
+
+### Use Cases & Industry Solutions
+- [CRM](docs/use-cases/crm.md) — Customer relationship management
+- [Project Management](docs/use-cases/project-management.md) — Projects, tasks, Gantt charts
+- [Sales](docs/use-cases/sales.md) — Pipeline, quoting, orders
+- [Procurement](docs/use-cases/procurement.md) — Purchase orders, supplier management
+- [Manufacturing](docs/use-cases/manufacturing.md) — Production planning, BOM, MRP
+- [Warehouse](docs/use-cases/warehouse.md) — Inventory, WMS, stock management
+- [Finance](docs/use-cases/finance.md) — Invoicing, AP/AR, tax compliance
+- [And 8 more →](docs/use-cases/README.md)
+
+### Extend & Deploy
+- [Plugin Development](docs/plugin-development/overview.md) — Build plugins with JSON, Java, or React
+- [API Reference](docs/api-reference/rest-api.md) — REST APIs, commands, data sources, webhooks
+- [Deployment](docs/deployment/docker.md) — Docker, Kubernetes, configuration
+- [Architecture](docs/architecture/overview.md) — System design and tech stack
 
 ## Community & Enterprise
 
