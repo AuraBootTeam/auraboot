@@ -17,23 +17,6 @@ import java.util.Map;
  */
 public interface CommandExecutorDelegate {
 
-    void executeAssertPhase(List<BindingRule> assertRules, Map<String, Object> payload);
-
-    void executePreconditionsPhase(Map<String, Object> execConfig, Map<String, Object> payload,
-                                   Long tenantId, CommandDefinition command, CommandExecuteRequest request);
-
-    void executeValidationPhase(Map<String, Object> execConfig, Map<String, Object> payload,
-                                 Long tenantId, CommandDefinition command, CommandExecuteRequest request);
-
-    void executeCrossFieldRules(CommandDefinition command, Map<String, Object> payload,
-                                 Map<String, Object> execConfig);
-
-    void executeCommandFieldValidationPhase(Map<String, Object> execConfig, Map<String, Object> payload,
-                                             CommandDefinition command, CommandExecuteRequest request);
-
-    boolean hasPluginHandler(String commandCode);
-
-    boolean shouldExecuteDslPersistenceWithPlugin(Map<String, Object> execConfig, CommandExecuteRequest request);
 
     Map<String, Object> readRecordSnapshot(Long tenantId, String modelCode, String recordId);
 
