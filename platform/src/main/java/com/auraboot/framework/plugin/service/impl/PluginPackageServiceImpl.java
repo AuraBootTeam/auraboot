@@ -424,9 +424,12 @@ public class PluginPackageServiceImpl implements PluginPackageService {
             // Determine conflict strategy: manifest importOptions takes precedence over options
             ImportRequest.ConflictStrategy conflictStrategy = resolveConflictStrategy(extendedManifest, options);
 
-            // Convert options
+            // Convert options — all autoPublish flags default to true for package installs
             ImportRequest importRequest = ImportRequest.builder()
                     .conflictStrategy(conflictStrategy)
+                    .autoPublishModels(true)
+                    .autoPublishFields(true)
+                    .autoPublishCommands(true)
                     .autoPublishPages(true)
                     .autoDeployProcesses(true)
                     .build();

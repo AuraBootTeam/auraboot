@@ -624,6 +624,21 @@ public class PluginManifestExtended extends PluginManifest {
         private Boolean createResourcePermissions;
 
         /**
+         * Whether to publish models after import.
+         */
+        private Boolean autoPublishModels;
+
+        /**
+         * Whether to publish fields after import.
+         */
+        private Boolean autoPublishFields;
+
+        /**
+         * Whether to publish commands after import.
+         */
+        private Boolean autoPublishCommands;
+
+        /**
          * Whether to publish pages after import.
          */
         private Boolean autoPublishPages;
