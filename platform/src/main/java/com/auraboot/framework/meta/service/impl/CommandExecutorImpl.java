@@ -255,8 +255,9 @@ public class CommandExecutorImpl implements CommandExecutor, CommandExecutorDele
                     handlerResults.putAll(result);
                 }
             } catch (Exception e) {
-                log.error("Handler {} execution failed: {}", rule.getHandlerClass(), e.getMessage());
-                throw new BusinessException(ResponseCode.BadParam, "Handler execution failed: " + rule.getHandlerClass());
+                log.error("Handler {} execution failed: {}", rule.getHandlerClass(), e.getMessage(), e);
+                throw new BusinessException(ResponseCode.BadParam,
+                        "Handler '" + rule.getHandlerClass() + "' failed: " + e.getMessage());
             }
         }
 
@@ -1028,27 +1029,23 @@ public class CommandExecutorImpl implements CommandExecutor, CommandExecutorDele
                 ? request.getTargetRecordId()
                 : (String) fieldMapResults.get("recordId");
         if (!computedValues.isEmpty() && StringUtils.hasText(recordIdStr)) {
-            try {
-                String tableName = metaModelService.getTableName(command.getModelCode());
-                CommandExecutorUtils.validateSqlIdentifier(tableName, "computed field tableName");
-                // Try pid-based lookup first (for implicit field map CREATE), then id-based
-                String sql = "SELECT id FROM " + tableName
-                        + " WHERE tenant_id = #{params.tenantId} AND pid = #{params.pid}";
-                Map<String, Object> lookupParams = Map.of("tenantId", tenantId, "pid", recordIdStr);
-                List<Map<String, Object>> rows = dynamicDataMapper.selectByQuery(sql, lookupParams);
-                if (rows != null && !rows.isEmpty()) {
-                    Long dbId = ((Number) rows.get(0).get("id")).longValue();
-                    Map<String, Object> conditions = Map.of("tenant_id", tenantId, "id", dbId);
-                    dynamicDataMapper.update(tableName, computedValues, conditions);
-                    log.debug("COMPUTED: wrote {} fields to {} (pid={})", computedValues.size(), tableName, recordIdStr);
-                } else {
-                    // Fallback: try using recordIdStr directly
-                    var fallbackEntry = CommandExecutorUtils.resolveRecordIdColumn(recordIdStr);
-                    Map<String, Object> conditions = Map.of("tenant_id", tenantId, fallbackEntry.getKey(), fallbackEntry.getValue());
-                    dynamicDataMapper.update(tableName, computedValues, conditions);
-                }
-            } catch (Exception e) {
-                log.warn("Failed to write computed fields to record: {}", e.getMessage());
+            String tableName = metaModelService.getTableName(command.getModelCode());
+            CommandExecutorUtils.validateSqlIdentifier(tableName, "computed field tableName");
+            // Try pid-based lookup first (for implicit field map CREATE), then id-based
+            String sql = "SELECT id FROM " + tableName
+                    + " WHERE tenant_id = #{params.tenantId} AND pid = #{params.pid}";
+            Map<String, Object> lookupParams = Map.of("tenantId", tenantId, "pid", recordIdStr);
+            List<Map<String, Object>> rows = dynamicDataMapper.selectByQuery(sql, lookupParams);
+            if (rows != null && !rows.isEmpty()) {
+                Long dbId = ((Number) rows.get(0).get("id")).longValue();
+                Map<String, Object> conditions = Map.of("tenant_id", tenantId, "id", dbId);
+                dynamicDataMapper.update(tableName, computedValues, conditions);
+                log.debug("COMPUTED: wrote {} fields to {} (pid={})", computedValues.size(), tableName, recordIdStr);
+            } else {
+                // Fallback: try using recordIdStr directly
+                var fallbackEntry = CommandExecutorUtils.resolveRecordIdColumn(recordIdStr);
+                Map<String, Object> conditions = Map.of("tenant_id", tenantId, fallbackEntry.getKey(), fallbackEntry.getValue());
+                dynamicDataMapper.update(tableName, computedValues, conditions);
             }
         }
     }
@@ -1072,9 +1069,12 @@ public class CommandExecutorImpl implements CommandExecutor, CommandExecutorDele
         }
 
         Set<String> modelFieldCodes = new HashSet<>();
+        Map<String, String> fieldDataTypes = new HashMap<>();
         for (FieldDefinition fieldDefinition : modelDef.getFields()) {
             if (fieldDefinition != null && StringUtils.hasText(fieldDefinition.getCode())) {
                 modelFieldCodes.add(fieldDefinition.getCode());
+                fieldDataTypes.put(fieldDefinition.getCode(),
+                        StringUtils.hasText(fieldDefinition.getDataType()) ? fieldDefinition.getDataType() : "text");
             }
         }
 
@@ -1086,6 +1086,13 @@ public class CommandExecutorImpl implements CommandExecutor, CommandExecutorDele
             }
             Object value = entry.getValue();
             if (value == null) {
+                continue;
+            }
+            String dataType = fieldDataTypes.getOrDefault(key, "text");
+            if (!CommandExecutorUtils.isTypeCompatible(value, dataType)) {
+                log.warn("HANDLER: skipping field '{}' — Java type {} is not compatible with dataType '{}'. "
+                        + "Handler should return correct types or exclude this field from result map.",
+                        key, value.getClass().getSimpleName(), dataType);
                 continue;
             }
             persistable.put(key, value);
@@ -1102,28 +1109,24 @@ public class CommandExecutorImpl implements CommandExecutor, CommandExecutorDele
             return;
         }
 
-        try {
-            String tableName = metaModelService.getTableName(modelCode);
-            CommandExecutorUtils.validateSqlIdentifier(tableName, "handler field tableName");
+        String tableName = metaModelService.getTableName(modelCode);
+        CommandExecutorUtils.validateSqlIdentifier(tableName, "handler field tableName");
 
-            Map<String, Object> conditions;
-            String sql = "SELECT id FROM " + tableName
-                    + " WHERE tenant_id = #{params.tenantId} AND pid = #{params.pid}";
-            Map<String, Object> lookupParams = Map.of("tenantId", tenantId, "pid", recordIdStr);
-            List<Map<String, Object>> rows = dynamicDataMapper.selectByQuery(sql, lookupParams);
-            if (rows != null && !rows.isEmpty()) {
-                Long dbId = ((Number) rows.get(0).get("id")).longValue();
-                conditions = Map.of("tenant_id", tenantId, "id", dbId);
-            } else {
-                var fallbackEntry = CommandExecutorUtils.resolveRecordIdColumn(recordIdStr);
-                conditions = Map.of("tenant_id", tenantId, fallbackEntry.getKey(), fallbackEntry.getValue());
-            }
-
-            dynamicDataMapper.update(tableName, persistable, conditions);
-            log.debug("HANDLER: wrote {} fields to {} (pid={})", persistable.size(), tableName, recordIdStr);
-        } catch (Exception e) {
-            log.warn("Failed to persist handler results for model {}: {}", modelCode, e.getMessage());
+        Map<String, Object> conditions;
+        String sql = "SELECT id FROM " + tableName
+                + " WHERE tenant_id = #{params.tenantId} AND pid = #{params.pid}";
+        Map<String, Object> lookupParams = Map.of("tenantId", tenantId, "pid", recordIdStr);
+        List<Map<String, Object>> rows = dynamicDataMapper.selectByQuery(sql, lookupParams);
+        if (rows != null && !rows.isEmpty()) {
+            Long dbId = ((Number) rows.get(0).get("id")).longValue();
+            conditions = Map.of("tenant_id", tenantId, "id", dbId);
+        } else {
+            var fallbackEntry = CommandExecutorUtils.resolveRecordIdColumn(recordIdStr);
+            conditions = Map.of("tenant_id", tenantId, fallbackEntry.getKey(), fallbackEntry.getValue());
         }
+
+        dynamicDataMapper.update(tableName, persistable, conditions);
+        log.debug("HANDLER: wrote {} fields to {} (pid={})", persistable.size(), tableName, recordIdStr);
     }
 
     @SuppressWarnings("unchecked")
