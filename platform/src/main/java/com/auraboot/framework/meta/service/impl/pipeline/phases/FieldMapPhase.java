@@ -1,11 +1,12 @@
 package com.auraboot.framework.meta.service.impl.pipeline.phases;
 
+import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.meta.entity.BindingRule;
 import com.auraboot.framework.meta.service.impl.CommandCascadeDeleteExecutor;
-import com.auraboot.framework.meta.service.impl.CommandExecutorDelegate;
 import com.auraboot.framework.meta.service.impl.CommandFieldMapExecutor;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPhase;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
+import com.auraboot.framework.meta.service.impl.pipeline.RecordSnapshotReader;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
@@ -25,7 +26,7 @@ public class FieldMapPhase implements CommandPhase {
 
     private final CommandFieldMapExecutor fieldMapExecutor;
     private final CommandCascadeDeleteExecutor cascadeDeleteExecutor;
-    private final CommandExecutorDelegate delegate;
+    private final RecordSnapshotReader snapshotReader;
 
     @Override
     public String name() {
@@ -37,7 +38,7 @@ public class FieldMapPhase implements CommandPhase {
         // Before-snapshot for change tracking
         if (ctx.getRequest() != null && StringUtils.hasText(ctx.getRequest().getTargetRecordId())
                 && StringUtils.hasText(ctx.getCommand().getModelCode())) {
-            ctx.setBeforeSnapshot(delegate.readRecordSnapshot(
+            ctx.setBeforeSnapshot(snapshotReader.readRecordSnapshot(
                     ctx.getTenantId(), ctx.getCommand().getModelCode(), ctx.getRequest().getTargetRecordId()));
         }
 
@@ -71,6 +72,18 @@ public class FieldMapPhase implements CommandPhase {
             }
         }
         ctx.setFieldMapResults(fieldMapResults);
-        delegate.propagateFieldMapRecordId(ctx.getRequest(), fieldMapResults);
+
+        // Propagate record ID from fieldMapResults to request (inline)
+        propagateFieldMapRecordId(ctx.getRequest(), fieldMapResults);
+    }
+
+    private void propagateFieldMapRecordId(CommandExecuteRequest request, Map<String, Object> fieldMapResults) {
+        if (request == null || fieldMapResults == null || StringUtils.hasText(request.getTargetRecordId())) {
+            return;
+        }
+        Object recordId = fieldMapResults.get("recordId");
+        if (recordId instanceof String recordIdStr && StringUtils.hasText(recordIdStr)) {
+            request.setTargetRecordId(recordIdStr);
+        }
     }
 }
