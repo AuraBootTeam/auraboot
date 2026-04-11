@@ -149,7 +149,7 @@ public class PasswordManagementServiceImpl implements PasswordManagementService 
 
         if (user == null) {
             // Don't reveal whether email exists — always return success
-            log.info("Password reset requested for unknown email: {}", email);
+            log.info("Password reset requested for unknown email: {}***", email.length() > 3 ? email.substring(0, 3) : "***");
             return;
         }
 

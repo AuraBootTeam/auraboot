@@ -205,8 +205,9 @@ public class DynamicController {
             if (metaModelService.getModelDefinition(normalized).isPresent()) {
                 return normalized;
             }
-        } catch (Exception ignored) {
-            // fall through to PageKeyConverter
+        } catch (Exception e) {
+            log.debug("Model lookup failed for normalized pageKey '{}', falling back to PageKeyConverter: {}",
+                    normalized, e.getMessage());
         }
         return PageKeyConverter.toModelCode(pageKey);
     }

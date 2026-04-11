@@ -26,6 +26,9 @@ public abstract class PageSchemaConverter {
     @Autowired
     protected ObjectMapper objectMapper;
 
+    @Autowired
+    protected ExtensionConverter extensionConverter;
+
     // ── Entity → DTO ──────────────────────────────────────────────
 
     @Mapping(target = "pid", source = "pid")
@@ -80,7 +83,7 @@ public abstract class PageSchemaConverter {
     @Mapping(target = "rowVersion", constant = "1")
     @Mapping(target = "isCurrent", constant = "true")
     @Mapping(target = "schemaVersion", constant = "2")
-    @Mapping(target = "extension", ignore = true)
+    @Mapping(target = "extension", source = "extension", qualifiedByName = "mapToExtensionBean")
     @Mapping(target = "status", ignore = true)
     @Mapping(target = "deletedFlag", constant = "false")
     @Mapping(target = "createdAt", ignore = true)
@@ -111,7 +114,7 @@ public abstract class PageSchemaConverter {
     @Mapping(target = "semver", source = "semver")
     @Mapping(target = "rowVersion", ignore = true)
     @Mapping(target = "isCurrent", ignore = true)
-    @Mapping(target = "extension", ignore = true)
+    @Mapping(target = "extension", source = "extension", qualifiedByName = "mapToExtensionBean")
     @Mapping(target = "status", ignore = true)
     @Mapping(target = "deletedFlag", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
@@ -262,5 +265,10 @@ public abstract class PageSchemaConverter {
             result.putAll(bean.getDynamicProperties());
         }
         return result.isEmpty() ? null : result;
+    }
+
+    @Named("mapToExtensionBean")
+    public ExtensionBean mapToExtensionBean(Map<String, Object> extension) {
+        return extensionConverter.toBean(extension);
     }
 }

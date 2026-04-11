@@ -4,61 +4,39 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.auth.dto.*;
 import com.auraboot.framework.auth.service.ApiRateLimiter;
 import com.auraboot.framework.auth.service.AuthService;
+import com.auraboot.framework.auth.service.LoginRateLimiter;
 import com.auraboot.framework.auth.service.PasswordManagementService;
-import com.auraboot.framework.permission.entity.Permission;
-import com.auraboot.framework.permission.mapper.PermissionMapper;
+import com.auraboot.framework.auth.service.UserInfoService;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.common.dto.ApiResponse;
-import com.auraboot.framework.rbac.entity.Role;
-import com.auraboot.framework.rbac.mapper.RoleMapper;
-import com.auraboot.framework.permission.service.UserPermissionService;
 import com.auraboot.framework.saas.config.service.SystemModeService;
 import com.auraboot.framework.tenant.service.TenantMemberService;
 import com.auraboot.framework.user.dao.entity.User;
-import com.auraboot.framework.user.exception.UserException;
 import com.auraboot.framework.user.service.UserService;
 import com.auraboot.framework.auth.util.JwtUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.web.bind.annotation.*;
-
-import com.auraboot.framework.user.service.UserPreferenceService;
-import com.auraboot.framework.tenant.service.TenantPreferenceService;
-import com.fasterxml.jackson.databind.JsonNode;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 @Slf4j
 @RestController
 @RequestMapping("/api/auth")
 @Tag(name = "Authentication", description = "Login, register, and current user APIs")
+@RequiredArgsConstructor
 public class AuthController {
 
     private final AuthService authService;
-    
-    @Autowired
-    private UserService userService;
-    
-    @Autowired
-    private RoleMapper roleMapper;
-    
-    @Autowired
-    private UserPermissionService userPermissionService;
-    
-    @Autowired
-    private PermissionMapper permissionMapper;
-
-    @Autowired
-    private PasswordManagementService passwordManagementService;
+    private final UserInfoService userInfoService;
+    private final UserService userService;
+    private final PasswordManagementService passwordManagementService;
+    private final LoginRateLimiter loginRateLimiter;
+    private final JwtUtil jwtUtil;
+    private final UserDetailsService userDetailsService;
 
     @Autowired
     private ApiRateLimiter apiRateLimiter;
@@ -69,39 +47,17 @@ public class AuthController {
     @Autowired(required = false)
     private TenantMemberService tenantMemberService;
 
-    @Autowired
-    private UserPreferenceService userPreferenceService;
-
-    @Autowired
-    private TenantPreferenceService tenantPreferenceService;
-
-    @Autowired
-    private JwtUtil jwtUtil;
-
-    @Autowired
-    private UserDetailsService userDetailsService;
-
-    public AuthController(AuthService authService) {
-        this.authService = authService;
-    }
-
     @PostMapping("/login")
     @ResponseBody
     @Operation(summary = "Password login", description = "Authenticate with email/username and password. Returns JWT token.")
-    public ApiResponse<AuthenticationResponse> login(@RequestBody AuthenticationRequest request){
-
-
-//            在 Spring Security 中，密码比对是由 Spring Security 的认证机制自动完成的.
-//            具体来说，是在 DaoAuthenticationProvider 类中进行的。
-//            DaoAuthenticationProvider 是 Spring Security 默认的认证提供者，
-//            它负责调用 UserDetailsService 获取用户信息，并使用 PasswordEncoder 对用户输入的密码进行比对。
+    public ApiResponse<AuthenticationResponse> login(@RequestBody AuthenticationRequest request,
+                                                      HttpServletRequest httpRequest) {
+            if (!loginRateLimiter.isAllowed(extractIp(httpRequest), request.getEmail())) {
+                return ApiResponse.error(ResponseCode.BadParam, "Too many login attempts. Please try again later.", null);
+            }
 
             AuthenticationResponse authenticate = authService.authenticate(request);
-
-            ApiResponse<AuthenticationResponse> success = ApiResponse.success(authenticate);
-            return success;
-
-
+            return ApiResponse.success(authenticate);
     }
     
     @PostMapping("/register")
@@ -146,8 +102,12 @@ public class AuthController {
     public ApiResponse<AuthenticationResponse> loginBySms(
             @RequestBody AuthStrategyRequest request,
             HttpServletRequest httpRequest) {
+        String ip = extractIp(httpRequest);
+        if (!loginRateLimiter.isAllowed(ip, request.getEmail())) {
+            return ApiResponse.error(ResponseCode.BadParam, "Too many login attempts. Please try again later.", null);
+        }
         request.setChannelCode("sms");
-        request.setIpAddress(extractIp(httpRequest));
+        request.setIpAddress(ip);
         request.setUserAgent(httpRequest.getHeader("User-Agent"));
         return ApiResponse.success(authService.authenticateByChannel(request));
     }
@@ -157,8 +117,12 @@ public class AuthController {
     public ApiResponse<AuthenticationResponse> loginByEmailCode(
             @RequestBody AuthStrategyRequest request,
             HttpServletRequest httpRequest) {
+        String ip = extractIp(httpRequest);
+        if (!loginRateLimiter.isAllowed(ip, request.getEmail())) {
+            return ApiResponse.error(ResponseCode.BadParam, "Too many login attempts. Please try again later.", null);
+        }
         request.setChannelCode("email_code");
-        request.setIpAddress(extractIp(httpRequest));
+        request.setIpAddress(ip);
         request.setUserAgent(httpRequest.getHeader("User-Agent"));
         return ApiResponse.success(authService.authenticateByChannel(request));
     }
@@ -191,94 +155,12 @@ public class AuthController {
     @ResponseBody
     @Operation(summary = "Get current user", description = "Returns the authenticated user's profile, roles, and permissions.")
     public ApiResponse<UserInfoResponse> getCurrentUser() {
-            // 1. 从ThreadLocal获取当前用户信息（由JwtAuthenticationFilter设置）
-            Long userId = MetaContext.getCurrentUserId();
-            String userPid = MetaContext.getCurrentUserPid();
-            Long tenantId = MetaContext.getCurrentTenantId();
+        Long userId = MetaContext.getCurrentUserId();
+        String userPid = MetaContext.getCurrentUserPid();
+        Long tenantId = MetaContext.getCurrentTenantId();
 
-            
-            // 2. 从数据库获取最新用户信息
-            User user = userService.findByUserId(userId);
-
-            // 3. 构建用户基本信息DTO
-            UserInfoResponse.UserDTO userDTO = new UserInfoResponse.UserDTO();
-            userDTO.setId(String.valueOf(user.getId()));
-            userDTO.setPid(user.getPid());
-            userDTO.setName(user.getNickName() != null ? user.getNickName() : user.getUserName());
-            userDTO.setEmail(user.getEmail());
-            userDTO.setMobile(user.getMobile());
-            userDTO.setTenantId(tenantId);
-            if (tenantId != null && tenantMemberService != null) {
-                userDTO.setTenantName(tenantMemberService.getTenantNameById(tenantId));
-            }
-            userDTO.setImgId(user.getImgId());
-            
-            // 4. 获取用户的实时角色和Permission
-            List<Role> roles = List.of();
-            List<String> permissionCodes = List.of();
-            
-            if (tenantId != null) {
-                // 有租户：获取该租户下的角色和Permission
-                Long memberId = MetaContext.getCurrentMemberId();
-                roles = memberId != null ? roleMapper.findByMemberIdAndTenantId(memberId, tenantId) : List.of();
-
-                // Check for SUPER_ADMIN or TENANT_ADMIN roles
-                boolean isSuperAdmin = roles.stream()
-                        .anyMatch(r -> "super_admin".equals(r.getCode()));
-                boolean isTenantAdmin = roles.stream()
-                        .anyMatch(r -> "tenant_admin".equals(r.getCode()));
-
-                if (isSuperAdmin || isTenantAdmin) {
-                    // Super admin / tenant admin: return all permissions for this tenant
-                    // selectList(null) uses MyBatis Plus auto tenant_id + deleted_flag filter
-                    List<Permission> allPermissions = permissionMapper.selectList(null);
-                    permissionCodes = allPermissions.stream()
-                            .map(Permission::getCode)
-                            .collect(Collectors.toList());
-                } else {
-                    // Normal user: only return assigned permissions
-                    Set<Long> permissionIds = userPermissionService.getUserPermissionIds(userId);
-                    if (!permissionIds.isEmpty()) {
-                        List<Permission> permissions = permissionMapper.findByIds(
-                                new ArrayList<>(permissionIds)
-                        );
-                        permissionCodes = permissions.stream()
-                                .map(Permission::getCode)
-                                .collect(Collectors.toList());
-                    }
-                }
-            }
-            
-            // 5. 转换为DTO
-            List<UserInfoResponse.RoleDTO> roleDTOs = roles.stream()
-                .map(UserInfoResponse.RoleDTO::fromEntity)
-                .collect(Collectors.toList());
-            
-            UserInfoResponse.PermissionsDTO permissionsDTO = new UserInfoResponse.PermissionsDTO(
-                roleDTOs, 
-                permissionCodes
-            );
-            
-            // 6. Resolve UI preferences: user > tenant > default
-            Map<String, JsonNode> userPrefs = userPreferenceService.getPreferencesByPrefix(userId, "ui.");
-            Map<String, JsonNode> tenantPrefs = tenantId != null
-                    ? tenantPreferenceService.getPreferencesByPrefix(tenantId, "ui.")
-                    : Map.of();
-
-            UserInfoResponse.PreferencesDTO preferencesDTO = new UserInfoResponse.PreferencesDTO();
-            preferencesDTO.setTimezone(resolvePreference(userPrefs, tenantPrefs, "ui.timezone",
-                    UserInfoResponse.PreferencesDTO.DEFAULT_TIMEZONE));
-            preferencesDTO.setDateFormat(resolvePreference(userPrefs, tenantPrefs, "ui.date.format",
-                    UserInfoResponse.PreferencesDTO.DEFAULT_DATE_FORMAT));
-            preferencesDTO.setDatetimeFormat(resolvePreference(userPrefs, tenantPrefs, "ui.datetime.format",
-                    UserInfoResponse.PreferencesDTO.DEFAULT_DATETIME_FORMAT));
-            preferencesDTO.setTimeFormat(resolvePreference(userPrefs, tenantPrefs, "ui.time.format",
-                    UserInfoResponse.PreferencesDTO.DEFAULT_TIME_FORMAT));
-
-            // 7. 构建响应
-            UserInfoResponse response = new UserInfoResponse(userDTO, permissionsDTO, preferencesDTO);
-
-            return ApiResponse.success(response);
+        UserInfoResponse response = userInfoService.buildCurrentUserInfo(userId, userPid, tenantId);
+        return ApiResponse.success(response);
     }
 
     @PostMapping("/forgot-password")
@@ -308,19 +190,4 @@ public class AuthController {
         return ApiResponse.success(null);
     }
 
-    private String resolvePreference(Map<String, JsonNode> userPrefs,
-                                      Map<String, JsonNode> tenantPrefs,
-                                      String key, String defaultValue) {
-        JsonNode userVal = userPrefs.get(key);
-        if (userVal != null && !userVal.isNull()) {
-            String text = userVal.asText().trim();
-            if (!text.isEmpty()) return text;
-        }
-        JsonNode tenantVal = tenantPrefs.get(key);
-        if (tenantVal != null && !tenantVal.isNull()) {
-            String text = tenantVal.asText().trim();
-            if (!text.isEmpty()) return text;
-        }
-        return defaultValue;
-    }
 }

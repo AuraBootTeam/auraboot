@@ -8,8 +8,10 @@ import com.auraboot.framework.meta.service.CommandHandlerContext;
 import com.auraboot.framework.meta.service.PageSchemaService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -17,13 +19,15 @@ import java.util.Map;
 /**
  * Command handler for page schema state transitions and custom operations.
  *
- * Bridges DSL commands to {@link PageSchemaService} for operations that
- * require business logic beyond simple CRUD (publish, archive, duplicate).
+ * For publish/archive: the DSL engine's EFFECT phase handles the status column
+ * update. This handler supplements it by setting published_at timestamp.
+ *
+ * For duplicate: creates a copy of the page with a new page_key.
  *
  * Supported command codes:
- * - pm:publish_page_schema  → publish a draft page
- * - pm:archive_page_schema  → archive a draft or published page
- * - pm:duplicate_page_schema → duplicate a page with "(Copy)" suffix
+ * - pgm:publish_page_schema  → set published_at timestamp
+ * - pgm:archive_page_schema  → clear published_at timestamp
+ * - pgm:duplicate_page_schema → duplicate a page with "(Copy)" suffix
  *
  * @author AuraBoot Team
  * @since 4.0.0
@@ -34,6 +38,7 @@ import java.util.Map;
 public class PageSchemaCommandHandler implements CommandHandler {
 
     private final PageSchemaService pageSchemaService;
+    private final JdbcTemplate jdbcTemplate;
 
     @Override
     public String getHandlerName() {
@@ -69,15 +74,22 @@ public class PageSchemaCommandHandler implements CommandHandler {
     }
 
     private void handlePublish(String pid, Map<String, Object> result) {
-        PageSchemaDTO dto = pageSchemaService.publish(pid);
-        result.put("pid", dto.getPid());
-        result.put("status", dto.getStatus());
+        // DSL EFFECT phase updates status → published.
+        // Handler supplements by setting published_at timestamp.
+        jdbcTemplate.update(
+                "UPDATE ab_page_schema SET published_at = ?, updated_at = ? WHERE pid = ? AND deleted_flag = false",
+                Instant.now(), Instant.now(), pid);
+        result.put("pid", pid);
+        result.put("published_at", Instant.now().toString());
     }
 
     private void handleArchive(String pid, Map<String, Object> result) {
-        PageSchemaDTO dto = pageSchemaService.unpublish(pid);
-        result.put("pid", dto.getPid());
-        result.put("status", dto.getStatus());
+        // DSL EFFECT phase updates status → archived.
+        // Handler supplements by clearing published_at.
+        jdbcTemplate.update(
+                "UPDATE ab_page_schema SET published_at = NULL, updated_at = ? WHERE pid = ? AND deleted_flag = false",
+                Instant.now(), pid);
+        result.put("pid", pid);
     }
 
     private void handleDuplicate(String pid, Map<String, Object> result) {

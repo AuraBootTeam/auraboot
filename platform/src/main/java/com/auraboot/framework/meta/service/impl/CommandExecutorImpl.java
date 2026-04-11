@@ -104,7 +104,10 @@ public class CommandExecutorImpl implements CommandExecutor, CommandExecutorDele
     private final RollUpFieldRegistry rollUpFieldRegistry;
     private final RollUpSummaryService rollUpSummaryService;
     private final PayloadTemporalNormalizer payloadTemporalNormalizer;
-    private final CommandPipeline commandPipeline;
+
+    @Autowired
+    @org.springframework.context.annotation.Lazy
+    private CommandPipeline commandPipeline;
 
     @Autowired(required = false)
     private I18nService i18nService;

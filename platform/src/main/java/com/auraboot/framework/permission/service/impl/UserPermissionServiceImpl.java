@@ -3,6 +3,7 @@ package com.auraboot.framework.permission.service.impl;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.cache.MetaCacheKeyGenerator;
 import com.auraboot.framework.permission.service.UserPermissionService;
+import com.auraboot.framework.permission.util.PermissionCodeAliasResolver;
 import com.auraboot.framework.rbac.entity.UserRole;
 import com.auraboot.framework.rbac.mapper.RolePermissionMapper;
 import com.auraboot.framework.rbac.mapper.UserRoleMapper;
@@ -258,28 +259,22 @@ public class UserPermissionServiceImpl implements UserPermissionService {
         log.debug("Checking permission by code: userId={}, permissionCode={}",
             userId, permissionCode);
 
-        // 1. Resolve permissionCode → permissionId (cached)
-        String permissionCacheKey = buildPermissionCodeCacheKey(permissionCode);
-        Long permissionId = permissionCodeCache.get(permissionCacheKey);
-        if (permissionId == null) {
-            com.auraboot.framework.permission.entity.Permission permission =
-                permissionMapper.findByCode(permissionCode);
-            if (permission == null) {
-                log.warn("Permission not found: permissionCode={}", permissionCode);
-                return false;
+        for (String candidateCode : PermissionCodeAliasResolver.resolveCandidates(permissionCode)) {
+            Long permissionId = resolvePermissionId(candidateCode);
+            if (permissionId == null) {
+                continue;
             }
-            permissionId = permission.getId();
-            permissionCodeCache.put(permissionCacheKey, permissionId);
-            log.debug("Cached permission mapping: {}={}", permissionCacheKey, permissionId);
+
+            if (hasPermission(userId, permissionId)) {
+                log.debug("Permission check result: userId={}, permissionCode={}, matchedCandidate={}",
+                    userId, permissionCode, candidateCode);
+                return true;
+            }
         }
 
-        // 2. Check if user has the permission ID
-        boolean hasPermission = hasPermission(userId, permissionId);
-
-        log.debug("Permission check result: userId={}, permissionCode={}, hasPermission={}",
-            userId, permissionCode, hasPermission);
-
-        return hasPermission;
+        log.debug("Permission check result: userId={}, permissionCode={}, hasPermission=false",
+            userId, permissionCode);
+        return false;
     }
 
     /**
@@ -294,6 +289,26 @@ public class UserPermissionServiceImpl implements UserPermissionService {
 
     private String buildPermissionCodeCacheKey(String permissionCode) {
         return MetaCacheKeyGenerator.getTenantContextSuffix() + ":" + permissionCode;
+    }
+
+    private Long resolvePermissionId(String permissionCode) {
+        String permissionCacheKey = buildPermissionCodeCacheKey(permissionCode);
+        Long permissionId = permissionCodeCache.get(permissionCacheKey);
+        if (permissionId != null) {
+            return permissionId;
+        }
+
+        com.auraboot.framework.permission.entity.Permission permission =
+            permissionMapper.findByCode(permissionCode);
+        if (permission == null) {
+            log.debug("Permission definition not found for candidate code: {}", permissionCode);
+            return null;
+        }
+
+        permissionId = permission.getId();
+        permissionCodeCache.put(permissionCacheKey, permissionId);
+        log.debug("Cached permission mapping: {}={}", permissionCacheKey, permissionId);
+        return permissionId;
     }
     
     /**
