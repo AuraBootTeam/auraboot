@@ -154,8 +154,17 @@ public class PlatformToolProvider implements ToolProvider {
         // Build params with tenantId for #{params.tenantId} placeholders
         Map<String, Object> queryParams = new LinkedHashMap<>();
         Long effectiveTenantId = tenantId != null ? tenantId : MetaContext.getCurrentTenantId();
-        if (effectiveTenantId != null) {
-            queryParams.put("tenantId", effectiveTenantId);
+        if (effectiveTenantId == null) {
+            return errorResult("Tenant context is required for SQL execution");
+        }
+        queryParams.put("tenantId", effectiveTenantId);
+
+        // Tenant isolation enforcement: reject SQL that doesn't reference tenant_id.
+        // LLM-generated SQL may omit tenant filtering (accidentally or via prompt injection),
+        // which would expose cross-tenant data since we use selectByQueryWithoutTenant.
+        if (!sql.contains("tenant_id")) {
+            return errorResult("SQL must include tenant_id filter for data isolation. "
+                    + "Use: WHERE tenant_id = #{params.tenantId}");
         }
 
         log.info("platform.execute_sql SQL: {}", sql);

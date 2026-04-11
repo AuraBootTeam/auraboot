@@ -11,6 +11,7 @@ import com.auraboot.framework.meta.service.MultiTenantIndexManager;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.common.util.DateUtil;
 import com.auraboot.framework.meta.dto.*;
+import com.auraboot.framework.meta.security.SqlSafetyUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -197,8 +198,11 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
      * 生成字段定义
      */
     private String generateColumnDefinition(FieldDefinition field) {
+        // Validate column name to prevent DDL injection
+        SqlSafetyUtils.validateIdentifier(field.getColumnName(), "column name");
+
         StringBuilder columnDef = new StringBuilder();
-        
+
         // 字段名
         columnDef.append(field.getColumnName());
         

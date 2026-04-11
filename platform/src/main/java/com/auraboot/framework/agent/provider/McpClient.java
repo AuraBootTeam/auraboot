@@ -1,5 +1,6 @@
 package com.auraboot.framework.agent.provider;
 
+import com.auraboot.framework.common.util.SsrfValidator;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -107,6 +108,9 @@ public class McpClient {
 
     private JsonNode sendRequest(String serverUrl, Map<String, Object> requestBody) {
         try {
+            // SSRF protection: validate URL before making server-side request
+            SsrfValidator.validateUrl(serverUrl);
+
             String body = objectMapper.writeValueAsString(requestBody);
             log.debug("MCP request to {}: {}", serverUrl, body);
 

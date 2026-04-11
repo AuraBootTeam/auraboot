@@ -757,13 +757,25 @@ public class MetaFieldServiceImpl implements MetaFieldService {
         if (request == null) {
             throw new ValidationException(ResponseCode.CommonValidationFailed, "更新请求不能为空");
         }
-        
-        if (!StringUtils.hasText(request.getDataType())) {
-            throw new ValidationException(ResponseCode.CommonValidationFailed, "数据类型不能为空");
+
+        MetaFieldValidationResult validationResult = fieldValidator.validateUpdateRequest(null, request);
+
+        if (!validationResult.isValid()) {
+            String errorMessages = validationResult.getErrors().stream()
+                .map(error -> String.format("%s: %s", error.getField(), error.getMessage()))
+                .collect(Collectors.joining("; "));
+
+            log.warn("Field update validation failed: errors={}", errorMessages);
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                "Field update validation failed: " + errorMessages);
         }
-        
-        // Note: Full validation using fieldValidator.validateUpdateRequest() can be added here
-        // For now, keeping basic validation to maintain backward compatibility
+
+        if (validationResult.hasWarnings()) {
+            String warningMessages = validationResult.getWarnings().stream()
+                .map(warning -> String.format("%s: %s", warning.getField(), warning.getMessage()))
+                .collect(Collectors.joining("; "));
+            log.warn("Field update validation warnings: {}", warningMessages);
+        }
     }
 
     /**
