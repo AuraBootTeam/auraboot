@@ -36,10 +36,20 @@ logging:
 # Security configuration
 # IMPORTANT: Set JWT_SECRET environment variable in production
 # Generate with: openssl rand -base64 64
+#
+# Key rotation:
+#   1. Generate new key: NEW_SECRET=$(openssl rand -base64 64)
+#   2. Set JWT_PREVIOUS_SECRET=$JWT_SECRET, JWT_PREVIOUS_KID=$JWT_KID
+#   3. Set JWT_SECRET=$NEW_SECRET, JWT_KID=key-<date>
+#   4. Rolling restart — new tokens use new key, old tokens still verify
+#   5. After one expiration period (24h), remove PREVIOUS env vars
 security:
   jwt:
     secret: ${JWT_SECRET:dev-only-secret-key-replace-in-production-min-32-chars}
+    kid: ${JWT_KID:key-1}
     expiration: ${JWT_EXPIRATION:86400}
+    previous-secret: ${JWT_PREVIOUS_SECRET:}
+    previous-kid: ${JWT_PREVIOUS_KID:}
   field-encryption:
     key: ${FIELD_ENCRYPTION_KEY:}  # Production: openssl rand -base64 32
   password:
