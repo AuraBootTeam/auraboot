@@ -5,40 +5,24 @@ import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.entitlement.spi.EntitlementChecker;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.exception.ValidationException;
-import com.auraboot.framework.meta.constant.Status;
-import com.auraboot.framework.meta.dto.CrossFieldRule;
-import com.auraboot.framework.meta.dto.RuleOverride;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.meta.dto.CommandExecuteResult;
-import com.auraboot.framework.meta.entity.BindingRule;
 import com.auraboot.framework.meta.entity.CommandDefinition;
 import com.auraboot.module.meta.event.DomainEventPublisher;
 import com.auraboot.framework.meta.mapper.BindingRuleMapper;
 import com.auraboot.framework.meta.mapper.CommandDefinitionMapper;
-import com.auraboot.framework.meta.dto.FieldDefinition;
-import com.auraboot.framework.meta.dto.ModelDefinition;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.connector.service.ApiConnectorService;
-import com.auraboot.framework.meta.dto.ChangeRecord;
-import com.auraboot.framework.meta.dto.FieldChange;
 import com.auraboot.framework.meta.service.ChangeTracker;
 import com.auraboot.framework.meta.service.DynamicDataService;
-import com.auraboot.framework.meta.dto.ValidationContext;
 import com.auraboot.framework.webhook.service.WebhookDispatcher;
 import com.auraboot.framework.meta.service.CommandExecutor;
-import com.auraboot.framework.meta.service.CommandHandler;
-import com.auraboot.framework.meta.service.CommandHandlerContext;
 import com.auraboot.framework.meta.service.ConcurrencyGuard;
 import com.auraboot.framework.meta.service.IdempotencyService;
 import com.auraboot.framework.meta.service.InvariantEngine;
-import com.auraboot.framework.meta.validation.ComputedFieldDependencyResolver;
-import com.auraboot.framework.meta.validation.CrossFieldRuleEngine;
-import com.auraboot.framework.meta.validation.RuleEvaluationResult;
 import com.auraboot.framework.i18n.service.I18nService;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.ValidationService;
-import com.auraboot.framework.plugin.extension.CommandHandlerExtension;
-import com.auraboot.framework.plugin.pf4j.BiTemporalAccessorImpl;
 import com.auraboot.framework.plugin.pf4j.ExtensionRegistry;
 import com.auraboot.module.bitemporal.service.BiTemporalService;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -48,20 +32,15 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
-import org.springframework.expression.EvaluationContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
-
 
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipeline;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
 /**
  * Command Executor implementation.
@@ -74,7 +53,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class CommandExecutorImpl implements CommandExecutor, CommandExecutorDelegate {
+public class CommandExecutorImpl implements CommandExecutor {
 
     private final CommandDefinitionMapper commandDefinitionMapper;
     private final BindingRuleMapper bindingRuleMapper;
