@@ -104,6 +104,7 @@ public class CommandExecutorImpl implements CommandExecutor, CommandExecutorDele
     private final RollUpFieldRegistry rollUpFieldRegistry;
     private final RollUpSummaryService rollUpSummaryService;
     private final PayloadTemporalNormalizer payloadTemporalNormalizer;
+    private final com.auraboot.framework.meta.service.impl.pipeline.RecordSnapshotReader recordSnapshotReader;
 
     @Autowired
     @org.springframework.context.annotation.Lazy
@@ -391,16 +392,6 @@ public class CommandExecutorImpl implements CommandExecutor, CommandExecutorDele
     }
 
 
-    @Override
-    public void propagateFieldMapRecordId(CommandExecuteRequest request, Map<String, Object> fieldMapResults) {
-        if (request == null || fieldMapResults == null || StringUtils.hasText(request.getTargetRecordId())) {
-            return;
-        }
-        Object recordId = fieldMapResults.get("recordId");
-        if (recordId instanceof String recordIdStr && StringUtils.hasText(recordIdStr)) {
-            request.setTargetRecordId(recordIdStr);
-        }
-    }
 
     private void mergeEffectiveRecordId(Map<String, Object> resultData, CommandExecuteRequest request) {
         if (resultData == null || resultData.containsKey("recordId") || request == null) {
@@ -856,25 +847,6 @@ public class CommandExecutorImpl implements CommandExecutor, CommandExecutorDele
     // ==================== Change Tracking ====================
 
     @Override
-    public Map<String, Object> readRecordSnapshot(Long tenantId, String modelCode, String recordId) {
-        try {
-            String tableName = metaModelService.getTableName(modelCode);
-            CommandExecutorUtils.validateSqlIdentifier(tableName, "snapshot tableName");
-            var idEntry = CommandExecutorUtils.resolveRecordIdColumn(recordId);
-            String sql = "SELECT * FROM " + tableName
-                    + " WHERE tenant_id = #{params.tenantId} AND " + idEntry.getKey() + " = #{params.recordId}";
-            Map<String, Object> params = Map.of("tenantId", tenantId, "recordId", idEntry.getValue());
-            List<Map<String, Object>> result = dynamicDataMapper.selectByQuery(sql, params);
-            if (result != null && !result.isEmpty()) {
-                return result.get(0);
-            }
-        } catch (Exception e) {
-            log.debug("Failed to read record snapshot for change tracking: {}", e.getMessage());
-        }
-        return null;
-    }
-
-    @Override
     public void recordChangeTracking(CommandDefinition command, CommandExecuteRequest request,
                                        Long tenantId, Long userId, Map<String, Object> beforeSnapshot) {
         try {
@@ -894,10 +866,10 @@ public class CommandExecutorImpl implements CommandExecutor, CommandExecutorDele
                 operation = "delete";
             } else if ("update".equalsIgnoreCase(operationType) && StringUtils.hasText(recordId)) {
                 operation = "update";
-                afterSnapshot = readRecordSnapshot(tenantId, modelCode, recordId);
+                afterSnapshot = recordSnapshotReader.readRecordSnapshot(tenantId, modelCode, recordId);
             } else if (beforeSnapshot == null && StringUtils.hasText(recordId)) {
                 operation = "create";
-                afterSnapshot = readRecordSnapshot(tenantId, modelCode, recordId);
+                afterSnapshot = recordSnapshotReader.readRecordSnapshot(tenantId, modelCode, recordId);
             } else {
                 return; // Cannot determine operation, skip
             }
