@@ -28,6 +28,9 @@ public class SecurityHeadersFilter extends OncePerRequestFilter {
         // Enable browser XSS filter (legacy but still useful for older browsers)
         response.setHeader("X-XSS-Protection", "1; mode=block");
 
+        // Enforce HTTPS — browsers will refuse plain HTTP for max-age duration
+        response.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+
         // Prevent referrer leakage
         response.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
 

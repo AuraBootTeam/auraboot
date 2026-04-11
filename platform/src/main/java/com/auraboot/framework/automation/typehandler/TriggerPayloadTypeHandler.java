@@ -8,7 +8,6 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.apache.ibatis.type.BaseTypeHandler;
 import org.apache.ibatis.type.JdbcType;
 import org.apache.ibatis.type.MappedJdbcTypes;
-import org.apache.ibatis.type.MappedTypes;
 import org.postgresql.util.PGobject;
 
 import java.sql.CallableStatement;
@@ -23,7 +22,6 @@ import java.util.Map;
  * @author AuraBoot Team
  * @since 2.2.0
  */
-@MappedTypes(Map.class)
 @MappedJdbcTypes(JdbcType.OTHER)
 public class TriggerPayloadTypeHandler extends BaseTypeHandler<Map<String, Object>> {
 
