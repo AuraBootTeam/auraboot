@@ -676,6 +676,16 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             bindingPid = fieldBindingMapper.getPidByModelAndField(modelId, fieldId);
 
             if (StatusConstants.PUBLISHED.equals(model.getStatus())) {
+                // Auto-publish the field when binding to an already-published model
+                if (!StatusConstants.PUBLISHED.equals(field.getStatus())) {
+                    Field fieldEntity = metaFieldMapper.selectById(fieldId);
+                    if (fieldEntity != null) {
+                        fieldEntity.setStatus(StatusConstants.PUBLISHED);
+                        metaFieldMapper.updateById(fieldEntity);
+                        log.info("Auto-published field {} (bound to published model {})", dto.getFieldCode(), dto.getModelCode());
+                    }
+                }
+
                 SchemaOperationResult schemaResult = schemaManagementService.updateTableByModel(dto.getModelCode());
                 if (schemaResult == null || !schemaResult.isSuccess()) {
                     String errorMessage = schemaResult != null && schemaResult.getErrorMessage() != null
