@@ -20,14 +20,6 @@ public interface CommandExecutorDelegate {
 
 
 
-    Map<String, Object> executeHandlerPhase(List<BindingRule> handlerRules, CommandDefinition command,
-                                             Map<String, Object> payload, Map<String, Object> fieldMapResults,
-                                             Long tenantId, Long userId, CommandExecuteRequest request,
-                                             Map<String, Object> execConfig);
-
-    void persistHandlerResults(String modelCode, Map<String, Object> payload,
-                                Map<String, Object> handlerResults, Long tenantId,
-                                CommandExecuteRequest request, Map<String, Object> fieldMapResults);
 
     void executeConsistencyCheckPhase(CommandDefinition command, Map<String, Object> payload,
                                        Map<String, Object> fieldMapResults, Long tenantId,
