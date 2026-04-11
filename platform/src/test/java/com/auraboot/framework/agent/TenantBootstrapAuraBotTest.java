@@ -69,7 +69,7 @@ class TenantBootstrapAuraBotTest extends BaseIntegrationTest {
         assertThat(agent.get("name")).isEqualTo("AuraBot");
         assertThat(agent.get("status")).isEqualTo("active");
         assertThat(agent.get("agent_type")).isEqualTo("reactive");
-        assertThat(agent.get("model")).isEqualTo("claude-sonnet-4-6");
+        assertThat(agent.get("model")).isNull(); // resolved at runtime from first enabled LLM provider
     }
 
     @Test
