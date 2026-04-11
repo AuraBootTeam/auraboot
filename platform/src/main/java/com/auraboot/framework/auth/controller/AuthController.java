@@ -2,6 +2,7 @@ package com.auraboot.framework.auth.controller;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.auth.dto.*;
+import com.auraboot.framework.auth.service.ApiRateLimiter;
 import com.auraboot.framework.auth.service.AuthService;
 import com.auraboot.framework.auth.service.PasswordManagementService;
 import com.auraboot.framework.permission.entity.Permission;
@@ -58,6 +59,9 @@ public class AuthController {
 
     @Autowired
     private PasswordManagementService passwordManagementService;
+
+    @Autowired
+    private ApiRateLimiter apiRateLimiter;
 
     @Autowired(required = false)
     private SystemModeService systemModeService;
@@ -279,7 +283,13 @@ public class AuthController {
 
     @PostMapping("/forgot-password")
     @ResponseBody
-    public ApiResponse<Void> forgotPassword(@jakarta.validation.Valid @RequestBody ForgotPasswordRequest request) {
+    public ApiResponse<Void> forgotPassword(@jakarta.validation.Valid @RequestBody ForgotPasswordRequest request,
+                                             HttpServletRequest httpRequest) {
+        // Rate limit: max 3 forgot-password requests per IP per minute (prevents email bombing)
+        String ip = extractIp(httpRequest);
+        if (!apiRateLimiter.isAllowed("forgot-pwd:ip:" + ip, 3)) {
+            return ApiResponse.error(ResponseCode.BadParam, "Too many requests. Please try again later.", null);
+        }
         passwordManagementService.initiatePasswordReset(request.getEmail());
         // Always return success to avoid email enumeration
         return ApiResponse.success(null);
@@ -287,7 +297,13 @@ public class AuthController {
 
     @PostMapping("/reset-password")
     @ResponseBody
-    public ApiResponse<Void> resetPassword(@jakarta.validation.Valid @RequestBody ResetPasswordRequest request) {
+    public ApiResponse<Void> resetPassword(@jakarta.validation.Valid @RequestBody ResetPasswordRequest request,
+                                            HttpServletRequest httpRequest) {
+        // Rate limit: max 5 reset-password attempts per IP per minute (prevents token brute force)
+        String ip = extractIp(httpRequest);
+        if (!apiRateLimiter.isAllowed("reset-pwd:ip:" + ip, 5)) {
+            return ApiResponse.error(ResponseCode.BadParam, "Too many requests. Please try again later.", null);
+        }
         passwordManagementService.resetPasswordWithToken(request.getToken(), request.getNewPassword());
         return ApiResponse.success(null);
     }
