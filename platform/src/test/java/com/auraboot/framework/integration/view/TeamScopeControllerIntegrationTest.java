@@ -35,6 +35,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @DisplayName("TEAM Scope Controller Guard - Integration Tests")
+@org.springframework.test.annotation.DirtiesContext(classMode = org.springframework.test.annotation.DirtiesContext.ClassMode.BEFORE_CLASS)
 class TeamScopeControllerIntegrationTest extends BaseIntegrationTest {
 
     private static final String TEAM_ALPHA = "team_alpha";
@@ -58,10 +59,19 @@ class TeamScopeControllerIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private TenantMemberService tenantMemberService;
 
+    @Autowired
+    private org.springframework.cache.CacheManager cacheManager;
+
     private MockMvc mockMvc;
 
     @BeforeEach
     void setup() {
+        // Clear ALL caches to prevent cross-test pollution from other test classes
+        cacheManager.getCacheNames().forEach(name -> {
+            var cache = cacheManager.getCache(name);
+            if (cache != null) cache.clear();
+        });
+
         grantPermission("system.saved_view.update", "system", "saved_view", "update", "Saved View Update");
         userPermissionService.evictUserPermissions(getTestUser().getId());
 
