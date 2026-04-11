@@ -33,6 +33,7 @@ public class BpmNotifyService {
                     .recipientUserId(recipientId)
                     .content(content)
                     .isRead(false)
+                    .deletedFlag(false)
                     .createdAt(Instant.now())
                     .build();
             notifyRecordMapper.insert(record);
@@ -57,6 +58,7 @@ public class BpmNotifyService {
                 .recipientUserId(assigneeUserId)
                 .content(content)
                 .isRead(false)
+                .deletedFlag(false)
                 .createdAt(Instant.now())
                 .build();
         notifyRecordMapper.insert(record);

@@ -24,7 +24,7 @@ public class SagaCompensator {
 
         // Get completed steps in reverse order
         List<SagaStep> completedSteps = steps.stream()
-                .filter(s -> SagaStatus.COMPLETED.name().equals(s.getStatus()))
+                .filter(s -> SagaStatus.COMPLETED.name().toLowerCase().equals(s.getStatus()))
                 .sorted(Comparator.comparingInt(SagaStep::getStepOrder).reversed())
                 .toList();
 

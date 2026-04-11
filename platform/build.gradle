@@ -310,7 +310,10 @@ tasks.withType(Test).configureEach {
 // 配置测试任务使用JUnit Platform
 test {
     useJUnitPlatform()
-    exclude '**/bpm/**'
+    // BPM integration tests use @ActiveProfiles("test") which requires a different DB role
+    exclude '**/bpm/integration/DatabaseIntegrationTest.class'
+    exclude '**/bpm/integration/DatabaseModeProcessTest.class'
+    exclude '**/bpm/integration/DualModeCoexistenceTest.class'
     exclude '**/controller/**'
     // i18n: needs enterprise plugin dirs on disk
     exclude '**/i18n/I18nPluginImportTest.class'

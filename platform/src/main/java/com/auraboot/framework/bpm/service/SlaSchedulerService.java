@@ -136,7 +136,7 @@ public class SlaSchedulerService {
         Long tenantId = record.getTenantId();
         String tenantIdStr = tenantId != null ? tenantId.toString() : null;
 
-        switch (action.toUpperCase()) {
+        switch (action.toLowerCase()) {
             case "notify" -> {
                 log.info("SLA NOTIFY: config={}, record={}, recipients={}, progress={:.1f}%",
                         config.getName(), record.getPid(), recipients, progress * 100);
