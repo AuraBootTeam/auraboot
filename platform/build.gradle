@@ -322,12 +322,6 @@ test {
     exclude '**/plugin/integration/PluginLifecycleTest.class'
     exclude '**/plugin/service/PluginImportIntegrationTest.class'
     exclude '**/plugin/template/TemplateControllerIntegrationTest.class'
-    // --- Tests using outdated UPPERCASE permission code format (MODEL.xxx.manage) ---
-    // Current system uses lowercase (model.xxx.manage). These need a permission-format refactor.
-    exclude '**/integration/ModelPermissionIntegrationTest.class'
-    exclude '**/integration/TenantBootstrapMetaContextTest.class'
-    exclude '**/integration/TenantBootstrapIntegrationTest.class'
-    exclude '**/integration/view/TeamScopeControllerIntegrationTest.class'
     jvmArgs "-Djavax.xml.parsers.SAXParserFactory=com.sun.org.apache.xerces.internal.jaxp.SAXParserFactoryImpl"
     jvmArgs '-Duser.timezone=UTC'
     jvmArgs '-Xmx6g', '-Xms2g', '-XX:+UseG1GC'

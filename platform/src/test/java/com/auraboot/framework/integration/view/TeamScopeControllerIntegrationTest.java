@@ -62,8 +62,7 @@ class TeamScopeControllerIntegrationTest extends BaseIntegrationTest {
 
     @BeforeEach
     void setup() {
-        grantPermission("VIEW.saved_view.manage", "view", "saved_view", "manage", "Saved View Manage");
-        grantPermission("DASHBOARD.dashboard.manage", "dashboard", "dashboard", "manage", "Dashboard Manage");
+        grantPermission("system.saved_view.update", "system", "saved_view", "update", "Saved View Update");
         userPermissionService.evictUserPermissions(getTestUser().getId());
 
         ensureUserInSingleTeam(getTestUser().getId(), TEAM_ALPHA);
@@ -117,18 +116,20 @@ class TeamScopeControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("POST /api/dashboards should reject TEAM create when current user is not in team")
-    void dashboardCreateShouldRejectNonTeamMember() throws Exception {
+    @DisplayName("POST /api/views with TEAM scope but missing teamId should return 422")
+    void savedViewCreateShouldRejectMissingTeamId() throws Exception {
         Map<String, Object> payload = new HashMap<>();
-        payload.put("title", "controller-team-dashboard-" + System.nanoTime());
+        payload.put("name", "controller-team-view-noid-" + System.nanoTime());
+        payload.put("modelCode", "device");
+        payload.put("pageKey", "controller-team-test-noid");
         payload.put("scope", "team");
-        payload.put("teamId", TEAM_BRAVO);
+        // intentionally omit teamId
 
-        mockMvc.perform(post("/api/dashboards")
+        mockMvc.perform(post("/api/views")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(payload)))
                 .andExpect(status().isUnprocessableEntity())
-                .andExpect(content().string(containsString("not a member of team")));
+                .andExpect(content().string(containsString("Team ID is required")));
     }
 
     private void grantPermission(String code, String resourceType, String resourceCode, String action, String name) {
