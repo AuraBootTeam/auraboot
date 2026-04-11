@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -75,20 +76,23 @@ public class PageSchemaCommandHandler implements CommandHandler {
 
     private void handlePublish(String pid, Map<String, Object> result) {
         // DSL EFFECT phase updates status → published.
-        // Handler supplements by setting published_at timestamp.
+        // Handler supplements by setting published_at timestamp via direct SQL.
+        // Do NOT put published_at into result map — CommandExecutor would try to
+        // persist it as VARCHAR, causing type mismatch with timestamptz column.
+        Timestamp now = Timestamp.from(Instant.now());
         jdbcTemplate.update(
                 "UPDATE ab_page_schema SET published_at = ?, updated_at = ? WHERE pid = ? AND deleted_flag = false",
-                Instant.now(), Instant.now(), pid);
+                now, now, pid);
         result.put("pid", pid);
-        result.put("published_at", Instant.now().toString());
     }
 
     private void handleArchive(String pid, Map<String, Object> result) {
         // DSL EFFECT phase updates status → archived.
         // Handler supplements by clearing published_at.
+        Timestamp now = Timestamp.from(Instant.now());
         jdbcTemplate.update(
                 "UPDATE ab_page_schema SET published_at = NULL, updated_at = ? WHERE pid = ? AND deleted_flag = false",
-                Instant.now(), pid);
+                now, pid);
         result.put("pid", pid);
     }
 
