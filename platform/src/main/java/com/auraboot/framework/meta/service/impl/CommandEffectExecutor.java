@@ -13,6 +13,7 @@ import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.service.EventStore;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.OutboxWriter;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -94,19 +95,19 @@ public class CommandEffectExecutor {
 
             commandAuditLogMapper.insertLog(auditLog);
         } catch (Exception e) {
-            log.warn("Failed to save audit log: {}", e.getMessage());
+            // CATCH: safe — called from after-commit (no transaction) or
+            // from execute() failure path (transaction already rolling back).
+            // Audit log failure must not mask the original command error.
+            log.warn("Failed to save audit log for command {}: {}", commandCode, e.getMessage());
         }
     }
 
     private void recordStateTransitionEvent(CommandDefinition command, Long tenantId, Long userId,
                                              CommandExecuteRequest request, String targetState) {
+        StateTransitionEvent transitionEvent = new StateTransitionEvent(
+                command.getModelCode(), request.getTargetRecordId(),
+                null, targetState, command.getCode(), tenantId, userId);
         try {
-            // Read current state before the transition was written
-            // (Note: by this point the state was already written during STATE_CHECK phase)
-            StateTransitionEvent transitionEvent = new StateTransitionEvent(
-                    command.getModelCode(), request.getTargetRecordId(),
-                    null, targetState, command.getCode(), tenantId, userId);
-
             String eventPayload = objectMapper.writeValueAsString(transitionEvent);
             Map<String, Object> metadata = new HashMap<>();
             metadata.put("userId", userId != null ? userId : 0L);
@@ -116,18 +117,18 @@ public class CommandEffectExecutor {
 
             eventStore.append(tenantId, "StateTransition", command.getModelCode(),
                     request.getTargetRecordId(), eventPayload, metadata);
-        } catch (Exception e) {
-            log.warn("Failed to record state transition event: {}", e.getMessage());
+        } catch (JsonProcessingException e) {
+            // CATCH: JSON serialization only, no SQL — safe to log and skip
+            log.warn("Failed to serialize state transition event: {}", e.getMessage());
         }
     }
 
     private void appendToEventStore(CommandExecutedEvent event, CommandDefinition command,
                                      Long tenantId, Long userId, CommandExecuteRequest request) {
+        String aggregateType = command.getModelCode();
+        String aggregateId = deriveAggregateId(event, request);
         try {
-            String aggregateType = command.getModelCode();
-            String aggregateId = deriveAggregateId(event, request);
             String payload = objectMapper.writeValueAsString(event);
-
             Map<String, Object> metadata = new HashMap<>();
             metadata.put("userId", userId != null ? userId : 0L);
             metadata.put("commandCode", command.getCode());
@@ -139,9 +140,9 @@ public class CommandEffectExecutor {
             log.warn("EventStore version conflict during EFFECT phase: {}", e.getMessage());
             throw new BusinessException(ResponseCode.BadParam,
                     "Concurrent modification detected: " + e.getMessage());
-        } catch (Exception e) {
-            log.error("Failed to write to event store: {}", e.getMessage());
-            // Non-fatal: outbox write succeeded, event store is supplementary
+        } catch (JsonProcessingException e) {
+            // CATCH: JSON serialization only, no SQL — safe to log and skip
+            log.warn("Failed to serialize event payload: {}", e.getMessage());
         }
     }
 
