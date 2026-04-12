@@ -8,6 +8,7 @@ import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.meta.dto.CommandExecuteResult;
 import com.auraboot.framework.meta.mapper.CommandDefinitionMapper;
 import com.auraboot.framework.meta.service.CommandExecutor;
+import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.tenant.service.TenantService;
 import com.auraboot.framework.test.dto.FixtureRequest;
 import com.auraboot.framework.test.dto.FixtureResult;
@@ -17,9 +18,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.lang.reflect.Method;
+import java.math.BigDecimal;
+import java.sql.Date;
+import java.time.LocalDate;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -47,6 +52,9 @@ public class TestFixtureController {
     private CommandDefinitionMapper commandDefinitionMapper;
 
     @Autowired
+    private DynamicDataService dynamicDataService;
+
+    @Autowired
     private TenantService tenantService;
 
     @Autowired
@@ -54,6 +62,9 @@ public class TestFixtureController {
 
     @Autowired
     private ApplicationContext applicationContext;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     /**
      * POST /api/test/fixture
@@ -155,6 +166,31 @@ public class TestFixtureController {
     // ── Private helpers ─────────────────────────────────────────────────────
 
     private String executeCreateCommand(String modelCode, Map<String, Object> payload) {
+        try {
+            Map<String, Object> created = dynamicDataService.create(modelCode, payload);
+            if (created != null) {
+                Object id = created.get("pid");
+                if (id == null) {
+                    id = created.get("id");
+                }
+                if (id == null) {
+                    id = created.get("recordId");
+                }
+                if (id != null) {
+                    return id.toString();
+                }
+            }
+        } catch (Exception e) {
+            log.debug("DynamicDataService.create failed for model {}: {}", modelCode, e.getMessage());
+        }
+
+        if ("e2et_order".equals(modelCode)) {
+            String insertedId = insertE2etOrderRecord(payload);
+            if (insertedId != null) {
+                return insertedId;
+            }
+        }
+
         String commandCode = resolveCreateCommandCode(modelCode);
         CommandExecuteRequest request = new CommandExecuteRequest();
         request.setPayload(payload);
@@ -170,6 +206,102 @@ public class TestFixtureController {
             }
         }
         return null;
+    }
+
+    private String insertE2etOrderRecord(Map<String, Object> payload) {
+        try {
+            var tenant = tenantService.findByName("e2e_test");
+            var user = userService.findByEmail("e2e@test.local");
+            Long nextId = jdbcTemplate.queryForObject(
+                    "select coalesce(max(id), 0) + 1 from mt_e2et_order",
+                    Long.class
+            );
+            if (nextId == null) {
+                return null;
+            }
+
+            String pid = UniqueIdGenerator.generate();
+            String orderNo = stringValue(payload, "e2et_order_no", "ORD-" + pid.substring(0, 8));
+            String orderTitle = stringValue(payload, "e2et_order_title", orderNo);
+
+            jdbcTemplate.update("""
+                    insert into mt_e2et_order (
+                        id, pid, created_at, updated_at, created_by, updated_by, tenant_id,
+                        e2et_order_no, e2et_order_title, e2et_order_desc, e2et_order_amount,
+                        e2et_order_qty, e2et_order_date, e2et_order_urgent, e2et_order_type,
+                        e2et_order_status, e2et_order_customer, e2et_order_remark,
+                        e2et_order_discount, e2et_delivery_date
+                    ) values (?, ?, now(), now(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    nextId,
+                    pid,
+                    user != null ? user.getId() : null,
+                    user != null ? user.getId() : null,
+                    tenant != null ? tenant.getId() : null,
+                    orderNo,
+                    orderTitle,
+                    nullableString(payload.get("e2et_order_desc")),
+                    decimalValue(payload.get("e2et_order_amount")),
+                    integerValue(payload.get("e2et_order_qty")),
+                    dateValue(payload.get("e2et_order_date")),
+                    booleanValue(payload.get("e2et_order_urgent")),
+                    stringValue(payload, "e2et_order_type", null),
+                    stringValue(payload, "e2et_order_status", "draft"),
+                    stringValue(payload, "e2et_order_customer", null),
+                    stringValue(payload, "e2et_order_remark", null),
+                    decimalValue(payload.get("e2et_order_discount")),
+                    dateValue(payload.get("e2et_delivery_date"))
+            );
+            return pid;
+        } catch (Exception e) {
+            log.warn("Direct SQL insert failed for e2et_order: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    private String stringValue(Map<String, Object> payload, String key, String defaultValue) {
+        Object value = payload.get(key);
+        if (value == null) {
+            return defaultValue;
+        }
+        String text = String.valueOf(value).trim();
+        return text.isEmpty() ? defaultValue : text;
+    }
+
+    private String nullableString(Object value) {
+        if (value == null) {
+            return null;
+        }
+        String text = String.valueOf(value).trim();
+        return text.isEmpty() ? null : text;
+    }
+
+    private BigDecimal decimalValue(Object value) {
+        if (value == null) {
+            return null;
+        }
+        return new BigDecimal(String.valueOf(value));
+    }
+
+    private Integer integerValue(Object value) {
+        if (value == null) {
+            return null;
+        }
+        return Integer.valueOf(String.valueOf(value));
+    }
+
+    private Boolean booleanValue(Object value) {
+        if (value == null) {
+            return null;
+        }
+        return Boolean.valueOf(String.valueOf(value));
+    }
+
+    private Date dateValue(Object value) {
+        if (value == null) {
+            return null;
+        }
+        return Date.valueOf(LocalDate.parse(String.valueOf(value)));
     }
 
     /**
@@ -206,7 +338,7 @@ public class TestFixtureController {
         try {
             for (int i = 0; i < count; i++) {
                 Map<String, Object> record = new HashMap<>();
-                record.put("e2et_order_title", "xp_" + runId + "_record_" + (i + 1));
+                record.put("e2et_order_no", "xp_" + runId + "_record_" + (i + 1));
                 record.put("e2et_order_status", "draft");
                 String pid = executeCreateCommand(modelCode, record);
                 if (pid != null) {
@@ -267,7 +399,13 @@ public class TestFixtureController {
         // Resolve InboxService via ApplicationContext (avoids compile-time dependency)
         Object inboxService;
         try {
-            inboxService = applicationContext.getBean("inboxService");
+            inboxService = requireRuntimeBean(
+                    new String[]{"inboxService", "inboxServiceImpl"},
+                    new String[]{
+                            "com.auraboot.framework.inbox.service.InboxService",
+                            "com.auraboot.framework.inbox.service.InboxServiceImpl"
+                    }
+            );
         } catch (Exception e) {
             return FixtureResult.builder()
                     .success(false).fixtureName(itemType.toLowerCase()).testRunId(runId)
@@ -417,8 +555,8 @@ public class TestFixtureController {
      * viewConfigs expected in the page schema (set up by plugin):
      *   list     — default
      *   kanban   — statusField: e2et_order_status
-     *   calendar — dateField: e2et_order_due_date  (may be null if field absent)
-     *   gallery  — imageField: e2et_order_image, titleField: e2et_order_title, columns: 3
+     *   calendar — no dedicated date field in the current schema, but the view must still mount
+     *   gallery  — uses the record title fallback from e2et_order_no
      */
     private FixtureResult createMultiviewFixture(String runId, Map<String, Object> params) {
         String modelCode = params != null && params.containsKey("modelCode")
@@ -433,7 +571,7 @@ public class TestFixtureController {
         try {
             for (int i = 0; i < count; i++) {
                 Map<String, Object> record = new HashMap<>();
-                record.put("e2et_order_title", "mv_" + runId + "_" + (i + 1));
+                record.put("e2et_order_no", "mv_" + runId + "_" + (i + 1));
                 record.put("e2et_order_status", statuses[i % statuses.length]);
                 String pid = executeCreateCommand(modelCode, record);
                 if (pid != null) {
@@ -451,7 +589,7 @@ public class TestFixtureController {
                             "modelCode", modelCode,
                             "viewTypes", List.of("list", "kanban", "calendar", "gallery"),
                             "statusField", "e2et_order_status",
-                            "titleField", "e2et_order_title"
+                            "titleField", "e2et_order_no"
                     ))
                     .build();
         } catch (Exception e) {
@@ -483,7 +621,13 @@ public class TestFixtureController {
         // Resolve IM service via ApplicationContext — avoids compile-time dependency
         Object conversationService;
         try {
-            conversationService = applicationContext.getBean("conversationService");
+            conversationService = requireRuntimeBean(
+                    new String[]{"conversationService", "imConversationService", "imConversationServiceImpl"},
+                    new String[]{
+                            "com.auraboot.framework.im.service.ImConversationService",
+                            "com.auraboot.framework.im.service.impl.ImConversationServiceImpl"
+                    }
+            );
         } catch (Exception e) {
             return FixtureResult.builder()
                     .success(false).fixtureName("chat").testRunId(runId)
@@ -519,20 +663,12 @@ public class TestFixtureController {
         List<String> conversationIds = new ArrayList<>();
         int totalMessages = 0;
         try {
-            // Attempt to find createConversation method — signature may vary by enterprise version.
-            // We try (tenantId, type, name, creatorId) first, then fall through.
-            Method createConv = null;
-            for (Method m : conversationService.getClass().getMethods()) {
-                if ("createConversation".equals(m.getName())) {
-                    createConv = m;
-                    break;
-                }
-            }
+            Method createConv = findMethod(conversationService.getClass(), "create");
             if (createConv == null) {
                 return FixtureResult.builder()
                         .success(false).fixtureName("chat").testRunId(runId)
                         .recordsCreated(0).recordIds(List.of())
-                        .metadata(Map.of("error", "conversationService.createConversation method not found"))
+                        .metadata(Map.of("error", "conversationService.create method not found"))
                         .build();
             }
 
@@ -607,21 +743,22 @@ public class TestFixtureController {
         }
     }
 
-    /** Invoke createConversation reflectively, trying multiple overload signatures. */
+    /** Invoke conversation creation reflectively using the enterprise DTO contract. */
     private Object invokeCreateConversation(Method method, Object service,
                                              Long tenantId, String type, String name,
                                              Long creatorId, List<Long> memberIds) throws Exception {
         Class<?>[] paramTypes = method.getParameterTypes();
-        if (paramTypes.length == 4) {
-            // (tenantId, type, name, creatorId)
-            return method.invoke(service, tenantId, type, name, creatorId);
-        } else if (paramTypes.length == 5) {
-            // (tenantId, type, name, creatorId, memberIds)
-            return method.invoke(service, tenantId, type, name, creatorId, memberIds);
-        } else {
-            // Generic fallback — try with all 5 args and hope for the best
-            return method.invoke(service, tenantId, type, name, creatorId, memberIds);
+        if (paramTypes.length != 3) {
+            throw new IllegalStateException("Unsupported conversation create signature");
         }
+
+        Class<?> requestType = paramTypes[0];
+        Object request = requestType.getDeclaredConstructor().newInstance();
+        setBeanProperty(request, "type", type);
+        setBeanProperty(request, "name", name);
+        setBeanProperty(request, "memberIds", memberIds);
+
+        return method.invoke(service, request, creatorId, tenantId);
     }
 
     /** Send N test messages to a conversation via reflection; returns count sent. */
@@ -629,19 +766,19 @@ public class TestFixtureController {
                                   Long senderId, String runId, int count) {
         Object messageService;
         try {
-            messageService = applicationContext.getBean("chatMessageService");
+            messageService = requireRuntimeBean(
+                    new String[]{"chatMessageService", "imMessageService", "imMessageServiceImpl"},
+                    new String[]{
+                            "com.auraboot.framework.im.service.ImMessageService",
+                            "com.auraboot.framework.im.service.impl.ImMessageServiceImpl"
+                    }
+            );
         } catch (Exception e) {
             log.warn("chatMessageService bean not found, skipping message creation: {}", e.getMessage());
             return 0;
         }
 
-        Method sendMethod = null;
-        for (Method m : messageService.getClass().getMethods()) {
-            if ("sendMessage".equals(m.getName())) {
-                sendMethod = m;
-                break;
-            }
-        }
+        Method sendMethod = findMethod(messageService.getClass(), "sendMessage");
         if (sendMethod == null) {
             log.warn("chatMessageService.sendMessage method not found, skipping message creation");
             return 0;
@@ -652,12 +789,15 @@ public class TestFixtureController {
             try {
                 String content = "E2E test message [" + runId + "-" + (i + 1) + "]";
                 Class<?>[] p = sendMethod.getParameterTypes();
-                if (p.length == 4) {
-                    sendMethod.invoke(messageService, tenantId, conversationId, senderId, content);
-                } else if (p.length == 5) {
-                    sendMethod.invoke(messageService, tenantId, conversationId, senderId, content, "text");
+                if (p.length == 3) {
+                    Object request = p[0].getDeclaredConstructor().newInstance();
+                    setBeanProperty(request, "conversationId", Long.valueOf(conversationId));
+                    setBeanProperty(request, "content", content);
+                    setBeanProperty(request, "messageType", "TEXT");
+                    setBeanProperty(request, "clientMsgId", "e2e-" + runId + "-" + (i + 1));
+                    sendMethod.invoke(messageService, request, senderId, tenantId);
                 } else {
-                    sendMethod.invoke(messageService, tenantId, conversationId, senderId, content, "text");
+                    throw new IllegalStateException("Unsupported message send signature");
                 }
                 sent++;
             } catch (Exception e) {
@@ -665,6 +805,51 @@ public class TestFixtureController {
             }
         }
         return sent;
+    }
+
+    private Object requireRuntimeBean(String[] candidateBeanNames, String[] candidateClassNames) {
+        for (String beanName : candidateBeanNames) {
+            if (applicationContext.containsBean(beanName)) {
+                return applicationContext.getBean(beanName);
+            }
+        }
+
+        for (String className : candidateClassNames) {
+            try {
+                Class<?> beanType = Class.forName(className);
+                return applicationContext.getBean(beanType);
+            } catch (ClassNotFoundException ignored) {
+                // Optional enterprise module not present on the runtime classpath.
+            } catch (Exception ignored) {
+                // Bean type exists but is not registered under this runtime profile.
+            }
+        }
+
+        throw new IllegalStateException("No matching runtime bean found");
+    }
+
+    private Method findMethod(Class<?> beanClass, String methodName) {
+        for (Method method : beanClass.getMethods()) {
+            if (methodName.equals(method.getName())) {
+                return method;
+            }
+        }
+        return null;
+    }
+
+    private void setBeanProperty(Object target, String propertyName, Object value) throws Exception {
+        String suffix = propertyName.substring(0, 1).toUpperCase() + propertyName.substring(1);
+        Method setter = null;
+        for (Method method : target.getClass().getMethods()) {
+            if (method.getName().equals("set" + suffix) && method.getParameterCount() == 1) {
+                setter = method;
+                break;
+            }
+        }
+        if (setter == null) {
+            throw new NoSuchMethodException("Setter not found for property: " + propertyName);
+        }
+        setter.invoke(target, value);
     }
 
     /** Extract string ID from a reflectively-created entity object. Tries getId(), then id field. */
@@ -688,13 +873,13 @@ public class TestFixtureController {
 
     /**
      * Fixture: "native_fields"
-     * Creates records in e2et_order with simulated camera-photo URLs and
-     * base64-encoded signature data — used by iOS NativeCapabilityFlowTests
-     * to verify that camera and signature fields render correctly.
+     * Creates baseline e2et_order records for the current minimal e2e-test-order schema.
+     * The plugin no longer ships camera/signature fields, so this fixture now provides
+     * stable create-form coverage instead of native-field-specific payloads.
      * <p>
-     * Field mapping (configured in the e2e test plugin's e2et_order model):
-     *   e2et_order_photo     — extension.renderComponent = "camera"  (stores image URL)
-     *   e2et_order_signature — extension.renderComponent = "signature" (stores base64 SVG)
+     * Field mapping:
+     *   e2et_order_no        — title / searchable field
+     *   e2et_order_status    — status field used by list/detail rendering
      */
     private FixtureResult createNativeFieldsFixture(String runId, Map<String, Object> params) {
         String modelCode = params != null && params.containsKey("modelCode")
@@ -704,21 +889,12 @@ public class TestFixtureController {
                 ? ((Number) params.get("count")).intValue()
                 : 3;
 
-        // Minimal inline SVG signature encoded as base64 data URI
-        String signatureDataUri = "data:image/svg+xml;base64,"
-                + "PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMDAiIGhlaWdodD0iNTAiPjxwYXRoIGQ9Ik0xMCAzMCBRNTAgNSAxMDAgMzAgUTE1MCA1NSAxOTAgMzAiIHN0cm9rZT0iIzMzMyIgZmlsbD0ibm9uZSIvPjwvc3ZnPg==";
-        // Placeholder camera photo URL (PNG 1x1 pixel data URI)
-        String photoDataUri = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
-
         List<String> recordIds = new ArrayList<>();
         try {
             for (int i = 0; i < count; i++) {
                 Map<String, Object> record = new HashMap<>();
-                record.put("e2et_order_title", "nf_" + runId + "_" + (i + 1));
+                record.put("e2et_order_no", "nf_" + runId + "_" + (i + 1));
                 record.put("e2et_order_status", "draft");
-                // Store simulated native field values using the field codes expected by the plugin
-                record.put("e2et_order_photo", photoDataUri);
-                record.put("e2et_order_signature", signatureDataUri);
                 String pid = executeCreateCommand(modelCode, record);
                 if (pid != null) {
                     recordIds.add(pid);
@@ -733,8 +909,8 @@ public class TestFixtureController {
                     .recordIds(recordIds)
                     .metadata(Map.of(
                             "modelCode", modelCode,
-                            "cameraField", "e2et_order_photo",
-                            "signatureField", "e2et_order_signature"
+                            "titleField", "e2et_order_no",
+                            "statusField", "e2et_order_status"
                     ))
                     .build();
         } catch (Exception e) {
@@ -760,7 +936,7 @@ public class TestFixtureController {
         try {
             for (int i = 0; i < baseCount; i++) {
                 Map<String, Object> record = new HashMap<>();
-                record.put("e2et_order_title", "dash_" + runId + "_" + (i + 1));
+                record.put("e2et_order_no", "dash_" + runId + "_" + (i + 1));
                 // Use valid status values from e2et_order_status dict
                 String[] statuses = {"draft", "submitted", "approved"};
                 record.put("e2et_order_status", statuses[i % 3]);
