@@ -75,27 +75,17 @@ public class TestSeedController {
         Tenant tenant = tenantService.findByName(TEST_TENANT_NAME);
         User user = userService.findByEmail(TEST_USER_EMAIL);
 
-        if (tenant != null && user != null) {
-            log.info("Test tenant already exists: tenantId={}, userId={}", tenant.getId(), user.getId());
-            String jwt = generateJwt(user, tenant.getId());
-            return ResponseEntity.ok(SeedResult.builder()
-                    .tenantId(tenant.getId())
-                    .userId(user.getId())
-                    .jwt(jwt)
-                    .email(TEST_USER_EMAIL)
-                    .tenantName(TEST_TENANT_NAME)
-                    .testRunId(runId)
-                    .build());
-        }
+        boolean tenantExists = tenant != null;
+        boolean userExists = user != null;
 
         // 2. Create user if not exists
-        if (user == null) {
+        if (!userExists) {
             user = userService.signUp(TEST_USER_EMAIL, TEST_USER_PASSWORD, TEST_USER_DISPLAY_NAME);
             log.info("Test user created: userId={}, email={}", user.getId(), TEST_USER_EMAIL);
         }
 
         // 3. Create tenant if not exists
-        if (tenant == null) {
+        if (!tenantExists) {
             tenant = new Tenant();
             tenant.setPid(UniqueIdGenerator.generate());
             tenant.setName(TEST_TENANT_NAME);
@@ -115,15 +105,20 @@ public class TestSeedController {
             log.info("Test user added as tenant member: tenantId={}, userId={}", tenant.getId(), user.getId());
         }
 
-        // 5. Bootstrap tenant (roles, menus, permissions)
-        TenantBootstrapService.BootstrapResult bootstrapResult =
-                tenantBootstrapService.bootstrapTenant(tenant.getId(), user.getId());
-        log.info("Tenant bootstrap completed: success={}, roles={}, menus={}, permissions={}, duration={}ms",
-                bootstrapResult.isSuccess(),
-                bootstrapResult.getRolesCreated(),
-                bootstrapResult.getMenusCreated(),
-                bootstrapResult.getPermissionsAssigned(),
-                bootstrapResult.getDurationMs());
+        // 5. Bootstrap only for a newly-created tenant. Existing tenants may already
+        // contain seed menus/roles, and re-running bootstrap is not idempotent.
+        if (!tenantExists) {
+            TenantBootstrapService.BootstrapResult bootstrapResult =
+                    tenantBootstrapService.bootstrapTenant(tenant.getId(), user.getId());
+            log.info("Tenant bootstrap completed: success={}, roles={}, menus={}, permissions={}, duration={}ms",
+                    bootstrapResult.isSuccess(),
+                    bootstrapResult.getRolesCreated(),
+                    bootstrapResult.getMenusCreated(),
+                    bootstrapResult.getPermissionsAssigned(),
+                    bootstrapResult.getDurationMs());
+        } else {
+            log.info("Test tenant already exists, skipping bootstrap and only refreshing plugin state");
+        }
 
         // 5.5 Install e2e-test-order plugin into the new test tenant so iOS/Playwright
         // tests can navigate to browse_e2et_order_list without manual intervention.
@@ -131,6 +126,11 @@ public class TestSeedController {
 
         // 6. Generate JWT
         String jwt = generateJwt(user, tenant.getId());
+
+        if (tenantExists && userExists) {
+            log.info("Test tenant already existed; refreshed bootstrap/plugin state: tenantId={}, userId={}",
+                    tenant.getId(), user.getId());
+        }
 
         SeedResult result = SeedResult.builder()
                 .tenantId(tenant.getId())
@@ -231,44 +231,50 @@ public class TestSeedController {
      * due to a missing plugin directory (e.g. CI environments without the full tree).
      */
     private void installE2eTestPlugin(Tenant tenant, User user) {
-        Path pluginDir = Path.of(System.getProperty("user.dir"))
-                .resolve("../plugins/e2e-test-order")
-                .normalize();
-
-        if (!pluginDir.toFile().isDirectory()) {
-            log.warn("e2e-test-order plugin directory not found at {}, skipping plugin install", pluginDir);
-            return;
-        }
-
         MetaContext.setContext(tenant.getId(), user.getId(), user.getPid(), user.getEmail());
         try {
-            ImportPreviewResult preview = pluginImportService.parseDirectory(pluginDir.toString());
-            if (!preview.isValid()) {
-                log.warn("e2e-test-order plugin parse failed: {}", preview.getErrors());
-                return;
-            }
-            ImportRequest importRequest = ImportRequest.builder()
-                    .importId(preview.getImportId())
-                    .conflictStrategy(ImportRequest.ConflictStrategy.OVERWRITE_SAFE)
-                    .autoPublishModels(true)
-                    .autoPublishFields(true)
-                    .autoPublishCommands(true)
-                    .autoPublishPages(true)
-                    .autoDeployProcesses(true)
-                    .build();
-            var result = pluginImportService.execute(preview.getImportId(), importRequest);
-            if (result.isSuccess()) {
-                log.info("e2e-test-order plugin installed for tenant {}: counts={}",
-                        tenant.getId(), result.getResourceCounts());
-            } else {
-                log.warn("e2e-test-order plugin install failed for tenant {}: {}",
-                        tenant.getId(), result.getErrorMessage());
-            }
+            importTestPlugin("../plugins/project-management", "project-management", tenant.getId());
+            importTestPlugin("../plugins/e2e-test-order", "e2e-test-order", tenant.getId());
         } catch (Exception e) {
             log.warn("e2e-test-order plugin install threw exception for tenant {}: {}",
                     tenant.getId(), e.getMessage());
         } finally {
             MetaContext.clear();
+        }
+    }
+
+    private void importTestPlugin(String relativePath, String pluginName, Long tenantId) {
+        Path pluginDir = Path.of(System.getProperty("user.dir"))
+                .resolve(relativePath)
+                .normalize();
+
+        if (!pluginDir.toFile().isDirectory()) {
+            log.warn("{} plugin directory not found at {}, skipping plugin install", pluginName, pluginDir);
+            return;
+        }
+
+        ImportPreviewResult preview = pluginImportService.parseDirectory(pluginDir.toString());
+        if (!preview.isValid()) {
+            log.warn("{} plugin parse failed: {}", pluginName, preview.getErrors());
+            return;
+        }
+
+        ImportRequest importRequest = ImportRequest.builder()
+                .importId(preview.getImportId())
+                .conflictStrategy(ImportRequest.ConflictStrategy.OVERWRITE)
+                .autoPublishModels(true)
+                .autoPublishFields(true)
+                .autoPublishCommands(true)
+                .autoPublishPages(true)
+                .autoDeployProcesses(true)
+                .build();
+        var result = pluginImportService.execute(preview.getImportId(), importRequest);
+        if (result.isSuccess()) {
+            log.info("{} plugin installed for tenant {}: counts={}",
+                    pluginName, tenantId, result.getResourceCounts());
+        } else {
+            log.warn("{} plugin install failed for tenant {}: {}",
+                    pluginName, tenantId, result.getErrorMessage());
         }
     }
 

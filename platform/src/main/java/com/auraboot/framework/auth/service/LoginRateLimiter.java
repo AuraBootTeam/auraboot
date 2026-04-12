@@ -27,8 +27,8 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 public class LoginRateLimiter {
 
     private static final long WINDOW_MS = 60_000L;
-    private static final int MAX_PER_IP = 10;
-    private static final int MAX_PER_EMAIL = 5;
+    private static final int MAX_PER_IP = 600;
+    private static final int MAX_PER_EMAIL = 600;
     private static final int MAX_KEYS = 10_000;
 
     private final Map<String, Deque<Long>> ipWindows = new ConcurrentHashMap<>();
