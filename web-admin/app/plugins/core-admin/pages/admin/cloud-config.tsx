@@ -17,7 +17,7 @@ import {
   ConfigEditorModal,
   type ServiceType,
   type ConfigLevel,
-} from './cloud-config-core';
+} from '~/shared/admin/cloud-config-core';
 
 // ---------------------------------------------------------------------------
 // Page-specific constants
