@@ -1,0 +1,170 @@
+[
+  {
+    "code": "org_structure",
+    "parentCode": "org_management",
+    "name:zh-CN": "组织架构",
+    "name:en": "Organization Structure",
+    "path": "/enterprise/organization",
+    "component": null,
+    "icon": "IconHierarchy",
+    "type": 1,
+    "permissionCode": "org_management",
+    "orderNo": 48,
+    "visible": true,
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    }
+  },
+  {
+    "code": "admin_sla_config",
+    "parentCode": "bpm_management",
+    "name:zh-CN": "SLA 配置",
+    "name:en": "SLA Configuration",
+    "path": "/p/sla_config",
+    "pageKey": "sla_config_list",
+    "component": null,
+    "icon": "IconClock",
+    "type": 1,
+    "permissionCode": "admin_sla_config",
+    "orderNo": 30,
+    "visible": true,
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    }
+  },
+  {
+    "code": "admin_bpm_domain_config",
+    "parentCode": "bpm_management",
+    "name:zh-CN": "域配置",
+    "name:en": "Domain Configuration",
+    "path": "/p/bpm_domain_config",
+    "pageKey": "bpm_domain_config_list",
+    "component": null,
+    "icon": "IconSettings",
+    "type": 1,
+    "permissionCode": "admin_bpm_domain_config",
+    "orderNo": 40,
+    "visible": true,
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    }
+  },
+  {
+    "code": "admin_data_permission",
+    "parentCode": "system_management",
+    "name:zh-CN": "数据权限",
+    "name:en": "Data Permissions",
+    "path": "/p/data_permission",
+    "component": null,
+    "icon": "IconShieldCheck",
+    "type": 1,
+    "permissionCode": "admin_data_permission",
+    "orderNo": 20,
+    "visible": true,
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    },
+    "pageKey": "data_permission_list"
+  },
+  {
+    "code": "admin_webhook",
+    "parentCode": "system_management",
+    "name:zh-CN": "Webhook 订阅",
+    "name:en": "Webhook Subscriptions",
+    "path": "/p/webhook",
+    "component": null,
+    "icon": "IconWebhook",
+    "type": 1,
+    "permissionCode": "admin_webhook",
+    "orderNo": 10,
+    "visible": true,
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    },
+    "pageKey": "webhook_list"
+  },
+  {
+    "code": "admin_api_connector",
+    "parentCode": "system_management",
+    "name:zh-CN": "API 连接器",
+    "name:en": "API Connectors",
+    "path": "/p/api_connector",
+    "component": null,
+    "icon": "IconApi",
+    "type": 1,
+    "permissionCode": "admin_api_connector",
+    "orderNo": 20,
+    "visible": true,
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    },
+    "pageKey": "api_connector_list"
+  },
+  {
+    "code": "plugin_marketplace",
+    "parentCode": "system_management",
+    "name:zh-CN": "插件市场",
+    "name:en": "Plugin Marketplace",
+    "path": "/marketplace",
+    "component": null,
+    "icon": "IconShoppingBag",
+    "type": 1,
+    "permissionCode": "plugin_marketplace",
+    "orderNo": 50,
+    "visible": true,
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    }
+  },
+  {
+    "code": "admin_scheduled_task",
+    "parentCode": "system_management",
+    "name:zh-CN": "定时任务",
+    "name:en": "Scheduled Tasks",
+    "path": "/p/scheduled_task",
+    "component": null,
+    "icon": "IconClock",
+    "type": 1,
+    "permissionCode": "admin_scheduled_task",
+    "orderNo": 60,
+    "visible": true,
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    },
+    "pageKey": "scheduled_task_list"
+  },
+  {
+    "code": "template_gallery",
+    "parentCode": "system_management",
+    "name:zh-CN": "模板中心",
+    "name:en": "Template Center",
+    "path": "/admin/templates",
+    "component": null,
+    "icon": "IconRocket",
+    "type": 1,
+    "permissionCode": "system_management",
+    "orderNo": 45,
+    "visible": true,
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    }
+  }
+]

@@ -1,0 +1,31 @@
+{
+  "pluginId": "com.auraboot.platform-admin",
+  "namespace": "admin",
+  "version": "1.0.0",
+  "dslVersion": 1,
+  "pluginType": "config",
+  "displayName": "Platform Admin DSL Pages",
+  "displayName:zh-CN": "平台管理 DSL 页面",
+  "displayName:en": "Platform Admin DSL Pages",
+  "description": "DSL-driven admin pages for SLA Config, BPM Domain Config, Data Permission, Webhook, and API Connector",
+  "author": "AuraBoot Team",
+  "minPlatformVersion": "1.0.0",
+  "dependencies": [],
+  "resourceDirs": {
+    "dicts": "config/dicts.json",
+    "fields": "config/fields.json",
+    "models": "config/models.json",
+    "modelFieldBindings": "config/bindings.json",
+    "commands": "config/commands.json",
+    "permissions": "config/permissions.json",
+    "menus": "config/menus.json",
+    "pages": "config/pages.json",
+    "i18n": "config/i18n.json"
+  },
+  "importOptions": {
+    "conflictStrategy": "overwrite",
+    "validateReferences": true,
+    "autoPublishPages": true,
+    "createResourcePermissions": true
+  }
+}
