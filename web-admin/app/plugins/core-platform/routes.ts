@@ -1,10 +1,7 @@
 import { route, type RouteConfigEntry } from '@react-router/dev/routes'
+import { toRouteEntries } from '../_shared/types.js'
+import { RESOURCES } from './resources.js'
 
 export function platformRoutes(): RouteConfigEntry[] {
-  return [
-    route('/system/plugins', './plugins/core-platform/pages/system/plugins/index.tsx'),
-    // Kernel Plugin Manager — visualizes the in-process PluginLoader
-    // (M4.3). Distinct from /system/plugins (backend PF4J management).
-    route('/system/kernel-plugins', './plugins/core-platform/pages/KernelPluginsPage.tsx'),
-  ]
+  return toRouteEntries(RESOURCES, (path, file) => route(path, file))
 }
