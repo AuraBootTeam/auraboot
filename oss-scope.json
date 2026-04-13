@@ -80,6 +80,25 @@
     "tests/e2e/cross-module/**"
   ],
 
+  "test_excludes": [
+    "tests/e2e/dashboard/dashboard-designer.spec.ts",
+    "tests/e2e/dashboard/dashboard-designer-deep.spec.ts",
+    "tests/e2e/dashboard/dashboard-widget-types.spec.ts",
+    "tests/e2e/dashboard/dashboard-charts.spec.ts",
+    "tests/e2e/dashboard/dashboard-export.spec.ts",
+    "tests/e2e/designer/dashboard-designer-deep.spec.ts",
+    "tests/e2e/designer/report-designer-deep.spec.ts",
+    "tests/e2e/plugin/pm-error-branches.spec.ts",
+    "tests/e2e/plugin/pm-master-data.spec.ts",
+    "tests/e2e/plugin/pm-member-management.spec.ts",
+    "tests/e2e/plugin/pm-my-tasks.spec.ts",
+    "tests/e2e/plugin/pm-project-lifecycle.spec.ts",
+    "tests/e2e/plugin/pm-smoke.spec.ts",
+    "tests/e2e/plugin/pm-task-associations.spec.ts",
+    "tests/e2e/plugin/pm-workspace-interactions.spec.ts",
+    "tests/e2e/plugin/pcba-plugin.spec.ts"
+  ],
+
   "excluded_paths_examples": [
     "tests/e2e/crm/**",
     "tests/e2e/sales/**",
