@@ -27,7 +27,7 @@ import { initRegistry } from '~/plugins/core-designer/components/studio/registry
 // the full registry before any component renders.
 initRegistry();
 import type { DslV4Schema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
-import { CURRENT_SCHEMA_VERSION } from '~/meta/migration';
+import { CURRENT_SCHEMA_VERSION } from '~/framework/meta/migration';
 import type { CanvasBlock } from '~/plugins/core-designer/components/studio/domain/canvas/types';
 import { useCanvasBlocks } from '~/plugins/core-designer/components/studio/hooks/canvas/useCanvasBlocks';
 import { useCanvasDnd } from '~/plugins/core-designer/components/studio/hooks/canvas/useCanvasDnd';

@@ -19,7 +19,7 @@ import { useLoaderData } from 'react-router';
 import { getTokenFromRequest } from '~/services/session';
 import { fetchResult } from '~/services/http-client';
 import { ResultHelper } from '~/utils/type';
-import { DynamicPageRenderer } from '~/meta/rendering/pages/DynamicPageRenderer';
+import { DynamicPageRenderer } from '~/framework/meta/rendering/pages/DynamicPageRenderer';
 
 interface MenuInfo {
   pid: string;

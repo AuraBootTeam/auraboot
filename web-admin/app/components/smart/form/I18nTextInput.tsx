@@ -30,7 +30,7 @@ import {
   I18N_SUPPORTED_LOCALES,
   extractI18nValues,
   buildI18nPatch,
-} from '~/meta/utils/i18nFieldHelper';
+} from '~/framework/meta/utils/i18nFieldHelper';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

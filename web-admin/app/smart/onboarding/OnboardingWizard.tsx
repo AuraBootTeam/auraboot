@@ -2,8 +2,8 @@ import React, { useState, useCallback, useMemo } from 'react';
 import { cn } from '~/utils/cn';
 import { useI18n } from '~/contexts/I18nContext';
 import { ONBOARDING_KEYS } from './i18nKeys';
-import { fieldPresetGroups, type FieldPreset } from '~/meta/fields/fieldPresets';
-import { commandTemplates, type CommandTemplate } from '~/meta/commands/commandTemplates';
+import { fieldPresetGroups, type FieldPreset } from '~/framework/meta/fields/fieldPresets';
+import { commandTemplates, type CommandTemplate } from '~/framework/meta/commands/commandTemplates';
 
 // ---------------------------------------------------------------------------
 // Types

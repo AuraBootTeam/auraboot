@@ -7,7 +7,7 @@
  */
 
 import { generateTestSpec } from './TestGenerator';
-import type { TemplateModelMeta } from '../../app/meta/templates/types';
+import type { TemplateModelMeta } from '../../app/framework/meta/templates/types';
 
 // Example model definition
 const storeModel: TemplateModelMeta = {

@@ -6,7 +6,7 @@
  */
 
 import React, { useMemo } from 'react';
-import { sanitizeHtml } from '~/meta/utils/sanitizeHtml';
+import { sanitizeHtml } from '~/framework/meta/utils/sanitizeHtml';
 import { cn } from '~/utils/cn';
 
 export interface SmartRichTextProps {

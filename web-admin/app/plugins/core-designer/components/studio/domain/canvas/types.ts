@@ -1,4 +1,4 @@
-import type { LocalizedText, BlockLayoutConfig, LayoutConfig } from '~/meta/schemas/types';
+import type { LocalizedText, BlockLayoutConfig, LayoutConfig } from '~/framework/meta/schemas/types';
 
 export interface BlockDataSource {
   type: 'model' | 'namedQuery' | 'api';

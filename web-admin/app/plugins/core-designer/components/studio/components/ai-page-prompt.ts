@@ -7,7 +7,7 @@
  * @since 4.1.0
  */
 
-import { CURRENT_SCHEMA_VERSION } from '~/meta/migration';
+import { CURRENT_SCHEMA_VERSION } from '~/framework/meta/migration';
 
 /**
  * Options for building a context-aware prompt (multi-turn).

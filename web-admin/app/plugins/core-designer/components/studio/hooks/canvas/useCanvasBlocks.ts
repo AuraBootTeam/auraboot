@@ -9,7 +9,7 @@
 
 import { useState, useCallback, useMemo } from 'react';
 import type { CanvasBlock } from '~/plugins/core-designer/components/studio/domain/canvas/types';
-import type { BlockLayoutConfig } from '~/meta/schemas/types';
+import type { BlockLayoutConfig } from '~/framework/meta/schemas/types';
 import { BlockRegistry } from '~/plugins/core-designer/components/studio/registry';
 
 let blockCounter = 0;

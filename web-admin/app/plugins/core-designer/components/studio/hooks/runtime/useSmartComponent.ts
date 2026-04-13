@@ -8,9 +8,9 @@ import {
   expressionEvaluator,
   bind as bindExpression,
   evaluateCondition as evaluateDslCondition,
-} from '~/meta/runtime/expression/evaluator';
-import { createExpressionContext } from '~/meta/runtime/expression/context';
-import type { ExpressionContext } from '~/meta/runtime/expression/context';
+} from '~/framework/meta/runtime/expression/evaluator';
+import { createExpressionContext } from '~/framework/meta/runtime/expression/context';
+import type { ExpressionContext } from '~/framework/meta/runtime/expression/context';
 
 // 基础类型定义
 export interface ValidationRule {
