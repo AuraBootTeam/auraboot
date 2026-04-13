@@ -1,0 +1,7 @@
+[
+  { "modelCode": "org_position", "fieldCode": "org_pos_code", "sequence": 1, "required": false, "visible": true, "editable": true },
+  { "modelCode": "org_position", "fieldCode": "org_pos_name", "sequence": 2, "required": true, "visible": true, "editable": true },
+  { "modelCode": "org_position", "fieldCode": "org_pos_dept_id", "sequence": 3, "required": true, "visible": true, "editable": true },
+  { "modelCode": "org_position", "fieldCode": "org_pos_level", "sequence": 4, "required": true, "visible": true, "editable": true },
+  { "modelCode": "org_position", "fieldCode": "org_pos_status", "sequence": 5, "required": false, "visible": true, "editable": true }
+]

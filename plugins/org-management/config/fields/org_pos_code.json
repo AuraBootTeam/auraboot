@@ -1,0 +1,8 @@
+{
+  "code": "org_pos_code",
+  "displayName:zh-CN": "岗位编码",
+  "displayName:en": "Position Code",
+  "dataType": "string",
+  "constraints": { "maxLength": 50 },
+  "feature": { "searchable": true, "sortable": true }
+}

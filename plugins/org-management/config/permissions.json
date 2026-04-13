@@ -1,0 +1,18 @@
+[
+  {
+    "code": "org.hr.read",
+    "name:zh-CN": "Organization View",
+    "name:en": "Organization View",
+    "description": "View departments, positions, employees",
+    "resourceType": "data",
+    "module": "organization"
+  },
+  {
+    "code": "org.hr.manage",
+    "name:zh-CN": "Organization Management",
+    "name:en": "Organization Management",
+    "description": "Create, edit, delete departments, positions, employees",
+    "resourceType": "operation",
+    "module": "organization"
+  }
+]

@@ -1,0 +1,8 @@
+[
+  { "modelCode": "org_department", "fieldCode": "org_dept_code", "sequence": 1, "required": false, "visible": true, "editable": false },
+  { "modelCode": "org_department", "fieldCode": "org_dept_name", "sequence": 2, "required": true, "visible": true, "editable": true },
+  { "modelCode": "org_department", "fieldCode": "org_dept_parent_id", "sequence": 3, "required": false, "visible": true, "editable": true },
+  { "modelCode": "org_department", "fieldCode": "org_dept_manager_id", "sequence": 4, "required": false, "visible": true, "editable": true },
+  { "modelCode": "org_department", "fieldCode": "org_dept_order", "sequence": 5, "required": false, "visible": true, "editable": true },
+  { "modelCode": "org_department", "fieldCode": "org_dept_status", "sequence": 6, "required": false, "visible": true, "editable": true }
+]

@@ -1,0 +1,105 @@
+{
+  "pageKey": "org_department_form",
+  "name:zh-CN": "Department Form",
+  "name:en": "Department Form",
+  "modelCode": "org_department",
+  "description": "Department create/edit form",
+  "kind": "form",
+  "schemaVersion": 2,
+  "layout": {
+    "type": "grid",
+    "cols": 12,
+    "gap": 12
+  },
+  "blocks": [
+    {
+      "id": "block_dept_basic",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "Basic Information",
+        "en": "Basic Information"
+      },
+      "layout": {
+        "colSpan": 12,
+        "rowSpan": 1
+      },
+      "columns": 2,
+      "fields": [
+        {
+          "field": "org_dept_name",
+          "layout": {
+            "colSpan": 6,
+            "rowSpan": 1
+          }
+        },
+        {
+          "field": "org_dept_code",
+          "readOnly": true,
+          "layout": {
+            "colSpan": 6,
+            "rowSpan": 1
+          }
+        },
+        {
+          "field": "org_dept_parent_id",
+          "layout": {
+            "colSpan": 6,
+            "rowSpan": 1
+          }
+        },
+        {
+          "field": "org_dept_manager_id",
+          "layout": {
+            "colSpan": 6,
+            "rowSpan": 1
+          }
+        },
+        {
+          "field": "org_dept_order",
+          "layout": {
+            "colSpan": 6,
+            "rowSpan": 1
+          }
+        },
+        {
+          "field": "org_dept_status",
+          "layout": {
+            "colSpan": 6,
+            "rowSpan": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "block_dept_actions",
+      "blockType": "form-buttons",
+      "layout": {
+        "colSpan": 12,
+        "rowSpan": 1
+      },
+      "buttons": [
+        {
+          "code": "save",
+          "primary": true,
+          "label": "save",
+          "action": {
+            "type": "command",
+            "command": "org:create_department"
+          }
+        },
+        {
+          "code": "cancel",
+          "label": "cancel",
+          "action": {
+            "type": "builtin",
+            "name": "back"
+          }
+        }
+      ]
+    }
+  ],
+  "title": {
+    "zh-CN": "Department Form",
+    "en": "Department Form"
+  }
+}

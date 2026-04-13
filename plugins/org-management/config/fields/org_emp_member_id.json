@@ -1,0 +1,17 @@
+{
+  "code": "org_emp_member_id",
+  "displayName:zh-CN": "关联成员",
+  "displayName:en": "Linked Member",
+  "dataType": "reference",
+  "refTarget": {
+    "targetModel": "ab_tenant_member",
+    "targetField": "pid"
+  },
+  "constraints": {
+    "required": false
+  },
+  "feature": {
+    "searchable": false,
+    "sortable": false
+  }
+}

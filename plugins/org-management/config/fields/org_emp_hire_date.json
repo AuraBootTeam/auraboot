@@ -1,0 +1,6 @@
+{
+  "code": "org_emp_hire_date",
+  "displayName:zh-CN": "入职日期",
+  "displayName:en": "Hire Date",
+  "dataType": "date"
+}

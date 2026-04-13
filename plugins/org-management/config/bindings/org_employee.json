@@ -1,0 +1,14 @@
+[
+  { "modelCode": "org_employee", "fieldCode": "org_emp_code", "sequence": 1, "required": false, "visible": true, "editable": false },
+  { "modelCode": "org_employee", "fieldCode": "org_emp_user_id", "sequence": 2, "required": true, "visible": true, "editable": true },
+  { "modelCode": "org_employee", "fieldCode": "org_emp_name", "sequence": 3, "required": true, "visible": true, "editable": true },
+  { "modelCode": "org_employee", "fieldCode": "org_emp_dept_id", "sequence": 4, "required": true, "visible": true, "editable": true },
+  { "modelCode": "org_employee", "fieldCode": "org_emp_position_id", "sequence": 5, "required": true, "visible": true, "editable": true },
+  { "modelCode": "org_employee", "fieldCode": "org_emp_report_to", "sequence": 6, "required": false, "visible": true, "editable": true },
+  { "modelCode": "org_employee", "fieldCode": "org_emp_phone", "sequence": 7, "required": false, "visible": true, "editable": true },
+  { "modelCode": "org_employee", "fieldCode": "org_emp_email", "sequence": 8, "required": false, "visible": true, "editable": true },
+  { "modelCode": "org_employee", "fieldCode": "org_emp_hire_date", "sequence": 9, "required": false, "visible": true, "editable": true },
+  { "modelCode": "org_employee", "fieldCode": "org_emp_status", "sequence": 10, "required": false, "visible": true, "editable": true },
+  { "modelCode": "org_employee", "fieldCode": "org_emp_member_id", "sequence": 11, "required": false, "visible": false, "editable": false },
+  { "modelCode": "org_employee", "fieldCode": "org_emp_type", "sequence": 12, "required": false, "visible": true, "editable": true }
+]

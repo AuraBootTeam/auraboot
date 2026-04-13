@@ -1,0 +1,191 @@
+[
+  {
+    "key": "model.org_department._meta.label",
+    "zh-CN": "部门",
+    "en-US": "Department",
+    "source": "import",
+    "refType": "model"
+  },
+  {
+    "key": "model.org_position._meta.label",
+    "zh-CN": "岗位",
+    "en-US": "Position",
+    "source": "import",
+    "refType": "model"
+  },
+  {
+    "key": "model.org_employee._meta.label",
+    "zh-CN": "员工",
+    "en-US": "Employee",
+    "source": "import",
+    "refType": "model"
+  },
+  {
+    "key": "model.org_department.org_dept_code.label",
+    "zh-CN": "部门编码",
+    "en-US": "Department Code",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.org_department.org_dept_name.label",
+    "zh-CN": "部门名称",
+    "en-US": "Department Name",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.org_department.org_dept_parent_id.label",
+    "zh-CN": "上级部门",
+    "en-US": "Parent Department",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.org_department.org_dept_manager_id.label",
+    "zh-CN": "部门负责人",
+    "en-US": "Department Manager",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.org_department.org_dept_order.label",
+    "zh-CN": "排序",
+    "en-US": "Sort Order",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.org_department.org_dept_status.label",
+    "zh-CN": "状态",
+    "en-US": "Status",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.org_position.org_pos_code.label",
+    "zh-CN": "岗位编码",
+    "en-US": "Position Code",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.org_position.org_pos_name.label",
+    "zh-CN": "岗位名称",
+    "en-US": "Position Name",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.org_position.org_pos_dept_id.label",
+    "zh-CN": "所属部门",
+    "en-US": "Department",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.org_position.org_pos_level.label",
+    "zh-CN": "岗位等级",
+    "en-US": "Position Level",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.org_position.org_pos_status.label",
+    "zh-CN": "状态",
+    "en-US": "Status",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.org_employee.org_emp_code.label",
+    "zh-CN": "员工编码",
+    "en-US": "Employee Code",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.org_employee.org_emp_user_id.label",
+    "zh-CN": "系统用户",
+    "en-US": "System User",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.org_employee.org_emp_name.label",
+    "zh-CN": "姓名",
+    "en-US": "Name",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.org_employee.org_emp_dept_id.label",
+    "zh-CN": "所属部门",
+    "en-US": "Department",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.org_employee.org_emp_position_id.label",
+    "zh-CN": "岗位",
+    "en-US": "Position",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.org_employee.org_emp_report_to.label",
+    "zh-CN": "汇报对象",
+    "en-US": "Reports To",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.org_employee.org_emp_phone.label",
+    "zh-CN": "手机号",
+    "en-US": "Phone",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.org_employee.org_emp_email.label",
+    "zh-CN": "邮箱",
+    "en-US": "Email",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.org_employee.org_emp_hire_date.label",
+    "zh-CN": "入职日期",
+    "en-US": "Hire Date",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.org_employee.org_emp_status.label",
+    "zh-CN": "状态",
+    "en-US": "Status",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "menu.ORG_DEPARTMENTS.label",
+    "zh-CN": "部门管理",
+    "en-US": "Departments",
+    "source": "import",
+    "refType": "menu"
+  },
+  {
+    "key": "menu.ORG_POSITIONS.label",
+    "zh-CN": "岗位管理",
+    "en-US": "Positions",
+    "source": "import",
+    "refType": "menu"
+  },
+  {
+    "key": "menu.ORG_EMPLOYEES.label",
+    "zh-CN": "员工管理",
+    "en-US": "Employees",
+    "source": "import",
+    "refType": "menu"
+  }
+]

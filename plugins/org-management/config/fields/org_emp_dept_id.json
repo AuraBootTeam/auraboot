@@ -1,0 +1,9 @@
+{
+  "code": "org_emp_dept_id",
+  "displayName:zh-CN": "部门",
+  "displayName:en": "Department",
+  "dataType": "reference",
+  "constraints": { "required": true },
+  "refTarget": { "targetModel": "org_department", "targetField": "org_dept_name" },
+  "extension": { "placeholder:zh-CN": "请选择部门" }
+}

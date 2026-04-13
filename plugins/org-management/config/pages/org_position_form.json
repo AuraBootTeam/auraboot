@@ -1,0 +1,97 @@
+{
+  "pageKey": "org_position_form",
+  "name:zh-CN": "Position Form",
+  "name:en": "Position Form",
+  "modelCode": "org_position",
+  "description": "Position create/edit form",
+  "kind": "form",
+  "schemaVersion": 2,
+  "layout": {
+    "type": "grid",
+    "cols": 12,
+    "gap": 12
+  },
+  "blocks": [
+    {
+      "id": "block_pos_basic",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "Basic Information",
+        "en": "Basic Information"
+      },
+      "layout": {
+        "colSpan": 12,
+        "rowSpan": 1
+      },
+      "columns": 2,
+      "fields": [
+        {
+          "field": "org_pos_name",
+          "layout": {
+            "colSpan": 6,
+            "rowSpan": 1
+          }
+        },
+        {
+          "field": "org_pos_code",
+          "layout": {
+            "colSpan": 6,
+            "rowSpan": 1
+          }
+        },
+        {
+          "field": "org_pos_dept_id",
+          "layout": {
+            "colSpan": 6,
+            "rowSpan": 1
+          }
+        },
+        {
+          "field": "org_pos_level",
+          "layout": {
+            "colSpan": 6,
+            "rowSpan": 1
+          }
+        },
+        {
+          "field": "org_pos_status",
+          "layout": {
+            "colSpan": 6,
+            "rowSpan": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "block_pos_actions",
+      "blockType": "form-buttons",
+      "layout": {
+        "colSpan": 12,
+        "rowSpan": 1
+      },
+      "buttons": [
+        {
+          "code": "save",
+          "primary": true,
+          "label": "save",
+          "action": {
+            "type": "command",
+            "command": "org:create_position"
+          }
+        },
+        {
+          "code": "cancel",
+          "label": "cancel",
+          "action": {
+            "type": "builtin",
+            "name": "back"
+          }
+        }
+      ]
+    }
+  ],
+  "title": {
+    "zh-CN": "Position Form",
+    "en": "Position Form"
+  }
+}

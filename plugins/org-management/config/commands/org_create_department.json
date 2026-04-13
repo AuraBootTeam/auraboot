@@ -1,0 +1,13 @@
+{
+  "code": "org:create_department",
+  "displayName:zh-CN": "Create Department",
+  "displayName:en": "Create Department",
+  "description": "Create a new department with auto-generated code",
+  "type": "create",
+  "modelCode": "org_department",
+  "inputFields": ["org_dept_name", "org_dept_parent_id", "org_dept_manager_id", "org_dept_order", "org_dept_status"],
+  "autoSetFields": {
+    "org_dept_code": { "strategy": "auto_generate", "pattern": "DEPT-{yyyyMMdd}-{seq}" }
+  },
+  "permissions": ["ORG.hr.manage"]
+}
