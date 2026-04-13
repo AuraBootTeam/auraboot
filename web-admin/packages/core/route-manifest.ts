@@ -25,6 +25,7 @@ import { settingsRoutes } from '../../app/plugins/core-settings/routes';
 import { platformRoutes as platformPluginRoutes } from '../../app/plugins/core-platform/routes';
 import { adminRoutes } from '../../app/plugins/core-admin/routes';
 import { opsRoutes } from '../../app/plugins/core-ops/routes';
+import { dashboardRoutes } from '../../app/plugins/core-dashboard/routes';
 
 /**
  * Core routes — included in ALL editions (community, enterprise, website).
@@ -45,6 +46,7 @@ export function coreRoutes() {
     ...platformPluginRoutes(),
     ...adminRoutes(),
     ...opsRoutes(),
+    ...dashboardRoutes(),
 
     // Page routes — /p/:pageKey based (V2, underscores)
     route('/p/:pageKey', './routes/p.$pageKey.tsx'),
