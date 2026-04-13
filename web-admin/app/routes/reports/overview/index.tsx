@@ -13,9 +13,9 @@ import { ArrowPathIcon, PencilSquareIcon } from '@heroicons/react/24/outline';
 import { ChartBarSquareIcon } from '@heroicons/react/24/outline';
 import { ExportPdfButton } from '~/smart/components/data-tools/ExportPdfButton';
 import { useToastContext } from '~/contexts/ToastContext';
-import { DashboardViewer } from '~/dashboard-designer/components/DashboardViewer';
-import { dashboardService } from '~/dashboard-designer/services/dashboardService';
-import type { Dashboard } from '~/dashboard-designer/types';
+import { DashboardViewer } from '~/plugins/core-dashboard/components/DashboardViewer';
+import { dashboardService } from '~/plugins/core-dashboard/services/dashboardService';
+import type { Dashboard } from '~/plugins/core-dashboard/types';
 
 const OVERVIEW_DASHBOARD_CODE = 'system_overview';
 
