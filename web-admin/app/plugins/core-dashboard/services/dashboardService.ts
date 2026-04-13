@@ -652,9 +652,21 @@ export const dashboardService = {
   /**
    * Get or create the current user's personal workbench dashboard.
    */
-  async getWorkbench(): Promise<Dashboard> {
-    const raw = await request<Dashboard>('/workbench');
-    return normalizeDashboard(raw);
+  async getWorkbench(): Promise<Dashboard | null> {
+    try {
+      const raw = await request<Dashboard>('/workbench');
+      return normalizeDashboard(raw);
+    } catch (err: unknown) {
+      // OSS backend does not implement /api/dashboards/workbench yet; enterprise
+      // adds it as part of ent-dashboard-workbench. Treat not-found / 500 as
+      // "no workbench configured" so the home page shows the empty-state CTA
+      // instead of a permanent error.
+      const msg = err instanceof Error ? err.message : '';
+      if (/404|not\s*found|noresource|internal system error/i.test(msg)) {
+        return null;
+      }
+      throw err;
+    }
   },
 
   /**
