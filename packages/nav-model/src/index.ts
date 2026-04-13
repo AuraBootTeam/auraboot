@@ -10,6 +10,7 @@ export type {
   RouteRegistry,
   RouteTree,
   RouteNode,
+  RegistryUser,
 } from './registry.js'
 
 export type {
