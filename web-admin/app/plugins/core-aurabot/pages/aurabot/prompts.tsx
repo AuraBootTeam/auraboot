@@ -24,7 +24,7 @@ import {
   type CloudConfig,
   type ServiceType,
   type ConfigLevel,
-} from '~/plugins/core-admin/pages/admin/cloud-config-core';
+} from '~/shared/admin/cloud-config-core';
 
 // ---------------------------------------------------------------------------
 // Constants
