@@ -1,4 +1,4 @@
-import TemplatePointers from '~/pages/custom_components/TemplatePointers';
+import TemplatePointers from '~/framework/pages/custom_components/TemplatePointers';
 
 function LandingIntro() {
   return (
