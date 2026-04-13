@@ -16,7 +16,7 @@ import {
   type ConsistencyRule,
   type ConsistencyRuleRequest,
   type PaginatedRules,
-} from '../../../services/consistencyRuleService';
+} from '~/services/consistencyRuleService';
 
 const AGGREGATION_OPTIONS = [
   { value: 'sum', label: 'sum' },

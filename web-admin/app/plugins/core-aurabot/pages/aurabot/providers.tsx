@@ -27,7 +27,7 @@ import {
   type CloudConfig,
   type ConfigLevel,
   type ServiceType,
-} from '~/routes/admin/cloud-config-core';
+} from '~/plugins/core-admin/pages/admin/cloud-config-core';
 import { useToastContext } from '~/contexts/ToastContext';
 import { post } from '~/services/http-client';
 import { ResultHelper } from '~/utils/type';
