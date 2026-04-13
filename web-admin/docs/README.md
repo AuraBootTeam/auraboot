@@ -268,8 +268,8 @@ Smart 组件渲染（共享 useSmartComponent hook）
 
 #### 根因 3：启动进程仍指向旧工作区
 
-- 最初 `localhost:5173` 实际运行的是 `/Users/ghj/work/startup/phenix/AuraMeta/web-admin`
-- 不是当前仓库 `/Users/ghj/work/auraboot/auraboot-enterprise/web-admin`
+- 最初 `localhost:5173` 实际运行的是历史工作区目录的 `web-admin`
+- 不是当前仓库的 `web-admin`
 - 因此即使在当前仓库修复了路由，浏览器里也不会立即生效
 
 #### 根因 4：拆分后缺少前端依赖

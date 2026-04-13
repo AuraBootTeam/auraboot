@@ -61,3 +61,4 @@ tests/storage/admin.json
 
 # Auto-generated plugin public routes
 app/plugins/_public-routes.ts
+vite.config.ts.timestamp-*.mjs
