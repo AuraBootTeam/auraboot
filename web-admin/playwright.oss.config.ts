@@ -8,9 +8,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const scopePath = resolve(__dirname, '../oss-scope.json');
 const scope = JSON.parse(readFileSync(scopePath, 'utf-8')) as {
   test_paths: string[];
+  test_excludes?: string[];
 };
 
-function toTestMatch(entries: string[]): RegExp[] {
+function toRegex(entries: string[]): RegExp[] {
   return entries.map((entry) => {
     const trimmed = entry.replace(/\/\*\*$/, '');
     const escaped = trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -20,7 +21,8 @@ function toTestMatch(entries: string[]): RegExp[] {
   });
 }
 
-const ossTestMatch = toTestMatch(scope.test_paths);
+const ossTestMatch = toRegex(scope.test_paths);
+const ossTestIgnore = toRegex(scope.test_excludes ?? []);
 
 /**
  * OSS-scoped Playwright configuration.
@@ -40,6 +42,7 @@ export default defineConfig({
     return {
       ...project,
       testMatch: ossTestMatch,
+      testIgnore: [...(Array.isArray(project.testIgnore) ? project.testIgnore : project.testIgnore ? [project.testIgnore] : []), ...ossTestIgnore],
     };
   }),
 });
