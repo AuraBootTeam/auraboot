@@ -1,0 +1,151 @@
+[
+  {
+    "code": "acs_req_code",
+    "displayName:zh-CN": "请求编号",
+    "displayName:en": "Request Code",
+    "dataType": "string",
+    "constraints": { "required": true, "maxLength": 30 },
+    "feature": { "searchable": true, "sortable": true }
+  },
+  {
+    "code": "acs_req_title",
+    "displayName:zh-CN": "请求标题",
+    "displayName:en": "Request Title",
+    "dataType": "string",
+    "constraints": { "required": true, "maxLength": 200 },
+    "feature": { "searchable": true, "sortable": true }
+  },
+  {
+    "code": "acs_req_nl_input",
+    "displayName:zh-CN": "自然语言输入",
+    "displayName:en": "Natural Language Input",
+    "dataType": "text",
+    "constraints": { "required": true, "maxLength": 2000 },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "acs_req_status",
+    "displayName:zh-CN": "状态",
+    "displayName:en": "Status",
+    "dataType": "enum",
+    "dictCode": "acs_demo_request_status",
+    "defaultValue": "draft",
+    "constraints": { "required": true },
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "acs_req_risk_level",
+    "displayName:zh-CN": "风险等级",
+    "displayName:en": "Risk Level",
+    "dataType": "enum",
+    "dictCode": "acs_risk_level",
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "acs_req_category",
+    "displayName:zh-CN": "请求类别",
+    "displayName:en": "Category",
+    "dataType": "enum",
+    "dictCode": "acs_demo_category"
+  },
+  {
+    "code": "acs_req_priority",
+    "displayName:zh-CN": "优先级",
+    "displayName:en": "Priority",
+    "dataType": "enum",
+    "dictCode": "acs_task_priority",
+    "defaultValue": "medium"
+  },
+  {
+    "code": "acs_req_skill_used",
+    "displayName:zh-CN": "使用的技能",
+    "displayName:en": "Skill Used",
+    "dataType": "string",
+    "constraints": { "maxLength": 200 }
+  },
+  {
+    "code": "acs_req_total_cost",
+    "displayName:zh-CN": "累计成本",
+    "displayName:en": "Total Cost",
+    "dataType": "decimal",
+    "extension": { "precision": 10, "scale": 4, "currencySymbol": "$" }
+  },
+  {
+    "code": "acs_req_token_count",
+    "displayName:zh-CN": "Token 消耗",
+    "displayName:en": "Token Count",
+    "dataType": "integer",
+    "constraints": { "min": 0 }
+  },
+  {
+    "code": "acs_req_tool_calls",
+    "displayName:zh-CN": "工具调用次数",
+    "displayName:en": "Tool Calls",
+    "dataType": "integer",
+    "constraints": { "min": 0 }
+  },
+  {
+    "code": "acs_req_duration_ms",
+    "displayName:zh-CN": "处理耗时(ms)",
+    "displayName:en": "Duration (ms)",
+    "dataType": "integer",
+    "constraints": { "min": 0 },
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "acs_req_grounding_result",
+    "displayName:zh-CN": "D1 Grounding 结果",
+    "displayName:en": "D1 Grounding Result",
+    "dataType": "text",
+    "constraints": { "maxLength": 10000 }
+  },
+  {
+    "code": "acs_req_plan",
+    "displayName:zh-CN": "执行计划",
+    "displayName:en": "Execution Plan",
+    "dataType": "text",
+    "constraints": { "maxLength": 10000 }
+  },
+  {
+    "code": "acs_req_safety_triggers",
+    "displayName:zh-CN": "安全阀门触发记录",
+    "displayName:en": "Safety Triggers",
+    "dataType": "text",
+    "constraints": { "maxLength": 5000 }
+  },
+  {
+    "code": "acs_req_outcome",
+    "displayName:zh-CN": "执行结果",
+    "displayName:en": "Outcome",
+    "dataType": "text",
+    "constraints": { "maxLength": 5000 }
+  },
+  {
+    "code": "acs_req_error_message",
+    "displayName:zh-CN": "错误详情",
+    "displayName:en": "Error Message",
+    "dataType": "text",
+    "constraints": { "maxLength": 5000 }
+  },
+  {
+    "code": "acs_req_run_id",
+    "displayName:zh-CN": "关联 Run ID",
+    "displayName:en": "Run ID",
+    "dataType": "string",
+    "constraints": { "maxLength": 64 }
+  },
+  {
+    "code": "acs_req_submitted_at",
+    "displayName:zh-CN": "提交时间",
+    "displayName:en": "Submitted At",
+    "dataType": "datetime",
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "acs_req_completed_at",
+    "displayName:zh-CN": "完成时间",
+    "displayName:en": "Completed At",
+    "dataType": "datetime",
+    "feature": { "sortable": true }
+  }
+]

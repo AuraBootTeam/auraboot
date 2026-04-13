@@ -1,0 +1,3485 @@
+[
+  {
+    "pageKey": "agent_definition_list",
+    "name:zh-CN": "Agent 定义",
+    "name:en": "Agent Definitions",
+    "modelCode": "agent_definition",
+    "kind": "list",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "stack"
+    },
+    "blocks": [
+      {
+        "id": "toolbar",
+        "blockType": "toolbar",
+        "buttons": [
+          {
+            "code": "create",
+            "variant": "primary",
+            "label": "create",
+            "action": {
+              "type": "navigate",
+              "to": "agent_definition_form",
+              "command": "acp:create_agent_definition"
+            }
+          }
+        ]
+      },
+      {
+        "id": "table",
+        "blockType": "table",
+        "columns": [
+          {
+            "field": "agent_code",
+            "width": 150,
+            "sortable": true
+          },
+          {
+            "field": "name",
+            "width": 200,
+            "sortable": true
+          },
+          {
+            "field": "agent_type",
+            "width": 140,
+            "renderType": "tag"
+          },
+          {
+            "field": "model",
+            "width": 160,
+            "renderType": "tag"
+          },
+          {
+            "field": "status",
+            "width": 100,
+            "renderType": "tag"
+          },
+          {
+            "field": "created_at",
+            "width": 160,
+            "format": "YYYY-MM-DD HH:mm"
+          }
+        ],
+        "rowActions": [
+          {
+            "code": "edit",
+            "label": "edit",
+            "action": {
+              "type": "navigate",
+              "to": "agent_definition_form",
+              "command": "acp:update_agent_definition"
+            }
+          },
+          {
+            "code": "delete",
+            "variant": "danger",
+            "label": "delete",
+            "confirm": "delete.confirm",
+            "action": {
+              "type": "command",
+              "command": "acp:delete_agent_definition"
+            }
+          }
+        ],
+        "defaultSort": {
+          "field": "created_at",
+          "order": "desc"
+        }
+      }
+    ]
+  },
+  {
+    "pageKey": "agent_definition_form",
+    "name:zh-CN": "Agent 定义表单",
+    "name:en": "Agent Definition Form",
+    "modelCode": "agent_definition",
+    "kind": "form",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "grid",
+      "cols": 12
+    },
+    "blocks": [
+      {
+        "id": "basic",
+        "blockType": "form-section",
+        "title": {
+          "zh-CN": "基本信息",
+          "en-US": "Basic Information"
+        },
+        "fields": [
+          {
+            "field": "agent_code",
+            "colSpan": 6
+          },
+          {
+            "field": "name",
+            "colSpan": 6
+          },
+          {
+            "field": "agent_type",
+            "colSpan": 4
+          },
+          {
+            "field": "model",
+            "colSpan": 4
+          },
+          {
+            "field": "status",
+            "colSpan": 4
+          },
+          {
+            "field": "avatar_url",
+            "colSpan": 12
+          },
+          {
+            "field": "description",
+            "colSpan": 12
+          },
+          {
+            "field": "system_prompt",
+            "colSpan": 12
+          },
+          {
+            "field": "tools",
+            "colSpan": 12
+          },
+          {
+            "field": "skills",
+            "colSpan": 12
+          },
+          {
+            "field": "guardrails",
+            "colSpan": 12
+          }
+        ]
+      },
+      {
+        "id": "soul_profile",
+        "blockType": "form-section",
+        "title": {
+          "zh-CN": "人格档案",
+          "en-US": "Soul Profile"
+        },
+        "fields": [
+          {
+            "field": "personality",
+            "colSpan": 6
+          },
+          {
+            "field": "expertise",
+            "colSpan": 6
+          },
+          {
+            "field": "communication_style",
+            "colSpan": 12
+          },
+          {
+            "field": "boundaries",
+            "colSpan": 12
+          },
+          {
+            "field": "soul_goals",
+            "colSpan": 12
+          }
+        ]
+      },
+      {
+        "id": "buttons",
+        "blockType": "form-buttons",
+        "buttons": [
+          {
+            "code": "submit",
+            "primary": true,
+            "label": "save",
+            "action": {
+              "type": "command",
+              "command": "acp:update_agent_definition"
+            }
+          },
+          {
+            "code": "cancel",
+            "label": "cancel"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "pageKey": "agent_definition_detail",
+    "name:zh-CN": "Agent 定义详情",
+    "name:en": "Agent Definition Detail",
+    "modelCode": "agent_definition",
+    "kind": "detail",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "grid",
+      "cols": 12
+    },
+    "blocks": [
+      {
+        "id": "basic",
+        "blockType": "form-section",
+        "title": {
+          "zh-CN": "基本信息",
+          "en-US": "Basic Information"
+        },
+        "fields": [
+          {
+            "field": "agent_code",
+            "colSpan": 6,
+            "readOnly": true
+          },
+          {
+            "field": "name",
+            "colSpan": 6,
+            "readOnly": true
+          },
+          {
+            "field": "agent_type",
+            "colSpan": 4,
+            "readOnly": true
+          },
+          {
+            "field": "model",
+            "colSpan": 4,
+            "readOnly": true
+          },
+          {
+            "field": "status",
+            "colSpan": 4,
+            "readOnly": true
+          },
+          {
+            "field": "avatar_url",
+            "colSpan": 12,
+            "readOnly": true
+          },
+          {
+            "field": "description",
+            "colSpan": 12,
+            "readOnly": true
+          },
+          {
+            "field": "system_prompt",
+            "colSpan": 12,
+            "readOnly": true
+          },
+          {
+            "field": "tools",
+            "colSpan": 12,
+            "readOnly": true
+          },
+          {
+            "field": "skills",
+            "colSpan": 12,
+            "readOnly": true
+          },
+          {
+            "field": "guardrails",
+            "colSpan": 12,
+            "readOnly": true
+          },
+          {
+            "field": "stats",
+            "colSpan": 12,
+            "readOnly": true
+          }
+        ]
+      },
+      {
+        "id": "soul_profile",
+        "blockType": "form-section",
+        "title": {
+          "zh-CN": "人格档案",
+          "en-US": "Soul Profile"
+        },
+        "fields": [
+          {
+            "field": "personality",
+            "colSpan": 6,
+            "readOnly": true
+          },
+          {
+            "field": "expertise",
+            "colSpan": 6,
+            "readOnly": true
+          },
+          {
+            "field": "communication_style",
+            "colSpan": 12,
+            "readOnly": true
+          },
+          {
+            "field": "boundaries",
+            "colSpan": 12,
+            "readOnly": true
+          },
+          {
+            "field": "soul_goals",
+            "colSpan": 12,
+            "readOnly": true
+          }
+        ]
+      },
+      {
+        "id": "buttons",
+        "blockType": "form-buttons",
+        "buttons": [
+          {
+            "code": "cancel",
+            "label": "cancel"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "pageKey": "mission_list",
+    "name:zh-CN": "使命",
+    "name:en": "Missions",
+    "modelCode": "mission",
+    "kind": "list",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "stack"
+    },
+    "blocks": [
+      {
+        "id": "toolbar",
+        "blockType": "toolbar",
+        "buttons": [
+          {
+            "code": "create",
+            "variant": "primary",
+            "label": "create",
+            "action": {
+              "type": "navigate",
+              "to": "mission_form",
+              "command": "acp:create_mission"
+            }
+          }
+        ]
+      },
+      {
+        "id": "table",
+        "blockType": "table",
+        "columns": [
+          {
+            "field": "title",
+            "width": 250,
+            "sortable": true
+          },
+          {
+            "field": "mission_status",
+            "width": 120,
+            "renderType": "tag"
+          },
+          {
+            "field": "priority",
+            "width": 80,
+            "sortable": true
+          },
+          {
+            "field": "target_date",
+            "width": 160,
+            "format": "YYYY-MM-DD HH:mm"
+          },
+          {
+            "field": "created_at",
+            "width": 160,
+            "format": "YYYY-MM-DD HH:mm"
+          }
+        ],
+        "rowActions": [
+          {
+            "code": "edit",
+            "label": "edit",
+            "action": {
+              "type": "navigate",
+              "to": "mission_form",
+              "command": "acp:update_mission"
+            }
+          },
+          {
+            "code": "pause",
+            "visibleWhen": "row.mission_status === 'active'",
+            "label": "pause",
+            "confirm": "pause.confirm",
+            "action": {
+              "type": "command",
+              "command": "acp:pause_mission"
+            }
+          },
+          {
+            "code": "resume",
+            "variant": "primary",
+            "visibleWhen": "row.mission_status === 'paused'",
+            "label": "resume",
+            "confirm": "resume.confirm",
+            "action": {
+              "type": "command",
+              "command": "acp:resume_mission"
+            }
+          },
+          {
+            "code": "complete",
+            "variant": "primary",
+            "visibleWhen": "row.mission_status === 'active'",
+            "label": "complete",
+            "confirm": "complete.confirm",
+            "action": {
+              "type": "state_transition",
+              "command": "acp:complete_mission"
+            }
+          },
+          {
+            "code": "archive",
+            "visibleWhen": "row.mission_status !== 'archived'",
+            "label": "archive",
+            "confirm": "archive.confirm",
+            "action": {
+              "type": "command",
+              "command": "acp:archive_mission"
+            }
+          },
+          {
+            "code": "delete",
+            "variant": "danger",
+            "label": "delete",
+            "confirm": "delete.confirm",
+            "action": {
+              "type": "command",
+              "command": "acp:delete_mission"
+            }
+          }
+        ],
+        "defaultSort": {
+          "field": "created_at",
+          "order": "desc"
+        }
+      }
+    ]
+  },
+  {
+    "pageKey": "mission_form",
+    "name:zh-CN": "使命表单",
+    "name:en": "Mission Form",
+    "modelCode": "mission",
+    "kind": "form",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "grid",
+      "cols": 12
+    },
+    "blocks": [
+      {
+        "id": "basic",
+        "blockType": "form-section",
+        "title": {
+          "zh-CN": "基本信息",
+          "en-US": "Basic Information"
+        },
+        "fields": [
+          {
+            "field": "title",
+            "colSpan": 8
+          },
+          {
+            "field": "mission_status",
+            "colSpan": 4
+          },
+          {
+            "field": "owner_id",
+            "colSpan": 4
+          },
+          {
+            "field": "priority",
+            "colSpan": 4
+          },
+          {
+            "field": "target_date",
+            "colSpan": 4
+          },
+          {
+            "field": "description",
+            "colSpan": 12
+          },
+          {
+            "field": "kpis",
+            "colSpan": 12
+          },
+          {
+            "field": "tags",
+            "colSpan": 12
+          }
+        ]
+      },
+      {
+        "id": "buttons",
+        "blockType": "form-buttons",
+        "buttons": [
+          {
+            "code": "submit",
+            "primary": true,
+            "label": "save",
+            "action": {
+              "type": "command",
+              "command": "acp:update_mission"
+            }
+          },
+          {
+            "code": "cancel",
+            "label": "cancel"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "pageKey": "agent_task_list",
+    "name:zh-CN": "Agent 任务",
+    "name:en": "Agent Tasks",
+    "modelCode": "agent_task",
+    "kind": "list",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "stack"
+    },
+    "blocks": [
+      {
+        "id": "toolbar",
+        "blockType": "toolbar",
+        "buttons": [
+          {
+            "code": "create",
+            "variant": "primary",
+            "label": "create",
+            "action": {
+              "type": "navigate",
+              "to": "agent_task_form",
+              "command": "acp:create_agent_task"
+            }
+          }
+        ]
+      },
+      {
+        "id": "table",
+        "blockType": "table",
+        "columns": [
+          {
+            "field": "title",
+            "width": 250,
+            "sortable": true
+          },
+          {
+            "field": "task_status",
+            "width": 120,
+            "renderType": "tag"
+          },
+          {
+            "field": "task_priority",
+            "width": 100,
+            "renderType": "tag"
+          },
+          {
+            "field": "assignee_type",
+            "width": 100,
+            "renderType": "tag"
+          },
+          {
+            "field": "assignee_id",
+            "width": 120
+          },
+          {
+            "field": "due_date",
+            "width": 160,
+            "format": "YYYY-MM-DD HH:mm"
+          },
+          {
+            "field": "created_at",
+            "width": 160,
+            "format": "YYYY-MM-DD HH:mm"
+          }
+        ],
+        "rowActions": [
+          {
+            "code": "edit",
+            "label": "edit",
+            "action": {
+              "type": "navigate",
+              "to": "agent_task_form",
+              "command": "acp:update_agent_task"
+            }
+          },
+          {
+            "code": "dispatch",
+            "label": "dispatch",
+            "variant": "primary",
+            "visibleWhen": "row.assignee_type === 'agent' && row.assignee_id && (row.task_status === 'backlog' || row.task_status === 'todo')",
+            "confirm": "action.dispatch.confirm",
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "endpoint": "/api/agent/dispatch",
+                  "method": "post",
+                  "bodyTemplate": {
+                    "taskPid": "{pid}",
+                    "agentCode": "{assignee_id}"
+                  },
+                  "successMessage": "Task dispatched successfully"
+                }
+              ]
+            }
+          },
+          {
+            "code": "start",
+            "variant": "primary",
+            "visibleWhen": "row.task_status === 'todo'",
+            "label": "start",
+            "confirm": "start.confirm",
+            "action": {
+              "type": "state_transition",
+              "command": "acp:start_task"
+            }
+          },
+          {
+            "code": "complete",
+            "variant": "primary",
+            "visibleWhen": "row.task_status === 'in_progress'",
+            "label": "complete",
+            "confirm": "complete.confirm",
+            "action": {
+              "type": "state_transition",
+              "command": "acp:complete_task"
+            }
+          },
+          {
+            "code": "block",
+            "variant": "danger",
+            "visibleWhen": "row.task_status === 'in_progress'",
+            "label": "block",
+            "confirm": "block.confirm",
+            "action": {
+              "type": "command",
+              "command": "acp:block_task"
+            }
+          },
+          {
+            "code": "cancel",
+            "variant": "danger",
+            "visibleWhen": "row.task_status !== 'done' && row.task_status !== 'cancelled'",
+            "label": "cancel_task",
+            "confirm": "cancel.confirm",
+            "action": {
+              "type": "state_transition",
+              "command": "acp:cancel_task"
+            }
+          },
+          {
+            "code": "delete",
+            "variant": "danger",
+            "label": "delete",
+            "confirm": "delete.confirm",
+            "action": {
+              "type": "command",
+              "command": "acp:delete_agent_task"
+            }
+          }
+        ],
+        "defaultSort": {
+          "field": "created_at",
+          "order": "desc"
+        }
+      }
+    ],
+    "extension": {
+      "savedViews": [
+        {
+          "code": "kanban_by_status",
+          "name": {
+            "en": "Kanban",
+            "zh": "看板"
+          },
+          "viewType": "kanban",
+          "isDefault": false,
+          "viewConfig": {
+            "groupByField": "task_status",
+            "titleField": "title",
+            "descriptionField": "description",
+            "cardFields": [
+              {
+                "field": "task_priority",
+                "renderType": "tag"
+              },
+              {
+                "field": "assignee_type",
+                "renderType": "tag"
+              },
+              {
+                "field": "due_date"
+              }
+            ],
+            "draggable": true,
+            "showCount": true
+          }
+        }
+      ]
+    }
+  },
+  {
+    "pageKey": "agent_task_form",
+    "name:zh-CN": "Agent 任务表单",
+    "name:en": "Agent Task Form",
+    "modelCode": "agent_task",
+    "kind": "form",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "grid",
+      "cols": 12
+    },
+    "blocks": [
+      {
+        "id": "basic",
+        "blockType": "form-section",
+        "title": {
+          "zh-CN": "基本信息",
+          "en-US": "Basic Information"
+        },
+        "fields": [
+          {
+            "field": "title",
+            "colSpan": 8
+          },
+          {
+            "field": "task_status",
+            "colSpan": 4
+          },
+          {
+            "field": "mission_id",
+            "colSpan": 6
+          },
+          {
+            "field": "parent_id",
+            "colSpan": 6
+          },
+          {
+            "field": "task_priority",
+            "colSpan": 4
+          },
+          {
+            "field": "assignee_type",
+            "colSpan": 4
+          },
+          {
+            "field": "assignee_id",
+            "colSpan": 4
+          },
+          {
+            "field": "due_date",
+            "colSpan": 4
+          },
+          {
+            "field": "estimated_cost",
+            "colSpan": 4
+          },
+          {
+            "field": "max_retries",
+            "colSpan": 4
+          },
+          {
+            "field": "description",
+            "colSpan": 12
+          },
+          {
+            "field": "input_data",
+            "colSpan": 12
+          },
+          {
+            "field": "agent_config",
+            "colSpan": 12
+          },
+          {
+            "field": "tags",
+            "colSpan": 12
+          }
+        ]
+      },
+      {
+        "id": "buttons",
+        "blockType": "form-buttons",
+        "buttons": [
+          {
+            "code": "submit",
+            "primary": true,
+            "label": "save",
+            "action": {
+              "type": "command",
+              "command": "acp:update_agent_task"
+            }
+          },
+          {
+            "code": "cancel",
+            "label": "cancel"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "pageKey": "agent_run_list",
+    "name:zh-CN": "运行记录",
+    "name:en": "Agent Runs",
+    "modelCode": "agent_run",
+    "kind": "list",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "stack"
+    },
+    "blocks": [
+      {
+        "id": "toolbar",
+        "blockType": "toolbar",
+        "buttons": []
+      },
+      {
+        "id": "table",
+        "blockType": "table",
+        "columns": [
+          {
+            "field": "task_id",
+            "width": 150
+          },
+          {
+            "field": "agent_id",
+            "width": 150
+          },
+          {
+            "field": "run_status",
+            "width": 110,
+            "renderType": "tag"
+          },
+          {
+            "field": "run_model",
+            "width": 160,
+            "renderType": "tag"
+          },
+          {
+            "field": "duration_ms",
+            "width": 100
+          },
+          {
+            "field": "input_tokens",
+            "width": 100
+          },
+          {
+            "field": "output_tokens",
+            "width": 110
+          },
+          {
+            "field": "total_cost",
+            "width": 100
+          },
+          {
+            "field": "started_at",
+            "width": 160,
+            "format": "YYYY-MM-DD HH:mm"
+          },
+          {
+            "field": "created_at",
+            "width": 160,
+            "format": "YYYY-MM-DD HH:mm"
+          }
+        ],
+        "rowActions": [
+          {
+            "code": "cancel",
+            "variant": "danger",
+            "visibleWhen": "row.run_status === 'running'",
+            "label": "cancel_run",
+            "confirm": "cancel.confirm",
+            "action": {
+              "type": "state_transition",
+              "command": "acp:cancel_run"
+            }
+          }
+        ],
+        "defaultSort": {
+          "field": "created_at",
+          "order": "desc"
+        }
+      }
+    ]
+  },
+  {
+    "pageKey": "agent_run_form",
+    "name:zh-CN": "运行记录详情",
+    "name:en": "Agent Run Detail",
+    "modelCode": "agent_run",
+    "kind": "form",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "grid",
+      "cols": 12
+    },
+    "blocks": [
+      {
+        "id": "basic",
+        "blockType": "form-section",
+        "title": {
+          "zh-CN": "运行信息",
+          "en-US": "Run Information"
+        },
+        "fields": [
+          {
+            "field": "task_id",
+            "colSpan": 6
+          },
+          {
+            "field": "agent_id",
+            "colSpan": 6
+          },
+          {
+            "field": "run_status",
+            "colSpan": 4
+          },
+          {
+            "field": "run_model",
+            "colSpan": 4
+          },
+          {
+            "field": "duration_ms",
+            "colSpan": 4
+          },
+          {
+            "field": "started_at",
+            "colSpan": 6
+          },
+          {
+            "field": "completed_at",
+            "colSpan": 6
+          },
+          {
+            "field": "input_tokens",
+            "colSpan": 4
+          },
+          {
+            "field": "output_tokens",
+            "colSpan": 4
+          },
+          {
+            "field": "total_cost",
+            "colSpan": 4
+          },
+          {
+            "field": "error_message",
+            "colSpan": 12
+          },
+          {
+            "field": "tool_calls",
+            "colSpan": 12
+          },
+          {
+            "field": "messages",
+            "colSpan": 12
+          },
+          {
+            "field": "metadata",
+            "colSpan": 12
+          }
+        ]
+      },
+      {
+        "id": "buttons",
+        "blockType": "form-buttons",
+        "buttons": [
+          {
+            "code": "cancel",
+            "label": "cancel"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "pageKey": "agent_artifact_list",
+    "name:zh-CN": "产出物",
+    "name:en": "Artifacts",
+    "modelCode": "agent_artifact",
+    "kind": "list",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "stack"
+    },
+    "blocks": [
+      {
+        "id": "toolbar",
+        "blockType": "toolbar",
+        "buttons": [
+          {
+            "code": "create",
+            "variant": "primary",
+            "label": "create",
+            "action": {
+              "type": "navigate",
+              "to": "agent_artifact_form",
+              "command": "acp:create_agent_artifact"
+            }
+          }
+        ]
+      },
+      {
+        "id": "table",
+        "blockType": "table",
+        "columns": [
+          {
+            "field": "title",
+            "width": 250,
+            "sortable": true
+          },
+          {
+            "field": "artifact_type",
+            "width": 120,
+            "renderType": "tag"
+          },
+          {
+            "field": "mime_type",
+            "width": 130
+          },
+          {
+            "field": "file_size",
+            "width": 100
+          },
+          {
+            "field": "version",
+            "width": 80
+          },
+          {
+            "field": "task_id",
+            "width": 150
+          },
+          {
+            "field": "created_at",
+            "width": 160,
+            "format": "YYYY-MM-DD HH:mm"
+          }
+        ],
+        "rowActions": [
+          {
+            "code": "edit",
+            "label": "edit",
+            "action": {
+              "type": "navigate",
+              "to": "agent_artifact_form",
+              "command": "acp:update_agent_artifact"
+            }
+          },
+          {
+            "code": "delete",
+            "variant": "danger",
+            "label": "delete",
+            "confirm": "delete.confirm",
+            "action": {
+              "type": "command",
+              "command": "acp:delete_agent_artifact"
+            }
+          }
+        ],
+        "defaultSort": {
+          "field": "created_at",
+          "order": "desc"
+        }
+      }
+    ]
+  },
+  {
+    "pageKey": "agent_artifact_form",
+    "name:zh-CN": "产出物表单",
+    "name:en": "Artifact Form",
+    "modelCode": "agent_artifact",
+    "kind": "form",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "grid",
+      "cols": 12
+    },
+    "blocks": [
+      {
+        "id": "basic",
+        "blockType": "form-section",
+        "title": {
+          "zh-CN": "基本信息",
+          "en-US": "Basic Information"
+        },
+        "fields": [
+          {
+            "field": "title",
+            "colSpan": 8
+          },
+          {
+            "field": "artifact_type",
+            "colSpan": 4
+          },
+          {
+            "field": "run_id",
+            "colSpan": 6
+          },
+          {
+            "field": "task_id",
+            "colSpan": 6
+          },
+          {
+            "field": "file_path",
+            "colSpan": 8
+          },
+          {
+            "field": "mime_type",
+            "colSpan": 4
+          },
+          {
+            "field": "content",
+            "colSpan": 12
+          },
+          {
+            "field": "tags",
+            "colSpan": 12
+          },
+          {
+            "field": "metadata",
+            "colSpan": 12
+          }
+        ]
+      },
+      {
+        "id": "buttons",
+        "blockType": "form-buttons",
+        "buttons": [
+          {
+            "code": "submit",
+            "primary": true,
+            "label": "save",
+            "action": {
+              "type": "command",
+              "command": "acp:update_agent_artifact"
+            }
+          },
+          {
+            "code": "cancel",
+            "label": "cancel"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "pageKey": "agent_schedule_list",
+    "name:zh-CN": "调度",
+    "name:en": "Schedules",
+    "modelCode": "agent_schedule",
+    "kind": "list",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "stack"
+    },
+    "blocks": [
+      {
+        "id": "toolbar",
+        "blockType": "toolbar",
+        "buttons": [
+          {
+            "code": "create",
+            "variant": "primary",
+            "label": "create",
+            "action": {
+              "type": "navigate",
+              "to": "agent_schedule_form",
+              "command": "acp:create_agent_schedule"
+            }
+          }
+        ]
+      },
+      {
+        "id": "table",
+        "blockType": "table",
+        "columns": [
+          {
+            "field": "title",
+            "width": 200,
+            "sortable": true
+          },
+          {
+            "field": "schedule_type",
+            "width": 120,
+            "renderType": "tag"
+          },
+          {
+            "field": "cron_expression",
+            "width": 140
+          },
+          {
+            "field": "schedule_status",
+            "width": 100,
+            "renderType": "tag"
+          },
+          {
+            "field": "run_count",
+            "width": 80
+          },
+          {
+            "field": "next_run_at",
+            "width": 160,
+            "format": "YYYY-MM-DD HH:mm"
+          },
+          {
+            "field": "last_run_at",
+            "width": 160,
+            "format": "YYYY-MM-DD HH:mm"
+          },
+          {
+            "field": "created_at",
+            "width": 160,
+            "format": "YYYY-MM-DD HH:mm"
+          }
+        ],
+        "rowActions": [
+          {
+            "code": "edit",
+            "label": "edit",
+            "action": {
+              "type": "navigate",
+              "to": "agent_schedule_form",
+              "command": "acp:update_agent_schedule"
+            }
+          },
+          {
+            "code": "pause",
+            "visibleWhen": "row.schedule_status === 'active'",
+            "label": "pause",
+            "confirm": "pause.confirm",
+            "action": {
+              "type": "state_transition",
+              "command": "acp:pause_schedule"
+            }
+          },
+          {
+            "code": "activate",
+            "variant": "primary",
+            "visibleWhen": "row.schedule_status === 'paused'",
+            "label": "activate",
+            "confirm": "activate.confirm",
+            "action": {
+              "type": "state_transition",
+              "command": "acp:activate_schedule"
+            }
+          },
+          {
+            "code": "delete",
+            "variant": "danger",
+            "label": "delete",
+            "confirm": "delete.confirm",
+            "action": {
+              "type": "state_transition",
+              "command": "acp:delete_agent_schedule"
+            }
+          }
+        ],
+        "defaultSort": {
+          "field": "created_at",
+          "order": "desc"
+        }
+      }
+    ]
+  },
+  {
+    "pageKey": "agent_schedule_form",
+    "name:zh-CN": "调度表单",
+    "name:en": "Schedule Form",
+    "modelCode": "agent_schedule",
+    "kind": "form",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "grid",
+      "cols": 12
+    },
+    "blocks": [
+      {
+        "id": "basic",
+        "blockType": "form-section",
+        "title": {
+          "zh-CN": "基本信息",
+          "en-US": "Basic Information"
+        },
+        "fields": [
+          {
+            "field": "title",
+            "colSpan": 8
+          },
+          {
+            "field": "schedule_status",
+            "colSpan": 4
+          },
+          {
+            "field": "schedule_type",
+            "colSpan": 4
+          },
+          {
+            "field": "cron_expression",
+            "colSpan": 4
+          },
+          {
+            "field": "interval_ms",
+            "colSpan": 4
+          },
+          {
+            "field": "timezone",
+            "colSpan": 4
+          },
+          {
+            "field": "max_runs",
+            "colSpan": 4
+          },
+          {
+            "field": "mission_id",
+            "colSpan": 4
+          },
+          {
+            "field": "event_trigger",
+            "colSpan": 12
+          },
+          {
+            "field": "description",
+            "colSpan": 12
+          },
+          {
+            "field": "task_template",
+            "colSpan": 12
+          }
+        ]
+      },
+      {
+        "id": "buttons",
+        "blockType": "form-buttons",
+        "buttons": [
+          {
+            "code": "submit",
+            "primary": true,
+            "label": "save",
+            "action": {
+              "type": "state_transition",
+              "command": "acp:update_agent_schedule"
+            }
+          },
+          {
+            "code": "cancel",
+            "label": "cancel"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "pageKey": "approval_policy_list",
+    "name:zh-CN": "审批策略",
+    "name:en": "Approval Policies",
+    "modelCode": "approval_policy",
+    "kind": "list",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "stack"
+    },
+    "blocks": [
+      {
+        "id": "toolbar",
+        "blockType": "toolbar",
+        "buttons": [
+          {
+            "code": "create",
+            "variant": "primary",
+            "label": "create",
+            "action": {
+              "type": "navigate",
+              "to": "approval_policy_form",
+              "command": "acp:create_approval_policy"
+            }
+          }
+        ]
+      },
+      {
+        "id": "table",
+        "blockType": "table",
+        "columns": [
+          {
+            "field": "policy_name",
+            "width": 200,
+            "sortable": true
+          },
+          {
+            "field": "description",
+            "width": 250
+          },
+          {
+            "field": "auto_approve",
+            "width": 100
+          },
+          {
+            "field": "timeout_hours",
+            "width": 100
+          },
+          {
+            "field": "timeout_action",
+            "width": 120,
+            "renderType": "tag"
+          },
+          {
+            "field": "policy_status",
+            "width": 100,
+            "renderType": "tag"
+          },
+          {
+            "field": "created_at",
+            "width": 160,
+            "format": "YYYY-MM-DD HH:mm"
+          }
+        ],
+        "rowActions": [
+          {
+            "code": "edit",
+            "label": "edit",
+            "action": {
+              "type": "navigate",
+              "to": "approval_policy_form",
+              "command": "acp:update_approval_policy"
+            }
+          },
+          {
+            "code": "delete",
+            "variant": "danger",
+            "label": "delete",
+            "confirm": "delete.confirm",
+            "action": {
+              "type": "command",
+              "command": "acp:delete_approval_policy"
+            }
+          }
+        ],
+        "defaultSort": {
+          "field": "created_at",
+          "order": "desc"
+        }
+      }
+    ]
+  },
+  {
+    "pageKey": "approval_policy_form",
+    "name:zh-CN": "审批策略表单",
+    "name:en": "Approval Policy Form",
+    "modelCode": "approval_policy",
+    "kind": "form",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "grid",
+      "cols": 12
+    },
+    "blocks": [
+      {
+        "id": "basic",
+        "blockType": "form-section",
+        "title": {
+          "zh-CN": "基本信息",
+          "en-US": "Basic Information"
+        },
+        "fields": [
+          {
+            "field": "policy_name",
+            "colSpan": 8
+          },
+          {
+            "field": "policy_status",
+            "colSpan": 4
+          },
+          {
+            "field": "auto_approve",
+            "colSpan": 4
+          },
+          {
+            "field": "timeout_hours",
+            "colSpan": 4
+          },
+          {
+            "field": "timeout_action",
+            "colSpan": 4
+          },
+          {
+            "field": "description",
+            "colSpan": 12
+          },
+          {
+            "field": "trigger_rules",
+            "colSpan": 12
+          },
+          {
+            "field": "approver_rules",
+            "colSpan": 12
+          }
+        ]
+      },
+      {
+        "id": "buttons",
+        "blockType": "form-buttons",
+        "buttons": [
+          {
+            "code": "submit",
+            "primary": true,
+            "label": "save",
+            "action": {
+              "type": "command",
+              "command": "acp:update_approval_policy"
+            }
+          },
+          {
+            "code": "cancel",
+            "label": "cancel"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "pageKey": "agent_approval_list",
+    "name:zh-CN": "Agent 审批",
+    "name:en": "Agent Approvals",
+    "modelCode": "agent_approval",
+    "kind": "list",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "stack"
+    },
+    "blocks": [
+      {
+        "id": "toolbar",
+        "blockType": "toolbar",
+        "buttons": []
+      },
+      {
+        "id": "table",
+        "blockType": "table",
+        "columns": [
+          {
+            "field": "approval_title",
+            "width": 250,
+            "sortable": true
+          },
+          {
+            "field": "approval_type",
+            "width": 140,
+            "renderType": "tag"
+          },
+          {
+            "field": "approval_status",
+            "width": 120,
+            "renderType": "tag"
+          },
+          {
+            "field": "task_id",
+            "width": 150
+          },
+          {
+            "field": "approver_id",
+            "width": 100
+          },
+          {
+            "field": "expires_at",
+            "width": 160,
+            "format": "YYYY-MM-DD HH:mm"
+          },
+          {
+            "field": "created_at",
+            "width": 160,
+            "format": "YYYY-MM-DD HH:mm"
+          }
+        ],
+        "rowActions": [
+          {
+            "code": "approve",
+            "variant": "primary",
+            "visibleWhen": "row.approval_status === 'pending'",
+            "label": "approve",
+            "confirm": "approve.confirm",
+            "action": {
+              "type": "state_transition",
+              "command": "acp:approve_request"
+            }
+          },
+          {
+            "code": "reject",
+            "variant": "danger",
+            "visibleWhen": "row.approval_status === 'pending'",
+            "label": "reject",
+            "confirm": "reject.confirm",
+            "action": {
+              "type": "state_transition",
+              "command": "acp:reject_request"
+            }
+          }
+        ],
+        "defaultSort": {
+          "field": "created_at",
+          "order": "desc"
+        }
+      }
+    ]
+  },
+  {
+    "pageKey": "agent_approval_form",
+    "name:zh-CN": "审批详情",
+    "name:en": "Approval Detail",
+    "modelCode": "agent_approval",
+    "kind": "form",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "grid",
+      "cols": 12
+    },
+    "blocks": [
+      {
+        "id": "basic",
+        "blockType": "form-section",
+        "title": {
+          "zh-CN": "审批信息",
+          "en-US": "Approval Information"
+        },
+        "fields": [
+          {
+            "field": "approval_title",
+            "colSpan": 8
+          },
+          {
+            "field": "approval_status",
+            "colSpan": 4
+          },
+          {
+            "field": "approval_type",
+            "colSpan": 4
+          },
+          {
+            "field": "run_id",
+            "colSpan": 4
+          },
+          {
+            "field": "task_id",
+            "colSpan": 4
+          },
+          {
+            "field": "approver_id",
+            "colSpan": 4
+          },
+          {
+            "field": "approved_at",
+            "colSpan": 4
+          },
+          {
+            "field": "expires_at",
+            "colSpan": 4
+          },
+          {
+            "field": "auto_action",
+            "colSpan": 4
+          },
+          {
+            "field": "policy_id",
+            "colSpan": 4
+          },
+          {
+            "field": "approval_description",
+            "colSpan": 12
+          },
+          {
+            "field": "request_data",
+            "colSpan": 12
+          },
+          {
+            "field": "rejection_reason",
+            "colSpan": 12
+          }
+        ]
+      },
+      {
+        "id": "buttons",
+        "blockType": "form-buttons",
+        "buttons": [
+          {
+            "code": "cancel",
+            "label": "cancel"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "pageKey": "agent_memory_list",
+    "name:zh-CN": "Agent 记忆",
+    "name:en": "Agent Memory",
+    "modelCode": "agent_memory",
+    "kind": "list",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "stack"
+    },
+    "blocks": [
+      {
+        "id": "toolbar",
+        "blockType": "toolbar",
+        "buttons": [
+          {
+            "code": "create",
+            "variant": "primary",
+            "label": "create",
+            "action": {
+              "type": "navigate",
+              "to": "agent_memory_form",
+              "command": "acp:create_agent_memory"
+            }
+          }
+        ]
+      },
+      {
+        "id": "table",
+        "blockType": "table",
+        "columns": [
+          {
+            "field": "memory_title",
+            "width": 200,
+            "sortable": true
+          },
+          {
+            "field": "memory_type",
+            "width": 120,
+            "renderType": "tag"
+          },
+          {
+            "field": "category",
+            "width": 120
+          },
+          {
+            "field": "memory_agent_id",
+            "width": 150
+          },
+          {
+            "field": "importance",
+            "width": 80,
+            "sortable": true
+          },
+          {
+            "field": "access_count",
+            "width": 80
+          },
+          {
+            "field": "created_at",
+            "width": 160,
+            "format": "YYYY-MM-DD HH:mm"
+          }
+        ],
+        "rowActions": [
+          {
+            "code": "edit",
+            "label": "edit",
+            "action": {
+              "type": "navigate",
+              "to": "agent_memory_form",
+              "command": "acp:update_agent_memory"
+            }
+          },
+          {
+            "code": "delete",
+            "variant": "danger",
+            "label": "delete",
+            "confirm": "delete.confirm",
+            "action": {
+              "type": "command",
+              "command": "acp:delete_agent_memory"
+            }
+          }
+        ],
+        "defaultSort": {
+          "field": "created_at",
+          "order": "desc"
+        }
+      }
+    ],
+    "extension": {
+      "savedViews": [
+        {
+          "code": "gallery_by_type",
+          "name": {
+            "en": "Cards",
+            "zh": "卡片"
+          },
+          "viewType": "gallery",
+          "isDefault": false,
+          "viewConfig": {
+            "titleField": "memory_title",
+            "descriptionField": "memory_content",
+            "cardFields": [
+              {
+                "field": "memory_type",
+                "renderType": "tag"
+              },
+              {
+                "field": "importance"
+              },
+              {
+                "field": "memory_agent_id"
+              },
+              {
+                "field": "created_at"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "pageKey": "agent_memory_form",
+    "name:zh-CN": "Agent 记忆表单",
+    "name:en": "Agent Memory Form",
+    "modelCode": "agent_memory",
+    "kind": "form",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "grid",
+      "cols": 12
+    },
+    "blocks": [
+      {
+        "id": "basic",
+        "blockType": "form-section",
+        "title": {
+          "zh-CN": "基本信息",
+          "en-US": "Basic Information"
+        },
+        "fields": [
+          {
+            "field": "memory_title",
+            "colSpan": 8
+          },
+          {
+            "field": "memory_type",
+            "colSpan": 4
+          },
+          {
+            "field": "memory_agent_id",
+            "colSpan": 6
+          },
+          {
+            "field": "category",
+            "colSpan": 6
+          },
+          {
+            "field": "importance",
+            "colSpan": 4
+          },
+          {
+            "field": "source_run_id",
+            "colSpan": 4
+          },
+          {
+            "field": "valid_from",
+            "colSpan": 4
+          },
+          {
+            "field": "valid_until",
+            "colSpan": 4
+          },
+          {
+            "field": "memory_content",
+            "colSpan": 12
+          },
+          {
+            "field": "metadata",
+            "colSpan": 12
+          }
+        ]
+      },
+      {
+        "id": "buttons",
+        "blockType": "form-buttons",
+        "buttons": [
+          {
+            "code": "submit",
+            "primary": true,
+            "label": "save",
+            "action": {
+              "type": "command",
+              "command": "acp:update_agent_memory"
+            }
+          },
+          {
+            "code": "cancel",
+            "label": "cancel"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "pageKey": "agent_observation_list",
+    "name:zh-CN": "观测记录",
+    "name:en": "Observations",
+    "modelCode": "agent_observation",
+    "kind": "list",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "stack"
+    },
+    "blocks": [
+      {
+        "id": "toolbar",
+        "blockType": "toolbar",
+        "buttons": []
+      },
+      {
+        "id": "table",
+        "blockType": "table",
+        "columns": [
+          {
+            "field": "obs_title",
+            "width": 250,
+            "sortable": true
+          },
+          {
+            "field": "observation_type",
+            "width": 120,
+            "renderType": "tag"
+          },
+          {
+            "field": "severity",
+            "width": 100,
+            "renderType": "tag"
+          },
+          {
+            "field": "source_type",
+            "width": 120
+          },
+          {
+            "field": "obs_agent_id",
+            "width": 150
+          },
+          {
+            "field": "created_at",
+            "width": 160,
+            "format": "YYYY-MM-DD HH:mm"
+          }
+        ],
+        "rowActions": [],
+        "defaultSort": {
+          "field": "created_at",
+          "order": "desc"
+        }
+      }
+    ]
+  },
+  {
+    "pageKey": "agent_observation_form",
+    "name:zh-CN": "观测详情",
+    "name:en": "Observation Detail",
+    "modelCode": "agent_observation",
+    "kind": "form",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "grid",
+      "cols": 12
+    },
+    "blocks": [
+      {
+        "id": "basic",
+        "blockType": "form-section",
+        "title": {
+          "zh-CN": "观测信息",
+          "en-US": "Observation Information"
+        },
+        "fields": [
+          {
+            "field": "obs_title",
+            "colSpan": 8
+          },
+          {
+            "field": "observation_type",
+            "colSpan": 4
+          },
+          {
+            "field": "severity",
+            "colSpan": 4
+          },
+          {
+            "field": "source_type",
+            "colSpan": 4
+          },
+          {
+            "field": "source_id",
+            "colSpan": 4
+          },
+          {
+            "field": "obs_agent_id",
+            "colSpan": 12
+          },
+          {
+            "field": "detail",
+            "colSpan": 12
+          }
+        ]
+      },
+      {
+        "id": "buttons",
+        "blockType": "form-buttons",
+        "buttons": [
+          {
+            "code": "cancel",
+            "label": "cancel"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "pageKey": "agent_tool_list",
+    "name:zh-CN": "Agent 工具",
+    "name:en": "Agent Tools",
+    "modelCode": "agent_tool",
+    "kind": "list",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "stack"
+    },
+    "blocks": [
+      {
+        "id": "toolbar",
+        "blockType": "toolbar",
+        "buttons": [
+          {
+            "code": "create",
+            "variant": "primary",
+            "label": "create",
+            "action": {
+              "type": "navigate",
+              "to": "agent_tool_form",
+              "command": "acp:create_agent_tool"
+            }
+          }
+        ]
+      },
+      {
+        "id": "table",
+        "blockType": "table",
+        "columns": [
+          {
+            "field": "tool_code",
+            "width": 150,
+            "sortable": true
+          },
+          {
+            "field": "tool_name",
+            "width": 200,
+            "sortable": true
+          },
+          {
+            "field": "tool_type",
+            "width": 140,
+            "renderType": "tag"
+          },
+          {
+            "field": "risk_level",
+            "width": 100,
+            "renderType": "tag"
+          },
+          {
+            "field": "requires_approval",
+            "width": 100
+          },
+          {
+            "field": "tool_status",
+            "width": 100,
+            "renderType": "tag"
+          },
+          {
+            "field": "auto_generated",
+            "width": 100
+          },
+          {
+            "field": "created_at",
+            "width": 160,
+            "format": "YYYY-MM-DD HH:mm"
+          }
+        ],
+        "rowActions": [
+          {
+            "code": "edit",
+            "label": "edit",
+            "action": {
+              "type": "navigate",
+              "to": "agent_tool_form",
+              "command": "acp:update_agent_tool"
+            }
+          },
+          {
+            "code": "delete",
+            "variant": "danger",
+            "label": "delete",
+            "confirm": "delete.confirm",
+            "action": {
+              "type": "command",
+              "command": "acp:delete_agent_tool"
+            }
+          }
+        ],
+        "defaultSort": {
+          "field": "created_at",
+          "order": "desc"
+        }
+      }
+    ]
+  },
+  {
+    "pageKey": "agent_tool_form",
+    "name:zh-CN": "Agent 工具表单",
+    "name:en": "Agent Tool Form",
+    "modelCode": "agent_tool",
+    "kind": "form",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "grid",
+      "cols": 12
+    },
+    "blocks": [
+      {
+        "id": "basic",
+        "blockType": "form-section",
+        "title": {
+          "zh-CN": "基本信息",
+          "en-US": "Basic Information"
+        },
+        "fields": [
+          {
+            "field": "tool_code",
+            "colSpan": 6
+          },
+          {
+            "field": "tool_name",
+            "colSpan": 6
+          },
+          {
+            "field": "tool_type",
+            "colSpan": 4
+          },
+          {
+            "field": "risk_level",
+            "colSpan": 4
+          },
+          {
+            "field": "tool_status",
+            "colSpan": 4
+          },
+          {
+            "field": "source_type",
+            "colSpan": 4
+          },
+          {
+            "field": "source_code",
+            "colSpan": 4
+          },
+          {
+            "field": "requires_approval",
+            "colSpan": 4
+          },
+          {
+            "field": "api_method",
+            "colSpan": 4
+          },
+          {
+            "field": "api_path",
+            "colSpan": 8
+          },
+          {
+            "field": "tool_description",
+            "colSpan": 12
+          },
+          {
+            "field": "input_schema",
+            "colSpan": 12
+          },
+          {
+            "field": "output_schema",
+            "colSpan": 12
+          }
+        ]
+      },
+      {
+        "id": "buttons",
+        "blockType": "form-buttons",
+        "buttons": [
+          {
+            "code": "submit",
+            "primary": true,
+            "label": "save",
+            "action": {
+              "type": "command",
+              "command": "acp:update_agent_tool"
+            }
+          },
+          {
+            "code": "cancel",
+            "label": "cancel"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "pageKey": "agent_skill_list",
+    "name:zh-CN": "技能市场",
+    "name:en": "Skills Market",
+    "modelCode": "agent_skill",
+    "kind": "list",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "stack"
+    },
+    "blocks": [
+      {
+        "id": "toolbar",
+        "blockType": "toolbar",
+        "buttons": [
+          {
+            "code": "create",
+            "variant": "primary",
+            "label": "create",
+            "action": {
+              "type": "navigate",
+              "to": "agent_skill_form",
+              "command": "acp:create_agent_skill"
+            }
+          }
+        ]
+      },
+      {
+        "id": "table",
+        "blockType": "table",
+        "columns": [
+          {
+            "field": "skill_code",
+            "width": 150,
+            "sortable": true
+          },
+          {
+            "field": "skill_name",
+            "width": 200,
+            "sortable": true
+          },
+          {
+            "field": "skill_level",
+            "width": 140,
+            "renderType": "tag"
+          },
+          {
+            "field": "skill_category",
+            "width": 120,
+            "renderType": "tag"
+          },
+          {
+            "field": "skill_icon",
+            "width": 60
+          },
+          {
+            "field": "skill_version",
+            "width": 80
+          },
+          {
+            "field": "skill_status",
+            "width": 100,
+            "renderType": "tag"
+          },
+          {
+            "field": "is_builtin",
+            "width": 80
+          },
+          {
+            "field": "created_at",
+            "width": 160,
+            "format": "YYYY-MM-DD HH:mm"
+          }
+        ],
+        "rowActions": [
+          {
+            "code": "edit",
+            "label": "edit",
+            "action": {
+              "type": "navigate",
+              "to": "agent_skill_form",
+              "command": "acp:update_agent_skill"
+            }
+          },
+          {
+            "code": "delete",
+            "variant": "danger",
+            "label": "delete",
+            "confirm": "delete.confirm",
+            "action": {
+              "type": "command",
+              "command": "acp:delete_agent_skill"
+            }
+          }
+        ],
+        "defaultSort": {
+          "field": "created_at",
+          "order": "desc"
+        }
+      }
+    ]
+  },
+  {
+    "pageKey": "agent_skill_form",
+    "name:zh-CN": "技能详情",
+    "name:en": "Skill Detail",
+    "modelCode": "agent_skill",
+    "kind": "form",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "grid",
+      "cols": 12
+    },
+    "blocks": [
+      {
+        "id": "basic",
+        "blockType": "form-section",
+        "title": {
+          "zh-CN": "基本信息",
+          "en-US": "Basic Information"
+        },
+        "fields": [
+          {
+            "field": "skill_code",
+            "colSpan": 6
+          },
+          {
+            "field": "skill_name",
+            "colSpan": 6
+          },
+          {
+            "field": "skill_level",
+            "colSpan": 4
+          },
+          {
+            "field": "skill_category",
+            "colSpan": 4
+          },
+          {
+            "field": "skill_status",
+            "colSpan": 4
+          },
+          {
+            "field": "skill_icon",
+            "colSpan": 4
+          },
+          {
+            "field": "skill_version",
+            "colSpan": 4
+          },
+          {
+            "field": "is_builtin",
+            "colSpan": 4
+          }
+        ]
+      },
+      {
+        "id": "definition",
+        "blockType": "form-section",
+        "title": {
+          "zh-CN": "技能定义",
+          "en-US": "Skill Definition"
+        },
+        "fields": [
+          {
+            "field": "skill_description",
+            "colSpan": 12
+          },
+          {
+            "field": "skill_tools",
+            "colSpan": 12
+          },
+          {
+            "field": "prompt_template",
+            "colSpan": 12
+          },
+          {
+            "field": "skill_input_schema",
+            "colSpan": 12
+          }
+        ]
+      },
+      {
+        "id": "buttons",
+        "blockType": "form-buttons",
+        "buttons": [
+          {
+            "code": "submit",
+            "primary": true,
+            "label": "save",
+            "action": {
+              "type": "command",
+              "command": "acp:update_agent_skill"
+            }
+          },
+          {
+            "code": "cancel",
+            "label": "cancel"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "pageKey": "acp_mission_control_list",
+    "name:zh-CN": "Mission Control",
+    "name:en": "Mission Control",
+    "modelCode": "mission",
+    "description": "Agent Control Plane Mission Control dashboard with KPIs, run trends, cost analysis, task distribution, approvals, and recent runs",
+    "kind": "dashboard",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "grid",
+      "cols": 12
+    },
+    "blocks": [
+      {
+        "id": "block_kpi_cards",
+        "blockType": "stat-card",
+        "layout": {
+          "colSpan": 12,
+          "rowSpan": 1
+        },
+        "title": {
+          "zh-CN": "关键指标",
+          "en": "Key Metrics"
+        },
+        "dataSource": {
+          "type": "api",
+          "url": "/api/datasource/list",
+          "params": {
+            "datasourceId": "nq:acp_dashboard_kpi",
+            "format": "records",
+            "maxItems": "1"
+          }
+        },
+        "cards": [
+          {
+            "field": "active_agents",
+            "label": {
+              "zh-CN": "活跃 Agent",
+              "en": "Active Agents"
+            },
+            "icon": "IconCpu",
+            "color": "#3b82f6"
+          },
+          {
+            "field": "active_missions",
+            "label": {
+              "zh-CN": "进行中使命",
+              "en": "Active Missions"
+            },
+            "icon": "IconTarget",
+            "color": "#8b5cf6"
+          },
+          {
+            "field": "active_tasks",
+            "label": {
+              "zh-CN": "运行中任务",
+              "en": "Running Tasks"
+            },
+            "icon": "IconChecklist",
+            "color": "#f59e0b"
+          },
+          {
+            "field": "running_now",
+            "label": {
+              "zh-CN": "正在执行",
+              "en": "Running Now"
+            },
+            "icon": "IconPlayerPlay",
+            "color": "#10b981"
+          },
+          {
+            "field": "month_cost",
+            "label": {
+              "zh-CN": "本月成本",
+              "en": "Month Cost"
+            },
+            "icon": "IconCurrencyDollar",
+            "color": "#06b6d4",
+            "format": "currency"
+          },
+          {
+            "field": "pending_approvals",
+            "label": {
+              "zh-CN": "待审批",
+              "en": "Pending Approvals"
+            },
+            "icon": "IconAlertTriangle",
+            "color": "#ef4444"
+          }
+        ]
+      },
+      {
+        "id": "chart_daily_activity",
+        "blockType": "chart",
+        "chartType": "line",
+        "layout": {
+          "colSpan": 6,
+          "rowSpan": 1
+        },
+        "title": {
+          "zh-CN": "每日活动趋势",
+          "en": "Daily Activity Trends"
+        },
+        "chartConfig": {
+          "smooth": true,
+          "areaStyle": true,
+          "showLabel": false,
+          "dataSource": {
+            "type": "namedQuery",
+            "queryCode": "acp_daily_activity",
+            "dimensions": [
+              "activity_date"
+            ],
+            "metrics": [
+              {
+                "field": "activity_count",
+                "aggregation": "sum",
+                "alias": "activity_count"
+              },
+              {
+                "field": "error_count",
+                "aggregation": "sum",
+                "alias": "error_count"
+              },
+              {
+                "field": "alert_count",
+                "aggregation": "sum",
+                "alias": "alert_count"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "chart_cost_by_agent",
+        "blockType": "chart",
+        "chartType": "pie",
+        "layout": {
+          "colSpan": 6,
+          "rowSpan": 1
+        },
+        "title": {
+          "zh-CN": "Agent 成本分布",
+          "en": "Cost by Agent"
+        },
+        "chartConfig": {
+          "showLabel": true,
+          "dataSource": {
+            "type": "namedQuery",
+            "queryCode": "acp_cost_by_agent",
+            "dimensions": [
+              "agent_name"
+            ],
+            "metrics": [
+              {
+                "field": "daily_cost",
+                "aggregation": "sum",
+                "alias": "daily_cost"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "chart_task_status",
+        "blockType": "chart",
+        "chartType": "bar",
+        "layout": {
+          "colSpan": 6,
+          "rowSpan": 1
+        },
+        "title": {
+          "zh-CN": "任务状态分布",
+          "en": "Task Status Distribution"
+        },
+        "chartConfig": {
+          "orientation": "horizontal",
+          "showLabel": true,
+          "dataSource": {
+            "type": "namedQuery",
+            "queryCode": "acp_task_board",
+            "dimensions": [
+              "task_status"
+            ],
+            "metrics": [
+              {
+                "field": "pid",
+                "aggregation": "count",
+                "alias": "count"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "chart_agent_performance",
+        "blockType": "chart",
+        "chartType": "bar",
+        "layout": {
+          "colSpan": 6,
+          "rowSpan": 1
+        },
+        "title": {
+          "zh-CN": "Agent 成功率",
+          "en": "Agent Success Rate"
+        },
+        "chartConfig": {
+          "orientation": "vertical",
+          "showLabel": true,
+          "dataSource": {
+            "type": "namedQuery",
+            "queryCode": "acp_agent_stats",
+            "dimensions": [
+              "agent_name"
+            ],
+            "metrics": [
+              {
+                "field": "success_rate",
+                "aggregation": "sum",
+                "alias": "success_rate"
+              },
+              {
+                "field": "total_runs",
+                "aggregation": "sum",
+                "alias": "total_runs"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "block_approval_inbox",
+        "blockType": "table",
+        "layout": {
+          "colSpan": 6,
+          "rowSpan": 1
+        },
+        "title": {
+          "zh-CN": "待审批",
+          "en": "Approval Inbox"
+        },
+        "dataSource": {
+          "type": "api",
+          "url": "/api/datasource/list",
+          "params": {
+            "datasourceId": "nq:acp_approval_inbox",
+            "format": "records",
+            "maxItems": "20"
+          }
+        },
+        "table": {
+          "columns": [
+            {
+              "field": "approval_type",
+              "width": 120,
+              "renderType": "tag",
+              "label": {
+                "zh-CN": "类型",
+                "en": "Type"
+              }
+            },
+            {
+              "field": "title",
+              "width": 200,
+              "label": {
+                "zh-CN": "标题",
+                "en": "Title"
+              }
+            },
+            {
+              "field": "agent_name",
+              "width": 140,
+              "label": {
+                "zh-CN": "Agent",
+                "en": "Agent"
+              }
+            },
+            {
+              "field": "task_title",
+              "width": 160,
+              "label": {
+                "zh-CN": "关联任务",
+                "en": "Task"
+              }
+            },
+            {
+              "field": "created_at",
+              "width": 150,
+              "label": {
+                "zh-CN": "创建时间",
+                "en": "Created At"
+              }
+            },
+            {
+              "field": "expires_at",
+              "width": 150,
+              "label": {
+                "zh-CN": "过期时间",
+                "en": "Expires At"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "block_recent_runs",
+        "blockType": "table",
+        "modelCode": "agent_run",
+        "layout": {
+          "colSpan": 6,
+          "rowSpan": 1
+        },
+        "title": {
+          "zh-CN": "最近运行",
+          "en": "Recent Runs"
+        },
+        "defaultSort": {
+          "field": "started_at",
+          "order": "desc"
+        },
+        "table": {
+          "columns": [
+            {
+              "field": "agent_id",
+              "width": 140,
+              "label": {
+                "zh-CN": "Agent",
+                "en": "Agent"
+              }
+            },
+            {
+              "field": "run_status",
+              "width": 100,
+              "renderType": "tag",
+              "label": {
+                "zh-CN": "状态",
+                "en": "Status"
+              }
+            },
+            {
+              "field": "run_model",
+              "width": 140,
+              "label": {
+                "zh-CN": "模型",
+                "en": "Model"
+              }
+            },
+            {
+              "field": "started_at",
+              "width": 150,
+              "format": "YYYY-MM-DD HH:mm",
+              "label": {
+                "zh-CN": "开始时间",
+                "en": "Started"
+              }
+            },
+            {
+              "field": "duration_ms",
+              "width": 100,
+              "align": "right",
+              "label": {
+                "zh-CN": "耗时(ms)",
+                "en": "Duration(ms)"
+              }
+            },
+            {
+              "field": "total_cost",
+              "width": 100,
+              "align": "right",
+              "label": {
+                "zh-CN": "成本",
+                "en": "Cost"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "block_mission_progress",
+        "blockType": "table",
+        "layout": {
+          "colSpan": 12,
+          "rowSpan": 1
+        },
+        "title": {
+          "zh-CN": "使命进度",
+          "en": "Mission Progress"
+        },
+        "dataSource": {
+          "type": "api",
+          "url": "/api/datasource/list",
+          "params": {
+            "datasourceId": "nq:acp_mission_progress",
+            "format": "records",
+            "maxItems": "20"
+          }
+        },
+        "table": {
+          "columns": [
+            {
+              "field": "title",
+              "width": 200,
+              "label": {
+                "zh-CN": "使命",
+                "en": "Mission"
+              }
+            },
+            {
+              "field": "mission_status",
+              "width": 100,
+              "renderType": "tag",
+              "label": {
+                "zh-CN": "状态",
+                "en": "Status"
+              }
+            },
+            {
+              "field": "priority",
+              "width": 80,
+              "renderType": "tag",
+              "label": {
+                "zh-CN": "优先级",
+                "en": "Priority"
+              }
+            },
+            {
+              "field": "total_tasks",
+              "width": 80,
+              "align": "right",
+              "label": {
+                "zh-CN": "总任务",
+                "en": "Total"
+              }
+            },
+            {
+              "field": "done_tasks",
+              "width": 80,
+              "align": "right",
+              "label": {
+                "zh-CN": "已完成",
+                "en": "Done"
+              }
+            },
+            {
+              "field": "active_tasks",
+              "width": 80,
+              "align": "right",
+              "label": {
+                "zh-CN": "进行中",
+                "en": "Active"
+              }
+            },
+            {
+              "field": "blocked_tasks",
+              "width": 80,
+              "align": "right",
+              "label": {
+                "zh-CN": "阻塞",
+                "en": "Blocked"
+              }
+            },
+            {
+              "field": "completion_pct",
+              "width": 100,
+              "align": "right",
+              "label": {
+                "zh-CN": "完成率(%)",
+                "en": "Complete(%)"
+              }
+            },
+            {
+              "field": "total_cost",
+              "width": 100,
+              "align": "right",
+              "label": {
+                "zh-CN": "总成本",
+                "en": "Total Cost"
+              }
+            },
+            {
+              "field": "target_date",
+              "width": 120,
+              "label": {
+                "zh-CN": "目标日期",
+                "en": "Target Date"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "block_error_summary",
+        "blockType": "table",
+        "layout": {
+          "colSpan": 12,
+          "rowSpan": 1
+        },
+        "title": {
+          "zh-CN": "最近错误",
+          "en": "Recent Errors"
+        },
+        "dataSource": {
+          "type": "api",
+          "url": "/api/datasource/list",
+          "params": {
+            "datasourceId": "nq:acp_error_summary",
+            "format": "records",
+            "maxItems": "10"
+          }
+        },
+        "table": {
+          "columns": [
+            {
+              "field": "agent_name",
+              "width": 140,
+              "label": {
+                "zh-CN": "Agent",
+                "en": "Agent"
+              }
+            },
+            {
+              "field": "task_title",
+              "width": 180,
+              "label": {
+                "zh-CN": "任务",
+                "en": "Task"
+              }
+            },
+            {
+              "field": "run_model",
+              "width": 140,
+              "label": {
+                "zh-CN": "模型",
+                "en": "Model"
+              }
+            },
+            {
+              "field": "started_at",
+              "width": 150,
+              "label": {
+                "zh-CN": "时间",
+                "en": "Time"
+              }
+            },
+            {
+              "field": "duration_ms",
+              "width": 100,
+              "align": "right",
+              "label": {
+                "zh-CN": "耗时(ms)",
+                "en": "Duration(ms)"
+              }
+            },
+            {
+              "field": "total_cost",
+              "width": 100,
+              "align": "right",
+              "label": {
+                "zh-CN": "成本",
+                "en": "Cost"
+              }
+            },
+            {
+              "field": "error_message",
+              "width": 300,
+              "label": {
+                "zh-CN": "错误信息",
+                "en": "Error Message"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "pageKey": "agent_action_list",
+    "name:zh-CN": "Agent 动作",
+    "name:en": "Agent Actions",
+    "modelCode": "agent_action",
+    "kind": "list",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "stack"
+    },
+    "blocks": [
+      {
+        "id": "toolbar",
+        "blockType": "toolbar",
+        "buttons": []
+      },
+      {
+        "id": "table",
+        "blockType": "table",
+        "columns": [
+          {
+            "field": "action_code",
+            "width": 150,
+            "sortable": true
+          },
+          {
+            "field": "action_type",
+            "width": 120,
+            "renderType": "tag"
+          },
+          {
+            "field": "target_model",
+            "width": 140
+          },
+          {
+            "field": "business_domain",
+            "width": 120
+          },
+          {
+            "field": "risk_level",
+            "width": 100,
+            "renderType": "tag"
+          },
+          {
+            "field": "action_status",
+            "width": 100,
+            "renderType": "tag"
+          },
+          {
+            "field": "intent_summary",
+            "width": 250
+          },
+          {
+            "field": "executed_at",
+            "width": 160,
+            "format": "YYYY-MM-DD HH:mm",
+            "sortable": true
+          }
+        ],
+        "defaultSort": {
+          "field": "executed_at",
+          "order": "desc"
+        }
+      }
+    ]
+  },
+  {
+    "pageKey": "object_alias_list",
+    "name:zh-CN": "对象别名",
+    "name:en": "Object Aliases",
+    "modelCode": "object_alias",
+    "kind": "list",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "stack"
+    },
+    "blocks": [
+      {
+        "id": "toolbar",
+        "blockType": "toolbar",
+        "buttons": [
+          {
+            "code": "create",
+            "variant": "primary",
+            "label": "create",
+            "action": {
+              "type": "navigate",
+              "to": "object_alias_form",
+              "command": "acp:create_object_alias"
+            }
+          }
+        ]
+      },
+      {
+        "id": "table",
+        "blockType": "table",
+        "columns": [
+          {
+            "field": "model_code",
+            "width": 180,
+            "sortable": true
+          },
+          {
+            "field": "alias",
+            "width": 200,
+            "sortable": true
+          },
+          {
+            "field": "language",
+            "width": 100
+          },
+          {
+            "field": "priority",
+            "width": 80,
+            "sortable": true
+          },
+          {
+            "field": "created_at",
+            "width": 160,
+            "format": "YYYY-MM-DD HH:mm"
+          }
+        ],
+        "defaultSort": {
+          "field": "model_code",
+          "order": "asc"
+        }
+      }
+    ]
+  },
+  {
+    "pageKey": "semantic_term_list",
+    "name:zh-CN": "语义术语",
+    "name:en": "Semantic Terms",
+    "modelCode": "semantic_term",
+    "kind": "list",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "stack"
+    },
+    "blocks": [
+      {
+        "id": "toolbar",
+        "blockType": "toolbar",
+        "buttons": [
+          {
+            "code": "create",
+            "variant": "primary",
+            "label": "create",
+            "action": {
+              "type": "navigate",
+              "to": "semantic_term_form",
+              "command": "acp:create_semantic_term"
+            }
+          }
+        ]
+      },
+      {
+        "id": "table",
+        "blockType": "table",
+        "columns": [
+          {
+            "field": "term",
+            "width": 180,
+            "sortable": true
+          },
+          {
+            "field": "model_code",
+            "width": 150
+          },
+          {
+            "field": "language",
+            "width": 100
+          },
+          {
+            "field": "term_type",
+            "width": 120,
+            "renderType": "tag"
+          },
+          {
+            "field": "description",
+            "width": 250
+          },
+          {
+            "field": "priority",
+            "width": 80,
+            "sortable": true
+          },
+          {
+            "field": "created_at",
+            "width": 160,
+            "format": "YYYY-MM-DD HH:mm"
+          }
+        ],
+        "defaultSort": {
+          "field": "term",
+          "order": "asc"
+        }
+      }
+    ]
+  },
+  {
+    "pageKey": "mcp_server_list",
+    "name:zh-CN": "MCP 服务器",
+    "name:en": "MCP Servers",
+    "modelCode": "mcp_server",
+    "kind": "list",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "stack"
+    },
+    "blocks": [
+      {
+        "id": "toolbar",
+        "blockType": "toolbar",
+        "buttons": [
+          {
+            "code": "create",
+            "variant": "primary",
+            "label": "create",
+            "action": {
+              "type": "navigate",
+              "to": "mcp_server_form",
+              "command": "acp:create_mcp_server"
+            }
+          }
+        ]
+      },
+      {
+        "id": "table",
+        "blockType": "table",
+        "columns": [
+          {
+            "field": "server_name",
+            "width": 200,
+            "sortable": true
+          },
+          {
+            "field": "server_url",
+            "width": 300
+          },
+          {
+            "field": "transport_type",
+            "width": 100
+          },
+          {
+            "field": "auth_type",
+            "width": 120
+          },
+          {
+            "field": "status",
+            "width": 100
+          },
+          {
+            "field": "tool_count",
+            "width": 100,
+            "sortable": true
+          },
+          {
+            "field": "last_synced_at",
+            "width": 180,
+            "format": "YYYY-MM-DD HH:mm",
+            "sortable": true
+          }
+        ],
+        "defaultSort": {
+          "field": "server_name",
+          "order": "asc"
+        }
+      }
+    ]
+  },
+  {
+    "pageKey": "object_alias_form",
+    "name:zh-CN": "对象别名表单",
+    "name:en": "Object Alias Form",
+    "modelCode": "object_alias",
+    "kind": "form",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "grid",
+      "cols": 12
+    },
+    "blocks": [
+      {
+        "id": "basic",
+        "blockType": "form-section",
+        "title": {
+          "zh-CN": "基本信息",
+          "en-US": "Basic Information"
+        },
+        "fields": [
+          {
+            "field": "model_code",
+            "colSpan": 6
+          },
+          {
+            "field": "alias",
+            "colSpan": 6
+          },
+          {
+            "field": "language",
+            "colSpan": 6
+          },
+          {
+            "field": "priority",
+            "colSpan": 6
+          }
+        ]
+      },
+      {
+        "id": "buttons",
+        "blockType": "form-buttons",
+        "buttons": [
+          {
+            "code": "submit",
+            "primary": true,
+            "label": "save",
+            "action": {
+              "type": "command",
+              "command": "acp:update_object_alias"
+            }
+          },
+          {
+            "code": "cancel",
+            "label": "cancel"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "pageKey": "semantic_term_form",
+    "name:zh-CN": "语义术语表单",
+    "name:en": "Semantic Term Form",
+    "modelCode": "semantic_term",
+    "kind": "form",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "grid",
+      "cols": 12
+    },
+    "blocks": [
+      {
+        "id": "basic",
+        "blockType": "form-section",
+        "title": {
+          "zh-CN": "基本信息",
+          "en-US": "Basic Information"
+        },
+        "fields": [
+          {
+            "field": "term",
+            "colSpan": 6
+          },
+          {
+            "field": "model_code",
+            "colSpan": 6
+          },
+          {
+            "field": "term_type",
+            "colSpan": 6
+          },
+          {
+            "field": "language",
+            "colSpan": 6
+          },
+          {
+            "field": "priority",
+            "colSpan": 6
+          },
+          {
+            "field": "description",
+            "colSpan": 12
+          },
+          {
+            "field": "resolution",
+            "colSpan": 12
+          }
+        ]
+      },
+      {
+        "id": "buttons",
+        "blockType": "form-buttons",
+        "buttons": [
+          {
+            "code": "submit",
+            "primary": true,
+            "label": "save",
+            "action": {
+              "type": "command",
+              "command": "acp:update_semantic_term"
+            }
+          },
+          {
+            "code": "cancel",
+            "label": "cancel"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "pageKey": "mcp_server_form",
+    "name:zh-CN": "MCP 服务器表单",
+    "name:en": "MCP Server Form",
+    "modelCode": "mcp_server",
+    "kind": "form",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "grid",
+      "cols": 12
+    },
+    "blocks": [
+      {
+        "id": "basic",
+        "blockType": "form-section",
+        "title": {
+          "zh-CN": "基本信息",
+          "en-US": "Basic Information"
+        },
+        "fields": [
+          {
+            "field": "server_name",
+            "colSpan": 6
+          },
+          {
+            "field": "server_url",
+            "colSpan": 6
+          },
+          {
+            "field": "transport_type",
+            "colSpan": 6
+          },
+          {
+            "field": "auth_type",
+            "colSpan": 6
+          },
+          {
+            "field": "status",
+            "colSpan": 6
+          },
+          {
+            "field": "auth_config",
+            "colSpan": 12
+          }
+        ]
+      },
+      {
+        "id": "buttons",
+        "blockType": "form-buttons",
+        "buttons": [
+          {
+            "code": "submit",
+            "primary": true,
+            "label": "save",
+            "action": {
+              "type": "command",
+              "command": "acp:update_mcp_server"
+            }
+          },
+          {
+            "code": "cancel",
+            "label": "cancel"
+          }
+        ]
+      }
+    ]
+  }
+]

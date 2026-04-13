@@ -1,0 +1,35 @@
+{
+  "pageKey": "acs_safety_rule_form",
+  "name:zh-CN": "安全规则表单",
+  "name:en": "Safety Rule Form",
+  "modelCode": "acs_safety_rule",
+  "kind": "form",
+  "schemaVersion": 2,
+  "layout": {"type": "grid", "cols": 12},
+  "blocks": [
+    {
+      "id": "section_rule_definition",
+      "blockType": "form-section",
+      "title": {"zh-CN": "规则定义", "en": "Rule Definition"},
+      "fields": [
+        {"field": "acs_rule_code", "colSpan": 6},
+        {"field": "acs_rule_name", "colSpan": 6},
+        {"field": "acs_rule_type", "colSpan": 4},
+        {"field": "acs_rule_action", "colSpan": 4},
+        {"field": "acs_rule_severity", "colSpan": 4},
+        {"field": "acs_rule_threshold", "colSpan": 4},
+        {"field": "acs_rule_priority", "colSpan": 4}
+      ]
+    },
+    {
+      "id": "section_rule_config",
+      "blockType": "form-section",
+      "title": {"zh-CN": "规则配置", "en": "Rule Configuration"},
+      "fields": [
+        {"field": "acs_rule_trigger_condition", "colSpan": 12, "extension": {"rows": 4, "placeholder:zh-CN": "JSON 格式的触发条件，例如：{\"risk_level\": \">=L3\"}", "placeholder:en": "JSON trigger condition, e.g.: {\"risk_level\": \">=L3\"}"}},
+        {"field": "acs_rule_scope", "colSpan": 12, "extension": {"rows": 3, "placeholder:zh-CN": "JSON 格式的作用范围，例如：{\"models\": [\"*\"], \"commands\": [\"*\"]}", "placeholder:en": "JSON scope, e.g.: {\"models\": [\"*\"], \"commands\": [\"*\"]}"}},
+        {"field": "acs_rule_description", "colSpan": 12}
+      ]
+    }
+  ]
+}

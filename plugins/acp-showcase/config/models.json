@@ -1,0 +1,44 @@
+[
+  {
+    "code": "acs_demo_request",
+    "displayName:zh-CN": "AI 业务请求",
+    "displayName:en": "AI Business Request",
+    "description": "Demonstrates the full ACP 7-layer semantic pipeline lifecycle with tipping points and safety valves.",
+    "modelType": "entity",
+    "modelCategory": "entity",
+    "extension": {
+      "icon": "Rocket",
+      "category": "acp-showcase",
+      "titleField": "acs_req_title",
+      "subtitleField": "acs_req_code"
+    }
+  },
+  {
+    "code": "acs_safety_rule",
+    "displayName:zh-CN": "安全阀门规则",
+    "displayName:en": "Safety Valve Rule",
+    "description": "Configurable safety rules that govern AI agent execution: approval gates, cost limits, rate limits, circuit breakers.",
+    "modelType": "entity",
+    "modelCategory": "entity",
+    "extension": {
+      "icon": "ShieldCheck",
+      "category": "acp-showcase",
+      "titleField": "acs_rule_name",
+      "subtitleField": "acs_rule_code"
+    }
+  },
+  {
+    "code": "acs_execution_log",
+    "displayName:zh-CN": "执行审计日志",
+    "displayName:en": "Execution Audit Log",
+    "description": "Records every step of the ACP pipeline execution with before/after snapshots, risk levels, and safety valve triggers.",
+    "modelType": "entity",
+    "modelCategory": "entity",
+    "extension": {
+      "icon": "ListDetails",
+      "category": "acp-showcase",
+      "titleField": "acs_log_action_detail",
+      "subtitleField": "acs_log_step_number"
+    }
+  }
+]

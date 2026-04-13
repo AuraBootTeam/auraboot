@@ -1,0 +1,208 @@
+[
+  {
+    "code": "acs:create_demo_request",
+    "displayName:zh-CN": "新建 AI 请求",
+    "displayName:en": "Create AI Request",
+    "type": "create",
+    "modelCode": "acs_demo_request",
+    "inputFields": [
+      "acs_req_title",
+      "acs_req_nl_input",
+      "acs_req_category",
+      "acs_req_priority"
+    ],
+    "autoSetFields": {
+      "acs_req_code": {
+        "strategy": "auto_generate",
+        "pattern": "REQ-{yyyyMMdd}-{seq}"
+      },
+      "acs_req_status": {
+        "strategy": "fixed_value",
+        "value": "draft"
+      }
+    },
+    "validation": {
+      "rules": [
+        {
+          "type": "unique_composite",
+          "fields": ["acs_req_title"],
+          "message:zh-CN": "请求标题不能重复",
+          "message:en": "Request title must be unique"
+        }
+      ]
+    },
+    "permissions": ["acs.showcase.manage"],
+    "agent_hint": "Create a new AI business request. User provides a natural language instruction and the system processes it through the ACP 7-layer pipeline.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "acs:update_demo_request",
+    "displayName:zh-CN": "编辑 AI 请求",
+    "displayName:en": "Update AI Request",
+    "type": "update",
+    "modelCode": "acs_demo_request",
+    "inputFields": [
+      "acs_req_title",
+      "acs_req_nl_input",
+      "acs_req_category",
+      "acs_req_priority"
+    ],
+    "preconditions": [
+      {
+        "field": "acs_req_status",
+        "operator": "EQ",
+        "value": "draft"
+      }
+    ],
+    "permissions": ["acs.showcase.manage"],
+    "agent_hint": "Update a draft AI business request.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "acs:delete_demo_request",
+    "displayName:zh-CN": "删除 AI 请求",
+    "displayName:en": "Delete AI Request",
+    "type": "delete",
+    "modelCode": "acs_demo_request",
+    "preconditions": [
+      {
+        "field": "acs_req_status",
+        "operator": "IN",
+        "value": ["draft", "rejected"]
+      }
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此 AI 请求？",
+      "confirmMessage:en": "Confirm delete this AI request?"
+    },
+    "permissions": ["acs.showcase.manage"],
+    "agent_hint": "Delete an AI request. Only allowed when status is draft or rejected.",
+    "cmd_risk_level": "L4"
+  },
+  {
+    "code": "acs:submit_request",
+    "displayName:zh-CN": "提交执行",
+    "displayName:en": "Submit for Execution",
+    "type": "state_transition",
+    "modelCode": "acs_demo_request",
+    "stateField": "acs_req_status",
+    "fromStates": ["draft"],
+    "toState": "submitted",
+    "autoSetFields": {
+      "acs_req_submitted_at": {
+        "strategy": "current_datetime"
+      }
+    },
+    "permissions": ["acs.showcase.manage"],
+    "agent_hint": "Submit the request to the ACP pipeline for execution. This is the TIPPING POINT that triggers D1 Grounding → Skill Selection → Execution.",
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "acs:complete_request",
+    "displayName:zh-CN": "标记完成",
+    "displayName:en": "Mark Completed",
+    "type": "state_transition",
+    "modelCode": "acs_demo_request",
+    "stateField": "acs_req_status",
+    "fromStates": ["executing"],
+    "toState": "completed",
+    "autoSetFields": {
+      "acs_req_completed_at": {
+        "strategy": "current_datetime"
+      }
+    },
+    "permissions": ["acs.showcase.manage"],
+    "agent_hint": "Mark request as completed after successful ACP pipeline execution.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "acs:fail_request",
+    "displayName:zh-CN": "标记失败",
+    "displayName:en": "Mark Failed",
+    "type": "state_transition",
+    "modelCode": "acs_demo_request",
+    "stateField": "acs_req_status",
+    "fromStates": ["executing", "grounding", "planning"],
+    "toState": "failed",
+    "autoSetFields": {
+      "acs_req_completed_at": {
+        "strategy": "current_datetime"
+      }
+    },
+    "permissions": ["acs.showcase.manage"],
+    "agent_hint": "Mark request as failed due to execution error, circuit breaker, or cost limit.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "acs:block_request",
+    "displayName:zh-CN": "安全阻断",
+    "displayName:en": "Block by Safety Valve",
+    "type": "state_transition",
+    "modelCode": "acs_demo_request",
+    "stateField": "acs_req_status",
+    "fromStates": ["executing", "grounding", "planning"],
+    "toState": "blocked",
+    "permissions": ["acs.showcase.manage"],
+    "agent_hint": "Block request execution due to a safety valve trigger (approval gate, cost limit, etc.).",
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "acs:approve_blocked",
+    "displayName:zh-CN": "审批通过",
+    "displayName:en": "Approve",
+    "type": "state_transition",
+    "modelCode": "acs_demo_request",
+    "stateField": "acs_req_status",
+    "fromStates": ["blocked"],
+    "toState": "executing",
+    "extension": {
+      "confirmMessage:zh-CN": "确认审批通过此高风险请求？",
+      "confirmMessage:en": "Confirm approving this high-risk request?"
+    },
+    "permissions": ["acs.showcase.manage"],
+    "agent_hint": "Approve a blocked request to resume execution through the ACP pipeline.",
+    "cmd_risk_level": "L3"
+  },
+  {
+    "code": "acs:reject_blocked",
+    "displayName:zh-CN": "审批拒绝",
+    "displayName:en": "Reject",
+    "type": "state_transition",
+    "modelCode": "acs_demo_request",
+    "stateField": "acs_req_status",
+    "fromStates": ["blocked"],
+    "toState": "rejected",
+    "autoSetFields": {
+      "acs_req_completed_at": {
+        "strategy": "current_datetime"
+      }
+    },
+    "extension": {
+      "confirmMessage:zh-CN": "确认拒绝此请求？",
+      "confirmMessage:en": "Confirm rejecting this request?"
+    },
+    "permissions": ["acs.showcase.manage"],
+    "agent_hint": "Reject a blocked request. The request will be terminated.",
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "acs:detail_demo_request",
+    "displayName:zh-CN": "查看请求详情",
+    "displayName:en": "View Request Detail",
+    "type": "query",
+    "modelCode": "acs_demo_request",
+    "permissions": ["acs.showcase.manage"],
+    "agent_hint": "Query AI request details including pipeline journey and safety audit.",
+    "cmd_risk_level": "L0"
+  },
+  {
+    "code": "acs:list_demo_request",
+    "displayName:zh-CN": "请求列表",
+    "displayName:en": "List Requests",
+    "type": "query",
+    "modelCode": "acs_demo_request",
+    "permissions": ["acs.showcase.manage"],
+    "agent_hint": "Query AI request list with status filtering.",
+    "cmd_risk_level": "L0"
+  }
+]

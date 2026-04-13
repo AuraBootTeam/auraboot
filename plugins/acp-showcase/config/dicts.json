@@ -1,0 +1,178 @@
+[
+  {
+    "code": "acs_demo_request_status",
+    "name": "ACP Request Status",
+    "name:zh-CN": "AI 请求状态",
+    "dictType": "static",
+    "items": [
+      {"value": "draft", "label": "Draft", "label:zh-CN": "草稿", "sortNo": 10, "color": "#d9d9d9", "status": "enabled", "extension": {"color": "gray"}},
+      {"value": "submitted", "label": "Submitted", "label:zh-CN": "已提交", "sortNo": 20, "color": "#1890ff", "status": "enabled", "extension": {"color": "blue"}},
+      {"value": "grounding", "label": "Grounding", "label:zh-CN": "语义解析中", "sortNo": 30, "color": "#13c2c2", "status": "enabled", "extension": {"color": "cyan"}},
+      {"value": "planning", "label": "Planning", "label:zh-CN": "规划中", "sortNo": 40, "color": "#722ed1", "status": "enabled", "extension": {"color": "purple"}},
+      {"value": "executing", "label": "Executing", "label:zh-CN": "执行中", "sortNo": 50, "color": "#fa8c16", "status": "enabled", "extension": {"color": "orange"}},
+      {"value": "completed", "label": "Completed", "label:zh-CN": "已完成", "sortNo": 60, "color": "#52c41a", "status": "enabled", "extension": {"color": "green"}},
+      {"value": "failed", "label": "Failed", "label:zh-CN": "失败", "sortNo": 70, "color": "#f5222d", "status": "enabled", "extension": {"color": "red"}},
+      {"value": "blocked", "label": "Blocked", "label:zh-CN": "已阻断", "sortNo": 80, "color": "#faad14", "status": "enabled", "extension": {"color": "gold"}},
+      {"value": "rejected", "label": "Rejected", "label:zh-CN": "已拒绝", "sortNo": 90, "color": "#cf1322", "status": "enabled", "extension": {"color": "volcano"}}
+    ]
+  },
+  {
+    "code": "acs_demo_category",
+    "name": "Request Category",
+    "name:zh-CN": "请求类别",
+    "dictType": "static",
+    "items": [
+      {"value": "data_query", "label": "Data Query", "label:zh-CN": "数据查询", "sortNo": 10, "status": "enabled", "extension": {"color": "blue"}},
+      {"value": "record_create", "label": "Record Create", "label:zh-CN": "创建记录", "sortNo": 20, "status": "enabled", "extension": {"color": "green"}},
+      {"value": "record_update", "label": "Record Update", "label:zh-CN": "更新记录", "sortNo": 30, "status": "enabled", "extension": {"color": "cyan"}},
+      {"value": "state_transition", "label": "State Transition", "label:zh-CN": "状态变更", "sortNo": 40, "status": "enabled", "extension": {"color": "purple"}},
+      {"value": "batch_operation", "label": "Batch Operation", "label:zh-CN": "批量操作", "sortNo": 50, "status": "enabled", "extension": {"color": "orange"}},
+      {"value": "data_deletion", "label": "Data Deletion", "label:zh-CN": "数据删除", "sortNo": 60, "status": "enabled", "extension": {"color": "red"}},
+      {"value": "external_api", "label": "External API", "label:zh-CN": "外部 API", "sortNo": 70, "status": "enabled", "extension": {"color": "geekblue"}},
+      {"value": "automation", "label": "Automation", "label:zh-CN": "自动化流程", "sortNo": 80, "status": "enabled", "extension": {"color": "magenta"}}
+    ]
+  },
+  {
+    "code": "acs_risk_level",
+    "name": "Risk Level",
+    "name:zh-CN": "风险等级",
+    "dictType": "static",
+    "items": [
+      {"value": "l0", "label": "L0 - Safe", "label:zh-CN": "L0 - 安全", "sortNo": 10, "color": "#52c41a", "status": "enabled", "extension": {"color": "green"}},
+      {"value": "l1", "label": "L1 - Low", "label:zh-CN": "L1 - 低风险", "sortNo": 20, "color": "#1890ff", "status": "enabled", "extension": {"color": "blue"}},
+      {"value": "l2", "label": "L2 - Medium", "label:zh-CN": "L2 - 中风险", "sortNo": 30, "color": "#fa8c16", "status": "enabled", "extension": {"color": "orange"}},
+      {"value": "l3", "label": "L3 - High", "label:zh-CN": "L3 - 高风险", "sortNo": 40, "color": "#f5222d", "status": "enabled", "extension": {"color": "red"}},
+      {"value": "l4", "label": "L4 - Critical", "label:zh-CN": "L4 - 极高风险", "sortNo": 50, "color": "#cf1322", "status": "enabled", "extension": {"color": "volcano"}}
+    ]
+  },
+  {
+    "code": "acs_task_priority",
+    "name": "Priority",
+    "name:zh-CN": "优先级",
+    "dictType": "static",
+    "items": [
+      {"value": "low", "label": "Low", "label:zh-CN": "低", "sortNo": 10, "status": "enabled", "extension": {"color": "blue"}},
+      {"value": "medium", "label": "Medium", "label:zh-CN": "中", "sortNo": 20, "status": "enabled", "extension": {"color": "orange"}},
+      {"value": "high", "label": "High", "label:zh-CN": "高", "sortNo": 30, "status": "enabled", "extension": {"color": "red"}},
+      {"value": "critical", "label": "Critical", "label:zh-CN": "紧急", "sortNo": 40, "status": "enabled", "extension": {"color": "volcano"}}
+    ]
+  },
+  {
+    "code": "acs_safety_rule_type",
+    "name": "Safety Rule Type",
+    "name:zh-CN": "安全规则类型",
+    "dictType": "static",
+    "items": [
+      {"value": "approval_gate", "label": "Approval Gate", "label:zh-CN": "审批门", "sortNo": 10, "status": "enabled", "extension": {"color": "gold"}},
+      {"value": "cost_limit", "label": "Cost Limit", "label:zh-CN": "成本上限", "sortNo": 20, "status": "enabled", "extension": {"color": "orange"}},
+      {"value": "rate_limit", "label": "Rate Limit", "label:zh-CN": "速率限制", "sortNo": 30, "status": "enabled", "extension": {"color": "blue"}},
+      {"value": "content_filter", "label": "Content Filter", "label:zh-CN": "内容过滤", "sortNo": 40, "status": "enabled", "extension": {"color": "purple"}},
+      {"value": "scope_restriction", "label": "Scope Restriction", "label:zh-CN": "范围限制", "sortNo": 50, "status": "enabled", "extension": {"color": "cyan"}},
+      {"value": "hallucination_breaker", "label": "Hallucination Breaker", "label:zh-CN": "幻觉熔断器", "sortNo": 60, "status": "enabled", "extension": {"color": "red"}},
+      {"value": "iteration_limit", "label": "Iteration Limit", "label:zh-CN": "迭代上限", "sortNo": 70, "status": "enabled", "extension": {"color": "geekblue"}}
+    ]
+  },
+  {
+    "code": "acs_safety_action",
+    "name": "Safety Action",
+    "name:zh-CN": "安全动作",
+    "dictType": "static",
+    "items": [
+      {"value": "pause_and_notify", "label": "Pause & Notify", "label:zh-CN": "暂停并通知", "sortNo": 10, "status": "enabled", "extension": {"color": "gold"}},
+      {"value": "terminate", "label": "Terminate", "label:zh-CN": "立即终止", "sortNo": 20, "status": "enabled", "extension": {"color": "red"}},
+      {"value": "downgrade", "label": "Downgrade", "label:zh-CN": "降级执行", "sortNo": 30, "status": "enabled", "extension": {"color": "orange"}},
+      {"value": "log_only", "label": "Log Only", "label:zh-CN": "仅记录", "sortNo": 40, "status": "enabled", "extension": {"color": "blue"}},
+      {"value": "require_approval", "label": "Require Approval", "label:zh-CN": "需要审批", "sortNo": 50, "status": "enabled", "extension": {"color": "volcano"}}
+    ]
+  },
+  {
+    "code": "acs_severity",
+    "name": "Severity",
+    "name:zh-CN": "严重程度",
+    "dictType": "static",
+    "items": [
+      {"value": "info", "label": "Info", "label:zh-CN": "信息", "sortNo": 10, "status": "enabled", "extension": {"color": "blue"}},
+      {"value": "warn", "label": "Warning", "label:zh-CN": "警告", "sortNo": 20, "status": "enabled", "extension": {"color": "gold"}},
+      {"value": "error", "label": "Error", "label:zh-CN": "错误", "sortNo": 30, "status": "enabled", "extension": {"color": "red"}},
+      {"value": "critical", "label": "Critical", "label:zh-CN": "严重", "sortNo": 40, "status": "enabled", "extension": {"color": "volcano"}}
+    ]
+  },
+  {
+    "code": "acs_pipeline_layer",
+    "name": "Pipeline Layer",
+    "name:zh-CN": "管线层级",
+    "dictType": "static",
+    "items": [
+      {"value": "l5_natural_language", "label": "L5 Natural Language", "label:zh-CN": "L5 自然语言", "sortNo": 10, "status": "enabled", "extension": {"color": "geekblue"}},
+      {"value": "l4_business_intent", "label": "L4 Business Intent", "label:zh-CN": "L4 业务意图", "sortNo": 20, "status": "enabled", "extension": {"color": "purple"}},
+      {"value": "l3_5_capability", "label": "L3.5 Capability", "label:zh-CN": "L3.5 能力域", "sortNo": 30, "status": "enabled", "extension": {"color": "cyan"}},
+      {"value": "l3_skill", "label": "L3 Skill", "label:zh-CN": "L3 技能", "sortNo": 40, "status": "enabled", "extension": {"color": "blue"}},
+      {"value": "l2_action", "label": "L2 Action", "label:zh-CN": "L2 业务动作", "sortNo": 50, "status": "enabled", "extension": {"color": "orange"}},
+      {"value": "l1_tool", "label": "L1 Tool", "label:zh-CN": "L1 工具执行", "sortNo": 60, "status": "enabled", "extension": {"color": "gold"}},
+      {"value": "l0_database", "label": "L0 Database", "label:zh-CN": "L0 数据库", "sortNo": 70, "status": "enabled", "extension": {"color": "green"}}
+    ]
+  },
+  {
+    "code": "acs_log_action_type",
+    "name": "Log Action Type",
+    "name:zh-CN": "日志动作类型",
+    "dictType": "static",
+    "items": [
+      {"value": "grounding", "label": "Grounding", "label:zh-CN": "语义解析", "sortNo": 10, "status": "enabled", "extension": {"color": "purple"}},
+      {"value": "intent_parse", "label": "Intent Parse", "label:zh-CN": "意图解析", "sortNo": 20, "status": "enabled", "extension": {"color": "geekblue"}},
+      {"value": "object_resolve", "label": "Object Resolve", "label:zh-CN": "对象识别", "sortNo": 30, "status": "enabled", "extension": {"color": "cyan"}},
+      {"value": "risk_evaluate", "label": "Risk Evaluate", "label:zh-CN": "风险评估", "sortNo": 40, "status": "enabled", "extension": {"color": "orange"}},
+      {"value": "skill_select", "label": "Skill Select", "label:zh-CN": "技能选择", "sortNo": 50, "status": "enabled", "extension": {"color": "blue"}},
+      {"value": "plan_generate", "label": "Plan Generate", "label:zh-CN": "计划生成", "sortNo": 60, "status": "enabled", "extension": {"color": "purple"}},
+      {"value": "tool_call", "label": "Tool Call", "label:zh-CN": "工具调用", "sortNo": 70, "status": "enabled", "extension": {"color": "green"}},
+      {"value": "approval_check", "label": "Approval Check", "label:zh-CN": "审批检查", "sortNo": 80, "status": "enabled", "extension": {"color": "gold"}},
+      {"value": "cost_check", "label": "Cost Check", "label:zh-CN": "成本检查", "sortNo": 90, "status": "enabled", "extension": {"color": "orange"}},
+      {"value": "circuit_break", "label": "Circuit Break", "label:zh-CN": "熔断触发", "sortNo": 100, "status": "enabled", "extension": {"color": "red"}},
+      {"value": "semantic_validate", "label": "Semantic Validate", "label:zh-CN": "语义校验", "sortNo": 110, "status": "enabled", "extension": {"color": "lime"}}
+    ]
+  },
+  {
+    "code": "acs_reversal_mode",
+    "name": "Reversal Mode",
+    "name:zh-CN": "可逆性",
+    "dictType": "static",
+    "items": [
+      {"value": "auto_reversible", "label": "Auto Reversible", "label:zh-CN": "自动可逆", "sortNo": 10, "status": "enabled", "extension": {"color": "green"}},
+      {"value": "manual_reversible", "label": "Manual Reversible", "label:zh-CN": "人工可逆", "sortNo": 20, "status": "enabled", "extension": {"color": "orange"}},
+      {"value": "irreversible", "label": "Irreversible", "label:zh-CN": "不可逆", "sortNo": 30, "status": "enabled", "extension": {"color": "red"}}
+    ]
+  },
+  {
+    "code": "acs_reversal_status",
+    "name": "Reversal Status",
+    "name:zh-CN": "回滚状态",
+    "dictType": "static",
+    "items": [
+      {"value": "not_reversed", "label": "Not Reversed", "label:zh-CN": "未回滚", "sortNo": 10, "status": "enabled", "extension": {"color": "gray"}},
+      {"value": "reversed", "label": "Reversed", "label:zh-CN": "已回滚", "sortNo": 20, "status": "enabled", "extension": {"color": "green"}},
+      {"value": "pending_reversal", "label": "Pending", "label:zh-CN": "待回滚", "sortNo": 30, "status": "enabled", "extension": {"color": "gold"}}
+    ]
+  },
+  {
+    "code": "acs_log_status",
+    "name": "Log Status",
+    "name:zh-CN": "日志状态",
+    "dictType": "static",
+    "items": [
+      {"value": "success", "label": "Success", "label:zh-CN": "成功", "sortNo": 10, "status": "enabled", "extension": {"color": "green"}},
+      {"value": "failed", "label": "Failed", "label:zh-CN": "失败", "sortNo": 20, "status": "enabled", "extension": {"color": "red"}},
+      {"value": "skipped", "label": "Skipped", "label:zh-CN": "跳过", "sortNo": 30, "status": "enabled", "extension": {"color": "gray"}},
+      {"value": "blocked", "label": "Blocked", "label:zh-CN": "阻断", "sortNo": 40, "status": "enabled", "extension": {"color": "gold"}}
+    ]
+  },
+  {
+    "code": "acs_rule_status",
+    "name": "Rule Status",
+    "name:zh-CN": "规则状态",
+    "dictType": "static",
+    "items": [
+      {"value": "active", "label": "Active", "label:zh-CN": "启用", "sortNo": 10, "color": "#52c41a", "status": "enabled", "extension": {"color": "green"}},
+      {"value": "inactive", "label": "Inactive", "label:zh-CN": "停用", "sortNo": 20, "color": "#d9d9d9", "status": "enabled", "extension": {"color": "gray"}}
+    ]
+  }
+]

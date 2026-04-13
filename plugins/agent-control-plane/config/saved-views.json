@@ -1,0 +1,54 @@
+[
+  {
+    "name": "Task Board",
+    "description": "Agent tasks kanban board grouped by status",
+    "modelCode": "agent_task",
+    "pageKey": "agent-task",
+    "scope": "global",
+    "viewType": "kanban",
+    "isDefault": false,
+    "sortOrder": 1,
+    "viewConfig": {
+      "groupByField": "task_status",
+      "titleField": "title",
+      "descriptionField": "description",
+      "idField": "pid",
+      "cardFields": [
+        { "field": "task_priority", "label": "Priority", "type": "tag" },
+        { "field": "assignee_type", "label": "Assignee", "type": "tag" },
+        { "field": "assignee_id", "label": "Agent", "type": "text" },
+        { "field": "due_date", "label": "Due", "type": "date" }
+      ],
+      "kanbanAggregations": [
+        { "field": "estimated_cost", "function": "sum", "label": "Est. Cost" },
+        { "field": null, "function": "count", "label": "Count" }
+      ],
+      "draggable": true,
+      "showCount": true,
+      "showAggregations": true
+    }
+  },
+  {
+    "name": "Mission Board",
+    "description": "Missions kanban board grouped by status",
+    "modelCode": "mission",
+    "pageKey": "mission",
+    "scope": "global",
+    "viewType": "kanban",
+    "isDefault": false,
+    "sortOrder": 1,
+    "viewConfig": {
+      "groupByField": "mission_status",
+      "titleField": "title",
+      "descriptionField": "description",
+      "idField": "pid",
+      "cardFields": [
+        { "field": "mission_priority", "label": "Priority", "type": "tag" },
+        { "field": "owner_id", "label": "Owner", "type": "text" },
+        { "field": "target_date", "label": "Target", "type": "date" }
+      ],
+      "draggable": true,
+      "showCount": true
+    }
+  }
+]

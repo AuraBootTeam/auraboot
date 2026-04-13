@@ -1,0 +1,82 @@
+{
+  "pageKey": "acs_safety_rule_list",
+  "name:zh-CN": "安全阀门规则",
+  "name:en": "Safety Valve Rules",
+  "modelCode": "acs_safety_rule",
+  "kind": "list",
+  "schemaVersion": 2,
+  "layout": {"type": "grid", "cols": 12},
+  "blocks": [
+    {
+      "id": "acs_rule_tabs",
+      "blockType": "tabs",
+      "tabs": [
+        {"key": "all", "label": {"en": "All", "zh-CN": "全部"}, "filter": null},
+        {"key": "active", "label": {"en": "Active", "zh-CN": "启用"}, "filter": {"field": "acs_rule_status", "value": "active", "operator": "EQ"}},
+        {"key": "inactive", "label": {"en": "Inactive", "zh-CN": "停用"}, "filter": {"field": "acs_rule_status", "value": "inactive", "operator": "EQ"}}
+      ]
+    },
+    {
+      "id": "acs_rule_toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "create",
+          "primary": true,
+          "permissionCode": "acs.safety_rule.manage",
+          "label": {"zh-CN": "新建规则", "en": "New Rule"},
+          "action": {"type": "navigate", "to": "acs_safety_rule_form", "command": "acs:create_safety_rule"}
+        }
+      ]
+    },
+    {
+      "id": "acs_rule_table",
+      "blockType": "table",
+      "columns": [
+        {"field": "acs_rule_code", "width": 160, "sortable": true},
+        {"field": "acs_rule_name", "width": 200, "sortable": true},
+        {"field": "acs_rule_type", "width": 150, "renderType": "tag", "dictCode": "acs_safety_rule_type"},
+        {"field": "acs_rule_action", "width": 130, "renderType": "tag", "dictCode": "acs_safety_action"},
+        {"field": "acs_rule_severity", "width": 100, "renderType": "tag", "dictCode": "acs_severity"},
+        {"field": "acs_rule_threshold", "width": 90},
+        {"field": "acs_rule_status", "width": 90, "renderType": "tag", "dictCode": "acs_rule_status"},
+        {"field": "acs_rule_trigger_count", "width": 100, "sortable": true},
+        {"field": "acs_rule_last_triggered_at", "width": 160, "sortable": true},
+        {
+          "field": "actions",
+          "isActionColumn": true,
+          "buttons": [
+            {
+              "code": "edit",
+              "permissionCode": "acs.safety_rule.manage",
+              "label": {"zh-CN": "编辑", "en": "Edit"},
+              "action": {"type": "navigate", "to": "acs_safety_rule_form"}
+            },
+            {
+              "code": "activate",
+              "permissionCode": "acs.safety_rule.manage",
+              "label": {"zh-CN": "启用", "en": "Activate"},
+              "action": {"type": "command", "command": "acs:activate_rule"}
+            },
+            {
+              "code": "deactivate",
+              "permissionCode": "acs.safety_rule.manage",
+              "label": {"zh-CN": "停用", "en": "Deactivate"},
+              "action": {"type": "command", "command": "acs:deactivate_rule"}
+            },
+            {
+              "code": "delete",
+              "danger": true,
+              "permissionCode": "acs.safety_rule.manage",
+              "label": {"zh-CN": "删除", "en": "Delete"},
+              "confirm": "delete.confirm",
+              "action": {"type": "command", "command": "acs:delete_safety_rule"}
+            }
+          ]
+        }
+      ],
+      "searchFields": ["acs_rule_name", "acs_rule_code"],
+      "defaultSort": {"field": "acs_rule_priority", "order": "asc"}
+    }
+  ]
+}

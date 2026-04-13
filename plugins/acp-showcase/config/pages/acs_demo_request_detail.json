@@ -1,0 +1,193 @@
+{
+  "pageKey": "acs_demo_request_detail",
+  "name:zh-CN": "AI 请求详情",
+  "name:en": "AI Request Detail",
+  "modelCode": "acs_demo_request",
+  "kind": "detail",
+  "schemaVersion": 2,
+  "layout": {"type": "stack"},
+  "blocks": [
+    {
+      "id": "acs_detail_toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "submit",
+          "primary": true,
+          "permissionCode": "acs.showcase.manage",
+          "label": {"zh-CN": "提交执行", "en": "Submit"},
+          "action": {"type": "command", "command": "acs:submit_request"}
+        },
+        {
+          "code": "approve",
+          "primary": true,
+          "permissionCode": "acs.showcase.manage",
+          "label": {"zh-CN": "审批通过", "en": "Approve"},
+          "action": {"type": "command", "command": "acs:approve_blocked"}
+        },
+        {
+          "code": "reject",
+          "danger": true,
+          "permissionCode": "acs.showcase.manage",
+          "label": {"zh-CN": "审批拒绝", "en": "Reject"},
+          "action": {"type": "command", "command": "acs:reject_blocked"}
+        },
+        {
+          "code": "edit",
+          "permissionCode": "acs.showcase.manage",
+          "label": {"zh-CN": "编辑", "en": "Edit"},
+          "action": {"type": "navigate", "to": "acs_demo_request_form"}
+        },
+        {
+          "code": "delete",
+          "danger": true,
+          "permissionCode": "acs.showcase.manage",
+          "label": {"zh-CN": "删除", "en": "Delete"},
+          "confirm": "delete.confirm",
+          "action": {"type": "command", "command": "acs:delete_demo_request"}
+        }
+      ]
+    },
+    {
+      "id": "acs_detail_tabs",
+      "blockType": "tabs",
+      "tabs": [
+        {
+          "key": "overview",
+          "label": {"zh-CN": "概览", "en": "Overview"},
+          "blocks": [
+            {
+              "id": "section_summary",
+              "blockType": "form-section",
+              "title": {"zh-CN": "请求摘要", "en": "Request Summary"},
+              "columns": 3,
+              "fields": [
+                {"field": "acs_req_code", "readOnly": true},
+                {"field": "acs_req_title", "readOnly": true},
+                {"field": "acs_req_status", "readOnly": true},
+                {"field": "acs_req_risk_level", "readOnly": true},
+                {"field": "acs_req_category", "readOnly": true},
+                {"field": "acs_req_priority", "readOnly": true},
+                {"field": "acs_req_skill_used", "readOnly": true},
+                {"field": "acs_req_submitted_at", "readOnly": true},
+                {"field": "acs_req_completed_at", "readOnly": true}
+              ]
+            },
+            {
+              "id": "section_metrics",
+              "blockType": "form-section",
+              "title": {"zh-CN": "执行指标", "en": "Execution Metrics"},
+              "columns": 4,
+              "fields": [
+                {"field": "acs_req_total_cost", "readOnly": true},
+                {"field": "acs_req_token_count", "readOnly": true},
+                {"field": "acs_req_tool_calls", "readOnly": true},
+                {"field": "acs_req_duration_ms", "readOnly": true}
+              ]
+            },
+            {
+              "id": "section_nl_input",
+              "blockType": "form-section",
+              "title": {"zh-CN": "自然语言输入", "en": "Natural Language Input"},
+              "columns": 1,
+              "fields": [
+                {"field": "acs_req_nl_input", "readOnly": true, "span": 1}
+              ]
+            },
+            {
+              "id": "section_outcome",
+              "blockType": "form-section",
+              "title": {"zh-CN": "执行结果", "en": "Outcome"},
+              "columns": 1,
+              "fields": [
+                {"field": "acs_req_outcome", "readOnly": true, "span": 1},
+                {"field": "acs_req_error_message", "readOnly": true, "span": 1}
+              ]
+            }
+          ]
+        },
+        {
+          "key": "pipeline_journey",
+          "label": {"zh-CN": "管线旅程", "en": "Pipeline Journey"},
+          "blocks": [
+            {
+              "id": "pipeline_log_table",
+              "blockType": "sub-table",
+              "modelCode": "acs_execution_log",
+              "foreignKeyField": "acs_log_request_id",
+              "columns": [
+                {"field": "acs_log_step_number", "width": 80},
+                {"field": "acs_log_layer", "width": 150, "renderType": "tag", "dictCode": "acs_pipeline_layer"},
+                {"field": "acs_log_action_type", "width": 130, "renderType": "tag", "dictCode": "acs_log_action_type"},
+                {"field": "acs_log_action_detail", "width": 250},
+                {"field": "acs_log_risk_level", "width": 110, "renderType": "tag", "dictCode": "acs_risk_level"},
+                {"field": "acs_log_duration_ms", "width": 100},
+                {"field": "acs_log_cost", "width": 90},
+                {"field": "acs_log_safety_triggered", "width": 100},
+                {"field": "acs_log_status", "width": 90, "renderType": "tag", "dictCode": "acs_log_status"}
+              ],
+              "defaultSort": {"field": "acs_log_step_number", "order": "asc"}
+            }
+          ]
+        },
+        {
+          "key": "safety_audit",
+          "label": {"zh-CN": "安全审计", "en": "Safety Audit"},
+          "blocks": [
+            {
+              "id": "safety_log_table",
+              "blockType": "sub-table",
+              "modelCode": "acs_execution_log",
+              "foreignKeyField": "acs_log_request_id",
+              "filter": {"field": "acs_log_safety_triggered", "value": true, "operator": "EQ"},
+              "columns": [
+                {"field": "acs_log_step_number", "width": 80},
+                {"field": "acs_log_safety_rule_id", "width": 150},
+                {"field": "acs_log_action_detail", "width": 250},
+                {"field": "acs_log_risk_level", "width": 110, "renderType": "tag", "dictCode": "acs_risk_level"},
+                {"field": "acs_log_before_snapshot", "width": 200},
+                {"field": "acs_log_after_snapshot", "width": 200},
+                {"field": "acs_log_reversal_mode", "width": 120, "renderType": "tag", "dictCode": "acs_reversal_mode"},
+                {"field": "acs_log_reversal_status", "width": 120, "renderType": "tag", "dictCode": "acs_reversal_status"}
+              ],
+              "defaultSort": {"field": "acs_log_step_number", "order": "asc"}
+            }
+          ]
+        },
+        {
+          "key": "grounding_plan",
+          "label": {"zh-CN": "Grounding & Plan", "en": "Grounding & Plan"},
+          "blocks": [
+            {
+              "id": "section_grounding",
+              "blockType": "form-section",
+              "title": {"zh-CN": "D1 Grounding 结果", "en": "D1 Grounding Result"},
+              "columns": 1,
+              "fields": [
+                {"field": "acs_req_grounding_result", "readOnly": true, "span": 1}
+              ]
+            },
+            {
+              "id": "section_plan",
+              "blockType": "form-section",
+              "title": {"zh-CN": "执行计划", "en": "Execution Plan"},
+              "columns": 1,
+              "fields": [
+                {"field": "acs_req_plan", "readOnly": true, "span": 1}
+              ]
+            },
+            {
+              "id": "section_safety_triggers",
+              "blockType": "form-section",
+              "title": {"zh-CN": "安全阀门触发记录", "en": "Safety Triggers"},
+              "columns": 1,
+              "fields": [
+                {"field": "acs_req_safety_triggers", "readOnly": true, "span": 1}
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

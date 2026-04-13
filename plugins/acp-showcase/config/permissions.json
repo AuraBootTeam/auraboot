@@ -1,0 +1,16 @@
+[
+  {
+    "code": "acs.showcase.manage",
+    "name:zh-CN": "管理 ACP 展示",
+    "name:en": "Manage ACP Showcase",
+    "resourceType": "operation",
+    "module": "acs"
+  },
+  {
+    "code": "acs.safety_rule.manage",
+    "name:zh-CN": "管理安全规则",
+    "name:en": "Manage Safety Rules",
+    "resourceType": "operation",
+    "module": "acs"
+  }
+]
