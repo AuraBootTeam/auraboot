@@ -1,7 +1,7 @@
 import React, { Suspense } from 'react';
 import { RouteLoadingFallback } from '~/components/RouteLoadingFallback';
 
-const FlowDesigner = React.lazy(() => import('~/flow-designer/FlowDesigner'));
+const FlowDesigner = React.lazy(() => import('~/plugins/core-designer/components/flow-designer/FlowDesigner'));
 
 type MetaArgs = Record<string, unknown>;
 

@@ -11,13 +11,13 @@ import { profileRegistry } from '../ProfileRegistry';
 
 // Lazy-loaded renderers
 const ReportPageContent = React.lazy(() =>
-  import('~/report-designer/renderers/ReportPageContent').then((m) => ({
+  import('~/plugins/core-designer/components/report-designer/renderers/ReportPageContent').then((m) => ({
     default: m.ReportPageContent as any,
   })),
 );
 
 // Skeleton
-import { ReportPageSkeleton } from '~/report-designer/renderers/ReportPageSkeleton';
+import { ReportPageSkeleton } from '~/plugins/core-designer/components/report-designer/renderers/ReportPageSkeleton';
 
 const reportProfile: RenderProfile = {
   name: 'report',

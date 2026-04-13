@@ -9,7 +9,7 @@
  */
 import { useSearchParams } from 'react-router'
 import { ReactFlowProvider } from '@xyflow/react'
-import { ProcessStatusViewer } from '~/bpmn-designer/components/ProcessStatusViewer'
+import { ProcessStatusViewer } from '~/plugins/core-designer/components/bpmn-designer/components/ProcessStatusViewer'
 
 export default function ProcessStatusPage() {
   const [searchParams] = useSearchParams()

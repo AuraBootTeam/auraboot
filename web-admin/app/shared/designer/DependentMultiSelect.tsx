@@ -9,7 +9,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { FieldAdapter } from '~/components/field-adapter';
 import { fetchDictOptions, fetchFieldOptions } from '~/services/resourceSelectService';
-import { useFlowStore } from '~/flow-designer-sdk/store';
+import { useFlowStore } from '~/plugins/core-designer/components/flow-designer-sdk/store';
 import type { ResourceOption } from '~/components/base-fields/BaseResourceSelect';
 
 export interface DependentMultiSelectProps {

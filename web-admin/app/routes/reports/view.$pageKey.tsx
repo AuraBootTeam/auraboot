@@ -3,7 +3,7 @@
  */
 
 import { useParams } from 'react-router';
-import { ReportPageContent } from '~/report-designer';
+import { ReportPageContent } from '~/plugins/core-designer/components/report-designer';
 
 export default function ReportViewPage() {
   const { pageKey } = useParams();
