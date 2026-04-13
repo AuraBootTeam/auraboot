@@ -1,0 +1,223 @@
+[
+  {
+    "code": "agent_definition",
+    "displayName:zh-CN": "Agent 定义",
+    "displayName:en": "Agent Definition",
+    "description": "AI agent definitions with configuration, tools, and guardrails",
+    "modelType": "entity",
+    "modelCategory": "master",
+    "extension": {
+      "titleField": "name",
+      "subtitleField": "agent_code",
+      "tableName": "ab_agent_definition",
+      "softDelete": true
+    }
+  },
+  {
+    "code": "mission",
+    "displayName:zh-CN": "任务使命",
+    "displayName:en": "Mission",
+    "description": "High-level missions that decompose into agent tasks",
+    "modelType": "entity",
+    "modelCategory": "entity",
+    "extension": {
+      "titleField": "title",
+      "tableName": "ab_mission",
+      "softDelete": true
+    }
+  },
+  {
+    "code": "agent_task",
+    "displayName:zh-CN": "Agent 任务",
+    "displayName:en": "Agent Task",
+    "description": "Individual tasks assigned to agents or humans",
+    "modelType": "entity",
+    "modelCategory": "entity",
+    "extension": {
+      "titleField": "title",
+      "subtitleField": "task_status",
+      "tableName": "ab_agent_task",
+      "softDelete": true
+    }
+  },
+  {
+    "code": "agent_run",
+    "displayName:zh-CN": "Agent 运行记录",
+    "displayName:en": "Agent Run",
+    "description": "Execution records of agent task runs with token/cost tracking",
+    "modelType": "entity",
+    "modelCategory": "transaction",
+    "extension": {
+      "titleField": "task_id",
+      "subtitleField": "run_status",
+      "tableName": "ab_agent_run",
+      "softDelete": false
+    }
+  },
+  {
+    "code": "agent_artifact",
+    "displayName:zh-CN": "Agent 产出物",
+    "displayName:en": "Agent Artifact",
+    "description": "Artifacts produced by agent runs (documents, code, reports, etc.)",
+    "modelType": "entity",
+    "modelCategory": "entity",
+    "extension": {
+      "titleField": "title",
+      "subtitleField": "artifact_type",
+      "tableName": "ab_agent_artifact",
+      "softDelete": true
+    }
+  },
+  {
+    "code": "agent_schedule",
+    "displayName:zh-CN": "Agent 调度",
+    "displayName:en": "Agent Schedule",
+    "description": "Scheduled or event-triggered agent task execution",
+    "modelType": "entity",
+    "modelCategory": "master",
+    "extension": {
+      "titleField": "title",
+      "subtitleField": "schedule_type",
+      "tableName": "ab_agent_schedule",
+      "softDelete": true
+    }
+  },
+  {
+    "code": "approval_policy",
+    "displayName:zh-CN": "审批策略",
+    "displayName:en": "Approval Policy",
+    "description": "Policies that govern when agent actions require human approval",
+    "modelType": "entity",
+    "modelCategory": "master",
+    "extension": {
+      "titleField": "policy_name",
+      "tableName": "ab_approval_policy",
+      "softDelete": true
+    }
+  },
+  {
+    "code": "agent_approval",
+    "displayName:zh-CN": "Agent 审批",
+    "displayName:en": "Agent Approval",
+    "description": "Human-in-the-loop approval requests for agent actions",
+    "modelType": "entity",
+    "modelCategory": "document",
+    "extension": {
+      "titleField": "approval_title",
+      "subtitleField": "approval_status",
+      "tableName": "ab_agent_approval",
+      "softDelete": false
+    }
+  },
+  {
+    "code": "agent_memory",
+    "displayName:zh-CN": "Agent 记忆",
+    "displayName:en": "Agent Memory",
+    "description": "Persistent memory entries for agents (facts, preferences, lessons)",
+    "modelType": "entity",
+    "modelCategory": "master",
+    "extension": {
+      "titleField": "memory_title",
+      "subtitleField": "memory_type",
+      "tableName": "ab_agent_memory"
+    }
+  },
+  {
+    "code": "agent_observation",
+    "displayName:zh-CN": "Agent 观测",
+    "displayName:en": "Agent Observation",
+    "description": "System observations, metrics, costs, and alerts",
+    "modelType": "entity",
+    "modelCategory": "transaction",
+    "extension": {
+      "titleField": "obs_title",
+      "subtitleField": "observation_type",
+      "tableName": "ab_agent_observation",
+      "softDelete": false
+    }
+  },
+  {
+    "code": "agent_tool",
+    "displayName:zh-CN": "Agent 工具",
+    "displayName:en": "Agent Tool",
+    "description": "Tool definitions available to agents (DSL commands, APIs, MCP servers)",
+    "modelType": "entity",
+    "modelCategory": "master",
+    "extension": {
+      "titleField": "tool_name",
+      "subtitleField": "tool_type",
+      "tableName": "ab_agent_tool",
+      "softDelete": true
+    }
+  },
+  {
+    "code": "agent_skill",
+    "displayName:zh-CN": "Agent 技能",
+    "displayName:en": "Agent Skill",
+    "description": "Reusable skill packages for agents (atomic tools, workflow skills, industry solutions)",
+    "modelType": "entity",
+    "modelCategory": "master",
+    "extension": {
+      "titleField": "skill_name",
+      "subtitleField": "skill_level",
+      "tableName": "ab_agent_skill",
+      "softDelete": true
+    }
+  },
+  {
+    "code": "agent_action",
+    "displayName:zh-CN": "Agent 动作",
+    "displayName:en": "Agent Action",
+    "description": "ACP ActionEngine audit trail",
+    "modelType": "entity",
+    "modelCategory": "transaction",
+    "extension": {
+      "titleField": "action_code",
+      "subtitleField": "action_status",
+      "tableName": "ab_agent_action",
+      "softDelete": false
+    }
+  },
+  {
+    "code": "object_alias",
+    "displayName:zh-CN": "对象别名",
+    "displayName:en": "Object Alias",
+    "description": "D1 Grounding object aliases",
+    "modelType": "entity",
+    "modelCategory": "master",
+    "extension": {
+      "titleField": "alias",
+      "subtitleField": "model_code",
+      "tableName": "ab_object_alias",
+      "softDelete": false
+    }
+  },
+  {
+    "code": "semantic_term",
+    "displayName:zh-CN": "语义术语",
+    "displayName:en": "Semantic Term",
+    "description": "D1 Grounding semantic terms",
+    "modelType": "entity",
+    "modelCategory": "master",
+    "extension": {
+      "titleField": "term",
+      "subtitleField": "term_type",
+      "tableName": "ab_semantic_term",
+      "softDelete": false
+    }
+  },
+  {
+    "code": "mcp_server",
+    "displayName:zh-CN": "MCP 服务器",
+    "displayName:en": "MCP Server",
+    "description": "External MCP server registry for agent tool consumption via MCP protocol",
+    "modelType": "entity",
+    "modelCategory": "master",
+    "extension": {
+      "titleField": "server_name",
+      "subtitleField": "server_url",
+      "tableName": "ab_agent_mcp_server",
+      "softDelete": true
+    }
+  }
+]

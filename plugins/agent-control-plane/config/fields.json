@@ -1,0 +1,1519 @@
+[
+  {
+    "code": "agent_code",
+    "displayName:zh-CN": "Agent 编码",
+    "displayName:en": "Agent Code",
+    "dataType": "string",
+    "constraints": {
+      "required": true,
+      "maxLength": 64
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "name",
+    "displayName:zh-CN": "名称",
+    "displayName:en": "Name",
+    "dataType": "string",
+    "constraints": {
+      "required": true,
+      "maxLength": 128
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "description",
+    "displayName:zh-CN": "描述",
+    "displayName:en": "Description",
+    "dataType": "text",
+    "extension": {
+      "multiline": true
+    }
+  },
+  {
+    "code": "avatar_url",
+    "displayName:zh-CN": "头像 URL",
+    "displayName:en": "Avatar URL",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 512
+    }
+  },
+  {
+    "code": "agent_type",
+    "displayName:zh-CN": "Agent 类型",
+    "displayName:en": "Agent Type",
+    "dataType": "enum",
+    "dictCode": "acp_agent_type",
+    "constraints": {
+      "required": true
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "model",
+    "displayName:zh-CN": "AI 模型",
+    "displayName:en": "AI Model",
+    "dataType": "enum",
+    "dictCode": "acp_ai_model"
+  },
+  {
+    "code": "system_prompt",
+    "displayName:zh-CN": "系统提示词",
+    "displayName:en": "System Prompt",
+    "dataType": "text",
+    "extension": {
+      "multiline": true
+    }
+  },
+  {
+    "code": "tools",
+    "displayName:zh-CN": "工具列表",
+    "displayName:en": "Tools",
+    "dataType": "text",
+    "extension": {
+      "renderComponent": "agenttoolpicker",
+      "placeholder:zh-CN": "选择工具...",
+      "placeholder:en": "Select tools..."
+    }
+  },
+  {
+    "code": "skills",
+    "displayName:zh-CN": "技能列表",
+    "displayName:en": "Skills",
+    "dataType": "text",
+    "extension": {
+      "multiline": true,
+      "placeholder:zh-CN": "JSON 格式",
+      "placeholder:en": "JSON format"
+    }
+  },
+  {
+    "code": "guardrails",
+    "displayName:zh-CN": "护栏规则",
+    "displayName:en": "Guardrails",
+    "dataType": "text",
+    "extension": {
+      "renderComponent": "guardrailseditor",
+      "placeholder:zh-CN": "配置护栏规则",
+      "placeholder:en": "Configure guardrails"
+    }
+  },
+  {
+    "code": "status",
+    "displayName:zh-CN": "状态",
+    "displayName:en": "Status",
+    "dataType": "enum",
+    "dictCode": "acp_agent_status",
+    "defaultValue": "active",
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "stats",
+    "displayName:zh-CN": "统计数据",
+    "displayName:en": "Stats",
+    "dataType": "text",
+    "extension": {
+      "multiline": true
+    }
+  },
+  {
+    "code": "personality",
+    "displayName:zh-CN": "人格特质",
+    "displayName:en": "Personality",
+    "dataType": "text",
+    "extension": {
+      "multiline": true,
+      "placeholder:zh-CN": "例如：严谨、友好、简洁、幽默",
+      "placeholder:en": "e.g., rigorous, friendly, concise, humorous",
+      "rows": 2
+    }
+  },
+  {
+    "code": "expertise",
+    "displayName:zh-CN": "专业领域",
+    "displayName:en": "Expertise",
+    "dataType": "text",
+    "extension": {
+      "multiline": true,
+      "placeholder:zh-CN": "例如：财务分析、项目管理、客户服务",
+      "placeholder:en": "e.g., financial analysis, project management, customer service",
+      "rows": 2
+    }
+  },
+  {
+    "code": "communication_style",
+    "displayName:zh-CN": "沟通风格",
+    "displayName:en": "Communication Style",
+    "dataType": "enum",
+    "dictCode": "acp_communication_style"
+  },
+  {
+    "code": "boundaries",
+    "displayName:zh-CN": "行为边界",
+    "displayName:en": "Boundaries",
+    "dataType": "text",
+    "extension": {
+      "multiline": true,
+      "placeholder:zh-CN": "例如：不能访问财务数据、不能发送外部邮件",
+      "placeholder:en": "e.g., cannot access financial data, cannot send external emails",
+      "rows": 3
+    }
+  },
+  {
+    "code": "soul_goals",
+    "displayName:zh-CN": "长期目标",
+    "displayName:en": "Goals",
+    "dataType": "text",
+    "extension": {
+      "multiline": true,
+      "placeholder:zh-CN": "Agent 的长期目标，与 Mission 对齐",
+      "placeholder:en": "Agent's long-term goals, aligned with Mission",
+      "rows": 2
+    }
+  },
+  {
+    "code": "title",
+    "displayName:zh-CN": "标题",
+    "displayName:en": "Title",
+    "dataType": "string",
+    "constraints": {
+      "required": true,
+      "maxLength": 256
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "mission_status",
+    "displayName:zh-CN": "使命状态",
+    "displayName:en": "Mission Status",
+    "dataType": "enum",
+    "dictCode": "acp_mission_status",
+    "defaultValue": "active",
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "owner_id",
+    "displayName:zh-CN": "负责人",
+    "displayName:en": "Owner",
+    "dataType": "reference",
+    "refTarget": {
+      "targetModel": "ns_user",
+      "displayField": "nick_name"
+    }
+  },
+  {
+    "code": "priority",
+    "displayName:zh-CN": "优先级",
+    "displayName:en": "Priority",
+    "dataType": "integer",
+    "defaultValue": 0
+  },
+  {
+    "code": "target_date",
+    "displayName:zh-CN": "目标日期",
+    "displayName:en": "Target Date",
+    "dataType": "datetime"
+  },
+  {
+    "code": "kpis",
+    "displayName:zh-CN": "KPI 指标",
+    "displayName:en": "KPIs",
+    "dataType": "text",
+    "extension": {
+      "multiline": true,
+      "placeholder:zh-CN": "JSON 格式",
+      "placeholder:en": "JSON format"
+    }
+  },
+  {
+    "code": "tags",
+    "displayName:zh-CN": "标签",
+    "displayName:en": "Tags",
+    "dataType": "text",
+    "extension": {
+      "multiline": true,
+      "placeholder:zh-CN": "JSON 数组格式",
+      "placeholder:en": "JSON array format"
+    }
+  },
+  {
+    "code": "mission_id",
+    "displayName:zh-CN": "所属使命",
+    "displayName:en": "Mission",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 64
+    }
+  },
+  {
+    "code": "parent_id",
+    "displayName:zh-CN": "父任务",
+    "displayName:en": "Parent Task",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 64
+    }
+  },
+  {
+    "code": "task_status",
+    "displayName:zh-CN": "任务状态",
+    "displayName:en": "Task Status",
+    "dataType": "enum",
+    "dictCode": "acp_task_status",
+    "constraints": {
+      "required": true
+    },
+    "defaultValue": "todo",
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "task_priority",
+    "displayName:zh-CN": "任务优先级",
+    "displayName:en": "Task Priority",
+    "dataType": "enum",
+    "dictCode": "acp_task_priority",
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "assignee_type",
+    "displayName:zh-CN": "执行者类型",
+    "displayName:en": "Assignee Type",
+    "dataType": "enum",
+    "dictCode": "acp_assignee_type"
+  },
+  {
+    "code": "assignee_id",
+    "displayName:zh-CN": "执行者",
+    "displayName:en": "Assignee",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 64
+    }
+  },
+  {
+    "code": "agent_config",
+    "displayName:zh-CN": "Agent 配置",
+    "displayName:en": "Agent Config",
+    "dataType": "text",
+    "extension": {
+      "multiline": true,
+      "placeholder:zh-CN": "JSON 格式",
+      "placeholder:en": "JSON format"
+    }
+  },
+  {
+    "code": "input_data",
+    "displayName:zh-CN": "输入数据",
+    "displayName:en": "Input Data",
+    "dataType": "text",
+    "extension": {
+      "multiline": true
+    }
+  },
+  {
+    "code": "output_data",
+    "displayName:zh-CN": "输出数据",
+    "displayName:en": "Output Data",
+    "dataType": "text",
+    "extension": {
+      "multiline": true
+    }
+  },
+  {
+    "code": "due_date",
+    "displayName:zh-CN": "截止日期",
+    "displayName:en": "Due Date",
+    "dataType": "datetime"
+  },
+  {
+    "code": "started_at",
+    "displayName:zh-CN": "开始时间",
+    "displayName:en": "Started At",
+    "dataType": "datetime"
+  },
+  {
+    "code": "completed_at",
+    "displayName:zh-CN": "完成时间",
+    "displayName:en": "Completed At",
+    "dataType": "datetime"
+  },
+  {
+    "code": "estimated_cost",
+    "displayName:zh-CN": "预估成本",
+    "displayName:en": "Estimated Cost",
+    "dataType": "decimal"
+  },
+  {
+    "code": "actual_cost",
+    "displayName:zh-CN": "实际成本",
+    "displayName:en": "Actual Cost",
+    "dataType": "decimal"
+  },
+  {
+    "code": "retry_count",
+    "displayName:zh-CN": "重试次数",
+    "displayName:en": "Retry Count",
+    "dataType": "integer",
+    "defaultValue": 0
+  },
+  {
+    "code": "max_retries",
+    "displayName:zh-CN": "最大重试次数",
+    "displayName:en": "Max Retries",
+    "dataType": "integer",
+    "defaultValue": 3,
+    "constraints": {
+      "min": 0,
+      "max": 10
+    }
+  },
+  {
+    "code": "task_id",
+    "displayName:zh-CN": "关联任务",
+    "displayName:en": "Task",
+    "dataType": "string",
+    "constraints": {
+      "required": false,
+      "maxLength": 64
+    }
+  },
+  {
+    "code": "agent_id",
+    "displayName:zh-CN": "Agent",
+    "displayName:en": "Agent",
+    "dataType": "string",
+    "constraints": {
+      "required": true,
+      "maxLength": 64
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "run_status",
+    "displayName:zh-CN": "运行状态",
+    "displayName:en": "Run Status",
+    "dataType": "enum",
+    "dictCode": "acp_run_status",
+    "defaultValue": "pending",
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "run_model",
+    "displayName:zh-CN": "使用模型",
+    "displayName:en": "Model Used",
+    "dataType": "enum",
+    "dictCode": "acp_ai_model"
+  },
+  {
+    "code": "duration_ms",
+    "displayName:zh-CN": "耗时(ms)",
+    "displayName:en": "Duration (ms)",
+    "dataType": "integer"
+  },
+  {
+    "code": "input_tokens",
+    "displayName:zh-CN": "输入 Token",
+    "displayName:en": "Input Tokens",
+    "dataType": "integer"
+  },
+  {
+    "code": "output_tokens",
+    "displayName:zh-CN": "输出 Token",
+    "displayName:en": "Output Tokens",
+    "dataType": "integer"
+  },
+  {
+    "code": "total_cost",
+    "displayName:zh-CN": "总成本",
+    "displayName:en": "Total Cost",
+    "dataType": "decimal"
+  },
+  {
+    "code": "tool_calls",
+    "displayName:zh-CN": "工具调用",
+    "displayName:en": "Tool Calls",
+    "dataType": "text",
+    "extension": {
+      "multiline": true
+    }
+  },
+  {
+    "code": "messages",
+    "displayName:zh-CN": "消息记录",
+    "displayName:en": "Messages",
+    "dataType": "text",
+    "extension": {
+      "multiline": true
+    }
+  },
+  {
+    "code": "error_message",
+    "displayName:zh-CN": "错误信息",
+    "displayName:en": "Error Message",
+    "dataType": "text",
+    "extension": {
+      "multiline": true
+    }
+  },
+  {
+    "code": "metadata",
+    "displayName:zh-CN": "元数据",
+    "displayName:en": "Metadata",
+    "dataType": "text",
+    "extension": {
+      "multiline": true,
+      "placeholder:zh-CN": "JSON 格式",
+      "placeholder:en": "JSON format"
+    }
+  },
+  {
+    "code": "run_id",
+    "displayName:zh-CN": "关联运行",
+    "displayName:en": "Run",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 64
+    }
+  },
+  {
+    "code": "artifact_type",
+    "displayName:zh-CN": "产出物类型",
+    "displayName:en": "Artifact Type",
+    "dataType": "enum",
+    "dictCode": "acp_artifact_type",
+    "constraints": {
+      "required": true
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "content",
+    "displayName:zh-CN": "内容",
+    "displayName:en": "Content",
+    "dataType": "text",
+    "extension": {
+      "multiline": true,
+      "renderComponent": "richtext"
+    }
+  },
+  {
+    "code": "file_path",
+    "displayName:zh-CN": "文件路径",
+    "displayName:en": "File Path",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 512
+    }
+  },
+  {
+    "code": "file_size",
+    "displayName:zh-CN": "文件大小",
+    "displayName:en": "File Size",
+    "dataType": "integer"
+  },
+  {
+    "code": "mime_type",
+    "displayName:zh-CN": "MIME 类型",
+    "displayName:en": "MIME Type",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 128
+    }
+  },
+  {
+    "code": "version",
+    "displayName:zh-CN": "版本",
+    "displayName:en": "Version",
+    "dataType": "integer",
+    "defaultValue": 1
+  },
+  {
+    "code": "schedule_type",
+    "displayName:zh-CN": "调度类型",
+    "displayName:en": "Schedule Type",
+    "dataType": "enum",
+    "dictCode": "acp_schedule_type",
+    "constraints": {
+      "required": true
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "cron_expression",
+    "displayName:zh-CN": "Cron 表达式",
+    "displayName:en": "Cron Expression",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 128
+    },
+    "extension": {
+      "placeholder:zh-CN": "如: 0 0 * * * (每小时)",
+      "placeholder:en": "e.g. 0 0 * * * (hourly)"
+    }
+  },
+  {
+    "code": "interval_ms",
+    "displayName:zh-CN": "间隔(ms)",
+    "displayName:en": "Interval (ms)",
+    "dataType": "integer"
+  },
+  {
+    "code": "event_trigger",
+    "displayName:zh-CN": "事件触发器",
+    "displayName:en": "Event Trigger",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 256
+    }
+  },
+  {
+    "code": "task_template",
+    "displayName:zh-CN": "任务模板",
+    "displayName:en": "Task Template",
+    "dataType": "text",
+    "constraints": {
+      "required": true
+    },
+    "extension": {
+      "multiline": true,
+      "placeholder:zh-CN": "JSON 格式的任务模板",
+      "placeholder:en": "JSON task template"
+    }
+  },
+  {
+    "code": "schedule_status",
+    "displayName:zh-CN": "调度状态",
+    "displayName:en": "Schedule Status",
+    "dataType": "enum",
+    "dictCode": "acp_schedule_status",
+    "defaultValue": "active",
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "timezone",
+    "displayName:zh-CN": "时区",
+    "displayName:en": "Timezone",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 64
+    },
+    "defaultValue": "utc"
+  },
+  {
+    "code": "next_run_at",
+    "displayName:zh-CN": "下次运行",
+    "displayName:en": "Next Run At",
+    "dataType": "datetime"
+  },
+  {
+    "code": "last_run_at",
+    "displayName:zh-CN": "上次运行",
+    "displayName:en": "Last Run At",
+    "dataType": "datetime"
+  },
+  {
+    "code": "run_count",
+    "displayName:zh-CN": "运行次数",
+    "displayName:en": "Run Count",
+    "dataType": "integer",
+    "defaultValue": 0
+  },
+  {
+    "code": "max_runs",
+    "displayName:zh-CN": "最大运行次数",
+    "displayName:en": "Max Runs",
+    "dataType": "integer"
+  },
+  {
+    "code": "policy_name",
+    "displayName:zh-CN": "策略名称",
+    "displayName:en": "Policy Name",
+    "dataType": "string",
+    "constraints": {
+      "required": true,
+      "maxLength": 128
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "trigger_rules",
+    "displayName:zh-CN": "触发规则",
+    "displayName:en": "Trigger Rules",
+    "dataType": "text",
+    "constraints": {
+      "required": true
+    },
+    "extension": {
+      "multiline": true,
+      "placeholder:zh-CN": "JSON 格式",
+      "placeholder:en": "JSON format"
+    }
+  },
+  {
+    "code": "approver_rules",
+    "displayName:zh-CN": "审批人规则",
+    "displayName:en": "Approver Rules",
+    "dataType": "text",
+    "constraints": {
+      "required": true
+    },
+    "extension": {
+      "multiline": true,
+      "placeholder:zh-CN": "JSON 格式",
+      "placeholder:en": "JSON format"
+    }
+  },
+  {
+    "code": "auto_approve",
+    "displayName:zh-CN": "自动通过",
+    "displayName:en": "Auto Approve",
+    "dataType": "boolean",
+    "defaultValue": false
+  },
+  {
+    "code": "timeout_hours",
+    "displayName:zh-CN": "超时小时数",
+    "displayName:en": "Timeout Hours",
+    "dataType": "integer"
+  },
+  {
+    "code": "timeout_action",
+    "displayName:zh-CN": "超时动作",
+    "displayName:en": "Timeout Action",
+    "dataType": "enum",
+    "dictCode": "acp_timeout_action"
+  },
+  {
+    "code": "policy_status",
+    "displayName:zh-CN": "策略状态",
+    "displayName:en": "Policy Status",
+    "dataType": "enum",
+    "dictCode": "acp_agent_status",
+    "defaultValue": "active",
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "approval_type",
+    "displayName:zh-CN": "审批类型",
+    "displayName:en": "Approval Type",
+    "dataType": "enum",
+    "dictCode": "acp_approval_type",
+    "constraints": {
+      "required": true
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "approval_title",
+    "displayName:zh-CN": "审批标题",
+    "displayName:en": "Approval Title",
+    "dataType": "string",
+    "constraints": {
+      "required": true,
+      "maxLength": 256
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "approval_description",
+    "displayName:zh-CN": "审批描述",
+    "displayName:en": "Approval Description",
+    "dataType": "text",
+    "extension": {
+      "multiline": true
+    }
+  },
+  {
+    "code": "request_data",
+    "displayName:zh-CN": "请求数据",
+    "displayName:en": "Request Data",
+    "dataType": "text",
+    "extension": {
+      "multiline": true
+    }
+  },
+  {
+    "code": "approval_status",
+    "displayName:zh-CN": "审批状态",
+    "displayName:en": "Approval Status",
+    "dataType": "enum",
+    "dictCode": "acp_approval_status",
+    "constraints": {
+      "required": true
+    },
+    "defaultValue": "pending",
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "approver_id",
+    "displayName:zh-CN": "审批人",
+    "displayName:en": "Approver",
+    "dataType": "integer"
+  },
+  {
+    "code": "approved_at",
+    "displayName:zh-CN": "审批时间",
+    "displayName:en": "Approved At",
+    "dataType": "datetime"
+  },
+  {
+    "code": "rejection_reason",
+    "displayName:zh-CN": "拒绝原因",
+    "displayName:en": "Rejection Reason",
+    "dataType": "text",
+    "extension": {
+      "multiline": true
+    }
+  },
+  {
+    "code": "policy_id",
+    "displayName:zh-CN": "关联策略",
+    "displayName:en": "Policy",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 64
+    }
+  },
+  {
+    "code": "expires_at",
+    "displayName:zh-CN": "过期时间",
+    "displayName:en": "Expires At",
+    "dataType": "datetime"
+  },
+  {
+    "code": "auto_action",
+    "displayName:zh-CN": "自动动作",
+    "displayName:en": "Auto Action",
+    "dataType": "enum",
+    "dictCode": "acp_timeout_action"
+  },
+  {
+    "code": "memory_agent_id",
+    "displayName:zh-CN": "Agent",
+    "displayName:en": "Agent",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 64
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "memory_type",
+    "displayName:zh-CN": "记忆类型",
+    "displayName:en": "Memory Type",
+    "dataType": "enum",
+    "dictCode": "acp_memory_type",
+    "constraints": {
+      "required": true
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "category",
+    "displayName:zh-CN": "分类",
+    "displayName:en": "Category",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 64
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "memory_title",
+    "displayName:zh-CN": "标题",
+    "displayName:en": "Title",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 256
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "memory_content",
+    "displayName:zh-CN": "内容",
+    "displayName:en": "Content",
+    "dataType": "text",
+    "constraints": {
+      "required": true
+    },
+    "extension": {
+      "multiline": true
+    }
+  },
+  {
+    "code": "importance",
+    "displayName:zh-CN": "重要度",
+    "displayName:en": "Importance",
+    "dataType": "integer",
+    "defaultValue": 5,
+    "constraints": {
+      "min": 1,
+      "max": 10
+    }
+  },
+  {
+    "code": "source_run_id",
+    "displayName:zh-CN": "来源运行",
+    "displayName:en": "Source Run",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 64
+    }
+  },
+  {
+    "code": "valid_from",
+    "displayName:zh-CN": "生效时间",
+    "displayName:en": "Valid From",
+    "dataType": "datetime"
+  },
+  {
+    "code": "valid_until",
+    "displayName:zh-CN": "失效时间",
+    "displayName:en": "Valid Until",
+    "dataType": "datetime"
+  },
+  {
+    "code": "access_count",
+    "displayName:zh-CN": "访问次数",
+    "displayName:en": "Access Count",
+    "dataType": "integer",
+    "defaultValue": 0
+  },
+  {
+    "code": "last_accessed",
+    "displayName:zh-CN": "最后访问",
+    "displayName:en": "Last Accessed",
+    "dataType": "datetime"
+  },
+  {
+    "code": "observation_type",
+    "displayName:zh-CN": "观测类型",
+    "displayName:en": "Observation Type",
+    "dataType": "enum",
+    "dictCode": "acp_observation_type",
+    "constraints": {
+      "required": true
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "source_type",
+    "displayName:zh-CN": "来源类型",
+    "displayName:en": "Source Type",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 64
+    }
+  },
+  {
+    "code": "source_id",
+    "displayName:zh-CN": "来源 ID",
+    "displayName:en": "Source ID",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 64
+    }
+  },
+  {
+    "code": "obs_agent_id",
+    "displayName:zh-CN": "Agent",
+    "displayName:en": "Agent",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 64
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "obs_title",
+    "displayName:zh-CN": "标题",
+    "displayName:en": "Title",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 256
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "detail",
+    "displayName:zh-CN": "详情",
+    "displayName:en": "Detail",
+    "dataType": "text",
+    "extension": {
+      "multiline": true
+    }
+  },
+  {
+    "code": "severity",
+    "displayName:zh-CN": "严重程度",
+    "displayName:en": "Severity",
+    "dataType": "enum",
+    "dictCode": "acp_severity",
+    "defaultValue": "info"
+  },
+  {
+    "code": "tool_code",
+    "displayName:zh-CN": "工具编码",
+    "displayName:en": "Tool Code",
+    "dataType": "string",
+    "constraints": {
+      "required": true,
+      "maxLength": 128
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "tool_type",
+    "displayName:zh-CN": "工具类型",
+    "displayName:en": "Tool Type",
+    "dataType": "enum",
+    "dictCode": "acp_tool_type",
+    "constraints": {
+      "required": true
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "tool_name",
+    "displayName:zh-CN": "工具名称",
+    "displayName:en": "Tool Name",
+    "dataType": "string",
+    "constraints": {
+      "required": true,
+      "maxLength": 128
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "tool_description",
+    "displayName:zh-CN": "工具描述",
+    "displayName:en": "Tool Description",
+    "dataType": "text",
+    "constraints": {
+      "required": true
+    },
+    "extension": {
+      "multiline": true
+    }
+  },
+  {
+    "code": "source_code",
+    "displayName:zh-CN": "来源编码",
+    "displayName:en": "Source Code",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 256
+    }
+  },
+  {
+    "code": "api_method",
+    "displayName:zh-CN": "API 方法",
+    "displayName:en": "API Method",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 16
+    }
+  },
+  {
+    "code": "api_path",
+    "displayName:zh-CN": "API 路径",
+    "displayName:en": "API Path",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 512
+    }
+  },
+  {
+    "code": "input_schema",
+    "displayName:zh-CN": "输入 Schema",
+    "displayName:en": "Input Schema",
+    "dataType": "text",
+    "extension": {
+      "multiline": true,
+      "placeholder:zh-CN": "JSON Schema 格式",
+      "placeholder:en": "JSON Schema format"
+    }
+  },
+  {
+    "code": "output_schema",
+    "displayName:zh-CN": "输出 Schema",
+    "displayName:en": "Output Schema",
+    "dataType": "text",
+    "extension": {
+      "multiline": true,
+      "placeholder:zh-CN": "JSON Schema 格式",
+      "placeholder:en": "JSON Schema format"
+    }
+  },
+  {
+    "code": "requires_approval",
+    "displayName:zh-CN": "需要审批",
+    "displayName:en": "Requires Approval",
+    "dataType": "boolean",
+    "defaultValue": false
+  },
+  {
+    "code": "risk_level",
+    "displayName:zh-CN": "风险等级",
+    "displayName:en": "Risk Level",
+    "dataType": "enum",
+    "dictCode": "acp_risk_level",
+    "defaultValue": "low"
+  },
+  {
+    "code": "tool_status",
+    "displayName:zh-CN": "状态",
+    "displayName:en": "Status",
+    "dataType": "enum",
+    "dictCode": "acp_agent_status",
+    "defaultValue": "active",
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "auto_generated",
+    "displayName:zh-CN": "自动生成",
+    "displayName:en": "Auto Generated",
+    "dataType": "boolean",
+    "defaultValue": false
+  },
+  {
+    "code": "skill_code",
+    "displayName:zh-CN": "技能编码",
+    "displayName:en": "Skill Code",
+    "dataType": "string",
+    "constraints": {
+      "required": true,
+      "maxLength": 100
+    },
+    "feature": {
+      "searchable": true
+    },
+    "extension": {
+      "placeholder:en": "e.g., web_search, weekly_intelligence"
+    }
+  },
+  {
+    "code": "skill_name",
+    "displayName:zh-CN": "技能名称",
+    "displayName:en": "Skill Name",
+    "dataType": "string",
+    "constraints": {
+      "required": true,
+      "maxLength": 200
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "skill_level",
+    "displayName:zh-CN": "技能级别",
+    "displayName:en": "Skill Level",
+    "dataType": "enum",
+    "dictCode": "acp_skill_level",
+    "constraints": {
+      "required": true
+    },
+    "defaultValue": "atomic",
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "skill_icon",
+    "displayName:zh-CN": "图标",
+    "displayName:en": "Icon",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 50
+    },
+    "extension": {
+      "placeholder:en": "Emoji or icon name, e.g. 🔍"
+    }
+  },
+  {
+    "code": "skill_tools",
+    "displayName:zh-CN": "关联工具",
+    "displayName:en": "Tools",
+    "dataType": "text",
+    "extension": {
+      "renderComponent": "agenttoolpicker",
+      "placeholder:zh-CN": "选择工具...",
+      "placeholder:en": "Select tools..."
+    }
+  },
+  {
+    "code": "prompt_template",
+    "displayName:zh-CN": "提示词模板",
+    "displayName:en": "Prompt Template",
+    "dataType": "text",
+    "extension": {
+      "multiline": true,
+      "rows": 6,
+      "placeholder:en": "Template with {{variables}}"
+    }
+  },
+  {
+    "code": "skill_input_schema",
+    "displayName:zh-CN": "输入 Schema",
+    "displayName:en": "Input Schema",
+    "dataType": "text",
+    "extension": {
+      "multiline": true,
+      "rows": 4,
+      "placeholder:zh-CN": "JSON Schema 格式",
+      "placeholder:en": "JSON Schema for skill inputs"
+    }
+  },
+  {
+    "code": "skill_version",
+    "displayName:zh-CN": "版本",
+    "displayName:en": "Version",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 20
+    },
+    "defaultValue": "1.0.0",
+    "extension": {
+      "placeholder:en": "1.0.0"
+    }
+  },
+  {
+    "code": "skill_status",
+    "displayName:zh-CN": "状态",
+    "displayName:en": "Status",
+    "dataType": "enum",
+    "dictCode": "acp_skill_status",
+    "defaultValue": "active",
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "skill_category",
+    "displayName:zh-CN": "分类",
+    "displayName:en": "Category",
+    "dataType": "enum",
+    "dictCode": "acp_skill_category",
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "skill_description",
+    "displayName:zh-CN": "描述",
+    "displayName:en": "Description",
+    "dataType": "text",
+    "extension": {
+      "multiline": true,
+      "rows": 3
+    }
+  },
+  {
+    "code": "is_builtin",
+    "displayName:zh-CN": "内置技能",
+    "displayName:en": "Built-in",
+    "dataType": "boolean",
+    "defaultValue": false
+  },
+
+  {
+    "code": "action_code",
+    "displayName:zh-CN": "动作编码",
+    "displayName:en": "Action Code",
+    "dataType": "string",
+    "constraints": {
+      "required": true,
+      "maxLength": 128
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "action_type",
+    "displayName:zh-CN": "动作类型",
+    "displayName:en": "Action Type",
+    "dataType": "string",
+    "constraints": {
+      "required": true,
+      "maxLength": 64
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "target_model",
+    "displayName:zh-CN": "目标模型",
+    "displayName:en": "Target Model",
+    "dataType": "string",
+    "constraints": {
+      "required": true,
+      "maxLength": 128
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "intent_summary",
+    "displayName:zh-CN": "意图摘要",
+    "displayName:en": "Intent Summary",
+    "dataType": "text",
+    "extension": {
+      "multiline": true
+    }
+  },
+  {
+    "code": "business_domain",
+    "displayName:zh-CN": "业务域",
+    "displayName:en": "Business Domain",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 64
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "command_result",
+    "displayName:zh-CN": "命令结果",
+    "displayName:en": "Command Result",
+    "dataType": "text",
+    "extension": {
+      "multiline": true
+    }
+  },
+  {
+    "code": "action_status",
+    "displayName:zh-CN": "动作状态",
+    "displayName:en": "Action Status",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 32
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "executed_at",
+    "displayName:zh-CN": "执行时间",
+    "displayName:en": "Executed At",
+    "dataType": "datetime"
+  },
+
+  {
+    "code": "model_code",
+    "displayName:zh-CN": "模型编码",
+    "displayName:en": "Model Code",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 100
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "alias",
+    "displayName:zh-CN": "别名",
+    "displayName:en": "Alias",
+    "dataType": "string",
+    "constraints": {
+      "required": true,
+      "maxLength": 128
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "language",
+    "displayName:zh-CN": "语言",
+    "displayName:en": "Language",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 16
+    },
+    "defaultValue": "zh-CN"
+  },
+
+  {
+    "code": "term",
+    "displayName:zh-CN": "术语",
+    "displayName:en": "Term",
+    "dataType": "string",
+    "constraints": {
+      "required": true,
+      "maxLength": 128
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "term_type",
+    "displayName:zh-CN": "术语类型",
+    "displayName:en": "Term Type",
+    "dataType": "string",
+    "constraints": {
+      "required": true,
+      "maxLength": 64
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "resolution",
+    "displayName:zh-CN": "解析结果",
+    "displayName:en": "Resolution",
+    "dataType": "text",
+    "extension": {
+      "multiline": true,
+      "rows": 3
+    }
+  },
+  {
+    "code": "server_name",
+    "displayName:zh-CN": "服务器名称",
+    "displayName:en": "Server Name",
+    "dataType": "string",
+    "constraints": {
+      "required": true,
+      "maxLength": 200
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "server_url",
+    "displayName:zh-CN": "服务器地址",
+    "displayName:en": "Server URL",
+    "dataType": "string",
+    "constraints": {
+      "required": true,
+      "maxLength": 500
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "transport_type",
+    "displayName:zh-CN": "传输类型",
+    "displayName:en": "Transport Type",
+    "dataType": "enum",
+    "extension": {
+      "options": [
+        {"value": "stdio", "label:zh-CN": "STDIO", "label:en": "STDIO"},
+        {"value": "sse", "label:zh-CN": "SSE", "label:en": "SSE"},
+        {"value": "http", "label:zh-CN": "HTTP", "label:en": "HTTP"}
+      ]
+    }
+  },
+  {
+    "code": "auth_type",
+    "displayName:zh-CN": "认证类型",
+    "displayName:en": "Auth Type",
+    "dataType": "enum",
+    "extension": {
+      "options": [
+        {"value": "none", "label:zh-CN": "无", "label:en": "None"},
+        {"value": "bearer", "label:zh-CN": "Bearer Token", "label:en": "Bearer Token"},
+        {"value": "api_key", "label:zh-CN": "API Key", "label:en": "API Key"}
+      ]
+    }
+  },
+  {
+    "code": "auth_config",
+    "displayName:zh-CN": "认证配置",
+    "displayName:en": "Auth Config",
+    "dataType": "text",
+    "extension": {
+      "multiline": true,
+      "rows": 3
+    }
+  },
+  {
+    "code": "tool_count",
+    "displayName:zh-CN": "工具数量",
+    "displayName:en": "Tool Count",
+    "dataType": "integer",
+    "extension": {
+      "readonly": true
+    }
+  },
+  {
+    "code": "last_synced_at",
+    "displayName:zh-CN": "最后同步时间",
+    "displayName:en": "Last Synced At",
+    "dataType": "datetime",
+    "extension": {
+      "readonly": true
+    }
+  }
+]

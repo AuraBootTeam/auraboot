@@ -1,0 +1,105 @@
+[
+  {
+    "code": "acs_rule_code",
+    "displayName:zh-CN": "规则编码",
+    "displayName:en": "Rule Code",
+    "dataType": "string",
+    "constraints": { "required": true, "maxLength": 50 },
+    "feature": { "searchable": true, "sortable": true }
+  },
+  {
+    "code": "acs_rule_name",
+    "displayName:zh-CN": "规则名称",
+    "displayName:en": "Rule Name",
+    "dataType": "string",
+    "constraints": { "required": true, "maxLength": 200 },
+    "feature": { "searchable": true, "sortable": true }
+  },
+  {
+    "code": "acs_rule_type",
+    "displayName:zh-CN": "阀门类型",
+    "displayName:en": "Valve Type",
+    "dataType": "enum",
+    "dictCode": "acs_safety_rule_type",
+    "constraints": { "required": true }
+  },
+  {
+    "code": "acs_rule_description",
+    "displayName:zh-CN": "规则描述",
+    "displayName:en": "Description",
+    "dataType": "text",
+    "constraints": { "maxLength": 2000 },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "acs_rule_trigger_condition",
+    "displayName:zh-CN": "触发条件",
+    "displayName:en": "Trigger Condition",
+    "dataType": "text",
+    "constraints": { "required": true, "maxLength": 5000 }
+  },
+  {
+    "code": "acs_rule_action",
+    "displayName:zh-CN": "触发动作",
+    "displayName:en": "Action",
+    "dataType": "enum",
+    "dictCode": "acs_safety_action",
+    "constraints": { "required": true }
+  },
+  {
+    "code": "acs_rule_severity",
+    "displayName:zh-CN": "严重程度",
+    "displayName:en": "Severity",
+    "dataType": "enum",
+    "dictCode": "acs_severity",
+    "defaultValue": "warn"
+  },
+  {
+    "code": "acs_rule_threshold",
+    "displayName:zh-CN": "阈值",
+    "displayName:en": "Threshold",
+    "dataType": "decimal",
+    "extension": { "precision": 10, "scale": 2 }
+  },
+  {
+    "code": "acs_rule_scope",
+    "displayName:zh-CN": "作用范围",
+    "displayName:en": "Scope",
+    "dataType": "text",
+    "constraints": { "maxLength": 5000 }
+  },
+  {
+    "code": "acs_rule_status",
+    "displayName:zh-CN": "状态",
+    "displayName:en": "Status",
+    "dataType": "enum",
+    "dictCode": "acs_rule_status",
+    "defaultValue": "active",
+    "constraints": { "required": true }
+  },
+  {
+    "code": "acs_rule_trigger_count",
+    "displayName:zh-CN": "累计触发次数",
+    "displayName:en": "Trigger Count",
+    "dataType": "integer",
+    "defaultValue": "0",
+    "constraints": { "min": 0 },
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "acs_rule_last_triggered_at",
+    "displayName:zh-CN": "最近触发时间",
+    "displayName:en": "Last Triggered",
+    "dataType": "datetime",
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "acs_rule_priority",
+    "displayName:zh-CN": "评估优先级",
+    "displayName:en": "Priority",
+    "dataType": "integer",
+    "defaultValue": "100",
+    "constraints": { "min": 1, "max": 999 },
+    "feature": { "sortable": true }
+  }
+]

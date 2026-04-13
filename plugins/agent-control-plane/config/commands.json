@@ -1,0 +1,482 @@
+[
+  {
+    "code": "acp:create_agent_definition",
+    "displayName:zh-CN": "创建 Agent 定义",
+    "displayName:en": "Create Agent Definition",
+    "type": "create",
+    "modelCode": "agent_definition",
+    "inputFields": ["agent_code", "name", "description", "avatar_url", "agent_type", "model", "system_prompt", "tools", "skills", "guardrails", "status", "personality", "expertise", "communication_style", "boundaries", "soul_goals"]
+  },
+  {
+    "code": "acp:update_agent_definition",
+    "displayName:zh-CN": "更新 Agent 定义",
+    "displayName:en": "Update Agent Definition",
+    "type": "update",
+    "modelCode": "agent_definition",
+    "inputFields": ["agent_code", "name", "description", "avatar_url", "agent_type", "model", "system_prompt", "tools", "skills", "guardrails", "status", "personality", "expertise", "communication_style", "boundaries", "soul_goals"]
+  },
+  {
+    "code": "acp:delete_agent_definition",
+    "displayName:zh-CN": "删除 Agent 定义",
+    "displayName:en": "Delete Agent Definition",
+    "type": "delete",
+    "modelCode": "agent_definition",
+    "extension": { "confirmMessage:zh-CN": "确认删除此 Agent 定义？", "confirmMessage:en": "Confirm delete this agent definition?" }
+  },
+
+  {
+    "code": "acp:create_mission",
+    "displayName:zh-CN": "创建使命",
+    "displayName:en": "Create Mission",
+    "type": "create",
+    "modelCode": "mission",
+    "inputFields": ["title", "description", "mission_status", "owner_id", "priority", "target_date", "kpis", "tags"]
+  },
+  {
+    "code": "acp:update_mission",
+    "displayName:zh-CN": "更新使命",
+    "displayName:en": "Update Mission",
+    "type": "update",
+    "modelCode": "mission",
+    "inputFields": ["title", "description", "mission_status", "owner_id", "priority", "target_date", "kpis", "tags"]
+  },
+  {
+    "code": "acp:delete_mission",
+    "displayName:zh-CN": "删除使命",
+    "displayName:en": "Delete Mission",
+    "type": "delete",
+    "modelCode": "mission",
+    "extension": { "confirmMessage:zh-CN": "确认删除此使命？", "confirmMessage:en": "Confirm delete this mission?" }
+  },
+  {
+    "code": "acp:pause_mission",
+    "displayName:zh-CN": "暂停使命",
+    "displayName:en": "Pause Mission",
+    "type": "state_transition",
+    "modelCode": "mission",
+    "stateField": "mission_status",
+    "fromStates": ["active"],
+    "toState": "paused",
+    "extension": { "confirmMessage:zh-CN": "确认暂停此使命？", "confirmMessage:en": "Pause this mission?" }
+  },
+  {
+    "code": "acp:resume_mission",
+    "displayName:zh-CN": "恢复使命",
+    "displayName:en": "Resume Mission",
+    "type": "state_transition",
+    "modelCode": "mission",
+    "stateField": "mission_status",
+    "fromStates": ["paused"],
+    "toState": "active",
+    "extension": { "confirmMessage:zh-CN": "确认恢复此使命？", "confirmMessage:en": "Resume this mission?" }
+  },
+  {
+    "code": "acp:complete_mission",
+    "displayName:zh-CN": "完成使命",
+    "displayName:en": "Complete Mission",
+    "type": "state_transition",
+    "modelCode": "mission",
+    "stateField": "mission_status",
+    "fromStates": ["active"],
+    "toState": "completed",
+    "extension": { "confirmMessage:zh-CN": "确认标记此使命为已完成？", "confirmMessage:en": "Mark this mission as completed?" }
+  },
+  {
+    "code": "acp:archive_mission",
+    "displayName:zh-CN": "归档使命",
+    "displayName:en": "Archive Mission",
+    "type": "state_transition",
+    "modelCode": "mission",
+    "stateField": "mission_status",
+    "fromStates": ["active", "paused", "completed"],
+    "toState": "archived",
+    "extension": { "confirmMessage:zh-CN": "确认归档此使命？", "confirmMessage:en": "Archive this mission?" }
+  },
+
+  {
+    "code": "acp:create_agent_task",
+    "displayName:zh-CN": "创建任务",
+    "displayName:en": "Create Task",
+    "type": "create",
+    "modelCode": "agent_task",
+    "inputFields": ["mission_id", "parent_id", "title", "description", "task_status", "task_priority", "assignee_type", "assignee_id", "agent_config", "input_data", "due_date", "estimated_cost", "max_retries", "tags"]
+  },
+  {
+    "code": "acp:update_agent_task",
+    "displayName:zh-CN": "更新任务",
+    "displayName:en": "Update Task",
+    "type": "update",
+    "modelCode": "agent_task",
+    "inputFields": ["mission_id", "parent_id", "title", "description", "task_status", "task_priority", "assignee_type", "assignee_id", "agent_config", "input_data", "due_date", "estimated_cost", "max_retries", "tags"]
+  },
+  {
+    "code": "acp:delete_agent_task",
+    "displayName:zh-CN": "删除任务",
+    "displayName:en": "Delete Task",
+    "type": "delete",
+    "modelCode": "agent_task",
+    "extension": { "confirmMessage:zh-CN": "确认删除此任务？", "confirmMessage:en": "Confirm delete this task?" }
+  },
+  {
+    "code": "acp:start_task",
+    "displayName:zh-CN": "开始任务",
+    "displayName:en": "Start Task",
+    "type": "state_transition",
+    "modelCode": "agent_task",
+    "stateField": "task_status",
+    "fromStates": ["todo"],
+    "toState": "in_progress",
+    "extension": { "confirmMessage:zh-CN": "确认开始此任务？", "confirmMessage:en": "Start this task?" }
+  },
+  {
+    "code": "acp:complete_task",
+    "displayName:zh-CN": "完成任务",
+    "displayName:en": "Complete Task",
+    "type": "state_transition",
+    "modelCode": "agent_task",
+    "stateField": "task_status",
+    "fromStates": ["in_progress"],
+    "toState": "done",
+    "extension": { "confirmMessage:zh-CN": "确认完成此任务？", "confirmMessage:en": "Complete this task?" }
+  },
+  {
+    "code": "acp:cancel_task",
+    "displayName:zh-CN": "取消任务",
+    "displayName:en": "Cancel Task",
+    "type": "state_transition",
+    "modelCode": "agent_task",
+    "stateField": "task_status",
+    "fromStates": ["backlog", "todo", "in_progress", "blocked"],
+    "toState": "cancelled",
+    "extension": { "confirmMessage:zh-CN": "确认取消此任务？", "confirmMessage:en": "Cancel this task?" }
+  },
+  {
+    "code": "acp:block_task",
+    "displayName:zh-CN": "阻塞任务",
+    "displayName:en": "Block Task",
+    "type": "state_transition",
+    "modelCode": "agent_task",
+    "stateField": "task_status",
+    "fromStates": ["in_progress"],
+    "toState": "blocked",
+    "extension": { "confirmMessage:zh-CN": "确认标记此任务为阻塞？", "confirmMessage:en": "Block this task?" }
+  },
+
+  {
+    "code": "acp:create_agent_run",
+    "displayName:zh-CN": "创建运行记录",
+    "displayName:en": "Create Run",
+    "type": "create",
+    "modelCode": "agent_run",
+    "inputFields": ["task_id", "agent_id", "run_status", "run_model", "started_at", "completed_at", "duration_ms", "input_tokens", "output_tokens", "total_cost", "tool_calls", "messages", "error_message", "metadata"]
+  },
+  {
+    "code": "acp:delete_agent_run",
+    "displayName:zh-CN": "删除运行记录",
+    "displayName:en": "Delete Run",
+    "type": "delete",
+    "modelCode": "agent_run",
+    "extension": { "confirmMessage:zh-CN": "确认删除此运行记录？", "confirmMessage:en": "Confirm delete this run record?" }
+  },
+  {
+    "code": "acp:cancel_run",
+    "displayName:zh-CN": "取消运行",
+    "displayName:en": "Cancel Run",
+    "type": "state_transition",
+    "modelCode": "agent_run",
+    "stateField": "run_status",
+    "fromStates": ["running"],
+    "toState": "cancelled",
+    "extension": { "confirmMessage:zh-CN": "确认取消此运行？", "confirmMessage:en": "Cancel this run?" }
+  },
+
+  {
+    "code": "acp:create_agent_artifact",
+    "displayName:zh-CN": "创建产出物",
+    "displayName:en": "Create Artifact",
+    "type": "create",
+    "modelCode": "agent_artifact",
+    "inputFields": ["run_id", "task_id", "artifact_type", "title", "content", "file_path", "file_size", "mime_type", "version", "parent_id", "tags", "metadata"]
+  },
+  {
+    "code": "acp:update_agent_artifact",
+    "displayName:zh-CN": "更新产出物",
+    "displayName:en": "Update Artifact",
+    "type": "update",
+    "modelCode": "agent_artifact",
+    "inputFields": ["run_id", "task_id", "artifact_type", "title", "content", "file_path", "file_size", "mime_type", "version", "parent_id", "tags", "metadata"]
+  },
+  {
+    "code": "acp:delete_agent_artifact",
+    "displayName:zh-CN": "删除产出物",
+    "displayName:en": "Delete Artifact",
+    "type": "delete",
+    "modelCode": "agent_artifact",
+    "extension": { "confirmMessage:zh-CN": "确认删除此产出物？", "confirmMessage:en": "Confirm delete this artifact?" }
+  },
+
+  {
+    "code": "acp:create_agent_schedule",
+    "displayName:zh-CN": "创建调度",
+    "displayName:en": "Create Schedule",
+    "type": "create",
+    "modelCode": "agent_schedule",
+    "inputFields": ["mission_id", "title", "description", "schedule_type", "cron_expression", "interval_ms", "event_trigger", "task_template", "schedule_status", "timezone", "max_runs"]
+  },
+  {
+    "code": "acp:update_agent_schedule",
+    "displayName:zh-CN": "更新调度",
+    "displayName:en": "Update Schedule",
+    "type": "update",
+    "modelCode": "agent_schedule",
+    "inputFields": ["mission_id", "title", "description", "schedule_type", "cron_expression", "interval_ms", "event_trigger", "task_template", "schedule_status", "timezone", "max_runs"]
+  },
+  {
+    "code": "acp:delete_agent_schedule",
+    "displayName:zh-CN": "删除调度",
+    "displayName:en": "Delete Schedule",
+    "type": "delete",
+    "modelCode": "agent_schedule",
+    "extension": { "confirmMessage:zh-CN": "确认删除此调度？", "confirmMessage:en": "Confirm delete this schedule?" }
+  },
+  {
+    "code": "acp:pause_schedule",
+    "displayName:zh-CN": "暂停调度",
+    "displayName:en": "Pause Schedule",
+    "type": "state_transition",
+    "modelCode": "agent_schedule",
+    "stateField": "schedule_status",
+    "fromStates": ["active"],
+    "toState": "paused",
+    "extension": { "confirmMessage:zh-CN": "确认暂停此调度？", "confirmMessage:en": "Pause this schedule?" }
+  },
+  {
+    "code": "acp:activate_schedule",
+    "displayName:zh-CN": "激活调度",
+    "displayName:en": "Activate Schedule",
+    "type": "state_transition",
+    "modelCode": "agent_schedule",
+    "stateField": "schedule_status",
+    "fromStates": ["paused"],
+    "toState": "active",
+    "extension": { "confirmMessage:zh-CN": "确认激活此调度？", "confirmMessage:en": "Activate this schedule?" }
+  },
+
+  {
+    "code": "acp:create_approval_policy",
+    "displayName:zh-CN": "创建审批策略",
+    "displayName:en": "Create Approval Policy",
+    "type": "create",
+    "modelCode": "approval_policy",
+    "inputFields": ["policy_name", "description", "trigger_rules", "approver_rules", "auto_approve", "timeout_hours", "timeout_action", "policy_status"]
+  },
+  {
+    "code": "acp:update_approval_policy",
+    "displayName:zh-CN": "更新审批策略",
+    "displayName:en": "Update Approval Policy",
+    "type": "update",
+    "modelCode": "approval_policy",
+    "inputFields": ["policy_name", "description", "trigger_rules", "approver_rules", "auto_approve", "timeout_hours", "timeout_action", "policy_status"]
+  },
+  {
+    "code": "acp:delete_approval_policy",
+    "displayName:zh-CN": "删除审批策略",
+    "displayName:en": "Delete Approval Policy",
+    "type": "delete",
+    "modelCode": "approval_policy",
+    "extension": { "confirmMessage:zh-CN": "确认删除此审批策略？", "confirmMessage:en": "Confirm delete this approval policy?" }
+  },
+
+  {
+    "code": "acp:approve_request",
+    "displayName:zh-CN": "通过",
+    "displayName:en": "Approve",
+    "type": "state_transition",
+    "modelCode": "agent_approval",
+    "stateField": "approval_status",
+    "fromStates": ["pending"],
+    "toState": "approved",
+    "extension": { "confirmMessage:zh-CN": "确认通过此审批请求？", "confirmMessage:en": "Approve this request?" }
+  },
+  {
+    "code": "acp:reject_request",
+    "displayName:zh-CN": "拒绝",
+    "displayName:en": "Reject",
+    "type": "state_transition",
+    "modelCode": "agent_approval",
+    "stateField": "approval_status",
+    "fromStates": ["pending"],
+    "toState": "rejected",
+    "inputFields": ["rejection_reason"],
+    "extension": { "confirmMessage:zh-CN": "确认拒绝此审批请求？", "confirmMessage:en": "Reject this request?" }
+  },
+
+  {
+    "code": "acp:create_agent_memory",
+    "displayName:zh-CN": "创建记忆",
+    "displayName:en": "Create Memory",
+    "type": "create",
+    "modelCode": "agent_memory",
+    "inputFields": ["memory_agent_id", "memory_type", "category", "memory_title", "memory_content", "importance", "source_run_id", "valid_from", "valid_until", "metadata"]
+  },
+  {
+    "code": "acp:update_agent_memory",
+    "displayName:zh-CN": "更新记忆",
+    "displayName:en": "Update Memory",
+    "type": "update",
+    "modelCode": "agent_memory",
+    "inputFields": ["memory_agent_id", "memory_type", "category", "memory_title", "memory_content", "importance", "source_run_id", "valid_from", "valid_until", "metadata"]
+  },
+  {
+    "code": "acp:delete_agent_memory",
+    "displayName:zh-CN": "删除记忆",
+    "displayName:en": "Delete Memory",
+    "type": "delete",
+    "modelCode": "agent_memory",
+    "extension": { "confirmMessage:zh-CN": "确认删除此记忆？", "confirmMessage:en": "Confirm delete this memory entry?" }
+  },
+
+  {
+    "code": "acp:create_agent_observation",
+    "displayName:zh-CN": "创建观测",
+    "displayName:en": "Create Observation",
+    "type": "create",
+    "modelCode": "agent_observation",
+    "inputFields": ["observation_type", "source_type", "source_id", "obs_agent_id", "obs_title", "detail", "severity"]
+  },
+  {
+    "code": "acp:delete_agent_observation",
+    "displayName:zh-CN": "删除观测",
+    "displayName:en": "Delete Observation",
+    "type": "delete",
+    "modelCode": "agent_observation",
+    "extension": { "confirmMessage:zh-CN": "确认删除此观测记录？", "confirmMessage:en": "Confirm delete this observation?" }
+  },
+
+  {
+    "code": "acp:create_agent_tool",
+    "displayName:zh-CN": "创建工具",
+    "displayName:en": "Create Tool",
+    "type": "create",
+    "modelCode": "agent_tool",
+    "inputFields": ["tool_code", "tool_type", "tool_name", "tool_description", "source_type", "source_code", "api_method", "api_path", "input_schema", "output_schema", "requires_approval", "risk_level", "tool_status"],
+    "autoSetFields": {
+      "auto_generated": { "strategy": "fixed_value", "value": false }
+    }
+  },
+  {
+    "code": "acp:update_agent_tool",
+    "displayName:zh-CN": "更新工具",
+    "displayName:en": "Update Tool",
+    "type": "update",
+    "modelCode": "agent_tool",
+    "inputFields": ["tool_code", "tool_type", "tool_name", "tool_description", "source_type", "source_code", "api_method", "api_path", "input_schema", "output_schema", "requires_approval", "risk_level", "tool_status"]
+  },
+  {
+    "code": "acp:delete_agent_tool",
+    "displayName:zh-CN": "删除工具",
+    "displayName:en": "Delete Tool",
+    "type": "delete",
+    "modelCode": "agent_tool",
+    "extension": { "confirmMessage:zh-CN": "确认删除此工具？", "confirmMessage:en": "Confirm delete this tool?" }
+  },
+
+  {
+    "code": "acp:create_agent_skill",
+    "displayName:zh-CN": "创建技能",
+    "displayName:en": "Create Skill",
+    "type": "create",
+    "modelCode": "agent_skill",
+    "inputFields": ["skill_code", "skill_name", "skill_description", "skill_level", "skill_category", "skill_icon", "skill_tools", "prompt_template", "skill_input_schema", "skill_version", "skill_status", "is_builtin"]
+  },
+  {
+    "code": "acp:update_agent_skill",
+    "displayName:zh-CN": "更新技能",
+    "displayName:en": "Update Skill",
+    "type": "update",
+    "modelCode": "agent_skill",
+    "inputFields": ["skill_code", "skill_name", "skill_description", "skill_level", "skill_category", "skill_icon", "skill_tools", "prompt_template", "skill_input_schema", "skill_version", "skill_status", "is_builtin"]
+  },
+  {
+    "code": "acp:delete_agent_skill",
+    "displayName:zh-CN": "删除技能",
+    "displayName:en": "Delete Skill",
+    "type": "delete",
+    "modelCode": "agent_skill",
+    "extension": { "confirmMessage:zh-CN": "确认删除此技能？", "confirmMessage:en": "Confirm delete this skill?" }
+  },
+  {
+    "code": "acp:create_object_alias",
+    "displayName:zh-CN": "创建对象别名",
+    "displayName:en": "Create Object Alias",
+    "type": "create",
+    "modelCode": "object_alias",
+    "inputFields": ["model_code", "alias", "language", "priority"]
+  },
+  {
+    "code": "acp:update_object_alias",
+    "displayName:zh-CN": "更新对象别名",
+    "displayName:en": "Update Object Alias",
+    "type": "update",
+    "modelCode": "object_alias",
+    "inputFields": ["model_code", "alias", "language", "priority"]
+  },
+  {
+    "code": "acp:delete_object_alias",
+    "displayName:zh-CN": "删除对象别名",
+    "displayName:en": "Delete Object Alias",
+    "type": "delete",
+    "modelCode": "object_alias",
+    "extension": { "confirmMessage:zh-CN": "确认删除此对象别名？", "confirmMessage:en": "Confirm delete this object alias?" }
+  },
+
+  {
+    "code": "acp:create_semantic_term",
+    "displayName:zh-CN": "创建语义术语",
+    "displayName:en": "Create Semantic Term",
+    "type": "create",
+    "modelCode": "semantic_term",
+    "inputFields": ["term", "model_code", "language", "term_type", "resolution", "description", "priority"]
+  },
+  {
+    "code": "acp:update_semantic_term",
+    "displayName:zh-CN": "更新语义术语",
+    "displayName:en": "Update Semantic Term",
+    "type": "update",
+    "modelCode": "semantic_term",
+    "inputFields": ["term", "model_code", "language", "term_type", "resolution", "description", "priority"]
+  },
+  {
+    "code": "acp:delete_semantic_term",
+    "displayName:zh-CN": "删除语义术语",
+    "displayName:en": "Delete Semantic Term",
+    "type": "delete",
+    "modelCode": "semantic_term",
+    "extension": { "confirmMessage:zh-CN": "确认删除此语义术语？", "confirmMessage:en": "Confirm delete this semantic term?" }
+  },
+
+  {
+    "code": "acp:create_mcp_server",
+    "displayName:zh-CN": "创建 MCP 服务器",
+    "displayName:en": "Create MCP Server",
+    "type": "create",
+    "modelCode": "mcp_server",
+    "inputFields": ["server_name", "server_url", "transport_type", "auth_type", "auth_config", "status"]
+  },
+  {
+    "code": "acp:update_mcp_server",
+    "displayName:zh-CN": "更新 MCP 服务器",
+    "displayName:en": "Update MCP Server",
+    "type": "update",
+    "modelCode": "mcp_server",
+    "inputFields": ["server_name", "server_url", "transport_type", "auth_type", "auth_config", "status"]
+  },
+  {
+    "code": "acp:delete_mcp_server",
+    "displayName:zh-CN": "删除 MCP 服务器",
+    "displayName:en": "Delete MCP Server",
+    "type": "delete",
+    "modelCode": "mcp_server",
+    "extension": { "confirmMessage:zh-CN": "确认删除此 MCP 服务器？", "confirmMessage:en": "Confirm delete this MCP server?" }
+  }
+]

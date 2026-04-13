@@ -1,0 +1,114 @@
+[
+  {
+    "code": "acp_agent_definition",
+    "name:zh-CN": "Agent 定义管理",
+    "name:en": "Agent Definition Management",
+    "description": "Manage AI agent definitions",
+    "resourceType": "operation",
+    "module": "acp"
+  },
+  {
+    "code": "acp_mission",
+    "name:zh-CN": "使命管理",
+    "name:en": "Mission Management",
+    "description": "Manage missions",
+    "resourceType": "operation",
+    "module": "acp"
+  },
+  {
+    "code": "acp_agent_task",
+    "name:zh-CN": "Agent 任务管理",
+    "name:en": "Agent Task Management",
+    "description": "Manage agent tasks",
+    "resourceType": "operation",
+    "module": "acp"
+  },
+  {
+    "code": "acp_agent_run",
+    "name:zh-CN": "运行记录查看",
+    "name:en": "Agent Run View",
+    "description": "View agent execution runs",
+    "resourceType": "operation",
+    "module": "acp"
+  },
+  {
+    "code": "acp_agent_artifact",
+    "name:zh-CN": "产出物管理",
+    "name:en": "Agent Artifact Management",
+    "description": "Manage agent artifacts",
+    "resourceType": "operation",
+    "module": "acp"
+  },
+  {
+    "code": "acp_agent_schedule",
+    "name:zh-CN": "调度管理",
+    "name:en": "Agent Schedule Management",
+    "description": "Manage agent schedules",
+    "resourceType": "operation",
+    "module": "acp"
+  },
+  {
+    "code": "acp_approval_policy",
+    "name:zh-CN": "审批策略管理",
+    "name:en": "Approval Policy Management",
+    "description": "Manage approval policies",
+    "resourceType": "operation",
+    "module": "acp"
+  },
+  {
+    "code": "acp_agent_approval",
+    "name:zh-CN": "Agent 审批管理",
+    "name:en": "Agent Approval Management",
+    "description": "Review and act on agent approval requests",
+    "resourceType": "operation",
+    "module": "acp"
+  },
+  {
+    "code": "acp_agent_memory",
+    "name:zh-CN": "Agent 记忆管理",
+    "name:en": "Agent Memory Management",
+    "description": "Manage agent memory entries",
+    "resourceType": "operation",
+    "module": "acp"
+  },
+  {
+    "code": "acp_agent_observation",
+    "name:zh-CN": "观测记录查看",
+    "name:en": "Agent Observation View",
+    "description": "View agent observations and metrics",
+    "resourceType": "operation",
+    "module": "acp"
+  },
+  {
+    "code": "acp_agent_tool",
+    "name:zh-CN": "Agent 工具管理",
+    "name:en": "Agent Tool Management",
+    "description": "Manage agent tool definitions",
+    "resourceType": "operation",
+    "module": "acp"
+  },
+  {
+    "code": "acp_mission_control",
+    "name:zh-CN": "任务控制台",
+    "name:en": "Mission Control",
+    "description": "Access the mission control dashboard",
+    "resourceType": "operation",
+    "module": "acp"
+  },
+  {
+    "code": "acp_agent_skill",
+    "name:zh-CN": "Agent 技能管理",
+    "name:en": "Agent Skill Management",
+    "description": "Manage agent skill definitions",
+    "resourceType": "operation",
+    "module": "acp"
+  },
+  {
+    "code": "AGENT_MANAGE",
+    "name:zh-CN": "AI 员工管理",
+    "name:en": "AI Employee Management",
+    "description": "Permission to create, edit, and delete custom AI employees (AgentDefinition with is_employee=true)",
+    "resourceType": "operation",
+    "module": "acp"
+  }
+]
