@@ -14,10 +14,32 @@ import { getKernel, resetKernel } from './bootstrap.js'
 
 import coreDemoPlugin from '~/plugins/core-demo'
 import coreBpmPlugin from '~/plugins/core-bpm'
+import coreDesignerPlugin from '~/plugins/core-designer'
+import coreAutomationPlugin from '~/plugins/core-automation'
+import coreOrganizationPlugin from '~/plugins/core-organization'
+import coreMetaPlugin from '~/plugins/core-meta'
+import coreAurabotPlugin from '~/plugins/core-aurabot'
+import coreAiColleaguesPlugin from '~/plugins/core-ai-colleagues'
+import corePersonalPlugin from '~/plugins/core-personal'
+import coreSettingsPlugin from '~/plugins/core-settings'
+import corePlatformPlugin from '~/plugins/core-platform'
+import coreAdminPlugin from '~/plugins/core-admin'
+import coreOpsPlugin from '~/plugins/core-ops'
 
 const CORE_PLUGINS = [
   coreDemoPlugin,
   coreBpmPlugin,
+  coreDesignerPlugin,
+  coreAutomationPlugin,
+  coreOrganizationPlugin,
+  coreMetaPlugin,
+  coreAurabotPlugin,
+  coreAiColleaguesPlugin,
+  corePersonalPlugin,
+  coreSettingsPlugin,
+  corePlatformPlugin,
+  coreAdminPlugin,
+  coreOpsPlugin,
 ]
 
 let bootedOnce = false
