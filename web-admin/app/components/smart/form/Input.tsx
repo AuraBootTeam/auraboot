@@ -1,8 +1,8 @@
 import React, { useRef } from 'react';
-import type { InputProps } from '~/studio/domain/schema/smart-components';
-import { useExpressionValue, useSmartField } from '~/studio/hooks/runtime/useSmartComponent';
-import { useSmartFieldContract } from '~/studio/hooks/runtime/useSmartFieldContract';
-import { useSmartFieldMeta } from '~/studio/hooks/runtime/useSmartFieldMeta';
+import type { InputProps } from '~/plugins/core-designer/components/studio/domain/schema/smart-components';
+import { useExpressionValue, useSmartField } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartComponent';
+import { useSmartFieldContract } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldContract';
+import { useSmartFieldMeta } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldMeta';
 import { useSmartText } from '~/utils/i18n';
 import { Input as BaseInput } from '~/components/ui/input';
 import { FieldBase } from '~/components/ui/field-base';

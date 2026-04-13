@@ -11,7 +11,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { LinkageEngine } from '~/meta/runtime/linkage/LinkageEngine';
 import { ScopedStateManager } from '~/meta/runtime/state/scoped-state';
 import type { ExpressionContext, GlobalState } from '~/meta/runtime/expression/context';
-import type { LinkageRule } from '~/studio/workbench/panels/linkage/types';
+import type { LinkageRule } from '~/plugins/core-designer/components/studio/workbench/panels/linkage/types';
 
 const SCOPE_ID = 'cascade-test';
 

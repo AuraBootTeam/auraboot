@@ -4,12 +4,12 @@ import {
   useSmartField,
   useExpressionValue,
   type ValidationRule,
-} from '~/studio/hooks/runtime/useSmartComponent';
+} from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartComponent';
 import {
   useSmartFieldContract,
   type SmartFieldExpressions,
-} from '~/studio/hooks/runtime/useSmartFieldContract';
-import { useSmartFieldMeta } from '~/studio/hooks/runtime/useSmartFieldMeta';
+} from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldContract';
+import { useSmartFieldMeta } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldMeta';
 import type { SmartText } from '~/utils/i18n';
 import type { FieldAdapter, FieldAdapterProps } from './types';
 

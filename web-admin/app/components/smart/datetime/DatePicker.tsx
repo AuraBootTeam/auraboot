@@ -1,10 +1,10 @@
 import React, { forwardRef } from 'react';
 import { useActionData } from 'react-router';
 import clsx from 'clsx';
-import type { DatePickerProps } from '~/studio/domain/schema/smart-components';
-import { useExpressionValue, useSmartField } from '~/studio/hooks/runtime/useSmartComponent';
-import { useSmartFieldContract } from '~/studio/hooks/runtime/useSmartFieldContract';
-import { useSmartFieldMeta } from '~/studio/hooks/runtime/useSmartFieldMeta';
+import type { DatePickerProps } from '~/plugins/core-designer/components/studio/domain/schema/smart-components';
+import { useExpressionValue, useSmartField } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartComponent';
+import { useSmartFieldContract } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldContract';
+import { useSmartFieldMeta } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldMeta';
 import { useSmartText } from '~/utils/i18n';
 import { FieldBase } from '~/components/ui/field-base';
 import { FieldControl } from '~/components/ui/field-control';

@@ -1,10 +1,10 @@
 import React, { forwardRef } from 'react';
 import { useActionData } from 'react-router';
 import clsx from 'clsx';
-import type { SelectProps } from '~/studio/domain/schema/smart-components';
-import { useSmartField } from '~/studio/hooks/runtime/useSmartComponent';
-import { useSmartFieldContract } from '~/studio/hooks/runtime/useSmartFieldContract';
-import { useSmartFieldMeta } from '~/studio/hooks/runtime/useSmartFieldMeta';
+import type { SelectProps } from '~/plugins/core-designer/components/studio/domain/schema/smart-components';
+import { useSmartField } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartComponent';
+import { useSmartFieldContract } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldContract';
+import { useSmartFieldMeta } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldMeta';
 import { useFieldDataSource } from '~/meta/hooks/useFieldDataSource';
 import { useI18n } from '~/contexts/I18nContext';
 import { useSmartText, translateArray } from '~/utils/i18n';

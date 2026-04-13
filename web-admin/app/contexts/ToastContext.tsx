@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import Toast from '~/components/Toast';
-import type { ToastEventDetail } from '~/studio/services/runtime/execution/UIBridge';
+import type { ToastEventDetail } from '~/plugins/core-designer/components/studio/services/runtime/execution/UIBridge';
 
 interface ToastState {
   message: string;

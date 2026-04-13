@@ -1,10 +1,10 @@
 import React, { forwardRef, useState } from 'react';
 import { useActionData } from 'react-router';
 import clsx from 'clsx';
-import type { TextareaProps } from '~/studio/domain/schema/smart-components';
-import { useSmartField } from '~/studio/hooks/runtime/useSmartComponent';
-import { useSmartFieldContract } from '~/studio/hooks/runtime/useSmartFieldContract';
-import { useSmartFieldMeta } from '~/studio/hooks/runtime/useSmartFieldMeta';
+import type { TextareaProps } from '~/plugins/core-designer/components/studio/domain/schema/smart-components';
+import { useSmartField } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartComponent';
+import { useSmartFieldContract } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldContract';
+import { useSmartFieldMeta } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldMeta';
 import { useSmartText } from '~/utils/i18n';
 import { FieldBase } from '~/components/ui/field-base';
 import { Textarea as BaseTextarea } from '~/components/ui/textarea';
