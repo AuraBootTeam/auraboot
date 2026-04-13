@@ -1,0 +1,482 @@
+[
+  {
+    "code": "sla_target_type",
+    "name": "SLA Target Type",
+    "name:zh-CN": "SLA 目标类型",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "process",
+        "label": "Process",
+        "label:zh-CN": "流程",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "node",
+        "label": "Node",
+        "label:zh-CN": "节点",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "task",
+        "label": "Task",
+        "label:zh-CN": "任务",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      }
+    ]
+  },
+  {
+    "code": "sla_deadline_mode",
+    "name": "SLA Deadline Mode",
+    "name:zh-CN": "SLA 截止模式",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "fixed",
+        "label": "Fixed Duration",
+        "label:zh-CN": "固定时长",
+        "sortNo": 10,
+        "status": "enabled"
+      },
+      {
+        "value": "expression",
+        "label": "Expression",
+        "label:zh-CN": "表达式",
+        "sortNo": 20,
+        "status": "enabled"
+      },
+      {
+        "value": "field",
+        "label": "Field Reference",
+        "label:zh-CN": "字段引用",
+        "sortNo": 30,
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "sla_suspend_policy",
+    "name": "SLA Suspend Policy",
+    "name:zh-CN": "SLA 暂停策略",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "pause",
+        "label": "Pause Timer",
+        "label:zh-CN": "暂停计时",
+        "sortNo": 10,
+        "status": "enabled"
+      },
+      {
+        "value": "continue",
+        "label": "Continue Timer",
+        "label:zh-CN": "继续计时",
+        "sortNo": 20,
+        "status": "enabled"
+      },
+      {
+        "value": "cancel",
+        "label": "Cancel SLA",
+        "label:zh-CN": "取消SLA",
+        "sortNo": 30,
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "dp_policy_type",
+    "name": "Data Permission Policy Type",
+    "name:zh-CN": "数据权限策略类型",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "row",
+        "label": "Row-level",
+        "label:zh-CN": "行级权限",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "column",
+        "label": "Column-level",
+        "label:zh-CN": "列级权限",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      }
+    ]
+  },
+  {
+    "code": "dp_scope_type",
+    "name": "Data Permission Scope Type",
+    "name:zh-CN": "数据权限范围类型",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "all",
+        "label": "All Data",
+        "label:zh-CN": "全部数据",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "self",
+        "label": "Own Data",
+        "label:zh-CN": "本人数据",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "department",
+        "label": "Department",
+        "label:zh-CN": "本部门",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "department_tree",
+        "label": "Department Tree",
+        "label:zh-CN": "部门树",
+        "sortNo": 40,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "custom",
+        "label": "Custom Expression",
+        "label:zh-CN": "自定义表达式",
+        "sortNo": 50,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      }
+    ]
+  },
+  {
+    "code": "dp_mask_type",
+    "name": "Data Permission Mask Type",
+    "name:zh-CN": "数据脱敏类型",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "hide",
+        "label": "Hide",
+        "label:zh-CN": "隐藏",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "partial",
+        "label": "Partial Mask",
+        "label:zh-CN": "部分脱敏",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "hash",
+        "label": "Hash",
+        "label:zh-CN": "哈希",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "custom",
+        "label": "Custom",
+        "label:zh-CN": "自定义",
+        "sortNo": 40,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      }
+    ]
+  },
+  {
+    "code": "webhook_event_type",
+    "name": "Webhook Event Type",
+    "name:zh-CN": "Webhook 事件类型",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "record_created",
+        "label": "Record Created",
+        "label:zh-CN": "记录创建",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "record_updated",
+        "label": "Record Updated",
+        "label:zh-CN": "记录更新",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "record_deleted",
+        "label": "Record Deleted",
+        "label:zh-CN": "记录删除",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "state_changed",
+        "label": "State Changed",
+        "label:zh-CN": "状态变更",
+        "sortNo": 40,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "bpm_completed",
+        "label": "BPM Completed",
+        "label:zh-CN": "流程完成",
+        "sortNo": 50,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      }
+    ]
+  },
+  {
+    "code": "webhook_delivery_status",
+    "name": "Webhook Delivery Status",
+    "name:zh-CN": "Webhook 投递状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "success",
+        "label": "Success",
+        "label:zh-CN": "成功",
+        "sortNo": 10,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "failed",
+        "label": "Failed",
+        "label:zh-CN": "失败",
+        "sortNo": 20,
+        "color": "#ff4d4f",
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      },
+      {
+        "value": "pending",
+        "label": "Pending",
+        "label:zh-CN": "待处理",
+        "sortNo": 30,
+        "color": "#faad14",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      }
+    ]
+  },
+  {
+    "code": "connector_auth_type",
+    "name": "API Connector Auth Type",
+    "name:zh-CN": "API 连接器认证类型",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "none",
+        "label": "No Auth",
+        "label:zh-CN": "无认证",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "api_key",
+        "label": "API Key",
+        "label:zh-CN": "API Key",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "basic",
+        "label": "Basic Auth",
+        "label:zh-CN": "Basic 认证",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "bearer",
+        "label": "Bearer Token",
+        "label:zh-CN": "Bearer Token",
+        "sortNo": 40,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "oauth2",
+        "label": "OAuth2",
+        "label:zh-CN": "OAuth2",
+        "sortNo": 50,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      }
+    ]
+  },
+  {
+    "code": "member_status",
+    "name": "Member Status",
+    "name:zh-CN": "成员状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "pending",
+        "label": "Pending",
+        "label:zh-CN": "待审批",
+        "sortNo": 10,
+        "color": "#faad14",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "active",
+        "label": "Active",
+        "label:zh-CN": "已激活",
+        "sortNo": 20,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "suspended",
+        "label": "Suspended",
+        "label:zh-CN": "已暂停",
+        "sortNo": 30,
+        "color": "#ff4d4f",
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "rejected",
+        "label": "Rejected",
+        "label:zh-CN": "已拒绝",
+        "sortNo": 40,
+        "color": "#d9d9d9",
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      }
+    ]
+  },
+  {
+    "code": "scheduled_task_type",
+    "name": "Scheduled Task Type",
+    "name:zh-CN": "定时任务类型",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "cron",
+        "label": "Cron",
+        "label:zh-CN": "Cron 表达式",
+        "sortNo": 10,
+        "color": "#722ed1",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "interval",
+        "label": "Interval",
+        "label:zh-CN": "固定间隔",
+        "sortNo": 20,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "one_time",
+        "label": "One-time",
+        "label:zh-CN": "一次性",
+        "sortNo": 30,
+        "color": "#faad14",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      }
+    ]
+  }
+]

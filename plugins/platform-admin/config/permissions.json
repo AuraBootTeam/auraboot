@@ -1,0 +1,74 @@
+[
+  {
+    "code": "admin_sla_config",
+    "name:zh-CN": "SLA 配置管理",
+    "name:en": "SLA Configuration Management",
+    "description": "Manage SLA configurations for BPM processes",
+    "resourceType": "operation",
+    "module": "bpm"
+  },
+  {
+    "code": "admin_bpm_domain_config",
+    "name:zh-CN": "BPM 域配置管理",
+    "name:en": "BPM Domain Configuration Management",
+    "description": "Manage BPM domain configurations",
+    "resourceType": "operation",
+    "module": "bpm"
+  },
+  {
+    "code": "admin_data_permission",
+    "name:zh-CN": "数据权限策略管理",
+    "name:en": "Data Permission Policy Management",
+    "description": "Manage row-level and column-level data permission policies",
+    "resourceType": "operation",
+    "module": "security"
+  },
+  {
+    "code": "admin_webhook",
+    "name:zh-CN": "Webhook 订阅管理",
+    "name:en": "Webhook Subscription Management",
+    "description": "Manage webhook subscriptions",
+    "resourceType": "operation",
+    "module": "integration"
+  },
+  {
+    "code": "admin_api_connector",
+    "name:zh-CN": "API 连接器管理",
+    "name:en": "API Connector Management",
+    "description": "Manage external API connectors",
+    "resourceType": "operation",
+    "module": "integration"
+  },
+  {
+    "code": "admin_tenant_member",
+    "name:zh-CN": "成员管理",
+    "name:en": "Member Management",
+    "description": "Manage tenant members, approve/reject/suspend/restore",
+    "resourceType": "operation",
+    "module": "enterprise"
+  },
+  {
+    "code": "plugin_marketplace",
+    "name:zh-CN": "插件市场",
+    "name:en": "Plugin Marketplace",
+    "description": "Browse and install plugins from marketplace",
+    "resourceType": "operation",
+    "module": "system"
+  },
+  {
+    "code": "plugin.plugin.manage",
+    "name:zh-CN": "插件管理",
+    "name:en": "Plugin Management",
+    "description": "Manage plugins",
+    "resourceType": "operation",
+    "module": "system"
+  },
+  {
+    "code": "admin_scheduled_task",
+    "name:zh-CN": "定时任务管理",
+    "name:en": "Scheduled Task Management",
+    "description": "Manage scheduled tasks, view execution logs",
+    "resourceType": "operation",
+    "module": "system"
+  }
+]

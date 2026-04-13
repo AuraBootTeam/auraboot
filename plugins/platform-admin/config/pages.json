@@ -1,0 +1,1964 @@
+[
+  {
+    "pageKey": "sla_config_list",
+    "name:zh-CN": "SLA 配置",
+    "name:en": "SLA Configuration",
+    "modelCode": "sla_config",
+    "kind": "list",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "stack"
+    },
+    "blocks": [
+      {
+        "id": "toolbar",
+        "blockType": "toolbar",
+        "buttons": [
+          {
+            "code": "create",
+            "variant": "primary",
+            "label": "create",
+            "action": {
+              "type": "navigate",
+              "to": "sla_config_form",
+              "command": "admin:create_sla_config"
+            }
+          }
+        ]
+      },
+      {
+        "id": "table",
+        "blockType": "table",
+        "columns": [
+          {
+            "field": "name",
+            "width": 200,
+            "sortable": true
+          },
+          {
+            "field": "target_type",
+            "width": 120,
+            "renderType": "tag"
+          },
+          {
+            "field": "target_key",
+            "width": 150
+          },
+          {
+            "field": "deadline_mode",
+            "width": 120,
+            "renderType": "tag"
+          },
+          {
+            "field": "deadline_value",
+            "width": 150
+          },
+          {
+            "field": "suspend_policy",
+            "width": 120
+          },
+          {
+            "field": "enabled",
+            "width": 80
+          },
+          {
+            "field": "created_at",
+            "width": 160,
+            "format": "YYYY-MM-DD HH:mm"
+          }
+        ],
+        "rowActions": [
+          {
+            "code": "edit",
+            "label": "edit",
+            "action": {
+              "type": "navigate",
+              "to": "sla_config_form",
+              "command": "admin:update_sla_config"
+            }
+          },
+          {
+            "code": "delete",
+            "variant": "danger",
+            "label": "delete",
+            "confirm": "delete.confirm",
+            "action": {
+              "type": "command",
+              "command": "admin:delete_sla_config"
+            }
+          }
+        ],
+        "defaultSort": {
+          "field": "created_at",
+          "order": "desc"
+        }
+      }
+    ]
+  },
+  {
+    "pageKey": "sla_config_form",
+    "name:zh-CN": "SLA 配置表单",
+    "name:en": "SLA Configuration Form",
+    "modelCode": "sla_config",
+    "kind": "form",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "grid",
+      "cols": 12
+    },
+    "blocks": [
+      {
+        "id": "basic",
+        "blockType": "form-section",
+        "title": {
+          "zh-CN": "基本信息",
+          "en-US": "Basic Information"
+        },
+        "fields": [
+          {
+            "field": "name",
+            "colSpan": 6
+          },
+          {
+            "field": "enabled",
+            "colSpan": 6
+          },
+          {
+            "field": "target_type",
+            "colSpan": 4
+          },
+          {
+            "field": "target_key",
+            "colSpan": 4
+          },
+          {
+            "field": "domain_code",
+            "colSpan": 4
+          },
+          {
+            "field": "deadline_mode",
+            "colSpan": 4
+          },
+          {
+            "field": "deadline_value",
+            "colSpan": 4
+          },
+          {
+            "field": "suspend_policy",
+            "colSpan": 4
+          },
+          {
+            "field": "business_calendar",
+            "colSpan": 4
+          },
+          {
+            "field": "model_code",
+            "colSpan": 4
+          },
+          {
+            "field": "deadline_field",
+            "colSpan": 4
+          },
+          {
+            "field": "priority_field",
+            "colSpan": 4
+          },
+          {
+            "field": "warning_rules",
+            "colSpan": 12
+          }
+        ]
+      },
+      {
+        "id": "buttons",
+        "blockType": "form-buttons",
+        "buttons": [
+          {
+            "code": "submit",
+            "primary": true,
+            "label": "save",
+            "action": {
+              "type": "command",
+              "command": "admin:update_sla_config"
+            }
+          },
+          {
+            "code": "cancel",
+            "label": "cancel"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "pageKey": "bpm_domain_config_list",
+    "name:zh-CN": "BPM 域配置",
+    "name:en": "BPM Domain Configuration",
+    "modelCode": "bpm_domain_config",
+    "kind": "list",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "stack"
+    },
+    "blocks": [
+      {
+        "id": "toolbar",
+        "blockType": "toolbar",
+        "buttons": [
+          {
+            "code": "create",
+            "variant": "primary",
+            "label": "create",
+            "action": {
+              "type": "navigate",
+              "to": "bpm_domain_config_form",
+              "command": "admin:create_bpm_domain_config"
+            }
+          }
+        ]
+      },
+      {
+        "id": "table",
+        "blockType": "table",
+        "columns": [
+          {
+            "field": "domain_code",
+            "width": 150,
+            "sortable": true
+          },
+          {
+            "field": "domain_name",
+            "width": 200,
+            "sortable": true
+          },
+          {
+            "field": "model_code",
+            "width": 150
+          },
+          {
+            "field": "enabled",
+            "width": 80
+          },
+          {
+            "field": "created_at",
+            "width": 160,
+            "format": "YYYY-MM-DD HH:mm"
+          }
+        ],
+        "rowActions": [
+          {
+            "code": "edit",
+            "label": "edit",
+            "action": {
+              "type": "navigate",
+              "to": "bpm_domain_config_form",
+              "command": "admin:update_bpm_domain_config"
+            }
+          },
+          {
+            "code": "delete",
+            "variant": "danger",
+            "label": "delete",
+            "confirm": "delete.confirm",
+            "action": {
+              "type": "command",
+              "command": "admin:delete_bpm_domain_config"
+            }
+          }
+        ],
+        "defaultSort": {
+          "field": "created_at",
+          "order": "desc"
+        }
+      }
+    ]
+  },
+  {
+    "pageKey": "bpm_domain_config_form",
+    "name:zh-CN": "BPM 域配置表单",
+    "name:en": "BPM Domain Configuration Form",
+    "modelCode": "bpm_domain_config",
+    "kind": "form",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "grid",
+      "cols": 12
+    },
+    "blocks": [
+      {
+        "id": "basic",
+        "blockType": "form-section",
+        "title": {
+          "zh-CN": "基本信息",
+          "en-US": "Basic Information"
+        },
+        "fields": [
+          {
+            "field": "domain_code",
+            "colSpan": 6
+          },
+          {
+            "field": "domain_name",
+            "colSpan": 6
+          },
+          {
+            "field": "model_code",
+            "colSpan": 6
+          },
+          {
+            "field": "enabled",
+            "colSpan": 6
+          },
+          {
+            "field": "process_keys",
+            "colSpan": 12
+          },
+          {
+            "field": "list_fields",
+            "colSpan": 12
+          },
+          {
+            "field": "filter_fields",
+            "colSpan": 12
+          },
+          {
+            "field": "sort_fields",
+            "colSpan": 12
+          }
+        ]
+      },
+      {
+        "id": "buttons",
+        "blockType": "form-buttons",
+        "buttons": [
+          {
+            "code": "submit",
+            "primary": true,
+            "label": "save",
+            "action": {
+              "type": "command",
+              "command": "admin:update_bpm_domain_config"
+            }
+          },
+          {
+            "code": "cancel",
+            "label": "cancel"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "pageKey": "data_permission_list",
+    "name:zh-CN": "数据权限策略",
+    "name:en": "Data Permission Policies",
+    "modelCode": "data_permission",
+    "kind": "list",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "stack"
+    },
+    "blocks": [
+      {
+        "id": "toolbar",
+        "blockType": "toolbar",
+        "buttons": [
+          {
+            "code": "create",
+            "variant": "primary",
+            "label": "create",
+            "action": {
+              "type": "navigate",
+              "to": "data_permission_form",
+              "command": "admin:create_data_permission"
+            }
+          }
+        ]
+      },
+      {
+        "id": "table",
+        "blockType": "table",
+        "columns": [
+          {
+            "field": "name",
+            "width": 200,
+            "sortable": true
+          },
+          {
+            "field": "model_code",
+            "width": 150
+          },
+          {
+            "field": "policy_type",
+            "width": 120,
+            "renderType": "tag"
+          },
+          {
+            "field": "scope_type",
+            "width": 130,
+            "renderType": "tag"
+          },
+          {
+            "field": "field_code",
+            "width": 120
+          },
+          {
+            "field": "mask_type",
+            "width": 120,
+            "renderType": "tag"
+          },
+          {
+            "field": "priority",
+            "width": 80,
+            "sortable": true
+          },
+          {
+            "field": "enabled",
+            "width": 80
+          },
+          {
+            "field": "created_at",
+            "width": 160,
+            "format": "YYYY-MM-DD HH:mm"
+          }
+        ],
+        "rowActions": [
+          {
+            "code": "edit",
+            "label": "edit",
+            "action": {
+              "type": "navigate",
+              "to": "data_permission_form",
+              "command": "admin:update_data_permission"
+            }
+          },
+          {
+            "code": "delete",
+            "variant": "danger",
+            "label": "delete",
+            "confirm": "delete.confirm",
+            "action": {
+              "type": "command",
+              "command": "admin:delete_data_permission"
+            }
+          }
+        ],
+        "defaultSort": {
+          "field": "priority",
+          "order": "asc"
+        }
+      }
+    ]
+  },
+  {
+    "pageKey": "data_permission_form",
+    "name:zh-CN": "数据权限策略表单",
+    "name:en": "Data Permission Policy Form",
+    "modelCode": "data_permission",
+    "kind": "form",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "grid",
+      "cols": 12
+    },
+    "blocks": [
+      {
+        "id": "basic",
+        "blockType": "form-section",
+        "title": {
+          "zh-CN": "基本信息",
+          "en-US": "Basic Information"
+        },
+        "fields": [
+          {
+            "field": "name",
+            "colSpan": 6
+          },
+          {
+            "field": "model_code",
+            "colSpan": 6
+          },
+          {
+            "field": "policy_type",
+            "colSpan": 6
+          },
+          {
+            "field": "enabled",
+            "colSpan": 6
+          },
+          {
+            "field": "priority",
+            "colSpan": 6
+          },
+          {
+            "field": "description",
+            "colSpan": 6
+          },
+          {
+            "field": "scope_type",
+            "colSpan": 6
+          },
+          {
+            "field": "scope_expression",
+            "colSpan": 6
+          },
+          {
+            "field": "field_code",
+            "colSpan": 6
+          },
+          {
+            "field": "mask_type",
+            "colSpan": 6
+          },
+          {
+            "field": "mask_expression",
+            "colSpan": 12
+          }
+        ]
+      },
+      {
+        "id": "role-bindings",
+        "blockType": "sub-table",
+        "title": {
+          "zh-CN": "角色绑定",
+          "en-US": "Role Bindings"
+        },
+        "dataSource": {
+          "type": "api",
+          "url": "/api/meta/data-permissions/${recordId}/roles/list",
+          "method": "get"
+        },
+        "columns": [
+          {
+            "field": "roleName",
+            "label": {
+              "zh-CN": "角色名称",
+              "en-US": "Role Name"
+            },
+            "width": 250
+          },
+          {
+            "field": "roleCode",
+            "label": {
+              "zh-CN": "角色代码",
+              "en-US": "Role Code"
+            },
+            "width": 250
+          }
+        ]
+      },
+      {
+        "id": "buttons",
+        "blockType": "form-buttons",
+        "buttons": [
+          {
+            "code": "submit",
+            "primary": true,
+            "label": "save",
+            "action": {
+              "type": "command",
+              "command": "admin:update_data_permission"
+            }
+          },
+          {
+            "code": "cancel",
+            "label": "cancel"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "pageKey": "webhook_list",
+    "name:zh-CN": "Webhook 订阅",
+    "name:en": "Webhook Subscriptions",
+    "modelCode": "webhook",
+    "kind": "list",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "stack"
+    },
+    "blocks": [
+      {
+        "id": "toolbar",
+        "blockType": "toolbar",
+        "buttons": [
+          {
+            "code": "create",
+            "variant": "primary",
+            "label": "create",
+            "action": {
+              "type": "navigate",
+              "to": "webhook_form",
+              "command": "admin:create_webhook"
+            }
+          }
+        ]
+      },
+      {
+        "id": "table",
+        "blockType": "table",
+        "columns": [
+          {
+            "field": "name",
+            "width": 200,
+            "sortable": true
+          },
+          {
+            "field": "target_url",
+            "width": 300
+          },
+          {
+            "field": "event_type",
+            "width": 140,
+            "renderType": "tag"
+          },
+          {
+            "field": "model_code",
+            "width": 120
+          },
+          {
+            "field": "max_retries",
+            "width": 100
+          },
+          {
+            "field": "timeout_ms",
+            "width": 110
+          },
+          {
+            "field": "enabled",
+            "width": 80
+          },
+          {
+            "field": "created_at",
+            "width": 160,
+            "format": "YYYY-MM-DD HH:mm"
+          }
+        ],
+        "rowActions": [
+          {
+            "code": "view",
+            "label": "view",
+            "action": {
+              "type": "navigate",
+              "to": "webhook_detail"
+            }
+          },
+          {
+            "code": "edit",
+            "label": "edit",
+            "action": {
+              "type": "navigate",
+              "to": "webhook_form",
+              "command": "admin:update_webhook"
+            }
+          },
+          {
+            "code": "delete",
+            "variant": "danger",
+            "label": "delete",
+            "confirm": "delete.confirm",
+            "action": {
+              "type": "command",
+              "command": "admin:delete_webhook"
+            }
+          }
+        ],
+        "defaultSort": {
+          "field": "created_at",
+          "order": "desc"
+        }
+      }
+    ]
+  },
+  {
+    "pageKey": "webhook_form",
+    "name:zh-CN": "Webhook 表单",
+    "name:en": "Webhook Form",
+    "modelCode": "webhook",
+    "kind": "form",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "grid",
+      "cols": 12
+    },
+    "blocks": [
+      {
+        "id": "basic",
+        "blockType": "form-section",
+        "title": {
+          "zh-CN": "基本信息",
+          "en-US": "Basic Information"
+        },
+        "fields": [
+          {
+            "field": "name",
+            "colSpan": 6
+          },
+          {
+            "field": "enabled",
+            "colSpan": 6
+          },
+          {
+            "field": "target_url",
+            "colSpan": 12
+          },
+          {
+            "field": "event_type",
+            "colSpan": 6
+          },
+          {
+            "field": "model_code",
+            "colSpan": 6
+          },
+          {
+            "field": "secret",
+            "colSpan": 6
+          },
+          {
+            "field": "max_retries",
+            "colSpan": 3
+          },
+          {
+            "field": "timeout_ms",
+            "colSpan": 3
+          },
+          {
+            "field": "filter_expression",
+            "colSpan": 12
+          },
+          {
+            "field": "headers",
+            "colSpan": 12
+          }
+        ]
+      },
+      {
+        "id": "buttons",
+        "blockType": "form-buttons",
+        "buttons": [
+          {
+            "code": "submit",
+            "primary": true,
+            "label": "save",
+            "action": {
+              "type": "command",
+              "command": "admin:update_webhook"
+            }
+          },
+          {
+            "code": "cancel",
+            "label": "cancel"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "pageKey": "webhook_detail",
+    "name:zh-CN": "Webhook 详情",
+    "name:en": "Webhook Detail",
+    "modelCode": "webhook",
+    "kind": "detail",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "grid",
+      "cols": 12
+    },
+    "blocks": [
+      {
+        "id": "basic",
+        "blockType": "form-section",
+        "title": {
+          "zh-CN": "基本信息",
+          "en-US": "Basic Information"
+        },
+        "readOnly": true,
+        "fields": [
+          {
+            "field": "name",
+            "colSpan": 6
+          },
+          {
+            "field": "enabled",
+            "colSpan": 6
+          },
+          {
+            "field": "target_url",
+            "colSpan": 12
+          },
+          {
+            "field": "event_type",
+            "colSpan": 6
+          },
+          {
+            "field": "model_code",
+            "colSpan": 6
+          },
+          {
+            "field": "secret",
+            "colSpan": 6
+          },
+          {
+            "field": "max_retries",
+            "colSpan": 3
+          },
+          {
+            "field": "timeout_ms",
+            "colSpan": 3
+          },
+          {
+            "field": "filter_expression",
+            "colSpan": 12
+          },
+          {
+            "field": "headers",
+            "colSpan": 12
+          }
+        ]
+      },
+      {
+        "id": "delivery_logs",
+        "blockType": "sub-table",
+        "title": {
+          "zh-CN": "投递日志",
+          "en-US": "Delivery Logs"
+        },
+        "childModel": "webhook_delivery_log",
+        "parentField": "subscription_pid",
+        "readOnly": true,
+        "columns": [
+          {
+            "field": "delivery_status",
+            "width": 100,
+            "renderType": "tag"
+          },
+          {
+            "field": "response_status",
+            "width": 100
+          },
+          {
+            "field": "event_id",
+            "width": 180
+          },
+          {
+            "field": "retry_count",
+            "width": 80
+          },
+          {
+            "field": "error_message",
+            "width": 250
+          },
+          {
+            "field": "delivered_at",
+            "width": 180,
+            "format": "YYYY-MM-DD HH:mm:ss"
+          },
+          {
+            "field": "created_at",
+            "width": 180,
+            "format": "YYYY-MM-DD HH:mm:ss"
+          }
+        ],
+        "defaultSort": {
+          "field": "created_at",
+          "order": "desc"
+        }
+      }
+    ]
+  },
+  {
+    "pageKey": "api_connector_list",
+    "name:zh-CN": "API 连接器",
+    "name:en": "API Connectors",
+    "modelCode": "api_connector",
+    "kind": "list",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "stack"
+    },
+    "blocks": [
+      {
+        "id": "toolbar",
+        "blockType": "toolbar",
+        "buttons": [
+          {
+            "code": "create",
+            "variant": "primary",
+            "label": "create",
+            "action": {
+              "type": "navigate",
+              "to": "api_connector_form",
+              "command": "admin:create_api_connector"
+            }
+          }
+        ]
+      },
+      {
+        "id": "table",
+        "blockType": "table",
+        "columns": [
+          {
+            "field": "name",
+            "width": 200,
+            "sortable": true
+          },
+          {
+            "field": "base_url",
+            "width": 300
+          },
+          {
+            "field": "auth_type",
+            "width": 120,
+            "renderType": "tag"
+          },
+          {
+            "field": "timeout_ms",
+            "width": 110
+          },
+          {
+            "field": "enabled",
+            "width": 80
+          },
+          {
+            "field": "created_at",
+            "width": 160,
+            "format": "YYYY-MM-DD HH:mm"
+          }
+        ],
+        "rowActions": [
+          {
+            "code": "edit",
+            "label": "edit",
+            "action": {
+              "type": "navigate",
+              "to": "api_connector_form",
+              "command": "admin:update_api_connector"
+            }
+          },
+          {
+            "code": "delete",
+            "variant": "danger",
+            "label": "delete",
+            "confirm": "delete.confirm",
+            "action": {
+              "type": "command",
+              "command": "admin:delete_api_connector"
+            }
+          }
+        ],
+        "defaultSort": {
+          "field": "created_at",
+          "order": "desc"
+        }
+      }
+    ]
+  },
+  {
+    "pageKey": "api_connector_form",
+    "name:zh-CN": "API 连接器表单",
+    "name:en": "API Connector Form",
+    "modelCode": "api_connector",
+    "kind": "form",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "grid",
+      "cols": 12
+    },
+    "blocks": [
+      {
+        "id": "basic",
+        "blockType": "form-section",
+        "title": {
+          "zh-CN": "基本信息",
+          "en-US": "Basic Information"
+        },
+        "fields": [
+          {
+            "field": "name",
+            "colSpan": 6
+          },
+          {
+            "field": "enabled",
+            "colSpan": 6
+          },
+          {
+            "field": "base_url",
+            "colSpan": 12
+          },
+          {
+            "field": "auth_type",
+            "colSpan": 6
+          },
+          {
+            "field": "timeout_ms",
+            "colSpan": 6
+          },
+          {
+            "field": "auth_config",
+            "colSpan": 12
+          },
+          {
+            "field": "default_headers",
+            "colSpan": 12
+          },
+          {
+            "field": "retry_policy",
+            "colSpan": 12
+          }
+        ]
+      },
+      {
+        "id": "buttons",
+        "blockType": "form-buttons",
+        "buttons": [
+          {
+            "code": "submit",
+            "primary": true,
+            "label": "save",
+            "action": {
+              "type": "command",
+              "command": "admin:update_api_connector"
+            }
+          },
+          {
+            "code": "cancel",
+            "label": "cancel"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "pageKey": "bpm_process_management_list",
+    "modelCode": "bpm_process_management",
+    "name:zh-CN": "BPM 流程定义",
+    "name:en": "BPM Process Management",
+    "kind": "list",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "stack"
+    },
+    "blocks": [
+      {
+        "id": "toolbar",
+        "blockType": "toolbar",
+        "buttons": [
+          {
+            "code": "create",
+            "label": "create",
+            "variant": "primary",
+            "action": {
+              "type": "navigate",
+              "to": "/bpmn-designer"
+            }
+          }
+        ]
+      },
+      {
+        "id": "table",
+        "blockType": "table",
+        "columns": [
+          {
+            "field": "processKey",
+            "label": {
+              "zh-CN": "流程标识",
+              "en-US": "Process Key"
+            },
+            "width": 180
+          },
+          {
+            "field": "processName",
+            "label": {
+              "zh-CN": "流程名称",
+              "en-US": "Process Name"
+            },
+            "width": 220
+          },
+          {
+            "field": "category",
+            "label": {
+              "zh-CN": "分类",
+              "en-US": "Category"
+            },
+            "width": 140
+          },
+          {
+            "field": "version",
+            "label": {
+              "zh-CN": "版本",
+              "en-US": "Version"
+            },
+            "width": 90
+          },
+          {
+            "field": "status",
+            "label": {
+              "zh-CN": "状态",
+              "en-US": "Status"
+            },
+            "width": 120,
+            "renderType": "tag"
+          },
+          {
+            "field": "deployedAt",
+            "label": {
+              "zh-CN": "部署时间",
+              "en-US": "Deployed At"
+            },
+            "width": 180,
+            "valueType": "datetime",
+            "format": "YYYY-MM-DD HH:mm"
+          }
+        ],
+        "rowActions": [
+          {
+            "code": "edit",
+            "label": "edit",
+            "action": {
+              "type": "navigate",
+              "to": "/bpmn-designer?pid={pid}"
+            }
+          }
+        ],
+        "defaultSort": {
+          "field": "deployedAt",
+          "order": "desc"
+        },
+        "onRowClick": "navigate",
+        "detailUrl": "/bpmn-designer?pid={pid}"
+      }
+    ],
+    "extension": {
+      "dataSource": {
+        "type": "api",
+        "endpoint": "/api/bpm/process-definitions",
+        "method": "get"
+      }
+    }
+  },
+  {
+    "pageKey": "dashboard_management_list",
+    "modelCode": "dashboard_management",
+    "name:zh-CN": "仪表盘管理",
+    "name:en": "Dashboard Management",
+    "kind": "list",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "grid",
+      "cols": 12
+    },
+    "blocks": [
+      {
+        "id": "block_filters",
+        "blockType": "filters",
+        "fields": [
+          {
+            "field": "title",
+            "label": {
+              "zh-CN": "标题",
+              "en-US": "Title"
+            },
+            "component": "SmartInput",
+            "props": {
+              "placeholder": {
+                "zh-CN": "搜索仪表盘标题",
+                "en-US": "Search dashboard title"
+              }
+            }
+          }
+        ],
+        "layout": {
+          "colSpan": 12,
+          "rowSpan": 1
+        }
+      },
+      {
+        "id": "block_toolbar",
+        "blockType": "toolbar",
+        "buttons": [
+          {
+            "code": "create",
+            "icon": "Plus",
+            "primary": true,
+            "label": "create",
+            "action": {
+              "type": "navigate",
+              "to": "/dashboard-designer"
+            }
+          }
+        ]
+      },
+      {
+        "id": "block_table",
+        "blockType": "table",
+        "onRowClick": "navigate",
+        "detailUrl": "/dashboard-designer/{pid}",
+        "table": {
+          "rowKey": "pid",
+          "columns": [
+            {
+              "field": "title",
+              "label": {
+                "zh-CN": "标题",
+                "en-US": "Title"
+              },
+              "width": 200
+            },
+            {
+              "field": "code",
+              "label": {
+                "zh-CN": "编码",
+                "en-US": "Code"
+              },
+              "width": 150
+            },
+            {
+              "field": "scope",
+              "label": {
+                "zh-CN": "范围",
+                "en-US": "Scope"
+              },
+              "width": 100,
+              "valueType": "tag",
+              "tagMap": {
+                "personal": {
+                  "label": "Personal",
+                  "color": "blue"
+                },
+                "global": {
+                  "label": "Global",
+                  "color": "green"
+                }
+              }
+            },
+            {
+              "field": "status",
+              "label": {
+                "zh-CN": "状态",
+                "en-US": "Status"
+              },
+              "width": 100,
+              "valueType": "tag",
+              "tagMap": {
+                "draft": {
+                  "label": "Draft",
+                  "color": "default"
+                },
+                "published": {
+                  "label": "Published",
+                  "color": "green"
+                }
+              }
+            },
+            {
+              "field": "updatedAt",
+              "label": {
+                "zh-CN": "更新时间",
+                "en-US": "Updated At"
+              },
+              "width": 180,
+              "valueType": "datetime"
+            },
+            {
+              "field": "_actions",
+              "isActionColumn": true,
+              "buttons": [
+                {
+                  "code": "edit",
+                  "icon": "Edit",
+                  "label": "edit",
+                  "action": {
+                    "type": "navigate",
+                    "to": "/dashboard-designer/{pid}"
+                  }
+                },
+                {
+                  "code": "publish",
+                  "visibleWhen": "row.status === 'draft'",
+                  "label": "publish",
+                  "action": {
+                    "type": "flow",
+                    "steps": [
+                      {
+                        "action": "api.request",
+                        "endpoint": "/api/dashboards/${record.pid}/publish",
+                        "method": "post"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "code": "unpublish",
+                  "visibleWhen": "row.status === 'published'",
+                  "label": "unpublish",
+                  "action": {
+                    "type": "flow",
+                    "steps": [
+                      {
+                        "action": "api.request",
+                        "endpoint": "/api/dashboards/${record.pid}/unpublish",
+                        "method": "post"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "code": "delete",
+                  "danger": true,
+                  "label": "delete",
+                  "confirm": "confirm.delete",
+                  "action": {
+                    "type": "flow",
+                    "steps": [
+                      {
+                        "action": "api.request",
+                        "endpoint": "/api/dashboards/${record.pid}",
+                        "method": "delete"
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ],
+          "pagination": {
+            "pageSize": 10
+          }
+        },
+        "layout": {
+          "colSpan": 12,
+          "rowSpan": 1
+        }
+      },
+      {
+        "id": "block_tabs",
+        "blockType": "tabs",
+        "tabs": [
+          {
+            "key": "all",
+            "label": {
+              "zh-CN": "全部",
+              "en-US": "All"
+            }
+          },
+          {
+            "key": "personal",
+            "label": {
+              "zh-CN": "个人",
+              "en-US": "Personal"
+            },
+            "filter": {
+              "field": "scope",
+              "operator": "EQ",
+              "value": "personal"
+            }
+          },
+          {
+            "key": "global",
+            "label": {
+              "zh-CN": "全局",
+              "en-US": "Global"
+            },
+            "filter": {
+              "field": "scope",
+              "operator": "EQ",
+              "value": "global"
+            }
+          }
+        ]
+      }
+    ],
+    "extension": {
+      "dataSource": {
+        "type": "api",
+        "endpoint": "/api/dashboards",
+        "method": "get"
+      }
+    }
+  },
+  {
+    "pageKey": "tenant_member_list",
+    "name:zh-CN": "企业成员管理",
+    "name:en": "Tenant Members",
+    "modelCode": "tenant_member",
+    "kind": "list",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "stack"
+    },
+    "blocks": [
+      {
+        "id": "toolbar",
+        "blockType": "toolbar",
+        "buttons": []
+      },
+      {
+        "id": "status-tabs",
+        "blockType": "tabs",
+        "tabs": [
+          {
+            "key": "all",
+            "label": {
+              "zh-CN": "全部",
+              "en-US": "All"
+            }
+          },
+          {
+            "key": "pending",
+            "label": {
+              "zh-CN": "待审批",
+              "en-US": "Pending"
+            },
+            "filter": {
+              "operator": "EQ",
+              "value": "pending",
+              "field": "status"
+            }
+          },
+          {
+            "key": "active",
+            "label": {
+              "zh-CN": "已激活",
+              "en-US": "Active"
+            },
+            "filter": {
+              "operator": "EQ",
+              "value": "active",
+              "field": "status"
+            }
+          },
+          {
+            "key": "suspended",
+            "label": {
+              "zh-CN": "已暂停",
+              "en-US": "Suspended"
+            },
+            "filter": {
+              "operator": "EQ",
+              "value": "suspended",
+              "field": "status"
+            }
+          },
+          {
+            "key": "rejected",
+            "label": {
+              "zh-CN": "已拒绝",
+              "en-US": "Rejected"
+            },
+            "filter": {
+              "operator": "EQ",
+              "value": "rejected",
+              "field": "status"
+            }
+          },
+          {
+            "key": "inactive",
+            "label": {
+              "zh-CN": "已离职",
+              "en-US": "Inactive"
+            },
+            "filter": {
+              "operator": "EQ",
+              "value": "inactive",
+              "field": "status"
+            }
+          }
+        ]
+      },
+      {
+        "id": "table",
+        "blockType": "table",
+        "columns": [
+          {
+            "field": "user_id",
+            "label": {
+              "zh-CN": "用户",
+              "en-US": "User"
+            },
+            "width": 280,
+            "sortable": true,
+            "valueType": "user_identity",
+            "render": {
+              "nameField": "user_name",
+              "usernameField": "user_username",
+              "avatarField": "user_avatar_url",
+              "idField": "user_id"
+            }
+          },
+          {
+            "field": "status",
+            "width": 120,
+            "renderType": "tag"
+          },
+          {
+            "field": "join_date",
+            "width": 140
+          },
+          {
+            "field": "leave_date",
+            "width": 140
+          },
+          {
+            "field": "created_at",
+            "width": 180,
+            "valueType": "datetime"
+          }
+        ],
+        "rowActions": [
+          {
+            "code": "approve",
+            "variant": "primary",
+            "visibleWhen": "row.status === 'pending'",
+            "label": "approve",
+            "confirm": "approve.confirm",
+            "action": {
+              "type": "state_transition",
+              "command": "admin:approve_member"
+            }
+          },
+          {
+            "code": "reject",
+            "variant": "danger",
+            "visibleWhen": "row.status === 'pending'",
+            "label": "reject",
+            "confirm": "reject.confirm",
+            "action": {
+              "type": "state_transition",
+              "command": "admin:reject_member"
+            }
+          },
+          {
+            "code": "suspend",
+            "variant": "danger",
+            "visibleWhen": "row.status === 'active'",
+            "label": "suspend",
+            "confirm": "suspend.confirm",
+            "action": {
+              "type": "command",
+              "command": "admin:suspend_member"
+            }
+          },
+          {
+            "code": "leave",
+            "variant": "danger",
+            "visibleWhen": "row.status === 'active'",
+            "label": "leave",
+            "confirm": "leave.confirm",
+            "action": {
+              "type": "command",
+              "command": "admin:leave_member"
+            }
+          },
+          {
+            "code": "restore",
+            "variant": "primary",
+            "visibleWhen": "row.status === 'suspended' || row.status === 'rejected'",
+            "label": "restore",
+            "confirm": "restore.confirm",
+            "action": {
+              "type": "command",
+              "command": "admin:restore_member"
+            }
+          },
+          {
+            "code": "reset-password",
+            "variant": "default",
+            "visibleWhen": "row.status === 'active'",
+            "label": {
+              "zh-CN": "重置密码",
+              "en-US": "Reset Password"
+            },
+            "confirm": {
+              "zh-CN": "确认重置该成员密码并发送重置邮件？",
+              "en-US": "Reset this member's password and send a reset email?"
+            },
+            "action": {
+              "type": "command",
+              "command": "admin:reset_member_password"
+            }
+          },
+          {
+            "code": "delete",
+            "variant": "danger",
+            "label": "delete",
+            "confirm": "delete.confirm",
+            "action": {
+              "type": "command",
+              "command": "admin:delete_member"
+            }
+          }
+        ],
+        "defaultSort": {
+          "field": "created_at",
+          "order": "desc"
+        }
+      }
+    ],
+    "extension": {
+      "defaultFilters": [
+        {
+          "field": "deleted_flag",
+          "operator": "EQ",
+          "value": false
+        }
+      ],
+      "options": {
+        "detailNavigation": "navigate",
+        "detailUrl": "/organization/members/{pid}"
+      }
+    }
+  },
+  {
+    "pageKey": "scheduled_task_list",
+    "name:zh-CN": "定时任务",
+    "name:en": "Scheduled Tasks",
+    "modelCode": "scheduled_task",
+    "kind": "list",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "stack"
+    },
+    "blocks": [
+      {
+        "id": "toolbar",
+        "blockType": "toolbar",
+        "buttons": [
+          {
+            "code": "create",
+            "variant": "primary",
+            "label": "create",
+            "action": {
+              "type": "navigate",
+              "to": "scheduled_task_form",
+              "command": "admin:create_scheduled_task"
+            }
+          }
+        ]
+      },
+      {
+        "id": "table",
+        "blockType": "table",
+        "columns": [
+          {
+            "field": "name",
+            "width": 200,
+            "sortable": true
+          },
+          {
+            "field": "task_type",
+            "width": 120,
+            "renderType": "tag"
+          },
+          {
+            "field": "cron_expression",
+            "width": 150
+          },
+          {
+            "field": "handler_bean",
+            "width": 160
+          },
+          {
+            "field": "enabled",
+            "width": 80
+          },
+          {
+            "field": "last_run_at",
+            "width": 170,
+            "format": "YYYY-MM-DD HH:mm:ss"
+          },
+          {
+            "field": "next_run_at",
+            "width": 170,
+            "format": "YYYY-MM-DD HH:mm:ss"
+          },
+          {
+            "field": "created_at",
+            "width": 160,
+            "format": "YYYY-MM-DD HH:mm"
+          }
+        ],
+        "rowActions": [
+          {
+            "code": "detail",
+            "label": "detail",
+            "action": {
+              "type": "navigate",
+              "to": "scheduled_task_detail"
+            }
+          },
+          {
+            "code": "edit",
+            "label": "edit",
+            "action": {
+              "type": "navigate",
+              "to": "scheduled_task_form",
+              "command": "admin:update_scheduled_task"
+            }
+          },
+          {
+            "code": "delete",
+            "variant": "danger",
+            "label": "delete",
+            "confirm": "delete.confirm",
+            "action": {
+              "type": "state_transition",
+              "command": "admin:delete_scheduled_task"
+            }
+          }
+        ],
+        "defaultSort": {
+          "field": "created_at",
+          "order": "desc"
+        }
+      }
+    ]
+  },
+  {
+    "pageKey": "scheduled_task_form",
+    "name:zh-CN": "定时任务表单",
+    "name:en": "Scheduled Task Form",
+    "modelCode": "scheduled_task",
+    "kind": "form",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "grid",
+      "cols": 12
+    },
+    "blocks": [
+      {
+        "id": "basic",
+        "blockType": "form-section",
+        "title": {
+          "zh-CN": "基本信息",
+          "en-US": "Basic Information"
+        },
+        "fields": [
+          {
+            "field": "name",
+            "colSpan": 6
+          },
+          {
+            "field": "enabled",
+            "colSpan": 6
+          },
+          {
+            "field": "task_type",
+            "colSpan": 4
+          },
+          {
+            "field": "cron_expression",
+            "colSpan": 4
+          },
+          {
+            "field": "interval_ms",
+            "colSpan": 4
+          },
+          {
+            "field": "description",
+            "colSpan": 12
+          }
+        ]
+      },
+      {
+        "id": "handler",
+        "blockType": "form-section",
+        "title": {
+          "zh-CN": "执行配置",
+          "en-US": "Execution Configuration"
+        },
+        "fields": [
+          {
+            "field": "handler_bean",
+            "colSpan": 6
+          },
+          {
+            "field": "handler_method",
+            "colSpan": 6
+          },
+          {
+            "field": "params",
+            "colSpan": 12
+          },
+          {
+            "field": "max_retries",
+            "colSpan": 4
+          },
+          {
+            "field": "timeout_ms",
+            "colSpan": 4
+          }
+        ]
+      },
+      {
+        "id": "buttons",
+        "blockType": "form-buttons",
+        "buttons": [
+          {
+            "code": "submit",
+            "primary": true,
+            "label": "save",
+            "action": {
+              "type": "state_transition",
+              "command": "admin:update_scheduled_task"
+            }
+          },
+          {
+            "code": "cancel",
+            "label": "cancel"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "pageKey": "scheduled_task_detail",
+    "name:zh-CN": "定时任务详情",
+    "name:en": "Scheduled Task Detail",
+    "modelCode": "scheduled_task",
+    "kind": "detail",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "grid",
+      "cols": 12
+    },
+    "blocks": [
+      {
+        "id": "basic",
+        "blockType": "form-section",
+        "title": {
+          "zh-CN": "基本信息",
+          "en-US": "Basic Information"
+        },
+        "readOnly": true,
+        "fields": [
+          {
+            "field": "name",
+            "colSpan": 6
+          },
+          {
+            "field": "enabled",
+            "colSpan": 6
+          },
+          {
+            "field": "task_type",
+            "colSpan": 4
+          },
+          {
+            "field": "cron_expression",
+            "colSpan": 4
+          },
+          {
+            "field": "interval_ms",
+            "colSpan": 4
+          },
+          {
+            "field": "handler_bean",
+            "colSpan": 6
+          },
+          {
+            "field": "handler_method",
+            "colSpan": 6
+          },
+          {
+            "field": "params",
+            "colSpan": 12
+          },
+          {
+            "field": "max_retries",
+            "colSpan": 3
+          },
+          {
+            "field": "timeout_ms",
+            "colSpan": 3
+          },
+          {
+            "field": "last_run_at",
+            "colSpan": 3
+          },
+          {
+            "field": "next_run_at",
+            "colSpan": 3
+          },
+          {
+            "field": "description",
+            "colSpan": 12
+          }
+        ]
+      },
+      {
+        "id": "execution_logs",
+        "blockType": "sub-table",
+        "title": {
+          "zh-CN": "执行日志",
+          "en-US": "Execution Logs"
+        },
+        "dataSource": {
+          "type": "api",
+          "url": "/api/scheduled-tasks/${recordId}/logs?limit=50",
+          "method": "get"
+        },
+        "columns": [
+          {
+            "field": "status",
+            "label": {
+              "zh-CN": "状态",
+              "en-US": "Status"
+            },
+            "width": 100
+          },
+          {
+            "field": "triggerType",
+            "label": {
+              "zh-CN": "触发方式",
+              "en-US": "Trigger Type"
+            },
+            "width": 110
+          },
+          {
+            "field": "startedAt",
+            "label": {
+              "zh-CN": "开始时间",
+              "en-US": "Started At"
+            },
+            "width": 180,
+            "format": "YYYY-MM-DD HH:mm:ss"
+          },
+          {
+            "field": "finishedAt",
+            "label": {
+              "zh-CN": "结束时间",
+              "en-US": "Finished At"
+            },
+            "width": 180,
+            "format": "YYYY-MM-DD HH:mm:ss"
+          },
+          {
+            "field": "durationMs",
+            "label": {
+              "zh-CN": "耗时(ms)",
+              "en-US": "Duration (ms)"
+            },
+            "width": 110
+          },
+          {
+            "field": "retryCount",
+            "label": {
+              "zh-CN": "重试次数",
+              "en-US": "Retry Count"
+            },
+            "width": 90
+          },
+          {
+            "field": "errorMessage",
+            "label": {
+              "zh-CN": "错误信息",
+              "en-US": "Error Message"
+            },
+            "width": 250
+          }
+        ]
+      }
+    ]
+  }
+]

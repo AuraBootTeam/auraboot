@@ -1,0 +1,517 @@
+[
+  {
+    "code": "name",
+    "displayName:zh-CN": "名称",
+    "displayName:en": "Name",
+    "dataType": "string",
+    "constraints": { "required": true, "maxLength": 128 },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "target_type",
+    "displayName:zh-CN": "目标类型",
+    "displayName:en": "Target Type",
+    "dataType": "enum",
+    "dictCode": "sla_target_type",
+    "constraints": { "required": true },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "target_key",
+    "displayName:zh-CN": "目标键",
+    "displayName:en": "Target Key",
+    "dataType": "string",
+    "constraints": { "maxLength": 128 }
+  },
+  {
+    "code": "domain_code",
+    "displayName:zh-CN": "域编码",
+    "displayName:en": "Domain Code",
+    "dataType": "string",
+    "constraints": { "maxLength": 64 },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "deadline_mode",
+    "displayName:zh-CN": "截止模式",
+    "displayName:en": "Deadline Mode",
+    "dataType": "enum",
+    "dictCode": "sla_deadline_mode",
+    "constraints": { "required": true }
+  },
+  {
+    "code": "deadline_value",
+    "displayName:zh-CN": "截止值",
+    "displayName:en": "Deadline Value",
+    "dataType": "string",
+    "constraints": { "maxLength": 256 },
+    "extension": { "placeholder:zh-CN": "如: PT2H (2小时), PT30M (30分钟)", "placeholder:en": "e.g. PT2H (2 hours), PT30M (30 minutes)" }
+  },
+  {
+    "code": "business_calendar",
+    "displayName:zh-CN": "使用工作日历",
+    "displayName:en": "Use Business Calendar",
+    "dataType": "boolean",
+    "defaultValue": false
+  },
+  {
+    "code": "suspend_policy",
+    "displayName:zh-CN": "暂停策略",
+    "displayName:en": "Suspend Policy",
+    "dataType": "enum",
+    "dictCode": "sla_suspend_policy",
+    "defaultValue": "pause"
+  },
+  {
+    "code": "warning_rules",
+    "displayName:zh-CN": "预警规则",
+    "displayName:en": "Warning Rules",
+    "dataType": "jsonb",
+    "extension": { "multiline": true, "placeholder:zh-CN": "JSON 数组格式", "placeholder:en": "JSON array format" }
+  },
+  {
+    "code": "model_code",
+    "displayName:zh-CN": "关联模型",
+    "displayName:en": "Model Code",
+    "dataType": "string",
+    "constraints": { "maxLength": 64 },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "deadline_field",
+    "displayName:zh-CN": "截止字段",
+    "displayName:en": "Deadline Field",
+    "dataType": "string",
+    "constraints": { "maxLength": 64 }
+  },
+  {
+    "code": "priority_field",
+    "displayName:zh-CN": "优先级字段",
+    "displayName:en": "Priority Field",
+    "dataType": "string",
+    "constraints": { "maxLength": 64 }
+  },
+  {
+    "code": "enabled",
+    "displayName:zh-CN": "启用",
+    "displayName:en": "Enabled",
+    "dataType": "boolean",
+    "defaultValue": true
+  },
+
+  {
+    "code": "domain_name",
+    "displayName:zh-CN": "域名称",
+    "displayName:en": "Domain Name",
+    "dataType": "string",
+    "constraints": { "required": true, "maxLength": 128 },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "process_keys",
+    "displayName:zh-CN": "流程键",
+    "displayName:en": "Process Keys",
+    "dataType": "text",
+    "extension": { "multiline": true, "placeholder:zh-CN": "JSON 数组格式", "placeholder:en": "JSON array format" }
+  },
+  {
+    "code": "list_fields",
+    "displayName:zh-CN": "列表字段",
+    "displayName:en": "List Fields",
+    "dataType": "text",
+    "extension": { "multiline": true }
+  },
+  {
+    "code": "filter_fields",
+    "displayName:zh-CN": "筛选字段",
+    "displayName:en": "Filter Fields",
+    "dataType": "text",
+    "extension": { "multiline": true }
+  },
+  {
+    "code": "sort_fields",
+    "displayName:zh-CN": "排序字段",
+    "displayName:en": "Sort Fields",
+    "dataType": "text",
+    "extension": { "multiline": true }
+  },
+
+  {
+    "code": "description",
+    "displayName:zh-CN": "描述",
+    "displayName:en": "Description",
+    "dataType": "text",
+    "extension": { "multiline": true }
+  },
+  {
+    "code": "policy_type",
+    "displayName:zh-CN": "策略类型",
+    "displayName:en": "Policy Type",
+    "dataType": "enum",
+    "dictCode": "dp_policy_type",
+    "constraints": { "required": true },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "scope_type",
+    "displayName:zh-CN": "范围类型",
+    "displayName:en": "Scope Type",
+    "dataType": "enum",
+    "dictCode": "dp_scope_type"
+  },
+  {
+    "code": "scope_expression",
+    "displayName:zh-CN": "范围表达式",
+    "displayName:en": "Scope Expression",
+    "dataType": "text",
+    "extension": { "multiline": true, "placeholder:zh-CN": "SpEL 表达式", "placeholder:en": "SpEL expression" }
+  },
+  {
+    "code": "field_code",
+    "displayName:zh-CN": "目标字段",
+    "displayName:en": "Target Field",
+    "dataType": "string",
+    "constraints": { "maxLength": 128 }
+  },
+  {
+    "code": "mask_type",
+    "displayName:zh-CN": "脱敏类型",
+    "displayName:en": "Mask Type",
+    "dataType": "enum",
+    "dictCode": "dp_mask_type"
+  },
+  {
+    "code": "mask_expression",
+    "displayName:zh-CN": "脱敏表达式",
+    "displayName:en": "Mask Expression",
+    "dataType": "text",
+    "extension": { "multiline": true }
+  },
+  {
+    "code": "priority",
+    "displayName:zh-CN": "优先级",
+    "displayName:en": "Priority",
+    "dataType": "integer",
+    "defaultValue": 0,
+    "constraints": { "min": 0, "max": 999 }
+  },
+
+  {
+    "code": "target_url",
+    "displayName:zh-CN": "目标 URL",
+    "displayName:en": "Target URL",
+    "dataType": "string",
+    "constraints": { "required": true, "maxLength": 512 },
+    "extension": { "placeholder:zh-CN": "https://example.com/webhook", "placeholder:en": "https://example.com/webhook" }
+  },
+  {
+    "code": "event_type",
+    "displayName:zh-CN": "事件类型",
+    "displayName:en": "Event Type",
+    "dataType": "enum",
+    "dictCode": "webhook_event_type",
+    "constraints": { "required": true },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "filter_expression",
+    "displayName:zh-CN": "过滤表达式",
+    "displayName:en": "Filter Expression",
+    "dataType": "text",
+    "extension": { "multiline": true, "placeholder:zh-CN": "SpEL 过滤条件", "placeholder:en": "SpEL filter expression" }
+  },
+  {
+    "code": "secret",
+    "displayName:zh-CN": "签名密钥",
+    "displayName:en": "Secret",
+    "dataType": "string",
+    "constraints": { "maxLength": 256 }
+  },
+  {
+    "code": "headers",
+    "displayName:zh-CN": "自定义头",
+    "displayName:en": "Custom Headers",
+    "dataType": "text",
+    "extension": { "multiline": true, "placeholder:zh-CN": "JSON 格式", "placeholder:en": "JSON format" }
+  },
+  {
+    "code": "max_retries",
+    "displayName:zh-CN": "最大重试次数",
+    "displayName:en": "Max Retries",
+    "dataType": "integer",
+    "defaultValue": 3,
+    "constraints": { "min": 0, "max": 10 }
+  },
+  {
+    "code": "timeout_ms",
+    "displayName:zh-CN": "超时时间(ms)",
+    "displayName:en": "Timeout (ms)",
+    "dataType": "integer",
+    "defaultValue": 10000,
+    "constraints": { "min": 1000, "max": 60000 }
+  },
+
+  {
+    "code": "subscription_pid",
+    "displayName:zh-CN": "订阅 PID",
+    "displayName:en": "Subscription PID",
+    "dataType": "string",
+    "constraints": { "maxLength": 32 }
+  },
+  {
+    "code": "event_id",
+    "displayName:zh-CN": "事件 ID",
+    "displayName:en": "Event ID",
+    "dataType": "string",
+    "constraints": { "maxLength": 64 }
+  },
+  {
+    "code": "request_url",
+    "displayName:zh-CN": "请求 URL",
+    "displayName:en": "Request URL",
+    "dataType": "string",
+    "constraints": { "maxLength": 512 }
+  },
+  {
+    "code": "request_body",
+    "displayName:zh-CN": "请求体",
+    "displayName:en": "Request Body",
+    "dataType": "text",
+    "extension": { "multiline": true }
+  },
+  {
+    "code": "response_status",
+    "displayName:zh-CN": "响应状态码",
+    "displayName:en": "Response Status",
+    "dataType": "integer"
+  },
+  {
+    "code": "response_body",
+    "displayName:zh-CN": "响应体",
+    "displayName:en": "Response Body",
+    "dataType": "text",
+    "extension": { "multiline": true }
+  },
+  {
+    "code": "retry_count",
+    "displayName:zh-CN": "重试次数",
+    "displayName:en": "Retry Count",
+    "dataType": "integer",
+    "defaultValue": 0
+  },
+  {
+    "code": "error_message",
+    "displayName:zh-CN": "错误信息",
+    "displayName:en": "Error Message",
+    "dataType": "text",
+    "extension": { "multiline": true }
+  },
+  {
+    "code": "delivered_at",
+    "displayName:zh-CN": "投递时间",
+    "displayName:en": "Delivered At",
+    "dataType": "datetime"
+  },
+  {
+    "code": "delivery_status",
+    "displayName:zh-CN": "投递状态",
+    "displayName:en": "Delivery Status",
+    "dataType": "enum",
+    "dictCode": "webhook_delivery_status"
+  },
+
+  {
+    "code": "base_url",
+    "displayName:zh-CN": "基础 URL",
+    "displayName:en": "Base URL",
+    "dataType": "string",
+    "constraints": { "required": true, "maxLength": 512 },
+    "extension": { "placeholder:zh-CN": "https://api.example.com", "placeholder:en": "https://api.example.com" }
+  },
+  {
+    "code": "auth_type",
+    "displayName:zh-CN": "认证类型",
+    "displayName:en": "Auth Type",
+    "dataType": "enum",
+    "dictCode": "connector_auth_type",
+    "constraints": { "required": true },
+    "defaultValue": "none"
+  },
+  {
+    "code": "auth_config",
+    "displayName:zh-CN": "认证配置",
+    "displayName:en": "Auth Configuration",
+    "dataType": "text",
+    "extension": { "multiline": true, "placeholder:zh-CN": "JSON 格式的认证配置", "placeholder:en": "JSON auth config" }
+  },
+  {
+    "code": "default_headers",
+    "displayName:zh-CN": "默认请求头",
+    "displayName:en": "Default Headers",
+    "dataType": "text",
+    "extension": { "multiline": true, "placeholder:zh-CN": "JSON 格式", "placeholder:en": "JSON format" }
+  },
+  {
+    "code": "retry_policy",
+    "displayName:zh-CN": "重试策略",
+    "displayName:en": "Retry Policy",
+    "dataType": "text",
+    "extension": { "multiline": true, "placeholder:zh-CN": "JSON 格式", "placeholder:en": "JSON format" }
+  },
+
+  {
+    "code": "user_id",
+    "displayName:zh-CN": "用户 ID",
+    "displayName:en": "User ID",
+    "dataType": "integer",
+    "constraints": { "required": true }
+  },
+  {
+    "code": "status",
+    "displayName:zh-CN": "状态",
+    "displayName:en": "Status",
+    "dataType": "enum",
+    "dictCode": "member_status",
+    "defaultValue": "pending",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "join_date",
+    "displayName:zh-CN": "加入日期",
+    "displayName:en": "Join Date",
+    "dataType": "date"
+  },
+  {
+    "code": "leave_date",
+    "displayName:zh-CN": "离开日期",
+    "displayName:en": "Leave Date",
+    "dataType": "date"
+  },
+
+  {
+    "code": "task_type",
+    "displayName:zh-CN": "任务类型",
+    "displayName:en": "Task Type",
+    "dataType": "enum",
+    "dictCode": "scheduled_task_type",
+    "constraints": { "required": true },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "cron_expression",
+    "displayName:zh-CN": "Cron 表达式",
+    "displayName:en": "Cron Expression",
+    "dataType": "string",
+    "constraints": { "maxLength": 64 },
+    "extension": { "placeholder:zh-CN": "0 0 * * * (分 时 日 月 周)", "placeholder:en": "0 0 * * * (min hour day month weekday)" }
+  },
+  {
+    "code": "interval_ms",
+    "displayName:zh-CN": "间隔(毫秒)",
+    "displayName:en": "Interval (ms)",
+    "dataType": "integer",
+    "constraints": { "min": 1000 }
+  },
+  {
+    "code": "handler_bean",
+    "displayName:zh-CN": "处理器 Bean",
+    "displayName:en": "Handler Bean",
+    "dataType": "string",
+    "constraints": { "required": true, "maxLength": 128 },
+    "extension": { "placeholder:zh-CN": "Spring Bean 名称", "placeholder:en": "Spring bean name" }
+  },
+  {
+    "code": "handler_method",
+    "displayName:zh-CN": "处理器方法",
+    "displayName:en": "Handler Method",
+    "dataType": "string",
+    "constraints": { "maxLength": 64 },
+    "defaultValue": "execute"
+  },
+  {
+    "code": "params",
+    "displayName:zh-CN": "参数",
+    "displayName:en": "Parameters",
+    "dataType": "text",
+    "extension": { "multiline": true, "placeholder:zh-CN": "JSON 格式参数", "placeholder:en": "JSON format parameters" }
+  },
+  {
+    "code": "last_run_at",
+    "displayName:zh-CN": "上次运行",
+    "displayName:en": "Last Run At",
+    "dataType": "datetime"
+  },
+  {
+    "code": "next_run_at",
+    "displayName:zh-CN": "下次运行",
+    "displayName:en": "Next Run At",
+    "dataType": "datetime"
+  },
+
+  {
+    "code": "process_key",
+    "displayName:zh-CN": "流程标识",
+    "displayName:en": "Process Key",
+    "dataType": "string",
+    "constraints": { "required": true, "maxLength": 128 },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "process_name",
+    "displayName:zh-CN": "流程名称",
+    "displayName:en": "Process Name",
+    "dataType": "string",
+    "constraints": { "required": true, "maxLength": 256 },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "category",
+    "displayName:zh-CN": "分类",
+    "displayName:en": "Category",
+    "dataType": "string",
+    "constraints": { "maxLength": 64 },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "version",
+    "displayName:zh-CN": "版本",
+    "displayName:en": "Version",
+    "dataType": "integer"
+  },
+  {
+    "code": "deployed_at",
+    "displayName:zh-CN": "部署时间",
+    "displayName:en": "Deployed At",
+    "dataType": "datetime"
+  },
+
+  {
+    "code": "code",
+    "displayName:zh-CN": "编码",
+    "displayName:en": "Code",
+    "dataType": "string",
+    "constraints": { "required": true, "maxLength": 128 },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "title",
+    "displayName:zh-CN": "标题",
+    "displayName:en": "Title",
+    "dataType": "string",
+    "constraints": { "required": true, "maxLength": 256 },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "scope",
+    "displayName:zh-CN": "作用域",
+    "displayName:en": "Scope",
+    "dataType": "string",
+    "constraints": { "maxLength": 32 }
+  },
+  {
+    "code": "is_default",
+    "displayName:zh-CN": "默认仪表盘",
+    "displayName:en": "Default",
+    "dataType": "boolean"
+  }
+]
