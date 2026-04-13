@@ -5,9 +5,9 @@
 import { useState } from 'react';
 import type { MultiInstanceConfig, FormBindingEntry, NodeHookEntry } from '~/bpmn-designer/types';
 import { useI18n } from '~/contexts/I18nContext';
-import { PagePickerSelect } from '~/bpm/components/PagePickerSelect';
-import { VariableMappingEditor } from '~/bpm/components/VariableMappingEditor';
-import { FieldPermissionMatrix } from '~/bpm/components/FieldPermissionMatrix';
+import { PagePickerSelect } from '~/plugins/core-bpm/components/PagePickerSelect';
+import { VariableMappingEditor } from '~/plugins/core-bpm/components/VariableMappingEditor';
+import { FieldPermissionMatrix } from '~/plugins/core-bpm/components/FieldPermissionMatrix';
 
 // Multi-instance configuration section
 export function MultiInstanceSection({

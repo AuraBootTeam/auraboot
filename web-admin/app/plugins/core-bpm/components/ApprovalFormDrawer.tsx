@@ -13,7 +13,7 @@ import {
   getTaskDetail,
   approveTask,
   rejectTask,
-} from '~/bpm/services/approvalService';
+} from '~/plugins/core-bpm/services/approvalService';
 
 interface Props {
   taskPid: string;

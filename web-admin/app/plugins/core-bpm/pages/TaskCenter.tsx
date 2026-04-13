@@ -5,7 +5,7 @@
  * plugin extraction. The route is now contributed via the core-bpm plugin
  * (see ../routes.ts and ../index.ts).
  */
-import { TaskCenter } from '~/bpm/components/TaskCenter'
+import { TaskCenter } from '~/plugins/core-bpm/components/TaskCenter'
 
 export default function TaskCenterPage() {
   return <TaskCenter />

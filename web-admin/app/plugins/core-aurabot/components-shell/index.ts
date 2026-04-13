@@ -14,11 +14,11 @@ export type { AuraBotProviderProps } from './AuraBotProvider';
 // Components
 export { AuraBotPanel } from './AuraBotPanel';
 
-export { AuraBotChat } from './components/AuraBotChat';
+export { AuraBotChat } from '../components-internal/AuraBotChat';
 
 // Services
-export { auraBotApi } from './services/auraBotApi';
-export type { SSEEvent, SSEEventType, ChatStreamCallbacks } from './services/auraBotApi';
+export { auraBotApi } from '../services/auraBotApi';
+export type { SSEEvent, SSEEventType, ChatStreamCallbacks } from '../services/auraBotApi';
 
 // Types
 export type {
@@ -77,4 +77,4 @@ export type {
   SkillMeta,
   SkillParam,
   IntentResult,
-} from './types';
+} from '../types';

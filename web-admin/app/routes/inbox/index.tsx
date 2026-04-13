@@ -25,7 +25,7 @@ import {
   type InboxItem,
   type InboxPage,
 } from '~/services/inboxService';
-import { BpmTaskDrawer } from '~/bpm/components/BpmTaskDrawer';
+import { BpmTaskDrawer } from '~/plugins/core-bpm/components/BpmTaskDrawer';
 
 const TABS = [
   { key: '', label: 'All', icon: InboxIcon },
