@@ -13,5 +13,5 @@ export const manifest: PluginManifest = {
     'bpm.process.read',
     'bpm.sla.read',
   ],
-  dependencies: { coreVersion: '^0.0.1' },
+  dependencies: { plugins: ['core.designer'], coreVersion: '^0.0.1' },
 }

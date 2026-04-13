@@ -8,5 +8,5 @@ export const manifest: PluginManifest = {
   kind: 'core',
   visibility: 'public',
   permissions: ['ai.settings.read', 'ai.agent.read', 'ai.agent.create', 'ai.agent.chat'],
-  dependencies: { coreVersion: '^0.0.1' },
+  dependencies: { plugins: ['core.aurabot'], coreVersion: '^0.0.1' },
 }
