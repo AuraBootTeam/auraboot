@@ -452,9 +452,20 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                         .collect(java.util.stream.Collectors.joining(","));
 
                 // Resolve display column name from field code or target model display field metadata.
-                String displayColumnName = resolveReferenceDisplayColumn(targetModelOpt.orElse(null), displayField);
+                // For system tables (no ModelDefinition), use SYSTEM_TABLE_DISPLAY_EXPRESSIONS mapping
+                // which includes COALESCE fallbacks for when primary display columns are empty.
+                String displayColumnExpr;
+                String displayColumnName;
+                if (targetModelOpt.isEmpty() && displayField == null && SYSTEM_TABLE_DISPLAY_EXPRESSIONS.containsKey(targetModelCode)) {
+                    displayColumnExpr = SYSTEM_TABLE_DISPLAY_EXPRESSIONS.get(targetModelCode);
+                    displayColumnName = "display_value";
+                } else {
+                    displayColumnName = resolveReferenceDisplayColumn(targetModelOpt.orElse(null), displayField);
+                    displayColumnExpr = displayColumnName;
+                }
 
-                String sql = "SELECT pid, " + displayColumnName + " FROM " + targetTable
+                String sql = "SELECT pid, " + displayColumnExpr + " AS " + displayColumnName
+                        + " FROM " + targetTable
                         + " WHERE pid IN (" + inClause + ")"
                         + buildSoftDeleteClause(targetModelOpt.orElse(null));
 
@@ -535,6 +546,16 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
         return "pid";
     }
+
+    /**
+     * Display column expression mapping for system tables that don't have ModelDefinition registered.
+     * Uses COALESCE to fall back through multiple columns (e.g., nick_name → user_name → email).
+     * Aliased as 'display_value' in the SELECT clause.
+     */
+    private static final Map<String, String> SYSTEM_TABLE_DISPLAY_EXPRESSIONS = Map.of(
+            "ab_user", "COALESCE(NULLIF(nick_name, ''), NULLIF(user_name, ''), email)",
+            "ns_user", "COALESCE(NULLIF(nick_name, ''), NULLIF(user_name, ''), email)"
+    );
 
     @Override
     public PaginationResult<Map<String, Object>> listByQueryCode(String queryCode, DynamicQueryRequest request) {
