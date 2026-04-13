@@ -124,12 +124,13 @@ ADMIN_EXISTS=$(psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -P pager=off -tAc 
     "SELECT COUNT(*) FROM ab_user WHERE email = 'admin@example.com';" 2>/dev/null || echo "0")
 
 mark_initialized_flag() {
+    # ab_system_config.pid is VARCHAR(26); use a deterministic, short value.
     psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -P pager=off -c "
         INSERT INTO ab_system_config (pid, config_scope, config_key, config_value, value_type, description)
-        VALUES ('RESET-INIT-FLAG-' || substr(md5(random()::text), 1, 20), 'system', 'system.initialized', 'true', 'boolean',
-                'Initialized flag set by reset-and-init.sh after auto-bootstrap completed admin+tenant creation')
+        VALUES ('CFG-SYSTEM-INITIALIZED-X', 'system', 'system.initialized', 'true', 'boolean',
+                'Marked by reset-and-init.sh recovery path')
         ON CONFLICT (config_key) DO UPDATE SET config_value = 'true', updated_at = now();
-    " >/dev/null 2>&1
+    "
 }
 
 if [ "$IS_INITIALIZED" = "True" ]; then
