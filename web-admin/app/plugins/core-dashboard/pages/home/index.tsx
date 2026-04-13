@@ -18,7 +18,7 @@ export default function WorkbenchPage() {
     setError(null);
     try {
       const result = await dashboardService.getWorkbench();
-      setDashboard(result);
+      setDashboard(result ?? null);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to load workbench';
       setError(message);
