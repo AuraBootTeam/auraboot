@@ -1,29 +1,18 @@
+import { definePlugin } from '@auraboot/plugin-sdk'
+import { toNavigationResources } from '../_shared/types.js'
+import { manifest } from './manifest.js'
+import { RESOURCES } from './resources.js'
+
 /**
- * Dashboard Designer Module
+ * core-dashboard plugin — dashboard viewer.
+ *
+ * The legacy module barrel lives in ./module.ts (exports DashboardViewer,
+ * dashboardService, useDashboardStore, widgetRegistry). It's still consumed
+ * by enterprise overlay (ent-dashboard-designer adds the authoring UX).
  */
-
-export { DashboardDesigner } from './DashboardDesigner';
-export { DashboardViewer } from './components/DashboardViewer';
-export { useDashboardStore } from './store/useDashboardStore';
-export { dashboardService } from './services/dashboardService';
-export { widgetRegistry } from './widgets/widgetRegistry';
-
-// Types
-export type {
-  Dashboard,
-  DashboardCreateRequest,
-  DashboardUpdateRequest,
-  DashboardQueryRequest,
-  Widget,
-  WidgetType,
-  WidgetConfig,
-  WidgetDefinition,
-  LayoutConfig,
-  DataSourceConfig,
-  MetricConfig,
-  FilterConfig,
-  LinkageConfig,
-  PropertySchema,
-  ValidationResult,
-  ValidationError,
-} from './types';
+export default definePlugin({
+  manifest,
+  setup(ctx) {
+    ctx.registerNavigationResources(toNavigationResources(RESOURCES))
+  },
+})
