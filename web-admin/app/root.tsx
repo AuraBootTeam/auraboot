@@ -230,6 +230,16 @@ function AppDirectionSync({ locale }: { locale: string }) {
 export default function App() {
   const data = useLoaderData<typeof loader>() as RootLoaderData;
 
+  // M3.7 — boot kernel + activate core plugins once on mount. Plugin
+  // setup() registers NavigationResources, widgets, etc. into the kernel
+  // singleton so menu / breadcrumb / widget resolution can derive from a
+  // single source. See app/framework/boot-plugins.ts.
+  useEffect(() => {
+    void import('~/framework/boot-plugins').then(({ bootCorePlugins }) =>
+      bootCorePlugins(),
+    );
+  }, []);
+
   return (
     <QueryProvider>
       <ThemeProvider>

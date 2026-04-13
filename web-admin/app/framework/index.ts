@@ -9,6 +9,11 @@
 export { RouteRegistryImpl } from './routing/registry.js'
 export { createRouteRegistry } from './routing/factory.js'
 export type { RouteRegistryOptions } from './routing/factory.js'
+export {
+  routesFromResources,
+  collectPluginRoutes,
+} from './routing/react-router-bridge.js'
+export type { PluginRoutesProvider } from './routing/react-router-bridge.js'
 
 // Plugins
 export { PluginLoader } from './plugins/loader.js'
