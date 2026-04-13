@@ -29,10 +29,10 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { DashboardViewer } from '~/dashboard-designer/components/DashboardViewer';
+import { DashboardViewer } from '~/plugins/core-dashboard/components/DashboardViewer';
 import { ExportPdfButton } from '~/smart/components/data-tools/ExportPdfButton';
-import { dashboardService } from '~/dashboard-designer/services/dashboardService';
-import type { Dashboard } from '~/dashboard-designer/types';
+import { dashboardService } from '~/plugins/core-dashboard/services/dashboardService';
+import type { Dashboard } from '~/plugins/core-dashboard/types';
 import { useToastContext } from '~/contexts/ToastContext';
 import { useI18n } from '~/contexts/I18nContext';
 import { userPreferenceService } from '~/services/userPreferenceService';
