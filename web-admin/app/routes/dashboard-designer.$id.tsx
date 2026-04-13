@@ -8,7 +8,7 @@ import { useParams } from 'react-router';
 import { RouteLoadingFallback } from '~/ui/RouteLoadingFallback';
 
 const DashboardDesigner = React.lazy(() =>
-  import('~/plugins/core-dashboard').then((m) => ({ default: m.DashboardDesigner })),
+  import('~/plugins/core-dashboard/module').then((m) => ({ default: m.DashboardDesigner })),
 );
 
 export default function DashboardDesignerEditPage() {
