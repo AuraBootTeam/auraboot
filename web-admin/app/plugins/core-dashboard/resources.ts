@@ -2,6 +2,22 @@ import type { PluginResource } from '../_shared/types.js'
 
 export const RESOURCES: PluginResource[] = [
   {
+    key: 'home.workbench',
+    path: '/home',
+    title: { en: 'Home', zh: '工作台' },
+    icon: 'home',
+    menu: { order: 0, group: 'workbench' },
+    file: './plugins/core-dashboard/pages/home/index.tsx',
+  },
+  {
+    key: 'home.settings',
+    path: '/home/settings',
+    title: { en: 'Workbench Settings', zh: '工作台设置' },
+    menu: false,
+    parentKey: 'home.workbench',
+    file: './plugins/core-dashboard/pages/home/settings.tsx',
+  },
+  {
     key: 'dashboard.list',
     path: '/dashboards',
     title: { en: 'Dashboards', zh: '仪表板' },

@@ -15,7 +15,7 @@ export default function WorkbenchSettingsPage() {
     async function loadWorkbench() {
       try {
         const wb = await dashboardService.getWorkbench();
-        setWorkbenchId(wb.pid || null);
+        setWorkbenchId(wb?.pid ?? null);
       } catch {
         // CATCH: non-transactional HTTP call — if workbench doesn't exist yet,
         // DashboardDesigner will create a new one
