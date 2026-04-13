@@ -3,7 +3,7 @@
  */
 
 import { useAuth, useUser, usePermissions } from '~/contexts/AuthContext';
-import { PermissionGuard, PermissionButton } from '~/components/PermissionGuard';
+import { PermissionGuard, PermissionButton } from '~/ui/PermissionGuard';
 
 export default function UserInfoDemo() {
   // 方式1：获取所有信息

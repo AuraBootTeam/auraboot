@@ -20,7 +20,7 @@ import {
   ExclamationCircleIcon,
   ClockIcon,
 } from '@heroicons/react/24/outline';
-import { post } from '~/services/http-client';
+import { post } from '~/shared/services/http-client';
 import type { AppTemplate } from './templateCatalog';
 
 type DialogState = 'preview' | 'installing' | 'success' | 'error';

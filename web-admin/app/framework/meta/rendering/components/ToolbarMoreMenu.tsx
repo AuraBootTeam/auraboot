@@ -10,7 +10,7 @@ import { cn } from '~/utils/cn';
 import { useToastContext } from '~/contexts/ToastContext';
 import { useI18n } from '~/contexts/I18nContext';
 import { ResultHelper } from '~/utils/type';
-import { reportTemplateService, type ReportTemplateDTO } from '~/services/reportTemplateService';
+import { reportTemplateService, type ReportTemplateDTO } from '~/shared/services/reportTemplateService';
 
 export interface ToolbarMoreMenuProps {
   /** Callback to open import dialog */

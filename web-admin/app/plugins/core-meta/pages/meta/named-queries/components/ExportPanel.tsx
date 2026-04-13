@@ -4,8 +4,8 @@
  */
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { namedQueryService } from '~/services/namedQueryService';
-import type { NamedQueryTestResult, ExportTaskDTO } from '~/services/namedQueryService';
+import { namedQueryService } from '~/shared/services/namedQueryService';
+import type { NamedQueryTestResult, ExportTaskDTO } from '~/shared/services/namedQueryService';
 
 type ExportFormat = 'excel' | 'csv' | 'json';
 

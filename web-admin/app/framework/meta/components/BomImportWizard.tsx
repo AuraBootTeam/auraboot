@@ -7,7 +7,7 @@ import {
   type ColumnMapping,
   type BomTargetField,
 } from './BomColumnMapper';
-import { post } from '~/services/http-client';
+import { post } from '~/shared/services/http-client';
 
 // ---------------------------------------------------------------------------
 // Types

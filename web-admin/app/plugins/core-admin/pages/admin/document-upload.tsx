@@ -4,9 +4,9 @@
  */
 
 import { useState } from 'react';
-import { FileUploader, type FileMetadata } from '~/components/admin/FileUploader';
-import { TaskList } from '~/components/admin/TaskList';
-import { uploadDocument } from '~/services/documentService';
+import { FileUploader, type FileMetadata } from '~/ui/admin/FileUploader';
+import { TaskList } from '~/ui/admin/TaskList';
+import { uploadDocument } from '~/shared/services/documentService';
 type MetaArgs = Record<string, unknown>;
 
 export function meta({}: MetaArgs) {

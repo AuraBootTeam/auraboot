@@ -22,7 +22,7 @@ import { test, expect } from '@playwright/test';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
-import { ErrorCodes } from '~/services/http-client/types';
+import { ErrorCodes } from '~/shared/services/http-client/types';
 
 const PLUGINS_DIR = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),

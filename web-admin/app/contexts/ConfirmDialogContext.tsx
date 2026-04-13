@@ -7,7 +7,7 @@ import {
   useEffect,
   type ReactNode,
 } from 'react';
-import ConfirmDialog from '~/components/ConfirmDialog';
+import ConfirmDialog from '~/ui/ConfirmDialog';
 import {
   registerConfirmDialog,
   unregisterConfirmDialog,

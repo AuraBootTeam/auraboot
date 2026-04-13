@@ -13,7 +13,7 @@
 import { test, expect } from '@playwright/test';
 import { ModelTestHelper } from '../helpers/model-test-helper';
 import { E2ET_ORDER_CONFIG } from '../helpers/configs/e2et-order.config';
-import { ErrorCodes } from '~/services/http-client/types';
+import { ErrorCodes } from '~/shared/services/http-client/types';
 import { uniqueId, todayStr, executeCommandViaApi } from '../e2e/helpers';
 
 const CUSTOMER_CONFIG = {

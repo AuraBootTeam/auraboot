@@ -7,8 +7,8 @@
  */
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { chartDataService } from '~/services/chartDataService';
-import { fetchResult } from '~/services/http-client';
+import { chartDataService } from '~/shared/services/chartDataService';
+import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import type {
   KanbanDataSource,

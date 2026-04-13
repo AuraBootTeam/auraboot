@@ -15,8 +15,8 @@ import {
 import type { FieldOption } from './KanbanConfigPanel';
 import { cn } from '~/utils/cn';
 import { confirmDialog } from '~/utils/confirmDialog';
-import { savedViewService } from '~/services/savedViewService';
-import { modelService } from '~/services/modelService';
+import { savedViewService } from '~/shared/services/savedViewService';
+import { modelService } from '~/shared/services/modelService';
 
 /**
  * View types that require field configuration after creation.

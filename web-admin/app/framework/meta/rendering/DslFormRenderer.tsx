@@ -22,8 +22,8 @@
 import React, { Suspense, useEffect } from 'react';
 import { profileRegistry } from '~/framework/meta/profiles/ProfileRegistry';
 import { ProfileProvider } from '~/framework/meta/profiles/ProfileContext';
-import { LoadingSpinner } from '~/components/LoadingSpinner';
-import { ErrorAlert } from '~/components/ErrorAlert';
+import { LoadingSpinner } from '~/ui/LoadingSpinner';
+import { ErrorAlert } from '~/ui/ErrorAlert';
 import type { UseDslFormReturn } from '~/framework/meta/hooks/useDslForm';
 import { useAuraBotSafe } from '~/plugins/core-aurabot/hooks/useAuraBotSafe';
 

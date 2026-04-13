@@ -14,15 +14,15 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useNavigate, useParams, useLoaderData, useLocation } from 'react-router';
 import type { LoaderFunctionArgs } from 'react-router';
-import { modelService } from '~/services/modelService';
+import { modelService } from '~/shared/services/modelService';
 import { confirmDialog } from '~/utils/confirmDialog';
-import { permissionService } from '~/services/permissionService';
+import { permissionService } from '~/shared/services/permissionService';
 import { useToastContext } from '~/contexts/ToastContext';
-import { CrudTemplateWizard } from '~/components/meta/CrudTemplateWizard';
-import { RuntimeVerification } from '~/components/meta/RuntimeVerification';
-import { FieldListManager } from '~/components/meta/FieldListManager';
-import { FieldConfigDialog, type FieldBindingConfig } from '~/components/meta/FieldConfigDialog';
-import { DictConfigDialog } from '~/components/meta/DictConfigDialog';
+import { CrudTemplateWizard } from '~/ui/meta/CrudTemplateWizard';
+import { RuntimeVerification } from '~/ui/meta/RuntimeVerification';
+import { FieldListManager } from '~/ui/meta/FieldListManager';
+import { FieldConfigDialog, type FieldBindingConfig } from '~/ui/meta/FieldConfigDialog';
+import { DictConfigDialog } from '~/ui/meta/DictConfigDialog';
 import type { MetaModelDTO, ModelFieldBinding, Permission, ModelVersion } from '~/types/model';
 
 /**

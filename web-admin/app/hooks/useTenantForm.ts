@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { fetchResult } from '~/services/http-client';
+import { fetchResult } from '~/shared/services/http-client';
 
 // 租户相关类型定义
 export interface TenantInfo {

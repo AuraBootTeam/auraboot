@@ -7,7 +7,7 @@ import {
   uniqueId,
   clickRowActionByLocator,
 } from '../helpers';
-import { ErrorCodes } from '~/services/http-client/types';
+import { ErrorCodes } from '~/shared/services/http-client/types';
 
 type Bucket = {
   customers: string[];

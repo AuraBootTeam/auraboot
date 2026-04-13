@@ -1,5 +1,5 @@
 import React, { Suspense } from 'react';
-import { RouteLoadingFallback } from '~/components/RouteLoadingFallback';
+import { RouteLoadingFallback } from '~/ui/RouteLoadingFallback';
 
 const FlowDesigner = React.lazy(() => import('~/plugins/core-designer/components/flow-designer/FlowDesigner'));
 

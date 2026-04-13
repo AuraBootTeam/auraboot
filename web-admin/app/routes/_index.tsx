@@ -1,7 +1,7 @@
 import type { LoaderFunctionArgs } from 'react-router';
 import { redirect } from 'react-router';
-import { getUserInfo } from '~/services/userService';
-import { getUserMenus } from '~/services/menu';
+import { getUserInfo } from '~/shared/services/userService';
+import { getUserMenus } from '~/shared/services/menu';
 
 const DEFAULT_AUTH_HOME = '/home';
 

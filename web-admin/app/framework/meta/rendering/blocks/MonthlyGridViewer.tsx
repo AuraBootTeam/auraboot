@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { fetchResult } from '~/services/http-client';
+import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import type { MonthlyGridConfig } from '~/framework/meta/schemas/types';

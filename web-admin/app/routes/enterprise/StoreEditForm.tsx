@@ -1,8 +1,8 @@
 import { useNavigate, useParams } from 'react-router';
-import { fetchResult } from '~/services/http-client';
+import { fetchResult } from '~/shared/services/http-client';
 import { useStoreForm } from '~/hooks/useStoreForm';
 import { useFormSubmit } from '~/hooks/useFormSubmit';
-import StoreFormFields from '~/components/StoreFormFields';
+import StoreFormFields from '~/ui/StoreFormFields';
 import { useAuth } from '~/contexts/AuthContext';
 
 export default function StoreEditForm() {

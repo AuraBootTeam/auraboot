@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router';
 import { useTheme } from '~/contexts/ThemeContext';
 import { useFormSubmit } from '~/hooks/useFormSubmit';
 import { useTenantForm, type TenantInfo } from '~/hooks/useTenantForm';
-import { fetchResult } from '~/services/http-client';
-import TenantFormFields from '~/components/TenantFormFields';
+import { fetchResult } from '~/shared/services/http-client';
+import TenantFormFields from '~/ui/TenantFormFields';
 import { useAuth } from '~/contexts/AuthContext';
 
 export default function TenantEditForm() {

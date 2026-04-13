@@ -18,7 +18,7 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { Link } from 'react-router';
 import { PrintButton } from '~/framework/meta/rendering/components/PrintButton';
-import { RecordShareDialog } from '~/components/shared/RecordShareDialog';
+import { RecordShareDialog } from '~/ui/shared/RecordShareDialog';
 import type { PageContentProps } from '~/framework/meta/profiles/types';
 import { usePageRuntime } from '~/framework/meta/rendering/pages/hooks/usePageRuntime';
 import {
@@ -26,14 +26,14 @@ import {
   DynamicField,
   buildApiEndpoint,
 } from '~/routes/_shared/dynamic-route-utils';
-import { fetchResult } from '~/services/http-client';
+import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { useDictCache } from '~/framework/meta/rendering/pages/hooks/useDictCache';
 import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
 import { useToastContext } from '~/contexts/ToastContext';
-import { ErrorAlert } from '~/components/ErrorAlert';
+import { ErrorAlert } from '~/ui/ErrorAlert';
 import { ReportGenerateButton } from '~/framework/smart/components/report/ReportGenerateButton';
-import { LoadingSpinner } from '~/components/LoadingSpinner';
+import { LoadingSpinner } from '~/ui/LoadingSpinner';
 import { InlineApprovalPanel } from '~/framework/smart/components/approval/InlineApprovalPanel';
 import { SubTableViewer } from '~/framework/meta/rendering/blocks/SubTableViewer';
 import { MonthlyGridViewer } from '~/framework/meta/rendering/blocks/MonthlyGridViewer';

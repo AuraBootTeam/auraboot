@@ -13,7 +13,7 @@
 
 import { test, expect } from '../../fixtures';
 import { DynamicListPage, DynamicFormPage } from '../../pages';
-import { ErrorCodes } from '~/services/http-client/types';
+import { ErrorCodes } from '~/shared/services/http-client/types';
 import { uniqueId } from '../quarry-management.setup';
 
 const ORDER_PAGE_KEY = 'e2et_order';

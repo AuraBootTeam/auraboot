@@ -11,8 +11,8 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useSearchParams, Link } from 'react-router';
 import { ArrowPathIcon } from '@heroicons/react/24/outline';
-import { WelcomeGuide } from '~/components/onboarding/WelcomeGuide';
-import { QuickStartCards } from '~/components/onboarding/QuickStartCards';
+import { WelcomeGuide } from '~/ui/onboarding/WelcomeGuide';
+import { QuickStartCards } from '~/ui/onboarding/QuickStartCards';
 import {
   DndContext,
   closestCenter,
@@ -35,7 +35,7 @@ import { dashboardService } from '~/plugins/core-dashboard/services/dashboardSer
 import type { Dashboard } from '~/plugins/core-dashboard/types';
 import { useToastContext } from '~/contexts/ToastContext';
 import { useI18n } from '~/contexts/I18nContext';
-import { userPreferenceService } from '~/services/userPreferenceService';
+import { userPreferenceService } from '~/shared/services/userPreferenceService';
 
 const PREF_KEY = 'dashboard_tab_order';
 const HINT_STORAGE_KEY = 'dashboard_drag_hint_shown';

@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { cn } from '~/utils/cn';
 import { useToastContext } from '~/contexts/ToastContext';
-import { DateTime } from '~/components/DateTime';
+import { DateTime } from '~/ui/DateTime';
 import { getApprovalChain, type ApprovalChainEntry } from '../services/bpmReportService';
 
 // ==================== Types ====================

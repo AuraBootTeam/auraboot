@@ -1,5 +1,5 @@
 import { type ActionFunctionArgs, type LoaderFunctionArgs, redirect } from 'react-router';
-import { createUserSession, getTokenFromRequest } from '~/services/session';
+import { createUserSession, getTokenFromRequest } from '~/shared/services/session';
 
 /**
  * Resource route for switching spaces (tenants).

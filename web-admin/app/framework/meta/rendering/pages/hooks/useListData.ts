@@ -10,7 +10,7 @@
  */
 
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { fetchResult } from '~/services/http-client';
+import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { buildApiEndpoint } from '~/routes/_shared/dynamic-route-utils';
 import type { UnifiedSchema } from '~/framework/meta/schemas/types';

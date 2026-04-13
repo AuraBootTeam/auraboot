@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useUser } from '~/contexts/AuthContext';
 import type { DataSourceManager } from '~/framework/meta/runtime/data-pipeline/DataSourceManager';
-import { fetchResult } from '~/services/http-client';
+import { fetchResult } from '~/shared/services/http-client';
 
 /**
  * Hook for real-time data sync on DSL pages.

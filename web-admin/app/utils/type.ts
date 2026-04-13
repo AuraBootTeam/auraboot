@@ -1,5 +1,5 @@
-export { ErrorCodes } from '~/services/http-client/types';
-import { ErrorCodes } from '~/services/http-client/types';
+export { ErrorCodes } from '~/shared/services/http-client/types';
+import { ErrorCodes } from '~/shared/services/http-client/types';
 
 /**
  * Unified API result type.

@@ -17,8 +17,8 @@ import React, { Suspense } from 'react';
 import { useSchemaLoader } from '~/framework/meta/hooks/useSchemaLoader';
 import { profileRegistry } from '~/framework/meta/profiles/ProfileRegistry';
 import { ProfileProvider } from '~/framework/meta/profiles/ProfileContext';
-import { ErrorAlert } from '~/components/ErrorAlert';
-import { LoadingSpinner } from '~/components/LoadingSpinner';
+import { ErrorAlert } from '~/ui/ErrorAlert';
+import { LoadingSpinner } from '~/ui/LoadingSpinner';
 
 
 // Ensure profiles are registered

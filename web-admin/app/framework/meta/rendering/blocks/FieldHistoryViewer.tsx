@@ -7,7 +7,7 @@
 
 import React, { useState, useEffect } from 'react';
 import dayjs from 'dayjs';
-import { fetchResult } from '~/services/http-client';
+import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 
 interface FieldChangeLog {

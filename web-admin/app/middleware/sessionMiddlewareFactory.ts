@@ -1,5 +1,5 @@
 import { redirect, type unstable_MiddlewareFunction } from 'react-router';
-import { sessionStorage } from '~/services/session.js';
+import { sessionStorage } from '~/shared/services/session.js';
 import { JWT_TOKEN_KEY } from '~/constants/AuthConstant';
 import { PLUGIN_PUBLIC_ROUTES } from '~/plugins/_public-routes';
 

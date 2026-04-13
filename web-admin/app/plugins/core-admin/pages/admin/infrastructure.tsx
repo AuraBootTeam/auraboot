@@ -15,7 +15,7 @@ import {
   XCircleIcon,
   ArrowPathIcon,
 } from '@heroicons/react/24/outline';
-import { get, post } from '~/services/http-client';
+import { get, post } from '~/shared/services/http-client';
 import { useToastContext } from '~/contexts/ToastContext';
 
 // ---------------------------------------------------------------------------

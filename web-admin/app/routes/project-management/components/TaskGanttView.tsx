@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Gantt, ViewMode, type Task as GanttTask } from 'gantt-task-react';
 import 'gantt-task-react/dist/index.css';
-import { get, post } from '~/services/http-client';
+import { get, post } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { useI18n } from '~/contexts/I18nContext';
 import { useToastContext } from '~/contexts/ToastContext';

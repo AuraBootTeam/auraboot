@@ -4,7 +4,7 @@
  */
 
 import React, { Suspense } from 'react';
-import { RouteLoadingFallback } from '~/components/RouteLoadingFallback';
+import { RouteLoadingFallback } from '~/ui/RouteLoadingFallback';
 
 const ReportDesigner = React.lazy(() =>
   import('~/plugins/core-designer/components/report-designer').then((m) => ({ default: m.ReportDesigner })),

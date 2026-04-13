@@ -34,7 +34,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { cn } from '~/utils/cn';
-import { get } from '~/services/http-client';
+import { get } from '~/shared/services/http-client';
 
 dayjs.extend(relativeTime);
 

@@ -16,8 +16,8 @@ import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import type { LoaderFunctionArgs } from 'react-router';
 import { useLoaderData } from 'react-router';
-import { getTokenFromRequest } from '~/services/session';
-import { fetchResult } from '~/services/http-client';
+import { getTokenFromRequest } from '~/shared/services/session';
+import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { DynamicPageRenderer } from '~/framework/meta/rendering/pages/DynamicPageRenderer';
 

@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import { useLoaderData, useNavigate, Form, useActionData, useNavigation } from 'react-router';
 import type { LoaderFunctionArgs, ActionFunctionArgs } from 'react-router';
-import { requireAuth } from '~/services/session';
+import { requireAuth } from '~/shared/services/session';
 import {
   listFeedback,
   createFeedback,
   toggleVote,
   updateFeedbackStatus,
   deleteFeedback,
-} from '~/services/feedback';
+} from '~/shared/services/feedback';
 import type {
   FeedbackItem,
   FeedbackType,

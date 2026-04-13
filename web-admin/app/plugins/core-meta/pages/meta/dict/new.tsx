@@ -6,7 +6,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router';
-import { dictService } from '~/services/dictService';
+import { dictService } from '~/shared/services/dictService';
 import { useToastContext } from '~/contexts/ToastContext';
 import type { DictCreateRequest, DictItemData } from '~/types/dict';
 

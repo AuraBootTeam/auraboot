@@ -26,7 +26,7 @@ import { ModelTestHelper } from '../../helpers/model-test-helper';
 import { E2ET_ORDER_CONFIG } from '../../helpers/configs/e2et-order.config';
 import { DynamicFormPage } from '../../pages/DynamicFormPage';
 import { uniqueId, todayStr, executeCommandViaApi, waitForToast } from '../helpers';
-import { ErrorCodes } from '~/services/http-client/types';
+import { ErrorCodes } from '~/shared/services/http-client/types';
 
 // Customer config for UNIQUE testing — field names match e2et_cust_* (not e2et_customer_*)
 const CUSTOMER_CONFIG = {

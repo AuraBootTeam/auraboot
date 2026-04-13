@@ -21,7 +21,7 @@ import {
   ChevronUpIcon,
   CpuChipIcon,
 } from '@heroicons/react/24/outline';
-import { post } from '~/services/http-client';
+import { post } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { useToastContext } from '~/contexts/ToastContext';
 import { useI18n } from '~/contexts/I18nContext';

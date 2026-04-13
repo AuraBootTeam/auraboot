@@ -7,9 +7,9 @@ import {
   type LoaderFunctionArgs,
 } from 'react-router';
 import { useState, useRef, useEffect } from 'react';
-import { createUserSession, getTokenFromRequest } from '~/services/session';
+import { createUserSession, getTokenFromRequest } from '~/shared/services/session';
 import { useTenantForm } from '~/hooks/useTenantForm';
-import TenantFormFields from '~/components/TenantFormFields';
+import TenantFormFields from '~/ui/TenantFormFields';
 import {
   BuildingOfficeIcon,
   UserGroupIcon,

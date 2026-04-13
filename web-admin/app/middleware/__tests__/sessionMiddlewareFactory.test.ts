@@ -7,7 +7,7 @@ vi.mock('react-router', () => ({
   redirect: vi.fn((url: string, init?: ResponseInit) => ({ url, ...init })),
 }));
 
-vi.mock('~/services/session.js', () => ({
+vi.mock('~/shared/services/session.js', () => ({
   getSessionWithRecovery: getSessionWithRecoveryMock,
   sessionStorage: {
     destroySession: destroySessionMock,

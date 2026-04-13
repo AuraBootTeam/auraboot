@@ -2,8 +2,8 @@ import { Outlet, useLoaderData } from 'react-router';
 import type { LoaderFunctionArgs } from 'react-router';
 import { MarketingHeader } from '../components/MarketingHeader';
 import { MarketingFooter } from '../components/MarketingFooter';
-import { getTokenFromRequest } from '~/services/session';
-import { getUserInfo } from '~/services/userService';
+import { getTokenFromRequest } from '~/shared/services/session';
+import { getUserInfo } from '~/shared/services/userService';
 import '../styles/site.css';
 
 export async function loader({ request }: LoaderFunctionArgs) {

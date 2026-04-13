@@ -12,7 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-} from '~/components/ui/dialog';
+} from '~/ui/ui/dialog';
 
 export interface FilePreviewModalProps {
   /** Whether the modal is visible */

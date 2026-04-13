@@ -1,10 +1,10 @@
 // app/routes/api.upload.aliyun.tsx
 import type { ActionFunctionArgs } from 'react-router';
 import OSS from 'ali-oss';
-import { fetchResult } from '~/services/http-client';
+import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
-import { getTokenFromRequest } from '~/services/session';
-import { saveFileToDatabase } from '~/services/fileupload/fileService';
+import { getTokenFromRequest } from '~/shared/services/session';
+import { saveFileToDatabase } from '~/shared/services/fileupload/fileService';
 import { uploadConfig } from '~/config/upload.config';
 
 // 阿里云配置接口

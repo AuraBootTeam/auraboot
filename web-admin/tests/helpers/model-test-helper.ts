@@ -17,7 +17,7 @@
 import { type Page, expect } from '@playwright/test';
 import { DynamicListPage, DynamicFormPage } from '../pages';
 import { executeCommandViaApi, normalizeDynamicPageKey, waitForFormReady } from '../e2e/helpers';
-import { ErrorCodes } from '~/services/http-client/types';
+import { ErrorCodes } from '~/shared/services/http-client/types';
 
 // ---------------------------------------------------------------------------
 // Types

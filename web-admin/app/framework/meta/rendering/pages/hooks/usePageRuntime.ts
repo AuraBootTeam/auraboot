@@ -19,7 +19,7 @@ import { useDataSync } from '~/framework/meta/hooks/useDataSync';
 import { usePageDataSources } from '~/framework/meta/hooks/usePageDataSources';
 import { useSchemaRuntime } from '~/framework/meta/hooks/useSchemaRuntime';
 import { createExpressionContext } from '~/framework/meta/runtime/expression/context';
-import { fetchResult } from '~/services/http-client';
+import { fetchResult } from '~/shared/services/http-client';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import type { DataSourceManager } from '~/framework/meta/runtime/data-pipeline/DataSourceManager';
 import type { UnifiedSchema } from '~/framework/meta/schemas/types';

@@ -14,14 +14,14 @@ import type {
   RenderComponentEntry,
   BlockRendererEntry,
   CommandHandlerEntry,
-} from '~/services/dslRegistryService';
+} from '~/shared/services/dslRegistryService';
 import {
   fetchDslRegistry,
   getFallbackRegistry,
   getEnumCodes,
   getEnumOptions,
   invalidateRegistryCache,
-} from '~/services/dslRegistryService';
+} from '~/shared/services/dslRegistryService';
 
 // ---------------------------------------------------------------------------
 // Context type

@@ -18,7 +18,7 @@
  */
 
 import { type Page, type Route } from '@playwright/test';
-import { ErrorCodes } from '~/services/http-client/types';
+import { ErrorCodes } from '~/shared/services/http-client/types';
 
 export interface MockListResponse<T = Record<string, any>> {
   records: T[];

@@ -15,7 +15,7 @@ import type { ChatMessage, ToolStatus } from '~/chat/types';
 import type { TemporaryAttachment } from '~/chat/services/fileService';
 import { streamChat } from '~/chat/services/chatService';
 import { getSessionHistory } from '~/chat/services/sessionService';
-import { getTokenFromRequest } from '~/services/session';
+import { getTokenFromRequest } from '~/shared/services/session';
 
 /**
  * Loader: 在服务器端获取 token

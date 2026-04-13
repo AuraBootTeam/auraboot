@@ -5,7 +5,7 @@ import {
   MagnifyingGlassIcon,
 } from '@heroicons/react/24/outline';
 import { useI18n } from '~/contexts/I18nContext';
-import { LoadingSpinner } from '~/components/LoadingSpinner';
+import { LoadingSpinner } from '~/ui/LoadingSpinner';
 import type { PermissionTreeNode } from './types';
 
 // ---------------------------------------------------------------------------

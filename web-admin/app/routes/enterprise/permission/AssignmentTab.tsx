@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useI18n } from '~/contexts/I18nContext';
 import { useToastContext } from '~/contexts/ToastContext';
-import { fetchResult } from '~/services/http-client';
+import { fetchResult } from '~/shared/services/http-client';
 import { useFormSubmit } from '~/hooks/useFormSubmit';
-import { LoadingSpinner } from '~/components/LoadingSpinner';
+import { LoadingSpinner } from '~/ui/LoadingSpinner';
 import PermissionTree from './PermissionTree';
 import type { Role, PermissionTreeNode } from './types';
 

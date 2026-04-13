@@ -12,7 +12,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import { useFieldLibrary } from '~/plugins/core-designer/components/studio/hooks/fields/useFieldLibrary';
-import { get } from '~/services/http-client';
+import { get } from '~/shared/services/http-client';
 import type { MetaFieldDTO } from '~/plugins/core-designer/components/studio/workbench/panels/fields/types';
 
 interface ModelOption {

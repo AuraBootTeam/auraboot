@@ -16,7 +16,7 @@
 
 import { useState, useEffect } from 'react';
 import { RefreshCw } from 'lucide-react';
-import { get, ErrorCodes } from '~/services/http-client';
+import { get, ErrorCodes } from '~/shared/services/http-client';
 import { ApprovalChainPanel } from '~/plugins/core-bpm/components/ApprovalChainPanel';
 
 // ==================== Types ====================

@@ -1,5 +1,5 @@
 // web-admin/app/flow-designer-sdk/nodes/types.ts
-import type { I18nText } from '~/components/field-adapter';
+import type { I18nText } from '~/ui/field-adapter';
 import type {
   PropertyType as SharedPropertyType,
   PropertySchema as SharedPropertySchema,

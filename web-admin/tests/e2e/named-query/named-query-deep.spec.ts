@@ -17,7 +17,7 @@
 
 import { test, expect } from '../../fixtures';
 import { NamedQueryPage } from '../../pages/NamedQueryPage';
-import { ErrorCodes } from '~/services/http-client/types';
+import { ErrorCodes } from '~/shared/services/http-client/types';
 
 function generateCode(): string {
   const ts = Date.now().toString(36);

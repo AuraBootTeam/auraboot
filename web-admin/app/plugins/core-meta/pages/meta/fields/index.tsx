@@ -14,13 +14,13 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useLoaderData, useNavigate } from 'react-router';
 import type { LoaderFunctionArgs } from 'react-router';
-import { fieldLibraryService } from '~/services/fieldLibraryService';
+import { fieldLibraryService } from '~/shared/services/fieldLibraryService';
 import { useToastContext } from '~/contexts/ToastContext';
 import type { FieldSearchRequest, MetaFieldDTO } from '~/types/fieldLibrary';
-import { LoadingSpinner } from '~/components/LoadingSpinner';
-import { ErrorAlert } from '~/components/ErrorAlert';
-import { Pagination } from '~/components/Pagination';
-import { ManagedBadge } from '~/components/common/ManagedBadge';
+import { LoadingSpinner } from '~/ui/LoadingSpinner';
+import { ErrorAlert } from '~/ui/ErrorAlert';
+import { Pagination } from '~/ui/Pagination';
+import { ManagedBadge } from '~/ui/common/ManagedBadge';
 import { useBatchResourceOwners } from '~/hooks/useResourceOwner';
 import { useDslRegistry } from '~/contexts/DslRegistryContext';
 

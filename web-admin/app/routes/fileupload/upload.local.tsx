@@ -3,7 +3,7 @@ import type { ActionFunctionArgs } from 'react-router';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
-import { saveFileToDatabase } from '~/services/fileupload/fileService';
+import { saveFileToDatabase } from '~/shared/services/fileupload/fileService';
 import { getServerUploadConfig } from '~/config/upload.config';
 
 export const action = async ({ request }: ActionFunctionArgs) => {

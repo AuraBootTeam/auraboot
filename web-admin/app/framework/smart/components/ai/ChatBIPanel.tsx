@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { fetchResult } from '~/services/http-client/HttpClient';
+import { fetchResult } from '~/shared/services/http-client/HttpClient';
 import { AIChartRenderer } from './AIChartRenderer';
 
 interface ChatBIResult {

@@ -10,7 +10,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router';
 import { EnvelopeIcon, PlusIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
-import { listSequences, createSequence, type EmailSequence } from '~/services/emailService';
+import { listSequences, createSequence, type EmailSequence } from '~/shared/services/emailService';
 import { useToastContext } from '~/contexts/ToastContext';
 
 function statusBadge(status: string) {

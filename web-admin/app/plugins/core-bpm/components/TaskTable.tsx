@@ -5,10 +5,10 @@
 
 import { useState, useCallback } from 'react';
 import dayjs from 'dayjs';
-import { Button } from '~/components/ui/button';
-import { Checkbox } from '~/components/ui/checkbox';
+import { Button } from '~/ui/ui/button';
+import { Checkbox } from '~/ui/ui/checkbox';
 import { MoreHorizontal, RefreshCw, CheckCircle2, User, AlertCircle, Clock } from 'lucide-react';
-import { DateTime } from '~/components/DateTime';
+import { DateTime } from '~/ui/DateTime';
 import type { TaskInstance } from '../services/bpmWorkbenchService';
 import type { DialogState } from '../hooks/useTaskCenter';
 

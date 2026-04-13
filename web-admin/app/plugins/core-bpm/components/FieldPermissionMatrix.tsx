@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { get, ErrorCodes } from '~/services/http-client';
+import { get, ErrorCodes } from '~/shared/services/http-client';
 
 type FieldPermission = 'editable' | 'readonly' | 'hidden';
 

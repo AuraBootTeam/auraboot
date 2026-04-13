@@ -7,7 +7,7 @@ import {
   PhoneIcon,
   EnvelopeIcon,
 } from '@heroicons/react/24/outline';
-import { fetchResult } from '~/services/http-client';
+import { fetchResult } from '~/shared/services/http-client';
 import { useTheme } from '~/contexts/ThemeContext';
 import { useFormSubmit } from '~/hooks/useFormSubmit';
 import { getIndustryLabel, type TenantInfo } from '~/hooks/useTenantForm';

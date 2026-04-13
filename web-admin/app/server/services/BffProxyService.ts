@@ -5,7 +5,7 @@ import * as http from 'http';
 import * as https from 'https';
 import { config } from '~/server/utils/config';
 import logger from '~/server/utils/logger';
-import { sessionStorage } from '~/services/session';
+import { sessionStorage } from '~/shared/services/session';
 import { JWT_TOKEN_KEY } from '~/constants/AuthConstant';
 
 // Explicit HTTP agents that bypass system proxy (http_proxy/https_proxy env vars).

@@ -22,9 +22,9 @@ import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
 import { useToastContext } from '~/contexts/ToastContext';
 import { DataSourceProvider } from '~/framework/meta/contexts/DataSourceContext';
 import { createFieldRenderer } from '~/framework/meta/utils/createFieldRenderer';
-import { ErrorAlert } from '~/components/ErrorAlert';
-import { LoadingSpinner } from '~/components/LoadingSpinner';
-import { fetchResult } from '~/services/http-client';
+import { ErrorAlert } from '~/ui/ErrorAlert';
+import { LoadingSpinner } from '~/ui/LoadingSpinner';
+import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { SubTable } from '~/framework/meta/components/SubTable';
 import { SubTableViewer } from '~/framework/meta/rendering/blocks/SubTableViewer';
@@ -34,12 +34,12 @@ import type { PageContentProps } from '~/framework/meta/profiles/types';
 import { mergeRules as crossFieldMergeRules } from '~/framework/meta/validation/ruleMerger';
 import { evaluateCondition as crossFieldEvalCondition } from '~/framework/meta/validation/conditionEvaluator';
 import { evaluateAssert as crossFieldEvalAssert } from '~/framework/meta/validation/assertEvaluator';
-import ConsistencyViolationAlert from '~/components/consistency/ConsistencyViolationAlert';
+import ConsistencyViolationAlert from '~/ui/consistency/ConsistencyViolationAlert';
 import {
   isConsistencyViolationError,
   extractViolations,
   type ConsistencyViolation,
-} from '~/services/consistencyRuleService';
+} from '~/shared/services/consistencyRuleService';
 import { deriveTestId, buttonTestId } from '~/framework/meta/rendering/utils/deriveTestId';
 
 /**

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { XMarkIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { toast } from 'sonner';
-import { fetchResult } from '~/services/http-client/HttpClient';
+import { fetchResult } from '~/shared/services/http-client/HttpClient';
 
 interface ScheduleFormModalProps {
   schedule: any | null;

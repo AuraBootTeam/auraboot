@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { fetchResult } from '~/services/http-client';
+import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 
 interface NbaSuggestion {

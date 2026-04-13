@@ -3,7 +3,7 @@
  * API service for approval task operations in APPROVAL-mode command chains.
  */
 
-import { get, post } from '~/services/http-client';
+import { get, post } from '~/shared/services/http-client';
 
 export interface ApprovalTaskDTO {
   pid: string;

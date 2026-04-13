@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { dynamicService } from '~/services/dynamicService';
+import { dynamicService } from '~/shared/services/dynamicService';
 import type {
   PaginationRequest,
   PaginationResult,

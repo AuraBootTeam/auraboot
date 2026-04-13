@@ -9,7 +9,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useToast } from '~/contexts/ToastContext';
 import { Link } from 'react-router';
-import { get } from '~/services/http-client';
+import { get } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 
 interface DeviceStats {

@@ -8,7 +8,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { fetchResult } from '~/services/http-client';
+import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import type { UnifiedSchema } from '~/framework/meta/schemas/types';
 import { DslMigrator } from '~/framework/meta/migration';

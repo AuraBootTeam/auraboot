@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'react-router';
-import { fetchResult } from '~/services/http-client/HttpClient';
+import { fetchResult } from '~/shared/services/http-client/HttpClient';
 import { useToken as useAuthToken } from '~/contexts/AuthContext';
 
 interface WidgetData {

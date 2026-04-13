@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { get, ErrorCodes } from '~/services/http-client';
+import { get, ErrorCodes } from '~/shared/services/http-client';
 import NotificationRuleList from '~/framework/smart/components/notification/NotificationRuleList';
 import NotificationRuleBuilder from '~/framework/smart/components/notification/NotificationRuleBuilder';
 import type { NotificationRule } from '~/framework/smart/components/notification/NotificationRuleBuilder';

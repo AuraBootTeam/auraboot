@@ -13,7 +13,7 @@ import {
   type StoreCreateRequest,
   type StoreUpdateRequest,
   type PaginationResult,
-} from '~/services/store';
+} from '~/shared/services/store';
 
 // Loader函数 - 获取Store列表数据
 export const loader = async ({ request }: LoaderFunctionArgs) => {

@@ -15,7 +15,7 @@ import { CSS } from '@dnd-kit/utilities';
 
 import { useI18n } from '~/contexts/I18nContext';
 import { useToastContext } from '~/contexts/ToastContext';
-import { get, post } from '~/services/http-client';
+import { get, post } from '~/shared/services/http-client';
 import TaskCard, { type TaskRecord } from './TaskCard';
 
 // ============================================================================

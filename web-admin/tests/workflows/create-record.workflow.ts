@@ -9,7 +9,7 @@
 
 import type { Page } from '@playwright/test';
 import { ApiClient } from '../model-system/helpers/api-client';
-import { ErrorCodes } from '~/services/http-client/types';
+import { ErrorCodes } from '~/shared/services/http-client/types';
 
 /**
  * Options for creating a record

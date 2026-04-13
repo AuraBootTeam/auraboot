@@ -24,7 +24,7 @@ import {
   type ReportTemplateDTO,
   type ReportTemplateCreateRequest,
   type ReportParameter,
-} from '~/services/reportTemplateService';
+} from '~/shared/services/reportTemplateService';
 import { ResultHelper } from '~/utils/type';
 import { cn } from '~/utils/cn';
 

@@ -14,7 +14,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useNavigate, useParams, useLoaderData } from 'react-router';
 import type { LoaderFunctionArgs, ActionFunctionArgs } from 'react-router';
-import { modelService } from '~/services/modelService';
+import { modelService } from '~/shared/services/modelService';
 import { confirmDialog } from '~/utils/confirmDialog';
 import { useToastContext } from '~/contexts/ToastContext';
 import type { MetaModelDTO, MetaModelUpdateRequest } from '~/types/model';

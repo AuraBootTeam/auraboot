@@ -9,10 +9,10 @@ import {
 } from '@heroicons/react/24/outline';
 import { useI18n } from '~/contexts/I18nContext';
 import { useToastContext } from '~/contexts/ToastContext';
-import { fetchResult } from '~/services/http-client';
+import { fetchResult } from '~/shared/services/http-client';
 import { useFormSubmit } from '~/hooks/useFormSubmit';
-import ConfirmDialog from '~/components/ConfirmDialog';
-import { LoadingSpinner } from '~/components/LoadingSpinner';
+import ConfirmDialog from '~/ui/ConfirmDialog';
+import { LoadingSpinner } from '~/ui/LoadingSpinner';
 import type { Permission } from './types';
 
 // ---------------------------------------------------------------------------

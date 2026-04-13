@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useI18n } from '~/contexts/I18nContext';
 import { useToastContext } from '~/contexts/ToastContext';
-import { LoadingSpinner } from '~/components/LoadingSpinner';
-import { permissionService } from '~/services/permissionService';
+import { LoadingSpinner } from '~/ui/LoadingSpinner';
+import { permissionService } from '~/shared/services/permissionService';
 import PermissionMatrix from './PermissionMatrix';
 import type { PermissionMatrixDTO } from './types';
 

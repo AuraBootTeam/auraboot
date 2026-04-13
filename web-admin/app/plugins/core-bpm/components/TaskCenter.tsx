@@ -6,8 +6,8 @@
 
 import { useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router';
-import { Button } from '~/components/ui/button';
-import { Input } from '~/components/ui/input';
+import { Button } from '~/ui/ui/button';
+import { Input } from '~/ui/ui/input';
 import { Search, RefreshCw, CheckCheck, XCircle } from 'lucide-react';
 import { useTaskCenter } from '../hooks/useTaskCenter';
 import type { TabId } from '../hooks/useTaskCenter';

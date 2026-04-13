@@ -3,7 +3,7 @@
  */
 
 import type { ChatMessage, ChatRequest, SSEEvent } from '~/chat/types';
-import { fetchResult } from '~/services/http-client';
+import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 
 const API_BASE_URL = '/api/ai';

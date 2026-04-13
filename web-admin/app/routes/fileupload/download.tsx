@@ -2,7 +2,7 @@ import { redirect } from 'react-router';
 import type { LoaderFunctionArgs } from 'react-router';
 import path from 'path';
 import fs from 'fs/promises';
-import { getFileById } from '~/services/fileupload/fileService';
+import { getFileById } from '~/shared/services/fileupload/fileService';
 import { getServerUploadConfig } from '~/config/upload.config';
 
 export const loader = async ({ params, request }: LoaderFunctionArgs) => {

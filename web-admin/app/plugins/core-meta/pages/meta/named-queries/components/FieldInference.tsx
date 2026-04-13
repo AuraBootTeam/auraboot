@@ -4,8 +4,8 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import { namedQueryService } from '~/services/namedQueryService';
-import type { NamedQueryFieldDTO, NamedQueryFieldRequest } from '~/services/namedQueryService';
+import { namedQueryService } from '~/shared/services/namedQueryService';
+import type { NamedQueryFieldDTO, NamedQueryFieldRequest } from '~/shared/services/namedQueryService';
 import { OPERATORS_BY_TYPE } from './constants';
 
 interface InferredField {

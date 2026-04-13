@@ -5,8 +5,8 @@
 
 import React from 'react';
 import type { DrillDownConfig as DrillDownConfigType } from '~/framework/smart/types/chart';
-import { BaseResourceSelect } from '~/components/base-fields';
-import { fetchPageOptions, fetchDashboardOptions } from '~/services/resourceSelectService';
+import { BaseResourceSelect } from '~/ui/base-fields';
+import { fetchPageOptions, fetchDashboardOptions } from '~/shared/services/resourceSelectService';
 
 interface DrilldownConfigProps {
   value: DrillDownConfigType;

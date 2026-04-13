@@ -15,7 +15,7 @@ import {
   EyeSlashIcon,
 } from '@heroicons/react/24/outline';
 import { useToastContext } from '~/contexts/ToastContext';
-import { get, post, del } from '~/services/http-client';
+import { get, post, del } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 
 // ---------------------------------------------------------------------------

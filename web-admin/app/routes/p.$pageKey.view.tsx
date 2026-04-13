@@ -6,7 +6,7 @@
 
 import { useLoaderData } from 'react-router';
 import type { LoaderFunctionArgs } from 'react-router';
-import { getTokenFromRequest } from '~/services/session';
+import { getTokenFromRequest } from '~/shared/services/session';
 import { DynamicPageRenderer } from '~/framework/meta/rendering/pages/DynamicPageRenderer';
 
 export const loader = async ({ params, request }: LoaderFunctionArgs) => {

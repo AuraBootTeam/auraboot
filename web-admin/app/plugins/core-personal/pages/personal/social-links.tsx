@@ -12,7 +12,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router';
-import { fetchResult } from '~/services/http-client';
+import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { useToast } from '~/contexts/ToastContext';
 
