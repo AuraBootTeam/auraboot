@@ -1,0 +1,12 @@
+[
+  {"modelCode": "sc_request", "fieldCode": "sc_req_code", "sequence": 1, "required": true, "visible": true, "editable": false},
+  {"modelCode": "sc_request", "fieldCode": "sc_req_title", "sequence": 2, "required": true, "visible": true, "editable": true},
+  {"modelCode": "sc_request", "fieldCode": "sc_req_description", "sequence": 3, "required": false, "visible": true, "editable": true},
+  {"modelCode": "sc_request", "fieldCode": "sc_req_priority", "sequence": 4, "required": true, "visible": true, "editable": true},
+  {"modelCode": "sc_request", "fieldCode": "sc_req_category", "sequence": 5, "required": true, "visible": true, "editable": true},
+  {"modelCode": "sc_request", "fieldCode": "sc_req_requester", "sequence": 6, "required": true, "visible": true, "editable": true},
+  {"modelCode": "sc_request", "fieldCode": "sc_req_due_date", "sequence": 7, "required": false, "visible": true, "editable": true},
+  {"modelCode": "sc_request", "fieldCode": "sc_req_amount", "sequence": 8, "required": false, "visible": true, "editable": true},
+  {"modelCode": "sc_request", "fieldCode": "sc_req_attachments", "sequence": 9, "required": false, "visible": true, "editable": true},
+  {"modelCode": "sc_request", "fieldCode": "sc_req_status", "sequence": 10, "required": true, "visible": true, "editable": false}
+]

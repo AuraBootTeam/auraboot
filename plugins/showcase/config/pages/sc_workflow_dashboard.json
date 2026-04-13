@@ -1,0 +1,64 @@
+{
+  "pageKey": "sc_workflow_dashboard",
+  "kind": "dashboard",
+  "schemaVersion": 2,
+  "title": {"zh-CN": "工作流看板", "en": "Workflow Dashboard"},
+  "layout": {"type": "grid", "cols": 12, "gap": 16},
+  "blocks": [
+    {
+      "id": "stat_total_requests",
+      "blockType": "stat-card",
+      "layout": {"col": 3},
+      "dataSource": {"type": "namedQuery", "query": "sc_request_total"},
+      "cards": [{"title": {"zh-CN": "申请总数", "en": "Total Requests"}, "icon": "ClipboardDocumentList", "valueField": "count"}]
+    },
+    {
+      "id": "stat_pending_reviews",
+      "blockType": "stat-card",
+      "layout": {"col": 3},
+      "dataSource": {"type": "namedQuery", "query": "sc_review_pending_count"},
+      "cards": [{"title": {"zh-CN": "待审批", "en": "Pending Reviews"}, "icon": "Clock", "valueField": "count", "color": "orange"}]
+    },
+    {
+      "id": "stat_active_tasks",
+      "blockType": "stat-card",
+      "layout": {"col": 3},
+      "dataSource": {"type": "namedQuery", "query": "sc_task_active_count"},
+      "cards": [{"title": {"zh-CN": "进行中任务", "en": "Active Tasks"}, "icon": "RectangleStack", "valueField": "count", "color": "blue"}]
+    },
+    {
+      "id": "stat_overdue_tasks",
+      "blockType": "stat-card",
+      "layout": {"col": 3},
+      "dataSource": {"type": "namedQuery", "query": "sc_task_overdue_count"},
+      "cards": [{"title": {"zh-CN": "逾期任务", "en": "Overdue Tasks"}, "icon": "ExclamationTriangle", "valueField": "count", "color": "red"}]
+    },
+    {
+      "id": "chart_status_distribution",
+      "blockType": "chart",
+      "layout": {"col": 6},
+      "title": {"zh-CN": "申请状态分布", "en": "Request Status Distribution"},
+      "chartType": "pie",
+      "dataSource": {"type": "namedQuery", "query": "sc_request_status_distribution"},
+      "config": {"labelField": "status", "valueField": "count"}
+    },
+    {
+      "id": "chart_priority_distribution",
+      "blockType": "chart",
+      "layout": {"col": 6},
+      "title": {"zh-CN": "优先级分布", "en": "Priority Distribution"},
+      "chartType": "bar",
+      "dataSource": {"type": "namedQuery", "query": "sc_request_priority_distribution"},
+      "config": {"xField": "priority", "yField": "count"}
+    },
+    {
+      "id": "chart_weekly_trend",
+      "blockType": "chart",
+      "layout": {"col": 12},
+      "title": {"zh-CN": "周处理趋势", "en": "Weekly Processing Trend"},
+      "chartType": "line",
+      "dataSource": {"type": "namedQuery", "query": "sc_request_weekly_trend"},
+      "config": {"xField": "week", "yField": "count", "seriesField": "type"}
+    }
+  ]
+}

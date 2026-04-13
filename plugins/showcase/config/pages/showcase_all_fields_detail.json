@@ -1,0 +1,345 @@
+{
+  "pageKey": "showcase_all_fields_detail",
+  "name:zh-CN": "全字段展示详情",
+  "name:en": "Showcase Detail",
+  "modelCode": "showcase_all_fields",
+  "kind": "detail",
+  "schemaVersion": 2,
+  "extension": {
+    "showShare": false,
+    "showReport": false
+  },
+  "layout": {
+    "type": "stack"
+  },
+  "blocks": [
+    {
+      "id": "sc_detail_tabs",
+      "blockType": "tabs",
+      "tabs": [
+        {
+          "key": "overview",
+          "label": {
+            "zh-CN": "概览",
+            "en-US": "Overview"
+          },
+          "blocks": [
+            {
+              "id": "section_basic",
+              "blockType": "form-section",
+              "title": {
+                "zh-CN": "基本信息",
+                "en-US": "Basic Information"
+              },
+              "columns": 2,
+              "fields": [
+                {
+                  "field": "sc_code",
+                  "readOnly": true
+                },
+                {
+                  "field": "sc_name",
+                  "readOnly": true
+                },
+                {
+                  "field": "sc_status",
+                  "readOnly": true
+                },
+                {
+                  "field": "sc_priority",
+                  "readOnly": true
+                },
+                {
+                  "field": "sc_category",
+                  "readOnly": true
+                },
+                {
+                  "field": "sc_is_active",
+                  "readOnly": true
+                },
+                {
+                  "field": "sc_description",
+                  "span": 2,
+                  "readOnly": true
+                }
+              ]
+            },
+            {
+              "id": "section_numbers",
+              "blockType": "form-section",
+              "title": {
+                "zh-CN": "数值类型",
+                "en-US": "Numeric Fields"
+              },
+              "columns": 2,
+              "fields": [
+                {
+                  "field": "sc_quantity",
+                  "readOnly": true
+                },
+                {
+                  "field": "sc_price",
+                  "readOnly": true
+                },
+                {
+                  "field": "sc_budget",
+                  "readOnly": true
+                },
+                {
+                  "field": "sc_progress",
+                  "readOnly": true
+                },
+                {
+                  "field": "sc_rating",
+                  "readOnly": true
+                }
+              ]
+            },
+            {
+              "id": "section_dates",
+              "blockType": "form-section",
+              "title": {
+                "zh-CN": "日期与时间",
+                "en-US": "Date & Time"
+              },
+              "columns": 2,
+              "fields": [
+                {
+                  "field": "sc_start_date",
+                  "readOnly": true
+                },
+                {
+                  "field": "sc_end_date",
+                  "readOnly": true
+                },
+                {
+                  "field": "sc_created_at",
+                  "readOnly": true
+                },
+                {
+                  "field": "sc_time_slot",
+                  "readOnly": true
+                },
+                {
+                  "field": "sc_date_range",
+                  "readOnly": true
+                },
+                {
+                  "field": "sc_working_hours",
+                  "readOnly": true
+                }
+              ]
+            },
+            {
+              "id": "section_contact",
+              "blockType": "form-section",
+              "title": {
+                "zh-CN": "联系信息",
+                "en-US": "Contact Information"
+              },
+              "columns": 2,
+              "fields": [
+                {
+                  "field": "sc_website",
+                  "readOnly": true
+                },
+                {
+                  "field": "sc_email",
+                  "readOnly": true
+                },
+                {
+                  "field": "sc_phone",
+                  "readOnly": true
+                },
+                {
+                  "field": "sc_color",
+                  "readOnly": true
+                }
+              ]
+            },
+            {
+              "id": "section_tags",
+              "blockType": "form-section",
+              "title": {
+                "zh-CN": "标签",
+                "en-US": "Tags"
+              },
+              "columns": 1,
+              "fields": [
+                {
+                  "field": "sc_tags",
+                  "readOnly": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "selectors_people",
+          "label": {
+            "zh-CN": "选择器与人员",
+            "en-US": "Selectors & People"
+          },
+          "blocks": [
+            {
+              "id": "section_selectors",
+              "blockType": "form-section",
+              "title": {
+                "zh-CN": "高级选择器",
+                "en-US": "Advanced Selectors"
+              },
+              "columns": 2,
+              "fields": [
+                {
+                  "field": "sc_cascade_category",
+                  "readOnly": true
+                },
+                {
+                  "field": "sc_tree_node",
+                  "readOnly": true
+                }
+              ]
+            },
+            {
+              "id": "section_people",
+              "blockType": "form-section",
+              "title": {
+                "zh-CN": "人员与组织",
+                "en-US": "People & Organization"
+              },
+              "columns": 2,
+              "fields": [
+                {
+                  "field": "sc_assignee",
+                  "readOnly": true
+                },
+                {
+                  "field": "sc_team_members",
+                  "readOnly": true
+                },
+                {
+                  "field": "sc_department",
+                  "readOnly": true
+                }
+              ]
+            },
+            {
+              "id": "section_geo",
+              "blockType": "form-section",
+              "title": {
+                "zh-CN": "地理信息",
+                "en-US": "Geographic"
+              },
+              "columns": 1,
+              "fields": [
+                {
+                  "field": "sc_location",
+                  "readOnly": true
+                },
+                {
+                  "field": "sc_address",
+                  "readOnly": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "rich_content",
+          "label": {
+            "zh-CN": "富内容",
+            "en-US": "Rich Content"
+          },
+          "blocks": [
+            {
+              "id": "section_richtext",
+              "blockType": "form-section",
+              "title": {
+                "zh-CN": "富文本内容",
+                "en-US": "Rich Text Content"
+              },
+              "columns": 1,
+              "fields": [
+                {
+                  "field": "sc_richtext_content",
+                  "readOnly": true
+                },
+                {
+                  "field": "sc_ai_summary",
+                  "readOnly": true
+                },
+                {
+                  "field": "sc_attachment",
+                  "readOnly": true
+                },
+                {
+                  "field": "sc_remark",
+                  "span": 1,
+                  "readOnly": true
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sc_detail_toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "edit",
+          "icon": "Edit",
+          "permissionCode": "sc.showcase.manage",
+          "label": {
+            "zh-CN": "编辑",
+            "en": "Edit"
+          },
+          "action": {
+            "type": "navigate",
+            "to": "showcase_all_fields_form"
+          }
+        },
+        {
+          "code": "activate",
+          "permissionCode": "sc.showcase.manage",
+          "label": {
+            "zh-CN": "激活",
+            "en": "Activate"
+          },
+          "action": {
+            "type": "state_transition",
+            "command": "sc:activate_showcase"
+          }
+        },
+        {
+          "code": "submit_review",
+          "permissionCode": "sc.showcase.manage",
+          "visibleWhen": "record.sc_status === 'draft'",
+          "label": {
+            "zh-CN": "提交审核",
+            "en": "Submit Review"
+          },
+          "action": {
+            "type": "state_transition",
+            "command": "sc:submit_review_showcase"
+          }
+        },
+        {
+          "code": "archive",
+          "danger": true,
+          "permissionCode": "sc.showcase.manage",
+          "label": {
+            "zh-CN": "归档",
+            "en": "Archive"
+          },
+          "confirm": "archive.confirm",
+          "action": {
+            "type": "command",
+            "command": "sc:archive_showcase"
+          }
+        }
+      ]
+    }
+  ]
+}

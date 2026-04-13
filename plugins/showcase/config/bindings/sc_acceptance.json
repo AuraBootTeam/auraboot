@@ -1,0 +1,8 @@
+[
+  {"modelCode": "sc_acceptance", "fieldCode": "sc_acc_request", "sequence": 1, "required": true, "visible": true, "editable": false},
+  {"modelCode": "sc_acceptance", "fieldCode": "sc_acc_inspector", "sequence": 2, "required": true, "visible": true, "editable": false},
+  {"modelCode": "sc_acceptance", "fieldCode": "sc_acc_result", "sequence": 3, "required": true, "visible": true, "editable": true},
+  {"modelCode": "sc_acceptance", "fieldCode": "sc_acc_comment", "sequence": 4, "required": false, "visible": true, "editable": true},
+  {"modelCode": "sc_acceptance", "fieldCode": "sc_acc_attachments", "sequence": 5, "required": false, "visible": true, "editable": true},
+  {"modelCode": "sc_acceptance", "fieldCode": "sc_acc_status", "sequence": 6, "required": true, "visible": true, "editable": false}
+]

@@ -1,0 +1,56 @@
+{
+  "pageKey": "sc_task_detail",
+  "modelCode": "sc_task",
+  "kind": "detail",
+  "schemaVersion": 2,
+  "title": {"zh-CN": "任务详情", "en": "Task Detail"},
+  "layout": {"type": "grid", "cols": 12},
+  "blocks": [
+    {
+      "id": "sc_task_detail_sections",
+      "blockType": "tabs",
+      "layout": {"col": 12},
+      "tabs": [
+        {
+          "key": "overview",
+          "label": {"zh-CN": "概览", "en": "Overview"},
+          "blocks": [
+            {
+              "id": "section_info",
+              "blockType": "form-section",
+              "fields": [
+                {"field": "sc_task_code", "readOnly": true},
+                {"field": "sc_task_title", "readOnly": true},
+                {"field": "sc_task_request", "readOnly": true},
+                {"field": "sc_task_assignee", "readOnly": true},
+                {"field": "sc_task_status", "readOnly": true}
+              ]
+            },
+            {
+              "id": "section_progress",
+              "blockType": "form-section",
+              "fields": [
+                {"field": "sc_task_progress", "readOnly": true},
+                {"field": "sc_task_due_date", "readOnly": true},
+                {"field": "sc_task_description", "span": 2, "readOnly": true},
+                {"field": "sc_task_result", "span": 2, "readOnly": true}
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sc_task_detail_toolbar",
+      "blockType": "toolbar",
+      "layout": {"col": 12},
+      "buttons": [
+        {"code": "assign", "action": {"type": "command", "command": "sc:assign_task"}, "visibleWhen": {"field": "sc_task_status", "operator": "EQ", "value": "pending_assignment"}},
+        {"code": "start", "action": {"type": "command", "command": "sc:start_task"}, "visibleWhen": {"field": "sc_task_status", "operator": "EQ", "value": "assigned"}},
+        {"code": "update_progress", "action": {"type": "navigate", "to": "sc_task_form", "command": "sc:update_task_progress"}, "visibleWhen": {"field": "sc_task_status", "operator": "EQ", "value": "in_progress"}},
+        {"code": "complete", "action": {"type": "command", "command": "sc:complete_task"}, "visibleWhen": {"field": "sc_task_status", "operator": "EQ", "value": "in_progress"}},
+        {"code": "cancel", "confirm": "cancel.confirm", "action": {"type": "command", "command": "sc:cancel_task"}, "variant": "danger", "visibleWhen": {"field": "sc_task_status", "operator": "IN", "value": ["pending_assignment", "assigned", "in_progress"]}}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,268 @@
+{
+  "pageKey": "showcase_all_fields_form",
+  "name:zh-CN": "全字段展示表单",
+  "name:en": "Showcase Form",
+  "modelCode": "showcase_all_fields",
+  "kind": "form",
+  "schemaVersion": 2,
+  "layout": {
+    "type": "grid",
+    "cols": 12,
+    "gap": 16
+  },
+  "blocks": [
+    {
+      "id": "section_basic",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "基本信息",
+        "en-US": "Basic Information"
+      },
+      "fields": [
+        {
+          "field": "sc_name",
+          "colSpan": 6
+        },
+        {
+          "field": "sc_code",
+          "colSpan": 6,
+          "readOnly": true
+        },
+        {
+          "field": "sc_description",
+          "colSpan": 12
+        }
+      ]
+    },
+    {
+      "id": "section_numbers",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "数值类型",
+        "en-US": "Numeric Fields"
+      },
+      "fields": [
+        {
+          "field": "sc_quantity",
+          "colSpan": 4
+        },
+        {
+          "field": "sc_price",
+          "colSpan": 4
+        },
+        {
+          "field": "sc_budget",
+          "colSpan": 4
+        },
+        {
+          "field": "sc_progress",
+          "colSpan": 4
+        },
+        {
+          "field": "sc_rating",
+          "colSpan": 4
+        }
+      ]
+    },
+    {
+      "id": "section_enums",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "枚举与选择",
+        "en-US": "Enums & Selection"
+      },
+      "fields": [
+        {
+          "field": "sc_status",
+          "colSpan": 4
+        },
+        {
+          "field": "sc_priority",
+          "colSpan": 4
+        },
+        {
+          "field": "sc_category",
+          "colSpan": 4
+        },
+        {
+          "field": "sc_tags",
+          "colSpan": 6
+        },
+        {
+          "field": "sc_is_active",
+          "colSpan": 6
+        }
+      ]
+    },
+    {
+      "id": "section_dates",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "日期与时间",
+        "en-US": "Date & Time"
+      },
+      "fields": [
+        {
+          "field": "sc_start_date",
+          "colSpan": 4
+        },
+        {
+          "field": "sc_end_date",
+          "colSpan": 4
+        },
+        {
+          "field": "sc_created_at",
+          "colSpan": 4,
+          "readOnly": true
+        },
+        {
+          "field": "sc_time_slot",
+          "colSpan": 4
+        },
+        {
+          "field": "sc_date_range",
+          "colSpan": 6
+        },
+        {
+          "field": "sc_working_hours",
+          "colSpan": 6
+        }
+      ]
+    },
+    {
+      "id": "section_selectors",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "高级选择器",
+        "en-US": "Advanced Selectors"
+      },
+      "fields": [
+        {
+          "field": "sc_cascade_category",
+          "colSpan": 6
+        },
+        {
+          "field": "sc_tree_node",
+          "colSpan": 6
+        }
+      ]
+    },
+    {
+      "id": "section_people",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "人员与组织",
+        "en-US": "People & Organization"
+      },
+      "fields": [
+        {
+          "field": "sc_assignee",
+          "colSpan": 4
+        },
+        {
+          "field": "sc_team_members",
+          "colSpan": 4
+        },
+        {
+          "field": "sc_department",
+          "colSpan": 4
+        }
+      ]
+    },
+    {
+      "id": "section_geo",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "地理信息",
+        "en-US": "Geographic"
+      },
+      "fields": [
+        {
+          "field": "sc_location",
+          "colSpan": 12
+        },
+        {
+          "field": "sc_address",
+          "colSpan": 12
+        }
+      ]
+    },
+    {
+      "id": "section_contact",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "联系信息",
+        "en-US": "Contact Information"
+      },
+      "fields": [
+        {
+          "field": "sc_website",
+          "colSpan": 6
+        },
+        {
+          "field": "sc_email",
+          "colSpan": 6
+        },
+        {
+          "field": "sc_phone",
+          "colSpan": 6
+        },
+        {
+          "field": "sc_color",
+          "colSpan": 6
+        }
+      ]
+    },
+    {
+      "id": "section_rich",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "富内容",
+        "en-US": "Rich Content"
+      },
+      "fields": [
+        {
+          "field": "sc_richtext_content",
+          "colSpan": 12
+        },
+        {
+          "field": "sc_attachment",
+          "colSpan": 12
+        },
+        {
+          "field": "sc_ai_summary",
+          "colSpan": 12
+        },
+        {
+          "field": "sc_remark",
+          "colSpan": 12
+        }
+      ]
+    },
+    {
+      "id": "buttons",
+      "blockType": "form-buttons",
+      "buttons": [
+        {
+          "code": "submit",
+          "primary": true,
+          "label": {
+            "zh-CN": "保存",
+            "en": "Save"
+          },
+          "action": {
+            "type": "command",
+            "command": "sc:update_showcase"
+          }
+        },
+        {
+          "code": "cancel",
+          "label": {
+            "zh-CN": "取消",
+            "en": "Cancel"
+          }
+        }
+      ]
+    }
+  ]
+}

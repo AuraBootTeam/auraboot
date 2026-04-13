@@ -1,0 +1,8 @@
+[
+  {"modelCode": "sc_review", "fieldCode": "sc_rev_request", "sequence": 1, "required": true, "visible": true, "editable": false},
+  {"modelCode": "sc_review", "fieldCode": "sc_rev_reviewer", "sequence": 2, "required": true, "visible": true, "editable": false},
+  {"modelCode": "sc_review", "fieldCode": "sc_rev_decision", "sequence": 3, "required": true, "visible": true, "editable": true},
+  {"modelCode": "sc_review", "fieldCode": "sc_rev_comment", "sequence": 4, "required": false, "visible": true, "editable": true},
+  {"modelCode": "sc_review", "fieldCode": "sc_rev_level", "sequence": 5, "required": true, "visible": true, "editable": false},
+  {"modelCode": "sc_review", "fieldCode": "sc_rev_status", "sequence": 6, "required": true, "visible": true, "editable": false}
+]

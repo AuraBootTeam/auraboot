@@ -1,0 +1,302 @@
+[
+  {
+    "code": "sc_name",
+    "displayName:zh-CN": "名称",
+    "displayName:en": "Name",
+    "dataType": "string",
+    "constraints": { "required": true, "maxLength": 200 },
+    "feature": { "searchable": true, "sortable": true }
+  },
+  {
+    "code": "sc_code",
+    "displayName:zh-CN": "编号",
+    "displayName:en": "Code",
+    "dataType": "string",
+    "constraints": { "required": true, "maxLength": 50 },
+    "feature": { "searchable": true, "sortable": true }
+  },
+  {
+    "code": "sc_description",
+    "displayName:zh-CN": "描述",
+    "displayName:en": "Description",
+    "dataType": "text",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "sc_quantity",
+    "displayName:zh-CN": "数量",
+    "displayName:en": "Quantity",
+    "dataType": "integer",
+    "constraints": { "min": 0, "max": 99999 }
+  },
+  {
+    "code": "sc_price",
+    "displayName:zh-CN": "价格",
+    "displayName:en": "Price",
+    "dataType": "decimal",
+    "constraints": { "min": 0 },
+    "extension": { "precision": 14, "scale": 2 }
+  },
+  {
+    "code": "sc_is_active",
+    "displayName:zh-CN": "是否启用",
+    "displayName:en": "Active",
+    "dataType": "boolean",
+    "defaultValue": "true"
+  },
+  {
+    "code": "sc_start_date",
+    "displayName:zh-CN": "开始日期",
+    "displayName:en": "Start Date",
+    "dataType": "date",
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "sc_end_date",
+    "displayName:zh-CN": "结束日期",
+    "displayName:en": "End Date",
+    "dataType": "date",
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "sc_created_at",
+    "displayName:zh-CN": "创建时间",
+    "displayName:en": "Created At",
+    "dataType": "datetime",
+    "feature": { "sortable": true },
+    "extension": { "readOnly": true }
+  },
+  {
+    "code": "sc_status",
+    "displayName:zh-CN": "状态",
+    "displayName:en": "Status",
+    "dataType": "enum",
+    "dictCode": "sc_status_dict",
+    "defaultValue": "draft",
+    "feature": { "searchable": true, "sortable": true }
+  },
+  {
+    "code": "sc_priority",
+    "displayName:zh-CN": "优先级",
+    "displayName:en": "Priority",
+    "dataType": "enum",
+    "dictCode": "sc_priority_dict",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "sc_category",
+    "displayName:zh-CN": "分类",
+    "displayName:en": "Category",
+    "dataType": "enum",
+    "dictCode": "sc_category_dict",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "sc_tags",
+    "displayName:zh-CN": "标签",
+    "displayName:en": "Tags",
+    "dataType": "string",
+    "constraints": { "maxLength": 500 },
+    "extension": { "renderComponent": "multiselect" }
+  },
+  {
+    "code": "sc_progress",
+    "displayName:zh-CN": "进度",
+    "displayName:en": "Progress",
+    "dataType": "integer",
+    "constraints": { "min": 0, "max": 100 },
+    "extension": { "renderComponent": "progress" }
+  },
+  {
+    "code": "sc_rating",
+    "displayName:zh-CN": "评分",
+    "displayName:en": "Rating",
+    "dataType": "integer",
+    "constraints": { "min": 0, "max": 5 },
+    "extension": { "renderComponent": "rating" }
+  },
+  {
+    "code": "sc_color",
+    "displayName:zh-CN": "颜色标记",
+    "displayName:en": "Color",
+    "dataType": "string",
+    "constraints": { "maxLength": 20 },
+    "extension": { "renderComponent": "colorpicker" }
+  },
+  {
+    "code": "sc_website",
+    "displayName:zh-CN": "网站URL",
+    "displayName:en": "Website",
+    "dataType": "string",
+    "constraints": { "maxLength": 500 }
+  },
+  {
+    "code": "sc_email",
+    "displayName:zh-CN": "邮箱",
+    "displayName:en": "Email",
+    "dataType": "string",
+    "constraints": { "maxLength": 200 }
+  },
+  {
+    "code": "sc_phone",
+    "displayName:zh-CN": "电话",
+    "displayName:en": "Phone",
+    "dataType": "string",
+    "constraints": { "maxLength": 50 }
+  },
+  {
+    "code": "sc_richtext_content",
+    "displayName:zh-CN": "富文本内容",
+    "displayName:en": "Rich Text Content",
+    "dataType": "text",
+    "extension": { "renderComponent": "richtext" }
+  },
+  {
+    "code": "sc_attachment",
+    "displayName:zh-CN": "附件",
+    "displayName:en": "Attachment",
+    "dataType": "json",
+    "extension": { "renderComponent": "fileattachment" }
+  },
+  {
+    "code": "sc_remark",
+    "displayName:zh-CN": "备注",
+    "displayName:en": "Remark",
+    "dataType": "text"
+  },
+  {
+    "code": "sc_cascade_category",
+    "displayName:zh-CN": "级联分类",
+    "displayName:en": "Cascade Category",
+    "dataType": "string",
+    "constraints": { "maxLength": 500 },
+    "extension": {
+      "renderComponent": "cascadeselect",
+      "levels": 3,
+      "levelLabels": ["一级分类", "二级分类", "三级分类"],
+      "dictCode": "sc_cascade_category_dict"
+    }
+  },
+  {
+    "code": "sc_tree_node",
+    "displayName:zh-CN": "树形选择",
+    "displayName:en": "Tree Select",
+    "dataType": "string",
+    "constraints": { "maxLength": 200 },
+    "extension": {
+      "renderComponent": "treeselect",
+      "searchable": true,
+      "clearable": true,
+      "dictCode": "sc_tree_dept_dict"
+    }
+  },
+  {
+    "code": "sc_assignee",
+    "displayName:zh-CN": "负责人",
+    "displayName:en": "Assignee",
+    "dataType": "string",
+    "extension": {
+      "renderComponent": "userselect",
+      "allowClear": true
+    }
+  },
+  {
+    "code": "sc_team_members",
+    "displayName:zh-CN": "团队成员",
+    "displayName:en": "Team Members",
+    "dataType": "string",
+    "constraints": { "maxLength": 2000 },
+    "extension": {
+      "renderComponent": "memberpicker",
+      "multiple": true
+    }
+  },
+  {
+    "code": "sc_department",
+    "displayName:zh-CN": "所属部门",
+    "displayName:en": "Department",
+    "dataType": "string",
+    "extension": {
+      "renderComponent": "organizationselect",
+      "showHierarchy": true,
+      "allowClear": true
+    }
+  },
+  {
+    "code": "sc_location",
+    "displayName:zh-CN": "地理位置",
+    "displayName:en": "Location",
+    "dataType": "json",
+    "extension": {
+      "renderComponent": "coordinatespicker",
+      "defaultZoom": 12
+    }
+  },
+  {
+    "code": "sc_budget",
+    "displayName:zh-CN": "预算金额",
+    "displayName:en": "Budget",
+    "dataType": "decimal",
+    "constraints": { "min": 0, "max": 99999999.99 },
+    "extension": {
+      "renderComponent": "moneyinput",
+      "precision": 2,
+      "currencySymbol": "¥"
+    }
+  },
+  {
+    "code": "sc_time_slot",
+    "displayName:zh-CN": "时间点",
+    "displayName:en": "Time Slot",
+    "dataType": "string",
+    "constraints": { "maxLength": 10 },
+    "extension": {
+      "renderComponent": "timepicker",
+      "format": "HH:mm",
+      "clearable": true
+    }
+  },
+  {
+    "code": "sc_date_range",
+    "displayName:zh-CN": "日期范围",
+    "displayName:en": "Date Range",
+    "dataType": "string",
+    "constraints": { "maxLength": 100 },
+    "extension": {
+      "renderComponent": "daterange",
+      "clearable": true
+    }
+  },
+  {
+    "code": "sc_working_hours",
+    "displayName:zh-CN": "工作时段",
+    "displayName:en": "Working Hours",
+    "dataType": "string",
+    "constraints": { "maxLength": 50 },
+    "extension": {
+      "renderComponent": "timerangepicker",
+      "format": "24h",
+      "minuteStep": 15
+    }
+  },
+  {
+    "code": "sc_ai_summary",
+    "displayName:zh-CN": "AI 摘要",
+    "displayName:en": "AI Summary",
+    "dataType": "text",
+    "extension": {
+      "renderComponent": "aifield",
+      "operation": "summarize",
+      "sourceFields": ["sc_name", "sc_description", "sc_category"],
+      "maxTokens": 300
+    }
+  },
+  {
+    "code": "sc_address",
+    "displayName:zh-CN": "\u5730\u5740",
+    "displayName:en": "Address",
+    "dataType": "string",
+    "constraints": { "maxLength": 500 },
+    "extension": { "renderComponent": "addressfield" }
+  }
+]

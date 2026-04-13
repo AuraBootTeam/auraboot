@@ -1,0 +1,72 @@
+[
+  {
+    "code": "showcase_all_fields",
+    "displayName:zh-CN": "全字段展示",
+    "displayName:en": "All Field Types Showcase",
+    "description": "Demonstrates all supported field types and Smart components for platform capability evaluation.",
+    "modelType": "entity",
+    "modelCategory": "entity",
+    "extension": {
+      "icon": "Star",
+      "category": "showcase",
+      "titleField": "sc_name",
+      "subtitleField": "sc_code"
+    }
+  },
+  {
+    "code": "sc_request",
+    "displayName:zh-CN": "工作流申请单",
+    "displayName:en": "Workflow Request",
+    "description": "Workflow showcase: request with full state machine, BPM process, and cross-model orchestration.",
+    "modelType": "entity",
+    "modelCategory": "entity",
+    "extension": {
+      "icon": "ClipboardDocumentList",
+      "category": "showcase",
+      "titleField": "sc_req_title",
+      "subtitleField": "sc_req_code"
+    }
+  },
+  {
+    "code": "sc_review",
+    "displayName:zh-CN": "审批记录",
+    "displayName:en": "Review Record",
+    "description": "Workflow showcase: approval/rejection records linked to requests.",
+    "modelType": "entity",
+    "modelCategory": "entity",
+    "extension": {
+      "icon": "ClipboardDocumentCheck",
+      "category": "showcase",
+      "titleField": "sc_rev_reviewer",
+      "subtitleField": "sc_rev_decision"
+    }
+  },
+  {
+    "code": "sc_task",
+    "displayName:zh-CN": "执行任务",
+    "displayName:en": "Execution Task",
+    "description": "Workflow showcase: tasks assigned via OrgTreePicker after approval.",
+    "modelType": "entity",
+    "modelCategory": "entity",
+    "extension": {
+      "icon": "RectangleStack",
+      "category": "showcase",
+      "titleField": "sc_task_title",
+      "subtitleField": "sc_task_code"
+    }
+  },
+  {
+    "code": "sc_acceptance",
+    "displayName:zh-CN": "验收报告",
+    "displayName:en": "Acceptance Report",
+    "description": "Workflow showcase: acceptance/rejection of completed tasks.",
+    "modelType": "entity",
+    "modelCategory": "entity",
+    "extension": {
+      "icon": "CheckBadge",
+      "category": "showcase",
+      "titleField": "sc_acc_inspector",
+      "subtitleField": "sc_acc_result"
+    }
+  }
+]

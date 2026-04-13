@@ -1,0 +1,201 @@
+[
+  {
+    "code": "sc:create_showcase",
+    "displayName:zh-CN": "新建展示记录",
+    "displayName:en": "Create Showcase",
+    "type": "create",
+    "modelCode": "showcase_all_fields",
+    "inputFields": [
+      "sc_name",
+      "sc_description",
+      "sc_quantity",
+      "sc_price",
+      "sc_start_date",
+      "sc_end_date",
+      "sc_priority",
+      "sc_category",
+      "sc_tags",
+      "sc_progress",
+      "sc_rating",
+      "sc_color",
+      "sc_website",
+      "sc_email",
+      "sc_phone",
+      "sc_richtext_content",
+      "sc_attachment",
+      "sc_remark"
+    ],
+    "autoSetFields": {
+      "sc_code": {
+        "strategy": "auto_generate",
+        "pattern": "SC-{yyyyMMdd}-{seq}"
+      },
+      "sc_created_at": {
+        "strategy": "current_datetime"
+      },
+      "sc_is_active": {
+        "strategy": "fixed_value",
+        "value": true
+      },
+      "sc_status": {
+        "strategy": "fixed_value",
+        "value": "draft"
+      }
+    },
+    "validation": {
+      "rules": [
+        {
+          "type": "unique_composite",
+          "fields": ["sc_name"],
+          "message:zh-CN": "展示记录名称不能重复",
+          "message:en": "Showcase name must be unique"
+        }
+      ]
+    },
+    "permissions": [
+      "sc.showcase.manage"
+    ],
+    "agent_hint": "Create a new showcase record demonstrating all field types. Key inputs: name, description, quantity, price, dates, priority, category, tags, progress, rating, color, website, email, phone, richtext, attachment, remark. Auto-generated: code, created_at, is_active, status.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "sc:update_showcase",
+    "displayName:zh-CN": "编辑展示记录",
+    "displayName:en": "Update Showcase",
+    "type": "update",
+    "modelCode": "showcase_all_fields",
+    "inputFields": [
+      "sc_name",
+      "sc_description",
+      "sc_quantity",
+      "sc_price",
+      "sc_is_active",
+      "sc_start_date",
+      "sc_end_date",
+      "sc_status",
+      "sc_priority",
+      "sc_category",
+      "sc_tags",
+      "sc_progress",
+      "sc_rating",
+      "sc_color",
+      "sc_website",
+      "sc_email",
+      "sc_phone",
+      "sc_richtext_content",
+      "sc_attachment",
+      "sc_remark"
+    ],
+    "validation": {
+      "rules": [
+        {
+          "type": "unique_composite",
+          "fields": ["sc_name"],
+          "message:zh-CN": "展示记录名称不能重复",
+          "message:en": "Showcase name must be unique"
+        }
+      ]
+    },
+    "permissions": [
+      "sc.showcase.manage"
+    ],
+    "agent_hint": "Update an existing showcase record. All user-editable fields can be modified.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "sc:delete_showcase",
+    "displayName:zh-CN": "删除展示记录",
+    "displayName:en": "Delete Showcase",
+    "type": "delete",
+    "modelCode": "showcase_all_fields",
+    "preconditions": [
+      {
+        "field": "sc_status",
+        "operator": "IN",
+        "value": ["draft", "archived"]
+      }
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此展示记录？",
+      "confirmMessage:en": "Confirm delete this showcase record?"
+    },
+    "permissions": [
+      "sc.showcase.manage"
+    ],
+    "agent_hint": "Delete showcase record(s). Only allowed when status is draft or archived.",
+    "cmd_risk_level": "L4"
+  },
+  {
+    "code": "sc:activate_showcase",
+    "displayName:zh-CN": "激活",
+    "displayName:en": "Activate",
+    "type": "state_transition",
+    "modelCode": "showcase_all_fields",
+    "stateField": "sc_status",
+    "fromStates": ["draft"],
+    "toState": "active",
+    "permissions": [
+      "sc.showcase.manage"
+    ],
+    "agent_hint": "Transition showcase status from draft to active.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "sc:submit_review_showcase",
+    "displayName:zh-CN": "提交审核",
+    "displayName:en": "Submit for Review",
+    "type": "state_transition",
+    "modelCode": "showcase_all_fields",
+    "stateField": "sc_status",
+    "fromStates": ["active"],
+    "toState": "review",
+    "permissions": [
+      "sc.showcase.manage"
+    ],
+    "agent_hint": "Transition showcase status from active to review.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "sc:archive_showcase",
+    "displayName:zh-CN": "归档",
+    "displayName:en": "Archive",
+    "type": "state_transition",
+    "modelCode": "showcase_all_fields",
+    "stateField": "sc_status",
+    "fromStates": ["active", "review"],
+    "toState": "archived",
+    "extension": {
+      "confirmMessage:zh-CN": "确认归档此展示记录？归档后不可编辑。",
+      "confirmMessage:en": "Confirm archiving this showcase record? It will become read-only."
+    },
+    "permissions": [
+      "sc.showcase.manage"
+    ],
+    "agent_hint": "Transition showcase status from active or review to archived.",
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "sc:detail_showcase",
+    "displayName:zh-CN": "查看展示记录",
+    "displayName:en": "View Showcase",
+    "type": "query",
+    "modelCode": "showcase_all_fields",
+    "permissions": [
+      "sc.showcase.read"
+    ],
+    "agent_hint": "Query showcase record details.",
+    "cmd_risk_level": "L0"
+  },
+  {
+    "code": "sc:list_showcase",
+    "displayName:zh-CN": "展示记录列表",
+    "displayName:en": "List Showcase",
+    "type": "query",
+    "modelCode": "showcase_all_fields",
+    "permissions": [
+      "sc.showcase.read"
+    ],
+    "agent_hint": "Query showcase record list.",
+    "cmd_risk_level": "L0"
+  }
+]
