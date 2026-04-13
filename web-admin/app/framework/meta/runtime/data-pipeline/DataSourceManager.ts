@@ -3,7 +3,7 @@
  * 支持 API、字典、静态数据源，以及依赖追踪和自动刷新
  */
 
-import { fetchResult } from '~/services/http-client';
+import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import type { DataSourceConfig } from '~/framework/meta/schemas/types';
 import type { ExpressionContext } from '~/framework/meta/runtime/expression/context';

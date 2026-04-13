@@ -1,4 +1,4 @@
-import { logout } from '~/services/session';
+import { logout } from '~/shared/services/session';
 import { type ActionFunctionArgs, type LoaderFunctionArgs, Form, Link } from 'react-router';
 
 export const loader = async (_args: LoaderFunctionArgs) => {

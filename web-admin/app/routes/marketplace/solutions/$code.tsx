@@ -13,7 +13,7 @@ import {
   CubeTransparentIcon,
   StarIcon,
 } from '@heroicons/react/24/outline';
-import ReviewSection from '~/components/ReviewSection';
+import ReviewSection from '~/ui/ReviewSection';
 
 interface PluginInfo {
   pluginId: string;

@@ -13,11 +13,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { User } from '~/utils/type';
 
-import { createUserSession, getTokenFromRequest, sessionStorage } from '~/services/session';
+import { createUserSession, getTokenFromRequest, sessionStorage } from '~/shared/services/session';
 import { safeRedirect, validateEmail } from '~/utils/utils';
-import { post, fetchResult } from '~/services/http-client';
+import { post, fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
-import { getUserInfo } from '~/services/userService';
+import { getUserInfo } from '~/shared/services/userService';
 import { useI18n } from '~/contexts/I18nContext';
 
 const REMEMBER_KEY = 'auth.remember';

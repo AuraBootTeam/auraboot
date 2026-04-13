@@ -17,7 +17,7 @@ import { actionRegistry } from '~/framework/meta/runtime/actions/ActionRegistry'
 import { FlowRunner } from '~/framework/meta/runtime/schema-runtime/FlowRunner';
 import { LinkageEngine } from '~/framework/meta/runtime/linkage/LinkageEngine';
 import type { TriggerEvent } from '~/plugins/core-designer/components/studio/workbench/panels/linkage/types';
-import { fetchResult } from '~/services/http-client';
+import { fetchResult } from '~/shared/services/http-client';
 
 /**
  * Schema Runtime 配置

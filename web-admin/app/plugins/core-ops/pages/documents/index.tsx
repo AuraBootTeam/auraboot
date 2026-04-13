@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useCallback, Suspense } from 'react';
-import { RouteLoadingFallback } from '~/components/RouteLoadingFallback';
+import { RouteLoadingFallback } from '~/ui/RouteLoadingFallback';
 
 const DocumentPage = React.lazy(() =>
   import('~/framework/smart/components/document').then((m) => ({ default: m.DocumentPage })),

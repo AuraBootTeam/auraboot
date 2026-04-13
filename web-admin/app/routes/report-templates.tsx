@@ -18,7 +18,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useToastContext } from '~/contexts/ToastContext';
 import { useConfirmDialog } from '~/contexts/ConfirmDialogContext';
-import { reportTemplateService, type ReportTemplateDTO } from '~/services/reportTemplateService';
+import { reportTemplateService, type ReportTemplateDTO } from '~/shared/services/reportTemplateService';
 import { ResultHelper } from '~/utils/type';
 import { cn } from '~/utils/cn';
 

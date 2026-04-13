@@ -13,8 +13,8 @@
  */
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { fetchResult } from '~/services/http-client';
-import { ErrorCodes } from '~/services/http-client/types';
+import { fetchResult } from '~/shared/services/http-client';
+import { ErrorCodes } from '~/shared/services/http-client/types';
 import { cn } from '~/utils/cn';
 import { BomTreeNode } from './BomTreeNode';
 import { BomTreeToolbar } from './BomTreeToolbar';

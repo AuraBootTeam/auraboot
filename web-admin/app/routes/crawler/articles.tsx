@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useLoaderData, type LoaderFunctionArgs } from 'react-router';
 import { useToast } from '~/contexts/ToastContext';
-import { getArticles } from '~/services/crawler';
+import { getArticles } from '~/shared/services/crawler';
 
 // Loader - 获取文章列表
 export async function loader({ request }: LoaderFunctionArgs) {

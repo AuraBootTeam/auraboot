@@ -26,8 +26,8 @@ import {
   type EmailMessage,
   type EmailThread,
   type CrmLink,
-} from '~/services/emailService';
-import TrackingStats from '~/components/email/TrackingStats';
+} from '~/shared/services/emailService';
+import TrackingStats from '~/ui/email/TrackingStats';
 import { sanitizeHtml } from '~/framework/meta/utils/sanitizeHtml';
 
 function timeAgo(dateStr: string): string {

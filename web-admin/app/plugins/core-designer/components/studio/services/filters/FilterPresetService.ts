@@ -1,4 +1,4 @@
-import { get, post, put, del } from '~/services/http-client';
+import { get, post, put, del } from '~/shared/services/http-client';
 import type { FilterPreset } from '~/plugins/core-designer/components/studio/workbench/panels/filters/types';
 
 /**

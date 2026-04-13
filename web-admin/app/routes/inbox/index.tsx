@@ -24,7 +24,7 @@ import {
   dismissItem,
   type InboxItem,
   type InboxPage,
-} from '~/services/inboxService';
+} from '~/shared/services/inboxService';
 import { BpmTaskDrawer } from '~/plugins/core-bpm/components/BpmTaskDrawer';
 
 const TABS = [

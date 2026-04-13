@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { fetchResult } from '~/services/http-client';
+import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import { DataSourceProvider } from '~/framework/meta/contexts/DataSourceContext';

@@ -8,7 +8,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useToastContext } from '~/contexts/ToastContext';
 import { useI18n } from '~/contexts/I18nContext';
-import { get, post, put, del } from '~/services/http-client';
+import { get, post, put, del } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 
 // --- Types ---

@@ -18,7 +18,7 @@ import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
 import { PaperAirplaneIcon, XMarkIcon } from '@heroicons/react/24/outline';
-import { listAccounts, sendEmail, type EmailAccount } from '~/services/emailService';
+import { listAccounts, sendEmail, type EmailAccount } from '~/shared/services/emailService';
 import { useToastContext } from '~/contexts/ToastContext';
 
 function ToolbarBtn({

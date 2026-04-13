@@ -5,7 +5,7 @@
  * Provides CRUD operations, enable/disable, logs query, and manual trigger.
  */
 
-import { get, post, put, del, ErrorCodes } from '~/services/http-client';
+import { get, post, put, del, ErrorCodes } from '~/shared/services/http-client';
 import type { FlowData } from '~/plugins/core-designer/components/flow-designer-sdk';
 
 // ==================== Types ====================

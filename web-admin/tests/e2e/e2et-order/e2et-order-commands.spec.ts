@@ -26,7 +26,7 @@ import {
 import { ModelTestHelper } from '../../helpers/model-test-helper';
 import { E2ET_ORDER_CONFIG } from '../../helpers/configs/e2et-order.config';
 import { DynamicListPage } from '../../pages';
-import { ErrorCodes } from '~/services/http-client/types';
+import { ErrorCodes } from '~/shared/services/http-client/types';
 
 // ---------------------------------------------------------------------------
 // UI helpers (spec-local -- not model-specific)

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { post, put, get, ErrorCodes } from '~/services/http-client';
+import { post, put, get, ErrorCodes } from '~/shared/services/http-client';
 import {
   BellIcon,
   ClockIcon,

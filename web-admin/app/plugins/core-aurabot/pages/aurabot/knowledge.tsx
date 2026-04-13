@@ -15,7 +15,7 @@ import {
   XMarkIcon,
   CircleStackIcon,
 } from '@heroicons/react/24/outline';
-import { get, post, put, del } from '~/services/http-client';
+import { get, post, put, del } from '~/shared/services/http-client';
 import { useToastContext } from '~/contexts/ToastContext';
 
 // ---------------------------------------------------------------------------

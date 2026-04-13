@@ -10,7 +10,7 @@
  */
 
 import { test, expect } from '@playwright/test';
-import { ErrorCodes } from '~/services/http-client/types';
+import { ErrorCodes } from '~/shared/services/http-client/types';
 
 function generateCode(prefix: string = 'intg'): string {
   const timestamp = Date.now().toString(36);

@@ -14,7 +14,7 @@ import {
   BaseTextarea,
   BaseFormulaEditor,
   BaseResourceSelect,
-} from '~/components/base-fields';
+} from '~/ui/base-fields';
 import {
   fetchPageOptions,
   fetchDashboardOptions,
@@ -22,11 +22,11 @@ import {
   fetchAutomationOptions,
   fetchCommandOptions,
   fetchModelOptions,
-} from '~/services/resourceSelectService';
+} from '~/shared/services/resourceSelectService';
 import { ExpressionEditor } from './expression';
 import { DependentFieldSelect } from './DependentFieldSelect';
 import { DependentMultiSelect } from './DependentMultiSelect';
-import type { FieldAdapter } from '~/components/field-adapter';
+import type { FieldAdapter } from '~/ui/field-adapter';
 import type { PropertySchema, PropertyType } from './types';
 
 // ---------------------------------------------------------------------------

@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { savedViewService } from '~/services/savedViewService';
+import { savedViewService } from '~/shared/services/savedViewService';
 import type {
   SavedView,
   SavedViewCreateRequest,

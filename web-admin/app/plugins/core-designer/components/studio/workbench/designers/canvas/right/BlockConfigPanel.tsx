@@ -19,7 +19,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import type { PropertySchema } from '~/shared/designer/types';
 import { PropertyFieldRenderer } from '~/shared/designer/PropertyFieldRenderer';
-import type { FieldAdapter } from '~/components/field-adapter';
+import type { FieldAdapter } from '~/ui/field-adapter';
 import type { CanvasBlock } from '~/plugins/core-designer/components/studio/domain/canvas/types';
 import { SchemaBlockConfigPanel } from './SchemaBlockConfigPanel';
 import { BUTTON_CONFIG_SCHEMA } from './block-schemas';

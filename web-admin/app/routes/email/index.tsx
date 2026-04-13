@@ -19,7 +19,7 @@ import {
   markMessageRead,
   type EmailMessage,
   type EmailPage,
-} from '~/services/emailService';
+} from '~/shared/services/emailService';
 
 const TABS = [
   { key: 'inbound', label: 'Inbox', icon: EnvelopeIcon },

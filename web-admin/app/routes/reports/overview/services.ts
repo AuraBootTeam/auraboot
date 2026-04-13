@@ -1,5 +1,5 @@
 import type { Result } from '~/utils/type';
-import { fetchResult } from '~/services/http-client';
+import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import type {
   OverviewSummaryRequest,

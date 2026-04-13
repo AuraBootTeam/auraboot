@@ -13,7 +13,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useToast } from '~/contexts/ToastContext';
 import { useAuth } from '~/contexts/AuthContext';
-import { fetchResult } from '~/services/http-client';
+import { fetchResult } from '~/shared/services/http-client';
 import jsQR from 'jsqr';
 
 interface DeviceQrCodeData {

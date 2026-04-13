@@ -8,7 +8,7 @@ import {
   type IntentAnalysisResult,
   type PluginGenerateResult,
   type PluginDeployResult,
-} from '~/services/intent';
+} from '~/shared/services/intent';
 
 // ---- Step indicators ----
 const STEPS = ['input', 'analysis', 'config', 'deploy'] as const;

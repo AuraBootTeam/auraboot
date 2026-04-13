@@ -5,7 +5,7 @@
  * Behavior-preserving extraction — no functional changes.
  */
 
-import { Pagination } from '~/components/Pagination';
+import { Pagination } from '~/ui/Pagination';
 import { BulkActionToolbar } from '~/framework/smart/components/bulk/BulkActionToolbar';
 
 export interface ListPaginationProps {

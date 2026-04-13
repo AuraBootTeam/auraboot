@@ -5,7 +5,7 @@
 
 import type { APIRequestContext } from '@playwright/test';
 import { ApiClient } from './api-client';
-import { ErrorCodes } from '~/services/http-client/types';
+import { ErrorCodes } from '~/shared/services/http-client/types';
 
 /**
  * Test data cleanup helper

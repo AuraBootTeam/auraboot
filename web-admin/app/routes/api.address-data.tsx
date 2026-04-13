@@ -1,7 +1,7 @@
 import type { ActionFunctionArgs } from 'react-router';
-import { fetchResult } from '~/services/http-client';
+import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
-import { getTokenFromRequest } from '~/services/session';
+import { getTokenFromRequest } from '~/shared/services/session';
 
 export async function action({ request }: ActionFunctionArgs) {
   const token = await getTokenFromRequest(request);

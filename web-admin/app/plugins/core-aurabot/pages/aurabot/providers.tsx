@@ -29,7 +29,7 @@ import {
   type ServiceType,
 } from '~/plugins/core-admin/pages/admin/cloud-config-core';
 import { useToastContext } from '~/contexts/ToastContext';
-import { post } from '~/services/http-client';
+import { post } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 
 // ---------------------------------------------------------------------------

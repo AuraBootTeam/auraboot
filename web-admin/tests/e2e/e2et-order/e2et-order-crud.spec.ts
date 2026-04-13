@@ -19,7 +19,7 @@ import { acceptConfirmDialog, uniqueId } from '../quarry-management.setup';
 import { clickRowActionByLocator } from '../helpers';
 import { ModelTestHelper } from '../../helpers/model-test-helper';
 import { E2ET_ORDER_CONFIG } from '../../helpers/configs/e2et-order.config';
-import { ErrorCodes } from '~/services/http-client/types';
+import { ErrorCodes } from '~/shared/services/http-client/types';
 
 async function waitForOrderFormReady(page: import('@playwright/test').Page) {
   await page.waitForLoadState('domcontentloaded');

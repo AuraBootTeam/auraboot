@@ -17,7 +17,7 @@ import type {
   CrossRowValidationRule,
   LocalizedText,
 } from '~/framework/meta/schemas/types';
-import { fetchResult } from '~/services/http-client';
+import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 
 export interface RowValidationError {

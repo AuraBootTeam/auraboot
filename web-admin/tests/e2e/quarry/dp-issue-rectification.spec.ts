@@ -13,7 +13,7 @@
 import { test, expect } from '@playwright/test';
 import { navigateToDynamicPage, uniqueId, executeCommandViaApi } from '../helpers/index';
 import { PAGE_KEYS, getTestProjectId } from '../quarry-management.setup';
-import { ErrorCodes } from '~/services/http-client/types';
+import { ErrorCodes } from '~/shared/services/http-client/types';
 
 const ISSUE_MODEL = PAGE_KEYS.ISSUE; // 'dp_issue'
 

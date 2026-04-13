@@ -7,7 +7,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useNavigate, useParams, useLoaderData, useLocation } from 'react-router';
 import type { LoaderFunctionArgs } from 'react-router';
-import { namedQueryService } from '~/services/namedQueryService';
+import { namedQueryService } from '~/shared/services/namedQueryService';
 import { confirmDialog } from '~/utils/confirmDialog';
 import { useToastContext } from '~/contexts/ToastContext';
 import type {
@@ -19,7 +19,7 @@ import type {
   NamedQueryTestResult,
   NamedQueryPolicyDTO,
   NamedQueryVersionDTO,
-} from '~/services/namedQueryService';
+} from '~/shared/services/namedQueryService';
 import { OPERATOR_LABELS } from './components/constants';
 import SqlEditor from './components/SqlEditor';
 import FieldForm from './components/FieldForm';

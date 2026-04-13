@@ -25,7 +25,7 @@ import {
   XMarkIcon,
   ChevronDownIcon,
 } from '@heroicons/react/24/outline';
-import { get, post, del } from '~/services/http-client';
+import { get, post, del } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { useToastContext } from '~/contexts/ToastContext';
 import { useI18n } from '~/contexts/I18nContext';

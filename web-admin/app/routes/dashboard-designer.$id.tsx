@@ -5,7 +5,7 @@
 
 import React, { Suspense } from 'react';
 import { useParams } from 'react-router';
-import { RouteLoadingFallback } from '~/components/RouteLoadingFallback';
+import { RouteLoadingFallback } from '~/ui/RouteLoadingFallback';
 
 const DashboardDesigner = React.lazy(() =>
   import('~/plugins/core-dashboard').then((m) => ({ default: m.DashboardDesigner })),

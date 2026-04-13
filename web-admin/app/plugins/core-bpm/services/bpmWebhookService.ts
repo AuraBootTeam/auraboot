@@ -2,7 +2,7 @@
  * BPM Webhook Service - Webhook configuration management
  */
 
-import { get, post, put, del, ErrorCodes } from '~/services/http-client';
+import { get, post, put, del, ErrorCodes } from '~/shared/services/http-client';
 
 const API_BASE = '/api/bpm/webhooks';
 

@@ -5,9 +5,9 @@
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { Input } from '~/components/smart/form/Input';
-import { Select } from '~/components/smart/form/Select';
-import { Checkbox } from '~/components/smart/form/Checkbox';
+import { Input } from '~/ui/smart/form/Input';
+import { Select } from '~/ui/smart/form/Select';
+import { Checkbox } from '~/ui/smart/form/Checkbox';
 import { useDesignerStore } from '~/plugins/core-designer/components/studio/hooks/store/useDesignerStore';
 import type { Component } from '~/plugins/core-designer/components/studio/domain/schema/types';
 

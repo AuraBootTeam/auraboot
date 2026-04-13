@@ -20,7 +20,7 @@
 
 import { test, expect } from '../../fixtures';
 import { uniqueId } from '../helpers';
-import { ErrorCodes } from '~/services/http-client/types';
+import { ErrorCodes } from '~/shared/services/http-client/types';
 
 // ---------------------------------------------------------------------------
 // Locator helpers — handle both Chinese (zh-CN) and English (en-US) i18n

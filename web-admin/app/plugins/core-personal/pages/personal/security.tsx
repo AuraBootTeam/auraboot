@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { get, del } from '~/services/http-client';
+import { get, del } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { useToast } from '~/contexts/ToastContext';
-import PasswordChangeForm from '~/components/security/PasswordChangeForm';
+import PasswordChangeForm from '~/ui/security/PasswordChangeForm';
 
 interface SessionInfo {
   pid: string;

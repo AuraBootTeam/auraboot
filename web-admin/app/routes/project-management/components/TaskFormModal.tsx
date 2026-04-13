@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { post } from '~/services/http-client';
+import { post } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { useI18n } from '~/contexts/I18nContext';
 import { useToastContext } from '~/contexts/ToastContext';

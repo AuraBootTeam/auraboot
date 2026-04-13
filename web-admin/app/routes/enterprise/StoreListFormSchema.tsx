@@ -1,6 +1,6 @@
 import { useLoaderData } from 'react-router';
 import type { LoaderFunctionArgs } from 'react-router';
-import { getItemList, submitSearchQuery } from '~/services/form';
+import { getItemList, submitSearchQuery } from '~/shared/services/form';
 import FormList from '~/routes/FormList';
 
 // 使用FormList的loader逻辑，但指定store schema

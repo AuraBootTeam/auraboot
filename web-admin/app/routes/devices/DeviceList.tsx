@@ -10,9 +10,9 @@ import {
 } from '@heroicons/react/24/outline';
 import { useToast } from '~/contexts/ToastContext';
 import { useAuth } from '~/contexts/AuthContext';
-import { fetchResult } from '~/services/http-client';
+import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
-import QrCodeScanner from '~/components/QrCodeScanner';
+import QrCodeScanner from '~/ui/QrCodeScanner';
 import { confirmDialog } from '~/utils/confirmDialog';
 
 interface Device {

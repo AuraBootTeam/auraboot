@@ -5,8 +5,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
-import { fieldService } from '~/services/fieldService';
-import { modelService } from '~/services/modelService';
+import { fieldService } from '~/shared/services/fieldService';
+import { modelService } from '~/shared/services/modelService';
 import { useToastContext } from '~/contexts/ToastContext';
 import { useDslRegistry } from '~/contexts/DslRegistryContext';
 import type { MetaFieldCreateRequest, MetaModelDTO } from '~/types/model';

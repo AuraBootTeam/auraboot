@@ -8,7 +8,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import type { BlockConfig, ColumnConfig, ButtonConfig, TreeConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
-import { fetchResult } from '~/services/http-client';
+import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { sanitizeHtml } from '~/framework/meta/utils/sanitizeHtml';
 import { useTreeData } from '~/framework/meta/hooks/useTreeData';

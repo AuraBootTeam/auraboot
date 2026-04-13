@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import type { NamedQueryFieldRequest } from '~/services/namedQueryService';
+import type { NamedQueryFieldRequest } from '~/shared/services/namedQueryService';
 import {
   DATA_TYPES,
   ALL_OPERATORS,

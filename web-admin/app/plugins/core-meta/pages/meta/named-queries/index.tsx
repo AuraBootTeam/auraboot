@@ -7,7 +7,7 @@
 import React, { useState, useCallback } from 'react';
 import { useNavigate, useLoaderData } from 'react-router';
 import type { LoaderFunctionArgs } from 'react-router';
-import { namedQueryService } from '~/services/namedQueryService';
+import { namedQueryService } from '~/shared/services/namedQueryService';
 import { confirmDialog } from '~/utils/confirmDialog';
 import { useToastContext } from '~/contexts/ToastContext';
 import type {
@@ -15,7 +15,7 @@ import type {
   NamedQueryQueryRequest,
   PageResult,
   NamedQueryStatusType,
-} from '~/services/namedQueryService';
+} from '~/shared/services/namedQueryService';
 
 /**
  * Loader function

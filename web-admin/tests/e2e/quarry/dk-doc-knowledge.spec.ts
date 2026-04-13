@@ -24,7 +24,7 @@ import {
   todayStr,
   clickRowActionByLocator,
 } from '../helpers/index';
-import { ErrorCodes } from '~/services/http-client/types';
+import { ErrorCodes } from '~/shared/services/http-client/types';
 
 // ---------------------------------------------------------------------------
 // Page keys (hyphenated for URL / API compatibility)

@@ -10,8 +10,8 @@ import { Gantt, ViewMode, type Task as GanttTask } from 'gantt-task-react';
 import 'gantt-task-react/dist/index.css';
 import type { ViewConfig } from '~/framework/smart/types/savedView';
 import type { FilterConfig } from '~/framework/smart/types/chart';
-import { dynamicService } from '~/services/dynamicService';
-import { fetchResult } from '~/services/http-client/HttpClient';
+import { dynamicService } from '~/shared/services/dynamicService';
+import { fetchResult } from '~/shared/services/http-client/HttpClient';
 import { DataLimitBanner, ViewDiagnostics, ViewEmptyState } from './shared';
 import { cn } from '~/utils/cn';
 

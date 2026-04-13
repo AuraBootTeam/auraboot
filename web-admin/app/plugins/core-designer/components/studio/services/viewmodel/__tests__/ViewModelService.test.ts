@@ -7,12 +7,12 @@ import type {
 } from '~/plugins/core-designer/components/studio/domain/viewmodel/types';
 
 // Mock the http-client module
-vi.mock('~/services/http-client', () => ({
+vi.mock('~/shared/services/http-client', () => ({
   get: vi.fn(),
   post: vi.fn(),
 }));
 
-import { get, post } from '~/services/http-client';
+import { get, post } from '~/shared/services/http-client';
 
 const mockGet = vi.mocked(get);
 const mockPost = vi.mocked(post);

@@ -9,7 +9,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { cn } from '~/utils/cn';
 import { useToastContext } from '~/contexts/ToastContext';
-import { reportTemplateService, type ReportTemplateDTO } from '~/services/reportTemplateService';
+import { reportTemplateService, type ReportTemplateDTO } from '~/shared/services/reportTemplateService';
 import { ResultHelper } from '~/utils/type';
 
 export interface ReportGenerateButtonProps {

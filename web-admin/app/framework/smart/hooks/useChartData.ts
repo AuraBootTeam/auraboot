@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { chartDataService } from '~/services/chartDataService';
+import { chartDataService } from '~/shared/services/chartDataService';
 import type {
   ChartDataSource,
   AggregateQueryResponse,

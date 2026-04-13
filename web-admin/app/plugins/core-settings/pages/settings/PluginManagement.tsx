@@ -16,7 +16,7 @@ import {
   ArrowPathIcon,
   CloudArrowUpIcon,
 } from '@heroicons/react/24/outline';
-import { Button } from '~/components/ui/button';
+import { Button } from '~/ui/ui/button';
 
 // ---------------------------------------------------------------------------
 // Types

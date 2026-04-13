@@ -16,7 +16,7 @@ import {
   clickRowActionByLocator,
 } from '../helpers/index';
 import { getTestProjectId } from '../quarry-management.setup';
-import { ErrorCodes } from '~/services/http-client/types';
+import { ErrorCodes } from '~/shared/services/http-client/types';
 
 const REPORT_MODEL = 'qo_daily_report';
 const SUMMARY_MODEL = 'qo_daily_summary';

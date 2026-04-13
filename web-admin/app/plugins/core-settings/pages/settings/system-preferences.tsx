@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useToastContext } from '~/contexts/ToastContext';
-import { tenantPreferenceService } from '~/services/tenantPreferenceService';
-import TimezoneSelect from '~/components/TimezoneSelect';
+import { tenantPreferenceService } from '~/shared/services/tenantPreferenceService';
+import TimezoneSelect from '~/ui/TimezoneSelect';
 
 type MetaArgs = Record<string, unknown>;
 

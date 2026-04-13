@@ -3,9 +3,9 @@
  */
 
 import { useState, useCallback } from 'react';
-import { Button } from '~/components/ui/button';
+import { Button } from '~/ui/ui/button';
 import { MoreHorizontal, RefreshCw, PlayCircle } from 'lucide-react';
-import { DateTime } from '~/components/DateTime';
+import { DateTime } from '~/ui/DateTime';
 import type { ProcessInstance } from '../services/bpmWorkbenchService';
 
 function StatusBadge({ status }: { status: string }) {

@@ -13,7 +13,7 @@
 import React, { useCallback, useMemo } from 'react';
 import type { PropertySchema } from '~/shared/designer/types';
 import { PropertyFieldRenderer } from '~/shared/designer/PropertyFieldRenderer';
-import type { FieldAdapter } from '~/components/field-adapter';
+import type { FieldAdapter } from '~/ui/field-adapter';
 import type { CanvasBlock } from '~/plugins/core-designer/components/studio/domain/canvas/types';
 import { BlockRegistry } from '~/plugins/core-designer/components/studio/registry';
 

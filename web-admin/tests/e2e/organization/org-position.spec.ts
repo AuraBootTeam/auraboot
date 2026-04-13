@@ -14,7 +14,7 @@
 
 import { test, expect } from '../../fixtures';
 import { navigateToDynamicPage, uniqueId, executeCommandViaApi, waitForFormReady, extractRecordId } from '../helpers';
-import { ErrorCodes } from '~/services/http-client/types';
+import { ErrorCodes } from '~/shared/services/http-client/types';
 
 const POSITION_PAGE_KEY = 'org-position';
 

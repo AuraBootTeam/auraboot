@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { Button } from '~/components/ui/button';
+import { Button } from '~/ui/ui/button';
 import { useSmartText } from '~/utils/i18n';
 import { useToastContext } from '~/contexts/ToastContext';
 import {

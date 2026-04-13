@@ -7,10 +7,10 @@
  * - dict:   load dictionary items for a dictCode (for fromStates/toStates)
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import type { FieldAdapter } from '~/components/field-adapter';
-import { fetchDictOptions, fetchFieldOptions } from '~/services/resourceSelectService';
+import type { FieldAdapter } from '~/ui/field-adapter';
+import { fetchDictOptions, fetchFieldOptions } from '~/shared/services/resourceSelectService';
 import { useFlowStore } from '~/plugins/core-designer/components/flow-designer-sdk/store';
-import type { ResourceOption } from '~/components/base-fields/BaseResourceSelect';
+import type { ResourceOption } from '~/ui/base-fields/BaseResourceSelect';
 
 export interface DependentMultiSelectProps {
   adapter: FieldAdapter<unknown>;

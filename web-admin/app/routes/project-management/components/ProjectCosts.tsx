@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { get } from '~/services/http-client';
+import { get } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { useI18n } from '~/contexts/I18nContext';
 

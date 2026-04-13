@@ -13,12 +13,12 @@
 import React, { useState, useCallback } from 'react';
 import { useLoaderData, useNavigate, useParams } from 'react-router';
 import type { LoaderFunctionArgs } from 'react-router';
-import { fieldLibraryService } from '~/services/fieldLibraryService';
-import { fieldService } from '~/services/fieldService';
+import { fieldLibraryService } from '~/shared/services/fieldLibraryService';
+import { fieldService } from '~/shared/services/fieldService';
 import { useToastContext } from '~/contexts/ToastContext';
 import type { FieldUsageInfo, BindingConfiguration, MetaFieldDTO } from '~/types/fieldLibrary';
-import { LoadingSpinner } from '~/components/LoadingSpinner';
-import { ErrorAlert } from '~/components/ErrorAlert';
+import { LoadingSpinner } from '~/ui/LoadingSpinner';
+import { ErrorAlert } from '~/ui/ErrorAlert';
 
 /**
  * Loader function - Load field usage data

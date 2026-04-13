@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router';
-import { Button } from '~/components/ui/button';
+import { Button } from '~/ui/ui/button';
 import { X, ExternalLink, FileText, Clock, Paperclip, Shield, ClipboardList } from 'lucide-react';
 import type { TaskInstance } from '../services/bpmWorkbenchService';
 import type { DialogState } from '../hooks/useTaskCenter';

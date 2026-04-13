@@ -9,8 +9,8 @@ import React, { Suspense } from 'react';
 import type { LoaderFunctionArgs } from 'react-router';
 import { automationService } from '~/framework/smart/automation/services/automationService';
 import type { Automation } from '~/framework/smart/automation/services/automationService';
-import { getTokenFromRequest } from '~/services/session';
-import { RouteLoadingFallback } from '~/components/RouteLoadingFallback';
+import { getTokenFromRequest } from '~/shared/services/session';
+import { RouteLoadingFallback } from '~/ui/RouteLoadingFallback';
 
 const AutomationEditPageImpl = React.lazy(
   () => import('~/framework/smart/automation/components/AutomationEditPageImpl'),

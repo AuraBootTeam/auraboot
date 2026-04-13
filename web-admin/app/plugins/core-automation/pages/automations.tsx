@@ -5,7 +5,7 @@ import { AutomationList } from '~/framework/smart/automation/components/Automati
 import { useSmartText } from '~/utils/i18n';
 import { automationService } from '~/framework/smart/automation/services/automationService';
 import type { Automation } from '~/framework/smart/automation/services/automationService';
-import { getTokenFromRequest } from '~/services/session';
+import { getTokenFromRequest } from '~/shared/services/session';
 
 interface LoaderData {
   automations: Automation[];

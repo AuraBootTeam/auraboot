@@ -10,7 +10,7 @@
 
 import React, { Suspense, useCallback } from 'react';
 import { useProfile } from '~/framework/meta/profiles/ProfileContext';
-import { LoadingSpinner } from '~/components/LoadingSpinner';
+import { LoadingSpinner } from '~/ui/LoadingSpinner';
 import { LayoutRenderer } from '~/framework/meta/rendering/layout';
 import type { PageContentProps } from '~/framework/meta/profiles/types';
 

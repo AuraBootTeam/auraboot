@@ -3,7 +3,7 @@
  */
 
 import { useState } from 'react';
-import { Button } from '~/components/ui/button';
+import { Button } from '~/ui/ui/button';
 import { useToastContext } from '~/contexts/ToastContext';
 
 interface ExportImportPanelProps {

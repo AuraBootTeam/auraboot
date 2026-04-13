@@ -2,7 +2,7 @@
  * BPM Notification Service - CC and URGE operations
  */
 
-import { get, post, put, ErrorCodes } from '~/services/http-client';
+import { get, post, put, ErrorCodes } from '~/shared/services/http-client';
 
 const API_BASE = '/api/bpm/notify';
 

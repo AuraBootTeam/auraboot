@@ -22,7 +22,7 @@ import {
   type SelectedItem,
 } from '~/plugins/core-admin/templates/TemplatePreviewSidebar';
 import { TemplateResourcePreview } from '~/plugins/core-admin/templates/TemplateResourcePreview';
-import { post } from '~/services/http-client';
+import { post } from '~/shared/services/http-client';
 
 type InstallState = 'idle' | 'installing' | 'success' | 'error';
 

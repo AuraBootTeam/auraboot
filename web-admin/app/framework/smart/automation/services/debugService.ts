@@ -4,7 +4,7 @@
  * API calls for automation debug sessions.
  */
 
-import { get, post, put } from '~/services/http-client';
+import { get, post, put } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import type { DebugSession, DebugSessionCreateRequest } from '../debug/types';
 

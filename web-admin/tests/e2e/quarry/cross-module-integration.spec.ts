@@ -16,7 +16,7 @@ import {
   dateOffsetStr,
 } from '../helpers/index';
 import { getTestProjectId } from '../quarry-management.setup';
-import { ErrorCodes } from '~/services/http-client/types';
+import { ErrorCodes } from '~/shared/services/http-client/types';
 
 test.describe('Cross-Module Integration', () => {
   test.describe.configure({ mode: 'serial', timeout: 90000 });

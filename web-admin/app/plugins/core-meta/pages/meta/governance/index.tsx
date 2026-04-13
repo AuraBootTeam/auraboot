@@ -16,7 +16,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useToken as useAuthToken } from '~/contexts/AuthContext';
 import { useI18n } from '~/contexts/I18nContext';
-import { fetchResult } from '~/services/http-client/HttpClient';
+import { fetchResult } from '~/shared/services/http-client/HttpClient';
 
 // ---- Types ----
 

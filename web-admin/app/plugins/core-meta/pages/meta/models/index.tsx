@@ -16,15 +16,15 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { useLoaderData, useNavigate } from 'react-router';
 import type { LoaderFunctionArgs } from 'react-router';
-import { getTokenFromRequest } from '~/services/session';
-import { modelService } from '~/services/modelService';
+import { getTokenFromRequest } from '~/shared/services/session';
+import { modelService } from '~/shared/services/modelService';
 import { confirmDialog } from '~/utils/confirmDialog';
 import { useToastContext } from '~/contexts/ToastContext';
 import type { MetaModelDTO, ModelQueryParams } from '~/types/model';
-import { LoadingSpinner } from '~/components/LoadingSpinner';
-import { ErrorAlert } from '~/components/ErrorAlert';
-import { Pagination } from '~/components/Pagination';
-import { ManagedBadge } from '~/components/common/ManagedBadge';
+import { LoadingSpinner } from '~/ui/LoadingSpinner';
+import { ErrorAlert } from '~/ui/ErrorAlert';
+import { Pagination } from '~/ui/Pagination';
+import { ManagedBadge } from '~/ui/common/ManagedBadge';
 import { useBatchResourceOwners } from '~/hooks/useResourceOwner';
 
 /**

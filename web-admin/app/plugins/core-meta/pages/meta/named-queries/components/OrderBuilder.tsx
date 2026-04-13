@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import type { NamedQueryFieldDTO } from '~/services/namedQueryService';
+import type { NamedQueryFieldDTO } from '~/shared/services/namedQueryService';
 
 interface OrderItem {
   id: string;

@@ -9,8 +9,8 @@ import {
   removeTeamMember,
   type Team,
   type TeamMember,
-} from '~/services/teamService';
-import { get } from '~/services/http-client';
+} from '~/shared/services/teamService';
+import { get } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 
 interface TenantMemberOption {

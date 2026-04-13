@@ -33,7 +33,7 @@ import { ADMIN_BPM_DOMAIN_CONFIG } from '../../helpers/configs/admin-bpm-domain-
 import { ADMIN_DATA_PERMISSION_CONFIG } from '../../helpers/configs/admin-data-permission.config';
 import { ADMIN_WEBHOOK_CONFIG } from '../../helpers/configs/admin-webhook.config';
 import { ADMIN_API_CONNECTOR_CONFIG } from '../../helpers/configs/admin-api-connector.config';
-import { ErrorCodes } from '~/services/http-client/types';
+import { ErrorCodes } from '~/shared/services/http-client/types';
 
 // ---------------------------------------------------------------------------
 // Shared helpers

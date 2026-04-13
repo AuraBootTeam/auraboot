@@ -6,9 +6,9 @@
 
 import React, { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router';
-import { namedQueryService } from '~/services/namedQueryService';
+import { namedQueryService } from '~/shared/services/namedQueryService';
 import { useToastContext } from '~/contexts/ToastContext';
-import type { NamedQueryCreateRequest } from '~/services/namedQueryService';
+import type { NamedQueryCreateRequest } from '~/shared/services/namedQueryService';
 import SqlEditor from './components/SqlEditor';
 
 export default function NamedQueryCreatePage() {

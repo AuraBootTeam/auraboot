@@ -7,8 +7,8 @@
  * @since 3.2.0
  */
 
-import { get, post, put, del } from '~/services/http-client';
-import type { Result } from '~/services/http-client';
+import { get, post, put, del } from '~/shared/services/http-client';
+import type { Result } from '~/shared/services/http-client';
 import type {
   PageSchemaDTO,
   PageSchemaCreateRequest,

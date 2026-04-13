@@ -55,7 +55,7 @@ import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import type { DataSourceManager } from '~/framework/meta/runtime/data-pipeline/DataSourceManager';
 import { executeSchemaHandler } from '~/framework/meta/hooks/executeSchemaHandler';
 import { executeRegistryAction } from '~/framework/meta/hooks/executeRegistryAction';
-import { fetchResult } from '~/services/http-client';
+import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { resolveConfirmDialog } from '~/framework/meta/utils/i18nResolver';
 import { buildApiEndpoint } from '~/routes/_shared/dynamic-route-utils';
@@ -411,7 +411,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
                 const flowRunner = runtime.getFlowRunner();
                 if (flowRunner) {
                   const freshContext = runtime.getContext();
-                  const { fetchResult: fr } = await import('~/services/http-client');
+                  const { fetchResult: fr } = await import('~/shared/services/http-client');
                   (freshContext as any).fetchResult = fr;
                   const contextWithRecord = { ...freshContext, record, row: record };
                   await flowRunner.run(actionDef.steps, contextWithRecord as any);
@@ -421,7 +421,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
               }
               // Fallback: execute steps via ActionRegistry directly
               const { actionRegistry } = await import('~/framework/meta/runtime/actions/ActionRegistry');
-              const { fetchResult: fr } = await import('~/services/http-client');
+              const { fetchResult: fr } = await import('~/shared/services/http-client');
               for (const step of actionDef.steps) {
                 if (step.action && actionRegistry.has(step.action)) {
                   await actionRegistry.execute(step.action, {

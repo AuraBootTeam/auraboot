@@ -3,7 +3,7 @@
  * API service for BPM workbench operations
  */
 
-import { get, post, ErrorCodes } from '~/services/http-client';
+import { get, post, ErrorCodes } from '~/shared/services/http-client';
 
 // ==================== Types ====================
 

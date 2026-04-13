@@ -15,7 +15,7 @@ import {
 } from '@heroicons/react/24/outline';
 import InstallDialog from './components/InstallDialog';
 import UpgradeDialog from './components/UpgradeDialog';
-import ReviewSection from '~/components/ReviewSection';
+import ReviewSection from '~/ui/ReviewSection';
 
 interface PluginDetail {
   pid: string;

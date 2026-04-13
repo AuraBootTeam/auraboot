@@ -16,7 +16,7 @@ import {
   GlobeAltIcon,
 } from '@heroicons/react/24/outline';
 import { useToastContext } from '~/contexts/ToastContext';
-import { get, put } from '~/services/http-client';
+import { get, put } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 
 // ---------------------------------------------------------------------------

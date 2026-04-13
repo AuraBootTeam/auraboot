@@ -18,7 +18,7 @@
 import { test, expect } from '../../fixtures';
 import { navigateToDynamicPage, uniqueId } from '../helpers';
 import { DynamicListPage } from '../../pages';
-import { ErrorCodes } from '~/services/http-client/types';
+import { ErrorCodes } from '~/shared/services/http-client/types';
 
 const ORDER_PAGE_KEY = 'e2et_order';
 const CUSTOMER_PAGE_KEY = 'e2et_customer';

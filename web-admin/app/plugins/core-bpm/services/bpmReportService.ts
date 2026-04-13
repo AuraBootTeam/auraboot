@@ -2,7 +2,7 @@
  * BPM Report Service - Approval chain reports
  */
 
-import { get, ErrorCodes } from '~/services/http-client';
+import { get, ErrorCodes } from '~/shared/services/http-client';
 
 const API_BASE = '/api/bpm/reports';
 

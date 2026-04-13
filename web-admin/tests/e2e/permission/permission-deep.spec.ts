@@ -18,7 +18,7 @@
 import { test, expect } from '../../fixtures';
 import { test as baseTest } from '@playwright/test';
 import { navigateToDynamicPage, waitForDynamicPageLoad, extractRecordId } from '../helpers';
-import { ErrorCodes } from '~/services/http-client/types';
+import { ErrorCodes } from '~/shared/services/http-client/types';
 
 const BASE_URL = process.env.BASE_URL || 'http://localhost:5173';
 
