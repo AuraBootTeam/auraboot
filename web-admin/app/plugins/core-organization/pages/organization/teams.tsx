@@ -10,7 +10,7 @@ import {
   type Team,
   type TeamCreateRequest,
   type TeamUpdateRequest,
-} from '~/services/teamService';
+} from '~/shared/services/teamService';
 import { useI18n } from '~/contexts/I18nContext';
 
 const STATUS_CONFIG: Record<string, { className: string }> = {

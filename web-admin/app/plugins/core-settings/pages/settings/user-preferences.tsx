@@ -8,8 +8,8 @@ import { useRevalidator } from 'react-router';
 import { useToastContext } from '~/contexts/ToastContext';
 import { useAuth } from '~/contexts/AuthContext';
 type MetaArgs = Record<string, unknown>;
-import { userPreferenceService } from '~/services/userPreferenceService';
-import TimezoneSelect from '~/components/TimezoneSelect';
+import { userPreferenceService } from '~/shared/services/userPreferenceService';
+import TimezoneSelect from '~/ui/TimezoneSelect';
 import {
   type UserMemory,
   type MemoryType,
@@ -19,7 +19,7 @@ import {
   deleteUserMemory,
   getMemoryTypeText,
   getMemoryTypeColor,
-} from '~/services/userMemoryService';
+} from '~/shared/services/userMemoryService';
 
 export function meta({}: MetaArgs) {
   return [

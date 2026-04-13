@@ -40,7 +40,7 @@ export {
 } from './helpers/index';
 
 import { uniqueId, todayStr, executeCommandViaApi } from './helpers/index';
-import { ErrorCodes } from '~/services/http-client/types';
+import { ErrorCodes } from '~/shared/services/http-client/types';
 
 // ---------------------------------------------------------------------------
 // Quarry-specific Constants

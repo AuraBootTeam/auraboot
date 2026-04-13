@@ -21,7 +21,7 @@ import type {
   ValidationRule,
 } from '~/framework/meta/schemas/types';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
-import { fetchResult } from '~/services/http-client';
+import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { useTreeData } from '~/framework/meta/hooks/useTreeData';
 import { useDictCache } from '~/framework/meta/rendering/pages/hooks/useDictCache';

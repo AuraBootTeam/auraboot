@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { del, post, put, ErrorCodes } from '~/services/http-client';
+import { del, post, put, ErrorCodes } from '~/shared/services/http-client';
 import {
   PencilIcon,
   TrashIcon,

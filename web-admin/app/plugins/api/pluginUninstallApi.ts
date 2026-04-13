@@ -4,8 +4,8 @@
  * Provides API calls for plugin uninstall operations and resource ownership management.
  */
 
-import { get, post } from '~/services/http-client';
-import type { Result } from '~/services/http-client';
+import { get, post } from '~/shared/services/http-client';
+import type { Result } from '~/shared/services/http-client';
 
 // ==================== Types ====================
 

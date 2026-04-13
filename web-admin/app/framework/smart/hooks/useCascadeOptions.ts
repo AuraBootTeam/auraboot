@@ -7,9 +7,9 @@
  */
 
 import { useState, useCallback } from 'react';
-import { get } from '~/services/http-client';
+import { get } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
-import type { CascadeOption } from '~/components/smart/picker/CascadeSelect';
+import type { CascadeOption } from '~/ui/smart/picker/CascadeSelect';
 
 /**
  * Options for the useCascadeOptions hook

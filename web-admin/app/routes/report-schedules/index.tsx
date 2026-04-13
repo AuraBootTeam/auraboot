@@ -7,7 +7,7 @@ import {
   ClockIcon,
 } from '@heroicons/react/24/outline';
 import { toast } from 'sonner';
-import { fetchResult } from '~/services/http-client/HttpClient';
+import { fetchResult } from '~/shared/services/http-client/HttpClient';
 import { useToken as useAuthToken } from '~/contexts/AuthContext';
 import ScheduleFormModal from './ScheduleFormModal';
 

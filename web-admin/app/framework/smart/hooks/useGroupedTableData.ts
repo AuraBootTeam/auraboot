@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { chartDataService } from '~/services/chartDataService';
+import { chartDataService } from '~/shared/services/chartDataService';
 import type { FilterConfig, AggregateQueryRequest } from '~/framework/smart/types/chart';
 import type { GroupByConfig, AggregationConfig } from '~/framework/smart/types/savedView';
 

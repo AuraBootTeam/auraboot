@@ -22,7 +22,7 @@ import type {
   VersionLock,
 } from '~/plugins/core-designer/components/studio/domain/metadata/types';
 import { VersionStatus, VersionType, VersionEventType } from '~/plugins/core-designer/components/studio/domain/metadata/types';
-import { ApiService } from '~/services/ApiService';
+import { ApiService } from '~/shared/services/ApiService';
 
 /**
  * 版本管理器实现类

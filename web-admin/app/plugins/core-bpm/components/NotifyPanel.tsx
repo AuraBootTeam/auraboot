@@ -7,7 +7,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Button } from '~/components/ui/button';
+import { Button } from '~/ui/ui/button';
 import { RefreshCw, Mail, BellRing, AlertCircle } from 'lucide-react';
 import { useToastContext } from '~/contexts/ToastContext';
 import {

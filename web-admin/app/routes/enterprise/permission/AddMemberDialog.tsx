@@ -13,13 +13,13 @@ import {
   UserGroupIcon,
   UserPlusIcon,
 } from '@heroicons/react/24/outline';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '~/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '~/ui/ui/dialog';
 import { useI18n } from '~/contexts/I18nContext';
 import { useToastContext } from '~/contexts/ToastContext';
 import { useFormSubmit } from '~/hooks/useFormSubmit';
-import { LoadingSpinner } from '~/components/LoadingSpinner';
-import OrgTreePicker from '~/components/shared/OrgTreePicker';
-import { permissionService } from '~/services/permissionService';
+import { LoadingSpinner } from '~/ui/LoadingSpinner';
+import OrgTreePicker from '~/ui/shared/OrgTreePicker';
+import { permissionService } from '~/shared/services/permissionService';
 import type { RoleMemberDTO } from './types';
 
 // ---------------------------------------------------------------------------

@@ -7,7 +7,7 @@
  */
 
 import { useState, useEffect, useMemo } from 'react';
-import { get } from '~/services/http-client';
+import { get } from '~/shared/services/http-client';
 import type { AppTemplate } from './templateCatalog';
 
 export interface ResourceChange {

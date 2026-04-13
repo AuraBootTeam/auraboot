@@ -14,7 +14,7 @@ import listPlugin from '@fullcalendar/list';
 import type { EventClickArg, EventDropArg, DateSelectArg } from '@fullcalendar/core';
 import type { ViewConfig } from '~/framework/smart/types/savedView';
 import type { FilterConfig } from '~/framework/smart/types/chart';
-import { dynamicService } from '~/services/dynamicService';
+import { dynamicService } from '~/shared/services/dynamicService';
 import { cn } from '~/utils/cn';
 import { DataLimitBanner, ViewDiagnostics, ViewEmptyState } from './shared';
 

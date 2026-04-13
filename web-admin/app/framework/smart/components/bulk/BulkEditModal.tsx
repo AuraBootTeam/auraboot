@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import { dynamicService } from '~/services/dynamicService';
+import { dynamicService } from '~/shared/services/dynamicService';
 import { cn } from '~/utils/cn';
 
 export interface BulkEditField {

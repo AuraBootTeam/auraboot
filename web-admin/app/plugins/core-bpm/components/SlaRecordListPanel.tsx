@@ -18,7 +18,7 @@ import {
   PauseCircle,
   CheckCircle,
 } from 'lucide-react';
-import { Button } from '~/components/ui/button';
+import { Button } from '~/ui/ui/button';
 import type { SlaRecord } from '../services/slaService';
 import * as slaService from '../services/slaService';
 

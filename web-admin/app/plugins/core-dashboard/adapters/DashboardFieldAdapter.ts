@@ -6,7 +6,7 @@
  */
 
 import { useCallback, useMemo } from 'react';
-import type { FieldAdapter } from '~/components/field-adapter';
+import type { FieldAdapter } from '~/ui/field-adapter';
 import { useDashboardStore } from '../store/useDashboardStore';
 
 export interface DashboardFieldAdapterProps {

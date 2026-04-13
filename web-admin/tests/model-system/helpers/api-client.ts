@@ -4,7 +4,7 @@
  */
 
 import type { APIRequestContext, Page } from '@playwright/test';
-import { ErrorCodes } from '~/services/http-client/types';
+import { ErrorCodes } from '~/shared/services/http-client/types';
 import type {
   ModelTestData,
   FieldTestData,

@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import type { NamedQueryFieldDTO } from '~/services/namedQueryService';
+import type { NamedQueryFieldDTO } from '~/shared/services/namedQueryService';
 import { OPERATORS_BY_TYPE, OPERATOR_LABELS } from './constants';
 
 interface Condition {

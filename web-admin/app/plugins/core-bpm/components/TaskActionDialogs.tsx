@@ -5,8 +5,8 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import { Button } from '~/components/ui/button';
-import { Textarea } from '~/components/ui/textarea';
+import { Button } from '~/ui/ui/button';
+import { Textarea } from '~/ui/ui/textarea';
 import {
   Dialog,
   DialogContent,
@@ -14,8 +14,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '~/components/ui/dialog';
-import { MemberPicker } from '~/components/smart/picker/MemberPicker';
+} from '~/ui/ui/dialog';
+import { MemberPicker } from '~/ui/smart/picker/MemberPicker';
 import type { DialogState } from '../hooks/useTaskCenter';
 import type { RollbackTarget } from '../services/bpmWorkbenchService';
 import * as workbenchService from '../services/bpmWorkbenchService';

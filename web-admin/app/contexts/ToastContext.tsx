@@ -8,7 +8,7 @@ import {
   useMemo,
   type ReactNode,
 } from 'react';
-import Toast from '~/components/Toast';
+import Toast from '~/ui/Toast';
 import type { ToastEventDetail } from '~/plugins/core-designer/components/studio/services/runtime/execution/UIBridge';
 
 interface ToastState {

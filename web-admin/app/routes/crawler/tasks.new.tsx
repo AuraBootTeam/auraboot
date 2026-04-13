@@ -7,7 +7,7 @@ import {
   type ActionFunctionArgs,
 } from 'react-router';
 import { useToast } from '~/contexts/ToastContext';
-import { createTask } from '~/services/crawler';
+import { createTask } from '~/shared/services/crawler';
 
 // Action - 处理任务创建
 export async function action({ request }: ActionFunctionArgs) {

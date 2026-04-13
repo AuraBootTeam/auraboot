@@ -13,9 +13,9 @@
 import React, { useState, useCallback } from 'react';
 import { useNavigate, useParams, useLoaderData, Link } from 'react-router';
 import type { LoaderFunctionArgs } from 'react-router';
-import { fieldService } from '~/services/fieldService';
+import { fieldService } from '~/shared/services/fieldService';
 import { confirmDialog } from '~/utils/confirmDialog';
-import { fieldLibraryService } from '~/services/fieldLibraryService';
+import { fieldLibraryService } from '~/shared/services/fieldLibraryService';
 import { useToastContext } from '~/contexts/ToastContext';
 import type { MetaFieldDTO } from '~/types/model';
 import type { FieldUsageInfo, FieldImpactAnalysis } from '~/types/fieldLibrary';

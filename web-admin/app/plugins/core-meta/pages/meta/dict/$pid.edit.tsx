@@ -7,7 +7,7 @@
 import React, { useState, useCallback } from 'react';
 import { useNavigate, useParams, useLoaderData } from 'react-router';
 import type { LoaderFunctionArgs } from 'react-router';
-import { dictService } from '~/services/dictService';
+import { dictService } from '~/shared/services/dictService';
 import { useToastContext } from '~/contexts/ToastContext';
 import type { DictDTO, DictUpdateRequest } from '~/types/dict';
 

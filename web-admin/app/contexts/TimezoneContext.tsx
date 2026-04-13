@@ -3,7 +3,7 @@ import { useAuth } from '~/contexts/AuthContext';
 import {
   DEFAULT_DATE_TIME_FORMATS,
   type DateTimeFormatPreferences,
-} from '~/services/dateTimeFormatService';
+} from '~/shared/services/dateTimeFormatService';
 
 const EFFECTIVE_TIMEZONE_KEY = 'effective-timezone';
 

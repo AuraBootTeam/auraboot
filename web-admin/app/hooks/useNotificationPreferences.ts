@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { get, put } from '~/services/http-client';
+import { get, put } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { useToastContext } from '~/contexts/ToastContext';
 

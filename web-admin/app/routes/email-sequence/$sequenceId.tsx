@@ -40,7 +40,7 @@ import {
   type EmailSequenceStep,
   type EmailSequenceEnrollment,
   type EmailAccount,
-} from '~/services/emailService';
+} from '~/shared/services/emailService';
 import { useToastContext } from '~/contexts/ToastContext';
 
 function statusBadge(status: string) {

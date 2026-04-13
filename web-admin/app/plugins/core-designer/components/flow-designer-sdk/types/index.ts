@@ -12,4 +12,4 @@ export type {
   PropertyType,
   NodeValidation,
 } from '../nodes/types';
-export type { I18nText, FieldAdapter } from '~/components/field-adapter';
+export type { I18nText, FieldAdapter } from '~/ui/field-adapter';

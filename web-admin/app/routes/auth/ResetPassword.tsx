@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
-import { post } from '~/services/http-client';
+import { post } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
-import PasswordStrengthIndicator from '~/components/security/PasswordStrengthIndicator';
+import PasswordStrengthIndicator from '~/ui/security/PasswordStrengthIndicator';
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();

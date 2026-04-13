@@ -9,7 +9,7 @@
 import React, { useCallback, useState, useEffect, useRef } from 'react';
 import type { ViewConfig } from '~/framework/smart/types/savedView';
 import type { FilterConfig } from '~/framework/smart/types/chart';
-import { dynamicService } from '~/services/dynamicService';
+import { dynamicService } from '~/shared/services/dynamicService';
 import { cn } from '~/utils/cn';
 import { DataLimitBanner, ViewEmptyState } from './shared';
 

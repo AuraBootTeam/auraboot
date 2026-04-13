@@ -15,7 +15,7 @@ import { test, expect } from '../../fixtures';
 import { uniqueId, navigateToDynamicPage, waitForDynamicPageLoad, waitForFormReady } from '../helpers';
 import { ModelTestHelper } from '../../helpers/model-test-helper';
 import { E2ET_CUSTOMER_CONFIG } from '../../helpers/configs/e2et-customer.config';
-import { ErrorCodes } from '~/services/http-client/types';
+import { ErrorCodes } from '~/shared/services/http-client/types';
 
 test.describe('E2E Test Customer — CRUD + UNIQUE_COMPOSITE', () => {
   const testCode = `CUST-${Date.now()}`;

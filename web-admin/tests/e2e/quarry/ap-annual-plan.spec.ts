@@ -14,7 +14,7 @@ import {
   findRowByContent,
 } from '../helpers/index';
 import { PAGE_KEYS, getTestProjectId } from '../quarry-management.setup';
-import { ErrorCodes } from '~/services/http-client/types';
+import { ErrorCodes } from '~/shared/services/http-client/types';
 
 const MODEL = PAGE_KEYS.ANNUAL_PLAN; // 'ap_annual_plan'
 

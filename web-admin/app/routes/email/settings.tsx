@@ -29,7 +29,7 @@ import {
   getOAuthUrl,
   type EmailAccount,
   type EmailAccountMember,
-} from '~/services/emailService';
+} from '~/shared/services/emailService';
 import { useToastContext } from '~/contexts/ToastContext';
 
 function statusBadge(status: string) {

@@ -13,7 +13,7 @@
 import React, { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router';
 import type { ActionFunctionArgs } from 'react-router';
-import { modelService } from '~/services/modelService';
+import { modelService } from '~/shared/services/modelService';
 import { useToastContext } from '~/contexts/ToastContext';
 import type { MetaModelCreateRequest } from '~/types/model';
 

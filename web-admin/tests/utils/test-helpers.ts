@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
-import { ErrorCodes } from '~/services/http-client/types';
+import { ErrorCodes } from '~/shared/services/http-client/types';
 
 export class StoreListPage {
   constructor(private page: Page) {}

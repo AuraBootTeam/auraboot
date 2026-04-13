@@ -1,6 +1,6 @@
 // web-admin/app/flow-designer-sdk/adapters/FlowFieldAdapter.ts
 import { useCallback, useMemo } from 'react';
-import type { FieldAdapter } from '~/components/field-adapter';
+import type { FieldAdapter } from '~/ui/field-adapter';
 import { useFlowStore } from '../store/useFlowStore';
 
 export interface FlowFieldAdapterProps<T = unknown> {

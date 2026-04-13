@@ -11,10 +11,10 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '~/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '~/ui/ui/dialog';
 import { useI18n } from '~/contexts/I18nContext';
 import { useToastContext } from '~/contexts/ToastContext';
-import { permissionService } from '~/services/permissionService';
+import { permissionService } from '~/shared/services/permissionService';
 
 // ---------------------------------------------------------------------------
 // Policy schema field types

@@ -13,7 +13,7 @@ import { useSearchParams } from 'react-router';
 import type { PageContentProps } from '~/framework/meta/profiles/types';
 import { usePageRuntime } from '~/framework/meta/rendering/pages/hooks/usePageRuntime';
 import { buildApiEndpoint, getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
-import { fetchResult } from '~/services/http-client';
+import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { createExpressionContext } from '~/framework/meta/runtime/expression/context';
 import type { BlockConfig, ColumnConfig, FieldConfig, ButtonConfig } from '~/framework/meta/schemas/types';
@@ -25,7 +25,7 @@ import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
 import { useToastContext } from '~/contexts/ToastContext';
 import { DataSourceProvider } from '~/framework/meta/contexts/DataSourceContext';
 import { createFieldRenderer } from '~/framework/meta/utils/createFieldRenderer';
-import { ErrorAlert } from '~/components/ErrorAlert';
+import { ErrorAlert } from '~/ui/ErrorAlert';
 import { useAuth } from '~/contexts/AuthContext';
 import { ListPageHeader } from './list/ListPageHeader';
 import { useSavedViews } from '~/framework/smart/hooks/useSavedViews';
@@ -49,7 +49,7 @@ import type {
   ViewScope,
   SortConfig,
 } from '~/framework/smart/types/savedView';
-import { modelService } from '~/services/modelService';
+import { modelService } from '~/shared/services/modelService';
 import { useTimezone } from '~/contexts/TimezoneContext';
 import { deriveTestId } from '~/framework/meta/rendering/utils/deriveTestId';
 import { RowActionButtons } from './list/RowActionButtons';
@@ -61,7 +61,7 @@ import { SortIndicator } from './list/SortIndicator';
 import { ListToolbar } from './list/ListToolbar';
 import { ListTable } from './list/ListTable';
 import { encodeSorts, decodeSorts } from './list/useListUrlState';
-import { savedViewService } from '~/services/savedViewService';
+import { savedViewService } from '~/shared/services/savedViewService';
 import { useDebouncedValue, useDebouncedCallback } from '~/hooks/useDebouncedValue';
 
 // Dict data item type

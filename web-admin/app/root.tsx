@@ -20,8 +20,8 @@ import { ThemeProvider } from '~/contexts/ThemeContext';
 import { ToastProvider } from '~/contexts/ToastContext';
 import { TimezoneProvider } from '~/contexts/TimezoneContext';
 import { ConfirmDialogProvider } from '~/contexts/ConfirmDialogContext';
-import { getI18nData } from '~/services/form';
-import { getUserMenus } from '~/services/menu';
+import { getI18nData } from '~/shared/services/form';
+import { getUserMenus } from '~/shared/services/menu';
 
 export interface RootLoaderData {
   user: any;
@@ -43,9 +43,9 @@ import '~/plugins/core-designer/components/studio/workbench/styles/responsive.cs
 import '~/plugins/core-designer/components/studio/workbench/styles/command.css';
 import '~/plugins/core-designer/components/studio/workbench/styles/drag.css';
 
-import { getUserInfo } from '~/services/userService';
+import { getUserInfo } from '~/shared/services/userService';
 import { isPublicRoute } from '~/middleware/sessionMiddlewareFactory';
-import { getSessionFromRequest, getTokenFromRequest, sessionStorage } from '~/services/session';
+import { getSessionFromRequest, getTokenFromRequest, sessionStorage } from '~/shared/services/session';
 import { AuthProvider } from '~/contexts/AuthContext';
 import { EntitlementProvider } from '~/contexts/EntitlementContext';
 import { DslRegistryProvider } from '~/contexts/DslRegistryContext';

@@ -6,7 +6,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-} from '~/components/ui/dialog';
+} from '~/ui/ui/dialog';
 import { cn } from '~/utils/cn';
 import { useSmartText } from '~/utils/i18n';
 import type { AutomationLog, ActionResult } from '../services/automationService';

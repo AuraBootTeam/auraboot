@@ -8,10 +8,10 @@ import {
   Link,
 } from 'react-router';
 import type { LoaderFunctionArgs, ActionFunctionArgs } from 'react-router';
-import { getUserProfile, updateUserProfile, uploadAvatar } from '~/services/profile';
+import { getUserProfile, updateUserProfile, uploadAvatar } from '~/shared/services/profile';
 import type { UserProfile, UpdateUserProfileRequest } from '~/types/profile';
 import { useToast } from '~/contexts/ToastContext';
-import PasswordChangeForm from '~/components/security/PasswordChangeForm';
+import PasswordChangeForm from '~/ui/security/PasswordChangeForm';
 
 // Loader函数 - 获取用户资料
 export async function loader({ request }: LoaderFunctionArgs) {

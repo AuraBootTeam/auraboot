@@ -16,8 +16,8 @@ import { useRootLoaderData } from '~/root';
 import { useTheme } from '~/contexts/ThemeContext';
 import { useI18n } from '~/contexts/I18nContext';
 import { useHydrated } from '~/hooks/useHydrated';
-import { InboxHeaderWidget } from '~/components/inbox/InboxDropdown';
-import { CommandPalette } from '~/components/CommandPalette';
+import { InboxHeaderWidget } from '~/ui/inbox/InboxDropdown';
+import { CommandPalette } from '~/ui/CommandPalette';
 import { useAuraBot } from '~/plugins/core-aurabot/components-shell/AuraBotProvider';
 
 interface HeaderProps {

@@ -63,7 +63,7 @@ export function useFieldLibrary({
         setFieldsByCategory(grouped);
       } else if (modelCode) {
         // Load fields by model code — resolve PID first via /api/meta/models/code/{code}
-        const { get: httpGet } = await import('~/services/http-client');
+        const { get: httpGet } = await import('~/shared/services/http-client');
         const modelResp = await httpGet<{ pid: string }>(`/api/meta/models/code/${modelCode}`);
         const pid = modelResp?.data?.pid;
         if (pid) {

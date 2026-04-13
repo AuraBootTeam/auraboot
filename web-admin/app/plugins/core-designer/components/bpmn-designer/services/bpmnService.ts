@@ -9,7 +9,7 @@
  * (pid, processName, processKey).
  */
 
-import { fetchResult } from '~/services/http-client';
+import { fetchResult } from '~/shared/services/http-client';
 import type { BPMNProcessDefinition } from '~/plugins/core-designer/components/bpmn-designer/types';
 
 const BASE_PATH = '/api/bpm/process-definitions';

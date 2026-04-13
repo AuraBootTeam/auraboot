@@ -3,7 +3,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { Button } from '~/components/ui/button';
+import { Button } from '~/ui/ui/button';
 import { RefreshCw } from 'lucide-react';
 import { useToastContext } from '~/contexts/ToastContext';
 import {

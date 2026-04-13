@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { fetchResult } from '~/services/http-client/HttpClient';
+import { fetchResult } from '~/shared/services/http-client/HttpClient';
 import { useToken as useAuthToken } from '~/contexts/AuthContext';
 import { useTheme } from '~/contexts/ThemeContext';
 import {

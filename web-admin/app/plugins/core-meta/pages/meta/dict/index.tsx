@@ -7,11 +7,11 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLoaderData } from 'react-router';
 import type { LoaderFunctionArgs } from 'react-router';
-import { dictService } from '~/services/dictService';
+import { dictService } from '~/shared/services/dictService';
 import { confirmDialog } from '~/utils/confirmDialog';
 import { useToastContext } from '~/contexts/ToastContext';
 import type { DictDTO, DictQueryRequest, DictPageResult } from '~/types/dict';
-import { StatusBadge } from '~/components/common/StatusBadge';
+import { StatusBadge } from '~/ui/common/StatusBadge';
 
 /**
  * Loader function

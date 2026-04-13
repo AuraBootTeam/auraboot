@@ -10,7 +10,7 @@
  */
 
 import { test, expect } from '../../fixtures';
-import { ErrorCodes } from '~/services/http-client/types';
+import { ErrorCodes } from '~/shared/services/http-client/types';
 import {
   navigateToDynamicPage,
   uniqueId,

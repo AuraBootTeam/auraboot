@@ -16,7 +16,7 @@ import type { NavigateFunction } from 'react-router';
 import type { ButtonConfig } from '~/framework/meta/schemas/types';
 import type { DataSourceManager } from '~/framework/meta/runtime/data-pipeline/DataSourceManager';
 import { actionRegistry } from '~/framework/meta/runtime/actions/ActionRegistry';
-import { fetchResult } from '~/services/http-client';
+import { fetchResult } from '~/shared/services/http-client';
 import { buildApiEndpoint } from '~/routes/_shared/dynamic-route-utils';
 import { confirmDialog } from '~/utils/confirmDialog';
 

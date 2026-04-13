@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import type { LoaderFunctionArgs } from 'react-router';
 import { redirect } from 'react-router';
-import { Button } from '~/components/ui/button';
+import { Button } from '~/ui/ui/button';
 
 /**
  * Loader: redirect to / if system is already initialized.

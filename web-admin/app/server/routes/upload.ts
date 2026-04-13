@@ -13,7 +13,7 @@ import { Router, type Request, type Response } from 'express';
 import Busboy from 'busboy';
 import axios, { type AxiosError } from 'axios';
 import logger from '../utils/logger';
-import { sessionStorage } from '~/services/session';
+import { sessionStorage } from '~/shared/services/session';
 import { JWT_TOKEN_KEY } from '~/constants/AuthConstant';
 
 const router = Router();

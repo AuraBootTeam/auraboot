@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useLoaderData, useNavigate, type LoaderFunctionArgs } from 'react-router';
 import { useToast } from '~/contexts/ToastContext';
-import { getTasks } from '~/services/crawler';
+import { getTasks } from '~/shared/services/crawler';
 
 // Loader - 获取任务列表
 export async function loader({ request }: LoaderFunctionArgs) {

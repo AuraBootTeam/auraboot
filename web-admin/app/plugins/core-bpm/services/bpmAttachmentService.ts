@@ -2,7 +2,7 @@
  * BPM Attachment Service - File upload/download for BPM tasks
  */
 
-import { get, del, ErrorCodes } from '~/services/http-client';
+import { get, del, ErrorCodes } from '~/shared/services/http-client';
 
 const API_BASE = '/api/bpm/attachments';
 

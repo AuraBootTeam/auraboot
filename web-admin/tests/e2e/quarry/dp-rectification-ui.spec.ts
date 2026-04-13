@@ -16,7 +16,7 @@ import {
   ensureFilterFormOpen,
 } from '../helpers/index';
 import { getTestProjectId } from '../quarry-management.setup';
-import { ErrorCodes } from '~/services/http-client/types';
+import { ErrorCodes } from '~/shared/services/http-client/types';
 
 const RECT_MODEL = 'dp_rectification';
 

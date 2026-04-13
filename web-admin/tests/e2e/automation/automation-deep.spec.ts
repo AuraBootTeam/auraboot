@@ -19,7 +19,7 @@
 import { test, expect } from '../../fixtures';
 import { uniqueId } from '../helpers';
 import { AutomationListPage } from '../../pages/AutomationListPage';
-import { ErrorCodes } from '~/services/http-client/types';
+import { ErrorCodes } from '~/shared/services/http-client/types';
 
 // ---------------------------------------------------------------------------
 // API Helpers

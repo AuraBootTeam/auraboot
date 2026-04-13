@@ -15,7 +15,7 @@ import {
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import tz from 'dayjs/plugin/timezone';
-import { dictService } from '~/services/dictService';
+import { dictService } from '~/shared/services/dictService';
 import { confirmDialog } from '~/utils/confirmDialog';
 import { useToastContext } from '~/contexts/ToastContext';
 import { useTimezone } from '~/contexts/TimezoneContext';

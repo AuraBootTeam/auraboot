@@ -19,7 +19,7 @@ import {
   queryFilteredList,
   todayStr,
 } from '../helpers/index';
-import { ErrorCodes } from '~/services/http-client/types';
+import { ErrorCodes } from '~/shared/services/http-client/types';
 
 const PAGE_KEY = 'dk-document';
 

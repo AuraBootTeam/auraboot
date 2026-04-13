@@ -5,7 +5,7 @@
  * shared across Dashboard Designer, Flow Designer SDK, and BPMN Designer.
  */
 
-import type { I18nText } from '~/components/field-adapter';
+import type { I18nText } from '~/ui/field-adapter';
 
 // ==================== Property Schema ====================
 

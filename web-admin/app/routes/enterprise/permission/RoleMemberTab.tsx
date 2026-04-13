@@ -14,10 +14,10 @@ import {
 } from '@heroicons/react/24/outline';
 import { useI18n } from '~/contexts/I18nContext';
 import { useToastContext } from '~/contexts/ToastContext';
-import { LoadingSpinner } from '~/components/LoadingSpinner';
-import ConfirmDialog from '~/components/ConfirmDialog';
+import { LoadingSpinner } from '~/ui/LoadingSpinner';
+import ConfirmDialog from '~/ui/ConfirmDialog';
 import AddMemberDialog from './AddMemberDialog';
-import { permissionService } from '~/services/permissionService';
+import { permissionService } from '~/shared/services/permissionService';
 import type { RoleMemberDTO } from './types';
 
 // ---------------------------------------------------------------------------

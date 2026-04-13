@@ -2,7 +2,7 @@
  * BPM Form Service - API calls for form binding and rendering
  */
 
-import { get, post, ErrorCodes } from '~/services/http-client';
+import { get, post, ErrorCodes } from '~/shared/services/http-client';
 
 const API_BASE = '/api/bpm/forms';
 

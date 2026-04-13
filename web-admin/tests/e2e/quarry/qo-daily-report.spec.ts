@@ -7,7 +7,7 @@
 import { test, expect } from '@playwright/test';
 import { navigateToDynamicPage, uniqueId, executeCommandViaApi } from '../helpers/index';
 import { PAGE_KEYS, getTestProjectId } from '../quarry-management.setup';
-import { ErrorCodes } from '~/services/http-client/types';
+import { ErrorCodes } from '~/shared/services/http-client/types';
 
 /** Generate a unique future date to avoid uniqueness constraint conflicts. */
 function randomFutureDate(): string {

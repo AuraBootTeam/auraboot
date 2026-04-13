@@ -16,7 +16,7 @@ import { DynamicFormPage } from '../../pages';
 import { uniqueId } from '../quarry-management.setup';
 import { ModelTestHelper } from '../../helpers/model-test-helper';
 import { E2ET_ORDER_CONFIG } from '../../helpers/configs/e2et-order.config';
-import { ErrorCodes } from '~/services/http-client/types';
+import { ErrorCodes } from '~/shared/services/http-client/types';
 
 test.describe('E2E Test Order — Field Types & Computed Fields', () => {
   /**

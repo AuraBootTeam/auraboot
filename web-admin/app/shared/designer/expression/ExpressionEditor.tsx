@@ -1,10 +1,10 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import type { FieldAdapter } from '~/components/field-adapter';
+import type { FieldAdapter } from '~/ui/field-adapter';
 import type { ConditionGroup, FieldOption } from './types';
 import { ConditionBuilder } from './ConditionBuilder';
 import { serialize, deserialize } from './serializer';
 import { CONTEXT_VARIABLES } from './context-variables';
-import { BaseFormulaEditor } from '~/components/base-fields';
+import { BaseFormulaEditor } from '~/ui/base-fields';
 
 export interface ExpressionEditorProps {
   adapter: FieldAdapter<any>;

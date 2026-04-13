@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { get, post } from '~/services/http-client/HttpClient';
+import { get, post } from '~/shared/services/http-client/HttpClient';
 
 /**
  * Resource ownership information returned by the API.

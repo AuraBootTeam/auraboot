@@ -7,7 +7,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, X, User, Shield, Building2, Loader2, Plus } from 'lucide-react';
 import { useI18n } from '~/contexts/I18nContext';
-import { get, post } from '~/services/http-client';
+import { get, post } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 
 // ---------------------------------------------------------------------------
