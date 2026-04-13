@@ -45,8 +45,6 @@ public class GoldenPathPluginTest {
             "plugins/templates/golden-path",
             // From platform/ subproject
             "../plugins/templates/golden-path",
-            // Absolute path for local dev
-            System.getProperty("user.home") + "/work/startup/phenix/AuraMeta/plugins/templates/golden-path"
         };
 
         for (String candidate : candidates) {
