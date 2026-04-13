@@ -1,0 +1,155 @@
+{
+  "pageKey": "org_position_list",
+  "name:zh-CN": "Position Management",
+  "name:en": "Position Management",
+  "modelCode": "org_position",
+  "description": "Position list with status tabs and CRUD",
+  "kind": "list",
+  "schemaVersion": 2,
+  "layout": {
+    "type": "grid",
+    "cols": 12
+  },
+  "blocks": [
+    {
+      "id": "block_pos_tabs",
+      "blockType": "tabs",
+      "layout": {
+        "colSpan": 12,
+        "rowSpan": 1
+      },
+      "tabs": [
+        {
+          "key": "all",
+          "label": {
+            "zh-CN": "All",
+            "en": "All"
+          },
+          "filter": null
+        },
+        {
+          "key": "active",
+          "label": {
+            "zh-CN": "Active",
+            "en": "Active"
+          },
+          "filter": {
+            "field": "org_pos_status",
+            "operator": "EQ",
+            "value": "active"
+          }
+        },
+        {
+          "key": "inactive",
+          "label": {
+            "zh-CN": "Inactive",
+            "en": "Inactive"
+          },
+          "filter": {
+            "field": "org_pos_status",
+            "operator": "EQ",
+            "value": "inactive"
+          }
+        }
+      ]
+    },
+    {
+      "id": "block_pos_toolbar",
+      "blockType": "form-buttons",
+      "layout": {
+        "colSpan": 12,
+        "rowSpan": 1
+      },
+      "buttons": [
+        {
+          "code": "create",
+          "primary": true,
+          "icon": "Plus",
+          "label": "create",
+          "action": {
+            "type": "navigate",
+            "to": "org_position_form",
+            "command": "org:create_position"
+          }
+        }
+      ]
+    },
+    {
+      "id": "block_pos_table",
+      "blockType": "table",
+      "layout": {
+        "colSpan": 12,
+        "rowSpan": 1
+      },
+      "defaultSort": {
+        "field": "org_pos_name",
+        "order": "asc"
+      },
+      "searchFields": [
+        "org_pos_code",
+        "org_pos_name",
+        "org_pos_status"
+      ],
+      "table": {
+        "columns": [
+          {
+            "field": "org_pos_code",
+            "width": 150,
+            "fixed": "left"
+          },
+          {
+            "field": "org_pos_name",
+            "width": 200
+          },
+          {
+            "field": "org_pos_dept_id",
+            "width": 180
+          },
+          {
+            "field": "org_pos_level",
+            "width": 120,
+            "renderType": "tag",
+            "dictCode": "org_position_level"
+          },
+          {
+            "field": "org_pos_status",
+            "width": 100,
+            "renderType": "tag",
+            "dictCode": "org_pos_status"
+          },
+          {
+            "field": "actions",
+            "isActionColumn": true,
+            "buttons": [
+              {
+                "code": "edit",
+                "icon": "Edit",
+                "label": "edit",
+                "action": {
+                  "type": "navigate",
+                  "to": "org_position_form",
+                  "command": "org:update_position"
+                }
+              },
+              {
+                "code": "delete",
+                "icon": "Trash2",
+                "danger": true,
+                "label": "delete",
+                "confirm": "delete.confirm",
+                "action": {
+                  "type": "command",
+                  "command": "org:delete_position"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "title": {
+    "zh-CN": "Position Management",
+    "en": "Position Management"
+  }
+}

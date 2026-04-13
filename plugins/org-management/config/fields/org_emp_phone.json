@@ -1,0 +1,7 @@
+{
+  "code": "org_emp_phone",
+  "displayName:zh-CN": "手机号",
+  "displayName:en": "Phone",
+  "dataType": "string",
+  "constraints": { "maxLength": 20 }
+}

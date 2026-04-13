@@ -1,0 +1,20 @@
+{
+  "code": "org_emp_type",
+  "displayName:zh-CN": "员工类型",
+  "displayName:en": "Employee Type",
+  "dataType": "enum",
+  "enumValues": [
+    { "code": "human", "displayName:zh-CN": "正式员工", "displayName:en": "Human" },
+    { "code": "ai", "displayName:zh-CN": "数字员工", "displayName:en": "AI" },
+    { "code": "external", "displayName:zh-CN": "外部人员", "displayName:en": "External" }
+  ],
+  "constraints": {
+    "required": false,
+    "defaultValue": "human"
+  },
+  "feature": {
+    "searchable": true,
+    "sortable": true,
+    "filterable": true
+  }
+}

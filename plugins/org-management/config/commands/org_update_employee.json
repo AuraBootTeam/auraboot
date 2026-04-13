@@ -1,0 +1,9 @@
+{
+  "code": "org:update_employee",
+  "displayName:zh-CN": "Update Employee",
+  "displayName:en": "Update Employee",
+  "type": "update",
+  "modelCode": "org_employee",
+  "inputFields": ["org_emp_user_id", "org_emp_name", "org_emp_dept_id", "org_emp_position_id", "org_emp_report_to", "org_emp_phone", "org_emp_email", "org_emp_hire_date"],
+  "permissions": ["ORG.hr.manage"]
+}
