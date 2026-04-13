@@ -10,10 +10,7 @@
  */
 
 import { test, expect } from '../../fixtures';
-import {
-  uniqueId,
-  executeCommandViaApi,
-} from '../helpers/index';
+import { uniqueId, executeCommandViaApi } from '../helpers/index';
 
 test.describe('Inventory Dashboard @smoke', () => {
   test.describe.configure({ mode: 'serial' });
@@ -62,14 +59,18 @@ test.describe('Inventory Dashboard @smoke', () => {
     await expect(page).toHaveURL(/\/inventory\/dashboard/, { timeout: 10000 });
 
     await Promise.all([
-      page.waitForResponse(
-        (resp) => resp.url().includes('/api/datasource/list') && resp.status() === 200,
-        { timeout: 15000 },
-      ).catch(() => null),
-      page.waitForResponse(
-        (resp) => resp.url().includes('/api/meta/chart-data') && resp.status() === 200,
-        { timeout: 15000 },
-      ).catch(() => null),
+      page
+        .waitForResponse(
+          (resp) => resp.url().includes('/api/datasource/list') && resp.status() === 200,
+          { timeout: 15000 },
+        )
+        .catch(() => null),
+      page
+        .waitForResponse(
+          (resp) => resp.url().includes('/api/meta/chart-data') && resp.status() === 200,
+          { timeout: 15000 },
+        )
+        .catch(() => null),
     ]);
 
     await page.waitForTimeout(1000);
@@ -95,7 +96,10 @@ test.describe('Inventory Dashboard @smoke', () => {
     expect(records.length, 'KPI NQ should return 1 row').toBe(1);
 
     const kpi = records[0];
-    expect(Number(kpi.active_warehouses), 'Should have at least 1 active warehouse').toBeGreaterThanOrEqual(1);
+    expect(
+      Number(kpi.active_warehouses),
+      'Should have at least 1 active warehouse',
+    ).toBeGreaterThanOrEqual(1);
   });
 
   test('INV-DASH-03: Movement trend NQ is queryable via chart-data API', async ({ page }) => {

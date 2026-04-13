@@ -53,9 +53,7 @@ export const DesignerEmptyState: React.FC<DesignerEmptyStateProps> = ({
         data-testid={testId}
         className="flex h-full flex-col items-center justify-center text-gray-400"
       >
-        <div className="mb-4 text-gray-300">
-          {icon || <DefaultIcon className="h-16 w-16" />}
-        </div>
+        <div className="mb-4 text-gray-300">{icon || <DefaultIcon className="h-16 w-16" />}</div>
         <p className="text-lg font-medium">{titleText}</p>
         {subtitleText && <p className="mt-1 text-sm">{subtitleText}</p>}
       </div>
@@ -68,9 +66,7 @@ export const DesignerEmptyState: React.FC<DesignerEmptyStateProps> = ({
       data-testid={testId}
       className="flex h-48 flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 text-gray-400"
     >
-      <div className="mb-3 text-gray-300">
-        {icon || <DefaultIcon className="h-12 w-12" />}
-      </div>
+      <div className="mb-3 text-gray-300">{icon || <DefaultIcon className="h-12 w-12" />}</div>
       <p className="text-sm font-medium">{titleText}</p>
       {subtitleText && <p className="mt-1 text-xs">{subtitleText}</p>}
     </div>

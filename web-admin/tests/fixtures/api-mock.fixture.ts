@@ -48,7 +48,7 @@ export async function setupCrudMocks(page: Page, config: ApiMockConfig): Promise
   const pageSize = config.pageSize ?? 20;
 
   // List endpoint
-  await page.route(`**${basePath}/list*`, async route => {
+  await page.route(`**${basePath}/list*`, async (route) => {
     const url = new URL(route.request().url());
     const page = parseInt(url.searchParams.get('pageNum') ?? '1');
     const size = parseInt(url.searchParams.get('pageSize') ?? String(pageSize));
@@ -66,28 +66,26 @@ export async function setupCrudMocks(page: Page, config: ApiMockConfig): Promise
   });
 
   // Get by ID endpoint
-  await page.route(`**${basePath}/*`, async route => {
+  await page.route(`**${basePath}/*`, async (route) => {
     if (route.request().method() !== 'get') {
       await route.fallback();
       return;
     }
     const url = route.request().url();
     const id = url.split('/').pop();
-    const record = records.find(r => r.id === id || r.pid === id);
+    const record = records.find((r) => r.id === id || r.pid === id);
 
     await route.fulfill({
       status: record ? 200 : 404,
       contentType: 'application/json',
       body: JSON.stringify(
-        record
-          ? { code: ErrorCodes.SUCCESS, data: record }
-          : { code: '404', desc: 'Not found' }
+        record ? { code: ErrorCodes.SUCCESS, data: record } : { code: '404', desc: 'Not found' },
       ),
     });
   });
 
   // Create endpoint
-  await page.route(`**${basePath}`, async route => {
+  await page.route(`**${basePath}`, async (route) => {
     if (route.request().method() !== 'post') {
       await route.fallback();
       return;
@@ -103,7 +101,7 @@ export async function setupCrudMocks(page: Page, config: ApiMockConfig): Promise
   });
 
   // Update endpoint
-  await page.route(`**${basePath}/*`, async route => {
+  await page.route(`**${basePath}/*`, async (route) => {
     if (route.request().method() !== 'put') {
       await route.fallback();
       return;
@@ -118,7 +116,7 @@ export async function setupCrudMocks(page: Page, config: ApiMockConfig): Promise
   });
 
   // Delete endpoint
-  await page.route(`**${basePath}/*`, async route => {
+  await page.route(`**${basePath}/*`, async (route) => {
     if (route.request().method() !== 'delete') {
       await route.fallback();
       return;
@@ -140,13 +138,13 @@ export async function setupDataSourceMock(
   datasourceId: string,
   options: Array<{ value: string; label: string }>,
 ): Promise<void> {
-  await page.route(`**/api/datasource/list*datasourceId=${datasourceId}*`, async route => {
+  await page.route(`**/api/datasource/list*datasourceId=${datasourceId}*`, async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
         code: ErrorCodes.SUCCESS,
-        data: options.map(o => ({ value: o.value, name: o.label })),
+        data: options.map((o) => ({ value: o.value, name: o.label })),
       }),
     });
   });
@@ -161,7 +159,7 @@ export async function interceptApiCalls(
 ): Promise<{ calls: Array<{ method: string; url: string; body: any }> }> {
   const calls: Array<{ method: string; url: string; body: any }> = [];
 
-  await page.route(pattern, async route => {
+  await page.route(pattern, async (route) => {
     calls.push({
       method: route.request().method(),
       url: route.request().url(),
@@ -183,7 +181,7 @@ export async function waitForApiCall(
   timeout: number = 5000,
 ): Promise<{ url: string; body: any }> {
   const response = await page.waitForRequest(
-    req => req.url().includes(urlPattern) && req.method() === method,
+    (req) => req.url().includes(urlPattern) && req.method() === method,
     { timeout },
   );
   return {

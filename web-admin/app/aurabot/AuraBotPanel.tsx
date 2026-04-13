@@ -3,7 +3,14 @@ import { useAuraBot } from './AuraBotProvider';
 import { AuraBotChat } from './components/AuraBotChat';
 import { ContextSuggestions } from './components/ContextSuggestions';
 import { ActionBar } from './components/ActionBar';
-import { XMarkIcon, Cog6ToothIcon, ChevronUpDownIcon } from '@heroicons/react/24/outline';
+import {
+  XMarkIcon,
+  Cog6ToothIcon,
+  ChevronUpDownIcon,
+  ClockIcon,
+  PlusIcon,
+  TrashIcon,
+} from '@heroicons/react/24/outline';
 import { useNavigate } from 'react-router';
 
 interface AgentOption {
@@ -18,11 +25,14 @@ const AURABOT_DEFAULT: AgentOption = {
 };
 
 export function AuraBotPanel() {
-  const { state, closePanel, sendMessage, setSelectedAgent } = useAuraBot();
+  const { state, sessions, closePanel, sendMessage, setSelectedAgent, newSession, selectSession, deleteSession } =
+    useAuraBot();
   const navigate = useNavigate();
   const [agents, setAgents] = useState<AgentOption[]>([AURABOT_DEFAULT]);
   const [selectorOpen, setSelectorOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const selectorRef = useRef<HTMLDivElement>(null);
+  const historyRef = useRef<HTMLDivElement>(null);
 
   // Fetch available ACP agents when panel expands
   useEffect(() => {
@@ -30,9 +40,12 @@ export function AuraBotPanel() {
 
     const loadAgents = async () => {
       try {
-        const res = await fetch('/api/dynamic/agent-definition/list?pageSize=50&sortField=agent_code&sortOrder=ASC', {
-          credentials: 'include',
-        });
+        const res = await fetch(
+          '/api/dynamic/agent-definition/list?pageSize=50&sortField=agent_code&sortOrder=ASC',
+          {
+            credentials: 'include',
+          },
+        );
         if (!res.ok) return;
         const json = await res.json();
         const records: AgentOption[] = json?.data?.records || [];
@@ -59,6 +72,17 @@ export function AuraBotPanel() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [selectorOpen]);
 
+  useEffect(() => {
+    if (!historyOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (historyRef.current && !historyRef.current.contains(e.target as Node)) {
+        setHistoryOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [historyOpen]);
+
   const handleAgentSelect = useCallback(
     (agentCode: string) => {
       setSelectedAgent(agentCode);
@@ -77,7 +101,8 @@ export function AuraBotPanel() {
     sendMessage(prompt);
   };
 
-  const currentAgent = agents.find((a) => a.agent_code === state.selectedAgentCode) || AURABOT_DEFAULT;
+  const currentAgent =
+    agents.find((a) => a.agent_code === state.selectedAgentCode) || AURABOT_DEFAULT;
 
   return (
     <div
@@ -122,8 +147,16 @@ export function AuraBotPanel() {
                   </span>
                   <span className="truncate">{agent.agent_name || agent.agent_code}</span>
                   {agent.agent_code === state.selectedAgentCode && (
-                    <svg className="ml-auto h-4 w-4 flex-shrink-0 text-blue-500" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
+                    <svg
+                      className="ml-auto h-4 w-4 flex-shrink-0 text-blue-500"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z"
+                        clipRule="evenodd"
+                      />
                     </svg>
                   )}
                 </button>
@@ -132,6 +165,100 @@ export function AuraBotPanel() {
           )}
         </div>
         <div className="flex items-center gap-1">
+          <div ref={historyRef} className="relative">
+            <button
+              onClick={() => setHistoryOpen(!historyOpen)}
+              className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-white/50 hover:text-gray-600 dark:hover:bg-gray-700/50 dark:hover:text-gray-300"
+              title="Chat History"
+              data-testid="aurabot-history-trigger"
+            >
+              <ClockIcon className="h-4 w-4" />
+            </button>
+
+            {historyOpen && (
+              <div
+                className="absolute top-full right-0 z-50 mt-1 w-80 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-600 dark:bg-gray-800"
+                data-testid="aurabot-history-dropdown"
+              >
+                <div className="flex items-center justify-between border-b border-gray-100 px-3 py-2 dark:border-gray-700">
+                  <div>
+                    <div className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                      历史对话
+                    </div>
+                    <div className="text-[11px] text-gray-400">
+                      历史会话已持久化到数据库
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      newSession();
+                      setHistoryOpen(false);
+                    }}
+                    className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-300 dark:hover:bg-blue-900/40"
+                    data-testid="aurabot-new-session"
+                  >
+                    <PlusIcon className="h-3.5 w-3.5" />
+                    新对话
+                  </button>
+                </div>
+
+                <div className="max-h-96 overflow-y-auto p-2">
+                  {sessions.length === 0 ? (
+                    <div className="px-3 py-8 text-center text-sm text-gray-400">暂无历史对话</div>
+                  ) : (
+                    sessions.map((session) => (
+                      <div
+                        key={session.sessionId}
+                        onClick={() => {
+                          selectSession(session.sessionId);
+                          setHistoryOpen(false);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            selectSession(session.sessionId);
+                            setHistoryOpen(false);
+                          }
+                        }}
+                        role="button"
+                        tabIndex={0}
+                        className={`group mb-1 block w-full rounded-lg border px-3 py-2 text-left transition-colors ${
+                          session.conversationId === state.currentConversationId
+                            ? 'border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20'
+                            : 'border-transparent hover:border-gray-200 hover:bg-gray-50 dark:hover:border-gray-700 dark:hover:bg-gray-700/40'
+                        }`}
+                        data-testid={`aurabot-session-${session.sessionId}`}
+                      >
+                        <div className="flex items-start gap-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-sm font-medium text-gray-800 dark:text-gray-200">
+                              {session.title}
+                            </div>
+                            <div className="mt-0.5 truncate text-xs text-gray-400">
+                              {session.lastMessagePreview || `${session.messageCount} 条消息`}
+                            </div>
+                            <div className="mt-1 text-[10px] text-gray-400">
+                              {new Date(session.updatedAt).toLocaleString('zh-CN')}
+                            </div>
+                          </div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteSession(session.sessionId);
+                            }}
+                            className="rounded p-1 text-gray-300 opacity-0 transition hover:bg-red-50 hover:text-red-500 group-hover:opacity-100 dark:hover:bg-red-900/20"
+                            title="Delete Session"
+                          >
+                            <TrashIcon className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
           <button
             onClick={() => navigate('/aurabot/providers')}
             className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-white/50 hover:text-gray-600 dark:hover:bg-gray-700/50 dark:hover:text-gray-300"

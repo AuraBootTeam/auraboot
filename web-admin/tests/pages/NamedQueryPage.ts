@@ -9,7 +9,13 @@
  * @since 4.0.0
  */
 
-import { type APIResponse, type Page, type Locator, type Response as PWResponse, expect } from '@playwright/test';
+import {
+  type APIResponse,
+  type Page,
+  type Locator,
+  type Response as PWResponse,
+  expect,
+} from '@playwright/test';
 import { BasePage } from './BasePage';
 
 export type NqTab = 'basic' | 'fields' | 'test' | 'policy' | 'versions';
@@ -216,7 +222,8 @@ export class NamedQueryPage extends BasePage {
         const input = node as HTMLInputElement;
         if (input) {
           const nativeSetter = Object.getOwnPropertyDescriptor(
-            HTMLInputElement.prototype, 'value'
+            HTMLInputElement.prototype,
+            'value',
           )!.set!;
           nativeSetter.call(input, text);
           input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -235,17 +242,21 @@ export class NamedQueryPage extends BasePage {
 
   /** Click submit and wait for create response (or URL transition fallback). */
   async submitCreate(): Promise<PWResponse | null> {
-    const responsePromise = this.page.waitForResponse(
-      (res) =>
-        res.url().includes('/api/meta/named-queries') &&
-        res.request().method().toLowerCase() === 'post',
-      { timeout: 15000 },
-    ).catch(() => null);
+    const responsePromise = this.page
+      .waitForResponse(
+        (res) =>
+          res.url().includes('/api/meta/named-queries') &&
+          res.request().method().toLowerCase() === 'post',
+        { timeout: 15000 },
+      )
+      .catch(() => null);
 
     const submitBtn = this.submitButton.or(
-      this.page.locator(
-        'button[data-testid="form-btn-save"], button:has-text("创建"), button:has-text("Create"), button:has-text("保存"), button:has-text("Save")'
-      ).first()
+      this.page
+        .locator(
+          'button[data-testid="form-btn-save"], button:has-text("创建"), button:has-text("Create"), button:has-text("保存"), button:has-text("Save")',
+        )
+        .first(),
     );
     await expect(submitBtn).toBeVisible({ timeout: 5000 });
     await submitBtn.click();
@@ -254,9 +265,13 @@ export class NamedQueryPage extends BasePage {
     if (resp) return resp;
 
     const movedToEdit = await this.page
-      .waitForURL((url) => /\/meta\/named-queries\/[^/]+/.test(url.toString()) && !url.toString().includes('/new'), {
-        timeout: 8000,
-      })
+      .waitForURL(
+        (url) =>
+          /\/meta\/named-queries\/[^/]+/.test(url.toString()) && !url.toString().includes('/new'),
+        {
+          timeout: 8000,
+        },
+      )
       .then(() => true)
       .catch(() => false);
     return movedToEdit ? null : null;
@@ -276,25 +291,29 @@ export class NamedQueryPage extends BasePage {
 
   /** Click save on the edit page and wait for the PUT response */
   async save(): Promise<void> {
-    const savePromise = this.page.waitForResponse(
-      (res) =>
-        res.url().includes('/api/meta/named-queries') &&
-        res.request().method().toLowerCase() === 'put',
-      { timeout: 10000 },
-    ).catch(() => null);
+    const savePromise = this.page
+      .waitForResponse(
+        (res) =>
+          res.url().includes('/api/meta/named-queries') &&
+          res.request().method().toLowerCase() === 'put',
+        { timeout: 10000 },
+      )
+      .catch(() => null);
     await this.saveButton.click();
     await savePromise;
   }
 
   /** Save policy and wait for response */
   async savePolicy(): Promise<void> {
-    const savePromise = this.page.waitForResponse(
-      (res) =>
-        res.url().includes('/api/meta/named-queries') &&
-        res.url().includes('/policy') &&
-        res.request().method().toLowerCase() === 'put',
-      { timeout: 10000 },
-    ).catch(() => null);
+    const savePromise = this.page
+      .waitForResponse(
+        (res) =>
+          res.url().includes('/api/meta/named-queries') &&
+          res.url().includes('/policy') &&
+          res.request().method().toLowerCase() === 'put',
+        { timeout: 10000 },
+      )
+      .catch(() => null);
     await this.savePolicyButton.click();
     await savePromise;
   }

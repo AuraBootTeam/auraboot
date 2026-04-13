@@ -55,24 +55,19 @@ async function expandDpMenu(page: Page): Promise<void> {
   await page.waitForResponse(() => true, { timeout: 2000 }).catch(() => null);
 }
 
-async function navigateToList(
-  page: Page,
-  path: string,
-  modelUrl: string,
-): Promise<void> {
+async function navigateToList(page: Page, path: string, modelUrl: string): Promise<void> {
   await expandDpMenu(page);
   const nav = page.locator('nav');
   const link = nav.locator(`a[href="${path}"]`).first();
   await link.waitFor({ state: 'attached', timeout: 8000 });
-  const listResp = page.waitForResponse(
-    (r: Response) => r.url().includes(modelUrl) && r.status() === 200,
-    { timeout: 15000 },
-  ).catch(() => null);
+  const listResp = page
+    .waitForResponse((r: Response) => r.url().includes(modelUrl) && r.status() === 200, {
+      timeout: 15000,
+    })
+    .catch(() => null);
   await link.evaluate((el: HTMLElement) => el.click());
   await listResp;
-  await expect(
-    page.locator('table, [class*="ant-table"]').first(),
-  ).toBeVisible({ timeout: 10000 });
+  await expect(page.locator('table, [class*="ant-table"]').first()).toBeVisible({ timeout: 10000 });
 }
 
 // ---------------------------------------------------------------------------
@@ -91,7 +86,8 @@ test.describe('Dual Prevention — Issue & Hazard CRUD @critical', () => {
     const page = await ctx.newPage();
     try {
       const resp = await page.request.get('/api/meta/models/code/dp_issue');
-      pluginInstalled = resp.ok();
+      const body = await resp.json().catch(() => ({}));
+      pluginInstalled = resp.ok() && body?.data?.status === 'published';
       if (pluginInstalled) {
         // Fetch a valid PM project ID (required for dp_issue creation)
         const projResp = await page.request.get('/api/dynamic/pm_project/list?pageSize=1');
@@ -135,18 +131,18 @@ test.describe('Dual Prevention — Issue & Hazard CRUD @critical', () => {
     expect(hazardSourcePid, 'Hazard source PID must be returned').toBeTruthy();
 
     // Verify via API
-    const detailResp = await page.request.get(`/api/dynamic/dp-hazard-source/${hazardSourcePid}`);
+    const detailResp = await page.request.get(`/api/dynamic/dp_hazard_source/${hazardSourcePid}`);
     expect(detailResp.status()).toBe(200);
     const body = await detailResp.json();
     expect(body.data).toBeTruthy();
     expect(body.data.dp_hs_name).toContain(UID);
 
     // Navigate to hazard source list and verify entry is visible
-    await navigateToList(page, '/dual-prevention/hazards', '/api/dynamic/dp-hazard-source');
+    await navigateToList(page, '/dual-prevention/hazards', '/api/dynamic/dp_hazard_source');
 
     // Search or wait for our record
     const listResp = await page.request.get(
-      `/api/dynamic/dp-hazard-source/list?pageNum=1&pageSize=20&keyword=${UID}`,
+      `/api/dynamic/dp_hazard_source/list?pageNum=1&pageSize=20&keyword=${UID}`,
     );
     expect(listResp.status()).toBe(200);
     const listBody = await listResp.json();
@@ -156,7 +152,11 @@ test.describe('Dual Prevention — Issue & Hazard CRUD @critical', () => {
   // -------------------------------------------------------------------------
   // DP-C002: Create issue draft → verify draft status
   // -------------------------------------------------------------------------
-  test('DP-C002: create issue in draft status → API confirms draft', async ({ page }: { page: Page }) => {
+  test('DP-C002: create issue in draft status → API confirms draft', async ({
+    page,
+  }: {
+    page: Page;
+  }) => {
     if (!pluginInstalled) {
       test.skip(true, 'dual-prevention plugin not installed');
       return;
@@ -179,14 +179,14 @@ test.describe('Dual Prevention — Issue & Hazard CRUD @critical', () => {
     expect(issuePid, 'Issue PID must be returned').toBeTruthy();
 
     // Verify initial status is draft
-    const detailResp = await page.request.get(`/api/dynamic/dp-issue/${issuePid}`);
+    const detailResp = await page.request.get(`/api/dynamic/dp_issue/${issuePid}`);
     expect(detailResp.status()).toBe(200);
     const body = await detailResp.json();
     expect(body.data.dp_issue_status).toBe('draft');
     expect(body.data.dp_issue_title).toContain(UID);
 
     // Navigate to issues list and verify New button is visible
-    await navigateToList(page, '/dual-prevention/issues', '/api/dynamic/dp-issue');
+    await navigateToList(page, '/dual-prevention/issues', '/api/dynamic/dp_issue');
     const createBtn = page.locator('button', { hasText: /新建|Create|创建/ }).first();
     await expect(createBtn).toBeVisible({ timeout: 5000 });
   });
@@ -212,16 +212,16 @@ test.describe('Dual Prevention — Issue & Hazard CRUD @critical', () => {
     expect(submitResult.status()).toBeLessThan(400);
 
     // Verify status changed to pending
-    const detailResp = await page.request.get(`/api/dynamic/dp-issue/${issuePid}`);
+    const detailResp = await page.request.get(`/api/dynamic/dp_issue/${issuePid}`);
     expect(detailResp.status()).toBe(200);
     const body = await detailResp.json();
     expect(body.data.dp_issue_status).toBe('pending');
 
     // Navigate to issues list and verify our record appears
-    await navigateToList(page, '/dual-prevention/issues', '/api/dynamic/dp-issue');
+    await navigateToList(page, '/dual-prevention/issues', '/api/dynamic/dp_issue');
 
     const listResp = await page.request.get(
-      `/api/dynamic/dp-issue/list?pageNum=1&pageSize=20&keyword=${UID}`,
+      `/api/dynamic/dp_issue/list?pageNum=1&pageSize=20&keyword=${UID}`,
     );
     expect(listResp.status()).toBe(200);
     const listBody = await listResp.json();
@@ -234,7 +234,11 @@ test.describe('Dual Prevention — Issue & Hazard CRUD @critical', () => {
   // -------------------------------------------------------------------------
   // DP-C004: Triage issue with no_action decision
   // -------------------------------------------------------------------------
-  test('DP-C004: triage issue with no_action → status becomes no_action', async ({ page }: { page: Page }) => {
+  test('DP-C004: triage issue with no_action → status becomes no_action', async ({
+    page,
+  }: {
+    page: Page;
+  }) => {
     if (!pluginInstalled) {
       test.skip(true, 'dual-prevention plugin not installed');
       return;
@@ -255,7 +259,7 @@ test.describe('Dual Prevention — Issue & Hazard CRUD @critical', () => {
     expect(triageResult.status()).toBeLessThan(400);
 
     // Verify final status
-    const detailResp = await page.request.get(`/api/dynamic/dp-issue/${issuePid}`);
+    const detailResp = await page.request.get(`/api/dynamic/dp_issue/${issuePid}`);
     expect(detailResp.status()).toBe(200);
     const body = await detailResp.json();
     expect(body.data.dp_issue_status).toBe('no_action');
@@ -265,7 +269,11 @@ test.describe('Dual Prevention — Issue & Hazard CRUD @critical', () => {
   // DP-C005: Full issue lifecycle — draft → pending → triage(need_rectify) → rectifying
   //          Side effect: creates rectification record automatically
   // -------------------------------------------------------------------------
-  test('DP-C005: triage need_rectify → creates rectification side-effect', async ({ page }: { page: Page }) => {
+  test('DP-C005: triage need_rectify → creates rectification side-effect', async ({
+    page,
+  }: {
+    page: Page;
+  }) => {
     if (!pluginInstalled) {
       test.skip(true, 'dual-prevention plugin not installed');
       return;
@@ -310,26 +318,29 @@ test.describe('Dual Prevention — Issue & Hazard CRUD @critical', () => {
     expect(triageResp.status()).toBeLessThan(400);
 
     // Verify issue status is now rectifying
-    const issueDetail = await page.request.get(`/api/dynamic/dp-issue/${newIssuePid}`);
+    const issueDetail = await page.request.get(`/api/dynamic/dp_issue/${newIssuePid}`);
     const issueBody = await issueDetail.json();
     expect(issueBody.data.dp_issue_status).toBe('rectifying');
 
     // Verify a rectification record was created via side-effect
     const rectListResp = await page.request.get(
-      `/api/dynamic/dp-rectification/list?pageNum=1&pageSize=50`,
+      `/api/dynamic/dp_rectification/list?pageNum=1&pageSize=50`,
     );
     expect(rectListResp.status()).toBe(200);
     const rectListBody = await rectListResp.json();
 
-    const linkedRect = (rectListBody.data.records as Array<{ dp_rect_issue_id?: string; dp_rect_status?: string }>).find(
-      (r) => r.dp_rect_issue_id === newIssuePid,
-    );
-    expect(linkedRect, 'A rectification record should be created as side-effect of need_rectify triage').toBeTruthy();
+    const linkedRect = (
+      rectListBody.data.records as Array<{ dp_rect_issue_id?: string; dp_rect_status?: string }>
+    ).find((r) => r.dp_rect_issue_id === newIssuePid);
+    expect(
+      linkedRect,
+      'A rectification record should be created as side-effect of need_rectify triage',
+    ).toBeTruthy();
     expect(linkedRect!.dp_rect_status).toBe('initiated');
 
     // Save rectification pid for lifecycle test
     const rectListFiltered = await page.request.get(
-      `/api/dynamic/dp-rectification/list?pageNum=1&pageSize=10`,
+      `/api/dynamic/dp_rectification/list?pageNum=1&pageSize=10`,
     );
     const rectBody = await rectListFiltered.json();
     const rect = (rectBody.data.records as Array<{ dp_rect_issue_id?: string; pid?: string }>).find(
@@ -341,7 +352,11 @@ test.describe('Dual Prevention — Issue & Hazard CRUD @critical', () => {
   // -------------------------------------------------------------------------
   // DP-C006: Rectification lifecycle — initiated → start → submit → accept
   // -------------------------------------------------------------------------
-  test('DP-C006: rectification lifecycle initiated → in_progress → submitted → done', async ({ page }: { page: Page }) => {
+  test('DP-C006: rectification lifecycle initiated → in_progress → submitted → done', async ({
+    page,
+  }: {
+    page: Page;
+  }) => {
     if (!pluginInstalled) {
       test.skip(true, 'dual-prevention plugin not installed');
       return;
@@ -368,7 +383,7 @@ test.describe('Dual Prevention — Issue & Hazard CRUD @critical', () => {
     expect(rectificationPid, 'Rectification PID is required').toBeTruthy();
 
     // Verify initial status is initiated
-    const detail1 = await page.request.get(`/api/dynamic/dp-rectification/${rectificationPid}`);
+    const detail1 = await page.request.get(`/api/dynamic/dp_rectification/${rectificationPid}`);
     const body1 = await detail1.json();
     expect(['initiated', 'in_progress']).toContain(body1.data.dp_rect_status);
 
@@ -379,41 +394,47 @@ test.describe('Dual Prevention — Issue & Hazard CRUD @critical', () => {
     expect(startResp.status()).toBeLessThan(400);
 
     // Submit rectification
-    const submitResp = await page.request.post('/api/meta/commands/execute/dp:submit_rectification', {
-      data: {
-        targetRecordId: rectificationPid,
-        operationType: 'update',
-        payload: {
-          dp_rect_result: `E2E rectification completed ${UID}`,
+    const submitResp = await page.request.post(
+      '/api/meta/commands/execute/dp:submit_rectification',
+      {
+        data: {
+          targetRecordId: rectificationPid,
+          operationType: 'update',
+          payload: {
+            dp_rect_result: `E2E rectification completed ${UID}`,
+          },
         },
       },
-    });
+    );
     expect(submitResp.status()).toBeLessThan(400);
 
     // Verify status = submitted
-    const detail2 = await page.request.get(`/api/dynamic/dp-rectification/${rectificationPid}`);
+    const detail2 = await page.request.get(`/api/dynamic/dp_rectification/${rectificationPid}`);
     const body2 = await detail2.json();
     expect(body2.data.dp_rect_status).toBe('submitted');
 
     // Accept rectification
-    const acceptResp = await page.request.post('/api/meta/commands/execute/dp:accept_rectification', {
-      data: {
-        targetRecordId: rectificationPid,
-        operationType: 'update',
-        payload: {
-          dp_rect_accept_remark: `E2E acceptance ${UID}`,
+    const acceptResp = await page.request.post(
+      '/api/meta/commands/execute/dp:accept_rectification',
+      {
+        data: {
+          targetRecordId: rectificationPid,
+          operationType: 'update',
+          payload: {
+            dp_rect_accept_remark: `E2E acceptance ${UID}`,
+          },
         },
       },
-    });
+    );
     expect(acceptResp.status()).toBeLessThan(400);
 
     // Verify final status = done (or accepted)
-    const detail3 = await page.request.get(`/api/dynamic/dp-rectification/${rectificationPid}`);
+    const detail3 = await page.request.get(`/api/dynamic/dp_rectification/${rectificationPid}`);
     const body3 = await detail3.json();
     expect(['done', 'accepted', 'closed']).toContain(body3.data.dp_rect_status);
 
     // Navigate to rectification list and verify the record is visible
-    await navigateToList(page, '/dual-prevention/rectifications', '/api/dynamic/dp-rectification');
+    await navigateToList(page, '/dual-prevention/rectifications', '/api/dynamic/dp_rectification');
 
     const table = page.locator('table, [class*="ant-table"]').first();
     await expect(table).toBeVisible({ timeout: 10000 });
@@ -422,16 +443,22 @@ test.describe('Dual Prevention — Issue & Hazard CRUD @critical', () => {
   // -------------------------------------------------------------------------
   // DP-C007: Issues list filter by status
   // -------------------------------------------------------------------------
-  test('DP-C007: issues list — status filter API returns filtered results', async ({ page }: { page: Page }) => {
+  test('DP-C007: issues list — status filter API returns filtered results', async ({
+    page,
+  }: {
+    page: Page;
+  }) => {
     if (!pluginInstalled) {
       test.skip(true, 'dual-prevention plugin not installed');
       return;
     }
 
     // Query issues filtered by status=draft
-    const resp = await page.request.get('/api/dynamic/dp-issue/list?pageNum=1&pageSize=50', {
+    const resp = await page.request.get('/api/dynamic/dp_issue/list?pageNum=1&pageSize=50', {
       params: {
-        filters: JSON.stringify([{ fieldName: 'dp_issue_status', operator: 'eq', value: 'no_action' }]),
+        filters: JSON.stringify([
+          { fieldName: 'dp_issue_status', operator: 'eq', value: 'no_action' },
+        ]),
       },
     });
     expect(resp.status()).toBe(200);
@@ -447,7 +474,11 @@ test.describe('Dual Prevention — Issue & Hazard CRUD @critical', () => {
   // -------------------------------------------------------------------------
   // DP-C008: Quality standard CRUD — create and verify
   // -------------------------------------------------------------------------
-  test('DP-C008: create quality standard → visible in quality standards list', async ({ page }: { page: Page }) => {
+  test('DP-C008: create quality standard → visible in quality standards list', async ({
+    page,
+  }: {
+    page: Page;
+  }) => {
     if (!pluginInstalled) {
       test.skip(true, 'dual-prevention plugin not installed');
       return;
@@ -469,17 +500,19 @@ test.describe('Dual Prevention — Issue & Hazard CRUD @critical', () => {
     expect(standardPid).toBeTruthy();
 
     // Verify via API
-    const detailResp = await page.request.get(`/api/dynamic/dp-quality-standard/${standardPid}`);
+    const detailResp = await page.request.get(`/api/dynamic/dp_quality_standard/${standardPid}`);
     expect(detailResp.status()).toBe(200);
     const body = await detailResp.json();
     expect(body.data.dp_qs_name).toContain(UID);
 
     // Navigate to quality standards list (uses /dual-prevention/quality-standards)
     await page.goto('/dual-prevention/quality-standards', { waitUntil: 'domcontentloaded' });
-    await page.waitForResponse(
-      (r: Response) => r.url().includes('/api/dynamic/dp-quality-standard') && r.status() === 200,
-      { timeout: 15000 },
-    ).catch(() => null);
+    await page
+      .waitForResponse(
+        (r: Response) => r.url().includes('/api/dynamic/dp_quality_standard') && r.status() === 200,
+        { timeout: 15000 },
+      )
+      .catch(() => null);
 
     const table = page.locator('table, [class*="ant-table"]').first();
     const emptyState = page.locator('[class*="empty"]').or(page.getByText('暂无数据')).first();

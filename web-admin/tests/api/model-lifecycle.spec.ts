@@ -65,9 +65,7 @@ test.describe('Model Lifecycle API', () => {
       const fieldPid = createBody.data?.pid;
       expect(fieldPid).toBeTruthy();
 
-      const bindResp = await request.post(
-        `/api/meta/models/${modelPid}/fields/${fieldPid}`
-      );
+      const bindResp = await request.post(`/api/meta/models/${modelPid}/fields/${fieldPid}`);
       expect(bindResp.ok()).toBe(true);
       const bindBody = await bindResp.json();
       expect(bindBody.code).toBe(ErrorCodes.SUCCESS);
@@ -83,9 +81,7 @@ test.describe('Model Lifecycle API', () => {
   test('INT-03: Publish model creates dynamic table', async ({ request }) => {
     test.skip(!modelPid, 'INT-01 must run first to create the model (serial dependency)');
 
-    const publishResponse = await request.post(
-      `/api/meta/models/${modelPid}/publish`
-    );
+    const publishResponse = await request.post(`/api/meta/models/${modelPid}/publish`);
 
     const publishBody = await publishResponse.json();
     if (!publishResponse.ok() || publishBody.code !== ErrorCodes.SUCCESS) {
@@ -94,9 +90,7 @@ test.describe('Model Lifecycle API', () => {
     }
     expect(publishBody.code).toBe(ErrorCodes.SUCCESS);
 
-    const getResponse = await request.get(
-      `/api/meta/models/${modelPid}`
-    );
+    const getResponse = await request.get(`/api/meta/models/${modelPid}`);
 
     expect(getResponse.ok()).toBe(true);
     const getBody = await getResponse.json();
@@ -104,9 +98,7 @@ test.describe('Model Lifecycle API', () => {
     expect(getBody.data.status).toBe('published');
     modelPublished = true;
 
-    const dynamicResponse = await request.get(
-      `/api/dynamic/${modelCode}/list`
-    );
+    const dynamicResponse = await request.get(`/api/dynamic/${modelCode}/list`);
 
     expect(dynamicResponse.ok()).toBe(true);
     const dynamicBody = await dynamicResponse.json();
@@ -116,14 +108,11 @@ test.describe('Model Lifecycle API', () => {
   test('INT-04: Create record in dynamic table', async ({ request }) => {
     test.skip(!modelPid || !modelPublished, 'INT-03 must succeed first (model must be published)');
 
-    const createResponse = await request.post(
-      `/api/dynamic/${modelCode}`,
-      {
-        data: {
-          [nameFieldCode]: 'Integration Test Record',
-        },
-      }
-    );
+    const createResponse = await request.post(`/api/dynamic/${modelCode}`, {
+      data: {
+        [nameFieldCode]: 'Integration Test Record',
+      },
+    });
 
     expect(createResponse.ok()).toBe(true);
     const createBody = await createResponse.json();
@@ -137,9 +126,7 @@ test.describe('Model Lifecycle API', () => {
   test('INT-05: Read record from dynamic table', async ({ request }) => {
     test.skip(!recordPid, 'INT-04 must run first (serial dependency)');
 
-    const getResponse = await request.get(
-      `/api/dynamic/${modelCode}/${recordPid}`
-    );
+    const getResponse = await request.get(`/api/dynamic/${modelCode}/${recordPid}`);
 
     expect(getResponse.ok()).toBe(true);
     const getBody = await getResponse.json();
@@ -151,22 +138,17 @@ test.describe('Model Lifecycle API', () => {
   test('INT-06: Update record in dynamic table', async ({ request }) => {
     test.skip(!recordPid, 'INT-04 must run first (serial dependency)');
 
-    const updateResponse = await request.put(
-      `/api/dynamic/${modelCode}/${recordPid}`,
-      {
-        data: {
-          [nameFieldCode]: 'Updated Record',
-        },
-      }
-    );
+    const updateResponse = await request.put(`/api/dynamic/${modelCode}/${recordPid}`, {
+      data: {
+        [nameFieldCode]: 'Updated Record',
+      },
+    });
 
     expect(updateResponse.ok()).toBe(true);
     const updateBody = await updateResponse.json();
     expect(updateBody.code).toBe(ErrorCodes.SUCCESS);
 
-    const verifyResponse = await request.get(
-      `/api/dynamic/${modelCode}/${recordPid}`
-    );
+    const verifyResponse = await request.get(`/api/dynamic/${modelCode}/${recordPid}`);
 
     expect(verifyResponse.ok()).toBe(true);
     const verifyBody = await verifyResponse.json();
@@ -176,23 +158,17 @@ test.describe('Model Lifecycle API', () => {
   test('INT-07: Delete record from dynamic table', async ({ request }) => {
     test.skip(!recordPid, 'INT-04 must run first (serial dependency)');
 
-    const deleteResponse = await request.delete(
-      `/api/dynamic/${modelCode}/${recordPid}`
-    );
+    const deleteResponse = await request.delete(`/api/dynamic/${modelCode}/${recordPid}`);
 
     expect(deleteResponse.ok()).toBe(true);
     const deleteBody = await deleteResponse.json();
     expect(deleteBody.code).toBe(ErrorCodes.SUCCESS);
 
-    const verifyResponse = await request.get(
-      `/api/dynamic/${modelCode}/${recordPid}`
-    );
+    const verifyResponse = await request.get(`/api/dynamic/${modelCode}/${recordPid}`);
 
     const verifyBody = await verifyResponse.json();
     const isGone =
-      !verifyResponse.ok() ||
-      verifyBody.code !== ErrorCodes.SUCCESS ||
-      verifyBody.data === null;
+      !verifyResponse.ok() || verifyBody.code !== ErrorCodes.SUCCESS || verifyBody.data === null;
     expect(isGone).toBe(true);
   });
 

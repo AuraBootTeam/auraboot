@@ -13,7 +13,15 @@ export type ViewScope = 'personal' | 'team' | 'global';
 /**
  * View type determines the rendering mode
  */
-export type ViewType = 'table' | 'kanban' | 'calendar' | 'gallery' | 'gantt' | 'tree' | 'timeline' | 'form';
+export type ViewType =
+  | 'table'
+  | 'kanban'
+  | 'calendar'
+  | 'gallery'
+  | 'gantt'
+  | 'tree'
+  | 'timeline'
+  | 'form';
 
 /**
  * View type configuration for UI rendering
@@ -118,6 +126,16 @@ export interface ViewFilterConfig {
   isExpression?: boolean;
   /** Expression string (used when isExpression is true) */
   expression?: string;
+}
+
+/**
+ * Toolbar action button configuration for user customization.
+ */
+export interface ToolbarActionConfig {
+  code: string;
+  visible: boolean;
+  pinned: boolean;
+  order: number;
 }
 
 /**
@@ -244,6 +262,8 @@ export interface ViewConfig {
   rowHeight?: RowHeight;
   /** Conditional formatting rules (applied to TABLE view rows) */
   conditionalFormats?: ConditionalFormatRule[];
+  /** Toolbar action button configuration (visibility, pinning, order) */
+  toolbarActions?: ToolbarActionConfig[];
 
   // ==================== Kanban Fields ====================
 

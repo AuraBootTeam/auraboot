@@ -144,21 +144,21 @@ export function CrudTemplateWizard({
               id: 'page_list_001',
               pageName: `${modelName}列表`,
               pageType: 'list',
-              route: `/dynamic/${modelCode}`,
+              route: `/p/${modelCode}`,
               createdAt: new Date().toISOString(),
             },
             {
               id: 'page_form_001',
               pageName: `${modelName}表单`,
               pageType: 'form',
-              route: `/dynamic/${modelCode}/new`,
+              route: `/p/${modelCode}/new`,
               createdAt: new Date().toISOString(),
             },
             {
               id: 'page_detail_001',
               pageName: `${modelName}详情`,
               pageType: 'detail',
-              route: `/dynamic/${modelCode}/view/:id`,
+              route: `/p/${modelCode}/view/:id`,
               createdAt: new Date().toISOString(),
             },
           ],
@@ -166,7 +166,7 @@ export function CrudTemplateWizard({
             {
               id: 'menu_001',
               menuName: config.menuName || modelName,
-              menuPath: `/dynamic/${modelCode}`,
+              menuPath: `/p/${modelCode}`,
               icon: config.menuIcon,
               displayOrder: 100,
             },
@@ -203,9 +203,9 @@ export function CrudTemplateWizard({
           ],
         },
         accessLinks: {
-          listPage: `/dynamic/${modelCode}`,
-          formPage: `/dynamic/${modelCode}/new`,
-          detailPage: `/dynamic/${modelCode}/view/:id`,
+          listPage: `/p/${modelCode}`,
+          formPage: `/p/${modelCode}/new`,
+          detailPage: `/p/${modelCode}/view/:id`,
         },
       };
 

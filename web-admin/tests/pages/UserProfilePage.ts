@@ -61,7 +61,9 @@ export class UserProfilePage extends BasePage {
 
   /** All visible form inputs (excludes hidden and file inputs) */
   get formInputs(): Locator {
-    return this.page.locator('form:has(input[name="intent"][value="update-profile"]) input:not([type="hidden"]):not([type="file"])');
+    return this.page.locator(
+      'form:has(input[name="intent"][value="update-profile"]) input:not([type="hidden"]):not([type="file"])',
+    );
   }
 
   /** Enter edit mode */

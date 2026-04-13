@@ -18,11 +18,7 @@
  */
 
 import { test, expect, type Page } from '../../fixtures';
-import {
-  uniqueId,
-  executeCommandViaApi,
-  findRowInPaginatedList,
-} from '../helpers/index';
+import { uniqueId, executeCommandViaApi, findRowInPaginatedList } from '../helpers/index';
 
 // ---------------------------------------------------------------------------
 // Navigation helper
@@ -48,16 +44,15 @@ async function navigateToAnnualPlanPage(
   const leafLink = nav.getByRole('link', { name: leafName });
   await leafLink.scrollIntoViewIfNeeded();
   const listResponsePromise = page.waitForResponse(
-    (r) =>
-      r.url().includes(`/api/dynamic/${modelCode}/list`) && r.status() === 200,
+    (r) => r.url().includes(`/api/dynamic/${modelCode}/list`) && r.status() === 200,
     { timeout: 15_000 },
   );
   await leafLink.evaluate((el: HTMLElement) => el.click());
   await listResponsePromise;
 
-  await expect(
-    page.locator('table, [class*="ant-table"]').first(),
-  ).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator('table, [class*="ant-table"]').first()).toBeVisible({
+    timeout: 10_000,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -128,9 +123,7 @@ test.describe('Annual Plan — Smoke & Lifecycle', () => {
   // AP-001 @smoke: Navigate to 计划编制
   // =========================================================================
 
-  test('AP-001 @smoke: Navigate to 计划编制 list via sidebar menu', async ({
-    page,
-  }) => {
+  test('AP-001 @smoke: Navigate to 计划编制 list via sidebar menu', async ({ page }) => {
     await navigateToAnnualPlanPage(page, '计划编制', 'ap_annual_plan');
 
     // At least 1 row visible
@@ -148,9 +141,7 @@ test.describe('Annual Plan — Smoke & Lifecycle', () => {
   // AP-002 @smoke: Navigate to 工作包管理
   // =========================================================================
 
-  test('AP-002 @smoke: Navigate to 工作包管理 list via sidebar menu', async ({
-    page,
-  }) => {
+  test('AP-002 @smoke: Navigate to 工作包管理 list via sidebar menu', async ({ page }) => {
     await navigateToAnnualPlanPage(page, '工作包管理', 'ap_work_package');
 
     const table = page.locator('table, [class*="ant-table"]').first();
@@ -161,9 +152,7 @@ test.describe('Annual Plan — Smoke & Lifecycle', () => {
   // AP-003 @critical: Created plan appears in list with draft status
   // =========================================================================
 
-  test('AP-003 @critical: Created annual plan appears with draft status', async ({
-    page,
-  }) => {
+  test('AP-003 @critical: Created annual plan appears with draft status', async ({ page }) => {
     expect(approvalPlanId).toBeTruthy();
 
     // Navigate to list UI and verify the list loads
@@ -188,9 +177,7 @@ test.describe('Annual Plan — Smoke & Lifecycle', () => {
   // AP-004 @critical: Submit annual plan → submitted
   // =========================================================================
 
-  test('AP-004 @critical: Submit annual plan → submitted status', async ({
-    page,
-  }) => {
+  test('AP-004 @critical: Submit annual plan → submitted status', async ({ page }) => {
     expect(approvalPlanId).toBeTruthy();
 
     await executeCommandViaApi(
@@ -201,9 +188,7 @@ test.describe('Annual Plan — Smoke & Lifecycle', () => {
       'state_transition',
     );
 
-    const resp = await page.request.get(
-      `/api/dynamic/ap_annual_plan/${approvalPlanId}`,
-    );
+    const resp = await page.request.get(`/api/dynamic/ap_annual_plan/${approvalPlanId}`);
     expect(resp.ok()).toBe(true);
     const body = await resp.json();
     expect((body?.data ?? body).ap_plan_status).toBe('submitted');
@@ -213,9 +198,7 @@ test.describe('Annual Plan — Smoke & Lifecycle', () => {
   // AP-005 @critical: Approve annual plan → approved
   // =========================================================================
 
-  test('AP-005 @critical: Approve annual plan → approved status', async ({
-    page,
-  }) => {
+  test('AP-005 @critical: Approve annual plan → approved status', async ({ page }) => {
     expect(approvalPlanId).toBeTruthy();
 
     await executeCommandViaApi(
@@ -226,9 +209,7 @@ test.describe('Annual Plan — Smoke & Lifecycle', () => {
       'state_transition',
     );
 
-    const resp = await page.request.get(
-      `/api/dynamic/ap_annual_plan/${approvalPlanId}`,
-    );
+    const resp = await page.request.get(`/api/dynamic/ap_annual_plan/${approvalPlanId}`);
     expect(resp.ok()).toBe(true);
     const body = await resp.json();
     expect((body?.data ?? body).ap_plan_status).toBe('approved');
@@ -239,11 +220,13 @@ test.describe('Annual Plan — Smoke & Lifecycle', () => {
       (r) => r.url().includes('/api/dynamic/ap_annual_plan') && r.status() === 200,
       { timeout: 20_000 },
     );
-    await page.goto(`/dynamic/ap_annual_plan/${approvalPlanId}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/p/ap_annual_plan/${approvalPlanId}`, { waitUntil: 'domcontentloaded' });
     await detailRespPromise.catch(() => null); // don't fail if response already fired
 
     // Wait for content to load
-    await expect(page.locator('main, [class*="detail"], [class*="content"], body').first()).toBeVisible({
+    await expect(
+      page.locator('main, [class*="detail"], [class*="content"], body').first(),
+    ).toBeVisible({
       timeout: 10_000,
     });
     await page.waitForTimeout(2000); // brief wait for renders
@@ -251,8 +234,8 @@ test.describe('Annual Plan — Smoke & Lifecycle', () => {
     const pageContent = await page.locator('body').textContent();
     expect(
       pageContent?.includes('approved') ||
-      pageContent?.includes('已批准') ||
-      pageContent?.includes('已审批'),
+        pageContent?.includes('已批准') ||
+        pageContent?.includes('已审批'),
     ).toBe(true);
   });
 
@@ -260,9 +243,7 @@ test.describe('Annual Plan — Smoke & Lifecycle', () => {
   // AP-006 @critical: Reject flow — submit then reject → rejected
   // =========================================================================
 
-  test('AP-006 @critical: Submit then reject annual plan → rejected', async ({
-    page,
-  }) => {
+  test('AP-006 @critical: Submit then reject annual plan → rejected', async ({ page }) => {
     expect(rejectionPlanId).toBeTruthy();
 
     // Submit first
@@ -283,9 +264,7 @@ test.describe('Annual Plan — Smoke & Lifecycle', () => {
       'state_transition',
     );
 
-    const resp = await page.request.get(
-      `/api/dynamic/ap_annual_plan/${rejectionPlanId}`,
-    );
+    const resp = await page.request.get(`/api/dynamic/ap_annual_plan/${rejectionPlanId}`);
     expect(resp.ok()).toBe(true);
     const body = await resp.json();
     const finalStatus = (body?.data ?? body).ap_plan_status as string;

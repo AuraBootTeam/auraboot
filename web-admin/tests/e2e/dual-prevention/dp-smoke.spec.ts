@@ -29,12 +29,42 @@ import { test, expect, type Page } from '../../fixtures';
 const PLUGIN_ID = 'com.auraboot.dual-prevention';
 
 const DP_MENUS = [
-  { code: 'dp_dashboard',        path: '/dual-prevention/dashboard',           modelUrl: null,                          label: /安全仪表盘|Dashboard/ },
-  { code: 'dp_issues',           path: '/dual-prevention/issues',              modelUrl: '/api/dynamic/dp-issue',       label: /隐患管理|Issue Management/ },
-  { code: 'dp_rectifications',   path: '/dual-prevention/rectifications',      modelUrl: '/api/dynamic/dp-rectification', label: /整改管理|Rectification/ },
-  { code: 'dp_inspections',      path: '/dual-prevention/inspections',         modelUrl: '/api/dynamic/dp-inspection-task', label: /巡检管理|Inspection/ },
-  { code: 'dp_hazards',          path: '/dual-prevention/hazards',             modelUrl: '/api/dynamic/dp-hazard-source', label: /风险源库|Hazard Sources/ },
-  { code: 'dp_quality_checkpoints', path: '/dual-prevention/quality-checkpoints', modelUrl: '/api/dynamic/dp-quality-checkpoint', label: /质量检查|Quality/ },
+  {
+    code: 'dp_dashboard',
+    path: '/dual-prevention/dashboard',
+    modelUrl: null,
+    label: /安全仪表盘|Dashboard/,
+  },
+  {
+    code: 'dp_issues',
+    path: '/dual-prevention/issues',
+    modelUrl: '/api/dynamic/dp_issue',
+    label: /隐患管理|Issue Management/,
+  },
+  {
+    code: 'dp_rectifications',
+    path: '/dual-prevention/rectifications',
+    modelUrl: '/api/dynamic/dp_rectification',
+    label: /整改管理|Rectification/,
+  },
+  {
+    code: 'dp_inspections',
+    path: '/dual-prevention/inspections',
+    modelUrl: '/api/dynamic/dp_inspection_task',
+    label: /巡检管理|Inspection/,
+  },
+  {
+    code: 'dp_hazards',
+    path: '/dual-prevention/hazards',
+    modelUrl: '/api/dynamic/dp_hazard_source',
+    label: /风险源库|Hazard Sources/,
+  },
+  {
+    code: 'dp_quality_checkpoints',
+    path: '/dual-prevention/quality-checkpoints',
+    modelUrl: '/api/dynamic/dp_quality_checkpoint',
+    label: /质量检查|Quality/,
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -57,11 +87,7 @@ async function expandDpMenu(page: Page): Promise<void> {
   await page.waitForResponse(() => true, { timeout: 2000 }).catch(() => null);
 }
 
-async function navigateToDpPage(
-  page: Page,
-  path: string,
-  modelUrl: string | null,
-): Promise<void> {
+async function navigateToDpPage(page: Page, path: string, modelUrl: string | null): Promise<void> {
   await expandDpMenu(page);
 
   const nav = page.locator('nav');
@@ -70,10 +96,11 @@ async function navigateToDpPage(
   await link.scrollIntoViewIfNeeded();
 
   const responsePromise = modelUrl
-    ? page.waitForResponse(
-        (r) => r.url().includes(modelUrl) && r.status() === 200,
-        { timeout: 15000 },
-      ).catch(() => null)
+    ? page
+        .waitForResponse((r) => r.url().includes(modelUrl) && r.status() === 200, {
+          timeout: 15000,
+        })
+        .catch(() => null)
     : Promise.resolve(null);
 
   await link.evaluate((el: HTMLElement) => el.click());
@@ -91,27 +118,21 @@ test.describe('Dual Prevention Plugin @smoke', () => {
   // -------------------------------------------------------------------------
   // DP-S001: Plugin install check
   // -------------------------------------------------------------------------
-  test('DP-S001: dual-prevention plugin is installed and models are published', async ({ page }) => {
-    // Check plugin record in backend
-    const pluginResp = await page.request.get('/api/system/plugins?pageNum=1&pageSize=100').catch(() => null);
+  test('DP-S001: dual-prevention plugin is installed and models are published', async ({
+    page,
+  }) => {
+    // Check plugin availability via model code API
+    const modelResp = await page.request.get('/api/meta/models/code/dp_issue').catch(() => null);
+    if (modelResp) {
+      const body = await modelResp.json().catch(() => ({}));
+      pluginInstalled = modelResp.ok() && body?.data?.status === 'published';
+    }
 
-    if (pluginResp && pluginResp.ok()) {
-      const body = await pluginResp.json().catch(() => null);
-      const plugins: Array<{ pluginId?: string; plugin_id?: string }> =
-        body?.data?.records ?? body?.data?.data ?? body?.data ?? [];
-      pluginInstalled = plugins.some(
-        (p) => (p.pluginId ?? p.plugin_id) === PLUGIN_ID,
+    if (!pluginInstalled) {
+      test.skip(
+        true,
+        'dual-prevention plugin not installed — run: aura plugin publish plugins/dual-prevention',
       );
-    }
-
-    if (!pluginInstalled) {
-      // Try model check as fallback
-      const modelResp = await page.request.get('/api/meta/models/code/dp_issue').catch(() => null);
-      pluginInstalled = modelResp?.ok() ?? false;
-    }
-
-    if (!pluginInstalled) {
-      test.skip(true, 'dual-prevention plugin not installed — run: aura plugin publish plugins/dual-prevention');
       return;
     }
 
@@ -132,15 +153,19 @@ test.describe('Dual Prevention Plugin @smoke', () => {
       return;
     }
 
-    await navigateToDpPage(page, '/dual-prevention/issues', '/api/dynamic/dp-issue');
+    await navigateToDpPage(page, '/dual-prevention/issues', '/api/dynamic/dp_issue');
 
     // Table or empty-state must be visible
     const table = page.locator('table, [class*="ant-table"]').first();
     await expect(table).toBeVisible({ timeout: 12000 });
 
     // No access error
-    await expect(page.locator('text=Access forbidden')).not.toBeVisible({ timeout: 2000 }).catch(() => {});
-    await expect(page.locator('text=403')).not.toBeVisible({ timeout: 1000 }).catch(() => {});
+    await expect(page.locator('text=Access forbidden'))
+      .not.toBeVisible({ timeout: 2000 })
+      .catch(() => {});
+    await expect(page.locator('text=403'))
+      .not.toBeVisible({ timeout: 1000 })
+      .catch(() => {});
   });
 
   // -------------------------------------------------------------------------
@@ -152,11 +177,17 @@ test.describe('Dual Prevention Plugin @smoke', () => {
       return;
     }
 
-    await navigateToDpPage(page, '/dual-prevention/rectifications', '/api/dynamic/dp-rectification');
+    await navigateToDpPage(
+      page,
+      '/dual-prevention/rectifications',
+      '/api/dynamic/dp_rectification',
+    );
 
     const table = page.locator('table, [class*="ant-table"]').first();
     await expect(table).toBeVisible({ timeout: 12000 });
-    await expect(page.locator('text=Access forbidden')).not.toBeVisible({ timeout: 2000 }).catch(() => {});
+    await expect(page.locator('text=Access forbidden'))
+      .not.toBeVisible({ timeout: 2000 })
+      .catch(() => {});
   });
 
   // -------------------------------------------------------------------------
@@ -168,11 +199,13 @@ test.describe('Dual Prevention Plugin @smoke', () => {
       return;
     }
 
-    await navigateToDpPage(page, '/dual-prevention/inspections', '/api/dynamic/dp-inspection-task');
+    await navigateToDpPage(page, '/dual-prevention/inspections', '/api/dynamic/dp_inspection_task');
 
     const table = page.locator('table, [class*="ant-table"]').first();
     await expect(table).toBeVisible({ timeout: 12000 });
-    await expect(page.locator('text=Access forbidden')).not.toBeVisible({ timeout: 2000 }).catch(() => {});
+    await expect(page.locator('text=Access forbidden'))
+      .not.toBeVisible({ timeout: 2000 })
+      .catch(() => {});
   });
 
   // -------------------------------------------------------------------------
@@ -184,11 +217,13 @@ test.describe('Dual Prevention Plugin @smoke', () => {
       return;
     }
 
-    await navigateToDpPage(page, '/dual-prevention/hazards', '/api/dynamic/dp-hazard-source');
+    await navigateToDpPage(page, '/dual-prevention/hazards', '/api/dynamic/dp_hazard_source');
 
     const table = page.locator('table, [class*="ant-table"]').first();
     await expect(table).toBeVisible({ timeout: 12000 });
-    await expect(page.locator('text=Access forbidden')).not.toBeVisible({ timeout: 2000 }).catch(() => {});
+    await expect(page.locator('text=Access forbidden'))
+      .not.toBeVisible({ timeout: 2000 })
+      .catch(() => {});
   });
 
   // -------------------------------------------------------------------------
@@ -200,11 +235,17 @@ test.describe('Dual Prevention Plugin @smoke', () => {
       return;
     }
 
-    await navigateToDpPage(page, '/dual-prevention/quality-checkpoints', '/api/dynamic/dp-quality-checkpoint');
+    await navigateToDpPage(
+      page,
+      '/dual-prevention/quality-checkpoints',
+      '/api/dynamic/dp_quality_checkpoint',
+    );
 
     const table = page.locator('table, [class*="ant-table"]').first();
     await expect(table).toBeVisible({ timeout: 12000 });
-    await expect(page.locator('text=Access forbidden')).not.toBeVisible({ timeout: 2000 }).catch(() => {});
+    await expect(page.locator('text=Access forbidden'))
+      .not.toBeVisible({ timeout: 2000 })
+      .catch(() => {});
   });
 
   // -------------------------------------------------------------------------
@@ -221,12 +262,16 @@ test.describe('Dual Prevention Plugin @smoke', () => {
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => null);
 
     // Dashboard should not show error states
-    await expect(page.locator('text=Access forbidden')).not.toBeVisible({ timeout: 2000 }).catch(() => {});
-    await expect(page.locator('text=Page not found')).not.toBeVisible({ timeout: 2000 }).catch(() => {});
+    await expect(page.locator('text=Access forbidden'))
+      .not.toBeVisible({ timeout: 2000 })
+      .catch(() => {});
+    await expect(page.locator('text=Page not found'))
+      .not.toBeVisible({ timeout: 2000 })
+      .catch(() => {});
 
     // Page body has meaningful content
     const bodyText = await page.locator('body').textContent({ timeout: 5000 });
-    expect((bodyText?.length ?? 0)).toBeGreaterThan(50);
+    expect(bodyText?.length ?? 0).toBeGreaterThan(50);
   });
 
   // -------------------------------------------------------------------------
@@ -239,14 +284,24 @@ test.describe('Dual Prevention Plugin @smoke', () => {
     }
 
     await page.goto('/dual-prevention/issues', { waitUntil: 'domcontentloaded' });
-    await page.waitForResponse(
-      (r) => r.url().includes('/api/dynamic/dp-issue') && r.status() === 200,
-      { timeout: 15000 },
-    ).catch(() => null);
+    await page
+      .waitForResponse((r) => r.url().includes('/api/dynamic/dp_issue') && r.status() === 200, {
+        timeout: 15000,
+      })
+      .catch(() => null);
+
+    // Wait for page to fully stabilize (avoid "execution context destroyed" from late navigations)
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => null);
+    await page
+      .locator('th, [role="columnheader"]')
+      .first()
+      .waitFor({ state: 'attached', timeout: 10000 });
 
     const headers = await page.locator('th, [role="columnheader"]').allTextContents();
     for (const h of headers) {
-      expect(h, `Header "${h}" should not be a raw i18n key`).not.toMatch(/model\.[a-z_]+\.[a-z_]+\.label/i);
+      expect(h, `Header "${h}" should not be a raw i18n key`).not.toMatch(
+        /model\.[a-z_]+\.[a-z_]+\.label/i,
+      );
       expect(h, `Header "${h}" should not be a raw i18n key`).not.toMatch(/^[a-z_]+\.[a-z_]+$/);
     }
   });
@@ -260,7 +315,7 @@ test.describe('Dual Prevention Plugin @smoke', () => {
       return;
     }
 
-    const resp = await page.request.get('/api/dynamic/dp-issue/list?pageNum=1&pageSize=10');
+    const resp = await page.request.get('/api/dynamic/dp_issue/list?pageNum=1&pageSize=10');
     expect(resp.status()).toBe(200);
     const body = await resp.json();
     expect(body).toHaveProperty('code');
@@ -279,7 +334,7 @@ test.describe('Dual Prevention Plugin @smoke', () => {
       return;
     }
 
-    await navigateToDpPage(page, '/dual-prevention/issues', '/api/dynamic/dp-issue');
+    await navigateToDpPage(page, '/dual-prevention/issues', '/api/dynamic/dp_issue');
 
     const createBtn = page.locator('button', { hasText: /新建|Create|创建|添加/ }).first();
     await expect(createBtn).toBeVisible({ timeout: 8000 });

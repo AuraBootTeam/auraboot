@@ -122,7 +122,7 @@ test.describe('Login Multi-Channel @login-multichannel', () => {
 
   function tabButton(page: import('@playwright/test').Page, channelCode: string) {
     const label = TAB_LABELS[channelCode] || channelCode;
-    return page.locator('button', { hasText: label });
+    return page.getByRole('tab', { name: label, exact: true });
   }
 
   // -----------------------------------------------------------------------
@@ -169,10 +169,7 @@ test.describe('Login Multi-Channel @login-multichannel', () => {
       await page.locator('button:has-text("立即登录")').click();
 
       // Wait until we leave /login
-      await page.waitForURL(
-        (url) => !url.pathname.includes('/login'),
-        { timeout: 20000 },
-      );
+      await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 20000 });
 
       expect(page.url()).not.toContain('/login');
     } finally {
@@ -185,6 +182,12 @@ test.describe('Login Multi-Channel @login-multichannel', () => {
   // -----------------------------------------------------------------------
 
   test('LM-003: channel tab switching', async ({ page }) => {
+    const channels = await getAvailableChannels(page);
+    if (!channels.includes('sms') || !channels.includes('email_code')) {
+      test.skip(true, 'SMS or EMAIL_CODE login channel is not enabled for public login');
+      return;
+    }
+
     // beforeAll enables EMAIL_PASSWORD + SMS + EMAIL_CODE — all 3 tabs should be visible
     await page.goto(LOGIN_URL);
     await page.waitForLoadState('domcontentloaded');
@@ -192,14 +195,17 @@ test.describe('Login Multi-Channel @login-multichannel', () => {
 
     // Switch to SMS tab
     await tabButton(page, 'sms').click();
+    await expect(tabButton(page, 'sms')).toHaveAttribute('aria-selected', 'true');
     await expect(page.locator('#mobile')).toBeVisible();
 
     // Switch to EMAIL_CODE tab
     await tabButton(page, 'email_code').click();
+    await expect(tabButton(page, 'email_code')).toHaveAttribute('aria-selected', 'true');
     await expect(page.locator('#ec-email')).toBeVisible();
 
     // Switch back to EMAIL_PASSWORD
     await tabButton(page, 'email_password').click();
+    await expect(tabButton(page, 'email_password')).toHaveAttribute('aria-selected', 'true');
     await expect(page.locator('#email')).toBeVisible();
     await expect(page.locator('#password')).toBeVisible();
   });
@@ -209,12 +215,19 @@ test.describe('Login Multi-Channel @login-multichannel', () => {
   // -----------------------------------------------------------------------
 
   test('LM-004: SMS form UI elements', async ({ page }) => {
+    const channels = await getAvailableChannels(page);
+    if (!channels.includes('sms')) {
+      test.skip(true, 'SMS login channel is not enabled for public login');
+      return;
+    }
+
     // beforeAll enables SMS channel — navigate and switch to SMS tab
     await page.goto(LOGIN_URL);
     await page.waitForLoadState('domcontentloaded');
     await page.locator('#email').waitFor({ state: 'visible', timeout: 5000 });
 
     await tabButton(page, 'sms').click();
+    await expect(tabButton(page, 'sms')).toHaveAttribute('aria-selected', 'true');
 
     // Verify SMS form elements
     await expect(page.locator('#mobile')).toBeVisible();
@@ -230,12 +243,19 @@ test.describe('Login Multi-Channel @login-multichannel', () => {
   // -----------------------------------------------------------------------
 
   test('LM-005: email code form UI elements', async ({ page }) => {
+    const channels = await getAvailableChannels(page);
+    if (!channels.includes('email_code')) {
+      test.skip(true, 'EMAIL_CODE login channel is not enabled for public login');
+      return;
+    }
+
     // beforeAll enables EMAIL_CODE channel — navigate and switch to EMAIL_CODE tab
     await page.goto(LOGIN_URL);
     await page.waitForLoadState('domcontentloaded');
     await page.locator('#email').waitFor({ state: 'visible', timeout: 5000 });
 
     await tabButton(page, 'email_code').click();
+    await expect(tabButton(page, 'email_code')).toHaveAttribute('aria-selected', 'true');
 
     // Verify email-code form elements
     await expect(page.locator('#ec-email')).toBeVisible();

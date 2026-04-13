@@ -9,7 +9,8 @@
  *
  * Usage:
  *   <DynamicPageRenderer tableName="device" pageType="list" />
- *   <DynamicPageRenderer tableName="order" pageType="form" recordId="123" />
+ *   <DynamicPageRenderer tableName="order" pageType="form" />
+ *   <DynamicPageRenderer tableName="order" pageType="form" recordId="123" />  // edit mode
  */
 
 import React, { Suspense } from 'react';
@@ -18,7 +19,7 @@ import { profileRegistry } from '~/meta/profiles/ProfileRegistry';
 import { ProfileProvider } from '~/meta/profiles/ProfileContext';
 import { ErrorAlert } from '~/components/ErrorAlert';
 import { LoadingSpinner } from '~/components/LoadingSpinner';
-import { mapRuntimePageTypeToSchemaKind } from '~/meta/utils/page-semantics';
+
 
 // Ensure profiles are registered
 import '~/meta/profiles/admin';
@@ -27,8 +28,8 @@ import '~/meta/profiles/report';
 export interface DynamicPageRendererProps {
   /** Model table name (e.g., "device", "pe-order") */
   tableName: string;
-  /** Page type: "list" | "new" | "edit" | "detail" */
-  pageType: string;
+  /** Page kind — must match ab_page_schema.kind values */
+  pageType: 'list' | 'form' | 'detail' | 'dashboard' | 'kanban' | 'composite';
   /** Profile name override (default resolves from schema.profile or "admin") */
   profileName?: string;
   /** Record ID for edit/detail modes */
@@ -47,12 +48,21 @@ export function DynamicPageRenderer({
   token,
   pageKey,
 }: DynamicPageRendererProps) {
-  // 1. Load schema
-  const schemaType = pageType === 'new' || pageType === 'edit' ? 'new' : pageType;
+  // 1. Validate pageType matches DB kind values
+  const VALID_KINDS = ['list', 'form', 'detail', 'dashboard', 'kanban', 'composite'] as const;
+  if (!VALID_KINDS.includes(pageType)) {
+    return (
+      <ErrorAlert
+        error={`Invalid pageType "${pageType}" for "${tableName}". Expected one of: ${VALID_KINDS.join(', ')}. If you see "new" or "edit", update the route to pass "form" instead.`}
+      />
+    );
+  }
+
+  // 2. Load schema
   const { schema, loading, error } = useSchemaLoader(
     pageKey
       ? { pageKey, token: token || undefined }
-      : { tableName, type: schemaType as any, token: token || undefined },
+      : { tableName, type: pageType, token: token || undefined },
   );
 
   // 2. Resolve profile (schema.profile > props.profileName > "admin")
@@ -67,8 +77,7 @@ export function DynamicPageRenderer({
   // 3. Loading state — show profile skeleton
   if (loading) {
     if (profile?.skeletons) {
-      const kind = mapRuntimePageTypeToSchemaKind(pageType);
-      const Skeleton = profile.skeletons.get(kind);
+      const Skeleton = profile.skeletons.get(pageType);
       if (Skeleton) {
         return <Skeleton />;
       }
@@ -91,8 +100,7 @@ export function DynamicPageRenderer({
     const PageContent = profile.pageRenderers.get(schema.kind);
     if (PageContent) {
       // Resolve skeleton for loading state during lazy chunk download
-      const kind = mapRuntimePageTypeToSchemaKind(pageType);
-      const Skeleton = profile.skeletons?.get(kind);
+      const Skeleton = profile.skeletons?.get(schema.kind);
       const fallback = Skeleton ? <Skeleton /> : <LoadingSpinner />;
 
       return (

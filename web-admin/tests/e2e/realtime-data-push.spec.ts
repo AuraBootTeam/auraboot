@@ -31,19 +31,16 @@ async function getToken(): Promise<string> {
 async function createRecordViaApi(
   token: string,
   commandCode: string,
-  payload: Record<string, unknown>
+  payload: Record<string, unknown>,
 ) {
-  const resp = await fetch(
-    `http://localhost:6443/api/meta/commands/execute/${commandCode}`,
-    {
-      method: 'post',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ payload }),
-    }
-  );
+  const resp = await fetch(`http://localhost:6443/api/meta/commands/execute/${commandCode}`, {
+    method: 'post',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ payload }),
+  });
   return resp.json();
 }
 

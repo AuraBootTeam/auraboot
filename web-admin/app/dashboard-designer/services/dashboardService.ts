@@ -41,6 +41,24 @@ const WIDGET_TYPE_MAP: Record<string, WidgetType> = {
   Calendar: 'smart-calendar',
   Image: 'smart-image',
   Iframe: 'smart-iframe',
+  WordCloudChart: 'smart-wordcloud-chart',
+  ComboChart: 'smart-combo-chart',
+  NpsChart: 'smart-nps-chart',
+  Gallery: 'smart-gallery',
+  Kanban: 'smart-kanban',
+  InboxWidget: 'smart-inbox',
+  RecentWidget: 'smart-recent',
+  ShortcutsWidget: 'smart-shortcuts',
+  StatsRowWidget: 'smart-stats-row',
+  StatsCardWidget: 'smart-stats-card',
+  PipelineWidget: 'smart-pipeline',
+  LeadsWidget: 'smart-leads',
+  ActivitiesWidget: 'smart-activities',
+  MyProcessWidget: 'smart-my-process',
+  ProcessStatsWidget: 'smart-process-stats',
+  CalendarWidget: 'smart-calendar',
+  AnnouncementWidget: 'smart-announcement',
+  QuickNoteWidget: 'smart-quick-note',
 };
 
 /**
@@ -68,6 +86,11 @@ const CUSTOM_CHART_TYPE_MAP: Record<string, WidgetType> = {
   bar: 'smart-bar-chart',
   line: 'smart-line-chart',
   pie: 'smart-pie-chart',
+  wordcloud: 'smart-wordcloud-chart',
+  combo: 'smart-combo-chart',
+  nps: 'smart-nps-chart',
+  gallery: 'smart-gallery',
+  kanban: 'smart-kanban',
 };
 
 /**
@@ -85,8 +108,7 @@ function normalizeWidget(raw: Record<string, unknown>, index: number): Widget {
   // Resolve type: PascalCase → smart-kebab-case, with CustomChart fallback
   let type: WidgetType;
   if (rawType === 'CustomChart' && rawConfig.chartType) {
-    type =
-      CUSTOM_CHART_TYPE_MAP[rawConfig.chartType as string] || (rawType as WidgetType);
+    type = CUSTOM_CHART_TYPE_MAP[rawConfig.chartType as string] || (rawType as WidgetType);
   } else {
     type = WIDGET_TYPE_MAP[rawType] || (rawType as WidgetType);
   }
@@ -136,9 +158,7 @@ function normalizeWidget(raw: Record<string, unknown>, index: number): Widget {
     config: {
       title,
       dataSource,
-      ...(visualization && Object.keys(visualization).length > 0
-        ? { visualization }
-        : {}),
+      ...(visualization && Object.keys(visualization).length > 0 ? { visualization } : {}),
     },
   };
 }
@@ -155,10 +175,7 @@ interface BuildResult {
  * Build a static ChartDataSource from inline chart configuration.
  * Also extracts visualization props that should be passed to the component.
  */
-function buildStaticDataSource(
-  type: WidgetType,
-  config: Record<string, unknown>,
-): BuildResult {
+function buildStaticDataSource(type: WidgetType, config: Record<string, unknown>): BuildResult {
   switch (type) {
     case 'smart-number-card': {
       const value = (config.value as number) ?? 0;
@@ -325,8 +342,7 @@ function buildStaticDataSource(
     }
     case 'smart-leaderboard': {
       const items =
-        (config.items as Array<{ rank: number; name: string; value: number | string }>) ||
-        [];
+        (config.items as Array<{ rank: number; name: string; value: number | string }>) || [];
       return {
         dataSource: {
           type: 'static' as const,
@@ -359,6 +375,102 @@ function buildStaticDataSource(
         visualization: {
           targetDate: config.targetDate,
           label: config.label,
+        },
+      };
+    }
+    case 'smart-wordcloud-chart': {
+      const data = (config.data as Array<{ name: string; value: number }>) || [];
+      const wordField = (config.wordField as string) || 'name';
+      const weightField = (config.weightField as string) || 'value';
+      return {
+        dataSource: {
+          type: 'static' as const,
+          staticData: data,
+          dimensions: [wordField],
+          metrics: [{ field: weightField, aggregation: 'sum' as const, alias: weightField }],
+        },
+        visualization: { wordField, weightField },
+      };
+    }
+    case 'smart-nps-chart': {
+      const data = (config.data as Array<Record<string, unknown>>) || [];
+      const scoreField = (config.scoreField as string) || 'score';
+      const countField = (config.countField as string) || 'count';
+      return {
+        dataSource: {
+          type: 'static' as const,
+          staticData: data,
+          dimensions: [scoreField],
+          metrics: [{ field: countField, aggregation: 'sum' as const, alias: countField }],
+        },
+        visualization: {
+          scoreField,
+          countField,
+          promoterThreshold: config.promoterThreshold,
+          passiveThreshold: config.passiveThreshold,
+          scoreRange: config.scoreRange,
+        },
+      };
+    }
+    case 'smart-combo-chart': {
+      const xAxis = (config.xAxis as string[]) || [];
+      const seriesConfig = (config.seriesConfig as Array<{ field: string; type: string; yAxisIndex?: number; label?: string; data: number[] }>) || [];
+      const rows = xAxis.map((cat, i) => {
+        const row: Record<string, unknown> = { category: cat };
+        for (const s of seriesConfig) {
+          row[s.field] = s.data?.[i] ?? 0;
+        }
+        return row;
+      });
+      return {
+        dataSource: {
+          type: 'static' as const,
+          staticData: rows,
+          dimensions: ['category'],
+          metrics: seriesConfig.map((s) => ({ field: s.field, aggregation: 'sum' as const, alias: s.field })),
+        },
+        visualization: {
+          seriesConfig: seriesConfig.map(({ data: _d, ...rest }) => rest),
+          xField: 'category',
+          yAxis: config.yAxis,
+        },
+      };
+    }
+    case 'smart-kanban': {
+      // Kanban: items[] with column assignment → static rows grouped by groupField
+      const items = (config.items as Array<{ id: string; title: string; column: string; [k: string]: unknown }>) || [];
+      const cols = (config.columns as Array<{ value: string; label: string; color?: string }>) || [];
+      return {
+        dataSource: {
+          type: 'static' as const,
+          staticData: items.map((item) => ({
+            id: item.id,
+            title: item.title,
+            status: item.column,
+          })),
+          dimensions: ['status'],
+          metrics: [{ field: 'id', aggregation: 'count' as const, alias: 'count' }],
+        },
+        visualization: {
+          groupField: 'status',
+          titleField: 'title',
+          columnOrder: cols.map((c) => c.value),
+          columnColors: Object.fromEntries(cols.map((c) => [c.value, c.color || ''])),
+        },
+      };
+    }
+    case 'smart-gallery': {
+      // Gallery: static items with image/title/description
+      const items = (config.items as Array<{ id?: string; title?: string; imageUrl?: string; description?: string }>) || [];
+      return {
+        dataSource: { type: 'static' as const, staticData: [] },
+        visualization: {
+          staticItems: items.map((item) => ({
+            image: item.imageUrl || '',
+            title: item.title,
+            description: item.description,
+          })),
+          columns: config.colCount || config.columns || 3,
         },
       };
     }
@@ -535,6 +647,14 @@ export const dashboardService = {
       method: 'post',
       body: JSON.stringify({ title: newTitle }),
     });
+  },
+
+  /**
+   * Get or create the current user's personal workbench dashboard.
+   */
+  async getWorkbench(): Promise<Dashboard> {
+    const raw = await request<Dashboard>('/workbench');
+    return normalizeDashboard(raw);
   },
 
   /**

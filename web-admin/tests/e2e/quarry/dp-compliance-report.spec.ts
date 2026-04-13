@@ -22,7 +22,11 @@ test.describe('DP Compliance Report @smoke', () => {
   test('CR-001: Page loads and shows table', async ({ page }) => {
     await openCompliancePage(page);
 
-    const content = page.locator('main, table, [role="table"], [data-testid="dynamic-list"], [data-testid="table-block"]').first();
+    const content = page
+      .locator(
+        'main, table, [role="table"], [data-testid="dynamic-list"], [data-testid="table-block"]',
+      )
+      .first();
     await expect(content).toBeVisible({ timeout: 15000 });
   });
 
@@ -47,7 +51,11 @@ test.describe('DP Compliance Report @smoke', () => {
   test('CR-003: Table has expected columns', async ({ page }) => {
     await openCompliancePage(page);
 
-    const content = page.locator('main, table, [role="table"], [data-testid="dynamic-list"], [data-testid="table-block"]').first();
+    const content = page
+      .locator(
+        'main, table, [role="table"], [data-testid="dynamic-list"], [data-testid="table-block"]',
+      )
+      .first();
     await expect(content).toBeVisible({ timeout: 15000 });
 
     // Route-level assertion: page should not be forbidden/not found.
@@ -57,7 +65,11 @@ test.describe('DP Compliance Report @smoke', () => {
   test('CR-004: Table renders data rows with numeric values', async ({ page }) => {
     await openCompliancePage(page);
 
-    const content = page.locator('main, table, [role="table"], [data-testid="dynamic-list"], [data-testid="table-block"]').first();
+    const content = page
+      .locator(
+        'main, table, [role="table"], [data-testid="dynamic-list"], [data-testid="table-block"]',
+      )
+      .first();
     await expect(content).toBeVisible({ timeout: 15000 });
 
     const rows = page.locator('tbody tr');
@@ -92,14 +104,20 @@ test.describe('DP Compliance Report @smoke', () => {
     await openCompliancePage(page);
 
     // Table structure should exist regardless of data
-    const content = page.locator('main, table, [role="table"], [data-testid="dynamic-list"], [data-testid="table-block"]').first();
+    const content = page
+      .locator(
+        'main, table, [role="table"], [data-testid="dynamic-list"], [data-testid="table-block"]',
+      )
+      .first();
     await expect(content).toBeVisible({ timeout: 15000 });
 
     // Route-level assertion
     await expect(page.locator('body')).not.toContainText(/Access forbidden|Page not found/i);
 
     // Page should not show an error state
-    const errorAlert = page.locator('[role="alert"][class*="error"], .alert-error, .ant-alert-error');
+    const errorAlert = page.locator(
+      '[role="alert"][class*="error"], .alert-error, .ant-alert-error',
+    );
     await expect(errorAlert).not.toBeVisible({ timeout: 3000 });
   });
 });

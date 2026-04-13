@@ -59,7 +59,9 @@ const GridCell: React.FC<{
       {/* 拖拽悬停指示器 */}
       {isOver && (
         <div className="bg-opacity-50 absolute inset-0 flex items-center justify-center border-2 border-dashed border-blue-400 bg-blue-100">
-          <span className="text-sm font-medium text-blue-600">{resolveDesignerText(DESIGNER_I18N.dropZone.placeHere, locale)}</span>
+          <span className="text-sm font-medium text-blue-600">
+            {resolveDesignerText(DESIGNER_I18N.dropZone.placeHere, locale)}
+          </span>
         </div>
       )}
     </div>
@@ -102,7 +104,9 @@ const ComponentRenderer: React.FC<{
             {component.name || component.type}
           </div>
           <div className="mt-1 text-xs text-gray-500">
-            {component.props?.label || component.props?.placeholder || resolveDesignerText(DESIGNER_I18N.dragCanvas.componentContent, locale)}
+            {component.props?.label ||
+              component.props?.placeholder ||
+              resolveDesignerText(DESIGNER_I18N.dragCanvas.componentContent, locale)}
           </div>
         </div>
       </div>
@@ -225,23 +229,38 @@ export const DragCanvas: React.FC<DragCanvasProps> = ({
       <div className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-2">
         <div className="flex items-center space-x-4">
           <span className="text-sm font-medium text-gray-700">
-            {resolveDesignerText(DESIGNER_I18N.dragCanvas.canvasTitle, locale, { columns: layoutResult.grid.columns })}
+            {resolveDesignerText(DESIGNER_I18N.dragCanvas.canvasTitle, locale, {
+              columns: layoutResult.grid.columns,
+            })}
           </span>
           <div className="flex items-center space-x-2">
-            <button className="rounded bg-gray-100 px-3 py-1 text-xs hover:bg-gray-200">{resolveDesignerText(DESIGNER_I18N.dragCanvas.cols2, locale)}</button>
-            <button className="rounded bg-blue-100 px-3 py-1 text-xs text-blue-700">{resolveDesignerText(DESIGNER_I18N.dragCanvas.cols4, locale)}</button>
-            <button className="rounded bg-gray-100 px-3 py-1 text-xs hover:bg-gray-200">{resolveDesignerText(DESIGNER_I18N.dragCanvas.cols6, locale)}</button>
+            <button className="rounded bg-gray-100 px-3 py-1 text-xs hover:bg-gray-200">
+              {resolveDesignerText(DESIGNER_I18N.dragCanvas.cols2, locale)}
+            </button>
+            <button className="rounded bg-blue-100 px-3 py-1 text-xs text-blue-700">
+              {resolveDesignerText(DESIGNER_I18N.dragCanvas.cols4, locale)}
+            </button>
+            <button className="rounded bg-gray-100 px-3 py-1 text-xs hover:bg-gray-200">
+              {resolveDesignerText(DESIGNER_I18N.dragCanvas.cols6, locale)}
+            </button>
           </div>
         </div>
 
         <div className="flex items-center space-x-2 text-xs text-gray-500">
-          <span>{resolveDesignerText(DESIGNER_I18N.dragCanvas.components, locale)}: {components.length}</span>
+          <span>
+            {resolveDesignerText(DESIGNER_I18N.dragCanvas.components, locale)}: {components.length}
+          </span>
           <span>|</span>
-          <span>{resolveDesignerText(DESIGNER_I18N.dragCanvas.rows, locale)}: {layoutResult.grid.rows}</span>
+          <span>
+            {resolveDesignerText(DESIGNER_I18N.dragCanvas.rows, locale)}: {layoutResult.grid.rows}
+          </span>
           {layoutResult.conflicts.length > 0 && (
             <>
               <span>|</span>
-              <span className="text-red-500">{resolveDesignerText(DESIGNER_I18N.dragCanvas.conflicts, locale)}: {layoutResult.conflicts.length}</span>
+              <span className="text-red-500">
+                {resolveDesignerText(DESIGNER_I18N.dragCanvas.conflicts, locale)}:{' '}
+                {layoutResult.conflicts.length}
+              </span>
             </>
           )}
         </div>
@@ -268,7 +287,9 @@ export const DragCanvas: React.FC<DragCanvasProps> = ({
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="text-center">
                 <div className="mb-2 text-lg text-gray-400">📋</div>
-                <div className="text-sm text-gray-500">{resolveDesignerText(DESIGNER_I18N.emptyState.startDesign, locale)}</div>
+                <div className="text-sm text-gray-500">
+                  {resolveDesignerText(DESIGNER_I18N.emptyState.startDesign, locale)}
+                </div>
               </div>
             </div>
           )}
@@ -280,15 +301,25 @@ export const DragCanvas: React.FC<DragCanvasProps> = ({
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <span>
-              {resolveDesignerText(DESIGNER_I18N.dragCanvas.grid, locale)}: {layoutResult.grid.columns}×{layoutResult.grid.rows}
+              {resolveDesignerText(DESIGNER_I18N.dragCanvas.grid, locale)}:{' '}
+              {layoutResult.grid.columns}×{layoutResult.grid.rows}
             </span>
-            <span>{resolveDesignerText(DESIGNER_I18N.dragCanvas.gap, locale)}: {layoutResult.grid.gap}px</span>
-            <span>{resolveDesignerText(DESIGNER_I18N.dragCanvas.padding, locale)}: {layoutResult.grid.padding}px</span>
+            <span>
+              {resolveDesignerText(DESIGNER_I18N.dragCanvas.gap, locale)}: {layoutResult.grid.gap}px
+            </span>
+            <span>
+              {resolveDesignerText(DESIGNER_I18N.dragCanvas.padding, locale)}:{' '}
+              {layoutResult.grid.padding}px
+            </span>
           </div>
 
           <div className="flex items-center space-x-2">
             {selectedComponents.length > 0 && (
-              <span className="text-blue-600">{resolveDesignerText(DESIGNER_I18N.dragCanvas.selected, locale, { count: selectedComponents.length })}</span>
+              <span className="text-blue-600">
+                {resolveDesignerText(DESIGNER_I18N.dragCanvas.selected, locale, {
+                  count: selectedComponents.length,
+                })}
+              </span>
             )}
           </div>
         </div>

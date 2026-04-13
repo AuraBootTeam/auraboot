@@ -1,7 +1,7 @@
 /**
  * useTableColumns — column computation + SavedView column overlay
  *
- * Reads columns from schema's data-table block and merges SavedView
+ * Reads columns from schema's table block and merges SavedView
  * column visibility/order/width preferences.
  */
 
@@ -19,7 +19,7 @@ interface UseTableColumnsResult {
   allColumns: ColumnConfig[];
   /** Visible columns (after SavedView filter) */
   visibleColumns: ColumnConfig[];
-  /** The data-table block from schema */
+  /** The table block from schema */
   tableBlock: BlockConfig | null;
 }
 
@@ -28,14 +28,12 @@ export function useTableColumns({
   viewConfig,
 }: UseTableColumnsOptions): UseTableColumnsResult {
   return useMemo(() => {
-    if (!schema?.areas) {
+    if (!schema?.blocks) {
       return { allColumns: [], visibleColumns: [], tableBlock: null };
     }
 
     const tableBlock =
-      Object.values(schema.areas)
-        .flatMap((area) => area.blocks)
-        .find((block) => block.blockType === 'data-table') ?? null;
+      schema.blocks.find((block) => block.blockType === 'table') ?? null;
 
     if (!tableBlock) {
       return { allColumns: [], visibleColumns: [], tableBlock: null };

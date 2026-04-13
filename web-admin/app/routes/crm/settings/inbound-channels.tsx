@@ -545,7 +545,10 @@ function ChannelFormModal({
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
             {initial ? 'Edit Channel' : 'New Inbound Channel'}
           </h3>
-          <button onClick={onClose} className="rounded-lg p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700">
+          <button
+            onClick={onClose}
+            className="rounded-lg p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700"
+          >
             <XMarkIcon className="h-5 w-5 text-gray-400" />
           </button>
         </div>

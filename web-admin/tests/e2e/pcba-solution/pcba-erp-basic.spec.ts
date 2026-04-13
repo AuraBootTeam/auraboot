@@ -86,7 +86,7 @@ test.describe('PCBA ERP — Basic Verification', () => {
 
     // Click create button
     const addButton = page.locator(
-      'button:has-text("新建"), button:has-text("New"), button:has-text("Create"), [data-testid="add-button"]'
+      'button:has-text("新建"), button:has-text("New"), button:has-text("Create"), [data-testid="add-button"]',
     );
     await addButton.first().click();
 
@@ -97,9 +97,11 @@ test.describe('PCBA ERP — Basic Verification', () => {
 
     // Fill product name
     const testName = uniqueId('pe_prod');
-    const nameInput = page.locator(
-      'input[data-testid*="prod_name"], input[placeholder*="名称"], input[placeholder*="name"]'
-    ).first();
+    const nameInput = page
+      .locator(
+        'input[data-testid*="prod_name"], input[placeholder*="名称"], input[placeholder*="name"]',
+      )
+      .first();
 
     if (await nameInput.isVisible({ timeout: 3000 }).catch(() => false)) {
       await nameInput.fill(testName);
@@ -111,13 +113,13 @@ test.describe('PCBA ERP — Basic Verification', () => {
 
     // Click save
     const saveButton = page.locator(
-      'button:has-text("保存"), button:has-text("Save"), button:has-text("提交"), button:has-text("Submit")'
+      'button:has-text("保存"), button:has-text("Save"), button:has-text("提交"), button:has-text("Submit")',
     );
     await saveButton.first().click();
 
     // Verify success toast or navigation back to list
     const successIndicator = page.locator(
-      '.ant-message-success, [class*="toast"]:has-text("成功"), [class*="toast"]:has-text("success")'
+      '.ant-message-success, [class*="toast"]:has-text("成功"), [class*="toast"]:has-text("success")',
     );
     try {
       await successIndicator.first().waitFor({ state: 'visible', timeout: 5000 });
@@ -138,12 +140,14 @@ test.describe('PCBA ERP — Basic Verification', () => {
     const menus = data.data || [];
 
     // Find PCBA ERP root menu by path (if plugin registered top-level menu).
-    const peRoot = (menus as any[]).find((m: any) => m.path === '/pcba-erp' || m.path === '/pcba-solution');
+    const peRoot = (menus as any[]).find(
+      (m: any) => m.path === '/pcba-erp' || m.path === '/pcba-solution',
+    );
     if (!peRoot) {
       // Some environments intentionally omit PCBA top-level menu and expose pages directly.
       // Fall back to validating core PCBA pages are still reachable.
-      const productResp = await page.request.get('/api/dynamic/prod-product/list?page=1&size=1');
-      const supplierResp = await page.request.get('/api/dynamic/pe-supplier/list?page=1&size=1');
+      const productResp = await page.request.get('/api/dynamic/prod_product/list?page=1&size=1');
+      const supplierResp = await page.request.get('/api/dynamic/pe_supplier/list?page=1&size=1');
       expect(productResp.ok()).toBe(true);
       expect(supplierResp.ok()).toBe(true);
       return;
@@ -170,10 +174,10 @@ test.describe('PCBA ERP — Basic Verification', () => {
    */
   test('PE-007: dynamic data APIs should respond @smoke', async ({ page }) => {
     const endpoints = [
-      '/api/dynamic/prod-product/list?page=1&size=5',
-      '/api/dynamic/prod-brand/list?page=1&size=5',
-      '/api/dynamic/prod-category/list?page=1&size=5',
-      '/api/dynamic/inv-warehouse/list?page=1&size=5',
+      '/api/dynamic/prod_product/list?page=1&size=5',
+      '/api/dynamic/prod_brand/list?page=1&size=5',
+      '/api/dynamic/prod_category/list?page=1&size=5',
+      '/api/dynamic/inv_warehouse/list?page=1&size=5',
     ];
 
     for (const endpoint of endpoints) {

@@ -17,8 +17,14 @@ import { uniqueId } from '../helpers';
 
 async function waitForDesignerLoad(page: Page) {
   await page.waitForLoadState('networkidle').catch(() => {});
-  await page.locator('.animate-spin').waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
-  await page.locator('text=Loading page...').waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
+  await page
+    .locator('.animate-spin')
+    .waitFor({ state: 'hidden', timeout: 10000 })
+    .catch(() => {});
+  await page
+    .locator('text=Loading page...')
+    .waitFor({ state: 'hidden', timeout: 10000 })
+    .catch(() => {});
 }
 
 function generateMinimalBpmn(pKey: string, pName: string): string {
@@ -42,8 +48,15 @@ const processKey = `bpd_${Date.now()}`;
 let sharedPid: string;
 
 async function waitForFlowNodes(page: Page) {
-  await page.locator('.react-flow').waitFor({ state: 'visible', timeout: 8000 }).catch(() => {});
-  await page.locator('.react-flow__node').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+  await page
+    .locator('.react-flow')
+    .waitFor({ state: 'visible', timeout: 8000 })
+    .catch(() => {});
+  await page
+    .locator('.react-flow__node')
+    .first()
+    .waitFor({ state: 'visible', timeout: 5000 })
+    .catch(() => {});
 }
 
 async function createAndOpenBpmn(page: Page): Promise<string> {
@@ -57,20 +70,54 @@ async function createAndOpenBpmn(page: Page): Promise<string> {
   const attemptKey = `${processKey}_${Date.now()}`;
   const resp = await page.request.post('/api/bpm/process-definitions', {
     data: {
-      processKey: attemptKey, processName: testId, description: 'BPMN deep E2E', category: 'e2e-test',
+      processKey: attemptKey,
+      processName: testId,
+      description: 'BPMN deep E2E',
+      category: 'e2e-test',
       bpmnContent: generateMinimalBpmn(attemptKey, testId),
       designerJson: JSON.stringify({
         nodes: [
-          { id: 'start', type: 'startEvent', position: { x: 100, y: 200 }, data: { type: 'startEvent', label: 'Start' } },
-          { id: 'userTask1', type: 'userTask', position: { x: 300, y: 200 }, data: { type: 'userTask', label: 'Approval' } },
-          { id: 'serviceTask1', type: 'serviceTask', position: { x: 500, y: 100 }, data: { type: 'serviceTask', label: 'Notify' } },
-          { id: 'gw1', type: 'exclusiveGateway', position: { x: 400, y: 200 }, data: { type: 'exclusiveGateway', label: 'Check' } },
-          { id: 'end', type: 'endEvent', position: { x: 700, y: 200 }, data: { type: 'endEvent', label: 'End' } },
+          {
+            id: 'start',
+            type: 'startEvent',
+            position: { x: 100, y: 200 },
+            data: { type: 'startEvent', label: 'Start' },
+          },
+          {
+            id: 'userTask1',
+            type: 'userTask',
+            position: { x: 300, y: 200 },
+            data: { type: 'userTask', label: 'Approval' },
+          },
+          {
+            id: 'serviceTask1',
+            type: 'serviceTask',
+            position: { x: 500, y: 100 },
+            data: { type: 'serviceTask', label: 'Notify' },
+          },
+          {
+            id: 'gw1',
+            type: 'exclusiveGateway',
+            position: { x: 400, y: 200 },
+            data: { type: 'exclusiveGateway', label: 'Check' },
+          },
+          {
+            id: 'end',
+            type: 'endEvent',
+            position: { x: 700, y: 200 },
+            data: { type: 'endEvent', label: 'End' },
+          },
         ],
         edges: [
           { id: 'flow1', source: 'start', target: 'userTask1', type: 'smoothstep' },
           { id: 'flow2', source: 'userTask1', target: 'gw1', type: 'smoothstep' },
-          { id: 'flow3', source: 'gw1', target: 'serviceTask1', type: 'smoothstep', data: { label: 'Approved' } },
+          {
+            id: 'flow3',
+            source: 'gw1',
+            target: 'serviceTask1',
+            type: 'smoothstep',
+            data: { label: 'Approved' },
+          },
           { id: 'flow4', source: 'serviceTask1', target: 'end', type: 'smoothstep' },
         ],
       }),
@@ -123,21 +170,26 @@ test.describe('Node Palette — All 9 Types', () => {
 
 async function ensureFlowNodesVisible(page: Page): Promise<boolean> {
   // Force React Flow container to have height (layout may collapse in headless)
-  await page.evaluate(() => {
-    const rf = document.querySelector('.react-flow') as HTMLElement;
-    if (rf && rf.offsetHeight < 50) {
-      rf.style.height = '600px';
-      rf.style.minHeight = '600px';
-    }
-    const parent = rf?.parentElement;
-    if (parent && parent.offsetHeight < 50) {
-      parent.style.height = '600px';
-      parent.style.minHeight = '600px';
-    }
-  }).catch(() => {});
+  await page
+    .evaluate(() => {
+      const rf = document.querySelector('.react-flow') as HTMLElement;
+      if (rf && rf.offsetHeight < 50) {
+        rf.style.height = '600px';
+        rf.style.minHeight = '600px';
+      }
+      const parent = rf?.parentElement;
+      if (parent && parent.offsetHeight < 50) {
+        parent.style.height = '600px';
+        parent.style.minHeight = '600px';
+      }
+    })
+    .catch(() => {});
   await page.waitForTimeout(500);
   const nodes = page.locator('.react-flow__node');
-  await nodes.first().waitFor({ state: 'visible', timeout: 8000 }).catch(() => {});
+  await nodes
+    .first()
+    .waitFor({ state: 'visible', timeout: 8000 })
+    .catch(() => {});
   return (await nodes.count()) > 0;
 }
 
@@ -150,7 +202,10 @@ test.describe('UserTask Properties', () => {
     await createAndOpenBpmn(page);
     const hasNodes = await ensureFlowNodesVisible(page);
     if (!hasNodes) return false;
-    const userTask = page.locator('.react-flow__node').filter({ hasText: /Approval/i }).first();
+    const userTask = page
+      .locator('.react-flow__node')
+      .filter({ hasText: /Approval/i })
+      .first();
     if (await userTask.isVisible({ timeout: 3000 }).catch(() => false)) {
       await userTask.click();
     } else {
@@ -162,7 +217,9 @@ test.describe('UserTask Properties', () => {
   test('BPD-UT-01: Click UserTask → panel appears', async ({ page }) => {
     const ok = await selectUserTask(page);
     test.skip(!ok, 'React Flow nodes not rendering');
-    await expect(page.locator('text=/节点标签|人员分配|Approval/i').first()).toBeVisible({ timeout: 8000 });
+    await expect(page.locator('text=/节点标签|人员分配|Approval/i').first()).toBeVisible({
+      timeout: 8000,
+    });
   });
 
   test('BPD-UT-02: Assignee Type select with options', async ({ page }) => {
@@ -213,7 +270,10 @@ test.describe('ServiceTask Properties', () => {
     await createAndOpenBpmn(page);
     const hasNodes = await ensureFlowNodesVisible(page);
     if (!hasNodes) return false;
-    const node = page.locator('.react-flow__node').filter({ hasText: /Notify/i }).first();
+    const node = page
+      .locator('.react-flow__node')
+      .filter({ hasText: /Notify/i })
+      .first();
     if (await node.isVisible({ timeout: 3000 }).catch(() => false)) await node.click();
     return true;
   }
@@ -272,10 +332,15 @@ test.describe('Edge Properties', () => {
     const hasNodes = await ensureFlowNodesVisible(page);
     test.skip(!hasNodes, 'React Flow not rendering');
     const edges = page.locator('.react-flow__edge');
-    await edges.first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    await edges
+      .first()
+      .waitFor({ state: 'visible', timeout: 5000 })
+      .catch(() => {});
     test.skip((await edges.count()) === 0, 'No edges rendered');
     await edges.first().click();
-    await expect(page.locator('label', { hasText: /连线标签/ }).first()).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('label', { hasText: /连线标签/ }).first()).toBeVisible({
+      timeout: 5000,
+    });
   });
 
   test('BPD-ED-02: Condition Expression textarea', async ({ page }) => {
@@ -283,10 +348,15 @@ test.describe('Edge Properties', () => {
     const hasNodes = await ensureFlowNodesVisible(page);
     test.skip(!hasNodes, 'React Flow not rendering');
     const edges = page.locator('.react-flow__edge');
-    await edges.first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    await edges
+      .first()
+      .waitFor({ state: 'visible', timeout: 5000 })
+      .catch(() => {});
     test.skip((await edges.count()) === 0, 'No edges rendered');
     await edges.first().click();
-    await expect(page.locator('label', { hasText: /条件表达式/ }).first()).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('label', { hasText: /条件表达式/ }).first()).toBeVisible({
+      timeout: 5000,
+    });
   });
 });
 
@@ -322,13 +392,25 @@ test.describe('Save Dialog', () => {
     const freshKey = `bpd_sd_${Date.now()}`;
     const resp = await page.request.post('/api/bpm/process-definitions', {
       data: {
-        processKey: freshKey, processName: `SD Test`,
-        description: 'save dialog test', category: 'e2e-test',
+        processKey: freshKey,
+        processName: `SD Test`,
+        description: 'save dialog test',
+        category: 'e2e-test',
         bpmnContent: generateMinimalBpmn(freshKey, 'SD Test'),
         designerJson: JSON.stringify({
           nodes: [
-            { id: 's', type: 'startEvent', position: { x: 100, y: 200 }, data: { type: 'startEvent', label: 'Start' } },
-            { id: 'e', type: 'endEvent', position: { x: 400, y: 200 }, data: { type: 'endEvent', label: 'End' } },
+            {
+              id: 's',
+              type: 'startEvent',
+              position: { x: 100, y: 200 },
+              data: { type: 'startEvent', label: 'Start' },
+            },
+            {
+              id: 'e',
+              type: 'endEvent',
+              position: { x: 400, y: 200 },
+              data: { type: 'endEvent', label: 'End' },
+            },
           ],
           edges: [{ id: 'f1', source: 's', target: 'e', type: 'smoothstep' }],
         }),
@@ -340,7 +422,11 @@ test.describe('Save Dialog', () => {
 
     await page.goto(`/bpmn-designer?pid=${freshPid}`, { waitUntil: 'domcontentloaded' });
     await expect(page.locator('[data-testid="bpmn-page-title"]')).toBeVisible({ timeout: 10000 });
-    await page.locator('.react-flow__node').first().waitFor({ state: 'visible', timeout: 8000 }).catch(() => {});
+    await page
+      .locator('.react-flow__node')
+      .first()
+      .waitFor({ state: 'visible', timeout: 8000 })
+      .catch(() => {});
 
     // Modify name to set isDirty=true
     const nameInput = page.locator('[data-testid="bpmn-field-name"]');
@@ -356,7 +442,10 @@ test.describe('Save Dialog', () => {
 
     // Wait for save dialog to appear (validation must pass first)
     const dialog = page.locator('h2:has-text("保存流程定义")');
-    return await dialog.waitFor({ state: 'visible', timeout: 8000 }).then(() => true).catch(() => false);
+    return await dialog
+      .waitFor({ state: 'visible', timeout: 8000 })
+      .then(() => true)
+      .catch(() => false);
   }
 
   test('BPD-SD-01: Save → dialog appears', async ({ page }) => {
@@ -388,7 +477,9 @@ test.describe('Save Dialog', () => {
   test('BPD-SD-05: Description textarea', async ({ page }) => {
     const ok = await openSaveDialog(page);
     test.skip(!ok, 'Save dialog did not appear');
-    await expect(page.locator('label:has-text("描述")').locator('..').locator('textarea').first()).toBeVisible();
+    await expect(
+      page.locator('label:has-text("描述")').locator('..').locator('textarea').first(),
+    ).toBeVisible();
   });
 
   test('BPD-SD-06: Category input', async ({ page }) => {
@@ -405,7 +496,9 @@ test.describe('Save Dialog', () => {
     const confirmBtn = dialog.locator('button:has-text("确定"), button.bg-blue-600').first();
     const [response] = await Promise.all([
       page.waitForResponse(
-        (r) => r.url().includes('/api/bpm/process-definitions') && r.request().method().toLowerCase() === 'put',
+        (r) =>
+          r.url().includes('/api/bpm/process-definitions') &&
+          r.request().method().toLowerCase() === 'put',
         { timeout: 15000 },
       ),
       confirmBtn.click(),
@@ -421,19 +514,28 @@ test.describe('Save Dialog', () => {
 test.describe('Import/Export + Deploy', () => {
   test('BPD-IE-01: Export button exists', async ({ page }) => {
     await createAndOpenBpmn(page);
-    const exportBtn = page.locator('[data-testid="bpmn-btn-export"]').or(page.getByRole('button', { name: /导出|Export/i })).first();
+    const exportBtn = page
+      .locator('[data-testid="bpmn-btn-export"]')
+      .or(page.getByRole('button', { name: /导出|Export/i }))
+      .first();
     await expect(exportBtn).toBeVisible({ timeout: 5000 });
   });
 
   test('BPD-IE-02: Import button exists', async ({ page }) => {
     await createAndOpenBpmn(page);
-    const importBtn = page.locator('[data-testid="bpmn-btn-import"]').or(page.getByRole('button', { name: /导入|Import/i })).first();
+    const importBtn = page
+      .locator('[data-testid="bpmn-btn-import"]')
+      .or(page.getByRole('button', { name: /导入|Import/i }))
+      .first();
     await expect(importBtn).toBeVisible({ timeout: 5000 });
   });
 
   test('BPD-DB-01: Deploy button visible', async ({ page }) => {
     await createAndOpenBpmn(page);
-    const deployBtn = page.locator('[data-testid="bpmn-btn-deploy"]').or(page.getByRole('button', { name: /部署|Deploy/i })).first();
+    const deployBtn = page
+      .locator('[data-testid="bpmn-btn-deploy"]')
+      .or(page.getByRole('button', { name: /部署|Deploy/i }))
+      .first();
     await expect(deployBtn).toBeVisible({ timeout: 5000 });
   });
 

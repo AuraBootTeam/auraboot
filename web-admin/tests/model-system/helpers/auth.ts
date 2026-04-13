@@ -13,7 +13,7 @@ export const TEST_CONFIG = {
     email: DEFAULT_TEST_ACCOUNT.email,
     password: DEFAULT_TEST_ACCOUNT.password,
   },
-  timeout: 30000
+  timeout: 30000,
 };
 
 /**
@@ -25,7 +25,10 @@ export async function login(page: Page): Promise<void> {
 
   // Check if already logged in (no login form visible)
   const loginForm = page.locator('input#email, input#password');
-  const hasLoginForm = await loginForm.first().isVisible().catch(() => false);
+  const hasLoginForm = await loginForm
+    .first()
+    .isVisible()
+    .catch(() => false);
 
   if (!hasLoginForm) {
     // Already logged in, no action needed
@@ -47,8 +50,8 @@ export async function login(page: Page): Promise<void> {
 
   // Wait for login to complete - either URL changes or login form disappears
   await Promise.race([
-    page.waitForURL(url => !url.pathname.includes('login'), { timeout: TEST_CONFIG.timeout }),
-    page.waitForSelector('input#email', { state: 'hidden', timeout: TEST_CONFIG.timeout })
+    page.waitForURL((url) => !url.pathname.includes('login'), { timeout: TEST_CONFIG.timeout }),
+    page.waitForSelector('input#email', { state: 'hidden', timeout: TEST_CONFIG.timeout }),
   ]).catch(() => {
     // Timeout is ok if we're already past login
   });
@@ -57,7 +60,10 @@ export async function login(page: Page): Promise<void> {
   await page.waitForLoadState('domcontentloaded');
 
   // Final check - verify not on login page
-  const stillOnLoginPage = await page.locator('input#email').isVisible().catch(() => false);
+  const stillOnLoginPage = await page
+    .locator('input#email')
+    .isVisible()
+    .catch(() => false);
   if (stillOnLoginPage) {
     throw new Error('Login failed: still on login page');
   }
@@ -69,11 +75,11 @@ export async function login(page: Page): Promise<void> {
 export async function getAuthHeaders(page: Page): Promise<Record<string, string>> {
   // Get cookies from the page context
   const cookies = await page.context().cookies();
-  const sessionCookie = cookies.find(c => c.name === '__session' || c.name === 'token');
+  const sessionCookie = cookies.find((c) => c.name === '__session' || c.name === 'token');
 
   if (sessionCookie) {
     return {
-      'Cookie': `${sessionCookie.name}=${sessionCookie.value}`
+      Cookie: `${sessionCookie.name}=${sessionCookie.value}`,
     };
   }
 

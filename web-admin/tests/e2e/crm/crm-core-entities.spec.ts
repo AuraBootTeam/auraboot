@@ -10,9 +10,9 @@
  * CE-007 @critical : Campaign cancel branch → active → cancelled
  *
  * Menu paths (CRM root → direct leaf links):
- *   /dynamic/crm-account    → model: crm_account
- *   /dynamic/crm-contact    → model: crm_contact
- *   /dynamic/crm-campaign   → model: crm_campaign
+ *   /p/crm-account    → model: crm_account
+ *   /p/crm-contact    → model: crm_contact
+ *   /p/crm-campaign   → model: crm_campaign
  *
  * Prerequisites: crm plugin imported and all models published.
  *
@@ -26,11 +26,7 @@ import { uniqueId, executeCommandViaApi } from '../helpers/index';
 // Navigation helper
 // ---------------------------------------------------------------------------
 
-async function navigateToCrmPage(
-  page: Page,
-  leafName: string,
-  modelCode: string,
-): Promise<void> {
+async function navigateToCrmPage(page: Page, leafName: string, modelCode: string): Promise<void> {
   await page.goto('/dashboards');
   await page.waitForLoadState('domcontentloaded');
 
@@ -43,7 +39,7 @@ async function navigateToCrmPage(
   await page.waitForResponse(() => true, { timeout: 1_500 }).catch(() => null);
 
   // Use href-based selector for reliability
-  const hrefPath = `/dynamic/${modelCode.replace(/_/g, '-')}`;
+  const hrefPath = `/p/${modelCode}`;
   const leafLink = nav
     .locator(`a[href="${hrefPath}"]`)
     .or(nav.getByRole('link', { name: leafName }))
@@ -52,18 +48,16 @@ async function navigateToCrmPage(
   await leafLink.scrollIntoViewIfNeeded();
 
   const listResponsePromise = page
-    .waitForResponse(
-      (r) =>
-        r.url().includes(`/api/dynamic/${modelCode}`) && r.status() === 200,
-      { timeout: 15_000 },
-    )
+    .waitForResponse((r) => r.url().includes(`/api/dynamic/${modelCode}`) && r.status() === 200, {
+      timeout: 15_000,
+    })
     .catch(() => null);
   await leafLink.evaluate((el: HTMLElement) => el.click());
   await listResponsePromise;
 
-  await expect(
-    page.locator('table, [class*="ant-table"]').first(),
-  ).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator('table, [class*="ant-table"]').first()).toBeVisible({
+    timeout: 10_000,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -173,9 +167,7 @@ test.describe('CRM — Core Entities', () => {
   // CE-001 @smoke: Navigate to 客户 list
   // =========================================================================
 
-  test('CE-001 @smoke: Navigate to 客户 list via CRM menu', async ({
-    page,
-  }) => {
+  test('CE-001 @smoke: Navigate to 客户 list via CRM menu', async ({ page }) => {
     await navigateToCrmPage(page, '客户', 'crm_account');
 
     const rows = page.locator('tbody tr');
@@ -192,9 +184,7 @@ test.describe('CRM — Core Entities', () => {
   // CE-002 @smoke: Navigate to 联系人 list
   // =========================================================================
 
-  test('CE-002 @smoke: Navigate to 联系人 list via CRM menu', async ({
-    page,
-  }) => {
+  test('CE-002 @smoke: Navigate to 联系人 list via CRM menu', async ({ page }) => {
     await navigateToCrmPage(page, '联系人', 'crm_contact');
 
     const rows = page.locator('tbody tr');
@@ -211,9 +201,7 @@ test.describe('CRM — Core Entities', () => {
   // CE-003 @smoke: Navigate to 营销活动 list
   // =========================================================================
 
-  test('CE-003 @smoke: Navigate to 营销活动 list via CRM menu', async ({
-    page,
-  }) => {
+  test('CE-003 @smoke: Navigate to 营销活动 list via CRM menu', async ({ page }) => {
     await navigateToCrmPage(page, '营销活动', 'crm_campaign');
 
     const rows = page.locator('tbody tr');
@@ -230,15 +218,11 @@ test.describe('CRM — Core Entities', () => {
   // CE-004 @critical: Account appears in list with correct data
   // =========================================================================
 
-  test('CE-004 @critical: Created account appears in 客户 list', async ({
-    page,
-  }) => {
+  test('CE-004 @critical: Created account appears in 客户 list', async ({ page }) => {
     expect(accountId).toBeTruthy();
 
     // Verify via direct GET
-    const resp = await page.request.get(
-      `/api/dynamic/crm_account/${accountId}`,
-    );
+    const resp = await page.request.get(`/api/dynamic/crm_account/${accountId}`);
     expect(resp.ok()).toBe(true);
     const body = await resp.json();
     const record = body?.data ?? body;
@@ -260,9 +244,7 @@ test.describe('CRM — Core Entities', () => {
     expect(contactId).toBeTruthy();
 
     // Verify via API
-    const resp = await page.request.get(
-      `/api/dynamic/crm_contact/${contactId}`,
-    );
+    const resp = await page.request.get(`/api/dynamic/crm_contact/${contactId}`);
     expect(resp.ok()).toBe(true);
     const body = await resp.json();
     const record = body?.data ?? body;
@@ -279,46 +261,28 @@ test.describe('CRM — Core Entities', () => {
   // CE-006 @critical: Campaign draft → active → completed
   // =========================================================================
 
-  test('CE-006 @critical: Campaign PLANNED → active → completed lifecycle', async ({
-    page,
-  }) => {
+  test('CE-006 @critical: Campaign PLANNED → active → completed lifecycle', async ({ page }) => {
     expect(campaignId).toBeTruthy();
 
     // Verify starts as PLANNED
-    let resp = await page.request.get(
-      `/api/dynamic/crm_campaign/${campaignId}`,
-    );
+    let resp = await page.request.get(`/api/dynamic/crm_campaign/${campaignId}`);
     expect(resp.ok()).toBe(true);
     const draftBody = await resp.json();
     expect((draftBody?.data ?? draftBody).crm_cpn_status).toBe('planned');
 
     // draft → active
-    await executeCommandViaApi(
-      page,
-      'crm:activate_campaign',
-      {},
-      campaignId,
-      'state_transition',
-    );
+    await executeCommandViaApi(page, 'crm:activate_campaign', {}, campaignId, 'state_transition');
 
     resp = await page.request.get(`/api/dynamic/crm_campaign/${campaignId}`);
     const activeBody = await resp.json();
     expect((activeBody?.data ?? activeBody).crm_cpn_status).toBe('active');
 
     // active → completed
-    await executeCommandViaApi(
-      page,
-      'crm:complete_campaign',
-      {},
-      campaignId,
-      'state_transition',
-    );
+    await executeCommandViaApi(page, 'crm:complete_campaign', {}, campaignId, 'state_transition');
 
     resp = await page.request.get(`/api/dynamic/crm_campaign/${campaignId}`);
     const completedBody = await resp.json();
-    expect((completedBody?.data ?? completedBody).crm_cpn_status).toBe(
-      'completed',
-    );
+    expect((completedBody?.data ?? completedBody).crm_cpn_status).toBe('completed');
 
     // Verify in list UI
     await navigateToCrmPage(page, '营销活动', 'crm_campaign');
@@ -330,9 +294,7 @@ test.describe('CRM — Core Entities', () => {
   // CE-007 @critical: Campaign cancel branch → active → cancelled
   // =========================================================================
 
-  test('CE-007 @critical: Campaign cancel branch → active → cancelled', async ({
-    page,
-  }) => {
+  test('CE-007 @critical: Campaign cancel branch → active → cancelled', async ({ page }) => {
     expect(cancelCampaignId).toBeTruthy();
 
     // Activate first
@@ -344,9 +306,7 @@ test.describe('CRM — Core Entities', () => {
       'state_transition',
     );
 
-    let resp = await page.request.get(
-      `/api/dynamic/crm_campaign/${cancelCampaignId}`,
-    );
+    let resp = await page.request.get(`/api/dynamic/crm_campaign/${cancelCampaignId}`);
     expect(resp.ok()).toBe(true);
     const activeBody = await resp.json();
     expect((activeBody?.data ?? activeBody).crm_cpn_status).toBe('active');
@@ -360,12 +320,8 @@ test.describe('CRM — Core Entities', () => {
       'state_transition',
     );
 
-    resp = await page.request.get(
-      `/api/dynamic/crm_campaign/${cancelCampaignId}`,
-    );
+    resp = await page.request.get(`/api/dynamic/crm_campaign/${cancelCampaignId}`);
     const cancelledBody = await resp.json();
-    expect((cancelledBody?.data ?? cancelledBody).crm_cpn_status).toBe(
-      'cancelled',
-    );
+    expect((cancelledBody?.data ?? cancelledBody).crm_cpn_status).toBe('cancelled');
   });
 });

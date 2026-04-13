@@ -11,10 +11,7 @@ import { useDraggable } from '@dnd-kit/core';
 import { useFieldLibrary } from '~/studio/hooks/fields/useFieldLibrary';
 import { useViewModelSelector } from '~/studio/hooks/viewmodel/useViewModelSelector';
 import { DRAG_TYPES } from '~/studio/workbench/constants';
-import {
-  DATA_TYPE_COMPONENT_MAP,
-  type MetaFieldDTO,
-} from '~/studio/workbench/panels/fields/types';
+import { DATA_TYPE_COMPONENT_MAP, type MetaFieldDTO } from '~/studio/workbench/panels/fields/types';
 import type { ApiDetectedField } from '~/studio/hooks/fields/useApiSchemaDetection';
 
 export interface AreasFieldLibraryProps {

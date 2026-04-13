@@ -51,13 +51,11 @@ test.describe('E2E Test Order — REFERENCE Field UI', () => {
     await order.gotoNewForm();
 
     // Find the customer reference field
-    const refField = page.locator(
-      '[data-testid="form-field-e2et_order_customer"]'
-    ).first();
+    const refField = page.locator('[data-testid="form-field-e2et_order_customer"]').first();
 
     const refVisible = await refField.isVisible({ timeout: 5000 }).catch(() => false);
     if (!refVisible) {
-      throw new Error(String('Customer reference field not found on order form'))
+      throw new Error(String('Customer reference field not found on order form'));
       return;
     }
 
@@ -80,13 +78,20 @@ test.describe('E2E Test Order — REFERENCE Field UI', () => {
 
     try {
       // Navigate directly to the created order's detail page
-      await page.goto(`/dynamic/e2et_order/view/${orderPid}`);
-      await page.waitForLoadState('domcontentloaded');
-      await page.locator('h2, h1').first().waitFor({ state: 'visible', timeout: 10000 });
+      await page.goto(`/p/e2et_order/view/${orderPid}`, { waitUntil: 'domcontentloaded' });
+      await page
+        .waitForResponse(
+          (r) => r.url().includes('/api/dynamic/e2et_order') && !r.url().includes('/list'),
+          { timeout: 12_000 },
+        )
+        .catch(() => null);
+      await expect(page.getByText(/订单标题|关联客户|订单状态/).first()).toBeVisible({
+        timeout: 10_000,
+      });
 
       // Check if customer name or customer PID is displayed on the detail page
       // Note: REFERENCE field may display the referenced record's title OR the PID
-      const pageContent = await page.textContent('body') || '';
+      const pageContent = (await page.textContent('body')) || '';
       const hasCustomerName = pageContent.includes(customerName);
       const hasCustomerPid = pageContent.includes(customerPid);
       expect(hasCustomerName || hasCustomerPid).toBe(true);

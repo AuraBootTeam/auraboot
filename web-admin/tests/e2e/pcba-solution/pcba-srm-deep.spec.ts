@@ -125,7 +125,7 @@ test.describe('PCBA SRM Deep — Supplier Evaluation', () => {
 
   test('PS-002: Create supplier eval via API, verify in list', async ({ page }) => {
     if (!sharedSupplierId) {
-      throw new Error(String('Shared supplier not available — plugin may not be imported'))
+      throw new Error(String('Shared supplier not available — plugin may not be imported'));
       return;
     }
 
@@ -144,7 +144,7 @@ test.describe('PCBA SRM Deep — Supplier Evaluation', () => {
     );
 
     if (!result.recordId || result.code !== ErrorCodes.SUCCESS) {
-      throw new Error(String('Supplier eval creation failed — plugin may not be imported'))
+      throw new Error(String('Supplier eval creation failed — plugin may not be imported'));
       return;
     }
     bucket.supplierEvals.push(result.recordId);
@@ -165,7 +165,7 @@ test.describe('PCBA SRM Deep — Supplier Evaluation', () => {
 
   test('PS-003: Supplier eval status flow draft → submitted → approved', async ({ page }) => {
     if (!sharedSupplierId) {
-      throw new Error(String('Shared supplier not available'))
+      throw new Error(String('Shared supplier not available'));
       return;
     }
 
@@ -184,7 +184,7 @@ test.describe('PCBA SRM Deep — Supplier Evaluation', () => {
     );
 
     if (!result.recordId || result.code !== ErrorCodes.SUCCESS) {
-      throw new Error(String('Supplier eval creation failed'))
+      throw new Error(String('Supplier eval creation failed'));
       return;
     }
     bucket.supplierEvals.push(result.recordId);

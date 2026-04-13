@@ -1,5 +1,5 @@
 {
-  "kind": "PageLayout",
+  "kind": "page_layout",
   "version": "4.0.0",
   "id": "page.app.shell",
   "title": "$i18n:page.app.shell.title",

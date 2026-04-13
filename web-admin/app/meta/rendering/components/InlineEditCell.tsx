@@ -1,5 +1,5 @@
 /**
- * InlineEditCell — inline cell editing for data-table columns
+ * InlineEditCell — inline cell editing for table columns
  *
  * When column.editable is true, double-clicking a cell enters edit mode.
  * Blur or Enter saves the change via Command execution.

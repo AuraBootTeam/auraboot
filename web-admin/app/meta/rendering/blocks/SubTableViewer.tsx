@@ -155,7 +155,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
         } else if (config.resolveVia) {
           // Indirect query
           const rv = config.resolveVia;
-          const intermediateModel = rv.model.replace(/_/g, '-');
+          const intermediateModel = rv.model;
           const intermediateFilters: Array<{ fieldName: string; operator: string; value: string }> =
             [{ fieldName: rv.parentField, operator: 'EQ', value: parentRecordId }];
           if (rv.filterField && rv.filterValue) {
@@ -187,7 +187,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
           }
 
           const intermediatePid = intermediateRecords[0].pid;
-          const childModel = config.childModel.replace(/_/g, '-');
+          const childModel = config.childModel;
           endpoint = `/api/dynamic/${childModel}/list`;
           filters = {
             pageNum: 1,
@@ -198,7 +198,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
           };
         } else {
           // Direct query
-          const childModel = config.childModel.replace(/_/g, '-');
+          const childModel = config.childModel;
           endpoint = `/api/dynamic/${childModel}/list`;
           filters = {
             pageNum: 1,

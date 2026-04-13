@@ -74,22 +74,15 @@ export const ListTemplate: TemplateGenerator = {
     );
 
     return {
-      kind: 'List',
+      kind: 'list',
       version: '1.0',
       id: `${model.modelCode}_list`,
       title: { 'zh-CN': `${model.displayName}列表`, 'en-US': `${model.displayName} List` },
       layout: {
-        areas: ['main'],
-        areasConfig: {
-          main: { type: 'flex', direction: 'column', rowGap: 0 },
-        },
+        type: 'stack',
+        gap: 0,
       },
-      areas: {
-        main: {
-          blocks,
-          className: classOverrides.container ?? styles.container,
-        },
-      },
+      blocks,
       dataSources: {
         ds_list: {
           type: 'api',
@@ -170,7 +163,7 @@ function buildFilterBlock(
 
   return {
     id: 'block_filters',
-    blockType: 'filter-form',
+    blockType: 'filters',
     className: overrides.card ?? styles.card,
     fields: filterFields,
     buttons: [
@@ -280,7 +273,7 @@ function buildTableBlock(
 
   return {
     id: 'block_table',
-    blockType: 'data-table',
+    blockType: 'table',
     className: overrides.card ?? styles.card,
     table: {
       rowKey: primaryKey,

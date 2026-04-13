@@ -52,7 +52,7 @@ interface BlockTypeInfo {
 const BLOCK_TYPES: BlockTypeInfo[] = [
   // Form category
   {
-    type: 'filter-form',
+    type: 'filters',
     name: '筛选表单',
     icon: '🔍',
     description: '带筛选条件的表单',
@@ -81,7 +81,7 @@ const BLOCK_TYPES: BlockTypeInfo[] = [
 
   // Display category
   {
-    type: 'data-table',
+    type: 'table',
     name: '数据表格',
     icon: '📊',
     description: '展示数据的表格',
@@ -110,7 +110,7 @@ const BLOCK_TYPES: BlockTypeInfo[] = [
 
   // Layout category
   {
-    type: 'toolbar-buttons',
+    type: 'toolbar',
     name: '工具栏按钮',
     icon: '🔘',
     description: '操作按钮组',

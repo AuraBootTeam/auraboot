@@ -84,18 +84,18 @@ function RejectModal({ resource, onConfirm, onCancel, submitting }: RejectModalP
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6 space-y-4">
+      <div className="mx-4 w-full max-w-md space-y-4 rounded-xl bg-white p-6 shadow-xl">
         <h3 className="text-lg font-semibold text-gray-900">Reject Translation</h3>
-        <div className="text-sm text-gray-500 space-y-1">
-          <p className="font-mono text-xs bg-gray-50 px-2 py-1 rounded">{resource.i18nKey}</p>
+        <div className="space-y-1 text-sm text-gray-500">
+          <p className="rounded bg-gray-50 px-2 py-1 font-mono text-xs">{resource.i18nKey}</p>
           <p className="text-gray-700 italic">"{resource.value}"</p>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="mb-1 block text-sm font-medium text-gray-700">
             Rejection Reason <span className="text-red-500">*</span>
           </label>
           <textarea
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent resize-none"
+            className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-transparent focus:ring-2 focus:ring-red-400 focus:outline-none"
             rows={3}
             placeholder="Explain why the translation needs to be revised..."
             value={reason}
@@ -103,18 +103,18 @@ function RejectModal({ resource, onConfirm, onCancel, submitting }: RejectModalP
             autoFocus
           />
         </div>
-        <div className="flex gap-3 justify-end">
+        <div className="flex justify-end gap-3">
           <button
             onClick={onCancel}
             disabled={submitting}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
+            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             onClick={() => onConfirm(reason)}
             disabled={submitting || !reason.trim()}
-            className="px-4 py-2 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {submitting ? 'Rejecting…' : 'Reject'}
           </button>
@@ -131,7 +131,9 @@ function RejectModal({ resource, onConfirm, onCancel, submitting }: RejectModalP
 function StatusBadge({ status }: { status: string }) {
   const badge = STATUS_BADGE[status] ?? { bg: 'bg-gray-100', text: 'text-gray-600', label: status };
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${badge.bg} ${badge.text}`}>
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${badge.bg} ${badge.text}`}
+    >
       {badge.label}
     </span>
   );
@@ -185,7 +187,7 @@ function AiTranslateModal({ onClose, onSuccess }: AiTranslateModalProps) {
       const data: AiTranslationResult = json.data;
       setResult(data);
       showSuccessToast(
-        `AI translation done — generated ${data.generated}, skipped ${data.skipped}`
+        `AI translation done — generated ${data.generated}, skipped ${data.skipped}`,
       );
       onSuccess();
     } catch (err: unknown) {
@@ -197,18 +199,23 @@ function AiTranslateModal({ onClose, onSuccess }: AiTranslateModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6 space-y-5">
+      <div className="mx-4 w-full max-w-md space-y-5 rounded-xl bg-white p-6 shadow-xl">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-semibold text-gray-900">AI Generate Drafts</h3>
-            <p className="text-sm text-gray-500 mt-0.5">
+            <p className="mt-0.5 text-sm text-gray-500">
               Automatically generate draft translations for missing keys
             </p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
+          <button onClick={onClose} className="text-gray-400 transition-colors hover:text-gray-600">
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
@@ -216,23 +223,23 @@ function AiTranslateModal({ onClose, onSuccess }: AiTranslateModalProps) {
         {/* Form */}
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Target Language
-            </label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Target Language</label>
             <select
               value={targetLocale}
               onChange={(e) => setTargetLocale(e.target.value)}
               disabled={running}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white disabled:opacity-50"
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none disabled:opacity-50"
             >
               {AI_TARGET_LOCALES.map((l) => (
-                <option key={l.code} value={l.code}>{l.label}</option>
+                <option key={l.code} value={l.code}>
+                  {l.label}
+                </option>
               ))}
             </select>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="mb-1 block text-sm font-medium text-gray-700">
               Max Keys to Generate
             </label>
             <input
@@ -242,46 +249,61 @@ function AiTranslateModal({ onClose, onSuccess }: AiTranslateModalProps) {
               value={maxKeys}
               onChange={(e) => setMaxKeys(Math.min(200, Math.max(1, Number(e.target.value))))}
               disabled={running}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none disabled:opacity-50"
             />
-            <p className="text-xs text-gray-400 mt-1">Between 1 and 200. Each batch of 10 keys uses one LLM call.</p>
+            <p className="mt-1 text-xs text-gray-400">
+              Between 1 and 200. Each batch of 10 keys uses one LLM call.
+            </p>
           </div>
         </div>
 
         {/* Result summary */}
         {result && (
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-sm space-y-1">
+          <div className="space-y-1 rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm">
             <p className="font-medium text-gray-700">Last run results</p>
             <div className="flex gap-4 text-gray-600">
-              <span className="text-emerald-600 font-semibold">+{result.generated} generated</span>
+              <span className="font-semibold text-emerald-600">+{result.generated} generated</span>
               <span>{result.skipped} skipped</span>
               {result.errors > 0 && <span className="text-red-500">{result.errors} errors</span>}
             </div>
             <p className="text-xs text-gray-400">
-              {result.llmUsed ? 'Used LLM provider' : 'Fallback: used source locale values as placeholder drafts'}
+              {result.llmUsed
+                ? 'Used LLM provider'
+                : 'Fallback: used source locale values as placeholder drafts'}
             </p>
           </div>
         )}
 
         {/* Actions */}
-        <div className="flex gap-3 justify-end pt-1">
+        <div className="flex justify-end gap-3 pt-1">
           <button
             onClick={onClose}
             disabled={running}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
+            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
           >
             Close
           </button>
           <button
             onClick={handleRun}
             disabled={running}
-            className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+            className="flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {running ? (
               <>
-                <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                  />
                 </svg>
                 Generating…
               </>
@@ -322,31 +344,34 @@ export default function I18nWorkflowPage() {
   // Fetch resources
   // -------------------------------------------------------------------------
 
-  const fetchResources = useCallback(async (page = 1) => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({
-        pageNum: String(page),
-        pageSize: '20',
-        lang: locale,
-      });
-      if (statusFilter) params.set('status', statusFilter);
-      if (keyword.trim()) params.set('keyword', keyword.trim());
+  const fetchResources = useCallback(
+    async (page = 1) => {
+      setLoading(true);
+      try {
+        const params = new URLSearchParams({
+          pageNum: String(page),
+          pageSize: '20',
+          lang: locale,
+        });
+        if (statusFilter) params.set('status', statusFilter);
+        if (keyword.trim()) params.set('keyword', keyword.trim());
 
-      const res = await fetch(`/api/admin/i18n/resources?${params.toString()}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json();
-      const paged: PagedResponse = json.data;
-      setResources(paged.records ?? []);
-      setTotal(paged.total ?? 0);
-      setPageNum(page);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      showErrorToast(`Failed to load translations: ${msg}`);
-    } finally {
-      setLoading(false);
-    }
-  }, [locale, statusFilter, keyword, showErrorToast]);
+        const res = await fetch(`/api/admin/i18n/resources?${params.toString()}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = await res.json();
+        const paged: PagedResponse = json.data;
+        setResources(paged.records ?? []);
+        setTotal(paged.total ?? 0);
+        setPageNum(page);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        showErrorToast(`Failed to load translations: ${msg}`);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [locale, statusFilter, keyword, showErrorToast],
+  );
 
   useEffect(() => {
     fetchResources(1);
@@ -421,7 +446,7 @@ export default function I18nWorkflowPage() {
   const pendingCount = resources.filter((r) => r.status === 'review').length;
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
+    <div className="mx-auto max-w-6xl space-y-6 p-6">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
@@ -432,17 +457,22 @@ export default function I18nWorkflowPage() {
         </div>
         <div className="flex items-center gap-3">
           {statusFilter === 'review' && pendingCount > 0 && (
-            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-amber-100 text-amber-800">
+            <span className="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-sm font-medium text-amber-800">
               {total} pending
             </span>
           )}
           <button
             onClick={() => setShowAiModal(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-colors shadow-sm"
+            className="inline-flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-purple-700"
             title="Use AI to generate draft translations for missing keys"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M13 10V3L4 14h7v7l9-11h-7z"
+              />
             </svg>
             AI Generate Drafts
           </button>
@@ -450,53 +480,63 @@ export default function I18nWorkflowPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
-        <div className="flex flex-wrap gap-3 items-end">
+      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap items-end gap-3">
           {/* Locale */}
-          <div className="flex flex-col gap-1 min-w-[160px]">
-            <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Locale</label>
+          <div className="flex min-w-[160px] flex-col gap-1">
+            <label className="text-xs font-medium tracking-wide text-gray-500 uppercase">
+              Locale
+            </label>
             <select
               value={locale}
               onChange={(e) => setLocale(e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
             >
               {LOCALES.map((l) => (
-                <option key={l.code} value={l.code}>{l.label}</option>
+                <option key={l.code} value={l.code}>
+                  {l.label}
+                </option>
               ))}
             </select>
           </div>
 
           {/* Status */}
-          <div className="flex flex-col gap-1 min-w-[180px]">
-            <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Status</label>
+          <div className="flex min-w-[180px] flex-col gap-1">
+            <label className="text-xs font-medium tracking-wide text-gray-500 uppercase">
+              Status
+            </label>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
             >
               {STATUS_OPTIONS.map((s) => (
-                <option key={s.value} value={s.value}>{s.label}</option>
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
               ))}
             </select>
           </div>
 
           {/* Keyword */}
-          <div className="flex flex-col gap-1 flex-1 min-w-[200px]">
-            <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Search</label>
+          <div className="flex min-w-[200px] flex-1 flex-col gap-1">
+            <label className="text-xs font-medium tracking-wide text-gray-500 uppercase">
+              Search
+            </label>
             <input
               type="text"
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && fetchResources(1)}
               placeholder="Search by key or value…"
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
             />
           </div>
 
           <button
             onClick={() => fetchResources(1)}
             disabled={loading}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
           >
             Search
           </button>
@@ -504,20 +544,30 @@ export default function I18nWorkflowPage() {
       </div>
 
       {/* Table */}
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
         {loading ? (
-          <div className="p-8 space-y-3 animate-pulse">
+          <div className="animate-pulse space-y-3 p-8">
             {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="h-12 bg-gray-100 rounded" />
+              <div key={i} className="h-12 rounded bg-gray-100" />
             ))}
           </div>
         ) : resources.length === 0 ? (
           <div className="p-12 text-center">
-            <svg className="mx-auto h-10 w-10 text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            <svg
+              className="mx-auto mb-3 h-10 w-10 text-gray-300"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+              />
             </svg>
-            <p className="text-gray-500 font-medium">No translations found</p>
-            <p className="text-sm text-gray-400 mt-1">
+            <p className="font-medium text-gray-500">No translations found</p>
+            <p className="mt-1 text-sm text-gray-400">
               {statusFilter === 'review'
                 ? 'No pending translations to review. Great work!'
                 : 'Try adjusting your filters.'}
@@ -525,7 +575,7 @@ export default function I18nWorkflowPage() {
           </div>
         ) : (
           <>
-            <div className="px-5 py-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
+            <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50 px-5 py-3">
               <p className="text-xs text-gray-500">
                 Showing <span className="font-medium">{resources.length}</span> of{' '}
                 <span className="font-medium">{total}</span> translations
@@ -534,10 +584,10 @@ export default function I18nWorkflowPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-xs font-medium text-gray-500 uppercase tracking-wide border-b border-gray-100">
-                    <th className="px-5 py-3 w-2/5">Key</th>
-                    <th className="px-5 py-3 w-1/4">Translation</th>
-                    <th className="px-5 py-3 w-24">Status</th>
+                  <tr className="border-b border-gray-100 text-left text-xs font-medium tracking-wide text-gray-500 uppercase">
+                    <th className="w-2/5 px-5 py-3">Key</th>
+                    <th className="w-1/4 px-5 py-3">Translation</th>
+                    <th className="w-24 px-5 py-3">Status</th>
                     <th className="px-5 py-3">Notes</th>
                     <th className="px-5 py-3 text-right">Actions</th>
                   </tr>
@@ -546,9 +596,9 @@ export default function I18nWorkflowPage() {
                   {resources.map((resource) => {
                     const isActing = actionLoading?.startsWith(resource.pid);
                     return (
-                      <tr key={resource.pid} className="hover:bg-gray-50 transition-colors">
+                      <tr key={resource.pid} className="transition-colors hover:bg-gray-50">
                         {/* Key */}
-                        <td className="px-5 py-3 font-mono text-xs text-gray-600 break-all">
+                        <td className="px-5 py-3 font-mono text-xs break-all text-gray-600">
                           {resource.i18nKey}
                         </td>
 
@@ -563,9 +613,12 @@ export default function I18nWorkflowPage() {
                         </td>
 
                         {/* Notes / reject reason */}
-                        <td className="px-5 py-3 text-xs text-gray-500 max-w-[200px]">
+                        <td className="max-w-[200px] px-5 py-3 text-xs text-gray-500">
                           {resource.rejectReason ? (
-                            <span className="text-red-500 line-clamp-2" title={resource.rejectReason}>
+                            <span
+                              className="line-clamp-2 text-red-500"
+                              title={resource.rejectReason}
+                            >
                               ✗ {resource.rejectReason}
                             </span>
                           ) : resource.status === 'approved' && resource.reviewedAt ? (
@@ -575,14 +628,16 @@ export default function I18nWorkflowPage() {
 
                         {/* Actions */}
                         <td className="px-5 py-3">
-                          <div className="flex gap-2 justify-end flex-wrap">
+                          <div className="flex flex-wrap justify-end gap-2">
                             {resource.status === 'draft' && (
                               <button
                                 onClick={() => handleSubmitReview(resource.pid)}
                                 disabled={!!isActing}
-                                className="px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 disabled:opacity-50 transition-colors"
+                                className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-100 disabled:opacity-50"
                               >
-                                {actionLoading === resource.pid + ':submit' ? 'Submitting…' : 'Submit for Review'}
+                                {actionLoading === resource.pid + ':submit'
+                                  ? 'Submitting…'
+                                  : 'Submit for Review'}
                               </button>
                             )}
                             {resource.status === 'review' && (
@@ -590,14 +645,16 @@ export default function I18nWorkflowPage() {
                                 <button
                                   onClick={() => handleApprove(resource.pid)}
                                   disabled={!!isActing}
-                                  className="px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100 disabled:opacity-50 transition-colors"
+                                  className="rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-50"
                                 >
-                                  {actionLoading === resource.pid + ':approve' ? 'Approving…' : 'Approve'}
+                                  {actionLoading === resource.pid + ':approve'
+                                    ? 'Approving…'
+                                    : 'Approve'}
                                 </button>
                                 <button
                                   onClick={() => setRejectTarget(resource)}
                                   disabled={!!isActing}
-                                  className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 disabled:opacity-50 transition-colors"
+                                  className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-100 disabled:opacity-50"
                                 >
                                   Reject
                                 </button>
@@ -614,11 +671,11 @@ export default function I18nWorkflowPage() {
 
             {/* Pagination */}
             {total > 20 && (
-              <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-between bg-gray-50">
+              <div className="flex items-center justify-between border-t border-gray-100 bg-gray-50 px-5 py-3">
                 <button
                   onClick={() => fetchResources(pageNum - 1)}
                   disabled={pageNum <= 1 || loading}
-                  className="px-3 py-1.5 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-40 transition-colors"
+                  className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-600 transition-colors hover:bg-gray-100 disabled:opacity-40"
                 >
                   Previous
                 </button>
@@ -628,7 +685,7 @@ export default function I18nWorkflowPage() {
                 <button
                   onClick={() => fetchResources(pageNum + 1)}
                   disabled={pageNum >= Math.ceil(total / 20) || loading}
-                  className="px-3 py-1.5 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-40 transition-colors"
+                  className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-600 transition-colors hover:bg-gray-100 disabled:opacity-40"
                 >
                   Next
                 </button>

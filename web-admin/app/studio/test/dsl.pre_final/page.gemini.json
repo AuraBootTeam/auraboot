@@ -1,5 +1,5 @@
 {
-  "kind": "PageLayout", // 顶层布局类型
+  "kind": "page_layout", // 顶层布局类型
   "id": "root_layout",
   "version": "3.0.0",
 

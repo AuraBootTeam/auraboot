@@ -19,7 +19,7 @@ import { PageDesignerPage } from '../../pages';
 
 async function resolveDropZone(
   page: import('@playwright/test').Page,
-  designerPage: PageDesignerPage
+  designerPage: PageDesignerPage,
 ): Promise<import('@playwright/test').Locator> {
   if (await designerPage.canvas.isVisible({ timeout: 1000 }).catch(() => false)) {
     return designerPage.canvas;
@@ -39,9 +39,11 @@ async function resolveDropZone(
 
 async function resolvePaletteDraggable(
   page: import('@playwright/test').Page,
-  dropZone: import('@playwright/test').Locator
+  dropZone: import('@playwright/test').Locator,
 ): Promise<import('@playwright/test').Locator> {
-  const allDraggables = page.locator('[aria-roledescription="draggable"], [draggable="true"], [data-draggable]');
+  const allDraggables = page.locator(
+    '[aria-roledescription="draggable"], [draggable="true"], [data-draggable]',
+  );
   const count = await allDraggables.count();
   const dropBox = await dropZone.boundingBox();
   const dropX = dropBox ? dropBox.x : Number.MAX_SAFE_INTEGER;
@@ -63,7 +65,7 @@ async function resolvePaletteDraggable(
 async function addBlocksToCanvas(
   page: import('@playwright/test').Page,
   designerPage: PageDesignerPage,
-  targetCount: number
+  targetCount: number,
 ): Promise<void> {
   await designerPage.openComponentLibrary();
   const dropZone = await resolveDropZone(page, designerPage);
@@ -80,13 +82,21 @@ async function addBlocksToCanvas(
     expect(sourceBox).toBeTruthy();
     expect(dropBox).toBeTruthy();
 
-    await page.mouse.move(sourceBox!.x + sourceBox!.width / 2, sourceBox!.y + sourceBox!.height / 2);
+    await page.mouse.move(
+      sourceBox!.x + sourceBox!.width / 2,
+      sourceBox!.y + sourceBox!.height / 2,
+    );
     await page.mouse.down();
-    await page.mouse.move(dropBox!.x + dropBox!.width / 2, dropBox!.y + dropBox!.height / 2, { steps: 12 });
+    await page.mouse.move(dropBox!.x + dropBox!.width / 2, dropBox!.y + dropBox!.height / 2, {
+      steps: 12,
+    });
     await page.mouse.up();
     // Wait for React to process the drop event
-    await page.locator('.react-grid-item, [data-testid="designer-canvas"] > *').first()
-      .waitFor({ state: 'attached', timeout: 3000 }).catch(() => {});
+    await page
+      .locator('.react-grid-item, [data-testid="designer-canvas"] > *')
+      .first()
+      .waitFor({ state: 'attached', timeout: 3000 })
+      .catch(() => {});
   }
 }
 
@@ -176,12 +186,17 @@ test.describe('Page Designer - Property Editing', () => {
       await addBlocksToCanvas(designerPage.page, designerPage, 1);
     }
 
-    const hasBlock = await designerPage.block(0).isVisible({ timeout: 5000 }).catch(() => false);
+    const hasBlock = await designerPage
+      .block(0)
+      .isVisible({ timeout: 5000 })
+      .catch(() => false);
     expect(hasBlock).toBe(true);
 
     await designerPage.selectBlock(0);
 
-    const hasProperties = await designerPage.propertiesPanel.isVisible({ timeout: 3000 }).catch(() => false);
+    const hasProperties = await designerPage.propertiesPanel
+      .isVisible({ timeout: 3000 })
+      .catch(() => false);
     const isEmpty = await designerPage.hasEmptyProperties();
 
     expect(hasProperties || !isEmpty).toBe(true);
@@ -198,12 +213,17 @@ test.describe('Page Designer - Property Editing', () => {
       await addBlocksToCanvas(designerPage.page, designerPage, 1);
     }
 
-    const hasBlock = await designerPage.block(0).isVisible({ timeout: 5000 }).catch(() => false);
+    const hasBlock = await designerPage
+      .block(0)
+      .isVisible({ timeout: 5000 })
+      .catch(() => false);
     expect(hasBlock).toBe(true);
 
     await designerPage.selectBlock(0);
 
-    const propertyInput = designerPage.page.locator('[data-testid="designer-properties-panel"] input, .w-80 input, aside input').first();
+    const propertyInput = designerPage.page
+      .locator('[data-testid="designer-properties-panel"] input, .w-80 input, aside input')
+      .first();
     const hasInput = await propertyInput.isVisible({ timeout: 3000 }).catch(() => false);
 
     expect(hasInput).toBe(true);
@@ -230,7 +250,9 @@ test.describe('Page Designer - Save and Publish', () => {
     const loaded = await designerPage.openViaList();
     expect(loaded).toBe(true);
 
-    const hasSaveBtn = await designerPage.saveButton.isVisible({ timeout: 10000 }).catch(() => false);
+    const hasSaveBtn = await designerPage.saveButton
+      .isVisible({ timeout: 10000 })
+      .catch(() => false);
     expect(hasSaveBtn).toBe(true);
 
     const isDisabled = await designerPage.saveButton.isDisabled();
@@ -254,7 +276,9 @@ test.describe('Page Designer - Save and Publish', () => {
     const loaded = await designerPage.openViaList();
     expect(loaded).toBe(true);
 
-    const hasPublishBtn = await designerPage.publishButton.isVisible({ timeout: 3000 }).catch(() => false);
+    const hasPublishBtn = await designerPage.publishButton
+      .isVisible({ timeout: 3000 })
+      .catch(() => false);
     expect(hasPublishBtn).toBe(true);
 
     await expect(designerPage.publishButton).toBeVisible();
@@ -275,7 +299,9 @@ test.describe('Page Designer - Preview', () => {
     const loaded = await designerPage.openViaList();
     expect(loaded).toBe(true);
 
-    const hasPreviewBtn = await designerPage.previewButton.isVisible({ timeout: 3000 }).catch(() => false);
+    const hasPreviewBtn = await designerPage.previewButton
+      .isVisible({ timeout: 3000 })
+      .catch(() => false);
     expect(hasPreviewBtn).toBe(true);
 
     await designerPage.preview();
@@ -304,7 +330,9 @@ test.describe('Page Designer - Undo/Redo', () => {
     const loaded = await designerPage.openViaList();
     expect(loaded).toBe(true);
 
-    const hasUndoBtn = await designerPage.undoButton.isVisible({ timeout: 3000 }).catch(() => false);
+    const hasUndoBtn = await designerPage.undoButton
+      .isVisible({ timeout: 3000 })
+      .catch(() => false);
     expect(hasUndoBtn).toBe(true);
 
     await expect(designerPage.undoButton).toBeVisible();
@@ -317,7 +345,9 @@ test.describe('Page Designer - Undo/Redo', () => {
     const loaded = await designerPage.openViaList();
     expect(loaded).toBe(true);
 
-    const hasRedoBtn = await designerPage.redoButton.isVisible({ timeout: 3000 }).catch(() => false);
+    const hasRedoBtn = await designerPage.redoButton
+      .isVisible({ timeout: 3000 })
+      .catch(() => false);
     expect(hasRedoBtn).toBe(true);
 
     await expect(designerPage.redoButton).toBeVisible();
@@ -351,9 +381,15 @@ test.describe('Page Designer - Zoom Controls', () => {
     const loaded = await designerPage.openViaList();
     expect(loaded).toBe(true);
 
-    const hasZoomIn = await designerPage.zoomInButton.isVisible({ timeout: 3000 }).catch(() => false);
-    const hasZoomOut = await designerPage.zoomOutButton.isVisible({ timeout: 3000 }).catch(() => false);
-    const hasZoomLevel = await designerPage.zoomLevel.isVisible({ timeout: 3000 }).catch(() => false);
+    const hasZoomIn = await designerPage.zoomInButton
+      .isVisible({ timeout: 3000 })
+      .catch(() => false);
+    const hasZoomOut = await designerPage.zoomOutButton
+      .isVisible({ timeout: 3000 })
+      .catch(() => false);
+    const hasZoomLevel = await designerPage.zoomLevel
+      .isVisible({ timeout: 3000 })
+      .catch(() => false);
 
     expect(hasZoomIn || hasZoomOut || hasZoomLevel).toBe(true);
   });

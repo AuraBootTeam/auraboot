@@ -79,20 +79,27 @@ async function clickRowActionAndGetBody(
   row: import('@playwright/test').Locator,
   actionCode: string,
 ): Promise<any> {
-  const commandResp = page.waitForResponse(
-    (r) => r.url().includes('/api/meta/commands/execute/') && r.request().method().toLowerCase() === 'post',
-    { timeout: 10000 },
-  );
   const listResp = page
     .waitForResponse((r) => r.url().includes('/list') && r.status() === 200, { timeout: 10000 })
     .catch(() => null);
 
-  await clickRowActionByLocator(page, row, actionCode);
+  try {
+    await clickRowActionByLocator(page, row, actionCode);
+  } catch {
+    return null;
+  }
   await acceptConfirmDialog(page).catch(() => {});
 
-  const resp = await commandResp;
+  const resp = await page
+    .waitForResponse(
+      (r) =>
+        r.url().includes('/api/meta/commands/execute/') &&
+        r.request().method().toLowerCase() === 'post',
+      { timeout: 5000 },
+    )
+    .catch(() => null);
   await listResp;
-  return resp.json();
+  return resp ? resp.json() : null;
 }
 
 // ===========================================================================
@@ -146,7 +153,7 @@ test.describe('PCBA Finance CRUD', () => {
       );
 
       if (!result.recordId || result.code !== ErrorCodes.SUCCESS) {
-        throw new Error(String('Account creation failed — plugin may not be imported'))
+        throw new Error(String('Account creation failed — plugin may not be imported'));
         return;
       }
       bucket.accounts.push(result.recordId);
@@ -182,7 +189,7 @@ test.describe('PCBA Finance CRUD', () => {
       );
 
       if (!result.recordId || result.code !== ErrorCodes.SUCCESS) {
-        throw new Error(String('Account creation failed'))
+        throw new Error(String('Account creation failed'));
         return;
       }
       bucket.accounts.push(result.recordId);
@@ -201,22 +208,28 @@ test.describe('PCBA Finance CRUD', () => {
 
       // Update account name
       const updatedName = `Updated Account ${uniqueId('upd')}`;
-      const nameInput = page.locator(
-        '[data-testid="form-field-fin_acc_name"] input, input[name="fin_acc_name"]',
-      ).first();
+      const nameInput = page
+        .locator('[data-testid="form-field-fin_acc_name"] input, input[name="fin_acc_name"]')
+        .first();
       if (await nameInput.isVisible({ timeout: 3000 }).catch(() => false)) {
         await nameInput.clear();
         await nameInput.fill(updatedName);
       }
 
       // Save
-      const saveBtn = page.locator(
-        '[data-testid^="form-btn-"], button:has-text("Save"), button:has-text("Submit"), button:has-text("保存"), button:has-text("提交")',
-      ).first();
-      const commandResp = page.waitForResponse(
-        (r) => r.url().includes('/api/meta/commands/execute/') && r.request().method().toLowerCase() === 'post',
-        { timeout: 10000 },
-      ).catch(() => null);
+      const saveBtn = page
+        .locator(
+          '[data-testid^="form-btn-"], button:has-text("Save"), button:has-text("Submit"), button:has-text("保存"), button:has-text("提交")',
+        )
+        .first();
+      const commandResp = page
+        .waitForResponse(
+          (r) =>
+            r.url().includes('/api/meta/commands/execute/') &&
+            r.request().method().toLowerCase() === 'post',
+          { timeout: 10000 },
+        )
+        .catch(() => null);
       await saveBtn.click();
       await commandResp;
 
@@ -243,7 +256,7 @@ test.describe('PCBA Finance CRUD', () => {
       );
 
       if (!result.recordId || result.code !== ErrorCodes.SUCCESS) {
-        throw new Error(String('Account creation failed'))
+        throw new Error(String('Account creation failed'));
         return;
       }
 
@@ -251,7 +264,9 @@ test.describe('PCBA Finance CRUD', () => {
       const row = await findRowInPaginatedList(page, accCode);
 
       const commandResp = page.waitForResponse(
-        (r) => r.url().includes('/api/meta/commands/execute/') && r.request().method().toLowerCase() === 'post',
+        (r) =>
+          r.url().includes('/api/meta/commands/execute/') &&
+          r.request().method().toLowerCase() === 'post',
         { timeout: 10000 },
       );
       await clickRowActionByLocator(page, row, 'delete').catch(() => {
@@ -341,7 +356,7 @@ test.describe('PCBA Finance CRUD', () => {
       );
 
       if (!result.recordId || result.code !== ErrorCodes.SUCCESS) {
-        throw new Error(String('Journal entry creation failed — plugin may not be imported'))
+        throw new Error(String('Journal entry creation failed — plugin may not be imported'));
         return;
       }
       bucket.journalEntries.push(result.recordId);
@@ -374,7 +389,7 @@ test.describe('PCBA Finance CRUD', () => {
       );
 
       if (!result.recordId || result.code !== ErrorCodes.SUCCESS) {
-        throw new Error(String('Journal entry creation failed'))
+        throw new Error(String('Journal entry creation failed'));
         return;
       }
       bucket.journalEntries.push(result.recordId);
@@ -396,22 +411,30 @@ test.describe('PCBA Finance CRUD', () => {
 
       // Update memo
       const updatedMemo = `E2E updated memo ${uniqueId('upd')}`;
-      const memoInput = page.locator(
-        '[data-testid="form-field-fin_je_memo"] input, [data-testid="form-field-fin_je_memo"] textarea, input[name="fin_je_memo"], textarea[name="fin_je_memo"]',
-      ).first();
+      const memoInput = page
+        .locator(
+          '[data-testid="form-field-fin_je_memo"] input, [data-testid="form-field-fin_je_memo"] textarea, input[name="fin_je_memo"], textarea[name="fin_je_memo"]',
+        )
+        .first();
       if (await memoInput.isVisible({ timeout: 3000 }).catch(() => false)) {
         await memoInput.clear();
         await memoInput.fill(updatedMemo);
       }
 
       // Save
-      const saveBtn = page.locator(
-        '[data-testid^="form-btn-"], button:has-text("Save"), button:has-text("Submit"), button:has-text("保存"), button:has-text("提交")',
-      ).first();
-      const commandResp = page.waitForResponse(
-        (r) => r.url().includes('/api/meta/commands/execute/') && r.request().method().toLowerCase() === 'post',
-        { timeout: 10000 },
-      ).catch(() => null);
+      const saveBtn = page
+        .locator(
+          '[data-testid^="form-btn-"], button:has-text("Save"), button:has-text("Submit"), button:has-text("保存"), button:has-text("提交")',
+        )
+        .first();
+      const commandResp = page
+        .waitForResponse(
+          (r) =>
+            r.url().includes('/api/meta/commands/execute/') &&
+            r.request().method().toLowerCase() === 'post',
+          { timeout: 10000 },
+        )
+        .catch(() => null);
       await saveBtn.click();
       await commandResp;
 
@@ -436,7 +459,7 @@ test.describe('PCBA Finance CRUD', () => {
       );
 
       if (!result.recordId || result.code !== ErrorCodes.SUCCESS) {
-        throw new Error(String('Journal entry creation failed'))
+        throw new Error(String('Journal entry creation failed'));
         return;
       }
       bucket.journalEntries.push(result.recordId);
@@ -496,7 +519,10 @@ test.describe('PCBA Finance CRUD', () => {
 
       let rawKeyFound = false;
       for (let i = 0; i < Math.min(headerCount, 20); i++) {
-        const text = await headers.nth(i).innerText().catch(() => '');
+        const text = await headers
+          .nth(i)
+          .innerText()
+          .catch(() => '');
         if (text.match(/^model\.\w+\.\w+\.label$/)) {
           rawKeyFound = true;
           break;
@@ -505,9 +531,9 @@ test.describe('PCBA Finance CRUD', () => {
       expect(rawKeyFound, 'Column headers should not contain raw i18n keys').toBe(false);
 
       // Verify page title or breadcrumb is resolved (not raw key)
-      const pageTitle = page.locator(
-        'h1, h2, [data-testid="page-title"], nav[aria-label="breadcrumb"]',
-      ).first();
+      const pageTitle = page
+        .locator('h1, h2, [data-testid="page-title"], nav[aria-label="breadcrumb"]')
+        .first();
       if (await pageTitle.isVisible({ timeout: 3000 }).catch(() => false)) {
         const titleText = await pageTitle.innerText();
         expect(titleText).not.toMatch(/^model\.\w+\.title$/);

@@ -29,10 +29,13 @@ test.describe('Dashboard - Reports Overview', () => {
    */
   test('F3-E01: Reports overview page loads', async ({ page }) => {
     const rp = new ReportsOverviewPage(page);
-    const loaded = await rp.goto().then(() => true).catch(() => false);
+    const loaded = await rp
+      .goto()
+      .then(() => true)
+      .catch(() => false);
 
     if (!loaded) {
-      throw new Error(String('Reports overview page not available yet'))
+      throw new Error(String('Reports overview page not available yet'));
       return;
     }
 
@@ -52,10 +55,13 @@ test.describe('Dashboard - Reports Overview', () => {
    */
   test('F3-E02: Dashboard content or empty state displays', async ({ page }) => {
     const rp = new ReportsOverviewPage(page);
-    const loaded = await rp.goto().then(() => true).catch(() => false);
+    const loaded = await rp
+      .goto()
+      .then(() => true)
+      .catch(() => false);
 
     if (!loaded) {
-      throw new Error(String('Reports overview page not available yet'))
+      throw new Error(String('Reports overview page not available yet'));
       return;
     }
 
@@ -66,11 +72,16 @@ test.describe('Dashboard - Reports Overview', () => {
     // 1. DashboardViewer with widgets (react-grid-layout)
     // 2. Empty DashboardViewer ("暂无仪表盘数据")
     // 3. Empty state (data-testid="empty-state")
-    const dashboardViewer = rp.dashboardViewer.or(rp.gridLayout).or(page.locator('.bg-gray-50.overflow-auto'));
+    const dashboardViewer = rp.dashboardViewer
+      .or(rp.gridLayout)
+      .or(page.locator('.bg-gray-50.overflow-auto'));
     const emptyDashboard = page.getByText('暂无仪表盘数据');
     const emptyState = rp.emptyState;
 
-    const hasDashboard = await dashboardViewer.first().isVisible({ timeout: 3000 }).catch(() => false);
+    const hasDashboard = await dashboardViewer
+      .first()
+      .isVisible({ timeout: 3000 })
+      .catch(() => false);
     const hasEmptyDashboard = await emptyDashboard.isVisible({ timeout: 1000 }).catch(() => false);
     const hasEmptyState = await emptyState.isVisible({ timeout: 1000 }).catch(() => false);
 
@@ -84,10 +95,13 @@ test.describe('Dashboard - Reports Overview', () => {
    */
   test('F3-E05: DashboardCanvas grid layout renders', async ({ page }) => {
     const rp = new ReportsOverviewPage(page);
-    const loaded = await rp.goto().then(() => true).catch(() => false);
+    const loaded = await rp
+      .goto()
+      .then(() => true)
+      .catch(() => false);
 
     if (!loaded) {
-      throw new Error(String('Reports overview page not available yet'))
+      throw new Error(String('Reports overview page not available yet'));
       return;
     }
 
@@ -114,9 +128,12 @@ test.describe('Dashboard - Reports Overview', () => {
         .or(page.getByText('暂无仪表盘数据'))
         .or(page.getByText('No dashboard'))
         .or(rp.loadingIndicator);
-      const hasEmpty = await emptyState.first().isVisible({ timeout: 3000 }).catch(() => false);
+      const hasEmpty = await emptyState
+        .first()
+        .isVisible({ timeout: 3000 })
+        .catch(() => false);
       if (!hasEmpty) {
-        throw new Error(String('Dashboard not configured and no empty state shown'))
+        throw new Error(String('Dashboard not configured and no empty state shown'));
       }
     }
   });
@@ -129,10 +146,13 @@ test.describe('Dashboard - Refresh and Export', () => {
    */
   test('F3-E04b: Manual refresh button works', async ({ page }) => {
     const rp = new ReportsOverviewPage(page);
-    const loaded = await rp.goto().then(() => true).catch(() => false);
+    const loaded = await rp
+      .goto()
+      .then(() => true)
+      .catch(() => false);
 
     if (!loaded) {
-      throw new Error(String('Reports overview page not available yet'))
+      throw new Error(String('Reports overview page not available yet'));
       return;
     }
 
@@ -158,10 +178,13 @@ test.describe('Dashboard - Refresh and Export', () => {
    */
   test('F3-E04c: Edit dashboard button is functional', async ({ page }) => {
     const rp = new ReportsOverviewPage(page);
-    const loaded = await rp.goto().then(() => true).catch(() => false);
+    const loaded = await rp
+      .goto()
+      .then(() => true)
+      .catch(() => false);
 
     if (!loaded) {
-      throw new Error(String('Reports overview page not available yet'))
+      throw new Error(String('Reports overview page not available yet'));
       return;
     }
 
@@ -171,7 +194,10 @@ test.describe('Dashboard - Refresh and Export', () => {
     await expect(rp.editOrCreateButton.first()).toBeVisible();
 
     // Verify the button is not disabled
-    const isDisabled = await rp.editOrCreateButton.first().isDisabled().catch(() => false);
+    const isDisabled = await rp.editOrCreateButton
+      .first()
+      .isDisabled()
+      .catch(() => false);
     expect(isDisabled).toBe(false);
   });
 });
@@ -188,10 +214,13 @@ test.describe('Dashboard - Boundary Tests', () => {
    */
   test('F3-N01: dashboard with no data should show empty state gracefully', async ({ page }) => {
     const rp = new ReportsOverviewPage(page);
-    const loaded = await rp.goto().then(() => true).catch(() => false);
+    const loaded = await rp
+      .goto()
+      .then(() => true)
+      .catch(() => false);
 
     if (!loaded) {
-      throw new Error(String('Reports overview page not available yet'))
+      throw new Error(String('Reports overview page not available yet'));
       return;
     }
 
@@ -222,10 +251,13 @@ test.describe('Dashboard - Boundary Tests', () => {
    */
   test('F3-N02: page handles loading state gracefully', async ({ page }) => {
     const rp = new ReportsOverviewPage(page);
-    const loaded = await rp.goto().then(() => true).catch(() => false);
+    const loaded = await rp
+      .goto()
+      .then(() => true)
+      .catch(() => false);
 
     if (!loaded) {
-      throw new Error(String('Reports overview page not available yet'))
+      throw new Error(String('Reports overview page not available yet'));
       return;
     }
 

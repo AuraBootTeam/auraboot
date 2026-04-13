@@ -16,7 +16,8 @@ delete process.env.http_proxy;
 delete process.env.HTTP_PROXY;
 delete process.env.https_proxy;
 delete process.env.HTTPS_PROXY;
-process.env.NO_PROXY = (process.env.NO_PROXY ? process.env.NO_PROXY + ',' : '') + 'localhost,127.0.0.1';
+process.env.NO_PROXY =
+  (process.env.NO_PROXY ? process.env.NO_PROXY + ',' : '') + 'localhost,127.0.0.1';
 process.env.no_proxy = process.env.NO_PROXY;
 if (process.env.FORCE_COLOR && process.env.NO_COLOR) {
   delete process.env.NO_COLOR;
@@ -41,8 +42,6 @@ const skipWebServer = process.env.PW_SKIP_WEBSERVER === '1';
  * @see https://playwright.dev/docs/test-configuration
  */
 export default defineConfig({
-
-  
   // Test directory structure
   testDir: './tests',
   testMatch: ['**/*.spec.ts'],
@@ -55,7 +54,7 @@ export default defineConfig({
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: 0,
-  workers: Number(process.env.PW_WORKERS || 6),
+  workers: Number(process.env.PW_WORKERS || 10),
   timeout: process.env.E2E_COVERAGE === '1' ? 60000 : 15000,
 
   // Reporter configuration
@@ -95,34 +94,7 @@ export default defineConfig({
         navigationTimeout: 15000,
       },
     },
-    // Environment init project — ensures tenant/account baseline before fixtures.
-    {
-      name: 'init-env',
-      testMatch: /init-env\.spec\.ts/,
-      dependencies: ['auth'],
-      timeout: 300000,
-      use: {
-        ...devices['Desktop Chrome'],
-        storageState: './tests/storage/admin.json',
-        actionTimeout: 30000,
-        navigationTimeout: 30000,
-      },
-    },
-    // Setup project — creates test fixtures (depends on auth)
-    // Uses higher timeouts because API calls during fixture setup can be slow
-    // when the backend is under load (plugin imports, model publishing, etc.)
-    {
-      name: 'setup',
-      testMatch: /test-fixtures\.setup\.ts/,
-      dependencies: ['init-env'],
-      timeout: 300000,
-      use: {
-        ...devices['Desktop Chrome'],
-        storageState: './tests/storage/admin.json',
-        actionTimeout: 30000,
-        navigationTimeout: 30000,
-      },
-    },
+    // init-env and setup projects removed — bootstrap handles plugin import + seed data automatically
     ...(runProfile === 'fast' || runProfile === 'full'
       ? [
           {
@@ -131,7 +103,7 @@ export default defineConfig({
             // Exclude resource-intensive deep designer tests — they get their own project (chromium-deep)
             // with workers:1 to prevent browser OOM crashes from concurrent heavy DOM operations.
             testIgnore: /.*-deep\.spec\.ts$/,
-            dependencies: ['setup'],
+            dependencies: ['auth'],
             use: {
               ...devices['Desktop Chrome'],
               storageState: './tests/storage/admin.json',
@@ -160,7 +132,7 @@ export default defineConfig({
             name: 'smoke',
             testDir: './tests/e2e',
             grep: /@smoke/,
-            dependencies: ['setup'],
+            dependencies: ['auth'],
             use: {
               ...devices['Desktop Chrome'],
               storageState: './tests/storage/admin.json',
@@ -174,7 +146,7 @@ export default defineConfig({
             name: 'critical',
             testDir: './tests/e2e',
             grep: /@critical|@smoke/,
-            dependencies: ['setup'],
+            dependencies: ['auth'],
             use: {
               ...devices['Desktop Chrome'],
               storageState: './tests/storage/admin.json',
@@ -185,9 +157,11 @@ export default defineConfig({
     ...(runProfile === 'full'
       ? [
           {
+            // API tests (excludes setup/seed — those run via reset-and-init.sh or playwright.seed.config.ts)
             name: 'api',
             testDir: './tests/api',
-            dependencies: ['setup'],
+            testIgnore: /setup\//,
+            dependencies: ['chromium'],
             use: {
               ...devices['Desktop Chrome'],
               storageState: './tests/storage/admin.json',
@@ -201,7 +175,7 @@ export default defineConfig({
             name: 'operator',
             testDir: './tests/e2e',
             grep: /@operator/,
-            dependencies: ['setup'],
+            dependencies: ['auth'],
             use: {
               ...devices['Desktop Chrome'],
               storageState: './tests/storage/operator.json',
@@ -211,7 +185,7 @@ export default defineConfig({
             name: 'viewer',
             testDir: './tests/e2e',
             grep: /@viewer/,
-            dependencies: ['setup'],
+            dependencies: ['auth'],
             use: {
               ...devices['Desktop Chrome'],
               storageState: './tests/storage/viewer.json',

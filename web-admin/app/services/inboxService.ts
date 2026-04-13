@@ -1,5 +1,5 @@
 /**
- * Unified Inbox Service — API client for /api/mobile/inbox endpoints.
+ * Unified Inbox Service — API client for /api/inbox endpoints.
  *
  * Data source: ab_inbox_item table via MobileInboxController.
  * Used by InboxBadge, InboxDropdown, and UnifiedInboxPage.
@@ -46,7 +46,7 @@ export interface UnreadSummary {
   [key: string]: number;
 }
 
-const BASE = '/api/mobile/inbox';
+const BASE = '/api/inbox';
 
 /**
  * List inbox items with optional filters.
@@ -147,10 +147,7 @@ export async function dismissItem(id: number): Promise<void> {
 /**
  * Submit approval action on an inbox item.
  */
-export async function submitApprovalAction(
-  id: number,
-  action: string,
-): Promise<void> {
+export async function submitApprovalAction(id: number, action: string): Promise<void> {
   await fetchResult(`${BASE}/${id}/approval-action`, {
     method: 'post',
     params: { action },

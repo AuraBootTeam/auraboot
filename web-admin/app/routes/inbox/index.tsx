@@ -2,7 +2,7 @@
  * UnifiedInboxPage — full inbox page with tabs, card list, and BpmTaskDrawer integration.
  *
  * Tabs: All | Approval | Alert | Assignment
- * Data source: /api/mobile/inbox via inboxService
+ * Data source: /api/inbox via inboxService
  * Approval items open BpmTaskDrawer for approve/reject actions.
  */
 
@@ -56,11 +56,9 @@ function timeAgo(dateStr: string): string {
 
 function priorityBadge(priority: string) {
   const styles: Record<string, string> = {
-    urgent:
-      'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+    urgent: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
     high: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
-    normal:
-      'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+    normal: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
     low: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400',
   };
   return (
@@ -74,16 +72,11 @@ function priorityBadge(priority: string) {
 
 function statusBadge(status: string) {
   const styles: Record<string, string> = {
-    pending:
-      'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
-    acted:
-      'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-    dismissed:
-      'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400',
-    closed:
-      'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400',
-    expired:
-      'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400',
+    pending: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
+    acted: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+    dismissed: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400',
+    closed: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400',
+    expired: 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400',
   };
   return (
     <span
@@ -109,18 +102,14 @@ function itemTypeIcon(type: string) {
 
 export default function UnifiedInboxPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [activeTab, setActiveTab] = useState(
-    searchParams.get('type') || '',
-  );
+  const [activeTab, setActiveTab] = useState(searchParams.get('type') || '');
   const [statusFilter, setStatusFilter] = useState('pending');
   const [page, setPage] = useState<InboxPage | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
 
   // BpmTaskDrawer state
-  const [drawerTaskId, setDrawerTaskId] = useState<string | null>(
-    searchParams.get('task') || null,
-  );
+  const [drawerTaskId, setDrawerTaskId] = useState<string | null>(searchParams.get('task') || null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -162,9 +151,7 @@ export default function UnifiedInboxPage() {
           if (!prev) return prev;
           return {
             ...prev,
-            records: prev.records.map((r) =>
-              r.id === item.id ? { ...r, isRead: true } : r,
-            ),
+            records: prev.records.map((r) => (r.id === item.id ? { ...r, isRead: true } : r)),
           };
         });
       } catch {
@@ -178,10 +165,7 @@ export default function UnifiedInboxPage() {
     }
   };
 
-  const handleDismiss = async (
-    e: React.MouseEvent,
-    item: InboxItem,
-  ) => {
+  const handleDismiss = async (e: React.MouseEvent, item: InboxItem) => {
     e.stopPropagation();
     try {
       await dismissItem(item.id);
@@ -229,12 +213,8 @@ export default function UnifiedInboxPage() {
         <div className="flex items-center gap-3">
           <InboxIcon className="h-7 w-7 text-gray-700 dark:text-gray-300" />
           <div>
-            <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
-              Inbox
-            </h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              {total} items
-            </p>
+            <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Inbox</h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400">{total} items</p>
           </div>
         </div>
         <button
@@ -304,9 +284,7 @@ export default function UnifiedInboxPage() {
             data-testid="inbox-empty-state"
           >
             <InboxIcon className="mb-3 h-10 w-10 text-gray-300 dark:text-gray-600" />
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              No items to show
-            </p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">No items to show</p>
           </div>
         ) : (
           items.map((item) => (
@@ -320,9 +298,7 @@ export default function UnifiedInboxPage() {
                   : 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800'
               }`}
             >
-              <div className="mt-0.5 flex-shrink-0">
-                {itemTypeIcon(item.itemType)}
-              </div>
+              <div className="mt-0.5 flex-shrink-0">{itemTypeIcon(item.itemType)}</div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
@@ -345,9 +321,7 @@ export default function UnifiedInboxPage() {
                   {priorityBadge(item.priority)}
                   {statusBadge(item.status)}
                   {item.actionTaken && (
-                    <span className="text-xs text-gray-400">
-                      {item.actionTaken}
-                    </span>
+                    <span className="text-xs text-gray-400">{item.actionTaken}</span>
                   )}
                 </div>
               </div>
@@ -358,12 +332,7 @@ export default function UnifiedInboxPage() {
                   title="Dismiss"
                   data-testid={`inbox-dismiss-${item.id}`}
                 >
-                  <svg
-                    className="h-4 w-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -393,9 +362,7 @@ export default function UnifiedInboxPage() {
               Previous
             </button>
             <button
-              onClick={() =>
-                setCurrentPage((p) => Math.min(totalPages, p + 1))
-              }
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               disabled={currentPage >= totalPages}
               className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm transition-colors hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:hover:bg-gray-700"
             >

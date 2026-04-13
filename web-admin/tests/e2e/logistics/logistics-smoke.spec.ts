@@ -30,25 +30,25 @@ const LG_MENUS = [
   {
     code: 'lg_shipments',
     path: '/logistics/shipments',
-    modelUrl: '/api/dynamic/lg-shipment',
+    modelUrl: '/api/dynamic/lg_shipment',
     label: /发货管理|Shipments/,
   },
   {
     code: 'lg_carriers',
     path: '/logistics/carriers',
-    modelUrl: '/api/dynamic/lg-carrier',
+    modelUrl: '/api/dynamic/lg_carrier',
     label: /承运商|Carriers/,
   },
   {
     code: 'lg_tracking',
     path: '/logistics/tracking',
-    modelUrl: '/api/dynamic/lg-tracking-event',
+    modelUrl: '/api/dynamic/lg_tracking_event',
     label: /物流跟踪|Tracking/,
   },
   {
     code: 'lg_delivery_notes',
     path: '/logistics/delivery-notes',
-    modelUrl: '/api/dynamic/lg-delivery-note',
+    modelUrl: '/api/dynamic/lg_delivery_note',
     label: /送货单|Delivery Notes/,
   },
 ];
@@ -74,11 +74,7 @@ async function expandLgMenu(page: Page): Promise<void> {
   await page.waitForResponse(() => true, { timeout: 2000 }).catch(() => null);
 }
 
-async function navigateToLgPage(
-  page: Page,
-  path: string,
-  modelUrl: string | null,
-): Promise<void> {
+async function navigateToLgPage(page: Page, path: string, modelUrl: string | null): Promise<void> {
   await expandLgMenu(page);
 
   const nav = page.locator('nav');
@@ -88,10 +84,9 @@ async function navigateToLgPage(
 
   const responsePromise = modelUrl
     ? page
-        .waitForResponse(
-          (r) => r.url().includes(modelUrl) && r.status() === 200,
-          { timeout: 15000 },
-        )
+        .waitForResponse((r) => r.url().includes(modelUrl) && r.status() === 200, {
+          timeout: 15000,
+        })
         .catch(() => null)
     : Promise.resolve(null);
 
@@ -111,24 +106,11 @@ test.describe('Logistics Plugin @smoke', () => {
   // LG-S001: Plugin install check
   // -------------------------------------------------------------------------
   test('LG-S001: logistics plugin is installed and models are published', async ({ page }) => {
-    const pluginResp = await page.request
-      .get('/api/system/plugins?pageNum=1&pageSize=100')
-      .catch(() => null);
-
-    if (pluginResp && pluginResp.ok()) {
-      const body = await pluginResp.json().catch(() => null);
-      const plugins: Array<{ pluginId?: string; plugin_id?: string }> =
-        body?.data?.records ?? body?.data?.data ?? body?.data ?? [];
-      pluginInstalled = plugins.some(
-        (p) => (p.pluginId ?? p.plugin_id) === PLUGIN_ID,
-      );
-    }
-
-    if (!pluginInstalled) {
-      const modelResp = await page.request
-        .get('/api/meta/models/code/lg_shipment')
-        .catch(() => null);
-      pluginInstalled = modelResp?.ok() ?? false;
+    // Check plugin availability via model code API
+    const modelResp = await page.request.get('/api/meta/models/code/lg_shipment').catch(() => null);
+    if (modelResp) {
+      const body = await modelResp.json().catch(() => ({}));
+      pluginInstalled = modelResp.ok() && body?.data?.status === 'published';
     }
 
     if (!pluginInstalled) {
@@ -149,72 +131,62 @@ test.describe('Logistics Plugin @smoke', () => {
   // -------------------------------------------------------------------------
   // LG-S002: 发货管理 list loads via sidebar
   // -------------------------------------------------------------------------
-  test('LG-S002: sidebar → 发货管理 (Shipments) list page loads with table', async ({
-    page,
-  }) => {
+  test('LG-S002: sidebar → 发货管理 (Shipments) list page loads with table', async ({ page }) => {
     if (!pluginInstalled) {
       test.skip(true, 'logistics plugin not installed');
       return;
     }
 
-    await navigateToLgPage(page, '/logistics/shipments', '/api/dynamic/lg-shipment');
+    await navigateToLgPage(page, '/logistics/shipments', '/api/dynamic/lg_shipment');
 
+    // Table should be visible (may contain "暂无数据" empty state row)
     const table = page.locator('table, [class*="ant-table"]').first();
-    const emptyState = page
-      .locator('[class*="empty"]')
-      .or(page.getByText('暂无数据'))
-      .or(page.getByText('No data'))
-      .first();
-    await expect(table.or(emptyState)).toBeVisible({ timeout: 12000 });
+    await expect(table).toBeVisible({ timeout: 12000 });
 
-    await expect(page.locator('text=Access forbidden')).not.toBeVisible({ timeout: 2000 }).catch(() => {});
-    await expect(page.locator('text=403')).not.toBeVisible({ timeout: 1000 }).catch(() => {});
+    await expect(page.locator('text=Access forbidden'))
+      .not.toBeVisible({ timeout: 2000 })
+      .catch(() => {});
+    await expect(page.locator('text=403'))
+      .not.toBeVisible({ timeout: 1000 })
+      .catch(() => {});
   });
 
   // -------------------------------------------------------------------------
   // LG-S003: 承运商 list loads
   // -------------------------------------------------------------------------
-  test('LG-S003: sidebar → 承运商 (Carriers) list page loads with table', async ({
-    page,
-  }) => {
+  test('LG-S003: sidebar → 承运商 (Carriers) list page loads with table', async ({ page }) => {
     if (!pluginInstalled) {
       test.skip(true, 'logistics plugin not installed');
       return;
     }
 
-    await navigateToLgPage(page, '/logistics/carriers', '/api/dynamic/lg-carrier');
+    await navigateToLgPage(page, '/logistics/carriers', '/api/dynamic/lg_carrier');
 
+    // Table should be visible (may contain "暂无数据" empty state row)
     const table = page.locator('table, [class*="ant-table"]').first();
-    const emptyState = page
-      .locator('[class*="empty"]')
-      .or(page.getByText('暂无数据'))
-      .or(page.getByText('No data'))
-      .first();
-    await expect(table.or(emptyState)).toBeVisible({ timeout: 12000 });
-    await expect(page.locator('text=Access forbidden')).not.toBeVisible({ timeout: 2000 }).catch(() => {});
+    await expect(table).toBeVisible({ timeout: 12000 });
+    await expect(page.locator('text=Access forbidden'))
+      .not.toBeVisible({ timeout: 2000 })
+      .catch(() => {});
   });
 
   // -------------------------------------------------------------------------
   // LG-S004: 物流跟踪 list loads
   // -------------------------------------------------------------------------
-  test('LG-S004: sidebar → 物流跟踪 (Tracking) list page loads with table', async ({
-    page,
-  }) => {
+  test('LG-S004: sidebar → 物流跟踪 (Tracking) list page loads with table', async ({ page }) => {
     if (!pluginInstalled) {
       test.skip(true, 'logistics plugin not installed');
       return;
     }
 
-    await navigateToLgPage(page, '/logistics/tracking', '/api/dynamic/lg-tracking-event');
+    await navigateToLgPage(page, '/logistics/tracking', '/api/dynamic/lg_tracking_event');
 
+    // Table should be visible (may contain "暂无数据" empty state row)
     const table = page.locator('table, [class*="ant-table"]').first();
-    const emptyState = page
-      .locator('[class*="empty"]')
-      .or(page.getByText('暂无数据'))
-      .or(page.getByText('No data'))
-      .first();
-    await expect(table.or(emptyState)).toBeVisible({ timeout: 12000 });
-    await expect(page.locator('text=Access forbidden')).not.toBeVisible({ timeout: 2000 }).catch(() => {});
+    await expect(table).toBeVisible({ timeout: 12000 });
+    await expect(page.locator('text=Access forbidden'))
+      .not.toBeVisible({ timeout: 2000 })
+      .catch(() => {});
   });
 
   // -------------------------------------------------------------------------
@@ -228,20 +200,14 @@ test.describe('Logistics Plugin @smoke', () => {
       return;
     }
 
-    await navigateToLgPage(
-      page,
-      '/logistics/delivery-notes',
-      '/api/dynamic/lg-delivery-note',
-    );
+    await navigateToLgPage(page, '/logistics/delivery-notes', '/api/dynamic/lg_delivery_note');
 
+    // Table should be visible (may contain "暂无数据" empty state row)
     const table = page.locator('table, [class*="ant-table"]').first();
-    const emptyState = page
-      .locator('[class*="empty"]')
-      .or(page.getByText('暂无数据'))
-      .or(page.getByText('No data'))
-      .first();
-    await expect(table.or(emptyState)).toBeVisible({ timeout: 12000 });
-    await expect(page.locator('text=Access forbidden')).not.toBeVisible({ timeout: 2000 }).catch(() => {});
+    await expect(table).toBeVisible({ timeout: 12000 });
+    await expect(page.locator('text=Access forbidden'))
+      .not.toBeVisible({ timeout: 2000 })
+      .catch(() => {});
   });
 
   // -------------------------------------------------------------------------
@@ -253,7 +219,7 @@ test.describe('Logistics Plugin @smoke', () => {
       return;
     }
 
-    await navigateToLgPage(page, '/logistics/shipments', '/api/dynamic/lg-shipment');
+    await navigateToLgPage(page, '/logistics/shipments', '/api/dynamic/lg_shipment');
 
     const headers = await page.locator('th, [role="columnheader"]').allTextContents();
     for (const h of headers) {
@@ -267,17 +233,13 @@ test.describe('Logistics Plugin @smoke', () => {
   // -------------------------------------------------------------------------
   // LG-S007: Shipments list API returns valid response structure
   // -------------------------------------------------------------------------
-  test('LG-S007: lg_shipment list API returns valid ApiResponse envelope', async ({
-    page,
-  }) => {
+  test('LG-S007: lg_shipment list API returns valid ApiResponse envelope', async ({ page }) => {
     if (!pluginInstalled) {
       test.skip(true, 'logistics plugin not installed');
       return;
     }
 
-    const resp = await page.request.get(
-      '/api/dynamic/lg-shipment/list?pageNum=1&pageSize=10',
-    );
+    const resp = await page.request.get('/api/dynamic/lg_shipment/list?pageNum=1&pageSize=10');
     expect(resp.status()).toBe(200);
     const body = await resp.json();
     expect(body).toHaveProperty('code');
@@ -296,7 +258,7 @@ test.describe('Logistics Plugin @smoke', () => {
       return;
     }
 
-    await navigateToLgPage(page, '/logistics/shipments', '/api/dynamic/lg-shipment');
+    await navigateToLgPage(page, '/logistics/shipments', '/api/dynamic/lg_shipment');
 
     const createBtn = page.locator('button', { hasText: /新建|Create|创建|添加/ }).first();
     await expect(createBtn).toBeVisible({ timeout: 8000 });

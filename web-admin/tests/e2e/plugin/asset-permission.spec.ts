@@ -14,7 +14,6 @@
 
 import { test, expect } from '../../fixtures';
 
-
 // Asset permission test plugin manifest
 const ASSET_PERM_PLUGIN = {
   pluginId: 'com.test.asset-permission',
@@ -163,7 +162,7 @@ const ASSET_PERM_PLUGIN = {
       code: 'astp_asset_list',
       name: 'Asset List',
       'name:zh-CN': '资产列表',
-      path: '/dynamic/astp_asset',
+      path: '/p/astp_asset',
       icon: 'List',
       type: 2,
       parentCode: 'astp_root',
@@ -198,10 +197,13 @@ test.describe('Asset Permission Control', () => {
 
   test.beforeAll(async ({ request }) => {
     try {
-      const response = await request.post(`/api/plugins/import/execute-direct?conflictStrategy=OVERWRITE`, {
-        data: ASSET_PERM_PLUGIN,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      const response = await request.post(
+        `/api/plugins/import/execute-direct?conflictStrategy=OVERWRITE`,
+        {
+          data: ASSET_PERM_PLUGIN,
+          headers: { 'Content-Type': 'application/json' },
+        },
+      );
 
       if (response.ok()) {
         importResult = await response.json();
@@ -328,7 +330,7 @@ test.describe('Asset Permission Control', () => {
             force: true,
             decisions: {},
           },
-        }
+        },
       );
 
       if (uninstallResponse.ok()) {

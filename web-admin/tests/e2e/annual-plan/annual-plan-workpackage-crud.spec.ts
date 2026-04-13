@@ -231,11 +231,16 @@ test.describe('Annual Plan — Work Package CRUD', () => {
     expect(wpPid, 'Work package pid should be available from beforeAll').toBeTruthy();
 
     // Navigate to edit form
-    const editFormResp = page.waitForResponse(
-      (r) => r.url().includes('/api/dynamic/ap_work_package') && !r.url().includes('/list') && r.status() === 200,
-      { timeout: 15000 },
-    ).catch(() => null);
-    await page.goto(`/dynamic/ap-work-package/${wpPid}/edit`, { waitUntil: 'domcontentloaded' });
+    const editFormResp = page
+      .waitForResponse(
+        (r) =>
+          r.url().includes('/api/dynamic/ap_work_package') &&
+          !r.url().includes('/list') &&
+          r.status() === 200,
+        { timeout: 15000 },
+      )
+      .catch(() => null);
+    await page.goto(`/p/ap_work_package/${wpPid}/edit`, { waitUntil: 'domcontentloaded' });
     await editFormResp;
 
     // Full-page edit form — wait for DSL form to be ready
@@ -259,19 +264,21 @@ test.describe('Annual Plan — Work Package CRUD', () => {
     await submitBtn.waitFor({ state: 'visible', timeout: 8000 });
 
     // Capture any commands/execute API response for the update
-    const anyCommandResp = page.waitForResponse(
-      (r) => r.url().includes('/commands/execute') || r.url().includes('/api/dynamic/ap_work_package'),
-      { timeout: 15000 },
-    ).catch(() => null);
+    const anyCommandResp = page
+      .waitForResponse(
+        (r) =>
+          r.url().includes('/commands/execute') || r.url().includes('/api/dynamic/ap_work_package'),
+        { timeout: 15000 },
+      )
+      .catch(() => null);
 
     await submitBtn.click();
     await anyCommandResp;
 
     // Wait for redirect away from edit form (indicates successful save)
-    await page.waitForFunction(
-      () => !window.location.pathname.includes('/edit'),
-      { timeout: 10000 },
-    ).catch(() => null);
+    await page
+      .waitForFunction(() => !window.location.pathname.includes('/edit'), { timeout: 10000 })
+      .catch(() => null);
 
     // After save, the form redirects to detail or list page — check for updated name there
     // Try finding the updated name anywhere on the current page first
@@ -320,8 +327,8 @@ test.describe('Annual Plan — Work Package CRUD', () => {
 
     await navigateToAnnualPlanSection(page, '工作包管理', 'ap_work_package');
 
-    const row = await findRowInPaginatedList(page, `WP ToDelete ${UID}`);
-    await expect(row).toBeVisible({ timeout: 8000 });
+    const row = await findRowInPaginatedList(page, `WP ToDelete ${UID}`, 15000);
+    await expect(row).toBeVisible({ timeout: 12000 });
 
     // Click delete via row action dropdown helper
     await clickRowActionByLocator(page, row, 'delete');
@@ -330,7 +337,10 @@ test.describe('Annual Plan — Work Package CRUD', () => {
     const confirmDialog = page.locator('[class*="modal"], [role="dialog"]').filter({
       hasText: /delete|删除|confirm|确认/i,
     });
-    const hasConfirmDialog = await confirmDialog.first().isVisible({ timeout: 5000 }).catch(() => false);
+    const hasConfirmDialog = await confirmDialog
+      .first()
+      .isVisible({ timeout: 5000 })
+      .catch(() => false);
     if (hasConfirmDialog) {
       // Click confirm / OK button in the dialog
       const confirmBtn = confirmDialog
@@ -340,17 +350,23 @@ test.describe('Annual Plan — Work Package CRUD', () => {
     }
 
     // Wait for the delete to complete
-    await page.waitForResponse(
-      (r) =>
-        (r.url().includes('/execute/ap:delete_work_package') ||
-          r.url().includes('/api/dynamic/ap_work_package')) &&
-        r.status() === 200,
-      { timeout: 10000 },
-    ).catch(() => null);
+    await page
+      .waitForResponse(
+        (r) =>
+          (r.url().includes('/execute/ap:delete_work_package') ||
+            r.url().includes('/api/dynamic/ap_work_package')) &&
+          r.status() === 200,
+        { timeout: 10000 },
+      )
+      .catch(() => null);
 
     // Verify work package no longer in list
     await navigateToAnnualPlanSection(page, '工作包管理', 'ap_work_package');
-    await page.locator('tbody tr').first().waitFor({ state: 'visible', timeout: 8000 }).catch(() => null);
+    await page
+      .locator('tbody tr')
+      .first()
+      .waitFor({ state: 'visible', timeout: 8000 })
+      .catch(() => null);
     const deletedRows = page.locator('tbody tr', { hasText: `WP ToDelete ${UID}` });
     const deletedCount = await deletedRows.count();
     expect(deletedCount, 'Deleted work package should not appear in list').toBe(0);
@@ -363,12 +379,10 @@ test.describe('Annual Plan — Work Package CRUD', () => {
   test('WP-005: Work package creation validates required name', async ({ page }) => {
     // Navigate directly to the work package new form (DSL full-page form for create action)
     // ap_sub_plan_id is a required hidden field — without it the form will show validation errors
-    await page.goto('/dynamic/ap_work_package/new', { waitUntil: 'domcontentloaded' });
+    await page.goto('/p/ap_work_package/new', { waitUntil: 'domcontentloaded' });
 
     // Wait for form page to render (full page form, not a modal)
-    const form = page
-      .locator('[data-testid="dynamic-form"], form, [class*="ant-form"]')
-      .first();
+    const form = page.locator('[data-testid="dynamic-form"], form, [class*="ant-form"]').first();
     await expect(form).toBeVisible({ timeout: 15000 });
 
     // Submit without filling required fields
@@ -380,7 +394,9 @@ test.describe('Annual Plan — Work Package CRUD', () => {
     await submitBtn.click();
 
     // Validation error should appear for any required field
-    const errorMsg = page.locator('[class*="error"], [class*="ant-form-item-explain-error"], .text-red-500');
+    const errorMsg = page.locator(
+      '[class*="error"], [class*="ant-form-item-explain-error"], .text-red-500',
+    );
     await expect(errorMsg.first()).toBeVisible({ timeout: 8000 });
 
     // Form page should still be at /new (form stays open due to validation error)
@@ -399,11 +415,13 @@ test.describe('Annual Plan — Work Package CRUD', () => {
       (r) => r.url().includes('/api/dynamic/ap_annual_plan') && r.status() === 200,
       { timeout: 15000 },
     );
-    await page.goto(`/dynamic/ap_annual_plan/${annualPlanId}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/p/ap_annual_plan/${annualPlanId}`, { waitUntil: 'domcontentloaded' });
     await detailRespPromise.catch(() => null);
 
     // Page loads with content
-    await expect(page.locator('main, [class*="detail"], body').first()).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('main, [class*="detail"], body').first()).toBeVisible({
+      timeout: 10000,
+    });
 
     // Look for work package section — either a tab, heading, or sub-table
     const wpSection = page
@@ -476,7 +494,9 @@ test.describe('Annual Plan — Work Package CRUD', () => {
     expect(fetchResp.ok(), 'Work package detail API should return 200').toBe(true);
     const fetchBody = await fetchResp.json();
     const wpRec = fetchBody?.data ?? fetchBody;
-    expect(String(wpRec?.ap_sub_plan_id), 'Work package should be linked to the sub-plan').toBe(String(subPlanId));
+    expect(String(wpRec?.ap_sub_plan_id), 'Work package should be linked to the sub-plan').toBe(
+      String(subPlanId),
+    );
 
     // Navigate to work package list UI and verify it shows data
     await navigateToAnnualPlanSection(page, '工作包管理', 'ap_work_package');

@@ -34,49 +34,49 @@ function deriveContextFromRoute(
   pathname: string,
   params: Record<string, string | undefined>,
 ): PageContext {
-  // /dynamic/:tableName/view/:recordId → detail
-  if (pathname.match(/^\/dynamic\/[^/]+\/view\/[^/]+/)) {
-    const tableName = params.tableName || '';
+  // /p/:pageKey/view/:recordId → detail
+  if (pathname.match(/^\/p\/[^/]+\/view\/[^/]+/)) {
+    const pageKey = params.pageKey || '';
     return {
       pageType: 'detail',
-      pageKey: tableName,
-      modelCode: tableName.replace(/-/g, '_'),
+      pageKey,
+      modelCode: pageKey,
       recordPid: params.recordId,
-      breadcrumb: [tableName],
+      breadcrumb: [pageKey],
     };
   }
 
-  // /dynamic/:tableName/:recordId/edit → form (edit)
-  if (pathname.match(/^\/dynamic\/[^/]+\/[^/]+\/edit/)) {
-    const tableName = params.tableName || '';
+  // /p/:pageKey/:recordId/edit → form (edit)
+  if (pathname.match(/^\/p\/[^/]+\/[^/]+\/edit/)) {
+    const pageKey = params.pageKey || '';
     return {
       pageType: 'form',
-      pageKey: tableName,
-      modelCode: tableName.replace(/-/g, '_'),
+      pageKey,
+      modelCode: pageKey,
       recordPid: params.recordId,
-      breadcrumb: [tableName],
+      breadcrumb: [pageKey],
     };
   }
 
-  // /dynamic/:tableName/new → form (create)
-  if (pathname.match(/^\/dynamic\/[^/]+\/new/)) {
-    const tableName = params.tableName || '';
+  // /p/:pageKey/new → form (create)
+  if (pathname.match(/^\/p\/[^/]+\/new/)) {
+    const pageKey = params.pageKey || '';
     return {
       pageType: 'form',
-      pageKey: tableName,
-      modelCode: tableName.replace(/-/g, '_'),
-      breadcrumb: [tableName],
+      pageKey,
+      modelCode: pageKey,
+      breadcrumb: [pageKey],
     };
   }
 
-  // /dynamic/:tableName → list
-  if (pathname.match(/^\/dynamic\/[^/]+$/)) {
-    const tableName = params.tableName || '';
+  // /p/:pageKey → list
+  if (pathname.match(/^\/p\/[^/]+$/)) {
+    const pageKey = params.pageKey || '';
     return {
       pageType: 'list',
-      pageKey: tableName,
-      modelCode: tableName.replace(/-/g, '_'),
-      breadcrumb: [tableName],
+      pageKey,
+      modelCode: pageKey,
+      breadcrumb: [pageKey],
     };
   }
 

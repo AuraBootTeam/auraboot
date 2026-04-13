@@ -2,11 +2,11 @@
  * Report Profile — registers report-specific renderers
  *
  * Following "Shell unified, DSL independent" principle:
- * Report has its own DslProfile, separate from admin.
+ * Report has its own RenderProfile, separate from admin.
  */
 
 import React from 'react';
-import type { DslProfile } from '../types';
+import type { RenderProfile } from '../types';
 import { profileRegistry } from '../ProfileRegistry';
 
 // Lazy-loaded renderers
@@ -19,18 +19,18 @@ const ReportPageContent = React.lazy(() =>
 // Skeleton
 import { ReportPageSkeleton } from '~/report-designer/renderers/ReportPageSkeleton';
 
-const reportProfile: DslProfile = {
+const reportProfile: RenderProfile = {
   name: 'report',
 
   blockTypes: ['report-data-table', 'report-header', 'report-footer'],
 
   blockRenderers: new Map(),
 
-  kinds: ['Report'],
+  kinds: ['report'],
 
-  pageRenderers: new Map<string, any>([['Report', ReportPageContent]]),
+  pageRenderers: new Map<string, any>([['report', ReportPageContent]]),
 
-  skeletons: new Map<string, any>([['Report', ReportPageSkeleton]]),
+  skeletons: new Map<string, any>([['report', ReportPageSkeleton]]),
 };
 
 profileRegistry.register(reportProfile);

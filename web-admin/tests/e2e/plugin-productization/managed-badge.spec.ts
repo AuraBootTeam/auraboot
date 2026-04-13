@@ -48,7 +48,10 @@ test.describe('ManagedBadge & Resource Protection', () => {
     for (let i = 0; i < rowCount; i += 1) {
       const row = rows.nth(i);
       const managedBadge = row.locator('span[title*="managed" i], span[title*="插件管理"]');
-      const hasManagedBadge = await managedBadge.first().isVisible({ timeout: 200 }).catch(() => false);
+      const hasManagedBadge = await managedBadge
+        .first()
+        .isVisible({ timeout: 200 })
+        .catch(() => false);
       if (!hasManagedBadge) {
         foundUnmanaged = true;
         break;
@@ -83,17 +86,14 @@ test.describe('ManagedBadge & Resource Protection', () => {
    * PP-04: Batch resource owner API returns results for multiple resources
    */
   test('PP-04: batch resource owner API', async ({ page }) => {
-    const resp = await page.request.post(
-      '/api/plugins/resources/owners',
-      {
-        data: {
-          resources: [
-            { type: 'model', code: 'org_department' },
-            { type: 'model', code: 'nonexistent_model' },
-          ],
-        },
+    const resp = await page.request.post('/api/plugins/resources/owners', {
+      data: {
+        resources: [
+          { type: 'model', code: 'org_department' },
+          { type: 'model', code: 'nonexistent_model' },
+        ],
       },
-    );
+    });
 
     expect(resp.ok()).toBe(true);
     const body = (await resp.json()) as any;

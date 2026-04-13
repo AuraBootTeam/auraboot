@@ -672,7 +672,7 @@ function DeployStep({
           </p>
           {pluginCode && (
             <a
-              href={`/dynamic/${pluginCode.replace(/_/g, '-')}`}
+              href={`/p/${pluginCode}`}
               className="mt-4 text-sm text-indigo-600 hover:underline dark:text-indigo-400"
             >
               {t('nlModeling.goToModule')}

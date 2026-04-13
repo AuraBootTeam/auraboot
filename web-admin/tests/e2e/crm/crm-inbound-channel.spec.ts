@@ -61,9 +61,9 @@ async function goToInboundChannels(page: Page): Promise<void> {
   await leafLink.evaluate((el: HTMLElement) => el.click());
 
   await page.waitForURL((url) => url.pathname === href, { timeout: 10000 });
-  await expect(
-    page.getByRole('heading', { name: 'Inbound Channels' }),
-  ).toBeVisible({ timeout: 10000 });
+  await expect(page.getByRole('heading', { name: 'Inbound Channels' })).toBeVisible({
+    timeout: 10000,
+  });
 }
 
 /**
@@ -138,8 +138,10 @@ test.describe('CRM Inbound Channel Management @critical', () => {
   });
 
   test.beforeEach(async () => {
-    test.skip(!channelApiAvailable,
-      'CRM inbound channel API not available (backend may need restart)');
+    test.skip(
+      !channelApiAvailable,
+      'CRM inbound channel API not available (backend may need restart)',
+    );
   });
 
   test('ch-01: Create Generic Webhook channel', async ({ page }) => {
@@ -148,17 +150,18 @@ test.describe('CRM Inbound Channel Management @critical', () => {
     await createChannel(page, channelName);
 
     // Verify new channel appears in the list
-    await expect(
-      page.locator('[data-testid="channel-list"]'),
-    ).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('[data-testid="channel-list"]')).toBeVisible({ timeout: 10000 });
 
     // Channel name should be in the table
-    await expect(
-      page.locator('[data-testid="channel-row"]', { hasText: channelName }),
-    ).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('[data-testid="channel-row"]', { hasText: channelName })).toBeVisible(
+      { timeout: 5000 },
+    );
 
     // Type badge should show "Generic Webhook"
-    const row = page.locator('[data-testid="channel-row"]').filter({ hasText: channelName }).first();
+    const row = page
+      .locator('[data-testid="channel-row"]')
+      .filter({ hasText: channelName })
+      .first();
     await expect(row.getByText('Generic Webhook')).toBeVisible();
   });
 
@@ -166,7 +169,10 @@ test.describe('CRM Inbound Channel Management @critical', () => {
     await goToInboundChannels(page);
 
     // Find the created channel row
-    const row = page.locator('[data-testid="channel-row"]').filter({ hasText: channelName }).first();
+    const row = page
+      .locator('[data-testid="channel-row"]')
+      .filter({ hasText: channelName })
+      .first();
     await expect(row).toBeVisible({ timeout: 10000 });
 
     // API key should be masked (contains bullet characters)
@@ -184,19 +190,25 @@ test.describe('CRM Inbound Channel Management @critical', () => {
     await goToInboundChannels(page);
     await ensureChannelExists(page, channelName);
 
-    const row = page.locator('[data-testid="channel-row"]').filter({ hasText: channelName }).first();
+    const row = page
+      .locator('[data-testid="channel-row"]')
+      .filter({ hasText: channelName })
+      .first();
     await expect(row).toBeVisible({ timeout: 10000 });
 
     // Find the toggle button in the row
     const toggle = row.locator('[data-testid="channel-toggle"]');
     await expect(toggle).toBeVisible();
 
-    const initialTitle = await toggle.getAttribute('title') ?? '';
+    const initialTitle = (await toggle.getAttribute('title')) ?? '';
     const wasEnabled = initialTitle === 'Disable';
 
     // Click to toggle - wait for API response
     const toggleResponse = page.waitForResponse(
-      (r) => r.url().includes('/api/crm/inbound-channels/') && r.url().includes('/toggle?enabled=') && r.request().method() === 'POST',
+      (r) =>
+        r.url().includes('/api/crm/inbound-channels/') &&
+        r.url().includes('/toggle?enabled=') &&
+        r.request().method() === 'POST',
       { timeout: 10000 },
     );
     await toggle.click();
@@ -210,7 +222,10 @@ test.describe('CRM Inbound Channel Management @critical', () => {
 
     // Toggle back to original state
     const toggleBack = page.waitForResponse(
-      (r) => r.url().includes('/api/crm/inbound-channels/') && r.url().includes('/toggle?enabled=') && r.request().method() === 'POST',
+      (r) =>
+        r.url().includes('/api/crm/inbound-channels/') &&
+        r.url().includes('/toggle?enabled=') &&
+        r.request().method() === 'POST',
       { timeout: 10000 },
     );
     await toggle.click();
@@ -221,7 +236,10 @@ test.describe('CRM Inbound Channel Management @critical', () => {
   test('ch-04: Edit channel name', async ({ page }) => {
     await goToInboundChannels(page);
 
-    const row = page.locator('[data-testid="channel-row"]').filter({ hasText: channelName }).first();
+    const row = page
+      .locator('[data-testid="channel-row"]')
+      .filter({ hasText: channelName })
+      .first();
     await expect(row).toBeVisible({ timeout: 10000 });
 
     // Click edit button
@@ -267,13 +285,14 @@ test.describe('CRM Inbound Channel Management @critical', () => {
     const rowCountBefore = await page.locator('[data-testid="channel-row"]').count();
 
     // Click delete button — uses native confirm()
-    const deleteRow = page.locator('[data-testid="channel-row"]').filter({ hasText: channelNameForDelete }).first();
+    const deleteRow = page
+      .locator('[data-testid="channel-row"]')
+      .filter({ hasText: channelNameForDelete })
+      .first();
     page.once('dialog', (dialog) => dialog.accept());
 
     const deleteResponse = page.waitForResponse(
-      (r) =>
-        r.url().includes('/api/crm/inbound-channels/') &&
-        r.request().method() === 'DELETE',
+      (r) => r.url().includes('/api/crm/inbound-channels/') && r.request().method() === 'DELETE',
       { timeout: 10000 },
     );
     await deleteRow.locator('[data-testid="channel-delete-btn"]').click();

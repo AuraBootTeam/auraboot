@@ -215,7 +215,7 @@ actionRegistry.register('new', ({ navigate, tableName }) => {
     console.error('[ActionRegistry] new: missing navigate or tableName');
     return;
   }
-  navigate(`/dynamic/${tableName}/new`);
+  navigate(`/p/${tableName}/new`);
 });
 
 /**
@@ -231,7 +231,7 @@ actionRegistry.register('edit', ({ navigate, tableName, record }) => {
     return;
   }
   const id = record.id || record.pid;
-  navigate(`/dynamic/${tableName}/${id}/edit`);
+  navigate(`/p/${tableName}/${id}/edit`);
 });
 
 /**
@@ -247,7 +247,7 @@ actionRegistry.register('view', ({ navigate, tableName, record }) => {
     return;
   }
   const id = record.id || record.pid;
-  navigate(`/dynamic/${tableName}/view/${id}`);
+  navigate(`/p/${tableName}/view/${id}`);
 });
 
 /**
@@ -1005,15 +1005,15 @@ actionRegistry.register('ui.openContainer', ({ args, stepTarget, navigate, schem
   // 根据 target 和 mode 决定跳转路径
   if (target === 'drawer.form' || target === 'form') {
     if (mode === 'create') {
-      navigate(`/dynamic/${modelCode}/new`);
+      navigate(`/p/${modelCode}/new`);
     } else if (mode === 'edit' && id) {
-      navigate(`/dynamic/${modelCode}/${id}/edit`);
+      navigate(`/p/${modelCode}/${id}/edit`);
     } else {
       console.warn('[ActionRegistry] ui.openContainer: unknown mode for form target:', mode);
     }
   } else if (target === 'drawer.detail' || target === 'detail') {
     if (id) {
-      navigate(`/dynamic/${modelCode}/view/${id}`);
+      navigate(`/p/${modelCode}/view/${id}`);
     } else {
       console.warn('[ActionRegistry] ui.openContainer: detail target requires id');
     }

@@ -54,9 +54,7 @@ export const FilterBuilder: React.FC<FilterBuilderProps> = ({
         </div>
       )}
 
-      {value.length === 0 && (
-        <p className="text-xs text-gray-400">No filters configured</p>
-      )}
+      {value.length === 0 && <p className="text-xs text-gray-400">No filters configured</p>}
 
       <div className="space-y-2">
         {value.map((filter, index) => (

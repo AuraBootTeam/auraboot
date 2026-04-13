@@ -14,7 +14,7 @@
  */
 
 import { test, expect } from '@playwright/test';
-import { uniqueId, executeCommandViaApi, dateOffsetStr } from '../helpers/index';
+import { uniqueId, executeCommandViaApi, dateOffsetStr, ensureFilterFormOpen } from '../helpers/index';
 
 test.describe('PM Smoke Tests', () => {
   test.describe.configure({ mode: 'serial' });
@@ -43,11 +43,11 @@ test.describe('PM Smoke Tests', () => {
 
       // Fetch auto-created member pid (sideEffect creates member on project creation)
       const BASE = process.env.BASE_URL || 'http://localhost:5173';
-      const memberFilter = encodeURIComponent(JSON.stringify([
-        { fieldName: 'pm_member_project_id', operator: 'EQ', value: projectPid },
-      ]));
+      const memberFilter = encodeURIComponent(
+        JSON.stringify([{ fieldName: 'pm_member_project_id', operator: 'EQ', value: projectPid }]),
+      );
       const memberResp = await page.request.get(
-        `${BASE}/api/dynamic/pm-project-member/list?pageSize=10&filters=${memberFilter}`,
+        `${BASE}/api/dynamic/pm_project_member/list?pageSize=10&filters=${memberFilter}`,
       );
       const memberBody = await memberResp.json();
       const memberPid = memberBody?.data?.records?.[0]?.pid;
@@ -86,11 +86,11 @@ test.describe('PM Smoke Tests', () => {
     await link.first().evaluate((el) => (el as HTMLAnchorElement).click());
   }
 
-  // PM-SMOKE-01: Sidebar "Projects" menu → /dynamic/pm-project (DSL list page)
+  // PM-SMOKE-01: Sidebar "Projects" menu → /p/pm-project (DSL list page)
   test('sidebar Projects menu navigates to project list', async ({ page }) => {
     await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
-    await clickPmMenuLink(page, '/dynamic/pm-project');
-    await expect(page).toHaveURL(/\/dynamic\/pm-project/);
+    await clickPmMenuLink(page, '/p/pm_project');
+    await expect(page).toHaveURL(/\/p\/pm_project/);
   });
 
   // PM-SMOKE-02: Sidebar "My Tasks" menu → /project-management/my-tasks
@@ -100,7 +100,7 @@ test.describe('PM Smoke Tests', () => {
     await expect(page).toHaveURL(/\/project-management\/my-tasks/);
   });
 
-  // PM-SMOKE-03: Sidebar "Project Roles" menu → /dynamic/pm-project-role
+  // PM-SMOKE-03: Sidebar "Project Roles" menu → /p/pm-project-role
   test('sidebar Project Roles menu navigates to roles page', async ({ page }) => {
     await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
 
@@ -115,20 +115,23 @@ test.describe('PM Smoke Tests', () => {
     await masterDataMenu.first().evaluate((el) => (el as HTMLButtonElement).click());
 
     // Click "Project Roles" link
-    const rolesLink = page.locator('a[href="/dynamic/pm-project-role"]');
+    const rolesLink = page.locator('a[href="/p/pm_project_role"]');
     await rolesLink.first().waitFor({ state: 'attached', timeout: 5000 });
     await rolesLink.first().evaluate((el) => (el as HTMLAnchorElement).click());
 
-    await expect(page).toHaveURL(/\/dynamic\/pm-project-role/);
-    await page.waitForResponse(resp => resp.url().includes('/list') && resp.status() === 200, { timeout: 10000 });
+    await expect(page).toHaveURL(/\/p\/pm_project_role/);
+    await page.waitForResponse((resp) => resp.url().includes('/list') && resp.status() === 200, {
+      timeout: 10000,
+    });
   });
 
   // Helper: search for a project by name in the DSL list search area
   async function searchProjectInList(page: import('@playwright/test').Page, name: string) {
     await page.locator('tbody tr').first().waitFor({ state: 'visible', timeout: 10000 });
-    const searchArea = page.getByTestId('search-area');
-  if (await searchArea.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await searchArea.locator('input').first().fill(name);
+    await ensureFilterFormOpen(page);
+    const filterForm = page.locator('[data-testid="filters"], form').first();
+    if (await filterForm.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await filterForm.locator('input').first().fill(name);
       await page.getByTestId('filter-search').click();
       const table = page.locator('table, [role="table"]');
       const empty = page.locator('text=/no data|暂无/i');
@@ -138,7 +141,7 @@ test.describe('PM Smoke Tests', () => {
 
   // PM-SMOKE-04: DSL project list page shows at least 1 row
   test('project list page displays project rows', async ({ page }) => {
-    await page.goto('/dynamic/pm-project', { waitUntil: 'domcontentloaded' });
+    await page.goto('/p/pm_project', { waitUntil: 'domcontentloaded' });
     const table = page.locator('table, [role="table"]');
     await expect(table.first()).toBeVisible({ timeout: 10000 });
 
@@ -150,25 +153,12 @@ test.describe('PM Smoke Tests', () => {
 
   // PM-SMOKE-05: Click project row → workspace kanban shows tasks
   test('project workspace kanban tab shows task cards', async ({ page }) => {
-    // Navigate to DSL project list and search for our project
-    await page.goto('/dynamic/pm-project', { waitUntil: 'domcontentloaded' });
-    await expect(page.locator('table, [role="table"]').first()).toBeVisible({ timeout: 10000 });
-    await searchProjectInList(page, projectName);
+    // Navigate directly to workspace (DSL row click goes to detail, not workspace)
+    await page.goto(`/project-management/projects/${projectPid}`, { waitUntil: 'domcontentloaded' });
 
-    // Click the project row (rowClickNavigateTo configured in DSL)
-    const projectRow = page.locator('tbody tr', { hasText: projectName });
-    await expect(projectRow.first()).toBeVisible({ timeout: 10000 });
-
-    // Wait for task list response when entering workspace
-    const taskListPromise = page.waitForResponse(
-      resp => resp.url().includes('/api/dynamic/pm-task/list') && resp.status() === 200,
-      { timeout: 10000 },
-    );
-    await projectRow.first().click();
-
-    // Should navigate to workspace
+    // Should be on workspace
     await expect(page).toHaveURL(/\/project-management\/projects\//);
-    await taskListPromise;
+    await page.waitForLoadState('networkidle').catch(() => {});
 
     // Kanban should show at least one task card
     const taskCard = page.locator('[class*="bg-white"]', { hasText: /SmokeTask/ });
@@ -179,16 +169,18 @@ test.describe('PM Smoke Tests', () => {
   test('project workspace list view shows task rows', async ({ page }) => {
     // Navigate directly to project workspace
     const taskListPromise = page.waitForResponse(
-      resp => resp.url().includes('/api/dynamic/pm-task/list') && resp.status() === 200,
+      (resp) => resp.url().includes('/api/dynamic/pm_task/list') && resp.status() === 200,
       { timeout: 10000 },
     );
-    await page.goto(`/project-management/projects/${projectPid}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/project-management/projects/${projectPid}`, {
+      waitUntil: 'domcontentloaded',
+    });
     await taskListPromise;
 
     // Click "List" tab — set up response listener BEFORE clicking
     const listTab = page.locator('button', { hasText: /List|列表/ });
     const listViewPromise = page.waitForResponse(
-      resp => resp.url().includes('/api/dynamic/pm-task/list') && resp.status() === 200,
+      (resp) => resp.url().includes('/api/dynamic/pm_task/list') && resp.status() === 200,
       { timeout: 10000 },
     );
     await listTab.first().click();
@@ -203,16 +195,18 @@ test.describe('PM Smoke Tests', () => {
   test('project workspace members tab shows members', async ({ page }) => {
     // Navigate to project workspace
     const taskListPromise = page.waitForResponse(
-      resp => resp.url().includes('/api/dynamic/pm-task/list') && resp.status() === 200,
+      (resp) => resp.url().includes('/api/dynamic/pm_task/list') && resp.status() === 200,
       { timeout: 10000 },
     );
-    await page.goto(`/project-management/projects/${projectPid}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/project-management/projects/${projectPid}`, {
+      waitUntil: 'domcontentloaded',
+    });
     await taskListPromise;
 
     // Click "Members" tab
     const membersTab = page.locator('button', { hasText: /Members|成员/ });
     const memberListPromise = page.waitForResponse(
-      resp => resp.url().includes('/api/dynamic/pm-project-member/list') && resp.status() === 200,
+      (resp) => resp.url().includes('/api/dynamic/pm_project_member/list') && resp.status() === 200,
       { timeout: 10000 },
     );
     await membersTab.first().click();
@@ -226,7 +220,10 @@ test.describe('PM Smoke Tests', () => {
   // PM-SMOKE-08: My Tasks page loads and displays task data
   test('my tasks page loads task data', async ({ page }) => {
     const apiPromise = page.waitForResponse(
-      resp => resp.url().includes('/api/datasource/list') && resp.url().includes('pm_my_tasks') && resp.status() === 200,
+      (resp) =>
+        resp.url().includes('/api/datasource/list') &&
+        resp.url().includes('pm_my_tasks') &&
+        resp.status() === 200,
       { timeout: 10000 },
     );
     await page.goto('/project-management/my-tasks', { waitUntil: 'domcontentloaded' });

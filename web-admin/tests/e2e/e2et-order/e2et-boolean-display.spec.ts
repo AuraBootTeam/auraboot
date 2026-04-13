@@ -92,6 +92,8 @@ test.describe('E2E Test Order — Boolean Display & Action Dropdown', () => {
     const row = page.locator('tr', { hasText: title }).first();
     await expect(row).toBeVisible({ timeout: 10000 });
 
+    // Hover row to reveal action buttons (opacity-0 → opacity-100 via group-hover)
+    await row.hover();
     // Find and click the "..." more actions button in the row
     const moreBtn = row.locator('[data-testid="row-action-more"]');
     if (await moreBtn.isVisible({ timeout: 3000 }).catch(() => false)) {

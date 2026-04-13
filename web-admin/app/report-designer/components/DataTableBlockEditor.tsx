@@ -1,5 +1,5 @@
 /**
- * DataTableBlockEditor — property editor for data-table blocks
+ * DataTableBlockEditor — property editor for table blocks
  * Configures data source, columns, and table style.
  * Uses shared ModelPicker and NamedQueryPicker for data source creation.
  */

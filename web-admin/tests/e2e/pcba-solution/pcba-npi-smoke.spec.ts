@@ -65,7 +65,7 @@ test.describe('PCBA NPI Smoke Tests @smoke', () => {
   test('NPI-001: Navigate to NPI Projects list page via menu', async ({ page }) => {
     await navigateToDynamicPage(page, 'pe-npi-project');
     await waitForDynamicPageLoad(page);
-    await expect(page).toHaveURL(/\/dynamic\/pe-npi-project/);
+    await expect(page).toHaveURL(/\/p\/pe_npi_project/);
 
     // Table should be visible
     const table = page.locator(
@@ -92,12 +92,7 @@ test.describe('PCBA NPI Smoke Tests @smoke', () => {
     );
 
     // Verify via API query (pe_npi_code is auto-generated, so query by name)
-    const records = await queryFilteredList(
-      page,
-      'pe-npi-project',
-      'pe_npi_name',
-      createUid,
-    );
+    const records = await queryFilteredList(page, 'pe-npi-project', 'pe_npi_name', createUid);
     expect(records.length, 'Created NPI project should appear in list').toBeGreaterThanOrEqual(1);
   });
 
@@ -105,31 +100,19 @@ test.describe('PCBA NPI Smoke Tests @smoke', () => {
     expect(npiProjectPid, 'NPI project should have been created in beforeAll').toBeTruthy();
 
     // Execute start command
-    await executeCommandViaApi(
-      page,
-      'pe:start_npi_project',
-      {},
-      npiProjectPid,
-      'update',
-    );
+    await executeCommandViaApi(page, 'pe:start_npi_project', {}, npiProjectPid, 'update');
 
     // Verify status changed via API (pe_npi_code is auto-generated, query by name)
-    const records = await queryFilteredList(
-      page,
-      'pe-npi-project',
-      'pe_npi_name',
-      uid,
-      {
-        extraFilters: [{ fieldName: 'pe_npi_status', operator: 'EQ', value: 'in_progress' }],
-      },
-    );
+    const records = await queryFilteredList(page, 'pe-npi-project', 'pe_npi_name', uid, {
+      extraFilters: [{ fieldName: 'pe_npi_status', operator: 'EQ', value: 'in_progress' }],
+    });
     expect(records.length, 'NPI project should be in_progress').toBeGreaterThanOrEqual(1);
   });
 
   test('NPI-004: Navigate to Phase Gate list page', async ({ page }) => {
     await navigateToDynamicPage(page, 'pe-npi-phase-gate');
     await waitForDynamicPageLoad(page);
-    await expect(page).toHaveURL(/\/dynamic\/pe-npi-phase-gate/);
+    await expect(page).toHaveURL(/\/p\/pe_npi_phase_gate/);
 
     const table = page.locator(
       '.ant-table, table, [role="table"], [data-testid="dynamic-list"], [data-testid="table-block"]',
@@ -140,7 +123,7 @@ test.describe('PCBA NPI Smoke Tests @smoke', () => {
   test('NPI-005: Navigate to Trial Run list page', async ({ page }) => {
     await navigateToDynamicPage(page, 'pe-npi-trial-run');
     await waitForDynamicPageLoad(page);
-    await expect(page).toHaveURL(/\/dynamic\/pe-npi-trial-run/);
+    await expect(page).toHaveURL(/\/p\/pe_npi_trial_run/);
 
     const table = page.locator(
       '.ant-table, table, [role="table"], [data-testid="dynamic-list"], [data-testid="table-block"]',
@@ -151,7 +134,7 @@ test.describe('PCBA NPI Smoke Tests @smoke', () => {
   test('NPI-006: Navigate to NPI Checklist list page', async ({ page }) => {
     await navigateToDynamicPage(page, 'pe-npi-checklist');
     await waitForDynamicPageLoad(page);
-    await expect(page).toHaveURL(/\/dynamic\/pe-npi-checklist/);
+    await expect(page).toHaveURL(/\/p\/pe_npi_checklist/);
 
     const table = page.locator(
       '.ant-table, table, [role="table"], [data-testid="dynamic-list"], [data-testid="table-block"]',
@@ -163,18 +146,8 @@ test.describe('PCBA NPI Smoke Tests @smoke', () => {
     expect(npiProjectPid, 'NPI project should have been created in beforeAll').toBeTruthy();
 
     // Navigate to detail page
-    const listResponse = page
-      .waitForResponse(
-        (resp) => resp.url().includes('/list') && resp.status() === 200,
-        { timeout: 10000 },
-      )
-      .catch(() => null);
-
-    await page.goto(`/dynamic/pe-npi-project/detail/${npiProjectPid}`, {
-      waitUntil: 'domcontentloaded',
-    });
+    await page.goto(`/p/pe_npi_project/${npiProjectPid}`, { waitUntil: 'domcontentloaded' });
     await waitForDynamicPageLoad(page);
-    await listResponse;
 
     // Verify the detail page loaded with basic info block
     const detailContent = page.locator(
@@ -195,9 +168,18 @@ test.describe('PCBA NPI Smoke Tests @smoke', () => {
       const checklistTitle = page.locator('text=NPI Checklist').or(page.locator('text=NPI检查单'));
 
       // At least one sub-table title should be visible
-      const phaseVisible = await phaseGateTitle.first().isVisible({ timeout: 5000 }).catch(() => false);
-      const trialVisible = await trialRunTitle.first().isVisible({ timeout: 2000 }).catch(() => false);
-      const checklistVisible = await checklistTitle.first().isVisible({ timeout: 2000 }).catch(() => false);
+      const phaseVisible = await phaseGateTitle
+        .first()
+        .isVisible({ timeout: 5000 })
+        .catch(() => false);
+      const trialVisible = await trialRunTitle
+        .first()
+        .isVisible({ timeout: 2000 })
+        .catch(() => false);
+      const checklistVisible = await checklistTitle
+        .first()
+        .isVisible({ timeout: 2000 })
+        .catch(() => false);
 
       expect(
         phaseVisible || trialVisible || checklistVisible,

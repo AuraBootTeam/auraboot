@@ -63,7 +63,7 @@ test.describe('CRM Inline Edit @smoke', () => {
   test('IE-001: Navigate to CRM Leads list page @smoke', async ({ page }) => {
     await navigateToDynamicPage(page, 'crm-lead');
     await waitForDynamicPageLoad(page);
-    await expect(page).toHaveURL(/\/dynamic\/crm-lead/);
+    await expect(page).toHaveURL(/\/p\/crm_lead/);
 
     const rows = page.locator('tbody tr');
     await rows.first().waitFor({ state: 'visible', timeout: 10000 });
@@ -81,9 +81,7 @@ test.describe('CRM Inline Edit @smoke', () => {
     await waitForDynamicPageLoad(page);
 
     // Find the row created in beforeAll
-    const row = await findRowInPaginatedList(page, initialCompany, 15000).catch(
-      () => null,
-    );
+    const row = await findRowInPaginatedList(page, initialCompany, 15000).catch(() => null);
     if (!row) {
       test.skip(true, 'beforeAll lead not found — check data setup');
       return;
@@ -103,7 +101,10 @@ test.describe('CRM Inline Edit @smoke', () => {
       '[data-testid^="inline-edit-text-"], [data-testid^="inline-edit-select-"], ' +
         '[data-testid^="inline-edit-number-"], [data-testid^="inline-edit-date-"]',
     );
-    const hasInlineEdit = await inlineInput.first().isVisible({ timeout: 3000 }).catch(() => false);
+    const hasInlineEdit = await inlineInput
+      .first()
+      .isVisible({ timeout: 3000 })
+      .catch(() => false);
 
     if (!hasInlineEdit) {
       // This column is not inline-editable — verify no crash occurred
@@ -133,7 +134,10 @@ test.describe('CRM Inline Edit @smoke', () => {
       .catch(() => false);
 
     if (!dismissed) {
-      await page.locator('body').click({ position: { x: 10, y: 10 } }).catch(() => {});
+      await page
+        .locator('body')
+        .click({ position: { x: 10, y: 10 } })
+        .catch(() => {});
       await editInput.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
     }
 
@@ -159,9 +163,7 @@ test.describe('CRM Inline Edit @smoke', () => {
     await waitForDynamicPageLoad(page);
 
     // Find the row created in beforeAll
-    const row = await findRowInPaginatedList(page, initialCompany, 15000).catch(
-      () => null,
-    );
+    const row = await findRowInPaginatedList(page, initialCompany, 15000).catch(() => null);
     if (!row) {
       test.skip(true, 'beforeAll lead not found — check data setup');
       return;
@@ -175,7 +177,10 @@ test.describe('CRM Inline Edit @smoke', () => {
     if (companyCount > 0) {
       await companyCells.first().dblclick();
       const inlineInput = page.locator('[data-testid^="inline-edit-text-"]');
-      const visible = await inlineInput.first().isVisible({ timeout: 2000 }).catch(() => false);
+      const visible = await inlineInput
+        .first()
+        .isVisible({ timeout: 2000 })
+        .catch(() => false);
       if (visible) {
         editableCell = companyCells.first();
       } else {
@@ -191,7 +196,10 @@ test.describe('CRM Inline Edit @smoke', () => {
         const cell = cells.nth(i);
         await cell.dblclick();
         const inlineInput = page.locator('[data-testid^="inline-edit-text-"]');
-        const visible = await inlineInput.first().isVisible({ timeout: 2000 }).catch(() => false);
+        const visible = await inlineInput
+          .first()
+          .isVisible({ timeout: 2000 })
+          .catch(() => false);
         if (visible) {
           editableCell = cell;
           break;
@@ -218,7 +226,7 @@ test.describe('CRM Inline Edit @smoke', () => {
       .waitForResponse(
         (r) =>
           r.url().includes('/commands/execute') ||
-          (r.url().includes('/api/dynamic/crm-lead') && r.request().method() !== 'GET'),
+          (r.url().includes('/api/dynamic/crm_lead') && r.request().method() !== 'GET'),
         { timeout: 15000 },
       )
       .catch(() => null);
@@ -232,25 +240,20 @@ test.describe('CRM Inline Edit @smoke', () => {
     if (saveResp) {
       const body = await saveResp.json().catch(() => null);
       if (body && body.code !== undefined) {
-        expect(
-          String(body.code),
-          'Save API must return code "0"',
-        ).toBe('0');
+        expect(String(body.code), 'Save API must return code "0"').toBe('0');
       }
     }
 
     // Wait for list to refresh
     await page
       .waitForResponse(
-        (r) => r.url().includes('/api/dynamic/crm-lead') && r.url().includes('/list'),
+        (r) => r.url().includes('/api/dynamic/crm_lead') && r.url().includes('/list'),
         { timeout: 10000 },
       )
       .catch(() => null);
 
     // The row should now show the updated value
-    const updatedRow = await findRowInPaginatedList(page, updatedCompany, 12000).catch(
-      () => null,
-    );
+    const updatedRow = await findRowInPaginatedList(page, updatedCompany, 12000).catch(() => null);
     expect(
       updatedRow,
       `After inline edit save, row with updated company "${updatedCompany}" must be visible in the list`,
@@ -261,7 +264,7 @@ test.describe('CRM Inline Edit @smoke', () => {
 
     // --- Persistence check: verify via API that the record was updated ---
     if (createdRecordId) {
-      const verifyResp = await page.request.get(`/api/dynamic/crm-lead/${createdRecordId}`);
+      const verifyResp = await page.request.get(`/api/dynamic/crm_lead/${createdRecordId}`);
       expect(verifyResp.ok(), 'Record fetch after reload should succeed').toBe(true);
       const verifyBody = await verifyResp.json();
       expect(
@@ -287,10 +290,9 @@ test.describe('CRM Inline Edit @smoke', () => {
     if (await searchInput.isVisible({ timeout: 3000 }).catch(() => false)) {
       await searchInput.fill(initialCompany);
       await page.keyboard.press('Enter');
-      await page.waitForResponse(
-        (r) => r.url().includes('/list') && r.status() === 200,
-        { timeout: 5000 },
-      ).catch(() => null);
+      await page
+        .waitForResponse((r) => r.url().includes('/list') && r.status() === 200, { timeout: 5000 })
+        .catch(() => null);
     }
     const oldRow = page.locator('tbody tr', { hasText: initialCompany }).first();
     await expect(

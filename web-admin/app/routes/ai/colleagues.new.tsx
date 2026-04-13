@@ -62,7 +62,8 @@ const AGENT_TEMPLATES: AgentTemplate[] = [
       name: 'Procurement Approver',
       description: 'Reviews purchase orders, checks budgets, and follows approval SOP',
       agent_type: 'reactive',
-      personality: 'Meticulous, detail-oriented, follows rules strictly. You verify data before making decisions and always provide clear reasoning for approvals or rejections.',
+      personality:
+        'Meticulous, detail-oriented, follows rules strictly. You verify data before making decisions and always provide clear reasoning for approvals or rejections.',
       communication_style: 'professional',
       system_prompt:
         'You are a procurement approval specialist. When reviewing purchase orders:\n1. Check the supplier history and rating\n2. Verify budget availability for the department\n3. If amount < 5000 and supplier rating is A, recommend approval\n4. Otherwise, flag for manual review with your detailed analysis\nAlways cite specific data points in your recommendations.',
@@ -77,7 +78,8 @@ const AGENT_TEMPLATES: AgentTemplate[] = [
       name: 'Weekly Report Writer',
       description: 'Generates team weekly reports from activity data and project updates',
       agent_type: 'autonomous',
-      personality: 'Organized, concise, and thorough. You synthesize information from multiple sources into clear, structured reports that highlight progress, blockers, and next steps.',
+      personality:
+        'Organized, concise, and thorough. You synthesize information from multiple sources into clear, structured reports that highlight progress, blockers, and next steps.',
       communication_style: 'professional',
       system_prompt:
         'You are a weekly report generation assistant. Your task:\n1. Collect completed tasks and milestones from the past week\n2. Identify ongoing issues and blockers\n3. Summarize key metrics and KPIs\n4. Draft a concise weekly report with sections: Highlights, Progress, Blockers, Next Week Plan\nKeep the report under 500 words and use bullet points for clarity.',
@@ -90,9 +92,11 @@ const AGENT_TEMPLATES: AgentTemplate[] = [
     descriptionKey: 'ai.template.customerService.desc',
     defaults: {
       name: 'Customer Service Agent',
-      description: 'Handles customer inquiries, checks order status, and drafts professional responses',
+      description:
+        'Handles customer inquiries, checks order status, and drafts professional responses',
       agent_type: 'reactive',
-      personality: 'Empathetic, patient, and solution-focused. You listen carefully to customer issues and provide clear, actionable responses while maintaining a warm and professional tone.',
+      personality:
+        'Empathetic, patient, and solution-focused. You listen carefully to customer issues and provide clear, actionable responses while maintaining a warm and professional tone.',
       communication_style: 'friendly',
       system_prompt:
         'You are a customer service specialist. When handling inquiries:\n1. Acknowledge the customer\'s concern with empathy\n2. Check order status or account information as needed\n3. Provide a clear solution or escalation path\n4. Always end with a follow-up offer (e.g., "Is there anything else I can help you with?")\nMaintain a professional yet friendly tone throughout.',
@@ -107,7 +111,8 @@ const AGENT_TEMPLATES: AgentTemplate[] = [
       name: 'Data Analyst',
       description: 'Queries data, generates business insights, and creates chart recommendations',
       agent_type: 'reactive',
-      personality: 'Analytical, data-driven, and precise. You transform raw data into actionable insights, always backing conclusions with specific numbers and trends.',
+      personality:
+        'Analytical, data-driven, and precise. You transform raw data into actionable insights, always backing conclusions with specific numbers and trends.',
       communication_style: 'detailed',
       system_prompt:
         'You are a business data analyst. When analyzing data:\n1. Identify trends, anomalies, and key patterns\n2. Calculate relevant metrics (growth rate, conversion, etc.)\n3. Provide 3-5 actionable insights based on the data\n4. Recommend appropriate chart types for visualization\nAlways present numbers with context (e.g., "Revenue grew 15% vs last month, driven primarily by...")',
@@ -120,9 +125,11 @@ const AGENT_TEMPLATES: AgentTemplate[] = [
     descriptionKey: 'ai.template.onboarding.desc',
     defaults: {
       name: 'Onboarding Guide',
-      description: 'Helps new employees navigate the platform, find resources, and complete onboarding tasks',
+      description:
+        'Helps new employees navigate the platform, find resources, and complete onboarding tasks',
       agent_type: 'reactive',
-      personality: 'Welcoming, patient, and encouraging. You make new team members feel comfortable and guide them step by step, celebrating their progress along the way.',
+      personality:
+        'Welcoming, patient, and encouraging. You make new team members feel comfortable and guide them step by step, celebrating their progress along the way.',
       communication_style: 'friendly',
       system_prompt:
         'You are a new employee onboarding guide. Your responsibilities:\n1. Welcome new employees and explain the platform structure\n2. Guide them through key features: navigation, tasks, team communication\n3. Answer common questions about company processes and tools\n4. Provide links to relevant documentation and resources\n5. Check in on their progress and offer additional help\nUse encouraging language and break down complex processes into simple steps.',
@@ -145,8 +152,20 @@ const INITIAL_DATA: WizardData = {
 };
 
 const AGENT_TYPES = [
-  { value: 'reactive', labelKey: 'ai.wizard.type.reactive', fallback: 'Reactive', descKey: 'ai.wizard.type.reactive.desc', descFallback: 'Responds when asked. Best for Q&A and on-demand tasks.' },
-  { value: 'autonomous', labelKey: 'ai.wizard.type.autonomous', fallback: 'Autonomous', descKey: 'ai.wizard.type.autonomous.desc', descFallback: 'Runs independently on schedules or triggers.' },
+  {
+    value: 'reactive',
+    labelKey: 'ai.wizard.type.reactive',
+    fallback: 'Reactive',
+    descKey: 'ai.wizard.type.reactive.desc',
+    descFallback: 'Responds when asked. Best for Q&A and on-demand tasks.',
+  },
+  {
+    value: 'autonomous',
+    labelKey: 'ai.wizard.type.autonomous',
+    fallback: 'Autonomous',
+    descKey: 'ai.wizard.type.autonomous.desc',
+    descFallback: 'Runs independently on schedules or triggers.',
+  },
 ];
 
 const COMM_STYLES = [
@@ -189,37 +208,37 @@ function TemplateSelector({
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
           {t('ai.wizard.template.title', undefined, 'Create AI Colleague')}
         </h2>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          {t('ai.wizard.template.subtitle', undefined, 'Start from a template or build from scratch.')}
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          {t(
+            'ai.wizard.template.subtitle',
+            undefined,
+            'Start from a template or build from scratch.',
+          )}
         </p>
       </div>
 
       {/* Template grid */}
       <div>
-        <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-3">
+        <p className="mb-3 text-xs font-semibold tracking-wider text-gray-400 uppercase dark:text-gray-500">
           {t('ai.wizard.template.sectionLabel', undefined, 'Start from a template')}
         </p>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3" data-testid="wizard-template-grid">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3" data-testid="wizard-template-grid">
           {AGENT_TEMPLATES.map((tpl) => (
             <button
               key={tpl.id}
               type="button"
               onClick={() => onSelect(tpl)}
-              className="flex flex-col items-start gap-2 p-4 rounded-xl border-2 border-gray-200 dark:border-gray-700
-                bg-white dark:bg-gray-900
-                hover:border-blue-400 dark:hover:border-blue-500
-                hover:bg-blue-50/50 dark:hover:bg-blue-900/10
-                transition-all text-left group"
+              className="group flex flex-col items-start gap-2 rounded-xl border-2 border-gray-200 bg-white p-4 text-left transition-all hover:border-blue-400 hover:bg-blue-50/50 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-blue-500 dark:hover:bg-blue-900/10"
               data-testid={`wizard-template-${tpl.id}`}
             >
               <span className="text-2xl leading-none" role="img" aria-hidden="true">
                 {tpl.icon}
               </span>
               <div>
-                <p className="text-sm font-semibold text-gray-900 dark:text-white group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors">
+                <p className="text-sm font-semibold text-gray-900 transition-colors group-hover:text-blue-700 dark:text-white dark:group-hover:text-blue-300">
                   {t(tpl.nameKey, undefined, tpl.defaults.name)}
                 </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">
+                <p className="mt-0.5 line-clamp-2 text-xs text-gray-500 dark:text-gray-400">
                   {t(tpl.descriptionKey, undefined, tpl.defaults.description)}
                 </p>
               </div>
@@ -234,8 +253,7 @@ function TemplateSelector({
         <button
           type="button"
           onClick={onSkip}
-          className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200
-            font-medium transition-colors whitespace-nowrap"
+          className="text-sm font-medium whitespace-nowrap text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
           data-testid="wizard-template-skip"
         >
           {t('ai.wizard.template.startFromScratch', undefined, 'Or start from scratch →')}
@@ -264,7 +282,7 @@ function StepIndicator({
   ];
 
   return (
-    <nav className="flex items-center justify-center gap-2 mb-8" data-testid="wizard-steps">
+    <nav className="mb-8 flex items-center justify-center gap-2" data-testid="wizard-steps">
       {STEPS.map((step, idx) => {
         const Icon = step.iconKey;
         const isActive = idx === currentStep;
@@ -274,30 +292,30 @@ function StepIndicator({
           <div key={step.key} className="flex items-center">
             {idx > 0 && (
               <div
-                className={`w-12 h-0.5 mx-1 transition-colors duration-300 ${
+                className={`mx-1 h-0.5 w-12 transition-colors duration-300 ${
                   isDone ? 'bg-blue-500' : 'bg-gray-200 dark:bg-gray-700'
                 }`}
               />
             )}
             <div className="flex items-center gap-2">
               <div
-                className={`flex items-center justify-center h-9 w-9 rounded-full transition-all duration-300 ${
+                className={`flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 ${
                   isActive
                     ? 'bg-blue-600 text-white shadow-md shadow-blue-200 dark:shadow-blue-900/40'
                     : isDone
-                    ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400'
-                    : 'bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500'
+                      ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400'
+                      : 'bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500'
                 }`}
               >
                 {isDone ? <CheckIcon className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
               </div>
               <span
-                className={`text-sm font-medium hidden sm:inline transition-colors duration-300 ${
+                className={`hidden text-sm font-medium transition-colors duration-300 sm:inline ${
                   isActive
                     ? 'text-gray-900 dark:text-white'
                     : isDone
-                    ? 'text-blue-600 dark:text-blue-400'
-                    : 'text-gray-400 dark:text-gray-500'
+                      ? 'text-blue-600 dark:text-blue-400'
+                      : 'text-gray-400 dark:text-gray-500'
                 }`}
               >
                 {stepLabels[idx]}
@@ -331,33 +349,41 @@ function StepIdentity({
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
           {t('ai.wizard.identity.title', undefined, 'Define your AI Colleague')}
         </h2>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          {t('ai.wizard.identity.subtitle', undefined, 'Give your colleague a name, purpose, and personality.')}
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          {t(
+            'ai.wizard.identity.subtitle',
+            undefined,
+            'Give your colleague a name, purpose, and personality.',
+          )}
         </p>
       </div>
 
       {/* Name */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+        <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
           {t('ai.wizard.field.name', undefined, 'Name')} <span className="text-red-500">*</span>
         </label>
         <input
           type="text"
           value={data.name}
           onChange={(e) => onChange({ name: e.target.value })}
-          placeholder={t('ai.wizard.field.name.placeholder', undefined, 'e.g. Procurement Assistant')}
-          className={`w-full rounded-lg border px-3 py-2.5 text-sm
-            bg-white dark:bg-gray-900
-            ${errors.name
-              ? 'border-red-300 dark:border-red-700 focus:ring-red-500 focus:border-red-500'
-              : 'border-gray-300 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500'
-            }
-            dark:text-white placeholder-gray-400 dark:placeholder-gray-500
-            focus:outline-none focus:ring-2 transition-colors`}
+          placeholder={t(
+            'ai.wizard.field.name.placeholder',
+            undefined,
+            'e.g. Procurement Assistant',
+          )}
+          className={`w-full rounded-lg border bg-white px-3 py-2.5 text-sm dark:bg-gray-900 ${
+            errors.name
+              ? 'border-red-300 focus:border-red-500 focus:ring-red-500 dark:border-red-700'
+              : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600'
+          } placeholder-gray-400 transition-colors focus:ring-2 focus:outline-none dark:text-white dark:placeholder-gray-500`}
           data-testid="wizard-input-name"
         />
         {errors.name && (
-          <p className="mt-1 text-sm text-red-600 dark:text-red-400" data-testid="wizard-error-name">
+          <p
+            className="mt-1 text-sm text-red-600 dark:text-red-400"
+            data-testid="wizard-error-name"
+          >
             {errors.name}
           </p>
         )}
@@ -365,25 +391,26 @@ function StepIdentity({
 
       {/* Description */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+        <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
           {t('ai.wizard.field.description', undefined, 'Description')}
         </label>
         <textarea
           value={data.description}
           onChange={(e) => onChange({ description: e.target.value })}
-          placeholder={t('ai.wizard.field.description.placeholder', undefined, 'What does this colleague do?')}
+          placeholder={t(
+            'ai.wizard.field.description.placeholder',
+            undefined,
+            'What does this colleague do?',
+          )}
           rows={3}
-          className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2.5 text-sm
-            bg-white dark:bg-gray-900 dark:text-white
-            placeholder-gray-400 dark:placeholder-gray-500
-            focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm placeholder-gray-400 transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:placeholder-gray-500"
           data-testid="wizard-input-description"
         />
       </div>
 
       {/* Avatar Icon */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+        <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
           {t('ai.wizard.field.avatar', undefined, 'Avatar')}
         </label>
         <div className="flex items-center gap-3" data-testid="wizard-avatar-picker">
@@ -392,10 +419,10 @@ function StepIdentity({
               key={value}
               type="button"
               onClick={() => onChange({ avatarIcon: data.avatarIcon === value ? '' : value })}
-              className={`flex items-center justify-center h-11 w-11 rounded-full border-2 transition-all ${
+              className={`flex h-11 w-11 items-center justify-center rounded-full border-2 transition-all ${
                 data.avatarIcon === value
-                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
-                  : 'border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 hover:border-gray-300 dark:hover:border-gray-600'
+                  ? 'border-blue-500 bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
+                  : 'border-gray-200 text-gray-400 hover:border-gray-300 dark:border-gray-700 dark:text-gray-500 dark:hover:border-gray-600'
               }`}
               data-testid={`wizard-avatar-${value}`}
             >
@@ -407,30 +434,32 @@ function StepIdentity({
 
       {/* Agent Type */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+        <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
           {t('ai.wizard.field.agentType', undefined, 'Agent Type')}
         </label>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" data-testid="wizard-agent-type">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2" data-testid="wizard-agent-type">
           {AGENT_TYPES.map((at) => (
             <button
               key={at.value}
               type="button"
               onClick={() => onChange({ agent_type: at.value })}
-              className={`text-left rounded-lg border-2 p-4 transition-all ${
+              className={`rounded-lg border-2 p-4 text-left transition-all ${
                 data.agent_type === at.value
-                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-600'
-                  : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                  ? 'border-blue-500 bg-blue-50 dark:border-blue-600 dark:bg-blue-900/20'
+                  : 'border-gray-200 hover:border-gray-300 dark:border-gray-700 dark:hover:border-gray-600'
               }`}
               data-testid={`wizard-type-${at.value}`}
             >
-              <span className={`text-sm font-semibold ${
-                data.agent_type === at.value
-                  ? 'text-blue-700 dark:text-blue-300'
-                  : 'text-gray-900 dark:text-white'
-              }`}>
+              <span
+                className={`text-sm font-semibold ${
+                  data.agent_type === at.value
+                    ? 'text-blue-700 dark:text-blue-300'
+                    : 'text-gray-900 dark:text-white'
+                }`}
+              >
                 {t(at.labelKey, undefined, at.fallback)}
               </span>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 {t(at.descKey, undefined, at.descFallback)}
               </p>
             </button>
@@ -462,35 +491,40 @@ function StepPersonality({
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
           {t('ai.wizard.personality.title', undefined, 'Shape the personality')}
         </h2>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          {t('ai.wizard.personality.subtitle', undefined, 'Define how your colleague communicates and behaves.')}
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          {t(
+            'ai.wizard.personality.subtitle',
+            undefined,
+            'Define how your colleague communicates and behaves.',
+          )}
         </p>
       </div>
 
       {/* Role Description */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+        <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
           {t('ai.wizard.field.personality', undefined, 'Role Description')}
         </label>
         <textarea
           value={data.personality}
           onChange={(e) => onChange({ personality: e.target.value })}
-          placeholder={t('ai.wizard.field.personality.placeholder', undefined, 'You are a procurement specialist who helps find the best suppliers and negotiate contracts...')}
+          placeholder={t(
+            'ai.wizard.field.personality.placeholder',
+            undefined,
+            'You are a procurement specialist who helps find the best suppliers and negotiate contracts...',
+          )}
           rows={4}
-          className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2.5 text-sm
-            bg-white dark:bg-gray-900 dark:text-white
-            placeholder-gray-400 dark:placeholder-gray-500
-            focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm placeholder-gray-400 transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:placeholder-gray-500"
           data-testid="wizard-input-personality"
         />
       </div>
 
       {/* Communication Style */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+        <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
           {t('ai.wizard.field.commStyle', undefined, 'Communication Style')}
         </label>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2" data-testid="wizard-comm-style">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" data-testid="wizard-comm-style">
           {COMM_STYLES.map((cs) => (
             <button
               key={cs.value}
@@ -498,8 +532,8 @@ function StepPersonality({
               onClick={() => onChange({ communication_style: cs.value })}
               className={`rounded-lg border-2 px-3 py-2 text-sm font-medium transition-all ${
                 data.communication_style === cs.value
-                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 dark:border-blue-600'
-                  : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600'
+                  ? 'border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-600 dark:bg-blue-900/20 dark:text-blue-300'
+                  : 'border-gray-200 text-gray-600 hover:border-gray-300 dark:border-gray-700 dark:text-gray-400 dark:hover:border-gray-600'
               }`}
               data-testid={`wizard-style-${cs.value}`}
             >
@@ -514,8 +548,7 @@ function StepPersonality({
         <button
           type="button"
           onClick={() => setShowAdvanced(!showAdvanced)}
-          className="flex items-center gap-1.5 text-sm font-medium text-gray-600 dark:text-gray-400
-            hover:text-gray-900 dark:hover:text-gray-200 transition-colors"
+          className="flex items-center gap-1.5 text-sm font-medium text-gray-600 transition-colors hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
           data-testid="wizard-toggle-advanced"
         >
           {showAdvanced ? (
@@ -536,14 +569,15 @@ function StepPersonality({
                 'Override the default system prompt. Leave empty to auto-generate from role description and communication style.',
               )}
               rows={6}
-              className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2.5 text-sm font-mono
-                bg-white dark:bg-gray-900 dark:text-white
-                placeholder-gray-400 dark:placeholder-gray-500
-                focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 font-mono text-sm placeholder-gray-400 transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:placeholder-gray-500"
               data-testid="wizard-input-system-prompt"
             />
             <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
-              {t('ai.wizard.field.systemPrompt.hint', undefined, 'If left empty, a prompt will be generated from the role description and communication style.')}
+              {t(
+                'ai.wizard.field.systemPrompt.hint',
+                undefined,
+                'If left empty, a prompt will be generated from the role description and communication style.',
+              )}
             </p>
           </div>
         )}
@@ -572,19 +606,23 @@ function StepReview({
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
           {t('ai.wizard.review.title', undefined, 'Review your AI Colleague')}
         </h2>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
           {t('ai.wizard.review.subtitle', undefined, 'Confirm the details before creating.')}
         </p>
       </div>
 
-      <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 divide-y divide-gray-200 dark:divide-gray-700">
+      <div className="divide-y divide-gray-200 rounded-xl border border-gray-200 bg-gray-50 dark:divide-gray-700 dark:border-gray-700 dark:bg-gray-800/50">
         {/* Identity section */}
         <div className="p-5">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-3">
+          <h3 className="mb-3 text-xs font-semibold tracking-wider text-gray-400 uppercase dark:text-gray-500">
             {t('ai.wizard.step.identity', undefined, 'Identity')}
           </h3>
           <div className="space-y-3">
-            <ReviewRow label={t('ai.wizard.field.name', undefined, 'Name')} value={data.name} testId="review-name" />
+            <ReviewRow
+              label={t('ai.wizard.field.name', undefined, 'Name')}
+              value={data.name}
+              testId="review-name"
+            />
             <ReviewRow
               label={t('ai.wizard.field.description', undefined, 'Description')}
               value={data.description || '—'}
@@ -592,7 +630,11 @@ function StepReview({
             />
             <ReviewRow
               label={t('ai.wizard.field.agentType', undefined, 'Agent Type')}
-              value={agentTypeLabel ? t(agentTypeLabel.labelKey, undefined, agentTypeLabel.fallback) : data.agent_type}
+              value={
+                agentTypeLabel
+                  ? t(agentTypeLabel.labelKey, undefined, agentTypeLabel.fallback)
+                  : data.agent_type
+              }
               testId="review-agent-type"
             />
           </div>
@@ -600,7 +642,7 @@ function StepReview({
 
         {/* Personality section */}
         <div className="p-5">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-3">
+          <h3 className="mb-3 text-xs font-semibold tracking-wider text-gray-400 uppercase dark:text-gray-500">
             {t('ai.wizard.step.personality', undefined, 'Personality')}
           </h3>
           <div className="space-y-3">
@@ -611,7 +653,11 @@ function StepReview({
             />
             <ReviewRow
               label={t('ai.wizard.field.commStyle', undefined, 'Communication Style')}
-              value={commStyleLabel ? t(commStyleLabel.labelKey, undefined, commStyleLabel.fallback) : data.communication_style}
+              value={
+                commStyleLabel
+                  ? t(commStyleLabel.labelKey, undefined, commStyleLabel.fallback)
+                  : data.communication_style
+              }
               testId="review-comm-style"
             />
             {data.system_prompt && (
@@ -641,10 +687,12 @@ function ReviewRow({
   testId?: string;
 }) {
   return (
-    <div className="flex flex-col sm:flex-row sm:items-start gap-1" data-testid={testId}>
-      <span className="text-sm font-medium text-gray-500 dark:text-gray-400 sm:w-40 shrink-0">{label}</span>
+    <div className="flex flex-col gap-1 sm:flex-row sm:items-start" data-testid={testId}>
+      <span className="shrink-0 text-sm font-medium text-gray-500 sm:w-40 dark:text-gray-400">
+        {label}
+      </span>
       <span
-        className={`text-sm text-gray-900 dark:text-white break-words ${mono ? 'font-mono text-xs whitespace-pre-wrap bg-white dark:bg-gray-900 rounded p-2 border border-gray-200 dark:border-gray-700' : ''}`}
+        className={`text-sm break-words text-gray-900 dark:text-white ${mono ? 'rounded border border-gray-200 bg-white p-2 font-mono text-xs whitespace-pre-wrap dark:border-gray-700 dark:bg-gray-900' : ''}`}
       >
         {value}
       </span>
@@ -668,15 +716,18 @@ export default function AIColleagueNewPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [creating, setCreating] = useState(false);
 
-  const onChange = useCallback((patch: Partial<WizardData>) => {
-    setData((prev) => ({ ...prev, ...patch }));
-    // Clear errors for changed fields
-    const clearedErrors = { ...errors };
-    for (const key of Object.keys(patch)) {
-      delete clearedErrors[key];
-    }
-    setErrors(clearedErrors);
-  }, [errors]);
+  const onChange = useCallback(
+    (patch: Partial<WizardData>) => {
+      setData((prev) => ({ ...prev, ...patch }));
+      // Clear errors for changed fields
+      const clearedErrors = { ...errors };
+      for (const key of Object.keys(patch)) {
+        delete clearedErrors[key];
+      }
+      setErrors(clearedErrors);
+    },
+    [errors],
+  );
 
   /** Apply a template preset and jump directly into Step 1 (identity) */
   const handleSelectTemplate = (tpl: AgentTemplate) => {
@@ -741,26 +792,31 @@ export default function AIColleagueNewPage() {
 
       const res = await post<{ pid: string }>('/api/dynamic/agent-definition/create', payload);
       if (ResultHelper.isSuccess(res) && res.data?.pid) {
-        toast.showSuccessToast(t('ai.wizard.success', undefined, 'AI Colleague created successfully'));
+        toast.showSuccessToast(
+          t('ai.wizard.success', undefined, 'AI Colleague created successfully'),
+        );
         navigate(`/ai/colleagues/${res.data.pid}`);
       } else {
-        toast.showErrorToast(t('ai.wizard.error.createFailed', undefined, 'Failed to create AI Colleague'));
+        toast.showErrorToast(
+          t('ai.wizard.error.createFailed', undefined, 'Failed to create AI Colleague'),
+        );
       }
     } catch {
-      toast.showErrorToast(t('ai.wizard.error.createFailed', undefined, 'Failed to create AI Colleague'));
+      toast.showErrorToast(
+        t('ai.wizard.error.createFailed', undefined, 'Failed to create AI Colleague'),
+      );
     } finally {
       setCreating(false);
     }
   };
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] flex flex-col items-center p-6">
+    <div className="flex min-h-[calc(100vh-4rem)] flex-col items-center p-6">
       <div className="w-full max-w-2xl">
         {/* Back to list */}
         <button
           onClick={() => navigate('/ai/colleagues')}
-          className="inline-flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400
-            hover:text-gray-700 dark:hover:text-gray-200 mb-6 transition-colors"
+          className="mb-6 inline-flex items-center gap-1.5 text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
           data-testid="wizard-back-to-list"
         >
           <ArrowLeftIcon className="h-4 w-4" />
@@ -769,7 +825,7 @@ export default function AIColleagueNewPage() {
 
         {/* Template Picker (step 0 of the overall flow) */}
         {showTemplatePicker ? (
-          <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-6 sm:p-8">
+          <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8 dark:border-gray-700 dark:bg-gray-900">
             <TemplateSelector onSelect={handleSelectTemplate} onSkip={handleSkipTemplate} t={t} />
           </div>
         ) : (
@@ -778,19 +834,17 @@ export default function AIColleagueNewPage() {
             <StepIndicator currentStep={step} t={t} />
 
             {/* Step Content */}
-            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-6 sm:p-8">
+            <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8 dark:border-gray-700 dark:bg-gray-900">
               {step === 0 && <StepIdentity data={data} onChange={onChange} errors={errors} t={t} />}
               {step === 1 && <StepPersonality data={data} onChange={onChange} t={t} />}
               {step === 2 && <StepReview data={data} t={t} />}
 
               {/* Navigation Buttons */}
-              <div className="flex items-center justify-between mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+              <div className="mt-8 flex items-center justify-between border-t border-gray-200 pt-6 dark:border-gray-700">
                 <div>
                   <button
                     onClick={handleBack}
-                    className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-medium
-                      text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800
-                      border border-gray-200 dark:border-gray-700 transition-colors"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
                     data-testid="wizard-btn-back"
                   >
                     <ArrowLeftIcon className="h-4 w-4" />
@@ -801,8 +855,7 @@ export default function AIColleagueNewPage() {
                   {step < 2 ? (
                     <button
                       onClick={handleNext}
-                      className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-lg text-sm font-medium
-                        bg-blue-600 text-white hover:bg-blue-700 shadow-sm transition-colors"
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700"
                       data-testid="wizard-btn-next"
                     >
                       {t('ai.wizard.btn.next', undefined, 'Next')}
@@ -812,16 +865,25 @@ export default function AIColleagueNewPage() {
                     <button
                       onClick={handleCreate}
                       disabled={creating}
-                      className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-lg text-sm font-medium
-                        bg-blue-600 text-white hover:bg-blue-700 shadow-sm transition-colors
-                        disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                       data-testid="wizard-btn-create"
                     >
                       {creating ? (
                         <>
-                          <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                          <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                            <circle
+                              className="opacity-25"
+                              cx="12"
+                              cy="12"
+                              r="10"
+                              stroke="currentColor"
+                              strokeWidth="4"
+                            />
+                            <path
+                              className="opacity-75"
+                              fill="currentColor"
+                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                            />
                           </svg>
                           {t('ai.wizard.btn.creating', undefined, 'Creating...')}
                         </>

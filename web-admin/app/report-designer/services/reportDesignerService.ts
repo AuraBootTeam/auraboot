@@ -17,8 +17,8 @@ interface ApiResponse<T> {
 interface PageSchemaRecord {
   pid: string;
   pageKey: string;
-  pageCategory: string;
   kind: string;
+  profile?: string;
   dslSchema: string; // JSON string of ReportDsl
   title?: string;
   status?: string;
@@ -86,13 +86,14 @@ export const reportDesignerService = {
 
     const payload = {
       pageKey,
-      pageType: 'custom',
-      pageCategory: 'report',
-      kind: 'Report',
+      kind: 'composite',
+      profile: 'report',
       title: report.title,
       name: `${report.title} (${suffix})`,
+      blocks: [],
       dslSchema: report as unknown as Record<string, unknown>,
       status: 'draft',
+      semver: '0.1.0',
     };
 
     if (existingPid) {

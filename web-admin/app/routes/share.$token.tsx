@@ -76,8 +76,18 @@ export default function SharedViewPage() {
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <div className="w-full max-w-sm rounded-xl border border-gray-200 bg-white p-6 shadow-lg">
           <div className="mb-4 text-center">
-            <svg className="mx-auto h-10 w-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            <svg
+              className="mx-auto h-10 w-10 text-gray-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+              />
             </svg>
             <h2 className="mt-2 text-lg font-semibold text-gray-900">Password Required</h2>
             <p className="mt-1 text-sm text-gray-500">This shared view is password protected.</p>
@@ -116,8 +126,18 @@ export default function SharedViewPage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <div className="text-center">
-          <svg className="mx-auto h-12 w-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+          <svg
+            className="mx-auto h-12 w-12 text-gray-300"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.5}
+              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"
+            />
           </svg>
           <h2 className="mt-3 text-lg font-semibold text-gray-700">{error}</h2>
           <p className="mt-1 text-sm text-gray-400">The link may have expired or been revoked.</p>

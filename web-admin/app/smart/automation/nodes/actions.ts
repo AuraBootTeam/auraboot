@@ -1,17 +1,6 @@
 // web-admin/app/smart/automation/nodes/actions.ts
 import type { FlowNodeDefinition } from '~/flow-designer-sdk';
 
-/**
- * Automation Action Node Definitions
- *
- * 6 action types matching backend framework:
- * - UPDATE_RECORD: Update the triggering record or related records
- * - CREATE_RECORD: Create new records
- * - SEND_NOTIFICATION: Send notification to users
- * - EXECUTE_COMMAND: Execute a defined command
- * - CALL_API: Call external API
- * - SEND_WEBHOOK: Send webhook to external system
- */
 export const actionNodes: FlowNodeDefinition[] = [
   {
     type: 'action-update-record',
@@ -25,6 +14,7 @@ export const actionNodes: FlowNodeDefinition[] = [
         label: '$i18n:automation.field.modelCode',
         type: 'model-select',
         required: true,
+        group: 'target',
       },
       {
         key: 'recordId',
@@ -33,6 +23,8 @@ export const actionNodes: FlowNodeDefinition[] = [
         required: true,
         placeholder: '${trigger.recordId}',
         description: '$i18n:automation.field.recordId.desc',
+        dependsOn: { field: 'modelCode' },
+        group: 'target',
       },
       {
         key: 'fields',
@@ -41,6 +33,8 @@ export const actionNodes: FlowNodeDefinition[] = [
         required: true,
         placeholder: '{ "status": "completed" }',
         description: '$i18n:automation.field.updateFields.desc',
+        dependsOn: { field: 'modelCode' },
+        group: 'fields_mapping',
       },
     ],
     defaultConfig: {
@@ -59,6 +53,7 @@ export const actionNodes: FlowNodeDefinition[] = [
         label: '$i18n:automation.field.modelCode',
         type: 'model-select',
         required: true,
+        group: 'target',
       },
       {
         key: 'fields',
@@ -67,6 +62,8 @@ export const actionNodes: FlowNodeDefinition[] = [
         required: true,
         placeholder: '{ "name": "${trigger.name}", "status": "new" }',
         description: '$i18n:automation.field.createFields.desc',
+        dependsOn: { field: 'modelCode' },
+        group: 'fields_mapping',
       },
     ],
     defaultConfig: {
@@ -91,6 +88,7 @@ export const actionNodes: FlowNodeDefinition[] = [
           { label: '$i18n:automation.field.notificationType.push', value: 'push' },
           { label: '$i18n:automation.field.notificationType.inApp', value: 'in_app' },
         ],
+        group: 'notification',
       },
       {
         key: 'title',
@@ -98,12 +96,14 @@ export const actionNodes: FlowNodeDefinition[] = [
         type: 'expression',
         required: true,
         placeholder: 'Task ${trigger.name} completed',
+        group: 'notification',
       },
       {
         key: 'content',
         label: '$i18n:automation.field.notificationContent',
         type: 'expression',
         required: true,
+        group: 'notification',
       },
       {
         key: 'recipients',
@@ -112,6 +112,7 @@ export const actionNodes: FlowNodeDefinition[] = [
         required: true,
         placeholder: '${trigger.assignee}',
         description: '$i18n:automation.field.recipients.desc',
+        group: 'notification',
       },
     ],
     defaultConfig: {
@@ -132,6 +133,7 @@ export const actionNodes: FlowNodeDefinition[] = [
         type: 'command-select',
         required: true,
         description: '$i18n:automation.field.commandCode.desc',
+        group: 'target',
       },
       {
         key: 'params',
@@ -139,6 +141,7 @@ export const actionNodes: FlowNodeDefinition[] = [
         type: 'json',
         placeholder: '{ "recordId": "${trigger.recordId}" }',
         description: '$i18n:automation.field.commandParams.desc',
+        group: 'fields_mapping',
       },
     ],
     defaultConfig: {
@@ -158,6 +161,7 @@ export const actionNodes: FlowNodeDefinition[] = [
         type: 'expression',
         required: true,
         placeholder: 'https://api.example.com/endpoint',
+        group: 'request',
       },
       {
         key: 'method',
@@ -165,24 +169,27 @@ export const actionNodes: FlowNodeDefinition[] = [
         type: 'select',
         required: true,
         options: [
-          { label: 'get', value: 'get' },
-          { label: 'post', value: 'post' },
-          { label: 'put', value: 'put' },
-          { label: 'patch', value: 'patch' },
-          { label: 'delete', value: 'delete' },
+          { label: 'GET', value: 'get' },
+          { label: 'POST', value: 'post' },
+          { label: 'PUT', value: 'put' },
+          { label: 'PATCH', value: 'patch' },
+          { label: 'DELETE', value: 'delete' },
         ],
+        group: 'request',
       },
       {
         key: 'headers',
         label: '$i18n:automation.field.httpHeaders',
         type: 'json',
         placeholder: '{ "Authorization": "Bearer ${secret.apiToken}" }',
+        group: 'advanced',
       },
       {
         key: 'body',
         label: '$i18n:automation.field.httpBody',
         type: 'json',
         placeholder: '{ "data": "${trigger.record}" }',
+        group: 'request',
       },
     ],
     defaultConfig: {
@@ -203,6 +210,7 @@ export const actionNodes: FlowNodeDefinition[] = [
         type: 'text',
         required: true,
         placeholder: 'https://hooks.example.com/webhook',
+        group: 'target',
       },
       {
         key: 'payload',
@@ -210,6 +218,7 @@ export const actionNodes: FlowNodeDefinition[] = [
         type: 'json',
         required: true,
         placeholder: '{ "event": "record_updated", "data": "${trigger.record}" }',
+        group: 'fields_mapping',
       },
     ],
     defaultConfig: {
@@ -228,6 +237,7 @@ export const actionNodes: FlowNodeDefinition[] = [
         label: '$i18n:automation.field.processKey',
         type: 'process-select',
         required: true,
+        group: 'process',
       },
       {
         key: 'businessKey',
@@ -235,6 +245,7 @@ export const actionNodes: FlowNodeDefinition[] = [
         type: 'expression',
         placeholder: '${trigger.recordId}',
         description: '$i18n:automation.field.businessKey.desc',
+        group: 'process',
       },
       {
         key: 'variables',
@@ -242,6 +253,7 @@ export const actionNodes: FlowNodeDefinition[] = [
         type: 'json',
         placeholder: '{ "assignee": "${trigger.assignee}" }',
         description: '$i18n:automation.field.processVariables.desc',
+        group: 'fields_mapping',
       },
     ],
     defaultConfig: {

@@ -12,7 +12,7 @@ import type { ModelTestConfig } from '../model-test-helper';
 
 export const E2ET_CUSTOMER_CONFIG: ModelTestConfig = {
   modelCode: 'e2et_customer',
-  pageKey: 'e2et-customer',
+  pageKey: 'e2et_customer',
   namespace: 'e2et',
   commands: {
     create: 'create_customer',

@@ -19,6 +19,11 @@ interface FlowStoreState {
   isDirty: boolean;
   validationResult: ValidationResult | null;
 
+  // Registry version — incremented after nodeRegistry.registerAll() so
+  // components that read from the registry (FlowPalette, FlowCanvas) re-render.
+  registryVersion: number;
+  bumpRegistryVersion: () => void;
+
   // Undo/Redo history
   history: FlowSnapshot[];
   historyIndex: number;
@@ -74,6 +79,8 @@ export const useFlowStore = create<FlowStoreState>((set, get) => {
     selectedNodeId: null,
     isDirty: false,
     validationResult: null,
+    registryVersion: 0,
+    bumpRegistryVersion: () => set((s) => ({ registryVersion: s.registryVersion + 1 })),
     history: [],
     historyIndex: -1,
 
@@ -192,10 +199,12 @@ export const useFlowStore = create<FlowStoreState>((set, get) => {
     },
 
     importData: (data) => {
-      const initialSnapshot = cloneSnapshot(data.nodes, data.edges);
+      const nodes = data?.nodes || [];
+      const edges = data?.edges || [];
+      const initialSnapshot = cloneSnapshot(nodes, edges);
       set({
-        nodes: data.nodes,
-        edges: data.edges,
+        nodes,
+        edges,
         selectedNodeId: null,
         isDirty: false,
         validationResult: null,

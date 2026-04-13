@@ -15,20 +15,21 @@
 
 import { test, expect } from '../../fixtures';
 import type { Page } from '@playwright/test';
+import { ensureFilterFormOpen } from '../helpers';
 
 test.describe('Dictionary Management @smoke', () => {
   async function runSearchAndWait(page: Page) {
     await page.getByTestId('filter-search').click();
-    await page.locator('.animate-spin').waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
+    await page
+      .locator('.animate-spin')
+      .waitFor({ state: 'hidden', timeout: 10000 })
+      .catch(() => {});
     const rows = page.locator('table tbody tr');
     await expect(rows.first()).toBeVisible({ timeout: 10000 });
     return rows;
   }
 
-  async function getColumnTexts(
-    page: Page,
-    columnIndex: number,
-  ) {
+  async function getColumnTexts(page: Page, columnIndex: number) {
     return page.locator(`table tbody tr td:nth-child(${columnIndex})`).allTextContents();
   }
 
@@ -39,6 +40,7 @@ test.describe('Dictionary Management @smoke', () => {
     // Wait for initial data to load
     const rows = page.locator('table tbody tr');
     await expect(rows.first()).toBeVisible({ timeout: 10000 });
+    await ensureFilterFormOpen(page);
   });
 
   test('should load dict list with data', async ({ page }) => {

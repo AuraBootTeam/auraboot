@@ -242,7 +242,7 @@ export default function NotificationCenter() {
       }
       if (notification.sourceType && notification.sourceId) {
         const sourceTypeLower = notification.sourceType.toLowerCase();
-        navigate(`/dynamic/${sourceTypeLower}/view/${notification.sourceId}`);
+        navigate(`/p/${sourceTypeLower}/view/${notification.sourceId}`);
       }
     },
     [navigate, markAsRead],

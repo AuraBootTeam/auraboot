@@ -34,7 +34,12 @@ export class PageDesignerPage extends BasePage {
   async openViaList(): Promise<boolean> {
     // Step 1: Prefer stable E2E fixture pages.
     // Prefer form/list fixtures first because they reliably contain selectable blocks.
-    const stablePageKeys = ['e2e_test_form', 'e2e_test_list', 'e2e_test_dashboard'];
+    const stablePageKeys = [
+      'e2e_test_form',
+      'e2e_test_list',
+      'e2e_test_dashboard',
+      'bpm_process_management_list',
+    ];
     for (const key of stablePageKeys) {
       try {
         const resp = await this.page.request.get(`/api/pages/key/${key}`);
@@ -45,12 +50,11 @@ export class PageDesignerPage extends BasePage {
           if (pageId) {
             await this.page.goto(`/page-designer/${pageId}`, { waitUntil: 'domcontentloaded' });
             await this.waitForLoad();
-            await this.page.locator('text=Loading page...').waitFor({ state: 'hidden', timeout: 30000 }).catch(() => null);
-            if (await this.saveButton.isVisible({ timeout: 15000 }).catch(() => false)) {
-              return true;
-            }
-            if (this.page.url().includes(`/page-designer/${pageId}`) &&
-              !(await this.page.getByText('Loading page...').isVisible({ timeout: 500 }).catch(() => false))) {
+            await this.page
+              .locator('text=Loading page...')
+              .waitFor({ state: 'hidden', timeout: 30000 })
+              .catch(() => null);
+            if (await this.canvas.isVisible({ timeout: 15000 }).catch(() => false)) {
               return true;
             }
           }
@@ -63,24 +67,25 @@ export class PageDesignerPage extends BasePage {
     // Step 2: Get first available page ID via API as a fallback.
     try {
       const resp = await this.page.request.get(
-        `/api/pages?current=1&size=1&keyword=e2e_test&sortField=updatedAt&sortDirection=DESC`
+        `/api/pages?current=1&size=20&sortField=updatedAt&sortDirection=DESC`,
       );
       if (resp.ok()) {
         const body = await resp.json();
         const rawData = body.data;
-        const pages = Array.isArray(rawData)
-          ? rawData
-          : rawData?.data || rawData?.records || [];
-        if (pages.length > 0) {
-          const pageId = pages[0].pid || pages[0].id;
+        const pages = Array.isArray(rawData) ? rawData : rawData?.data || rawData?.records || [];
+        const preferredPage =
+          pages.find((p: any) => String(p?.pageKey ?? '').startsWith('e2e_')) ??
+          pages.find((p: any) => p?.kind === 'composite' || p?.kind === 'list' || p?.kind === 'form') ??
+          pages[0];
+        if (preferredPage) {
+          const pageId = preferredPage.pid || preferredPage.id;
           await this.page.goto(`/page-designer/${pageId}`, { waitUntil: 'domcontentloaded' });
           await this.waitForLoad();
-          await this.page.locator('text=Loading page...').waitFor({ state: 'hidden', timeout: 30000 }).catch(() => null);
-          if (await this.saveButton.isVisible({ timeout: 15000 }).catch(() => false)) {
-            return true;
-          }
-          if (this.page.url().includes(`/page-designer/${pageId}`) &&
-            !(await this.page.getByText('Loading page...').isVisible({ timeout: 500 }).catch(() => false))) {
+          await this.page
+            .locator('text=Loading page...')
+            .waitFor({ state: 'hidden', timeout: 30000 })
+            .catch(() => null);
+          if (await this.canvas.isVisible({ timeout: 15000 }).catch(() => false)) {
             return true;
           }
         }
@@ -97,7 +102,10 @@ export class PageDesignerPage extends BasePage {
     const hasPages = await pageCount.isVisible({ timeout: 10000 }).catch(() => false);
 
     const pageCards = this.page.locator('main h3');
-    const hasCards = await pageCards.first().isVisible({ timeout: 10000 }).catch(() => false);
+    const hasCards = await pageCards
+      .first()
+      .isVisible({ timeout: 10000 })
+      .catch(() => false);
 
     if (!hasPages && !hasCards) {
       return false;
@@ -131,23 +139,37 @@ export class PageDesignerPage extends BasePage {
   }
 
   get saveButton(): Locator {
-    return this.page.locator('[data-testid="toolbar-save"], button:has-text("Save"), button:has-text("保存")').first();
+    return this.page
+      .locator('[data-testid="toolbar-save"], button:has-text("Save"), button:has-text("保存")')
+      .first();
   }
 
   get publishButton(): Locator {
-    return this.page.locator('[data-testid="toolbar-publish"], button:has-text("Publish"), button:has-text("发布")').first();
+    return this.page
+      .locator(
+        '[data-testid="toolbar-publish"], button:has-text("Publish"), button:has-text("发布")',
+      )
+      .first();
   }
 
   get previewButton(): Locator {
-    return this.page.locator('[data-testid="toolbar-preview"], button:has-text("Preview"), button:has-text("预览")').first();
+    return this.page
+      .locator(
+        '[data-testid="toolbar-preview"], button:has-text("Preview"), button:has-text("预览")',
+      )
+      .first();
   }
 
   get undoButton(): Locator {
-    return this.page.locator('[data-testid="toolbar-undo"], button[title*="Undo"], button:has-text("撤销")').first();
+    return this.page
+      .locator('[data-testid="toolbar-undo"], button[title*="Undo"], button:has-text("撤销")')
+      .first();
   }
 
   get redoButton(): Locator {
-    return this.page.locator('[data-testid="toolbar-redo"], button[title*="Redo"], button:has-text("重做")').first();
+    return this.page
+      .locator('[data-testid="toolbar-redo"], button[title*="Redo"], button:has-text("重做")')
+      .first();
   }
 
   get zoomInButton(): Locator {
@@ -183,15 +205,21 @@ export class PageDesignerPage extends BasePage {
   // --- Left Panel Tabs ---
 
   get fieldsTab(): Locator {
-    return this.page.locator('[data-testid="designer-tab-fields"], button:has-text("Fields")').first();
+    return this.page
+      .locator('[data-testid="designer-tab-fields"], button:has-text("Fields"), button:has-text("字段")')
+      .first();
   }
 
   get blocksTab(): Locator {
-    return this.page.locator('[data-testid="designer-tab-blocks"], button:has-text("Blocks")').first();
+    return this.page
+      .locator('[data-testid="designer-tab-blocks"], button:has-text("Blocks"), button:has-text("组件")')
+      .first();
   }
 
   get outlineTab(): Locator {
-    return this.page.locator('[data-testid="designer-tab-outline"], button:has-text("Outline")').first();
+    return this.page
+      .locator('[data-testid="designer-tab-outline"], button:has-text("Outline"), button:has-text("大纲")')
+      .first();
   }
 
   async clickFieldsTab(): Promise<void> {
@@ -251,12 +279,14 @@ export class PageDesignerPage extends BasePage {
   // --- Canvas ---
 
   get canvas(): Locator {
-    return this.page.locator('[data-testid="designer-canvas"]').first();
+    return this.page.locator('[data-testid="canvas-editor"], [data-testid="designer-canvas"]').first();
   }
 
   /** All sortable blocks on the canvas */
   get blocks(): Locator {
-    return this.page.locator('[aria-roledescription="sortable"], [roledescription="sortable"]');
+    return this.page.locator(
+      '[data-testid="sortable-block"], [data-testid^="canvas-block-"], [aria-roledescription="sortable"], [roledescription="sortable"]',
+    );
   }
 
   /** Get a specific block by index */
@@ -282,7 +312,11 @@ export class PageDesignerPage extends BasePage {
   // --- Properties Panel ---
 
   get propertiesPanel(): Locator {
-    return this.page.locator('[data-testid="designer-properties-panel"], [data-testid="floors-properties-panel"], text=Select a block').first();
+    return this.page
+      .locator(
+        '[data-testid="designer-properties-panel"], [data-testid="floors-properties-panel"], [data-testid="block-config-panel"], text=Select a block',
+      )
+      .first();
   }
 
   get propertiesEmpty(): Locator {

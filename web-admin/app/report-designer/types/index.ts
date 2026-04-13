@@ -98,7 +98,7 @@ export type ReportBlock =
 
 export interface DataTableBlock {
   id: string;
-  blockType: 'data-table';
+  blockType: 'table';
   title?: string;
   dataSource: string;
   columns: ReportColumn[];

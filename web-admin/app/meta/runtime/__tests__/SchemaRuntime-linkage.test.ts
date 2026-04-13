@@ -21,32 +21,28 @@ const createManager = () => new DataSourceManager(createExpressionContext());
 
 function buildSchemaWithLinkage(): UnifiedSchema {
   return {
-    kind: 'Form',
+    kind: 'form',
     version: '1.0.0',
     id: 'linkage-integration-test',
     title: 'Linkage Integration Test',
     layout: {
-      areas: ['main'],
-      areasConfig: {
-        main: { type: 'grid', cols: 2, rowGap: 8, colGap: 8 },
-      },
+      type: 'grid',
+      cols: 2,
+      rowGap: 8,
+      colGap: 8,
     },
-    areas: {
-      main: {
-        blocks: [
-          {
-            id: 'block_form',
-            blockType: 'form-section',
-            fields: [
-              { field: 'category', label: 'Category', component: 'SmartSelect' },
-              { field: 'subcategory', label: 'Sub Category', component: 'SmartSelect' },
-              { field: 'details', label: 'Details', component: 'SmartInput' },
-              { field: 'reason', label: 'Reason', component: 'SmartInput' },
-            ],
-          },
+    blocks: [
+      {
+        id: 'block_form',
+        blockType: 'form-section',
+        fields: [
+          { field: 'category', label: 'Category', component: 'SmartSelect' },
+          { field: 'subcategory', label: 'Sub Category', component: 'SmartSelect' },
+          { field: 'details', label: 'Details', component: 'SmartInput' },
+          { field: 'reason', label: 'Reason', component: 'SmartInput' },
         ],
       },
-    },
+    ],
     linkageRules: [
       {
         id: 'rule-show-sub',
@@ -133,15 +129,15 @@ describe('SchemaRuntime + LinkageEngine integration', () => {
 
   it('does not initialize LinkageEngine when no linkageRules', () => {
     const schema: UnifiedSchema = {
-      kind: 'Form',
+      kind: 'form',
       version: '1.0.0',
       id: 'no-linkage-test',
       title: 'No Linkage',
       layout: {
-        areas: ['main'],
-        areasConfig: { main: { type: 'grid', cols: 1 } },
+        type: 'grid',
+        cols: 1,
       },
-      areas: { main: { blocks: [] } },
+      blocks: [],
     };
 
     const runtime = new SchemaRuntime({

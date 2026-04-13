@@ -42,9 +42,11 @@ test.describe('CC Contract Detail Tabs @critical', () => {
     try {
       // 1. Create and activate project
       const proj = await executeCommandViaApi(
-        page, 'pm:create_project',
+        page,
+        'pm:create_project',
         { pm_project_name: projectName, pm_planned_progress: 70 },
-        undefined, 'create',
+        undefined,
+        'create',
       );
       projectPid = proj.recordId;
       expect(projectPid).toBeTruthy();
@@ -52,7 +54,8 @@ test.describe('CC Contract Detail Tabs @critical', () => {
 
       // 2. Create contract → EXECUTING
       const contract = await executeCommandViaApi(
-        page, 'cc:create_contract',
+        page,
+        'cc:create_contract',
         {
           cc_contract_name: contractName,
           cc_contract_amount: 800000,
@@ -64,7 +67,8 @@ test.describe('CC Contract Detail Tabs @critical', () => {
           cc_start_date: dateOffsetStr(-60),
           cc_end_date: dateOffsetStr(120),
         },
-        undefined, 'create',
+        undefined,
+        'create',
       );
       contractPid = contract.recordId;
       expect(contractPid).toBeTruthy();
@@ -75,13 +79,15 @@ test.describe('CC Contract Detail Tabs @critical', () => {
 
       // 3. Budget with lines
       const budget = await executeCommandViaApi(
-        page, 'cc:create_budget',
+        page,
+        'cc:create_budget',
         {
           cc_budget_name: `Budget_${uid}`,
           cc_budget_project_id: projectPid,
           cc_budget_total_amount: 500000,
         },
-        undefined, 'create',
+        undefined,
+        'create',
       );
       budgetPid = budget.recordId;
       expect(budgetPid).toBeTruthy();
@@ -94,9 +100,11 @@ test.describe('CC Contract Detail Tabs @critical', () => {
         { cc_bl_category: 'expense', cc_bl_amount: 120000 },
       ]) {
         await executeCommandViaApi(
-          page, 'cc:create_budget_line',
+          page,
+          'cc:create_budget_line',
           { cc_bl_budget_id: budgetPid, ...line },
-          undefined, 'create',
+          undefined,
+          'create',
         );
       }
 
@@ -107,49 +115,57 @@ test.describe('CC Contract Detail Tabs @critical', () => {
         { cc_ac_category: 'expense', cc_ac_amount: 90000, cc_ac_date: dateOffsetStr(-5) },
       ]) {
         await executeCommandViaApi(
-          page, 'cc:create_actual_cost',
+          page,
+          'cc:create_actual_cost',
           { cc_ac_project_id: projectPid, cc_ac_budget_id: budgetPid, ...cost },
-          undefined, 'create',
+          undefined,
+          'create',
         );
       }
 
       // 5. Payment plans (2 pending, will test update/delete preconditions)
       const pp1 = await executeCommandViaApi(
-        page, 'cc:create_payment_plan',
+        page,
+        'cc:create_payment_plan',
         {
           cc_pp_contract_id: contractPid,
           cc_pp_period: 1,
           cc_pp_plan_date: dateOffsetStr(-10),
           cc_pp_plan_amount: 300000,
         },
-        undefined, 'create',
+        undefined,
+        'create',
       );
       paymentPlanPid = pp1.recordId;
       expect(paymentPlanPid).toBeTruthy();
 
       const pp2 = await executeCommandViaApi(
-        page, 'cc:create_payment_plan',
+        page,
+        'cc:create_payment_plan',
         {
           cc_pp_contract_id: contractPid,
           cc_pp_period: 2,
           cc_pp_plan_date: dateOffsetStr(60),
           cc_pp_plan_amount: 500000,
         },
-        undefined, 'create',
+        undefined,
+        'create',
       );
       paymentPlan2Pid = pp2.recordId;
       expect(paymentPlan2Pid).toBeTruthy();
 
       // 6. Contract change record
       await executeCommandViaApi(
-        page, 'cc:create_change',
+        page,
+        'cc:create_change',
         {
           cc_change_contract_id: contractPid,
           cc_change_type: 'scope_add',
           cc_change_amount: 100000,
           cc_change_reason: `E2E test change ${uid}`,
         },
-        undefined, 'create',
+        undefined,
+        'create',
       );
     } finally {
       await ctx.close();
@@ -172,15 +188,16 @@ test.describe('CC Contract Detail Tabs @critical', () => {
     await expect(page).toHaveURL(/\/contract-cost\/contracts/, { timeout: 10000 });
 
     // Wait for list to load
-    await page.waitForResponse(
-      (r) => r.url().includes('/list') && r.status() === 200,
-      { timeout: 10000 },
-    ).catch(() => null);
+    await page
+      .waitForResponse((r) => r.url().includes('/list') && r.status() === 200, { timeout: 10000 })
+      .catch(() => null);
 
     // Find our contract row and click the detail action (Eye icon)
     const row = page.locator('tbody tr', { hasText: contractName }).first();
     await row.waitFor({ state: 'visible', timeout: 10000 });
 
+    // Hover row to reveal action buttons (opacity-0 → opacity-100 via group-hover)
+    await row.hover();
     // Prefer the explicit detail action. Some list rows require horizontal scroll
     // before the action column becomes interactable.
     const detailBtn = row.locator('[data-testid="row-action-detail"]').first();
@@ -193,12 +210,12 @@ test.describe('CC Contract Detail Tabs @critical', () => {
     }
 
     // If row interaction does not navigate, go to the known detail route after menu-driven entry.
-    const detailUrlPattern = /\/dynamic\/cc_contract\/view\/|\/contract-cost\/contracts\//;
+    const detailUrlPattern = /\/p\/cc_contract\/view\/|\/contract-cost\/contracts\//;
     try {
       await expect(page).toHaveURL(detailUrlPattern, { timeout: 10000 });
     } catch {
-      await page.goto(`/dynamic/cc_contract/view/${contractPid}`, { waitUntil: 'load' });
-      await expect(page).toHaveURL(/\/dynamic\/cc_contract\/view\//, { timeout: 10000 });
+      await page.goto(`/p/cc_contract/view/${contractPid}`, { waitUntil: 'load' });
+      await expect(page).toHaveURL(/\/p\/cc_contract\/view\//, { timeout: 10000 });
     }
   }
 
@@ -222,7 +239,9 @@ test.describe('CC Contract Detail Tabs @critical', () => {
     await navigateToContractDetail(page);
 
     // Payment Plans is in the "Financial" tab — click it using the tab navigation area
-    const tabNav = page.locator('nav').filter({ has: page.locator('button', { hasText: /概览|Overview/ }) });
+    const tabNav = page
+      .locator('nav')
+      .filter({ has: page.locator('button', { hasText: /概览|Overview/ }) });
     const financialTab = tabNav.locator('button').filter({ hasText: /财务|Financial/ });
     await expect(financialTab).toBeVisible({ timeout: 10000 });
     await financialTab.click();
@@ -232,15 +251,29 @@ test.describe('CC Contract Detail Tabs @critical', () => {
     await expect(ppSection.first()).toBeVisible({ timeout: 10000 });
 
     // Sub-table should have rows (we created 2 payment plans)
-    const subTable = ppSection.first().locator('..').locator('table').first()
-      .or(page.locator('.sub-table-section').filter({ hasText: /回款计划|Payment Plans/ }).locator('table'));
+    const subTable = ppSection
+      .first()
+      .locator('..')
+      .locator('table')
+      .first()
+      .or(
+        page
+          .locator('.sub-table-section')
+          .filter({ hasText: /回款计划|Payment Plans/ })
+          .locator('table'),
+      );
 
     if (await subTable.isVisible({ timeout: 5000 }).catch(() => false)) {
       const rows = subTable.locator('tbody tr');
-      expect(await rows.count(), 'Payment plans table should have at least 2 rows').toBeGreaterThanOrEqual(2);
+      expect(
+        await rows.count(),
+        'Payment plans table should have at least 2 rows',
+      ).toBeGreaterThanOrEqual(2);
     } else {
       // Verify the section content is rendered (might be different DOM structure)
-      const sectionContainer = page.locator('.sub-table-section').filter({ hasText: /回款|Payment/ });
+      const sectionContainer = page
+        .locator('.sub-table-section')
+        .filter({ hasText: /回款|Payment/ });
       await expect(sectionContainer.first()).toBeVisible({ timeout: 10000 });
     }
   });
@@ -252,7 +285,9 @@ test.describe('CC Contract Detail Tabs @critical', () => {
     await navigateToContractDetail(page);
 
     // Click "变更/Changes" tab (same pattern as CD-02)
-    const tabNav = page.locator('nav').filter({ has: page.locator('button', { hasText: /概览|Overview/ }) });
+    const tabNav = page
+      .locator('nav')
+      .filter({ has: page.locator('button', { hasText: /概览|Overview/ }) });
     const changesTab = tabNav.locator('button').filter({ hasText: /^变更$/ });
     await expect(changesTab).toBeVisible({ timeout: 10000 });
     await changesTab.click();
@@ -262,12 +297,17 @@ test.describe('CC Contract Detail Tabs @critical', () => {
     await expect(changeSection.first()).toBeVisible({ timeout: 10000 });
 
     // Should have at least 1 change record (we created one)
-    const sectionContainer = page.locator('.sub-table-section, [class*="sub-table"]').filter({ hasText: /变更记录|Change Records/ });
+    const sectionContainer = page
+      .locator('.sub-table-section, [class*="sub-table"]')
+      .filter({ hasText: /变更记录|Change Records/ });
     if (await sectionContainer.isVisible({ timeout: 5000 }).catch(() => false)) {
       const table = sectionContainer.locator('table');
       if (await table.isVisible({ timeout: 3000 }).catch(() => false)) {
         const rows = table.locator('tbody tr');
-        expect(await rows.count(), 'Change records should have at least 1 row').toBeGreaterThanOrEqual(1);
+        expect(
+          await rows.count(),
+          'Change records should have at least 1 row',
+        ).toBeGreaterThanOrEqual(1);
       }
     }
   });
@@ -290,7 +330,9 @@ test.describe('CC Contract Detail Tabs @critical', () => {
     await navigateToContractDetail(page);
 
     // Click "成本/Costs" tab (linked costs is under this tab)
-    const tabNav = page.locator('nav').filter({ has: page.locator('button', { hasText: /概览|Overview/ }) });
+    const tabNav = page
+      .locator('nav')
+      .filter({ has: page.locator('button', { hasText: /概览|Overview/ }) });
     const costsTab = tabNav.locator('button').filter({ hasText: /^成本$/ });
     await expect(costsTab).toBeVisible({ timeout: 10000 });
     await costsTab.click();
@@ -300,11 +342,15 @@ test.describe('CC Contract Detail Tabs @critical', () => {
     await expect(costSection.first()).toBeVisible({ timeout: 10000 });
 
     // Sub-table should have data rows (3 cost categories from seed data)
-    const sectionContainer = page.locator('.sub-table-section').filter({ hasText: /成本构成|Cost Breakdown/ });
+    const sectionContainer = page
+      .locator('.sub-table-section')
+      .filter({ hasText: /成本构成|Cost Breakdown/ });
     const table = sectionContainer.locator('table');
     await expect(table).toBeVisible({ timeout: 5000 });
     const rows = table.locator('tbody tr');
-    expect(await rows.count(), 'Linked costs table should have cost category rows').toBeGreaterThan(0);
+    expect(await rows.count(), 'Linked costs table should have cost category rows').toBeGreaterThan(
+      0,
+    );
   });
 
   // =========================================================================
@@ -313,9 +359,11 @@ test.describe('CC Contract Detail Tabs @critical', () => {
   test('CD-05: Payment plan update succeeds for pending plan', async ({ page }) => {
     // Update plan amount (pending → should succeed)
     const result = await executeCommandViaApi(
-      page, 'cc:update_payment_plan',
+      page,
+      'cc:update_payment_plan',
       { cc_pp_plan_amount: 350000, cc_pp_remark: `Updated by E2E ${uid}` },
-      paymentPlan2Pid, 'update',
+      paymentPlan2Pid,
+      'update',
     );
     expect(result.code).toBe('0');
   });
@@ -326,21 +374,26 @@ test.describe('CC Contract Detail Tabs @critical', () => {
   test('CD-06: Payment plan delete succeeds for pending plan', async ({ page }) => {
     // First create a plan to delete
     const toDelete = await executeCommandViaApi(
-      page, 'cc:create_payment_plan',
+      page,
+      'cc:create_payment_plan',
       {
         cc_pp_contract_id: contractPid,
         cc_pp_period: 9,
         cc_pp_plan_date: dateOffsetStr(180),
         cc_pp_plan_amount: 50000,
       },
-      undefined, 'create',
+      undefined,
+      'create',
     );
     expect(toDelete.recordId).toBeTruthy();
 
     // Delete it (pending → should succeed)
     const result = await executeCommandViaApi(
-      page, 'cc:delete_payment_plan', {},
-      toDelete.recordId, 'delete',
+      page,
+      'cc:delete_payment_plan',
+      {},
+      toDelete.recordId,
+      'delete',
     );
     expect(result.code).toBe('0');
   });
@@ -351,16 +404,20 @@ test.describe('CC Contract Detail Tabs @critical', () => {
   test('CD-07: Payment plan update blocked for RECEIVED plan', async ({ page }) => {
     // Transition plan 1: pending → RECEIVED
     await executeCommandViaApi(
-      page, 'cc:confirm_receipt',
+      page,
+      'cc:confirm_receipt',
       { cc_pp_actual_amount: 300000, cc_pp_actual_date: dateOffsetStr(0) },
-      paymentPlanPid, 'update',
+      paymentPlanPid,
+      'update',
     );
 
     // Now try to update — should fail (RECEIVED is not in fromStates)
     const result = await executeCommandViaApi(
-      page, 'cc:update_payment_plan',
+      page,
+      'cc:update_payment_plan',
       { cc_pp_plan_amount: 999999 },
-      paymentPlanPid, 'update',
+      paymentPlanPid,
+      'update',
       { allowHttpError: true },
     );
     // Command should be rejected (non-zero code or HTTP error)
@@ -380,7 +437,9 @@ test.describe('CC Contract Detail Tabs @critical', () => {
     expect(records.length, 'cc_profit_ranking should return at least 1 project').toBeGreaterThan(0);
 
     // At least one record should have profit data
-    const withProfit = records.find((r: any) => Number(r.profit_amount) !== 0 || Number(r.profit_rate) !== 0);
+    const withProfit = records.find(
+      (r: any) => Number(r.profit_amount) !== 0 || Number(r.profit_rate) !== 0,
+    );
     expect(withProfit, 'At least one project should have profit data').toBeTruthy();
   });
 
@@ -395,7 +454,9 @@ test.describe('CC Contract Detail Tabs @critical', () => {
     const body = await nqResp.json();
     const records: any[] = body?.data?.records ?? [];
     // We created projects with overdue payments and over-budget costs → should generate risks
-    expect(records.length, 'cc_risk_projects should return at least 1 risk').toBeGreaterThanOrEqual(0);
+    expect(records.length, 'cc_risk_projects should return at least 1 risk').toBeGreaterThanOrEqual(
+      0,
+    );
     // If records exist, verify structure
     if (records.length > 0) {
       expect(records[0]).toHaveProperty('project_name');
@@ -433,7 +494,10 @@ test.describe('CC Contract Detail Tabs @critical', () => {
     expect(nqResp.ok()).toBe(true);
     const body = await nqResp.json();
     const records: any[] = body?.data?.records ?? [];
-    expect(records.length, 'cc_monthly_cost_trend should return data for our project').toBeGreaterThan(0);
+    expect(
+      records.length,
+      'cc_monthly_cost_trend should return data for our project',
+    ).toBeGreaterThan(0);
   });
 
   // =========================================================================

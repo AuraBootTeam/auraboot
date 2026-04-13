@@ -37,9 +37,10 @@ test.describe('Logout Functionality', () => {
 
     // Verify we're on a logged-out state (logout page, login page, or home)
     const postLogoutUrl = page.url();
-    const loggedOut = postLogoutUrl.includes('login')
-      || postLogoutUrl.includes('logout')
-      || postLogoutUrl.endsWith('/');
+    const loggedOut =
+      postLogoutUrl.includes('login') ||
+      postLogoutUrl.includes('logout') ||
+      postLogoutUrl.endsWith('/');
     expect(loggedOut).toBe(true);
   });
 
@@ -73,7 +74,10 @@ test.describe('Logout Functionality', () => {
    * LO-003: Protected route redirect after logout
    * Verify that accessing protected routes after logout redirects to login
    */
-  test('LO-003: should redirect to login when accessing protected route after logout', async ({ page, context }) => {
+  test('LO-003: should redirect to login when accessing protected route after logout', async ({
+    page,
+    context,
+  }) => {
     // Clear all cookies to simulate logged out state
     await context.clearCookies();
 

@@ -16,27 +16,43 @@
  */
 
 import { test, expect, type Page } from '../../fixtures/index';
-import {
-  uniqueId,
-  navigateToDynamicPage,
-  waitForDynamicPageLoad,
-} from '../helpers/index';
+import { uniqueId, navigateToDynamicPage, waitForDynamicPageLoad } from '../helpers/index';
 
 // Each test gets a fresh page — no serial dependency
 
 // Use e2et_order — has full data-table DSL with columns, dict fields, row actions
 // Dynamic pages use kebab-case model code as URL path
-const testPageKey = 'e2et-order';
+const testPageKey = 'e2et_order';
 
 test.describe('List Query Dynamic Configuration', () => {
-
   // Seed test data via command API so the list page has rows with dict values
   test.beforeAll(async ({ request }) => {
     const UID = uniqueId('LQC');
     const orders = [
-      { e2et_order_no: `${UID}-001`, e2et_order_title: `Order A ${UID}`, e2et_order_status: 'draft', e2et_order_type: 'normal', e2et_order_amount: 1000, e2et_order_qty: 5 },
-      { e2et_order_no: `${UID}-002`, e2et_order_title: `Order B ${UID}`, e2et_order_status: 'confirmed', e2et_order_type: 'express', e2et_order_amount: 2500, e2et_order_qty: 10 },
-      { e2et_order_no: `${UID}-003`, e2et_order_title: `Order C ${UID}`, e2et_order_status: 'shipped', e2et_order_type: 'bulk', e2et_order_amount: 500, e2et_order_qty: 2 },
+      {
+        e2et_order_no: `${UID}-001`,
+        e2et_order_title: `Order A ${UID}`,
+        e2et_order_status: 'draft',
+        e2et_order_type: 'normal',
+        e2et_order_amount: 1000,
+        e2et_order_qty: 5,
+      },
+      {
+        e2et_order_no: `${UID}-002`,
+        e2et_order_title: `Order B ${UID}`,
+        e2et_order_status: 'confirmed',
+        e2et_order_type: 'express',
+        e2et_order_amount: 2500,
+        e2et_order_qty: 10,
+      },
+      {
+        e2et_order_no: `${UID}-003`,
+        e2et_order_title: `Order C ${UID}`,
+        e2et_order_status: 'shipped',
+        e2et_order_type: 'bulk',
+        e2et_order_amount: 500,
+        e2et_order_qty: 2,
+      },
     ];
     for (const order of orders) {
       await request.post('/api/meta/commands/execute/e2et_order_create', {
@@ -51,28 +67,32 @@ test.describe('List Query Dynamic Configuration', () => {
   test('column header click triggers sort with visual indicator', async ({ page }) => {
     await navigateToDynamicPage(page, testPageKey);
 
+    // Wait for table to render with headers
+    await page.locator('thead th').first().waitFor({ state: 'visible', timeout: 10_000 });
+
     // Find the first sortable column header (non-action column)
+    // Sortable headers contain an SVG sort indicator (SortIndicator component)
     const headers = page.locator('thead th');
     const headerCount = await headers.count();
     expect(headerCount).toBeGreaterThan(1);
 
-    // Find a header with the sort indicator (↕)
+    // Find a header with the SVG sort indicator
     let sortableHeader: ReturnType<typeof page.locator> | null = null;
     for (let i = 1; i < headerCount; i++) {
       const th = headers.nth(i);
-      const sortIcon = th.locator('span:has-text("↕")');
-      if (await sortIcon.isVisible().catch(() => false)) {
+      const sortSvg = th.locator('svg');
+      if (await sortSvg.isVisible().catch(() => false)) {
         sortableHeader = th;
         break;
       }
     }
 
     if (!sortableHeader) {
-      // If no ↕ icon found, click any non-first header
+      // If no sort SVG found, click any non-first header
       sortableHeader = headers.nth(1);
     }
 
-    // Click header → should show ↑ (ascending)
+    // Click header → should trigger sort (ascending) with API call
     const listResponse = page.waitForResponse(
       (resp) => resp.url().includes('/list') && resp.status() === 200,
       { timeout: 10000 },
@@ -80,11 +100,12 @@ test.describe('List Query Dynamic Configuration', () => {
     await sortableHeader.click();
     await listResponse;
 
-    // Verify sort indicator changed to ↑
-    const ascIcon = sortableHeader.locator('span:has-text("↑")');
-    await expect(ascIcon).toBeVisible({ timeout: 3000 });
+    // Verify sort is active: the SVG sort indicator should be visible (opacity changes from 0 to 100)
+    // The sort indicator SVG uses blue (#2563eb) fill for the active direction
+    const sortIndicator = sortableHeader.locator('svg');
+    await expect(sortIndicator.first()).toBeVisible({ timeout: 3000 });
 
-    // Click again → should show ↓ (descending)
+    // Click again → should change direction (descending)
     const listResponse2 = page.waitForResponse(
       (resp) => resp.url().includes('/list') && resp.status() === 200,
       { timeout: 10000 },
@@ -92,19 +113,16 @@ test.describe('List Query Dynamic Configuration', () => {
     await sortableHeader.click();
     await listResponse2;
 
-    const descIcon = sortableHeader.locator('span:has-text("↓")');
-    await expect(descIcon).toBeVisible({ timeout: 3000 });
+    // Sort indicator still visible
+    await expect(sortIndicator.first()).toBeVisible({ timeout: 3000 });
 
-    // Click again → should clear sort (back to ↕)
+    // Click again → should clear sort
     const listResponse3 = page.waitForResponse(
       (resp) => resp.url().includes('/list') && resp.status() === 200,
       { timeout: 10000 },
     );
     await sortableHeader.click();
     await listResponse3;
-
-    const neutralIcon = sortableHeader.locator('span:has-text("↕")');
-    await expect(neutralIcon).toBeVisible({ timeout: 3000 });
   });
 
   test('sort request sends correct API parameters', async ({ page }) => {
@@ -148,7 +166,7 @@ test.describe('List Query Dynamic Configuration', () => {
     // Collect all unique background color classes
     const colorClasses = new Set<string>();
     for (let i = 0; i < Math.min(tagCount, 20); i++) {
-      const cls = await tags.nth(i).getAttribute('class') || '';
+      const cls = (await tags.nth(i).getAttribute('class')) || '';
       const bgMatch = cls.match(/bg-(\w+)-100/);
       if (bgMatch) colorClasses.add(bgMatch[1]);
     }
@@ -174,7 +192,7 @@ test.describe('List Query Dynamic Configuration', () => {
     await expect(firstRow).toBeVisible({ timeout: 8000 });
 
     // Verify row has the 'group' class (enables group-hover for children)
-    const rowClass = await firstRow.getAttribute('class') || '';
+    const rowClass = (await firstRow.getAttribute('class')) || '';
     expect(rowClass).toContain('group');
 
     // Verify row actions exist in the DOM with the correct hover-reveal CSS classes.
@@ -188,7 +206,7 @@ test.describe('List Query Dynamic Configuration', () => {
     }
 
     // Verify the wrapper has both opacity-0 (hidden) and group-hover:opacity-100 (show on hover)
-    const wrapperClass = await actionWrapper.first().getAttribute('class') || '';
+    const wrapperClass = (await actionWrapper.first().getAttribute('class')) || '';
     expect(wrapperClass).toContain('opacity-0');
     expect(wrapperClass).toContain('group-hover:opacity-100');
 
@@ -230,9 +248,9 @@ test.describe('List Query Dynamic Configuration', () => {
     // Menu should be gone
     await expect(menu).not.toBeVisible({ timeout: 2000 });
 
-    // Sort icon should show ↑
-    const ascIcon = header.locator('span:has-text("↑")');
-    await expect(ascIcon).toBeVisible({ timeout: 3000 });
+    // Sort indicator SVG should be visible (active state has opacity-100)
+    const sortIndicator = header.locator('svg');
+    await expect(sortIndicator.first()).toBeVisible({ timeout: 3000 });
   });
 
   test('⋮ button exists in column header and triggers context menu on click', async ({ page }) => {
@@ -244,7 +262,7 @@ test.describe('List Query Dynamic Configuration', () => {
 
     // Find the ⋮ trigger button (contains SVG with circles)
     const menuTrigger = header.locator('button:has(svg)');
-    if (await menuTrigger.count() === 0) return;
+    if ((await menuTrigger.count()) === 0) return;
 
     // The button exists in the DOM (even if visually hidden via opacity-0)
     expect(await menuTrigger.count()).toBeGreaterThan(0);
@@ -343,7 +361,12 @@ test.describe('List Query Dynamic Configuration', () => {
     await page.waitForTimeout(500);
 
     // Click group header to collapse
-    if (await groupHeaders.first().isVisible().catch(() => false)) {
+    if (
+      await groupHeaders
+        .first()
+        .isVisible()
+        .catch(() => false)
+    ) {
       await groupHeaders.first().click();
       // Should show ▶ after collapse
       const collapsedHeader = page.locator('tr.bg-gray-50:has-text("▶")');

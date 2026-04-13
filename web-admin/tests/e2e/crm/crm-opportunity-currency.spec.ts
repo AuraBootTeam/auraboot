@@ -24,7 +24,13 @@
  */
 
 import { test, expect } from '../../fixtures';
-import { uniqueId, executeCommandViaApi, todayStr } from '../helpers/index';
+import {
+  uniqueId,
+  executeCommandViaApi,
+  todayStr,
+  ensureFilterFormOpen,
+  waitForFormReady,
+} from '../helpers/index';
 
 const MODEL_CODE = 'crm_opportunity';
 const PAGE_KEY = 'crm-opportunity';
@@ -107,54 +113,83 @@ test.describe('CRM Opportunity Multi-Currency @smoke', () => {
       });
 
       // Create a shared account to link opportunities
-      const accResult = await executeCommandViaApi(page, 'crm:create_account', {
-        crm_acc_name: `CurTestAcct_${UID}`,
-        crm_acc_industry: 'technology',
-        crm_acc_status: 'active',
-      }, undefined, 'create');
+      const accResult = await executeCommandViaApi(
+        page,
+        'crm:create_account',
+        {
+          crm_acc_name: `CurTestAcct_${UID}`,
+          crm_acc_industry: 'technology',
+          crm_acc_status: 'active',
+        },
+        undefined,
+        'create',
+      );
       accountPid = accResult.recordId;
 
       // OPP-CUR-01 seed: USD opportunity — expects CurrencyConversionHandler to fire
-      const usdResult = await executeCommandViaApi(page, 'crm:create_opportunity', {
-        crm_opp_name: USD_OPP_NAME,
-        crm_opp_account_id: accountPid,
-        crm_opp_stage: 'qualification',
-        crm_opp_expected_amount: 10000,
-        crm_opp_currency_code: 'usd',
-      }, undefined, 'create');
+      const usdResult = await executeCommandViaApi(
+        page,
+        'crm:create_opportunity',
+        {
+          crm_opp_name: USD_OPP_NAME,
+          crm_opp_account_id: accountPid,
+          crm_opp_stage: 'qualification',
+          crm_opp_expected_amount: 10000,
+          crm_opp_currency_code: 'usd',
+        },
+        undefined,
+        'create',
+      );
       usdOppPid = usdResult.recordId;
 
       // OPP-CUR-02 seed: EUR opportunity
-      const eurResult = await executeCommandViaApi(page, 'crm:create_opportunity', {
-        crm_opp_name: EUR_OPP_NAME,
-        crm_opp_account_id: accountPid,
-        crm_opp_stage: 'proposal',
-        crm_opp_expected_amount: 5000,
-        crm_opp_currency_code: 'eur',
-      }, undefined, 'create');
+      const eurResult = await executeCommandViaApi(
+        page,
+        'crm:create_opportunity',
+        {
+          crm_opp_name: EUR_OPP_NAME,
+          crm_opp_account_id: accountPid,
+          crm_opp_stage: 'proposal',
+          crm_opp_expected_amount: 5000,
+          crm_opp_currency_code: 'eur',
+        },
+        undefined,
+        'create',
+      );
       eurOppPid = eurResult.recordId;
 
       // OPP-CUR-03 seed: no currency code (domestic CNY deal)
-      const noResult = await executeCommandViaApi(page, 'crm:create_opportunity', {
-        crm_opp_name: CNY_OPP_NAME,
-        crm_opp_account_id: accountPid,
-        crm_opp_stage: 'discovery',
-        crm_opp_expected_amount: 80000,
-        // crm_opp_currency_code intentionally omitted
-      }, undefined, 'create');
+      const noResult = await executeCommandViaApi(
+        page,
+        'crm:create_opportunity',
+        {
+          crm_opp_name: CNY_OPP_NAME,
+          crm_opp_account_id: accountPid,
+          crm_opp_stage: 'discovery',
+          crm_opp_expected_amount: 80000,
+          // crm_opp_currency_code intentionally omitted
+        },
+        undefined,
+        'create',
+      );
       noCurrencyOppPid = noResult.recordId;
     } finally {
       await ctx.close();
     }
   });
 
-  async function ensureCurrency(page: import('@playwright/test').Page, payload: Record<string, unknown>) {
+  async function ensureCurrency(
+    page: import('@playwright/test').Page,
+    payload: Record<string, unknown>,
+  ) {
     const code = String(payload.fin_cur_code ?? '');
-    await executeCommandViaApi(page, 'fin:create_currency', payload, undefined, 'create', { allowHttpError: true });
+    await executeCommandViaApi(page, 'fin:create_currency', payload, undefined, 'create', {
+      allowHttpError: true,
+    });
     const resp = await page.request.get(
       `/api/dynamic/fin_currency/list?pageNum=1&pageSize=20&filters=${encodeURIComponent(
-        JSON.stringify([{ fieldName: 'fin_cur_code', operator: 'EQ', value: code }])
-      )}`
+        JSON.stringify([{ fieldName: 'fin_cur_code', operator: 'EQ', value: code }]),
+      )}`,
     );
     expect(resp.ok(), `Currency lookup failed for ${code}`).toBeTruthy();
     const body = await resp.json();
@@ -162,24 +197,32 @@ test.describe('CRM Opportunity Multi-Currency @smoke', () => {
     expect(records.length, `Currency ${code} must exist after setup`).toBeGreaterThan(0);
   }
 
-  async function ensureExchangeRate(page: import('@playwright/test').Page, payload: Record<string, unknown>) {
+  async function ensureExchangeRate(
+    page: import('@playwright/test').Page,
+    payload: Record<string, unknown>,
+  ) {
     const fromCurrency = String(payload.fin_exr_from_currency ?? '');
     const toCurrency = String(payload.fin_exr_to_currency ?? '');
     const rateType = String(payload.fin_exr_rate_type ?? '');
-    await executeCommandViaApi(page, 'fin:create_exchange_rate', payload, undefined, 'create', { allowHttpError: true });
+    await executeCommandViaApi(page, 'fin:create_exchange_rate', payload, undefined, 'create', {
+      allowHttpError: true,
+    });
     const resp = await page.request.get(
       `/api/dynamic/fin_exchange_rate/list?pageNum=1&pageSize=20&filters=${encodeURIComponent(
         JSON.stringify([
           { fieldName: 'fin_exr_from_currency', operator: 'EQ', value: fromCurrency },
           { fieldName: 'fin_exr_to_currency', operator: 'EQ', value: toCurrency },
           { fieldName: 'fin_exr_rate_type', operator: 'EQ', value: rateType },
-        ])
-      )}`
+        ]),
+      )}`,
     );
     expect(resp.ok(), `Exchange rate lookup failed for ${fromCurrency}/${toCurrency}`).toBeTruthy();
     const body = await resp.json();
     const records = body?.data?.records ?? [];
-    expect(records.length, `Exchange rate ${fromCurrency}/${toCurrency} must exist after setup`).toBeGreaterThan(0);
+    expect(
+      records.length,
+      `Exchange rate ${fromCurrency}/${toCurrency} must exist after setup`,
+    ).toBeGreaterThan(0);
   }
 
   async function openOpportunityListViaSidebar(page: import('@playwright/test').Page) {
@@ -191,27 +234,32 @@ test.describe('CRM Opportunity Multi-Currency @smoke', () => {
     await crmButton.click();
 
     // Click the Opportunities menu link to navigate to list
-    const oppLink = page.locator('nav a[href="/dynamic/crm-opportunity"], nav a[href="/crm/opportunities"]');
+    const oppLink = page.locator(
+      'nav a[href="/p/crm_opportunity"], nav a[href="/crm/opportunities"]',
+    );
     await oppLink.first().waitFor({ state: 'attached', timeout: 8_000 });
 
     const listResponsePromise = page
       .waitForResponse(
-        (r) =>
-          r.url().includes(`/api/dynamic/${MODEL_CODE}/list`) && r.status() === 200,
-        { timeout: 15_000 }
+        (r) => r.url().includes(`/api/dynamic/${MODEL_CODE}/list`) && r.status() === 200,
+        { timeout: 15_000 },
       )
       .catch(() => null);
 
     await oppLink.first().evaluate((el: HTMLElement) => el.click());
     await listResponsePromise;
 
-    await expect(page.locator('table, [class*="ant-table"]').first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('table, [class*="ant-table"]').first()).toBeVisible({
+      timeout: 10_000,
+    });
   }
 
   // =========================================================================
   // OPP-CUR-01: USD opportunity — verify conversion fields via API read-back
   // =========================================================================
-  test('OPP-CUR-01: USD opportunity has exchange_rate and base_amount populated', async ({ page }) => {
+  test('OPP-CUR-01: USD opportunity has exchange_rate and base_amount populated', async ({
+    page,
+  }) => {
     // Verify records were created
     expect(usdOppPid, 'USD opportunity pid must be non-empty').toBeTruthy();
 
@@ -240,7 +288,9 @@ test.describe('CRM Opportunity Multi-Currency @smoke', () => {
   // =========================================================================
   // OPP-CUR-02: EUR opportunity — different rate applied
   // =========================================================================
-  test('OPP-CUR-02: EUR opportunity has distinct exchange_rate and correct base_currency', async ({ page }) => {
+  test('OPP-CUR-02: EUR opportunity has distinct exchange_rate and correct base_currency', async ({
+    page,
+  }) => {
     expect(eurOppPid, 'EUR opportunity pid must be non-empty').toBeTruthy();
 
     const detailResp = await page.request.get(`/api/dynamic/${MODEL_CODE}/${eurOppPid}`);
@@ -283,19 +333,22 @@ test.describe('CRM Opportunity Multi-Currency @smoke', () => {
   // =========================================================================
   // OPP-CUR-04: Navigate via sidebar menu → opportunity records visible in list
   // =========================================================================
-  test('OPP-CUR-04: Navigate CRM → Opportunities via sidebar → seeded records visible', async ({ page }) => {
+  test('OPP-CUR-04: Navigate CRM → Opportunities via sidebar → seeded records visible', async ({
+    page,
+  }) => {
     await openOpportunityListViaSidebar(page);
 
-    const searchArea = page.locator('[data-testid="search-area"]');
-    await expect(searchArea).toBeVisible({ timeout: 10_000 });
+    await ensureFilterFormOpen(page);
+    const filterForm = page.locator('[data-testid="search-area"], [data-testid="filters"], form').first();
+    await expect(filterForm).toBeVisible({ timeout: 10_000 });
 
-    const nameInput = searchArea.locator('input[name="crm_opp_name"]').first();
+    const nameInput = filterForm.locator('[data-testid="form-field-crm_opp_name"] input, input[name="crm_opp_name"]').first();
     await expect(nameInput).toBeVisible({ timeout: 10_000 });
     await nameInput.fill(`USD_Opp_${UID}`);
 
     const searchResp = page
       .waitForResponse(
-        (r) => r.url().includes('/api/dynamic/crm-opportunity/list') && r.status() === 200,
+        (r) => r.url().includes('/api/dynamic/crm_opportunity/list') && r.status() === 200,
         { timeout: 15_000 },
       )
       .catch(() => null);
@@ -311,28 +364,36 @@ test.describe('CRM Opportunity Multi-Currency @smoke', () => {
   // =========================================================================
   // OPP-CUR-05: Fill form with currency code and amount → verify creation and detail view
   // =========================================================================
-  test('OPP-CUR-05: Fill opportunity form with currency fields → record created with currency conversion', async ({ page }) => {
+  test('OPP-CUR-05: Fill opportunity form with currency fields → record created with currency conversion', async ({
+    page,
+  }) => {
     await openOpportunityListViaSidebar(page);
 
     // Find and click the "Create" / "新增" / "New" button
     const createBtn = page
-      .locator('[data-testid="toolbar-btn-create"], button:has-text("新增"), button:has-text("新建"), button:has-text("Create")')
+      .locator(
+        '[data-testid="toolbar-btn-create"], button:has-text("新增"), button:has-text("新建"), button:has-text("Create")',
+      )
       .first();
     await expect(createBtn).toBeVisible({ timeout: 5_000 });
 
     const formResponsePromise = page
-      .waitForResponse(
-        (r) => r.url().includes(`/api/meta/forms/`) && r.status() === 200,
-        { timeout: 10_000 }
-      )
+      .waitForResponse((r) => r.url().includes(`/api/meta/forms/`) && r.status() === 200, {
+        timeout: 10_000,
+      })
       .catch(() => null);
 
     await createBtn.click();
     await formResponsePromise;
 
     // Wait for form page to load (either /new URL or form heading)
-    await page.waitForURL((url) => url.pathname.includes('/new'), { timeout: 10_000 }).catch(() => {});
-    await expect(page.locator('h2, h1').first()).toBeVisible({ timeout: 8_000 });
+    await page
+      .waitForURL((url) => url.pathname.includes('/new'), { timeout: 10_000 })
+      .catch(() => {});
+    await waitForFormReady(page, 12_000);
+    await expect(page.locator('form, [data-testid="dynamic-form"], main').first()).toBeVisible({
+      timeout: 8_000,
+    });
 
     // -----------------------------------------------------------------------
     // Fill form fields
@@ -345,8 +406,8 @@ test.describe('CRM Opportunity Multi-Currency @smoke', () => {
     const nameInput = page
       .locator(
         '[data-testid="form-field-crm_opp_name"] input, ' +
-        'input[name*="opp_name"], ' +
-        'input[placeholder*="name"]'
+          'input[name*="opp_name"], ' +
+          'input[placeholder*="name"]',
       )
       .first();
 
@@ -363,8 +424,7 @@ test.describe('CRM Opportunity Multi-Currency @smoke', () => {
     // 2. Find and fill currency code (e.g., "usd")
     const currencyInput = page
       .locator(
-        '[data-testid="form-field-crm_opp_currency_code"] input, ' +
-        'input[name*="currency_code"]'
+        '[data-testid="form-field-crm_opp_currency_code"] input, ' + 'input[name*="currency_code"]',
       )
       .first();
 
@@ -377,7 +437,7 @@ test.describe('CRM Opportunity Multi-Currency @smoke', () => {
     const amountInput = page
       .locator(
         '[data-testid="form-field-crm_opp_expected_amount"] input, ' +
-        'input[name*="expected_amount"]'
+          'input[name*="expected_amount"]',
       )
       .first();
 
@@ -390,8 +450,7 @@ test.describe('CRM Opportunity Multi-Currency @smoke', () => {
     // Using the accountPid created in beforeAll
     const accountInput = page
       .locator(
-        '[data-testid="form-field-crm_opp_account_id"] input, ' +
-        'input[name*="account_id"]'
+        '[data-testid="form-field-crm_opp_account_id"] input, ' + 'input[name*="account_id"]',
       )
       .first();
 
@@ -400,10 +459,18 @@ test.describe('CRM Opportunity Multi-Currency @smoke', () => {
       // Click to open the select/search dropdown
       await accountInput.click();
       // Wait for dropdown options to load
-      await page.locator('[role="option"], [class*="ant-select"]').first().waitFor({ state: 'visible', timeout: 5_000 }).catch(() => {});
+      await page
+        .locator('[role="option"], [class*="ant-select"]')
+        .first()
+        .waitFor({ state: 'visible', timeout: 5_000 })
+        .catch(() => {});
       // Type to search, then select first option
       await accountInput.fill(`CurTestAcct_${UID}`);
-      await page.locator('[role="option"]').first().click().catch(() => {});
+      await page
+        .locator('[role="option"]')
+        .first()
+        .click()
+        .catch(() => {});
     }
 
     // -----------------------------------------------------------------------
@@ -414,7 +481,7 @@ test.describe('CRM Opportunity Multi-Currency @smoke', () => {
     const submitBtn = page
       .locator(
         '[data-testid="form-btn-submit"], [data-testid="form-btn-save"], ' +
-        'button:has-text("保存"), button:has-text("提交"), button:has-text("Save")'
+          'button:has-text("保存"), button:has-text("提交"), button:has-text("Save")',
       )
       .first();
 
@@ -423,8 +490,10 @@ test.describe('CRM Opportunity Multi-Currency @smoke', () => {
     // Wait for command response
     const cmdResponsePromise = page
       .waitForResponse(
-        (r) => r.url().includes('/api/meta/commands/execute/') && r.request().method().toLowerCase() === 'post',
-        { timeout: 15_000 }
+        (r) =>
+          r.url().includes('/api/meta/commands/execute/') &&
+          r.request().method().toLowerCase() === 'post',
+        { timeout: 15_000 },
       )
       .catch(() => null);
 
@@ -436,10 +505,9 @@ test.describe('CRM Opportunity Multi-Currency @smoke', () => {
     }
 
     // Wait for redirect back to list or detail view
-    await page.waitForURL(
-      (url) => !url.pathname.includes('/new'),
-      { timeout: 10_000 }
-    ).catch(() => {});
+    await page
+      .waitForURL((url) => !url.pathname.includes('/new'), { timeout: 10_000 })
+      .catch(() => {});
 
     // -----------------------------------------------------------------------
     // Verify record creation: check it appears in list or detail
@@ -483,7 +551,9 @@ test.describe('CRM Opportunity Multi-Currency @smoke', () => {
       }
     } else {
       // We're back on list page — search for the record we just created
-      await expect(page.locator('table, [class*="ant-table"]').first()).toBeVisible({ timeout: 8_000 });
+      await expect(page.locator('table, [class*="ant-table"]').first()).toBeVisible({
+        timeout: 8_000,
+      });
 
       // Try to find the new record by name on the list
       const newOppRow = page.locator(`text=${formOppName}`).first();
@@ -498,14 +568,17 @@ test.describe('CRM Opportunity Multi-Currency @smoke', () => {
     // Verify the record was created via API read-back
     const listResp = await page.request.get(
       `/api/dynamic/${MODEL_CODE}/list?pageNum=1&pageSize=50&filters=${encodeURIComponent(
-        JSON.stringify([{ fieldName: 'crm_opp_name', operator: 'EQ', value: formOppName }])
-      )}`
+        JSON.stringify([{ fieldName: 'crm_opp_name', operator: 'EQ', value: formOppName }]),
+      )}`,
     );
     expect(listResp.ok()).toBeTruthy();
 
     const body = await listResp.json();
     const records: any[] = body?.data?.records ?? [];
-    expect(records.length, `Record with name "${formOppName}" must be created`).toBeGreaterThanOrEqual(1);
+    expect(
+      records.length,
+      `Record with name "${formOppName}" must be created`,
+    ).toBeGreaterThanOrEqual(1);
 
     const createdOpp = records[0];
     expect(createdOpp.crm_opp_currency_code).toBe('usd');
@@ -517,7 +590,10 @@ test.describe('CRM Opportunity Multi-Currency @smoke', () => {
 
     // Verify base amount was computed
     const baseAmount = parseFloat(createdOpp.crm_opp_expected_amount_base ?? '0');
-    expect(baseAmount, 'Base amount must be > 0 for currency-converted opportunity').toBeGreaterThan(0);
+    expect(
+      baseAmount,
+      'Base amount must be > 0 for currency-converted opportunity',
+    ).toBeGreaterThan(0);
     // 15000 USD * ~7 rate ≈ 105000 CNY
     expect(baseAmount, 'Base amount for 15000 USD should be > 70000 CNY').toBeGreaterThan(70000);
   });

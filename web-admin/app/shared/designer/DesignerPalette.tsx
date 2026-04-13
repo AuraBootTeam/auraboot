@@ -165,7 +165,14 @@ export function DesignerPalette({
       {/* Header */}
       {(title || subtitle || searchable) && (
         <div className="space-y-3 border-b border-gray-200 p-4">
-          {title && <h2 className="text-sm font-semibold text-gray-900" data-testid={testId ? `${testId}-heading` : undefined}>{title}</h2>}
+          {title && (
+            <h2
+              className="text-sm font-semibold text-gray-900"
+              data-testid={testId ? `${testId}-heading` : undefined}
+            >
+              {title}
+            </h2>
+          )}
           {subtitle && <p className="text-xs text-gray-500">{subtitle}</p>}
           {searchable && (
             <div className="relative">
@@ -204,7 +211,11 @@ export function DesignerPalette({
           }
 
           return (
-            <div key={category} className="mb-6" data-testid={testId ? `${testId}-category-${category}` : undefined}>
+            <div
+              key={category}
+              className="mb-6"
+              data-testid={testId ? `${testId}-category-${category}` : undefined}
+            >
               <button
                 type="button"
                 onClick={() => toggleCategory(category)}

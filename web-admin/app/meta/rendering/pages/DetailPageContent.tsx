@@ -18,6 +18,7 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { Link } from 'react-router';
 import { PrintButton } from '~/meta/rendering/components/PrintButton';
+import { RecordShareDialog } from '~/components/shared/RecordShareDialog';
 import type { PageContentProps } from '~/meta/profiles/types';
 import { usePageRuntime } from '~/meta/rendering/pages/hooks/usePageRuntime';
 import {
@@ -42,7 +43,7 @@ import { ApprovalCommentsBlock } from '~/meta/rendering/blocks/ApprovalCommentsB
 import { RecordComments } from '~/meta/rendering/blocks/RecordComments';
 import { NbaSuggestionBar } from '~/meta/rendering/blocks/NbaSuggestionBar';
 import type { BlockConfig, ButtonConfig, DetailTabConfig, FieldConfig } from '~/meta/schemas/types';
-import { deriveTestId } from '~/meta/rendering/utils/deriveTestId';
+import { deriveTestId, buttonTestId } from '~/meta/rendering/utils/deriveTestId';
 
 interface RecordData {
   [key: string]: any;
@@ -59,46 +60,62 @@ interface RecordData {
 export function DetailPageContent(props: PageContentProps) {
   const { schema, tableName, recordId, token } = props;
 
-  // Client-side record loading
+  // Client-side record + model field loading (parallelized)
   const [recordData, setRecordData] = useState<RecordData>({});
   const [recordLoading, setRecordLoading] = useState(true);
-
-  // Fetch model field metadata for dictCode / component / dataType enrichment
   const [modelFieldMap, setModelFieldMap] = useState<Map<string, any>>(new Map());
-  useEffect(() => {
-    const modelCode = schema?.modelCode || tableName?.replace(/-/g, '_');
-    if (!modelCode) return;
-
-    (async () => {
-      try {
-        const modelRes = await fetchResult<any>(`/api/meta/models/code/${modelCode}`, { method: 'get', token: token || undefined });
-        if (!ResultHelper.isSuccess(modelRes) || !modelRes.data?.pid) return;
-
-        const fieldsRes = await fetchResult<any[]>(`/api/meta/models/${modelRes.data.pid}/fields`, { method: 'get', token: token || undefined });
-        if (!ResultHelper.isSuccess(fieldsRes) || !fieldsRes.data) return;
-
-        const map = new Map<string, any>();
-        for (const f of fieldsRes.data) {
-          map.set(f.code, f);
-        }
-        setModelFieldMap(map);
-      } catch { /* ignore - fields will render without enrichment */ }
-    })();
-  }, [schema?.modelCode, tableName, token]);
 
   useEffect(() => {
     if (!recordId || !tableName) {
       setRecordLoading(false);
       return;
     }
-    const endpoint = `${buildApiEndpoint(tableName)}/${recordId}`;
-    fetchResult<RecordData>(endpoint, { method: 'get', token: token || undefined })
-      .then((result) => {
-        if (ResultHelper.isSuccess(result) && result.data) setRecordData(result.data);
-      })
-      .catch(() => {})
-      .finally(() => setRecordLoading(false));
-  }, [recordId, tableName, token]);
+    let cancelled = false;
+
+    async function loadModelFields(): Promise<void> {
+      // Use /api/dynamic/{pageKey}/field-meta which requires model-level read permission
+      // instead of /api/meta/models/{pid}/fields which requires management permission
+      const pageKey = schema?.modelCode || tableName;
+      if (!pageKey) return;
+      const fieldsRes = await fetchResult<any[]>(`/api/dynamic/${pageKey}/field-meta`, {
+        method: 'get',
+        token: token || undefined,
+      });
+      if (cancelled) return;
+      if (!ResultHelper.isSuccess(fieldsRes) || !fieldsRes.data) return;
+      const map = new Map<string, any>();
+      for (const f of fieldsRes.data) {
+        map.set(f.code, f);
+      }
+      setModelFieldMap(map);
+    }
+
+    async function loadRecord(): Promise<void> {
+      const endpoint = `${buildApiEndpoint(tableName)}/${recordId}`;
+      const result = await fetchResult<RecordData>(endpoint, {
+        method: 'get',
+        token: token || undefined,
+      });
+      if (cancelled) return;
+      if (ResultHelper.isSuccess(result) && result.data) {
+        setRecordData(result.data);
+      }
+    }
+
+    (async () => {
+      try {
+        // Fetch model fields and record data in parallel
+        await Promise.all([
+          loadModelFields().catch(() => {}),
+          loadRecord().catch(() => {}),
+        ]);
+      } finally {
+        if (!cancelled) setRecordLoading(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [recordId, tableName, schema?.modelCode, token]);
 
   // Stable callback to reload the parent record (used after sub-table command execution)
   const reloadRecord = useCallback(() => {
@@ -112,38 +129,44 @@ export function DetailPageContent(props: PageContentProps) {
   }, [recordId, tableName, token]);
 
   // Enrich a page-schema field with model field metadata (dictCode, component, dataType)
-  const enrichField = useCallback((field: FieldConfig): FieldConfig => {
-    const meta = modelFieldMap.get(field.field);
-    if (!meta) return field;
+  const enrichField = useCallback(
+    (field: FieldConfig): FieldConfig => {
+      const meta = modelFieldMap.get(field.field);
+      if (!meta) return field;
 
-    const enriched = { ...field } as any;
+      const enriched = { ...field } as any;
 
-    // Add dictCode from model field
-    if (meta.dictCode && !enriched.dictCode) {
-      enriched.dictCode = meta.dictCode;
-    }
-
-    // Derive component from renderComponent or dataType
-    if (!enriched.component) {
-      const renderComp = meta.extension?.renderComponent || meta.extension?.component || meta.extension?.uiComponent;
-      if (renderComp) {
-        enriched.component = String(renderComp).trim().toLowerCase();
-      } else if (meta.dataType === 'boolean') {
-        enriched.component = 'switch';
-      } else if (meta.dataType === 'date') {
-        enriched.component = 'date';
-      } else if (meta.dataType === 'datetime') {
-        enriched.component = 'datetime';
+      // Add dictCode from model field
+      if (meta.dictCode && !enriched.dictCode) {
+        enriched.dictCode = meta.dictCode;
       }
-    }
 
-    return enriched as FieldConfig;
-  }, [modelFieldMap]);
+      // Derive component from renderComponent or dataType
+      if (!enriched.component) {
+        const renderComp =
+          meta.extension?.renderComponent ||
+          meta.extension?.component ||
+          meta.extension?.uiComponent;
+        if (renderComp) {
+          enriched.component = String(renderComp).trim().toLowerCase();
+        } else if (meta.dataType === 'boolean') {
+          enriched.component = 'switch';
+        } else if (meta.dataType === 'date') {
+          enriched.component = 'date';
+        } else if (meta.dataType === 'datetime') {
+          enriched.component = 'datetime';
+        }
+      }
+
+      return enriched as FieldConfig;
+    },
+    [modelFieldMap],
+  );
 
   // Collect all dictCodes from schema fields (including inside tabs → blocks → form-section → fields)
   // Also check modelFieldMap for dictCodes not declared in the page schema
   const allDictCodes = useMemo(() => {
-    if (!schema?.areas) return [];
+    if (!schema?.blocks) return [];
     const codes: string[] = [];
     const collectFromFields = (fields: FieldConfig[]) => {
       for (const f of fields) {
@@ -152,24 +175,20 @@ export function DetailPageContent(props: PageContentProps) {
         if (meta?.dictCode) codes.push(meta.dictCode);
       }
     };
-    for (const areaKey of Object.keys(schema.areas)) {
-      const area = schema.areas[areaKey];
-      if (!area?.blocks) continue;
-      for (const block of area.blocks) {
-        if (block.blockType === 'tabs' && block.tabs) {
-          for (const tab of block.tabs as any[]) {
-            if (tab.blocks) {
-              for (const b of tab.blocks) {
-                if (b.blockType === 'form-section' && b.fields) {
-                  collectFromFields(b.fields);
-                }
+    for (const block of schema.blocks) {
+      if (block.blockType === 'tabs' && block.tabs) {
+        for (const tab of block.tabs as any[]) {
+          if (tab.blocks) {
+            for (const b of tab.blocks) {
+              if (b.blockType === 'form-section' && b.fields) {
+                collectFromFields(b.fields);
               }
             }
           }
         }
-        if (block.blockType === 'form-section' && block.fields) {
-          collectFromFields(block.fields);
-        }
+      }
+      if (block.blockType === 'form-section' && block.fields) {
+        collectFromFields(block.fields);
       }
     }
     return [...new Set(codes)];
@@ -199,12 +218,19 @@ export function DetailPageContent(props: PageContentProps) {
   );
 
   const [activeTab, setActiveTab] = useState(0);
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
 
   // Use usePageRuntime instead of useDynamicPageSetup
   const { runtime, dataSourceManager, t, locale, navigate } = usePageRuntime(schema, {
     token: token || undefined,
     additionalContext: {
       record: recordData,
+      $page: {
+        kind: (schema as any)?.kind,
+        modelCode: (schema as any)?.modelCode,
+        pageKey: (schema as any)?.pageKey,
+        recordId: recordId || undefined,
+      },
     },
   });
 
@@ -220,6 +246,7 @@ export function DetailPageContent(props: PageContentProps) {
     tableName,
     context: {
       record: recordData,
+      loadData: reloadRecord,
     },
     dataSourceManager,
     locale,
@@ -283,10 +310,9 @@ export function DetailPageContent(props: PageContentProps) {
     [locale, t],
   );
 
-  // Extract areas from schema
+  // Extract blocks from schema
   const allBlocks = useMemo(() => {
-    if (!schema?.areas) return [];
-    return Object.values(schema.areas).flatMap((area: any) => area.blocks);
+    return schema?.blocks || [];
   }, [schema]);
 
   const headerToolbar = useMemo(
@@ -341,13 +367,16 @@ export function DetailPageContent(props: PageContentProps) {
   }
 
   return (
-    <div className="mx-auto w-full px-6 py-8" data-testid={deriveTestId('detail', schema?.modelCode || tableName, 'container')}>
+    <div
+      className="mx-auto w-full px-2 py-3"
+      data-testid={deriveTestId('detail', schema?.modelCode || tableName, 'container')}
+    >
       <div className="rounded-lg bg-white shadow-sm">
         {/* Page Header with title + toolbar buttons (hidden in print) */}
         <div className="print-hide border-b border-gray-200 px-6 py-4" data-print="hide">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <Link to={`/dynamic/${tableName}`} className="text-gray-400 hover:text-gray-600">
+              <Link to={`/p/${tableName}`} className="text-gray-400 hover:text-gray-600">
                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
                     strokeLinecap="round"
@@ -364,11 +393,22 @@ export function DetailPageContent(props: PageContentProps) {
 
             {/* Header toolbar buttons */}
             <div className="print-hide flex items-center space-x-2" data-print="hide">
+              {schema.extension?.showShare !== false && (
+                <button
+                  onClick={() => setShareDialogOpen(true)}
+                  className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  data-testid={deriveTestId('detail', schema?.modelCode || tableName, 'share-btn')}
+                >
+                  {t('action.share') || 'Share'}
+                </button>
+              )}
+              {schema.extension?.showReport !== false && recordData?.pid && (
+                <ReportGenerateButton
+                  modelCode={schema?.modelCode || tableName}
+                  recordPid={recordData.pid}
+                />
+              )}
               <PrintButton title={getLocalizedText(schema.title, locale, t)} />
-              <ReportGenerateButton
-                modelCode={schema?.modelCode || tableName}
-                recordPid={recordId}
-              />
               {effectiveHeaderToolbar?.buttons && effectiveHeaderToolbar.buttons.length > 0 && (
                 <>
                   {effectiveHeaderToolbar.buttons
@@ -376,6 +416,7 @@ export function DetailPageContent(props: PageContentProps) {
                     .map((button: ButtonConfig) => (
                       <button
                         key={button.code}
+                        data-ab-testid={buttonTestId('detail', schema?.modelCode || tableName, button.code)}
                         onClick={() => handleAction(button, recordData)}
                         disabled={actionLoading}
                         className={`rounded-md px-3 py-1.5 text-sm font-medium ${
@@ -427,7 +468,12 @@ export function DetailPageContent(props: PageContentProps) {
                     key={tab.key || index}
                     role="tab"
                     aria-selected={activeTab === index}
-                    data-testid={deriveTestId('detail', schema?.modelCode || tableName, 'tab', tab.key || String(index))}
+                    data-testid={deriveTestId(
+                      'detail',
+                      schema?.modelCode || tableName,
+                      'tab',
+                      tab.key || String(index),
+                    )}
                     onClick={() => setActiveTab(index)}
                     className={`border-b-2 px-1 py-3 text-sm font-medium ${
                       activeTab === index
@@ -441,27 +487,33 @@ export function DetailPageContent(props: PageContentProps) {
               </nav>
             </div>
 
-            {/* Tab content */}
-            <div className="p-6">
-              {tabs[activeTab]?.blocks?.map((block: BlockConfig, blockIndex: number) => (
-                <DetailBlockRenderer
-                  key={block.id || `tab-block-${blockIndex}`}
-                  block={block}
-                  recordData={recordData}
-                  recordId={recordId!}
-                  token={token || undefined}
-                  locale={locale}
-                  t={t}
-                  modelCode={schema?.modelCode || tableName}
-                  evaluateEditableWhen={evaluateVisibleWhen}
-                  onDataChange={reloadRecord}
-                  getDictItems={getDictItems}
-                  enrichField={enrichField}
-                />
-              ))}
-              {/* Inline approval panel — shown when the record has an associated BPM process */}
-              {recordData?.pid && <InlineApprovalPanel recordPid={recordData.pid} />}
-            </div>
+            {/* Tab content — render all tabs but hide inactive ones to prefetch sub-table data in parallel */}
+            {tabs.map((tab, tabIndex) => (
+              <div
+                key={tab.key || tabIndex}
+                className="p-6"
+                style={{ display: activeTab === tabIndex ? undefined : 'none' }}
+              >
+                {tab.blocks?.map((block: BlockConfig, blockIndex: number) => (
+                  <DetailBlockRenderer
+                    key={block.id || `tab-${tabIndex}-block-${blockIndex}`}
+                    block={block}
+                    recordData={recordData}
+                    recordId={recordId!}
+                    token={token || undefined}
+                    locale={locale}
+                    t={t}
+                    modelCode={schema?.modelCode || tableName}
+                    evaluateEditableWhen={evaluateVisibleWhen}
+                    onDataChange={reloadRecord}
+                    getDictItems={getDictItems}
+                    enrichField={enrichField}
+                  />
+                ))}
+              </div>
+            ))}
+            {/* Inline approval panel — shown when the record has an associated BPM process */}
+            {recordData?.pid && <InlineApprovalPanel recordPid={recordData.pid} />}
           </div>
         ) : (
           /* Direct mode: render form-sections and sub-tables without tabs */
@@ -533,13 +585,13 @@ export function DetailPageContent(props: PageContentProps) {
                 data-print="hide"
               >
                 <Link
-                  to={`/dynamic/${tableName}`}
+                  to={`/p/${tableName}`}
                   className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
                 >
                   {t('action.back')}
                 </Link>
                 <Link
-                  to={`/dynamic/${tableName}/${recordId}/edit`}
+                  to={`/p/${tableName}/${recordId}/edit`}
                   className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
                 >
                   {t('action.update')}
@@ -549,6 +601,16 @@ export function DetailPageContent(props: PageContentProps) {
           </div>
         )}
       </div>
+
+      {/* Record Share Dialog */}
+      {shareDialogOpen && recordId && (
+        <RecordShareDialog
+          open={shareDialogOpen}
+          onClose={() => setShareDialogOpen(false)}
+          resourceCode={schema?.modelCode || tableName}
+          recordId={recordId}
+        />
+      )}
     </div>
   );
 }
@@ -578,7 +640,9 @@ function DetailBlockRenderer({
   modelCode?: string;
   evaluateEditableWhen?: (expr: string | undefined) => boolean;
   onDataChange?: () => void;
-  getDictItems?: (code: string) => Array<{ value: string; label: string; extension?: Record<string, any> }>;
+  getDictItems?: (
+    code: string,
+  ) => Array<{ value: string; label: string; extension?: Record<string, any> }>;
   enrichField?: (field: FieldConfig) => FieldConfig;
 }) {
   const resolveModelFieldLabel = useCallback(
@@ -600,7 +664,7 @@ function DetailBlockRenderer({
     return (
       <div className="form-section">
         {block.title && (
-          <h3 className="mb-5 text-sm font-semibold uppercase tracking-wider text-gray-500">
+          <h3 className="mb-5 text-sm font-semibold tracking-wider text-gray-500 uppercase">
             {getLocalizedText(block.title, locale, t)}
           </h3>
         )}
@@ -615,7 +679,10 @@ function DetailBlockRenderer({
               const enrichedField = enrichField ? enrichField(resolvedField) : resolvedField;
 
               return (
-                <div key={field.field} className={`${isFullWidth ? 'md:col-span-2' : ''} border-b border-gray-100 pb-4`}>
+                <div
+                  key={field.field}
+                  className={`${isFullWidth ? 'md:col-span-2' : ''} border-b border-gray-100 pb-4`}
+                >
                   <DynamicField
                     field={enrichedField}
                     value={recordData ? recordData[field.field] : undefined}
@@ -658,7 +725,7 @@ function DetailBlockRenderer({
       return (
         <div className="sub-table-section">
           {block.title && (
-            <h3 className="mb-5 text-sm font-semibold uppercase tracking-wider text-gray-500">
+            <h3 className="mb-5 text-sm font-semibold tracking-wider text-gray-500 uppercase">
               {getLocalizedText(block.title, locale, t)}
             </h3>
           )}
@@ -737,7 +804,7 @@ function DetailBlockRenderer({
     return (
       <div className="monthly-grid-section">
         {block.title && (
-          <h3 className="mb-5 text-sm font-semibold uppercase tracking-wider text-gray-500">
+          <h3 className="mb-5 text-sm font-semibold tracking-wider text-gray-500 uppercase">
             {getLocalizedText(block.title, locale, t)}
           </h3>
         )}
@@ -770,16 +837,14 @@ function FallbackDetailView({
   locale: string;
   t: (key: string) => string;
 }) {
-  // Try to extract fields from any block in any area
+  // Try to extract fields from any block
   const fields: FieldConfig[] = [];
-  if (schema?.areas) {
-    Object.values(schema.areas).forEach((area: any) => {
-      area.blocks?.forEach((block: BlockConfig) => {
-        if (block.fields) {
-          fields.push(...block.fields);
-        }
-      });
-    });
+  if (schema?.blocks) {
+    for (const block of schema.blocks) {
+      if (block.fields) {
+        fields.push(...block.fields);
+      }
+    }
   }
 
   if (fields.length === 0) return null;

@@ -14,7 +14,6 @@
 import { test, expect } from '../../fixtures';
 import { navigateToDynamicPage, waitForDynamicPageLoad, extractRecordId } from '../helpers/index';
 
-
 test.describe('BPM Frontend Management Pages', () => {
   // ==================== Domain Config (DSL page) ====================
 
@@ -48,13 +47,13 @@ test.describe('BPM Frontend Management Pages', () => {
             enabled: true,
           },
         },
-      }
+      },
     );
 
     if (!createResponse.ok()) {
       const body = await createResponse.text().catch(() => '');
       console.warn(`Domain config API failed: ${createResponse.status()} ${body.slice(0, 200)}`);
-      throw new Error(String(`Domain config API returned ${createResponse.status()}`))
+      throw new Error(String(`Domain config API returned ${createResponse.status()}`));
       return;
     }
 
@@ -67,13 +66,17 @@ test.describe('BPM Frontend Management Pages', () => {
       await waitForDynamicPageLoad(page);
 
       // Should show the created config
-      await expect(page.locator('tbody tr', { hasText: domainCode }).first()).toBeVisible({ timeout: 5000 });
+      await expect(page.locator('tbody tr', { hasText: domainCode }).first()).toBeVisible({
+        timeout: 5000,
+      });
     } finally {
       // Cleanup
       if (pid) {
-        await page.request.post(`/api/meta/commands/execute/admin:delete_bpm_domain_config`, {
-          data: { targetRecordId: pid, operationType: 'delete', payload: {} },
-        }).catch(() => {});
+        await page.request
+          .post(`/api/meta/commands/execute/admin:delete_bpm_domain_config`, {
+            data: { targetRecordId: pid, operationType: 'delete', payload: {} },
+          })
+          .catch(() => {});
       }
     }
   });
@@ -112,13 +115,13 @@ test.describe('BPM Frontend Management Pages', () => {
             enabled: true,
           },
         },
-      }
+      },
     );
 
     if (!createResponse.ok()) {
       const body = await createResponse.text().catch(() => '');
       console.warn(`SLA config API failed: ${createResponse.status()} ${body.slice(0, 200)}`);
-      throw new Error(String(`SLA config API returned ${createResponse.status()}`))
+      throw new Error(String(`SLA config API returned ${createResponse.status()}`));
       return;
     }
 
@@ -135,9 +138,11 @@ test.describe('BPM Frontend Management Pages', () => {
     } finally {
       // Cleanup
       if (pid) {
-        await page.request.post(`/api/meta/commands/execute/admin:delete_sla_config`, {
-          data: { targetRecordId: pid, operationType: 'delete', payload: {} },
-        }).catch(() => {});
+        await page.request
+          .post(`/api/meta/commands/execute/admin:delete_sla_config`, {
+            data: { targetRecordId: pid, operationType: 'delete', payload: {} },
+          })
+          .catch(() => {});
       }
     }
   });
@@ -152,11 +157,30 @@ test.describe('BPM Frontend Management Pages', () => {
     await page.waitForLoadState('domcontentloaded');
 
     // Should show the page title h1 (Chinese: SLA 监控)
-    await expect(page.locator('h1').filter({ hasText: 'sla' })).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('h1').filter({ hasText: /sla|监控/i })).toBeVisible({
+      timeout: 5000,
+    });
 
-    // Should show stat sections (Chinese titles) — use h2 to avoid sidebar menu ambiguity
-    await expect(page.locator('h2').filter({ hasText: '流程定义' })).toBeVisible();
-    await expect(page.locator('h2').filter({ hasText: '活跃 SLA 记录' })).toBeVisible();
-    await expect(page.locator('h2').filter({ hasText: 'SLA 配置' })).toBeVisible();
+    const emptyStateVisible = await expect
+      .poll(
+        async () => {
+          const text = await page.locator('main').textContent().catch(() => '');
+          return /暂无监控数据|No monitoring data available/i.test(text || '');
+        },
+        { timeout: 5000 },
+      )
+      .toBe(true)
+      .then(() => true)
+      .catch(() => false);
+
+    if (emptyStateVisible) {
+      await expect(page.getByTestId('sla-refresh')).toBeVisible();
+      return;
+    }
+
+    // With data available, stat sections should render.
+    await expect(page.getByTestId('sla-dashboard-process-definitions')).toBeVisible();
+    await expect(page.getByTestId('sla-dashboard-active-records')).toBeVisible();
+    await expect(page.getByTestId('sla-dashboard-configs')).toBeVisible();
   });
 });

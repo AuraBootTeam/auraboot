@@ -54,7 +54,6 @@ export const STUDIO_BUILD_INFO = {
     'device-preview',
     'page-preview',
     'page-list-management',
-    'new-page-wizard',
     'empty-state-guide',
     'settings-panel',
   ],

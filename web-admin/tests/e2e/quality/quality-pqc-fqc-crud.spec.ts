@@ -20,11 +20,7 @@
  */
 
 import { test, expect, type Page } from '../../fixtures';
-import {
-  uniqueId,
-  executeCommandViaApi,
-  todayStr,
-} from '../helpers/index';
+import { uniqueId, executeCommandViaApi, todayStr } from '../helpers/index';
 
 // ---------------------------------------------------------------------------
 // Prerequisite resolution helper
@@ -83,16 +79,15 @@ async function goToPqcList(page: Page): Promise<import('@playwright/test').Respo
   await leafLink.scrollIntoViewIfNeeded();
 
   const listResponsePromise = page.waitForResponse(
-    (r) =>
-      r.url().includes('/api/dynamic/qc_pqc_record/list') && r.status() === 200,
+    (r) => r.url().includes('/api/dynamic/qc_pqc_record/list') && r.status() === 200,
     { timeout: 15_000 },
   );
   await leafLink.evaluate((el: HTMLElement) => el.click());
   const resp = await listResponsePromise;
 
-  await expect(
-    page.locator('table, [class*="ant-table"]').first(),
-  ).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator('table, [class*="ant-table"]').first()).toBeVisible({
+    timeout: 10_000,
+  });
 
   return resp;
 }
@@ -111,16 +106,15 @@ async function goToFqcList(page: Page): Promise<import('@playwright/test').Respo
   await leafLink.scrollIntoViewIfNeeded();
 
   const listResponsePromise = page.waitForResponse(
-    (r) =>
-      r.url().includes('/api/dynamic/qc_fqc_order/list') && r.status() === 200,
+    (r) => r.url().includes('/api/dynamic/qc_fqc_order/list') && r.status() === 200,
     { timeout: 15_000 },
   );
   await leafLink.evaluate((el: HTMLElement) => el.click());
   const resp = await listResponsePromise;
 
-  await expect(
-    page.locator('table, [class*="ant-table"]').first(),
-  ).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator('table, [class*="ant-table"]').first()).toBeVisible({
+    timeout: 10_000,
+  });
 
   return resp;
 }
@@ -154,7 +148,10 @@ test.describe('Quality — PQC CRUD', () => {
       const { workOrderOpId: wooId } = await resolveQcPrerequisites(page);
       if (!wooId) {
         // Skip the entire suite: prerequisite data unavailable in this environment
-        test.skip(true, 'qc_pqc_work_order_op_id requires pe_work_order_op data — run seed-marketplace.sh or PCBA ERP fixtures first');
+        test.skip(
+          true,
+          'qc_pqc_work_order_op_id requires pe_work_order_op data — run seed-marketplace.sh or PCBA ERP fixtures first',
+        );
         return;
       }
       workOrderOpId = wooId;
@@ -232,9 +229,9 @@ test.describe('Quality — PQC CRUD', () => {
 
     const listResp = await goToPqcList(page);
     const body = await listResp.json();
-    const records = (
-      body?.data?.records ?? body?.data?.data ?? []
-    ) as Array<Record<string, unknown>>;
+    const records = (body?.data?.records ?? body?.data?.data ?? []) as Array<
+      Record<string, unknown>
+    >;
 
     expect(records.length).toBeGreaterThan(0);
 
@@ -244,19 +241,14 @@ test.describe('Quality — PQC CRUD', () => {
         String(r.qc_pqc_remark ?? '').includes(UID) ||
         String(r.qc_pqc_inspector ?? '').includes(UID),
     );
-    expect(
-      found,
-      `Expected to find PQC record with inspector containing ${UID}`,
-    ).toBe(true);
+    expect(found, `Expected to find PQC record with inspector containing ${UID}`).toBe(true);
   });
 
   // -------------------------------------------------------------------------
   // QC-PQC-003: i18n column headers
   // -------------------------------------------------------------------------
 
-  test('QC-PQC-003 @critical: PQC list shows Chinese column headers', async ({
-    page,
-  }) => {
+  test('QC-PQC-003 @critical: PQC list shows Chinese column headers', async ({ page }) => {
     await goToPqcList(page);
 
     const headerRow = page.locator('thead tr').first();
@@ -295,9 +287,7 @@ test.describe('Quality — PQC CRUD', () => {
   // QC-PQC-005: PQC fail result — defect_rate should be > 0
   // -------------------------------------------------------------------------
 
-  test('QC-PQC-005 @critical: PQC fail record — defect_rate is > 0', async ({
-    page,
-  }) => {
+  test('QC-PQC-005 @critical: PQC fail record — defect_rate is > 0', async ({ page }) => {
     expect(pqcFailId).toBeTruthy();
 
     const resp = await page.request.get(`/api/dynamic/qc_pqc_record/${pqcFailId}`);
@@ -318,9 +308,9 @@ test.describe('Quality — PQC CRUD', () => {
     // Verify on list page — fail record visible
     const listResp = await goToPqcList(page);
     const listBody = await listResp.json();
-    const records = (
-      listBody?.data?.records ?? listBody?.data?.data ?? []
-    ) as Array<Record<string, unknown>>;
+    const records = (listBody?.data?.records ?? listBody?.data?.data ?? []) as Array<
+      Record<string, unknown>
+    >;
     expect(records.length).toBeGreaterThan(0);
   });
 
@@ -328,9 +318,7 @@ test.describe('Quality — PQC CRUD', () => {
   // QC-PQC-006: Update PQC remark
   // -------------------------------------------------------------------------
 
-  test('QC-PQC-006 @critical: Update PQC remark via API → confirmed by GET', async ({
-    page,
-  }) => {
+  test('QC-PQC-006 @critical: Update PQC remark via API → confirmed by GET', async ({ page }) => {
     expect(pqcPassId).toBeTruthy();
 
     const newRemark = `Updated_PQC_${UID}`;
@@ -381,7 +369,10 @@ test.describe('Quality — FQC CRUD', () => {
       const { productionPlanId: ppId } = await resolveQcPrerequisites(page);
       if (!ppId) {
         // Skip the entire suite: prerequisite data unavailable in this environment
-        test.skip(true, 'qc_fqc_work_order_id requires pe_production_plan data — run seed-marketplace.sh or PCBA ERP fixtures first');
+        test.skip(
+          true,
+          'qc_fqc_work_order_id requires pe_production_plan data — run seed-marketplace.sh or PCBA ERP fixtures first',
+        );
         return;
       }
       productionPlanId = ppId;
@@ -391,7 +382,8 @@ test.describe('Quality — FQC CRUD', () => {
       let productId: string | null = null;
       if (prodResp.ok()) {
         const prodBody = await prodResp.json();
-        const prodRecords: Record<string, unknown>[] = prodBody?.data?.records ?? prodBody?.records ?? [];
+        const prodRecords: Record<string, unknown>[] =
+          prodBody?.data?.records ?? prodBody?.records ?? [];
         if (prodRecords.length > 0) {
           productId = String(prodRecords[0].pid ?? prodRecords[0].id ?? '');
         }
@@ -496,13 +488,7 @@ test.describe('Quality — FQC CRUD', () => {
     expect((beforeBody?.data ?? beforeBody).qc_fqc_result).toBe('pending');
 
     // Complete the FQC
-    await executeCommandViaApi(
-      page,
-      'qc:complete_fqc',
-      {},
-      fqcId1,
-      'state_transition',
-    );
+    await executeCommandViaApi(page, 'qc:complete_fqc', {}, fqcId1, 'state_transition');
 
     // Verify result is now pass
     const after = await page.request.get(`/api/dynamic/qc_fqc_order/${fqcId1}`);
@@ -513,14 +499,12 @@ test.describe('Quality — FQC CRUD', () => {
     // Verify on list page — state change visible
     const listResp = await goToFqcList(page);
     const listBody = await listResp.json();
-    const records = (
-      listBody?.data?.records ?? listBody?.data?.data ?? []
-    ) as Array<Record<string, unknown>>;
+    const records = (listBody?.data?.records ?? listBody?.data?.data ?? []) as Array<
+      Record<string, unknown>
+    >;
     expect(records.length).toBeGreaterThan(0);
 
-    const passRecord = records.find(
-      (r) => String(r.pid ?? r.id) === fqcId1,
-    );
+    const passRecord = records.find((r) => String(r.pid ?? r.id) === fqcId1);
     // If visible on first page, check status
     if (passRecord) {
       expect(/pass/i.test(String(passRecord.qc_fqc_result ?? ''))).toBe(true);
@@ -531,9 +515,7 @@ test.describe('Quality — FQC CRUD', () => {
   // QC-FQC-004: i18n column headers
   // -------------------------------------------------------------------------
 
-  test('QC-FQC-004 @critical: FQC list shows correct Chinese column headers', async ({
-    page,
-  }) => {
+  test('QC-FQC-004 @critical: FQC list shows correct Chinese column headers', async ({ page }) => {
     await goToFqcList(page);
 
     const headerRow = page.locator('thead tr').first();

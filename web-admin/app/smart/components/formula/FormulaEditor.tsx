@@ -5,7 +5,7 @@
  * A formula expression editor with function picker and preview.
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { cn } from '~/utils/cn';
 
 /**
@@ -67,6 +67,16 @@ export const FormulaEditor: React.FC<FormulaEditorProps> = ({
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // $ variable autocomplete state
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [acQuery, setAcQuery] = useState<string | null>(null); // null = hidden
+  const [acIndex, setAcIndex] = useState(0);
+
+  // Filter fields matching the $ prefix query
+  const acItems = acQuery !== null
+    ? fields.filter((f) => f.code.startsWith('$') && f.code.toLowerCase().includes(acQuery.toLowerCase())).slice(0, 8)
+    : [];
+
   // Load functions
   useEffect(() => {
     if (fetchFunctions) {
@@ -112,6 +122,53 @@ export const FormulaEditor: React.FC<FormulaEditorProps> = ({
       setLoading(false);
     }
   }, [previewExpression, value, previewContext]);
+
+  // Handle textarea input for $ autocomplete trigger
+  const handleInput = useCallback((newValue: string) => {
+    onChange?.(newValue);
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    const cursorPos = textarea.selectionStart;
+    const textBefore = newValue.slice(0, cursorPos);
+    // Find the $ token being typed (e.g., "$user.ro" → query = "$user.ro")
+    const match = textBefore.match(/(\$[\w.]*)$/);
+    if (match) {
+      setAcQuery(match[1]);
+      setAcIndex(0);
+    } else {
+      setAcQuery(null);
+    }
+  }, [onChange]);
+
+  // Handle keyboard navigation in autocomplete
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (acQuery === null || acItems.length === 0) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setAcIndex((prev) => (prev + 1) % acItems.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setAcIndex((prev) => (prev - 1 + acItems.length) % acItems.length);
+    } else if (e.key === 'Enter' || e.key === 'Tab') {
+      e.preventDefault();
+      const selected = acItems[acIndex];
+      if (selected) {
+        const textarea = textareaRef.current;
+        if (!textarea) return;
+        const cursorPos = textarea.selectionStart;
+        const textBefore = (value || '').slice(0, cursorPos);
+        const textAfter = (value || '').slice(cursorPos);
+        const match = textBefore.match(/(\$[\w.]*)$/);
+        if (match) {
+          const prefix = textBefore.slice(0, textBefore.length - match[1].length);
+          onChange?.(prefix + selected.code + textAfter);
+        }
+      }
+      setAcQuery(null);
+    } else if (e.key === 'Escape') {
+      setAcQuery(null);
+    }
+  }, [acQuery, acItems, acIndex, value, onChange]);
 
   return (
     <div className={cn('space-y-2', className)}>
@@ -199,20 +256,63 @@ export const FormulaEditor: React.FC<FormulaEditorProps> = ({
         </div>
       )}
 
-      {/* Expression input */}
-      <textarea
-        className={cn(
-          'w-full rounded-md border px-3 py-2 font-mono text-sm',
-          'focus:ring-2 focus:ring-blue-500 focus:outline-none',
-          disabled && 'cursor-not-allowed bg-gray-100',
-          error && 'border-red-500',
+      {/* Expression input with $ autocomplete */}
+      <div className="relative">
+        <textarea
+          ref={textareaRef}
+          className={cn(
+            'w-full rounded-md border px-3 py-2 font-mono text-sm',
+            'focus:ring-2 focus:ring-blue-500 focus:outline-none',
+            disabled && 'cursor-not-allowed bg-gray-100',
+            error && 'border-red-500',
+          )}
+          value={value}
+          onChange={(e) => handleInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onBlur={() => setTimeout(() => setAcQuery(null), 150)}
+          placeholder={placeholder}
+          disabled={disabled}
+          rows={3}
+          data-testid="formula-editor-textarea"
+        />
+
+        {/* $ variable autocomplete dropdown */}
+        {acQuery !== null && acItems.length > 0 && (
+          <div
+            className="absolute left-0 z-50 mt-1 max-h-48 w-72 overflow-y-auto rounded-md border border-gray-200 bg-white shadow-lg"
+            data-testid="formula-autocomplete"
+          >
+            {acItems.map((item, i) => (
+              <button
+                key={item.code}
+                type="button"
+                className={cn(
+                  'flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs',
+                  i === acIndex ? 'bg-purple-50 text-purple-700' : 'text-gray-700 hover:bg-gray-50',
+                )}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  const textarea = textareaRef.current;
+                  if (!textarea) return;
+                  const cursorPos = textarea.selectionStart;
+                  const textBefore = (value || '').slice(0, cursorPos);
+                  const textAfter = (value || '').slice(cursorPos);
+                  const match = textBefore.match(/(\$[\w.]*)$/);
+                  if (match) {
+                    const prefix = textBefore.slice(0, textBefore.length - match[1].length);
+                    onChange?.(prefix + item.code + textAfter);
+                  }
+                  setAcQuery(null);
+                }}
+                data-testid={`ac-item-${item.code}`}
+              >
+                <span className="font-mono font-medium">{item.code}</span>
+                <span className="text-gray-400">{item.name}</span>
+              </button>
+            ))}
+          </div>
         )}
-        value={value}
-        onChange={(e) => onChange?.(e.target.value)}
-        placeholder={placeholder}
-        disabled={disabled}
-        rows={3}
-      />
+      </div>
 
       {/* Error */}
       {error && <p className="text-sm text-red-500">{error}</p>}

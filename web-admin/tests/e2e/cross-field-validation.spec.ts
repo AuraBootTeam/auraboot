@@ -37,22 +37,19 @@ async function executeCommand(
   token: string,
   commandCode: string,
   payload: Record<string, unknown>,
-  targetRecordId?: string
+  targetRecordId?: string,
 ) {
   const body: Record<string, unknown> = { payload };
   if (targetRecordId) body.targetRecordId = targetRecordId;
 
-  const resp = await fetch(
-    `http://localhost:6443/api/meta/commands/execute/${commandCode}`,
-    {
-      method: 'post',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(body),
-    }
-  );
+  const resp = await fetch(`http://localhost:6443/api/meta/commands/execute/${commandCode}`, {
+    method: 'post',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(body),
+  });
   return resp.json();
 }
 

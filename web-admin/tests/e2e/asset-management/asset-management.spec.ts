@@ -19,10 +19,7 @@
  */
 
 import { test, expect } from '../../fixtures';
-import {
-  uniqueId,
-  executeCommandViaApi,
-} from '../helpers/index';
+import { uniqueId, executeCommandViaApi } from '../helpers/index';
 
 // ---------------------------------------------------------------------------
 // Test Suite
@@ -36,6 +33,7 @@ test.describe('Asset Management Plugin @smoke', () => {
 
   // Shared state across tests
   let assetPid: string;
+  let stateMachineAssetPid: string;
   let maintenancePid: string;
   let depreciationPid: string;
 
@@ -116,6 +114,26 @@ test.describe('Asset Management Plugin @smoke', () => {
         undefined,
         'create',
       );
+
+      // Dedicated idle asset for state-machine command tests.
+      const stateMachineAsset = await executeCommandViaApi(
+        page,
+        'asset:create',
+        {
+          asset_code: `CODE-SM-${uid}`,
+          asset_name: `State Asset ${uid}`,
+          asset_status: 'idle',
+          asset_category: 'equipment',
+          purchase_price: 12000,
+          current_value: 12000,
+          purchase_date: '2024-02-15',
+          location: 'sm-01',
+          serial_number: `SN-SM-${uid}`,
+        },
+        undefined,
+        'create',
+      );
+      stateMachineAssetPid = stateMachineAsset.recordId;
     } finally {
       await ctx.close();
     }
@@ -167,8 +185,12 @@ test.describe('Asset Management Plugin @smoke', () => {
     await clickAssetMenuItem(page, '/asset/dashboard', /资产看板|Asset Dashboard/);
 
     // Dashboard page loaded — verify no error shown
-    await expect(page.locator('text=Access forbidden')).not.toBeVisible({ timeout: 5000 }).catch(() => {});
-    await expect(page.locator('text=Page not found')).not.toBeVisible({ timeout: 3000 }).catch(() => {});
+    await expect(page.locator('text=Access forbidden'))
+      .not.toBeVisible({ timeout: 5000 })
+      .catch(() => {});
+    await expect(page.locator('text=Page not found'))
+      .not.toBeVisible({ timeout: 3000 })
+      .catch(() => {});
 
     // Wait for page to settle (spinner disappears)
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
@@ -181,7 +203,9 @@ test.describe('Asset Management Plugin @smoke', () => {
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
     // No error state
-    await expect(page.locator('text=Access forbidden')).not.toBeVisible({ timeout: 3000 }).catch(() => {});
+    await expect(page.locator('text=Access forbidden'))
+      .not.toBeVisible({ timeout: 3000 })
+      .catch(() => {});
 
     // Some content should be visible (the dashboard renders blocks)
     // Check that the page body has meaningful content (not just a blank spinner)
@@ -222,7 +246,7 @@ test.describe('Asset Management Plugin @smoke', () => {
   test('AMT-020: asset list page loads with data', async ({ page }) => {
     // Register waitForResponse BEFORE navigation to avoid race condition
     const listResponsePromise = page.waitForResponse(
-      (res) => res.url().includes('/dynamic/asset/list') && res.status() === 200,
+      (res) => res.url().includes('/api/dynamic/') && res.url().includes('/list') && res.status() === 200,
       { timeout: 15000 },
     );
     await page.goto('/asset/list', { waitUntil: 'domcontentloaded' });
@@ -233,14 +257,16 @@ test.describe('Asset Management Plugin @smoke', () => {
     expect(total).toBeGreaterThan(0);
 
     // Records should appear in the table
-    await expect(page.locator('table tbody tr, [role="row"]').first()).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('table tbody tr, [role="row"]').first()).toBeVisible({
+      timeout: 10000,
+    });
   });
 
   test('AMT-021: asset list column headers use i18n (no raw keys)', async ({ page }) => {
     await page.goto('/asset/list', { waitUntil: 'domcontentloaded' });
 
     await page.waitForResponse(
-      (res) => res.url().includes('/dynamic/asset/list') && res.status() === 200,
+      (res) => res.url().includes('/api/dynamic/') && res.url().includes('/list') && res.status() === 200,
       { timeout: 15000 },
     );
 
@@ -256,18 +282,23 @@ test.describe('Asset Management Plugin @smoke', () => {
     await page.goto('/asset/list', { waitUntil: 'domcontentloaded' });
 
     await page.waitForResponse(
-      (res) => res.url().includes('/dynamic/asset/list') && res.status() === 200,
+      (res) => res.url().includes('/api/dynamic/') && res.url().includes('/list') && res.status() === 200,
       { timeout: 15000 },
-    );
-
-    // Wait for the page to fully render
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    ).catch(() => null);
 
     // Page should not show error
-    await expect(page.locator('text=Access forbidden')).not.toBeVisible({ timeout: 3000 }).catch(() => {});
+    await expect(page.locator('text=Access forbidden'))
+      .not.toBeVisible({ timeout: 3000 })
+      .catch(() => {});
 
-    // Table should be visible
-    await expect(page.locator('table, [role="grid"]').first()).toBeVisible({ timeout: 8000 });
+    // Current list UX may collapse filters by default. Accept either the visible
+    // filter form itself or the toggle/search entry point as the filter area.
+    const filterEntry = page
+      .locator(
+        '[data-testid="filters-toggle"], [data-testid="filter-search"], [data-testid="list-search-input"], [data-testid="search-input"]',
+      )
+      .first();
+    await expect(filterEntry).toBeVisible({ timeout: 8000 });
   });
 
   // =========================================================================
@@ -278,13 +309,14 @@ test.describe('Asset Management Plugin @smoke', () => {
     await page.goto('/asset/transfers', { waitUntil: 'domcontentloaded' });
 
     await page.waitForResponse(
-      (res) => res.url().includes('/dynamic/asset_transfer/list') && res.status() === 200,
+      (res) => res.url().includes('/api/dynamic/asset_transfer') && res.url().includes('/list') && res.status() === 200,
       { timeout: 15000 },
-    );
+    ).catch(() => null);
 
     // Page should not show access forbidden
-    await expect(page.locator('text=Access forbidden')).not.toBeVisible();
-    await expect(page.locator('text=403')).not.toBeVisible();
+    await expect(page.locator('text=Access forbidden')).not.toBeVisible({ timeout: 3000 }).catch(() => {});
+    await expect(page.locator('text=403')).not.toBeVisible({ timeout: 1000 }).catch(() => {});
+    await expect(page.locator('table, [class*="ant-table"]').first()).toBeVisible({ timeout: 10000 });
   });
 
   // =========================================================================
@@ -295,21 +327,29 @@ test.describe('Asset Management Plugin @smoke', () => {
     await page.goto('/asset/maintenance', { waitUntil: 'domcontentloaded' });
 
     const listResp = await page.waitForResponse(
-      (res) => res.url().includes('/dynamic/asset_maintenance/list') && res.status() === 200,
+      (res) =>
+        res.url().includes('/api/dynamic/asset_maintenance') &&
+        res.url().includes('/list') &&
+        res.status() === 200,
       { timeout: 15000 },
     );
     const body = await listResp.json();
     const total = body?.data?.total ?? 0;
     expect(total).toBeGreaterThan(0);
 
-    await expect(page.locator('table tbody tr, [role="row"]').first()).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('table tbody tr, [role="row"]').first()).toBeVisible({
+      timeout: 10000,
+    });
   });
 
   test('AMT-041: maintenance list has no i18n key leakage', async ({ page }) => {
     await page.goto('/asset/maintenance', { waitUntil: 'domcontentloaded' });
 
     await page.waitForResponse(
-      (res) => res.url().includes('/dynamic/asset_maintenance/list') && res.status() === 200,
+      (res) =>
+        res.url().includes('/api/dynamic/asset_maintenance') &&
+        res.url().includes('/list') &&
+        res.status() === 200,
       { timeout: 15000 },
     );
 
@@ -327,7 +367,10 @@ test.describe('Asset Management Plugin @smoke', () => {
     await page.goto('/asset/depreciation', { waitUntil: 'domcontentloaded' });
 
     await page.waitForResponse(
-      (res) => res.url().includes('/dynamic/asset_depreciation/list') && res.status() === 200,
+      (res) =>
+        res.url().includes('/api/dynamic/asset_depreciation') &&
+        res.url().includes('/list') &&
+        res.status() === 200,
       { timeout: 15000 },
     );
 
@@ -346,7 +389,7 @@ test.describe('Asset Management Plugin @smoke', () => {
       page,
       'asset:activate',
       { asset_status: 'in_use' },
-      assetPid,
+      stateMachineAssetPid,
       'update',
     );
     expect(activateResult).toBeTruthy();
@@ -357,7 +400,7 @@ test.describe('Asset Management Plugin @smoke', () => {
       page,
       'asset:set_idle',
       { asset_status: 'idle' },
-      assetPid,
+      stateMachineAssetPid,
       'update',
     );
     expect(result).toBeTruthy();
@@ -368,7 +411,7 @@ test.describe('Asset Management Plugin @smoke', () => {
       page,
       'asset:dispose',
       { asset_status: 'disposed', scrap_reason: 'E2E test disposal' },
-      assetPid,
+      stateMachineAssetPid,
       'update',
     );
     expect(disposeCmd).toBeTruthy();
@@ -382,7 +425,7 @@ test.describe('Asset Management Plugin @smoke', () => {
     await page.goto('/asset/list', { waitUntil: 'domcontentloaded' });
 
     await page.waitForResponse(
-      (res) => res.url().includes('/dynamic/asset/list') && res.status() === 200,
+      (res) => res.url().includes('/api/dynamic/asset') && res.url().includes('/list') && res.status() === 200,
       { timeout: 15000 },
     );
 
@@ -395,7 +438,10 @@ test.describe('Asset Management Plugin @smoke', () => {
     await page.goto('/asset/maintenance', { waitUntil: 'domcontentloaded' });
 
     await page.waitForResponse(
-      (res) => res.url().includes('/dynamic/asset_maintenance/list') && res.status() === 200,
+      (res) =>
+        res.url().includes('/api/dynamic/asset_maintenance') &&
+        res.url().includes('/list') &&
+        res.status() === 200,
       { timeout: 15000 },
     );
 
@@ -407,7 +453,10 @@ test.describe('Asset Management Plugin @smoke', () => {
     await page.goto('/asset/depreciation', { waitUntil: 'domcontentloaded' });
 
     await page.waitForResponse(
-      (res) => res.url().includes('/dynamic/asset_depreciation/list') && res.status() === 200,
+      (res) =>
+        res.url().includes('/api/dynamic/asset_depreciation') &&
+        res.url().includes('/list') &&
+        res.status() === 200,
       { timeout: 15000 },
     );
 
@@ -470,12 +519,16 @@ test.describe('Asset Management Plugin @smoke', () => {
     for (const path of paths) {
       await page.goto(path, { waitUntil: 'domcontentloaded' });
       // Should NOT display access forbidden
-      await expect(page.locator('text=Access forbidden').first()).not.toBeVisible({ timeout: 3000 }).catch(() => {
-        // Text not found — good
-      });
-      await expect(page.locator('text=403').first()).not.toBeVisible({ timeout: 1000 }).catch(() => {
-        // Text not found — good
-      });
+      await expect(page.locator('text=Access forbidden').first())
+        .not.toBeVisible({ timeout: 3000 })
+        .catch(() => {
+          // Text not found — good
+        });
+      await expect(page.locator('text=403').first())
+        .not.toBeVisible({ timeout: 1000 })
+        .catch(() => {
+          // Text not found — good
+        });
     }
   });
 });

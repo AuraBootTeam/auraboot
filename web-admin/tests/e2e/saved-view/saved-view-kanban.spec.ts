@@ -14,26 +14,29 @@ import { uniqueId, todayStr, navigateToDynamicPage } from '../helpers';
 
 const VIEW_NAME = 'E2E Kanban Board';
 const MODEL_CODE = 'e2et_order';
-const PAGE_KEY = 'e2et-order';
+const PAGE_KEY = 'e2et_order';
 
-/** Navigate to e2et-order page, click kanban type, and select the kanban view */
+/** Navigate to e2et-order page and select the kanban view via ViewManagePanel */
 async function gotoAndSelectKanbanView(page: import('@playwright/test').Page) {
   await navigateToDynamicPage(page, PAGE_KEY);
-  await page.locator('[data-testid="view-type-table"]').waitFor({ state: 'visible', timeout: 8000 });
+  // Wait for the list page content to be visible (table renders by default)
+  await page.locator('table, [role="table"], [data-testid="dynamic-list"]').first().waitFor({ state: 'visible', timeout: 15000 });
 
-  const kanbanBtn = page.locator('[data-testid="view-type-kanban"]');
-  await expect(kanbanBtn).toBeVisible({ timeout: 5000 });
-  await kanbanBtn.click();
-
-  // Open dropdown and select the kanban view
+  // Click ViewSelector button to open ViewManagePanel (slide-out dialog)
   const viewSelector = page.locator('button[aria-haspopup="listbox"]');
   await viewSelector.click();
-  const dropdown = page.locator('[role="listbox"]');
-  await dropdown.waitFor({ state: 'visible', timeout: 5000 });
-  const viewOption = dropdown.getByText(VIEW_NAME).first();
-  if (await viewOption.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await viewOption.click();
+  const panel = page.locator('[role="dialog"]');
+  await panel.waitFor({ state: 'visible', timeout: 5000 });
+  // Find and click the kanban view by name in the panel
+  const viewOption = panel.getByText(VIEW_NAME, { exact: false }).first();
+  await viewOption.waitFor({ state: 'visible', timeout: 5000 });
+  await viewOption.click();
+  // Close the panel after selecting the view (panel does not auto-close)
+  const closeBtn = panel.locator('button[aria-label="Close panel"]');
+  if (await closeBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+    await closeBtn.click();
   }
+  await panel.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
 }
 
 test.describe('SavedView — KANBAN View', () => {
@@ -51,7 +54,9 @@ test.describe('SavedView — KANBAN View', () => {
     );
     if (existing.ok()) {
       const body = await existing.json();
-      for (const v of (body.data ?? []).filter((v: any) => v.viewType === 'kanban' && v.name === VIEW_NAME)) {
+      for (const v of (body.data ?? []).filter(
+        (v: any) => v.viewType === 'kanban' && v.name === VIEW_NAME,
+      )) {
         await page.request.delete(`/api/views/${v.pid}`).catch(() => {});
       }
     }
@@ -104,7 +109,9 @@ test.describe('SavedView — KANBAN View', () => {
         const status = record.e2et_order_status as string;
         if (status === 'submitted') await order.executeCommand('reject', pid).catch(() => {});
         await order.deleteViaApi(pid).catch(() => {});
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     }
     // Clean up kanban views
     if (kanbanViewPid) {
@@ -115,7 +122,9 @@ test.describe('SavedView — KANBAN View', () => {
     );
     if (cleanup.ok()) {
       const body = await cleanup.json();
-      for (const v of (body.data ?? []).filter((v: any) => v.viewType === 'kanban' && v.name === VIEW_NAME)) {
+      for (const v of (body.data ?? []).filter(
+        (v: any) => v.viewType === 'kanban' && v.name === VIEW_NAME,
+      )) {
         await page.request.delete(`/api/views/${v.pid}`).catch(() => {});
       }
     }
@@ -161,8 +170,10 @@ test.describe('SavedView — KANBAN View', () => {
     if (await firstCard.isVisible({ timeout: 3000 }).catch(() => false)) {
       await firstCard.click();
       await Promise.race([
-        page.waitForURL(/\/dynamic\/e2et-order\/[^/]+/, { timeout: 3000 }),
-        page.locator('[role="dialog"], [class*="modal"], [data-testid*="detail"]').first()
+        page.waitForURL(/\/p\/e2et-order\/[^/]+/, { timeout: 3000 }),
+        page
+          .locator('[role="dialog"], [class*="modal"], [data-testid*="detail"]')
+          .first()
           .waitFor({ state: 'visible', timeout: 3000 }),
       ]).catch(() => {});
     }

@@ -97,7 +97,7 @@ export class TestCleanup {
     // Query and delete models with prefix
     try {
       const modelsResponse = await request.get(`/api/meta/models`, {
-        params: { keyword: prefix, size: 100 }
+        params: { keyword: prefix, size: 100 },
       });
       const modelsData = await modelsResponse.json();
 
@@ -119,7 +119,7 @@ export class TestCleanup {
     // Query and delete fields with prefix
     try {
       const fieldsResponse = await request.get(`/api/meta/fields`, {
-        params: { code: prefix, size: 100 }
+        params: { code: prefix, size: 100 },
       });
       const fieldsData = await fieldsResponse.json();
 
@@ -141,7 +141,7 @@ export class TestCleanup {
     // Query and delete dictionaries with prefix
     try {
       const dictsResponse = await request.get(`/api/meta/dict`, {
-        params: { code: prefix, pageSize: 100 }
+        params: { code: prefix, pageSize: 100 },
       });
       const dictsData = await dictsResponse.json();
 

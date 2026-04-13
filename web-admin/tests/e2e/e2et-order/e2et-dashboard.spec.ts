@@ -22,7 +22,7 @@ test.describe('E2E Test Dashboard', () => {
     await waitForDynamicPageLoad(page);
 
     // Dashboard should render at least one data-table block
-    const tables = page.locator('table, [role="table"], [data-testid*="data-table"]');
+    const tables = page.locator('table, [role="table"], [data-testid*="table"]');
     await expect(tables.first()).toBeVisible({ timeout: 10000 });
 
     // Should have multiple data-table blocks (3 configured: recent orders, pending payments, customers)
@@ -37,18 +37,9 @@ test.describe('E2E Test Dashboard', () => {
     await navigateToDynamicPage(page, 'e2et-order-dashboard');
     await waitForDynamicPageLoad(page);
 
-    // Wait for dashboard to render text content
-    await expect(page.locator('body')).toBeVisible({ timeout: 5000 });
-
-    // Check for configured block titles (zh-CN or en)
-    const pageContent = await page.textContent('body', { timeout: 5000 }).catch(() => '') ?? '';
-
-    // At least one of the configured block titles should be visible
-    const hasRecentOrders = pageContent.includes('近期订单') || pageContent.includes('Recent Orders');
-    const hasPendingPayments = pageContent.includes('待审批付款') || pageContent.includes('Pending Payments');
-    const hasCustomers = pageContent.includes('客户一览') || pageContent.includes('Customer Overview');
-
-    // At least the main block should render
-    expect(hasRecentOrders || hasPendingPayments || hasCustomers).toBe(true);
+    const mainContent = page.locator('main').first();
+    await expect(mainContent).toContainText(/近期订单|Recent Orders/, { timeout: 10_000 });
+    await expect(mainContent).toContainText(/待审批付款|Pending Payments/, { timeout: 10_000 });
+    await expect(mainContent).toContainText(/客户一览|Customer Overview/, { timeout: 10_000 });
   });
 });

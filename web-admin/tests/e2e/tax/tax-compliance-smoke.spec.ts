@@ -37,25 +37,29 @@ async function navigateToTaxMenu(page: Page, menuText: RegExp, expectedUrl: RegE
 // ==================== Tax Dashboard ====================
 
 test.describe('Tax Dashboard', () => {
-
   test('dashboard page loads with stat cards', async ({ page }) => {
     await navigateToTaxMenu(page, /Tax Dashboard|税务概览/, /\/tax\/dashboard/);
 
     // Assert the actual dashboard content instead of relying on legacy stat-card CSS hooks.
-    await expect(page.getByRole('heading', { name: /Tax Dashboard|税务概览/ })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('heading', { name: /Tax Dashboard|税务概览/ })).toBeVisible({
+      timeout: 15000,
+    });
     await expect(page.getByText(/^今日开具$|^Issued Today$/)).toBeVisible();
     await expect(page.getByText(/^今日开票金额$|^Issued Amount$/)).toBeVisible();
     await expect(page.getByText(/^待报送$|^Pending Submit$/)).toBeVisible();
     await expect(page.getByText(/^已验证$|^Verified$/)).toBeVisible();
-    await expect(page.getByRole('heading', { name: /待报送发票|Unsubmitted Invoices/ })).toBeVisible();
-    await expect(page.getByRole('heading', { name: /失败提交记录|Failed Submissions/ })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: /待报送发票|Unsubmitted Invoices/ }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: /失败提交记录|Failed Submissions/ }),
+    ).toBeVisible();
   });
 });
 
 // ==================== VAT Rates ====================
 
 test.describe('VAT Rate Management', () => {
-
   test('VAT rate list page loads and shows table', async ({ page }) => {
     await navigateToTaxMenu(page, /VAT Rates|增值税税率/, /\/tax\/vat-rates/);
 
@@ -76,7 +80,7 @@ test.describe('VAT Rate Management', () => {
     await createBtn.first().click();
 
     // Wait for form to load
-    await page.waitForURL(/\/dynamic\/tax_vat_rate\/new(\?|$)/, { timeout: 10000 });
+    await page.waitForURL(/\/p\/tax_vat_rate\/new(\?|$)/, { timeout: 10000 });
 
     const rateCode = uniqueId();
 
@@ -93,7 +97,12 @@ test.describe('VAT Rate Management', () => {
 
     // Save
     const saveBtn = page.locator('button').filter({ hasText: /save|保存/i });
-    if (await saveBtn.first().isVisible({ timeout: 3000 }).catch(() => false)) {
+    if (
+      await saveBtn
+        .first()
+        .isVisible({ timeout: 3000 })
+        .catch(() => false)
+    ) {
       await saveBtn.first().click();
     }
   });
@@ -102,7 +111,6 @@ test.describe('VAT Rate Management', () => {
 // ==================== E-Invoices ====================
 
 test.describe('E-Invoice Management', () => {
-
   test('e-invoice list page loads with status tabs', async ({ page }) => {
     await navigateToTaxMenu(page, /E-Invoices|电子发票/, /\/tax\/einvoices/);
 
@@ -127,7 +135,7 @@ test.describe('E-Invoice Management', () => {
     await page.getByTestId('toolbar-btn-create').click();
 
     // Wait for form
-    await page.waitForURL(/\/dynamic\/tax_einvoice\/new(\?|$)/, { timeout: 10000 });
+    await page.waitForURL(/\/p\/tax_einvoice\/new(\?|$)/, { timeout: 10000 });
 
     // Buyer section should exist
     const buyerSection = page.locator('text=/Buyer Information|购方信息/');
@@ -142,7 +150,6 @@ test.describe('E-Invoice Management', () => {
 // ==================== Tax Configuration ====================
 
 test.describe('Tax Configuration', () => {
-
   test('tax config page loads and shows table', async ({ page }) => {
     await navigateToTaxMenu(page, /Tax Settings|税务配置/, /\/tax\/settings/);
 

@@ -14,6 +14,8 @@ import {
   uniqueId,
   executeCommandViaApi,
   extractRecordId,
+  ensureFilterFormOpen,
+  clickRowActionByLocator,
 } from '../helpers/index';
 
 // ---------------------------------------------------------------------------
@@ -32,11 +34,11 @@ async function navigateToProjectRoles(page: import('@playwright/test').Page) {
   await masterDataMenu.first().waitFor({ state: 'attached', timeout: 5000 });
   await masterDataMenu.first().evaluate((el) => (el as HTMLButtonElement).click());
 
-  const link = page.locator('a[href="/dynamic/pm-project-role"]');
+  const link = page.locator('a[href="/p/pm_project_role"]');
   await link.first().waitFor({ state: 'attached', timeout: 5000 });
   await link.first().evaluate((el) => (el as HTMLAnchorElement).click());
 
-  await expect(page).toHaveURL(/\/dynamic\/pm-project-role/);
+  await expect(page).toHaveURL(/\/p\/pm_project_role/);
   // Wait for table to render
   const table = page.locator('table, [role="table"]');
   const empty = page.locator('text=/no data|暂无/i');
@@ -45,6 +47,7 @@ async function navigateToProjectRoles(page: import('@playwright/test').Page) {
 
 /** Search for a role by name using DSL filter form (handles pagination) */
 async function searchRole(page: import('@playwright/test').Page, name: string) {
+  await ensureFilterFormOpen(page);
   // DSL filter form renders a textbox labeled "角色名称"
   const filterInput = page.getByRole('textbox', { name: /角色名称|pm_role_name/i });
   await expect(filterInput).toBeVisible({ timeout: 5000 });
@@ -80,10 +83,16 @@ test.describe('PM Master Data — Project Role CRUD', () => {
   });
 
   test('PM-ROLE-02: Create project role via API, verify in list', async ({ page }) => {
-    const result = await executeCommandViaApi(page, 'pm:create_project_role', {
-      pm_role_name: roleName,
-      pm_role_description: 'E2E test role',
-    }, undefined, 'create');
+    const result = await executeCommandViaApi(
+      page,
+      'pm:create_project_role',
+      {
+        pm_role_name: roleName,
+        pm_role_description: 'E2E test role',
+      },
+      undefined,
+      'create',
+    );
     rolePid = result.recordId;
     expect(rolePid).toBeTruthy();
 
@@ -101,7 +110,7 @@ test.describe('PM Master Data — Project Role CRUD', () => {
     await addBtn.first().click();
 
     // Wait for DSL form page to load (URL uses underscores: pm_project_role)
-    await expect(page).toHaveURL(/\/dynamic\/pm_project_role\/new/, { timeout: 10000 });
+    await expect(page).toHaveURL(/\/p\/pm_project_role\/new/, { timeout: 10000 });
 
     // DSL form fields use data-testid="form-field-{fieldCode}"
     const nameField = page.getByTestId('form-field-pm_role_name');
@@ -118,9 +127,9 @@ test.describe('PM Master Data — Project Role CRUD', () => {
       (r) => r.url().includes('/execute/pm:create_project_role') && r.status() === 200,
       { timeout: 10000 },
     );
-    const saveBtn = page.getByTestId('form-btn-pm:create_project_role').or(
-      page.locator('button[type="submit"], button:has-text("Save"), button:has-text("保存")')
-    );
+    const saveBtn = page
+      .getByTestId('form-btn-pm:create_project_role')
+      .or(page.locator('button[type="submit"], button:has-text("Save"), button:has-text("保存")'));
     await saveBtn.first().click();
     const submitResp = await submitPromise;
     const submitBody = await submitResp.json();
@@ -146,7 +155,7 @@ test.describe('PM Master Data — Project Role CRUD', () => {
     await editBtn.evaluate((el) => (el as HTMLButtonElement).click());
 
     // Wait for edit form page (URL uses underscores: pm_project_role)
-    await expect(page).toHaveURL(/\/dynamic\/pm_project_role\/.*\/edit/, { timeout: 15000 });
+    await expect(page).toHaveURL(/\/p\/pm_project_role\/.*\/edit/, { timeout: 15000 });
     await expect(page.getByTestId('form-field-pm_role_name')).toBeVisible({ timeout: 15000 });
 
     // Update name
@@ -181,18 +190,19 @@ test.describe('PM Master Data — Project Role CRUD', () => {
     const roleRow = page.locator('tbody tr', { hasText: deleteRoleName }).first();
     await expect(roleRow).toBeVisible({ timeout: 10000 });
 
-    // Click "删除" (delete) button in the row actions
-    const deleteBtn = roleRow.locator('button:has-text("删除"), button:has-text("Delete")').first();
-    await expect(deleteBtn).toBeVisible({ timeout: 5000 });
-
-    const deletePromise = page.waitForResponse(
-      (r) => r.url().includes('/execute/pm:delete_project_role') && r.status() === 200,
-      { timeout: 10000 },
-    ).catch(() => null);
-    await deleteBtn.click();
+    // Click delete action via DSL row action button (may be in dropdown)
+    const deletePromise = page
+      .waitForResponse(
+        (r) => r.url().includes('/execute/pm:delete_project_role') && r.status() === 200,
+        { timeout: 10000 },
+      )
+      .catch(() => null);
+    await clickRowActionByLocator(page, roleRow, 'delete_project_role', 'Delete');
 
     await acceptConfirmDialog(page).catch(async () => {
-      const confirmBtn = page.locator('button:has-text("OK"), button:has-text("确定"), button:has-text("Confirm")').first();
+      const confirmBtn = page
+        .locator('button:has-text("OK"), button:has-text("确定"), button:has-text("Confirm")')
+        .first();
       if (await confirmBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
         await confirmBtn.click();
       }
@@ -210,7 +220,9 @@ test.describe('PM Master Data — Project Role CRUD', () => {
     await expect(page.locator(`text=${updatedRoleName}`)).toBeVisible({ timeout: 10000 });
   });
 
-  test('PM-ROLE-07: Project role list supports pagination or shows all entries', async ({ page }) => {
+  test('PM-ROLE-07: Project role list supports pagination or shows all entries', async ({
+    page,
+  }) => {
     await navigateToProjectRoles(page);
 
     // Table should render with at least 1 row (our created role)

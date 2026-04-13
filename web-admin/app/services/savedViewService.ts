@@ -12,6 +12,7 @@ import type {
   SavedViewCreateRequest,
   SavedViewUpdateRequest,
   SavedViewQueryParams,
+  ViewConfig,
 } from '~/smart/types/savedView';
 
 const BASE_URL = '/api/views';
@@ -91,6 +92,18 @@ export class SavedViewService {
   async createView(data: SavedViewCreateRequest, request?: Request): Promise<SavedView> {
     const result = await post<SavedView>(BASE_URL, data, undefined, request);
     return handleResponse(result, 'Failed to create view');
+  }
+
+  /**
+   * Auto-save view config (atomic upsert of implicit view).
+   * Backend finds or creates an implicit personal view for the current user/model/page.
+   */
+  async autoSave(
+    data: { modelCode: string; pageKey?: string; viewConfig?: Partial<ViewConfig> },
+    request?: Request,
+  ): Promise<SavedView> {
+    const result = await post<SavedView>(`${BASE_URL}/auto-save`, data, undefined, request);
+    return handleResponse(result, 'Failed to auto-save view');
   }
 
   /**

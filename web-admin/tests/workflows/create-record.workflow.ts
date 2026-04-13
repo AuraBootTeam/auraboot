@@ -45,7 +45,7 @@ export interface CreateRecordResult {
  */
 export async function createRecord(
   api: ApiClient,
-  options: CreateRecordOptions
+  options: CreateRecordOptions,
 ): Promise<CreateRecordResult> {
   // This is a placeholder implementation.
   // Adjust the endpoint and request format based on your actual API.
@@ -76,7 +76,7 @@ export async function createRecord(
  * @param modelCode - Model code
  */
 export async function navigateToCreateRecordPage(page: Page, modelCode: string): Promise<void> {
-  await page.goto(`/dynamic/${modelCode}/new`);
+  await page.goto(`/p/${modelCode}/new`);
   await page.waitForLoadState('domcontentloaded');
 }
 
@@ -87,7 +87,7 @@ export async function navigateToCreateRecordPage(page: Page, modelCode: string):
  * @param modelCode - Model code
  */
 export async function navigateToRecordList(page: Page, modelCode: string): Promise<void> {
-  await page.goto(`/dynamic/${modelCode}`);
+  await page.goto(`/p/${modelCode}`);
   await page.waitForLoadState('domcontentloaded');
 }
 
@@ -101,9 +101,9 @@ export async function navigateToRecordList(page: Page, modelCode: string): Promi
 export async function navigateToRecordDetail(
   page: Page,
   modelCode: string,
-  recordId: string | number
+  recordId: string | number,
 ): Promise<void> {
-  await page.goto(`/dynamic/${modelCode}/${recordId}`);
+  await page.goto(`/p/${modelCode}/${recordId}`);
   await page.waitForLoadState('domcontentloaded');
 }
 
@@ -118,7 +118,7 @@ export async function navigateToRecordDetail(
 export async function deleteRecord(
   api: ApiClient,
   modelCode: string,
-  recordId: string | number
+  recordId: string | number,
 ): Promise<boolean> {
   try {
     const endpoint = `/api/dynamic/${modelCode}/${recordId}`;

@@ -15,16 +15,33 @@ const storeModel: TemplateModelMeta = {
   displayName: '门店',
   primaryKey: 'pid',
   fields: [
-    { field: 'name', label: '门店名称', type: 'string', required: true, searchable: true, listVisible: true },
+    {
+      field: 'name',
+      label: '门店名称',
+      type: 'string',
+      required: true,
+      searchable: true,
+      listVisible: true,
+    },
     { field: 'code', label: '门店编码', type: 'string', required: true, listVisible: true },
-    { field: 'type', label: '门店类型', type: 'enum', searchable: true, listVisible: true,
+    {
+      field: 'type',
+      label: '门店类型',
+      type: 'enum',
+      searchable: true,
+      listVisible: true,
       options: [
         { label: '旗舰店', value: 'flagship' },
         { label: '分店', value: 'branch' },
         { label: '加盟店', value: 'franchise' },
       ],
     },
-    { field: 'status', label: '状态', type: 'enum', searchable: true, listVisible: true,
+    {
+      field: 'status',
+      label: '状态',
+      type: 'enum',
+      searchable: true,
+      listVisible: true,
       options: [
         { label: '营业中', value: 'active' },
         { label: '暂停营业', value: 'inactive' },
@@ -33,7 +50,13 @@ const storeModel: TemplateModelMeta = {
     },
     { field: 'address', label: '地址', type: 'string', listVisible: true },
     { field: 'contactPhone', label: '联系电话', type: 'string', required: true },
-    { field: 'createdAt', label: '创建时间', type: 'datetime', listVisible: true, valueType: 'datetime' },
+    {
+      field: 'createdAt',
+      label: '创建时间',
+      type: 'datetime',
+      listVisible: true,
+      valueType: 'datetime',
+    },
   ],
 };
 

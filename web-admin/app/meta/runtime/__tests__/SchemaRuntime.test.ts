@@ -4,7 +4,7 @@ import { DataSourceManager } from '~/meta/runtime/data-pipeline/DataSourceManage
 import { createExpressionContext, type GlobalState } from '~/meta/runtime/expression/context';
 import type { UnifiedSchema } from '~/meta/schemas/types';
 import { actionRegistry } from '~/meta/runtime/actions/ActionRegistry';
-import formDsl from '~/designer/test/final.v1.0/form.json';
+import formDsl from '~/studio/test/final.v1.0/form.json';
 
 const createGlobalState = (): GlobalState => ({
   locale: 'zh-CN',
@@ -15,26 +15,17 @@ const createGlobalState = (): GlobalState => ({
 const createManager = () => new DataSourceManager(createExpressionContext());
 
 const minimalSchema: UnifiedSchema = {
-  kind: 'Form',
+  kind: 'form',
   version: '1.0.0',
   id: 'schema.runtime.test',
   title: 'Test',
   layout: {
-    areas: ['main'],
-    areasConfig: {
-      main: {
-        type: 'grid',
-        cols: 1,
-        rowGap: 8,
-        colGap: 8,
-      },
-    },
+    type: 'grid',
+    cols: 1,
+    rowGap: 8,
+    colGap: 8,
   },
-  areas: {
-    main: {
-      blocks: [],
-    },
-  },
+  blocks: [],
 };
 
 describe('SchemaRuntime', () => {
@@ -116,7 +107,7 @@ describe('SchemaRuntime', () => {
   it('initializes successfully with the final.v1.0 DSL sample', () => {
     const manager = createManager();
     const runtime = new SchemaRuntime({
-      schema: formDsl as UnifiedSchema,
+      schema: formDsl as unknown as UnifiedSchema,
       globalState: createGlobalState(),
       dataSourceManager: manager,
       disableAutoFetch: true,

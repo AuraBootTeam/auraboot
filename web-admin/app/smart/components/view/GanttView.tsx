@@ -489,11 +489,19 @@ export const GanttView: React.FC<GanttViewProps> = ({
             validRecords={diagnostics.validRecords}
             categories={[
               { key: 'missing_both', label: 'Missing both dates', count: diagnostics.missingBoth },
-              { key: 'missing_start', label: 'Missing start date', count: diagnostics.missingStartOnly },
+              {
+                key: 'missing_start',
+                label: 'Missing start date',
+                count: diagnostics.missingStartOnly,
+              },
               { key: 'missing_end', label: 'Missing end date', count: diagnostics.missingEndOnly },
-              { key: 'invalid_date', label: 'Invalid date value', count: diagnostics.invalidDateRecords },
+              {
+                key: 'invalid_date',
+                label: 'Invalid date value',
+                count: diagnostics.invalidDateRecords,
+              },
             ]}
-            issues={issueRecords.map(ir => ({
+            issues={issueRecords.map((ir) => ({
               recordId: ir.recordId,
               title: ir.title,
               reason: ir.reason,

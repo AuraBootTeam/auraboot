@@ -82,12 +82,16 @@ export const FormView: React.FC<FormViewProps> = ({
   const formTitle = viewConfig?.formTitle || 'Submit';
   const formDescription = viewConfig?.formDescription;
   const submitLabel = viewConfig?.formSubmitLabel || 'Submit';
-  const successMessage = viewConfig?.formSuccessMessage || 'Thank you! Your submission has been received.';
+  const successMessage =
+    viewConfig?.formSuccessMessage || 'Thank you! Your submission has been received.';
 
   // Fetch model field metadata
   useEffect(() => {
-    if (!modelCode) { setLoading(false); return; }
-    const slug = modelCode.replace(/_/g, '-');
+    if (!modelCode) {
+      setLoading(false);
+      return;
+    }
+    const slug = modelCode;
     fetchResult<any>(`/api/meta/dynamic/${slug}/meta`)
       .then((result) => {
         if (ResultHelper.isSuccess(result) && result.data) {
@@ -113,7 +117,16 @@ export const FormView: React.FC<FormViewProps> = ({
           }
 
           // Exclude system/auto fields
-          const systemFields = new Set(['id', 'pid', 'tenant_id', 'created_at', 'updated_at', 'created_by', 'updated_by', 'deleted_flag']);
+          const systemFields = new Set([
+            'id',
+            'pid',
+            'tenant_id',
+            'created_at',
+            'updated_at',
+            'created_by',
+            'updated_by',
+            'deleted_flag',
+          ]);
           fieldDefs = fieldDefs.filter((f) => !systemFields.has(f.code));
 
           setFields(fieldDefs);
@@ -127,32 +140,35 @@ export const FormView: React.FC<FormViewProps> = ({
     setFormData((prev) => ({ ...prev, [fieldCode]: value }));
   }, []);
 
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmitting(true);
-    setError(null);
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      setSubmitting(true);
+      setError(null);
 
-    try {
-      // Find the CREATE command for this model
-      const slug = modelCode.replace(/_/g, '-');
-      const result = await fetchResult<any>(`/api/dynamic/${slug}`, {
-        method: 'post',
-        params: formData,
-      });
+      try {
+        // Find the CREATE command for this model
+        const slug = modelCode;
+        const result = await fetchResult<any>(`/api/dynamic/${slug}`, {
+          method: 'post',
+          params: formData,
+        });
 
-      if (ResultHelper.isSuccess(result)) {
-        setSubmitted(true);
-        const newId = result.data?.pid || result.data?.id;
-        if (newId) onSubmitSuccess?.(String(newId));
-      } else {
-        setError(result.desc || 'Submission failed');
+        if (ResultHelper.isSuccess(result)) {
+          setSubmitted(true);
+          const newId = result.data?.pid || result.data?.id;
+          if (newId) onSubmitSuccess?.(String(newId));
+        } else {
+          setError(result.desc || 'Submission failed');
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Submission failed');
+      } finally {
+        setSubmitting(false);
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Submission failed');
-    } finally {
-      setSubmitting(false);
-    }
-  }, [modelCode, formData, onSubmitSuccess]);
+    },
+    [modelCode, formData, onSubmitSuccess],
+  );
 
   const handleReset = useCallback(() => {
     setFormData({});
@@ -190,7 +206,12 @@ export const FormView: React.FC<FormViewProps> = ({
     return (
       <div className={`mx-auto max-w-lg p-8 ${className || ''}`} data-testid="form-view-success">
         <div className="rounded-lg border border-green-200 bg-green-50 p-6 text-center">
-          <svg className="mx-auto mb-3 h-12 w-12 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg
+            className="mx-auto mb-3 h-12 w-12 text-green-500"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
           <h3 className="mb-2 text-lg font-medium text-green-800">{successMessage}</h3>
@@ -212,15 +233,18 @@ export const FormView: React.FC<FormViewProps> = ({
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Header */}
         <div className="text-center">
-          <h2 className="text-xl font-semibold text-gray-900" data-testid="form-view-title">{formTitle}</h2>
-          {formDescription && (
-            <p className="mt-1 text-sm text-gray-500">{formDescription}</p>
-          )}
+          <h2 className="text-xl font-semibold text-gray-900" data-testid="form-view-title">
+            {formTitle}
+          </h2>
+          {formDescription && <p className="mt-1 text-sm text-gray-500">{formDescription}</p>}
         </div>
 
         {/* Error */}
         {error && (
-          <div className="rounded-md bg-red-50 p-3 text-sm text-red-700" data-testid="form-view-error">
+          <div
+            className="rounded-md bg-red-50 p-3 text-sm text-red-700"
+            data-testid="form-view-error"
+          >
             {error}
           </div>
         )}

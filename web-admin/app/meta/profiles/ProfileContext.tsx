@@ -3,16 +3,16 @@
  */
 
 import { createContext, useContext } from 'react';
-import type { DslProfile } from './types';
+import type { RenderProfile } from './types';
 
-const ProfileContext = createContext<DslProfile | null>(null);
+const ProfileContext = createContext<RenderProfile | null>(null);
 
 export const ProfileProvider = ProfileContext.Provider;
 
 /**
  * Hook to access the current DSL profile from context
  */
-export function useProfile(): DslProfile {
+export function useProfile(): RenderProfile {
   const profile = useContext(ProfileContext);
   if (!profile) {
     throw new Error(
@@ -25,6 +25,6 @@ export function useProfile(): DslProfile {
 /**
  * Hook that returns profile or null (safe version)
  */
-export function useProfileSafe(): DslProfile | null {
+export function useProfileSafe(): RenderProfile | null {
   return useContext(ProfileContext);
 }

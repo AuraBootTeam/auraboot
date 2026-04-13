@@ -158,7 +158,7 @@ async function main() {
       pm_cl_name: `${name} ${batchTag}`,
       pm_cl_contact_person: '刘伟',
       pm_cl_phone: '13800001234',
-      pm_cl_email: 'biz.demo@example.com',
+      pm_cl_email: 'biz.demo@auraboot.test',
       pm_cl_address: '上海市浦东新区',
     });
   }
@@ -173,7 +173,7 @@ async function main() {
       pm_sc_category: s.category,
       pm_sc_contact_person: '陈浩',
       pm_sc_phone: '13900004567',
-      pm_sc_email: 'sc.demo@example.com',
+      pm_sc_email: 'sc.demo@auraboot.test',
       pm_sc_qualification_date: dateOffset(-30),
     });
   }

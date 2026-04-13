@@ -68,6 +68,8 @@ interface DslRegistryContextType {
   /** Get the default render component for a data type */
   getDefaultComponentForDataType: (dataType: string) => string | undefined;
 
+  /** Trigger lazy loading of the registry */
+  ensureLoaded: () => void;
   /** Force re-fetch */
   refresh: () => void;
 }
@@ -94,6 +96,7 @@ const DslRegistryContext = createContext<DslRegistryContextType>({
   commandHandlers: [],
   getRenderComponentsForDataType: () => [],
   getDefaultComponentForDataType: () => undefined,
+  ensureLoaded: () => {},
   refresh: () => {},
 });
 
@@ -106,6 +109,7 @@ export function DslRegistryProvider({ children }: { children: React.ReactNode })
   const [registry, setRegistry] = useState<DslRegistryData>(fallback);
   const [loading, setLoading] = useState(false);
   const [isFallback, setIsFallback] = useState(true);
+  const [requested, setRequested] = useState(false);
 
   const load = useCallback(async () => {
     if (!isAuthenticated) return;
@@ -121,9 +125,16 @@ export function DslRegistryProvider({ children }: { children: React.ReactNode })
     }
   }, [isAuthenticated]);
 
+  // Lazy-load: only fetch when a consumer calls ensureLoaded()
   useEffect(() => {
-    load();
-  }, [load]);
+    if (requested) {
+      load();
+    }
+  }, [requested, load]);
+
+  const ensureLoaded = useCallback(() => {
+    setRequested(true);
+  }, []);
 
   const refresh = useCallback(() => {
     invalidateRegistryCache();
@@ -164,9 +175,10 @@ export function DslRegistryProvider({ children }: { children: React.ReactNode })
       commandHandlers,
       getRenderComponentsForDataType,
       getDefaultComponentForDataType,
+      ensureLoaded,
       refresh,
     };
-  }, [registry, loading, isFallback, refresh]);
+  }, [registry, loading, isFallback, ensureLoaded, refresh]);
 
   return <DslRegistryContext.Provider value={value}>{children}</DslRegistryContext.Provider>;
 }

@@ -32,31 +32,29 @@ export function lintBestPractice(schema: UnifiedSchema): ValidationMessage[] {
     }
   }
 
-  if (schema.areas) {
-    for (const [areaId, area] of Object.entries(schema.areas)) {
-      for (const [blockIdx, block] of (area.blocks || []).entries()) {
-        const bp = `areas.${areaId}.blocks[${blockIdx}]`;
+  if (schema.blocks) {
+    for (const [blockIdx, block] of schema.blocks.entries()) {
+      const bp = `blocks[${blockIdx}]`;
 
-        // Check for unknown blockType
-        if (block.blockType && !blockTypeSet.has(block.blockType)) {
-          messages.push({
-            code: 'bp_unknown_block',
-            path: `${bp}.blockType`,
-            message: `Unknown block type "${block.blockType}" — may not render correctly`,
-            severity: 'warning',
-            suggestion: `Valid types: ${BLOCK_TYPES.join(', ')}`,
-          });
-        }
+      // Check for unknown blockType
+      if (block.blockType && !blockTypeSet.has(block.blockType)) {
+        messages.push({
+          code: 'bp_unknown_block',
+          path: `${bp}.blockType`,
+          message: `Unknown block type "${block.blockType}" — may not render correctly`,
+          severity: 'warning',
+          suggestion: `Valid types: ${BLOCK_TYPES.join(', ')}`,
+        });
+      }
 
-        // Check for missing block id
-        if (!block.id) {
-          messages.push({
-            code: 'bp_missing_id',
-            path: bp,
-            message: 'Block is missing an id — this may cause issues with state management',
-            severity: 'info',
-          });
-        }
+      // Check for missing block id
+      if (!block.id) {
+        messages.push({
+          code: 'bp_missing_id',
+          path: bp,
+          message: 'Block is missing an id — this may cause issues with state management',
+          severity: 'info',
+        });
       }
     }
   }

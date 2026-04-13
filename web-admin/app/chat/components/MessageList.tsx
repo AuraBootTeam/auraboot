@@ -14,10 +14,15 @@ interface MessageListProps {
 
 export function MessageList({ messages, isLoading }: MessageListProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const previousMessageCountRef = useRef(messages.length);
 
-  // 自动滚动到底部
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const isNewMessage = messages.length > previousMessageCountRef.current;
+    messagesEndRef.current?.scrollIntoView({
+      behavior: isNewMessage ? 'smooth' : 'auto',
+      block: 'end',
+    });
+    previousMessageCountRef.current = messages.length;
   }, [messages]);
 
   return (

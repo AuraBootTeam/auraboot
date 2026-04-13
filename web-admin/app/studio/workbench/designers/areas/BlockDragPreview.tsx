@@ -15,13 +15,13 @@ export interface BlockDragPreviewProps {
  * Block type display info
  */
 const BLOCK_INFO: Record<BlockType, { name: string; icon: string }> = {
-  'filter-form': { name: 'Filter Form', icon: '🔍' },
+  'filters': { name: 'Filter Form', icon: '🔍' },
   'form-section': { name: 'Form Section', icon: '📝' },
   'detail-section': { name: 'Detail Section', icon: '📄' },
   'form-buttons': { name: 'Form Buttons', icon: '✅' },
-  'toolbar-buttons': { name: 'Toolbar Buttons', icon: '🔘' },
+  'toolbar': { name: 'Toolbar Buttons', icon: '🔘' },
   'selection-info': { name: 'Selection Info', icon: '☑️' },
-  'data-table': { name: 'Data Table', icon: '📊' },
+  'table': { name: 'Data Table', icon: '📊' },
   'stat-card': { name: 'Stat Card', icon: '📈' },
   'chart-card': { name: 'Chart Card', icon: '📉' },
   text: { name: 'Text Content', icon: '📃' },

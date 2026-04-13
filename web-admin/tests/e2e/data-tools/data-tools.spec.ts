@@ -21,22 +21,29 @@ import { test, expect } from '../../fixtures';
  */
 async function navigateToDynamicPage(page: import('@playwright/test').Page): Promise<boolean> {
   // Try pages in order: e2et-order (most reliable), e2et-record, e2et-customer
-  const candidates = ['e2et-order', 'e2et-record', 'e2et-customer'];
-  const contentLocator = page.locator('table, .ant-table, [data-testid="smart-table"], [role="table"]');
+  const candidates = ['e2et_order', 'e2et_record', 'e2et_customer'];
+  const contentLocator = page.locator(
+    'table, .ant-table, [data-testid="smart-table"], [role="table"]',
+  );
 
   for (const pageKey of candidates) {
-    await page.goto(`/dynamic/${pageKey}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/p/${pageKey}`, { waitUntil: 'domcontentloaded' });
 
     // Wait for dynamic page content to render (schema fetch + render)
-    const found = await contentLocator.first().waitFor({ state: 'visible', timeout: 10000 })
+    const found = await contentLocator
+      .first()
+      .waitFor({ state: 'visible', timeout: 10000 })
       .then(() => true)
       .catch(() => false);
 
     if (found) return true;
 
     // Check for error state to fail fast
-    const hasError = await page.locator('text=加载失败, text=Page not found').first()
-      .isVisible({ timeout: 500 }).catch(() => false);
+    const hasError = await page
+      .locator('text=加载失败, text=Page not found')
+      .first()
+      .isVisible({ timeout: 500 })
+      .catch(() => false);
     if (hasError) continue;
   }
 
@@ -90,8 +97,12 @@ test.describe('Data Tools - Export', () => {
     await moreBtn.click();
 
     // Verify export options in dropdown
-    const excelOption = page.locator('[data-testid="more-menu-export-excel"], button:has-text("Export Excel")');
-    const csvOption = page.locator('[data-testid="more-menu-export-csv"], button:has-text("Export CSV")');
+    const excelOption = page.locator(
+      '[data-testid="more-menu-export-excel"], button:has-text("Export Excel")',
+    );
+    const csvOption = page.locator(
+      '[data-testid="more-menu-export-csv"], button:has-text("Export CSV")',
+    );
 
     await expect(excelOption).toBeVisible({ timeout: 3000 });
     await expect(csvOption).toBeVisible({ timeout: 3000 });
@@ -111,7 +122,9 @@ test.describe('Data Tools - Export', () => {
     expect(hasMoreBtn).toBe(true);
     await moreBtn.click();
 
-    const excelOption = page.locator('[data-testid="more-menu-export-excel"], button:has-text("Export Excel")');
+    const excelOption = page.locator(
+      '[data-testid="more-menu-export-excel"], button:has-text("Export Excel")',
+    );
     await expect(excelOption).toBeVisible({ timeout: 3000 });
 
     // Click outside to close
@@ -137,7 +150,9 @@ test.describe('Data Tools - Import', () => {
     expect(hasMoreBtn).toBe(true);
     await moreBtn.click();
 
-    const importBtn = page.locator('[data-testid="more-menu-import"], button:has-text("Import")').first();
+    const importBtn = page
+      .locator('[data-testid="more-menu-import"], button:has-text("Import")')
+      .first();
     await expect(importBtn).toBeVisible({ timeout: 3000 });
     await expect(importBtn).toBeEnabled();
   });
@@ -156,7 +171,9 @@ test.describe('Data Tools - Import', () => {
     expect(hasMoreBtn).toBe(true);
     await moreBtn.click();
 
-    const importBtn = page.locator('[data-testid="more-menu-import"], button:has-text("Import")').first();
+    const importBtn = page
+      .locator('[data-testid="more-menu-import"], button:has-text("Import")')
+      .first();
     const hasImportBtn = await importBtn.isVisible({ timeout: 3000 }).catch(() => false);
     expect(hasImportBtn).toBe(true);
 
@@ -164,12 +181,14 @@ test.describe('Data Tools - Import', () => {
     await importBtn.click();
 
     // Verify modal appears with upload area or import options
-    const modal = page.locator(
-      '[role="dialog"], ' +
-      '.ant-modal, ' +
-      '.fixed.inset-0, ' +
-      'div:has-text("Import"):has(input[type="file"])'
-    ).first();
+    const modal = page
+      .locator(
+        '[role="dialog"], ' +
+          '.ant-modal, ' +
+          '.fixed.inset-0, ' +
+          'div:has-text("Import"):has(input[type="file"])',
+      )
+      .first();
 
     const hasModal = await modal.isVisible({ timeout: 5000 }).catch(() => false);
 

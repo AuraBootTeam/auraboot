@@ -128,7 +128,9 @@ export const EmptyStateGuide: React.FC<EmptyStateGuideProps> = ({
             />
           </svg>
         </div>
-        <p className="mb-4 text-sm text-gray-500">{resolveDesignerText(DESIGNER_I18N.emptyState.startDesign, locale)}</p>
+        <p className="mb-4 text-sm text-gray-500">
+          {resolveDesignerText(DESIGNER_I18N.emptyState.startDesign, locale)}
+        </p>
         <div className="flex items-center gap-2 text-xs text-gray-400">
           <span>Ctrl+S {resolveDesignerText(DESIGNER_I18N.studio.save, locale)}</span>
           <span>·</span>
@@ -158,10 +160,14 @@ export const EmptyStateGuide: React.FC<EmptyStateGuideProps> = ({
           </svg>
         </div>
         <h2 className="mb-2 text-xl font-semibold text-gray-900">
-          {resolveDesignerText(DESIGNER_I18N.studio.startDesignTitle, locale, { mode: modeInfo.label })}
+          {resolveDesignerText(DESIGNER_I18N.studio.startDesignTitle, locale, {
+            mode: modeInfo.label,
+          })}
         </h2>
         <p className="max-w-md text-gray-500">
-          {resolveDesignerText(DESIGNER_I18N.studio.startDesignDesc, locale, { description: modeInfo.description })}
+          {resolveDesignerText(DESIGNER_I18N.studio.startDesignDesc, locale, {
+            description: modeInfo.description,
+          })}
         </p>
       </div>
 

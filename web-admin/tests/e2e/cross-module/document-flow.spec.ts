@@ -29,7 +29,10 @@ import { uniqueId } from '../helpers';
 // ---------------------------------------------------------------------------
 
 /** Build a minimal DocumentFlowConfig for inline testing via command sideEffect. */
-function buildDocumentFlowSideEffect(targetModelCode: string, fieldMapping: Record<string, string>) {
+function buildDocumentFlowSideEffect(
+  targetModelCode: string,
+  fieldMapping: Record<string, string>,
+) {
   return {
     action: 'document_flow',
     documentFlow: {
@@ -43,10 +46,10 @@ function buildListUrl(
   pageKey: string,
   pageNum: number,
   pageSize: number,
-  filters: Array<{ fieldName: string; operator: string; value: string | null }>
+  filters: Array<{ fieldName: string; operator: string; value: string | null }>,
 ): string {
   return `/api/dynamic/${pageKey}/list?pageNum=${pageNum}&pageSize=${pageSize}&filters=${encodeURIComponent(
-    JSON.stringify(filters)
+    JSON.stringify(filters),
   )}`;
 }
 
@@ -67,12 +70,14 @@ test.describe('Document Flow — Basic', () => {
     const order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
 
     sourceRecordTitle = `Document Flow Test ${orderId}`;
-    sourceRecordPid = await order.createViaApi({
-      e2et_order_title: sourceRecordTitle,
-      e2et_order_type: 'normal',
-      e2et_order_date: new Date().toISOString().split('T')[0],
-      e2et_order_urgent: false,
-    }).catch(() => null);
+    sourceRecordPid = await order
+      .createViaApi({
+        e2et_order_title: sourceRecordTitle,
+        e2et_order_type: 'normal',
+        e2et_order_date: new Date().toISOString().split('T')[0],
+        e2et_order_urgent: false,
+      })
+      .catch(() => null);
 
     await page.close();
     await context.close();
@@ -86,9 +91,9 @@ test.describe('Document Flow — Basic', () => {
     expect(sourceRecordPid).not.toBeNull();
 
     const listResp = await request.get(
-      buildListUrl('e2et-order', 1, 50, [
+      buildListUrl('e2et_order', 1, 50, [
         { fieldName: 'pid', operator: 'EQ', value: sourceRecordPid },
-      ])
+      ]),
     );
 
     expect(listResp.ok()).toBeTruthy();
@@ -96,8 +101,8 @@ test.describe('Document Flow — Basic', () => {
     const records = body.data?.records ?? [];
     expect(records.length).toBeGreaterThanOrEqual(1);
 
-    const found = records.find((r: { pid?: string; e2et_order_title?: string }) =>
-      r.pid === sourceRecordPid
+    const found = records.find(
+      (r: { pid?: string; e2et_order_title?: string }) => r.pid === sourceRecordPid,
     );
     expect(found).toBeDefined();
     expect(found?.e2et_order_title).toBe(sourceRecordTitle);
@@ -121,7 +126,7 @@ test.describe('Document Flow — Basic', () => {
     expect(sourceRecordPid).not.toBeNull();
 
     // Fetch the source record directly to confirm field resolution would work
-    const detailResp = await request.get(`/api/dynamic/e2et-order/${sourceRecordPid}`);
+    const detailResp = await request.get(`/api/dynamic/e2et_order/${sourceRecordPid}`);
 
     expect(detailResp.ok()).toBeTruthy();
     const body = await detailResp.json();
@@ -149,21 +154,26 @@ test.describe('Document Flow — Line Replication', () => {
     const page = await context.newPage();
     const order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
 
-    orderPid = await order.createViaApi({
-      e2et_order_title: `Line Replication Test ${orderId}`,
-      e2et_order_type: 'normal',
-      e2et_order_date: new Date().toISOString().split('T')[0],
-      e2et_order_urgent: false,
-    }).catch(() => null);
+    orderPid = await order
+      .createViaApi({
+        e2et_order_title: `Line Replication Test ${orderId}`,
+        e2et_order_type: 'normal',
+        e2et_order_date: new Date().toISOString().split('T')[0],
+        e2et_order_urgent: false,
+      })
+      .catch(() => null);
 
     if (orderPid) {
       for (let i = 1; i <= 2; i++) {
-        const pid = await order.child('item').createForParent(orderPid, {
-          e2et_item_name: `Line ${i} for ${orderId}`,
-          e2et_item_spec: 'spec_m',
-          e2et_item_qty: i * 3,
-          e2et_item_price: i * 10.0,
-        }).catch(() => null);
+        const pid = await order
+          .child('item')
+          .createForParent(orderPid, {
+            e2et_item_name: `Line ${i} for ${orderId}`,
+            e2et_item_spec: 'spec_m',
+            e2et_item_qty: i * 3,
+            e2et_item_price: i * 10.0,
+          })
+          .catch(() => null);
         if (pid) itemPids.push(pid);
       }
     }
@@ -184,7 +194,7 @@ test.describe('Document Flow — Line Replication', () => {
     const itemListResp = await request.get(
       buildListUrl('e2et-order-item', 1, 50, [
         { fieldName: 'e2et_order_id', operator: 'EQ', value: orderPid },
-      ])
+      ]),
     );
 
     expect(itemListResp.ok()).toBeTruthy();

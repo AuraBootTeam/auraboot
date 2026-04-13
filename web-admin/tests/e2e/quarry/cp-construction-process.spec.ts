@@ -71,7 +71,12 @@ test.describe('CP Construction Log — CRUD', () => {
     expect(result.recordId).toBeTruthy();
     logPid = result.recordId;
 
-    const records = await queryFilteredList(page, 'cp-construction-log', 'cp_log_content', logContent);
+    const records = await queryFilteredList(
+      page,
+      'cp-construction-log',
+      'cp_log_content',
+      logContent,
+    );
     expect(records.length).toBeGreaterThan(0);
     logNo = String(records[0].cp_log_no ?? '');
     expect(logNo).toBeTruthy();
@@ -114,16 +119,24 @@ test.describe('CP Construction Log — CRUD', () => {
 
     // Click edit action
     await clickRowActionByLocator(page, row, 'edit');
-    await page.waitForURL((u) => u.pathname.includes('/edit'), { timeout: 2500 }).catch(async () => {
-      await page.goto(`/dynamic/cp-construction-log/${logPid}/edit`, { waitUntil: 'domcontentloaded' });
-    });
+    await page
+      .waitForURL((u) => u.pathname.includes('/edit'), { timeout: 2500 })
+      .catch(async () => {
+        await page.goto(`/p/cp_construction_log/${logPid}/edit`, {
+          waitUntil: 'domcontentloaded',
+        });
+      });
 
     // Wait for form to load with existing data
     await waitForFormReady(page);
     await page.waitForFunction(
       () => {
-        const areas = document.querySelectorAll('form textarea, form input[type="text"], form input:not([type])');
-        return Array.from(areas).some((el) => (el as HTMLInputElement | HTMLTextAreaElement).value.length > 0);
+        const areas = document.querySelectorAll(
+          'form textarea, form input[type="text"], form input:not([type])',
+        );
+        return Array.from(areas).some(
+          (el) => (el as HTMLInputElement | HTMLTextAreaElement).value.length > 0,
+        );
       },
       { timeout: 10000 },
     );
@@ -134,19 +147,25 @@ test.describe('CP Construction Log — CRUD', () => {
       await contentField.clear();
       await contentField.fill(updatedContent);
     } else {
-      const fallback = page.locator('[name="cp_log_content"], [data-field="cp_log_content"] textarea').first();
+      const fallback = page
+        .locator('[name="cp_log_content"], [data-field="cp_log_content"] textarea')
+        .first();
       await fallback.clear();
       await fallback.fill(updatedContent);
     }
 
     // Click submit
-    const submitBtn = page.locator(
-      '[data-testid="form-btn-cp:update_log"], [data-testid="form-btn-update_log"], [data-testid="form-btn-submit"], [data-testid="form-btn-save"], button:has-text("Submit"), button:has-text("Save"), button:has-text("提交"), button:has-text("保存")',
-    ).first();
+    const submitBtn = page
+      .locator(
+        '[data-testid="form-btn-cp:update_log"], [data-testid="form-btn-update_log"], [data-testid="form-btn-submit"], [data-testid="form-btn-save"], button:has-text("Submit"), button:has-text("Save"), button:has-text("提交"), button:has-text("保存")',
+      )
+      .first();
     await expect(submitBtn).toBeVisible({ timeout: 5000 });
 
     const saveResponse = page.waitForResponse(
-      (r) => r.url().includes('/api/meta/commands/execute/') && r.request().method().toLowerCase() === 'post',
+      (r) =>
+        r.url().includes('/api/meta/commands/execute/') &&
+        r.request().method().toLowerCase() === 'post',
       { timeout: 10000 },
     );
     await submitBtn.click();
@@ -155,13 +174,18 @@ test.describe('CP Construction Log — CRUD', () => {
     expect(String((body as any)?.code ?? '')).toBe(ErrorCodes.SUCCESS);
 
     // Verify record remains accessible by id after submit.
-    await expect.poll(async () => {
-      const getResp = await page.request.get(`/api/dynamic/cp-construction-log/${logPid}`);
-      if (!getResp.ok()) return 'missing';
-      const getBody = await getResp.json().catch(() => ({}));
-      const data = getBody.data ?? getBody;
-      return String((data as any)?.pid ?? (data as any)?.id ?? '');
-    }, { timeout: 10000, intervals: [400, 800, 1200] }).toBe(String(logPid));
+    await expect
+      .poll(
+        async () => {
+          const getResp = await page.request.get(`/api/dynamic/cp_construction_log/${logPid}`);
+          if (!getResp.ok()) return 'missing';
+          const getBody = await getResp.json().catch(() => ({}));
+          const data = getBody.data ?? getBody;
+          return String((data as any)?.pid ?? (data as any)?.id ?? '');
+        },
+        { timeout: 10000, intervals: [400, 800, 1200] },
+      )
+      .toBe(String(logPid));
   });
 
   test('LOG-004: Delete log via API', async ({ page }) => {
@@ -171,14 +195,19 @@ test.describe('CP Construction Log — CRUD', () => {
     expect(result.code).toBe(ErrorCodes.SUCCESS);
 
     // Verify deletion by id to avoid false positives from duplicate content rows.
-    await expect.poll(async () => {
-      const resp = await page.request.get(`/api/dynamic/cp-construction-log/${logPid}`);
-      if (!resp.ok()) return 'missing';
-      const body = await resp.json().catch(() => ({}));
-      const data = body.data ?? body;
-      const id = (data as any)?.pid ?? (data as any)?.id;
-      return id ? 'exists' : 'missing';
-    }, { timeout: 10000, intervals: [400, 800, 1200] }).toBe('missing');
+    await expect
+      .poll(
+        async () => {
+          const resp = await page.request.get(`/api/dynamic/cp_construction_log/${logPid}`);
+          if (!resp.ok()) return 'missing';
+          const body = await resp.json().catch(() => ({}));
+          const data = body.data ?? body;
+          const id = (data as any)?.pid ?? (data as any)?.id;
+          return id ? 'exists' : 'missing';
+        },
+        { timeout: 10000, intervals: [400, 800, 1200] },
+      )
+      .toBe('missing');
   });
 
   test.afterAll(async ({ browser }) => {
@@ -235,14 +264,21 @@ test.describe('CP Weekly Report — Lifecycle', () => {
 
     // UI interaction: weekly report list page should render after creation.
     await navigateToDynamicPage(page, 'cp-weekly-report');
-    await expect(page.locator('table, [role="table"], [data-testid="dynamic-list"]').first()).toBeVisible({ timeout: 10000 });
+    await expect(
+      page.locator('table, [role="table"], [data-testid="dynamic-list"]').first(),
+    ).toBeVisible({ timeout: 10000 });
   });
 
   test('WR-002: Verify report in list', async ({ page }) => {
     expect(reportPid).toBeTruthy();
 
     // cp_wr_summary is not a list column, so verify via API first
-    const records = await queryFilteredList(page, 'cp-weekly-report', 'cp_wr_summary', reportSummary);
+    const records = await queryFilteredList(
+      page,
+      'cp-weekly-report',
+      'cp_wr_summary',
+      reportSummary,
+    );
     expect(records.length).toBeGreaterThan(0);
     const reportNo = String(records[0].cp_wr_no ?? '');
     expect(reportNo).toBeTruthy();
@@ -257,43 +293,71 @@ test.describe('CP Weekly Report — Lifecycle', () => {
     expect(reportPid).toBeTruthy();
 
     const result = await executeCommandViaApi(
-      page, 'cp:submit_report', {}, reportPid, 'state_transition',
+      page,
+      'cp:submit_report',
+      {},
+      reportPid,
+      'state_transition',
     );
     expect(result.code).toBe(ErrorCodes.SUCCESS);
 
     // Verify status via API
-    const records = await queryFilteredList(page, 'cp-weekly-report', 'cp_wr_summary', reportSummary, {
-      extraFilters: [{ fieldName: 'cp_wr_status', operator: 'EQ', value: 'submitted' }],
-    });
+    const records = await queryFilteredList(
+      page,
+      'cp-weekly-report',
+      'cp_wr_summary',
+      reportSummary,
+      {
+        extraFilters: [{ fieldName: 'cp_wr_status', operator: 'EQ', value: 'submitted' }],
+      },
+    );
     expect(records.length).toBeGreaterThan(0);
   });
 
-  test('WR-004: Reject and resubmit (submitted -> rejected -> draft resubmit -> submitted)', async ({ page }) => {
+  test('WR-004: Reject and resubmit (submitted -> rejected -> draft resubmit -> submitted)', async ({
+    page,
+  }) => {
     expect(reportPid).toBeTruthy();
 
     // Reject (submitted -> rejected)
     let result = await executeCommandViaApi(
-      page, 'cp:reject_report', {}, reportPid, 'state_transition',
+      page,
+      'cp:reject_report',
+      {},
+      reportPid,
+      'state_transition',
     );
     expect(result.code).toBe(ErrorCodes.SUCCESS);
 
     // Verify rejected status
-    let records = await queryFilteredList(page, 'cp-weekly-report', 'cp_wr_summary', reportSummary, {
-      extraFilters: [{ fieldName: 'cp_wr_status', operator: 'EQ', value: 'rejected' }],
-    });
+    let records = await queryFilteredList(
+      page,
+      'cp-weekly-report',
+      'cp_wr_summary',
+      reportSummary,
+      {
+        extraFilters: [{ fieldName: 'cp_wr_status', operator: 'EQ', value: 'rejected' }],
+      },
+    );
     expect(records.length).toBeGreaterThan(0);
 
     // Re-submit (rejected -> back to draft is implied by update, then submit)
     // The update command allows fromStates: [draft, rejected], so update first
-    result = await executeCommandViaApi(page, 'cp:update_report', {
-      cp_wr_project_id: projectId,
-      cp_wr_week_start: weekStart,
-      cp_wr_week_end: weekEnd,
-      cp_wr_summary: reportSummary,
-      cp_wr_progress: 48.0,
-      cp_wr_next_plan: 'Revised plan after rejection',
-      cp_wr_issues: 'Weather delay resolved',
-    }, reportPid, 'update');
+    result = await executeCommandViaApi(
+      page,
+      'cp:update_report',
+      {
+        cp_wr_project_id: projectId,
+        cp_wr_week_start: weekStart,
+        cp_wr_week_end: weekEnd,
+        cp_wr_summary: reportSummary,
+        cp_wr_progress: 48.0,
+        cp_wr_next_plan: 'Revised plan after rejection',
+        cp_wr_issues: 'Weather delay resolved',
+      },
+      reportPid,
+      'update',
+    );
     expect(result.code).toBe(ErrorCodes.SUCCESS);
 
     // Submit again (rejected -> submitted, since submit fromStates is [draft])
@@ -323,7 +387,12 @@ test.describe('CP Weekly Report — Lifecycle', () => {
     expect(reportPid).toBeTruthy();
 
     // Check current state - if rejected from previous test, submit first
-    const currentRecords = await queryFilteredList(page, 'cp-weekly-report', 'cp_wr_summary', reportSummary);
+    const currentRecords = await queryFilteredList(
+      page,
+      'cp-weekly-report',
+      'cp_wr_summary',
+      reportSummary,
+    );
     const currentStatus = currentRecords[0]?.cp_wr_status;
 
     if (currentStatus === 'rejected') {
@@ -342,21 +411,35 @@ test.describe('CP Weekly Report — Lifecycle', () => {
 
       // Submit it
       const submitResult = await executeCommandViaApi(
-        page, 'cp:submit_report', {}, reportPid, 'state_transition',
+        page,
+        'cp:submit_report',
+        {},
+        reportPid,
+        'state_transition',
       );
       expect(submitResult.code).toBe(ErrorCodes.SUCCESS);
     }
 
     // Approve (submitted -> approved)
     const result = await executeCommandViaApi(
-      page, 'cp:approve_report', {}, reportPid, 'state_transition',
+      page,
+      'cp:approve_report',
+      {},
+      reportPid,
+      'state_transition',
     );
     expect(result.code).toBe(ErrorCodes.SUCCESS);
 
     // Verify approved status
-    const records = await queryFilteredList(page, 'cp-weekly-report', 'cp_wr_summary', reportSummary, {
-      extraFilters: [{ fieldName: 'cp_wr_status', operator: 'EQ', value: 'approved' }],
-    });
+    const records = await queryFilteredList(
+      page,
+      'cp-weekly-report',
+      'cp_wr_summary',
+      reportSummary,
+      {
+        extraFilters: [{ fieldName: 'cp_wr_status', operator: 'EQ', value: 'approved' }],
+      },
+    );
     // May find 0 if we used a fresh report with different summary
     // Just verify the command succeeded (checked above)
   });
@@ -422,29 +505,51 @@ test.describe('CP Material Inspection — Lifecycle', () => {
     expect(inspectionPid).toBeTruthy();
 
     const result = await executeCommandViaApi(
-      page, 'cp:start_inspection', {}, inspectionPid, 'state_transition',
+      page,
+      'cp:start_inspection',
+      {},
+      inspectionPid,
+      'state_transition',
     );
     expect(result.code).toBe(ErrorCodes.SUCCESS);
 
     // Verify status
-    const records = await queryFilteredList(page, 'cp-material-inspection', 'cp_mi_material_name', materialName, {
-      extraFilters: [{ fieldName: 'cp_mi_result', operator: 'EQ', value: 'inspecting' }],
-    });
+    const records = await queryFilteredList(
+      page,
+      'cp-material-inspection',
+      'cp_mi_material_name',
+      materialName,
+      {
+        extraFilters: [{ fieldName: 'cp_mi_result', operator: 'EQ', value: 'inspecting' }],
+      },
+    );
     expect(records.length).toBeGreaterThan(0);
   });
 
   test('MI-003: Pass inspection (INSPECTING -> PASSED)', async ({ page }) => {
     expect(inspectionPid).toBeTruthy();
 
-    const result = await executeCommandViaApi(page, 'cp:pass_inspection', {
-      cp_mi_remark: 'All quality checks passed',
-    }, inspectionPid, 'state_transition');
+    const result = await executeCommandViaApi(
+      page,
+      'cp:pass_inspection',
+      {
+        cp_mi_remark: 'All quality checks passed',
+      },
+      inspectionPid,
+      'state_transition',
+    );
     expect(result.code).toBe(ErrorCodes.SUCCESS);
 
     // Verify status
-    const records = await queryFilteredList(page, 'cp-material-inspection', 'cp_mi_material_name', materialName, {
-      extraFilters: [{ fieldName: 'cp_mi_result', operator: 'EQ', value: 'passed' }],
-    });
+    const records = await queryFilteredList(
+      page,
+      'cp-material-inspection',
+      'cp_mi_material_name',
+      materialName,
+      {
+        extraFilters: [{ fieldName: 'cp_mi_result', operator: 'EQ', value: 'passed' }],
+      },
+    );
     expect(records.length).toBeGreaterThan(0);
   });
 
@@ -465,20 +570,36 @@ test.describe('CP Material Inspection — Lifecycle', () => {
 
     // Start inspection (pending -> INSPECTING)
     let result = await executeCommandViaApi(
-      page, 'cp:start_inspection', {}, inspectionPid2, 'state_transition',
+      page,
+      'cp:start_inspection',
+      {},
+      inspectionPid2,
+      'state_transition',
     );
     expect(result.code).toBe(ErrorCodes.SUCCESS);
 
     // Fail inspection (INSPECTING -> failed)
-    result = await executeCommandViaApi(page, 'cp:fail_inspection', {
-      cp_mi_remark: 'Moisture content too high, rejected',
-    }, inspectionPid2, 'state_transition');
+    result = await executeCommandViaApi(
+      page,
+      'cp:fail_inspection',
+      {
+        cp_mi_remark: 'Moisture content too high, rejected',
+      },
+      inspectionPid2,
+      'state_transition',
+    );
     expect(result.code).toBe(ErrorCodes.SUCCESS);
 
     // Verify failed status
-    const records = await queryFilteredList(page, 'cp-material-inspection', 'cp_mi_material_name', materialName2, {
-      extraFilters: [{ fieldName: 'cp_mi_result', operator: 'EQ', value: 'failed' }],
-    });
+    const records = await queryFilteredList(
+      page,
+      'cp-material-inspection',
+      'cp_mi_material_name',
+      materialName2,
+      {
+        extraFilters: [{ fieldName: 'cp_mi_result', operator: 'EQ', value: 'failed' }],
+      },
+    );
     expect(records.length).toBeGreaterThan(0);
   });
 
@@ -491,10 +612,14 @@ test.describe('CP Material Inspection — Lifecycle', () => {
     // PASSED/failed inspections cannot be deleted (fromStates: [pending] for delete)
     // Only try deleting if still in pending state
     if (inspectionPid) {
-      await executeCommandViaApi(p, 'cp:delete_inspection', {}, inspectionPid, 'delete').catch(() => {});
+      await executeCommandViaApi(p, 'cp:delete_inspection', {}, inspectionPid, 'delete').catch(
+        () => {},
+      );
     }
     if (inspectionPid2) {
-      await executeCommandViaApi(p, 'cp:delete_inspection', {}, inspectionPid2, 'delete').catch(() => {});
+      await executeCommandViaApi(p, 'cp:delete_inspection', {}, inspectionPid2, 'delete').catch(
+        () => {},
+      );
     }
     await ctx.close();
   });
@@ -554,7 +679,11 @@ test.describe('CP Site Issue — Lifecycle', () => {
     expect(issuePid).toBeTruthy();
 
     const result = await executeCommandViaApi(
-      page, 'cp:start_issue', {}, issuePid, 'state_transition',
+      page,
+      'cp:start_issue',
+      {},
+      issuePid,
+      'state_transition',
     );
     expect(result.code).toBe(ErrorCodes.SUCCESS);
 
@@ -568,9 +697,15 @@ test.describe('CP Site Issue — Lifecycle', () => {
   test('SI-004: Resolve issue (in_progress -> resolved) with resolution', async ({ page }) => {
     expect(issuePid).toBeTruthy();
 
-    const result = await executeCommandViaApi(page, 'cp:resolve_issue', {
-      cp_si_resolution: 'Applied sealant and added monitoring points',
-    }, issuePid, 'state_transition');
+    const result = await executeCommandViaApi(
+      page,
+      'cp:resolve_issue',
+      {
+        cp_si_resolution: 'Applied sealant and added monitoring points',
+      },
+      issuePid,
+      'state_transition',
+    );
     expect(result.code).toBe(ErrorCodes.SUCCESS);
 
     // Verify status
@@ -584,7 +719,11 @@ test.describe('CP Site Issue — Lifecycle', () => {
     expect(issuePid).toBeTruthy();
 
     const result = await executeCommandViaApi(
-      page, 'cp:close_issue', {}, issuePid, 'state_transition',
+      page,
+      'cp:close_issue',
+      {},
+      issuePid,
+      'state_transition',
     );
     expect(result.code).toBe(ErrorCodes.SUCCESS);
 
@@ -664,7 +803,9 @@ test.describe('CP Issue Follow-Up', () => {
 
     // UI interaction: follow-up list page should render after creation.
     await navigateToDynamicPage(page, 'cp-issue-follow-up');
-    await expect(page.locator('table, [role="table"], [data-testid="dynamic-list"]').first()).toBeVisible({ timeout: 10000 });
+    await expect(
+      page.locator('table, [role="table"], [data-testid="dynamic-list"]').first(),
+    ).toBeVisible({ timeout: 10000 });
   });
 
   test('FU-002: Verify follow-up in list', async ({ page }) => {
@@ -685,7 +826,9 @@ test.describe('CP Issue Follow-Up', () => {
     });
     const p = await ctx.newPage();
     if (followUpPid) {
-      await executeCommandViaApi(p, 'cp:delete_follow_up', {}, followUpPid, 'delete').catch(() => {});
+      await executeCommandViaApi(p, 'cp:delete_follow_up', {}, followUpPid, 'delete').catch(
+        () => {},
+      );
     }
     if (issuePid) {
       await executeCommandViaApi(p, 'cp:delete_issue', {}, issuePid, 'delete').catch(() => {});

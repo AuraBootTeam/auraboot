@@ -13,7 +13,6 @@
 
 import { test, expect } from '../fixtures';
 
-
 /**
  * Minimal BPMN XML for a Start -> UserTask -> End process.
  */
@@ -55,18 +54,15 @@ test.describe('BPM SLA Suspend Policy', () => {
 
     try {
       // Create process definition
-      const createResponse = await request.post(
-        `/api/bpm/process-definitions`,
-        {
-          data: {
-            processKey,
-            processName: `SLA Suspend Test ${processKey}`,
-            description: 'Auto-generated for SLA suspend policy E2E test',
-            category: 'e2e-test',
-            bpmnContent,
-          },
-        }
-      );
+      const createResponse = await request.post(`/api/bpm/process-definitions`, {
+        data: {
+          processKey,
+          processName: `SLA Suspend Test ${processKey}`,
+          description: 'Auto-generated for SLA suspend policy E2E test',
+          category: 'e2e-test',
+          bpmnContent,
+        },
+      });
 
       if (createResponse.ok()) {
         const createData = await createResponse.json();
@@ -74,21 +70,18 @@ test.describe('BPM SLA Suspend Policy', () => {
 
         // Deploy process
         const deployResponse = await request.post(
-          `/api/bpm/process-definitions/${processPid}/deploy`
+          `/api/bpm/process-definitions/${processPid}/deploy`,
         );
 
         if (deployResponse.ok()) {
           // Start process instance
-          const startResponse = await request.post(
-            `/api/bpm/process-instances`,
-            {
-              data: {
-                processDefinitionId: processKey,
-                businessKey: `E2E-SLA-${Date.now()}`,
-                variables: { initiator: 'e2e-sla-test' },
-              },
-            }
-          );
+          const startResponse = await request.post(`/api/bpm/process-instances`, {
+            data: {
+              processDefinitionId: processKey,
+              businessKey: `E2E-SLA-${Date.now()}`,
+              variables: { initiator: 'e2e-sla-test' },
+            },
+          });
 
           if (startResponse.ok()) {
             const instanceData = await startResponse.json();
@@ -106,20 +99,17 @@ test.describe('BPM SLA Suspend Policy', () => {
    * Verify that an SLA config can be created with suspend_policy = PAUSE.
    */
   test('SLA-E01: Create SLA config with PAUSE policy', async ({ page }) => {
-    const response = await page.request.post(
-      `/api/bpm/sla-configs`,
-      {
-        data: {
-          name: `E2E SLA PAUSE ${Date.now()}`,
-          targetType: 'process',
-          targetKey: processKey || 'e2e-sla-fallback',
-          deadlineMode: 'fixed',
-          deadlineValue: 'pt1h',
-          suspendPolicy: 'pause',
-          enabled: true,
-        },
-      }
-    );
+    const response = await page.request.post(`/api/bpm/sla-configs`, {
+      data: {
+        name: `E2E SLA PAUSE ${Date.now()}`,
+        targetType: 'process',
+        targetKey: processKey || 'e2e-sla-fallback',
+        deadlineMode: 'fixed',
+        deadlineValue: 'pt1h',
+        suspendPolicy: 'pause',
+        enabled: true,
+      },
+    });
 
     if (!response.ok()) {
       // SLA config API may not be fully deployed yet
@@ -144,20 +134,17 @@ test.describe('BPM SLA Suspend Policy', () => {
    * Verify that CONTINUE policy can be set.
    */
   test('SLA-E02: Create SLA config with CONTINUE policy', async ({ page }) => {
-    const response = await page.request.post(
-      `/api/bpm/sla-configs`,
-      {
-        data: {
-          name: `E2E SLA CONTINUE ${Date.now()}`,
-          targetType: 'process',
-          targetKey: processKey || 'e2e-sla-fallback',
-          deadlineMode: 'fixed',
-          deadlineValue: 'pt2h',
-          suspendPolicy: 'continue',
-          enabled: true,
-        },
-      }
-    );
+    const response = await page.request.post(`/api/bpm/sla-configs`, {
+      data: {
+        name: `E2E SLA CONTINUE ${Date.now()}`,
+        targetType: 'process',
+        targetKey: processKey || 'e2e-sla-fallback',
+        deadlineMode: 'fixed',
+        deadlineValue: 'pt2h',
+        suspendPolicy: 'continue',
+        enabled: true,
+      },
+    });
 
     if (!response.ok()) {
       if (response.status() === 404) {
@@ -178,20 +165,17 @@ test.describe('BPM SLA Suspend Policy', () => {
    * Verify that CANCEL policy can be set.
    */
   test('SLA-E03: Create SLA config with CANCEL policy', async ({ page }) => {
-    const response = await page.request.post(
-      `/api/bpm/sla-configs`,
-      {
-        data: {
-          name: `E2E SLA CANCEL ${Date.now()}`,
-          targetType: 'process',
-          targetKey: processKey || 'e2e-sla-fallback',
-          deadlineMode: 'fixed',
-          deadlineValue: 'pt30m',
-          suspendPolicy: 'cancel',
-          enabled: true,
-        },
-      }
-    );
+    const response = await page.request.post(`/api/bpm/sla-configs`, {
+      data: {
+        name: `E2E SLA CANCEL ${Date.now()}`,
+        targetType: 'process',
+        targetKey: processKey || 'e2e-sla-fallback',
+        deadlineMode: 'fixed',
+        deadlineValue: 'pt30m',
+        suspendPolicy: 'cancel',
+        enabled: true,
+      },
+    });
 
     if (!response.ok()) {
       if (response.status() === 404) {
@@ -220,7 +204,7 @@ test.describe('BPM SLA Suspend Policy', () => {
 
     // Suspend the process instance
     const suspendResponse = await page.request.post(
-      `/api/bpm/process-instances/${processInstanceId}/suspend`
+      `/api/bpm/process-instances/${processInstanceId}/suspend`,
     );
 
     if (!suspendResponse.ok()) {
@@ -236,7 +220,7 @@ test.describe('BPM SLA Suspend Policy', () => {
 
     // Check SLA records for this process instance
     const slaResponse = await page.request.get(
-      `/api/bpm/monitor/instances/${processInstanceId}/sla`
+      `/api/bpm/monitor/instances/${processInstanceId}/sla`,
     );
 
     if (slaResponse.ok()) {
@@ -246,9 +230,7 @@ test.describe('BPM SLA Suspend Policy', () => {
       if (Array.isArray(records) && records.length > 0) {
         for (const record of records) {
           // Depending on suspend policy, status should be paused, cancelled, or still running
-          expect(['running', 'paused', 'cancelled', 'warning']).toContain(
-            record.status
-          );
+          expect(['running', 'paused', 'cancelled', 'warning']).toContain(record.status);
         }
       }
     }
@@ -266,7 +248,7 @@ test.describe('BPM SLA Suspend Policy', () => {
 
     // Resume the process instance
     const resumeResponse = await page.request.post(
-      `/api/bpm/process-instances/${processInstanceId}/resume`
+      `/api/bpm/process-instances/${processInstanceId}/resume`,
     );
 
     if (!resumeResponse.ok()) {
@@ -281,7 +263,7 @@ test.describe('BPM SLA Suspend Policy', () => {
 
     // Check SLA records - paused records should now be running again
     const slaResponse = await page.request.get(
-      `/api/bpm/monitor/instances/${processInstanceId}/sla`
+      `/api/bpm/monitor/instances/${processInstanceId}/sla`,
     );
 
     if (slaResponse.ok()) {
@@ -305,29 +287,24 @@ test.describe('BPM SLA Suspend Policy', () => {
    * SLA-E06: Undeploy safety check - reject when running instances exist
    * Verify that undeploying a process with running instances is rejected.
    */
-  test('SLA-E06: Undeploy rejects with running instances', async ({
-    page,
-  }) => {
+  test('SLA-E06: Undeploy rejects with running instances', async ({ page }) => {
     if (!processPid || !processInstanceId) {
       test.skip(true, 'No process or instance available');
       return;
     }
 
     // Start another instance to ensure there's at least one running
-    const startResponse = await page.request.post(
-      `/api/bpm/process-instances`,
-      {
-        data: {
-          processDefinitionId: processKey,
-          businessKey: `E2E-UNDEPLOY-CHECK-${Date.now()}`,
-          variables: { action: 'undeploy-safety-test' },
-        },
-      }
-    );
+    const startResponse = await page.request.post(`/api/bpm/process-instances`, {
+      data: {
+        processDefinitionId: processKey,
+        businessKey: `E2E-UNDEPLOY-CHECK-${Date.now()}`,
+        variables: { action: 'undeploy-safety-test' },
+      },
+    });
 
     // Try to undeploy - should fail with running instances
     const undeployResponse = await page.request.post(
-      `/api/bpm/process-definitions/${processPid}/undeploy`
+      `/api/bpm/process-definitions/${processPid}/undeploy`,
     );
 
     // If there are running instances, this should fail
@@ -347,12 +324,8 @@ test.describe('BPM SLA Suspend Policy', () => {
    * SLA-E07: SLA config list includes suspend_policy field
    * Verify that the SLA config list API returns suspend_policy in results.
    */
-  test('SLA-E07: SLA config list includes suspend_policy', async ({
-    page,
-  }) => {
-    const response = await page.request.get(
-      `/api/bpm/sla-configs`
-    );
+  test('SLA-E07: SLA config list includes suspend_policy', async ({ page }) => {
+    const response = await page.request.get(`/api/bpm/sla-configs`);
 
     if (!response.ok()) {
       if (response.status() === 404) {
@@ -370,7 +343,7 @@ test.describe('BPM SLA Suspend Policy', () => {
       // At least one config should have a suspend_policy field
       const hasPolicy = configs.some(
         (c: { suspendPolicy?: string; suspend_policy?: string }) =>
-          c.suspendPolicy !== undefined || c.suspend_policy !== undefined
+          c.suspendPolicy !== undefined || c.suspend_policy !== undefined,
       );
       expect(hasPolicy).toBe(true);
     }
@@ -382,9 +355,7 @@ test.describe('BPM SLA Suspend Policy', () => {
    * SLA suspend policy changes.
    */
   test('SLA-E08: Workbench data accessible', async ({ page }) => {
-    const response = await page.request.get(
-      `/api/bpm/workbench`
-    );
+    const response = await page.request.get(`/api/bpm/workbench`);
 
     if (!response.ok()) {
       if (response.status() === 401) {
@@ -416,9 +387,7 @@ test.describe('BPM SLA Suspend Policy', () => {
     // Terminate any running instances
     if (processInstanceId) {
       try {
-        await request.post(
-          `/api/bpm/process-instances/${processInstanceId}/terminate`
-        );
+        await request.post(`/api/bpm/process-instances/${processInstanceId}/terminate`);
       } catch {
         // Ignore
       }
@@ -427,17 +396,13 @@ test.describe('BPM SLA Suspend Policy', () => {
     if (!processPid) return;
 
     try {
-      await request.post(
-        `/api/bpm/process-definitions/${processPid}/undeploy`
-      );
+      await request.post(`/api/bpm/process-definitions/${processPid}/undeploy`);
     } catch {
       // Ignore
     }
 
     try {
-      await request.delete(
-        `/api/bpm/process-definitions/${processPid}`
-      );
+      await request.delete(`/api/bpm/process-definitions/${processPid}`);
     } catch (error) {
       console.warn('Failed to cleanup SLA suspend test data:', error);
     }

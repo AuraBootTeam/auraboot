@@ -1,0 +1,45 @@
+{
+  "name": "@auraboot/plugin-sdk",
+  "version": "0.0.1",
+  "description": "AuraBoot Plugin SDK — definePlugin, PluginContext, and registration APIs for core, enterprise, and third-party plugins",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@auraboot/dsl-types": "workspace:*",
+    "@auraboot/nav-model": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AuraBootTeam/auraboot.git",
+    "directory": "packages/plugin-sdk"
+  },
+  "keywords": ["auraboot", "plugin", "sdk", "platform"],
+  "engines": {
+    "node": ">=20"
+  }
+}

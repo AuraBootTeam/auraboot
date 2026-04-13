@@ -1,6 +1,5 @@
-
-import type { Config } from "@react-router/dev/config";
-import "react-router";
+import type { Config } from '@react-router/dev/config';
+import 'react-router';
 
 export default {
   future: {
@@ -10,8 +9,7 @@ export default {
   ssr: true,
 } satisfies Config;
 
-
-declare module "react-router" {
+declare module 'react-router' {
   interface Future {
     unstable_middleware: true; // 👈 Enable middleware types
   }

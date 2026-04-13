@@ -9,13 +9,16 @@ import type { Result } from './types';
 import { ErrorCodes } from './types';
 
 function normalizeResult<T>(result: Result<T>): Result<T> {
+  // Ensure code is always a string — backend may return numeric 0 instead of "0"
+  const code = String(result.code ?? '');
   const message = result.message ?? result.desc ?? '';
   const desc = result.desc ?? result.message ?? '';
   const success =
-    typeof result.success === 'boolean' ? result.success : result.code === ErrorCodes.SUCCESS;
+    typeof result.success === 'boolean' ? result.success : code === ErrorCodes.SUCCESS;
 
   return {
     ...result,
+    code,
     desc,
     message,
     success,

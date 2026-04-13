@@ -53,15 +53,11 @@ function generateProcessKey(): string {
 }
 
 test.describe('BPM Conversion API', () => {
-
   test('D2-E06: JSON to BPMN conversion', async ({ request }) => {
     const processKey = generateProcessKey();
     const json = generateMinimalJson(processKey);
 
-    const convertResponse = await request.post(
-      `/api/bpm/convert/json-to-bpmn`,
-      { data: json }
-    );
+    const convertResponse = await request.post(`/api/bpm/convert/json-to-bpmn`, { data: json });
 
     if (convertResponse.ok()) {
       const bpmnXml = await convertResponse.text();
@@ -86,13 +82,10 @@ test.describe('BPM Conversion API', () => {
   </process>
 </definitions>`;
 
-    const convertResponse = await request.post(
-      `/api/bpm/convert/bpmn-to-json`,
-      {
-        data: { bpmnContent: bpmnXml },
-        headers: { 'Content-Type': 'application/json' },
-      }
-    );
+    const convertResponse = await request.post(`/api/bpm/convert/bpmn-to-json`, {
+      data: { bpmnContent: bpmnXml },
+      headers: { 'Content-Type': 'application/json' },
+    });
 
     if (convertResponse.ok()) {
       const json = unwrap(await convertResponse.json());
@@ -128,16 +121,13 @@ test.describe('BPM Conversion API', () => {
   </process>
 </definitions>`;
 
-    const createResponse = await request.post(
-      `/api/bpm/process-definitions`,
-      {
-        data: {
-          processKey,
-          processName: `E2E Gateway Test ${processKey}`,
-          bpmnContent: bpmnXml,
-        },
-      }
-    );
+    const createResponse = await request.post(`/api/bpm/process-definitions`, {
+      data: {
+        processKey,
+        processName: `E2E Gateway Test ${processKey}`,
+        bpmnContent: bpmnXml,
+      },
+    });
 
     if (!createResponse.ok()) {
       test.skip();
@@ -148,9 +138,7 @@ test.describe('BPM Conversion API', () => {
     const processPid = data.pid;
 
     try {
-      const verifyResponse = await request.get(
-        `/api/bpm/process-definitions/${processPid}`
-      );
+      const verifyResponse = await request.get(`/api/bpm/process-definitions/${processPid}`);
       expect(verifyResponse.ok()).toBe(true);
 
       const verifyData = unwrap(await verifyResponse.json());
@@ -163,7 +151,6 @@ test.describe('BPM Conversion API', () => {
 });
 
 test.describe('BPM Node Types API', () => {
-
   test('D2-E09: Service task definition', async ({ request }) => {
     const processKey = generateProcessKey();
 
@@ -182,16 +169,13 @@ test.describe('BPM Node Types API', () => {
   </process>
 </definitions>`;
 
-    const createResponse = await request.post(
-      `/api/bpm/process-definitions`,
-      {
-        data: {
-          processKey,
-          processName: `E2E Service Task ${processKey}`,
-          bpmnContent: bpmnXml,
-        },
-      }
-    );
+    const createResponse = await request.post(`/api/bpm/process-definitions`, {
+      data: {
+        processKey,
+        processName: `E2E Service Task ${processKey}`,
+        bpmnContent: bpmnXml,
+      },
+    });
 
     if (!createResponse.ok()) {
       test.skip();
@@ -222,16 +206,13 @@ test.describe('BPM Node Types API', () => {
   </process>
 </definitions>`;
 
-    const createResponse = await request.post(
-      `/api/bpm/process-definitions`,
-      {
-        data: {
-          processKey,
-          processName: `E2E Receive Task ${processKey}`,
-          bpmnContent: bpmnXml,
-        },
-      }
-    );
+    const createResponse = await request.post(`/api/bpm/process-definitions`, {
+      data: {
+        processKey,
+        processName: `E2E Receive Task ${processKey}`,
+        bpmnContent: bpmnXml,
+      },
+    });
 
     if (!createResponse.ok()) {
       test.skip();

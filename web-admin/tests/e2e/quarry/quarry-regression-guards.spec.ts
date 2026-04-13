@@ -2,7 +2,9 @@ import { test, expect, type Page } from '@playwright/test';
 
 async function openRoute(page: Page, route: string) {
   await page.goto(route, { waitUntil: 'domcontentloaded' });
-  await expect(page.locator('body')).not.toContainText(/Access forbidden|Page not found/i, { timeout: 15000 });
+  await expect(page.locator('body')).not.toContainText(/Access forbidden|Page not found/i, {
+    timeout: 15000,
+  });
 }
 
 test.describe('Quarry regression guards @smoke', () => {
@@ -47,7 +49,9 @@ test.describe('Quarry regression guards @smoke', () => {
     }
   });
 
-  test('RG-004: doc content uses rich text editor and category has parent selector', async ({ page }) => {
+  test('RG-004: doc content uses rich text editor and category has parent selector', async ({
+    page,
+  }) => {
     const parentName = `RG Parent ${Date.now()}`;
     const createResp = await page.request.post('/api/dynamic/dk_doc_category', {
       data: {
@@ -58,12 +62,22 @@ test.describe('Quarry regression guards @smoke', () => {
     });
     expect(createResp.ok()).toBeTruthy();
 
-    await page.goto('/dynamic/dk-document/new?commandCode=dk%3Acreate_document', { waitUntil: 'domcontentloaded' });
-    await expect(page.locator('[data-testid="form-field-dk_doc_content"] [title="Bold"]')).toBeVisible({ timeout: 15000 });
-    await expect(page.locator('[data-testid="form-field-dk_doc_content"] [contenteditable="true"]')).toBeVisible();
+    await page.goto('/p/dk_document/new?commandCode=dk%3Acreate_document', {
+      waitUntil: 'domcontentloaded',
+    });
+    await expect(
+      page.locator('[data-testid="form-field-dk_doc_content"] [title="Bold"]'),
+    ).toBeVisible({ timeout: 15000 });
+    await expect(
+      page.locator('[data-testid="form-field-dk_doc_content"] [contenteditable="true"]'),
+    ).toBeVisible();
 
-    await page.goto('/dynamic/dk-doc-category/new?commandCode=dk%3Acreate_category', { waitUntil: 'domcontentloaded' });
-    await expect(page.locator('[data-testid="form-field-dk_cat_parent_id"]')).toBeVisible({ timeout: 15000 });
+    await page.goto('/p/dk_doc_category/new?commandCode=dk%3Acreate_category', {
+      waitUntil: 'domcontentloaded',
+    });
+    await expect(page.locator('[data-testid="form-field-dk_cat_parent_id"]')).toBeVisible({
+      timeout: 15000,
+    });
     const parentSelect = page.locator('[data-testid="select-trigger-dk_cat_parent_id"]');
     await parentSelect.click();
     const options = page.getByRole('option');

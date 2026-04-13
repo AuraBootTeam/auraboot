@@ -255,7 +255,7 @@ export const MonthlyGridViewer: React.FC<MonthlyGridViewerProps> = ({
 async function loadParentRows(config: MonthlyGridConfig, parentRecordId: string, token?: string) {
   if (config.resolveVia) {
     const rv = config.resolveVia;
-    const intermediateModel = rv.intermediateModel.replace(/_/g, '-');
+    const intermediateModel = rv.intermediateModel;
     const intermediateFilters: Array<{ fieldName: string; operator: string; value: any }> = [
       { fieldName: rv.intermediateParentField, operator: 'EQ', value: parentRecordId },
     ];
@@ -286,7 +286,7 @@ async function loadParentRows(config: MonthlyGridConfig, parentRecordId: string,
     }
 
     const parentPid = records[0].pid;
-    const model = config.parentModel.replace(/_/g, '-');
+    const model = config.parentModel;
     const parentRes = await fetchResult<any>(`/api/dynamic/${model}/list`, {
       method: 'get',
       params: {
@@ -301,7 +301,7 @@ async function loadParentRows(config: MonthlyGridConfig, parentRecordId: string,
     return parentRes.data?.records ?? [];
   }
 
-  const model = config.parentModel.replace(/_/g, '-');
+  const model = config.parentModel;
   const parentRes = await fetchResult<any>(`/api/dynamic/${model}/list`, {
     method: 'get',
     params: {
@@ -317,7 +317,7 @@ async function loadParentRows(config: MonthlyGridConfig, parentRecordId: string,
 }
 
 async function loadChildRows(config: MonthlyGridConfig, parentPid: string, token?: string) {
-  const childModel = config.childModel.replace(/_/g, '-');
+  const childModel = config.childModel;
   const childRes = await fetchResult<any>(`/api/dynamic/${childModel}/list`, {
     method: 'get',
     params: {

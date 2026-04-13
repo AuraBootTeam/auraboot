@@ -14,10 +14,7 @@
  */
 
 import { test, expect } from '@playwright/test';
-import {
-  uniqueId,
-  executeCommandViaApi,
-} from '../helpers/index';
+import { uniqueId, executeCommandViaApi } from '../helpers/index';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -33,10 +30,13 @@ async function clickPmMenuLink(page: import('@playwright/test').Page, href: stri
   await link.first().evaluate((el) => (el as HTMLAnchorElement).click());
 }
 
-async function navigateToProjectWorkspace(page: import('@playwright/test').Page, projectPid: string) {
+async function navigateToProjectWorkspace(
+  page: import('@playwright/test').Page,
+  projectPid: string,
+) {
   await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
-  await clickPmMenuLink(page, '/dynamic/pm-project');
-  await expect(page).toHaveURL(/\/dynamic\/pm-project/);
+  await clickPmMenuLink(page, '/p/pm_project');
+  await expect(page).toHaveURL(/\/p\/pm_project/);
 
   // Navigate to workspace directly via row click or URL
   await page.goto(`/project-management/projects/${projectPid}`, { waitUntil: 'domcontentloaded' });
@@ -61,9 +61,11 @@ test.describe('PM Error Branches', () => {
     try {
       // Create project (PLANNING state)
       const proj = await executeCommandViaApi(
-        page, 'pm:create_project',
+        page,
+        'pm:create_project',
         { pm_project_name: projectName },
-        undefined, 'create',
+        undefined,
+        'create',
       );
       projectPid = proj.recordId;
       expect(projectPid).toBeTruthy();
@@ -73,14 +75,16 @@ test.describe('PM Error Branches', () => {
 
       // Create a task
       const t = await executeCommandViaApi(
-        page, 'pm:create_task',
+        page,
+        'pm:create_task',
         {
           pm_task_title: `ErrorTest ${projectName}`,
           pm_task_project_id: projectPid,
           pm_task_type: 'task',
           pm_task_priority: 'medium',
         },
-        undefined, 'create',
+        undefined,
+        'create',
       );
       taskPid = t.recordId;
       expect(taskPid).toBeTruthy();
@@ -96,7 +100,11 @@ test.describe('PM Error Branches', () => {
   test('PM-ERR-01: Cannot activate already active project (API)', async ({ page }) => {
     // Project is in_progress, trying to activate again should fail
     const result = await executeCommandViaApi(
-      page, 'pm:activate_project', {}, projectPid, 'update',
+      page,
+      'pm:activate_project',
+      {},
+      projectPid,
+      'update',
       { allowHttpError: true },
     );
     // Should return error code (not '0')
@@ -106,7 +114,11 @@ test.describe('PM Error Branches', () => {
   test('PM-ERR-02: Cannot archive non-completed project (API)', async ({ page }) => {
     // Project is in_progress, archive requires completed
     const result = await executeCommandViaApi(
-      page, 'pm:archive_project', {}, projectPid, 'update',
+      page,
+      'pm:archive_project',
+      {},
+      projectPid,
+      'update',
       { allowHttpError: true },
     );
     expect(result.code).not.toBe('0');
@@ -114,10 +126,9 @@ test.describe('PM Error Branches', () => {
 
   test('PM-ERR-03: Cannot complete TODO task directly (API)', async ({ page }) => {
     // Task is TODO, complete requires in_progress
-    const result = await executeCommandViaApi(
-      page, 'pm:complete_task', {}, taskPid, 'update',
-      { allowHttpError: true },
-    );
+    const result = await executeCommandViaApi(page, 'pm:complete_task', {}, taskPid, 'update', {
+      allowHttpError: true,
+    });
     expect(result.code).not.toBe('0');
   });
 
@@ -126,10 +137,9 @@ test.describe('PM Error Branches', () => {
     await executeCommandViaApi(page, 'pm:start_task', {}, taskPid, 'update');
 
     // Now try to start again — should fail
-    const result = await executeCommandViaApi(
-      page, 'pm:start_task', {}, taskPid, 'update',
-      { allowHttpError: true },
-    );
+    const result = await executeCommandViaApi(page, 'pm:start_task', {}, taskPid, 'update', {
+      allowHttpError: true,
+    });
     expect(result.code).not.toBe('0');
   });
 
@@ -165,7 +175,9 @@ test.describe('PM Error Branches', () => {
     await page.getByTestId('task-form-modal-close').click();
   });
 
-  test('PM-ERR-06: Task create form validates and submits with required fields', async ({ page }) => {
+  test('PM-ERR-06: Task create form validates and submits with required fields', async ({
+    page,
+  }) => {
     await navigateToProjectWorkspace(page, projectPid);
     await expect(page.getByTestId('task-board')).toBeVisible({ timeout: 15000 });
 
@@ -199,10 +211,9 @@ test.describe('PM Error Branches', () => {
 
   test('PM-ERR-07: Cannot delete non-PLANNING project (API)', async ({ page }) => {
     // Project is in_progress — delete should fail (precondition: only PLANNING)
-    const result = await executeCommandViaApi(
-      page, 'pm:delete_project', {}, projectPid, 'delete',
-      { allowHttpError: true },
-    );
+    const result = await executeCommandViaApi(page, 'pm:delete_project', {}, projectPid, 'delete', {
+      allowHttpError: true,
+    });
     expect(result.code).not.toBe('0');
   });
 

@@ -2,9 +2,7 @@ import http from 'http';
 import fs from 'fs';
 
 // Credentials must match tests/helpers/test-accounts.ts (DEFAULT_TEST_ACCOUNT)
-const email = process.env.TEST_ADMIN_EMAIL || 'e2e@test.local';
-const password = process.env.TEST_ADMIN_PASSWORD || 'E2eTestPass2026!';
-const data = JSON.stringify({ email, password });
+const data = JSON.stringify({ email: 'admin@example.com', password: 'Test2026x' });
 const options = {
   hostname: 'localhost',
   port: 5173,

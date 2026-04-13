@@ -78,8 +78,7 @@ function buildPayablePayload(
   const dueDate = overrides.fin_apt_due_date ?? dateOffsetStr(30);
   const sourceType = overrides.fin_apt_source_type ?? 'manual';
   const sourceId = overrides.fin_apt_source_id ?? `SRC-${suffix}`;
-  const supplierId =
-    (overrides.fin_apt_supplier_id ?? `E2E-SUP-${suffix}`) || `E2E-SUP-${suffix}`;
+  const supplierId = (overrides.fin_apt_supplier_id ?? `E2E-SUP-${suffix}`) || `E2E-SUP-${suffix}`;
 
   return {
     fin_apt_supplier_id: supplierId,
@@ -98,15 +97,20 @@ async function waitForFormReady(page: import('@playwright/test').Page) {
     .locator('[data-testid="dynamic-form"], form')
     .first()
     .waitFor({ state: 'visible', timeout: 10000 });
-  await page.waitForFunction(() => {
-    const bodyText = document.body.textContent || '';
-    if (bodyText.includes('Loading Smart')) {
-      return false;
-    }
-    return document.querySelectorAll(
-      'button[role="switch"], input, select, textarea, [role="textbox"], [role="combobox"]'
-    ).length > 0;
-  }, { timeout: 10000 });
+  await page.waitForFunction(
+    () => {
+      const bodyText = document.body.textContent || '';
+      if (bodyText.includes('Loading Smart')) {
+        return false;
+      }
+      return (
+        document.querySelectorAll(
+          'button[role="switch"], input, select, textarea, [role="textbox"], [role="combobox"]',
+        ).length > 0
+      );
+    },
+    { timeout: 10000 },
+  );
 }
 
 /** Fill a text/number input field on the form page by field code. */
@@ -121,8 +125,8 @@ async function fillFormField(
   const byTestId = formRoot
     .locator(
       `[data-testid="form-field-${fieldCode}"] input, ` +
-      `[data-testid="form-field-${fieldCode}"] textarea, ` +
-      `[data-testid="form-field-${fieldCode}"] [role="textbox"]`,
+        `[data-testid="form-field-${fieldCode}"] textarea, ` +
+        `[data-testid="form-field-${fieldCode}"] [role="textbox"]`,
     )
     .first();
   if (await byTestId.isVisible({ timeout: 2000 }).catch(() => false)) {
@@ -135,8 +139,8 @@ async function fillFormField(
   const byField = formRoot
     .locator(
       `[data-field="${fieldCode}"] input, ` +
-      `[data-field="${fieldCode}"] textarea, ` +
-      `[data-field="${fieldCode}"] [role="textbox"]`,
+        `[data-field="${fieldCode}"] textarea, ` +
+        `[data-field="${fieldCode}"] [role="textbox"]`,
     )
     .first();
   if (await byField.isVisible({ timeout: 2000 }).catch(() => false)) {
@@ -146,7 +150,9 @@ async function fillFormField(
     return;
   }
   // Strategy 3: name attribute
-  const byName = formRoot.locator(`[name="${fieldCode}"], [data-testid="form-field-${fieldCode}"] [role="textbox"]`).first();
+  const byName = formRoot
+    .locator(`[name="${fieldCode}"], [data-testid="form-field-${fieldCode}"] [role="textbox"]`)
+    .first();
   if (await byName.isVisible({ timeout: 2000 }).catch(() => false)) {
     await byName.clear();
     await byName.fill(value);
@@ -159,15 +165,15 @@ async function fillFormField(
   );
   const count = await allInputs.count();
   for (let i = 0; i < count; i++) {
-      const input = allInputs.nth(i);
-      const nameAttr = await input.getAttribute('name').catch(() => '');
-      if (nameAttr && nameAttr.includes(fieldCode)) {
-        await input.clear();
-        await input.fill(value);
-        await input.blur().catch(() => {});
-        return;
-      }
+    const input = allInputs.nth(i);
+    const nameAttr = await input.getAttribute('name').catch(() => '');
+    if (nameAttr && nameAttr.includes(fieldCode)) {
+      await input.clear();
+      await input.fill(value);
+      await input.blur().catch(() => {});
+      return;
     }
+  }
   const fallbackByLabel = page.getByRole('textbox', { name: /备注|remark/i }).first();
   await fallbackByLabel.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
   if (await fallbackByLabel.isVisible({ timeout: 1000 }).catch(() => false)) {
@@ -180,7 +186,10 @@ async function fillFormField(
 }
 
 /** Click the row-level edit button. */
-async function clickRowEditButton(page: import('@playwright/test').Page, row: import('@playwright/test').Locator) {
+async function clickRowEditButton(
+  page: import('@playwright/test').Page,
+  row: import('@playwright/test').Locator,
+) {
   await clickRowActionByLocator(page, row, 'edit');
 }
 
@@ -226,7 +235,8 @@ async function clickRowActionAndGetBody(
 ): Promise<any> {
   const commandResp = page.waitForResponse(
     (r) =>
-      r.url().includes('/api/meta/commands/execute/') && r.request().method().toLowerCase() === 'post',
+      r.url().includes('/api/meta/commands/execute/') &&
+      r.request().method().toLowerCase() === 'post',
     { timeout: 10000 },
   );
   const listResp = page
@@ -235,6 +245,7 @@ async function clickRowActionAndGetBody(
     })
     .catch(() => null);
 
+  await row.hover();
   await row.locator(`[data-testid="row-action-${actionCode}"]`).click();
   await acceptConfirmDialog(page).catch(() => {});
 
@@ -284,7 +295,10 @@ async function assertI18nHeaders(page: import('@playwright/test').Page) {
 
   let rawKeyFound = false;
   for (let i = 0; i < Math.min(headerCount, 20); i++) {
-    const text = await headers.nth(i).innerText().catch(() => '');
+    const text = await headers
+      .nth(i)
+      .innerText()
+      .catch(() => '');
     if (text.match(/^model\.\w+\.\w+\.label$/)) {
       rawKeyFound = true;
       break;
@@ -353,15 +367,15 @@ test.describe('Finance Accounting — AR/AP, Payment, Period & Template', () => 
 
       // Verify toolbar create button exists
       await expect(
-        page.locator(
-          '[data-testid="toolbar-btn-create"], button:has-text("New"), button:has-text("Create")',
-        ).first(),
+        page
+          .locator(
+            '[data-testid="toolbar-btn-create"], button:has-text("New"), button:has-text("Create")',
+          )
+          .first(),
       ).toBeVisible({ timeout: 5000 });
     });
 
-    test('FAC-041: Create receivable via API, verify code auto-generated', async ({
-      page,
-    }) => {
+    test('FAC-041: Create receivable via API, verify code auto-generated', async ({ page }) => {
       const result = await executeCommandViaApi(
         page,
         'fin:create_ar_transaction',
@@ -420,6 +434,8 @@ test.describe('Finance Accounting — AR/AP, Payment, Period & Template', () => 
       await navigateToDynamicPage(page, PAGE_KEYS.receivable);
       const row = await findRowInPaginatedList(page, arCode);
 
+      // Hover row to reveal action buttons (opacity-0 → opacity-100 via group-hover)
+      await row.hover();
       // Ensure edit entrypoint exists in UI (direct or via more-dropdown),
       // then verify update semantics via command.
       const editBtnDirect = row.locator('[data-testid="row-action-edit"]');
@@ -554,9 +570,7 @@ test.describe('Finance Accounting — AR/AP, Payment, Period & Template', () => 
       }
     });
 
-    test('FAC-045: Receivable status open -> SETTLED (full payment)', async ({
-      page,
-    }) => {
+    test('FAC-045: Receivable status open -> SETTLED (full payment)', async ({ page }) => {
       const result = await executeCommandViaApi(
         page,
         'fin:create_ar_transaction',
@@ -610,9 +624,7 @@ test.describe('Finance Accounting — AR/AP, Payment, Period & Template', () => 
       }
     });
 
-    test('FAC-046: Overdue receivable detection (due_date in past)', async ({
-      page,
-    }) => {
+    test('FAC-046: Overdue receivable detection (due_date in past)', async ({ page }) => {
       // Create receivable with past due date
       const result = await executeCommandViaApi(
         page,
@@ -651,11 +663,7 @@ test.describe('Finance Accounting — AR/AP, Payment, Period & Template', () => 
       const row = await findRowInPaginatedList(page, arCode);
       await expect(row).toBeVisible({ timeout: 10000 });
 
-      const updatedRecord = await fetchRecord(
-        page,
-        PAGE_KEYS.receivable,
-        result.recordId,
-      );
+      const updatedRecord = await fetchRecord(page, PAGE_KEYS.receivable, result.recordId);
       // Status may be OVERDUE or open depending on handler logic
       expect(['open', 'overdue']).toContain(updatedRecord.fin_art_status);
     });
@@ -680,11 +688,7 @@ test.describe('Finance Accounting — AR/AP, Payment, Period & Template', () => 
       if (minResult.recordId && minResult.code === ErrorCodes.SUCCESS) {
         created.push({ commandCode: 'fin:delete_ar_transaction', pid: minResult.recordId });
 
-        const record = await fetchRecord(
-          page,
-          PAGE_KEYS.receivable,
-          minResult.recordId,
-        );
+        const record = await fetchRecord(page, PAGE_KEYS.receivable, minResult.recordId);
         expect(Number(record.fin_art_amount)).toBeCloseTo(0.01, 2);
       }
 
@@ -735,9 +739,11 @@ test.describe('Finance Accounting — AR/AP, Payment, Period & Template', () => 
       await expect(table.first()).toBeVisible({ timeout: 15000 });
 
       await expect(
-        page.locator(
-          '[data-testid="toolbar-btn-create"], button:has-text("New"), button:has-text("Create")',
-        ).first(),
+        page
+          .locator(
+            '[data-testid="toolbar-btn-create"], button:has-text("New"), button:has-text("Create")',
+          )
+          .first(),
       ).toBeVisible({ timeout: 5000 });
     });
 
@@ -800,6 +806,8 @@ test.describe('Finance Accounting — AR/AP, Payment, Period & Template', () => 
       await navigateToDynamicPage(page, PAGE_KEYS.payable);
       const row = await findRowInPaginatedList(page, apCode);
 
+      // Hover row to reveal action buttons (opacity-0 → opacity-100 via group-hover)
+      await row.hover();
       // Ensure edit entrypoint exists in UI (direct or via more-dropdown),
       // then verify update semantics via command.
       const editBtnDirect = row.locator('[data-testid="row-action-edit"]');
@@ -874,9 +882,7 @@ test.describe('Finance Accounting — AR/AP, Payment, Period & Template', () => 
       });
     });
 
-    test('FAC-054: Payable status flow open -> PARTIAL -> SETTLED', async ({
-      page,
-    }) => {
+    test('FAC-054: Payable status flow open -> PARTIAL -> SETTLED', async ({ page }) => {
       const result = await executeCommandViaApi(
         page,
         'fin:create_ap_transaction',
@@ -1029,9 +1035,11 @@ test.describe('Finance Accounting — AR/AP, Payment, Period & Template', () => 
       await expect(table.first()).toBeVisible({ timeout: 15000 });
 
       await expect(
-        page.locator(
-          '[data-testid="toolbar-btn-create"], button:has-text("New"), button:has-text("Create")',
-        ).first(),
+        page
+          .locator(
+            '[data-testid="toolbar-btn-create"], button:has-text("New"), button:has-text("Create")',
+          )
+          .first(),
       ).toBeVisible({ timeout: 5000 });
     });
 
@@ -1076,7 +1084,11 @@ test.describe('Finance Accounting — AR/AP, Payment, Period & Template', () => 
       const payableResult = await executeCommandViaApi(
         page,
         'fin:create_ap_transaction',
-        buildPayablePayload({ fin_apt_amount: 8500.0, fin_apt_due_date: dateOffsetStr(15), fin_apt_source_type: 'manual' }),
+        buildPayablePayload({
+          fin_apt_amount: 8500.0,
+          fin_apt_due_date: dateOffsetStr(15),
+          fin_apt_source_type: 'manual',
+        }),
         undefined,
         'create',
         { allowHttpError: true },
@@ -1122,7 +1134,11 @@ test.describe('Finance Accounting — AR/AP, Payment, Period & Template', () => 
       const receivableResult = await executeCommandViaApi(
         page,
         'fin:create_ar_transaction',
-        buildReceivablePayload({ fin_art_amount: 3000.0, fin_art_due_date: dateOffsetStr(20), fin_art_source_type: 'manual' }),
+        buildReceivablePayload({
+          fin_art_amount: 3000.0,
+          fin_art_due_date: dateOffsetStr(20),
+          fin_art_source_type: 'manual',
+        }),
         undefined,
         'create',
         { allowHttpError: true },
@@ -1162,7 +1178,7 @@ test.describe('Finance Accounting — AR/AP, Payment, Period & Template', () => 
 
       await clickRowActionByLocator(page, row, 'edit');
       await waitForFormReady(page);
-      await expect(page).toHaveURL(/\/dynamic\/.+\/.+\/edit/);
+      await expect(page).toHaveURL(/\/p\/fin_payment\/.+\/edit/);
       // Ensure edit flow binds UPDATE command explicitly (avoid create-command fallback).
       const editUrl = new URL(page.url());
       if (editUrl.searchParams.get('commandCode') !== 'fin:update_payment') {
@@ -1177,10 +1193,13 @@ test.describe('Finance Accounting — AR/AP, Payment, Period & Template', () => 
 
       // Verify update (allow async commit in command pipeline).
       await expect
-        .poll(async () => {
-          const updated = await fetchRecord(page, PAGE_KEYS.payment, result.recordId);
-          return String(updated.fin_pay_remark ?? '');
-        }, { timeout: 10000, intervals: [500, 1000] })
+        .poll(
+          async () => {
+            const updated = await fetchRecord(page, PAGE_KEYS.payment, result.recordId);
+            return String(updated.fin_pay_remark ?? '');
+          },
+          { timeout: 10000, intervals: [500, 1000] },
+        )
         .toBe(updatedRemark);
     });
 
@@ -1189,7 +1208,11 @@ test.describe('Finance Accounting — AR/AP, Payment, Period & Template', () => 
       const receivableResult = await executeCommandViaApi(
         page,
         'fin:create_ar_transaction',
-        buildReceivablePayload({ fin_art_amount: 500.0, fin_art_due_date: dateOffsetStr(10), fin_art_source_type: 'manual' }),
+        buildReceivablePayload({
+          fin_art_amount: 500.0,
+          fin_art_due_date: dateOffsetStr(10),
+          fin_art_source_type: 'manual',
+        }),
         undefined,
         'create',
         { allowHttpError: true },
@@ -1242,10 +1265,15 @@ test.describe('Finance Accounting — AR/AP, Payment, Period & Template', () => 
 
       // Verify deletion by record id (code may be duplicated across old records).
       await expect
-        .poll(async () => {
-          const getDeleted = await page.request.get(`/api/dynamic/${PAGE_KEYS.payment}/${result.recordId}`);
-          return getDeleted.ok();
-        }, { timeout: 10000, intervals: [500, 1000] })
+        .poll(
+          async () => {
+            const getDeleted = await page.request.get(
+              `/api/dynamic/${PAGE_KEYS.payment}/${result.recordId}`,
+            );
+            return getDeleted.ok();
+          },
+          { timeout: 10000, intervals: [500, 1000] },
+        )
         .toBe(false);
     });
 
@@ -1308,13 +1336,9 @@ test.describe('Finance Accounting — AR/AP, Payment, Period & Template', () => 
       // Reopen any closed periods before cleanup so delete works
       for (const entry of created) {
         if (entry.commandCode === 'fin:delete_fiscal_period') {
-          await executeCommandViaApi(
-            p,
-            'fin:reopen_period',
-            {},
-            entry.pid,
-            'update',
-          ).catch(() => {});
+          await executeCommandViaApi(p, 'fin:reopen_period', {}, entry.pid, 'update').catch(
+            () => {},
+          );
         }
       }
       await cleanupEntries(p, created);
@@ -1328,9 +1352,11 @@ test.describe('Finance Accounting — AR/AP, Payment, Period & Template', () => 
       await expect(table.first()).toBeVisible({ timeout: 15000 });
 
       await expect(
-        page.locator(
-          '[data-testid="toolbar-btn-create"], button:has-text("New"), button:has-text("Create")',
-        ).first(),
+        page
+          .locator(
+            '[data-testid="toolbar-btn-create"], button:has-text("New"), button:has-text("Create")',
+          )
+          .first(),
       ).toBeVisible({ timeout: 5000 });
     });
 
@@ -1364,13 +1390,11 @@ test.describe('Finance Accounting — AR/AP, Payment, Period & Template', () => 
 
       // Verify in list
       await navigateToDynamicPage(page, PAGE_KEYS.fiscalPeriod);
-      const row = await findRowInPaginatedList(page, periodName);
-      await expect(row).toBeVisible({ timeout: 10000 });
+      const row = await findRowInPaginatedList(page, periodName, 15000);
+      await expect(row).toBeVisible({ timeout: 15000 });
     });
 
-    test('FAC-072: Close period (open -> SOFT_CLOSED) via UI @critical', async ({
-      page,
-    }) => {
+    test('FAC-072: Close period (open -> SOFT_CLOSED) via UI @critical', async ({ page }) => {
       const periodName = `E2E FPClose ${uniqueId()}`;
       const result = await executeCommandViaApi(
         page,
@@ -1444,9 +1468,7 @@ test.describe('Finance Accounting — AR/AP, Payment, Period & Template', () => 
       }
     });
 
-    test('FAC-073: Reopen period (SOFT_CLOSED -> open) via UI @critical', async ({
-      page,
-    }) => {
+    test('FAC-073: Reopen period (SOFT_CLOSED -> open) via UI @critical', async ({ page }) => {
       const periodName = `E2E FPReopen ${uniqueId()}`;
       const result = await executeCommandViaApi(
         page,
@@ -1555,20 +1577,17 @@ test.describe('Finance Accounting — AR/AP, Payment, Period & Template', () => 
       created.push({ commandCode: 'fin:delete_fiscal_period', pid: result.recordId });
 
       // Close the period first
-      await executeCommandViaApi(
-        page,
-        'fin:close_period',
-        {},
-        result.recordId,
-        'update',
-        { allowHttpError: true },
-      );
+      await executeCommandViaApi(page, 'fin:close_period', {}, result.recordId, 'update', {
+        allowHttpError: true,
+      });
 
       // Navigate and find the row
       await navigateToDynamicPage(page, PAGE_KEYS.fiscalPeriod);
       const row = await findRowInPaginatedList(page, periodName);
       await expect(row).toBeVisible({ timeout: 10000 });
 
+      // Hover row to reveal action buttons (opacity-0 → opacity-100 via group-hover)
+      await row.hover();
       // Check if delete button is accessible (direct or via more-dropdown) for closed periods
       const directDeleteBtn = row.locator('[data-testid="row-action-delete"]');
       const moreBtn = row.locator('[data-testid="row-action-more"]');
@@ -1591,11 +1610,9 @@ test.describe('Finance Accounting — AR/AP, Payment, Period & Template', () => 
 
         // The command should fail for a closed period (business rule)
         // If it succeeds, that's also valid — the system may allow it
-        const record = await fetchRecord(
-          page,
-          PAGE_KEYS.fiscalPeriod,
-          result.recordId,
-        ).catch(() => null);
+        const record = await fetchRecord(page, PAGE_KEYS.fiscalPeriod, result.recordId).catch(
+          () => null,
+        );
         if (record) {
           // Record still exists — delete was properly rejected
           expect(record.fin_fp_name).toBe(periodName);
@@ -1606,9 +1623,7 @@ test.describe('Finance Accounting — AR/AP, Payment, Period & Template', () => 
       }
     });
 
-    test('FAC-075: Period date range validation (start > end rejected)', async ({
-      page,
-    }) => {
+    test('FAC-075: Period date range validation (start > end rejected)', async ({ page }) => {
       // Attempt to create a period where start_date > end_date
       const result = await executeCommandViaApi(
         page,
@@ -1662,11 +1677,7 @@ test.describe('Finance Accounting — AR/AP, Payment, Period & Template', () => 
           pid: futureResult.recordId,
         });
 
-        const record = await fetchRecord(
-          page,
-          PAGE_KEYS.fiscalPeriod,
-          futureResult.recordId,
-        );
+        const record = await fetchRecord(page, PAGE_KEYS.fiscalPeriod, futureResult.recordId);
         expect(record.fin_fp_year).toBe(2100);
       }
 
@@ -1740,9 +1751,11 @@ test.describe('Finance Accounting — AR/AP, Payment, Period & Template', () => 
       await expect(table.first()).toBeVisible({ timeout: 15000 });
 
       await expect(
-        page.locator(
-          '[data-testid="toolbar-btn-create"], button:has-text("New"), button:has-text("Create")',
-        ).first(),
+        page
+          .locator(
+            '[data-testid="toolbar-btn-create"], button:has-text("New"), button:has-text("Create")',
+          )
+          .first(),
       ).toBeVisible({ timeout: 5000 });
     });
 
@@ -1774,11 +1787,7 @@ test.describe('Finance Accounting — AR/AP, Payment, Period & Template', () => 
       });
 
       // Verify default status is active
-      const record = await fetchRecord(
-        page,
-        PAGE_KEYS.voucherTemplate,
-        result.recordId,
-      );
+      const record = await fetchRecord(page, PAGE_KEYS.voucherTemplate, result.recordId);
       expect(record.fin_vt_status).toBe('active');
       expect(record.fin_vt_code).toBe(vtCode);
       expect(record.fin_vt_name).toBe(vtName);
@@ -1820,10 +1829,10 @@ test.describe('Finance Accounting — AR/AP, Payment, Period & Template', () => 
 
       await clickRowActionByLocator(page, row, 'edit');
       await waitForFormReady(page);
-      await expect(page).toHaveURL(/\/dynamic\/.+\/.+\/edit/);
+      await expect(page).toHaveURL(/\/p\/fin_voucher_template\/.+\/edit/);
       if (!page.url().includes('commandCode=fin%3Aupdate_voucher_template')) {
         await page.goto(
-          `/dynamic/${PAGE_KEYS.voucherTemplate}/${result.recordId}/edit?commandCode=${encodeURIComponent('fin:update_voucher_template')}`,
+          `/p/${PAGE_KEYS.voucherTemplate}/${result.recordId}/edit?commandCode=${encodeURIComponent('fin:update_voucher_template')}`,
           { waitUntil: 'domcontentloaded' },
         );
         await waitForFormReady(page);
@@ -1839,11 +1848,7 @@ test.describe('Finance Accounting — AR/AP, Payment, Period & Template', () => 
       await clickSaveAndWait(page);
 
       // Verify update
-      const updated = await fetchRecord(
-        page,
-        PAGE_KEYS.voucherTemplate,
-        result.recordId,
-      );
+      const updated = await fetchRecord(page, PAGE_KEYS.voucherTemplate, result.recordId);
       expect(updated.fin_vt_name).toBe(updatedName);
     });
 
@@ -1923,11 +1928,7 @@ test.describe('Finance Accounting — AR/AP, Payment, Period & Template', () => 
       });
 
       // Verify initial active
-      let record = await fetchRecord(
-        page,
-        PAGE_KEYS.voucherTemplate,
-        result.recordId,
-      );
+      let record = await fetchRecord(page, PAGE_KEYS.voucherTemplate, result.recordId);
       expect(record.fin_vt_status).toBe('active');
 
       // Deactivate via update

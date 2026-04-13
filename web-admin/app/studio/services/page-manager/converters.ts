@@ -22,6 +22,7 @@ export function toApiPageType(mode: PageMode): ApiPageType {
     grid: 'dashboard',
     floor: 'detail',
     form: 'form',
+    composite: 'composite',
   };
   return mapping[mode] || 'custom';
 }
@@ -35,6 +36,7 @@ export function fromApiPageType(pageType: ApiPageType): PageMode {
     list: 'form', // List pages use form mode
     detail: 'floor',
     dashboard: 'grid',
+    composite: 'composite',
     custom: 'grid', // Default custom to grid
   };
   return mapping[pageType] || 'grid';
@@ -70,6 +72,26 @@ export function fromApiPageStatus(apiStatus: ApiPageStatus, isPublished?: boolea
  * Convert PageSchemaDTO to PageMeta
  */
 export function toPageMeta(dto: PageSchemaDTO): PageMeta {
+  const extension = dto.extension && typeof dto.extension === 'object'
+    ? dto.extension
+    : undefined;
+
+  const compositeDslSchema =
+    dto.kind === 'composite'
+      ? {
+          kind: 'composite',
+          pageKey: dto.pageKey,
+          blocks: dto.blocks || [],
+          layout: dto.layout,
+          title: dto.title,
+          extension,
+          enableMultiView:
+            typeof extension?.enableMultiView === 'boolean'
+              ? (extension.enableMultiView as boolean)
+              : undefined,
+        }
+      : undefined;
+
   // Extract tags from the tags object
   let tags: string[] = [];
   if (dto.tags) {
@@ -80,19 +102,19 @@ export function toPageMeta(dto: PageSchemaDTO): PageMeta {
     }
   }
 
-  // Get component count from metaInfo or dslSchema
+  // Get component count from metaInfo or blocks
   let componentCount = 0;
   if (dto.metaInfo?.componentCount) {
     componentCount = dto.metaInfo.componentCount as number;
-  } else if (dto.dslSchema?.components) {
-    componentCount = (dto.dslSchema.components as unknown[]).length;
+  } else if (dto.blocks) {
+    componentCount = dto.blocks.length;
   }
 
   return {
     id: dto.pid,
-    title: dto.title || dto.name,
+    title: (typeof dto.title === 'string' ? dto.title : dto.title?.['en-US'] || dto.title?.['zh-CN']) || dto.name,
     description: dto.description,
-    mode: fromApiPageType(dto.pageType),
+    mode: fromApiPageType(dto.kind),
     viewModelCode: dto.extension?.viewModelCode as string | undefined,
     status: fromApiPageStatus(dto.status || 'draft', dto.isPublished),
     version: dto.semver || `${dto.version || 1}.0.0`,
@@ -102,7 +124,8 @@ export function toPageMeta(dto: PageSchemaDTO): PageMeta {
     tags,
     thumbnail: dto.metaInfo?.thumbnail as string | undefined,
     componentCount,
-    dslSchema: dto.dslSchema,
+    dslSchema: compositeDslSchema,
+    extension,
   };
 }
 
@@ -122,7 +145,7 @@ export function toUpdateRequest(page: Partial<PageMeta>): Record<string, unknown
     request.tags = { list: page.tags };
   }
   if (page.mode !== undefined) {
-    request.pageType = toApiPageType(page.mode);
+    request.kind = toApiPageType(page.mode);
   }
 
   return request;
@@ -165,15 +188,8 @@ export function toCreateRequest(request: CreatePageRequest): PageSchemaCreateReq
     pageKey,
     title: request.title,
     description: request.description,
-    pageType: toApiPageType(request.mode),
-    dslSchema: {
-      version: '1.0.0',
-      type: request.mode,
-      components: [],
-      layout: request.layoutPreset
-        ? { columns: parseInt(request.layoutPreset.split('-')[1]) }
-        : undefined,
-    },
+    kind: toApiPageType(request.mode),
+    blocks: [],
     metaInfo: {
       templateId: request.templateId,
       componentCount: 0,
@@ -187,30 +203,54 @@ export function toCreateRequest(request: CreatePageRequest): PageSchemaCreateReq
 }
 
 /**
- * Extract DSL schema from PageSchemaDTO
- */
-export function extractDslSchema(dto: PageSchemaDTO): Record<string, unknown> {
-  return (
-    dto.dslSchema || {
-      version: '1.0.0',
-      type: fromApiPageType(dto.pageType),
-      components: [],
-    }
-  );
-}
-
-/**
- * Create DSL schema update payload
+ * Create page update payload from DSL schema.
+ * Maps DSL fields to backend PageSchemaUpdateRequest fields:
+ *   - blocks (JSONB array)
+ *   - layout (JSONB object)
+ *   - kind
+ *   - title (string)
+ *   - metaInfo
  */
 export function createDslSchemaPayload(
   schema: Record<string, unknown>,
   componentCount: number,
 ): Record<string, unknown> {
-  return {
-    dslSchema: schema,
+  const payload: Record<string, unknown> = {
     metaInfo: {
       componentCount,
       lastModified: new Date().toISOString(),
     },
   };
+
+  // Map DSL fields to backend DTO fields
+  if (Array.isArray(schema.blocks)) {
+    payload.blocks = schema.blocks;
+  }
+  if (schema.layout != null) {
+    payload.layout = schema.layout;
+  }
+  if (typeof schema.kind === 'string') {
+    payload.kind = schema.kind;
+  }
+  const schemaExtension =
+    schema.extension && typeof schema.extension === 'object'
+      ? { ...(schema.extension as Record<string, unknown>) }
+      : {};
+  if (typeof schema.enableMultiView === 'boolean') {
+    schemaExtension.enableMultiView = schema.enableMultiView;
+  }
+  if (Object.keys(schemaExtension).length > 0) {
+    payload.extension = schemaExtension;
+  }
+  if (schema.title != null) {
+    payload.title = typeof schema.title === 'string'
+      ? schema.title
+      : JSON.stringify(schema.title);
+  }
+  // Persist the schema version set by the frontend (CURRENT_SCHEMA_VERSION)
+  if (typeof schema.schemaVersion === 'number') {
+    payload.schemaVersion = schema.schemaVersion;
+  }
+
+  return payload;
 }

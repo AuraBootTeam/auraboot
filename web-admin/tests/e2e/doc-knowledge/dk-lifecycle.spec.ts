@@ -23,11 +23,7 @@ import { uniqueId, executeCommandViaApi } from '../helpers/index';
 // Navigation helper
 // ---------------------------------------------------------------------------
 
-async function navigateToDkPage(
-  page: Page,
-  leafName: string,
-  modelCode: string,
-): Promise<void> {
+async function navigateToDkPage(page: Page, leafName: string, modelCode: string): Promise<void> {
   await page.goto('/dashboards');
   await page.waitForLoadState('domcontentloaded');
 
@@ -42,17 +38,17 @@ async function navigateToDkPage(
   // Set up waitForResponse BEFORE click
   const leafLink = nav.getByRole('link', { name: leafName });
   await leafLink.scrollIntoViewIfNeeded();
-  const listResponsePromise = page.waitForResponse(
-    (r) =>
-      r.url().includes(`/api/dynamic/${modelCode}`) && r.status() === 200,
-    { timeout: 15_000 },
-  ).catch(() => null);
+  const listResponsePromise = page
+    .waitForResponse((r) => r.url().includes(`/api/dynamic/${modelCode}`) && r.status() === 200, {
+      timeout: 15_000,
+    })
+    .catch(() => null);
   await leafLink.evaluate((el: HTMLElement) => el.click());
   await listResponsePromise;
 
-  await expect(
-    page.locator('table, [class*="ant-table"]').first(),
-  ).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator('table, [class*="ant-table"]').first()).toBeVisible({
+    timeout: 10_000,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -139,9 +135,7 @@ test.describe('Doc Knowledge — Lifecycle', () => {
   // DK-001 @smoke: Navigate to 文档管理
   // =========================================================================
 
-  test('DK-001 @smoke: Navigate to 文档管理 list via sidebar menu', async ({
-    page,
-  }) => {
+  test('DK-001 @smoke: Navigate to 文档管理 list via sidebar menu', async ({ page }) => {
     await navigateToDkPage(page, '文档管理', 'dk_document');
 
     const rows = page.locator('tbody tr');
@@ -158,9 +152,7 @@ test.describe('Doc Knowledge — Lifecycle', () => {
   // DK-002 @smoke: Navigate to 知识文章
   // =========================================================================
 
-  test('DK-002 @smoke: Navigate to 知识文章 list via sidebar menu', async ({
-    page,
-  }) => {
+  test('DK-002 @smoke: Navigate to 知识文章 list via sidebar menu', async ({ page }) => {
     await navigateToDkPage(page, '知识文章', 'dk_knowledge_article');
 
     const table = page.locator('table, [class*="ant-table"]').first();
@@ -174,9 +166,7 @@ test.describe('Doc Knowledge — Lifecycle', () => {
   // DK-003 @critical: Document draft → published → archived
   // =========================================================================
 
-  test('DK-003 @critical: Document draft → published → archived', async ({
-    page,
-  }) => {
+  test('DK-003 @critical: Document draft → published → archived', async ({ page }) => {
     expect(documentId).toBeTruthy();
 
     // Verify starts as draft
@@ -186,28 +176,14 @@ test.describe('Doc Knowledge — Lifecycle', () => {
     expect((draftBody?.data ?? draftBody).dk_doc_status).toBe('draft');
 
     // draft → published
-    await executeCommandViaApi(
-      page,
-      'dk:publish_document',
-      {},
-      documentId,
-      'state_transition',
-    );
+    await executeCommandViaApi(page, 'dk:publish_document', {}, documentId, 'state_transition');
 
     resp = await page.request.get(`/api/dynamic/dk_document/${documentId}`);
     const publishedBody = await resp.json();
-    expect((publishedBody?.data ?? publishedBody).dk_doc_status).toBe(
-      'published',
-    );
+    expect((publishedBody?.data ?? publishedBody).dk_doc_status).toBe('published');
 
     // published → archived
-    await executeCommandViaApi(
-      page,
-      'dk:archive_document',
-      {},
-      documentId,
-      'state_transition',
-    );
+    await executeCommandViaApi(page, 'dk:archive_document', {}, documentId, 'state_transition');
 
     resp = await page.request.get(`/api/dynamic/dk_document/${documentId}`);
     const archivedBody = await resp.json();
@@ -223,9 +199,7 @@ test.describe('Doc Knowledge — Lifecycle', () => {
   // DK-004 @critical: Document published → revise → draft
   // =========================================================================
 
-  test('DK-004 @critical: Document published → revise → draft', async ({
-    page,
-  }) => {
+  test('DK-004 @critical: Document published → revise → draft', async ({ page }) => {
     expect(reviseDocumentId).toBeTruthy();
 
     // Publish first
@@ -237,14 +211,10 @@ test.describe('Doc Knowledge — Lifecycle', () => {
       'state_transition',
     );
 
-    let resp = await page.request.get(
-      `/api/dynamic/dk_document/${reviseDocumentId}`,
-    );
+    let resp = await page.request.get(`/api/dynamic/dk_document/${reviseDocumentId}`);
     expect(resp.ok()).toBe(true);
     const publishedBody = await resp.json();
-    expect((publishedBody?.data ?? publishedBody).dk_doc_status).toBe(
-      'published',
-    );
+    expect((publishedBody?.data ?? publishedBody).dk_doc_status).toBe('published');
 
     // published → revise → draft
     await executeCommandViaApi(
@@ -255,9 +225,7 @@ test.describe('Doc Knowledge — Lifecycle', () => {
       'state_transition',
     );
 
-    resp = await page.request.get(
-      `/api/dynamic/dk_document/${reviseDocumentId}`,
-    );
+    resp = await page.request.get(`/api/dynamic/dk_document/${reviseDocumentId}`);
     const revisedBody = await resp.json();
     expect((revisedBody?.data ?? revisedBody).dk_doc_status).toBe('draft');
   });
@@ -266,48 +234,26 @@ test.describe('Doc Knowledge — Lifecycle', () => {
   // DK-005 @critical: Knowledge Article draft → published → archived
   // =========================================================================
 
-  test('DK-005 @critical: Knowledge Article draft → published → archived', async ({
-    page,
-  }) => {
+  test('DK-005 @critical: Knowledge Article draft → published → archived', async ({ page }) => {
     expect(articleId).toBeTruthy();
 
     // Verify starts as draft
-    let resp = await page.request.get(
-      `/api/dynamic/dk_knowledge_article/${articleId}`,
-    );
+    let resp = await page.request.get(`/api/dynamic/dk_knowledge_article/${articleId}`);
     expect(resp.ok()).toBe(true);
     const draftBody = await resp.json();
     expect((draftBody?.data ?? draftBody).dk_ka_status).toBe('draft');
 
     // draft → published
-    await executeCommandViaApi(
-      page,
-      'dk:publish_article',
-      {},
-      articleId,
-      'state_transition',
-    );
+    await executeCommandViaApi(page, 'dk:publish_article', {}, articleId, 'state_transition');
 
-    resp = await page.request.get(
-      `/api/dynamic/dk_knowledge_article/${articleId}`,
-    );
+    resp = await page.request.get(`/api/dynamic/dk_knowledge_article/${articleId}`);
     const publishedBody = await resp.json();
-    expect((publishedBody?.data ?? publishedBody).dk_ka_status).toBe(
-      'published',
-    );
+    expect((publishedBody?.data ?? publishedBody).dk_ka_status).toBe('published');
 
     // published → archived
-    await executeCommandViaApi(
-      page,
-      'dk:archive_article',
-      {},
-      articleId,
-      'state_transition',
-    );
+    await executeCommandViaApi(page, 'dk:archive_article', {}, articleId, 'state_transition');
 
-    resp = await page.request.get(
-      `/api/dynamic/dk_knowledge_article/${articleId}`,
-    );
+    resp = await page.request.get(`/api/dynamic/dk_knowledge_article/${articleId}`);
     const archivedBody = await resp.json();
     expect((archivedBody?.data ?? archivedBody).dk_ka_status).toBe('archived');
 

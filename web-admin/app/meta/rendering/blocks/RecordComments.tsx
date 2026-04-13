@@ -35,7 +35,12 @@ export interface RecordCommentsProps {
   t?: (key: string) => string;
 }
 
-export function RecordComments({ modelCode, recordPid, locale, t: externalT }: RecordCommentsProps) {
+export function RecordComments({
+  modelCode,
+  recordPid,
+  locale,
+  t: externalT,
+}: RecordCommentsProps) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
   const [newComment, setNewComment] = useState('');
@@ -44,7 +49,7 @@ export function RecordComments({ modelCode, recordPid, locale, t: externalT }: R
   const [editContent, setEditContent] = useState('');
 
   const t = useCallback(
-    (key: string, fallback?: string) => (externalT ? externalT(key) : fallback ?? key),
+    (key: string, fallback?: string) => (externalT ? externalT(key) : (fallback ?? key)),
     [externalT],
   );
 
@@ -158,9 +163,7 @@ export function RecordComments({ modelCode, recordPid, locale, t: externalT }: R
             className="rounded-md bg-blue-600 px-4 py-1.5 text-sm text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
             data-testid="comment-submit"
           >
-            {submitting
-              ? t('comment.submitting', 'Sending...')
-              : t('comment.submit', 'Comment')}
+            {submitting ? t('comment.submitting', 'Sending...') : t('comment.submit', 'Comment')}
           </button>
         </div>
       </div>
@@ -191,7 +194,7 @@ export function RecordComments({ modelCode, recordPid, locale, t: externalT }: R
                     {dayjs(comment.created_at).fromNow()}
                   </span>
                   {comment.is_edited && (
-                    <span className="text-xs italic text-gray-400">
+                    <span className="text-xs text-gray-400 italic">
                       ({t('comment.edited', 'edited')})
                     </span>
                   )}
@@ -202,8 +205,18 @@ export function RecordComments({ modelCode, recordPid, locale, t: externalT }: R
                     className="rounded p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700"
                     title={t('comment.edit', 'Edit')}
                   >
-                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    <svg
+                      className="h-3.5 w-3.5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                      />
                     </svg>
                   </button>
                   <button
@@ -211,8 +224,18 @@ export function RecordComments({ modelCode, recordPid, locale, t: externalT }: R
                     className="rounded p-1 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20"
                     title={t('comment.delete', 'Delete')}
                   >
-                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    <svg
+                      className="h-3.5 w-3.5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                      />
                     </svg>
                   </button>
                 </div>
@@ -236,7 +259,10 @@ export function RecordComments({ modelCode, recordPid, locale, t: externalT }: R
                       {t('comment.save', 'Save')}
                     </button>
                     <button
-                      onClick={() => { setEditingId(null); setEditContent(''); }}
+                      onClick={() => {
+                        setEditingId(null);
+                        setEditContent('');
+                      }}
                       className="rounded px-3 py-1 text-xs text-gray-500 hover:text-gray-700"
                     >
                       {t('comment.cancel', 'Cancel')}
@@ -244,7 +270,7 @@ export function RecordComments({ modelCode, recordPid, locale, t: externalT }: R
                   </div>
                 </div>
               ) : (
-                <p className="mt-2 whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300">
+                <p className="mt-2 text-sm whitespace-pre-wrap text-gray-700 dark:text-gray-300">
                   {comment.content}
                 </p>
               )}

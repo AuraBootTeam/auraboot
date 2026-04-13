@@ -17,8 +17,14 @@ import { uniqueId } from '../helpers';
 
 async function waitForDesignerLoad(page: Page) {
   await page.waitForLoadState('networkidle').catch(() => {});
-  await page.locator('.animate-spin').waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
-  await page.locator('text=Loading page...').waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
+  await page
+    .locator('.animate-spin')
+    .waitFor({ state: 'hidden', timeout: 10000 })
+    .catch(() => {});
+  await page
+    .locator('text=Loading page...')
+    .waitFor({ state: 'hidden', timeout: 10000 })
+    .catch(() => {});
 }
 
 const testId = uniqueId('pdd');
@@ -72,16 +78,26 @@ test.describe('Block Library', () => {
   test('PDD-BL-01: Blocks tab → block items > 0', async ({ page }) => {
     await createAndOpenPage(page);
     // Page Designer uses @dnd-kit (useDraggable), not HTML5 draggable
-    const blocksTab = page.locator('[data-testid="library-tab-blocks"], [data-testid="designer-tab-blocks"], button:has-text("Blocks"), button:has-text("区块")').first();
+    const blocksTab = page
+      .locator(
+        '[data-testid="library-tab-blocks"], [data-testid="designer-tab-blocks"], button:has-text("Blocks"), button:has-text("区块")',
+      )
+      .first();
     if (await blocksTab.isVisible({ timeout: 5000 }).catch(() => false)) await blocksTab.click();
     // dnd-kit items have role="button" injected by useDraggable
-    const blockItems = page.locator('[role="button"][tabindex]').or(page.locator('[draggable="true"]'));
+    const blockItems = page
+      .locator('[role="button"][tabindex]')
+      .or(page.locator('[draggable="true"]'));
     expect(await blockItems.count()).toBeGreaterThan(0);
   });
 
   test('PDD-BL-02: Library search filters items', async ({ page }) => {
     await createAndOpenPage(page);
-    const blocksTab = page.locator('[data-testid="library-tab-blocks"], [data-testid="designer-tab-blocks"], button:has-text("Blocks"), button:has-text("区块")').first();
+    const blocksTab = page
+      .locator(
+        '[data-testid="library-tab-blocks"], [data-testid="designer-tab-blocks"], button:has-text("Blocks"), button:has-text("区块")',
+      )
+      .first();
     if (await blocksTab.isVisible({ timeout: 5000 }).catch(() => false)) await blocksTab.click();
     const search = page.locator('[data-testid="library-search"]').first();
     if (await search.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -96,7 +112,11 @@ test.describe('Block Library', () => {
 
   test('PDD-BL-03: Fields tab switchable', async ({ page }) => {
     await createAndOpenPage(page);
-    const fieldsTab = page.locator('[data-testid="designer-tab-fields"], button:has-text("Fields"), button:has-text("字段")').first();
+    const fieldsTab = page
+      .locator(
+        '[data-testid="designer-tab-fields"], button:has-text("Fields"), button:has-text("字段")',
+      )
+      .first();
     if (await fieldsTab.isVisible({ timeout: 5000 }).catch(() => false)) {
       await fieldsTab.click();
       await expect(fieldsTab).toBeVisible();
@@ -105,7 +125,11 @@ test.describe('Block Library', () => {
 
   test('PDD-BL-04: Outline tab switchable', async ({ page }) => {
     await createAndOpenPage(page);
-    const outlineTab = page.locator('[data-testid="designer-tab-outline"], button:has-text("Outline"), button:has-text("大纲")').first();
+    const outlineTab = page
+      .locator(
+        '[data-testid="designer-tab-outline"], button:has-text("Outline"), button:has-text("大纲")',
+      )
+      .first();
     if (await outlineTab.isVisible({ timeout: 5000 }).catch(() => false)) {
       await outlineTab.click();
       await expect(outlineTab).toBeVisible();
@@ -120,14 +144,25 @@ test.describe('Block Library', () => {
 test.describe('Properties Panel', () => {
   test('PDD-FE-01: Select block → properties panel visible', async ({ page }) => {
     await createAndOpenPage(page);
-    const block = page.locator('[data-testid="designer-canvas"]').locator('[aria-roledescription="sortable"]').first();
+    const block = page
+      .locator('[data-testid="designer-canvas"]')
+      .locator('[aria-roledescription="sortable"]')
+      .first();
     if (await block.isVisible({ timeout: 5000 }).catch(() => false)) await block.click();
-    await expect(page.locator('[data-testid="designer-properties-panel"], [data-testid="floors-properties-panel"], aside').first()).toBeVisible({ timeout: 5000 });
+    await expect(
+      page
+        .locator(
+          '[data-testid="designer-properties-panel"], [data-testid="floors-properties-panel"], aside',
+        )
+        .first(),
+    ).toBeVisible({ timeout: 5000 });
   });
 
   test('PDD-FE-02: Canvas visible after load', async ({ page }) => {
     await createAndOpenPage(page);
-    await expect(page.locator('[data-testid="designer-canvas"], main').first()).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('[data-testid="designer-canvas"], main').first()).toBeVisible({
+      timeout: 5000,
+    });
   });
 });
 
@@ -138,22 +173,38 @@ test.describe('Properties Panel', () => {
 test.describe('Toolbar State & Actions', () => {
   test('PDD-TL-01: Save button visible', async ({ page }) => {
     await createAndOpenPage(page);
-    await expect(page.locator('[data-testid="toolbar-save"], button:has-text("Save"), button:has-text("保存")').first()).toBeVisible({ timeout: 8000 });
+    await expect(
+      page
+        .locator('[data-testid="toolbar-save"], button:has-text("Save"), button:has-text("保存")')
+        .first(),
+    ).toBeVisible({ timeout: 8000 });
   });
 
   test('PDD-TL-02: Undo button visible', async ({ page }) => {
     await createAndOpenPage(page);
-    await expect(page.locator('[data-testid="toolbar-undo"], button[title*="Undo"], button[title*="撤销"]').first()).toBeVisible({ timeout: 5000 });
+    await expect(
+      page
+        .locator('[data-testid="toolbar-undo"], button[title*="Undo"], button[title*="撤销"]')
+        .first(),
+    ).toBeVisible({ timeout: 5000 });
   });
 
   test('PDD-TL-03: Redo button visible', async ({ page }) => {
     await createAndOpenPage(page);
-    await expect(page.locator('[data-testid="toolbar-redo"], button[title*="Redo"], button[title*="重做"]').first()).toBeVisible({ timeout: 5000 });
+    await expect(
+      page
+        .locator('[data-testid="toolbar-redo"], button[title*="Redo"], button[title*="重做"]')
+        .first(),
+    ).toBeVisible({ timeout: 5000 });
   });
 
   test('PDD-TL-04: Zoom controls visible', async ({ page }) => {
     await createAndOpenPage(page);
-    const zoom = page.locator('[data-testid="toolbar-zoom-in"], button[title*="Zoom"], button[title*="放大"], [data-testid="toolbar-zoom-level"]').first();
+    const zoom = page
+      .locator(
+        '[data-testid="toolbar-zoom-in"], button[title*="Zoom"], button[title*="放大"], [data-testid="toolbar-zoom-level"]',
+      )
+      .first();
     if (await zoom.isVisible({ timeout: 3000 }).catch(() => false)) {
       await expect(zoom).toBeVisible();
     }

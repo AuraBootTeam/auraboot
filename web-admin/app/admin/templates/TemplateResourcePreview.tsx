@@ -78,13 +78,7 @@ export function TemplateResourcePreview({
 
 // ─── Overview (default, nothing selected) ────────────────────────────────────
 
-function OverviewView({
-  template,
-  groups,
-}: {
-  template: AppTemplate;
-  groups: PreviewGroup[];
-}) {
+function OverviewView({ template, groups }: { template: AppTemplate; groups: PreviewGroup[] }) {
   const modelGroup = groups.find((g) => g.type === 'MODEL');
   const cmdGroup = groups.find((g) => g.type === 'COMMAND');
   const pageGroup = groups.find((g) => g.type === 'PAGE');
@@ -106,12 +100,8 @@ function OverviewView({
             {template.icon}
           </span>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-              {template.name}
-            </h1>
-            <span className="text-sm text-gray-500 dark:text-gray-400">
-              {template.category}
-            </span>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{template.name}</h1>
+            <span className="text-sm text-gray-500 dark:text-gray-400">{template.category}</span>
           </div>
         </div>
         <p className="max-w-2xl text-base leading-relaxed text-gray-600 dark:text-gray-400">
@@ -120,7 +110,10 @@ function OverviewView({
       </div>
 
       {/* Resource summary cards */}
-      <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-4" data-testid="preview-resource-summary">
+      <div
+        className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-4"
+        data-testid="preview-resource-summary"
+      >
         {stats.map(({ label, count, icon: Icon }) => (
           <div
             key={label}
@@ -169,13 +162,7 @@ function OverviewView({
 
 // ─── Model detail (with fields table) ────────────────────────────────────────
 
-function ModelView({
-  resource,
-  groups,
-}: {
-  resource: ResourceChange;
-  groups: PreviewGroup[];
-}) {
+function ModelView({ resource, groups }: { resource: ResourceChange; groups: PreviewGroup[] }) {
   // Find fields belonging to this model
   const fieldGroup = groups.find((g) => g.type === 'FIELD');
   const modelCode = resource.resourceCode;
@@ -198,9 +185,7 @@ function ModelView({
           Fields ({fields.length})
         </h3>
         {fields.length === 0 ? (
-          <p className="text-sm text-gray-400 dark:text-gray-500">
-            No fields detected in preview.
-          </p>
+          <p className="text-sm text-gray-400 dark:text-gray-500">No fields detected in preview.</p>
         ) : (
           <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
             <table className="w-full text-sm" data-testid="preview-fields-table">
@@ -280,7 +265,7 @@ function CommandView({ resource }: { resource: ResourceChange }) {
 
 function PageView({ resource }: { resource: ResourceChange }) {
   const details = resource.details ?? {};
-  const pageType = details.pageType ? String(details.pageType) : null;
+  const pageType = details.kind ? String(details.kind) : null;
   const modelCode = details.modelCode ? String(details.modelCode) : null;
 
   return (
@@ -302,13 +287,7 @@ function PageView({ resource }: { resource: ResourceChange }) {
 
 // ─── Generic detail (menus, permissions, dicts, etc.) ────────────────────────
 
-function GenericView({
-  resource,
-  typeName,
-}: {
-  resource: ResourceChange;
-  typeName: string;
-}) {
+function GenericView({ resource, typeName }: { resource: ResourceChange; typeName: string }) {
   return (
     <div className="flex-1 overflow-y-auto p-8" data-testid="preview-generic-detail">
       <ResourceHeader resource={resource} typeName={typeName} />
@@ -367,9 +346,7 @@ function DetailRow({
       <span className="w-28 flex-shrink-0 text-sm font-medium text-gray-500 dark:text-gray-400">
         {label}
       </span>
-      <span
-        className={`text-sm text-gray-900 dark:text-gray-200 ${mono ? 'font-mono' : ''}`}
-      >
+      <span className={`text-sm text-gray-900 dark:text-gray-200 ${mono ? 'font-mono' : ''}`}>
         {value}
       </span>
     </div>

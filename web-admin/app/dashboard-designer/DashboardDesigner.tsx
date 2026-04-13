@@ -10,7 +10,13 @@
  */
 
 import React, { useCallback, useEffect, useState, useRef } from 'react';
-import { DesignerToolbar, WidgetPalette, DesignerCanvas, WidgetPropertyPanel, BigScreenMode } from './components';
+import {
+  DesignerToolbar,
+  WidgetPalette,
+  DesignerCanvas,
+  WidgetPropertyPanel,
+  BigScreenMode,
+} from './components';
 import { useDashboardStore } from './store/useDashboardStore';
 import type { WidgetType, DashboardScope } from './types';
 import { widgetRegistry } from './widgets/widgetRegistry';
@@ -356,10 +362,7 @@ export const DashboardDesigner: React.FC<DashboardDesignerProps> = ({
 
       {/* Big Screen Presentation Mode */}
       {showBigScreen && dashboard?.pid && (
-        <BigScreenMode
-          dashboardId={dashboard.pid}
-          onExit={() => setShowBigScreen(false)}
-        />
+        <BigScreenMode dashboardId={dashboard.pid} onExit={() => setShowBigScreen(false)} />
       )}
 
       {/* Settings dialog */}

@@ -9,7 +9,7 @@
  */
 
 import React, { useMemo } from 'react';
-import type { UnifiedSchema, AreaConfig } from '~/meta/schemas/types';
+import type { UnifiedSchema, BlockConfig } from '~/meta/schemas/types';
 import type { SchemaRuntime } from '~/meta/runtime/schema-runtime';
 import { BlockRenderer } from '~/meta/rendering/BlockRenderer';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
@@ -24,9 +24,9 @@ export interface SchemaRendererProps {
  * SchemaRenderer - 主渲染引擎
  *
  * 功能:
- * 1. 解析 UnifiedSchema 的 layout 和 areas
- * 2. 按照 layout 定义的结构渲染各个 area
- * 3. 将每个 area 的 blocks 交给 BlockRenderer 处理
+ * 1. 解析 UnifiedSchema 的 layout 和 blocks
+ * 2. 按照 layout 定义的结构渲染 blocks
+ * 3. 将每个 block 交给 BlockRenderer 处理
  * 4. 支持响应式布局 (grid/flex)
  */
 export const SchemaRenderer: React.FC<SchemaRendererProps> = ({
@@ -63,42 +63,27 @@ export const SchemaRenderer: React.FC<SchemaRendererProps> = ({
     );
   };
 
-  // 渲染单个 area
-  const renderArea = (areaId: string, areaConfig: AreaConfig) => {
-    const areaStyle: React.CSSProperties = {
-      gridArea: areaId,
-    };
-
-    // 处理条件渲染
-    if (areaConfig.visibleWhen) {
-      const visible = evaluator.evaluateCondition(areaConfig.visibleWhen, context);
-      if (!visible) return null;
-    }
-
-    return (
-      <div
-        key={areaId}
-        className={`area-${areaId} ${areaConfig.className || ''}`}
-        style={areaStyle}
-      >
-        {areaConfig.blocks.map((block, index) => (
-          <BlockRenderer
-            key={`${areaId}-block-${index}`}
-            block={block}
-            runtime={runtime}
-            areaId={areaId}
-          />
-        ))}
-      </div>
-    );
-  };
-
   return (
     <div className={`schema-renderer ${className}`}>
       {renderTitle()}
 
       <div className="schema-layout" style={layoutStyle}>
-        {Object.entries(schema.areas).map(([areaId, areaConfig]) => renderArea(areaId, areaConfig))}
+        {(schema.blocks || []).map((block: BlockConfig, index: number) => {
+          // 处理条件渲染
+          if (block.visibleWhen) {
+            const visible = evaluator.evaluateCondition(block.visibleWhen, context);
+            if (!visible) return null;
+          }
+
+          return (
+            <BlockRenderer
+              key={block.id || `block-${index}`}
+              block={block}
+              runtime={runtime}
+              areaId="main"
+            />
+          );
+        })}
       </div>
     </div>
   );
@@ -109,7 +94,7 @@ export const SchemaRenderer: React.FC<SchemaRendererProps> = ({
  */
 export const SchemaRendererWithContainer: React.FC<SchemaRendererProps> = (props) => {
   return (
-    <div className="mx-auto w-full px-6 py-8">
+    <div className="mx-auto w-full px-2 py-3">
       <div className="rounded-lg bg-white p-6 shadow-sm">
         <SchemaRenderer {...props} />
       </div>

@@ -164,10 +164,7 @@ export default function Join() {
               <div className="absolute right-20 bottom-20 h-40 w-40 rounded-full bg-white/10 blur-2xl"></div>
             </div>
             <div className="relative z-10 max-w-md text-center text-white">
-              <div className="mx-auto mb-8 flex h-20 w-20 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm">
-                <img className="h-12 w-12 rounded-lg" src="/logo192.png" alt="Logo" />
-              </div>
-              <h2 className="mb-4 text-4xl font-bold">加入 AuraBoot</h2>
+              <h2 className="mb-4 text-5xl font-bold tracking-tight">AuraBoot</h2>
               <p className="mb-8 text-lg text-white/80">快速构建企业级应用的低代码平台</p>
               <div className="space-y-4 text-left">
                 <div className="flex items-center space-x-3">

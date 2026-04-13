@@ -53,10 +53,11 @@ async function navigateToEmailSettings(page: any): Promise<void> {
   await settingsLink.waitFor({ state: 'attached', timeout: 10_000 });
   await settingsLink.scrollIntoViewIfNeeded().catch(() => null);
 
-  const apiPromise = page.waitForResponse(
-    (r: any) => r.url().includes('/api/email/accounts') && r.status() === 200,
-    { timeout: 15_000 },
-  ).catch(() => null);
+  const apiPromise = page
+    .waitForResponse((r: any) => r.url().includes('/api/email/accounts') && r.status() === 200, {
+      timeout: 15_000,
+    })
+    .catch(() => null);
 
   await settingsLink.evaluate((el: HTMLElement) => el.click());
   await apiPromise;
@@ -75,7 +76,9 @@ test.describe('Email Account Setup', () => {
   test('T1: navigate to Email Settings via sidebar menu', async ({ page }) => {
     await navigateToEmailSettings(page);
 
-    await expect(page.locator('[data-testid="email-settings-page"]')).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('[data-testid="email-settings-page"]')).toBeVisible({
+      timeout: 15_000,
+    });
     await expect(page.locator('[data-testid="connect-gmail-btn"]')).toBeVisible();
     await expect(page.locator('[data-testid="connect-gmail-btn"]')).toContainText('Connect Gmail');
   });
@@ -89,8 +92,15 @@ test.describe('Email Account Setup', () => {
     await expect(page.getByText('Email Settings')).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText('Manage connected Gmail accounts')).toBeVisible();
 
-    const hasAccounts = await page.locator('[data-testid^="email-account-"]').first().isVisible({ timeout: 5_000 }).catch(() => false);
-    const hasEmpty = await page.locator('[data-testid="email-settings-empty"]').isVisible({ timeout: 5_000 }).catch(() => false);
+    const hasAccounts = await page
+      .locator('[data-testid^="email-account-"]')
+      .first()
+      .isVisible({ timeout: 5_000 })
+      .catch(() => false);
+    const hasEmpty = await page
+      .locator('[data-testid="email-settings-empty"]')
+      .isVisible({ timeout: 5_000 })
+      .catch(() => false);
 
     expect(
       hasAccounts || hasEmpty,
@@ -112,15 +122,20 @@ test.describe('Email Account Setup', () => {
       return;
     }
 
-    const toggleBtn = accountCard.locator('button').filter({ hasText: /Metadata only|Full sync/i }).first();
+    const toggleBtn = accountCard
+      .locator('button')
+      .filter({ hasText: /Metadata only|Full sync/i })
+      .first();
     await expect(toggleBtn).toBeVisible({ timeout: 5_000 });
 
     const initialText = await toggleBtn.textContent();
 
-    const apiPromise = page.waitForResponse(
-      (r: any) => r.url().includes('/sync-mode') && (r.status() === 200 || r.status() === 204),
-      { timeout: 10_000 },
-    ).catch(() => null);
+    const apiPromise = page
+      .waitForResponse(
+        (r: any) => r.url().includes('/sync-mode') && (r.status() === 200 || r.status() === 204),
+        { timeout: 10_000 },
+      )
+      .catch(() => null);
 
     await toggleBtn.click();
     await apiPromise;
@@ -155,8 +170,14 @@ test.describe('Email Account Setup', () => {
 
     await trashBtn.click();
 
-    const confirmBtn = accountCard.locator('button').filter({ hasText: /Confirm/i }).first();
-    const cancelBtn = accountCard.locator('button').filter({ hasText: /Cancel/i }).first();
+    const confirmBtn = accountCard
+      .locator('button')
+      .filter({ hasText: /Confirm/i })
+      .first();
+    const cancelBtn = accountCard
+      .locator('button')
+      .filter({ hasText: /Cancel/i })
+      .first();
 
     await expect(confirmBtn).toBeVisible({ timeout: 5_000 });
     await expect(cancelBtn).toBeVisible({ timeout: 5_000 });

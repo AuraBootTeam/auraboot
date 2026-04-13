@@ -66,31 +66,44 @@ const NAVIGABLE_MODELS = [
 ];
 
 function toDynamicRoute(modelCode: string): string {
-  return modelCode.replace(/_/g, '-');
+  return modelCode;
 }
 
 function isCrashText(text: string): boolean {
-  return /Application Error|Unhandled Runtime Error|TypeError:|ReferenceError:|500 Internal Server Error/i.test(text);
+  return /Application Error|Unhandled Runtime Error|TypeError:|ReferenceError:|500 Internal Server Error/i.test(
+    text,
+  );
 }
 
 async function hasVisibleSelector(
   page: import('@playwright/test').Page,
   selectors: string,
 ): Promise<boolean> {
-  return page.waitForFunction(
-    (selectorList) => {
-      const selectors = selectorList.split(',').map((item) => item.trim()).filter(Boolean);
-      return selectors.some((selector) => {
-        const el = document.querySelector(selector) as HTMLElement | null;
-        if (!el) return false;
-        const style = window.getComputedStyle(el);
-        const rect = el.getBoundingClientRect();
-        return style.visibility !== 'hidden' && style.display !== 'none' && rect.width > 0 && rect.height > 0;
-      });
-    },
-    selectors,
-    { timeout: 8_000 },
-  ).then(() => true).catch(() => false);
+  return page
+    .waitForFunction(
+      (selectorList) => {
+        const selectors = selectorList
+          .split(',')
+          .map((item) => item.trim())
+          .filter(Boolean);
+        return selectors.some((selector) => {
+          const el = document.querySelector(selector) as HTMLElement | null;
+          if (!el) return false;
+          const style = window.getComputedStyle(el);
+          const rect = el.getBoundingClientRect();
+          return (
+            style.visibility !== 'hidden' &&
+            style.display !== 'none' &&
+            rect.width > 0 &&
+            rect.height > 0
+          );
+        });
+      },
+      selectors,
+      { timeout: 8_000 },
+    )
+    .then(() => true)
+    .catch(() => false);
 }
 
 test.describe('Inventory Model & Page Full Coverage', () => {
@@ -122,7 +135,7 @@ test.describe('Inventory Model & Page Full Coverage', () => {
 
     for (const modelCode of NAVIGABLE_MODELS) {
       const slug = toDynamicRoute(modelCode);
-      const listPath = `/dynamic/${slug}`;
+      const listPath = `/p/${slug}`;
 
       await page.goto(listPath, { waitUntil: 'domcontentloaded' });
       await expect(page.locator('body')).toBeVisible();
@@ -148,7 +161,7 @@ test.describe('Inventory Model & Page Full Coverage', () => {
 
     for (const modelCode of NAVIGABLE_MODELS) {
       const slug = toDynamicRoute(modelCode);
-      const newPath = `/dynamic/${slug}/new`;
+      const newPath = `/p/${slug}/new`;
 
       await page.goto(newPath, { waitUntil: 'domcontentloaded' });
       await expect(page.locator('body')).toBeVisible();
@@ -165,15 +178,30 @@ test.describe('Inventory Model & Page Full Coverage', () => {
         withContent += 1;
 
         // Probe: check that at least one input field is rendered
-        const inputVisible = await page.waitForFunction(() => {
-          const container = document.querySelector('[data-testid="dynamic-form"]') || document.querySelector('form');
-          if (!container) return false;
-          const field = container.querySelector('input:not([type="hidden"]), textarea') as HTMLElement | null;
-          if (!field) return false;
-          const style = window.getComputedStyle(field);
-          const rect = field.getBoundingClientRect();
-          return style.visibility !== 'hidden' && style.display !== 'none' && rect.width > 0 && rect.height > 0;
-        }, { timeout: 2_000 }).then(() => true).catch(() => false);
+        const inputVisible = await page
+          .waitForFunction(
+            () => {
+              const container =
+                document.querySelector('[data-testid="dynamic-form"]') ||
+                document.querySelector('form');
+              if (!container) return false;
+              const field = container.querySelector(
+                'input:not([type="hidden"]), textarea',
+              ) as HTMLElement | null;
+              if (!field) return false;
+              const style = window.getComputedStyle(field);
+              const rect = field.getBoundingClientRect();
+              return (
+                style.visibility !== 'hidden' &&
+                style.display !== 'none' &&
+                rect.width > 0 &&
+                rect.height > 0
+              );
+            },
+            { timeout: 2_000 },
+          )
+          .then(() => true)
+          .catch(() => false);
         expect(inputVisible, `new page ${newPath} should render form inputs`).toBe(true);
       }
     }

@@ -5,7 +5,19 @@ import { ResultHelper } from '~/utils/type';
 const MISSING_KEY_WARNED = new Set<string>();
 
 // RTL locale detection
-const RTL_LOCALES = new Set(['ar', 'ar-SA', 'ar-EG', 'ar-AE', 'ar-MA', 'he', 'he-IL', 'fa', 'fa-IR', 'ur', 'ur-PK']);
+const RTL_LOCALES = new Set([
+  'ar',
+  'ar-SA',
+  'ar-EG',
+  'ar-AE',
+  'ar-MA',
+  'he',
+  'he-IL',
+  'fa',
+  'fa-IR',
+  'ur',
+  'ur-PK',
+]);
 
 export function isRTLLocale(locale: string): boolean {
   return RTL_LOCALES.has(locale) || RTL_LOCALES.has(locale.split('-')[0]);
@@ -207,7 +219,15 @@ export function I18nProvider({ children, initialData = {}, initialLocale }: I18n
   };
 
   return (
-    <I18nContext.Provider value={{ t: translate, locale, setLocale: handleSetLocale, loading, isRTL: isRTLLocale(locale) }}>
+    <I18nContext.Provider
+      value={{
+        t: translate,
+        locale,
+        setLocale: handleSetLocale,
+        loading,
+        isRTL: isRTLLocale(locale),
+      }}
+    >
       {recovering && Object.keys(translations).length === 0 && (
         <>
           <style>{`@keyframes i18n-loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }`}</style>

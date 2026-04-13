@@ -20,11 +20,6 @@ import { getTokenFromRequest } from '~/services/session';
 import { fetchResult } from '~/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { DynamicPageRenderer } from '~/meta/rendering/pages/DynamicPageRenderer';
-import {
-  isCommandPageCategory,
-  isDashboardPageCategory,
-  mapApiPageTypeToRuntime,
-} from '~/meta/utils/page-semantics';
 
 interface MenuInfo {
   pid: string;
@@ -38,8 +33,7 @@ interface PageInfo {
   pid: string;
   pageKey?: string;
   modelCode?: string;
-  pageCategory?: string;
-  pageType?: string;
+  kind?: string;
 }
 
 interface LoaderData {
@@ -72,7 +66,7 @@ export default function CatchAllRoute() {
   const [renderPage, setRenderPage] = useState<{
     tableName: string;
     pageKey?: string;
-    pageType: 'list' | 'new' | 'detail' | 'page';
+    pageType: 'list' | 'form' | 'detail' | 'dashboard' | 'kanban';
   } | null>(null);
 
   useEffect(() => {
@@ -147,33 +141,31 @@ export default function CatchAllRoute() {
         }
 
         // Step 3: Resolve rendering strategy based on page configuration
-        const { modelCode, pageCategory, pageType } = pageInfo;
-        const runtimePageType = mapApiPageTypeToRuntime(pageType);
-
-        if (isCommandPageCategory(pageCategory) && pageInfo.pageKey) {
-          setRenderPage({
-            tableName: pageInfo.pageKey,
-            pageKey: pageInfo.pageKey,
-            pageType: runtimePageType,
-          });
-          return;
+        const { modelCode, kind } = pageInfo;
+        // Pass kind directly — must match ab_page_schema.kind values
+        const VALID_KINDS = ['list', 'form', 'detail', 'dashboard', 'kanban'] as const;
+        type PageKind = (typeof VALID_KINDS)[number];
+        const resolvedKind = (kind || 'list') as string;
+        if (!VALID_KINDS.includes(resolvedKind as PageKind)) {
+          console.error(
+            `[CatchAllRoute] Invalid page kind "${resolvedKind}" for path "${location.pathname}". ` +
+            `Expected one of: ${VALID_KINDS.join(', ')}. Check ab_page_schema.kind value.`
+          );
         }
+        const pageType = resolvedKind as PageKind;
 
-        if (isDashboardPageCategory(pageCategory)) {
-          // DSL Dashboard pages: render in place using DynamicPageRenderer
-          // (not the dashboard-designer viewer which uses a different schema)
+        if (pageInfo.pageKey) {
+          // Page has a pageKey — render via DynamicPageRenderer
           setRenderPage({
-            tableName: pageInfo.pageKey || modelCode || 'dashboard',
+            tableName: modelCode || pageInfo.pageKey,
             pageKey: pageInfo.pageKey,
-            pageType: runtimePageType,
+            pageType,
           });
         } else if (modelCode) {
-          // Keep original plugin route path (e.g. /project-management/projects),
-          // render dynamic page in place instead of redirecting to /dynamic/{model}.
+          // Model-bound page without explicit pageKey
           setRenderPage({
             tableName: modelCode,
-            pageKey: pageInfo.pageKey,
-            pageType: runtimePageType,
+            pageType,
           });
         } else {
           setRedirecting(true);

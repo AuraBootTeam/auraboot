@@ -45,38 +45,32 @@ test.describe('BPM Workflow API', () => {
     const bpmnContent = generateMinimalBpmn(processKey);
 
     try {
-      const createResponse = await request.post(
-        `/api/bpm/process-definitions`,
-        {
-          data: {
-            processKey,
-            processName: `E2E Workflow API Test ${processKey}`,
-            description: 'Auto-generated for workflow API test',
-            category: 'e2e-test',
-            bpmnContent,
-          },
-        }
-      );
+      const createResponse = await request.post(`/api/bpm/process-definitions`, {
+        data: {
+          processKey,
+          processName: `E2E Workflow API Test ${processKey}`,
+          description: 'Auto-generated for workflow API test',
+          category: 'e2e-test',
+          bpmnContent,
+        },
+      });
 
       if (createResponse.ok()) {
         const createData = await createResponse.json();
         processPid = createData.pid;
 
         const deployResponse = await request.post(
-          `/api/bpm/process-definitions/${processPid}/deploy`
+          `/api/bpm/process-definitions/${processPid}/deploy`,
         );
 
         if (deployResponse.ok()) {
-          const startResponse = await request.post(
-            `/api/bpm/process-instances`,
-            {
-              data: {
-                processDefinitionId: processKey,
-                businessKey: `E2E-API-BK-${Date.now()}`,
-                variables: { initiator: 'e2e-api-test' },
-              },
-            }
-          );
+          const startResponse = await request.post(`/api/bpm/process-instances`, {
+            data: {
+              processDefinitionId: processKey,
+              businessKey: `E2E-API-BK-${Date.now()}`,
+              variables: { initiator: 'e2e-api-test' },
+            },
+          });
 
           if (startResponse.ok()) {
             const instanceData = await startResponse.json();
@@ -95,16 +89,13 @@ test.describe('BPM Workflow API', () => {
       return;
     }
 
-    const startResponse = await request.post(
-      `/api/bpm/process-instances`,
-      {
-        data: {
-          processDefinitionId: processKey,
-          businessKey: `E2E-APPROVE-${Date.now()}`,
-          variables: { action: 'approve-test' },
-        },
-      }
-    );
+    const startResponse = await request.post(`/api/bpm/process-instances`, {
+      data: {
+        processDefinitionId: processKey,
+        businessKey: `E2E-APPROVE-${Date.now()}`,
+        variables: { action: 'approve-test' },
+      },
+    });
 
     if (!startResponse.ok()) {
       test.skip(true, 'Cannot start process instance for approve test');
@@ -119,9 +110,7 @@ test.describe('BPM Workflow API', () => {
       return;
     }
 
-    const tasksResponse = await request.get(
-      `/api/bpm/tasks/by-process/${instanceId}`
-    );
+    const tasksResponse = await request.get(`/api/bpm/tasks/by-process/${instanceId}`);
 
     if (!tasksResponse.ok()) {
       test.skip(true, 'Cannot fetch tasks for process instance');
@@ -138,28 +127,23 @@ test.describe('BPM Workflow API', () => {
 
     const approveTaskId = tasks[0].taskId || tasks[0].instanceId;
 
-    const approveResponse = await request.post(
-      `/api/bpm/tasks/${approveTaskId}/approve`,
-      {
-        data: {
-          comment: 'Approved by E2E API test',
-          variables: {},
-        },
-      }
-    );
+    const approveResponse = await request.post(`/api/bpm/tasks/${approveTaskId}/approve`, {
+      data: {
+        comment: 'Approved by E2E API test',
+        variables: {},
+      },
+    });
 
     expect(approveResponse.ok()).toBe(true);
 
-    const verifyResponse = await request.get(
-      `/api/bpm/tasks/by-process/${instanceId}`
-    );
+    const verifyResponse = await request.get(`/api/bpm/tasks/by-process/${instanceId}`);
 
     if (verifyResponse.ok()) {
       const verifyData = await verifyResponse.json();
       const remainingTasks = verifyData.data || verifyData;
       if (Array.isArray(remainingTasks)) {
         const stillPending = remainingTasks.find(
-          (t: { taskId: string }) => t.taskId === approveTaskId
+          (t: { taskId: string }) => t.taskId === approveTaskId,
         );
         expect(stillPending).toBeUndefined();
       }
@@ -172,16 +156,13 @@ test.describe('BPM Workflow API', () => {
       return;
     }
 
-    const startResponse = await request.post(
-      `/api/bpm/process-instances`,
-      {
-        data: {
-          processDefinitionId: processKey,
-          businessKey: `E2E-REJECT-${Date.now()}`,
-          variables: { action: 'reject-test' },
-        },
-      }
-    );
+    const startResponse = await request.post(`/api/bpm/process-instances`, {
+      data: {
+        processDefinitionId: processKey,
+        businessKey: `E2E-REJECT-${Date.now()}`,
+        variables: { action: 'reject-test' },
+      },
+    });
 
     if (!startResponse.ok()) {
       test.skip(true, 'Cannot start process instance for reject test');
@@ -196,9 +177,7 @@ test.describe('BPM Workflow API', () => {
       return;
     }
 
-    const tasksResponse = await request.get(
-      `/api/bpm/tasks/by-process/${instanceId}`
-    );
+    const tasksResponse = await request.get(`/api/bpm/tasks/by-process/${instanceId}`);
 
     if (!tasksResponse.ok()) {
       test.skip(true, 'Cannot fetch tasks for process instance');
@@ -215,15 +194,12 @@ test.describe('BPM Workflow API', () => {
 
     const rejectTaskId = tasks[0].taskId || tasks[0].instanceId;
 
-    const rejectResponse = await request.post(
-      `/api/bpm/tasks/${rejectTaskId}/reject`,
-      {
-        data: {
-          comment: 'Rejected by E2E API test',
-          variables: {},
-        },
-      }
-    );
+    const rejectResponse = await request.post(`/api/bpm/tasks/${rejectTaskId}/reject`, {
+      data: {
+        comment: 'Rejected by E2E API test',
+        variables: {},
+      },
+    });
 
     expect(rejectResponse.ok()).toBe(true);
   });
@@ -250,7 +226,7 @@ test.describe('BPM Workflow API', () => {
     }
 
     const statusResponse = await request.get(
-      `/api/bpm/process-instances/${monitorInstanceId}/status`
+      `/api/bpm/process-instances/${monitorInstanceId}/status`,
     );
 
     if (!statusResponse.ok()) {
@@ -270,16 +246,13 @@ test.describe('BPM Workflow API', () => {
       return;
     }
 
-    const startResponse = await request.post(
-      `/api/bpm/process-instances`,
-      {
-        data: {
-          processDefinitionId: processKey,
-          businessKey: `E2E-EMPTY-OPINION-${Date.now()}`,
-          variables: { action: 'empty-opinion-test' },
-        },
-      }
-    );
+    const startResponse = await request.post(`/api/bpm/process-instances`, {
+      data: {
+        processDefinitionId: processKey,
+        businessKey: `E2E-EMPTY-OPINION-${Date.now()}`,
+        variables: { action: 'empty-opinion-test' },
+      },
+    });
 
     if (!startResponse.ok()) {
       test.skip(true, 'Cannot start process instance');
@@ -293,9 +266,7 @@ test.describe('BPM Workflow API', () => {
       return;
     }
 
-    const tasksResponse = await request.get(
-      `/api/bpm/tasks/by-process/${instanceId}`
-    );
+    const tasksResponse = await request.get(`/api/bpm/tasks/by-process/${instanceId}`);
 
     if (!tasksResponse.ok()) {
       test.skip(true, 'Cannot fetch tasks for process instance');
@@ -312,26 +283,21 @@ test.describe('BPM Workflow API', () => {
 
     const approveTaskId = tasks[0].taskId || tasks[0].instanceId;
 
-    const approveResponse = await request.post(
-      `/api/bpm/tasks/${approveTaskId}/approve`,
-      {
-        data: {
-          comment: '',
-          variables: {},
-        },
-      }
-    );
+    const approveResponse = await request.post(`/api/bpm/tasks/${approveTaskId}/approve`, {
+      data: {
+        comment: '',
+        variables: {},
+      },
+    });
 
     if (approveResponse.ok()) {
-      const verifyResponse = await request.get(
-        `/api/bpm/tasks/by-process/${instanceId}`
-      );
+      const verifyResponse = await request.get(`/api/bpm/tasks/by-process/${instanceId}`);
       if (verifyResponse.ok()) {
         const verifyData = await verifyResponse.json();
         const remainingTasks = verifyData.data || verifyData;
         if (Array.isArray(remainingTasks)) {
           const stillPending = remainingTasks.find(
-            (t: { taskId: string }) => t.taskId === approveTaskId
+            (t: { taskId: string }) => t.taskId === approveTaskId,
           );
           expect(stillPending).toBeUndefined();
         }
@@ -348,16 +314,13 @@ test.describe('BPM Workflow API', () => {
       return;
     }
 
-    const startResponse = await request.post(
-      `/api/bpm/process-instances`,
-      {
-        data: {
-          processDefinitionId: processKey,
-          businessKey: `E2E-LONG-OPINION-${Date.now()}`,
-          variables: { action: 'long-opinion-test' },
-        },
-      }
-    );
+    const startResponse = await request.post(`/api/bpm/process-instances`, {
+      data: {
+        processDefinitionId: processKey,
+        businessKey: `E2E-LONG-OPINION-${Date.now()}`,
+        variables: { action: 'long-opinion-test' },
+      },
+    });
 
     if (!startResponse.ok()) {
       test.skip(true, 'Cannot start process instance');
@@ -371,9 +334,7 @@ test.describe('BPM Workflow API', () => {
       return;
     }
 
-    const tasksResponse = await request.get(
-      `/api/bpm/tasks/by-process/${instanceId}`
-    );
+    const tasksResponse = await request.get(`/api/bpm/tasks/by-process/${instanceId}`);
 
     if (!tasksResponse.ok()) {
       test.skip(true, 'Cannot fetch tasks for process instance');
@@ -393,26 +354,21 @@ test.describe('BPM Workflow API', () => {
     const longComment = 'E2E long opinion test. '.repeat(250);
     expect(longComment.length).toBeGreaterThan(5000);
 
-    const approveResponse = await request.post(
-      `/api/bpm/tasks/${approveTaskId}/approve`,
-      {
-        data: {
-          comment: longComment,
-          variables: {},
-        },
-      }
-    );
+    const approveResponse = await request.post(`/api/bpm/tasks/${approveTaskId}/approve`, {
+      data: {
+        comment: longComment,
+        variables: {},
+      },
+    });
 
     if (approveResponse.ok()) {
-      const verifyResponse = await request.get(
-        `/api/bpm/tasks/by-process/${instanceId}`
-      );
+      const verifyResponse = await request.get(`/api/bpm/tasks/by-process/${instanceId}`);
       if (verifyResponse.ok()) {
         const verifyData = await verifyResponse.json();
         const remainingTasks = verifyData.data || verifyData;
         if (Array.isArray(remainingTasks)) {
           const stillPending = remainingTasks.find(
-            (t: { taskId: string }) => t.taskId === approveTaskId
+            (t: { taskId: string }) => t.taskId === approveTaskId,
           );
           expect(stillPending).toBeUndefined();
         }
@@ -429,7 +385,9 @@ test.describe('BPM Workflow API', () => {
 
     try {
       await request.post(`/api/bpm/process-definitions/${processPid}/undeploy`);
-    } catch { /* Ignore */ }
+    } catch {
+      /* Ignore */
+    }
 
     try {
       await request.delete(`/api/bpm/process-definitions/${processPid}`);

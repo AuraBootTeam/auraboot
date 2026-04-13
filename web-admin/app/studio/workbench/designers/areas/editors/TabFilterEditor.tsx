@@ -41,7 +41,7 @@ export function TabFilterEditor({ tabs, onChange, readonly }: TabFilterEditorPro
       updated[index] = { ...updated[index], ...updates };
       onChange(updated);
     },
-    [tabs, onChange]
+    [tabs, onChange],
   );
 
   const deleteTab = useCallback(
@@ -50,7 +50,7 @@ export function TabFilterEditor({ tabs, onChange, readonly }: TabFilterEditorPro
       onChange(updated);
       setSelectedIndex(Math.min(selectedIndex, updated.length - 1));
     },
-    [tabs, onChange, selectedIndex]
+    [tabs, onChange, selectedIndex],
   );
 
   const addTab = useCallback(() => {
@@ -71,14 +71,14 @@ export function TabFilterEditor({ tabs, onChange, readonly }: TabFilterEditorPro
       currentLabel[lang] = value;
       updateTab(index, { label: currentLabel as LocalizedText });
     },
-    [tabs, updateTab]
+    [tabs, updateTab],
   );
 
   const updateFilter = useCallback(
     (index: number, filter: TabFilterExpression | null) => {
       updateTab(index, { filter });
     },
-    [updateTab]
+    [updateTab],
   );
 
   const currentTab = tabs[selectedIndex];
@@ -167,7 +167,10 @@ export function TabFilterEditor({ tabs, onChange, readonly }: TabFilterEditorPro
                 onClick={() => {
                   if (selectedIndex > 0) {
                     const updated = [...tabs];
-                    [updated[selectedIndex - 1], updated[selectedIndex]] = [updated[selectedIndex], updated[selectedIndex - 1]];
+                    [updated[selectedIndex - 1], updated[selectedIndex]] = [
+                      updated[selectedIndex],
+                      updated[selectedIndex - 1],
+                    ];
                     onChange(updated);
                     setSelectedIndex(selectedIndex - 1);
                   }
@@ -182,7 +185,10 @@ export function TabFilterEditor({ tabs, onChange, readonly }: TabFilterEditorPro
                 onClick={() => {
                   if (selectedIndex < tabs.length - 1) {
                     const updated = [...tabs];
-                    [updated[selectedIndex], updated[selectedIndex + 1]] = [updated[selectedIndex + 1], updated[selectedIndex]];
+                    [updated[selectedIndex], updated[selectedIndex + 1]] = [
+                      updated[selectedIndex + 1],
+                      updated[selectedIndex],
+                    ];
                     onChange(updated);
                     setSelectedIndex(selectedIndex + 1);
                   }

@@ -15,6 +15,8 @@ import { test, expect } from '@playwright/test';
 import { uniqueId } from '../helpers';
 
 const KB_NAME = `E2E KB ${uniqueId('KB')}`;
+const KNOWLEDGE_BASE_RE = /Knowledge Base|知识库/;
+const NEW_KB_RE = /New Knowledge Base|新建知识库/;
 const TEST_FILE_CONTENT = `
 AuraBoot Platform Overview
 
@@ -36,7 +38,6 @@ Solution plugins compose multiple L1/L2 plugins into complete vertical solutions
 let kbPid: string;
 
 test.describe('RAG Knowledge Base', () => {
-
   test.describe.configure({ mode: 'serial' });
 
   test('should navigate to KB list via menu', async ({ page }) => {
@@ -45,24 +46,33 @@ test.describe('RAG Knowledge Base', () => {
     await page.waitForLoadState('domcontentloaded');
 
     // Navigate via sidebar menu: AuraBot Management → Knowledge Base
-    const sidebar = page.locator('nav, aside, [data-testid="sidebar"]').first();
-    // Click AuraBot parent menu
-    const aurabotMenu = sidebar.getByText(/AuraBot/);
-    if (await aurabotMenu.isVisible()) {
-      await aurabotMenu.evaluate((el: HTMLElement) => el.click());
+    const sidebar = page.locator('nav').first();
+    const aurabotMenu = sidebar.getByText(/AuraBot|Aura Bot|智能体|AI/).first();
+    if (await aurabotMenu.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await aurabotMenu.evaluate((el: HTMLElement) => el.click()).catch(() => {});
     }
-    // Click Knowledge Base menu item
-    const kbMenu = sidebar.getByText(/Knowledge Base|知识库/);
-    if (await kbMenu.isVisible()) {
-      await kbMenu.evaluate((el: HTMLElement) => el.click());
-    } else {
-      // Fallback: direct navigation
-      await page.goto('/aurabot/knowledge');
+    const kbMenu = sidebar.getByText(KNOWLEDGE_BASE_RE).first();
+    let navigatedByMenu = false;
+    if (await kbMenu.isVisible({ timeout: 3000 }).catch(() => false)) {
+      navigatedByMenu = await kbMenu
+        .evaluate((el: HTMLElement) => {
+          el.click();
+          return true;
+        })
+        .catch(() => false);
+    }
+    if (!navigatedByMenu) {
+      await page.goto('/aurabot/knowledge', { waitUntil: 'domcontentloaded' });
+    }
+    if (!page.url().includes('/aurabot/knowledge')) {
+      await page.goto('/aurabot/knowledge', { waitUntil: 'domcontentloaded' });
     }
 
     // Verify page loads
-    await expect(page.getByRole('heading', { name: 'Knowledge Base' })).toBeVisible({ timeout: 10000 });
-    await expect(page.getByRole('button', { name: 'New Knowledge Base' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: KNOWLEDGE_BASE_RE })).toBeVisible({
+      timeout: 10000,
+    });
+    await expect(page.getByRole('button', { name: NEW_KB_RE })).toBeVisible();
   });
 
   test('should create a knowledge base via API', async ({ page }) => {
@@ -112,11 +122,14 @@ test.describe('RAG Knowledge Base', () => {
 
     await expect(page.getByText(/Uploading\.\.\.|上传中/i)).toBeVisible({ timeout: 5000 });
     await expect
-      .poll(async () => {
-        const resp = await page.request.get(`/api/ai/knowledge/${kbPid}/documents`);
-        const body = await resp.json().catch(() => ({}));
-        return Array.isArray(body.data) ? body.data.length : 0;
-      }, { timeout: 10000 })
+      .poll(
+        async () => {
+          const resp = await page.request.get(`/api/ai/knowledge/${kbPid}/documents`);
+          const body = await resp.json().catch(() => ({}));
+          return Array.isArray(body.data) ? body.data.length : 0;
+        },
+        { timeout: 10000 },
+      )
       .toBeGreaterThan(0);
   });
 
@@ -136,11 +149,16 @@ test.describe('RAG Knowledge Base', () => {
       if (doc.status === 'failed') {
         throw new Error(`Document processing failed: ${doc.errorMessage}`);
       }
-      await expect.poll(async () => {
-        const resp = await page.request.get(`/api/ai/knowledge/${kbPid}/documents`);
-        const body = await resp.json();
-        return body?.data?.[0]?.status ?? '';
-      }, { timeout: 1000 }).not.toBe('');
+      await expect
+        .poll(
+          async () => {
+            const resp = await page.request.get(`/api/ai/knowledge/${kbPid}/documents`);
+            const body = await resp.json();
+            return body?.data?.[0]?.status ?? '';
+          },
+          { timeout: 1000 },
+        )
+        .not.toBe('');
     }
     expect(completed).toBeTruthy();
   });
@@ -168,7 +186,10 @@ test.describe('RAG Knowledge Base', () => {
     await expect(page.getByText(/Chunk #1/)).toBeVisible();
 
     // Expand first chunk to see content
-    await page.getByText(/Chunk #0/).first().click();
+    await page
+      .getByText(/Chunk #0/)
+      .first()
+      .click();
     // Verify chunk content is visible (scoped to chunk area)
     await expect(page.getByText('AuraBoot Platform Overview')).toBeVisible();
   });

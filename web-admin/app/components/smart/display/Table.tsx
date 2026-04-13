@@ -459,9 +459,12 @@ export const Table: React.FC<TableProps> = ({
           break;
 
         case 'boolean': {
-          const boolVal = typeof value === 'boolean' ? value
-            : typeof value === 'string' ? value.toLowerCase() === 'true'
-            : Boolean(value);
+          const boolVal =
+            typeof value === 'boolean'
+              ? value
+              : typeof value === 'string'
+                ? value.toLowerCase() === 'true'
+                : Boolean(value);
           renderedValue = (
             <span className={boolVal ? 'text-green-600' : 'text-gray-600'}>
               {boolVal ? '是' : '否'}

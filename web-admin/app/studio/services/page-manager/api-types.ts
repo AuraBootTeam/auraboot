@@ -11,7 +11,7 @@
  * Backend page type enum
  * Maps to: FORM, LIST, DETAIL, DASHBOARD, CUSTOM
  */
-export type ApiPageType = 'form' | 'list' | 'detail' | 'dashboard' | 'custom';
+export type ApiPageType = 'form' | 'list' | 'detail' | 'dashboard' | 'custom' | 'composite';
 
 /**
  * Backend status enum
@@ -20,16 +20,20 @@ export type ApiPageType = 'form' | 'list' | 'detail' | 'dashboard' | 'custom';
 export type ApiPageStatus = 'draft' | 'published' | 'archived';
 
 /**
- * Page Schema DTO from backend
+ * Page Schema DTO from backend (v2 API)
  * Matches: PageSchemaDTO.java
  */
 export interface PageSchemaDTO {
   pid: string;
+  pageKey?: string;
   name: string;
-  title: string;
+  title: string | Record<string, string>;
   description?: string;
-  pageType: ApiPageType;
-  dslSchema?: Record<string, unknown>;
+  kind: ApiPageType;
+  blocks?: any[];
+  layout?: Record<string, unknown>;
+  profile?: string;
+  schemaVersion?: number;
   metaInfo?: Record<string, unknown>;
   isTemplate?: boolean;
   templateCategory?: string;
@@ -57,8 +61,8 @@ export interface PageSchemaCreateRequest {
   pageKey: string; // Required by backend
   title: string;
   description?: string;
-  pageType: ApiPageType;
-  dslSchema: Record<string, unknown>;
+  kind: ApiPageType;
+  blocks?: unknown[];
   metaInfo?: Record<string, unknown>;
   isTemplate?: boolean;
   templateCategory?: string;
@@ -76,8 +80,10 @@ export interface PageSchemaUpdateRequest {
   name?: string;
   title?: string;
   description?: string;
-  pageType?: ApiPageType;
-  dslSchema?: Record<string, unknown>;
+  kind?: ApiPageType;
+  blocks?: unknown[];
+  layout?: Record<string, unknown>;
+  schemaVersion?: number;
   metaInfo?: Record<string, unknown>;
   isTemplate?: boolean;
   templateCategory?: string;

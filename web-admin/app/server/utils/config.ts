@@ -179,6 +179,7 @@ export const config: BffConfig = {
       { path: '/api/ai/aurabot/chat/stream', method: 'post' as const },
       { path: '/api/ai/aurabot/wizard', method: 'post' as const },
       { path: '/api/notifications/stream', method: 'get' as const },
+      { path: '/api/agent/events/stream', method: 'get' as const },
     ],
     heartbeatInterval: parseInt(process.env.SSE_HEARTBEAT_INTERVAL || '30000', 10),
     connectionTimeout: parseInt(process.env.SSE_CONNECTION_TIMEOUT || '300000', 10),

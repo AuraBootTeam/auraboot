@@ -17,7 +17,11 @@ import React, {
 } from 'react';
 import { useLocation, useParams } from 'react-router';
 import type { PageContext } from './hooks/usePageContext';
-import { auraBotApi } from './services/auraBotApi';
+import {
+  auraBotApi,
+  type AuraBotConversationItem,
+  type AuraBotConversationMessage,
+} from './services/auraBotApi';
 
 // ============================================================================
 // State Types
@@ -52,9 +56,21 @@ interface KnowledgeBaseInfo {
   docCount: number;
 }
 
+export interface AuraBotSessionSummary {
+  sessionId: string;
+  conversationId: number;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+  messageCount: number;
+  selectedAgentCode: string;
+  lastMessagePreview: string;
+}
+
 interface AuraBotState {
   panelState: PanelState;
   sessionId: string;
+  currentConversationId: number | null;
   messages: SimpleMessage[];
   isLoading: boolean;
   pageContext: PageContext;
@@ -85,6 +101,16 @@ type AuraBotAction =
   | { type: 'set_loading'; payload: boolean }
   | { type: 'set_selected_agent'; payload: string }
   | { type: 'new_session' }
+  | {
+      type: 'hydrate_session';
+      payload: {
+        sessionId: string;
+        conversationId: number;
+        messages: SimpleMessage[];
+        selectedAgentCode: string;
+      };
+    }
+  | { type: 'set_current_conversation'; payload: number | null }
   | { type: 'toggle_knowledge_base'; payload: string }
   | { type: 'set_knowledge_bases'; payload: KnowledgeBaseInfo[] };
 
@@ -100,6 +126,17 @@ function generateMessageId(): string {
   return `msg_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 }
 
+const LAST_CONVERSATION_KEY = 'aurabot.lastConversationId';
+
+function rememberConversationId(conversationId: number | null) {
+  if (typeof window === 'undefined') return;
+  if (conversationId == null) {
+    window.localStorage.removeItem(LAST_CONVERSATION_KEY);
+    return;
+  }
+  window.localStorage.setItem(LAST_CONVERSATION_KEY, String(conversationId));
+}
+
 const defaultPageContext: PageContext = {
   pageType: 'custom',
   pageKey: '/',
@@ -110,6 +147,7 @@ const defaultPageContext: PageContext = {
 const initialState: AuraBotState = {
   panelState: 'collapsed',
   sessionId: generateSessionId(),
+  currentConversationId: null,
   messages: [],
   isLoading: false,
   pageContext: defaultPageContext,
@@ -118,6 +156,45 @@ const initialState: AuraBotState = {
   selectedKnowledgeBaseIds: [],
   knowledgeBases: [],
 };
+
+function toSimpleMessage(message: AuraBotConversationMessage): SimpleMessage {
+  const sender: SimpleMessage['sender'] =
+    message.sender === 'user'
+      ? 'user'
+      : message.sender === 'system'
+        ? 'system'
+        : 'bot';
+
+  const normalizedType: SimpleMessage['type'] =
+    message.type === 'system'
+      ? 'error'
+      : message.type === 'ai_response' || message.type === 'text'
+        ? 'text'
+        : 'text';
+
+  return {
+    id: `db-${message.id}`,
+    type: normalizedType,
+    sender,
+    timestamp: new Date(message.createdAt).getTime(),
+    content: message.content || '',
+    traceId: message.traceId || undefined,
+  };
+}
+
+function toSessionSummary(item: AuraBotConversationItem): AuraBotSessionSummary {
+  const updatedAt = item.updatedAt ? new Date(item.updatedAt).getTime() : Date.now();
+  return {
+    sessionId: String(item.conversationId),
+    conversationId: item.conversationId,
+    title: item.title,
+    createdAt: updatedAt,
+    updatedAt,
+    messageCount: item.messageCount,
+    selectedAgentCode: item.agentCode,
+    lastMessagePreview: item.lastMessagePreview || '',
+  };
+}
 
 function auraBotReducer(state: AuraBotState, action: AuraBotAction): AuraBotState {
   switch (action.type) {
@@ -191,6 +268,7 @@ function auraBotReducer(state: AuraBotState, action: AuraBotAction): AuraBotStat
         selectedAgentCode: action.payload,
         // Start a new session when switching agents
         sessionId: generateSessionId(),
+        currentConversationId: null,
         messages: [],
         inputValue: '',
       };
@@ -199,9 +277,23 @@ function auraBotReducer(state: AuraBotState, action: AuraBotAction): AuraBotStat
       return {
         ...state,
         sessionId: generateSessionId(),
+        currentConversationId: null,
         messages: [],
         inputValue: '',
       };
+
+    case 'hydrate_session':
+      return {
+        ...state,
+        sessionId: action.payload.sessionId,
+        currentConversationId: action.payload.conversationId,
+        messages: action.payload.messages,
+        selectedAgentCode: action.payload.selectedAgentCode,
+        inputValue: '',
+      };
+
+    case 'set_current_conversation':
+      return { ...state, currentConversationId: action.payload };
 
     case 'toggle_knowledge_base': {
       const kbId = action.payload;
@@ -224,8 +316,11 @@ function auraBotReducer(state: AuraBotState, action: AuraBotAction): AuraBotStat
 // Context
 // ============================================================================
 
+export type FormFillHandler = (fields: Record<string, any>) => void;
+
 interface AuraBotContextValue {
   state: AuraBotState;
+  sessions: AuraBotSessionSummary[];
   openPanel: () => void;
   closePanel: () => void;
   togglePanel: () => void;
@@ -234,13 +329,17 @@ interface AuraBotContextValue {
   cancelTool: (toolId: string) => void;
   clearMessages: () => void;
   newSession: () => void;
+  selectSession: (sessionId: string) => void | Promise<void>;
+  deleteSession: (sessionId: string) => void | Promise<void>;
   setInputValue: (value: string) => void;
   setPageContext: (ctx: Partial<PageContext>) => void;
   setSelectedAgent: (agentCode: string) => void;
   toggleKnowledgeBase: (kbPid: string) => void;
+  registerFormFillHandler: (handler: FormFillHandler) => void;
+  unregisterFormFillHandler: () => void;
 }
 
-const AuraBotCtx = createContext<AuraBotContextValue | null>(null);
+export const AuraBotCtx = createContext<AuraBotContextValue | null>(null);
 
 // ============================================================================
 // Route-based PageContext derivation
@@ -250,49 +349,49 @@ function derivePageContextFromRoute(
   pathname: string,
   params: Record<string, string | undefined>,
 ): PageContext {
-  // /dynamic/:tableName/view/:recordId → detail
-  if (pathname.match(/^\/dynamic\/[^/]+\/view\/[^/]+/)) {
-    const tableName = params.tableName || '';
+  // /p/:pageKey/view/:recordId → detail
+  if (pathname.match(/^\/p\/[^/]+\/view\/[^/]+/)) {
+    const pageKey = params.pageKey || '';
     return {
       pageType: 'detail',
-      pageKey: tableName,
-      modelCode: tableName.replace(/-/g, '_'),
+      pageKey,
+      modelCode: pageKey,
       recordPid: params.recordId,
-      breadcrumb: [tableName],
+      breadcrumb: [pageKey],
     };
   }
 
-  // /dynamic/:tableName/:recordId/edit → form (edit)
-  if (pathname.match(/^\/dynamic\/[^/]+\/[^/]+\/edit/)) {
-    const tableName = params.tableName || '';
+  // /p/:pageKey/:recordId/edit → form (edit)
+  if (pathname.match(/^\/p\/[^/]+\/[^/]+\/edit/)) {
+    const pageKey = params.pageKey || '';
     return {
       pageType: 'form',
-      pageKey: tableName,
-      modelCode: tableName.replace(/-/g, '_'),
+      pageKey,
+      modelCode: pageKey,
       recordPid: params.recordId,
-      breadcrumb: [tableName],
+      breadcrumb: [pageKey],
     };
   }
 
-  // /dynamic/:tableName/new → form (create)
-  if (pathname.match(/^\/dynamic\/[^/]+\/new/)) {
-    const tableName = params.tableName || '';
+  // /p/:pageKey/new → form (create)
+  if (pathname.match(/^\/p\/[^/]+\/new/)) {
+    const pageKey = params.pageKey || '';
     return {
       pageType: 'form',
-      pageKey: tableName,
-      modelCode: tableName.replace(/-/g, '_'),
-      breadcrumb: [tableName],
+      pageKey,
+      modelCode: pageKey,
+      breadcrumb: [pageKey],
     };
   }
 
-  // /dynamic/:tableName → list
-  if (pathname.match(/^\/dynamic\/[^/]+$/)) {
-    const tableName = params.tableName || '';
+  // /p/:pageKey → list
+  if (pathname.match(/^\/p\/[^/]+$/)) {
+    const pageKey = params.pageKey || '';
     return {
       pageType: 'list',
-      pageKey: tableName,
-      modelCode: tableName.replace(/-/g, '_'),
-      breadcrumb: [tableName],
+      pageKey,
+      modelCode: pageKey,
+      breadcrumb: [pageKey],
     };
   }
 
@@ -325,8 +424,47 @@ export interface AuraBotProviderProps {
 
 export function AuraBotProvider({ children }: AuraBotProviderProps) {
   const [state, dispatch] = useReducer(auraBotReducer, initialState);
+  const [sessions, setSessions] = React.useState<AuraBotSessionSummary[]>([]);
   const location = useLocation();
   const params = useParams();
+  const formFillHandlerRef = useRef<FormFillHandler | null>(null);
+
+  const refreshConversations = useCallback(async () => {
+    try {
+      const items = await auraBotApi.listConversations();
+      const summaries = items.map(toSessionSummary);
+      setSessions(summaries);
+      if (!state.currentConversationId && summaries.length > 0 && state.messages.length === 0) {
+        const preferredConversationId =
+          typeof window !== 'undefined'
+            ? Number(window.localStorage.getItem(LAST_CONVERSATION_KEY) || '')
+            : NaN;
+        const target =
+          summaries.find((item) => item.conversationId === preferredConversationId) || summaries[0];
+        const messages = await auraBotApi.getConversationMessages(target.conversationId);
+        dispatch({
+          type: 'hydrate_session',
+          payload: {
+            sessionId: generateSessionId(),
+            conversationId: target.conversationId,
+            messages: messages.map(toSimpleMessage),
+            selectedAgentCode: target.selectedAgentCode,
+          },
+        });
+      }
+    } catch {
+      // Conversation history unavailable — keep in-memory state only
+    }
+  }, [state.currentConversationId, state.messages.length]);
+
+  useEffect(() => {
+    if (state.panelState !== 'expanded') return;
+    refreshConversations();
+  }, [state.panelState, refreshConversations]);
+
+  useEffect(() => {
+    rememberConversationId(state.currentConversationId);
+  }, [state.currentConversationId]);
 
   // Sync pageContext from route changes
   useEffect(() => {
@@ -359,8 +497,39 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
 
   // Session
   const newSession = useCallback(() => {
+    rememberConversationId(null);
     dispatch({ type: 'new_session' });
   }, []);
+
+  const selectSession = useCallback(
+    async (sessionId: string) => {
+      const session = sessions.find((item) => item.sessionId === sessionId);
+      if (!session) return;
+      const messages = await auraBotApi.getConversationMessages(session.conversationId);
+      dispatch({
+        type: 'hydrate_session',
+        payload: {
+          sessionId: generateSessionId(),
+          conversationId: session.conversationId,
+          messages: messages.map(toSimpleMessage),
+          selectedAgentCode: session.selectedAgentCode,
+        },
+      });
+      rememberConversationId(session.conversationId);
+    },
+    [sessions],
+  );
+
+  const deleteSession = useCallback(
+    async (sessionId: string) => {
+      setSessions((prev) => prev.filter((item) => item.sessionId !== sessionId));
+      if (String(state.currentConversationId ?? '') === sessionId) {
+        rememberConversationId(null);
+        dispatch({ type: 'new_session' });
+      }
+    },
+    [state.currentConversationId],
+  );
 
   // Agent selector
   const setSelectedAgent = useCallback((agentCode: string) => {
@@ -407,17 +576,60 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
     [state.pageContext],
   );
 
+  const ensureConversation = useCallback(async () => {
+    if (state.currentConversationId != null) {
+      return {
+        conversationId: state.currentConversationId,
+        agentCode: state.selectedAgentCode,
+      };
+    }
+
+    const conversation = await auraBotApi.ensureConversation(state.selectedAgentCode);
+    const summary = toSessionSummary(conversation);
+    setSessions((prev) => {
+      const filtered = prev.filter((item) => item.conversationId !== summary.conversationId);
+      return [summary, ...filtered];
+    });
+    rememberConversationId(summary.conversationId);
+    dispatch({ type: 'set_current_conversation', payload: summary.conversationId });
+    return {
+      conversationId: summary.conversationId,
+      agentCode: summary.selectedAgentCode,
+    };
+  }, [state.currentConversationId, state.selectedAgentCode]);
+
+  const persistAssistantMessage = useCallback(
+    async (conversationId: number, content: string, traceId?: string, error?: boolean) => {
+      if (!content.trim()) return;
+      try {
+        await auraBotApi.appendAssistantMessage(conversationId, content, traceId, error);
+        await refreshConversations();
+      } catch {
+        // Ignore persistence failures so chat UX remains responsive
+      }
+    },
+    [refreshConversations],
+  );
+
   // Send message — wired to SSE streaming
   const sendMessage = useCallback(
     async (content: string) => {
       if (!content.trim() || state.isLoading) return;
 
+      const { conversationId } = await ensureConversation();
+
       // Add user message
       const userMsgId = generateMessageId();
+      try {
+        await auraBotApi.appendUserMessage(conversationId, content, userMsgId);
+      } catch {
+        // Ignore persistence failures — keep chat usable
+      }
       dispatch({
         type: 'add_message',
         payload: { id: userMsgId, type: 'text', sender: 'user', timestamp: Date.now(), content },
       });
+      refreshConversations().catch(() => {});
       dispatch({ type: 'set_input_value', payload: '' });
       dispatch({ type: 'set_loading', payload: true });
 
@@ -457,6 +669,7 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
                   type: 'update_message',
                   payload: { id: botMsgId, content: fullContent, traceId },
                 });
+                persistAssistantMessage(conversationId, fullContent, traceId).catch(() => {});
               } else if (traceId) {
                 dispatch({ type: 'update_message', payload: { id: botMsgId, traceId } });
               }
@@ -467,6 +680,7 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
                 type: 'update_message',
                 payload: { id: botMsgId, type: 'error', content: error, traceId },
               });
+              persistAssistantMessage(conversationId, error, traceId, true).catch(() => {});
               dispatch({ type: 'set_loading', payload: false });
             },
             onToolStart: (toolId: string, toolName: string, input: Record<string, any>) => {
@@ -492,6 +706,11 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
                   updates: { type: 'tool_result', content: '', toolResult: result },
                 },
               });
+              // Handle form_fill action — populate the current page's form
+              const data = result?.data || result;
+              if (data?.action === 'form_fill' && data?.fields && formFillHandlerRef.current) {
+                formFillHandlerRef.current(data.fields);
+              }
             },
             onConfirmRequired: (
               toolId: string,
@@ -521,15 +740,30 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
           type: 'update_message',
           payload: { id: botMsgId, type: 'error', content: e.message || 'Chat failed' },
         });
+        persistAssistantMessage(conversationId, e.message || 'Chat failed', undefined, true).catch(
+          () => {},
+        );
         dispatch({ type: 'set_loading', payload: false });
       }
     },
-    [state.isLoading, state.sessionId, state.selectedAgentCode, state.pageContext, state.messages, state.selectedKnowledgeBaseIds],
+    [
+      ensureConversation,
+      persistAssistantMessage,
+      refreshConversations,
+      state.isLoading,
+      state.sessionId,
+      state.selectedAgentCode,
+      state.pageContext,
+      state.messages,
+      state.selectedKnowledgeBaseIds,
+    ],
   );
 
   // Confirm a tool execution (user approved)
   const confirmTool = useCallback(
     async (toolId: string) => {
+      const conversationId = state.currentConversationId;
+
       // Update confirm card to show "executing"
       dispatch({
         type: 'update_tool_message',
@@ -574,6 +808,10 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
                   updates: { type: 'tool_result', content: '', toolResult: result },
                 },
               });
+              const data = result?.data || result;
+              if (data?.action === 'form_fill' && data?.fields && formFillHandlerRef.current) {
+                formFillHandlerRef.current(data.fields);
+              }
             },
             onConfirmRequired: (
               tid: string,
@@ -602,6 +840,9 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
                   type: 'update_message',
                   payload: { id: botMsgId, content: full, traceId },
                 });
+                if (conversationId != null) {
+                  persistAssistantMessage(conversationId, full, traceId).catch(() => {});
+                }
               } else if (traceId) {
                 dispatch({ type: 'update_message', payload: { id: botMsgId, traceId } });
               }
@@ -612,6 +853,9 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
                 type: 'update_message',
                 payload: { id: botMsgId, content: err, type: 'error', traceId },
               });
+              if (conversationId != null) {
+                persistAssistantMessage(conversationId, err, traceId, true).catch(() => {});
+              }
               dispatch({ type: 'set_loading', payload: false });
             },
           },
@@ -621,10 +865,15 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
           type: 'update_message',
           payload: { id: botMsgId, type: 'error', content: e.message || 'Execute failed' },
         });
+        if (conversationId != null) {
+          persistAssistantMessage(conversationId, e.message || 'Execute failed', undefined, true).catch(
+            () => {},
+          );
+        }
         dispatch({ type: 'set_loading', payload: false });
       }
     },
-    [state.sessionId],
+    [persistAssistantMessage, state.currentConversationId, state.sessionId],
   );
 
   // Cancel a tool execution (user rejected)
@@ -663,8 +912,17 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [togglePanel, closePanel, state.panelState]);
 
+  const registerFormFillHandler = useCallback((handler: FormFillHandler) => {
+    formFillHandlerRef.current = handler;
+  }, []);
+
+  const unregisterFormFillHandler = useCallback(() => {
+    formFillHandlerRef.current = null;
+  }, []);
+
   const value: AuraBotContextValue = {
     state,
+    sessions,
     openPanel,
     closePanel,
     togglePanel,
@@ -673,10 +931,14 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
     cancelTool,
     clearMessages,
     newSession,
+    selectSession,
+    deleteSession,
     setInputValue,
     setPageContext,
     setSelectedAgent,
     toggleKnowledgeBase,
+    registerFormFillHandler,
+    unregisterFormFillHandler,
   };
 
   return <AuraBotCtx.Provider value={value}>{children}</AuraBotCtx.Provider>;

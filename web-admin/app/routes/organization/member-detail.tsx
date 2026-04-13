@@ -190,7 +190,7 @@ export default function MemberDetailPage() {
   const doDelete = () =>
     handleAction('delete', async () => {
       await del(`/api/tenant/members/${memberPid}`);
-      navigate('/dynamic/tenant-member');
+      navigate('/p/tenant_member');
     });
 
   // --- Render ---
@@ -229,7 +229,7 @@ export default function MemberDetailPage() {
       {/* Header */}
       <div className="mb-6 flex items-start gap-4">
         <button
-          onClick={() => navigate('/dynamic/tenant-member')}
+          onClick={() => navigate('/p/tenant_member')}
           className="mt-1 rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-gray-300"
           data-testid="back-btn"
         >

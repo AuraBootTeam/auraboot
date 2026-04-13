@@ -155,7 +155,7 @@ export function SchemaList({
         case 'link':
           return (
             <Link
-              to={`/dynamic/${schema?.meta?.entityCode}/${record.id}`}
+              to={`/p/${schema?.meta?.entityCode}/${record.id}`}
               className="text-blue-600 underline hover:text-blue-800"
             >
               {value}
@@ -244,7 +244,7 @@ export function SchemaList({
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-medium text-gray-900">{title || '数据列表'}</h2>
           <Link
-            to={`/dynamic/unknown/new`}
+            to={`/p/unknown/new`}
             className="inline-flex items-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
           >
             新建

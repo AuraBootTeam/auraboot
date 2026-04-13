@@ -28,7 +28,13 @@ import { test, expect, type Page } from '@playwright/test';
 import { ModelTestHelper } from '../../helpers/model-test-helper';
 import { E2ET_ORDER_CONFIG } from '../../helpers/configs/e2et-order.config';
 import { DynamicListPage } from '../../pages/DynamicListPage';
-import { uniqueId, todayStr, dateOffsetStr, executeCommandViaApi, findRowByContent } from '../helpers';
+import {
+  uniqueId,
+  todayStr,
+  dateOffsetStr,
+  executeCommandViaApi,
+  findRowByContent,
+} from '../helpers';
 
 test.describe('Query Operators', () => {
   test.describe.configure({ retries: 1 });
@@ -55,16 +61,57 @@ test.describe('Query Operators', () => {
     // precondition) and that setup is fragile. draft status is sufficient for
     // testing query operators.
     const orders = [
-      { e2et_order_title: `${testPrefix}_Alpha`, e2et_order_type: 'normal', e2et_order_urgent: false },
-      { e2et_order_title: `${testPrefix}_Beta`, e2et_order_type: 'bulk', e2et_order_urgent: true, e2et_order_remark: 'Urgent query operator test Beta' },
-      { e2et_order_title: `${testPrefix}_Gamma`, e2et_order_type: 'normal', e2et_order_urgent: false },
-      { e2et_order_title: `${testPrefix}_Delta`, e2et_order_type: 'bulk', e2et_order_urgent: true, e2et_order_remark: 'Urgent query operator test Delta' },
-      { e2et_order_title: `${testPrefix}_Epsilon`, e2et_order_type: 'normal', e2et_order_urgent: false },
+      {
+        e2et_order_title: `${testPrefix}_Alpha`,
+        e2et_order_type: 'normal',
+        e2et_order_urgent: false,
+      },
+      {
+        e2et_order_title: `${testPrefix}_Beta`,
+        e2et_order_type: 'bulk',
+        e2et_order_urgent: true,
+        e2et_order_remark: 'Urgent query operator test Beta',
+      },
+      {
+        e2et_order_title: `${testPrefix}_Gamma`,
+        e2et_order_type: 'normal',
+        e2et_order_urgent: false,
+      },
+      {
+        e2et_order_title: `${testPrefix}_Delta`,
+        e2et_order_type: 'bulk',
+        e2et_order_urgent: true,
+        e2et_order_remark: 'Urgent query operator test Delta',
+      },
+      {
+        e2et_order_title: `${testPrefix}_Epsilon`,
+        e2et_order_type: 'normal',
+        e2et_order_urgent: false,
+      },
       { e2et_order_title: `${testPrefix}_Zeta`, e2et_order_type: 'bulk', e2et_order_urgent: false },
-      { e2et_order_title: `${testPrefix}_Eta`, e2et_order_type: 'normal', e2et_order_urgent: true, e2et_order_remark: 'Urgent query operator test Eta' },
-      { e2et_order_title: `${testPrefix}_Theta`, e2et_order_type: 'bulk', e2et_order_urgent: false },
-      { e2et_order_title: `${testPrefix}_Iota`, e2et_order_type: 'normal', e2et_order_urgent: true, e2et_order_remark: 'Urgent query operator test Iota' },
-      { e2et_order_title: `${testPrefix}_Kappa`, e2et_order_type: 'bulk', e2et_order_urgent: true, e2et_order_remark: 'Urgent query operator test Kappa' },
+      {
+        e2et_order_title: `${testPrefix}_Eta`,
+        e2et_order_type: 'normal',
+        e2et_order_urgent: true,
+        e2et_order_remark: 'Urgent query operator test Eta',
+      },
+      {
+        e2et_order_title: `${testPrefix}_Theta`,
+        e2et_order_type: 'bulk',
+        e2et_order_urgent: false,
+      },
+      {
+        e2et_order_title: `${testPrefix}_Iota`,
+        e2et_order_type: 'normal',
+        e2et_order_urgent: true,
+        e2et_order_remark: 'Urgent query operator test Iota',
+      },
+      {
+        e2et_order_title: `${testPrefix}_Kappa`,
+        e2et_order_type: 'bulk',
+        e2et_order_urgent: true,
+        e2et_order_remark: 'Urgent query operator test Kappa',
+      },
     ];
 
     for (const data of orders) {
@@ -83,7 +130,9 @@ test.describe('Query Operators', () => {
     for (const pid of [...pids].reverse()) {
       try {
         await order.deleteViaApi(pid);
-      } catch { /* ignore cleanup errors */ }
+      } catch {
+        /* ignore cleanup errors */
+      }
     }
     await page.close();
   });
@@ -117,7 +166,7 @@ test.describe('Query Operators', () => {
   ): Promise<unknown[]> {
     const { pageNum = 1, pageSize = 50, sortField, sortOrder } = options ?? {};
     const filtersParam = encodeURIComponent(JSON.stringify(filters));
-    let url = `/api/dynamic/e2et-order/list?filters=${filtersParam}&pageNum=${pageNum}&pageSize=${pageSize}`;
+    let url = `/api/dynamic/e2et_order/list?filters=${filtersParam}&pageNum=${pageNum}&pageSize=${pageSize}`;
     if (sortField) url += `&sortField=${sortField}`;
     if (sortOrder) url += `&sortOrder=${sortOrder}`;
 
@@ -337,9 +386,7 @@ test.describe('Query Operators', () => {
       likeFilter('e2et_order_title', testPrefix),
     ]);
     // Then query without type filter
-    const all = await queryViaApi(page, [
-      likeFilter('e2et_order_title', testPrefix),
-    ]);
+    const all = await queryViaApi(page, [likeFilter('e2et_order_title', testPrefix)]);
     expect(all.length).toBeGreaterThan(filtered.length);
   });
 
@@ -366,26 +413,22 @@ test.describe('Query Operators', () => {
 
   test('QO-021: pagination + filter — filtered results paginate correctly', async ({ page }) => {
     // Query all with filter
-    const results = await queryViaApi(page, [
-      likeFilter('e2et_order_title', testPrefix),
-    ]);
+    const results = await queryViaApi(page, [likeFilter('e2et_order_title', testPrefix)]);
     expect(results.length).toBeGreaterThan(0);
 
     // Query with pagination — limit to 5 per page
-    const pagedResults = await queryViaApi(
-      page,
-      [likeFilter('e2et_order_title', testPrefix)],
-      { pageNum: 1, pageSize: 5 },
-    );
+    const pagedResults = await queryViaApi(page, [likeFilter('e2et_order_title', testPrefix)], {
+      pageNum: 1,
+      pageSize: 5,
+    });
     expect(pagedResults.length).toBeLessThanOrEqual(5);
   });
 
   test('QO-022: sort + filter — both apply simultaneously', async ({ page }) => {
-    const results = await queryViaApi(
-      page,
-      [likeFilter('e2et_order_title', testPrefix)],
-      { sortField: 'e2et_order_title', sortOrder: 'asc' },
-    );
+    const results = await queryViaApi(page, [likeFilter('e2et_order_title', testPrefix)], {
+      sortField: 'e2et_order_title',
+      sortOrder: 'asc',
+    });
     expect(results.length).toBeGreaterThan(0);
     // Verify sorting: titles should be alphabetically ordered
     for (let i = 1; i < results.length; i++) {

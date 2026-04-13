@@ -22,6 +22,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { getMessagesByRecord, type EmailMessage } from '~/services/emailService';
 import TrackingStats from './TrackingStats';
+import { sanitizeHtml } from '~/meta/utils/sanitizeHtml';
 
 interface EmailTimelineProps {
   modelCode: string;
@@ -54,17 +55,12 @@ function EmailTimelineItem({ message }: EmailTimelineItemProps) {
     : '';
 
   return (
-    <div
-      className="flex gap-3"
-      data-testid={`email-timeline-item-${message.id}`}
-    >
+    <div className="flex gap-3" data-testid={`email-timeline-item-${message.id}`}>
       {/* Icon column */}
       <div className="flex flex-col items-center">
         <div
           className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full ${
-            isInbound
-              ? 'bg-gray-100 dark:bg-gray-700'
-              : 'bg-blue-100 dark:bg-blue-900/30'
+            isInbound ? 'bg-gray-100 dark:bg-gray-700' : 'bg-blue-100 dark:bg-blue-900/30'
           }`}
           title={isInbound ? 'Inbound' : 'Outbound'}
         >
@@ -97,10 +93,7 @@ function EmailTimelineItem({ message }: EmailTimelineItemProps) {
 
         {/* Snippet / Expand */}
         {snippet && (
-          <button
-            onClick={() => setExpanded((v) => !v)}
-            className="mt-1 w-full text-start"
-          >
+          <button onClick={() => setExpanded((v) => !v)} className="mt-1 w-full text-start">
             {!expanded ? (
               <p className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
                 {snippet}
@@ -108,19 +101,15 @@ function EmailTimelineItem({ message }: EmailTimelineItemProps) {
               </p>
             ) : (
               <div>
-                <div
-                  className="text-xs text-gray-700 dark:text-gray-300"
-                >
+                <div className="text-xs text-gray-700 dark:text-gray-300">
                   {message.bodyHtml ? (
                     <div
-                      className="prose prose-xs max-w-none dark:prose-invert"
+                      className="prose prose-xs dark:prose-invert max-w-none"
                       // eslint-disable-next-line react/no-danger
-                      dangerouslySetInnerHTML={{ __html: message.bodyHtml }}
+                      dangerouslySetInnerHTML={{ __html: sanitizeHtml(message.bodyHtml) }}
                     />
                   ) : (
-                    <pre className="whitespace-pre-wrap font-sans">
-                      {message.bodyText}
-                    </pre>
+                    <pre className="font-sans whitespace-pre-wrap">{message.bodyText}</pre>
                   )}
                 </div>
                 <span className="mt-1 flex items-center gap-1 text-xs text-blue-500">
@@ -150,7 +139,9 @@ export default function EmailTimeline({ modelCode, recordId }: EmailTimelineProp
     setLoading(true);
     getMessagesByRecord(modelCode, recordId)
       .then(setMessages)
-      .catch(() => {/* non-critical */})
+      .catch(() => {
+        /* non-critical */
+      })
       .finally(() => setLoading(false));
   }, [modelCode, recordId]);
 
@@ -175,10 +166,7 @@ export default function EmailTimeline({ modelCode, recordId }: EmailTimelineProp
   }
 
   return (
-    <div
-      className="space-y-0"
-      data-testid={`email-timeline-${modelCode}-${recordId}`}
-    >
+    <div className="space-y-0" data-testid={`email-timeline-${modelCode}-${recordId}`}>
       {messages.map((message) => (
         <EmailTimelineItem key={message.id} message={message} />
       ))}

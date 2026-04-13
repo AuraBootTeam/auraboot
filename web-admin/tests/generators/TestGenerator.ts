@@ -113,7 +113,7 @@ function generateSetup(config: TestGenConfig): string {
 
 function generateListTests(config: TestGenConfig): string {
   const { model, paths } = config;
-  const searchableFields = model.fields.filter(f => f.searchable);
+  const searchableFields = model.fields.filter((f) => f.searchable);
 
   const lines: string[] = [];
   lines.push(`  test.describe('List Page', () => {`);
@@ -197,14 +197,16 @@ function generateCreateTests(config: TestGenConfig): string {
 
 function generateValidationTests(config: TestGenConfig): string {
   const { model, paths } = config;
-  const requiredFields = model.fields.filter(f => f.required && f.formVisible !== false);
+  const requiredFields = model.fields.filter((f) => f.required && f.formVisible !== false);
 
   if (requiredFields.length === 0) return '';
 
   const lines: string[] = [];
   lines.push(`  test.describe('Form Validation', () => {`);
 
-  lines.push(`    test('should show errors for empty required fields', async ({ authedPage }) => {`);
+  lines.push(
+    `    test('should show errors for empty required fields', async ({ authedPage }) => {`,
+  );
   lines.push(`      const formPage = new DynamicFormPage(authedPage, '${paths.create}');`);
   lines.push(`      await formPage.goto();`);
   lines.push(`      await formPage.submit();`);
@@ -214,7 +216,9 @@ function generateValidationTests(config: TestGenConfig): string {
 
   for (const field of requiredFields.slice(0, 3)) {
     lines.push('');
-    lines.push(`    test('should validate required field: ${field.field}', async ({ authedPage }) => {`);
+    lines.push(
+      `    test('should validate required field: ${field.field}', async ({ authedPage }) => {`,
+    );
     lines.push(`      const formPage = new DynamicFormPage(authedPage, '${paths.create}');`);
     lines.push(`      await formPage.goto();`);
     lines.push(`      // Fill all fields except ${field.field}`);
@@ -253,7 +257,9 @@ function generateCrudFlowTest(config: TestGenConfig): string {
   const lines: string[] = [];
   lines.push(`  test.describe('CRUD Flow', () => {`);
 
-  lines.push(`    test('should complete create → list → delete cycle', async ({ authedPage }) => {`);
+  lines.push(
+    `    test('should complete create → list → delete cycle', async ({ authedPage }) => {`,
+  );
   lines.push(`      // Step 1: Create`);
   lines.push(`      const formPage = new DynamicFormPage(authedPage, '${paths.create}');`);
   lines.push(`      await formPage.goto();`);

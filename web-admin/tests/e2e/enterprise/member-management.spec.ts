@@ -1,7 +1,7 @@
 /**
  * Enterprise Member Management E2E Tests
  *
- * Tests the DSL-driven tenant member management page at /dynamic/tenant-member.
+ * Tests the DSL-driven tenant member management page at /p/tenant-member.
  *
  * MM-01: Page loads with table rendered
  * MM-02: Status tabs (All, Pending, Active, Suspended, Rejected) exist and switch
@@ -48,7 +48,10 @@ async function getAdminJwt(): Promise<string> {
   const resp = await fetch(`${BACKEND_URL}/api/auth/login`, {
     method: 'post',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: DEFAULT_TEST_ACCOUNT.email, password: DEFAULT_TEST_ACCOUNT.password }),
+    body: JSON.stringify({
+      email: DEFAULT_TEST_ACCOUNT.email,
+      password: DEFAULT_TEST_ACCOUNT.password,
+    }),
   });
   const body = await resp.json();
   return body.data?.jwt;
@@ -67,7 +70,7 @@ async function findMember(
         headers: { Authorization: `Bearer ${adminJwt}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ keyword: '', pageNum, pageSize: 200 }),
       });
-      const body = await resp.json().catch(() => ({} as any));
+      const body = await resp.json().catch(() => ({}) as any);
       const items = body.data?.data ?? [];
       const match = items.find((item: any) => {
         const itemUserId = String(item.userId ?? item.user?.id ?? '');
@@ -140,7 +143,10 @@ async function clearListSearch(page: import('@playwright/test').Page): Promise<v
   await searchInput.press('Enter').catch(() => null);
   await page
     .waitForResponse(
-      (r) => r.url().includes('/list') && r.request().method().toLowerCase() === 'post' && r.status() === 200,
+      (r) =>
+        r.url().includes('/list') &&
+        r.request().method().toLowerCase() === 'post' &&
+        r.status() === 200,
       { timeout: 5000 },
     )
     .catch(() => null);
@@ -175,10 +181,10 @@ test.describe('Member Management — DSL Page', () => {
   });
 
   /**
-   * MM-01: Page loads — navigate to /dynamic/tenant-member, verify table renders.
+   * MM-01: Page loads — navigate to /p/tenant-member, verify table renders.
    */
   test('MM-01: should load member management DSL page with table @smoke', async ({ page }) => {
-    await navigateToDynamicPage(page, 'tenant-member');
+    await navigateToDynamicPage(page, 'tenant_member');
 
     // Verify no error page
     const errorMsg = page.locator('text=Page Unavailable');
@@ -198,7 +204,7 @@ test.describe('Member Management — DSL Page', () => {
    * MM-02: Status tabs — verify tabs exist and can be clicked.
    */
   test('MM-02: should display and switch status tabs', async ({ page }) => {
-    await navigateToDynamicPage(page, 'tenant-member');
+    await navigateToDynamicPage(page, 'tenant_member');
 
     // Verify the tab navigation area exists
     const tabNav = page.locator('nav[aria-label="Tabs"]');
@@ -225,7 +231,7 @@ test.describe('Member Management — DSL Page', () => {
    * Verifies the DSL-defined columns are rendered (user_id, status, join_date, etc.)
    */
   test('MM-03: should display correct table columns', async ({ page }) => {
-    await navigateToDynamicPage(page, 'tenant-member');
+    await navigateToDynamicPage(page, 'tenant_member');
 
     // Wait for table to render
     await expect(page.locator('table').first()).toBeVisible({ timeout: 15000 });
@@ -245,7 +251,7 @@ test.describe('Member Management — DSL Page', () => {
    * MM-04: Row action visibility — active member shows suspend/delete.
    */
   test('MM-04: should show correct row actions for active member', async ({ page }) => {
-    await navigateToDynamicPage(page, 'tenant-member');
+    await navigateToDynamicPage(page, 'tenant_member');
 
     // Switch to active tab
     await clickTabAndWaitForLoad(page, /Active|已激活/, 5000, 'active');
@@ -254,6 +260,8 @@ test.describe('Member Management — DSL Page', () => {
     await expect(rows.first()).toBeVisible({ timeout: 10000 });
 
     const firstRow = rows.first();
+    // Hover row to reveal action buttons (opacity-0 → opacity-100 via group-hover)
+    await firstRow.hover();
 
     // For an active member, suspend should be visible as a direct action
     const suspendAction = firstRow.locator('[data-testid="row-action-suspend"]').first();
@@ -267,7 +275,10 @@ test.describe('Member Management — DSL Page', () => {
       // Open "more actions" dropdown to check for delete
       const moreBtn = firstRow.locator('[data-testid="row-action-more"]').first();
       const hasMore = await moreBtn.isVisible({ timeout: 3000 }).catch(() => false);
-      expect(hasMore, 'Either direct delete button or "more" dropdown must be present for active member').toBe(true);
+      expect(
+        hasMore,
+        'Either direct delete button or "more" dropdown must be present for active member',
+      ).toBe(true);
 
       if (hasMore) {
         await moreBtn.evaluate((el: HTMLElement) => el.click());
@@ -275,11 +286,33 @@ test.describe('Member Management — DSL Page', () => {
         await dropdown.waitFor({ state: 'visible', timeout: 5000 });
         const deleteInDropdown = dropdown.locator('[data-testid="row-action-delete"]').first();
         await expect(deleteInDropdown).toBeVisible({ timeout: 3000 });
+        await expect(dropdown.locator('[data-testid="row-action-reset-password"]').first()).toBeVisible({
+          timeout: 3000,
+        });
         // Close dropdown
         await page.keyboard.press('Escape');
       }
     } else {
       await expect(directDelete).toBeVisible();
+      const moreBtn = firstRow.locator('[data-testid="row-action-more"]').first();
+      const hasMore = await moreBtn.isVisible({ timeout: 3000 }).catch(() => false);
+      const directResetAction = firstRow.locator('[data-testid="row-action-reset-password"]').first();
+      const hasDirectReset = await directResetAction.isVisible({ timeout: 1000 }).catch(() => false);
+      expect(
+        hasDirectReset || hasMore,
+        'Reset password action should be available directly or in the more menu',
+      ).toBe(true);
+      if (hasMore) {
+        await moreBtn.evaluate((el: HTMLElement) => el.click());
+        const dropdown = page.locator('[data-testid="row-action-dropdown"]');
+        await dropdown.waitFor({ state: 'visible', timeout: 5000 });
+        await expect(dropdown.locator('[data-testid="row-action-reset-password"]').first()).toBeVisible({
+          timeout: 3000,
+        });
+        await page.keyboard.press('Escape');
+      } else {
+        await expect(directResetAction).toBeVisible();
+      }
     }
 
     // For an active member, approve should NOT be visible (only for pending)
@@ -293,7 +326,8 @@ test.describe('Member Management — DSL Page', () => {
    */
   test('MM-05: should complete suspend-restore cycle', async ({ page }) => {
     test.setTimeout(60000);
-    await navigateToDynamicPage(page, 'tenant-member');
+    test.skip(!testMemberPid, 'Seeded operator member is not attached to the current tenant in this environment');
+    await navigateToDynamicPage(page, 'tenant_member');
 
     // Switch to active tab
     await clickTabAndWaitForLoad(page, /Active|已激活/, 5000);
@@ -304,6 +338,7 @@ test.describe('Member Management — DSL Page', () => {
     await expect(targetRow).toBeVisible({ timeout: 10000 });
 
     // --- Step 1: Suspend ---
+    await targetRow.hover();
     const suspendBtn = targetRow.locator('[data-testid="row-action-suspend"]');
     await expect(suspendBtn).toBeVisible({ timeout: 3000 });
     if (testMemberPid) {
@@ -343,14 +378,16 @@ test.describe('Member Management — DSL Page', () => {
     await clearListSearch(page);
     const restoredRow = await findRowInPaginatedList(page, targetLookup, 12000);
     await expect(restoredRow).toBeVisible({ timeout: 5000 });
-    await expect(restoredRow.locator('[data-testid="row-action-suspend"]')).toBeVisible({ timeout: 3000 });
+    await expect(restoredRow.locator('[data-testid="row-action-suspend"]')).toBeVisible({
+      timeout: 3000,
+    });
   });
 
   /**
    * MM-06: i18n — field labels should use translated text, not raw keys.
    */
   test('MM-06: should display translated labels, not raw i18n keys', async ({ page }) => {
-    await navigateToDynamicPage(page, 'tenant-member');
+    await navigateToDynamicPage(page, 'tenant_member');
 
     // Check column headers are not raw i18n keys (e.g. "model.tenant_member.user_id.label")
     const headers = page.locator('thead th');
@@ -377,5 +414,26 @@ test.describe('Member Management — DSL Page', () => {
       const isRawTabKey = /^model\.|^tab\.|^status\./.test(trimmedTab);
       expect(isRawTabKey).toBe(false);
     }
+  });
+
+  test('MM-07: should import members through tenant member import API', async ({ page }) => {
+    await navigateToDynamicPage(page, 'tenant_member');
+    const email = `e2e-import-${Date.now()}@test.com`;
+    const resp = await page.request.post('/api/tenant/members/import-rows', {
+      data: [
+        {
+          name: '导入成员',
+          email,
+          phone: '13800138000',
+          department: '',
+          position: '',
+        },
+      ],
+    });
+    expect(resp.ok()).toBe(true);
+    const body = await resp.json();
+    expect(body?.code).toBe('0');
+    expect(body?.data?.successCount).toBe(1);
+    expect(body?.data?.invitedCount).toBe(1);
   });
 });

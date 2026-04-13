@@ -56,52 +56,42 @@ describe('convertSchemaToUnified', () => {
     const studioResult = convertSchemaToUnified(schema);
 
     expect(studioResult).toMatchObject({
-      kind: 'Form',
+      kind: 'form',
       version: '1.0.0',
       id: 'form_1',
       title: '测试表单',
       description: 'Studio schema compatibility test',
       layout: {
-        areas: ['main'],
-        areasConfig: {
-          main: {
-            type: 'grid',
-            cols: 4,
-            rowGap: 16,
-            colGap: 16,
-            padding: 24,
-          },
-        },
+        type: 'grid',
+        cols: 4,
+        rowGap: 16,
+        colGap: 16,
       },
-      areas: {
-        main: {
-          blocks: [
+      blocks: [
+        {
+          id: 'block_basic',
+          blockType: 'section',
+          title: '基础信息',
+          fields: [
             {
-              id: 'block_basic',
-              blockType: 'section',
-              title: '基础信息',
-              fields: [
+              field: 'code',
+              label: '编码',
+              component: 'input',
+              props: expect.objectContaining({
+                name: 'code',
+                label: '编码',
+                required: true,
+              }),
+              validation: [
                 {
-                  field: 'code',
-                  label: '编码',
-                  component: 'input',
-                  props: expect.objectContaining({
-                    name: 'code',
-                    label: '编码',
-                    required: true,
-                  }),
-                  validation: [
-                    {
-                      type: 'required',
-                      message: { 'zh-CN': '该字段必填' },
-                    },
-                  ],
+                  type: 'required',
+                  message: { 'zh-CN': '该字段必填' },
                 },
               ],
             },
           ],
         },
-      },
+      ],
       theme: {
         tokens: {
           'color.primary': '#3B82F6',

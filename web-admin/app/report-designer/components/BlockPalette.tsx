@@ -13,7 +13,7 @@ import type { PaletteItem } from '~/shared/designer';
 
 const BLOCK_DEFINITIONS: BlockDefinition[] = [
   {
-    type: 'data-table',
+    type: 'table',
     label: 'Data Table',
     icon: 'table',
     description: 'Tabular data from a model or query',
@@ -202,9 +202,9 @@ export const BlockPalette: React.FC = () => {
   const { addBlock, updateHeader, updateFooter, report } = useReportStore();
 
   const handleAddBlock = (def: BlockDefinition) => {
-    if (def.type === 'data-table') {
+    if (def.type === 'table') {
       addBlock({
-        blockType: 'data-table',
+        blockType: 'table',
         title: 'New Table',
         dataSource: '',
         columns: [],

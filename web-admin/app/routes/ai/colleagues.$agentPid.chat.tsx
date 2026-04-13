@@ -41,9 +41,16 @@ interface AgentInfo {
 
 function avatarColor(str: string): string {
   const colors = [
-    'bg-blue-500', 'bg-indigo-500', 'bg-purple-500', 'bg-pink-500',
-    'bg-rose-500', 'bg-orange-500', 'bg-amber-500', 'bg-teal-500',
-    'bg-cyan-500', 'bg-emerald-500',
+    'bg-blue-500',
+    'bg-indigo-500',
+    'bg-purple-500',
+    'bg-pink-500',
+    'bg-rose-500',
+    'bg-orange-500',
+    'bg-amber-500',
+    'bg-teal-500',
+    'bg-cyan-500',
+    'bg-emerald-500',
   ];
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
@@ -57,11 +64,7 @@ function AgentAvatar({ agent }: { agent: AgentInfo }) {
 
   if (agent.avatar_url) {
     return (
-      <img
-        src={agent.avatar_url}
-        alt={agent.name}
-        className="h-9 w-9 rounded-full object-cover"
-      />
+      <img src={agent.avatar_url} alt={agent.name} className="h-9 w-9 rounded-full object-cover" />
     );
   }
 
@@ -69,8 +72,7 @@ function AgentAvatar({ agent }: { agent: AgentInfo }) {
 
   return (
     <div
-      className={`flex h-9 w-9 items-center justify-center rounded-full font-semibold text-white
-        ${isAuraBot ? 'bg-gradient-to-br from-blue-500 to-violet-600' : avatarColor(agent.agent_code)}`}
+      className={`flex h-9 w-9 items-center justify-center rounded-full font-semibold text-white ${isAuraBot ? 'bg-gradient-to-br from-blue-500 to-violet-600' : avatarColor(agent.agent_code)}`}
     >
       {isAuraBot ? <SparklesIcon className="h-5 w-5" /> : initial}
     </div>
@@ -139,10 +141,7 @@ export default function AgentChatPage() {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4">
         <p className="text-sm text-gray-500">{error || 'Agent not found'}</p>
-        <Link
-          to="/ai/colleagues"
-          className="text-sm font-medium text-blue-600 hover:text-blue-700"
-        >
+        <Link to="/ai/colleagues" className="text-sm font-medium text-blue-600 hover:text-blue-700">
           {t('ai.chat.backToColleagues', undefined, 'Back to AI Colleagues')}
         </Link>
       </div>

@@ -22,11 +22,7 @@
  */
 
 import { test, expect, type Page } from '../../fixtures';
-import {
-  uniqueId,
-  executeCommandViaApi,
-  todayStr,
-} from '../helpers/index';
+import { uniqueId, executeCommandViaApi, todayStr } from '../helpers/index';
 
 // ---------------------------------------------------------------------------
 // Navigation helper — sidebar-driven navigation
@@ -52,9 +48,9 @@ async function goToIqcList(page: Page): Promise<import('@playwright/test').Respo
   await leafLink.evaluate((el: HTMLElement) => el.click());
   const resp = await listResponsePromise;
 
-  await expect(
-    page.locator('table, [class*="ant-table"]').first(),
-  ).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator('table, [class*="ant-table"]').first()).toBeVisible({
+    timeout: 10_000,
+  });
 
   return resp;
 }
@@ -144,11 +140,10 @@ test.describe('Quality — IQC CRUD', () => {
 
     // Navigate to detail page
     const detailResponsePromise = page.waitForResponse(
-      (r) =>
-        r.url().includes(`/api/dynamic/qc_iqc_order/${iqcId}`) && r.status() === 200,
+      (r) => r.url().includes(`/api/dynamic/qc_iqc_order/${iqcId}`) && r.status() === 200,
       { timeout: 15_000 },
     );
-    await page.goto(`/dynamic/qc_iqc_order/view/${iqcId}`);
+    await page.goto(`/p/qc_iqc_order/view/${iqcId}`);
     await detailResponsePromise;
 
     // Wait for content to load
@@ -156,14 +151,10 @@ test.describe('Quality — IQC CRUD', () => {
     await page.waitForTimeout(1_500);
 
     // Section "检验信息" must be visible
-    await expect(
-      page.getByText('检验信息').first(),
-    ).toBeVisible({ timeout: 8_000 });
+    await expect(page.getByText('检验信息').first()).toBeVisible({ timeout: 8_000 });
 
     // Section "数量统计" must be visible
-    await expect(
-      page.getByText('数量统计').first(),
-    ).toBeVisible({ timeout: 8_000 });
+    await expect(page.getByText('数量统计').first()).toBeVisible({ timeout: 8_000 });
 
     // The IQC code field should show the generated code
     expect(iqcCode).toBeTruthy();
@@ -192,9 +183,9 @@ test.describe('Quality — IQC CRUD', () => {
     // Get the list via API and verify our record is present
     const listResp = await goToIqcList(page);
     const listBody = await listResp.json();
-    const records = (
-      listBody?.data?.records ?? listBody?.data?.data ?? []
-    ) as Array<Record<string, unknown>>;
+    const records = (listBody?.data?.records ?? listBody?.data?.data ?? []) as Array<
+      Record<string, unknown>
+    >;
 
     expect(records.length).toBeGreaterThan(0);
 
@@ -204,10 +195,7 @@ test.describe('Quality — IQC CRUD', () => {
         String(r.qc_iqc_material_id) === `MAT_${UID}` ||
         String(r.qc_iqc_remark ?? '').includes(UID),
     );
-    expect(
-      found,
-      `Expected to find IQC record with MAT_${UID} in list response`,
-    ).toBe(true);
+    expect(found, `Expected to find IQC record with MAT_${UID} in list response`).toBe(true);
   });
 
   // =========================================================================
@@ -238,7 +226,7 @@ test.describe('Quality — IQC CRUD', () => {
     expect(String(record.qc_iqc_remark)).toBe(updatedRemark);
 
     // Navigate to detail page and verify updated remark is visible
-    await page.goto(`/dynamic/qc_iqc_order/view/${iqcId}`);
+    await page.goto(`/p/qc_iqc_order/view/${iqcId}`);
     await page.waitForLoadState('domcontentloaded');
     await page.waitForTimeout(1_500);
 
@@ -256,13 +244,7 @@ test.describe('Quality — IQC CRUD', () => {
     expect(iqcId).toBeTruthy();
 
     // Execute state transition
-    await executeCommandViaApi(
-      page,
-      'qc:complete_iqc',
-      {},
-      iqcId,
-      'state_transition',
-    );
+    await executeCommandViaApi(page, 'qc:complete_iqc', {}, iqcId, 'state_transition');
 
     // Verify API: result should now be "pass"
     const resp = await page.request.get(`/api/dynamic/qc_iqc_order/${iqcId}`);
@@ -272,24 +254,26 @@ test.describe('Quality — IQC CRUD', () => {
     expect(result).toBe('pass');
 
     // Navigate to detail page and verify the UI reflects "pass"
-    await page.goto(`/dynamic/qc_iqc_order/view/${iqcId}`);
+    await page.goto(`/p/qc_iqc_order/view/${iqcId}`);
     await page.waitForLoadState('domcontentloaded');
     await page.waitForTimeout(1_500);
 
     // Result tag "合格" or "Pass" should be visible
-    const pageText = await page.locator('main, [class*="ant-layout-content"]').first().textContent();
+    const pageText = await page
+      .locator('main, [class*="ant-layout-content"]')
+      .first()
+      .textContent();
     const showsPass = /pass|合格/i.test(pageText ?? '');
-    expect(
-      showsPass,
-      'Detail page should show Pass/合格 after completing IQC',
-    ).toBe(true);
+    expect(showsPass, 'Detail page should show Pass/合格 after completing IQC').toBe(true);
 
     // The "完成检验" button should no longer be visible (visibleWhen: pending only)
     const completeBtn = page.getByRole('button', { name: /完成检验|Complete IQC/i });
     // If button exists it should be hidden (not pending state)
     const btnCount = await completeBtn.count();
     if (btnCount > 0) {
-      await expect(completeBtn).not.toBeVisible({ timeout: 3_000 }).catch(() => null);
+      await expect(completeBtn)
+        .not.toBeVisible({ timeout: 3_000 })
+        .catch(() => null);
     }
   });
 
@@ -304,9 +288,7 @@ test.describe('Quality — IQC CRUD', () => {
     const filterResp = await page.request.get(
       '/api/dynamic/qc_iqc_order/list?pageSize=50&filters=' +
         encodeURIComponent(
-          JSON.stringify([
-            { fieldName: 'qc_iqc_result', operator: 'eq', value: 'pass' },
-          ]),
+          JSON.stringify([{ fieldName: 'qc_iqc_result', operator: 'eq', value: 'pass' }]),
         ),
     );
     expect(filterResp.ok()).toBe(true);
@@ -319,13 +301,8 @@ test.describe('Quality — IQC CRUD', () => {
     expect(records.length).toBeGreaterThan(0);
 
     // All returned records must have result=pass
-    const allPass = records.every(
-      (r) => /pass/i.test(String(r.qc_iqc_result ?? '')),
-    );
-    expect(
-      allPass,
-      'All filtered records should have result=pass',
-    ).toBe(true);
+    const allPass = records.every((r) => /pass/i.test(String(r.qc_iqc_result ?? '')));
+    expect(allPass, 'All filtered records should have result=pass').toBe(true);
 
     // Navigate via sidebar and verify the table is visible
     await goToIqcList(page);
@@ -360,7 +337,7 @@ test.describe('Quality — IQC CRUD', () => {
     expect(freshId).toBeTruthy();
 
     // Navigate to detail
-    await page.goto(`/dynamic/qc_iqc_order/view/${freshId}`);
+    await page.goto(`/p/qc_iqc_order/view/${freshId}`);
     await page.waitForLoadState('domcontentloaded');
     await page.waitForTimeout(1_500);
 
@@ -369,9 +346,7 @@ test.describe('Quality — IQC CRUD', () => {
 
     // Action buttons configured for pending state should be visible
     // (either "完成检验" or the edit button)
-    const actionButtons = page.locator(
-      'button, [role="button"]',
-    );
+    const actionButtons = page.locator('button, [role="button"]');
     const btnCount = await actionButtons.count();
     expect(btnCount).toBeGreaterThan(0);
   });
@@ -421,9 +396,9 @@ test.describe('Quality — IQC CRUD', () => {
       expect(listResp.ok()).toBe(true);
       // Navigation should still work — list page renders normally
       await goToIqcList(page);
-      await expect(
-        page.locator('table, [class*="ant-table"]').first(),
-      ).toBeVisible({ timeout: 10_000 });
+      await expect(page.locator('table, [class*="ant-table"]').first()).toBeVisible({
+        timeout: 10_000,
+      });
     } else {
       // Error was correctly thrown for missing required field
       expect(errorCaught).toBe(true);

@@ -121,14 +121,14 @@ const I18nTextInput: React.FC<I18nTextInputProps> = (props) => {
     <div className={`smart-i18n-text-input ${className}`}>
       {/* Field label */}
       {label && (
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="mb-1 block text-sm font-medium text-gray-700">
           {label}
           {required && <span className="ml-1 text-red-500">*</span>}
         </label>
       )}
 
       {/* Locale tab strip */}
-      <div className="border border-gray-200 rounded-md overflow-hidden">
+      <div className="overflow-hidden rounded-md border border-gray-200">
         {/* Tabs */}
         <div className="flex border-b border-gray-200 bg-gray-50">
           {ALL_LOCALES.map((locale) => (
@@ -139,8 +139,8 @@ const I18nTextInput: React.FC<I18nTextInputProps> = (props) => {
               className={[
                 'px-3 py-2 text-xs font-medium transition-colors',
                 activeLocale === locale
-                  ? 'bg-white text-blue-600 border-b-2 border-blue-500 -mb-px'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100',
+                  ? '-mb-px border-b-2 border-blue-500 bg-white text-blue-600'
+                  : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700',
               ]
                 .filter(Boolean)
                 .join(' ')}
@@ -156,22 +156,27 @@ const I18nTextInput: React.FC<I18nTextInputProps> = (props) => {
             rows={rows}
             disabled={disabled}
             readOnly={readOnly}
-            placeholder={placeholder ?? (activeLocale === 'zh-CN' ? '请输入（默认语言）' : `Enter ${I18N_LOCALE_LABELS[activeLocale] ?? activeLocale} translation`)}
+            placeholder={
+              placeholder ??
+              (activeLocale === 'zh-CN'
+                ? '请输入（默认语言）'
+                : `Enter ${I18N_LOCALE_LABELS[activeLocale] ?? activeLocale} translation`)
+            }
             value={initialValues[activeLocale] ?? ''}
             onChange={(e) => handleChange(activeLocale, e.target.value)}
             className={[
               'w-full resize-none text-sm outline-none',
               'placeholder:text-gray-400',
-              disabled || readOnly ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : 'bg-white text-gray-900',
+              disabled || readOnly
+                ? 'cursor-not-allowed bg-gray-50 text-gray-500'
+                : 'bg-white text-gray-900',
             ].join(' ')}
           />
         </div>
       </div>
 
       {/* Missing translations hint */}
-      {!readOnly && !disabled && (
-        <MissingTranslationsHint values={initialValues} />
-      )}
+      {!readOnly && !disabled && <MissingTranslationsHint values={initialValues} />}
     </div>
   );
 };
@@ -191,8 +196,7 @@ const MissingTranslationsHint: React.FC<MissingTranslationsHintProps> = ({ value
 
   return (
     <p className="mt-1 text-xs text-amber-600">
-      缺少翻译:{' '}
-      {missing.map((locale) => I18N_LOCALE_LABELS[locale] ?? locale).join('、')}
+      缺少翻译: {missing.map((locale) => I18N_LOCALE_LABELS[locale] ?? locale).join('、')}
     </p>
   );
 };

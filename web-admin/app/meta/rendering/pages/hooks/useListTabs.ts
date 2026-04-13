@@ -1,7 +1,7 @@
 /**
  * useListTabs — tab filter state management for list pages
  *
- * Manages the list-tabs block's active tab and generates
+ * Manages the tabs block's active tab and generates
  * the corresponding filter condition for data loading.
  */
 
@@ -25,7 +25,7 @@ interface UseListTabsResult {
   setActiveTab: (key: string) => void;
   /** Tab configurations from schema */
   tabs: ListTabConfig[];
-  /** Whether schema has list-tabs */
+  /** Whether schema has tabs */
   hasTabs: boolean;
   /** Current tab filter condition (null for "all" tab) */
   getTabFilter: () => TabFilter | null;
@@ -35,10 +35,8 @@ export function useListTabs({ schema }: UseListTabsOptions): UseListTabsResult {
   const [activeTab, setActiveTab] = useState('all');
 
   const tabs = useMemo<ListTabConfig[]>(() => {
-    if (!schema?.areas) return [];
-    const tabsBlock = Object.values(schema.areas)
-      .flatMap((area) => area.blocks)
-      .find((block) => block.blockType === 'list-tabs');
+    if (!schema?.blocks) return [];
+    const tabsBlock = schema.blocks.find((block) => block.blockType === 'tabs');
     return (tabsBlock?.tabs as ListTabConfig[]) || [];
   }, [schema]);
 

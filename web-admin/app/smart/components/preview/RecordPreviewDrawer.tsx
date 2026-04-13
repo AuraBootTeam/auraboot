@@ -140,8 +140,8 @@ export function RecordPreviewDrawer({
   const displayFields = fields || deriveFieldsFromRecord(record);
 
   const detailUrl = detailPageKey
-    ? `/dynamic/${detailPageKey}/${recordId}`
-    : `/dynamic/${modelCode}_detail/${recordId}`;
+    ? `/p/${detailPageKey}/${recordId}`
+    : `/p/${modelCode}_detail/${recordId}`;
 
   if (!open) return null;
 

@@ -215,7 +215,9 @@ test.describe('Dashboard Designer - Configuration Panels', () => {
     // Wait for drilldown options to render after checkbox toggle
     await expect(dp.propertyLabel('钻取动作')).toBeVisible({ timeout: 5000 });
     await dp.propertyPanel.locator('input[value="modal"]').click();
-    await expect(dp.propertyPanel.locator('text=点击图表元素后将在弹窗中显示详细数据')).toBeVisible();
+    await expect(
+      dp.propertyPanel.locator('text=点击图表元素后将在弹窗中显示详细数据'),
+    ).toBeVisible();
   });
 });
 

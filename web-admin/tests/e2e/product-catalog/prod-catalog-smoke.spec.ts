@@ -44,15 +44,14 @@ async function navigateToCatalogPage(
   await leafLink.scrollIntoViewIfNeeded();
   // Set up waitForResponse BEFORE click to avoid race condition
   const listResponsePromise = page.waitForResponse(
-    (r) =>
-      r.url().includes(`/api/dynamic/${modelCode}/list`) && r.status() === 200,
+    (r) => r.url().includes(`/api/dynamic/${modelCode}/list`) && r.status() === 200,
     { timeout: 15_000 },
   );
   await leafLink.evaluate((el) => (el as HTMLElement).click());
   await listResponsePromise;
-  await expect(
-    page.locator('table, [class*="ant-table"]').first(),
-  ).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator('table, [class*="ant-table"]').first()).toBeVisible({
+    timeout: 10_000,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -153,18 +152,14 @@ test.describe('Product Catalog Smoke Tests', () => {
     }
   });
 
-  test('PC-002 @smoke: Navigate to 品牌管理 list → table visible', async ({
-    page,
-  }) => {
+  test('PC-002 @smoke: Navigate to 品牌管理 list → table visible', async ({ page }) => {
     await navigateToCatalogPage(page, '品牌管理', 'prod_brand');
 
     const table = page.locator('table, [class*="ant-table"]').first();
     await expect(table).toBeVisible({ timeout: 10_000 });
   });
 
-  test('PC-003 @smoke: Navigate to 分类管理 list → table visible', async ({
-    page,
-  }) => {
+  test('PC-003 @smoke: Navigate to 分类管理 list → table visible', async ({ page }) => {
     await navigateToCatalogPage(page, '分类管理', 'prod_category');
 
     const table = page.locator('table, [class*="ant-table"]').first();
@@ -175,17 +170,10 @@ test.describe('Product Catalog Smoke Tests', () => {
   // CRITICAL TESTS
   // =========================================================================
 
-  test('PC-004 @critical: Created product appears in list with active status', async ({
-    page,
-  }) => {
+  test('PC-004 @critical: Created product appears in list with active status', async ({ page }) => {
     // Query via API to verify the record exists with active status
     // (prod:create_product auto-sets prod_status = active)
-    const records = await queryFilteredList(
-      page,
-      'prod_product',
-      'prod_name',
-      productName,
-    );
+    const records = await queryFilteredList(page, 'prod_product', 'prod_name', productName);
     expect(records.length).toBeGreaterThan(0);
     const productRecord = records[0] as Record<string, unknown>;
     expect(String(productRecord.prod_status ?? '')).toBe('active');
@@ -215,12 +203,7 @@ test.describe('Product Catalog Smoke Tests', () => {
     );
 
     // Verify via filtered API query that status changed to DISCONTINUED
-    const records = await queryFilteredList(
-      page,
-      'prod_product',
-      'prod_name',
-      productName,
-    );
+    const records = await queryFilteredList(page, 'prod_product', 'prod_name', productName);
     expect(records.length).toBeGreaterThan(0);
     const productRecord = records[0] as Record<string, unknown>;
     expect(String(productRecord.prod_status ?? '')).toBe('discontinued');
@@ -238,12 +221,7 @@ test.describe('Product Catalog Smoke Tests', () => {
     page,
   }) => {
     // --- Brand ---
-    const brandRecords = await queryFilteredList(
-      page,
-      'prod_brand',
-      'prod_brand_name',
-      brandName,
-    );
+    const brandRecords = await queryFilteredList(page, 'prod_brand', 'prod_brand_name', brandName);
     expect(brandRecords.length).toBeGreaterThan(0);
 
     await navigateToCatalogPage(page, '品牌管理', 'prod_brand');

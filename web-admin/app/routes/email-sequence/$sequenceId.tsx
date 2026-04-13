@@ -51,7 +51,9 @@ function statusBadge(status: string) {
     archived: 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-500',
   };
   return (
-    <span className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${styles[status] || styles.draft}`}>
+    <span
+      className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${styles[status] || styles.draft}`}
+    >
       {status}
     </span>
   );
@@ -65,7 +67,9 @@ function enrollmentStatusBadge(status: string) {
     unsubscribed: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
   };
   return (
-    <span className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${styles[status] || styles.active}`}>
+    <span
+      className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${styles[status] || styles.active}`}
+    >
       {status}
     </span>
   );
@@ -94,7 +98,12 @@ function StepRow({ step, sequenceId, onUpdated, onDeleted }: StepRowProps) {
         subjectTemplate: subject,
         bodyTemplate: body,
       });
-      onUpdated({ ...step, delayDays: Number(delayDays), subjectTemplate: subject, bodyTemplate: body });
+      onUpdated({
+        ...step,
+        delayDays: Number(delayDays),
+        subjectTemplate: subject,
+        bodyTemplate: body,
+      });
       setEditing(false);
       showSuccessToast('Step updated');
     } catch {
@@ -129,7 +138,7 @@ function StepRow({ step, sequenceId, onUpdated, onDeleted }: StepRowProps) {
               {step.subjectTemplate}
             </p>
             {step.bodyTemplate && (
-              <p className="mt-1 text-xs text-gray-400 dark:text-gray-500 line-clamp-2">
+              <p className="mt-1 line-clamp-2 text-xs text-gray-400 dark:text-gray-500">
                 {step.bodyTemplate}
               </p>
             )}
@@ -270,7 +279,7 @@ export default function EmailSequenceEditorPage() {
     if (!nameValue.trim() || !sequence) return;
     try {
       await updateSequence(seqId, { name: nameValue.trim() });
-      setSequence((s) => s ? { ...s, name: nameValue.trim() } : s);
+      setSequence((s) => (s ? { ...s, name: nameValue.trim() } : s));
       setEditingName(false);
       showSuccessToast('Name updated');
     } catch {
@@ -282,7 +291,7 @@ export default function EmailSequenceEditorPage() {
     if (!sequence) return;
     try {
       await updateSequence(seqId, { description: descValue.trim() || undefined });
-      setSequence((s) => s ? { ...s, description: descValue.trim() } : s);
+      setSequence((s) => (s ? { ...s, description: descValue.trim() } : s));
       setEditingDesc(false);
       showSuccessToast('Description updated');
     } catch {
@@ -293,7 +302,7 @@ export default function EmailSequenceEditorPage() {
   const handleStatusChange = async (status: 'active' | 'paused' | 'archived') => {
     try {
       await updateSequenceStatus(seqId, status);
-      setSequence((s) => s ? { ...s, status } : s);
+      setSequence((s) => (s ? { ...s, status } : s));
       showSuccessToast(`Sequence ${status}`);
     } catch {
       showErrorToast('Failed to update status');
@@ -389,10 +398,16 @@ export default function EmailSequenceEditorPage() {
                   data-testid="sequence-editor-name"
                   className="flex-1 rounded-lg border border-blue-400 px-3 py-1.5 text-lg font-semibold text-gray-900 dark:bg-gray-800 dark:text-white"
                 />
-                <button onClick={handleSaveName} className="rounded-lg bg-blue-600 p-1.5 text-white">
+                <button
+                  onClick={handleSaveName}
+                  className="rounded-lg bg-blue-600 p-1.5 text-white"
+                >
                   <CheckIcon className="h-4 w-4" />
                 </button>
-                <button onClick={() => setEditingName(false)} className="rounded-lg border border-gray-200 p-1.5 text-gray-500">
+                <button
+                  onClick={() => setEditingName(false)}
+                  className="rounded-lg border border-gray-200 p-1.5 text-gray-500"
+                >
                   <XMarkIcon className="h-4 w-4" />
                 </button>
               </div>
@@ -421,10 +436,16 @@ export default function EmailSequenceEditorPage() {
                   placeholder="Add description…"
                   className="flex-1 rounded-lg border border-blue-400 px-3 py-1 text-sm text-gray-700 dark:bg-gray-800 dark:text-white"
                 />
-                <button onClick={handleSaveDesc} className="rounded-lg bg-blue-600 p-1.5 text-white">
+                <button
+                  onClick={handleSaveDesc}
+                  className="rounded-lg bg-blue-600 p-1.5 text-white"
+                >
                   <CheckIcon className="h-3.5 w-3.5" />
                 </button>
-                <button onClick={() => setEditingDesc(false)} className="rounded-lg border border-gray-200 p-1.5 text-gray-500">
+                <button
+                  onClick={() => setEditingDesc(false)}
+                  className="rounded-lg border border-gray-200 p-1.5 text-gray-500"
+                >
                   <XMarkIcon className="h-3.5 w-3.5" />
                 </button>
               </div>
@@ -501,13 +522,9 @@ export default function EmailSequenceEditorPage() {
                 step={step}
                 sequenceId={seqId}
                 onUpdated={(updated) =>
-                  setSteps((prev) =>
-                    prev.map((s) => (s.id === updated.id ? updated : s)),
-                  )
+                  setSteps((prev) => prev.map((s) => (s.id === updated.id ? updated : s)))
                 }
-                onDeleted={(stepId) =>
-                  setSteps((prev) => prev.filter((s) => s.id !== stepId))
-                }
+                onDeleted={(stepId) => setSteps((prev) => prev.filter((s) => s.id !== stepId))}
               />
             ))}
           </div>
@@ -517,12 +534,10 @@ export default function EmailSequenceEditorPage() {
         {showAddStep && (
           <form
             onSubmit={handleAddStep}
-            className="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-5 space-y-3 dark:border-blue-800/50 dark:bg-blue-900/10"
+            className="mt-4 space-y-3 rounded-xl border border-blue-200 bg-blue-50 p-5 dark:border-blue-800/50 dark:bg-blue-900/10"
             data-testid="add-step-form"
           >
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-              New Step
-            </h3>
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">New Step</h3>
             <div className="flex items-center gap-3">
               <label className="w-24 text-xs font-medium text-gray-500">Delay (days)</label>
               <input
@@ -547,9 +562,7 @@ export default function EmailSequenceEditorPage() {
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-gray-500">
-                Body Template
-              </label>
+              <label className="mb-1 block text-xs font-medium text-gray-500">Body Template</label>
               <textarea
                 value={newBody}
                 onChange={(e) => setNewBody(e.target.value)}
@@ -600,7 +613,7 @@ export default function EmailSequenceEditorPage() {
         {showEnroll && (
           <form
             onSubmit={handleEnroll}
-            className="mb-4 rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-3 dark:border-gray-700 dark:bg-gray-800/50"
+            className="mb-4 space-y-3 rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/50"
             data-testid="enroll-form"
           >
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Enroll Contact</h3>
@@ -612,7 +625,9 @@ export default function EmailSequenceEditorPage() {
                 className="flex-1 rounded-lg border border-gray-200 px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white"
               >
                 {accounts.map((a) => (
-                  <option key={a.id} value={a.id}>{a.emailAddress}</option>
+                  <option key={a.id} value={a.id}>
+                    {a.emailAddress}
+                  </option>
                 ))}
               </select>
             </div>
@@ -658,10 +673,18 @@ export default function EmailSequenceEditorPage() {
             <table className="w-full text-sm" data-testid="enrollments-table">
               <thead>
                 <tr className="border-b border-gray-200 dark:border-gray-700">
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">Email</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">Status</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">Step</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">Next Send</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium tracking-wide text-gray-500 uppercase">
+                    Email
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium tracking-wide text-gray-500 uppercase">
+                    Status
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium tracking-wide text-gray-500 uppercase">
+                    Step
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium tracking-wide text-gray-500 uppercase">
+                    Next Send
+                  </th>
                   <th className="px-4 py-3" />
                 </tr>
               </thead>

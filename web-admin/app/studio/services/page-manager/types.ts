@@ -14,7 +14,7 @@ export type PageStatus = 'draft' | 'published' | 'modified' | 'archived';
 /**
  * Page mode/type
  */
-export type PageMode = 'grid' | 'floor' | 'form';
+export type PageMode = 'grid' | 'floor' | 'form' | 'composite';
 
 /**
  * Page metadata
@@ -52,6 +52,8 @@ export interface PageMeta {
   componentCount?: number;
   /** DSL Schema (page structure and layout) */
   dslSchema?: Record<string, unknown>;
+  /** Extension metadata persisted by backend */
+  extension?: Record<string, unknown>;
 }
 
 /**
@@ -179,6 +181,11 @@ export const PAGE_MODE_INFO: Record<
     label: '表单模式',
     icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
     description: '标准表单，支持2/3/4列布局',
+  },
+  composite: {
+    label: '组合模式',
+    icon: 'M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0010.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z',
+    description: '组合多个区块，灵活布局',
   },
 };
 

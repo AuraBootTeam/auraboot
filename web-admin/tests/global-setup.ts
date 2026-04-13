@@ -54,10 +54,7 @@ const STORAGE_DIR = path.join(__dirname, 'storage');
 /**
  * Login a single user via Remix action and save storageState
  */
-async function loginAndSave(
-  baseURL: string,
-  user: TestUser,
-): Promise<boolean> {
+async function loginAndSave(baseURL: string, user: TestUser): Promise<boolean> {
   const storagePath = path.join(STORAGE_DIR, user.storageFile);
   const browser = await chromium.launch({
     args: ['--no-proxy-server'],
@@ -91,15 +88,17 @@ async function loginAndSave(
           const cookieMatch = setCookieHeader.match(/__session=([^;]+)/);
           if (cookieMatch) {
             const cookieValue = cookieMatch[1];
-            await context.addCookies([{
-              name: '__session',
-              value: cookieValue,
-              domain: 'localhost',
-              path: '/',
-              httpOnly: true,
-              sameSite: 'Lax',
-              expires: Math.floor(Date.now() / 1000) + 604800,
-            }]);
+            await context.addCookies([
+              {
+                name: '__session',
+                value: cookieValue,
+                domain: 'localhost',
+                path: '/',
+                httpOnly: true,
+                sameSite: 'Lax',
+                expires: Math.floor(Date.now() / 1000) + 604800,
+              },
+            ]);
             loginSuccess = true;
             console.log(`   [${user.role}] __session cookie created from 302 redirect`);
           }
@@ -109,7 +108,7 @@ async function loginAndSave(
       // Fallback: check context cookies (in case Playwright auto-applied them)
       if (!loginSuccess) {
         const cookies = await context.cookies();
-        const sessionCookie = cookies.find(c => c.name === '__session');
+        const sessionCookie = cookies.find((c) => c.name === '__session');
         if (sessionCookie) {
           loginSuccess = true;
           console.log(`   [${user.role}] __session cookie created`);
@@ -149,10 +148,7 @@ async function loginAndSave(
         await loginButton.click();
 
         try {
-          await page.waitForURL(
-            url => !url.pathname.includes('login'),
-            { timeout: 15000 },
-          );
+          await page.waitForURL((url) => !url.pathname.includes('login'), { timeout: 15000 });
           loginSuccess = true;
         } catch {
           await page.screenshot({ path: path.join(STORAGE_DIR, `${user.role}-login-failed.png`) });
@@ -191,7 +187,7 @@ async function globalSetup(config: FullConfig): Promise<void> {
   }
 
   // Get baseURL from config
-  const project = config.projects.find(p => p.name === 'chromium') || config.projects[0];
+  const project = config.projects.find((p) => p.name === 'chromium') || config.projects[0];
   const baseURL = project?.use?.baseURL || 'http://localhost:5173';
   console.log(`   Base URL: ${baseURL}`);
 
@@ -207,7 +203,9 @@ async function globalSetup(config: FullConfig): Promise<void> {
     try {
       const success = await loginAndSave(baseURL, user);
       if (!success) {
-        console.log(`   [${user.role}] Login failed — user may not be registered yet. Run init-env to set up.`);
+        console.log(
+          `   [${user.role}] Login failed — user may not be registered yet. Run init-env to set up.`,
+        );
         // Write empty storageState so config doesn't fail
         const emptyState = { cookies: [], origins: [] };
         fs.writeFileSync(

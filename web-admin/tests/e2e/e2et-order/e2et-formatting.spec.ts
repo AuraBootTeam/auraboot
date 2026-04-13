@@ -18,6 +18,17 @@ import { E2ET_ORDER_CONFIG } from '../../helpers/configs/e2et-order.config';
 test.describe('E2E Test Order — Format Rendering', () => {
   let orderPid: string;
 
+  async function gotoOrderDetail(page: import('@playwright/test').Page) {
+    await page.goto(`/p/e2et_order/view/${orderPid}`, { waitUntil: 'domcontentloaded' });
+    await page
+      .waitForResponse(
+        (r) => r.url().includes('/api/dynamic/e2et_order') && !r.url().includes('/list'),
+        { timeout: 12_000 },
+      )
+      .catch(() => null);
+    await expect(page.getByText(/订单标题|总金额|折扣率/).first()).toBeVisible({ timeout: 10_000 });
+  }
+
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext({ storageState: 'tests/storage/admin.json' });
     const page = await context.newPage();
@@ -55,12 +66,9 @@ test.describe('E2E Test Order — Format Rendering', () => {
    * Verifies via detail page (more reliable than list page in parallel runs)
    */
   test('FT-001: should display amount with currency format', async ({ page }) => {
-    // Navigate directly to the order detail page (more reliable than list page)
-    await page.goto(`/dynamic/e2et_order/view/${orderPid}`);
-    await page.waitForLoadState('domcontentloaded');
-    await page.locator('h2, h1').first().waitFor({ state: 'visible', timeout: 10000 });
+    await gotoOrderDetail(page);
 
-    const pageText = await page.textContent('body') || '';
+    const pageText = (await page.textContent('body')) || '';
 
     // The amount should be 999.90 (10 * 99.99)
     // Look for the numeric value in any format: "999.90", "999.9", "¥999", "$999"
@@ -76,12 +84,9 @@ test.describe('E2E Test Order — Format Rendering', () => {
    * FT-002: Discount field should display with percent format
    */
   test('FT-002: should display discount with percent format', async ({ page }) => {
-    // Navigate to the detail page
-    await page.goto(`/dynamic/e2et_order/view/${orderPid}`);
-    await page.waitForLoadState('domcontentloaded');
-    await page.locator('h2, h1').first().waitFor({ state: 'visible', timeout: 10000 });
+    await gotoOrderDetail(page);
 
-    const pageText = await page.textContent('body') || '';
+    const pageText = (await page.textContent('body')) || '';
 
     // Discount value 0.15 should be rendered as "15%" or "0.15" or "15"
     // Depends on platform's percent format implementation

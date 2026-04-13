@@ -35,7 +35,7 @@ test.describe('PCBA IoT Smoke Tests @smoke', () => {
   test('IOT-001: Navigate to IoT Devices list page via menu', async ({ page }) => {
     await navigateToDynamicPage(page, 'pe-iot-device');
     await waitForDynamicPageLoad(page);
-    await expect(page).toHaveURL(/\/dynamic\/pe-iot-device/);
+    await expect(page).toHaveURL(/\/p\/pe_iot_device/);
 
     const table = page.locator(
       '.ant-table, table, [role="table"], [data-testid="dynamic-list"], [data-testid="table-block"]',
@@ -63,20 +63,16 @@ test.describe('PCBA IoT Smoke Tests @smoke', () => {
     expect(devicePid, 'Device should be created with a record ID').toBeTruthy();
 
     // Verify device exists in list
-    const records = await queryFilteredList(
-      page,
-      'pe-iot-device',
-      'pe_iotd_code',
-      `DEV_${uid}`,
-      { operator: 'EQ' },
-    );
+    const records = await queryFilteredList(page, 'pe-iot-device', 'pe_iotd_code', `DEV_${uid}`, {
+      operator: 'EQ',
+    });
     expect(records.length, 'Created IoT device should appear in list').toBeGreaterThanOrEqual(1);
   });
 
   test('IOT-003: Navigate to IoT Data Points list page', async ({ page }) => {
     await navigateToDynamicPage(page, 'pe-iot-data-point');
     await waitForDynamicPageLoad(page);
-    await expect(page).toHaveURL(/\/dynamic\/pe-iot-data-point/);
+    await expect(page).toHaveURL(/\/p\/pe_iot_data_point/);
 
     const table = page.locator(
       '.ant-table, table, [role="table"], [data-testid="dynamic-list"], [data-testid="table-block"]',

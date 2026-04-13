@@ -61,10 +61,13 @@ test.describe('CC Contract — CRUD & Lifecycle', () => {
     expect(contractPid).toBeTruthy();
 
     // Verify the contract appears via API (poll to handle async commit)
-    await expect.poll(
-      async () => (await queryFilteredList(page, 'cc-contract', 'cc_contract_name', contractName)).length,
-      { timeout: 10000, intervals: [500, 1000] },
-    ).toBeGreaterThan(0);
+    await expect
+      .poll(
+        async () =>
+          (await queryFilteredList(page, 'cc-contract', 'cc_contract_name', contractName)).length,
+        { timeout: 10000, intervals: [500, 1000] },
+      )
+      .toBeGreaterThan(0);
 
     // Verify the contract appears in the list page
     await navigateToDynamicPage(page, 'cc-contract');
@@ -94,14 +97,18 @@ test.describe('CC Contract — CRUD & Lifecycle', () => {
     await expect(row).toBeVisible({ timeout: 5000 });
 
     // Click the view/detail action
-    const viewBtn = row.locator('[data-testid="row-action-detail"], [data-testid="row-action-view"]').first();
+    const viewBtn = row
+      .locator('[data-testid="row-action-detail"], [data-testid="row-action-view"]')
+      .first();
     const hasViewBtn = await viewBtn.isVisible({ timeout: 3000 }).catch(() => false);
     if (hasViewBtn) {
       await viewBtn.click();
     } else {
       await row.click();
-      await page.waitForURL(/\/dynamic\/cc-contract\/view\//, { timeout: 5000 }).catch(async () => {
-        await page.goto(`/dynamic/cc-contract/view/${contractPid}`, { waitUntil: 'domcontentloaded' });
+      await page.waitForURL(/\/p\/cc-contract\/view\//, { timeout: 5000 }).catch(async () => {
+        await page.goto(`/p/cc_contract/view/${contractPid}`, {
+          waitUntil: 'domcontentloaded',
+        });
       });
     }
 
@@ -140,15 +147,19 @@ test.describe('CC Contract — CRUD & Lifecycle', () => {
       await nameInput.clear();
       await nameInput.fill(updatedName);
     } else {
-      const fallback = page.locator('[name="cc_contract_name"], [data-field="cc_contract_name"] input').first();
+      const fallback = page
+        .locator('[name="cc_contract_name"], [data-field="cc_contract_name"] input')
+        .first();
       await fallback.clear();
       await fallback.fill(updatedName);
     }
 
     // Click submit
-    const submitBtn = page.locator(
-      '[data-testid="form-btn-submit"], [data-testid="form-btn-save"], button:has-text("Submit"), button:has-text("Save"), button:has-text("提交"), button:has-text("保存")',
-    ).first();
+    const submitBtn = page
+      .locator(
+        '[data-testid="form-btn-submit"], [data-testid="form-btn-save"], button:has-text("Submit"), button:has-text("Save"), button:has-text("提交"), button:has-text("保存")',
+      )
+      .first();
     await expect(submitBtn).toBeVisible({ timeout: 5000 });
 
     const saveResponse = page.waitForResponse(
@@ -167,36 +178,54 @@ test.describe('CC Contract — CRUD & Lifecycle', () => {
     expect(contractPid).toBeTruthy();
 
     const result = await executeCommandViaApi(
-      page, 'cc:submit_review', {}, contractPid, 'state_transition',
+      page,
+      'cc:submit_review',
+      {},
+      contractPid,
+      'state_transition',
     );
     expect(result.code).toBe(ErrorCodes.SUCCESS);
 
     // Verify status by recordId to avoid list indexing/eventual consistency noise.
-    await expect.poll(async () => {
-      const resp = await page.request.get(`/api/dynamic/cc-contract/${contractPid}`);
-      if (!resp.ok()) return '';
-      const body = await resp.json().catch(() => ({}));
-      const data = body.data ?? body;
-      return String((data as any)?.cc_contract_status ?? '');
-    }, { timeout: 10000, intervals: [400, 800, 1200] }).toBe('review');
+    await expect
+      .poll(
+        async () => {
+          const resp = await page.request.get(`/api/dynamic/cc_contract/${contractPid}`);
+          if (!resp.ok()) return '';
+          const body = await resp.json().catch(() => ({}));
+          const data = body.data ?? body;
+          return String((data as any)?.cc_contract_status ?? '');
+        },
+        { timeout: 10000, intervals: [400, 800, 1200] },
+      )
+      .toBe('review');
   });
 
   test('CC-005: Approve contract (REVIEW -> SIGNED)', async ({ page }) => {
     expect(contractPid).toBeTruthy();
 
     const result = await executeCommandViaApi(
-      page, 'cc:approve_contract', {}, contractPid, 'state_transition',
+      page,
+      'cc:approve_contract',
+      {},
+      contractPid,
+      'state_transition',
     );
     expect(result.code).toBe(ErrorCodes.SUCCESS);
 
     // Verify status by recordId to avoid list query lag.
-    await expect.poll(async () => {
-      const resp = await page.request.get(`/api/dynamic/cc-contract/${contractPid}`);
-      if (!resp.ok()) return '';
-      const body = await resp.json().catch(() => ({}));
-      const data = body.data ?? body;
-      return String((data as any)?.cc_contract_status ?? '');
-    }, { timeout: 10000, intervals: [400, 800, 1200] }).toBe('signed');
+    await expect
+      .poll(
+        async () => {
+          const resp = await page.request.get(`/api/dynamic/cc_contract/${contractPid}`);
+          if (!resp.ok()) return '';
+          const body = await resp.json().catch(() => ({}));
+          const data = body.data ?? body;
+          return String((data as any)?.cc_contract_status ?? '');
+        },
+        { timeout: 10000, intervals: [400, 800, 1200] },
+      )
+      .toBe('signed');
   });
 
   test('CC-006: Full lifecycle — SIGNED -> EXECUTING -> SETTLED -> closed', async ({ page }) => {
@@ -204,30 +233,47 @@ test.describe('CC Contract — CRUD & Lifecycle', () => {
 
     // Start execution (SIGNED -> EXECUTING)
     let result = await executeCommandViaApi(
-      page, 'cc:start_execution', {}, contractPid, 'state_transition',
+      page,
+      'cc:start_execution',
+      {},
+      contractPid,
+      'state_transition',
     );
     expect(result.code).toBe(ErrorCodes.SUCCESS);
 
     // Settle (EXECUTING -> SETTLED)
     result = await executeCommandViaApi(
-      page, 'cc:settle_contract', {}, contractPid, 'state_transition',
+      page,
+      'cc:settle_contract',
+      {},
+      contractPid,
+      'state_transition',
     );
     expect(result.code).toBe(ErrorCodes.SUCCESS);
 
     // Close (SETTLED -> closed)
     result = await executeCommandViaApi(
-      page, 'cc:close_contract', {}, contractPid, 'state_transition',
+      page,
+      'cc:close_contract',
+      {},
+      contractPid,
+      'state_transition',
     );
     expect(result.code).toBe(ErrorCodes.SUCCESS);
 
     // Verify final status closed by recordId.
-    await expect.poll(async () => {
-      const resp = await page.request.get(`/api/dynamic/cc-contract/${contractPid}`);
-      if (!resp.ok()) return '';
-      const body = await resp.json().catch(() => ({}));
-      const data = body.data ?? body;
-      return String((data as any)?.cc_contract_status ?? '');
-    }, { timeout: 10000, intervals: [400, 800, 1200] }).toBe('closed');
+    await expect
+      .poll(
+        async () => {
+          const resp = await page.request.get(`/api/dynamic/cc_contract/${contractPid}`);
+          if (!resp.ok()) return '';
+          const body = await resp.json().catch(() => ({}));
+          const data = body.data ?? body;
+          return String((data as any)?.cc_contract_status ?? '');
+        },
+        { timeout: 10000, intervals: [400, 800, 1200] },
+      )
+      .toBe('closed');
   });
 
   test('CC-007: Reject flow — create, submit, reject back to draft', async ({ page }) => {
@@ -244,13 +290,21 @@ test.describe('CC Contract — CRUD & Lifecycle', () => {
 
     // Submit for review
     let result = await executeCommandViaApi(
-      page, 'cc:submit_review', {}, contractPid2, 'state_transition',
+      page,
+      'cc:submit_review',
+      {},
+      contractPid2,
+      'state_transition',
     );
     expect(result.code).toBe(ErrorCodes.SUCCESS);
 
     // Reject back to draft
     result = await executeCommandViaApi(
-      page, 'cc:reject_contract', {}, contractPid2, 'state_transition',
+      page,
+      'cc:reject_contract',
+      {},
+      contractPid2,
+      'state_transition',
     );
     expect(result.code).toBe(ErrorCodes.SUCCESS);
 
@@ -261,7 +315,9 @@ test.describe('CC Contract — CRUD & Lifecycle', () => {
     expect(records.length).toBeGreaterThan(0);
 
     // Cleanup
-    await executeCommandViaApi(page, 'cc:delete_contract', {}, contractPid2, 'delete').catch(() => {});
+    await executeCommandViaApi(page, 'cc:delete_contract', {}, contractPid2, 'delete').catch(
+      () => {},
+    );
   });
 
   test('CC-008: List page has status tabs', async ({ page }) => {
@@ -355,13 +411,21 @@ test.describe('CC Contract Change — Approval & SideEffect', () => {
 
     // Submit (draft -> submitted)
     let result = await executeCommandViaApi(
-      page, 'cc:submit_change', {}, changePid, 'state_transition',
+      page,
+      'cc:submit_change',
+      {},
+      changePid,
+      'state_transition',
     );
     expect(result.code).toBe(ErrorCodes.SUCCESS);
 
     // Approve (submitted -> approved) — triggers sideEffect: update contract amount
     result = await executeCommandViaApi(
-      page, 'cc:approve_change', {}, changePid, 'state_transition',
+      page,
+      'cc:approve_change',
+      {},
+      changePid,
+      'state_transition',
     );
     expect(result.code).toBe(ErrorCodes.SUCCESS);
 
@@ -372,7 +436,7 @@ test.describe('CC Contract Change — Approval & SideEffect', () => {
     //
     // await expect
     //   .poll(async () => {
-    //     const resp = await page.request.get(`/api/dynamic/cc-contract/${contractPid}`);
+    //     const resp = await page.request.get(`/api/dynamic/cc_contract/${contractPid}`);
     //     if (!resp.ok()) return null;
     //     const body = await resp.json();
     //     return Number((body.data ?? body).cc_contract_amount);
@@ -451,18 +515,22 @@ test.describe('CC Payment & Receipt — SideEffect on Contract', () => {
 
     // UI interaction: verify payment/receipt list page is accessible after creation.
     await navigateToDynamicPage(page, 'cc-payment-receipt');
-    await expect(page.locator('table, [role="table"], [data-testid="dynamic-list"]').first()).toBeVisible({ timeout: 10000 });
+    await expect(
+      page.locator('table, [role="table"], [data-testid="dynamic-list"]').first(),
+    ).toBeVisible({ timeout: 10000 });
 
     // NOTE: sideEffect UPDATE_RECORD on cross-model fields is a platform capability gap.
     // Uncomment when platform implements UPDATE_RECORD sideEffects:
     // await expect.poll(async () => {
-    //   const resp = await page.request.get(`/api/dynamic/cc-contract/${contractPid}`);
+    //   const resp = await page.request.get(`/api/dynamic/cc_contract/${contractPid}`);
     //   if (!resp.ok()) return null;
     //   return Number((await resp.json()).data?.cc_paid_amount ?? (await resp.json()).cc_paid_amount);
     // }, { timeout: 10000 }).toBe(paymentAmount);
   });
 
-  test('PR-002: Create receipt and verify sideEffect on contract received_amount', async ({ page }) => {
+  test('PR-002: Create receipt and verify sideEffect on contract received_amount', async ({
+    page,
+  }) => {
     expect(contractPid).toBeTruthy();
 
     const result = await executeCommandViaApi(page, 'cc:create_payment', {
@@ -479,7 +547,7 @@ test.describe('CC Payment & Receipt — SideEffect on Contract', () => {
     // NOTE: sideEffect UPDATE_RECORD on cross-model fields is a platform capability gap.
     // Uncomment when platform implements UPDATE_RECORD sideEffects:
     // await expect.poll(async () => {
-    //   const resp = await page.request.get(`/api/dynamic/cc-contract/${contractPid}`);
+    //   const resp = await page.request.get(`/api/dynamic/cc_contract/${contractPid}`);
     //   if (!resp.ok()) return null;
     //   return Number((await resp.json()).data?.cc_received_amount);
     // }, { timeout: 10000 }).toBe(receiptAmount);
@@ -578,13 +646,21 @@ test.describe('CC Cost Budget & Budget Lines', () => {
 
     // Submit (draft -> submitted)
     let result = await executeCommandViaApi(
-      page, 'cc:submit_budget', {}, budgetPid, 'state_transition',
+      page,
+      'cc:submit_budget',
+      {},
+      budgetPid,
+      'state_transition',
     );
     expect(result.code).toBe(ErrorCodes.SUCCESS);
 
     // Approve (submitted -> approved)
     result = await executeCommandViaApi(
-      page, 'cc:approve_budget', {}, budgetPid, 'state_transition',
+      page,
+      'cc:approve_budget',
+      {},
+      budgetPid,
+      'state_transition',
     );
     expect(result.code).toBe(ErrorCodes.SUCCESS);
 
@@ -612,7 +688,9 @@ test.describe('CC Cost Budget & Budget Lines', () => {
     });
     const p = await ctx.newPage();
     if (budgetLinePid) {
-      await executeCommandViaApi(p, 'cc:delete_budget_line', {}, budgetLinePid, 'delete').catch(() => {});
+      await executeCommandViaApi(p, 'cc:delete_budget_line', {}, budgetLinePid, 'delete').catch(
+        () => {},
+      );
     }
     // Budget is approved, may not be deletable
     if (budgetPid) {
@@ -679,7 +757,9 @@ test.describe('CC Actual Cost', () => {
     });
     const p = await ctx.newPage();
     if (actualCostPid) {
-      await executeCommandViaApi(p, 'cc:delete_actual_cost', {}, actualCostPid, 'delete').catch(() => {});
+      await executeCommandViaApi(p, 'cc:delete_actual_cost', {}, actualCostPid, 'delete').catch(
+        () => {},
+      );
     }
     await ctx.close();
   });

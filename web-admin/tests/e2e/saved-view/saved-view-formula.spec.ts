@@ -7,7 +7,6 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Formula Field Enhancement (GAP-125)', () => {
-
   test('FF-001: formula functions API returns all categories', async ({ page }) => {
     await page.goto('/');
     await page.locator('nav, [data-testid="sidebar"]').first().waitFor({ timeout: 15000 });
@@ -34,7 +33,9 @@ test.describe('Formula Field Enhancement (GAP-125)', () => {
     const resp = await page.request.get('/api/meta/formula/functions');
     const body = await resp.json();
     const functions = body.data ?? body;
-    const ifFunc = (Array.isArray(functions) ? functions : []).find((f: any) => f.name?.toLowerCase() === 'if');
+    const ifFunc = (Array.isArray(functions) ? functions : []).find(
+      (f: any) => f.name?.toLowerCase() === 'if',
+    );
     expect(ifFunc).toBeTruthy();
     expect(ifFunc.category).toBe('logical');
   });
@@ -45,7 +46,9 @@ test.describe('Formula Field Enhancement (GAP-125)', () => {
 
     const resp = await page.request.get('/api/meta/formula/functions');
     const functions = (await resp.json()).data ?? [];
-    const dateadd = (Array.isArray(functions) ? functions : []).find((f: any) => f.name === 'dateadd');
+    const dateadd = (Array.isArray(functions) ? functions : []).find(
+      (f: any) => f.name === 'dateadd',
+    );
     expect(dateadd).toBeTruthy();
     expect(dateadd.category).toBe('date');
   });
@@ -56,7 +59,9 @@ test.describe('Formula Field Enhancement (GAP-125)', () => {
 
     const resp = await page.request.get('/api/meta/formula/functions');
     const functions = (await resp.json()).data ?? [];
-    const concat = (Array.isArray(functions) ? functions : []).find((f: any) => f.name === 'concatenate');
+    const concat = (Array.isArray(functions) ? functions : []).find(
+      (f: any) => f.name === 'concatenate',
+    );
     expect(concat).toBeTruthy();
     expect(concat.category).toBe('text');
   });
@@ -67,7 +72,9 @@ test.describe('Formula Field Enhancement (GAP-125)', () => {
 
     const resp = await page.request.get('/api/meta/formula/functions');
     const functions = (await resp.json()).data ?? [];
-    const switchFunc = (Array.isArray(functions) ? functions : []).find((f: any) => f.name === 'switch');
+    const switchFunc = (Array.isArray(functions) ? functions : []).find(
+      (f: any) => f.name === 'switch',
+    );
     expect(switchFunc).toBeTruthy();
     expect(switchFunc.category).toBe('logical');
   });

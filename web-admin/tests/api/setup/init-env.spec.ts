@@ -2,7 +2,7 @@
  * Environment Initialization E2E Test
  *
  * This test performs initial environment setup:
- * 1. Register test user (via TEST_ADMIN_EMAIL / TEST_ADMIN_PASSWORD env vars)
+ * 1. Register test user (admin@example.com / Test2026x)
  * 2. Create tenant (Xinran)
  * 3. Test plugin import
  *
@@ -208,7 +208,13 @@ const TEST_PLUGIN = {
       dictType: 'static',
       items: [
         { value: 'active', label: 'Active', 'label:zh-CN': '活跃', sortNo: 10, status: 'enabled' },
-        { value: 'inactive', label: 'Inactive', 'label:zh-CN': '非活跃', sortNo: 20, status: 'enabled' },
+        {
+          value: 'inactive',
+          label: 'Inactive',
+          'label:zh-CN': '非活跃',
+          sortNo: 20,
+          status: 'enabled',
+        },
       ],
     },
   ],
@@ -245,7 +251,13 @@ const TEST_PLUGIN = {
 
   modelFieldBindings: [
     { modelCode: 'initv_record', fieldCode: 'initv_name', sequence: 10, required: true },
-    { modelCode: 'initv_record', fieldCode: 'initv_status', sequence: 20, required: true, defaultValue: 'active' },
+    {
+      modelCode: 'initv_record',
+      fieldCode: 'initv_status',
+      sequence: 20,
+      required: true,
+      defaultValue: 'active',
+    },
   ],
 
   permissions: [
@@ -309,9 +321,7 @@ const TEST_PLUGIN = {
               {
                 id: 'initv_record_toolbar',
                 blockType: 'toolbar',
-                buttons: [
-                  { code: 'create', action: 'create', primary: true },
-                ],
+                buttons: [{ code: 'create', action: 'create', primary: true }],
               },
             ],
           },
@@ -319,7 +329,7 @@ const TEST_PLUGIN = {
             blocks: [
               {
                 id: 'initv_record_table',
-                blockType: 'data-table',
+                blockType: 'table',
                 columns: [
                   { field: 'initv_name', width: 200 },
                   { field: 'initv_status', width: 100 },
@@ -369,8 +379,18 @@ const TEST_PLUGIN = {
                 id: 'initv_record_buttons',
                 blockType: 'form-buttons',
                 buttons: [
-                  { code: 'create', action: 'create', primary: true, visibleWhen: "state.mode === 'create'" },
-                  { code: 'update', action: 'update', primary: true, visibleWhen: "state.mode === 'edit'" },
+                  {
+                    code: 'create',
+                    action: 'create',
+                    primary: true,
+                    visibleWhen: "state.mode === 'create'",
+                  },
+                  {
+                    code: 'update',
+                    action: 'update',
+                    primary: true,
+                    visibleWhen: "state.mode === 'edit'",
+                  },
                   { code: 'cancel', action: 'cancel' },
                 ],
               },
@@ -382,7 +402,11 @@ const TEST_PLUGIN = {
   ],
 };
 
-async function tryLoginByApi(request: APIRequestContext, email: string, password: string): Promise<{ jwt: string; tenantId: number | null; tenantStatus: string | null } | null> {
+async function tryLoginByApi(
+  request: APIRequestContext,
+  email: string,
+  password: string,
+): Promise<{ jwt: string; tenantId: number | null; tenantStatus: string | null } | null> {
   const response = await request.post('/api/auth/login', {
     data: { email, password },
     headers: { 'Content-Type': 'application/json' },
@@ -443,7 +467,11 @@ async function refreshAdminStorageState(page: Page): Promise<void> {
   await page.context().storageState({ path: ADMIN_STORAGE_PATH });
 }
 
-async function registerByApiIfNeeded(request: APIRequestContext, email: string, password: string): Promise<void> {
+async function registerByApiIfNeeded(
+  request: APIRequestContext,
+  email: string,
+  password: string,
+): Promise<void> {
   const existing = await tryLoginByApi(request, email, password);
   if (existing) return;
 
@@ -459,10 +487,13 @@ async function registerByApiIfNeeded(request: APIRequestContext, email: string, 
       return;
     }
     const knownAcceptable =
-      /already|已存在|exists|duplicate|重复|bad parameter|self-registration.*disabled|single-tenant/i.test(errorText)
-      || registerResponse.status() === 409;
+      /already|已存在|exists|duplicate|重复|bad parameter|self-registration.*disabled|single-tenant/i.test(
+        errorText,
+      ) || registerResponse.status() === 409;
     if (!knownAcceptable) {
-      throw new Error(`Registration failed for ${email}: ${registerResponse.status()} ${errorText}`);
+      throw new Error(
+        `Registration failed for ${email}: ${registerResponse.status()} ${errorText}`,
+      );
     }
     // Self-registration disabled — user may have been provisioned by admin (POST /api/admin/users)
     // or via reset-and-init.sh. Not a failure, just skip.
@@ -470,11 +501,17 @@ async function registerByApiIfNeeded(request: APIRequestContext, email: string, 
 
   const loginAfterRegister = await tryLoginByApi(request, email, password);
   if (!loginAfterRegister) {
-    console.log(`   User ${email} not available (self-registration may be disabled, and admin has not provisioned this user yet)`);
+    console.log(
+      `   User ${email} not available (self-registration may be disabled, and admin has not provisioned this user yet)`,
+    );
   }
 }
 
-async function assertUserAndTenant(request: APIRequestContext, jwt: string, options?: { requireTenant?: boolean }) {
+async function assertUserAndTenant(
+  request: APIRequestContext,
+  jwt: string,
+  options?: { requireTenant?: boolean },
+) {
   const meResp = await request.get('/api/auth/me', { headers: authHeaders(jwt) });
   const meText = await meResp.text();
   expect(meResp.ok(), `GET /api/auth/me failed: ${meResp.status()} ${meText}`).toBe(true);
@@ -556,15 +593,19 @@ test.describe('Environment Initialization', () => {
     const login = await loginByApi(page.request, TEST_USER.email, TEST_USER.password);
     await assertUserAndTenant(page.request, login.jwt, { requireTenant: true });
 
-    const response = await page.request.post('/api/plugins/import/execute-direct?conflictStrategy=OVERWRITE', {
-      data: TEST_PLUGIN,
-      headers: authHeaders(login.jwt),
-    });
+    const response = await page.request.post(
+      '/api/plugins/import/execute-direct?conflictStrategy=OVERWRITE',
+      {
+        data: TEST_PLUGIN,
+        headers: authHeaders(login.jwt),
+      },
+    );
     if (!response.ok()) {
       const bodyText = await response.text();
       const status = response.status();
-      const isAcceptable = status === 409
-        || /already exists|conflict|duplicate|being imported by another process/i.test(bodyText);
+      const isAcceptable =
+        status === 409 ||
+        /already exists|conflict|duplicate|being imported by another process/i.test(bodyText);
       if (!isAcceptable) {
         expect.soft(response.ok(), `Plugin import failed: ${status} ${bodyText}`).toBe(true);
         return;
@@ -575,19 +616,21 @@ test.describe('Environment Initialization', () => {
       console.log('Plugin import result:', result);
     }
 
-    await expect.poll(
-      async () => {
-        const modelResponse = await page.request.get('/api/meta/models/code/initv_record', {
-          headers: authHeaders(login.jwt),
-        });
-        if (!modelResponse.ok()) {
-          return null;
-        }
-        const modelData = await modelResponse.json();
-        return modelData.data || modelData;
-      },
-      { timeout: 30000, intervals: [1000, 2000, 3000] },
-    ).toMatchObject({ code: 'initv_record' });
+    await expect
+      .poll(
+        async () => {
+          const modelResponse = await page.request.get('/api/meta/models/code/initv_record', {
+            headers: authHeaders(login.jwt),
+          });
+          if (!modelResponse.ok()) {
+            return null;
+          }
+          const modelData = await modelResponse.json();
+          return modelData.data || modelData;
+        },
+        { timeout: 30000, intervals: [1000, 2000, 3000] },
+      )
+      .toMatchObject({ code: 'initv_record' });
     console.log('✅ Plugin model verified');
   });
 
@@ -616,7 +659,9 @@ test.describe('Environment Initialization', () => {
         headers: authHeaders(login.jwt),
       });
       if (!createResponse.ok()) {
-        console.log(`   ⚠️ Failed to create page ${pageConfig.pageKey}: ${createResponse.status()} ${await createResponse.text()}`);
+        console.log(
+          `   ⚠️ Failed to create page ${pageConfig.pageKey}: ${createResponse.status()} ${await createResponse.text()}`,
+        );
         continue;
       }
 
@@ -630,7 +675,9 @@ test.describe('Environment Initialization', () => {
         headers: authHeaders(login.jwt),
       });
       if (!publishResponse.ok()) {
-        console.log(`   ⚠️ Failed to publish page ${pageConfig.pageKey}: ${publishResponse.status()}`);
+        console.log(
+          `   ⚠️ Failed to publish page ${pageConfig.pageKey}: ${publishResponse.status()}`,
+        );
       }
     }
 
@@ -666,7 +713,10 @@ test.describe('Environment Initialization', () => {
       widgets: [
         {
           i: 'widget_total_users',
-          x: 0, y: 0, w: 3, h: 2,
+          x: 0,
+          y: 0,
+          w: 3,
+          h: 2,
           type: 'NumberCard',
           title: '用户总数',
           config: {
@@ -678,7 +728,10 @@ test.describe('Environment Initialization', () => {
         },
         {
           i: 'widget_total_models',
-          x: 3, y: 0, w: 3, h: 2,
+          x: 3,
+          y: 0,
+          w: 3,
+          h: 2,
           type: 'NumberCard',
           title: '模型数量',
           config: {
@@ -690,7 +743,10 @@ test.describe('Environment Initialization', () => {
         },
         {
           i: 'widget_bar_chart',
-          x: 0, y: 2, w: 6, h: 3,
+          x: 0,
+          y: 2,
+          w: 6,
+          h: 3,
           type: 'BarChart',
           title: '数据分布',
           config: {
@@ -700,7 +756,10 @@ test.describe('Environment Initialization', () => {
         },
         {
           i: 'widget_line_chart',
-          x: 6, y: 0, w: 6, h: 3,
+          x: 6,
+          y: 0,
+          w: 6,
+          h: 3,
           type: 'LineChart',
           title: '趋势图',
           config: {
@@ -710,7 +769,10 @@ test.describe('Environment Initialization', () => {
         },
         {
           i: 'widget_pie_chart',
-          x: 6, y: 3, w: 6, h: 3,
+          x: 6,
+          y: 3,
+          w: 6,
+          h: 3,
           type: 'PieChart',
           title: '类型分布',
           config: {
@@ -731,7 +793,9 @@ test.describe('Environment Initialization', () => {
       headers: authHeaders(login.jwt),
     });
     if (!createResponse.ok()) {
-      console.log(`   ⚠️ Failed to create dashboard: ${createResponse.status()} ${await createResponse.text()}`);
+      console.log(
+        `   ⚠️ Failed to create dashboard: ${createResponse.status()} ${await createResponse.text()}`,
+      );
       return;
     }
     const result = await createResponse.json();
@@ -757,12 +821,15 @@ test.describe('Environment Initialization', () => {
     if (pagesResp.ok()) {
       const pagesBody = await pagesResp.json();
       const pagesData = pagesBody.data || pagesBody;
-      const pages =
-        Array.isArray(pagesData) ? pagesData
-          : Array.isArray(pagesData?.records) ? pagesData.records
-            : Array.isArray(pagesData?.items) ? pagesData.items
-              : Array.isArray(pagesData?.content) ? pagesData.content
-                : [];
+      const pages = Array.isArray(pagesData)
+        ? pagesData
+        : Array.isArray(pagesData?.records)
+          ? pagesData.records
+          : Array.isArray(pagesData?.items)
+            ? pagesData.items
+            : Array.isArray(pagesData?.content)
+              ? pagesData.content
+              : [];
       console.log(`   Pages visible: ${pages.length}`);
     } else {
       console.log(`   ⚠️ /api/pages not accessible for current tenant role: ${pagesResp.status()}`);
@@ -781,17 +848,20 @@ test.describe('Environment Initialization', () => {
     test.setTimeout(60000);
 
     const ROLE_USERS = [
-      { email: 'e2e-operator@test.com', password: DEFAULT_TEST_ACCOUNT.password, roleCode: 'operator' },
+      {
+        email: 'e2e-operator@test.com',
+        password: DEFAULT_TEST_ACCOUNT.password,
+        roleCode: 'operator',
+      },
       { email: 'e2e-viewer@test.com', password: DEFAULT_TEST_ACCOUNT.password, roleCode: 'viewer' },
     ];
 
     const adminLogin = await loginByApi(page.request, TEST_USER.email, TEST_USER.password);
     await assertUserAndTenant(page.request, adminLogin.jwt, { requireTenant: true });
 
-    const inviteResp = await page.request.post(
-      '/api/tenant/invite-code/generate?expiryDays=30',
-      { headers: authHeaders(adminLogin.jwt) },
-    );
+    const inviteResp = await page.request.post('/api/tenant/invite-code/generate?expiryDays=30', {
+      headers: authHeaders(adminLogin.jwt),
+    });
     let inviteCode: string | null = null;
     if (inviteResp.ok()) {
       const inviteData = await inviteResp.json();
@@ -811,11 +881,13 @@ test.describe('Environment Initialization', () => {
     let roleMap: Record<string, number> = {};
     if (rolesResp.ok()) {
       const rolesData = await rolesResp.json();
-      const roles =
-        Array.isArray(rolesData?.data) ? rolesData.data
-          : Array.isArray(rolesData?.data?.records) ? rolesData.data.records
-            : Array.isArray(rolesData) ? rolesData
-              : [];
+      const roles = Array.isArray(rolesData?.data)
+        ? rolesData.data
+        : Array.isArray(rolesData?.data?.records)
+          ? rolesData.data.records
+          : Array.isArray(rolesData)
+            ? rolesData
+            : [];
       if (Array.isArray(roles)) {
         for (const role of roles) {
           if (role.code === 'operator' || role.code === 'viewer') {
@@ -840,14 +912,22 @@ test.describe('Environment Initialization', () => {
       console.log(`   Registering ${roleUser.email} (${roleUser.roleCode})...`);
 
       // Register/login user in isolated context, then use invite code
-      const regBrowser = await (await import('@playwright/test')).chromium.launch({
+      const regBrowser = await (
+        await import('@playwright/test')
+      ).chromium.launch({
         args: ['--no-proxy-server'],
       });
-      const regContext = await regBrowser.newContext({ baseURL: (page.context() as any)._options?.baseURL || 'http://localhost:5173' });
+      const regContext = await regBrowser.newContext({
+        baseURL: (page.context() as any)._options?.baseURL || 'http://localhost:5173',
+      });
 
       try {
         await registerByApiIfNeeded(regContext.request, roleUser.email, roleUser.password);
-        const memberLogin = await tryLoginByApi(regContext.request, roleUser.email, roleUser.password);
+        const memberLogin = await tryLoginByApi(
+          regContext.request,
+          roleUser.email,
+          roleUser.password,
+        );
         if (memberLogin && inviteCode) {
           const useInviteResp = await regContext.request.post(
             `/api/tenant/invite-code/use?code=${inviteCode}`,
@@ -856,12 +936,16 @@ test.describe('Environment Initialization', () => {
           if (useInviteResp.ok()) {
             console.log(`   ✅ ${roleUser.email} joined tenant via invite code`);
           } else {
-            console.log(`   ℹ️ Invite code use status for ${roleUser.email}: ${useInviteResp.status()}`);
+            console.log(
+              `   ℹ️ Invite code use status for ${roleUser.email}: ${useInviteResp.status()}`,
+            );
           }
         } else if (!memberLogin) {
           // User may have been provisioned by admin (POST /api/admin/users) and is already a tenant member.
           // Login fails because JWT has no tenantId, but the user IS in the tenant.
-          console.log(`   ℹ️ ${roleUser.email}: login returned no JWT (user may already be provisioned by admin)`);
+          console.log(
+            `   ℹ️ ${roleUser.email}: login returned no JWT (user may already be provisioned by admin)`,
+          );
         }
       } finally {
         await regBrowser.close();
@@ -893,10 +977,10 @@ test.describe('Environment Initialization', () => {
             // Assign role
             const roleId = roleMap[roleUser.roleCode];
             if (roleId && userId) {
-              const assignResp = await page.request.put(
-                `/api/user-roles/sync?userId=${userId}`,
-                { data: [roleId], headers: authHeaders(adminLogin.jwt) },
-              );
+              const assignResp = await page.request.put(`/api/user-roles/sync?userId=${userId}`, {
+                data: [roleId],
+                headers: authHeaders(adminLogin.jwt),
+              });
               if (assignResp.ok()) {
                 console.log(`   ✅ Assigned ${roleUser.roleCode} role to ${roleUser.email}`);
               } else {

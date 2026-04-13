@@ -9,16 +9,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router';
-import {
-  EnvelopeIcon,
-  PlusIcon,
-  ChevronRightIcon,
-} from '@heroicons/react/24/outline';
-import {
-  listSequences,
-  createSequence,
-  type EmailSequence,
-} from '~/services/emailService';
+import { EnvelopeIcon, PlusIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
+import { listSequences, createSequence, type EmailSequence } from '~/services/emailService';
 import { useToastContext } from '~/contexts/ToastContext';
 
 function statusBadge(status: string) {
@@ -72,7 +64,10 @@ export default function EmailSequenceListPage() {
     if (!newName.trim()) return;
     setCreating(true);
     try {
-      const seq = await createSequence({ name: newName.trim(), description: newDesc.trim() || undefined });
+      const seq = await createSequence({
+        name: newName.trim(),
+        description: newDesc.trim() || undefined,
+      });
       if (seq) {
         showSuccessToast('Sequence created');
         setShowForm(false);
@@ -96,9 +91,7 @@ export default function EmailSequenceListPage() {
         <div className="flex items-center gap-3">
           <EnvelopeIcon className="h-7 w-7 text-gray-700 dark:text-gray-300" />
           <div>
-            <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
-              Email Sequences
-            </h1>
+            <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Email Sequences</h1>
             <p className="text-sm text-gray-500 dark:text-gray-400">
               Automated email drip campaigns
             </p>
@@ -205,13 +198,13 @@ export default function EmailSequenceListPage() {
           <table className="w-full text-sm" data-testid="sequence-table">
             <thead>
               <tr className="border-b border-gray-200 dark:border-gray-700">
-                <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                <th className="px-5 py-3 text-left text-xs font-medium tracking-wide text-gray-500 uppercase dark:text-gray-400">
                   Name
                 </th>
-                <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                <th className="px-5 py-3 text-left text-xs font-medium tracking-wide text-gray-500 uppercase dark:text-gray-400">
                   Status
                 </th>
-                <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                <th className="px-5 py-3 text-left text-xs font-medium tracking-wide text-gray-500 uppercase dark:text-gray-400">
                   Created
                 </th>
                 <th className="px-5 py-3" />
@@ -222,13 +215,13 @@ export default function EmailSequenceListPage() {
                 <tr
                   key={seq.id}
                   data-testid={`sequence-row-${seq.id}`}
-                  className="cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-750"
+                  className="dark:hover:bg-gray-750 cursor-pointer transition-colors hover:bg-gray-50"
                   onClick={() => navigate(`/email-sequence/${seq.id}`)}
                 >
                   <td className="px-5 py-4">
                     <p className="font-medium text-gray-900 dark:text-white">{seq.name}</p>
                     {seq.description && (
-                      <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400 truncate max-w-xs">
+                      <p className="mt-0.5 max-w-xs truncate text-xs text-gray-500 dark:text-gray-400">
                         {seq.description}
                       </p>
                     )}

@@ -36,7 +36,7 @@ export async function expectFieldValue(
   expectedValue: string,
 ): Promise<void> {
   const input = page.locator(
-    `[name="${fieldName}"], [data-field="${fieldName}"] input, [data-field="${fieldName}"] select`
+    `[name="${fieldName}"], [data-field="${fieldName}"] input, [data-field="${fieldName}"] select`,
   );
   await expect(input).toHaveValue(expectedValue);
 }
@@ -52,7 +52,7 @@ export async function expectApiCalledWith(
   timeout: number = 5000,
 ): Promise<void> {
   const request = await page.waitForRequest(
-    req => req.url().includes(urlPattern) && req.method() === method,
+    (req) => req.url().includes(urlPattern) && req.method() === method,
     { timeout },
   );
 
@@ -78,20 +78,14 @@ export async function expectNavigation(
 /**
  * Assert element count within a container.
  */
-export async function expectCount(
-  locator: Locator,
-  count: number,
-): Promise<void> {
+export async function expectCount(locator: Locator, count: number): Promise<void> {
   await expect(locator).toHaveCount(count);
 }
 
 /**
  * Assert loading state transitions: visible → hidden.
  */
-export async function expectLoadingComplete(
-  page: Page,
-  timeout: number = 10000,
-): Promise<void> {
+export async function expectLoadingComplete(page: Page, timeout: number = 10000): Promise<void> {
   const loader = page.locator('.animate-spin, [data-testid="loading"]');
   // Wait for loading to appear and then disappear
   try {
@@ -105,10 +99,7 @@ export async function expectLoadingComplete(
 /**
  * Assert a confirmation dialog appears and handle it.
  */
-export async function expectAndConfirmDialog(
-  page: Page,
-  expectedMessage?: string,
-): Promise<void> {
+export async function expectAndConfirmDialog(page: Page, expectedMessage?: string): Promise<void> {
   const dialog = page.locator('[role="dialog"], [role="alertdialog"]');
   await expect(dialog).toBeVisible();
 
@@ -116,26 +107,22 @@ export async function expectAndConfirmDialog(
     await expect(dialog).toContainText(expectedMessage);
   }
 
-  await dialog.locator('button:has-text("确定"), button:has-text("确认"), button:has-text("OK")').click();
+  await dialog
+    .locator('button:has-text("确定"), button:has-text("确认"), button:has-text("OK")')
+    .click();
   await expect(dialog).not.toBeVisible();
 }
 
 /**
  * Take a screenshot with a descriptive name for debugging.
  */
-export async function captureState(
-  page: Page,
-  name: string,
-): Promise<void> {
+export async function captureState(page: Page, name: string): Promise<void> {
   await page.screenshot({ path: `test-results/screenshots/${name}.png`, fullPage: true });
 }
 
 /**
  * Wait for network to be idle (no pending requests).
  */
-export async function waitForNetworkIdle(
-  page: Page,
-  timeout: number = 5000,
-): Promise<void> {
+export async function waitForNetworkIdle(page: Page, timeout: number = 5000): Promise<void> {
   await page.waitForLoadState('domcontentloaded', { timeout });
 }

@@ -56,7 +56,10 @@ export const ViewDiagnostics: React.FC<ViewDiagnosticsProps> = ({
   }, [issues, activeFilter]);
 
   return (
-    <div data-testid="view-diagnostics" className={`px-6 py-10 text-sm text-gray-600 dark:text-gray-400 ${className || ''}`}>
+    <div
+      data-testid="view-diagnostics"
+      className={`px-6 py-10 text-sm text-gray-600 dark:text-gray-400 ${className || ''}`}
+    >
       {/* Summary header */}
       <div className="mb-2 font-medium text-gray-800 dark:text-gray-200">
         View loaded, but some records cannot be rendered.
@@ -169,11 +172,16 @@ export const ViewDiagnostics: React.FC<ViewDiagnosticsProps> = ({
                 onClick={onRecordClick ? () => onRecordClick(item.recordId) : undefined}
               >
                 <div className="min-w-0 flex-1">
-                  <div className="truncate font-medium text-gray-800 dark:text-gray-200">{item.title}</div>
+                  <div className="truncate font-medium text-gray-800 dark:text-gray-200">
+                    {item.title}
+                  </div>
                   <div className="mt-0.5 text-gray-500 dark:text-gray-400">
                     {item.reason}
                     {Object.entries(item.details).map(([k, v]) => (
-                      <span key={k}> · {k}={String(v ?? 'null')}</span>
+                      <span key={k}>
+                        {' '}
+                        · {k}={String(v ?? 'null')}
+                      </span>
                     ))}
                   </div>
                 </div>

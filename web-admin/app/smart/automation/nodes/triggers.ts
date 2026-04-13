@@ -1,17 +1,6 @@
 // web-admin/app/smart/automation/nodes/triggers.ts
 import type { FlowNodeDefinition } from '~/flow-designer-sdk';
 
-/**
- * Automation Trigger Node Definitions
- *
- * 6 trigger types matching backend framework:
- * - ON_RECORD_CREATE: Record create event
- * - ON_RECORD_UPDATE: Record update event
- * - ON_FIELD_CHANGE: Field change event
- * - ON_STATE_CHANGE: State transition event
- * - SCHEDULED: Cron-based scheduled trigger
- * - WEBHOOK: External webhook trigger
- */
 export const triggerNodes: FlowNodeDefinition[] = [
   {
     type: 'trigger-record-create',
@@ -26,6 +15,7 @@ export const triggerNodes: FlowNodeDefinition[] = [
         type: 'model-select',
         required: true,
         description: '$i18n:automation.field.modelCode.desc',
+        group: 'trigger_source',
       },
     ],
     defaultConfig: {
@@ -44,12 +34,15 @@ export const triggerNodes: FlowNodeDefinition[] = [
         label: '$i18n:automation.field.modelCode',
         type: 'model-select',
         required: true,
+        group: 'trigger_source',
       },
       {
         key: 'watchFields',
         label: '$i18n:automation.field.watchFields',
         type: 'multiselect',
         description: '$i18n:automation.field.watchFields.desc',
+        dependsOn: { field: 'modelCode' },
+        group: 'filter',
       },
     ],
     defaultConfig: {
@@ -68,24 +61,31 @@ export const triggerNodes: FlowNodeDefinition[] = [
         label: '$i18n:automation.field.modelCode',
         type: 'model-select',
         required: true,
+        group: 'trigger_source',
       },
       {
         key: 'fieldCode',
         label: '$i18n:automation.field.fieldCode',
         type: 'field-select',
         required: true,
+        dependsOn: { field: 'modelCode' },
+        group: 'trigger_source',
       },
       {
         key: 'fromValue',
         label: '$i18n:automation.field.fromValue',
         type: 'text',
         description: '$i18n:automation.field.fromValue.desc',
+        dependsOn: { field: 'fieldCode' },
+        group: 'filter',
       },
       {
         key: 'toValue',
         label: '$i18n:automation.field.toValue',
         type: 'text',
         description: '$i18n:automation.field.toValue.desc',
+        dependsOn: { field: 'fieldCode' },
+        group: 'filter',
       },
     ],
     defaultConfig: {
@@ -104,24 +104,31 @@ export const triggerNodes: FlowNodeDefinition[] = [
         label: '$i18n:automation.field.modelCode',
         type: 'model-select',
         required: true,
+        group: 'trigger_source',
       },
       {
         key: 'stateField',
         label: '$i18n:automation.field.stateField',
         type: 'field-select',
         required: true,
+        dependsOn: { field: 'modelCode' },
+        group: 'trigger_source',
       },
       {
         key: 'fromStates',
         label: '$i18n:automation.field.fromStates',
         type: 'multiselect',
         description: '$i18n:automation.field.fromStates.desc',
+        dependsOn: { field: 'stateField' },
+        group: 'filter',
       },
       {
         key: 'toStates',
         label: '$i18n:automation.field.toStates',
         type: 'multiselect',
         description: '$i18n:automation.field.toStates.desc',
+        dependsOn: { field: 'stateField' },
+        group: 'filter',
       },
     ],
     defaultConfig: {
@@ -142,6 +149,7 @@ export const triggerNodes: FlowNodeDefinition[] = [
         required: true,
         placeholder: '0 0 * * *',
         description: '$i18n:automation.field.cron.desc',
+        group: 'trigger_source',
       },
       {
         key: 'timezone',
@@ -149,16 +157,18 @@ export const triggerNodes: FlowNodeDefinition[] = [
         type: 'select',
         options: [
           { label: 'Asia/Shanghai', value: 'Asia/Shanghai' },
-          { label: 'utc', value: 'utc' },
+          { label: 'UTC', value: 'utc' },
           { label: 'America/New_York', value: 'America/New_York' },
           { label: 'Europe/London', value: 'Europe/London' },
         ],
+        group: 'trigger_source',
       },
       {
         key: 'maxExecutionTime',
         label: '$i18n:automation.field.maxExecutionTime',
         type: 'number',
         description: '$i18n:automation.field.maxExecutionTime.desc',
+        group: 'advanced',
       },
     ],
     defaultConfig: {
@@ -178,6 +188,7 @@ export const triggerNodes: FlowNodeDefinition[] = [
         label: '$i18n:automation.field.secret',
         type: 'text',
         description: '$i18n:automation.field.secret.desc',
+        group: 'trigger_source',
       },
       {
         key: 'validationMode',
@@ -188,12 +199,14 @@ export const triggerNodes: FlowNodeDefinition[] = [
           { label: '$i18n:automation.field.validationMode.signature', value: 'signature' },
           { label: '$i18n:automation.field.validationMode.token', value: 'token' },
         ],
+        group: 'trigger_source',
       },
       {
         key: 'expectedHeaders',
         label: '$i18n:automation.field.expectedHeaders',
         type: 'multiselect',
         description: '$i18n:automation.field.expectedHeaders.desc',
+        group: 'advanced',
       },
     ],
     defaultConfig: {

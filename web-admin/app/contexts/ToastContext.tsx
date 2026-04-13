@@ -60,13 +60,16 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('aura:toast', handler);
   }, [addToast]);
 
-  const toastMethods = useMemo(() => ({
-    showSuccessToast: (message: string) => addToast(message, 'success'),
-    showErrorToast: (message: string) => addToast(message, 'error'),
-    showWarningToast: (message: string) => addToast(message, 'warning'),
-    showInfoToast: (message: string) => addToast(message, 'info'),
-    showToast: (message: string, type: ToastState['type']) => addToast(message, type),
-  }), [addToast]);
+  const toastMethods = useMemo(
+    () => ({
+      showSuccessToast: (message: string) => addToast(message, 'success'),
+      showErrorToast: (message: string) => addToast(message, 'error'),
+      showWarningToast: (message: string) => addToast(message, 'warning'),
+      showInfoToast: (message: string) => addToast(message, 'info'),
+      showToast: (message: string, type: ToastState['type']) => addToast(message, type),
+    }),
+    [addToast],
+  );
 
   return (
     <ToastContext.Provider value={toastMethods}>

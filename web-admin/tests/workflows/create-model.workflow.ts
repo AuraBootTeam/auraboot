@@ -60,7 +60,7 @@ export interface CreateModelResult {
  */
 export async function createModel(
   api: ApiClient,
-  options: CreateModelOptions = {}
+  options: CreateModelOptions = {},
 ): Promise<CreateModelResult> {
   // Generate model data
   const modelData: ModelTestData = createModelData({
@@ -75,7 +75,9 @@ export async function createModel(
   const response = await api.createModel(modelData);
 
   if (!api.isSuccess(response)) {
-    throw new Error(`Failed to create model: ${response.desc || response.message || 'Unknown error'}`);
+    throw new Error(
+      `Failed to create model: ${response.desc || response.message || 'Unknown error'}`,
+    );
   }
 
   if (!response.data) {
@@ -103,7 +105,7 @@ export async function createModel(
 export async function createAndPublishModel(
   api: ApiClient,
   options: CreateModelOptions = {},
-  versionNote?: string
+  versionNote?: string,
 ): Promise<CreateModelResult> {
   // Create the model
   const model = await createModel(api, options);
@@ -113,7 +115,9 @@ export async function createAndPublishModel(
 
   if (!api.isSuccess(publishResponse)) {
     // Publishing may fail if model has no fields - this is acceptable for some tests
-    console.warn(`Model publishing skipped (may require fields): ${publishResponse.desc || publishResponse.message}`);
+    console.warn(
+      `Model publishing skipped (may require fields): ${publishResponse.desc || publishResponse.message}`,
+    );
     return model;
   }
 
@@ -151,7 +155,7 @@ export async function deleteModel(api: ApiClient, pid: string): Promise<boolean>
 export async function createMultipleModels(
   api: ApiClient,
   count: number,
-  optionsFactory?: (index: number) => CreateModelOptions
+  optionsFactory?: (index: number) => CreateModelOptions,
 ): Promise<CreateModelResult[]> {
   const models: CreateModelResult[] = [];
 

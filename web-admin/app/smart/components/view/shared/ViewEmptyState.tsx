@@ -18,7 +18,13 @@ export interface ViewEmptyStateProps {
 }
 
 const CogIcon: React.FC<{ className?: string }> = ({ className }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+  <svg
+    className={className}
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    strokeWidth={1.5}
+  >
     <path
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -29,7 +35,13 @@ const CogIcon: React.FC<{ className?: string }> = ({ className }) => (
 );
 
 const InboxIcon: React.FC<{ className?: string }> = ({ className }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+  <svg
+    className={className}
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    strokeWidth={1.5}
+  >
     <path
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -39,7 +51,13 @@ const InboxIcon: React.FC<{ className?: string }> = ({ className }) => (
 );
 
 const ExclamationIcon: React.FC<{ className?: string }> = ({ className }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+  <svg
+    className={className}
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    strokeWidth={1.5}
+  >
     <path
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -58,7 +76,10 @@ export const ViewEmptyState: React.FC<ViewEmptyStateProps> = ({
   onRetry,
   className,
 }) => {
-  const borderColor = variant === 'error' ? 'border-red-200 dark:border-red-800' : 'border-gray-200 dark:border-gray-700';
+  const borderColor =
+    variant === 'error'
+      ? 'border-red-200 dark:border-red-800'
+      : 'border-gray-200 dark:border-gray-700';
 
   return (
     <div

@@ -10,7 +10,7 @@
 
 import { ResultHelper } from '~/utils/type';
 import { getTokenFromRequest } from '~/services/session';
-import type { User, UserPermissions } from '~/utils/type';
+import type { User, UserPermissions, Preferences } from '~/utils/type';
 
 /**
  * 从后端API获取用户完整信息（包括权限）
@@ -23,6 +23,7 @@ import type { User, UserPermissions } from '~/utils/type';
 export async function fetchUserInfo(request: Request): Promise<{
   user: User;
   permissions: UserPermissions;
+  preferences: Preferences | null;
 } | null> {
   const token = await getTokenFromRequest(request);
 
@@ -31,7 +32,7 @@ export async function fetchUserInfo(request: Request): Promise<{
   }
 
   try {
-    const apiUrl = process.env.SPRING_BOOT_URL;
+    const apiUrl = process.env.SPRING_BOOT_URL || 'http://127.0.0.1:6443';
 
     const response = await fetch(`${apiUrl}/api/auth/me`, {
       headers: {
@@ -59,6 +60,7 @@ export async function fetchUserInfo(request: Request): Promise<{
         roles: [],
         permissions: [],
       },
+      preferences: result.data.preferences || null,
     };
   } catch (error) {
     console.error('Error fetching user info:', error);
@@ -76,16 +78,18 @@ export async function fetchUserInfo(request: Request): Promise<{
 export async function getUserInfo(request: Request): Promise<{
   user: User | null;
   permissions: UserPermissions | null;
+  preferences: Preferences | null;
 }> {
   const fullInfo = await fetchUserInfo(request);
 
   if (!fullInfo) {
-    return { user: null, permissions: null };
+    return { user: null, permissions: null, preferences: null };
   }
 
   return {
     user: fullInfo.user,
     permissions: fullInfo.permissions,
+    preferences: fullInfo.preferences,
   };
 }
 

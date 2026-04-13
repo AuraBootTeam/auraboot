@@ -46,7 +46,7 @@ import { ErrorCodes } from '~/services/http-client/types';
 // Quarry-specific Constants
 // ---------------------------------------------------------------------------
 
-/** Table names (model codes) used in /dynamic/:tableName route.
+/** Table names (model codes) used in /p/:tableName route.
  *  The route auto-appends '_list' to compute the pageKey for schema lookup. */
 export const PAGE_KEYS = {
   DAILY_REPORT: 'qo_daily_report',
@@ -175,7 +175,9 @@ export async function navigateToMenu(page: Page, menuPath: string[]): Promise<vo
 
     // For parent menus (directories), click to expand
     // For leaf menus, click to navigate
-    const menuItem = page.locator(`nav >> text="${label}"`).first()
+    const menuItem = page
+      .locator(`nav >> text="${label}"`)
+      .first()
       .or(page.getByText(label, { exact: false }).first());
 
     await menuItem.waitFor({ state: 'visible', timeout: 10000 });

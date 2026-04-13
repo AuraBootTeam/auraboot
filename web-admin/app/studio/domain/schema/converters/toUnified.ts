@@ -12,28 +12,18 @@ export function convertSchemaToUnified(schema: FormSchema): UnifiedSchema {
   const padding = schema.layout?.padding ?? 16;
 
   return {
-    kind: 'Form',
+    kind: 'form',
     version: schema.version || '1.0.0',
     id: schema.id,
     title: schema.title,
     description: schema.description,
     layout: {
-      areas: ['main'],
-      areasConfig: {
-        main: {
-          type: 'grid',
-          cols: layoutColumns,
-          rowGap: spacing,
-          colGap: spacing,
-          padding,
-        },
-      },
+      type: 'grid',
+      cols: layoutColumns,
+      rowGap: spacing,
+      colGap: spacing,
     },
-    areas: {
-      main: {
-        blocks: flattenBlocks(schema.components),
-      },
-    },
+    blocks: flattenBlocks(schema.components),
     dataSources: (schema as any).dataSources || {},
     handlers: (schema as any).handlers || {},
     theme: convertTheme(schema),

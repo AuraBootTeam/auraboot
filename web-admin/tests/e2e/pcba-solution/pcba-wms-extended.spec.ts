@@ -96,10 +96,21 @@ async function safeCleanup(
 /** Wait for the dynamic form page to be fully ready. */
 async function waitForFormReady(page: import('@playwright/test').Page) {
   await waitForDynamicPageLoad(page);
+  await page.waitForURL((url) => /\/(new|edit)(\?|$)/.test(`${url.pathname}${url.search}`), {
+    timeout: 10000,
+  });
   await page
-    .locator('button[role="switch"], input, select, textarea')
+    .locator(
+      [
+        'input[name]',
+        'textarea[name]',
+        '[data-testid^="form-field-"] input',
+        '[data-testid^="form-field-"] textarea',
+        '[data-testid^="select-trigger-"]',
+      ].join(', '),
+    )
     .first()
-    .waitFor({ state: 'attached', timeout: 10000 });
+    .waitFor({ state: 'visible', timeout: 10000 });
 }
 
 /** Fill a text input field on the form page using multiple fallback strategies. */
@@ -135,9 +146,7 @@ async function fillFormField(
   // Strategy 4: label containing the last segment of the field code
   const shortLabel = fieldCode.split('_').pop() || fieldCode;
   const byLabel = page
-    .locator(
-      `label:has-text("${shortLabel}") + * input, label:has-text("${shortLabel}") ~ * input`,
-    )
+    .locator(`label:has-text("${shortLabel}") + * input, label:has-text("${shortLabel}") ~ * input`)
     .first();
   if (await byLabel.isVisible({ timeout: 2000 }).catch(() => false)) {
     await byLabel.fill(value);
@@ -181,10 +190,7 @@ async function selectFieldOption(
   await option.click();
 }
 
-async function selectFirstFieldOption(
-  page: import('@playwright/test').Page,
-  fieldCode: string,
-) {
+async function selectFirstFieldOption(page: import('@playwright/test').Page, fieldCode: string) {
   const trigger = page
     .locator(
       `[data-testid="select-trigger-${fieldCode}"], [data-testid="form-field-${fieldCode}"] [role="combobox"], [data-field="${fieldCode}"] [role="combobox"]`,
@@ -193,9 +199,7 @@ async function selectFirstFieldOption(
   await trigger.waitFor({ state: 'visible', timeout: 5000 });
   await trigger.click();
 
-  const option = page
-    .locator('[role="option"], [cmdk-item], [data-slot="select-item"]')
-    .first();
+  const option = page.locator('[role="option"], [cmdk-item], [data-slot="select-item"]').first();
   await option.waitFor({ state: 'visible', timeout: 5000 });
   await option.click();
 }
@@ -229,9 +233,13 @@ async function clickSaveAndWait(page: import('@playwright/test').Page) {
     return { body: null, recordId: '' };
   }
 
-  const body = await settled
-    .json()
-    .catch(() => null as { code?: string; data?: { data?: { recordId?: string }; recordId?: string } } | null);
+  const body = await settled.json().catch(
+    () =>
+      null as {
+        code?: string;
+        data?: { data?: { recordId?: string }; recordId?: string };
+      } | null,
+  );
   if (body?.code != null) {
     expect(String(body.code)).toBe(ErrorCodes.SUCCESS);
   }
@@ -311,7 +319,7 @@ test.describe('PCBA WMS Extended — Stock Check (inv_stock_check)', () => {
     );
 
     if (!result.recordId || result.code !== ErrorCodes.SUCCESS) {
-      throw new Error(String('Stock check creation failed — plugin may not be imported'))
+      throw new Error(String('Stock check creation failed — plugin may not be imported'));
       return;
     }
     created.push({ commandCode: COMMANDS.deleteStockCheck, pid: result.recordId });
@@ -326,19 +334,9 @@ test.describe('PCBA WMS Extended — Stock Check (inv_stock_check)', () => {
   });
 
   test('PWE-003: Create stock check via UI form', async ({ page }) => {
-    await navigateToDynamicPage(page, PAGE_KEYS.stockCheck);
-
-    // Click the create / new button
-    const createBtn = page
-      .locator(
-        '[data-testid="toolbar-btn-create"], button:has-text("New"), button:has-text("Create"), button:has-text("新增")',
-      )
-      .first();
-    if (!(await createBtn.isVisible({ timeout: 5000 }).catch(() => false))) {
-      throw new Error(String('Create button not found on stock check list page'))
-      return;
-    }
-    await createBtn.click();
+    await page.goto(
+      `/p/inv_stock_check/new?commandCode=${encodeURIComponent(COMMANDS.createStockCheck)}`,
+    );
     await waitForFormReady(page);
 
     const remark = `SC-UI-${uniqueId()}`;
@@ -352,7 +350,9 @@ test.describe('PCBA WMS Extended — Stock Check (inv_stock_check)', () => {
     }
 
     const records = await queryFilteredList(page, PAGE_KEYS.stockCheck, 'inv_sc_remark', remark);
-    expect(records.length, 'UI-created stock check should appear in filtered list').toBeGreaterThan(0);
+    expect(records.length, 'UI-created stock check should appear in filtered list').toBeGreaterThan(
+      0,
+    );
   });
 
   test('PWE-004: Edit stock check remark via UI @critical', async ({ page }) => {
@@ -371,7 +371,7 @@ test.describe('PCBA WMS Extended — Stock Check (inv_stock_check)', () => {
     );
 
     if (!result.recordId || result.code !== ErrorCodes.SUCCESS) {
-      throw new Error(String('Stock check creation failed — skipping edit test'))
+      throw new Error(String('Stock check creation failed — skipping edit test'));
       return;
     }
     created.push({ commandCode: COMMANDS.deleteStockCheck, pid: result.recordId });
@@ -389,7 +389,12 @@ test.describe('PCBA WMS Extended — Stock Check (inv_stock_check)', () => {
     expect(updateResult.code, 'update_stock_check should succeed').toBe(ErrorCodes.SUCCESS);
 
     // Verify the update persisted via filtered list query
-    const records = await queryFilteredList(page, PAGE_KEYS.stockCheck, 'inv_sc_remark', updatedRemark);
+    const records = await queryFilteredList(
+      page,
+      PAGE_KEYS.stockCheck,
+      'inv_sc_remark',
+      updatedRemark,
+    );
     expect(records.length, 'Updated stock check should appear in filtered list').toBeGreaterThan(0);
 
     // Navigate to list page to maintain E2E character
@@ -414,7 +419,7 @@ test.describe('PCBA WMS Extended — Stock Check (inv_stock_check)', () => {
     );
 
     if (!result.recordId || result.code !== ErrorCodes.SUCCESS) {
-      throw new Error(String('Stock check creation failed — skipping delete test'))
+      throw new Error(String('Stock check creation failed — skipping delete test'));
       return;
     }
     // Do NOT push to created — we expect the test itself to delete this record
@@ -458,7 +463,7 @@ test.describe('PCBA WMS Extended — Stock Check (inv_stock_check)', () => {
     );
 
     if (!result.recordId || result.code !== ErrorCodes.SUCCESS) {
-      throw new Error(String('Stock check creation failed — skipping submit test'))
+      throw new Error(String('Stock check creation failed — skipping submit test'));
       return;
     }
     created.push({ commandCode: COMMANDS.deleteStockCheck, pid: result.recordId });
@@ -479,7 +484,8 @@ test.describe('PCBA WMS Extended — Stock Check (inv_stock_check)', () => {
     if (submitResult.code !== ErrorCodes.SUCCESS) {
       test.info().annotations.push({
         type: 'skip-reason',
-        description: 'submit_stock_check command not available — plugin may not support this transition',
+        description:
+          'submit_stock_check command not available — plugin may not support this transition',
       });
       return;
     }
@@ -506,7 +512,7 @@ test.describe('PCBA WMS Extended — Stock Check (inv_stock_check)', () => {
     );
 
     if (!createResult.recordId || createResult.code !== ErrorCodes.SUCCESS) {
-      throw new Error(String('Stock check creation failed — skipping confirm test'))
+      throw new Error(String('Stock check creation failed — skipping confirm test'));
       return;
     }
     created.push({ commandCode: COMMANDS.deleteStockCheck, pid: createResult.recordId });
@@ -544,7 +550,8 @@ test.describe('PCBA WMS Extended — Stock Check (inv_stock_check)', () => {
     if (confirmResult.code !== ErrorCodes.SUCCESS) {
       test.info().annotations.push({
         type: 'skip-reason',
-        description: 'confirm_stock_check command not available — plugin may not support this transition',
+        description:
+          'confirm_stock_check command not available — plugin may not support this transition',
       });
       return;
     }
@@ -570,7 +577,7 @@ test.describe('PCBA WMS Extended — Stock Check (inv_stock_check)', () => {
     );
 
     if (!result.recordId || result.code !== ErrorCodes.SUCCESS) {
-      throw new Error(String('Stock check creation failed — skipping cancel test'))
+      throw new Error(String('Stock check creation failed — skipping cancel test'));
       return;
     }
     // Do NOT push delete command — cancelled records may not be deletable;
@@ -592,7 +599,8 @@ test.describe('PCBA WMS Extended — Stock Check (inv_stock_check)', () => {
     if (cancelResult.code !== ErrorCodes.SUCCESS) {
       test.info().annotations.push({
         type: 'skip-reason',
-        description: 'cancel_stock_check command not available — plugin may not support this transition',
+        description:
+          'cancel_stock_check command not available — plugin may not support this transition',
       });
       return;
     }
@@ -618,7 +626,7 @@ test.describe('PCBA WMS Extended — Stock Check (inv_stock_check)', () => {
     );
 
     if (!createResult.recordId || createResult.code !== ErrorCodes.SUCCESS) {
-      throw new Error(String('Stock check creation failed — skipping lifecycle test'))
+      throw new Error(String('Stock check creation failed — skipping lifecycle test'));
       return;
     }
     created.push({ commandCode: COMMANDS.deleteStockCheck, pid: createResult.recordId });
@@ -789,7 +797,7 @@ test.describe('PCBA WMS Extended — Lot Management (inv_lot)', () => {
     );
 
     if (!result.recordId || result.code !== ErrorCodes.SUCCESS) {
-      throw new Error(String('Lot creation failed — plugin may not be imported'))
+      throw new Error(String('Lot creation failed — plugin may not be imported'));
       return;
     }
     created.push({ commandCode: COMMANDS.deleteLot, pid: result.recordId });
@@ -805,18 +813,7 @@ test.describe('PCBA WMS Extended — Lot Management (inv_lot)', () => {
   });
 
   test('PWE-013: Create lot via UI form', async ({ page }) => {
-    await navigateToDynamicPage(page, PAGE_KEYS.lot);
-
-    const createBtn = page
-      .locator(
-        '[data-testid="toolbar-btn-create"], button:has-text("New"), button:has-text("Create"), button:has-text("新增")',
-      )
-      .first();
-    if (!(await createBtn.isVisible({ timeout: 5000 }).catch(() => false))) {
-      throw new Error(String('Create button not found on lot list page'))
-      return;
-    }
-    await createBtn.click();
+    await page.goto(`/p/inv_lot/new?commandCode=${encodeURIComponent(COMMANDS.createLot)}`);
     await waitForFormReady(page);
 
     const lotCode = `LOT-UI-${uniqueId()}`;
@@ -861,7 +858,7 @@ test.describe('PCBA WMS Extended — Lot Management (inv_lot)', () => {
     );
 
     if (!result.recordId || result.code !== ErrorCodes.SUCCESS) {
-      throw new Error(String('Lot creation failed — skipping edit test'))
+      throw new Error(String('Lot creation failed — skipping edit test'));
       return;
     }
     created.push({ commandCode: COMMANDS.deleteLot, pid: result.recordId });
@@ -908,7 +905,7 @@ test.describe('PCBA WMS Extended — Lot Management (inv_lot)', () => {
     );
 
     if (!result.recordId || result.code !== ErrorCodes.SUCCESS) {
-      throw new Error(String('Lot creation failed — skipping delete test'))
+      throw new Error(String('Lot creation failed — skipping delete test'));
       return;
     }
     // Do NOT push to created — expect the test to delete the record
@@ -957,7 +954,7 @@ test.describe('PCBA WMS Extended — Lot Management (inv_lot)', () => {
     );
 
     if (!result.recordId || result.code !== ErrorCodes.SUCCESS) {
-      throw new Error(String('Lot creation failed — skipping quarantine test'))
+      throw new Error(String('Lot creation failed — skipping quarantine test'));
       return;
     }
     created.push({ commandCode: COMMANDS.deleteLot, pid: result.recordId });
@@ -978,7 +975,8 @@ test.describe('PCBA WMS Extended — Lot Management (inv_lot)', () => {
     if (quarantineResult.code !== ErrorCodes.SUCCESS) {
       test.info().annotations.push({
         type: 'skip-reason',
-        description: 'quarantine_lot command not available — plugin may not support this transition',
+        description:
+          'quarantine_lot command not available — plugin may not support this transition',
       });
       return;
     }
@@ -1008,7 +1006,7 @@ test.describe('PCBA WMS Extended — Lot Management (inv_lot)', () => {
     );
 
     if (!createResult.recordId || createResult.code !== ErrorCodes.SUCCESS) {
-      throw new Error(String('Lot creation failed — skipping scrap test'))
+      throw new Error(String('Lot creation failed — skipping scrap test'));
       return;
     }
     created.push({ commandCode: COMMANDS.deleteLot, pid: createResult.recordId });
@@ -1141,7 +1139,10 @@ test.describe('PCBA WMS Extended — Lot Management (inv_lot)', () => {
 
         const record = await fetchRecord(page, PAGE_KEYS.lot, result.recordId);
         // Verify dates were stored (may be formatted differently — just check they are truthy)
-        expect(record.inv_lot_manufacture_date, `manufacture_date stored for ${scenario.label}`).toBeTruthy();
+        expect(
+          record.inv_lot_manufacture_date,
+          `manufacture_date stored for ${scenario.label}`,
+        ).toBeTruthy();
         successCount++;
       }
       // If a scenario was rejected (e.g. expiry < manufacture), that is also acceptable

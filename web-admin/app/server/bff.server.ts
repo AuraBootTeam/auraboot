@@ -1,5 +1,6 @@
 import express from 'express';
 import cookieParser from 'cookie-parser';
+import compression from 'compression';
 import axios from 'axios';
 import * as http from 'http';
 import * as https from 'https';
@@ -10,15 +11,27 @@ import { bffFlowDesignerService } from '~/server/services/BffFlowDesignerService
 import uploadRouter from '~/server/routes/upload';
 import { config } from '~/server/utils/config';
 import { requestLogger, errorLogger } from '~/server/middlewares/RequestLogger';
+import { register, proxyDurationHistogram } from './metrics.server';
 
 // ============================================================
 // CRITICAL: Bypass system proxy for ALL axios requests in BFF.
 // Without this, http_proxy/https_proxy env vars (e.g. Clash at
 // 127.0.0.1:7891) hijack localhost requests → 502 Proxy Error.
 // ============================================================
-axios.defaults.httpAgent = new http.Agent({ keepAlive: true });
-axios.defaults.httpsAgent = new https.Agent({ keepAlive: true });
+axios.defaults.httpAgent = new http.Agent({
+  keepAlive: true,
+  maxSockets: 100,
+  maxFreeSockets: 20,
+  keepAliveMsecs: 30000,
+});
+axios.defaults.httpsAgent = new https.Agent({
+  keepAlive: true,
+  maxSockets: 100,
+  maxFreeSockets: 20,
+  keepAliveMsecs: 30000,
+});
 axios.defaults.proxy = false;
+axios.defaults.timeout = 30000; // 30s — prevents slow backend from cascading to BFF
 dns.setDefaultResultOrder('ipv4first');
 
 const app = express();
@@ -54,6 +67,15 @@ app.use((req, res, next) => {
 });
 
 app.use(express.raw({ type: 'application/octet-stream', limit: '50mb' }));
+
+// Gzip/deflate compression for responses
+app.use(compression({
+  threshold: 1024,
+  filter: (req, res) => {
+    if (req.headers.accept?.includes('text/event-stream')) return false;
+    return compression.filter(req, res);
+  },
+}));
 
 // 禁用 X-Powered-By 头
 app.disable('x-powered-by');
@@ -99,6 +121,27 @@ app.use((req, res, next) => {
     return;
   }
 
+  next();
+});
+
+// Prometheus metrics endpoint
+app.get('/metrics', async (_req, res) => {
+  res.set('Content-Type', register.contentType);
+  res.end(await register.metrics());
+});
+
+// Proxy timing middleware — measure BFF→backend latency
+app.use('/api', (req, res, next) => {
+  const start = process.hrtime.bigint();
+  res.on('finish', () => {
+    const durationSec = Number(process.hrtime.bigint() - start) / 1e9;
+    // Normalize path: replace UUIDs and numeric IDs with placeholders
+    const path = req.path.replace(/[0-9a-f]{8,}/gi, ':id').replace(/\d+/g, ':n');
+    proxyDurationHistogram.observe(
+      { method: req.method, path, status: String(res.statusCode) },
+      durationSec,
+    );
+  });
   next();
 });
 
@@ -157,16 +200,34 @@ app.get('/health', async (req, res) => {
   }
 });
 
-// 静态文件服务
-app.use(express.static('build/client'));
+// ============================================================
+// Static asset cache headers
+// - /assets/* (Vite content-hashed): immutable, 1 year
+// - favicon, logos, manifest, etc.: 1 day
+// - HTML responses (SPA shell): no-cache
+// ============================================================
+app.use('/assets', (_req, res, next) => {
+  res.set('Cache-Control', 'public, max-age=31536000, immutable');
+  next();
+});
 
-// 处理所有其他路由 - 返回到前端应用
+// Static file serving with default 1-day cache for non-hashed files
+app.use(express.static('build/client', {
+  maxAge: '1d',
+  setHeaders: (res, filePath) => {
+    // HTML files must not be cached (SPA shell changes on every deploy)
+    if (filePath.endsWith('.html')) {
+      res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    }
+  },
+}));
+
+// SPA fallback — serve index.html for all non-API routes
 app.get('*', (req, res) => {
-  // 在开发环境中，让Vite处理路由
   if (process.env.NODE_ENV === 'development') {
     res.status(404).json({ error: 'Route not found in BFF' });
   } else {
-    // 生产环境中返回index.html
+    res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.sendFile('index.html', { root: 'build/client' });
   }
 });

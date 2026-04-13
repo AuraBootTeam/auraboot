@@ -251,7 +251,7 @@ const BlockPreview: React.FC<{ block: DslBlock; showGrid: boolean }> = ({ block,
     : 'border border-gray-200 bg-gray-50';
 
   switch (block.blockType) {
-    case 'filter-form':
+    case 'filters':
       return (
         <div className={`${borderClass} rounded-lg p-3`}>
           <div className="mb-2 text-[10px] text-gray-400 uppercase">Filters</div>
@@ -275,7 +275,7 @@ const BlockPreview: React.FC<{ block: DslBlock; showGrid: boolean }> = ({ block,
         </div>
       );
 
-    case 'data-table':
+    case 'table':
       return (
         <div className={`${borderClass} overflow-hidden rounded-lg`}>
           <div className="px-3 pt-2 text-[10px] text-gray-400 uppercase">Data Table</div>
@@ -330,7 +330,7 @@ const BlockPreview: React.FC<{ block: DslBlock; showGrid: boolean }> = ({ block,
         </div>
       );
 
-    case 'toolbar-buttons':
+    case 'toolbar':
     case 'form-buttons':
       return (
         <div className={`${borderClass} rounded-lg p-3`}>

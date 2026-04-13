@@ -33,7 +33,7 @@ export class DynamicFormPage extends BasePage {
   /** Get a form field input by name attribute */
   field(name: string): Locator {
     return this.page.locator(
-      `[data-testid="form-field-${name}"] input, [data-testid="form-field-${name}"] select, [data-testid="form-field-${name}"] [role="combobox"], [data-testid="form-field-${name}"] textarea, [name="${name}"], [data-field="${name}"] input, [data-field="${name}"] select, [data-field="${name}"] [role="combobox"], [data-field="${name}"] textarea`
+      `[data-testid="form-field-${name}"] input, [data-testid="form-field-${name}"] select, [data-testid="form-field-${name}"] [role="combobox"], [data-testid="form-field-${name}"] textarea, [name="${name}"], [data-field="${name}"] input, [data-field="${name}"] select, [data-field="${name}"] [role="combobox"], [data-field="${name}"] textarea`,
     );
   }
 
@@ -55,7 +55,7 @@ export class DynamicFormPage extends BasePage {
   async selectField(name: string, value: string): Promise<void> {
     const container = this.fieldContainer(name);
     const nativeSelect = container.locator('select');
-    if (await nativeSelect.count() > 0) {
+    if ((await nativeSelect.count()) > 0) {
       await nativeSelect.selectOption(value);
     } else {
       const trigger = container.locator('[role="combobox"]');
@@ -71,7 +71,7 @@ export class DynamicFormPage extends BasePage {
   /** Toggle a checkbox/switch field */
   async toggleField(name: string): Promise<void> {
     const input = this.page.locator(
-      `[data-testid="form-field-${name}"] input[type="checkbox"], [data-testid="form-field-${name}"] button[role="switch"], [name="${name}"][type="checkbox"], [data-field="${name}"] input[type="checkbox"], [data-field="${name}"] button[role="switch"]`
+      `[data-testid="form-field-${name}"] input[type="checkbox"], [data-testid="form-field-${name}"] button[role="switch"], [name="${name}"][type="checkbox"], [data-field="${name}"] input[type="checkbox"], [data-field="${name}"] button[role="switch"]`,
     );
     await input.click();
   }
@@ -85,7 +85,7 @@ export class DynamicFormPage extends BasePage {
   /** Fill a textarea field */
   async fillTextarea(name: string, value: string): Promise<void> {
     const textarea = this.page.locator(
-      `[data-testid="form-field-${name}"] textarea, textarea[name="${name}"], [data-field="${name}"] textarea`
+      `[data-testid="form-field-${name}"] textarea, textarea[name="${name}"], [data-field="${name}"] textarea`,
     );
     await textarea.fill(value);
   }
@@ -96,7 +96,7 @@ export class DynamicFormPage extends BasePage {
       const input = this.field(field);
       if (!(await input.isVisible())) continue;
 
-      const tagName = await input.evaluate(el => el.tagName.toLowerCase());
+      const tagName = await input.evaluate((el) => el.tagName.toLowerCase());
       const inputType = await input.getAttribute('type');
       const role = await input.getAttribute('role');
 
@@ -133,7 +133,9 @@ export class DynamicFormPage extends BasePage {
 
   /** Get validation error for a specific field */
   fieldError(name: string): Locator {
-    return this.page.locator(`[data-testid="form-field-${name}"] .field-error, [data-testid="form-field-${name}"] .text-red-500, [data-field="${name}"] .field-error, [data-field="${name}"] .text-red-500`);
+    return this.page.locator(
+      `[data-testid="form-field-${name}"] .field-error, [data-testid="form-field-${name}"] .text-red-500, [data-field="${name}"] .field-error, [data-field="${name}"] .text-red-500`,
+    );
   }
 
   /** Assert a field has a validation error */
@@ -165,7 +167,7 @@ export class DynamicFormPage extends BasePage {
   /** Get the cancel button */
   get cancelButton(): Locator {
     return this.page.locator(
-      '[data-testid="form-btn-cancel"], button:has-text("取消"), button:has-text("Cancel")'
+      '[data-testid="form-btn-cancel"], button:has-text("取消"), button:has-text("Cancel")',
     );
   }
 
@@ -220,12 +222,17 @@ export class DynamicFormPage extends BasePage {
   /** Get all current form values */
   async getFormValues(): Promise<Record<string, string>> {
     const values: Record<string, string> = {};
-    const inputs = this.page.locator('[name], [data-field] input, [data-field] select, [data-field] textarea');
+    const inputs = this.page.locator(
+      '[name], [data-field] input, [data-field] select, [data-field] textarea',
+    );
     const count = await inputs.count();
 
     for (let i = 0; i < count; i++) {
       const input = inputs.nth(i);
-      const name = await input.getAttribute('name') ?? await input.getAttribute('data-field') ?? `field_${i}`;
+      const name =
+        (await input.getAttribute('name')) ??
+        (await input.getAttribute('data-field')) ??
+        `field_${i}`;
       values[name] = await input.inputValue();
     }
 

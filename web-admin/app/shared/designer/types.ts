@@ -46,7 +46,9 @@ export interface PropertySchema<TLabel = string | I18nText> {
   placeholder?: TLabel;
   description?: TLabel;
   defaultValue?: unknown;
-  dependsOn?: { field: string; value: unknown };
+  dependsOn?: { field: string; value?: unknown };
+  /** Group name for panel sectioning */
+  group?: string;
 }
 
 // ==================== Validation ====================

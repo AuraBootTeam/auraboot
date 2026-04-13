@@ -38,14 +38,24 @@ test.describe('E2E Test Order — Field Types & Computed Fields', () => {
       // Verify auto-generated order_no has a value (autoSetValues: AUTO_GENERATE)
       const formPage = new DynamicFormPage(page, '');
       const orderNoInput = formPage.field('e2et_order_no');
-      if (await orderNoInput.first().isVisible({ timeout: 3000 }).catch(() => false)) {
+      if (
+        await orderNoInput
+          .first()
+          .isVisible({ timeout: 3000 })
+          .catch(() => false)
+      ) {
         const orderNo = await orderNoInput.first().inputValue();
         expect(orderNo.length).toBeGreaterThan(5);
       }
 
       // Verify title field preserved user input
       const titleInput = formPage.field('e2et_order_title');
-      if (await titleInput.first().isVisible({ timeout: 3000 }).catch(() => false)) {
+      if (
+        await titleInput
+          .first()
+          .isVisible({ timeout: 3000 })
+          .catch(() => false)
+      ) {
         const titleValue = await titleInput.first().inputValue();
         expect(titleValue).toBe(title);
       }
@@ -77,7 +87,12 @@ test.describe('E2E Test Order — Field Types & Computed Fields', () => {
 
       // Verify STRING field: title has correct value
       const titleInput = formPage.field('e2et_order_title');
-      if (await titleInput.first().isVisible({ timeout: 3000 }).catch(() => false)) {
+      if (
+        await titleInput
+          .first()
+          .isVisible({ timeout: 3000 })
+          .catch(() => false)
+      ) {
         const val = await titleInput.first().inputValue();
         expect(typeof val).toBe('string');
       }
@@ -167,8 +182,10 @@ test.describe('E2E Test Order — Field Types & Computed Fields', () => {
     await expect(titleInput.first()).toBeVisible({ timeout: 5000 });
 
     // Verify ENUM field: order_type (select)
-    const typeSelect = page.locator('select[name*="order_type"], [data-field*="order_type"] select').first();
-    const typeSelectExists = await typeSelect.count() > 0;
+    const typeSelect = page
+      .locator('select[name*="order_type"], [data-field*="order_type"] select')
+      .first();
+    const typeSelectExists = (await typeSelect.count()) > 0;
     // ENUM renders as native <select> in SmartInput
     if (typeSelectExists) {
       await expect(typeSelect).toBeVisible();
@@ -234,9 +251,11 @@ test.describe('E2E Test Order — Field Types & Computed Fields', () => {
       const isError = String(body.code) !== ErrorCodes.SUCCESS;
       if (isError) {
         // Validation error from server — verify error UI appears
-        const errorUI = page.locator(
-          '.text-red-500, .text-red-600, [class*="error"], [role="alert"], .ant-message-error'
-        ).first();
+        const errorUI = page
+          .locator(
+            '.text-red-500, .text-red-600, [class*="error"], [role="alert"], .ant-message-error',
+          )
+          .first();
         const hasError = await errorUI.isVisible({ timeout: 3000 }).catch(() => false);
         // Error may show as toast or inline — either is acceptable
         expect(isError || hasError).toBeTruthy();
@@ -244,9 +263,11 @@ test.describe('E2E Test Order — Field Types & Computed Fields', () => {
     } else {
       // Client-side validation prevented API call
       // Look for validation error indicators
-      const errorIndicator = page.locator(
-        '.text-red-500, .text-red-600, [class*="error"], [aria-invalid="true"], .border-red-500'
-      ).first();
+      const errorIndicator = page
+        .locator(
+          '.text-red-500, .text-red-600, [class*="error"], [aria-invalid="true"], .border-red-500',
+        )
+        .first();
       const hasClientError = await errorIndicator.isVisible({ timeout: 3000 }).catch(() => false);
 
       // At minimum, we should still be on the form page (not navigated away)
@@ -297,14 +318,17 @@ test.describe('E2E Test Order — Field Types & Computed Fields', () => {
       }
 
       // Click detail/view button on a row
-      const detailBtn = listPage.row(0).locator(
-        'button:has-text("detail"), button:has-text("详情"), button:has-text("view"), button:has-text("查看")'
-      ).first();
+      const detailBtn = listPage
+        .row(0)
+        .locator(
+          'button:has-text("detail"), button:has-text("详情"), button:has-text("view"), button:has-text("查看")',
+        )
+        .first();
 
       const hasDetailBtn = await detailBtn.isVisible({ timeout: 5000 }).catch(() => false);
       if (!hasDetailBtn) {
         // Fallback: verify computedField via API (still valid E2E — command pipeline test)
-        const itemResp = await page.request.get(`/api/dynamic/e2et-order-item/${itemPid}`);
+        const itemResp = await page.request.get(`/api/dynamic/e2et_order_item/${itemPid}`);
         if (itemResp.ok()) {
           const itemBody = await itemResp.json();
           const data = itemBody.data || itemBody;
@@ -319,23 +343,27 @@ test.describe('E2E Test Order — Field Types & Computed Fields', () => {
       await page.waitForLoadState('domcontentloaded');
 
       // Switch to Items tab
-      const itemsTab = page.locator('nav button, [role="tablist"] button').filter({
-        hasText: /订单明细|Order Items/i,
-      }).first();
+      const itemsTab = page
+        .locator('nav button, [role="tablist"] button')
+        .filter({
+          hasText: /订单明细|Order Items/i,
+        })
+        .first();
 
       if (await itemsTab.isVisible({ timeout: 3000 }).catch(() => false)) {
         await itemsTab.click();
         await page.locator('table').first().waitFor({ state: 'visible', timeout: 5000 });
 
         // Verify subtotal value in the items table
-        const tableText = await page.locator('table').first().textContent() ?? '';
+        const tableText = (await page.locator('table').first().textContent()) ?? '';
         // Subtotal should be 100 or 100.00 or 100.0
-        const hasSubtotal = tableText.includes(String(expectedSubtotal))
-          || tableText.includes(expectedSubtotal.toFixed(2));
+        const hasSubtotal =
+          tableText.includes(String(expectedSubtotal)) ||
+          tableText.includes(expectedSubtotal.toFixed(2));
         expect(hasSubtotal).toBe(true);
       } else {
         // Fallback: verify via API
-        const itemResp = await page.request.get(`/api/dynamic/e2et-order-item/${itemPid}`);
+        const itemResp = await page.request.get(`/api/dynamic/e2et_order_item/${itemPid}`);
         if (itemResp.ok()) {
           const itemBody = await itemResp.json();
           const data = itemBody.data || itemBody;

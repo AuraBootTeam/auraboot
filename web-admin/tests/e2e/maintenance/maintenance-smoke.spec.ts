@@ -48,11 +48,7 @@ async function expandMntMenu(page: Page): Promise<void> {
   await page.waitForResponse(() => true, { timeout: 2000 }).catch(() => null);
 }
 
-async function navigateToMntPage(
-  page: Page,
-  path: string,
-  modelUrl: string | null,
-): Promise<void> {
+async function navigateToMntPage(page: Page, path: string, modelUrl: string | null): Promise<void> {
   await expandMntMenu(page);
 
   const nav = page.locator('nav');
@@ -62,10 +58,9 @@ async function navigateToMntPage(
 
   const responsePromise = modelUrl
     ? page
-        .waitForResponse(
-          (r) => r.url().includes(modelUrl) && r.status() === 200,
-          { timeout: 15000 },
-        )
+        .waitForResponse((r) => r.url().includes(modelUrl) && r.status() === 200, {
+          timeout: 15000,
+        })
         .catch(() => null)
     : Promise.resolve(null);
 
@@ -84,27 +79,14 @@ test.describe('Maintenance Plugin @smoke', () => {
   // -------------------------------------------------------------------------
   // MNT-S001: Plugin install check
   // -------------------------------------------------------------------------
-  test('MNT-S001: maintenance plugin is installed and models are published', async ({
-    page,
-  }) => {
-    const pluginResp = await page.request
-      .get('/api/system/plugins?pageNum=1&pageSize=100')
+  test('MNT-S001: maintenance plugin is installed and models are published', async ({ page }) => {
+    // Check plugin availability via model code API
+    const modelResp = await page.request
+      .get('/api/meta/models/code/mnt_work_order')
       .catch(() => null);
-
-    if (pluginResp && pluginResp.ok()) {
-      const body = await pluginResp.json().catch(() => null);
-      const plugins: Array<{ pluginId?: string; plugin_id?: string }> =
-        body?.data?.records ?? body?.data?.data ?? body?.data ?? [];
-      pluginInstalled = plugins.some(
-        (p) => (p.pluginId ?? p.plugin_id) === PLUGIN_ID,
-      );
-    }
-
-    if (!pluginInstalled) {
-      const modelResp = await page.request
-        .get('/api/meta/models/code/mnt_equipment')
-        .catch(() => null);
-      pluginInstalled = modelResp?.ok() ?? false;
+    if (modelResp) {
+      const body = await modelResp.json().catch(() => ({}));
+      pluginInstalled = modelResp.ok() && body?.data?.status === 'published';
     }
 
     if (!pluginInstalled) {
@@ -125,53 +107,43 @@ test.describe('Maintenance Plugin @smoke', () => {
   // -------------------------------------------------------------------------
   // MNT-S002: 设备台账 list loads via sidebar
   // -------------------------------------------------------------------------
-  test('MNT-S002: sidebar → 设备台账 (Equipment) list page loads with table', async ({
-    page,
-  }) => {
+  test('MNT-S002: sidebar → 设备台账 (Equipment) list page loads with table', async ({ page }) => {
     if (!pluginInstalled) {
       test.skip(true, 'maintenance plugin not installed');
       return;
     }
 
-    await navigateToMntPage(page, '/maintenance/equipment', '/api/dynamic/mnt-equipment');
+    await navigateToMntPage(page, '/maintenance/equipment', '/api/dynamic/mnt_equipment');
 
+    // Table should be visible (may contain "暂无数据" empty state row)
     const table = page.locator('table, [class*="ant-table"]').first();
-    const emptyState = page
-      .locator('[class*="empty"]')
-      .or(page.getByText('暂无数据'))
-      .or(page.getByText('No data'))
-      .first();
-    await expect(table.or(emptyState)).toBeVisible({ timeout: 12000 });
+    await expect(table).toBeVisible({ timeout: 12000 });
 
-    await expect(page.locator('text=Access forbidden')).not.toBeVisible({ timeout: 2000 }).catch(() => {});
-    await expect(page.locator('text=403')).not.toBeVisible({ timeout: 1000 }).catch(() => {});
+    await expect(page.locator('text=Access forbidden'))
+      .not.toBeVisible({ timeout: 2000 })
+      .catch(() => {});
+    await expect(page.locator('text=403'))
+      .not.toBeVisible({ timeout: 1000 })
+      .catch(() => {});
   });
 
   // -------------------------------------------------------------------------
   // MNT-S003: 维护计划 list loads
   // -------------------------------------------------------------------------
-  test('MNT-S003: sidebar → 维护计划 (Maintenance Plans) list page loads', async ({
-    page,
-  }) => {
+  test('MNT-S003: sidebar → 维护计划 (Maintenance Plans) list page loads', async ({ page }) => {
     if (!pluginInstalled) {
       test.skip(true, 'maintenance plugin not installed');
       return;
     }
 
-    await navigateToMntPage(
-      page,
-      '/maintenance/plans',
-      '/api/dynamic/mnt-maintenance-plan',
-    );
+    await navigateToMntPage(page, '/maintenance/plans', '/api/dynamic/mnt_maintenance_plan');
 
+    // Table should be visible (may contain "暂无数据" empty state row)
     const table = page.locator('table, [class*="ant-table"]').first();
-    const emptyState = page
-      .locator('[class*="empty"]')
-      .or(page.getByText('暂无数据'))
-      .or(page.getByText('No data'))
-      .first();
-    await expect(table.or(emptyState)).toBeVisible({ timeout: 12000 });
-    await expect(page.locator('text=Access forbidden')).not.toBeVisible({ timeout: 2000 }).catch(() => {});
+    await expect(table).toBeVisible({ timeout: 12000 });
+    await expect(page.locator('text=Access forbidden'))
+      .not.toBeVisible({ timeout: 2000 })
+      .catch(() => {});
   });
 
   // -------------------------------------------------------------------------
@@ -183,16 +155,14 @@ test.describe('Maintenance Plugin @smoke', () => {
       return;
     }
 
-    await navigateToMntPage(page, '/maintenance/work-orders', '/api/dynamic/mnt-work-order');
+    await navigateToMntPage(page, '/maintenance/work-orders', '/api/dynamic/mnt_work_order');
 
+    // Table should be visible (may contain "暂无数据" empty state row)
     const table = page.locator('table, [class*="ant-table"]').first();
-    const emptyState = page
-      .locator('[class*="empty"]')
-      .or(page.getByText('暂无数据'))
-      .or(page.getByText('No data'))
-      .first();
-    await expect(table.or(emptyState)).toBeVisible({ timeout: 12000 });
-    await expect(page.locator('text=Access forbidden')).not.toBeVisible({ timeout: 2000 }).catch(() => {});
+    await expect(table).toBeVisible({ timeout: 12000 });
+    await expect(page.locator('text=Access forbidden'))
+      .not.toBeVisible({ timeout: 2000 })
+      .catch(() => {});
   });
 
   // -------------------------------------------------------------------------
@@ -204,16 +174,14 @@ test.describe('Maintenance Plugin @smoke', () => {
       return;
     }
 
-    await navigateToMntPage(page, '/maintenance/spare-parts', '/api/dynamic/mnt-spare-part');
+    await navigateToMntPage(page, '/maintenance/spare-parts', '/api/dynamic/mnt_spare_part');
 
+    // Table should be visible (may contain "暂无数据" empty state row)
     const table = page.locator('table, [class*="ant-table"]').first();
-    const emptyState = page
-      .locator('[class*="empty"]')
-      .or(page.getByText('暂无数据'))
-      .or(page.getByText('No data'))
-      .first();
-    await expect(table.or(emptyState)).toBeVisible({ timeout: 12000 });
-    await expect(page.locator('text=Access forbidden')).not.toBeVisible({ timeout: 2000 }).catch(() => {});
+    await expect(table).toBeVisible({ timeout: 12000 });
+    await expect(page.locator('text=Access forbidden'))
+      .not.toBeVisible({ timeout: 2000 })
+      .catch(() => {});
   });
 
   // -------------------------------------------------------------------------
@@ -225,7 +193,7 @@ test.describe('Maintenance Plugin @smoke', () => {
       return;
     }
 
-    await navigateToMntPage(page, '/maintenance/equipment', '/api/dynamic/mnt-equipment');
+    await navigateToMntPage(page, '/maintenance/equipment', '/api/dynamic/mnt_equipment');
 
     const headers = await page.locator('th, [role="columnheader"]').allTextContents();
     for (const h of headers) {
@@ -239,17 +207,13 @@ test.describe('Maintenance Plugin @smoke', () => {
   // -------------------------------------------------------------------------
   // MNT-S007: Equipment list API returns valid response structure
   // -------------------------------------------------------------------------
-  test('MNT-S007: mnt_equipment list API returns valid ApiResponse envelope', async ({
-    page,
-  }) => {
+  test('MNT-S007: mnt_equipment list API returns valid ApiResponse envelope', async ({ page }) => {
     if (!pluginInstalled) {
       test.skip(true, 'maintenance plugin not installed');
       return;
     }
 
-    const resp = await page.request.get(
-      '/api/dynamic/mnt-equipment/list?pageNum=1&pageSize=10',
-    );
+    const resp = await page.request.get('/api/dynamic/mnt_equipment/list?pageNum=1&pageSize=10');
     expect(resp.status()).toBe(200);
     const body = await resp.json();
     expect(body).toHaveProperty('code');
@@ -268,7 +232,7 @@ test.describe('Maintenance Plugin @smoke', () => {
       return;
     }
 
-    await navigateToMntPage(page, '/maintenance/work-orders', '/api/dynamic/mnt-work-order');
+    await navigateToMntPage(page, '/maintenance/work-orders', '/api/dynamic/mnt_work_order');
 
     const createBtn = page.locator('button', { hasText: /新建|Create|创建|添加/ }).first();
     await expect(createBtn).toBeVisible({ timeout: 8000 });

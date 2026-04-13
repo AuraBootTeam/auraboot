@@ -41,8 +41,11 @@ export interface ComponentEntry {
  * Layout configuration preset
  */
 export interface LayoutConfig {
-  areas: string[];
-  areasConfig?: Record<string, unknown>;
+  type?: 'grid' | 'stack';
+  cols?: number;
+  colGap?: number;
+  rowGap?: number;
+  gap?: number;
 }
 
 /**
@@ -55,7 +58,7 @@ export interface LayoutConfig {
  * - How to render each page kind
  * - Optional skeleton components for loading states
  */
-export interface DslProfile {
+export interface RenderProfile {
   /** Profile identifier, e.g. "admin" | "storefront" | "portal" */
   name: string;
 

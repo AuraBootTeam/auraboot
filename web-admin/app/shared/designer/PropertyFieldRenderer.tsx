@@ -21,7 +21,11 @@ import {
   fetchProcessOptions,
   fetchAutomationOptions,
   fetchCommandOptions,
+  fetchModelOptions,
 } from '~/services/resourceSelectService';
+import { ExpressionEditor } from './expression';
+import { DependentFieldSelect } from './DependentFieldSelect';
+import { DependentMultiSelect } from './DependentMultiSelect';
 import type { FieldAdapter } from '~/components/field-adapter';
 import type { PropertySchema, PropertyType } from './types';
 
@@ -100,9 +104,6 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
 
     // ---- Selection fields ----
     case 'select':
-    case 'multiselect':
-    case 'model-select':
-    case 'field-select':
       return (
         <BaseSelect
           adapter={adapter as any}
@@ -117,6 +118,52 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
         />
       );
 
+    case 'multiselect':
+      if (schema.options && schema.options.length > 0) {
+        return (
+          <BaseSelect
+            adapter={adapter as any}
+            name={schema.key}
+            label={label}
+            placeholder={placeholder}
+            helpText={helpText}
+            options={schema.options.map((opt) => ({
+              label: opt.label as string,
+              value: opt.value,
+            }))}
+          />
+        );
+      }
+      return (
+        <DependentMultiSelect
+          adapter={adapter}
+          label={label}
+          helpText={helpText}
+          placeholder={placeholder}
+        />
+      );
+
+    case 'model-select':
+      return (
+        <ResourceSelectField
+          adapter={adapter}
+          label={label}
+          placeholder={placeholder || 'Select model...'}
+          helpText={helpText}
+          fetchOptions={fetchModelOptions}
+        />
+      );
+
+    case 'field-select':
+      return (
+        <DependentFieldSelect
+          adapter={adapter}
+          label={label}
+          placeholder={placeholder || 'Select field...'}
+          helpText={helpText}
+        />
+      );
+
     case 'boolean':
       return (
         <BaseSwitch adapter={adapter as any} name={schema.key} label={label} helpText={helpText} />
@@ -124,6 +171,15 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
 
     // ---- Expression / formula ----
     case 'expression':
+      return (
+        <ExpressionEditor
+          adapter={adapter as any}
+          name={schema.key}
+          label={label}
+          helpText={helpText}
+        />
+      );
+
     case 'formula':
       return (
         <BaseFormulaEditor

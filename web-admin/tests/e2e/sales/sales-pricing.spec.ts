@@ -62,17 +62,13 @@ async function navigateToPricingMenu(
   await salesRootBtn.scrollIntoViewIfNeeded();
   await salesRootBtn.evaluate((el: HTMLElement) => el.click());
   // Brief pause to let submenu animate open — use response wait not timeout
-  await page
-    .waitForResponse(() => true, { timeout: 2_000 })
-    .catch(() => null);
+  await page.waitForResponse(() => true, { timeout: 2_000 }).catch(() => null);
 
   // Expand "价格与折扣" directory
   const pricingDirBtn = nav.getByRole('button', { name: '价格与折扣' });
   await pricingDirBtn.scrollIntoViewIfNeeded();
   await pricingDirBtn.evaluate((el: HTMLElement) => el.click());
-  await page
-    .waitForResponse(() => true, { timeout: 2_000 })
-    .catch(() => null);
+  await page.waitForResponse(() => true, { timeout: 2_000 }).catch(() => null);
 
   // Click the leaf menu link
   const leafLink = nav.getByRole('link', { name: leafName });
@@ -81,16 +77,12 @@ async function navigateToPricingMenu(
 
   // Wait for list API to respond — use modelCode not pageKey
   await page.waitForResponse(
-    (r) =>
-      r.url().includes(`/api/dynamic/${modelCode}/list`) &&
-      r.status() === 200,
+    (r) => r.url().includes(`/api/dynamic/${modelCode}/list`) && r.status() === 200,
     { timeout: 15_000 },
   );
 
   // Table must be visible
-  await expect(
-    page.locator('table, [class*="ant-table"]'),
-  ).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator('table, [class*="ant-table"]')).toBeVisible({ timeout: 10_000 });
 }
 
 // ---------------------------------------------------------------------------
@@ -127,17 +119,13 @@ test.describe('Sales — Price List & Discount Rule', () => {
       // Create price list
       priceListName = `E2E PriceList ${UID}`;
       priceListCode = `PL-${UID}`;
-      const plResult = await executeCommandViaApi(
-        page,
-        'sl:create_price_list',
-        {
-          sl_pl_name: priceListName,
-          sl_pl_code: priceListCode,
-          sl_pl_currency: 'cny',
-          sl_pl_priority: 10,
-          sl_pl_status: 'draft',
-        },
-      );
+      const plResult = await executeCommandViaApi(page, 'sl:create_price_list', {
+        sl_pl_name: priceListName,
+        sl_pl_code: priceListCode,
+        sl_pl_currency: 'cny',
+        sl_pl_priority: 10,
+        sl_pl_status: 'draft',
+      });
       priceListPid = plResult.recordId;
     } catch (e) {
       console.error('[beforeAll] Failed to create price list:', e);
@@ -147,17 +135,13 @@ test.describe('Sales — Price List & Discount Rule', () => {
       // Create discount rule
       discountRuleName = `E2E DiscountRule ${UID}`;
       discountRuleCode = `DR-${UID}`;
-      const drResult = await executeCommandViaApi(
-        page,
-        'sl:create_discount_rule',
-        {
-          sl_dr_name: discountRuleName,
-          sl_dr_code: discountRuleCode,
-          sl_dr_type: 'percentage',
-          sl_dr_value: 10,
-          sl_dr_status: 'draft',
-        },
-      );
+      const drResult = await executeCommandViaApi(page, 'sl:create_discount_rule', {
+        sl_dr_name: discountRuleName,
+        sl_dr_code: discountRuleCode,
+        sl_dr_type: 'percentage',
+        sl_dr_value: 10,
+        sl_dr_status: 'draft',
+      });
       discountRulePid = drResult.recordId;
     } catch (e) {
       console.error('[beforeAll] Failed to create discount rule:', e);
@@ -228,9 +212,7 @@ test.describe('Sales — Price List & Discount Rule', () => {
 
     // Status should be draft (may render as Chinese "草稿" via i18n)
     const hasDraftStatus =
-      rowText?.includes('草稿') ||
-      rowText?.includes('draft') ||
-      rowText?.includes('draft');
+      rowText?.includes('草稿') || rowText?.includes('draft') || rowText?.includes('draft');
     expect(hasDraftStatus).toBe(true);
   });
 
@@ -252,9 +234,7 @@ test.describe('Sales — Price List & Discount Rule', () => {
     expect(result.recordId || result.code).toBeTruthy();
 
     // Verify status via direct record fetch (use model code, not page key)
-    const resp = await page.request.get(
-      `/api/dynamic/sl_price_list/${priceListPid}`,
-    );
+    const resp = await page.request.get(`/api/dynamic/sl_price_list/${priceListPid}`);
     expect(resp.ok()).toBe(true);
     const body = await resp.json();
     const record = body.data ?? body;
@@ -289,9 +269,7 @@ test.describe('Sales — Price List & Discount Rule', () => {
     const rowText = await row.textContent();
 
     const hasDraftStatus =
-      rowText?.includes('草稿') ||
-      rowText?.includes('draft') ||
-      rowText?.includes('draft');
+      rowText?.includes('草稿') || rowText?.includes('draft') || rowText?.includes('draft');
     expect(hasDraftStatus).toBe(true);
   });
 
@@ -313,9 +291,7 @@ test.describe('Sales — Price List & Discount Rule', () => {
     expect(result.recordId || result.code).toBeTruthy();
 
     // Verify status via direct record fetch (use model code, not page key)
-    const resp = await page.request.get(
-      `/api/dynamic/sl_discount_rule/${discountRulePid}`,
-    );
+    const resp = await page.request.get(`/api/dynamic/sl_discount_rule/${discountRulePid}`);
     expect(resp.ok()).toBe(true);
     const body = await resp.json();
     const record = body.data ?? body;
@@ -352,9 +328,7 @@ test.describe('Sales — Price List & Discount Rule', () => {
     expect(result.recordId || result.code).toBeTruthy();
 
     // Verify status via direct record fetch (use model code, not page key)
-    const resp = await page.request.get(
-      `/api/dynamic/sl_price_list/${priceListPid}`,
-    );
+    const resp = await page.request.get(`/api/dynamic/sl_price_list/${priceListPid}`);
     expect(resp.ok()).toBe(true);
     const body = await resp.json();
     const record = body.data ?? body;
@@ -374,13 +348,9 @@ test.describe('Sales — Price List & Discount Rule', () => {
 
     // Cross-verify via API query that data integrity is maintained
     // Use underscore model code to match the dynamic API endpoint format
-    const records = await queryFilteredList(
-      page,
-      'sl_price_list',
-      'sl_pl_name',
-      priceListName,
-      { operator: 'like' },
-    );
+    const records = await queryFilteredList(page, 'sl_price_list', 'sl_pl_name', priceListName, {
+      operator: 'like',
+    });
     expect(records.length).toBeGreaterThanOrEqual(1);
     expect(records[0].sl_pl_status).toBe('inactive');
   });

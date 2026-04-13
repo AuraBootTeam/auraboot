@@ -12,7 +12,7 @@ async function createViewViaApi(
   page: Page,
   modelCode: string,
   name: string,
-  viewConfig: any
+  viewConfig: any,
 ): Promise<string> {
   const resp = await page.request.post('/api/views', {
     data: {
@@ -36,7 +36,6 @@ async function getViewViaApi(page: Page, pid: string): Promise<any> {
 }
 
 test.describe('Kanban Enhanced Grouping (GAP-129)', () => {
-
   test('KG-001: BOOLEAN field accepted as groupByField', async ({ page }) => {
     await page.goto('/');
     await page.locator('nav, [data-testid="sidebar"]').first().waitFor({ timeout: 15000 });

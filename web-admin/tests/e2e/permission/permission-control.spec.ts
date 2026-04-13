@@ -14,7 +14,6 @@
 
 import { test, expect } from '../../fixtures';
 
-
 test.describe('Permission Control', () => {
   /**
    * E4-E01: Verify menu visibility
@@ -22,9 +21,7 @@ test.describe('Permission Control', () => {
    */
   test('E4-E01: User with permissions sees menus', async ({ page }) => {
     // Fetch user menu tree via API
-    const menuResponse = await page.request.get(
-      `/api/menu/user`
-    );
+    const menuResponse = await page.request.get(`/api/menu/user`);
 
     expect(menuResponse.ok()).toBe(true);
 
@@ -65,9 +62,7 @@ test.describe('Permission Control', () => {
       .catch(() => false);
 
     const hasAccessDenied = await page
-      .locator(
-        'text=403, text=无权限, text=Access Denied, text=Forbidden, text=权限不足'
-      )
+      .locator('text=403, text=无权限, text=Access Denied, text=Forbidden, text=权限不足')
       .isVisible({ timeout: 3000 })
       .catch(() => false);
 
@@ -82,9 +77,7 @@ test.describe('Permission Control', () => {
     // If content is visible, also verify it's meaningful (not just a blank layout)
     if (hasContent && !hasAccessDenied && !hasNotFound) {
       // Check permission management API is accessible
-      const permResponse = await page.request.get(
-        `/api/permissions/resource-type/MODEL`
-      );
+      const permResponse = await page.request.get(`/api/permissions/resource-type/MODEL`);
       // Admin should get 200, restricted user may get 403
       expect([200, 403]).toContain(permResponse.status());
     }
@@ -96,9 +89,7 @@ test.describe('Permission Control', () => {
    */
   test('E4-E04: Button permissions loaded', async ({ page }) => {
     // Fetch button permissions via API
-    const btnResponse = await page.request.get(
-      `/api/menu/buttons`
-    );
+    const btnResponse = await page.request.get(`/api/menu/buttons`);
 
     expect(btnResponse.ok()).toBe(true);
 
@@ -123,7 +114,7 @@ test.describe('Permission Control', () => {
     // Check for any action buttons on the page
     const hasActionButtons = await page
       .locator(
-        'button:has-text("新建"), button:has-text("创建"), button:has-text("Create"), button:has-text("New")'
+        'button:has-text("新建"), button:has-text("创建"), button:has-text("Create"), button:has-text("New")',
       )
       .first()
       .isVisible({ timeout: 5000 })
@@ -133,5 +124,4 @@ test.describe('Permission Control', () => {
     // Both states are valid depending on user role
     expect(typeof hasActionButtons).toBe('boolean');
   });
-
 });

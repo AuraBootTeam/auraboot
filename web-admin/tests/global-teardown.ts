@@ -46,7 +46,7 @@ async function globalTeardown(config: FullConfig): Promise<void> {
     }
 
     // Clean up E2E test orders (title starts with "E2E ")
-    await cleanupByPrefix(baseURL, cookieHeader, 'e2et-order', 'e2et_order_title', 'E2E ');
+    await cleanupByPrefix(baseURL, cookieHeader, 'e2et_order', 'e2et_order_title', 'E2E ');
 
     // Clean up temp integration test models
     await cleanupTempModels(baseURL, cookieHeader);
@@ -63,7 +63,7 @@ async function cleanupByPrefix(
   cookieHeader: string,
   modelCode: string,
   fieldName: string,
-  prefix: string
+  prefix: string,
 ): Promise<void> {
   try {
     const listUrl = `${baseURL}/api/dynamic/${modelCode}/list?current=1&size=100`;
@@ -75,8 +75,8 @@ async function cleanupByPrefix(
 
     const body = await resp.json();
     const records = body.data?.records || body.data?.list || [];
-    const toDelete = records.filter(
-      (r: Record<string, unknown>) => String(r[fieldName] || '').startsWith(prefix)
+    const toDelete = records.filter((r: Record<string, unknown>) =>
+      String(r[fieldName] || '').startsWith(prefix),
     );
 
     if (toDelete.length === 0) return;
@@ -119,8 +119,8 @@ async function cleanupTempModels(baseURL: string, cookieHeader: string): Promise
 
     if (!Array.isArray(models)) return;
 
-    const tempModels = models.filter(
-      (m: Record<string, unknown>) => String(m.code || '').startsWith('intg_e2e_')
+    const tempModels = models.filter((m: Record<string, unknown>) =>
+      String(m.code || '').startsWith('intg_e2e_'),
     );
 
     if (tempModels.length === 0) return;

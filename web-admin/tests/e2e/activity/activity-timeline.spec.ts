@@ -14,7 +14,7 @@
  */
 
 import { test, expect } from '../../fixtures';
-import { uniqueId, navigateToDynamicPage } from '../helpers';
+import { uniqueId, waitForDynamicPageLoad } from '../helpers';
 import { ModelTestHelper } from '../../helpers/model-test-helper';
 import { E2ET_ORDER_CONFIG } from '../../helpers/configs/e2et-order.config';
 
@@ -65,7 +65,7 @@ test.describe('Activity Timeline — DOCUMENT model', () => {
    */
   test('ACT-001: GET /api/activities returns activities for the order', async ({ page }) => {
     const resp = await page.request.get(
-      `/api/activities?objectModel=e2et_order&objectRecord=${orderPid}&limit=50`
+      `/api/activities?objectModel=e2et_order&objectRecord=${orderPid}&limit=50`,
     );
     expect(resp.ok()).toBe(true);
 
@@ -89,7 +89,7 @@ test.describe('Activity Timeline — DOCUMENT model', () => {
 
     // System activity from command execution should also be present
     const systemOrCreate = activities.find(
-      (a: any) => a.activityType === 'create' || a.activityType === 'system'
+      (a: any) => a.activityType === 'create' || a.activityType === 'system',
     );
     expect(systemOrCreate).toBeTruthy();
     expect(systemOrCreate.commandCode).toContain('create_order');
@@ -100,7 +100,7 @@ test.describe('Activity Timeline — DOCUMENT model', () => {
    */
   test('ACT-002: GET /api/activities/count returns positive count', async ({ page }) => {
     const resp = await page.request.get(
-      `/api/activities/count?objectModel=e2et_order&objectRecord=${orderPid}`
+      `/api/activities/count?objectModel=e2et_order&objectRecord=${orderPid}`,
     );
     expect(resp.ok()).toBe(true);
 
@@ -114,9 +114,8 @@ test.describe('Activity Timeline — DOCUMENT model', () => {
    */
   test('ACT-003: Detail page shows Activity tab for DOCUMENT model', async ({ page }) => {
     // Navigate to the detail page
-    await page.goto(`/dynamic/e2et_order/view/${orderPid}`);
-    await page.waitForLoadState('domcontentloaded');
-    await page.locator('h2, h1').first().waitFor({ state: 'visible', timeout: 10000 });
+    await page.goto(`/p/e2et_order/view/${orderPid}`);
+    await waitForDynamicPageLoad(page, 10000);
 
     // Look for the Activity tab
     const activityTab = page.locator('button, [role="tab"]').filter({
@@ -129,9 +128,8 @@ test.describe('Activity Timeline — DOCUMENT model', () => {
    * ACT-004: Clicking Activity tab loads and displays activities
    */
   test('ACT-004: Activity tab shows timeline with real data', async ({ page }) => {
-    await page.goto(`/dynamic/e2et_order/view/${orderPid}`);
-    await page.waitForLoadState('domcontentloaded');
-    await page.locator('h2, h1').first().waitFor({ state: 'visible', timeout: 10000 });
+    await page.goto(`/p/e2et_order/view/${orderPid}`);
+    await waitForDynamicPageLoad(page, 10000);
 
     const activityTab = page.locator('button, [role="tab"]').filter({
       hasText: /Activity|活动记录/,
@@ -140,9 +138,12 @@ test.describe('Activity Timeline — DOCUMENT model', () => {
 
     if (!(await noteText.isVisible().catch(() => false))) {
       const activityResponsePromise = page
-        .waitForResponse((resp) => resp.url().includes('/api/activities') && resp.status() === 200, {
-          timeout: 10000,
-        })
+        .waitForResponse(
+          (resp) => resp.url().includes('/api/activities') && resp.status() === 200,
+          {
+            timeout: 10000,
+          },
+        )
         .catch(() => null);
 
       await activityTab.first().click();
@@ -168,9 +169,8 @@ test.describe('Activity Timeline — DOCUMENT model', () => {
    * ACT-005: Field History tab still visible alongside Activity tab
    */
   test('ACT-005: Field History tab coexists with Activity tab', async ({ page }) => {
-    await page.goto(`/dynamic/e2et_order/view/${orderPid}`);
-    await page.waitForLoadState('domcontentloaded');
-    await page.locator('h2, h1').first().waitFor({ state: 'visible', timeout: 10000 });
+    await page.goto(`/p/e2et_order/view/${orderPid}`);
+    await waitForDynamicPageLoad(page, 10000);
 
     // Both tabs should be visible
     const activityTab = page.locator('button, [role="tab"]').filter({

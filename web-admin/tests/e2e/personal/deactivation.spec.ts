@@ -31,19 +31,15 @@ function ensureUserEnabled(): void {
   const email = DEFAULT_TEST_ACCOUNT.email;
   const db = 'aura_boot';
   const psql = (sql: string) =>
-    execSync(
-      `psql -h localhost -U ghj -d ${db} -P pager=off -t -c "${sql}"`,
-      { encoding: 'utf-8', timeout: 5000 },
-    ).trim();
+    execSync(`psql -h localhost -U ghj -d ${db} -P pager=off -t -c "${sql}"`, {
+      encoding: 'utf-8',
+      timeout: 5000,
+    }).trim();
 
   // Enable user and clear deactivation status
-  psql(
-    `UPDATE ab_user SET is_enabled = true, deactivation_status = NULL WHERE email = '${email}'`,
-  );
+  psql(`UPDATE ab_user SET is_enabled = true, deactivation_status = NULL WHERE email = '${email}'`);
   // Remove any lingering deactivation records
-  psql(
-    `DELETE FROM ab_user_deactivation WHERE user_email = '${email}'`,
-  );
+  psql(`DELETE FROM ab_user_deactivation WHERE user_email = '${email}'`);
 }
 
 test.describe.serial('Account Deactivation', () => {
@@ -58,9 +54,7 @@ test.describe.serial('Account Deactivation', () => {
     });
     const cleanupPage = await ctx.newPage();
     try {
-      await cleanupPage.request
-        .post('/api/auth/deactivation/cancel')
-        .catch(() => {});
+      await cleanupPage.request.post('/api/auth/deactivation/cancel').catch(() => {});
     } finally {
       await cleanupPage.close();
       await ctx.close();
@@ -74,9 +68,7 @@ test.describe.serial('Account Deactivation', () => {
     });
     const cleanupPage = await ctx.newPage();
     try {
-      await cleanupPage.request
-        .post('/api/auth/deactivation/cancel')
-        .catch(() => {});
+      await cleanupPage.request.post('/api/auth/deactivation/cancel').catch(() => {});
     } finally {
       await cleanupPage.close();
       await ctx.close();
@@ -89,16 +81,12 @@ test.describe.serial('Account Deactivation', () => {
    * DA-001: Page load shows step 1
    * Verify page title, step indicator, reason options, and Continue button.
    */
-  test('DA-001: should display step 1 with warnings @smoke', async ({
-    page,
-  }) => {
+  test('DA-001: should display step 1 with warnings @smoke', async ({ page }) => {
     await page.goto(PAGE_URL);
     await page.waitForLoadState('domcontentloaded');
 
     // Page title
-    await expect(
-      page.locator('h1').filter({ hasText: 'Account Deactivation' }),
-    ).toBeVisible();
+    await expect(page.locator('h1').filter({ hasText: 'Account Deactivation' })).toBeVisible();
 
     // Step 1 content
     const step1 = page.locator('[data-testid="deactivation-step-1"]');
@@ -119,9 +107,7 @@ test.describe.serial('Account Deactivation', () => {
   /**
    * DA-002: Step 1 validation — Continue enabled after selecting reason
    */
-  test('DA-002: should enable Continue after selecting reason', async ({
-    page,
-  }) => {
+  test('DA-002: should enable Continue after selecting reason', async ({ page }) => {
     await page.goto(PAGE_URL);
     await page.waitForLoadState('domcontentloaded');
 
@@ -138,9 +124,7 @@ test.describe.serial('Account Deactivation', () => {
   /**
    * DA-003: Step 2 shows password input
    */
-  test('DA-003: should navigate to step 2 with password input', async ({
-    page,
-  }) => {
+  test('DA-003: should navigate to step 2 with password input', async ({ page }) => {
     await page.goto(PAGE_URL);
     await page.waitForLoadState('domcontentloaded');
 
@@ -153,9 +137,7 @@ test.describe.serial('Account Deactivation', () => {
     await expect(step2).toBeVisible();
 
     // Password input
-    const passwordInput = page.locator(
-      '[data-testid="deactivation-password-input"]',
-    );
+    const passwordInput = page.locator('[data-testid="deactivation-password-input"]');
     await expect(passwordInput).toBeVisible();
 
     // Continue button disabled until password entered
@@ -193,9 +175,7 @@ test.describe.serial('Account Deactivation', () => {
     await expect(submitBtn).toBeDisabled();
 
     // Check consent
-    await page
-      .locator('[data-testid="deactivation-consent-checkbox"]')
-      .check();
+    await page.locator('[data-testid="deactivation-consent-checkbox"]').check();
     await expect(submitBtn).toBeEnabled();
 
     // Submit and wait for API
