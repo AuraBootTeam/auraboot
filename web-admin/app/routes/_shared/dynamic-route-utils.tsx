@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { sanitizeHtml } from '~/meta/utils/sanitizeHtml';
+import { sanitizeHtml } from '~/framework/meta/utils/sanitizeHtml';
 
 // 导入并重新导出统一的 i18n 实现
 import {
@@ -12,7 +12,7 @@ import {
   type LocalizedText,
   type TranslatableText,
   type TranslateFunction,
-} from '~/meta/runtime/expression/i18n-renderer';
+} from '~/framework/meta/runtime/expression/i18n-renderer';
 
 // 重新导出供外部使用
 export { getLocalizedText, type LocalizedText, type TranslatableText, type TranslateFunction };

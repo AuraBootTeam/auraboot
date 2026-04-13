@@ -10,7 +10,7 @@
  * @since 4.0.0
  */
 
-import type { TemplateFieldMeta, TemplateModelMeta } from '../../app/meta/templates/types';
+import type { TemplateFieldMeta, TemplateModelMeta } from '../../app/framework/meta/templates/types';
 
 export interface TestGenConfig {
   /** Model metadata */
@@ -92,7 +92,7 @@ import { setupCrudMocks } from '../fixtures/api-mock.fixture';
 import { DynamicListPage } from '../pages/DynamicListPage';
 import { DynamicFormPage } from '../pages/DynamicFormPage';
 import { generateMockRecords, generateFormPayload, generateInvalidPayload } from '../generators/MockDataGenerator';
-import type { TemplateFieldMeta } from '../../app/meta/templates/types';`;
+import type { TemplateFieldMeta } from '../../app/framework/meta/templates/types';`;
 }
 
 function generateSetup(config: TestGenConfig): string {

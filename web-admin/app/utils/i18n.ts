@@ -7,8 +7,8 @@
 
 import { useI18n } from '~/contexts/I18nContext';
 import { useCallback } from 'react';
-import { getLocalizedText as getLocalizedTextImpl } from '~/meta/runtime/expression/i18n-renderer';
-import type { LocalizedText } from '~/meta/runtime/expression/i18n-renderer';
+import { getLocalizedText as getLocalizedTextImpl } from '~/framework/meta/runtime/expression/i18n-renderer';
+import type { LocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
 
 // 重新导出统一实现的类型和函数
 export {
@@ -17,7 +17,7 @@ export {
   type LocalizedText,
   type TranslatableText,
   type TranslateFunction,
-} from '~/meta/runtime/expression/i18n-renderer';
+} from '~/framework/meta/runtime/expression/i18n-renderer';
 
 /**
  * React Hook：自动获取 t 函数并提供翻译权限

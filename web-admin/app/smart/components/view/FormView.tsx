@@ -16,9 +16,9 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { fetchResult } from '~/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import type { ViewConfig } from '~/smart/types/savedView';
-import type { FieldConfig } from '~/meta/schemas/types';
-import { createExpressionContext } from '~/meta/runtime/expression/context';
-import { ControlledFieldRenderer } from '~/meta/rendering/ControlledFieldRenderer';
+import type { FieldConfig } from '~/framework/meta/schemas/types';
+import { createExpressionContext } from '~/framework/meta/runtime/expression/context';
+import { ControlledFieldRenderer } from '~/framework/meta/rendering/ControlledFieldRenderer';
 import { ViewEmptyState } from './shared';
 
 interface FormViewProps {

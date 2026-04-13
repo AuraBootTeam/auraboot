@@ -17,7 +17,7 @@ import { ExportPdfButton } from '~/smart/components/data-tools/ExportPdfButton';
 import { DashboardExportExcel } from './DashboardExportExcel';
 import { useI18n } from '~/contexts/I18nContext';
 import { DESIGNER_I18N, resolveDesignerText } from '~/shared/designer';
-import { deriveTestId } from '~/meta/rendering/utils/deriveTestId';
+import { deriveTestId } from '~/framework/meta/rendering/utils/deriveTestId';
 
 type LinkageFiltersMap = Record<string, FilterConfig[]>;
 

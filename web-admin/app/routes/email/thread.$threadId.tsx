@@ -28,7 +28,7 @@ import {
   type CrmLink,
 } from '~/services/emailService';
 import TrackingStats from '~/components/email/TrackingStats';
-import { sanitizeHtml } from '~/meta/utils/sanitizeHtml';
+import { sanitizeHtml } from '~/framework/meta/utils/sanitizeHtml';
 
 function timeAgo(dateStr: string): string {
   const d = new Date(dateStr);

@@ -4,7 +4,7 @@ import { render, screen } from '@testing-library/react';
 import { DesignerPreview } from '~/plugins/core-designer/components/studio/workbench/runtime/DesignerPreview';
 import type { FormSchema } from '~/plugins/core-designer/components/studio/domain/schema/types';
 
-vi.mock('~/meta/rendering/SchemaRenderer', () => ({
+vi.mock('~/framework/meta/rendering/SchemaRenderer', () => ({
   SchemaRendererWithContainer: ({ runtime }: any) => (
     <div data-testid="schema-renderer">{runtime ? 'rendered' : 'empty'}</div>
   ),

@@ -5,7 +5,7 @@
  * @since 4.0.0
  */
 
-import type { TemplateFieldMeta, FieldDataType } from '../../app/meta/templates/types';
+import type { TemplateFieldMeta, FieldDataType } from '../../app/framework/meta/templates/types';
 
 export interface MockGeneratorOptions {
   /** Number of records to generate */

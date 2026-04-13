@@ -13,7 +13,7 @@ import {
   componentRegistry,
   initializeComponentRegistry,
   type ComponentRegistry,
-} from '~/meta/registry/components';
+} from '~/framework/meta/registry/components';
 import {
   actionRegistry,
   useSchemaRuntime,

@@ -19,7 +19,7 @@
 
 import React from 'react';
 import { useI18n } from '~/contexts/I18nContext';
-import { resolveI18nValue } from '~/meta/utils/i18nFieldHelper';
+import { resolveI18nValue } from '~/framework/meta/utils/i18nFieldHelper';
 
 export interface I18nTextProps {
   /** The data record containing primary and companion locale fields */

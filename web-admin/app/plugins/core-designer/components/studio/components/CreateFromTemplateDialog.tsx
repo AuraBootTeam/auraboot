@@ -12,7 +12,7 @@ import React, { useState } from 'react';
 import { createPage } from '~/plugins/core-designer/components/studio/services/page-manager/pageApi';
 import type { PageSchemaDTO } from '~/plugins/core-designer/components/studio/services/page-manager/api-types';
 import { TemplateGallery } from './TemplateGallery';
-import { CURRENT_SCHEMA_VERSION } from '~/meta/migration';
+import { CURRENT_SCHEMA_VERSION } from '~/framework/meta/migration';
 
 interface CreateFromTemplateDialogProps {
   open: boolean;

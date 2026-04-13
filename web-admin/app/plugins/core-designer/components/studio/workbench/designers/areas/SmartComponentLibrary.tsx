@@ -7,8 +7,8 @@
 
 import React, { useState, useMemo } from 'react';
 import { useDraggable } from '@dnd-kit/core';
-import { componentRegistry, initializeComponentRegistry } from '~/meta/registry/components';
-import type { ComponentConfig } from '~/meta/registry/components/ComponentConfig';
+import { componentRegistry, initializeComponentRegistry } from '~/framework/meta/registry/components';
+import type { ComponentConfig } from '~/framework/meta/registry/components/ComponentConfig';
 import { DRAG_TYPES } from '~/plugins/core-designer/components/studio/workbench/constants';
 
 export interface SmartComponentLibraryProps {

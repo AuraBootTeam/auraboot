@@ -5,7 +5,7 @@ import type { SelectProps } from '~/plugins/core-designer/components/studio/doma
 import { useSmartField } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartComponent';
 import { useSmartFieldContract } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldContract';
 import { useSmartFieldMeta } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldMeta';
-import { useFieldDataSource } from '~/meta/hooks/useFieldDataSource';
+import { useFieldDataSource } from '~/framework/meta/hooks/useFieldDataSource';
 import { useI18n } from '~/contexts/I18nContext';
 import { useSmartText, translateArray } from '~/utils/i18n';
 import { FieldBase } from '~/components/ui/field-base';
