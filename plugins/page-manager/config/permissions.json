@@ -1,0 +1,18 @@
+[
+  {
+    "code": "pgm.page_schema.read",
+    "name:zh-CN": "查看页面配置",
+    "name:en": "View Page Configuration",
+    "type": "menu",
+    "resource": "/p/page_schema",
+    "action": "view"
+  },
+  {
+    "code": "pgm.page_schema.manage",
+    "name:zh-CN": "管理页面配置",
+    "name:en": "Manage Page Configuration",
+    "type": "operation",
+    "resource": "page_schema",
+    "action": "manage"
+  }
+]

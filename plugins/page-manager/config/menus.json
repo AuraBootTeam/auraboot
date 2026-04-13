@@ -1,0 +1,17 @@
+[
+  {
+    "code": "page_schema_mgmt",
+    "parentCode": "meta_management",
+    "name:zh-CN": "页面配置",
+    "name:en": "Page Configuration",
+    "path": "/p/page_schema",
+    "pageKey": "page_schema_list",
+    "component": null,
+    "icon": "Layout",
+    "type": 1,
+    "permissionCode": "pgm.page_schema.read",
+    "orderNo": 14,
+    "visible": true,
+    "extension": { "platforms": ["web"] }
+  }
+]

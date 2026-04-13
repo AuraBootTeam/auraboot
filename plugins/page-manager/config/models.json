@@ -1,0 +1,17 @@
+[
+  {
+    "code": "page_schema",
+    "displayName:zh-CN": "页面配置",
+    "displayName:en": "Page Schema",
+    "description": "Page schema management for the Page Designer",
+    "modelType": "entity",
+    "modelCategory": "master",
+    "extension": {
+      "titleField": "name",
+      "subtitleField": "page_key",
+      "tableName": "ab_page_schema",
+      "softDelete": true,
+      "icon": "Layout"
+    }
+  }
+]

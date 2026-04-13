@@ -1,0 +1,15 @@
+[
+  { "modelCode": "page_schema", "fieldCode": "name", "sequence": 1, "required": true, "visible": true, "editable": true, "displayConfig": { "searchable": true, "sortable": true } },
+  { "modelCode": "page_schema", "fieldCode": "page_key", "sequence": 2, "required": true, "visible": true, "editable": true, "displayConfig": { "searchable": true, "sortable": true } },
+  { "modelCode": "page_schema", "fieldCode": "kind", "sequence": 3, "required": true, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "page_schema", "fieldCode": "status", "sequence": 4, "required": false, "visible": true, "editable": false, "displayConfig": { "searchable": true } },
+  { "modelCode": "page_schema", "fieldCode": "model_code", "sequence": 5, "required": false, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "page_schema", "fieldCode": "description", "sequence": 6, "required": false, "visible": true, "editable": true },
+  { "modelCode": "page_schema", "fieldCode": "profile", "sequence": 7, "required": false, "visible": true, "editable": true },
+  { "modelCode": "page_schema", "fieldCode": "version", "sequence": 8, "required": false, "visible": false, "editable": false },
+  { "modelCode": "page_schema", "fieldCode": "semver", "sequence": 9, "required": false, "visible": true, "editable": false },
+  { "modelCode": "page_schema", "fieldCode": "is_template", "sequence": 10, "required": false, "visible": true, "editable": true },
+  { "modelCode": "page_schema", "fieldCode": "published_at", "sequence": 10, "required": false, "visible": true, "editable": false },
+  { "modelCode": "page_schema", "fieldCode": "created_at", "sequence": 11, "required": false, "visible": true, "editable": false },
+  { "modelCode": "page_schema", "fieldCode": "updated_at", "sequence": 12, "required": false, "visible": true, "editable": false }
+]
