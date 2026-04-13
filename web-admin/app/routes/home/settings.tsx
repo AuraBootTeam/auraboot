@@ -4,8 +4,8 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { DashboardDesigner } from '~/dashboard-designer/DashboardDesigner';
-import { dashboardService } from '~/dashboard-designer/services/dashboardService';
+import { DashboardDesigner } from '~/plugins/core-dashboard/DashboardDesigner';
+import { dashboardService } from '~/plugins/core-dashboard/services/dashboardService';
 
 export default function WorkbenchSettingsPage() {
   const [workbenchId, setWorkbenchId] = useState<string | null>(null);

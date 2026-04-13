@@ -4,9 +4,9 @@
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { DashboardViewer } from '~/dashboard-designer/components/DashboardViewer';
-import type { Dashboard } from '~/dashboard-designer/types';
-import { dashboardService } from '~/dashboard-designer/services/dashboardService';
+import { DashboardViewer } from '~/plugins/core-dashboard/components/DashboardViewer';
+import type { Dashboard } from '~/plugins/core-dashboard/types';
+import { dashboardService } from '~/plugins/core-dashboard/services/dashboardService';
 
 export default function WorkbenchPage() {
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);

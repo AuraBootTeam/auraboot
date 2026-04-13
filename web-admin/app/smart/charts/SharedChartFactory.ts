@@ -7,19 +7,19 @@
  */
 
 import React from 'react';
-import { InboxWidget } from '~/dashboard-designer/widgets/workbench/InboxWidget';
-import { RecentWidget } from '~/dashboard-designer/widgets/workbench/RecentWidget';
-import { ShortcutsWidget } from '~/dashboard-designer/widgets/workbench/ShortcutsWidget';
-import { StatsRowWidget } from '~/dashboard-designer/widgets/workbench/StatsRowWidget';
-import { MyProcessWidget } from '~/dashboard-designer/widgets/workbench/MyProcessWidget';
-import { ProcessStatsWidget } from '~/dashboard-designer/widgets/workbench/ProcessStatsWidget';
-import { PipelineWidget } from '~/dashboard-designer/widgets/workbench/PipelineWidget';
-import { LeadsWidget } from '~/dashboard-designer/widgets/workbench/LeadsWidget';
-import { ActivitiesWidget } from '~/dashboard-designer/widgets/workbench/ActivitiesWidget';
-import { CalendarWidget } from '~/dashboard-designer/widgets/workbench/CalendarWidget';
-import { AnnouncementWidget } from '~/dashboard-designer/widgets/workbench/AnnouncementWidget';
-import { QuickNoteWidget } from '~/dashboard-designer/widgets/workbench/QuickNoteWidget';
-import { StatsCardWidget } from '~/dashboard-designer/widgets/workbench/StatsCardWidget';
+import { InboxWidget } from '~/plugins/core-dashboard/widgets/workbench/InboxWidget';
+import { RecentWidget } from '~/plugins/core-dashboard/widgets/workbench/RecentWidget';
+import { ShortcutsWidget } from '~/plugins/core-dashboard/widgets/workbench/ShortcutsWidget';
+import { StatsRowWidget } from '~/plugins/core-dashboard/widgets/workbench/StatsRowWidget';
+import { MyProcessWidget } from '~/plugins/core-dashboard/widgets/workbench/MyProcessWidget';
+import { ProcessStatsWidget } from '~/plugins/core-dashboard/widgets/workbench/ProcessStatsWidget';
+import { PipelineWidget } from '~/plugins/core-dashboard/widgets/workbench/PipelineWidget';
+import { LeadsWidget } from '~/plugins/core-dashboard/widgets/workbench/LeadsWidget';
+import { ActivitiesWidget } from '~/plugins/core-dashboard/widgets/workbench/ActivitiesWidget';
+import { CalendarWidget } from '~/plugins/core-dashboard/widgets/workbench/CalendarWidget';
+import { AnnouncementWidget } from '~/plugins/core-dashboard/widgets/workbench/AnnouncementWidget';
+import { QuickNoteWidget } from '~/plugins/core-dashboard/widgets/workbench/QuickNoteWidget';
+import { StatsCardWidget } from '~/plugins/core-dashboard/widgets/workbench/StatsCardWidget';
 
 type LazyComponent = React.LazyExoticComponent<React.ComponentType<any>>;
 
