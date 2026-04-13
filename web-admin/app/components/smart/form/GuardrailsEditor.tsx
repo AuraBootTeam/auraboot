@@ -7,7 +7,7 @@
  */
 
 import React, { forwardRef, useState, useCallback, useMemo, useEffect } from 'react';
-import { useSmartFieldContract } from '~/studio/hooks/runtime/useSmartFieldContract';
+import { useSmartFieldContract } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldContract';
 import { useSmartText } from '~/utils/i18n';
 import { FieldBase } from '~/components/ui/field-base';
 import { FieldControl } from '~/components/ui/field-control';

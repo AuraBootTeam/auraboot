@@ -7,10 +7,10 @@
  */
 
 import React, { useRef, useState, useCallback } from 'react';
-import type { UploadProps, UploadFile } from '~/studio/domain/schema/smart-components';
-import { useSmartField } from '~/studio/hooks/runtime/useSmartComponent';
-import { useSmartFieldContract } from '~/studio/hooks/runtime/useSmartFieldContract';
-import { useSmartFieldMeta } from '~/studio/hooks/runtime/useSmartFieldMeta';
+import type { UploadProps, UploadFile } from '~/plugins/core-designer/components/studio/domain/schema/smart-components';
+import { useSmartField } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartComponent';
+import { useSmartFieldContract } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldContract';
+import { useSmartFieldMeta } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldMeta';
 import { useSmartText } from '~/utils/i18n';
 import { FieldBase } from '~/components/ui/field-base';
 import { FilePreviewModal } from '~/smart/components/common/FilePreviewModal';

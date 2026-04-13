@@ -1,6 +1,6 @@
 import React from 'react';
 import clsx from 'clsx';
-import type { ButtonProps } from '~/studio/domain/schema/smart-components';
+import type { ButtonProps } from '~/plugins/core-designer/components/studio/domain/schema/smart-components';
 
 const sizeStyles: Record<NonNullable<ButtonProps['size']>, string> = {
   small: 'px-2 py-1 text-sm',

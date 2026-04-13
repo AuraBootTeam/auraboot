@@ -1,12 +1,12 @@
 import React, { forwardRef } from 'react';
-import type { CheckboxProps } from '~/studio/domain/schema/smart-components';
+import type { CheckboxProps } from '~/plugins/core-designer/components/studio/domain/schema/smart-components';
 import {
   useConditionalRender,
   useExpressionValue,
   useSmartField,
-} from '~/studio/hooks/runtime/useSmartComponent';
-import { useSmartFieldContract } from '~/studio/hooks/runtime/useSmartFieldContract';
-import { useSmartFieldMeta } from '~/studio/hooks/runtime/useSmartFieldMeta';
+} from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartComponent';
+import { useSmartFieldContract } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldContract';
+import { useSmartFieldMeta } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldMeta';
 import { useSmartText } from '~/utils/i18n';
 import { FieldBase } from '~/components/ui/field-base';
 

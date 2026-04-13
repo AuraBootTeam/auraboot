@@ -3,7 +3,7 @@
  * 基于 final.v1.0 DSL 结构
  */
 
-import type { LinkageRule } from '~/studio/workbench/panels/linkage/types';
+import type { LinkageRule } from '~/plugins/core-designer/components/studio/workbench/panels/linkage/types';
 
 // 多语言文本类型
 // 注意: 此类型应与 i18n-renderer.ts 中的定义保持一致

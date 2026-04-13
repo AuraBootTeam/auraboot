@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { cn } from '~/utils/cn';
-import { useConditionalRender } from '~/studio/hooks/runtime/useSmartComponent';
-import { ExpressionParser } from '~/studio/services/runtime/expression/expression-parser';
+import { useConditionalRender } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartComponent';
+import { ExpressionParser } from '~/plugins/core-designer/components/studio/services/runtime/expression/expression-parser';
 import { Input } from '~/components/smart/form/Input';
 import { Select } from '~/components/smart/form/Select';
 import { Textarea } from '~/components/smart/form/Textarea';
@@ -14,7 +14,7 @@ import type {
   FormProps,
   FormFieldConfig,
   FormActionConfig,
-} from '~/studio/domain/schema/smart-components';
+} from '~/plugins/core-designer/components/studio/domain/schema/smart-components';
 
 /**
  * Form 智能表单组件

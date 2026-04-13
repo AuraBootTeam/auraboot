@@ -1,15 +1,15 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import clsx from 'clsx';
 import { ChevronUpIcon, ChevronDownIcon, FilterIcon, SearchIcon } from 'lucide-react';
-import type { ButtonProps } from '~/studio/domain/schema/smart-components';
+import type { ButtonProps } from '~/plugins/core-designer/components/studio/domain/schema/smart-components';
 import {
   useSmartComponentState,
   useValidation,
   useConditionalRender,
   useDataSource,
   useExpressionValue,
-} from '~/studio/hooks/runtime/useSmartComponent';
-import { ExpressionParser } from '~/studio/services/runtime/expression/expression-parser';
+} from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartComponent';
+import { ExpressionParser } from '~/plugins/core-designer/components/studio/services/runtime/expression/expression-parser';
 import { Button } from '~/components/smart/interaction/Button';
 import { confirmDialog } from '~/utils/confirmDialog';
 
