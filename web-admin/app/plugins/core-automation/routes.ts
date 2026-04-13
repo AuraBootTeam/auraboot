@@ -1,8 +1,7 @@
 import { route, type RouteConfigEntry } from '@react-router/dev/routes'
+import { toRouteEntries } from '../_shared/types.js'
+import { RESOURCES } from './resources.js'
 
 export function automationRoutes(): RouteConfigEntry[] {
-  return [
-    route('/automations', './plugins/core-automation/pages/automations.tsx'),
-    route('/automation/:id', './plugins/core-automation/pages/automation.$id.tsx'),
-  ]
+  return toRouteEntries(RESOURCES, (path, file) => route(path, file))
 }

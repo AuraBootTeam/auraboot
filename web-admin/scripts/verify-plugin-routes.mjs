@@ -95,6 +95,27 @@ function main() {
     const dir = path.join(PLUGINS_DIR, name)
     const indexFile = path.join(dir, 'index.ts')
     const routesFile = path.join(dir, 'routes.ts')
+    const resourcesFile = path.join(dir, 'resources.ts')
+
+    // Single-source plugins (M5+) declare paths in resources.ts and have
+    // thin index.ts/routes.ts that derive from it. For those, the dual-write
+    // is eliminated by construction — just verify resources.ts exists and
+    // index.ts/routes.ts use the toNavigationResources/toRouteEntries pattern.
+    const resourcesSrc = readIfExists(resourcesFile)
+    if (resourcesSrc) {
+      const indexSrcAlt = readIfExists(indexFile) ?? ''
+      const routesSrcAlt = readIfExists(routesFile) ?? ''
+      const usesPattern = /toNavigationResources\s*\(\s*RESOURCES\s*\)/.test(indexSrcAlt) ||
+                          /toRouteEntries\s*\(\s*RESOURCES/.test(routesSrcAlt)
+      if (usesPattern) {
+        const resourceCount = (resourcesSrc.match(/\bpath\s*:\s*['"]/g) ?? []).length
+        const fileCount = (resourcesSrc.match(/\bfile\s*:\s*['"]/g) ?? []).length
+        console.log(`${GREEN}[ ok ]${RESET}    ${name}: single-source resources.ts (${resourceCount} resources, ${fileCount} routable)`)
+        ok++
+        continue
+      }
+      // Has resources.ts but doesn't use the helper — fall through to legacy check
+    }
 
     const indexSrc = readIfExists(indexFile)
     const routesSrc = readIfExists(routesFile)

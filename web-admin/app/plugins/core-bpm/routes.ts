@@ -1,17 +1,11 @@
 import { route, type RouteConfigEntry } from '@react-router/dev/routes'
+import { toRouteEntries } from '../_shared/types.js'
+import { RESOURCES } from './resources.js'
 
 /**
- * Static React Router 7 route declarations for core-bpm.
- *
- * Imported by `packages/core/route-manifest.ts` so React Router typegen
- * picks them up. The same paths are also registered via PluginContext
- * in ./index.ts for menu/breadcrumb/permission gating.
+ * Static React Router 7 routes for core-bpm. Derived from ./resources.ts.
+ * Imported by packages/core/route-manifest.ts.
  */
 export function bpmRoutes(): RouteConfigEntry[] {
-  return [
-    route('/bpm/task-center', './plugins/core-bpm/pages/TaskCenter.tsx'),
-    route('/bpm/approval-inbox', './plugins/core-bpm/pages/ApprovalInbox.tsx'),
-    route('/bpm/process-status', './plugins/core-bpm/pages/ProcessStatus.tsx'),
-    route('/bpm/sla-monitor', './plugins/core-bpm/pages/SlaMonitor.tsx'),
-  ]
+  return toRouteEntries(RESOURCES, (path, file) => route(path, file))
 }
