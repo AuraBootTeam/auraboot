@@ -16,12 +16,12 @@ import React, {
   useRef,
 } from 'react';
 import { useLocation, useParams } from 'react-router';
-import type { PageContext } from './hooks/usePageContext';
+import type { PageContext } from '../hooks/usePageContext';
 import {
   auraBotApi,
   type AuraBotConversationItem,
   type AuraBotConversationMessage,
-} from './services/auraBotApi';
+} from '../services/auraBotApi';
 
 // ============================================================================
 // State Types

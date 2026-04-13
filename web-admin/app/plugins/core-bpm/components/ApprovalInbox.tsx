@@ -13,7 +13,7 @@ import {
   type ApprovalTaskDTO,
   getMyPendingTasks,
   getMyHistory,
-} from '~/bpm/services/approvalService';
+} from '~/plugins/core-bpm/services/approvalService';
 import { BpmTaskDrawer } from './BpmTaskDrawer';
 
 type Tab = 'pending' | 'approved' | 'rejected' | 'all';

@@ -49,7 +49,7 @@ import { getSessionFromRequest, getTokenFromRequest, sessionStorage } from '~/se
 import { AuthProvider } from '~/contexts/AuthContext';
 import { EntitlementProvider } from '~/contexts/EntitlementContext';
 import { DslRegistryProvider } from '~/contexts/DslRegistryContext';
-import { AuraBotProvider } from '~/aurabot';
+import { AuraBotProvider } from '~/plugins/core-aurabot/components-shell';
 import { QueryProvider } from '~/providers/QueryProvider';
 
 import { sessionMiddleware } from '~/middleware/auth_filter';

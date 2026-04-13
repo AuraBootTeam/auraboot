@@ -3,11 +3,11 @@ import { useLocation } from 'react-router';
 import Header from '~/routes/Header';
 import LeftSidebar from '~/routes/LeftSidebar';
 import PageContent from '~/routes/PageContent';
-import { useAuraBot } from '~/aurabot/AuraBotProvider';
+import { useAuraBot } from '~/plugins/core-aurabot/components-shell/AuraBotProvider';
 import { recordVisit } from '~/dashboard-designer/widgets/workbench/useRecentVisits';
 
 const AuraBotPanel = React.lazy(() =>
-  import('~/aurabot/AuraBotPanel').then((m) => ({ default: m.AuraBotPanel })),
+  import('~/plugins/core-aurabot/components-shell/AuraBotPanel').then((m) => ({ default: m.AuraBotPanel })),
 );
 
 export default function DefaultLayout() {

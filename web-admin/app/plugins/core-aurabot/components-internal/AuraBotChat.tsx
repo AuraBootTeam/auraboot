@@ -9,8 +9,8 @@
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import type { KeyboardEvent } from 'react';
-import { useAuraBot } from '../AuraBotProvider';
-import type { SimpleMessage } from '../AuraBotProvider';
+import { useAuraBot } from '../components-shell/AuraBotProvider';
+import type { SimpleMessage } from '../components-shell/AuraBotProvider';
 import { ToolResultCard } from './ToolResultCard';
 import { ChatBiResultCard } from './ChatBiResultCard';
 import { ConfirmCard } from './ConfirmCard';

@@ -10,7 +10,7 @@ import {
   ChatBubbleLeftRightIcon,
   DevicePhoneMobileIcon,
 } from '@heroicons/react/24/outline';
-import { useAuraBot } from '~/aurabot';
+import { useAuraBot } from '~/plugins/core-aurabot/components-shell';
 
 const CARDS = [
   {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { fetchResult } from '~/services/http-client';
-import type { PageContext } from '~/aurabot/hooks/usePageContext';
+import type { PageContext } from '~/plugins/core-aurabot/hooks/usePageContext';
 
 interface Action {
   code: string;

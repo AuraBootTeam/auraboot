@@ -8,7 +8,7 @@
  */
 
 import React, { useState, useRef } from 'react';
-import { auraBotApi } from '~/aurabot/services/auraBotApi';
+import { auraBotApi } from '~/plugins/core-aurabot/services/auraBotApi';
 import { buildPageGenerationPrompt, parsePageDslResponse } from './ai-page-prompt';
 
 export interface AiPageGenerateDialogProps {

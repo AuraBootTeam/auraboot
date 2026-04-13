@@ -9,7 +9,7 @@
  */
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { auraBotApi } from '~/aurabot/services/auraBotApi';
+import { auraBotApi } from '~/plugins/core-aurabot/services/auraBotApi';
 import { get } from '~/services/http-client';
 import {
   buildContextPrompt,
