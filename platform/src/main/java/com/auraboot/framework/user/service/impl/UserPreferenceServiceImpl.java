@@ -33,6 +33,8 @@ public class UserPreferenceServiceImpl implements UserPreferenceService {
     @Override
     @Transactional
     public void setPreference(Long userId, String key, JsonNode value) {
+        validatePreferenceValue(key, value);
+
         UserPreference existing = preferenceMapper.selectOne(
                 new QueryWrapper<UserPreference>()
                         .eq("user_id", userId)
@@ -49,6 +51,21 @@ public class UserPreferenceServiceImpl implements UserPreferenceService {
             pref.setPreferenceKey(key);
             pref.setPreferenceValue(value);
             preferenceMapper.insert(pref);
+        }
+    }
+
+    /**
+     * Validate preference values to prevent corrupt data.
+     * Date/time format strings must be reasonable length to prevent accidental
+     * concatenation bugs (e.g., "YYYY-MM-DDYYYY-MM-DD..." from buggy clients).
+     */
+    private void validatePreferenceValue(String key, JsonNode value) {
+        if (value == null || !value.isTextual()) return;
+        String text = value.asText();
+        if (key != null && key.startsWith("ui.") && key.endsWith(".format") && text.length() > 64) {
+            throw new IllegalArgumentException(
+                    "Preference value for '" + key + "' exceeds 64 chars: likely a concatenation bug. "
+                            + "Received length: " + text.length());
         }
     }
 
