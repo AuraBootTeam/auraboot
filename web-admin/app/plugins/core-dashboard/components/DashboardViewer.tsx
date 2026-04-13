@@ -10,10 +10,10 @@ import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
 import { renderWidget } from './WidgetRenderer';
 import type { Widget, LayoutConfig } from '../types';
-import type { Layout } from '~/smart/types/dashboard';
-import type { FilterConfig } from '~/smart/types/chart';
-import { ChartWidgetWrapper } from '~/smart/components/dashboard/ChartWidgetWrapper';
-import { ExportPdfButton } from '~/smart/components/data-tools/ExportPdfButton';
+import type { Layout } from '~/framework/smart/types/dashboard';
+import type { FilterConfig } from '~/framework/smart/types/chart';
+import { ChartWidgetWrapper } from '~/framework/smart/components/dashboard/ChartWidgetWrapper';
+import { ExportPdfButton } from '~/framework/smart/components/data-tools/ExportPdfButton';
 import { DashboardExportExcel } from './DashboardExportExcel';
 import { useI18n } from '~/contexts/I18nContext';
 import { DESIGNER_I18N, resolveDesignerText } from '~/shared/designer';
@@ -114,10 +114,10 @@ export const DashboardViewer: React.FC<DashboardViewerProps> = ({
       <ChartWidgetWrapper
         title={widget.config.title}
         dataSource={
-          widget.config.dataSource as unknown as import('~/smart/types/chart').ChartDataSource
+          widget.config.dataSource as unknown as import('~/framework/smart/types/chart').ChartDataSource
         }
         linkageFilters={
-          widgetLinkageFilters as unknown as import('~/smart/types/chart').FilterConfig[]
+          widgetLinkageFilters as unknown as import('~/framework/smart/types/chart').FilterConfig[]
         }
       >
         {chartElement}

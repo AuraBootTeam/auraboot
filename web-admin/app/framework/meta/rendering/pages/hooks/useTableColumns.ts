@@ -7,7 +7,7 @@
 
 import { useMemo } from 'react';
 import type { ColumnConfig, BlockConfig, UnifiedSchema } from '~/framework/meta/schemas/types';
-import type { ViewConfig, ColumnConfig as SavedViewColumnConfig } from '~/smart/types/savedView';
+import type { ViewConfig, ColumnConfig as SavedViewColumnConfig } from '~/framework/smart/types/savedView';
 
 interface UseTableColumnsOptions {
   schema: UnifiedSchema | null;

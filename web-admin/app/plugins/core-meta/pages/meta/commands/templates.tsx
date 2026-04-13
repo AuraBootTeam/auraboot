@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { useI18n } from '~/contexts/I18nContext';
-import { ONBOARDING_KEYS } from '~/smart/onboarding/i18nKeys';
+import { ONBOARDING_KEYS } from '~/framework/smart/onboarding/i18nKeys';
 import { CommandTemplateGallery, type CommandTemplate } from '~/framework/meta/commands';
 
 /**

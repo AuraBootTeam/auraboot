@@ -2,7 +2,7 @@
  * ChatBI Route — natural language to chart query interface.
  */
 
-import { ChatBIPanel } from '~/smart/components/ai/ChatBIPanel';
+import { ChatBIPanel } from '~/framework/smart/components/ai/ChatBIPanel';
 
 export default function ChatBIPage() {
   return (

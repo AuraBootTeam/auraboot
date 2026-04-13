@@ -13,7 +13,7 @@ import type {
   SavedViewUpdateRequest,
   SavedViewQueryParams,
   ViewConfig,
-} from '~/smart/types/savedView';
+} from '~/framework/smart/types/savedView';
 
 const BASE_URL = '/api/views';
 

@@ -7,7 +7,7 @@
 
 import { post } from '~/services/http-client';
 import { ResultHelper } from '~/utils/type';
-import type { AggregateQueryRequest, AggregateQueryResponse } from '~/smart/types/chart';
+import type { AggregateQueryRequest, AggregateQueryResponse } from '~/framework/smart/types/chart';
 
 /**
  * Chart data service for aggregate queries

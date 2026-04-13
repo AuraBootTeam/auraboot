@@ -7,13 +7,13 @@
 
 import React, { Suspense } from 'react';
 import type { LoaderFunctionArgs } from 'react-router';
-import { automationService } from '~/smart/automation/services/automationService';
-import type { Automation } from '~/smart/automation/services/automationService';
+import { automationService } from '~/framework/smart/automation/services/automationService';
+import type { Automation } from '~/framework/smart/automation/services/automationService';
 import { getTokenFromRequest } from '~/services/session';
 import { RouteLoadingFallback } from '~/components/RouteLoadingFallback';
 
 const AutomationEditPageImpl = React.lazy(
-  () => import('~/smart/automation/components/AutomationEditPageImpl'),
+  () => import('~/framework/smart/automation/components/AutomationEditPageImpl'),
 );
 
 interface LoaderData {

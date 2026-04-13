@@ -14,7 +14,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import type { ModelFieldBinding, ValidationRule } from '~/types/model';
 import type { MetaFieldDTO } from '~/types/field';
-import { FormulaEditor } from '~/smart/components/formula/FormulaEditor';
+import { FormulaEditor } from '~/framework/smart/components/formula/FormulaEditor';
 
 /**
  * Field配置Props

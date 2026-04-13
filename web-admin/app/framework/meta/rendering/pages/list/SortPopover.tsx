@@ -11,7 +11,7 @@
  */
 import React, { useCallback, useRef, useState } from 'react';
 import * as Popover from '@radix-ui/react-popover';
-import type { SortConfig } from '~/smart/types/savedView';
+import type { SortConfig } from '~/framework/smart/types/savedView';
 
 export interface SortableColumn {
   field: string;

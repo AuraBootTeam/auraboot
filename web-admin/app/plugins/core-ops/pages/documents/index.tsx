@@ -9,7 +9,7 @@ import React, { useState, useCallback, Suspense } from 'react';
 import { RouteLoadingFallback } from '~/components/RouteLoadingFallback';
 
 const DocumentPage = React.lazy(() =>
-  import('~/smart/components/document').then((m) => ({ default: m.DocumentPage })),
+  import('~/framework/smart/components/document').then((m) => ({ default: m.DocumentPage })),
 );
 
 export default function DocumentEditorPage() {

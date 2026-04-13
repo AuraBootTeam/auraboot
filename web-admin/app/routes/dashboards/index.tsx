@@ -30,7 +30,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { DashboardViewer } from '~/plugins/core-dashboard/components/DashboardViewer';
-import { ExportPdfButton } from '~/smart/components/data-tools/ExportPdfButton';
+import { ExportPdfButton } from '~/framework/smart/components/data-tools/ExportPdfButton';
 import { dashboardService } from '~/plugins/core-dashboard/services/dashboardService';
 import type { Dashboard } from '~/plugins/core-dashboard/types';
 import { useToastContext } from '~/contexts/ToastContext';

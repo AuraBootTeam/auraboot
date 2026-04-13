@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import type { MetaFieldDTO, FieldBindingRequest } from '~/types/fieldLibrary';
-import { FormulaEditor } from '~/smart/components/formula/FormulaEditor';
+import { FormulaEditor } from '~/framework/smart/components/formula/FormulaEditor';
 
 interface FieldBindingConfigFormProps {
   field: MetaFieldDTO;

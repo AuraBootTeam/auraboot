@@ -5,8 +5,8 @@ import {
   encodeFilters,
   decodeFilters,
 } from '../useListUrlState';
-import type { SortConfig } from '~/smart/types/savedView';
-import type { ViewFilterConfig } from '~/smart/types/savedView';
+import type { SortConfig } from '~/framework/smart/types/savedView';
+import type { ViewFilterConfig } from '~/framework/smart/types/savedView';
 
 describe('encodeSorts', () => {
   it('encodes multiple sort configs to colon-separated string', () => {

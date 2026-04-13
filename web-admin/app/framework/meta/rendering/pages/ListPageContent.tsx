@@ -28,27 +28,27 @@ import { createFieldRenderer } from '~/framework/meta/utils/createFieldRenderer'
 import { ErrorAlert } from '~/components/ErrorAlert';
 import { useAuth } from '~/contexts/AuthContext';
 import { ListPageHeader } from './list/ListPageHeader';
-import { useSavedViews } from '~/smart/hooks/useSavedViews';
-import { useAutoSaveView } from '~/smart/hooks/useAutoSaveView';
-import { ViewSelector } from '~/smart/components/view/ViewSelector';
-import { RowHeightSelector } from '~/smart/components/view/RowHeightSelector';
-import { ColumnResizeHandle } from '~/smart/components/view/ColumnResizeHandle';
-import { FilterChipBar } from '~/smart/components/view/FilterChipBar';
-import type { ViewFilterConfig } from '~/smart/types/savedView';
-import type { RowHeight } from '~/smart/types/savedView';
-import { ROW_HEIGHT_CONFIG, DEFAULT_ROW_HEIGHT } from '~/smart/types/savedView';
+import { useSavedViews } from '~/framework/smart/hooks/useSavedViews';
+import { useAutoSaveView } from '~/framework/smart/hooks/useAutoSaveView';
+import { ViewSelector } from '~/framework/smart/components/view/ViewSelector';
+import { RowHeightSelector } from '~/framework/smart/components/view/RowHeightSelector';
+import { ColumnResizeHandle } from '~/framework/smart/components/view/ColumnResizeHandle';
+import { FilterChipBar } from '~/framework/smart/components/view/FilterChipBar';
+import type { ViewFilterConfig } from '~/framework/smart/types/savedView';
+import type { RowHeight } from '~/framework/smart/types/savedView';
+import { ROW_HEIGHT_CONFIG, DEFAULT_ROW_HEIGHT } from '~/framework/smart/types/savedView';
 import {
   evaluateConditionalFormats,
   buildConditionalStyle,
-} from '~/smart/utils/conditionalFormatEvaluator';
-import { SmartViewRenderer } from '~/smart/components/view/SmartViewRenderer';
+} from '~/framework/smart/utils/conditionalFormatEvaluator';
+import { SmartViewRenderer } from '~/framework/smart/components/view/SmartViewRenderer';
 import type {
   SavedViewCreateRequest,
   ColumnConfig as ViewColumnConfig,
   ViewType,
   ViewScope,
   SortConfig,
-} from '~/smart/types/savedView';
+} from '~/framework/smart/types/savedView';
 import { modelService } from '~/services/modelService';
 import { useTimezone } from '~/contexts/TimezoneContext';
 import { deriveTestId } from '~/framework/meta/rendering/utils/deriveTestId';
@@ -1686,7 +1686,7 @@ export function ListPageContent(props: PageContentProps) {
 
   // Auto-save view config — delegates upsert logic to backend
   const ensureViewAndUpdateConfig = useCallback(
-    async (config: Partial<import('~/smart/types/savedView').ViewConfig>) => {
+    async (config: Partial<import('~/framework/smart/types/savedView').ViewConfig>) => {
       try {
         if (currentView) {
           await updateViewConfig(config);
@@ -1757,7 +1757,7 @@ export function ListPageContent(props: PageContentProps) {
 
   // Handle toolbar action config change -> update SavedView
   const handleToolbarConfigChange = useCallback(
-    (config: import('~/smart/types/savedView').ToolbarActionConfig[]) => {
+    (config: import('~/framework/smart/types/savedView').ToolbarActionConfig[]) => {
       autoSave({ toolbarActions: config });
     },
     [autoSave],

@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { get, ErrorCodes } from '~/services/http-client';
-import NotificationRuleList from '~/smart/components/notification/NotificationRuleList';
-import NotificationRuleBuilder from '~/smart/components/notification/NotificationRuleBuilder';
-import type { NotificationRule } from '~/smart/components/notification/NotificationRuleBuilder';
+import NotificationRuleList from '~/framework/smart/components/notification/NotificationRuleList';
+import NotificationRuleBuilder from '~/framework/smart/components/notification/NotificationRuleBuilder';
+import type { NotificationRule } from '~/framework/smart/components/notification/NotificationRuleBuilder';
 import { BellAlertIcon, PlusIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
 /**
