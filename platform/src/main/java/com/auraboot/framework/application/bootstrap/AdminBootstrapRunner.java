@@ -3,6 +3,8 @@ package com.auraboot.framework.application.bootstrap;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.plugin.service.BuiltinPluginImportService;
+import com.auraboot.framework.saas.config.service.SystemConfigService;
+import com.auraboot.framework.saas.constant.SystemConfigKeys;
 import com.auraboot.framework.tenant.dao.entity.Tenant;
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
 import com.auraboot.framework.tenant.service.TenantBootstrapService;
@@ -48,6 +50,7 @@ public class AdminBootstrapRunner implements ApplicationRunner {
     private final TenantMemberService tenantMemberService;
     private final TenantBootstrapService tenantBootstrapService;
     private final BuiltinPluginImportService builtinPluginImportService;
+    private final SystemConfigService systemConfigService;
 
     @Override
     public void run(ApplicationArguments args) {
@@ -109,6 +112,19 @@ public class AdminBootstrapRunner implements ApplicationRunner {
             } finally {
                 MetaContext.clear();
             }
+
+            // 7. Mark the system as initialized so frontend root loader stops
+            //    redirecting to /setup. Without this, SystemConfigService.isInitialized()
+            //    returns false and /api/bootstrap/status reports initialized=false
+            //    even though the admin user and tenant already exist.
+            systemConfigService.initialize(
+                    SystemConfigKeys.SYSTEM_INITIALIZED,
+                    "true",
+                    "system",
+                    "boolean",
+                    "Set by AdminBootstrapRunner after first-run admin+tenant creation",
+                    true);
+            log.info("AdminBootstrapRunner: system.initialized flag set.");
 
             log.info("AdminBootstrapRunner: first-run bootstrap complete. Login with {} / {}", ADMIN_EMAIL, ADMIN_PASSWORD);
 
