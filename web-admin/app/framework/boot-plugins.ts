@@ -26,6 +26,10 @@ import corePlatformPlugin from '~/plugins/core-platform'
 import coreAdminPlugin from '~/plugins/core-admin'
 import coreOpsPlugin from '~/plugins/core-ops'
 
+// Enterprise plugins — empty in OSS, populated by enterprise overlay
+// (see auraboot-enterprise/web-admin-ext/.../boot-plugins-ent.ts).
+import { ENT_PLUGINS } from './boot-plugins-ent.js'
+
 const CORE_PLUGINS = [
   coreDemoPlugin,
   coreBpmPlugin,
@@ -61,7 +65,8 @@ export async function bootCorePlugins(opts: { hasFeature?: (key: string) => bool
   if (opts.force) resetKernel({ hasFeature: opts.hasFeature })
 
   const kernel = getKernel()
-  for (const plugin of CORE_PLUGINS) {
+  const ALL_PLUGINS = [...CORE_PLUGINS, ...ENT_PLUGINS]
+  for (const plugin of ALL_PLUGINS) {
     try {
       kernel.pluginLoader.install(plugin)
       kernel.pluginLoader.enable(plugin.manifest.code)
@@ -74,7 +79,7 @@ export async function bootCorePlugins(opts: { hasFeature?: (key: string) => bool
   const activated = await kernel.pluginLoader.activateAll()
   bootedOnce = true
   // eslint-disable-next-line no-console
-  console.info(`[boot-plugins] activated ${activated.length}/${CORE_PLUGINS.length} core plugins:`, activated.join(', '))
+  console.info(`[boot-plugins] activated ${activated.length}/${ALL_PLUGINS.length} plugins (${CORE_PLUGINS.length} core + ${ENT_PLUGINS.length} ent):`, activated.join(', '))
   return activated
 }
 
