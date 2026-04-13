@@ -1,0 +1,33 @@
+{
+  "pluginId": "com.auraboot.agent-control-plane",
+  "namespace": "acp",
+  "version": "1.0.0",
+  "dslVersion": 1,
+  "pluginType": "config",
+  "displayName": "Agent Control Plane",
+  "displayName:zh-CN": "Agent 控制平面",
+  "displayName:en": "Agent Control Plane",
+  "description": "AI Agent orchestration, task management, execution tracking, and governance",
+  "author": "AuraBoot Team",
+  "minPlatformVersion": "1.0.0",
+  "dependencies": [],
+  "resourceDirs": {
+    "dicts": "config/dicts.json",
+    "fields": "config/fields.json",
+    "models": "config/models.json",
+    "modelFieldBindings": "config/bindings.json",
+    "commands": "config/commands.json",
+    "permissions": "config/permissions.json",
+    "menus": "config/menus.json",
+    "pages": "config/pages.json",
+    "i18n": "config/i18n.json",
+    "roles": "config/roles.json",
+    "namedQueries": "config/named-queries.json"
+  },
+  "importOptions": {
+    "conflictStrategy": "overwrite",
+    "validateReferences": true,
+    "autoPublishPages": true,
+    "createResourcePermissions": true
+  }
+}

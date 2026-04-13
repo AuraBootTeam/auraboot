@@ -1,0 +1,22 @@
+[
+  {
+    "code": "acp_admin",
+    "name:zh-CN": "ACP 管理员",
+    "name:en": "ACP Administrator",
+    "description": "Full access to Agent Control Plane",
+    "permissions": [
+      "acp_agent_definition",
+      "acp_mission",
+      "acp_agent_task",
+      "acp_agent_run",
+      "acp_agent_artifact",
+      "acp_agent_schedule",
+      "acp_approval_policy",
+      "acp_agent_approval",
+      "acp_agent_memory",
+      "acp_agent_observation",
+      "acp_agent_tool",
+      "acp_mission_control"
+    ]
+  }
+]

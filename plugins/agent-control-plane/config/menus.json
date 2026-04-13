@@ -1,0 +1,451 @@
+[
+  {
+    "_note": "ACP Menu Deprecation Status (as of 2026-03-24 AI Center migration)",
+    "_migration_summary": [
+      "All ACP sidebar menus are hidden (visible: false) after the AI Center UI redesign.",
+      "DSL pages (/p/...) remain fully functional and accessible via direct URL.",
+      "Each entry below documents where the feature is now accessed.",
+      "",
+      "Categories:",
+      "  MOVED_TO_AI_CENTER  - Embedded in the new AI Center tsx pages (AgentDetailPage, RunLogsPage, etc.)",
+      "  MOVED_TO_AI_SETTINGS - Accessible via AI Settings modal / governance config",
+      "  DEPRECATED          - Functionality merged into another surface; standalone page no longer needed",
+      "  PROMOTED            - Elevated to AI Center top-level nav (visible via AI Center, not sidebar)"
+    ]
+  },
+  {
+    "code": "agent_control_plane",
+    "parentCode": "ai_center",
+    "name:zh-CN": "Agent",
+    "name:en": "Agents",
+    "path": null,
+    "component": null,
+    "icon": "IconCpu",
+    "type": 0,
+    "permissionCode": null,
+    "orderNo": 20,
+    "visible": false,
+    "_deprecated": "DEPRECATED — Root group hidden; AI Center provides the top-level Agent entry point.",
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    }
+  },
+  {
+    "code": "acp_mission_control",
+    "parentCode": "agent_control_plane",
+    "name:zh-CN": "Mission Control",
+    "name:en": "Mission Control",
+    "path": "/p/acp_mission_control",
+    "component": null,
+    "icon": "IconDashboard",
+    "type": 1,
+    "permissionCode": "acp_mission",
+    "orderNo": 1,
+    "visible": false,
+    "_deprecated": "DEPRECATED — Functionality merged into AI Center Dashboard. DSL page still accessible at /p/acp-mission-control.",
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    },
+    "pageKey": "acp_mission_control_list"
+  },
+  {
+    "code": "acp_missions",
+    "parentCode": "agent_control_plane",
+    "name:zh-CN": "使命",
+    "name:en": "Missions",
+    "path": "/p/mission",
+    "component": null,
+    "icon": "IconTarget",
+    "type": 1,
+    "permissionCode": "acp_mission",
+    "orderNo": 2,
+    "visible": false,
+    "_deprecated": "DEPRECATED — Accessed via Agent detail page. DSL page still accessible at /p/mission.",
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    },
+    "pageKey": "mission_list"
+  },
+  {
+    "code": "acp_tasks",
+    "parentCode": "agent_control_plane",
+    "name:zh-CN": "任务",
+    "name:en": "Tasks",
+    "path": "/p/agent_task",
+    "component": null,
+    "icon": "IconChecklist",
+    "type": 1,
+    "permissionCode": "acp_agent_task",
+    "orderNo": 3,
+    "visible": false,
+    "_deprecated": "DEPRECATED — Accessed via Run Logs page (per-run task breakdown). DSL page still accessible at /p/agent-task.",
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    },
+    "pageKey": "agent_task_list"
+  },
+  {
+    "code": "acp_agents",
+    "parentCode": "agent_control_plane",
+    "name:zh-CN": "Agent",
+    "name:en": "Agents",
+    "path": null,
+    "component": null,
+    "icon": "IconCpu",
+    "type": 0,
+    "permissionCode": null,
+    "orderNo": 10,
+    "visible": false,
+    "_deprecated": "DEPRECATED — Submenu group replaced by AI Center 'AI Colleagues' card page.",
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    }
+  },
+  {
+    "code": "acp_agent_definitions",
+    "parentCode": "acp_agents",
+    "name:zh-CN": "Agent 定义",
+    "name:en": "Agent Definitions",
+    "path": "/p/agent_definition",
+    "component": null,
+    "icon": null,
+    "type": 1,
+    "permissionCode": "acp_agent_definition",
+    "orderNo": 1,
+    "visible": false,
+    "_deprecated": "MOVED_TO_AI_CENTER — Accessed via AI Center > AI Colleagues card page. DSL page still accessible at /p/agent-definition.",
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    },
+    "pageKey": "agent_definition_list"
+  },
+  {
+    "code": "acp_agent_tools",
+    "parentCode": "acp_agents",
+    "name:zh-CN": "工具",
+    "name:en": "Tools",
+    "path": "/p/agent_tool",
+    "component": null,
+    "icon": null,
+    "type": 1,
+    "permissionCode": "acp_agent_tool",
+    "orderNo": 2,
+    "visible": false,
+    "_deprecated": "MOVED_TO_AI_CENTER — Accessed via Agent detail page > 'Tools & Skills' tab. DSL page still accessible at /p/agent-tool.",
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    },
+    "pageKey": "agent_tool_list"
+  },
+  {
+    "code": "acp_agent_memory_menu",
+    "parentCode": "acp_agents",
+    "name:zh-CN": "记忆",
+    "name:en": "Memory",
+    "path": "/p/agent_memory",
+    "component": null,
+    "icon": null,
+    "type": 1,
+    "permissionCode": "acp_agent_memory",
+    "orderNo": 3,
+    "visible": false,
+    "_deprecated": "MOVED_TO_AI_CENTER — Accessed via Agent detail page > 'Memory' tab. DSL page still accessible at /p/agent-memory.",
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    },
+    "pageKey": "agent_memory_list"
+  },
+  {
+    "code": "acp_skills",
+    "parentCode": "acp_agents",
+    "name:zh-CN": "技能市场",
+    "name:en": "Skills Market",
+    "path": "/p/agent_skill",
+    "component": null,
+    "icon": null,
+    "type": 1,
+    "permissionCode": "acp_agent_skill",
+    "orderNo": 4,
+    "visible": false,
+    "_deprecated": "DEPRECATED — Accessed via Agent detail page > 'Tools & Skills' tab. DSL page still accessible at /p/agent-skill.",
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    },
+    "pageKey": "agent_skill_list"
+  },
+  {
+    "code": "acp_mcp_servers",
+    "parentCode": "acp_agents",
+    "name:zh-CN": "MCP 服务器",
+    "name:en": "MCP Servers",
+    "path": "/p/mcp_server",
+    "component": null,
+    "icon": null,
+    "type": 1,
+    "permissionCode": "acp_agent_definition",
+    "orderNo": 5,
+    "visible": false,
+    "_deprecated": "MOVED_TO_AI_CENTER — Accessed via AI Center > Agent detail. DSL page still accessible at /p/mcp-server.",
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    },
+    "pageKey": "mcp_server_list"
+  },
+  {
+    "code": "acp_execution",
+    "parentCode": "agent_control_plane",
+    "name:zh-CN": "执行",
+    "name:en": "Execution",
+    "path": null,
+    "component": null,
+    "icon": "IconPlayerPlay",
+    "type": 0,
+    "permissionCode": null,
+    "orderNo": 20,
+    "visible": false,
+    "_deprecated": "DEPRECATED — Submenu group replaced by AI Center run/schedule surfaces embedded in Agent detail page.",
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    }
+  },
+  {
+    "code": "acp_runs",
+    "parentCode": "acp_execution",
+    "name:zh-CN": "运行记录",
+    "name:en": "Runs",
+    "path": "/p/agent_run",
+    "component": null,
+    "icon": null,
+    "type": 1,
+    "permissionCode": "acp_agent_run",
+    "orderNo": 1,
+    "visible": false,
+    "_deprecated": "MOVED_TO_AI_CENTER — Accessed via Agent detail page > 'Run History' tab, or via AI Center Run Logs page. DSL page still accessible at /p/agent-run.",
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    },
+    "pageKey": "agent_run_list"
+  },
+  {
+    "code": "acp_schedules",
+    "parentCode": "acp_execution",
+    "name:zh-CN": "调度",
+    "name:en": "Schedules",
+    "path": "/p/agent_schedule",
+    "component": null,
+    "icon": null,
+    "type": 1,
+    "permissionCode": "acp_agent_schedule",
+    "orderNo": 2,
+    "visible": false,
+    "_deprecated": "MOVED_TO_AI_CENTER — Accessed via Agent detail page > 'Schedules' tab. DSL page still accessible at /p/agent-schedule.",
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    },
+    "pageKey": "agent_schedule_list"
+  },
+  {
+    "code": "acp_artifacts",
+    "parentCode": "acp_execution",
+    "name:zh-CN": "产出物",
+    "name:en": "Artifacts",
+    "path": "/p/agent_artifact",
+    "component": null,
+    "icon": null,
+    "type": 1,
+    "permissionCode": "acp_agent_artifact",
+    "orderNo": 3,
+    "visible": false,
+    "_deprecated": "DEPRECATED — Accessed via Run Logs page (per-run artifact view). DSL page still accessible at /p/agent-artifact.",
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    },
+    "pageKey": "agent_artifact_list"
+  },
+  {
+    "code": "acp_semantic",
+    "parentCode": "agent_control_plane",
+    "name:zh-CN": "语义配置",
+    "name:en": "Semantic Config",
+    "path": null,
+    "component": null,
+    "icon": "IconBrain",
+    "type": 0,
+    "permissionCode": null,
+    "orderNo": 25,
+    "visible": false,
+    "_deprecated": "MOVED_TO_AI_SETTINGS — Submenu group; children moved to AI Settings > Semantic Config section.",
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    }
+  },
+  {
+    "code": "acp_object_alias",
+    "parentCode": "acp_semantic",
+    "name:zh-CN": "对象别名",
+    "name:en": "Object Aliases",
+    "path": "/p/object_alias",
+    "component": null,
+    "icon": null,
+    "type": 1,
+    "permissionCode": "acp_agent_definition",
+    "orderNo": 1,
+    "visible": false,
+    "_deprecated": "MOVED_TO_AI_SETTINGS — Accessed via AI Settings > Semantic Config. DSL page still accessible at /p/object-alias.",
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    },
+    "pageKey": "object_alias_list"
+  },
+  {
+    "code": "acp_semantic_term",
+    "parentCode": "acp_semantic",
+    "name:zh-CN": "语义术语",
+    "name:en": "Semantic Terms",
+    "path": "/p/semantic_term",
+    "component": null,
+    "icon": null,
+    "type": 1,
+    "permissionCode": "acp_agent_definition",
+    "orderNo": 2,
+    "visible": false,
+    "_deprecated": "MOVED_TO_AI_SETTINGS — Accessed via AI Settings > Semantic Config. DSL page still accessible at /p/semantic-term.",
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    },
+    "pageKey": "semantic_term_list"
+  },
+  {
+    "code": "acp_governance",
+    "parentCode": "agent_control_plane",
+    "name:zh-CN": "治理",
+    "name:en": "Governance",
+    "path": null,
+    "component": null,
+    "icon": "IconShieldCheck",
+    "type": 0,
+    "permissionCode": null,
+    "orderNo": 30,
+    "visible": false,
+    "_deprecated": "MOVED_TO_AI_SETTINGS — Submenu group; children split between AI Center top-level (Approvals) and AI Settings > Governance.",
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    }
+  },
+  {
+    "code": "acp_actions",
+    "parentCode": "acp_governance",
+    "name:zh-CN": "业务动作",
+    "name:en": "Actions",
+    "path": "/p/agent_action",
+    "component": null,
+    "icon": null,
+    "type": 1,
+    "permissionCode": "acp_agent_run",
+    "orderNo": 0,
+    "visible": false,
+    "_deprecated": "MOVED_TO_AI_CENTER — Accessed via Run Logs page (per-run action records). DSL page still accessible at /p/agent-action.",
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    },
+    "pageKey": "agent_action_list"
+  },
+  {
+    "code": "acp_approvals",
+    "parentCode": "acp_governance",
+    "name:zh-CN": "审批",
+    "name:en": "Approvals",
+    "path": "/p/agent_approval",
+    "component": null,
+    "icon": null,
+    "type": 1,
+    "permissionCode": "acp_agent_approval",
+    "orderNo": 1,
+    "visible": false,
+    "_deprecated": "PROMOTED — Promoted to AI Center top-level nav as a primary surface. No longer in sidebar group. DSL page still accessible at /p/agent-approval.",
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    },
+    "pageKey": "agent_approval_list"
+  },
+  {
+    "code": "acp_policies",
+    "parentCode": "acp_governance",
+    "name:zh-CN": "审批策略",
+    "name:en": "Policies",
+    "path": "/p/approval_policy",
+    "component": null,
+    "icon": null,
+    "type": 1,
+    "permissionCode": "acp_approval_policy",
+    "orderNo": 2,
+    "visible": false,
+    "_deprecated": "MOVED_TO_AI_SETTINGS — Accessed via AI Settings > Governance. DSL page still accessible at /p/approval-policy.",
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    },
+    "pageKey": "approval_policy_list"
+  },
+  {
+    "code": "acp_observations",
+    "parentCode": "acp_governance",
+    "name:zh-CN": "观测",
+    "name:en": "Observations",
+    "path": "/p/agent_observation",
+    "component": null,
+    "icon": null,
+    "type": 1,
+    "permissionCode": "acp_agent_observation",
+    "orderNo": 3,
+    "visible": false,
+    "_deprecated": "MOVED_TO_AI_CENTER — Accessed via AI Center Dashboard > 'Observations' tab. DSL page still accessible at /p/agent-observation.",
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    },
+    "pageKey": "agent_observation_list"
+  }
+]

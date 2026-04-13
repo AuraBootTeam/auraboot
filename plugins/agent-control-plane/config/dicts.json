@@ -1,0 +1,1212 @@
+[
+  {
+    "code": "acp_agent_type",
+    "name": "Agent Type",
+    "name:zh-CN": "Agent 类型",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "autonomous",
+        "label": "Autonomous Agent",
+        "label:zh-CN": "自主 Agent",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "copilot",
+        "label": "Copilot",
+        "label:zh-CN": "协作 Agent",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "reactive",
+        "label": "Reactive Agent",
+        "label:zh-CN": "响应式 Agent",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      }
+    ]
+  },
+  {
+    "code": "acp_agent_status",
+    "name": "Agent Status",
+    "name:zh-CN": "Agent 状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "active",
+        "label": "Active",
+        "label:zh-CN": "活跃",
+        "sortNo": 10,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "paused",
+        "label": "Paused",
+        "label:zh-CN": "已暂停",
+        "sortNo": 20,
+        "color": "#faad14",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "archived",
+        "label": "Archived",
+        "label:zh-CN": "已归档",
+        "sortNo": 30,
+        "color": "#d9d9d9",
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      }
+    ]
+  },
+  {
+    "code": "acp_mission_status",
+    "name": "Mission Status",
+    "name:zh-CN": "使命状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "active",
+        "label": "Active",
+        "label:zh-CN": "活跃",
+        "sortNo": 10,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "paused",
+        "label": "Paused",
+        "label:zh-CN": "已暂停",
+        "sortNo": 20,
+        "color": "#faad14",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "completed",
+        "label": "Completed",
+        "label:zh-CN": "已完成",
+        "sortNo": 30,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "archived",
+        "label": "Archived",
+        "label:zh-CN": "已归档",
+        "sortNo": 40,
+        "color": "#d9d9d9",
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      }
+    ]
+  },
+  {
+    "code": "acp_task_status",
+    "name": "Task Status",
+    "name:zh-CN": "任务状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "backlog",
+        "label": "Backlog",
+        "label:zh-CN": "待规划",
+        "sortNo": 10,
+        "color": "#d9d9d9",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "todo",
+        "label": "To Do",
+        "label:zh-CN": "待执行",
+        "sortNo": 20,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "in_progress",
+        "label": "In Progress",
+        "label:zh-CN": "进行中",
+        "sortNo": 30,
+        "color": "#faad14",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "blocked",
+        "label": "Blocked",
+        "label:zh-CN": "已阻塞",
+        "sortNo": 40,
+        "color": "#ff4d4f",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "done",
+        "label": "Done",
+        "label:zh-CN": "已完成",
+        "sortNo": 50,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "cancelled",
+        "label": "Cancelled",
+        "label:zh-CN": "已取消",
+        "sortNo": 60,
+        "color": "#d9d9d9",
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      }
+    ]
+  },
+  {
+    "code": "acp_task_priority",
+    "name": "Task Priority",
+    "name:zh-CN": "任务优先级",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "critical",
+        "label": "Critical",
+        "label:zh-CN": "紧急",
+        "sortNo": 10,
+        "color": "#ff4d4f",
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      },
+      {
+        "value": "high",
+        "label": "High",
+        "label:zh-CN": "高",
+        "sortNo": 20,
+        "color": "#fa8c16",
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      },
+      {
+        "value": "medium",
+        "label": "Medium",
+        "label:zh-CN": "中",
+        "sortNo": 30,
+        "color": "#faad14",
+        "status": "enabled",
+        "extension": {
+          "color": "orange"
+        }
+      },
+      {
+        "value": "low",
+        "label": "Low",
+        "label:zh-CN": "低",
+        "sortNo": 40,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      }
+    ]
+  },
+  {
+    "code": "acp_assignee_type",
+    "name": "Assignee Type",
+    "name:zh-CN": "执行者类型",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "human",
+        "label": "Human",
+        "label:zh-CN": "人工",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "agent",
+        "label": "Agent",
+        "label:zh-CN": "Agent",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      }
+    ]
+  },
+  {
+    "code": "acp_run_status",
+    "name": "Run Status",
+    "name:zh-CN": "运行状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "pending",
+        "label": "Pending",
+        "label:zh-CN": "等待中",
+        "sortNo": 10,
+        "color": "#d9d9d9",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "running",
+        "label": "Running",
+        "label:zh-CN": "运行中",
+        "sortNo": 20,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "success",
+        "label": "Success",
+        "label:zh-CN": "成功",
+        "sortNo": 30,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "failed",
+        "label": "Failed",
+        "label:zh-CN": "失败",
+        "sortNo": 40,
+        "color": "#ff4d4f",
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      },
+      {
+        "value": "cancelled",
+        "label": "Cancelled",
+        "label:zh-CN": "已取消",
+        "sortNo": 50,
+        "color": "#d9d9d9",
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      },
+      {
+        "value": "timeout",
+        "label": "Timeout",
+        "label:zh-CN": "超时",
+        "sortNo": 60,
+        "color": "#fa8c16",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      }
+    ]
+  },
+  {
+    "code": "acp_artifact_type",
+    "name": "Artifact Type",
+    "name:zh-CN": "产出物类型",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "document",
+        "label": "Document",
+        "label:zh-CN": "文档",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "code",
+        "label": "Code",
+        "label:zh-CN": "代码",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "report",
+        "label": "Report",
+        "label:zh-CN": "报告",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "data",
+        "label": "Data",
+        "label:zh-CN": "数据",
+        "sortNo": 40,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "image",
+        "label": "Image",
+        "label:zh-CN": "图片",
+        "sortNo": 50,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "email",
+        "label": "Email",
+        "label:zh-CN": "邮件",
+        "sortNo": 60,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "decision",
+        "label": "Decision",
+        "label:zh-CN": "决策",
+        "sortNo": 70,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      }
+    ]
+  },
+  {
+    "code": "acp_schedule_type",
+    "name": "Schedule Type",
+    "name:zh-CN": "调度类型",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "cron",
+        "label": "Cron",
+        "label:zh-CN": "Cron 定时",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "interval",
+        "label": "Interval",
+        "label:zh-CN": "间隔",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "event",
+        "label": "Event",
+        "label:zh-CN": "事件触发",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "one_time",
+        "label": "One Time",
+        "label:zh-CN": "一次性",
+        "sortNo": 40,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      }
+    ]
+  },
+  {
+    "code": "acp_schedule_status",
+    "name": "Schedule Status",
+    "name:zh-CN": "调度状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "active",
+        "label": "Active",
+        "label:zh-CN": "活跃",
+        "sortNo": 10,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "paused",
+        "label": "Paused",
+        "label:zh-CN": "已暂停",
+        "sortNo": 20,
+        "color": "#faad14",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "expired",
+        "label": "Expired",
+        "label:zh-CN": "已过期",
+        "sortNo": 30,
+        "color": "#d9d9d9",
+        "status": "enabled",
+        "extension": {
+          "color": "orange"
+        }
+      }
+    ]
+  },
+  {
+    "code": "acp_approval_type",
+    "name": "Approval Type",
+    "name:zh-CN": "审批类型",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "tool_call",
+        "label": "Tool Call",
+        "label:zh-CN": "工具调用",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "data_change",
+        "label": "Data Change",
+        "label:zh-CN": "数据变更",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "external_api",
+        "label": "External API",
+        "label:zh-CN": "外部 API",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "cost_threshold",
+        "label": "Cost Threshold",
+        "label:zh-CN": "成本阈值",
+        "sortNo": 40,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "sensitive_action",
+        "label": "Sensitive Action",
+        "label:zh-CN": "敏感操作",
+        "sortNo": 50,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      }
+    ]
+  },
+  {
+    "code": "acp_approval_status",
+    "name": "Approval Status",
+    "name:zh-CN": "审批状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "pending",
+        "label": "Pending",
+        "label:zh-CN": "待审批",
+        "sortNo": 10,
+        "color": "#faad14",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "approved",
+        "label": "Approved",
+        "label:zh-CN": "已通过",
+        "sortNo": 20,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "rejected",
+        "label": "Rejected",
+        "label:zh-CN": "已拒绝",
+        "sortNo": 30,
+        "color": "#ff4d4f",
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      },
+      {
+        "value": "expired",
+        "label": "Expired",
+        "label:zh-CN": "已过期",
+        "sortNo": 40,
+        "color": "#d9d9d9",
+        "status": "enabled",
+        "extension": {
+          "color": "orange"
+        }
+      },
+      {
+        "value": "auto_approved",
+        "label": "Auto Approved",
+        "label:zh-CN": "自动通过",
+        "sortNo": 50,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      }
+    ]
+  },
+  {
+    "code": "acp_memory_type",
+    "name": "Memory Type",
+    "name:zh-CN": "记忆类型",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "fact",
+        "label": "Fact",
+        "label:zh-CN": "事实",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "preference",
+        "label": "Preference",
+        "label:zh-CN": "偏好",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "lesson",
+        "label": "Lesson",
+        "label:zh-CN": "经验",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "context",
+        "label": "Context",
+        "label:zh-CN": "上下文",
+        "sortNo": 40,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "decision",
+        "label": "Decision",
+        "label:zh-CN": "决策",
+        "sortNo": 50,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "summary",
+        "label": "Summary",
+        "label:zh-CN": "摘要",
+        "sortNo": 60,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      }
+    ]
+  },
+  {
+    "code": "acp_observation_type",
+    "name": "Observation Type",
+    "name:zh-CN": "观测类型",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "activity",
+        "label": "Activity",
+        "label:zh-CN": "活动",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "metric",
+        "label": "Metric",
+        "label:zh-CN": "指标",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "cost",
+        "label": "Cost",
+        "label:zh-CN": "成本",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "error",
+        "label": "Error",
+        "label:zh-CN": "错误",
+        "sortNo": 40,
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      },
+      {
+        "value": "alert",
+        "label": "Alert",
+        "label:zh-CN": "告警",
+        "sortNo": 50,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      }
+    ]
+  },
+  {
+    "code": "acp_severity",
+    "name": "Severity",
+    "name:zh-CN": "严重程度",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "info",
+        "label": "Info",
+        "label:zh-CN": "信息",
+        "sortNo": 10,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "warn",
+        "label": "Warning",
+        "label:zh-CN": "警告",
+        "sortNo": 20,
+        "color": "#faad14",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "error",
+        "label": "Error",
+        "label:zh-CN": "错误",
+        "sortNo": 30,
+        "color": "#ff4d4f",
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      },
+      {
+        "value": "critical",
+        "label": "Critical",
+        "label:zh-CN": "严重",
+        "sortNo": 40,
+        "color": "#cf1322",
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      }
+    ]
+  },
+  {
+    "code": "acp_tool_type",
+    "name": "Tool Type",
+    "name:zh-CN": "工具类型",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "dsl_command",
+        "label": "DSL Command",
+        "label:zh-CN": "DSL 命令",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "dsl_query",
+        "label": "DSL Query",
+        "label:zh-CN": "DSL 查询",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "dsl_datasource",
+        "label": "DSL DataSource",
+        "label:zh-CN": "DSL 数据源",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "custom_api",
+        "label": "Custom API",
+        "label:zh-CN": "自定义 API",
+        "sortNo": 40,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "mcp_server",
+        "label": "MCP Server",
+        "label:zh-CN": "MCP 服务器",
+        "sortNo": 50,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "llm_native",
+        "label": "LLM Native",
+        "label:zh-CN": "LLM 原生",
+        "sortNo": 60,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      }
+    ]
+  },
+  {
+    "code": "acp_risk_level",
+    "name": "Risk Level",
+    "name:zh-CN": "风险等级",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "low",
+        "label": "Low",
+        "label:zh-CN": "低",
+        "sortNo": 10,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "medium",
+        "label": "Medium",
+        "label:zh-CN": "中",
+        "sortNo": 20,
+        "color": "#faad14",
+        "status": "enabled",
+        "extension": {
+          "color": "orange"
+        }
+      },
+      {
+        "value": "high",
+        "label": "High",
+        "label:zh-CN": "高",
+        "sortNo": 30,
+        "color": "#fa8c16",
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      },
+      {
+        "value": "critical",
+        "label": "Critical",
+        "label:zh-CN": "严重",
+        "sortNo": 40,
+        "color": "#ff4d4f",
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      }
+    ]
+  },
+  {
+    "code": "acp_timeout_action",
+    "name": "Timeout Action",
+    "name:zh-CN": "超时动作",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "approve",
+        "label": "Auto Approve",
+        "label:zh-CN": "自动通过",
+        "sortNo": 10,
+        "status": "enabled"
+      },
+      {
+        "value": "reject",
+        "label": "Auto Reject",
+        "label:zh-CN": "自动拒绝",
+        "sortNo": 20,
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "acp_communication_style",
+    "name": "Communication Style",
+    "name:zh-CN": "沟通风格",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "formal",
+        "label": "Formal",
+        "label:zh-CN": "正式",
+        "sortNo": 10,
+        "color": "#3B82F6",
+        "status": "enabled"
+      },
+      {
+        "value": "casual",
+        "label": "Casual",
+        "label:zh-CN": "轻松",
+        "sortNo": 20,
+        "color": "#22C55E",
+        "status": "enabled"
+      },
+      {
+        "value": "technical",
+        "label": "Technical",
+        "label:zh-CN": "技术型",
+        "sortNo": 30,
+        "color": "#8B5CF6",
+        "status": "enabled"
+      },
+      {
+        "value": "concise",
+        "label": "Concise",
+        "label:zh-CN": "简洁",
+        "sortNo": 40,
+        "color": "#F59E0B",
+        "status": "enabled"
+      },
+      {
+        "value": "detailed",
+        "label": "Detailed",
+        "label:zh-CN": "详细",
+        "sortNo": 50,
+        "color": "#6366F1",
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "acp_ai_model",
+    "name": "AI Model",
+    "name:zh-CN": "AI 模型",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "claude-opus-4-6",
+        "label": "Claude Opus 4.6",
+        "label:zh-CN": "Claude Opus 4.6",
+        "sortNo": 10,
+        "status": "enabled"
+      },
+      {
+        "value": "claude-sonnet-4-6",
+        "label": "Claude Sonnet 4.6",
+        "label:zh-CN": "Claude Sonnet 4.6",
+        "sortNo": 20,
+        "status": "enabled"
+      },
+      {
+        "value": "claude-haiku-4-5",
+        "label": "Claude Haiku 4.5",
+        "label:zh-CN": "Claude Haiku 4.5",
+        "sortNo": 30,
+        "status": "enabled"
+      },
+      {
+        "value": "gpt-4o",
+        "label": "GPT-4o",
+        "label:zh-CN": "GPT-4o",
+        "sortNo": 40,
+        "status": "enabled"
+      },
+      {
+        "value": "MiniMax-Text-01",
+        "label": "MiniMax-Text-01",
+        "label:zh-CN": "MiniMax-Text-01",
+        "sortNo": 45,
+        "status": "enabled"
+      },
+      {
+        "value": "abab6.5-chat",
+        "label": "abab6.5-chat",
+        "label:zh-CN": "abab6.5-chat",
+        "sortNo": 46,
+        "status": "enabled"
+      },
+      {
+        "value": "custom",
+        "label": "Custom",
+        "label:zh-CN": "自定义",
+        "sortNo": 50,
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "acp_skill_level",
+    "name": "Skill Level",
+    "name:zh-CN": "技能级别",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "atomic",
+        "label": "Atomic Tool",
+        "label:zh-CN": "原子工具",
+        "sortNo": 10,
+        "color": "#3B82F6",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "workflow",
+        "label": "Workflow Skill",
+        "label:zh-CN": "流程技能",
+        "sortNo": 20,
+        "color": "#8B5CF6",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "solution",
+        "label": "Industry Solution",
+        "label:zh-CN": "行业方案",
+        "sortNo": 30,
+        "color": "#F59E0B",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      }
+    ]
+  },
+  {
+    "code": "acp_skill_category",
+    "name": "Skill Category",
+    "name:zh-CN": "技能分类",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "communication",
+        "label": "Communication",
+        "label:zh-CN": "沟通",
+        "sortNo": 10,
+        "color": "#3B82F6",
+        "status": "enabled"
+      },
+      {
+        "value": "data",
+        "label": "Data",
+        "label:zh-CN": "数据",
+        "sortNo": 20,
+        "color": "#22C55E",
+        "status": "enabled"
+      },
+      {
+        "value": "automation",
+        "label": "Automation",
+        "label:zh-CN": "自动化",
+        "sortNo": 30,
+        "color": "#8B5CF6",
+        "status": "enabled"
+      },
+      {
+        "value": "analysis",
+        "label": "Analysis",
+        "label:zh-CN": "分析",
+        "sortNo": 40,
+        "color": "#F59E0B",
+        "status": "enabled"
+      },
+      {
+        "value": "integration",
+        "label": "Integration",
+        "label:zh-CN": "集成",
+        "sortNo": 50,
+        "color": "#EF4444",
+        "status": "enabled"
+      },
+      {
+        "value": "custom",
+        "label": "Custom",
+        "label:zh-CN": "自定义",
+        "sortNo": 60,
+        "color": "#6B7280",
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "acp_skill_status",
+    "name": "Skill Status",
+    "name:zh-CN": "技能状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "active",
+        "label": "Active",
+        "label:zh-CN": "启用",
+        "sortNo": 10,
+        "color": "#22C55E",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "draft",
+        "label": "Draft",
+        "label:zh-CN": "草稿",
+        "sortNo": 20,
+        "color": "#6B7280",
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "deprecated",
+        "label": "Deprecated",
+        "label:zh-CN": "已废弃",
+        "sortNo": 30,
+        "color": "#EF4444",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      }
+    ]
+  }
+]

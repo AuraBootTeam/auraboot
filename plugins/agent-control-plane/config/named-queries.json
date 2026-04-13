@@ -1,0 +1,239 @@
+[
+  {
+    "code": "acp_dashboard_kpi",
+    "name:zh-CN": "ACP 仪表盘 KPI",
+    "name:en": "ACP Dashboard KPI",
+    "description": "Key metrics for Mission Control dashboard: task/run/agent/approval counts",
+    "fromSql": "SELECT (SELECT COUNT(*) FROM ab_agent_task WHERE tenant_id = #{params.tenantId} AND (deleted_flag = FALSE OR deleted_flag IS NULL) AND task_status NOT IN ('done','cancelled')) AS active_tasks, (SELECT COUNT(*) FROM ab_agent_run WHERE tenant_id = #{params.tenantId} AND run_status = 'running') AS running_now, (SELECT COUNT(*) FROM ab_agent_approval WHERE tenant_id = #{params.tenantId} AND approval_status = 'pending') AS pending_approvals, (SELECT COUNT(*) FROM ab_agent_definition WHERE tenant_id = #{params.tenantId} AND (deleted_flag = FALSE OR deleted_flag IS NULL) AND status = 'active') AS active_agents, (SELECT COUNT(*) FROM ab_mission WHERE tenant_id = #{params.tenantId} AND (deleted_flag = FALSE OR deleted_flag IS NULL) AND mission_status = 'active') AS active_missions, (SELECT COALESCE(SUM(total_cost), 0) FROM ab_agent_run WHERE tenant_id = #{params.tenantId} AND started_at >= date_trunc('month', CURRENT_DATE)) AS month_cost",
+    "outputFields": [
+      { "code": "active_tasks", "columnExpr": "active_tasks", "dataType": "number" },
+      { "code": "running_now", "columnExpr": "running_now", "dataType": "number" },
+      { "code": "pending_approvals", "columnExpr": "pending_approvals", "dataType": "number" },
+      { "code": "active_agents", "columnExpr": "active_agents", "dataType": "number" },
+      { "code": "active_missions", "columnExpr": "active_missions", "dataType": "number" },
+      { "code": "month_cost", "columnExpr": "month_cost", "dataType": "number" }
+    ]
+  },
+  {
+    "code": "acp_recent_runs",
+    "name:zh-CN": "最近运行记录",
+    "name:en": "Recent Agent Runs",
+    "description": "Recent agent run records with task and agent info",
+    "fromSql": "SELECT r.pid, r.run_status, r.run_model, r.started_at, r.completed_at, r.duration_ms, r.input_tokens, r.output_tokens, r.total_cost, r.error_message, r.messages, r.metadata, COALESCE(t.title, NULLIF(r.metadata::jsonb ->> 'userMessage', '')) AS task_title, d.name AS agent_name, NULLIF(r.metadata::jsonb ->> 'sessionId', '') AS session_id, NULLIF(r.metadata::jsonb ->> 'traceId', '') AS trace_id, NULLIF(r.metadata::jsonb ->> 'userMessage', '') AS user_message FROM ab_agent_run r LEFT JOIN ab_agent_task t ON r.task_id = t.pid AND t.tenant_id = #{params.tenantId} LEFT JOIN ab_agent_definition d ON r.agent_id = d.agent_code AND d.tenant_id = #{params.tenantId} AND (d.deleted_flag = FALSE OR d.deleted_flag IS NULL) WHERE r.tenant_id = #{params.tenantId} ORDER BY r.started_at DESC",
+    "outputFields": [
+      { "code": "pid", "columnExpr": "pid", "dataType": "string" },
+      { "code": "run_status", "columnExpr": "run_status", "dataType": "string", "searchable": true },
+      { "code": "run_model", "columnExpr": "run_model", "dataType": "string" },
+      { "code": "started_at", "columnExpr": "started_at", "dataType": "date", "sortable": true },
+      { "code": "completed_at", "columnExpr": "completed_at", "dataType": "date" },
+      { "code": "duration_ms", "columnExpr": "duration_ms", "dataType": "number" },
+      { "code": "input_tokens", "columnExpr": "input_tokens", "dataType": "number" },
+      { "code": "output_tokens", "columnExpr": "output_tokens", "dataType": "number" },
+      { "code": "total_cost", "columnExpr": "total_cost", "dataType": "number", "sortable": true },
+      { "code": "error_message", "columnExpr": "error_message", "dataType": "string" },
+      { "code": "messages", "columnExpr": "messages", "dataType": "string" },
+      { "code": "metadata", "columnExpr": "metadata", "dataType": "string" },
+      { "code": "task_title", "columnExpr": "task_title", "dataType": "string", "searchable": true },
+      { "code": "agent_name", "columnExpr": "agent_name", "dataType": "string", "searchable": true },
+      { "code": "session_id", "columnExpr": "session_id", "dataType": "string", "searchable": true },
+      { "code": "trace_id", "columnExpr": "trace_id", "dataType": "string", "searchable": true },
+      { "code": "user_message", "columnExpr": "user_message", "dataType": "string", "searchable": true }
+    ]
+  },
+  {
+    "code": "acp_task_board",
+    "name:zh-CN": "任务看板",
+    "name:en": "Task Board",
+    "description": "Agent tasks with mission and agent info for kanban view",
+    "fromSql": "SELECT t.pid, t.title, t.description, t.task_status, t.task_priority, t.assignee_type, t.assignee_id, t.due_date, t.estimated_cost, t.actual_cost, t.retry_count, t.created_at, m.title AS mission_title, d.name AS agent_name FROM ab_agent_task t LEFT JOIN ab_mission m ON t.mission_id = m.pid AND m.tenant_id = #{params.tenantId} LEFT JOIN ab_agent_definition d ON t.assignee_id = d.agent_code AND d.tenant_id = #{params.tenantId} AND (d.deleted_flag = FALSE OR d.deleted_flag IS NULL) WHERE t.tenant_id = #{params.tenantId} AND (t.deleted_flag = FALSE OR t.deleted_flag IS NULL) ORDER BY CASE t.task_priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END, t.created_at DESC",
+    "outputFields": [
+      { "code": "pid", "columnExpr": "pid", "dataType": "string" },
+      { "code": "title", "columnExpr": "title", "dataType": "string", "searchable": true },
+      { "code": "task_status", "columnExpr": "task_status", "dataType": "string", "searchable": true },
+      { "code": "task_priority", "columnExpr": "task_priority", "dataType": "string", "searchable": true },
+      { "code": "assignee_type", "columnExpr": "assignee_type", "dataType": "string", "searchable": true },
+      { "code": "assignee_id", "columnExpr": "assignee_id", "dataType": "string" },
+      { "code": "due_date", "columnExpr": "due_date", "dataType": "date", "sortable": true },
+      { "code": "estimated_cost", "columnExpr": "estimated_cost", "dataType": "number" },
+      { "code": "actual_cost", "columnExpr": "actual_cost", "dataType": "number" },
+      { "code": "mission_title", "columnExpr": "mission_title", "dataType": "string", "searchable": true },
+      { "code": "agent_name", "columnExpr": "agent_name", "dataType": "string", "searchable": true },
+      { "code": "created_at", "columnExpr": "created_at", "dataType": "date", "sortable": true }
+    ]
+  },
+  {
+    "code": "acp_run_detail",
+    "name:zh-CN": "运行详情",
+    "name:en": "Run Detail",
+    "description": "Full run detail including tool_calls for expanded view",
+    "fromSql": "SELECT r.pid, r.run_status, r.run_model, r.started_at, r.completed_at, r.duration_ms, r.input_tokens, r.output_tokens, r.total_cost, r.error_message, r.tool_calls, r.messages, r.metadata, COALESCE(t.title, NULLIF(r.metadata::jsonb ->> 'userMessage', '')) AS task_title, t.output_data AS task_output, d.name AS agent_name, NULLIF(r.metadata::jsonb ->> 'sessionId', '') AS session_id, NULLIF(r.metadata::jsonb ->> 'traceId', '') AS trace_id, NULLIF(r.metadata::jsonb ->> 'userMessage', '') AS user_message FROM ab_agent_run r LEFT JOIN ab_agent_task t ON r.task_id = t.pid AND t.tenant_id = #{params.tenantId} LEFT JOIN ab_agent_definition d ON r.agent_id = d.agent_code AND d.tenant_id = #{params.tenantId} AND (d.deleted_flag = FALSE OR d.deleted_flag IS NULL) WHERE r.tenant_id = #{params.tenantId} AND r.pid = #{params.run_pid}",
+    "outputFields": [
+      { "code": "pid", "columnExpr": "pid", "dataType": "string" },
+      { "code": "run_status", "columnExpr": "run_status", "dataType": "string" },
+      { "code": "run_model", "columnExpr": "run_model", "dataType": "string" },
+      { "code": "started_at", "columnExpr": "started_at", "dataType": "date" },
+      { "code": "completed_at", "columnExpr": "completed_at", "dataType": "date" },
+      { "code": "duration_ms", "columnExpr": "duration_ms", "dataType": "number" },
+      { "code": "input_tokens", "columnExpr": "input_tokens", "dataType": "number" },
+      { "code": "output_tokens", "columnExpr": "output_tokens", "dataType": "number" },
+      { "code": "total_cost", "columnExpr": "total_cost", "dataType": "number" },
+      { "code": "error_message", "columnExpr": "error_message", "dataType": "string" },
+      { "code": "tool_calls", "columnExpr": "tool_calls", "dataType": "string" },
+      { "code": "messages", "columnExpr": "messages", "dataType": "string" },
+      { "code": "metadata", "columnExpr": "metadata", "dataType": "string" },
+      { "code": "task_title", "columnExpr": "task_title", "dataType": "string" },
+      { "code": "task_output", "columnExpr": "task_output", "dataType": "string" },
+      { "code": "agent_name", "columnExpr": "agent_name", "dataType": "string" },
+      { "code": "session_id", "columnExpr": "session_id", "dataType": "string" },
+      { "code": "trace_id", "columnExpr": "trace_id", "dataType": "string" },
+      { "code": "user_message", "columnExpr": "user_message", "dataType": "string" }
+    ]
+  },
+  {
+    "code": "acp_agent_stats",
+    "name:zh-CN": "Agent 统计",
+    "name:en": "Agent Statistics",
+    "description": "Per-agent performance statistics: run count, success rate, average cost",
+    "fromSql": "SELECT d.pid, d.agent_code, d.name AS agent_name, d.agent_type, d.model, d.status AS agent_status, COALESCE(s.total_runs, 0) AS total_runs, COALESCE(s.success_runs, 0) AS success_runs, CASE WHEN COALESCE(s.total_runs, 0) > 0 THEN ROUND(s.success_runs * 100.0 / s.total_runs, 1) ELSE 0 END AS success_rate, COALESCE(s.total_cost, 0) AS total_cost, CASE WHEN COALESCE(s.total_runs, 0) > 0 THEN ROUND(s.total_cost / s.total_runs, 4) ELSE 0 END AS avg_cost, s.last_run_at FROM ab_agent_definition d LEFT JOIN (SELECT agent_id, COUNT(*) AS total_runs, COUNT(*) FILTER (WHERE run_status = 'success') AS success_runs, COALESCE(SUM(total_cost), 0) AS total_cost, MAX(started_at) AS last_run_at FROM ab_agent_run WHERE tenant_id = #{params.tenantId} GROUP BY agent_id) s ON d.agent_code = s.agent_id WHERE d.tenant_id = #{params.tenantId} AND (d.deleted_flag = FALSE OR d.deleted_flag IS NULL) ORDER BY COALESCE(s.total_runs, 0) DESC",
+    "outputFields": [
+      { "code": "pid", "columnExpr": "pid", "dataType": "string" },
+      { "code": "agent_code", "columnExpr": "agent_code", "dataType": "string" },
+      { "code": "agent_name", "columnExpr": "agent_name", "dataType": "string", "searchable": true },
+      { "code": "agent_type", "columnExpr": "agent_type", "dataType": "string", "searchable": true },
+      { "code": "model", "columnExpr": "model", "dataType": "string" },
+      { "code": "agent_status", "columnExpr": "agent_status", "dataType": "string", "searchable": true },
+      { "code": "total_runs", "columnExpr": "total_runs", "dataType": "number", "sortable": true },
+      { "code": "success_runs", "columnExpr": "success_runs", "dataType": "number" },
+      { "code": "success_rate", "columnExpr": "success_rate", "dataType": "number", "sortable": true },
+      { "code": "total_cost", "columnExpr": "total_cost", "dataType": "number", "sortable": true },
+      { "code": "avg_cost", "columnExpr": "avg_cost", "dataType": "number", "sortable": true },
+      { "code": "last_run_at", "columnExpr": "last_run_at", "dataType": "date", "sortable": true }
+    ]
+  },
+  {
+    "code": "acp_cost_by_agent",
+    "name:zh-CN": "Agent 成本趋势",
+    "name:en": "Cost by Agent (Daily)",
+    "description": "Daily cost breakdown by agent over the last 30 days",
+    "fromSql": "SELECT d.name AS agent_name, r.agent_id, DATE(r.started_at) AS run_date, COUNT(*) AS run_count, COALESCE(SUM(r.total_cost), 0) AS daily_cost, COALESCE(SUM(r.input_tokens), 0) AS daily_input_tokens, COALESCE(SUM(r.output_tokens), 0) AS daily_output_tokens FROM ab_agent_run r LEFT JOIN ab_agent_definition d ON r.agent_id = d.agent_code AND d.tenant_id = #{params.tenantId} AND (d.deleted_flag = FALSE OR d.deleted_flag IS NULL) WHERE r.tenant_id = #{params.tenantId} AND r.started_at >= CURRENT_DATE - INTERVAL '30 days' GROUP BY d.name, r.agent_id, DATE(r.started_at) ORDER BY DATE(r.started_at) DESC, daily_cost DESC",
+    "outputFields": [
+      { "code": "agent_name", "columnExpr": "agent_name", "dataType": "string", "searchable": true },
+      { "code": "agent_id", "columnExpr": "agent_id", "dataType": "string" },
+      { "code": "run_date", "columnExpr": "run_date", "dataType": "date", "sortable": true },
+      { "code": "run_count", "columnExpr": "run_count", "dataType": "number" },
+      { "code": "daily_cost", "columnExpr": "daily_cost", "dataType": "number", "sortable": true },
+      { "code": "daily_input_tokens", "columnExpr": "daily_input_tokens", "dataType": "number" },
+      { "code": "daily_output_tokens", "columnExpr": "daily_output_tokens", "dataType": "number" }
+    ]
+  },
+  {
+    "code": "acp_daily_activity",
+    "name:zh-CN": "每日活动概览",
+    "name:en": "Daily Activity Overview",
+    "description": "Daily activity counts: runs, tasks created/completed, observations",
+    "fromSql": "SELECT DATE(created_at) AS activity_date, COUNT(*) FILTER (WHERE observation_type = 'activity') AS activity_count, COUNT(*) FILTER (WHERE observation_type = 'error') AS error_count, COUNT(*) FILTER (WHERE observation_type = 'cost') AS cost_events, COUNT(*) FILTER (WHERE observation_type = 'alert') AS alert_count, COUNT(*) AS total_observations FROM ab_agent_observation WHERE tenant_id = #{params.tenantId} AND created_at >= CURRENT_DATE - INTERVAL '30 days' GROUP BY DATE(created_at) ORDER BY DATE(created_at) DESC",
+    "outputFields": [
+      { "code": "activity_date", "columnExpr": "activity_date", "dataType": "date", "sortable": true },
+      { "code": "activity_count", "columnExpr": "activity_count", "dataType": "number" },
+      { "code": "error_count", "columnExpr": "error_count", "dataType": "number" },
+      { "code": "cost_events", "columnExpr": "cost_events", "dataType": "number" },
+      { "code": "alert_count", "columnExpr": "alert_count", "dataType": "number" },
+      { "code": "total_observations", "columnExpr": "total_observations", "dataType": "number" }
+    ]
+  },
+  {
+    "code": "acp_error_summary",
+    "name:zh-CN": "错误汇总",
+    "name:en": "Error Summary",
+    "description": "Recent failed runs with error details for debugging",
+    "fromSql": "SELECT r.pid, r.agent_id, d.name AS agent_name, r.run_model, r.started_at, r.duration_ms, r.total_cost, r.error_message, t.title AS task_title FROM ab_agent_run r LEFT JOIN ab_agent_task t ON r.task_id = t.pid AND t.tenant_id = #{params.tenantId} LEFT JOIN ab_agent_definition d ON r.agent_id = d.agent_code AND d.tenant_id = #{params.tenantId} AND (d.deleted_flag = FALSE OR d.deleted_flag IS NULL) WHERE r.tenant_id = #{params.tenantId} AND r.run_status = 'failed' ORDER BY r.started_at DESC",
+    "outputFields": [
+      { "code": "pid", "columnExpr": "pid", "dataType": "string" },
+      { "code": "agent_id", "columnExpr": "agent_id", "dataType": "string" },
+      { "code": "agent_name", "columnExpr": "agent_name", "dataType": "string", "searchable": true },
+      { "code": "run_model", "columnExpr": "run_model", "dataType": "string" },
+      { "code": "started_at", "columnExpr": "started_at", "dataType": "date", "sortable": true },
+      { "code": "duration_ms", "columnExpr": "duration_ms", "dataType": "number" },
+      { "code": "total_cost", "columnExpr": "total_cost", "dataType": "number" },
+      { "code": "error_message", "columnExpr": "error_message", "dataType": "string", "searchable": true },
+      { "code": "task_title", "columnExpr": "task_title", "dataType": "string", "searchable": true }
+    ]
+  },
+  {
+    "code": "acp_agent_tools_active",
+    "name:zh-CN": "可用 Agent 工具",
+    "name:en": "Active Agent Tools",
+    "description": "All active agent tools for tool picker component",
+    "fromSql": "SELECT pid, tool_code, tool_type, tool_name, tool_description, tool_status, source_type FROM ab_agent_tool WHERE tenant_id = #{params.tenantId} AND (deleted_flag = FALSE OR deleted_flag IS NULL) AND tool_status = 'active' ORDER BY tool_type, tool_code",
+    "outputFields": [
+      { "code": "pid", "columnExpr": "pid", "dataType": "string" },
+      { "code": "tool_code", "columnExpr": "tool_code", "dataType": "string", "searchable": true },
+      { "code": "tool_type", "columnExpr": "tool_type", "dataType": "string", "searchable": true },
+      { "code": "tool_name", "columnExpr": "tool_name", "dataType": "string", "searchable": true },
+      { "code": "tool_description", "columnExpr": "tool_description", "dataType": "string" },
+      { "code": "tool_status", "columnExpr": "tool_status", "dataType": "string" },
+      { "code": "source_type", "columnExpr": "source_type", "dataType": "string" }
+    ]
+  },
+  {
+    "code": "acp_mission_progress",
+    "name:zh-CN": "使命进度",
+    "name:en": "Mission Progress",
+    "description": "Mission progress with task counts and completion rate",
+    "fromSql": "SELECT m.pid, m.title, m.mission_status, m.priority, m.kpis, m.target_date, COUNT(t.pid) AS total_tasks, COUNT(t.pid) FILTER (WHERE t.task_status = 'done') AS done_tasks, COUNT(t.pid) FILTER (WHERE t.task_status = 'in_progress') AS active_tasks, COUNT(t.pid) FILTER (WHERE t.task_status IN ('failed','blocked')) AS blocked_tasks, CASE WHEN COUNT(t.pid) > 0 THEN ROUND(COUNT(t.pid) FILTER (WHERE t.task_status = 'done') * 100.0 / COUNT(t.pid), 1) ELSE 0 END AS completion_pct, COALESCE(SUM(t.actual_cost), 0) AS total_cost FROM ab_mission m LEFT JOIN ab_agent_task t ON t.mission_id = m.pid AND t.tenant_id = #{params.tenantId} AND (t.deleted_flag = FALSE OR t.deleted_flag IS NULL) WHERE m.tenant_id = #{params.tenantId} AND (m.deleted_flag = FALSE OR m.deleted_flag IS NULL) AND m.mission_status IN ('active', 'paused') GROUP BY m.pid, m.title, m.mission_status, m.priority, m.kpis, m.target_date, m.created_at ORDER BY m.created_at DESC, m.priority, m.title",
+    "outputFields": [
+      { "code": "pid", "columnExpr": "pid", "dataType": "string" },
+      { "code": "title", "columnExpr": "title", "dataType": "string", "searchable": true },
+      { "code": "mission_status", "columnExpr": "mission_status", "dataType": "string", "searchable": true },
+      { "code": "priority", "columnExpr": "priority", "dataType": "string", "sortable": true },
+      { "code": "kpis", "columnExpr": "kpis", "dataType": "string" },
+      { "code": "target_date", "columnExpr": "target_date", "dataType": "date" },
+      { "code": "total_tasks", "columnExpr": "total_tasks", "dataType": "number" },
+      { "code": "done_tasks", "columnExpr": "done_tasks", "dataType": "number" },
+      { "code": "active_tasks", "columnExpr": "active_tasks", "dataType": "number" },
+      { "code": "blocked_tasks", "columnExpr": "blocked_tasks", "dataType": "number" },
+      { "code": "completion_pct", "columnExpr": "completion_pct", "dataType": "number", "sortable": true },
+      { "code": "total_cost", "columnExpr": "total_cost", "dataType": "number", "sortable": true }
+    ]
+  },
+  {
+    "code": "acp_approval_inbox",
+    "name:zh-CN": "待审批",
+    "name:en": "Approval Inbox",
+    "description": "Pending agent approvals with task and agent context",
+    "fromSql": "SELECT a.pid, a.approval_type, a.title, a.description, a.approval_status, a.request_data, a.created_at, a.expires_at, t.title AS task_title, d.name AS agent_name, d.agent_code FROM ab_agent_approval a LEFT JOIN ab_agent_task t ON a.task_id = t.pid AND t.tenant_id = #{params.tenantId} LEFT JOIN ab_agent_run r ON a.run_id = r.pid AND r.tenant_id = #{params.tenantId} LEFT JOIN ab_agent_definition d ON r.agent_id = d.agent_code AND d.tenant_id = #{params.tenantId} AND (d.deleted_flag = FALSE OR d.deleted_flag IS NULL) WHERE a.tenant_id = #{params.tenantId} AND a.approval_status = 'pending' ORDER BY a.created_at ASC",
+    "outputFields": [
+      { "code": "pid", "columnExpr": "pid", "dataType": "string" },
+      { "code": "approval_type", "columnExpr": "approval_type", "dataType": "string", "searchable": true },
+      { "code": "title", "columnExpr": "title", "dataType": "string", "searchable": true },
+      { "code": "description", "columnExpr": "description", "dataType": "string" },
+      { "code": "approval_status", "columnExpr": "approval_status", "dataType": "string" },
+      { "code": "request_data", "columnExpr": "request_data", "dataType": "string" },
+      { "code": "created_at", "columnExpr": "created_at", "dataType": "date", "sortable": true },
+      { "code": "expires_at", "columnExpr": "expires_at", "dataType": "date" },
+      { "code": "task_title", "columnExpr": "task_title", "dataType": "string", "searchable": true },
+      { "code": "agent_name", "columnExpr": "agent_name", "dataType": "string", "searchable": true },
+      { "code": "agent_code", "columnExpr": "agent_code", "dataType": "string" }
+    ]
+  },
+  {
+    "code": "acp_memory_search",
+    "name:zh-CN": "记忆搜索",
+    "name:en": "Memory Search",
+    "description": "Agent memory search by keyword, category, or agent",
+    "fromSql": "SELECT m.pid, m.memory_type, m.category, m.memory_title, m.memory_content, m.importance, m.memory_agent_id, d.name AS agent_name, m.access_count, m.created_at, m.updated_at FROM ab_agent_memory m LEFT JOIN ab_agent_definition d ON m.memory_agent_id = d.agent_code AND d.tenant_id = #{params.tenantId} AND (d.deleted_flag = FALSE OR d.deleted_flag IS NULL) WHERE m.tenant_id = #{params.tenantId} ORDER BY m.importance DESC, m.updated_at DESC",
+    "outputFields": [
+      { "code": "pid", "columnExpr": "pid", "dataType": "string" },
+      { "code": "memory_type", "columnExpr": "memory_type", "dataType": "string", "searchable": true },
+      { "code": "category", "columnExpr": "category", "dataType": "string", "searchable": true },
+      { "code": "memory_title", "columnExpr": "memory_title", "dataType": "string", "searchable": true },
+      { "code": "memory_content", "columnExpr": "memory_content", "dataType": "string", "searchable": true },
+      { "code": "importance", "columnExpr": "importance", "dataType": "number", "sortable": true },
+      { "code": "memory_agent_id", "columnExpr": "memory_agent_id", "dataType": "string" },
+      { "code": "agent_name", "columnExpr": "agent_name", "dataType": "string", "searchable": true },
+      { "code": "access_count", "columnExpr": "access_count", "dataType": "number", "sortable": true },
+      { "code": "created_at", "columnExpr": "created_at", "dataType": "date", "sortable": true },
+      { "code": "updated_at", "columnExpr": "updated_at", "dataType": "date", "sortable": true }
+    ]
+  }
+]
