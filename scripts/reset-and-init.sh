@@ -101,14 +101,51 @@ if [ $WAITED -ge $MAX_WAIT ]; then
 fi
 
 # Step 4.5: Bootstrap system (create admin user + tenant via API)
+#
+# Backend may auto-bootstrap on startup (when auraboot.saas.bootstrap.mode=seed)
+# and also supports manual /api/bootstrap/setup. The two paths can conflict if
+# auto-bootstrap partially commits (system_config + admin user) but fails before
+# marking system.initialized=true. We handle three cases here:
+#
+#   1) Already initialized (idempotent skip)
+#   2) Not initialized, admin missing → run /setup
+#   3) Not initialized, admin already exists → recover by marking initialized
+#      directly in ab_system_config (avoids UserException: IdentifierAlreadyBeenTaken)
 echo -e "${YELLOW}Step 4.5: Bootstrapping system...${NC}"
 
-# Check if system is already initialized
 BOOTSTRAP_STATUS=$(NO_PROXY=localhost curl -s http://localhost:6443/api/bootstrap/status 2>/dev/null || echo '{}')
 IS_INITIALIZED=$(echo "$BOOTSTRAP_STATUS" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('initialized',False))" 2>/dev/null || echo "False")
 
+# Detect admin presence directly (survives bootstrap failures that half-commit)
+DB_NAME="${POSTGRES_DB:-aura_boot}"
+DB_USER="${POSTGRES_USER:-$(whoami)}"
+DB_HOST="${POSTGRES_HOST:-localhost}"
+ADMIN_EXISTS=$(psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -P pager=off -tAc \
+    "SELECT COUNT(*) FROM ab_user WHERE email = 'admin@example.com';" 2>/dev/null || echo "0")
+
+mark_initialized_flag() {
+    psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -P pager=off -c "
+        INSERT INTO ab_system_config (pid, config_scope, config_key, config_value, value_type, description)
+        VALUES ('RESET-INIT-FLAG-' || substr(md5(random()::text), 1, 20), 'system', 'system.initialized', 'true', 'boolean',
+                'Initialized flag set by reset-and-init.sh after auto-bootstrap completed admin+tenant creation')
+        ON CONFLICT (config_key) DO UPDATE SET config_value = 'true', updated_at = now();
+    " >/dev/null 2>&1
+}
+
 if [ "$IS_INITIALIZED" = "True" ]; then
     echo -e "${GREEN}   System already initialized, skipping bootstrap${NC}"
+elif [ "$ADMIN_EXISTS" = "1" ]; then
+    # Auto-bootstrap (BootstrapStartupListener) or a prior partial bootstrap
+    # already created the admin user. Calling /setup now would fail with
+    # IdentifierAlreadyBeenTaken. Recover by marking the flag directly.
+    echo -e "${YELLOW}   Admin user already exists (auto-bootstrap or prior run).${NC}"
+    echo "   Marking system.initialized=true directly..."
+    if mark_initialized_flag; then
+        echo -e "${GREEN}   Bootstrap recovery successful${NC}"
+    else
+        echo -e "${RED}   Failed to write initialized flag. Inspect DB manually.${NC}"
+        exit 1
+    fi
 else
     echo "   Calling /api/bootstrap/setup..."
     BOOTSTRAP_RESP=$(NO_PROXY=localhost curl -s -w "\n%{http_code}" -X POST http://localhost:6443/api/bootstrap/setup \
@@ -128,12 +165,25 @@ else
     if [ "$BOOTSTRAP_HTTP" = "200" ]; then
         BOOTSTRAP_CODE=$(echo "$BOOTSTRAP_BODY" | python3 -c "import sys,json; print(json.load(sys.stdin).get('code',''))" 2>/dev/null || echo "")
         if [ "$BOOTSTRAP_CODE" = "0" ]; then
-            # Bootstrap is synchronous — by the time /setup returns, it's done
             BOOTSTRAP_TENANT=$(echo "$BOOTSTRAP_BODY" | python3 -c "import sys,json; print(json.load(sys.stdin).get('data',{}).get('tenantId',''))" 2>/dev/null || echo "")
             echo -e "${GREEN}   Bootstrap successful (tenantId=$BOOTSTRAP_TENANT)${NC}"
         else
-            echo -e "${RED}   Bootstrap returned unexpected code: $BOOTSTRAP_BODY${NC}"
-            exit 1
+            # Race: admin was created between our ADMIN_EXISTS check and /setup
+            # (most likely auto-bootstrap finishing). Fall back to flag recovery.
+            POST_CHECK=$(psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -P pager=off -tAc \
+                "SELECT COUNT(*) FROM ab_user WHERE email = 'admin@example.com';" 2>/dev/null || echo "0")
+            if [ "$POST_CHECK" = "1" ]; then
+                echo -e "${YELLOW}   /setup returned error but admin now exists — recovering${NC}"
+                if mark_initialized_flag; then
+                    echo -e "${GREEN}   Bootstrap recovery successful${NC}"
+                else
+                    echo -e "${RED}   Failed to write initialized flag${NC}"
+                    exit 1
+                fi
+            else
+                echo -e "${RED}   Bootstrap returned unexpected code: $BOOTSTRAP_BODY${NC}"
+                exit 1
+            fi
         fi
     else
         echo -e "${RED}   Bootstrap failed (HTTP $BOOTSTRAP_HTTP): $BOOTSTRAP_BODY${NC}"
