@@ -22,7 +22,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { getMessagesByRecord, type EmailMessage } from '~/services/emailService';
 import TrackingStats from './TrackingStats';
-import { sanitizeHtml } from '~/meta/utils/sanitizeHtml';
+import { sanitizeHtml } from '~/framework/meta/utils/sanitizeHtml';
 
 interface EmailTimelineProps {
   modelCode: string;

@@ -4,7 +4,7 @@
  */
 
 import type { ReactNode, CSSProperties, ComponentType } from 'react';
-import type { LocalizedText } from '~/meta/schemas/types';
+import type { LocalizedText } from '~/framework/meta/schemas/types';
 
 // 基础组件属性
 export interface BaseSmartComponentProps {

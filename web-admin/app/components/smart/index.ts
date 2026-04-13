@@ -42,8 +42,8 @@ export {
   componentRegistry,
   initializeComponentRegistry,
   COMPONENT_CATEGORIES,
-} from '~/meta/registry/components';
-export type { ComponentConfig, ComponentCategory } from '~/meta/registry/components';
+} from '~/framework/meta/registry/components';
+export type { ComponentConfig, ComponentCategory } from '~/framework/meta/registry/components';
 export {
   FORM_COMPONENT_CONFIGS,
   DISPLAY_COMPONENT_CONFIGS,
@@ -51,7 +51,7 @@ export {
   LAYOUT_COMPONENT_CONFIGS,
   DATETIME_COMPONENT_CONFIGS,
   ALL_COMPONENT_CONFIGS,
-} from '~/meta/registry/components';
+} from '~/framework/meta/registry/components';
 
 // Types
 export * from '~/components/smart/types';

@@ -11,7 +11,7 @@
 import React, { useState } from 'react';
 import { createPage, getPageByPid } from '~/plugins/core-designer/components/studio/services/page-manager/pageApi';
 import type { ApiPageType } from '~/plugins/core-designer/components/studio/services/page-manager/api-types';
-import { CURRENT_SCHEMA_VERSION } from '~/meta/migration';
+import { CURRENT_SCHEMA_VERSION } from '~/framework/meta/migration';
 
 interface ClonePageDialogProps {
   open: boolean;

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { PaletteItem } from '~/plugins/core-designer/components/studio/workbench/palette/PaletteItem';
-import { componentRegistry } from '~/meta/registry/components';
+import { componentRegistry } from '~/framework/meta/registry/components';
 import type {
   ComponentPaletteProps,
   ComponentType,

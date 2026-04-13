@@ -11,8 +11,8 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { get, post } from '~/services/http-client';
-import { useDslForm } from '~/meta/hooks/useDslForm';
-import { DslFormRenderer } from '~/meta/rendering/DslFormRenderer';
+import { useDslForm } from '~/framework/meta/hooks/useDslForm';
+import { DslFormRenderer } from '~/framework/meta/rendering/DslFormRenderer';
 import { ApprovalOpinionSection } from './ApprovalOpinionSection';
 
 // ---------------------------------------------------------------------------

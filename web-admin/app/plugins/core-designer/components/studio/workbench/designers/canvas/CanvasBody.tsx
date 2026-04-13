@@ -19,7 +19,7 @@ import {
 import { GridLayout, verticalCompactor } from 'react-grid-layout';
 import 'react-grid-layout/css/styles.css';
 import { rglToDslLayout, autoFlow } from '~/plugins/core-designer/components/studio/core/layout';
-import type { BlockLayoutConfig } from '~/meta/schemas/types';
+import type { BlockLayoutConfig } from '~/framework/meta/schemas/types';
 import { InlineTitle } from './InlineTitle';
 import { EmptyCanvas } from './EmptyCanvas';
 import type { CanvasBlock } from '~/plugins/core-designer/components/studio/domain/canvas/types';

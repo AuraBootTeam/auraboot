@@ -16,7 +16,7 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
-import { sanitizeHtml } from '~/meta/utils/sanitizeHtml';
+import { sanitizeHtml } from '~/framework/meta/utils/sanitizeHtml';
 
 interface RichTextEditorProps {
   name: string;

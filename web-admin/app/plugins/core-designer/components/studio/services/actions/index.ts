@@ -3,5 +3,5 @@
  * For now we re-export the registry and helper types so studio code can
  * reference them without importing from app/meta directly.
  */
-export { actionRegistry } from '~/meta/runtime/actions/ActionRegistry';
-export type { ActionContext, ActionHandler } from '~/meta/runtime/actions/ActionRegistry';
+export { actionRegistry } from '~/framework/meta/runtime/actions/ActionRegistry';
+export type { ActionContext, ActionHandler } from '~/framework/meta/runtime/actions/ActionRegistry';
