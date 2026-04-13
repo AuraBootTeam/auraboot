@@ -7,7 +7,7 @@
 import React from 'react';
 import { useToastContext } from '~/contexts/ToastContext';
 import { useDashboardStore } from '../store/useDashboardStore';
-import { ExportPdfButton } from '~/smart/components/data-tools/ExportPdfButton';
+import { ExportPdfButton } from '~/framework/smart/components/data-tools/ExportPdfButton';
 import { DashboardExportExcel } from './DashboardExportExcel';
 import { DesignerToolbar as SharedDesignerToolbar } from '~/shared/designer/DesignerToolbar';
 import { Clock, Maximize2 } from 'lucide-react';

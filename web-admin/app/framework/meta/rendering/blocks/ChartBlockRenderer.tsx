@@ -14,7 +14,7 @@
 import React, { Suspense, useMemo } from 'react';
 import type { BlockConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
-import { getChartComponent, getSupportedChartTypes } from '~/smart/charts/SharedChartFactory';
+import { getChartComponent, getSupportedChartTypes } from '~/framework/smart/charts/SharedChartFactory';
 
 export interface ChartBlockRendererProps {
   block: BlockConfig;

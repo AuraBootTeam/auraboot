@@ -7,8 +7,8 @@
 
 import { useSearchParams } from 'react-router';
 import { useMemo, useCallback } from 'react';
-import type { SortConfig } from '~/smart/types/savedView';
-import type { ViewFilterConfig } from '~/smart/types/savedView';
+import type { SortConfig } from '~/framework/smart/types/savedView';
+import type { ViewFilterConfig } from '~/framework/smart/types/savedView';
 
 // ---------------------------------------------------------------------------
 // Pure encoding / decoding helpers (exported for unit testing)

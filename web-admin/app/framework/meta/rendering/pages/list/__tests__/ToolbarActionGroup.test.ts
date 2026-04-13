@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildDefaultConfig, mergeConfig } from '../ToolbarActionGroup';
 import type { ButtonConfig } from '~/framework/meta/schemas/types';
-import type { ToolbarActionConfig } from '~/smart/types/savedView';
+import type { ToolbarActionConfig } from '~/framework/smart/types/savedView';
 
 function makeButton(code: string, opts?: Partial<ButtonConfig>): ButtonConfig {
   return { code, ...opts } as ButtonConfig;

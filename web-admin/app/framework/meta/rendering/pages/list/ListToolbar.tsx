@@ -5,9 +5,9 @@
  * Below:  <FilterChipBar .../>
  */
 import React, { useCallback } from 'react';
-import { RowHeightSelector } from '~/smart/components/view/RowHeightSelector';
-import { FilterChipBar } from '~/smart/components/view/FilterChipBar';
-import type { SortConfig, ViewFilterConfig, RowHeight } from '~/smart/types/savedView';
+import { RowHeightSelector } from '~/framework/smart/components/view/RowHeightSelector';
+import { FilterChipBar } from '~/framework/smart/components/view/FilterChipBar';
+import type { SortConfig, ViewFilterConfig, RowHeight } from '~/framework/smart/types/savedView';
 import type { ColumnConfig } from '~/framework/meta/schemas/types';
 import { SortPopover } from './SortPopover';
 import type { SortableColumn } from './SortPopover';

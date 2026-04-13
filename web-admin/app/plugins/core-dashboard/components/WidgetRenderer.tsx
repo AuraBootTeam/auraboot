@@ -8,8 +8,8 @@
 
 import React, { Suspense } from 'react';
 import type { Widget, WidgetType } from '../types';
-import type { FilterConfig } from '~/smart/types/chart';
-import { getChartComponent, normalizeChartType } from '~/smart/charts/SharedChartFactory';
+import type { FilterConfig } from '~/framework/smart/types/chart';
+import { getChartComponent, normalizeChartType } from '~/framework/smart/charts/SharedChartFactory';
 
 interface WidgetRenderProps {
   /** The widget to render */

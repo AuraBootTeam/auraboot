@@ -6,8 +6,8 @@
 
 import React from 'react';
 import type { FieldAdapter } from '~/components/field-adapter';
-import { FormulaEditor } from '~/smart/components/formula/FormulaEditor';
-import type { FormulaFunction } from '~/smart/components/formula/FormulaEditor';
+import { FormulaEditor } from '~/framework/smart/components/formula/FormulaEditor';
+import type { FormulaFunction } from '~/framework/smart/components/formula/FormulaEditor';
 import { cn } from '~/utils/cn';
 
 export interface BaseFormulaEditorProps {

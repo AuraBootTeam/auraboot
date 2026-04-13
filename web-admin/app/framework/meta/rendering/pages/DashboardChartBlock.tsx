@@ -14,7 +14,7 @@
  */
 
 import React, { Suspense, useMemo } from 'react';
-import type { ChartDataSource, DrillDownConfig } from '~/smart/types/chart';
+import type { ChartDataSource, DrillDownConfig } from '~/framework/smart/types/chart';
 
 interface DashboardChartBlockProps {
   block: {
@@ -35,19 +35,19 @@ interface DashboardChartBlockProps {
 
 /** Lazy-loaded chart components */
 const SmartBarChart = React.lazy(() =>
-  import('~/smart/components/charts/SmartBarChart').then((m) => ({ default: m.SmartBarChart })),
+  import('~/framework/smart/components/charts/SmartBarChart').then((m) => ({ default: m.SmartBarChart })),
 );
 const SmartLineChart = React.lazy(() =>
-  import('~/smart/components/charts/SmartLineChart').then((m) => ({ default: m.SmartLineChart })),
+  import('~/framework/smart/components/charts/SmartLineChart').then((m) => ({ default: m.SmartLineChart })),
 );
 const SmartNumberCard = React.lazy(() =>
-  import('~/smart/components/charts/SmartNumberCard').then((m) => ({ default: m.SmartNumberCard })),
+  import('~/framework/smart/components/charts/SmartNumberCard').then((m) => ({ default: m.SmartNumberCard })),
 );
 const SmartPieChart = React.lazy(() =>
-  import('~/smart/components/charts/SmartPieChart').then((m) => ({ default: m.SmartPieChart })),
+  import('~/framework/smart/components/charts/SmartPieChart').then((m) => ({ default: m.SmartPieChart })),
 );
 const SmartAreaChart = React.lazy(() =>
-  import('~/smart/components/charts/SmartAreaChart').then((m) => ({ default: m.SmartAreaChart })),
+  import('~/framework/smart/components/charts/SmartAreaChart').then((m) => ({ default: m.SmartAreaChart })),
 );
 
 function getLocalizedTitle(

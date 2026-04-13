@@ -11,7 +11,7 @@
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import type { ButtonConfig } from '~/framework/meta/schemas/types';
-import type { ToolbarActionConfig } from '~/smart/types/savedView';
+import type { ToolbarActionConfig } from '~/framework/smart/types/savedView';
 import { cn } from '~/utils/cn';
 import { ActionConfigPanel } from './ActionConfigPanel';
 

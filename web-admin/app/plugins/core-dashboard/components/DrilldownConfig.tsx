@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import type { DrillDownConfig as DrillDownConfigType } from '~/smart/types/chart';
+import type { DrillDownConfig as DrillDownConfigType } from '~/framework/smart/types/chart';
 import { BaseResourceSelect } from '~/components/base-fields';
 import { fetchPageOptions, fetchDashboardOptions } from '~/services/resourceSelectService';
 

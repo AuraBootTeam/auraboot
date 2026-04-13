@@ -2,8 +2,8 @@
  * Dashboard Designer Types
  */
 
-import type { EnhancedGridCellConfig, EnhancedGridConfig } from '~/smart/types/dashboard';
-import type { DrillDownConfig } from '~/smart/types/chart';
+import type { EnhancedGridCellConfig, EnhancedGridConfig } from '~/framework/smart/types/dashboard';
+import type { DrillDownConfig } from '~/framework/smart/types/chart';
 import type {
   PropertySchema as SharedPropertySchema,
   ValidationResult as SharedValidationResult,

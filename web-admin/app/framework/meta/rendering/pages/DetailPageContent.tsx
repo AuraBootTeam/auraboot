@@ -32,9 +32,9 @@ import { useDictCache } from '~/framework/meta/rendering/pages/hooks/useDictCach
 import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
 import { useToastContext } from '~/contexts/ToastContext';
 import { ErrorAlert } from '~/components/ErrorAlert';
-import { ReportGenerateButton } from '~/smart/components/report/ReportGenerateButton';
+import { ReportGenerateButton } from '~/framework/smart/components/report/ReportGenerateButton';
 import { LoadingSpinner } from '~/components/LoadingSpinner';
-import { InlineApprovalPanel } from '~/smart/components/approval/InlineApprovalPanel';
+import { InlineApprovalPanel } from '~/framework/smart/components/approval/InlineApprovalPanel';
 import { SubTableViewer } from '~/framework/meta/rendering/blocks/SubTableViewer';
 import { MonthlyGridViewer } from '~/framework/meta/rendering/blocks/MonthlyGridViewer';
 import { FieldHistoryViewer } from '~/framework/meta/rendering/blocks/FieldHistoryViewer';

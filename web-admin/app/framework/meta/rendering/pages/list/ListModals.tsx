@@ -8,14 +8,14 @@
  */
 
 import type { ColumnConfig } from '~/framework/meta/schemas/types';
-import { ImportModal } from '~/smart/components/data-tools/ImportModal';
+import { ImportModal } from '~/framework/smart/components/data-tools/ImportModal';
 import FormDialog from '~/framework/meta/runtime/actions/FormDialog';
-import { ViewManagePanel } from '~/smart/components/view/ViewManagePanel';
-import { ColumnSettingsPanel } from '~/smart/components/view/ColumnSettingsPanel';
-import { FilterFieldPicker } from '~/smart/components/view/FilterFieldPicker';
-import { FilterValuePopover } from '~/smart/components/view/FilterValuePopover';
-import { BulkEditModal } from '~/smart/components/bulk/BulkEditModal';
-import { RecordPreviewDrawer } from '~/smart/components/preview/RecordPreviewDrawer';
+import { ViewManagePanel } from '~/framework/smart/components/view/ViewManagePanel';
+import { ColumnSettingsPanel } from '~/framework/smart/components/view/ColumnSettingsPanel';
+import { FilterFieldPicker } from '~/framework/smart/components/view/FilterFieldPicker';
+import { FilterValuePopover } from '~/framework/smart/components/view/FilterValuePopover';
+import { BulkEditModal } from '~/framework/smart/components/bulk/BulkEditModal';
+import { RecordPreviewDrawer } from '~/framework/smart/components/preview/RecordPreviewDrawer';
 import { ColumnContextMenu } from './ColumnContextMenu';
 import type {
   SavedViewCreateRequest,
@@ -24,7 +24,7 @@ import type {
   ViewType,
   ViewScope,
   SortConfig,
-} from '~/smart/types/savedView';
+} from '~/framework/smart/types/savedView';
 
 export interface ListModalsProps {
   // BulkEditModal

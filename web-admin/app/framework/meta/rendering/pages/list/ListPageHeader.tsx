@@ -7,9 +7,9 @@
 
 import React, { useCallback } from 'react';
 import type { ButtonConfig } from '~/framework/meta/schemas/types';
-import type { ToolbarActionConfig } from '~/smart/types/savedView';
-import type { SavedView, ViewType } from '~/smart/types/savedView';
-import { ViewSelector } from '~/smart/components/view/ViewSelector';
+import type { ToolbarActionConfig } from '~/framework/smart/types/savedView';
+import type { SavedView, ViewType } from '~/framework/smart/types/savedView';
+import { ViewSelector } from '~/framework/smart/components/view/ViewSelector';
 import { ToolbarActionGroup } from './ToolbarActionGroup';
 import { deriveTestId } from '~/framework/meta/rendering/utils/deriveTestId';
 
