@@ -13,10 +13,10 @@ import {
   APP_TEMPLATES,
   TEMPLATE_CATEGORY_TREE,
   type AppTemplate,
-} from '~/admin/templates/templateCatalog';
-import { TemplateCategorySidebar } from '~/admin/templates/TemplateCategorySidebar';
-import { TemplateCard } from '~/admin/templates/TemplateCard';
-import { CreateBlankCard } from '~/admin/templates/CreateBlankCard';
+} from '~/plugins/core-admin/templates/templateCatalog';
+import { TemplateCategorySidebar } from '~/plugins/core-admin/templates/TemplateCategorySidebar';
+import { TemplateCard } from '~/plugins/core-admin/templates/TemplateCard';
+import { CreateBlankCard } from '~/plugins/core-admin/templates/CreateBlankCard';
 
 export default function TemplateCenterPage() {
   const [activeCategory, setActiveCategory] = useState('all');

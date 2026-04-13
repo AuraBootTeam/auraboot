@@ -15,13 +15,13 @@ import {
   CheckCircleIcon,
   ExclamationCircleIcon,
 } from '@heroicons/react/24/outline';
-import { APP_TEMPLATES } from '~/admin/templates/templateCatalog';
-import { useTemplatePreview } from '~/admin/templates/useTemplatePreview';
+import { APP_TEMPLATES } from '~/plugins/core-admin/templates/templateCatalog';
+import { useTemplatePreview } from '~/plugins/core-admin/templates/useTemplatePreview';
 import {
   TemplatePreviewSidebar,
   type SelectedItem,
-} from '~/admin/templates/TemplatePreviewSidebar';
-import { TemplateResourcePreview } from '~/admin/templates/TemplateResourcePreview';
+} from '~/plugins/core-admin/templates/TemplatePreviewSidebar';
+import { TemplateResourcePreview } from '~/plugins/core-admin/templates/TemplateResourcePreview';
 import { post } from '~/services/http-client';
 
 type InstallState = 'idle' | 'installing' | 'success' | 'error';

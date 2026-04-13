@@ -1,5 +1,5 @@
 import React from 'react';
-import { KeysToComponentMap } from '~/pages/utils/ComponentMapping';
+import { KeysToComponentMap } from '~/framework/pages/utils/ComponentMapping';
 
 interface ComponentConfig {
   type: string;
