@@ -1,0 +1,73 @@
+[
+  {
+    "code": "pgm:create_page_schema",
+    "displayName:zh-CN": "新建页面",
+    "displayName:en": "Create Page",
+    "type": "create",
+    "modelCode": "page_schema",
+    "inputFields": ["name", "page_key", "kind", "model_code", "description", "profile"]
+  },
+  {
+    "code": "pgm:update_page_schema",
+    "displayName:zh-CN": "更新页面",
+    "displayName:en": "Update Page",
+    "type": "update",
+    "modelCode": "page_schema",
+    "inputFields": ["name", "page_key", "kind", "model_code", "description", "profile"]
+  },
+  {
+    "code": "pgm:delete_page_schema",
+    "displayName:zh-CN": "删除页面",
+    "displayName:en": "Delete Page",
+    "type": "delete",
+    "modelCode": "page_schema",
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此页面？此操作不可恢复。",
+      "confirmMessage:en": "Delete this page? This action cannot be undone."
+    }
+  },
+  {
+    "code": "pgm:publish_page_schema",
+    "displayName:zh-CN": "发布",
+    "displayName:en": "Publish",
+    "type": "state_transition",
+    "modelCode": "page_schema",
+    "stateField": "status",
+    "fromStates": ["draft"],
+    "toState": "published",
+    "bindingRules": [
+      { "ruleType": "handler", "handlerClass": "pageSchemaCommandHandler" }
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认发布此页面？发布后将立即生效。",
+      "confirmMessage:en": "Publish this page? It will take effect immediately."
+    }
+  },
+  {
+    "code": "pgm:archive_page_schema",
+    "displayName:zh-CN": "归档",
+    "displayName:en": "Archive",
+    "type": "state_transition",
+    "modelCode": "page_schema",
+    "stateField": "status",
+    "fromStates": ["draft", "published"],
+    "toState": "archived",
+    "bindingRules": [
+      { "ruleType": "handler", "handlerClass": "pageSchemaCommandHandler" }
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认归档此页面？归档后将不再对用户可见。",
+      "confirmMessage:en": "Archive this page? It will no longer be visible."
+    }
+  },
+  {
+    "code": "pgm:duplicate_page_schema",
+    "displayName:zh-CN": "复制页面",
+    "displayName:en": "Duplicate Page",
+    "type": "custom",
+    "modelCode": "page_schema",
+    "bindingRules": [
+      { "ruleType": "handler", "handlerClass": "pageSchemaCommandHandler" }
+    ]
+  }
+]

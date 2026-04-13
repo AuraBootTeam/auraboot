@@ -1,0 +1,93 @@
+[
+  {
+    "code": "name",
+    "displayName:zh-CN": "页面名称",
+    "displayName:en": "Page Name",
+    "dataType": "text",
+    "constraints": { "required": true, "maxLength": 200 },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "page_key",
+    "displayName:zh-CN": "页面标识",
+    "displayName:en": "Page Key",
+    "dataType": "text",
+    "constraints": { "required": true, "maxLength": 200 },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "kind",
+    "displayName:zh-CN": "页面类型",
+    "displayName:en": "Page Kind",
+    "dataType": "enum",
+    "dictCode": "pm_page_kind",
+    "constraints": { "required": true },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "status",
+    "displayName:zh-CN": "状态",
+    "displayName:en": "Status",
+    "dataType": "enum",
+    "dictCode": "pm_page_status",
+    "constraints": { "required": true },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "model_code",
+    "displayName:zh-CN": "绑定模型",
+    "displayName:en": "Bound Model",
+    "dataType": "text",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "description",
+    "displayName:zh-CN": "描述",
+    "displayName:en": "Description",
+    "dataType": "text",
+    "constraints": { "maxLength": 500 }
+  },
+  {
+    "code": "profile",
+    "displayName:zh-CN": "渲染策略",
+    "displayName:en": "Profile",
+    "dataType": "enum",
+    "dictCode": "pm_page_profile"
+  },
+  {
+    "code": "version",
+    "displayName:zh-CN": "内部版本",
+    "displayName:en": "Revision",
+    "dataType": "integer"
+  },
+  {
+    "code": "semver",
+    "displayName:zh-CN": "版本号",
+    "displayName:en": "Version",
+    "dataType": "text"
+  },
+  {
+    "code": "is_template",
+    "displayName:zh-CN": "是否模板",
+    "displayName:en": "Is Template",
+    "dataType": "boolean"
+  },
+  {
+    "code": "published_at",
+    "displayName:zh-CN": "发布时间",
+    "displayName:en": "Published At",
+    "dataType": "datetime"
+  },
+  {
+    "code": "created_at",
+    "displayName:zh-CN": "创建时间",
+    "displayName:en": "Created At",
+    "dataType": "datetime"
+  },
+  {
+    "code": "updated_at",
+    "displayName:zh-CN": "更新时间",
+    "displayName:en": "Updated At",
+    "dataType": "datetime"
+  }
+]
