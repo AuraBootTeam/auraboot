@@ -567,11 +567,12 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         refTarget.put("targetEntity", modelCode);
         refTarget.put("modelCode", modelCode);
 
-        // Resolve display field (targetField) from extension.refDisplayField
+        // Resolve display field from extension.refDisplayField
+        // Must use "displayField" key to match DynamicDataServiceImpl.enrichReferenceDisplayFields()
         if (dto.getExtension() != null) {
             Object refDisplayField = dto.getExtension().get("refDisplayField");
             if (refDisplayField instanceof String s && !s.isBlank()) {
-                refTarget.put("targetField", s);
+                refTarget.put("displayField", s);
             }
         }
 
