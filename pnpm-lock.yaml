@@ -49,6 +49,15 @@ importers:
       '@auraboot/core':
         specifier: workspace:*
         version: link:packages/core
+      '@auraboot/dsl-types':
+        specifier: workspace:*
+        version: link:../packages/dsl-types
+      '@auraboot/nav-model':
+        specifier: workspace:*
+        version: link:../packages/nav-model
+      '@auraboot/plugin-sdk':
+        specifier: workspace:*
+        version: link:../packages/plugin-sdk
       '@dnd-kit/core':
         specifier: ^6.3.1
         version: 6.3.1(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
