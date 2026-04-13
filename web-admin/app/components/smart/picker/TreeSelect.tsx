@@ -1,8 +1,8 @@
 import React, { forwardRef, useState, useEffect, useRef } from 'react';
 import { useActionData } from 'react-router';
 import clsx from 'clsx';
-import { useSmartFieldContract } from '~/studio/hooks/runtime/useSmartFieldContract';
-import { useSmartFieldMeta } from '~/studio/hooks/runtime/useSmartFieldMeta';
+import { useSmartFieldContract } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldContract';
+import { useSmartFieldMeta } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldMeta';
 import { useSmartText } from '~/utils/i18n';
 import { FieldBase } from '~/components/ui/field-base';
 import { useDictTree } from './useDictTree';

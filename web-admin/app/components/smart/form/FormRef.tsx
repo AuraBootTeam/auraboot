@@ -9,8 +9,8 @@ import type {
   FormRef as FormRefSchema,
   FormRefState,
   FormRefEvent,
-} from '~/studio/domain/schema/formref';
-import { useFormRefManager } from '~/studio/hooks/forms/useFormRefManager';
+} from '~/plugins/core-designer/components/studio/domain/schema/formref';
+import { useFormRefManager } from '~/plugins/core-designer/components/studio/hooks/forms/useFormRefManager';
 import { Form } from '~/components/smart/layout/Form';
 
 interface OverlayProps {

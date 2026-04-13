@@ -11,7 +11,7 @@ import React, { Suspense } from 'react';
 import { RouteLoadingFallback } from '~/components/RouteLoadingFallback';
 
 const PageDesignerEditorImpl = React.lazy(
-  () => import('~/studio/workbench/PageDesignerEditorImpl'),
+  () => import('~/plugins/core-designer/components/studio/workbench/PageDesignerEditorImpl'),
 );
 
 export default function PageDesignerEditor() {

@@ -15,15 +15,15 @@ import {
   useSmartComponentState,
   useValidation,
   useConditionalRender,
-} from '~/studio/hooks/runtime/useSmartComponent';
-import { ExpressionParser } from '~/studio/services/runtime/expression/expression-parser';
+} from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartComponent';
+import { ExpressionParser } from '~/plugins/core-designer/components/studio/services/runtime/expression/expression-parser';
 import type {
   NavigationProps,
   NavigationItem,
   MenuConfig,
   BreadcrumbConfig,
   TabConfig,
-} from '~/studio/domain/schema/smart-components';
+} from '~/plugins/core-designer/components/studio/domain/schema/smart-components';
 
 export const Navigation: React.FC<NavigationProps> = ({
   name,

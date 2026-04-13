@@ -37,11 +37,11 @@ export interface RootLoaderData {
 
 import '~/app.css';
 import '~/styles/print.css';
-import '~/studio/workbench/styles/smart-slots.css';
-import '~/studio/workbench/styles/drag-preview.css';
-import '~/studio/workbench/styles/responsive.css';
-import '~/studio/workbench/styles/command.css';
-import '~/studio/workbench/styles/drag.css';
+import '~/plugins/core-designer/components/studio/workbench/styles/smart-slots.css';
+import '~/plugins/core-designer/components/studio/workbench/styles/drag-preview.css';
+import '~/plugins/core-designer/components/studio/workbench/styles/responsive.css';
+import '~/plugins/core-designer/components/studio/workbench/styles/command.css';
+import '~/plugins/core-designer/components/studio/workbench/styles/drag.css';
 
 import { getUserInfo } from '~/services/userService';
 import { isPublicRoute } from '~/middleware/sessionMiddlewareFactory';

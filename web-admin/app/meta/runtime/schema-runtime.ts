@@ -16,7 +16,7 @@ import { expressionEvaluator } from '~/meta/runtime/expression/evaluator';
 import { actionRegistry } from '~/meta/runtime/actions/ActionRegistry';
 import { FlowRunner } from '~/meta/runtime/schema-runtime/FlowRunner';
 import { LinkageEngine } from '~/meta/runtime/linkage/LinkageEngine';
-import type { TriggerEvent } from '~/studio/workbench/panels/linkage/types';
+import type { TriggerEvent } from '~/plugins/core-designer/components/studio/workbench/panels/linkage/types';
 import { fetchResult } from '~/services/http-client';
 
 /**

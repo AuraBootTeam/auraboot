@@ -4,7 +4,7 @@ import { DataSourceManager } from '~/meta/runtime/data-pipeline/DataSourceManage
 import { createExpressionContext, type GlobalState } from '~/meta/runtime/expression/context';
 import type { UnifiedSchema } from '~/meta/schemas/types';
 import { actionRegistry } from '~/meta/runtime/actions/ActionRegistry';
-import formDsl from '~/studio/test/final.v1.0/form.json';
+import formDsl from '~/plugins/core-designer/components/studio/test/final.v1.0/form.json';
 
 const createGlobalState = (): GlobalState => ({
   locale: 'zh-CN',

@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { cn } from '~/utils/cn';
-import { useConditionalRender } from '~/studio/hooks/runtime/useSmartComponent';
-import { ExpressionParser } from '~/studio/services/runtime/expression/expression-parser';
+import { useConditionalRender } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartComponent';
+import { ExpressionParser } from '~/plugins/core-designer/components/studio/services/runtime/expression/expression-parser';
 import type {
   LayoutProps,
   LayoutItemConfig,
@@ -10,7 +10,7 @@ import type {
   FlexLayoutConfig,
   StackLayoutConfig,
   AbsoluteLayoutConfig,
-} from '~/studio/domain/schema/smart-components';
+} from '~/plugins/core-designer/components/studio/domain/schema/smart-components';
 
 export const Layout: React.FC<LayoutProps> = ({
   name,
