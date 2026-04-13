@@ -43,3 +43,67 @@ describe('ColumnRendererRegistry', () => {
     expect(wr.resolve('foo')?.component).not.toBe(cr.resolve('foo')?.component)
   })
 })
+
+describe('propsSchema validation', () => {
+  const moneySchema = {
+    type: 'object',
+    properties: {
+      currency: { type: 'string', enum: ['CNY', 'USD', 'EUR'] },
+      precision: { type: 'integer', minimum: 0, maximum: 8 },
+    },
+    required: ['currency'],
+    additionalProperties: false,
+  }
+
+  it('compile failures surface at register time', () => {
+    const r = new WidgetRegistry()
+    expect(() =>
+      r.register({
+        type: 'broken',
+        component: () => null,
+        propsSchema: { type: 'not-a-real-type' as unknown as string },
+      }),
+    ).toThrow(/invalid propsSchema/)
+  })
+
+  it('valid props pass', () => {
+    const r = new WidgetRegistry()
+    r.register({ type: 'money-input', component: () => null, propsSchema: moneySchema })
+    const result = r.validate('money-input', { currency: 'CNY', precision: 2 })
+    expect(result).toEqual({ valid: true, errors: [] })
+  })
+
+  it('invalid props produce structured errors', () => {
+    const r = new WidgetRegistry()
+    r.register({ type: 'money-input', component: () => null, propsSchema: moneySchema })
+    const result = r.validate('money-input', { precision: 99 }) // missing currency, precision OOR
+    expect(result.valid).toBe(false)
+    expect(result.errors.length).toBeGreaterThan(0)
+    expect(result.errors.some(e => /currency/.test(e.path) || /currency/.test(e.message))).toBe(true)
+  })
+
+  it('unknown type returns explicit error', () => {
+    const r = new WidgetRegistry()
+    const result = r.validate('does-not-exist', {})
+    expect(result.valid).toBe(false)
+    expect(result.errors[0]?.message).toMatch(/unknown type/)
+  })
+
+  it('no propsSchema means no constraints', () => {
+    const r = new WidgetRegistry()
+    r.register({ type: 'unconstrained', component: () => null })
+    expect(r.validate('unconstrained', { whatever: true }).valid).toBe(true)
+  })
+
+  it('assertValid throws with all error paths joined', () => {
+    const r = new WidgetRegistry()
+    r.register({ type: 'money-input', component: () => null, propsSchema: moneySchema })
+    expect(() => r.assertValid('money-input', { currency: 'JPY' })).toThrow(/currency/)
+  })
+
+  it('assertValid passes silently on valid input', () => {
+    const r = new WidgetRegistry()
+    r.register({ type: 'money-input', component: () => null, propsSchema: moneySchema })
+    expect(() => r.assertValid('money-input', { currency: 'USD' })).not.toThrow()
+  })
+})
