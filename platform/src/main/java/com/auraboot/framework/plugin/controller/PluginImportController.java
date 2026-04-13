@@ -203,11 +203,11 @@ public class PluginImportController {
         inputParams.put("conflictStrategy",
                 request.getConflictStrategy() != null
                         ? request.getConflictStrategy().name() : "overwrite");
-        inputParams.put("autoDeployProcesses", request.isAutoDeployProcesses());
-        inputParams.put("autoPublishModels", request.isAutoPublishModels());
-        inputParams.put("autoPublishFields", request.isAutoPublishFields());
-        inputParams.put("autoPublishCommands", request.isAutoPublishCommands());
-        inputParams.put("autoPublishPages", request.isAutoPublishPages());
+        inputParams.put("autoDeployProcesses", request.getAutoDeployProcesses());
+        inputParams.put("autoPublishModels", request.getAutoPublishModels());
+        inputParams.put("autoPublishFields", request.getAutoPublishFields());
+        inputParams.put("autoPublishCommands", request.getAutoPublishCommands());
+        inputParams.put("autoPublishPages", request.getAutoPublishPages());
         inputParams.put("tenantId", ctx.getTenantId());
         inputParams.put("userId", ctx.getUserId());
         inputParams.put("userPid", ctx.getUserPid());
@@ -265,11 +265,11 @@ public class PluginImportController {
                 .conflictStrategy(request.getConflictStrategy() != null
                         ? request.getConflictStrategy()
                         : ImportRequest.ConflictStrategy.OVERWRITE)
-                .autoDeployProcesses(request.isAutoDeployProcesses())
-                .autoPublishModels(request.isAutoPublishModels())
-                .autoPublishFields(request.isAutoPublishFields())
-                .autoPublishCommands(request.isAutoPublishCommands())
-                .autoPublishPages(request.isAutoPublishPages())
+                .autoDeployProcesses(request.getAutoDeployProcesses())
+                .autoPublishModels(request.getAutoPublishModels())
+                .autoPublishFields(request.getAutoPublishFields())
+                .autoPublishCommands(request.getAutoPublishCommands())
+                .autoPublishPages(request.getAutoPublishPages())
                 .build();
 
         ImportExecuteResult result = importService.execute(preview.getImportId(), importRequest);
@@ -286,11 +286,12 @@ public class PluginImportController {
     public static class DirectoryImportRequest {
         private String path;
         private ImportRequest.ConflictStrategy conflictStrategy;
-        private boolean autoDeployProcesses = true;
-        private boolean autoPublishModels = true;
-        private boolean autoPublishFields = true;
-        private boolean autoPublishCommands = true;
-        private boolean autoPublishPages = true;
+        // Use Boolean wrappers so null = "not set by caller" (allows manifest defaults to apply)
+        private Boolean autoDeployProcesses;
+        private Boolean autoPublishModels;
+        private Boolean autoPublishFields;
+        private Boolean autoPublishCommands;
+        private Boolean autoPublishPages;
     }
 
     // ==================== Preview ====================
