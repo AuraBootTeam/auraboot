@@ -1,5 +1,12 @@
 import { route } from '@react-router/dev/routes';
 
+// Plugin-contributed static routes. As core-* plugins migrate from
+// hardcoded entries below into definePlugin form, their static React
+// Router 7 route declarations live in the plugin's routes.ts and are
+// imported here. The same paths are also registered with the kernel
+// at runtime via PluginContext for menu/breadcrumb/permission gating.
+import { bpmRoutes } from '../../app/plugins/core-bpm/routes';
+
 /**
  * Core routes — included in ALL editions (community, enterprise, website).
  * File paths are relative to the app/ directory.
@@ -20,11 +27,8 @@ export function coreRoutes() {
     route('/automations', './routes/automations.tsx'),
     route('/automation/:id', './routes/automation.$id.tsx'),
 
-    // BPM (process-management, domain-configs, sla-configs are DSL pages under /dynamic/)
-    route('/bpm/task-center', './routes/bpm/task-center.tsx'),
-    route('/bpm/process-status', './routes/bpm/process-status.tsx'),
-    route('/bpm/sla-monitor', './routes/bpm/sla-monitor.tsx'),
-    route('/bpm/approval-inbox', './routes/bpm/approval-inbox.tsx'),
+    // BPM — migrated to core-bpm plugin (M3.6).
+    ...bpmRoutes(),
 
     // Organization management
     route('/organization/members/:memberPid', './routes/organization/member-detail.tsx'),

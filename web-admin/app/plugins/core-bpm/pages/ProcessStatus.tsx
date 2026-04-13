@@ -1,23 +1,22 @@
 /**
- * Process Status Route
- *
- * Read-only BPMN diagram with runtime node status highlighting.
+ * Process Status page — read-only BPMN diagram with runtime node status.
  *
  * URL params:
  *   ?processInstanceId=<id>                   — query by instance ID
  *   ?businessKey=<key>&processKey=<key>       — query by business key
+ *
+ * Migrated from app/routes/bpm/process-status.tsx (M3 core-bpm extraction).
  */
-
-import { useSearchParams } from 'react-router';
-import { ReactFlowProvider } from '@xyflow/react';
-import { ProcessStatusViewer } from '~/bpmn-designer/components/ProcessStatusViewer';
+import { useSearchParams } from 'react-router'
+import { ReactFlowProvider } from '@xyflow/react'
+import { ProcessStatusViewer } from '~/bpmn-designer/components/ProcessStatusViewer'
 
 export default function ProcessStatusPage() {
-  const [searchParams] = useSearchParams();
+  const [searchParams] = useSearchParams()
 
-  const processInstanceId = searchParams.get('processInstanceId') ?? undefined;
-  const processKey = searchParams.get('processKey') ?? undefined;
-  const businessKey = searchParams.get('businessKey') ?? undefined;
+  const processInstanceId = searchParams.get('processInstanceId') ?? undefined
+  const processKey = searchParams.get('processKey') ?? undefined
+  const businessKey = searchParams.get('businessKey') ?? undefined
 
   if (!processInstanceId && !businessKey) {
     return (
@@ -30,7 +29,7 @@ export default function ProcessStatusPage() {
           </p>
         </div>
       </div>
-    );
+    )
   }
 
   return (
@@ -43,5 +42,5 @@ export default function ProcessStatusPage() {
         />
       </ReactFlowProvider>
     </div>
-  );
+  )
 }
