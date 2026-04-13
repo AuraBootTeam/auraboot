@@ -1,5 +1,5 @@
 // web-admin/app/smart/automation/nodes/triggers.ts
-import type { FlowNodeDefinition } from '~/flow-designer-sdk';
+import type { FlowNodeDefinition } from '~/plugins/core-designer/components/flow-designer-sdk';
 
 export const triggerNodes: FlowNodeDefinition[] = [
   {

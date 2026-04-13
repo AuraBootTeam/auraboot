@@ -1,6 +1,6 @@
 // web-admin/app/smart/automation/components/TemplatePreviewDialog.tsx
 import React from 'react';
-import { FlowDesigner } from '~/flow-designer-sdk';
+import { FlowDesigner } from '~/plugins/core-designer/components/flow-designer-sdk';
 import { automationNodes, automationCategoryOrder } from '../nodes';
 import type { AutomationTemplate } from '../templates/automationTemplates';
 

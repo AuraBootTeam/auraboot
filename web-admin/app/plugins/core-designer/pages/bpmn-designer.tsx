@@ -7,7 +7,7 @@ import React, { Suspense } from 'react';
 import { RouteLoadingFallback } from '~/components/RouteLoadingFallback';
 
 const BPMNDesigner = React.lazy(() =>
-  import('~/bpmn-designer/BPMNDesigner').then((m) => ({ default: m.BPMNDesigner })),
+  import('~/plugins/core-designer/components/bpmn-designer/BPMNDesigner').then((m) => ({ default: m.BPMNDesigner })),
 );
 
 export default function BPMNDesignerPage() {

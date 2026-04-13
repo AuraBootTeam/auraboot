@@ -1,5 +1,5 @@
 // web-admin/app/smart/automation/templates/automationTemplates.ts
-import type { FlowData } from '~/flow-designer-sdk';
+import type { FlowData } from '~/plugins/core-designer/components/flow-designer-sdk';
 
 /**
  * Automation Template

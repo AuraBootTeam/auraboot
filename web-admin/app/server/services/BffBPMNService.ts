@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import logger from '~/server/utils/logger';
-import type { BPMNProcessDefinition } from '~/bpmn-designer/types';
+import type { BPMNProcessDefinition } from '~/plugins/core-designer/components/bpmn-designer/types';
 
 const NOT_IMPLEMENTED_RESPONSE = {
   success: false,

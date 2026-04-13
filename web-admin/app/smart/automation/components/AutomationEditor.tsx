@@ -1,6 +1,6 @@
 // web-admin/app/smart/automation/components/AutomationEditor.tsx
 import React, { useCallback, useState, useEffect, useRef } from 'react';
-import { FlowDesigner, type FlowData } from '~/flow-designer-sdk';
+import { FlowDesigner, type FlowData } from '~/plugins/core-designer/components/flow-designer-sdk';
 import { automationNodes, automationCategoryOrder } from '../nodes';
 import { useSmartText } from '~/utils/i18n';
 import { useToastContext } from '~/contexts/ToastContext';

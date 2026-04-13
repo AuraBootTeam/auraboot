@@ -4,7 +4,7 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 import { BaseResourceSelect } from '~/components/base-fields';
 import { fetchFieldOptions } from '~/services/resourceSelectService';
-import { useFlowStore } from '~/flow-designer-sdk/store';
+import { useFlowStore } from '~/plugins/core-designer/components/flow-designer-sdk/store';
 import type { FieldAdapter } from '~/components/field-adapter';
 
 export interface DependentFieldSelectProps {
