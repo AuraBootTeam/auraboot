@@ -1,0 +1,139 @@
+[
+  {
+    "code": "sla_config",
+    "displayName:zh-CN": "SLA 配置",
+    "displayName:en": "SLA Configuration",
+    "description": "SLA deadline and warning configuration for BPM processes",
+    "modelType": "entity",
+    "modelCategory": "master",
+    "extension": {
+      "titleField": "name",
+      "subtitleField": "target_type",
+      "tableName": "ab_sla_config",
+      "softDelete": true
+    }
+  },
+  {
+    "code": "bpm_domain_config",
+    "displayName:zh-CN": "BPM 域配置",
+    "displayName:en": "BPM Domain Configuration",
+    "description": "BPM domain configuration for process grouping and field display",
+    "modelType": "entity",
+    "modelCategory": "master",
+    "extension": {
+      "titleField": "domain_name",
+      "subtitleField": "domain_code",
+      "tableName": "ab_bpm_domain_config",
+      "softDelete": true
+    }
+  },
+  {
+    "code": "data_permission",
+    "displayName:zh-CN": "数据权限策略",
+    "displayName:en": "Data Permission Policy",
+    "description": "Row-level and column-level data permission policies",
+    "modelType": "entity",
+    "modelCategory": "master",
+    "extension": {
+      "titleField": "name",
+      "subtitleField": "model_code",
+      "tableName": "ab_data_permission_policy",
+      "softDelete": false
+    }
+  },
+  {
+    "code": "webhook",
+    "displayName:zh-CN": "Webhook 订阅",
+    "displayName:en": "Webhook Subscription",
+    "description": "Webhook subscriptions triggered by platform events",
+    "modelType": "entity",
+    "modelCategory": "master",
+    "extension": {
+      "titleField": "name",
+      "subtitleField": "event_type",
+      "tableName": "ab_webhook_subscription",
+      "softDelete": false
+    }
+  },
+  {
+    "code": "webhook_delivery_log",
+    "displayName:zh-CN": "Webhook 投递日志",
+    "displayName:en": "Webhook Delivery Log",
+    "description": "Delivery attempt logs for webhook subscriptions",
+    "modelType": "entity",
+    "modelCategory": "master",
+    "extension": {
+      "titleField": "event_id",
+      "subtitleField": "status",
+      "tableName": "ab_webhook_delivery_log",
+      "softDelete": false
+    }
+  },
+  {
+    "code": "api_connector",
+    "displayName:zh-CN": "API 连接器",
+    "displayName:en": "API Connector",
+    "description": "External API connector configurations",
+    "modelType": "entity",
+    "modelCategory": "master",
+    "extension": {
+      "titleField": "name",
+      "subtitleField": "base_url",
+      "tableName": "ab_api_connector",
+      "softDelete": false
+    }
+  },
+  {
+    "code": "tenant_member",
+    "displayName:zh-CN": "企业成员",
+    "displayName:en": "Tenant Member",
+    "description": "Tenant member management with status workflow",
+    "modelType": "entity",
+    "modelCategory": "master",
+    "extension": {
+      "titleField": "user_id",
+      "tableName": "ab_tenant_member",
+      "softDelete": true
+    }
+  },
+  {
+    "code": "scheduled_task",
+    "displayName:zh-CN": "定时任务",
+    "displayName:en": "Scheduled Task",
+    "description": "Configurable scheduled task definitions",
+    "modelType": "entity",
+    "modelCategory": "master",
+    "extension": {
+      "titleField": "name",
+      "subtitleField": "task_type",
+      "tableName": "ab_scheduled_task",
+      "softDelete": false
+    }
+  },
+  {
+    "code": "bpm_process_management",
+    "displayName:zh-CN": "BPM 流程定义",
+    "displayName:en": "BPM Process Definition",
+    "description": "BPM process definition management (data from dedicated BPM API)",
+    "modelType": "entity",
+    "modelCategory": "master",
+    "extension": {
+      "titleField": "process_name",
+      "subtitleField": "process_key",
+      "skipTableCreation": true
+    }
+  },
+  {
+    "code": "dashboard_management",
+    "displayName:zh-CN": "仪表盘管理",
+    "displayName:en": "Dashboard Management",
+    "description": "Dashboard management (data from dedicated dashboard API)",
+    "modelType": "entity",
+    "modelCategory": "master",
+    "extension": {
+      "titleField": "title",
+      "subtitleField": "code",
+      "skipTableCreation": true
+    }
+  }
+]

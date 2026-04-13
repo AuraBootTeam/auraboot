@@ -1,0 +1,268 @@
+[
+  {
+    "code": "admin:create_sla_config",
+    "displayName:zh-CN": "创建 SLA 配置",
+    "displayName:en": "Create SLA Configuration",
+    "type": "create",
+    "modelCode": "sla_config",
+    "inputFields": ["name", "target_type", "target_key", "domain_code", "deadline_mode", "deadline_value", "business_calendar", "suspend_policy", "warning_rules", "model_code", "deadline_field", "priority_field", "enabled"]
+  },
+  {
+    "code": "admin:update_sla_config",
+    "displayName:zh-CN": "更新 SLA 配置",
+    "displayName:en": "Update SLA Configuration",
+    "type": "update",
+    "modelCode": "sla_config",
+    "inputFields": ["name", "target_type", "target_key", "domain_code", "deadline_mode", "deadline_value", "business_calendar", "suspend_policy", "warning_rules", "model_code", "deadline_field", "priority_field", "enabled"]
+  },
+  {
+    "code": "admin:delete_sla_config",
+    "displayName:zh-CN": "删除 SLA 配置",
+    "displayName:en": "Delete SLA Configuration",
+    "type": "delete",
+    "modelCode": "sla_config",
+    "extension": { "confirmMessage:zh-CN": "确认删除此 SLA 配置？", "confirmMessage:en": "Confirm delete this SLA configuration?" }
+  },
+
+  {
+    "code": "admin:create_bpm_domain_config",
+    "displayName:zh-CN": "创建域配置",
+    "displayName:en": "Create Domain Configuration",
+    "type": "create",
+    "modelCode": "bpm_domain_config",
+    "inputFields": ["domain_code", "domain_name", "model_code", "process_keys", "list_fields", "filter_fields", "sort_fields", "enabled"]
+  },
+  {
+    "code": "admin:update_bpm_domain_config",
+    "displayName:zh-CN": "更新域配置",
+    "displayName:en": "Update Domain Configuration",
+    "type": "update",
+    "modelCode": "bpm_domain_config",
+    "inputFields": ["domain_code", "domain_name", "model_code", "process_keys", "list_fields", "filter_fields", "sort_fields", "enabled"]
+  },
+  {
+    "code": "admin:delete_bpm_domain_config",
+    "displayName:zh-CN": "删除域配置",
+    "displayName:en": "Delete Domain Configuration",
+    "type": "delete",
+    "modelCode": "bpm_domain_config",
+    "extension": { "confirmMessage:zh-CN": "确认删除此域配置？", "confirmMessage:en": "Confirm delete this domain configuration?" }
+  },
+
+  {
+    "code": "admin:create_data_permission",
+    "displayName:zh-CN": "创建数据权限策略",
+    "displayName:en": "Create Data Permission Policy",
+    "type": "create",
+    "modelCode": "data_permission",
+    "inputFields": ["name", "description", "model_code", "policy_type", "scope_type", "scope_expression", "field_code", "mask_type", "mask_expression", "priority", "enabled"]
+  },
+  {
+    "code": "admin:update_data_permission",
+    "displayName:zh-CN": "更新数据权限策略",
+    "displayName:en": "Update Data Permission Policy",
+    "type": "update",
+    "modelCode": "data_permission",
+    "inputFields": ["name", "description", "model_code", "policy_type", "scope_type", "scope_expression", "field_code", "mask_type", "mask_expression", "priority", "enabled"]
+  },
+  {
+    "code": "admin:delete_data_permission",
+    "displayName:zh-CN": "删除数据权限策略",
+    "displayName:en": "Delete Data Permission Policy",
+    "type": "delete",
+    "modelCode": "data_permission",
+    "extension": { "confirmMessage:zh-CN": "确认删除此数据权限策略？", "confirmMessage:en": "Confirm delete this data permission policy?" }
+  },
+
+  {
+    "code": "admin:create_webhook",
+    "displayName:zh-CN": "创建 Webhook",
+    "displayName:en": "Create Webhook",
+    "type": "create",
+    "modelCode": "webhook",
+    "inputFields": ["name", "target_url", "event_type", "model_code", "filter_expression", "secret", "headers", "max_retries", "timeout_ms", "enabled"]
+  },
+  {
+    "code": "admin:update_webhook",
+    "displayName:zh-CN": "更新 Webhook",
+    "displayName:en": "Update Webhook",
+    "type": "update",
+    "modelCode": "webhook",
+    "inputFields": ["name", "target_url", "event_type", "model_code", "filter_expression", "secret", "headers", "max_retries", "timeout_ms", "enabled"]
+  },
+  {
+    "code": "admin:delete_webhook",
+    "displayName:zh-CN": "删除 Webhook",
+    "displayName:en": "Delete Webhook",
+    "type": "delete",
+    "modelCode": "webhook",
+    "extension": { "confirmMessage:zh-CN": "确认删除此 Webhook？", "confirmMessage:en": "Confirm delete this webhook?" }
+  },
+
+  {
+    "code": "admin:create_api_connector",
+    "displayName:zh-CN": "创建 API 连接器",
+    "displayName:en": "Create API Connector",
+    "type": "create",
+    "modelCode": "api_connector",
+    "inputFields": ["name", "base_url", "auth_type", "auth_config", "default_headers", "timeout_ms", "retry_policy", "enabled"]
+  },
+  {
+    "code": "admin:update_api_connector",
+    "displayName:zh-CN": "更新 API 连接器",
+    "displayName:en": "Update API Connector",
+    "type": "update",
+    "modelCode": "api_connector",
+    "inputFields": ["name", "base_url", "auth_type", "auth_config", "default_headers", "timeout_ms", "retry_policy", "enabled"]
+  },
+  {
+    "code": "admin:delete_api_connector",
+    "displayName:zh-CN": "删除 API 连接器",
+    "displayName:en": "Delete API Connector",
+    "type": "delete",
+    "modelCode": "api_connector",
+    "extension": { "confirmMessage:zh-CN": "确认删除此 API 连接器？", "confirmMessage:en": "Confirm delete this API connector?" }
+  },
+
+  {
+    "code": "admin:approve_member",
+    "displayName:zh-CN": "通过",
+    "displayName:en": "Approve",
+    "type": "state_transition",
+    "modelCode": "tenant_member",
+    "stateField": "status",
+    "fromStates": ["pending"],
+    "toState": "active",
+    "bindingRules": [
+      { "ruleType": "handler", "handlerClass": "tenantMemberCommandHandler" }
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认通过该成员申请？",
+      "confirmMessage:en": "Approve this member?"
+    }
+  },
+  {
+    "code": "admin:reject_member",
+    "displayName:zh-CN": "拒绝",
+    "displayName:en": "Reject",
+    "type": "state_transition",
+    "modelCode": "tenant_member",
+    "stateField": "status",
+    "fromStates": ["pending"],
+    "toState": "rejected",
+    "bindingRules": [
+      { "ruleType": "handler", "handlerClass": "tenantMemberCommandHandler" }
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认拒绝该成员申请？",
+      "confirmMessage:en": "Reject this member?"
+    }
+  },
+  {
+    "code": "admin:suspend_member",
+    "displayName:zh-CN": "暂停",
+    "displayName:en": "Suspend",
+    "type": "state_transition",
+    "modelCode": "tenant_member",
+    "stateField": "status",
+    "fromStates": ["active"],
+    "toState": "suspended",
+    "bindingRules": [
+      { "ruleType": "handler", "handlerClass": "tenantMemberCommandHandler" }
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认暂停该成员？",
+      "confirmMessage:en": "Suspend this member?"
+    }
+  },
+  {
+    "code": "admin:restore_member",
+    "displayName:zh-CN": "恢复",
+    "displayName:en": "Restore",
+    "type": "state_transition",
+    "modelCode": "tenant_member",
+    "stateField": "status",
+    "fromStates": ["suspended", "rejected"],
+    "toState": "active",
+    "bindingRules": [
+      { "ruleType": "handler", "handlerClass": "tenantMemberCommandHandler" }
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认恢复该成员？",
+      "confirmMessage:en": "Restore this member?"
+    }
+  },
+  {
+    "code": "admin:leave_member",
+    "displayName:zh-CN": "离职",
+    "displayName:en": "Leave",
+    "type": "state_transition",
+    "modelCode": "tenant_member",
+    "stateField": "status",
+    "fromStates": ["active"],
+    "toState": "inactive",
+    "bindingRules": [
+      { "ruleType": "handler", "handlerClass": "tenantMemberCommandHandler" }
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认将该成员标记为离职？",
+      "confirmMessage:en": "Mark this member as left?"
+    }
+  },
+  {
+    "code": "admin:delete_member",
+    "displayName:zh-CN": "移除成员",
+    "displayName:en": "Remove Member",
+    "type": "delete",
+    "modelCode": "tenant_member",
+    "bindingRules": [
+      { "ruleType": "handler", "handlerClass": "tenantMemberCommandHandler" }
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认移除该成员？此操作不可恢复。",
+      "confirmMessage:en": "Remove this member? This action cannot be undone."
+    }
+  },
+  {
+    "code": "admin:reset_member_password",
+    "displayName:zh-CN": "重置密码",
+    "displayName:en": "Reset Password",
+    "type": "custom",
+    "modelCode": "tenant_member",
+    "bindingRules": [
+      { "ruleType": "handler", "handlerClass": "tenantMemberCommandHandler" }
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认重置该成员密码并发送重置邮件？",
+      "confirmMessage:en": "Reset this member's password and send a reset email?"
+    }
+  },
+
+  {
+    "code": "admin:create_scheduled_task",
+    "displayName:zh-CN": "创建定时任务",
+    "displayName:en": "Create Scheduled Task",
+    "type": "create",
+    "modelCode": "scheduled_task",
+    "inputFields": ["name", "description", "task_type", "cron_expression", "interval_ms", "handler_bean", "handler_method", "params", "max_retries", "timeout_ms", "enabled"]
+  },
+  {
+    "code": "admin:update_scheduled_task",
+    "displayName:zh-CN": "更新定时任务",
+    "displayName:en": "Update Scheduled Task",
+    "type": "update",
+    "modelCode": "scheduled_task",
+    "inputFields": ["name", "description", "task_type", "cron_expression", "interval_ms", "handler_bean", "handler_method", "params", "max_retries", "timeout_ms", "enabled"]
+  },
+  {
+    "code": "admin:delete_scheduled_task",
+    "displayName:zh-CN": "删除定时任务",
+    "displayName:en": "Delete Scheduled Task",
+    "type": "delete",
+    "modelCode": "scheduled_task",
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此定时任务？",
+      "confirmMessage:en": "Confirm delete this scheduled task?"
+    }
+  }
+]
