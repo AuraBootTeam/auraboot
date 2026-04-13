@@ -28,29 +28,28 @@ fi
 
 cd "$WEB_ADMIN_DIR"
 
-# Expand manifest test_paths (single file or dir/**) into concrete .spec.ts files.
-# Playwright CLI positional args are regex-matched against test file paths, which
-# over-matches when using directory names that appear as substrings elsewhere.
-# Pass explicit file paths to avoid cross-plugin leakage.
-FILES=()
+# Count spec files in scope (for reporting only — the actual filter is applied
+# by playwright.oss.config.ts which reads oss-scope.json and builds per-project
+# testMatch regexes. CLI positional filtering is unreliable because the default
+# config sets testDir + testMatch at the project level.)
+COUNT=0
 while IFS= read -r entry; do
   if [[ "$entry" == *.ts ]]; then
-    [[ -f "$entry" ]] && FILES+=("$entry")
+    [[ -f "$entry" ]] && COUNT=$((COUNT + 1))
   else
     dir="${entry%/\*\*}"
-    while IFS= read -r f; do
-      FILES+=("$f")
-    done < <(find "$dir" -name "*.spec.ts" 2>/dev/null)
+    [[ -d "$dir" ]] && COUNT=$((COUNT + $(find "$dir" -name "*.spec.ts" 2>/dev/null | wc -l)))
   fi
 done < <(jq -r '.test_paths[]' "$SCOPE_FILE")
 
 echo "=== AuraBoot OSS Test Runner ==="
 echo "Scope file:    $SCOPE_FILE"
-echo "Spec files:    ${#FILES[@]}"
+echo "Spec files:    $COUNT"
+echo "Playwright config: playwright.oss.config.ts"
 echo ""
 
 LOG="/tmp/pw-oss-$(date +%Y%m%d-%H%M%S).log"
 echo "Log: $LOG"
 echo ""
 
-NO_PROXY=localhost npx playwright test "${FILES[@]}" "$@" 2>&1 | tee "$LOG"
+NO_PROXY=localhost npx playwright test -c playwright.oss.config.ts "$@" 2>&1 | tee "$LOG"
