@@ -1,0 +1,64 @@
+[
+  {
+    "code": "sc:create_review",
+    "displayName:zh-CN": "创建审批记录",
+    "displayName:en": "Create Review",
+    "type": "create",
+    "modelCode": "sc_review",
+    "inputFields": ["sc_rev_request", "sc_rev_reviewer", "sc_rev_level"],
+    "autoSetFields": {
+      "sc_rev_status": {"strategy": "fixed_value", "value": "pending"},
+      "sc_rev_decision": {"strategy": "fixed_value", "value": "pending"}
+    },
+    "permissions": ["sc.workflow.manage"],
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "sc:approve_review",
+    "displayName:zh-CN": "批准",
+    "displayName:en": "Approve",
+    "type": "state_transition",
+    "modelCode": "sc_review",
+    "stateField": "sc_rev_status",
+    "fromStates": ["pending"],
+    "toState": "approved",
+    "inputFields": ["sc_rev_comment"],
+    "autoSetFields": {
+      "sc_rev_decision": {"strategy": "fixed_value", "value": "approved"}
+    },
+    "permissions": ["sc.workflow.approve"],
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "sc:reject_review",
+    "displayName:zh-CN": "拒绝",
+    "displayName:en": "Reject",
+    "type": "state_transition",
+    "modelCode": "sc_review",
+    "stateField": "sc_rev_status",
+    "fromStates": ["pending"],
+    "toState": "rejected",
+    "inputFields": ["sc_rev_comment"],
+    "autoSetFields": {
+      "sc_rev_decision": {"strategy": "fixed_value", "value": "rejected"}
+    },
+    "permissions": ["sc.workflow.approve"],
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "sc:request_revision",
+    "displayName:zh-CN": "要求修订",
+    "displayName:en": "Request Revision",
+    "type": "state_transition",
+    "modelCode": "sc_review",
+    "stateField": "sc_rev_status",
+    "fromStates": ["pending"],
+    "toState": "rejected",
+    "inputFields": ["sc_rev_comment"],
+    "autoSetFields": {
+      "sc_rev_decision": {"strategy": "fixed_value", "value": "need_revision"}
+    },
+    "permissions": ["sc.workflow.approve"],
+    "cmd_risk_level": "L2"
+  }
+]

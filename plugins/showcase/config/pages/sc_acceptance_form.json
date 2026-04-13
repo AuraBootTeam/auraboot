@@ -1,0 +1,31 @@
+{
+  "pageKey": "sc_acceptance_form",
+  "modelCode": "sc_acceptance",
+  "kind": "form",
+  "schemaVersion": 2,
+  "title": {"zh-CN": "验收表单", "en": "Acceptance Form"},
+  "layout": {"type": "grid", "cols": 12},
+  "blocks": [
+    {
+      "id": "section_request_info",
+      "blockType": "form-section",
+      "layout": {"col": 12},
+      "title": {"zh-CN": "申请信息", "en": "Request Information"},
+      "fields": [
+        {"field": "sc_acc_request", "colSpan": 6, "readOnly": true}
+      ]
+    },
+    {
+      "id": "section_inspection",
+      "blockType": "form-section",
+      "layout": {"col": 12},
+      "title": {"zh-CN": "验收信息", "en": "Inspection"},
+      "fields": [
+        {"field": "sc_acc_inspector", "colSpan": 6},
+        {"field": "sc_acc_result", "colSpan": 6},
+        {"field": "sc_acc_comment", "colSpan": 12},
+        {"field": "sc_acc_attachments", "colSpan": 12}
+      ]
+    }
+  ]
+}

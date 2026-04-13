@@ -1,0 +1,299 @@
+[
+  {
+    "code": "sc_status_dict",
+    "name": "Showcase Status",
+    "name:zh-CN": "展示状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "draft",
+        "label": "Draft",
+        "label:zh-CN": "草稿",
+        "sortNo": 10,
+        "color": "#d9d9d9",
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "active",
+        "label": "Active",
+        "label:zh-CN": "启用",
+        "sortNo": 20,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "review",
+        "label": "Under Review",
+        "label:zh-CN": "审核中",
+        "sortNo": 30,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "archived",
+        "label": "Archived",
+        "label:zh-CN": "已归档",
+        "sortNo": 40,
+        "color": "#fa8c16",
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      }
+    ]
+  },
+  {
+    "code": "sc_priority_dict",
+    "name": "Priority",
+    "name:zh-CN": "优先级",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "low",
+        "label": "Low",
+        "label:zh-CN": "低",
+        "sortNo": 10,
+        "color": "#d9d9d9",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "medium",
+        "label": "Medium",
+        "label:zh-CN": "中",
+        "sortNo": 20,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "orange"
+        }
+      },
+      {
+        "value": "high",
+        "label": "High",
+        "label:zh-CN": "高",
+        "sortNo": 30,
+        "color": "#fa8c16",
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      },
+      {
+        "value": "critical",
+        "label": "Critical",
+        "label:zh-CN": "紧急",
+        "sortNo": 40,
+        "color": "#f5222d",
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      }
+    ]
+  },
+  {
+    "code": "sc_category_dict",
+    "name": "Category",
+    "name:zh-CN": "分类",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "electronics",
+        "label": "Electronics",
+        "label:zh-CN": "电子",
+        "sortNo": 10,
+        "status": "enabled"
+      },
+      {
+        "value": "software",
+        "label": "Software",
+        "label:zh-CN": "软件",
+        "sortNo": 20,
+        "status": "enabled"
+      },
+      {
+        "value": "hardware",
+        "label": "Hardware",
+        "label:zh-CN": "硬件",
+        "sortNo": 30,
+        "status": "enabled"
+      },
+      {
+        "value": "service",
+        "label": "Service",
+        "label:zh-CN": "服务",
+        "sortNo": 40,
+        "status": "enabled"
+      },
+      {
+        "value": "other",
+        "label": "Other",
+        "label:zh-CN": "其他",
+        "sortNo": 50,
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "sc_cascade_category_dict",
+    "name": "Cascade Category",
+    "name:zh-CN": "级联分类",
+    "dictType": "tree",
+    "items": [
+      { "value": "electronics", "label": "Electronics", "label:zh-CN": "电子产品", "sortNo": 10, "status": "enabled" },
+      { "value": "electronics_phone", "label": "Phone", "label:zh-CN": "手机", "parentValue": "electronics", "sortNo": 1, "status": "enabled" },
+      { "value": "electronics_phone_smart", "label": "Smartphone", "label:zh-CN": "智能手机", "parentValue": "electronics_phone", "sortNo": 1, "status": "enabled" },
+      { "value": "electronics_phone_feature", "label": "Feature Phone", "label:zh-CN": "功能机", "parentValue": "electronics_phone", "sortNo": 2, "status": "enabled" },
+      { "value": "electronics_computer", "label": "Computer", "label:zh-CN": "电脑", "parentValue": "electronics", "sortNo": 2, "status": "enabled" },
+      { "value": "electronics_computer_laptop", "label": "Laptop", "label:zh-CN": "笔记本", "parentValue": "electronics_computer", "sortNo": 1, "status": "enabled" },
+      { "value": "electronics_computer_desktop", "label": "Desktop", "label:zh-CN": "台式机", "parentValue": "electronics_computer", "sortNo": 2, "status": "enabled" },
+      { "value": "electronics_tablet", "label": "Tablet", "label:zh-CN": "平板", "parentValue": "electronics", "sortNo": 3, "status": "enabled" },
+      { "value": "electronics_tablet_ipad", "label": "iPad", "label:zh-CN": "iPad", "parentValue": "electronics_tablet", "sortNo": 1, "status": "enabled" },
+      { "value": "electronics_tablet_android", "label": "Android Tablet", "label:zh-CN": "安卓平板", "parentValue": "electronics_tablet", "sortNo": 2, "status": "enabled" },
+      { "value": "software", "label": "Software", "label:zh-CN": "软件", "sortNo": 20, "status": "enabled" },
+      { "value": "software_saas", "label": "SaaS", "label:zh-CN": "SaaS", "parentValue": "software", "sortNo": 1, "status": "enabled" },
+      { "value": "software_saas_crm", "label": "CRM", "label:zh-CN": "CRM", "parentValue": "software_saas", "sortNo": 1, "status": "enabled" },
+      { "value": "software_saas_erp", "label": "ERP", "label:zh-CN": "ERP", "parentValue": "software_saas", "sortNo": 2, "status": "enabled" },
+      { "value": "software_onprem", "label": "On-Premise", "label:zh-CN": "本地部署", "parentValue": "software", "sortNo": 2, "status": "enabled" },
+      { "value": "software_onprem_db", "label": "Database", "label:zh-CN": "数据库", "parentValue": "software_onprem", "sortNo": 1, "status": "enabled" },
+      { "value": "software_onprem_middleware", "label": "Middleware", "label:zh-CN": "中间件", "parentValue": "software_onprem", "sortNo": 2, "status": "enabled" },
+      { "value": "software_opensource", "label": "Open Source", "label:zh-CN": "开源", "parentValue": "software", "sortNo": 3, "status": "enabled" },
+      { "value": "software_opensource_framework", "label": "Framework", "label:zh-CN": "框架", "parentValue": "software_opensource", "sortNo": 1, "status": "enabled" },
+      { "value": "software_opensource_tool", "label": "Tool", "label:zh-CN": "工具", "parentValue": "software_opensource", "sortNo": 2, "status": "enabled" },
+      { "value": "service", "label": "Service", "label:zh-CN": "服务", "sortNo": 30, "status": "enabled" },
+      { "value": "service_consulting", "label": "Consulting", "label:zh-CN": "咨询", "parentValue": "service", "sortNo": 1, "status": "enabled" },
+      { "value": "service_consulting_strategy", "label": "Strategy", "label:zh-CN": "战略咨询", "parentValue": "service_consulting", "sortNo": 1, "status": "enabled" },
+      { "value": "service_consulting_tech", "label": "Technical", "label:zh-CN": "技术咨询", "parentValue": "service_consulting", "sortNo": 2, "status": "enabled" },
+      { "value": "service_ops", "label": "Operations", "label:zh-CN": "运维", "parentValue": "service", "sortNo": 2, "status": "enabled" },
+      { "value": "service_ops_cloud", "label": "Cloud Ops", "label:zh-CN": "云运维", "parentValue": "service_ops", "sortNo": 1, "status": "enabled" },
+      { "value": "service_ops_infra", "label": "Infra Ops", "label:zh-CN": "基础设施", "parentValue": "service_ops", "sortNo": 2, "status": "enabled" },
+      { "value": "service_training", "label": "Training", "label:zh-CN": "培训", "parentValue": "service", "sortNo": 3, "status": "enabled" },
+      { "value": "service_training_online", "label": "Online", "label:zh-CN": "线上培训", "parentValue": "service_training", "sortNo": 1, "status": "enabled" },
+      { "value": "service_training_offline", "label": "Offline", "label:zh-CN": "线下培训", "parentValue": "service_training", "sortNo": 2, "status": "enabled" }
+    ]
+  },
+  {
+    "code": "sc_tree_dept_dict",
+    "name": "Department Tree",
+    "name:zh-CN": "部门树",
+    "dictType": "tree",
+    "items": [
+      { "value": "tech", "label": "Technology", "label:zh-CN": "技术部", "sortNo": 10, "status": "enabled" },
+      { "value": "tech_frontend", "label": "Frontend Team", "label:zh-CN": "前端组", "parentValue": "tech", "sortNo": 1, "status": "enabled" },
+      { "value": "tech_backend", "label": "Backend Team", "label:zh-CN": "后端组", "parentValue": "tech", "sortNo": 2, "status": "enabled" },
+      { "value": "tech_qa", "label": "QA Team", "label:zh-CN": "测试组", "parentValue": "tech", "sortNo": 3, "status": "enabled" },
+      { "value": "product", "label": "Product", "label:zh-CN": "产品部", "sortNo": 20, "status": "enabled" },
+      { "value": "product_design", "label": "Design Team", "label:zh-CN": "设计组", "parentValue": "product", "sortNo": 1, "status": "enabled" },
+      { "value": "product_pm", "label": "Product Managers", "label:zh-CN": "产品组", "parentValue": "product", "sortNo": 2, "status": "enabled" },
+      { "value": "ops", "label": "Operations", "label:zh-CN": "运营部", "sortNo": 30, "status": "enabled" },
+      { "value": "ops_marketing", "label": "Marketing Team", "label:zh-CN": "市场组", "parentValue": "ops", "sortNo": 1, "status": "enabled" },
+      { "value": "ops_cs", "label": "Customer Service", "label:zh-CN": "客服组", "parentValue": "ops", "sortNo": 2, "status": "enabled" }
+    ]
+  },
+  {
+    "code": "sc_req_status_dict",
+    "displayName:zh-CN": "申请单状态",
+    "displayName:en": "Request Status",
+    "items": [
+      {"value": "draft", "label:zh-CN": "草稿", "label:en": "Draft", "sequence": 1, "color": "gray"},
+      {"value": "submitted", "label:zh-CN": "已提交", "label:en": "Submitted", "sequence": 2, "color": "blue"},
+      {"value": "under_review", "label:zh-CN": "审批中", "label:en": "Under Review", "sequence": 3, "color": "orange"},
+      {"value": "approved", "label:zh-CN": "已批准", "label:en": "Approved", "sequence": 4, "color": "green"},
+      {"value": "rejected", "label:zh-CN": "已拒绝", "label:en": "Rejected", "sequence": 5, "color": "red"},
+      {"value": "revision", "label:zh-CN": "修订中", "label:en": "Revision", "sequence": 6, "color": "yellow"},
+      {"value": "re_submitted", "label:zh-CN": "已重提", "label:en": "Re-submitted", "sequence": 7, "color": "blue"},
+      {"value": "in_progress", "label:zh-CN": "执行中", "label:en": "In Progress", "sequence": 8, "color": "cyan"},
+      {"value": "pending_acceptance", "label:zh-CN": "待验收", "label:en": "Pending Acceptance", "sequence": 9, "color": "purple"},
+      {"value": "completed", "label:zh-CN": "已完成", "label:en": "Completed", "sequence": 10, "color": "green"},
+      {"value": "archived", "label:zh-CN": "已归档", "label:en": "Archived", "sequence": 11, "color": "gray"},
+      {"value": "cancelled", "label:zh-CN": "已取消", "label:en": "Cancelled", "sequence": 12, "color": "gray"},
+      {"value": "escalated", "label:zh-CN": "已升级", "label:en": "Escalated", "sequence": 13, "color": "red"},
+      {"value": "on_hold", "label:zh-CN": "已挂起", "label:en": "On Hold", "sequence": 14, "color": "yellow"}
+    ]
+  },
+  {
+    "code": "sc_req_priority_dict",
+    "displayName:zh-CN": "申请优先级",
+    "displayName:en": "Request Priority",
+    "items": [
+      {"value": "low", "label:zh-CN": "低", "label:en": "Low", "sequence": 1, "color": "gray"},
+      {"value": "medium", "label:zh-CN": "中", "label:en": "Medium", "sequence": 2, "color": "blue"},
+      {"value": "high", "label:zh-CN": "高", "label:en": "High", "sequence": 3, "color": "orange"},
+      {"value": "urgent", "label:zh-CN": "紧急", "label:en": "Urgent", "sequence": 4, "color": "red"}
+    ]
+  },
+  {
+    "code": "sc_req_category_dict",
+    "displayName:zh-CN": "申请分类",
+    "displayName:en": "Request Category",
+    "items": [
+      {"value": "general", "label:zh-CN": "常规", "label:en": "General", "sequence": 1},
+      {"value": "technical", "label:zh-CN": "技术", "label:en": "Technical", "sequence": 2},
+      {"value": "financial", "label:zh-CN": "财务", "label:en": "Financial", "sequence": 3},
+      {"value": "urgent", "label:zh-CN": "紧急", "label:en": "Urgent", "sequence": 4}
+    ]
+  },
+  {
+    "code": "sc_rev_decision_dict",
+    "displayName:zh-CN": "审批决定",
+    "displayName:en": "Review Decision",
+    "items": [
+      {"value": "approved", "label:zh-CN": "通过", "label:en": "Approved", "sequence": 1, "color": "green"},
+      {"value": "rejected", "label:zh-CN": "拒绝", "label:en": "Rejected", "sequence": 2, "color": "red"},
+      {"value": "need_revision", "label:zh-CN": "需修订", "label:en": "Need Revision", "sequence": 3, "color": "yellow"}
+    ]
+  },
+  {
+    "code": "sc_rev_status_dict",
+    "displayName:zh-CN": "审批状态",
+    "displayName:en": "Review Status",
+    "items": [
+      {"value": "pending", "label:zh-CN": "待审批", "label:en": "Pending", "sequence": 1, "color": "orange"},
+      {"value": "approved", "label:zh-CN": "已通过", "label:en": "Approved", "sequence": 2, "color": "green"},
+      {"value": "rejected", "label:zh-CN": "已拒绝", "label:en": "Rejected", "sequence": 3, "color": "red"}
+    ]
+  },
+  {
+    "code": "sc_task_status_dict",
+    "displayName:zh-CN": "任务状态",
+    "displayName:en": "Task Status",
+    "items": [
+      {"value": "pending_assignment", "label:zh-CN": "待分配", "label:en": "Pending Assignment", "sequence": 1, "color": "gray"},
+      {"value": "assigned", "label:zh-CN": "已分配", "label:en": "Assigned", "sequence": 2, "color": "blue"},
+      {"value": "in_progress", "label:zh-CN": "执行中", "label:en": "In Progress", "sequence": 3, "color": "cyan"},
+      {"value": "done", "label:zh-CN": "已完成", "label:en": "Done", "sequence": 4, "color": "green"},
+      {"value": "cancelled", "label:zh-CN": "已取消", "label:en": "Cancelled", "sequence": 5, "color": "gray"}
+    ]
+  },
+  {
+    "code": "sc_acc_result_dict",
+    "displayName:zh-CN": "验收结果",
+    "displayName:en": "Acceptance Result",
+    "items": [
+      {"value": "passed", "label:zh-CN": "通过", "label:en": "Passed", "sequence": 1, "color": "green"},
+      {"value": "failed", "label:zh-CN": "不通过", "label:en": "Failed", "sequence": 2, "color": "red"}
+    ]
+  },
+  {
+    "code": "sc_acc_status_dict",
+    "displayName:zh-CN": "验收状态",
+    "displayName:en": "Acceptance Status",
+    "items": [
+      {"value": "pending", "label:zh-CN": "待验收", "label:en": "Pending", "sequence": 1, "color": "orange"},
+      {"value": "passed", "label:zh-CN": "已通过", "label:en": "Passed", "sequence": 2, "color": "green"},
+      {"value": "failed", "label:zh-CN": "不通过", "label:en": "Failed", "sequence": 3, "color": "red"}
+    ]
+  }
+]

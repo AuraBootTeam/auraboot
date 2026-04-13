@@ -1,0 +1,242 @@
+{
+  "pageKey": "showcase_all_fields_list",
+  "name:zh-CN": "全字段展示列表",
+  "name:en": "All Field Types",
+  "modelCode": "showcase_all_fields",
+  "kind": "list",
+  "schemaVersion": 2,
+  "layout": {
+    "type": "grid",
+    "cols": 12
+  },
+  "blocks": [
+    {
+      "id": "sc_list_tabs",
+      "blockType": "tabs",
+      "tabs": [
+        {
+          "key": "all",
+          "label": {
+            "en": "All",
+            "zh-CN": "全部"
+          },
+          "filter": null
+        },
+        {
+          "key": "draft",
+          "label": {
+            "en": "Draft",
+            "zh-CN": "草稿"
+          },
+          "filter": {
+            "field": "sc_status",
+            "value": "draft",
+            "operator": "EQ"
+          }
+        },
+        {
+          "key": "active",
+          "label": {
+            "en": "Active",
+            "zh-CN": "启用"
+          },
+          "filter": {
+            "field": "sc_status",
+            "value": "active",
+            "operator": "EQ"
+          }
+        },
+        {
+          "key": "review",
+          "label": {
+            "en": "Under Review",
+            "zh-CN": "审核中"
+          },
+          "filter": {
+            "field": "sc_status",
+            "value": "review",
+            "operator": "EQ"
+          }
+        },
+        {
+          "key": "archived",
+          "label": {
+            "en": "Archived",
+            "zh-CN": "已归档"
+          },
+          "filter": {
+            "field": "sc_status",
+            "value": "archived",
+            "operator": "EQ"
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "create",
+          "primary": true,
+          "permissionCode": "sc.showcase.manage",
+          "label": {
+            "zh-CN": "新建",
+            "en": "Create"
+          },
+          "action": {
+            "type": "navigate",
+            "to": "showcase_all_fields_form",
+            "command": "sc:create_showcase"
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_table",
+      "blockType": "table",
+      "onRowClick": "navigate",
+      "columns": [
+        {
+          "field": "sc_code",
+          "width": 150,
+          "sortable": true
+        },
+        {
+          "field": "sc_name",
+          "width": 200,
+          "sortable": true
+        },
+        {
+          "field": "sc_status",
+          "width": 110,
+          "renderType": "tag",
+          "dictCode": "sc_status_dict"
+        },
+        {
+          "field": "sc_priority",
+          "width": 100,
+          "renderType": "tag",
+          "dictCode": "sc_priority_dict"
+        },
+        {
+          "field": "sc_category",
+          "width": 100,
+          "renderType": "tag",
+          "dictCode": "sc_category_dict"
+        },
+        {
+          "field": "sc_quantity",
+          "width": 80
+        },
+        {
+          "field": "sc_price",
+          "width": 100
+        },
+        {
+          "field": "sc_progress",
+          "width": 120,
+          "renderType": "progress"
+        },
+        {
+          "field": "sc_rating",
+          "width": 120,
+          "renderType": "rating"
+        },
+        {
+          "field": "sc_is_active",
+          "width": 80
+        },
+        {
+          "field": "sc_color",
+          "width": 100,
+          "valueType": "color"
+        },
+        {
+          "field": "sc_website",
+          "width": 180,
+          "valueType": "url"
+        },
+        {
+          "field": "sc_email",
+          "width": 200,
+          "valueType": "email"
+        },
+        {
+          "field": "sc_budget",
+          "width": 120
+        },
+        {
+          "field": "sc_assignee",
+          "width": 120
+        },
+        {
+          "field": "sc_department",
+          "width": 120
+        },
+        {
+          "field": "sc_start_date",
+          "width": 120,
+          "sortable": true
+        },
+        {
+          "field": "sc_created_at",
+          "width": 160,
+          "sortable": true
+        },
+        {
+          "field": "actions",
+          "isActionColumn": true,
+          "buttons": [
+            {
+              "code": "view",
+              "label": {
+                "zh-CN": "详情",
+                "en": "Detail"
+              },
+              "action": {
+                "type": "navigate",
+                "to": "showcase_all_fields_detail"
+              }
+            },
+            {
+              "code": "edit",
+              "permissionCode": "sc.showcase.manage",
+              "label": {
+                "zh-CN": "编辑",
+                "en": "Edit"
+              },
+              "action": {
+                "type": "navigate",
+                "to": "showcase_all_fields_form"
+              }
+            },
+            {
+              "code": "delete",
+              "danger": true,
+              "permissionCode": "sc.showcase.manage",
+              "label": {
+                "zh-CN": "删除",
+                "en": "Delete"
+              },
+              "confirm": "delete.confirm",
+              "action": {
+                "type": "command",
+                "command": "sc:delete_showcase"
+              }
+            }
+          ]
+        }
+      ],
+      "searchFields": [
+        "sc_name",
+        "sc_code",
+        "sc_description"
+      ],
+      "defaultSort": {
+        "field": "created_at",
+        "order": "desc"
+      }
+    }
+  ]
+}

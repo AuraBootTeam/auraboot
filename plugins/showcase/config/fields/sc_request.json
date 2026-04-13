@@ -1,0 +1,86 @@
+[
+  {
+    "code": "sc_req_code",
+    "displayName:zh-CN": "申请编号",
+    "displayName:en": "Request Code",
+    "dataType": "string",
+    "constraints": { "required": true, "maxLength": 32 },
+    "feature": { "searchable": true, "sortable": true },
+    "extension": { "readOnly": true }
+  },
+  {
+    "code": "sc_req_title",
+    "displayName:zh-CN": "标题",
+    "displayName:en": "Title",
+    "dataType": "string",
+    "constraints": { "required": true, "maxLength": 200 },
+    "feature": { "searchable": true, "sortable": true }
+  },
+  {
+    "code": "sc_req_description",
+    "displayName:zh-CN": "详细描述",
+    "displayName:en": "Description",
+    "dataType": "text",
+    "extension": { "renderComponent": "richtext" }
+  },
+  {
+    "code": "sc_req_priority",
+    "displayName:zh-CN": "优先级",
+    "displayName:en": "Priority",
+    "dataType": "enum",
+    "constraints": { "required": true },
+    "dictCode": "sc_req_priority_dict",
+    "feature": { "searchable": true, "sortable": true }
+  },
+  {
+    "code": "sc_req_category",
+    "displayName:zh-CN": "分类",
+    "displayName:en": "Category",
+    "dataType": "enum",
+    "constraints": { "required": true },
+    "dictCode": "sc_req_category_dict",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "sc_req_requester",
+    "displayName:zh-CN": "申请人",
+    "displayName:en": "Requester",
+    "dataType": "reference",
+    "constraints": { "required": true },
+    "extension": {
+      "renderComponent": "userselect",
+      "refModelCode": "ab_user"
+    }
+  },
+  {
+    "code": "sc_req_due_date",
+    "displayName:zh-CN": "期望完成日期",
+    "displayName:en": "Due Date",
+    "dataType": "date",
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "sc_req_amount",
+    "displayName:zh-CN": "金额",
+    "displayName:en": "Amount",
+    "dataType": "decimal",
+    "constraints": { "min": 0 },
+    "extension": { "precision": 12, "scale": 2 }
+  },
+  {
+    "code": "sc_req_attachments",
+    "displayName:zh-CN": "附件",
+    "displayName:en": "Attachments",
+    "dataType": "json",
+    "extension": { "renderComponent": "fileattachment" }
+  },
+  {
+    "code": "sc_req_status",
+    "displayName:zh-CN": "状态",
+    "displayName:en": "Status",
+    "dataType": "enum",
+    "constraints": { "required": true },
+    "dictCode": "sc_req_status_dict",
+    "feature": { "searchable": true, "sortable": true }
+  }
+]

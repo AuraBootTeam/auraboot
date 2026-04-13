@@ -1,0 +1,43 @@
+{
+  "pageKey": "sc_request_form",
+  "modelCode": "sc_request",
+  "kind": "form",
+  "schemaVersion": 2,
+  "title": {"zh-CN": "申请表单", "en": "Request Form"},
+  "layout": {"type": "grid", "cols": 12},
+  "blocks": [
+    {
+      "id": "section_basic",
+      "blockType": "form-section",
+      "layout": {"col": 12},
+      "title": {"zh-CN": "基本信息", "en": "Basic Information"},
+      "fields": [
+        {"field": "sc_req_title", "colSpan": 6},
+        {"field": "sc_req_code", "colSpan": 6, "readOnly": true},
+        {"field": "sc_req_category", "colSpan": 6},
+        {"field": "sc_req_priority", "colSpan": 6}
+      ]
+    },
+    {
+      "id": "section_detail",
+      "blockType": "form-section",
+      "layout": {"col": 12},
+      "title": {"zh-CN": "详细信息", "en": "Details"},
+      "fields": [
+        {"field": "sc_req_requester", "colSpan": 6},
+        {"field": "sc_req_amount", "colSpan": 6},
+        {"field": "sc_req_due_date", "colSpan": 6}
+      ]
+    },
+    {
+      "id": "section_content",
+      "blockType": "form-section",
+      "layout": {"col": 12},
+      "title": {"zh-CN": "描述与附件", "en": "Description & Attachments"},
+      "fields": [
+        {"field": "sc_req_description", "colSpan": 12},
+        {"field": "sc_req_attachments", "colSpan": 12}
+      ]
+    }
+  ]
+}

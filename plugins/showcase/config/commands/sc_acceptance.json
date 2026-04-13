@@ -1,0 +1,47 @@
+[
+  {
+    "code": "sc:create_acceptance",
+    "displayName:zh-CN": "创建验收",
+    "displayName:en": "Create Acceptance",
+    "type": "create",
+    "modelCode": "sc_acceptance",
+    "inputFields": ["sc_acc_request", "sc_acc_inspector"],
+    "autoSetFields": {
+      "sc_acc_status": {"strategy": "fixed_value", "value": "pending"}
+    },
+    "permissions": ["sc.workflow.manage"],
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "sc:pass_acceptance",
+    "displayName:zh-CN": "验收通过",
+    "displayName:en": "Pass Acceptance",
+    "type": "state_transition",
+    "modelCode": "sc_acceptance",
+    "stateField": "sc_acc_status",
+    "fromStates": ["pending"],
+    "toState": "passed",
+    "inputFields": ["sc_acc_comment", "sc_acc_attachments"],
+    "autoSetFields": {
+      "sc_acc_result": {"strategy": "fixed_value", "value": "passed"}
+    },
+    "permissions": ["sc.workflow.approve"],
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "sc:fail_acceptance",
+    "displayName:zh-CN": "验收不通过",
+    "displayName:en": "Fail Acceptance",
+    "type": "state_transition",
+    "modelCode": "sc_acceptance",
+    "stateField": "sc_acc_status",
+    "fromStates": ["pending"],
+    "toState": "failed",
+    "inputFields": ["sc_acc_comment", "sc_acc_attachments"],
+    "autoSetFields": {
+      "sc_acc_result": {"strategy": "fixed_value", "value": "failed"}
+    },
+    "permissions": ["sc.workflow.approve"],
+    "cmd_risk_level": "L2"
+  }
+]

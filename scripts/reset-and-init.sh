@@ -463,7 +463,7 @@ cd "$PROJECT_ROOT"
 export AURA_TOKEN="$LOGIN_JWT"
 
 # Import in dependency order: base plugins first, then dependent ones
-PLUGINS_TO_IMPORT=(page-manager platform-admin org-management e2e-test-order crm-starter)
+PLUGINS_TO_IMPORT=(page-manager platform-admin org-management e2e-test-order crm-starter showcase)
 for plugin in "${PLUGINS_TO_IMPORT[@]}"; do
     if [ -d "plugins/$plugin" ]; then
         echo -n "   Importing $plugin... "

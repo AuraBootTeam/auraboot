@@ -1,0 +1,56 @@
+[
+  {
+    "code": "sc_rev_request",
+    "displayName:zh-CN": "关联申请单",
+    "displayName:en": "Related Request",
+    "dataType": "reference",
+    "constraints": { "required": true },
+    "extension": {
+      "renderComponent": "refpicker",
+      "refModelCode": "sc_request",
+      "refDisplayField": "sc_req_title"
+    }
+  },
+  {
+    "code": "sc_rev_reviewer",
+    "displayName:zh-CN": "审批人",
+    "displayName:en": "Reviewer",
+    "dataType": "reference",
+    "constraints": { "required": true },
+    "extension": {
+      "renderComponent": "userselect",
+      "refModelCode": "ab_user"
+    }
+  },
+  {
+    "code": "sc_rev_decision",
+    "displayName:zh-CN": "审批决定",
+    "displayName:en": "Decision",
+    "dataType": "enum",
+    "constraints": { "required": true },
+    "dictCode": "sc_rev_decision_dict",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "sc_rev_comment",
+    "displayName:zh-CN": "审批意见",
+    "displayName:en": "Comment",
+    "dataType": "text"
+  },
+  {
+    "code": "sc_rev_level",
+    "displayName:zh-CN": "审批层级",
+    "displayName:en": "Review Level",
+    "dataType": "integer",
+    "constraints": { "required": true, "min": 1 }
+  },
+  {
+    "code": "sc_rev_status",
+    "displayName:zh-CN": "审批状态",
+    "displayName:en": "Status",
+    "dataType": "enum",
+    "constraints": { "required": true },
+    "dictCode": "sc_rev_status_dict",
+    "feature": { "searchable": true, "sortable": true }
+  }
+]
