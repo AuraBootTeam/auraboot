@@ -18,7 +18,7 @@ import { useI18n } from '~/contexts/I18nContext';
 import { useHydrated } from '~/hooks/useHydrated';
 import { InboxHeaderWidget } from '~/components/inbox/InboxDropdown';
 import { CommandPalette } from '~/components/CommandPalette';
-import { useAuraBot } from '~/aurabot/AuraBotProvider';
+import { useAuraBot } from '~/plugins/core-aurabot/components-shell/AuraBotProvider';
 
 interface HeaderProps {
   sidebarOpen?: boolean;

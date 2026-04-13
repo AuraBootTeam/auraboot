@@ -25,7 +25,7 @@ import { ProfileProvider } from '~/meta/profiles/ProfileContext';
 import { LoadingSpinner } from '~/components/LoadingSpinner';
 import { ErrorAlert } from '~/components/ErrorAlert';
 import type { UseDslFormReturn } from '~/meta/hooks/useDslForm';
-import { useAuraBotSafe } from '~/aurabot/hooks/useAuraBotSafe';
+import { useAuraBotSafe } from '~/plugins/core-aurabot/hooks/useAuraBotSafe';
 
 // Ensure built-in profiles are registered before resolution
 import '~/meta/profiles/admin';

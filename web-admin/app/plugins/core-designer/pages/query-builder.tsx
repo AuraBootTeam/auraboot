@@ -7,7 +7,7 @@ import React, { Suspense } from 'react';
 import { RouteLoadingFallback } from '~/components/RouteLoadingFallback';
 
 const QueryBuilder = React.lazy(() =>
-  import('~/query-builder/QueryBuilder').then((m) => ({ default: m.QueryBuilder })),
+  import('~/plugins/core-designer/components/query-builder/QueryBuilder').then((m) => ({ default: m.QueryBuilder })),
 );
 
 export default function QueryBuilderPage() {

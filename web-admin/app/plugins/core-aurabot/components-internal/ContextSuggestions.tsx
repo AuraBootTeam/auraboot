@@ -1,5 +1,5 @@
-import { getSuggestions, type Suggestion } from '~/aurabot/config/suggestions';
-import type { PageContext } from '~/aurabot/hooks/usePageContext';
+import { getSuggestions, type Suggestion } from '~/plugins/core-aurabot/config/suggestions';
+import type { PageContext } from '~/plugins/core-aurabot/hooks/usePageContext';
 
 interface ContextSuggestionsProps {
   pageContext: PageContext;

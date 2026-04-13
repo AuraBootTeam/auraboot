@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuraBot } from './AuraBotProvider';
-import { AuraBotChat } from './components/AuraBotChat';
-import { ContextSuggestions } from './components/ContextSuggestions';
-import { ActionBar } from './components/ActionBar';
+import { AuraBotChat } from '../components-internal/AuraBotChat';
+import { ContextSuggestions } from '../components-internal/ContextSuggestions';
+import { ActionBar } from '../components-internal/ActionBar';
 import {
   XMarkIcon,
   Cog6ToothIcon,
