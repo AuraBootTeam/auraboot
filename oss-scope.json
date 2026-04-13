@@ -37,7 +37,8 @@
     "core-auth",
     "core-permission",
     "core-bpm",
-    "core-automation"
+    "core-automation",
+    "page-manager"
   ],
 
   "test_paths": [

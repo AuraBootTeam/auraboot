@@ -1,0 +1,32 @@
+{
+  "pluginId": "com.auraboot.page-manager",
+  "namespace": "pgm",
+  "version": "1.0.0",
+  "dslVersion": 1,
+  "pluginType": "config",
+  "displayName": "Page Manager",
+  "displayName:zh-CN": "页面管理",
+  "displayName:en": "Page Manager",
+  "description": "DSL-driven page management for ab_page_schema system table",
+  "author": "AuraBoot Team",
+  "minPlatformVersion": "1.0.0",
+  "dependencies": [],
+  "resourceDirs": {
+    "dicts": "config/dicts.json",
+    "fields": "config/fields.json",
+    "models": "config/models.json",
+    "modelFieldBindings": "config/bindings.json",
+    "commands": "config/commands.json",
+    "bindingRules": "config/bindingRules.json",
+    "permissions": "config/permissions.json",
+    "menus": "config/menus.json",
+    "pages": "config/pages.json",
+    "i18n": "config/i18n.json"
+  },
+  "importOptions": {
+    "conflictStrategy": "overwrite",
+    "validateReferences": true,
+    "autoPublishPages": true,
+    "createResourcePermissions": true
+  }
+}

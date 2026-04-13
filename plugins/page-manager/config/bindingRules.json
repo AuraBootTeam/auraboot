@@ -1,0 +1,23 @@
+[
+  {
+    "commandCode": "pgm:publish_page_schema",
+    "ruleType": "handler",
+    "handlerClass": "pageSchemaCommandHandler",
+    "sequence": 10,
+    "enabled": true
+  },
+  {
+    "commandCode": "pgm:archive_page_schema",
+    "ruleType": "handler",
+    "handlerClass": "pageSchemaCommandHandler",
+    "sequence": 10,
+    "enabled": true
+  },
+  {
+    "commandCode": "pgm:duplicate_page_schema",
+    "ruleType": "handler",
+    "handlerClass": "pageSchemaCommandHandler",
+    "sequence": 10,
+    "enabled": true
+  }
+]
