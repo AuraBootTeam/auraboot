@@ -12,7 +12,7 @@ import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import { DataSourceProvider } from '~/framework/meta/contexts/DataSourceContext';
 import { deriveTestId } from '~/framework/meta/rendering/utils/deriveTestId';
 
-import { getChartComponent, getSupportedChartTypes } from '~/smart/charts/SharedChartFactory';
+import { getChartComponent, getSupportedChartTypes } from '~/framework/smart/charts/SharedChartFactory';
 
 // Dashboard stat card — renders stat cards from API datasource
 function DashboardStatCard({

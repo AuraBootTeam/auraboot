@@ -6,7 +6,7 @@
  */
 
 import { Pagination } from '~/components/Pagination';
-import { BulkActionToolbar } from '~/smart/components/bulk/BulkActionToolbar';
+import { BulkActionToolbar } from '~/framework/smart/components/bulk/BulkActionToolbar';
 
 export interface ListPaginationProps {
   current: number;

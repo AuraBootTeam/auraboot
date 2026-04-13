@@ -11,7 +11,7 @@ import React, { useCallback } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { SortIndicator } from './SortIndicator';
-import { ColumnResizeHandle } from '~/smart/components/view/ColumnResizeHandle';
+import { ColumnResizeHandle } from '~/framework/smart/components/view/ColumnResizeHandle';
 import type { ColumnConfig } from '~/framework/meta/schemas/types';
 
 export interface DraggableColumnHeaderProps {

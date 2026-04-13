@@ -1,10 +1,10 @@
 // web-admin/app/routes/automations.tsx
 import type { LoaderFunctionArgs } from 'react-router';
 import { useLoaderData } from 'react-router';
-import { AutomationList } from '~/smart/automation/components/AutomationList';
+import { AutomationList } from '~/framework/smart/automation/components/AutomationList';
 import { useSmartText } from '~/utils/i18n';
-import { automationService } from '~/smart/automation/services/automationService';
-import type { Automation } from '~/smart/automation/services/automationService';
+import { automationService } from '~/framework/smart/automation/services/automationService';
+import type { Automation } from '~/framework/smart/automation/services/automationService';
 import { getTokenFromRequest } from '~/services/session';
 
 interface LoaderData {

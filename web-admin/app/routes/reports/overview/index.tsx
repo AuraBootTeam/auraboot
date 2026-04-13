@@ -11,7 +11,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ArrowPathIcon, PencilSquareIcon } from '@heroicons/react/24/outline';
 import { ChartBarSquareIcon } from '@heroicons/react/24/outline';
-import { ExportPdfButton } from '~/smart/components/data-tools/ExportPdfButton';
+import { ExportPdfButton } from '~/framework/smart/components/data-tools/ExportPdfButton';
 import { useToastContext } from '~/contexts/ToastContext';
 import { DashboardViewer } from '~/plugins/core-dashboard/components/DashboardViewer';
 import { dashboardService } from '~/plugins/core-dashboard/services/dashboardService';

@@ -13,7 +13,7 @@ import { useSmartFieldContract } from '~/plugins/core-designer/components/studio
 import { useSmartFieldMeta } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldMeta';
 import { useSmartText } from '~/utils/i18n';
 import { FieldBase } from '~/components/ui/field-base';
-import { FilePreviewModal } from '~/smart/components/common/FilePreviewModal';
+import { FilePreviewModal } from '~/framework/smart/components/common/FilePreviewModal';
 
 const Upload: React.FC<UploadProps> = ({
   name,

@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react';
 import { useNavigate } from 'react-router';
-import { OnboardingWizard } from '~/smart/onboarding';
+import { OnboardingWizard } from '~/framework/smart/onboarding';
 
 /**
  * Standalone onboarding page.

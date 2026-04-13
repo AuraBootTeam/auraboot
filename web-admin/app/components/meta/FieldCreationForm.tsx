@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { FormulaEditor } from '~/smart/components/formula/FormulaEditor';
+import { FormulaEditor } from '~/framework/smart/components/formula/FormulaEditor';
 import { useDslRegistry } from '~/contexts/DslRegistryContext';
 
 interface FieldCreationFormProps {
