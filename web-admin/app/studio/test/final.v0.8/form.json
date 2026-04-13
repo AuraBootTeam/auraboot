@@ -1,5 +1,5 @@
 {
-  "kind": "Form",
+  "kind": "form",
   "version": "4.0.0",
   "id": "form.store",
   "title": "$i18n:form.store.title",

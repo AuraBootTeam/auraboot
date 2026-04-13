@@ -13,7 +13,6 @@
 export type {
   LocalizedText,
   LayoutConfig,
-  AreaLayoutConfig,
   BlockLayoutConfig,
   DataSourceConfig,
   HandlerConfig,
@@ -46,7 +45,6 @@ export type {
 import type {
   LocalizedText,
   LayoutConfig,
-  AreaConfig,
   BlockLayoutConfig,
   FieldConfig,
   ButtonConfig,
@@ -129,15 +127,6 @@ export interface StrictBlockConfig {
   addCommandCode?: string;
 }
 
-// ---------------------------------------------------------------------------
-// StrictAreaConfig — uses StrictBlockConfig instead of BlockConfig
-// ---------------------------------------------------------------------------
-
-export interface StrictAreaConfig {
-  blocks: StrictBlockConfig[];
-  visibleWhen?: string;
-  className?: string;
-}
 
 // ---------------------------------------------------------------------------
 // Inlined Linkage types (from ~/studio/workbench/panels/linkage/types)
@@ -240,7 +229,7 @@ export interface RuleOverride extends CrossFieldRule {
 // ---------------------------------------------------------------------------
 
 export interface DslSchema {
-  kind: 'Page' | 'List' | 'Form' | 'Detail' | 'PageLayout' | 'Dashboard' | 'Record' | 'Transaction';
+  kind: 'page' | 'list' | 'form' | 'detail' | 'page_layout' | 'dashboard';
   version: string;
   schemaVersion?: number;
   id: string;
@@ -255,7 +244,7 @@ export interface DslSchema {
   stateBinding?: Record<string, string>;
 
   layout: LayoutConfig;
-  areas: Record<string, StrictAreaConfig>;
+  blocks: StrictBlockConfig[];
 
   dataSources?: Record<string, DataSourceConfig>;
   handlers?: Record<string, HandlerConfig>;

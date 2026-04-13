@@ -16,6 +16,10 @@ import type { ExpressionContext } from '~/meta/runtime/expression/context';
 export interface ValidationRule {
   type: 'required' | 'minLength' | 'maxLength' | 'pattern' | 'email' | 'custom';
   value?: any;
+  // Named constraint properties (produced by mergeFieldValidationRules in FormPageContent)
+  maxLength?: number;
+  minLength?: number;
+  pattern?: string;
   message?: string;
   validator?: string;
 }
@@ -211,18 +215,24 @@ export const useValidation = ({ value, rules, required, context = {} }: UseValid
               isValid =
                 valueToValidate !== undefined && valueToValidate !== null && valueToValidate !== '';
               break;
-            case 'minLength':
+            case 'minLength': {
+              const minLen = (rule.value as number) ?? rule.minLength;
               isValid =
-                !valueToValidate || String(valueToValidate).length >= (rule.value as number);
+                !valueToValidate || minLen == null || String(valueToValidate).length >= minLen;
               break;
-            case 'maxLength':
+            }
+            case 'maxLength': {
+              const maxLen = (rule.value as number) ?? rule.maxLength;
               isValid =
-                !valueToValidate || String(valueToValidate).length <= (rule.value as number);
+                !valueToValidate || maxLen == null || String(valueToValidate).length <= maxLen;
               break;
-            case 'pattern':
+            }
+            case 'pattern': {
+              const pat = (rule.value as string) ?? rule.pattern;
               isValid =
-                !valueToValidate || new RegExp(rule.value as string).test(String(valueToValidate));
+                !valueToValidate || !pat || new RegExp(pat).test(String(valueToValidate));
               break;
+            }
             case 'email':
               isValid =
                 !valueToValidate || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(valueToValidate));

@@ -4,7 +4,9 @@
  */
 
 import { useState, useEffect } from 'react';
+import { useRevalidator } from 'react-router';
 import { useToastContext } from '~/contexts/ToastContext';
+import { useAuth } from '~/contexts/AuthContext';
 type MetaArgs = Record<string, unknown>;
 import { userPreferenceService } from '~/services/userPreferenceService';
 import TimezoneSelect from '~/components/TimezoneSelect';
@@ -28,6 +30,8 @@ export function meta({}: MetaArgs) {
 
 export default function UserPreferencesPage() {
   const { showErrorToast, showSuccessToast } = useToastContext();
+  const { preferences } = useAuth();
+  const revalidator = useRevalidator();
   const [memories, setMemories] = useState<UserMemory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -58,27 +62,11 @@ export default function UserPreferencesPage() {
   }, [filterType]);
 
   useEffect(() => {
-    userPreferenceService
-      .get<string>('ui.datetime.format')
-      .then((value) => {
-        if (value && value.trim()) {
-          setDatetimeFormat(value);
-        }
-      })
-      .catch(() => {
-        // ignore loading errors, keep default
-      });
-    userPreferenceService
-      .get<string>('ui.timezone')
-      .then((value) => {
-        if (value && value.trim()) {
-          setTimezone(value);
-        }
-      })
-      .catch(() => {
-        // ignore loading errors
-      });
-  }, []);
+    if (preferences) {
+      if (preferences.datetimeFormat) setDatetimeFormat(preferences.datetimeFormat);
+      if (preferences.timezone) setTimezone(preferences.timezone);
+    }
+  }, [preferences]);
 
   const handleAdd = async (request: CreateMemoryRequest) => {
     try {
@@ -110,6 +98,7 @@ export default function UserPreferencesPage() {
       setFormatSaving(true);
       await userPreferenceService.set('ui.datetime.format', datetimeFormat.trim());
       showSuccessToast('Datetime format saved');
+      revalidator.revalidate();
     } catch (err: any) {
       showErrorToast(`Failed to save datetime format: ${err?.message || 'Unknown error'}`);
     } finally {
@@ -122,6 +111,7 @@ export default function UserPreferencesPage() {
       setTimezoneSaving(true);
       await userPreferenceService.set('ui.timezone', timezone);
       showSuccessToast('Timezone preference saved');
+      revalidator.revalidate();
     } catch (err: any) {
       showErrorToast(`Failed to save timezone: ${err?.message || 'Unknown error'}`);
     } finally {
@@ -135,6 +125,7 @@ export default function UserPreferencesPage() {
       await userPreferenceService.set('ui.timezone', '');
       setTimezone('');
       showSuccessToast('Timezone override cleared — system default will be used');
+      revalidator.revalidate();
     } catch (err: any) {
       showErrorToast(`Failed to clear timezone: ${err?.message || 'Unknown error'}`);
     } finally {

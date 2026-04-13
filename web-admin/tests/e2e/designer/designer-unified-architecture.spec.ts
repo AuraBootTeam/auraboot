@@ -21,15 +21,21 @@
 import { test, expect } from '@playwright/test';
 import { uniqueId } from '../helpers';
 
+// Report designer is a heavy page — increase per-test timeout
+test.setTimeout(60_000);
+
 // ---------------------------------------------------------------------------
 // Shared helpers
 // ---------------------------------------------------------------------------
 
 async function openReportDesigner(page: import('@playwright/test').Page) {
   await page.goto('/report-designer', { waitUntil: 'domcontentloaded' });
-  await page.waitForLoadState('networkidle').catch(() => {});
-  await page.locator('.animate-spin').waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
-  await expect(page.getByTestId('block-palette')).toBeVisible({ timeout: 15000 });
+  // Wait for block palette to appear (may be SSR-rendered or client-rendered)
+  await expect(page.getByTestId('block-palette')).toBeVisible({ timeout: 30000 });
+  // Wait for React hydration + store initialization: the title input gets a value
+  // only after the useEffect runs createReport(), which happens after hydration.
+  const titleInput = page.locator('input[placeholder="Report Title"]');
+  await expect(titleInput).toHaveValue('Untitled Report', { timeout: 15000 });
 }
 
 // =========================================================================
@@ -59,8 +65,9 @@ test.describe('GAP 1: Report Toolbar Undo/Redo', () => {
     const undoBtn = page.getByTestId('report-designer-toolbar-btn-undo');
     const redoBtn = page.getByTestId('report-designer-toolbar-btn-redo');
 
-    // Add a stat card block
-    await page.getByRole('button', { name: /Stat Card/ }).click();
+    // Add a stat card block by clicking palette item
+    const palette = page.getByTestId('block-palette');
+    await palette.getByTestId('block-palette-item-stat-card').click();
     const statCard = canvas.getByText('12,345');
     await expect(statCard).toBeVisible({ timeout: 10000 });
 
@@ -81,8 +88,9 @@ test.describe('GAP 1: Report Toolbar Undo/Redo', () => {
     await openReportDesigner(page);
     const canvas = page.getByTestId('report-canvas');
 
-    // Add a block
-    await page.getByRole('button', { name: /Rich Text/ }).click();
+    // Add a block via palette testId
+    const palette = page.getByTestId('block-palette');
+    await palette.getByTestId('block-palette-item-rich-text').click();
     await expect(canvas.getByText('Click to add text content')).toBeVisible({ timeout: 10000 });
 
     // Ctrl+Z undoes
@@ -142,16 +150,20 @@ test.describe('GAP 2: Report Version History', () => {
     await expect(saveBtn).toBeEnabled();
 
     const saveResponse = page.waitForResponse(
-      (resp) => resp.url().includes('/api/pages') &&
+      (resp) =>
+        resp.url().includes('/api/pages') &&
         (resp.request().method() === 'POST' || resp.request().method() === 'PUT'),
-      { timeout: 15000 }
+      { timeout: 15000 },
     );
     await saveBtn.click();
     const resp = await saveResponse;
     expect(resp.status()).toBeLessThan(400);
 
     // Wait for save to complete
-    await page.getByText('Saving...').waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {});
+    await page
+      .getByText('Saving...')
+      .waitFor({ state: 'hidden', timeout: 15000 })
+      .catch(() => {});
     await expect(saveBtn).toBeDisabled({ timeout: 5000 });
 
     // Open version history — should trigger API call
@@ -159,13 +171,17 @@ test.describe('GAP 2: Report Version History', () => {
     await expect(page.getByText('Version History', { exact: true })).toBeVisible({ timeout: 5000 });
 
     // Wait for version list to load (API call)
-    const versionApi = page.waitForResponse(
-      (resp) => resp.url().includes('/versions') && resp.status() === 200,
-      { timeout: 15000 }
-    ).catch(() => null);
+    const versionApi = page
+      .waitForResponse((resp) => resp.url().includes('/versions') && resp.status() === 200, {
+        timeout: 15000,
+      })
+      .catch(() => null);
     await versionApi;
 
-    await page.getByText('Loading versions...').waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
+    await page
+      .getByText('Loading versions...')
+      .waitFor({ state: 'hidden', timeout: 10000 })
+      .catch(() => {});
 
     // Panel footer shows version count text
     const panelFooter = page.locator('.fixed.right-0.z-40');
@@ -182,9 +198,14 @@ test.describe('GAP 3: Report DataSource — Shared Pickers', () => {
     await openReportDesigner(page);
 
     // Add data-table block and select it
-    await page.getByRole('button', { name: /Data Table/ }).click();
-    await expect(page.getByTestId('report-canvas').getByText('Configure columns in the property panel')).toBeVisible({ timeout: 10000 });
-    await page.getByTestId('report-canvas').getByText('Configure columns in the property panel').click();
+    await page.getByRole('button', { name: /Data Table|数据表/i }).first().click();
+    await expect(
+      page.getByTestId('report-canvas').getByText('Configure columns in the property panel'),
+    ).toBeVisible({ timeout: 10000 });
+    await page
+      .getByTestId('report-canvas')
+      .getByText('Configure columns in the property panel')
+      .click();
 
     const panel = page.getByTestId('block-property-panel');
     await panel.getByText('+ Add new data source').click();
@@ -203,9 +224,14 @@ test.describe('GAP 3: Report DataSource — Shared Pickers', () => {
   test('DUA-12: Model type loads shared ModelPicker with API data', async ({ page }) => {
     await openReportDesigner(page);
 
-    await page.getByRole('button', { name: /Data Table/ }).click();
-    await expect(page.getByTestId('report-canvas').getByText('Configure columns in the property panel')).toBeVisible({ timeout: 10000 });
-    await page.getByTestId('report-canvas').getByText('Configure columns in the property panel').click();
+    await page.getByRole('button', { name: /Data Table|数据表/i }).first().click();
+    await expect(
+      page.getByTestId('report-canvas').getByText('Configure columns in the property panel'),
+    ).toBeVisible({ timeout: 10000 });
+    await page
+      .getByTestId('report-canvas')
+      .getByText('Configure columns in the property panel')
+      .click();
 
     const panel = page.getByTestId('block-property-panel');
     await panel.getByText('+ Add new data source').click();
@@ -213,7 +239,7 @@ test.describe('GAP 3: Report DataSource — Shared Pickers', () => {
     // Wait for models API (ModelPicker auto-fetches)
     await page.waitForResponse(
       (resp) => resp.url().includes('/api/meta/models') && resp.status() === 200,
-      { timeout: 15000 }
+      { timeout: 15000 },
     );
 
     // ModelPicker renders as a select with "Select model" placeholder
@@ -226,9 +252,14 @@ test.describe('GAP 3: Report DataSource — Shared Pickers', () => {
   test('DUA-13: NamedQuery type shows shared NamedQueryPicker', async ({ page }) => {
     await openReportDesigner(page);
 
-    await page.getByRole('button', { name: /Data Table/ }).click();
-    await expect(page.getByTestId('report-canvas').getByText('Configure columns in the property panel')).toBeVisible({ timeout: 10000 });
-    await page.getByTestId('report-canvas').getByText('Configure columns in the property panel').click();
+    await page.getByRole('button', { name: /Data Table|数据表/i }).first().click();
+    await expect(
+      page.getByTestId('report-canvas').getByText('Configure columns in the property panel'),
+    ).toBeVisible({ timeout: 10000 });
+    await page
+      .getByTestId('report-canvas')
+      .getByText('Configure columns in the property panel')
+      .click();
 
     const panel = page.getByTestId('block-property-panel');
     await panel.getByText('+ Add new data source').click();
@@ -241,7 +272,7 @@ test.describe('GAP 3: Report DataSource — Shared Pickers', () => {
     // Wait for NQ API
     await page.waitForResponse(
       (resp) => resp.url().includes('/api/meta/named-queries') && resp.status() === 200,
-      { timeout: 15000 }
+      { timeout: 15000 },
     );
 
     // NamedQueryPicker visible
@@ -252,9 +283,14 @@ test.describe('GAP 3: Report DataSource — Shared Pickers', () => {
   test('DUA-14: API type shows URL text input', async ({ page }) => {
     await openReportDesigner(page);
 
-    await page.getByRole('button', { name: /Data Table/ }).click();
-    await expect(page.getByTestId('report-canvas').getByText('Configure columns in the property panel')).toBeVisible({ timeout: 10000 });
-    await page.getByTestId('report-canvas').getByText('Configure columns in the property panel').click();
+    await page.getByRole('button', { name: /Data Table|数据表/i }).first().click();
+    await expect(
+      page.getByTestId('report-canvas').getByText('Configure columns in the property panel'),
+    ).toBeVisible({ timeout: 10000 });
+    await page
+      .getByTestId('report-canvas')
+      .getByText('Configure columns in the property panel')
+      .click();
 
     const panel = page.getByTestId('block-property-panel');
     await panel.getByText('+ Add new data source').click();
@@ -288,21 +324,25 @@ test.describe('Integration', () => {
     // 1. Set title
     await page.locator('input[placeholder="Report Title"]').fill(title);
 
-    // 2. Add block
-    await page.getByRole('button', { name: /Rich Text/ }).click();
+    // 2. Add block via palette testId
+    await page.getByTestId('block-palette-item-rich-text').click();
     await expect(canvas.getByText('Click to add text content')).toBeVisible({ timeout: 10000 });
     await expect(undoBtn).toBeEnabled();
 
     // 3. Save
     const saveResponse = page.waitForResponse(
-      (resp) => resp.url().includes('/api/pages') &&
+      (resp) =>
+        resp.url().includes('/api/pages') &&
         (resp.request().method() === 'POST' || resp.request().method() === 'PUT'),
-      { timeout: 15000 }
+      { timeout: 15000 },
     );
     await saveBtn.click();
     const resp = await saveResponse;
     expect(resp.status()).toBeLessThan(400);
-    await page.getByText('Saving...').waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {});
+    await page
+      .getByText('Saving...')
+      .waitFor({ state: 'hidden', timeout: 15000 })
+      .catch(() => {});
     await expect(saveBtn).toBeDisabled({ timeout: 5000 });
 
     // 4. Open/close version history

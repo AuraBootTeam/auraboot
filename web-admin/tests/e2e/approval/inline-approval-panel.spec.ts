@@ -39,7 +39,9 @@ test.describe('InlineApprovalPanel', () => {
    * structured error response (400/404) — NOT a 500 or connection error.
    * This confirms the BPM module is wired up correctly.
    */
-  test('IAP-001: BPM process-instances by-business-key endpoint is accessible', async ({ page }) => {
+  test('IAP-001: BPM process-instances by-business-key endpoint is accessible', async ({
+    page,
+  }) => {
     const nonExistentKey = `no-such-record-${Date.now()}`;
 
     const resp = await page.request.get(BPM_BY_BUSINESS_KEY_ENDPOINT, {
@@ -50,7 +52,7 @@ test.describe('InlineApprovalPanel', () => {
     // A 400 or 404 is expected for a missing business key — that is the correct behavior.
     // A 200 with a success code would mean a ghost record exists, which is also acceptable.
     // What is NOT acceptable: 500-range errors or missing JSON body.
-    expect(resp.status()).toBeLessThan(400);
+    expect(resp.status()).toBeLessThan(500);
 
     const body = await resp.json().catch(() => null);
     expect(body).not.toBeNull();
@@ -69,24 +71,39 @@ test.describe('InlineApprovalPanel', () => {
    * Uses the e2et_record model from the e2e-test-order plugin.
    * If that model is unavailable, the test is skipped.
    */
-  test('IAP-002: Detail page loads without errors when no approval process exists', async ({ page }) => {
-    // 1. Verify the e2et_record model is available
-    const modelResp = await page.request.get('/api/meta/models/code/e2et_record');
-    expect(modelResp.ok()).toBe(true);
+  test('IAP-002: Detail page loads without errors when no approval process exists', async ({
+    page,
+  }) => {
+    // 1. Prefer e2et_record fixture data, but fall back to another seeded dynamic model when empty.
+    const candidates = ['e2et_record', 'e2et_order'];
+    let targetModelCode = '';
+    let recordPid = '';
 
-    // 2. Reuse setup fixture data instead of depending on a non-existent create command.
-    const listResp = await page.request.get('/api/dynamic/e2et-record/list?pageNum=1&pageSize=1');
-    expect(listResp.ok()).toBe(true);
-    const listBody = await listResp.json();
-    const records = listBody?.data?.records || listBody?.data?.data || listBody?.data || [];
-    const recordPid: string = Array.isArray(records) && records.length > 0
-      ? (records[0]?.pid || records[0]?.recordId || '')
-      : '';
-    expect(recordPid).toBeTruthy();
+    for (const modelCode of candidates) {
+      const modelResp = await page.request.get(`/api/meta/models/code/${modelCode}`);
+      if (!modelResp.ok()) continue;
 
-    // 3. Navigate to the detail page for this record via the dynamic route
-    //    The URL pattern is /dynamic/e2et-record/{pid}/view
-    await page.goto(`/dynamic/e2et-record/${recordPid}/view`, {
+      const listResp = await page.request.get(`/api/dynamic/${modelCode}/list?pageNum=1&pageSize=1`);
+      if (!listResp.ok()) continue;
+
+      const listBody = await listResp.json().catch(() => null);
+      const records = listBody?.data?.records || listBody?.data?.data || listBody?.data || [];
+      const pid =
+        Array.isArray(records) && records.length > 0
+          ? records[0]?.pid || records[0]?.recordId || ''
+          : '';
+
+      if (pid) {
+        targetModelCode = modelCode;
+        recordPid = pid;
+        break;
+      }
+    }
+
+    test.skip(!recordPid, 'No seeded dynamic record available for inline approval detail smoke');
+
+    // 2. Navigate to the detail page for the selected record via the dynamic route.
+    await page.goto(`/p/${targetModelCode}/view/${recordPid}`, {
       waitUntil: 'domcontentloaded',
     });
     await expect(page.locator('body')).toBeVisible();
@@ -95,13 +112,14 @@ test.describe('InlineApprovalPanel', () => {
     await expect(page.locator('body')).not.toContainText('Access forbidden');
     await expect(page.locator('body')).not.toContainText('Page not found');
 
-    // 5. Wait for the approval-status lookup to settle when it is triggered.
-    await page.waitForResponse(
-      (response) => response.url().includes(BPM_BY_BUSINESS_KEY_ENDPOINT),
-      { timeout: 5000 }
-    ).catch(() => null);
+    // 3. Wait for the approval-status lookup to settle when it is triggered.
+    await page
+      .waitForResponse((response) => response.url().includes(BPM_BY_BUSINESS_KEY_ENDPOINT), {
+        timeout: 5000,
+      })
+      .catch(() => null);
 
-    // 6. Because this record has NO BPM process, "Approval History" must NOT appear
+    // 4. Because this record has NO BPM process, "Approval History" must NOT appear
     await expect(page.locator('text=Approval History')).toHaveCount(0);
   });
 });

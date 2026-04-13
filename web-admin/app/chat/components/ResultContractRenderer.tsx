@@ -37,7 +37,7 @@ export function ResultContractRenderer({ result, toolName }: ResultContractRende
       <RecordsTable
         records={records}
         total={result.total as number}
-        returned={result.returned as number || records.length}
+        returned={(result.returned as number) || records.length}
       />
     );
   }
@@ -66,7 +66,11 @@ export function ResultContractRenderer({ result, toolName }: ResultContractRende
 
 // ========== Sub-components ==========
 
-function RecordsTable({ records, total, returned }: {
+function RecordsTable({
+  records,
+  total,
+  returned,
+}: {
   records: Record<string, unknown>[];
   total?: number;
   returned: number;
@@ -74,8 +78,17 @@ function RecordsTable({ records, total, returned }: {
   const [expanded, setExpanded] = useState(true);
 
   // Extract column headers from first record, filter out system fields
-  const systemFields = new Set(['id', 'pid', 'tenant_id', 'created_at', 'updated_at', 'created_by', 'updated_by', 'deleted_flag']);
-  const allKeys = Object.keys(records[0]).filter(k => !systemFields.has(k));
+  const systemFields = new Set([
+    'id',
+    'pid',
+    'tenant_id',
+    'created_at',
+    'updated_at',
+    'created_by',
+    'updated_by',
+    'deleted_flag',
+  ]);
+  const allKeys = Object.keys(records[0]).filter((k) => !systemFields.has(k));
   // Show max 6 columns
   const columns = allKeys.slice(0, 6);
 
@@ -90,7 +103,9 @@ function RecordsTable({ records, total, returned }: {
         </span>
         <svg
           className={`h-4 w-4 text-gray-400 transition-transform ${expanded ? 'rotate-180' : ''}`}
-          fill="none" stroke="currentColor" viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
         >
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
@@ -101,7 +116,7 @@ function RecordsTable({ records, total, returned }: {
           <table className="min-w-full text-sm">
             <thead>
               <tr className="border-b bg-gray-50">
-                {columns.map(col => (
+                {columns.map((col) => (
                   <th key={col} className="px-3 py-1.5 text-left font-medium text-gray-600">
                     {col}
                   </th>
@@ -111,7 +126,7 @@ function RecordsTable({ records, total, returned }: {
             <tbody>
               {records.slice(0, 10).map((row, i) => (
                 <tr key={i} className="border-b border-gray-50 hover:bg-gray-50/50">
-                  {columns.map(col => (
+                  {columns.map((col) => (
                     <td key={col} className="max-w-[200px] truncate px-3 py-1.5 text-gray-700">
                       {formatCellValue(row[col])}
                     </td>
@@ -131,10 +146,7 @@ function RecordsTable({ records, total, returned }: {
   );
 }
 
-function ModelsCard({ models, total }: {
-  models: Record<string, unknown>[];
-  total?: number;
-}) {
+function ModelsCard({ models, total }: { models: Record<string, unknown>[]; total?: number }) {
   return (
     <div className="mt-2 rounded-md border border-blue-200 bg-blue-50 p-3">
       <div className="mb-2 text-sm font-medium text-blue-800">
@@ -166,7 +178,9 @@ function JsonFallback({ data }: { data: unknown }) {
         <span>{expanded ? 'Hide' : 'Show'} raw data</span>
         <svg
           className={`h-3 w-3 transition-transform ${expanded ? 'rotate-180' : ''}`}
-          fill="none" stroke="currentColor" viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
         >
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>

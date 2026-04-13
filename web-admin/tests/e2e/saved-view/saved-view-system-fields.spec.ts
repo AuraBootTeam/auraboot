@@ -13,7 +13,7 @@ async function createViewViaApi(
   page: Page,
   modelCode: string,
   name: string,
-  columns?: any[]
+  columns?: any[],
 ): Promise<string> {
   const resp = await page.request.post('/api/views', {
     data: {
@@ -37,7 +37,6 @@ async function getViewViaApi(page: Page, pid: string): Promise<any> {
 }
 
 test.describe('System Fields Visible (GAP-126)', () => {
-
   // Create a fresh view with NO system fields configured and set it as default,
   // so SF-001/SF-002 see the clean/default state regardless of prior test runs
   test.beforeAll(async ({ browser }) => {
@@ -47,10 +46,10 @@ test.describe('System Fields Visible (GAP-126)', () => {
       data: {
         name: `SF_Clean_${uniqueId()}`,
         modelCode: 'e2et_order',
-        pageKey: 'e2et-order',
+        pageKey: 'e2et_order',
         viewType: 'table',
         scope: 'personal',
-        viewConfig: {},  // empty config — system fields not configured → hidden by default
+        viewConfig: {}, // empty config — system fields not configured → hidden by default
       },
     });
     if (resp.ok()) {
@@ -59,7 +58,7 @@ test.describe('System Fields Visible (GAP-126)', () => {
       if (pid) {
         // Set as default so useSavedViews auto-selects it on page load
         await page.request.post(`/api/views/${pid}/set-default`, {
-          data: { modelCode: 'e2et_order', pageKey: 'e2et-order' },
+          data: { modelCode: 'e2et_order', pageKey: 'e2et_order' },
         });
       }
     }
@@ -67,7 +66,7 @@ test.describe('System Fields Visible (GAP-126)', () => {
   });
 
   test('SF-001: system fields appear in column settings panel', async ({ page }) => {
-    await page.goto('/dynamic/e2et-order');
+    await page.goto('/p/e2et_order');
     const colBtn = page.getByTestId('column-settings-btn');
     await expect(colBtn).toBeVisible({ timeout: 30000 });
     await colBtn.click();
@@ -87,7 +86,7 @@ test.describe('System Fields Visible (GAP-126)', () => {
   });
 
   test('SF-002: system fields are hidden by default', async ({ page }) => {
-    await page.goto('/dynamic/e2et-order');
+    await page.goto('/p/e2et_order');
     const colBtn = page.getByTestId('column-settings-btn');
     await expect(colBtn).toBeVisible({ timeout: 30000 });
     await colBtn.click();

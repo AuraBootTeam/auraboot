@@ -112,9 +112,12 @@ export const bpmnVersionService = (() => {
 
   function mapStatusToOperation(status: string | null): string {
     switch (status?.toLowerCase()) {
-      case 'deployed': return 'PUBLISH';
-      case 'suspended': return 'ARCHIVE';
-      default: return 'UPDATE';
+      case 'deployed':
+        return 'PUBLISH';
+      case 'suspended':
+        return 'ARCHIVE';
+      default:
+        return 'UPDATE';
     }
   }
 

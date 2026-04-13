@@ -40,10 +40,14 @@ test.describe('Named Query Management', () => {
   const testTitle = 'E2E Lifecycle Test';
   const testFromSql = 'ab_meta_model';
 
-  async function resolveExecutableQueryCode(page: import('@playwright/test').Page): Promise<string> {
+  async function resolveExecutableQueryCode(
+    page: import('@playwright/test').Page,
+  ): Promise<string> {
     if (queryCode) return queryCode;
 
-    const listResp = await page.request.get('/api/meta/named-queries?pageSize=20&sortBy=createdAt&sortOrder=desc');
+    const listResp = await page.request.get(
+      '/api/meta/named-queries?pageSize=20&sortBy=createdAt&sortOrder=desc',
+    );
     expect(listResp.ok()).toBe(true);
     const listBody = await listResp.json();
     const records = listBody.data?.data || listBody.data?.records || [];
@@ -95,8 +99,9 @@ test.describe('Named Query Management', () => {
 
     if (apiResponse?.ok()) {
       await page.waitForURL(
-        url => /\/meta\/named-queries\/[^/]+/.test(url.toString()) && !url.toString().includes('/new'),
-        { timeout: 10000 }
+        (url) =>
+          /\/meta\/named-queries\/[^/]+/.test(url.toString()) && !url.toString().includes('/new'),
+        { timeout: 10000 },
       );
     }
     await page.waitForLoadState('domcontentloaded');
@@ -111,7 +116,9 @@ test.describe('Named Query Management', () => {
 
     // API fallback: if URL-based extraction failed, query the API to find the just-created named query
     if (!queryPid) {
-      const listResp = await page.request.get('/api/meta/named-queries?pageSize=10&sortBy=createdAt&sortOrder=desc');
+      const listResp = await page.request.get(
+        '/api/meta/named-queries?pageSize=10&sortBy=createdAt&sortOrder=desc',
+      );
       if (listResp.ok()) {
         const listData = await listResp.json();
         const records = listData.data?.data || listData.data?.records || [];
@@ -140,7 +147,9 @@ test.describe('Named Query Management', () => {
    * NQ-E03: View detail page — all 5 tabs visible
    */
   test('NQ-E03: View detail page with 5 tabs', async ({ page }) => {
-    if (!queryPid) { throw new Error(String('Named query not created - NQ-E02 failed')); }
+    if (!queryPid) {
+      throw new Error(String('Named query not created - NQ-E02 failed'));
+    }
 
     const nq = new NamedQueryPage(page);
     await nq.gotoEdit(queryPid!);
@@ -157,7 +166,9 @@ test.describe('Named Query Management', () => {
    * NQ-E04: Update basic info (title)
    */
   test('NQ-E04: Update basic info', async ({ page }) => {
-    if (!queryPid) { throw new Error(String('Named query not created - NQ-E02 failed')); }
+    if (!queryPid) {
+      throw new Error(String('Named query not created - NQ-E02 failed'));
+    }
 
     const nq = new NamedQueryPage(page);
     await nq.gotoEdit(queryPid!);
@@ -182,18 +193,22 @@ test.describe('Named Query Management', () => {
    * NQ-E05: Add field and view in fields tab
    */
   test('NQ-E05: Add field and view in fields tab', async ({ page }) => {
-    if (!queryPid || !queryCode) { throw new Error(String('Named query not created - NQ-E02 failed')); }
+    if (!queryPid || !queryCode) {
+      throw new Error(String('Named query not created - NQ-E02 failed'));
+    }
 
     // Add field via API
-    await page.request.post(`/api/meta/named-queries/${queryCode}/fields`, {
-      data: {
-        fieldCode: 'code',
-        columnExpr: 'code',
-        dataType: 'string',
-        sortable: true,
-        searchable: true,
-      },
-    }).catch(() => {}); // ignore if exists
+    await page.request
+      .post(`/api/meta/named-queries/${queryCode}/fields`, {
+        data: {
+          fieldCode: 'code',
+          columnExpr: 'code',
+          dataType: 'string',
+          sortable: true,
+          searchable: true,
+        },
+      })
+      .catch(() => {}); // ignore if exists
 
     // View in UI
     const nq = new NamedQueryPage(page);
@@ -211,7 +226,9 @@ test.describe('Named Query Management', () => {
    * NQ-E06: draft → testing via API, verify status badge in UI
    */
   test('NQ-E06: Transition draft → testing', async ({ page }) => {
-    if (!queryPid) { throw new Error(String('Named query not created - NQ-E02 failed')); }
+    if (!queryPid) {
+      throw new Error(String('Named query not created - NQ-E02 failed'));
+    }
 
     const nq = new NamedQueryPage(page);
     const resp = await nq.updateStatusViaApi(queryPid!, 'testing');
@@ -228,7 +245,9 @@ test.describe('Named Query Management', () => {
    * NQ-E07: testing → published, creates version v1
    */
   test('NQ-E07: Transition testing → published (creates version)', async ({ page }) => {
-    if (!queryPid || !queryCode) { throw new Error(String('Named query not created - NQ-E02 failed')); }
+    if (!queryPid || !queryCode) {
+      throw new Error(String('Named query not created - NQ-E02 failed'));
+    }
 
     const nq = new NamedQueryPage(page);
     const resp = await nq.updateStatusViaApi(queryPid!, 'published');
@@ -253,18 +272,26 @@ test.describe('Named Query Management', () => {
    * NQ-E08: published state — fromSql input is disabled (frozen)
    */
   test('NQ-E08: published state — SQL is frozen', async ({ page }) => {
-    if (!queryPid) { throw new Error(String('Named query not created - NQ-E02 failed')); }
+    if (!queryPid) {
+      throw new Error(String('Named query not created - NQ-E02 failed'));
+    }
 
     const nq = new NamedQueryPage(page);
     await nq.gotoEdit(queryPid!);
     await nq.clickTab('basic');
 
     // fromSql should be disabled (textarea value not matched by hasText, use attribute check)
-    const frozenIndicator = page.locator('textarea[disabled], textarea[readonly], input[disabled][value*="ab_meta"], [class*="frozen"], [class*="readonly"]').first();
+    const frozenIndicator = page
+      .locator(
+        'textarea[disabled], textarea[readonly], input[disabled][value*="ab_meta"], [class*="frozen"], [class*="readonly"]',
+      )
+      .first();
     const hasFrozen = await frozenIndicator.isVisible({ timeout: 5000 }).catch(() => false);
     if (!hasFrozen) {
       // Fallback: check that the page shows "frozen" or "已发布" status indicator
-      await expect(page.getByText(/frozen|冻结|已发布|published/i).first()).toBeVisible({ timeout: 5000 });
+      await expect(page.getByText(/frozen|冻结|已发布|published/i).first()).toBeVisible({
+        timeout: 5000,
+      });
     }
   });
 
@@ -272,7 +299,9 @@ test.describe('Named Query Management', () => {
    * NQ-E09: published → deprecated
    */
   test('NQ-E09: Transition published → deprecated', async ({ page }) => {
-    if (!queryPid) { throw new Error(String('Named query not created - NQ-E02 failed')); }
+    if (!queryPid) {
+      throw new Error(String('Named query not created - NQ-E02 failed'));
+    }
 
     const nq = new NamedQueryPage(page);
     const resp = await nq.updateStatusViaApi(queryPid!, 'deprecated');
@@ -286,7 +315,9 @@ test.describe('Named Query Management', () => {
    * NQ-E10: deprecated → archived
    */
   test('NQ-E10: Transition deprecated → archived', async ({ page }) => {
-    if (!queryPid) { throw new Error(String('Named query not created - NQ-E02 failed')); }
+    if (!queryPid) {
+      throw new Error(String('Named query not created - NQ-E02 failed'));
+    }
 
     const nq = new NamedQueryPage(page);
     const resp = await nq.updateStatusViaApi(queryPid!, 'archived');
@@ -300,7 +331,9 @@ test.describe('Named Query Management', () => {
    * NQ-E11: archived → draft (re-open)
    */
   test('NQ-E11: Transition archived → draft (re-open)', async ({ page }) => {
-    if (!queryPid) { throw new Error(String('Named query not created - NQ-E02 failed')); }
+    if (!queryPid) {
+      throw new Error(String('Named query not created - NQ-E02 failed'));
+    }
 
     const nq = new NamedQueryPage(page);
     const resp = await nq.updateStatusViaApi(queryPid!, 'draft');
@@ -318,7 +351,9 @@ test.describe('Named Query Management', () => {
    * NQ-E12: Re-publish creates version v2, verify in versions tab
    */
   test('NQ-E12: Re-publish creates v2, versions tab shows history', async ({ page }) => {
-    if (!queryPid || !queryCode) { throw new Error(String('Named query not created - NQ-E02 failed')); }
+    if (!queryPid || !queryCode) {
+      throw new Error(String('Named query not created - NQ-E02 failed'));
+    }
 
     // draft → testing → published again
     const nq = new NamedQueryPage(page);
@@ -350,7 +385,9 @@ test.describe('Named Query Management', () => {
    * NQ-E13: View and update policy via UI
    */
   test('NQ-E13: View and update policy via UI', async ({ page }) => {
-    if (!queryPid) { throw new Error(String('Named query not created - NQ-E02 failed')); }
+    if (!queryPid) {
+      throw new Error(String('Named query not created - NQ-E02 failed'));
+    }
 
     const nq = new NamedQueryPage(page);
     await nq.gotoEditTab(queryPid!, 'policy');
@@ -405,11 +442,11 @@ test.describe('Named Query Management', () => {
    * NQ-E15: DataSource nq: prefix returns data
    */
   test('NQ-E15: DataSource nq: prefix integration', async ({ page }) => {
-    if (!queryCode) { throw new Error(String('Named query not created - NQ-E02 failed')); }
+    if (!queryCode) {
+      throw new Error(String('Named query not created - NQ-E02 failed'));
+    }
 
-    const resp = await page.request.get(
-      `/api/datasource/list?datasourceId=nq:${queryCode}`
-    );
+    const resp = await page.request.get(`/api/datasource/list?datasourceId=nq:${queryCode}`);
     expect(resp.ok()).toBe(true);
     const result = await resp.json();
     expect(result.data.length).toBeGreaterThan(0);
@@ -423,11 +460,11 @@ test.describe('Named Query Management', () => {
    * NQ-E16: Param schema returns searchable fields
    */
   test('NQ-E16: Param schema endpoint', async ({ page }) => {
-    if (!queryCode) { throw new Error(String('Named query not created - NQ-E02 failed')); }
+    if (!queryCode) {
+      throw new Error(String('Named query not created - NQ-E02 failed'));
+    }
 
-    const resp = await page.request.get(
-      `/api/meta/named-queries/${queryCode}/param-schema`
-    );
+    const resp = await page.request.get(`/api/meta/named-queries/${queryCode}/param-schema`);
     expect(resp.ok()).toBe(true);
     const result = await resp.json();
     expect(result.data).toBeDefined();
@@ -441,7 +478,9 @@ test.describe('Named Query Management', () => {
    * NQ-E17: Batch status update
    */
   test('NQ-E17: Batch status update', async ({ page }) => {
-    if (!queryPid) { throw new Error(String('Named query not created - NQ-E02 failed')); }
+    if (!queryPid) {
+      throw new Error(String('Named query not created - NQ-E02 failed'));
+    }
 
     const resp = await page.request.post(`/api/meta/named-queries/batch-status`, {
       data: {
@@ -494,9 +533,11 @@ test.describe('Named Query Management', () => {
     if (queryPid) {
       try {
         // Move to draft first if needed for deletion
-        await request.put(`/api/meta/named-queries/${queryPid}/status`, {
-          data: { status: 'draft' },
-        }).catch(() => {});
+        await request
+          .put(`/api/meta/named-queries/${queryPid}/status`, {
+            data: { status: 'draft' },
+          })
+          .catch(() => {});
 
         if (queryCode) {
           await request.delete(`/api/meta/named-queries/${queryCode}/fields/code`);

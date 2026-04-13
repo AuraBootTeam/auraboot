@@ -27,6 +27,7 @@ import {
   findRowInPaginatedList,
   queryFilteredList,
   clickRowActionByLocator,
+  ensureFilterFormOpen,
 } from '../helpers';
 
 // ---------------------------------------------------------------------------
@@ -44,44 +45,42 @@ const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:5173';
  * with name attributes matching the model field codes (e.g. pe_supplier_name).
  * We fill the first text input and click the search button.
  */
-async function navigateAndSearchByName(page: import('@playwright/test').Page, pageKey: string, searchText: string) {
+async function navigateAndSearchByName(
+  page: import('@playwright/test').Page,
+  pageKey: string,
+  searchText: string,
+) {
   await navigateToDynamicPage(page, pageKey);
 
   // Wait for the initial unfiltered list to load before interacting with filters.
   // This prevents the initial list response from being mistaken for the search response.
-  await page.waitForResponse(
-    (r) => r.url().includes('/list') && r.status() === 200,
-    { timeout: 10000 }
-  ).catch(() => {});
+  await page
+    .waitForResponse((r) => r.url().includes('/list') && r.status() === 200, { timeout: 10000 })
+    .catch(() => {});
 
-  // Wait for the search area to render
-  const searchArea = page.locator('[data-testid="search-area"]');
-  if (!(await searchArea.isVisible({ timeout: 3000 }).catch(() => false))) {
-    // No search area — fall back to unfiltered list
-    return;
-  }
+  // Open the filter form (hidden by default after list refactor)
+  await ensureFilterFormOpen(page);
 
-  // Wait for SmartInput fields inside the search area to render.
-  // Use broad selector since React may or may not set type="text" explicitly.
-  const filterInput = searchArea.locator('input').first();
+  // Wait for SmartInput fields inside the filter form to render.
+  const filterForm = page.locator('[data-testid="filters"], form').first();
+  const filterInput = filterForm.locator('input').first();
   await filterInput.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
   if (await filterInput.isVisible().catch(() => false)) {
     await filterInput.fill(searchText);
   } else {
-    // Fallback: no input in search area, skip filtering
+    // Fallback: no input in filter form, skip filtering
     return;
   }
 
   // Click the search button and wait for the SEARCH-TRIGGERED list response.
   // The response listener must be set up BEFORE clicking to avoid missing the response.
-  const searchBtn = page.locator(
-    '[data-testid="filter-search"], [data-testid="filter-btn-search"]'
-  ).first();
+  const searchBtn = page
+    .locator('[data-testid="filter-search"], [data-testid="filter-btn-search"]')
+    .first();
   if (await searchBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-    const listResp = page.waitForResponse(
-      (r) => r.url().includes('/list') && r.status() === 200,
-      { timeout: 8000 }
-    ).catch(() => null);
+    const listResp = page
+      .waitForResponse((r) => r.url().includes('/list') && r.status() === 200, { timeout: 8000 })
+      .catch(() => null);
     await searchBtn.click();
     await listResp;
   }
@@ -99,12 +98,14 @@ async function waitForFormReady(page: import('@playwright/test').Page, expectEdi
   // Wait for actual form INPUT fields to be visible (not just buttons).
   // Dynamic forms render in two stages: schema fetch -> field metadata -> smart components.
   // Waiting only for buttons (Save/Cancel) is insufficient since they may appear before fields render.
-  const firstInput = page.locator(
-    'form input, form textarea, form select, ' +
-    'button[role="switch"], ' +
-    '[data-testid^="form-field-"] input, ' +
-    '[data-testid^="form-field-"] textarea'
-  ).first();
+  const firstInput = page
+    .locator(
+      'form input, form textarea, form select, ' +
+        'button[role="switch"], ' +
+        '[data-testid^="form-field-"] input, ' +
+        '[data-testid^="form-field-"] textarea',
+    )
+    .first();
   await firstInput.waitFor({ state: 'visible', timeout: 15000 });
 
   // In edit mode, wait for the record data to populate form inputs AND for React
@@ -114,72 +115,84 @@ async function waitForFormReady(page: import('@playwright/test').Page, expectEdi
   //
   // Strategy: wait until form input values are stable (no changes for 300ms).
   if (expectEdit) {
-    await page.waitForFunction(
-      () => {
-        // Phase 1: At least one text input must have a value
-        const inputs = document.querySelectorAll('form input');
-        let hasValue = false;
-        for (const input of inputs) {
-          const el = input as HTMLInputElement;
-          if (el.type === 'text' && el.value && el.value.length > 0) {
-            hasValue = true;
-            break;
+    await page
+      .waitForFunction(
+        () => {
+          // Phase 1: At least one text input must have a value
+          const inputs = document.querySelectorAll('form input');
+          let hasValue = false;
+          for (const input of inputs) {
+            const el = input as HTMLInputElement;
+            if (el.type === 'text' && el.value && el.value.length > 0) {
+              hasValue = true;
+              break;
+            }
           }
-        }
-        return hasValue;
-      },
-      { timeout: 10000 }
-    ).catch(() => {});
+          return hasValue;
+        },
+        { timeout: 10000 },
+      )
+      .catch(() => {});
 
     // Phase 2: Wait for form values to stabilize (no React re-renders changing values).
     // Take a snapshot of input values, wait 300ms, then compare. Repeat until stable.
-    await page.waitForFunction(
-      () => {
-        const w = window as any;
-        const inputs = document.querySelectorAll('form input[type="text"], form textarea');
-        const snapshot = Array.from(inputs).map((el) => (el as HTMLInputElement).value).join('|');
+    await page
+      .waitForFunction(
+        () => {
+          const w = window as any;
+          const inputs = document.querySelectorAll('form input[type="text"], form textarea');
+          const snapshot = Array.from(inputs)
+            .map((el) => (el as HTMLInputElement).value)
+            .join('|');
 
-        if (w.__formSnapshot === snapshot) {
-          // Values haven't changed since last check — form is stable
-          if (w.__formStableAt && Date.now() - w.__formStableAt > 300) {
-            delete w.__formSnapshot;
-            delete w.__formStableAt;
-            return true;
+          if (w.__formSnapshot === snapshot) {
+            // Values haven't changed since last check — form is stable
+            if (w.__formStableAt && Date.now() - w.__formStableAt > 300) {
+              delete w.__formSnapshot;
+              delete w.__formStableAt;
+              return true;
+            }
+            if (!w.__formStableAt) {
+              w.__formStableAt = Date.now();
+            }
+            return false;
           }
-          if (!w.__formStableAt) {
-            w.__formStableAt = Date.now();
-          }
+          // Values changed — reset stability timer
+          w.__formSnapshot = snapshot;
+          w.__formStableAt = null;
           return false;
-        }
-        // Values changed — reset stability timer
-        w.__formSnapshot = snapshot;
-        w.__formStableAt = null;
-        return false;
-      },
-      { timeout: 10000, polling: 100 }
-    ).catch(() => {});
+        },
+        { timeout: 10000, polling: 100 },
+      )
+      .catch(() => {});
   }
 }
 
 /** Fill a text input field on the form page and verify the value was set. */
-async function fillFormField(page: import('@playwright/test').Page, fieldCode: string, value: string) {
+async function fillFormField(
+  page: import('@playwright/test').Page,
+  fieldCode: string,
+  value: string,
+) {
   // Give edit forms extra time — data fetch + field re-render may take longer
   const waitMs = 3000;
 
   let targetInput: import('@playwright/test').Locator | null = null;
 
   // Strategy 1: data-testid="form-field-{code}"
-  const byTestId = page.locator(
-    `[data-testid="form-field-${fieldCode}"] input, [data-testid="form-field-${fieldCode}"] textarea`
-  ).first();
+  const byTestId = page
+    .locator(
+      `[data-testid="form-field-${fieldCode}"] input, [data-testid="form-field-${fieldCode}"] textarea`,
+    )
+    .first();
   if (await byTestId.isVisible({ timeout: waitMs }).catch(() => false)) {
     targetInput = byTestId;
   }
   // Strategy 2: data-field="{code}"
   if (!targetInput) {
-    const byField = page.locator(
-      `[data-field="${fieldCode}"] input, [data-field="${fieldCode}"] textarea`
-    ).first();
+    const byField = page
+      .locator(`[data-field="${fieldCode}"] input, [data-field="${fieldCode}"] textarea`)
+      .first();
     if (await byField.isVisible({ timeout: waitMs }).catch(() => false)) {
       targetInput = byField;
     }
@@ -194,14 +207,20 @@ async function fillFormField(page: import('@playwright/test').Page, fieldCode: s
   // Strategy 4: label text containing the field code (last part after last underscore)
   if (!targetInput) {
     const shortLabel = fieldCode.split('_').pop() || fieldCode;
-    const byLabel = page.locator(`label:has-text("${shortLabel}") + * input, label:has-text("${shortLabel}") ~ * input`).first();
+    const byLabel = page
+      .locator(
+        `label:has-text("${shortLabel}") + * input, label:has-text("${shortLabel}") ~ * input`,
+      )
+      .first();
     if (await byLabel.isVisible({ timeout: waitMs }).catch(() => false)) {
       targetInput = byLabel;
     }
   }
   // Strategy 5: any visible text input on the form with matching name attribute
   if (!targetInput) {
-    const allInputs = page.locator('form input[type="text"], form textarea, [data-testid*="form"] input[type="text"]');
+    const allInputs = page.locator(
+      'form input[type="text"], form textarea, [data-testid*="form"] input[type="text"]',
+    );
     const count = await allInputs.count();
     for (let i = 0; i < count; i++) {
       const input = allInputs.nth(i);
@@ -244,7 +263,11 @@ async function fillFormField(page: import('@playwright/test').Page, fieldCode: s
 
 /** Click the toolbar create button and wait for form page navigation. */
 async function clickCreateButton(page: import('@playwright/test').Page) {
-  const createBtn = page.locator('[data-testid="toolbar-btn-create"], button:has-text("新建"), button:has-text("New"), button:has-text("Create")').first();
+  const createBtn = page
+    .locator(
+      '[data-testid="toolbar-btn-create"], button:has-text("新建"), button:has-text("New"), button:has-text("Create")',
+    )
+    .first();
   await createBtn.waitFor({ state: 'visible', timeout: 5000 });
   await createBtn.click();
   // Wait for form page to start loading (URL change or network activity)
@@ -253,7 +276,11 @@ async function clickCreateButton(page: import('@playwright/test').Page) {
 
 /** Click the save button and wait for command API response. */
 async function clickSaveAndWait(page: import('@playwright/test').Page) {
-  const saveBtn = page.locator('[data-testid="form-btn-submit"], [data-testid="form-btn-save"], button:has-text("保存"), button:has-text("Save")').first();
+  const saveBtn = page
+    .locator(
+      '[data-testid="form-btn-submit"], [data-testid="form-btn-save"], button:has-text("保存"), button:has-text("Save")',
+    )
+    .first();
   await saveBtn.waitFor({ state: 'visible', timeout: 10000 });
 
   const respPromise = page.waitForResponse(
@@ -271,16 +298,22 @@ async function clickSaveAndWait(page: import('@playwright/test').Page) {
  * Click the row-level edit button and wait for navigation + record data load.
  * Sets up response listeners BEFORE clicking to avoid race conditions.
  */
-async function clickRowEditButton(page: import('@playwright/test').Page, row: import('@playwright/test').Locator) {
+async function clickRowEditButton(
+  page: import('@playwright/test').Page,
+  row: import('@playwright/test').Locator,
+) {
   // Set up response listener BEFORE clicking to capture the record data fetch.
   // The form page fetches GET /api/dynamic/{model}/{recordId} on mount.
-  const recordDataPromise = page.waitForResponse(
-    (r) => r.url().match(/\/api\/dynamic\/[^/]+\/[^/]+$/) !== null
-        && !r.url().includes('/list')
-        && r.request().method() === 'get'
-        && r.status() === 200,
-    { timeout: 15000 }
-  ).catch(() => null);
+  const recordDataPromise = page
+    .waitForResponse(
+      (r) =>
+        r.url().match(/\/api\/dynamic\/[^/]+\/[^/]+$/) !== null &&
+        !r.url().includes('/list') &&
+        r.request().method() === 'get' &&
+        r.status() === 200,
+      { timeout: 15000 },
+    )
+    .catch(() => null);
 
   await clickRowActionByLocator(page, row, 'edit');
   await page.waitForLoadState('domcontentloaded');
@@ -290,7 +323,10 @@ async function clickRowEditButton(page: import('@playwright/test').Page, row: im
 }
 
 /** Click the row-level delete button, confirm, and wait for command. */
-async function clickRowDeleteAndConfirm(page: import('@playwright/test').Page, row: import('@playwright/test').Locator) {
+async function clickRowDeleteAndConfirm(
+  page: import('@playwright/test').Page,
+  row: import('@playwright/test').Locator,
+) {
   // Set up response listener BEFORE accepting the dialog (which triggers the API call)
   const cmdPromise = page.waitForResponse(
     (r) => r.url().includes('/commands/execute/') && r.status() === 200,
@@ -411,7 +447,11 @@ test.describe('PCBA Base — Product CRUD', () => {
       page.locator('[data-testid="form-field-prod_name"] [aria-required="true"]').first(),
       page.locator('[data-testid="form-field-prod_unit"] [aria-required="true"]').first(),
       page.locator('[data-testid="form-field-prod_type"] [aria-required="true"]').first(),
-      page.locator('label:has-text("商品名称") .text-destructive, label:has-text("Product Name") .text-destructive').first(),
+      page
+        .locator(
+          'label:has-text("商品名称") .text-destructive, label:has-text("Product Name") .text-destructive',
+        )
+        .first(),
     ];
 
     let hasRequiredFieldSignal = false;
@@ -423,12 +463,20 @@ test.describe('PCBA Base — Product CRUD', () => {
     }
 
     // Try to save without filling required fields
-    const saveBtn = page.locator('[data-testid="form-btn-submit"], [data-testid="form-btn-save"], button:has-text("保存"), button:has-text("Save")').first();
+    const saveBtn = page
+      .locator(
+        '[data-testid="form-btn-submit"], [data-testid="form-btn-save"], button:has-text("保存"), button:has-text("Save")',
+      )
+      .first();
     await saveBtn.waitFor({ state: 'visible', timeout: 10000 });
-    const commandResponse = page.waitForResponse(
-      (r) => r.url().includes('/api/meta/commands/execute/') && r.request().method().toLowerCase() === 'post',
-      { timeout: 4000 },
-    ).catch(() => null);
+    const commandResponse = page
+      .waitForResponse(
+        (r) =>
+          r.url().includes('/api/meta/commands/execute/') &&
+          r.request().method().toLowerCase() === 'post',
+        { timeout: 4000 },
+      )
+      .catch(() => null);
     await saveBtn.click();
 
     // Validation UX may be inline, field-level aria-invalid, a failed command, or simply keep the form open.
@@ -454,15 +502,27 @@ test.describe('PCBA Base — Product CRUD', () => {
       commandRejected = String(body.code ?? '') !== ErrorCodes.SUCCESS;
     }
 
-    expect(hasRequiredFieldSignal || hasValidation || commandRejected || /\/new($|\?)/.test(page.url())).toBe(true);
+    expect(
+      hasRequiredFieldSignal || hasValidation || commandRejected || /\/new($|\?)/.test(page.url()),
+    ).toBe(true);
   });
 
   test('PB-006: Product page i18n labels are translated', async ({ page }) => {
     await navigateToDynamicPage(page, 'prod-product');
 
+    // Wait for table to render fully
+    await page.locator('table, [role="table"], [data-testid="dynamic-list"]').first()
+      .waitFor({ state: 'visible', timeout: 10000 });
+
     // Table headers should NOT show raw i18n keys like "model.prod_product.prod_name.label"
-    const headers = page.locator('thead th');
-    const headerCount = await headers.count();
+    // Try both thead th and role-based headers
+    let headers = page.locator('thead th');
+    let headerCount = await headers.count();
+    if (headerCount === 0) {
+      // Some table renderers use role="columnheader" or other structures
+      headers = page.locator('[role="columnheader"], th');
+      headerCount = await headers.count();
+    }
     expect(headerCount).toBeGreaterThan(0);
 
     const meaningfulHeaders: string[] = [];
@@ -703,14 +763,28 @@ test.describe('PCBA Base — Warehouse CRUD', () => {
     const row = page.locator('tbody tr', { hasText: originalName }).first();
     await expect(row).toBeVisible({ timeout: 8000 });
     await clickRowEditButton(page, row);
-    const formReady = await waitForFormReady(page, true).then(() => true).catch(() => false);
+    const formReady = await waitForFormReady(page, true)
+      .then(() => true)
+      .catch(() => false);
     if (!formReady) {
       // Fallback when deployed DSL still uses legacy blockType and form fields are not rendered.
-      const apiUpdate = await executeCommandViaApi(page, 'pe:update_warehouse', {
-        inv_warehouse_name: updatedName,
-      }, result.recordId, 'update', { allowHttpError: true });
+      const apiUpdate = await executeCommandViaApi(
+        page,
+        'pe:update_warehouse',
+        {
+          inv_warehouse_name: updatedName,
+        },
+        result.recordId,
+        'update',
+        { allowHttpError: true },
+      );
       expect(apiUpdate.code).toBe(ErrorCodes.SUCCESS);
-      const records = await queryFilteredList(page, 'inv-warehouse', 'inv_warehouse_name', updatedName);
+      const records = await queryFilteredList(
+        page,
+        'inv-warehouse',
+        'inv_warehouse_name',
+        updatedName,
+      );
       expect(records.length).toBeGreaterThan(0);
       return;
     }
@@ -719,7 +793,12 @@ test.describe('PCBA Base — Warehouse CRUD', () => {
     await clickSaveAndWait(page);
 
     // Verify updated via API
-    const records = await queryFilteredList(page, 'inv-warehouse', 'inv_warehouse_name', updatedName);
+    const records = await queryFilteredList(
+      page,
+      'inv-warehouse',
+      'inv_warehouse_name',
+      updatedName,
+    );
     expect(records.length).toBeGreaterThan(0);
   });
 

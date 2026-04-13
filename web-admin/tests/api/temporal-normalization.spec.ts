@@ -43,16 +43,13 @@ async function executeRaw(
   const data: Record<string, unknown> = { payload };
   if (targetRecordId) data.targetRecordId = targetRecordId;
 
-  const resp = await page.request.post(
-    `/api/meta/commands/execute/${commandCode}`,
-    {
-      data,
-      headers: {
-        'Content-Type': 'application/json',
-        ...extraHeaders,
-      },
+  const resp = await page.request.post(`/api/meta/commands/execute/${commandCode}`, {
+    data,
+    headers: {
+      'Content-Type': 'application/json',
+      ...extraHeaders,
     },
-  );
+  });
 
   let body: any = {};
   try {
@@ -69,18 +66,13 @@ async function executeRaw(
 // ---------------------------------------------------------------------------
 
 test.describe('Temporal Normalization — DATE fields', () => {
-
   test('TN-01: valid DATE string accepted and record created @smoke', async ({ page }) => {
-    const { status, body } = await executeRaw(
-      page,
-      'e2et:create_order',
-      {
-        e2et_order_title: `TN_DATE_${uniqueId()}`,
-        e2et_order_type: 'normal',
-        e2et_order_urgent: false,
-        e2et_order_date: '2026-03-18',
-      },
-    );
+    const { status, body } = await executeRaw(page, 'e2et:create_order', {
+      e2et_order_title: `TN_DATE_${uniqueId()}`,
+      e2et_order_type: 'normal',
+      e2et_order_urgent: false,
+      e2et_order_date: '2026-03-18',
+    });
 
     // Should succeed — HTTP 200 and business code "0"
     expect(status).toBe(200);
@@ -94,17 +86,13 @@ test.describe('Temporal Normalization — DATE fields', () => {
   });
 
   test('TN-05: invalid DATE format returns HTTP 400', async ({ page }) => {
-    const { status, body } = await executeRaw(
-      page,
-      'e2et:create_order',
-      {
-        e2et_order_title: `TN_BADDATE_${uniqueId()}`,
-        e2et_order_type: 'normal',
-        e2et_order_urgent: false,
-        // Not a valid ISO-8601 date — missing leading zeros and wrong separator
-        e2et_order_date: '18/03/2026',
-      },
-    );
+    const { status, body } = await executeRaw(page, 'e2et:create_order', {
+      e2et_order_title: `TN_BADDATE_${uniqueId()}`,
+      e2et_order_type: 'normal',
+      e2et_order_urgent: false,
+      // Not a valid ISO-8601 date — missing leading zeros and wrong separator
+      e2et_order_date: '18/03/2026',
+    });
 
     expect(status).toBe(400);
     // Response body should describe the parse failure
@@ -112,17 +100,15 @@ test.describe('Temporal Normalization — DATE fields', () => {
     expect(bodyStr).toMatch(/e2et_order_date|temporal|date|invalid|parse/);
   });
 
-  test('TN-07: null DATE value is accepted (field omitted from normalization)', async ({ page }) => {
-    const { status, body } = await executeRaw(
-      page,
-      'e2et:create_order',
-      {
-        e2et_order_title: `TN_NULL_${uniqueId()}`,
-        e2et_order_type: 'normal',
-        e2et_order_urgent: false,
-        e2et_order_date: null,
-      },
-    );
+  test('TN-07: null DATE value is accepted (field omitted from normalization)', async ({
+    page,
+  }) => {
+    const { status, body } = await executeRaw(page, 'e2et:create_order', {
+      e2et_order_title: `TN_NULL_${uniqueId()}`,
+      e2et_order_type: 'normal',
+      e2et_order_urgent: false,
+      e2et_order_date: null,
+    });
 
     // Null values are skipped by the normalizer — request should succeed
     expect(status).toBe(200);
@@ -133,7 +119,6 @@ test.describe('Temporal Normalization — DATE fields', () => {
       await executeRaw(page, 'e2et:delete_order', {}, String(recordId)).catch(() => {});
     }
   });
-
 });
 
 // ---------------------------------------------------------------------------
@@ -141,19 +126,14 @@ test.describe('Temporal Normalization — DATE fields', () => {
 // ---------------------------------------------------------------------------
 
 test.describe('Temporal Normalization — DATETIME fields', () => {
-
   test('TN-02: DATETIME with Z suffix (UTC) is accepted @smoke', async ({ page }) => {
-    const { status, body } = await executeRaw(
-      page,
-      'crm:create_activity',
-      {
-        crm_act_subject: `TN_DTZUTC_${uniqueId()}`,
-        crm_act_type: 'call',
-        crm_act_status: 'planned',
-        // UTC datetime — normalizer must parse to Instant
-        crm_act_date: '2026-03-18T02:30:00Z',
-      },
-    );
+    const { status, body } = await executeRaw(page, 'crm:create_activity', {
+      crm_act_subject: `TN_DTZUTC_${uniqueId()}`,
+      crm_act_type: 'call',
+      crm_act_status: 'planned',
+      // UTC datetime — normalizer must parse to Instant
+      crm_act_date: '2026-03-18T02:30:00Z',
+    });
 
     expect(status).toBe(200);
     expect(String(body?.code ?? '')).toBe('0');
@@ -165,19 +145,15 @@ test.describe('Temporal Normalization — DATETIME fields', () => {
   });
 
   test('TN-03: DATETIME with explicit offset (+08:00) is accepted', async ({ page }) => {
-    const { status, body } = await executeRaw(
-      page,
-      'crm:create_activity',
-      {
-        crm_act_subject: `TN_DTZOFFSET_${uniqueId()}`,
-        crm_act_type: 'meeting',
-        crm_act_status: 'planned',
-        // Datetime with +08:00 offset — normalizer must parse to Instant
-        crm_act_date: '2026-03-18T10:30:00+08:00',
-        crm_act_start_time: '2026-03-18T10:30:00+08:00',
-        crm_act_end_time: '2026-03-18T12:00:00+08:00',
-      },
-    );
+    const { status, body } = await executeRaw(page, 'crm:create_activity', {
+      crm_act_subject: `TN_DTZOFFSET_${uniqueId()}`,
+      crm_act_type: 'meeting',
+      crm_act_status: 'planned',
+      // Datetime with +08:00 offset — normalizer must parse to Instant
+      crm_act_date: '2026-03-18T10:30:00+08:00',
+      crm_act_start_time: '2026-03-18T10:30:00+08:00',
+      crm_act_end_time: '2026-03-18T12:00:00+08:00',
+    });
 
     expect(status).toBe(200);
     expect(String(body?.code ?? '')).toBe('0');
@@ -189,17 +165,13 @@ test.describe('Temporal Normalization — DATETIME fields', () => {
   });
 
   test('TN-04: DATETIME without offset returns HTTP 400 @smoke', async ({ page }) => {
-    const { status, body } = await executeRaw(
-      page,
-      'crm:create_activity',
-      {
-        crm_act_subject: `TN_DTNOOFFSET_${uniqueId()}`,
-        crm_act_type: 'call',
-        crm_act_status: 'planned',
-        // No timezone offset — normalizer must reject this
-        crm_act_date: '2026-03-18T10:30:00',
-      },
-    );
+    const { status, body } = await executeRaw(page, 'crm:create_activity', {
+      crm_act_subject: `TN_DTNOOFFSET_${uniqueId()}`,
+      crm_act_type: 'call',
+      crm_act_status: 'planned',
+      // No timezone offset — normalizer must reject this
+      crm_act_date: '2026-03-18T10:30:00',
+    });
 
     expect(status).toBe(400);
     // Error message should reference the field and expected format
@@ -233,5 +205,4 @@ test.describe('Temporal Normalization — DATETIME fields', () => {
       await executeRaw(page, 'crm:update_activity', {}, String(recordId)).catch(() => {});
     }
   });
-
 });

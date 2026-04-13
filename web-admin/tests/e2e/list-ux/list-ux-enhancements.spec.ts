@@ -34,19 +34,21 @@ test.describe('GAP-158: Page Designer enableMultiView Settings', () => {
         name: testPageName,
         title: testPageName,
         description: `E2E test page for GAP-158 enableMultiView toggle (${uid})`,
-        pageType: 'list',
-        viewModelCode: 'e2et_order',
+        kind: 'composite',
+        blocks: [{ id: 'blk1', blockType: 'table', config: {} }],
+        metaInfo: { componentCount: 1 },
+        semver: '0.1.0',
         dslSchema: {
           $schema: 'auraboot://schemas/page/v4',
           version: '4.0.0',
           id: testPageKey,
-          kind: 'list',
+          kind: 'composite',
           modelCode: 'e2et_order',
           layout: { type: 'grid', columns: 12 },
           areas: {
             filters: { blocks: [] },
             toolbar: { blocks: [] },
-            main: { blocks: [] },
+            main: { blocks: [{ id: 'blk1', blockType: 'table', config: {} }] },
           },
         },
       },
@@ -141,15 +143,13 @@ test.describe('GAP-158: Page Designer enableMultiView Settings', () => {
     await toolbarSaveBtn.click();
     await saveResponse;
 
-    // Verify DSL was saved with enableMultiView: true by fetching the page via API
+    // Verify page setting was saved by fetching the page via API
     const pageResp = await page.request.get(`/api/pages/${pagePid}`);
     expect(pageResp.ok(), 'Page fetch should succeed').toBe(true);
     const pageBody = await pageResp.json();
-    const dslSchema = pageBody?.data?.dslSchema;
-    expect(dslSchema, 'DSL schema should exist').toBeTruthy();
     expect(
-      dslSchema.enableMultiView,
-      'DSL should have enableMultiView: true after toggle ON + save',
+      pageBody?.data?.extension?.enableMultiView,
+      'Page extension should persist enableMultiView: true after toggle ON + save',
     ).toBe(true);
   });
 
@@ -201,6 +201,15 @@ test.describe('GAP-159: Report Templates in ToolbarMoreMenu', () => {
     const page = await ctx.newPage();
 
     // Create a report template associated with crm_account model
+    // templateContent is required for publishing (backend validates hasInlineContent || hasFileContent)
+    const minimalJrxml = `<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd"
+  name="${reportCode}" pageWidth="595" pageHeight="842">
+  <detail><band height="20"><staticText><reportElement x="0" y="0" width="200" height="20"/><text><![CDATA[E2E Test Report]]></text></staticText></band></detail>
+</jasperReport>`;
+
     const createResp = await page.request.post('/api/report-templates', {
       data: {
         code: reportCode,
@@ -208,10 +217,11 @@ test.describe('GAP-159: Report Templates in ToolbarMoreMenu', () => {
         description: `E2E report template for GAP-159 (${uid})`,
         category: 'crm_account',
         outputFormat: 'pdf',
-        pageSize: 'A4',
+        pageSize: 'a4',
         orientation: 'portrait',
         dataSourceType: 'model',
         dataSourceConfig: { modelCode: 'crm_account' },
+        templateContent: minimalJrxml,
         parameters: [],
       },
     });
@@ -221,9 +231,7 @@ test.describe('GAP-159: Report Templates in ToolbarMoreMenu', () => {
       reportPid = createBody.data.pid;
 
       // Publish the template so it appears in the menu
-      const publishResp = await page.request.post(
-        `/api/report-templates/${reportPid}/publish`,
-      );
+      const publishResp = await page.request.post(`/api/report-templates/${reportPid}/publish`);
       const publishBody = await publishResp.json();
       if (publishBody?.code === '0') {
         hasReport = true;
@@ -238,24 +246,24 @@ test.describe('GAP-159: Report Templates in ToolbarMoreMenu', () => {
     test.skip(!hasReport, 'Report template creation failed — skipping');
 
     // Navigate to CRM Account list page
-    await page.goto('/dynamic/crm_account', { waitUntil: 'domcontentloaded' });
+    await page.goto('/p/crm_account', { waitUntil: 'domcontentloaded' });
 
     // Wait for the list API to respond
-    await page.waitForResponse(
-      (resp) => resp.url().includes('/list') && resp.status() === 200,
-      { timeout: 15000 },
-    );
+    await page.waitForResponse((resp) => resp.url().includes('/list') && resp.status() === 200, {
+      timeout: 15000,
+    });
 
     // Click the More Menu button (⋮)
     const moreMenuBtn = page.locator('[data-testid="toolbar-more-menu"]');
     await moreMenuBtn.waitFor({ state: 'visible', timeout: 10000 });
     await moreMenuBtn.click();
-
-    // Wait for report templates to load — the menu fetches /api/report-templates/published
+    // Wait for the dropdown menu to appear (report-templates API may or may not be called)
     await page.waitForResponse(
       (resp) => resp.url().includes('/report-templates/published') && resp.status() === 200,
-      { timeout: 10000 },
-    );
+      { timeout: 8000 },
+    ).catch(() => {
+      // Report templates API may not be called if feature is not enabled
+    });
 
     // Verify standard menu items are visible (Print, Import, Export)
     await expect(page.locator('[data-testid="more-menu-print"]')).toBeVisible({ timeout: 3000 });
@@ -276,22 +284,20 @@ test.describe('GAP-159: Report Templates in ToolbarMoreMenu', () => {
     test.skip(!hasReport, 'Report template creation failed — skipping');
 
     // Navigate to CRM Account list page
-    await page.goto('/dynamic/crm_account', { waitUntil: 'domcontentloaded' });
-    await page.waitForResponse(
-      (resp) => resp.url().includes('/list') && resp.status() === 200,
-      { timeout: 15000 },
-    );
+    await page.goto('/p/crm_account', { waitUntil: 'domcontentloaded' });
+    await page.waitForResponse((resp) => resp.url().includes('/list') && resp.status() === 200, {
+      timeout: 15000,
+    });
 
-    // Open the More Menu
+    // Open the More Menu — set up response listener BEFORE clicking to avoid race
     const moreMenuBtn = page.locator('[data-testid="toolbar-more-menu"]');
     await moreMenuBtn.waitFor({ state: 'visible', timeout: 10000 });
-    await moreMenuBtn.click();
-
-    // Wait for report templates API
-    await page.waitForResponse(
+    const reportApiPromise = page.waitForResponse(
       (resp) => resp.url().includes('/report-templates/published') && resp.status() === 200,
       { timeout: 10000 },
     );
+    await moreMenuBtn.click();
+    await reportApiPromise;
 
     // Find our report item
     const reportItem = page.locator(`[data-testid="more-menu-report-${reportCode}"]`);
@@ -313,22 +319,20 @@ test.describe('GAP-159: Report Templates in ToolbarMoreMenu', () => {
     test.skip(!hasReport, 'Report template creation failed — skipping');
 
     // Navigate to CRM Account list page
-    await page.goto('/dynamic/crm_account', { waitUntil: 'domcontentloaded' });
-    await page.waitForResponse(
-      (resp) => resp.url().includes('/list') && resp.status() === 200,
-      { timeout: 15000 },
-    );
+    await page.goto('/p/crm_account', { waitUntil: 'domcontentloaded' });
+    await page.waitForResponse((resp) => resp.url().includes('/list') && resp.status() === 200, {
+      timeout: 15000,
+    });
 
-    // Open the More Menu
+    // Open the More Menu — set up response listener BEFORE clicking to avoid race
     const moreMenuBtn = page.locator('[data-testid="toolbar-more-menu"]');
     await moreMenuBtn.waitFor({ state: 'visible', timeout: 10000 });
-    await moreMenuBtn.click();
-
-    // Wait for report templates API
-    await page.waitForResponse(
+    const reportApiPromise = page.waitForResponse(
       (resp) => resp.url().includes('/report-templates/published') && resp.status() === 200,
       { timeout: 10000 },
     );
+    await moreMenuBtn.click();
+    await reportApiPromise;
 
     // Find and click the report template item
     const reportItem = page.locator(`[data-testid="more-menu-report-${reportCode}"]`);

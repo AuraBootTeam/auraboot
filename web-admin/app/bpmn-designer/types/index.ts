@@ -162,7 +162,7 @@ export interface FormBindingEntry {
   permissionMode?: 'merge' | 'override'; // default: merge
   builtinVariables?: {
     decision: string; // default: 'decision'
-    comment: string;  // default: 'comment'
+    comment: string; // default: 'comment'
   };
 }
 

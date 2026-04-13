@@ -36,7 +36,7 @@ function mustSucceed(result: { code: string; recordId: string }, command: string
 async function fetchRecord(
   page: import('@playwright/test').Page,
   pageKey: string,
-  pid: string
+  pid: string,
 ): Promise<Record<string, unknown>> {
   const resp = await page.request.get(`/api/dynamic/${pageKey}/${pid}`);
   expect(resp.ok(), `GET /api/dynamic/${pageKey}/${pid} should return 200`).toBe(true);
@@ -47,7 +47,7 @@ async function fetchRecord(
 async function deleteRecord(
   page: import('@playwright/test').Page,
   pageKey: string,
-  pid: string
+  pid: string,
 ): Promise<void> {
   await page.request.delete(`/api/dynamic/${pageKey}/${pid}`);
 }
@@ -76,11 +76,13 @@ async function cleanup(page: import('@playwright/test').Page, b: Bucket): Promis
 async function clickActionAndGetBody(
   page: import('@playwright/test').Page,
   row: import('@playwright/test').Locator,
-  actionCode: string
+  actionCode: string,
 ): Promise<any> {
   const commandResp = page.waitForResponse(
-    (r) => r.url().includes('/api/meta/commands/execute/') && r.request().method().toLowerCase() === 'post',
-    { timeout: 10000 }
+    (r) =>
+      r.url().includes('/api/meta/commands/execute/') &&
+      r.request().method().toLowerCase() === 'post',
+    { timeout: 10000 },
   );
   const listResp = page
     .waitForResponse((r) => r.url().includes('/list') && r.status() === 200, { timeout: 10000 })
@@ -109,6 +111,11 @@ async function clickActionAndGetBody(
 test.describe('PCBA ERP - SRM OC to ASN Mainline and Branch', () => {
   test.describe.configure({ timeout: 60000 });
 
+  test.beforeEach(async ({ page }) => {
+    const resp = await page.request.get('/api/dynamic/pr_order_confirmation/list?pageSize=1');
+    test.skip(!resp.ok(), 'PCBA SRM plugin not imported');
+  });
+
   test('PCBA-SRM-E2E-01 mainline: OC confirmed then ASN ship should pass', async ({ page }) => {
     const b: Bucket = {
       suppliers: [],
@@ -127,7 +134,7 @@ test.describe('PCBA ERP - SRM OC to ASN Mainline and Branch', () => {
           pe_supplier_contact: 'E2E Contact',
           pe_supplier_phone: '13800000000',
         }),
-        'pe:create_supplier'
+        'pe:create_supplier',
       );
       b.suppliers.push(supplierId);
 
@@ -138,7 +145,7 @@ test.describe('PCBA ERP - SRM OC to ASN Mainline and Branch', () => {
           prod_unit: 'pcs',
           prod_base_price: 10,
         }),
-        'prod:create_product'
+        'prod:create_product',
       );
       b.products.push(productId);
 
@@ -147,7 +154,7 @@ test.describe('PCBA ERP - SRM OC to ASN Mainline and Branch', () => {
           pr_po_supplier: supplierId,
           pr_po_date: new Date().toISOString().slice(0, 10),
         }),
-        'pr:create_purchase_order'
+        'pr:create_purchase_order',
       );
       b.purchaseOrders.push(poId);
 
@@ -158,7 +165,7 @@ test.describe('PCBA ERP - SRM OC to ASN Mainline and Branch', () => {
           pr_pol_qty: 50,
           pr_pol_price: 12,
         }),
-        'pr:add_po_line'
+        'pr:add_po_line',
       );
       b.purchaseOrderLines.push(poLineId);
 
@@ -168,7 +175,7 @@ test.describe('PCBA ERP - SRM OC to ASN Mainline and Branch', () => {
           pe_oc_supplier_id: supplierId,
           pe_oc_confirmed_qty: 50,
         }),
-        'pe:create_order_confirmation'
+        'pe:create_order_confirmation',
       );
       b.orderConfirmations.push(ocId);
 
@@ -189,7 +196,7 @@ test.describe('PCBA ERP - SRM OC to ASN Mainline and Branch', () => {
           pe_asn_ship_date: new Date().toISOString().slice(0, 10),
           pe_asn_total_qty: 50,
         }),
-        'pe:create_asn'
+        'pe:create_asn',
       );
       b.asns.push(asnId);
 
@@ -227,7 +234,7 @@ test.describe('PCBA ERP - SRM OC to ASN Mainline and Branch', () => {
           pe_supplier_name: `E2E Supplier ${uid}`,
           pe_supplier_contact: 'E2E Contact',
         }),
-        'pe:create_supplier'
+        'pe:create_supplier',
       );
       b.suppliers.push(supplierId);
 
@@ -238,7 +245,7 @@ test.describe('PCBA ERP - SRM OC to ASN Mainline and Branch', () => {
           prod_unit: 'pcs',
           prod_base_price: 10,
         }),
-        'prod:create_product'
+        'prod:create_product',
       );
       b.products.push(productId);
 
@@ -247,7 +254,7 @@ test.describe('PCBA ERP - SRM OC to ASN Mainline and Branch', () => {
           pr_po_supplier: supplierId,
           pr_po_date: new Date().toISOString().slice(0, 10),
         }),
-        'pr:create_purchase_order'
+        'pr:create_purchase_order',
       );
       b.purchaseOrders.push(poId);
 
@@ -258,7 +265,7 @@ test.describe('PCBA ERP - SRM OC to ASN Mainline and Branch', () => {
           pr_pol_qty: 20,
           pr_pol_price: 8,
         }),
-        'pr:add_po_line'
+        'pr:add_po_line',
       );
       b.purchaseOrderLines.push(poLineId);
 
@@ -269,7 +276,7 @@ test.describe('PCBA ERP - SRM OC to ASN Mainline and Branch', () => {
           pe_asn_ship_date: new Date().toISOString().slice(0, 10),
           pe_asn_total_qty: 20,
         }),
-        'pe:create_asn'
+        'pe:create_asn',
       );
       b.asns.push(asnId);
 

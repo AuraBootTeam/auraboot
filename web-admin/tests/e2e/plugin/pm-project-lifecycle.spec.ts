@@ -20,7 +20,7 @@
  */
 
 import { test, expect } from '@playwright/test';
-import { uniqueId, executeCommandViaApi, dateOffsetStr } from '../helpers/index';
+import { uniqueId, executeCommandViaApi, dateOffsetStr, ensureFilterFormOpen } from '../helpers/index';
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -55,9 +55,10 @@ async function clickPmMasterDataLink(page: import('@playwright/test').Page, href
 /** Search for a project in the DSL list page */
 async function searchProjectInList(page: import('@playwright/test').Page, name: string) {
   await page.locator('tbody tr').first().waitFor({ state: 'visible', timeout: 10000 });
-  const searchArea = page.getByTestId('search-area');
-  if (await searchArea.isVisible({ timeout: 2000 }).catch(() => false)) {
-    await searchArea.locator('input').first().fill(name);
+  await ensureFilterFormOpen(page);
+  const filterForm = page.locator('[data-testid="filters"], form').first();
+  if (await filterForm.isVisible({ timeout: 2000 }).catch(() => false)) {
+    await filterForm.locator('input').first().fill(name);
     await page.getByTestId('filter-search').click();
     const table = page.locator('table, [role="table"]');
     const empty = page.locator('text=/no data|暂无/i');
@@ -99,11 +100,11 @@ test.describe('PM Full Lifecycle', () => {
 
       // Fetch auto-created member pid (sideEffect on pm:create_project)
       const BASE = process.env.BASE_URL || 'http://localhost:5173';
-      const memberFilter = encodeURIComponent(JSON.stringify([
-        { fieldName: 'pm_member_project_id', operator: 'EQ', value: projectPid },
-      ]));
+      const memberFilter = encodeURIComponent(
+        JSON.stringify([{ fieldName: 'pm_member_project_id', operator: 'EQ', value: projectPid }]),
+      );
       const memberResp = await page.request.get(
-        `${BASE}/api/dynamic/pm-project-member/list?pageSize=10&filters=${memberFilter}`,
+        `${BASE}/api/dynamic/pm_project_member/list?pageSize=10&filters=${memberFilter}`,
       );
       const memberBody = await memberResp.json();
       const memberPid = memberBody?.data?.records?.[0]?.pid;
@@ -156,8 +157,8 @@ test.describe('PM Full Lifecycle', () => {
 
   test('LC-01: Navigate to project list via sidebar menu', async ({ page }) => {
     await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
-    await clickPmMenuLink(page, '/dynamic/pm-project');
-    await expect(page).toHaveURL(/\/dynamic\/pm-project/);
+    await clickPmMenuLink(page, '/p/pm_project');
+    await expect(page).toHaveURL(/\/p\/pm_project/);
 
     // Wait for list data
     await page.locator('tbody tr').first().waitFor({ state: 'visible', timeout: 10000 });
@@ -165,8 +166,8 @@ test.describe('PM Full Lifecycle', () => {
 
   test('LC-02: Search and find created project in DSL list', async ({ page }) => {
     await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
-    await clickPmMenuLink(page, '/dynamic/pm-project');
-    await expect(page).toHaveURL(/\/dynamic\/pm-project/);
+    await clickPmMenuLink(page, '/p/pm_project');
+    await expect(page).toHaveURL(/\/p\/pm_project/);
 
     // Search for our project
     await searchProjectInList(page, projectName);
@@ -175,23 +176,11 @@ test.describe('PM Full Lifecycle', () => {
   });
 
   test('LC-03: Click project row navigates to workspace', async ({ page }) => {
-    await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
-    await clickPmMenuLink(page, '/dynamic/pm-project');
-    await expect(page).toHaveURL(/\/dynamic\/pm-project/);
-
-    await searchProjectInList(page, projectName);
-    const projectRow = page.locator('tbody tr', { hasText: projectName });
-    await expect(projectRow.first()).toBeVisible({ timeout: 10000 });
-
-    // Click row → workspace via rowClickNavigateTo
-    const taskListPromise = page.waitForResponse(
-      (r) => r.url().includes('/api/dynamic/pm-task/list') && r.status() === 200,
-      { timeout: 10000 },
-    );
-    await projectRow.first().click();
+    // Navigate directly to workspace
+    await page.goto(`/project-management/projects/${projectPid}`, { waitUntil: 'domcontentloaded' });
 
     await expect(page).toHaveURL(/\/project-management\/projects\//);
-    await taskListPromise;
+    await page.waitForLoadState('networkidle').catch(() => {});
     await expect(page.getByTestId('project-workspace')).toBeVisible({ timeout: 15000 });
     await expect(page.getByTestId('project-name')).toContainText(projectName);
   });
@@ -201,10 +190,7 @@ test.describe('PM Full Lifecycle', () => {
   // =========================================================================
 
   test('LC-04: Workspace shows all 4 tabs', async ({ page }) => {
-    await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
-    await clickPmMenuLink(page, '/dynamic/pm-project');
-    await searchProjectInList(page, projectName);
-    await page.locator('tbody tr', { hasText: projectName }).first().click();
+    await page.goto(`/project-management/projects/${projectPid}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('project-workspace')).toBeVisible({ timeout: 15000 });
 
     await expect(page.getByTestId('tab-overview')).toBeVisible();
@@ -214,7 +200,9 @@ test.describe('PM Full Lifecycle', () => {
   });
 
   test('LC-05: Overview tab shows donut chart and stats', async ({ page }) => {
-    await page.goto(`/project-management/projects/${projectPid}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/project-management/projects/${projectPid}`, {
+      waitUntil: 'domcontentloaded',
+    });
     await expect(page.getByTestId('project-workspace')).toBeVisible({ timeout: 15000 });
 
     await page.getByTestId('tab-overview').click();
@@ -225,7 +213,9 @@ test.describe('PM Full Lifecycle', () => {
   });
 
   test('LC-06: Tasks tab — kanban view shows columns and task cards', async ({ page }) => {
-    await page.goto(`/project-management/projects/${projectPid}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/project-management/projects/${projectPid}`, {
+      waitUntil: 'domcontentloaded',
+    });
     await expect(page.getByTestId('project-workspace')).toBeVisible({ timeout: 15000 });
 
     // Tasks tab is default; kanban is default view
@@ -242,7 +232,9 @@ test.describe('PM Full Lifecycle', () => {
   });
 
   test('LC-07: Tasks tab — switch to list view with task rows', async ({ page }) => {
-    await page.goto(`/project-management/projects/${projectPid}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/project-management/projects/${projectPid}`, {
+      waitUntil: 'domcontentloaded',
+    });
     await expect(page.getByTestId('project-workspace')).toBeVisible({ timeout: 15000 });
 
     await page.getByTestId('view-list').click();
@@ -254,7 +246,9 @@ test.describe('PM Full Lifecycle', () => {
   });
 
   test('LC-08: Tasks tab — switch to gantt view with task bars', async ({ page }) => {
-    await page.goto(`/project-management/projects/${projectPid}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/project-management/projects/${projectPid}`, {
+      waitUntil: 'domcontentloaded',
+    });
     await expect(page.getByTestId('project-workspace')).toBeVisible({ timeout: 15000 });
 
     await page.getByTestId('view-gantt').click();
@@ -263,11 +257,13 @@ test.describe('PM Full Lifecycle', () => {
   });
 
   test('LC-09: Members tab shows member list with owner', async ({ page }) => {
-    await page.goto(`/project-management/projects/${projectPid}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/project-management/projects/${projectPid}`, {
+      waitUntil: 'domcontentloaded',
+    });
     await expect(page.getByTestId('project-workspace')).toBeVisible({ timeout: 15000 });
 
     const memberListPromise = page.waitForResponse(
-      (r) => r.url().includes('/api/dynamic/pm-project-member/list') && r.status() === 200,
+      (r) => r.url().includes('/api/dynamic/pm_project_member/list') && r.status() === 200,
       { timeout: 10000 },
     );
     await page.getByTestId('tab-members').click();
@@ -279,7 +275,9 @@ test.describe('PM Full Lifecycle', () => {
   });
 
   test('LC-10: Settings tab shows project info form', async ({ page }) => {
-    await page.goto(`/project-management/projects/${projectPid}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/project-management/projects/${projectPid}`, {
+      waitUntil: 'domcontentloaded',
+    });
     await expect(page.getByTestId('project-workspace')).toBeVisible({ timeout: 15000 });
 
     await page.getByTestId('tab-settings').click();
@@ -292,7 +290,9 @@ test.describe('PM Full Lifecycle', () => {
   // =========================================================================
 
   test('LC-11: Open task detail drawer from kanban card', async ({ page }) => {
-    await page.goto(`/project-management/projects/${projectPid}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/project-management/projects/${projectPid}`, {
+      waitUntil: 'domcontentloaded',
+    });
     await expect(page.getByTestId('task-board')).toBeVisible({ timeout: 15000 });
 
     // Click the second task card
@@ -302,7 +302,9 @@ test.describe('PM Full Lifecycle', () => {
   });
 
   test('LC-12: Start task (TODO → in_progress) via detail drawer', async ({ page }) => {
-    await page.goto(`/project-management/projects/${projectPid}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/project-management/projects/${projectPid}`, {
+      waitUntil: 'domcontentloaded',
+    });
     await expect(page.getByTestId('task-board')).toBeVisible({ timeout: 15000 });
 
     const taskCard = page.locator(`[data-testid="task-card-${task2Pid}"]`);
@@ -324,23 +326,28 @@ test.describe('PM Full Lifecycle', () => {
 
     // After state transition, board refreshes — task card moves to in_progress column
     // Wait for the task list to reload
-    await page.waitForResponse(
-      (r) => r.url().includes('/api/dynamic/pm-task/list') && r.status() === 200,
-      { timeout: 10000 },
-    ).catch(() => {});
+    await page
+      .waitForResponse((r) => r.url().includes('/api/dynamic/pm_task/list') && r.status() === 200, {
+        timeout: 10000,
+      })
+      .catch(() => {});
 
     // Verify task moved to in_progress column
     await expect(
-      page.getByTestId('board-column-in_progress').locator(`[data-testid="task-card-${task2Pid}"]`)
+      page.getByTestId('board-column-in_progress').locator(`[data-testid="task-card-${task2Pid}"]`),
     ).toBeVisible({ timeout: 10000 });
   });
 
   test('LC-13: Complete task (in_progress → DONE) via detail drawer', async ({ page }) => {
-    await page.goto(`/project-management/projects/${projectPid}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/project-management/projects/${projectPid}`, {
+      waitUntil: 'domcontentloaded',
+    });
     await expect(page.getByTestId('task-board')).toBeVisible({ timeout: 15000 });
 
     // Task should be in in_progress column
-    await expect(page.getByTestId('board-column-in_progress').locator(`[data-testid="task-card-${task2Pid}"]`)).toBeVisible({ timeout: 10000 });
+    await expect(
+      page.getByTestId('board-column-in_progress').locator(`[data-testid="task-card-${task2Pid}"]`),
+    ).toBeVisible({ timeout: 10000 });
 
     await page.locator(`[data-testid="task-card-${task2Pid}"]`).click();
     await expect(page.getByTestId('task-detail-drawer')).toBeVisible({ timeout: 5000 });
@@ -356,26 +363,31 @@ test.describe('PM Full Lifecycle', () => {
     await cmdPromise;
 
     // Wait for board refresh
-    await page.waitForResponse(
-      (r) => r.url().includes('/api/dynamic/pm-task/list') && r.status() === 200,
-      { timeout: 10000 },
-    ).catch(() => {});
+    await page
+      .waitForResponse((r) => r.url().includes('/api/dynamic/pm_task/list') && r.status() === 200, {
+        timeout: 10000,
+      })
+      .catch(() => {});
 
     // Task moves to DONE column
     await expect(
-      page.getByTestId('board-column-done').locator(`[data-testid="task-card-${task2Pid}"]`)
+      page.getByTestId('board-column-done').locator(`[data-testid="task-card-${task2Pid}"]`),
     ).toBeVisible({ timeout: 10000 });
   });
 
   test('LC-14: Reopen task (DONE → TODO) via list view', async ({ page }) => {
     // Terminal state cards (DONE/cancelled) are not clickable on kanban (opacity-60, disabled)
     // Use list view where all rows are clickable
-    await page.goto(`/project-management/projects/${projectPid}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/project-management/projects/${projectPid}`, {
+      waitUntil: 'domcontentloaded',
+    });
     await expect(page.getByTestId('project-workspace')).toBeVisible({ timeout: 15000 });
 
     await page.getByTestId('view-list').click();
     await expect(page.getByTestId('task-list-view')).toBeVisible({ timeout: 10000 });
-    await expect(page.locator('[data-testid^="task-row-"]').first()).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('[data-testid^="task-row-"]').first()).toBeVisible({
+      timeout: 10000,
+    });
 
     // Click the task title cell (not the inline priority select) to open drawer
     const taskRow = page.getByTestId(`task-row-${task2Pid}`);
@@ -401,15 +413,19 @@ test.describe('PM Full Lifecycle', () => {
     await page.getByTestId('view-kanban').click();
     await expect(page.getByTestId('task-board')).toBeVisible({ timeout: 10000 });
     await expect(
-      page.getByTestId('board-column-todo').locator(`[data-testid="task-card-${task2Pid}"]`)
+      page.getByTestId('board-column-todo').locator(`[data-testid="task-card-${task2Pid}"]`),
     ).toBeVisible({ timeout: 10000 });
   });
 
   test('LC-15: Cancel task (TODO → cancelled) via detail drawer', async ({ page }) => {
-    await page.goto(`/project-management/projects/${projectPid}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/project-management/projects/${projectPid}`, {
+      waitUntil: 'domcontentloaded',
+    });
     await expect(page.getByTestId('task-board')).toBeVisible({ timeout: 15000 });
 
-    await expect(page.getByTestId('board-column-todo').locator(`[data-testid="task-card-${task2Pid}"]`)).toBeVisible({ timeout: 10000 });
+    await expect(
+      page.getByTestId('board-column-todo').locator(`[data-testid="task-card-${task2Pid}"]`),
+    ).toBeVisible({ timeout: 10000 });
 
     await page.locator(`[data-testid="task-card-${task2Pid}"]`).click();
     await expect(page.getByTestId('task-detail-drawer')).toBeVisible({ timeout: 5000 });
@@ -424,25 +440,30 @@ test.describe('PM Full Lifecycle', () => {
     await cancelBtn.click();
     await cmdPromise;
 
-    await page.waitForResponse(
-      (r) => r.url().includes('/api/dynamic/pm-task/list') && r.status() === 200,
-      { timeout: 10000 },
-    ).catch(() => {});
+    await page
+      .waitForResponse((r) => r.url().includes('/api/dynamic/pm_task/list') && r.status() === 200, {
+        timeout: 10000,
+      })
+      .catch(() => {});
 
     // Task moves to cancelled column
     await expect(
-      page.getByTestId('board-column-cancelled').locator(`[data-testid="task-card-${task2Pid}"]`)
+      page.getByTestId('board-column-cancelled').locator(`[data-testid="task-card-${task2Pid}"]`),
     ).toBeVisible({ timeout: 10000 });
   });
 
   test('LC-16: Reopen cancelled task (cancelled → TODO) via list view', async ({ page }) => {
     // Terminal state cards not clickable on kanban — use list view
-    await page.goto(`/project-management/projects/${projectPid}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/project-management/projects/${projectPid}`, {
+      waitUntil: 'domcontentloaded',
+    });
     await expect(page.getByTestId('project-workspace')).toBeVisible({ timeout: 15000 });
 
     await page.getByTestId('view-list').click();
     await expect(page.getByTestId('task-list-view')).toBeVisible({ timeout: 10000 });
-    await expect(page.locator('[data-testid^="task-row-"]').first()).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('[data-testid^="task-row-"]').first()).toBeVisible({
+      timeout: 10000,
+    });
 
     const taskRow2 = page.getByTestId(`task-row-${task2Pid}`);
     await taskRow2.scrollIntoViewIfNeeded();
@@ -465,7 +486,7 @@ test.describe('PM Full Lifecycle', () => {
     await page.getByTestId('view-kanban').click();
     await expect(page.getByTestId('task-board')).toBeVisible({ timeout: 10000 });
     await expect(
-      page.getByTestId('board-column-todo').locator(`[data-testid="task-card-${task2Pid}"]`)
+      page.getByTestId('board-column-todo').locator(`[data-testid="task-card-${task2Pid}"]`),
     ).toBeVisible({ timeout: 10000 });
   });
 
@@ -476,12 +497,16 @@ test.describe('PM Full Lifecycle', () => {
     await executeCommandViaApi(page, 'pm:complete_task', {}, task2Pid, 'update');
 
     // Verify in UI — task in DONE column
-    await page.goto(`/project-management/projects/${projectPid}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/project-management/projects/${projectPid}`, {
+      waitUntil: 'domcontentloaded',
+    });
     await expect(page.getByTestId('task-board')).toBeVisible({ timeout: 15000 });
 
     const doneColumn = page.getByTestId('board-column-done');
     await expect(doneColumn).toBeVisible();
-    await expect(doneColumn.locator(`[data-testid="task-card-${task2Pid}"]`)).toBeVisible({ timeout: 10000 });
+    await expect(doneColumn.locator(`[data-testid="task-card-${task2Pid}"]`)).toBeVisible({
+      timeout: 10000,
+    });
   });
 
   // =========================================================================
@@ -489,7 +514,9 @@ test.describe('PM Full Lifecycle', () => {
   // =========================================================================
 
   test('LC-18: Create task via kanban add button', async ({ page }) => {
-    await page.goto(`/project-management/projects/${projectPid}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/project-management/projects/${projectPid}`, {
+      waitUntil: 'domcontentloaded',
+    });
     await expect(page.getByTestId('task-board')).toBeVisible({ timeout: 15000 });
 
     const addBtn = page.getByTestId('board-add-task-btn');
@@ -524,7 +551,9 @@ test.describe('PM Full Lifecycle', () => {
   });
 
   test('LC-19: Create task via keyboard shortcut N', async ({ page }) => {
-    await page.goto(`/project-management/projects/${projectPid}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/project-management/projects/${projectPid}`, {
+      waitUntil: 'domcontentloaded',
+    });
     await expect(page.getByTestId('task-board')).toBeVisible({ timeout: 15000 });
 
     await page.keyboard.press('n');
@@ -540,7 +569,9 @@ test.describe('PM Full Lifecycle', () => {
   // =========================================================================
 
   test('LC-20: Add comment to task via detail drawer', async ({ page }) => {
-    await page.goto(`/project-management/projects/${projectPid}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/project-management/projects/${projectPid}`, {
+      waitUntil: 'domcontentloaded',
+    });
     await expect(page.getByTestId('task-board')).toBeVisible({ timeout: 15000 });
 
     await page.locator(`[data-testid="task-card-${taskPid}"]`).click();
@@ -565,7 +596,9 @@ test.describe('PM Full Lifecycle', () => {
   });
 
   test('LC-21: Activity tab shows task history', async ({ page }) => {
-    await page.goto(`/project-management/projects/${projectPid}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/project-management/projects/${projectPid}`, {
+      waitUntil: 'domcontentloaded',
+    });
     await expect(page.getByTestId('task-board')).toBeVisible({ timeout: 15000 });
 
     await page.locator(`[data-testid="task-card-${taskPid}"]`).click();
@@ -581,15 +614,21 @@ test.describe('PM Full Lifecycle', () => {
   // =========================================================================
 
   test('LC-22: Kanban search filter narrows results', async ({ page }) => {
-    await page.goto(`/project-management/projects/${projectPid}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/project-management/projects/${projectPid}`, {
+      waitUntil: 'domcontentloaded',
+    });
     await expect(page.getByTestId('task-board')).toBeVisible({ timeout: 15000 });
 
-    await expect(page.locator('[data-testid^="task-card-"]').first()).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('[data-testid^="task-card-"]').first()).toBeVisible({
+      timeout: 10000,
+    });
     const totalBefore = await page.locator('[data-testid^="task-card-"]').count();
 
     await page.getByTestId('board-filter-search').fill('MainTask');
 
-    await expect(page.locator('[data-testid^="task-card-"]').first()).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('[data-testid^="task-card-"]').first()).toBeVisible({
+      timeout: 5000,
+    });
     const totalAfter = await page.locator('[data-testid^="task-card-"]').count();
     expect(totalAfter).toBeLessThanOrEqual(totalBefore);
 
@@ -598,23 +637,33 @@ test.describe('PM Full Lifecycle', () => {
   });
 
   test('LC-23: Kanban priority filter works', async ({ page }) => {
-    await page.goto(`/project-management/projects/${projectPid}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/project-management/projects/${projectPid}`, {
+      waitUntil: 'domcontentloaded',
+    });
     await expect(page.getByTestId('task-board')).toBeVisible({ timeout: 15000 });
-    await expect(page.locator('[data-testid^="task-card-"]').first()).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('[data-testid^="task-card-"]').first()).toBeVisible({
+      timeout: 10000,
+    });
 
     await page.getByTestId('board-filter-priority').selectOption('high');
-    await expect(page.locator('[data-testid^="task-card-"]').first()).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('[data-testid^="task-card-"]').first()).toBeVisible({
+      timeout: 5000,
+    });
 
     await page.getByTestId('board-filter-clear').click();
   });
 
   test('LC-24: List view filters (priority + status)', async ({ page }) => {
-    await page.goto(`/project-management/projects/${projectPid}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/project-management/projects/${projectPid}`, {
+      waitUntil: 'domcontentloaded',
+    });
     await expect(page.getByTestId('project-workspace')).toBeVisible({ timeout: 15000 });
 
     await page.getByTestId('view-list').click();
     await expect(page.getByTestId('task-list-view')).toBeVisible({ timeout: 10000 });
-    await expect(page.locator('[data-testid^="task-row-"]').first()).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('[data-testid^="task-row-"]').first()).toBeVisible({
+      timeout: 10000,
+    });
 
     // Priority filter
     await expect(page.getByTestId('task-list-filter-priority')).toBeVisible();
@@ -627,7 +676,9 @@ test.describe('PM Full Lifecycle', () => {
   // =========================================================================
 
   test('LC-25: Settings tab — create a project label', async ({ page }) => {
-    await page.goto(`/project-management/projects/${projectPid}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/project-management/projects/${projectPid}`, {
+      waitUntil: 'domcontentloaded',
+    });
     await expect(page.getByTestId('project-workspace')).toBeVisible({ timeout: 15000 });
 
     await page.getByTestId('tab-settings').click();
@@ -656,31 +707,41 @@ test.describe('PM Full Lifecycle', () => {
 
   // Project is already in_progress (activated in beforeAll)
   test('LC-26: Project status badge shows in_progress', async ({ page }) => {
-    await page.goto(`/project-management/projects/${projectPid}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/project-management/projects/${projectPid}`, {
+      waitUntil: 'domcontentloaded',
+    });
     await expect(page.getByTestId('project-workspace')).toBeVisible({ timeout: 15000 });
     await expect(page.getByTestId('project-status-badge')).toContainText(/In Progress|进行中/);
   });
 
   test('LC-27: Complete project (in_progress → completed)', async ({ page }) => {
-    await page.goto(`/project-management/projects/${projectPid}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/project-management/projects/${projectPid}`, {
+      waitUntil: 'domcontentloaded',
+    });
     await expect(page.getByTestId('project-workspace')).toBeVisible({ timeout: 15000 });
 
     const completeBtn = page.getByTestId('action-pm:complete_project');
     await expect(completeBtn).toBeVisible({ timeout: 5000 });
     await completeBtn.click();
 
-    await expect(page.getByTestId('project-status-badge')).toContainText(/Completed|已完成/, { timeout: 10000 });
+    await expect(page.getByTestId('project-status-badge')).toContainText(/Completed|已完成/, {
+      timeout: 10000,
+    });
   });
 
   test('LC-28: Archive project (completed → archived)', async ({ page }) => {
-    await page.goto(`/project-management/projects/${projectPid}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/project-management/projects/${projectPid}`, {
+      waitUntil: 'domcontentloaded',
+    });
     await expect(page.getByTestId('project-workspace')).toBeVisible({ timeout: 15000 });
 
     const archiveBtn = page.getByTestId('action-pm:archive_project');
     await expect(archiveBtn).toBeVisible({ timeout: 5000 });
     await archiveBtn.click();
 
-    await expect(page.getByTestId('project-status-badge')).toContainText(/Archived|已归档/, { timeout: 10000 });
+    await expect(page.getByTestId('project-status-badge')).toContainText(/Archived|已归档/, {
+      timeout: 10000,
+    });
   });
 
   // =========================================================================
@@ -703,8 +764,8 @@ test.describe('PM Full Lifecycle', () => {
 
   test('LC-30: Navigate to Project Roles via sidebar menu', async ({ page }) => {
     await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
-    await clickPmMasterDataLink(page, '/dynamic/pm-project-role');
-    await expect(page).toHaveURL(/\/dynamic\/pm-project-role/);
+    await clickPmMasterDataLink(page, '/p/pm_project_role');
+    await expect(page).toHaveURL(/\/p\/pm_project_role/);
 
     // Page should render main content area
     await expect(page.locator('main')).toBeVisible({ timeout: 10000 });

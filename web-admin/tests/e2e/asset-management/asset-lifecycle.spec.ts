@@ -55,28 +55,21 @@ async function expandAssetMenu(page: Page): Promise<void> {
   await page.waitForResponse(() => true, { timeout: 2000 }).catch(() => null);
 }
 
-async function navigateToAssetPage(
-  page: Page,
-  path: string,
-  modelUrl: string,
-): Promise<void> {
+async function navigateToAssetPage(page: Page, path: string, modelUrl: string): Promise<void> {
   await expandAssetMenu(page);
   const nav = page.locator('nav');
   const link = nav.locator(`a[href="${path}"]`).first();
   await link.waitFor({ state: 'attached', timeout: 8000 });
   await link.scrollIntoViewIfNeeded();
 
-  const listResp = page.waitForResponse(
-    (r) => r.url().includes(modelUrl) && r.status() === 200,
-    { timeout: 15000 },
-  ).catch(() => null);
+  const listResp = page
+    .waitForResponse((r) => r.url().includes(modelUrl) && r.status() === 200, { timeout: 15000 })
+    .catch(() => null);
 
   await link.evaluate((el: HTMLElement) => el.click());
   await listResp;
 
-  await expect(
-    page.locator('table, [class*="ant-table"]').first(),
-  ).toBeVisible({ timeout: 10000 });
+  await expect(page.locator('table, [class*="ant-table"]').first()).toBeVisible({ timeout: 10000 });
 }
 
 // ---------------------------------------------------------------------------
@@ -95,7 +88,8 @@ test.describe('Asset Management — Lifecycle @critical', () => {
     const page = await ctx.newPage();
     try {
       const resp = await page.request.get('/api/meta/models/code/asset');
-      pluginInstalled = resp.ok();
+      const body = await resp.json().catch(() => ({}));
+      pluginInstalled = resp.ok() && body?.data?.status === 'published';
     } catch {
       pluginInstalled = false;
     } finally {
@@ -109,7 +103,10 @@ test.describe('Asset Management — Lifecycle @critical', () => {
 
   test('AM-L001: sidebar → 资产台账 list loads with data', async ({ page }) => {
     if (!pluginInstalled) {
-      test.skip(true, 'asset-management plugin not installed — run: aura plugin publish plugins/asset-management');
+      test.skip(
+        true,
+        'asset-management plugin not installed — run: aura plugin publish plugins/asset-management',
+      );
       return;
     }
 
@@ -122,8 +119,12 @@ test.describe('Asset Management — Lifecycle @critical', () => {
     expect(body.code).toBe('0');
 
     // Table must be visible
-    await expect(page.locator('table, [class*="ant-table"]').first()).toBeVisible({ timeout: 10000 });
-    await expect(page.locator('text=Access forbidden')).not.toBeVisible({ timeout: 2000 }).catch(() => {});
+    await expect(page.locator('table, [class*="ant-table"]').first()).toBeVisible({
+      timeout: 10000,
+    });
+    await expect(page.locator('text=Access forbidden'))
+      .not.toBeVisible({ timeout: 2000 })
+      .catch(() => {});
   });
 
   test('AM-L002: sidebar → 维保记录 list loads without error', async ({ page }) => {
@@ -134,8 +135,12 @@ test.describe('Asset Management — Lifecycle @critical', () => {
 
     await navigateToAssetPage(page, '/asset/maintenance', '/api/dynamic/asset_maintenance');
 
-    await expect(page.locator('table, [class*="ant-table"]').first()).toBeVisible({ timeout: 10000 });
-    await expect(page.locator('text=Access forbidden')).not.toBeVisible({ timeout: 2000 }).catch(() => {});
+    await expect(page.locator('table, [class*="ant-table"]').first()).toBeVisible({
+      timeout: 10000,
+    });
+    await expect(page.locator('text=Access forbidden'))
+      .not.toBeVisible({ timeout: 2000 })
+      .catch(() => {});
   });
 
   test('AM-L003: sidebar → 折旧记录 list loads without error', async ({ page }) => {
@@ -146,8 +151,12 @@ test.describe('Asset Management — Lifecycle @critical', () => {
 
     await navigateToAssetPage(page, '/asset/depreciation', '/api/dynamic/asset_depreciation');
 
-    await expect(page.locator('table, [class*="ant-table"]').first()).toBeVisible({ timeout: 10000 });
-    await expect(page.locator('text=Access forbidden')).not.toBeVisible({ timeout: 2000 }).catch(() => {});
+    await expect(page.locator('table, [class*="ant-table"]').first()).toBeVisible({
+      timeout: 10000,
+    });
+    await expect(page.locator('text=Access forbidden'))
+      .not.toBeVisible({ timeout: 2000 })
+      .catch(() => {});
   });
 
   test('AM-L004: sidebar → 调拨记录 list loads without error', async ({ page }) => {
@@ -158,8 +167,12 @@ test.describe('Asset Management — Lifecycle @critical', () => {
 
     await navigateToAssetPage(page, '/asset/transfers', '/api/dynamic/asset_transfer');
 
-    await expect(page.locator('table, [class*="ant-table"]').first()).toBeVisible({ timeout: 10000 });
-    await expect(page.locator('text=Access forbidden')).not.toBeVisible({ timeout: 2000 }).catch(() => {});
+    await expect(page.locator('table, [class*="ant-table"]').first()).toBeVisible({
+      timeout: 10000,
+    });
+    await expect(page.locator('text=Access forbidden'))
+      .not.toBeVisible({ timeout: 2000 })
+      .catch(() => {});
   });
 
   // =========================================================================
@@ -200,11 +213,11 @@ test.describe('Asset Management — Lifecycle @critical', () => {
     const body1 = await detail1.json();
     expect(body1.data.asset_name).toContain(UID);
 
-    // Activate the asset
+    // Activate the asset (state_transition: stateField+toState in command config handles the update)
     const activateResult = await executeCommandViaApi(
       page,
       'asset:activate',
-      { asset_status: 'in_use' },
+      {},
       primaryAssetPid,
       'update',
     );
@@ -236,7 +249,7 @@ test.describe('Asset Management — Lifecycle @critical', () => {
     const result = await executeCommandViaApi(
       page,
       'asset:start_maintenance',
-      { asset_status: 'under_maintenance' },
+      {},
       primaryAssetPid,
       'update',
     );
@@ -275,7 +288,9 @@ test.describe('Asset Management — Lifecycle @critical', () => {
     // Navigate to maintenance list — record should be visible
     await navigateToAssetPage(page, '/asset/maintenance', '/api/dynamic/asset_maintenance');
 
-    const maintListResp = await page.request.get('/api/dynamic/asset_maintenance/list?pageNum=1&pageSize=50');
+    const maintListResp = await page.request.get(
+      '/api/dynamic/asset_maintenance/list?pageNum=1&pageSize=50',
+    );
     expect(maintListResp.status()).toBe(200);
     const maintListBody = await maintListResp.json();
     const found = (maintListBody.data.records as Array<{ pid: string }>).find(
@@ -296,7 +311,7 @@ test.describe('Asset Management — Lifecycle @critical', () => {
     const completeMaint = await executeCommandViaApi(
       page,
       'asset_maintenance:complete',
-      { maintenance_status: 'completed' },
+      {},
       maintenancePid,
       'update',
     );
@@ -306,7 +321,7 @@ test.describe('Asset Management — Lifecycle @critical', () => {
     const completeAsset = await executeCommandViaApi(
       page,
       'asset:complete_maintenance',
-      { asset_status: 'in_use' },
+      {},
       primaryAssetPid,
       'update',
     );
@@ -333,7 +348,7 @@ test.describe('Asset Management — Lifecycle @critical', () => {
     const result = await executeCommandViaApi(
       page,
       'asset:set_idle',
-      { asset_status: 'idle' },
+      {},
       primaryAssetPid,
       'update',
     );
@@ -344,7 +359,9 @@ test.describe('Asset Management — Lifecycle @critical', () => {
     expect(body.data.asset_status).toBe('idle');
   });
 
-  test('AM-L009: dispose asset → status becomes disposed, cannot be reactivated', async ({ page }) => {
+  test('AM-L009: dispose asset → status becomes disposed, cannot be reactivated', async ({
+    page,
+  }) => {
     if (!pluginInstalled) {
       test.skip(true, 'asset-management plugin not installed');
       return;
@@ -355,7 +372,6 @@ test.describe('Asset Management — Lifecycle @critical', () => {
       page,
       'asset:dispose',
       {
-        asset_status: 'disposed',
         scrap_reason: `E2E test disposal - end of lifecycle ${UID}`,
       },
       primaryAssetPid,
@@ -369,14 +385,16 @@ test.describe('Asset Management — Lifecycle @critical', () => {
     expect(body.data.asset_status).toBe('disposed');
     expect(body.data.scrap_reason).toContain(UID);
 
-    // Attempt to reactivate should fail (state machine restriction)
-    const reactivateResp = await page.request.post('/api/meta/commands/execute/asset:activate', {
-      data: {
-        targetRecordId: primaryAssetPid,
-        operationType: 'update',
-        payload: { asset_status: 'in_use' },
-      },
-    }).catch(() => null);
+    // Attempt to reactivate should fail (fromStates restriction: disposed is not in fromStates)
+    const reactivateResp = await page.request
+      .post('/api/meta/commands/execute/asset:activate', {
+        data: {
+          targetRecordId: primaryAssetPid,
+          operationType: 'update',
+          payload: {},
+        },
+      })
+      .catch(() => null);
 
     if (reactivateResp) {
       // If the backend enforces state machine, it should return 4xx
@@ -452,7 +470,9 @@ test.describe('Asset Management — Lifecycle @critical', () => {
     // Navigate to transfers list and verify
     await navigateToAssetPage(page, '/asset/transfers', '/api/dynamic/asset_transfer');
 
-    const listResp = await page.request.get('/api/dynamic/asset_transfer/list?pageNum=1&pageSize=50');
+    const listResp = await page.request.get(
+      '/api/dynamic/asset_transfer/list?pageNum=1&pageSize=50',
+    );
     expect(listResp.status()).toBe(200);
     const listBody = await listResp.json();
     const found = (listBody.data.records as Array<{ pid: string }>).find(
@@ -517,12 +537,12 @@ test.describe('Asset Management — Lifecycle @critical', () => {
     await navigateToAssetPage(page, '/asset/depreciation', '/api/dynamic/asset_depreciation');
 
     // Verify list has data
-    const listResp = await page.request.get('/api/dynamic/asset_depreciation/list?pageNum=1&pageSize=50');
+    const listResp = await page.request.get(
+      '/api/dynamic/asset_depreciation/list?pageNum=1&pageSize=50',
+    );
     expect(listResp.status()).toBe(200);
     const listBody = await listResp.json();
-    const found = (listBody.data.records as Array<{ pid: string }>).find(
-      (r) => r.pid === deprPid,
-    );
+    const found = (listBody.data.records as Array<{ pid: string }>).find((r) => r.pid === deprPid);
     expect(found, 'Depreciation record should appear in list').toBeTruthy();
   });
 
@@ -530,7 +550,9 @@ test.describe('Asset Management — Lifecycle @critical', () => {
   // Additional: Filter, Dashboard, UI Elements
   // =========================================================================
 
-  test('AM-L012: asset list filter by status=in_use returns only in_use records', async ({ page }) => {
+  test('AM-L012: asset list filter by status=in_use returns only in_use records', async ({
+    page,
+  }) => {
     if (!pluginInstalled) {
       test.skip(true, 'asset-management plugin not installed');
       return;
@@ -566,11 +588,15 @@ test.describe('Asset Management — Lifecycle @critical', () => {
 
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => null);
 
-    await expect(page.locator('text=Access forbidden')).not.toBeVisible({ timeout: 2000 }).catch(() => {});
-    await expect(page.locator('text=Page not found')).not.toBeVisible({ timeout: 2000 }).catch(() => {});
+    await expect(page.locator('text=Access forbidden'))
+      .not.toBeVisible({ timeout: 2000 })
+      .catch(() => {});
+    await expect(page.locator('text=Page not found'))
+      .not.toBeVisible({ timeout: 2000 })
+      .catch(() => {});
 
     const bodyText = await page.locator('body').textContent({ timeout: 5000 });
-    expect((bodyText?.length ?? 0)).toBeGreaterThan(50);
+    expect(bodyText?.length ?? 0).toBeGreaterThan(50);
   });
 
   test('AM-L014: asset list has create button and correct column headers', async ({ page }) => {

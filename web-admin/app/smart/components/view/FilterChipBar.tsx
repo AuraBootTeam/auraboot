@@ -73,8 +73,8 @@ const FilterChip = React.memo<FilterChipProps>(function FilterChip({ filter, lab
     <span
       className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm leading-5 ${
         hasValue || isUnary
-          ? 'bg-blue-50 border border-blue-200 text-blue-800'
-          : 'bg-white border border-gray-200 text-gray-600'
+          ? 'border border-blue-200 bg-blue-50 text-blue-800'
+          : 'border border-gray-200 bg-white text-gray-600'
       }`}
     >
       <span className="font-medium">{label}</span>
@@ -86,7 +86,7 @@ const FilterChip = React.memo<FilterChipProps>(function FilterChip({ filter, lab
           e.stopPropagation();
           onRemove();
         }}
-        className="ml-0.5 inline-flex items-center justify-center rounded hover:bg-blue-200/60 w-4 h-4 text-blue-400 hover:text-blue-700 transition-colors"
+        className="ml-0.5 inline-flex h-4 w-4 items-center justify-center rounded text-blue-400 transition-colors hover:bg-blue-200/60 hover:text-blue-700"
         aria-label={`Remove filter ${label}`}
       >
         &times;
@@ -107,7 +107,7 @@ const SortChip = React.memo<SortChipProps>(function SortChip({ sort, label, onRe
 
   return (
     <span
-      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm leading-5 bg-amber-50 border border-amber-200 text-amber-800 cursor-pointer select-none"
+      className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-sm leading-5 text-amber-800 select-none"
       onClick={onToggle}
       role="button"
       tabIndex={0}
@@ -127,7 +127,7 @@ const SortChip = React.memo<SortChipProps>(function SortChip({ sort, label, onRe
           e.stopPropagation();
           onRemove();
         }}
-        className="ml-0.5 inline-flex items-center justify-center rounded hover:bg-amber-200/60 w-4 h-4 text-amber-400 hover:text-amber-700 transition-colors"
+        className="ml-0.5 inline-flex h-4 w-4 items-center justify-center rounded text-amber-400 transition-colors hover:bg-amber-200/60 hover:text-amber-700"
         aria-label={`Remove sort ${label}`}
       >
         &times;
@@ -159,10 +159,7 @@ export const FilterChipBar = React.memo<FilterChipBarProps>(function FilterChipB
     return map;
   }, [fieldMetadata]);
 
-  const resolveLabel = useCallback(
-    (code: string) => labelMap.get(code) ?? code,
-    [labelMap],
-  );
+  const resolveLabel = useCallback((code: string) => labelMap.get(code) ?? code, [labelMap]);
 
   const handleRemoveFilter = useCallback(
     (index: number) => {
@@ -181,7 +178,9 @@ export const FilterChipBar = React.memo<FilterChipBarProps>(function FilterChipB
   const handleToggleSortDirection = useCallback(
     (index: number) => {
       const updated = sorts.map((s, i) =>
-        i === index ? { ...s, direction: s.direction === 'asc' ? 'desc' as const : 'asc' as const } : s,
+        i === index
+          ? { ...s, direction: s.direction === 'asc' ? ('desc' as const) : ('asc' as const) }
+          : s,
       );
       onSortsChange(updated);
     },
@@ -194,7 +193,7 @@ export const FilterChipBar = React.memo<FilterChipBarProps>(function FilterChipB
   // Always render — "Add Filter" button must be accessible even when no filters/sorts active
 
   return (
-    <div className="flex items-center gap-2 flex-wrap border-b border-gray-100 bg-gray-50/50 px-6 py-2">
+    <div className="flex flex-wrap items-center gap-2 border-b border-gray-100 bg-gray-50/50 px-6 py-2">
       {/* Filter chips */}
       {filters.map((f, idx) => (
         <span
@@ -211,7 +210,7 @@ export const FilterChipBar = React.memo<FilterChipBarProps>(function FilterChipB
       ))}
 
       {/* Separator between filters and sorts */}
-      {hasFilters && hasSorts && <div className="w-px h-6 bg-gray-200 mx-1" />}
+      {hasFilters && hasSorts && <div className="mx-1 h-6 w-px bg-gray-200" />}
 
       {/* Sort chips */}
       {sorts.map((s, idx) => (
@@ -225,13 +224,13 @@ export const FilterChipBar = React.memo<FilterChipBarProps>(function FilterChipB
       ))}
 
       {/* Separator before actions */}
-      {(hasFilters || hasSorts) && <div className="w-px h-6 bg-gray-200 mx-1" />}
+      {(hasFilters || hasSorts) && <div className="mx-1 h-6 w-px bg-gray-200" />}
 
       {/* Add Filter button */}
       <button
         type="button"
         onClick={(e) => onAddFilter(e)}
-        className="inline-flex items-center gap-0.5 rounded-md border border-dashed border-blue-300 bg-white px-2 py-1 text-sm text-blue-600 hover:bg-blue-50 hover:border-blue-400 transition-colors"
+        className="inline-flex items-center gap-0.5 rounded-md border border-dashed border-blue-300 bg-white px-2 py-1 text-sm text-blue-600 transition-colors hover:border-blue-400 hover:bg-blue-50"
       >
         + Add Filter
       </button>
@@ -241,7 +240,7 @@ export const FilterChipBar = React.memo<FilterChipBarProps>(function FilterChipB
         <button
           type="button"
           onClick={onClearAll}
-          className="text-sm text-gray-400 hover:text-red-500 transition-colors ml-1"
+          className="ml-1 text-sm text-gray-400 transition-colors hover:text-red-500"
         >
           Clear All
         </button>

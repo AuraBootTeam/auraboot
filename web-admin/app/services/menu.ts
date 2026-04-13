@@ -77,7 +77,7 @@ export async function getUserMenus(request: Request): Promise<any[]> {
   }
 
   try {
-    const apiUrl = process.env.SPRING_BOOT_URL;
+    const apiUrl = process.env.SPRING_BOOT_URL || 'http://127.0.0.1:6443';
     const url = `${apiUrl}/api/menu/user`;
 
     const response = await fetch(url, {

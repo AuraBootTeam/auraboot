@@ -223,10 +223,7 @@ async function selectFieldOption(
   await option.click();
 }
 
-async function selectFirstFieldOption(
-  page: import('@playwright/test').Page,
-  fieldCode: string,
-) {
+async function selectFirstFieldOption(page: import('@playwright/test').Page, fieldCode: string) {
   const trigger = page
     .locator(
       `[data-testid="select-trigger-${fieldCode}"], [data-testid="form-field-${fieldCode}"] [role="combobox"], [data-field="${fieldCode}"] [role="combobox"]`,
@@ -235,9 +232,7 @@ async function selectFirstFieldOption(
   await trigger.waitFor({ state: 'visible', timeout: 5000 });
   await trigger.click();
 
-  const option = page
-    .locator('[role="option"], [cmdk-item], [data-slot="select-item"]')
-    .first();
+  const option = page.locator('[role="option"], [cmdk-item], [data-slot="select-item"]').first();
   await option.waitFor({ state: 'visible', timeout: 5000 });
   await option.click();
 }
@@ -342,7 +337,7 @@ test.describe('PCBA SRM Extended', () => {
 
     // Fallback: query existing product if creation failed
     if (!sharedRefs.productPid) {
-      const resp = await p.request.get('/api/dynamic/prod-product/list?pageSize=1');
+      const resp = await p.request.get('/api/dynamic/prod_product/list?pageSize=1');
       if (resp.ok()) {
         const body = await resp.json();
         const rec = body?.data?.records?.[0];
@@ -355,7 +350,7 @@ test.describe('PCBA SRM Extended', () => {
 
     // Fallback: query existing supplier if creation failed
     if (!sharedRefs.supplierPid) {
-      const resp = await p.request.get('/api/dynamic/pe-supplier/list?pageSize=1');
+      const resp = await p.request.get('/api/dynamic/pe_supplier/list?pageSize=1');
       if (resp.ok()) {
         const body = await resp.json();
         const rec = body?.data?.records?.[0];
@@ -425,7 +420,12 @@ test.describe('PCBA SRM Extended', () => {
       expect(Number(record.pe_sp_unit_price)).toBeCloseTo(unitPrice, 1);
 
       // Verify in list using remark as the findable text
-      const records = await queryFilteredList(page, PAGE_KEYS.supplierPrice, 'pe_sp_remark', remark);
+      const records = await queryFilteredList(
+        page,
+        PAGE_KEYS.supplierPrice,
+        'pe_sp_remark',
+        remark,
+      );
       expect(records.length).toBeGreaterThan(0);
     });
 
@@ -463,7 +463,12 @@ test.describe('PCBA SRM Extended', () => {
       });
 
       // UI verification: query list API to find the record
-      const records = await queryFilteredList(page, PAGE_KEYS.supplierPrice, 'pe_sp_remark', remark);
+      const records = await queryFilteredList(
+        page,
+        PAGE_KEYS.supplierPrice,
+        'pe_sp_remark',
+        remark,
+      );
       expect(records.length).toBeGreaterThan(0);
     });
 
@@ -499,16 +504,24 @@ test.describe('PCBA SRM Extended', () => {
       bucket.supplierPrices.push(result.recordId);
 
       // Verify record exists via API before navigating to UI
-      const records = await queryFilteredList(page, PAGE_KEYS.supplierPrice, 'pe_sp_remark', remark);
+      const records = await queryFilteredList(
+        page,
+        PAGE_KEYS.supplierPrice,
+        'pe_sp_remark',
+        remark,
+      );
       expect(records.length).toBeGreaterThan(0);
       const createdRecord = await fetchRecord(page, PAGE_KEYS.supplierPrice, result.recordId);
       const rowKey = String(createdRecord.pe_sp_code ?? remark);
 
-      await page.goto(`/dynamic/${PAGE_KEYS.supplierPrice}/${result.recordId}/edit?commandCode=pe:update_supplier_price`);
+      // Use underscore model code in the URL (route system requires underscores for edit/view)
+      await page.goto(
+        `/p/pe_supplier_price/${result.recordId}/edit?commandCode=pe:update_supplier_price`,
+      );
       await waitForDynamicPageLoad(page);
 
       const form = page.locator('form, .ant-form, [data-testid="dynamic-form"]');
-      await form.first().waitFor({ state: 'visible', timeout: 10000 });
+      await form.first().waitFor({ state: 'visible', timeout: 15000 });
 
       // Update remark
       const remarkInput = page
@@ -541,7 +554,8 @@ test.describe('PCBA SRM Extended', () => {
       const commandResp = page
         .waitForResponse(
           (r) =>
-            r.url().includes('/api/meta/commands/execute/') && r.request().method().toLowerCase() === 'post',
+            r.url().includes('/api/meta/commands/execute/') &&
+            r.request().method().toLowerCase() === 'post',
           { timeout: 10000 },
         )
         .catch(() => null);
@@ -735,7 +749,12 @@ test.describe('PCBA SRM Extended', () => {
       ).toBe(false);
 
       // Verify both are visible in list
-      const recordsMin = await queryFilteredList(page, PAGE_KEYS.supplierPrice, 'pe_sp_remark', remarkMin);
+      const recordsMin = await queryFilteredList(
+        page,
+        PAGE_KEYS.supplierPrice,
+        'pe_sp_remark',
+        remarkMin,
+      );
       expect(recordsMin.length).toBeGreaterThan(0);
     });
 
@@ -751,7 +770,10 @@ test.describe('PCBA SRM Extended', () => {
 
       let rawKeyFound = false;
       for (let i = 0; i < Math.min(headerCount, 20); i++) {
-        const text = await headers.nth(i).innerText().catch(() => '');
+        const text = await headers
+          .nth(i)
+          .innerText()
+          .catch(() => '');
         if (text.match(/^model\.\w+\.\w+\.label$/)) {
           rawKeyFound = true;
           break;
@@ -834,7 +856,12 @@ test.describe('PCBA SRM Extended', () => {
       expect(String(record.pe_sq_status)).toBe('active');
 
       // Verify in list using cert_name
-      const records = await queryFilteredList(page, PAGE_KEYS.supplierQualification, 'pe_sq_cert_name', certName);
+      const records = await queryFilteredList(
+        page,
+        PAGE_KEYS.supplierQualification,
+        'pe_sq_cert_name',
+        certName,
+      );
       expect(records.length).toBeGreaterThan(0);
     });
 
@@ -909,7 +936,12 @@ test.describe('PCBA SRM Extended', () => {
       }
 
       // Verify in list using cert_name as findable text
-      const records = await queryFilteredList(page, PAGE_KEYS.supplierQualification, 'pe_sq_cert_name', certName);
+      const records = await queryFilteredList(
+        page,
+        PAGE_KEYS.supplierQualification,
+        'pe_sq_cert_name',
+        certName,
+      );
       expect(records.length).toBeGreaterThan(0);
     });
 
@@ -1112,11 +1144,7 @@ test.describe('PCBA SRM Extended', () => {
       }
       bucket.supplierQualifications.push(resultValid.recordId);
 
-      const record = await fetchRecord(
-        page,
-        PAGE_KEYS.supplierQualification,
-        resultValid.recordId,
-      );
+      const record = await fetchRecord(page, PAGE_KEYS.supplierQualification, resultValid.recordId);
       // Issue date should come before expiry date
       const issueDateStr = String(record.pe_sq_issue_date ?? '');
       const expiryDateStr = String(record.pe_sq_expiry_date ?? '');
@@ -1185,7 +1213,12 @@ test.describe('PCBA SRM Extended', () => {
       }
 
       // Verify all records visible in list
-      const recordsValid = await queryFilteredList(page, PAGE_KEYS.supplierQualification, 'pe_sq_cert_name', certNameValid);
+      const recordsValid = await queryFilteredList(
+        page,
+        PAGE_KEYS.supplierQualification,
+        'pe_sq_cert_name',
+        certNameValid,
+      );
       expect(recordsValid.length).toBeGreaterThan(0);
     });
 
@@ -1201,7 +1234,10 @@ test.describe('PCBA SRM Extended', () => {
 
       let rawKeyFound = false;
       for (let i = 0; i < Math.min(headerCount, 20); i++) {
-        const text = await headers.nth(i).innerText().catch(() => '');
+        const text = await headers
+          .nth(i)
+          .innerText()
+          .catch(() => '');
         if (text.match(/^model\.\w+\.\w+\.label$/)) {
           rawKeyFound = true;
           break;

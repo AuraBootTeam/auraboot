@@ -137,13 +137,19 @@ export const DashboardViewer: React.FC<DashboardViewerProps> = ({
           />
         </svg>
         <p className="text-sm">{resolveDesignerText(DESIGNER_I18N.viewer.noData, locale)}</p>
-        <p className="mt-1 text-xs text-gray-300">{resolveDesignerText(DESIGNER_I18N.viewer.configureHint, locale)}</p>
+        <p className="mt-1 text-xs text-gray-300">
+          {resolveDesignerText(DESIGNER_I18N.viewer.configureHint, locale)}
+        </p>
       </div>
     );
   }
 
   return (
-    <div ref={containerRef} className={`overflow-auto bg-gray-50 p-4 ${className}`} data-testid={deriveTestId('dashboard', title.replace(/\s+/g, '_'), 'container')}>
+    <div
+      ref={containerRef}
+      className={`overflow-auto bg-gray-50 p-4 ${className}`}
+      data-testid={deriveTestId('dashboard', title.replace(/\s+/g, '_'), 'container')}
+    >
       {showExport && widgets.length > 0 && (
         <div
           className="mb-3 flex items-center justify-end gap-2"

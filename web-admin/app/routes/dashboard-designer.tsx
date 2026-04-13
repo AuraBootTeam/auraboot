@@ -1,9 +1,19 @@
 /**
- * Dashboard Designer 路由页面
+ * Dashboard Designer route page
+ * Lazy-loaded to reduce initial bundle size (~75KB).
  */
 
-import { DashboardDesigner } from '~/dashboard-designer';
+import React, { Suspense } from 'react';
+import { RouteLoadingFallback } from '~/components/RouteLoadingFallback';
+
+const DashboardDesigner = React.lazy(() =>
+  import('~/dashboard-designer').then((m) => ({ default: m.DashboardDesigner })),
+);
 
 export default function DashboardDesignerPage() {
-  return <DashboardDesigner />;
+  return (
+    <Suspense fallback={<RouteLoadingFallback />}>
+      <DashboardDesigner />
+    </Suspense>
+  );
 }

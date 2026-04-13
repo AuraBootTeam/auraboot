@@ -32,8 +32,8 @@ test.describe('E2E Test Order — Roles & Permissions', () => {
       const roleStr = JSON.stringify(body);
       expect(
         roleStr.includes('e2et_admin') ||
-        roleStr.includes('e2et_approver') ||
-        roleStr.includes('e2et_operator')
+          roleStr.includes('e2et_approver') ||
+          roleStr.includes('e2et_operator'),
       ).toBe(true);
       return;
     }

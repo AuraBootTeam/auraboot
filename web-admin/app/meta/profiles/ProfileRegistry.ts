@@ -5,14 +5,14 @@
  * the correct profile from schema.profile or falls back to "admin".
  */
 
-import type { DslProfile } from './types';
+import type { RenderProfile } from './types';
 
 class ProfileRegistry {
-  private profiles = new Map<string, DslProfile>();
+  private profiles = new Map<string, RenderProfile>();
   private defaultProfileName = 'admin';
 
   /** Register a profile */
-  register(profile: DslProfile): void {
+  register(profile: RenderProfile): void {
     if (this.profiles.has(profile.name)) {
       console.warn(`[ProfileRegistry] Overwriting existing profile: ${profile.name}`);
     }
@@ -20,12 +20,12 @@ class ProfileRegistry {
   }
 
   /** Get a profile by name */
-  get(name: string): DslProfile | undefined {
+  get(name: string): RenderProfile | undefined {
     return this.profiles.get(name);
   }
 
   /** Get profile or throw if not found */
-  getOrThrow(name: string): DslProfile {
+  getOrThrow(name: string): RenderProfile {
     const profile = this.profiles.get(name);
     if (!profile) {
       throw new Error(
@@ -36,7 +36,7 @@ class ProfileRegistry {
   }
 
   /** Resolve profile from schema (schema.profile > fallback > default) */
-  resolve(schema: { profile?: string } | null | undefined, fallback?: string): DslProfile {
+  resolve(schema: { profile?: string } | null | undefined, fallback?: string): RenderProfile {
     const name = schema?.profile || fallback || this.defaultProfileName;
     return this.getOrThrow(name);
   }
@@ -47,7 +47,7 @@ class ProfileRegistry {
   }
 
   /** List all registered profiles */
-  list(): DslProfile[] {
+  list(): RenderProfile[] {
     return Array.from(this.profiles.values());
   }
 

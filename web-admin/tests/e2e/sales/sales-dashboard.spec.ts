@@ -14,12 +14,7 @@
  */
 
 import { test, expect } from '../../fixtures';
-import {
-  uniqueId,
-  todayStr,
-  dateOffsetStr,
-  executeCommandViaApi,
-} from '../helpers/index';
+import { uniqueId, todayStr, dateOffsetStr, executeCommandViaApi } from '../helpers/index';
 
 test.describe('Sales Dashboard @smoke', () => {
   test.describe.configure({ mode: 'serial' });
@@ -83,14 +78,18 @@ test.describe('Sales Dashboard @smoke', () => {
 
     // Wait for dashboard data to load
     await Promise.all([
-      page.waitForResponse(
-        (resp) => resp.url().includes('/api/datasource/list') && resp.status() === 200,
-        { timeout: 15000 },
-      ).catch(() => null),
-      page.waitForResponse(
-        (resp) => resp.url().includes('/api/meta/chart-data') && resp.status() === 200,
-        { timeout: 15000 },
-      ).catch(() => null),
+      page
+        .waitForResponse(
+          (resp) => resp.url().includes('/api/datasource/list') && resp.status() === 200,
+          { timeout: 15000 },
+        )
+        .catch(() => null),
+      page
+        .waitForResponse(
+          (resp) => resp.url().includes('/api/meta/chart-data') && resp.status() === 200,
+          { timeout: 15000 },
+        )
+        .catch(() => null),
     ]);
 
     // Wait for page content to render

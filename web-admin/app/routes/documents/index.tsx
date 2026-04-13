@@ -5,8 +5,12 @@
  * Supports creating and editing documents with formatting, links, and more.
  */
 
-import React, { useState, useCallback } from 'react';
-import { DocumentPage } from '~/smart/components/document';
+import React, { useState, useCallback, Suspense } from 'react';
+import { RouteLoadingFallback } from '~/components/RouteLoadingFallback';
+
+const DocumentPage = React.lazy(() =>
+  import('~/smart/components/document').then((m) => ({ default: m.DocumentPage })),
+);
 
 export default function DocumentEditorPage() {
   const [title, setTitle] = useState('Untitled Document');
@@ -25,13 +29,15 @@ export default function DocumentEditorPage() {
         <h1 className="text-2xl font-bold text-gray-900">Documents</h1>
         {saved && <span className="text-sm text-green-600">Saved</span>}
       </div>
-      <DocumentPage
-        title={title}
-        onTitleChange={setTitle}
-        value={content}
-        onChange={setContent}
-        onSave={handleSave}
-      />
+      <Suspense fallback={<RouteLoadingFallback />}>
+        <DocumentPage
+          title={title}
+          onTitleChange={setTitle}
+          value={content}
+          onChange={setContent}
+          onSave={handleSave}
+        />
+      </Suspense>
     </div>
   );
 }

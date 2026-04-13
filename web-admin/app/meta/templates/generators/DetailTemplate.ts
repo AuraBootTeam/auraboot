@@ -45,22 +45,15 @@ export const DetailTemplate: TemplateGenerator = {
     }
 
     return {
-      kind: 'Page',
+      kind: 'page',
       version: '1.0',
       id: `${model.modelCode}_detail`,
       title: { 'zh-CN': `${model.displayName}详情`, 'en-US': `${model.displayName} Detail` },
       layout: {
-        areas: ['main'],
-        areasConfig: {
-          main: { type: 'flex', direction: 'column', rowGap: 0 },
-        },
+        type: 'stack',
+        gap: 0,
       },
-      areas: {
-        main: {
-          blocks,
-          className: classOverrides.container ?? styles.container,
-        },
-      },
+      blocks,
       dataSources: {
         ds_detail: {
           type: 'api',

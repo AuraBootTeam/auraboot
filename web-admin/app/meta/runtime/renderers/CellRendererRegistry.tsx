@@ -177,18 +177,54 @@ function formatTemporalValue(
 // 注册内置渲染器
 // ============================================
 
+// Shared auto-detection for URL/email in text values
+function renderSmartText(value: any): React.ReactNode {
+  const str = String(value ?? '');
+  if (!str) return <span>{str}</span>;
+
+  // URL pattern
+  if (/^https?:\/\/.+/i.test(str)) {
+    return (
+      <a
+        href={str}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-blue-600 hover:text-blue-800 hover:underline dark:text-blue-400"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {str}
+      </a>
+    );
+  }
+
+  // Email pattern
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(str)) {
+    return (
+      <a
+        href={`mailto:${str}`}
+        className="text-blue-600 hover:text-blue-800 hover:underline dark:text-blue-400"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {str}
+      </a>
+    );
+  }
+
+  return <span>{str}</span>;
+}
+
 /**
- * 默认渲染器 - 简单文本显示
+ * 默认渲染器 - 带 URL/email 自动检测
  */
 cellRendererRegistry.register('default', ({ value }) => {
-  return <span>{String(value ?? '')}</span>;
+  return renderSmartText(value);
 });
 
 /**
- * 文本渲染器
+ * 文本渲染器 - 带 URL/email 自动检测
  */
 cellRendererRegistry.register('text', ({ value }) => {
-  return <span>{String(value ?? '')}</span>;
+  return renderSmartText(value);
 });
 
 /**
@@ -264,11 +300,7 @@ cellRendererRegistry.register('tag', ({ value, column }) => {
 
   const { label, color } = resolveTag(value);
   const cls = TAG_COLOR_CLASSES[color] || TAG_COLOR_CLASSES.gray;
-  return (
-    <span className={`rounded-full px-2 py-1 text-xs ${cls}`}>
-      {label}
-    </span>
-  );
+  return <span className={`rounded-full px-2 py-1 text-xs ${cls}`}>{label}</span>;
 });
 
 /**
@@ -315,9 +347,12 @@ cellRendererRegistry.register('time', ({ value, locale, column }) => {
  */
 cellRendererRegistry.register('boolean', ({ value, t }) => {
   // Normalize: handle native boolean, string "true"/"false", and numeric 1/0
-  const boolVal = typeof value === 'boolean' ? value
-    : typeof value === 'string' ? value.toLowerCase() === 'true'
-    : Boolean(value);
+  const boolVal =
+    typeof value === 'boolean'
+      ? value
+      : typeof value === 'string'
+        ? value.toLowerCase() === 'true'
+        : Boolean(value);
   const displayValue = boolVal ? t?.('common.yes') || 'Yes' : t?.('common.no') || 'No';
   const colorClass = boolVal
     ? 'text-green-600 dark:text-green-400'
@@ -456,11 +491,14 @@ cellRendererRegistry.register('user_identity', ({ value, record, column }) => {
   const idField = renderConfig.idField || column.field;
   const size = renderConfig.size || 32;
 
-  const displayName = record?.[nameField] || record?.[usernameField] || value || '-';
+  // Fallback: try _display suffix from generic reference enrichment
+  const displaySuffix = column.field ? `${column.field}_display` : null;
+  const displayName = record?.[nameField] || record?.[usernameField]
+    || (displaySuffix && record?.[displaySuffix]) || value || '-';
   const username = record?.[usernameField];
   const userId = record?.[idField] ?? value;
   const avatarUrl = record?.[avatarField];
-  const subtitle = username ? `@${String(username)}` : `ID: ${String(userId)}`;
+  const subtitle = username ? `@${String(username)}` : (displayName !== value ? '' : `ID: ${String(userId)}`);
   const initial = String(displayName || '?')
     .charAt(0)
     .toUpperCase();
@@ -512,6 +550,57 @@ cellRendererRegistry.register('link', ({ value, column }) => {
     >
       {text}
     </a>
+  );
+});
+
+/**
+ * URL 渲染器 - 显式 URL 链接
+ */
+cellRendererRegistry.register('url', ({ value, column }) => {
+  if (!value) return null;
+  const target = column.render?.target || '_blank';
+  return (
+    <a
+      href={String(value)}
+      target={target}
+      rel={target === '_blank' ? 'noopener noreferrer' : undefined}
+      className="text-blue-600 hover:text-blue-800 hover:underline dark:text-blue-400"
+      onClick={(e) => e.stopPropagation()}
+    >
+      {String(value)}
+    </a>
+  );
+});
+
+/**
+ * Email 渲染器 - mailto 链接
+ */
+cellRendererRegistry.register('email', ({ value }) => {
+  if (!value) return null;
+  return (
+    <a
+      href={`mailto:${String(value)}`}
+      className="text-blue-600 hover:text-blue-800 hover:underline dark:text-blue-400"
+      onClick={(e) => e.stopPropagation()}
+    >
+      {String(value)}
+    </a>
+  );
+});
+
+/**
+ * Color 渲染器 - 色块 + hex 值
+ */
+cellRendererRegistry.register('color', ({ value }) => {
+  if (!value) return null;
+  return (
+    <div className="flex items-center gap-1.5">
+      <div
+        className="h-4 w-4 rounded border border-gray-300 dark:border-gray-600"
+        style={{ backgroundColor: String(value) }}
+      />
+      <span className="text-xs text-gray-600 dark:text-gray-400">{String(value)}</span>
+    </div>
   );
 });
 

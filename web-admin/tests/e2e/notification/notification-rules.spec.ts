@@ -29,14 +29,17 @@ async function openCreateRulePanel(page: import('@playwright/test').Page): Promi
   await expect(createButton).toBeVisible({ timeout: 10000 });
 
   await expect
-    .poll(async () => {
-      await createButton.click().catch(() => null);
-      return page
-        .locator('h2')
-        .filter({ hasText: '创建通知规则' })
-        .isVisible({ timeout: 500 })
-        .catch(() => false);
-    }, { timeout: 8000, intervals: [100, 250, 500, 1000] })
+    .poll(
+      async () => {
+        await createButton.click().catch(() => null);
+        return page
+          .locator('h2')
+          .filter({ hasText: '创建通知规则' })
+          .isVisible({ timeout: 500 })
+          .catch(() => false);
+      },
+      { timeout: 8000, intervals: [100, 250, 500, 1000] },
+    )
     .toBe(true);
 }
 
@@ -51,11 +54,11 @@ test('NRULE-01: notification rules page loads via sidebar menu', async ({ page }
   const sidebar = page.locator('[data-testid="sidebar"], nav, aside').first();
 
   // Try clicking via sidebar menu
-  const notificationRulesLink = page.locator(
-    'a[href="/notification-rules"], [data-menu-code="notification_rule_menu"]',
-  ).first();
+  const notificationRulesLink = page
+    .locator('a[href="/notification-rules"], [data-menu-code="notification_rule_menu"]')
+    .first();
 
-  if (await notificationRulesLink.count() > 0) {
+  if ((await notificationRulesLink.count()) > 0) {
     await notificationRulesLink.evaluate((el: HTMLElement) => el.click());
   } else {
     // Fallback: navigate directly (for environment where sidebar is collapsed)
@@ -122,7 +125,7 @@ test('NRULE-04: create notification rule via builder', async ({ page }) => {
 
   // Dismiss preset templates
   const skipPresets = page.locator('text=从空白创建');
-  if (await skipPresets.count() > 0) {
+  if ((await skipPresets.count()) > 0) {
     await skipPresets.click();
   }
 
@@ -263,7 +266,7 @@ test('NRULE-08: test rule evaluation button triggers API call', async ({ page })
 
   // Intercept the test API call
   const testApiPromise = page.waitForResponse(
-    resp =>
+    (resp) =>
       resp.url().includes(`/api/notification-rules/${ruleId}/test`) &&
       resp.request().method().toLowerCase() === 'post',
     { timeout: 15000 },
@@ -319,7 +322,7 @@ test('NRULE-09: toggle rule enabled state', async ({ page }) => {
 
   // Intercept toggle API call
   const toggleApiPromise = page.waitForResponse(
-    resp =>
+    (resp) =>
       resp.url().match(/\/api\/notification-rules\/\d+\/toggle/) != null &&
       resp.request().method().toLowerCase() === 'put',
     { timeout: 10000 },
@@ -355,9 +358,7 @@ test('NRULE-10: API creates and retrieves rule correctly', async ({ request }) =
       triggerType: 'scheduled',
       triggerConfig: JSON.stringify({ schedule: 'weekly' }),
       conditionModelCode: 'fin_ar_invoice',
-      conditionFilter: JSON.stringify([
-        { fieldName: 'status', operator: 'NE', value: 'paid' },
-      ]),
+      conditionFilter: JSON.stringify([{ fieldName: 'status', operator: 'NE', value: 'paid' }]),
       actionChannel: 'email',
       recipientType: 'operator',
       enabled: true,

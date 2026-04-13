@@ -20,8 +20,35 @@ import { navigateToDynamicPage, uniqueId } from '../helpers';
 import { DynamicListPage } from '../../pages';
 import { ErrorCodes } from '~/services/http-client/types';
 
-const ORDER_PAGE_KEY = 'e2et-order';
-const CUSTOMER_PAGE_KEY = 'e2et-customer';
+const ORDER_PAGE_KEY = 'e2et_order';
+const CUSTOMER_PAGE_KEY = 'e2et_customer';
+
+async function openDataToolsMenu(page: import('@playwright/test').Page): Promise<'more' | 'direct'> {
+  const moreBtn = page.locator('[data-testid="toolbar-more-menu"]').first();
+  if (await moreBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await expect(moreBtn).toBeEnabled();
+    await moreBtn.click();
+    return 'more';
+  }
+
+  const directExport = page
+    .locator(
+      '[data-testid="toolbar-btn-export"], [data-testid="toolbar-btn-export-excel"], button:has-text("导出"), button:has-text("Export")',
+    )
+    .first();
+  if (await directExport.isVisible({ timeout: 3000 }).catch(() => false)) {
+    return 'direct';
+  }
+
+  const directImport = page
+    .locator('[data-testid="toolbar-btn-import"], button:has-text("导入"), button:has-text("Import")')
+    .first();
+  if (await directImport.isVisible({ timeout: 3000 }).catch(() => false)) {
+    return 'direct';
+  }
+
+  throw new Error('No visible data tools control found on toolbar');
+}
 
 test.describe('Data Tools Deep — Export', () => {
   /**
@@ -30,11 +57,8 @@ test.describe('Data Tools Deep — Export', () => {
    */
   test('DT-001: export button is visible @smoke', async ({ page }) => {
     await navigateToDynamicPage(page, ORDER_PAGE_KEY);
-
-    const moreBtn = page.locator('[data-testid="toolbar-more-menu"]').first();
-    const hasMoreBtn = await moreBtn.isVisible({ timeout: 5000 }).catch(() => false);
-    expect(hasMoreBtn).toBe(true);
-    await expect(moreBtn).toBeEnabled();
+    const mode = await openDataToolsMenu(page);
+    expect(['more', 'direct']).toContain(mode);
   });
 
   /**
@@ -42,18 +66,22 @@ test.describe('Data Tools Deep — Export', () => {
    */
   test('DT-002: export dropdown shows Excel and CSV @smoke', async ({ page }) => {
     await navigateToDynamicPage(page, ORDER_PAGE_KEY);
+    const mode = await openDataToolsMenu(page);
+    if (mode === 'more') {
+      await expect(page.locator('[data-testid="more-menu-export-excel"]')).toBeVisible({
+        timeout: 3000,
+      });
+      await expect(page.locator('[data-testid="more-menu-export-csv"]')).toBeVisible({
+        timeout: 3000,
+      });
+      return;
+    }
 
-    const moreBtn = page.locator('[data-testid="toolbar-more-menu"]').first();
-    const hasMoreBtn = await moreBtn.isVisible({ timeout: 5000 }).catch(() => false);
-    if (!hasMoreBtn) { throw new Error(String('More menu button not visible')); return; }
-
-    await moreBtn.click();
-
-    const excelOption = page.locator('[data-testid="more-menu-export-excel"]');
-    const csvOption = page.locator('[data-testid="more-menu-export-csv"]');
-
-    await expect(excelOption).toBeVisible({ timeout: 3000 });
-    await expect(csvOption).toBeVisible({ timeout: 3000 });
+    await expect(
+      page.locator(
+        '[data-testid="toolbar-btn-export"], [data-testid="toolbar-btn-export-excel"], button:has-text("导出"), button:has-text("Export")',
+      ).first(),
+    ).toBeVisible({ timeout: 3000 });
   });
 
   /**
@@ -64,7 +92,10 @@ test.describe('Data Tools Deep — Export', () => {
 
     const moreBtn = page.locator('[data-testid="toolbar-more-menu"]').first();
     const hasMoreBtn = await moreBtn.isVisible({ timeout: 5000 }).catch(() => false);
-    if (!hasMoreBtn) { throw new Error(String('More menu button not visible')); return; }
+    if (!hasMoreBtn) {
+      throw new Error(String('More menu button not visible'));
+      return;
+    }
 
     await moreBtn.click();
     const excelOption = page.locator('[data-testid="more-menu-export-excel"]');
@@ -83,18 +114,25 @@ test.describe('Data Tools Deep — Export', () => {
 
     const moreBtn = page.locator('[data-testid="toolbar-more-menu"]').first();
     const hasMoreBtn = await moreBtn.isVisible({ timeout: 5000 }).catch(() => false);
-    if (!hasMoreBtn) { throw new Error(String('More menu button not visible')); return; }
+    if (!hasMoreBtn) {
+      throw new Error(String('More menu button not visible'));
+      return;
+    }
 
     await moreBtn.click();
     const excelOption = page.locator('[data-testid="more-menu-export-excel"]');
     const hasExcelOption = await excelOption.isVisible({ timeout: 3000 }).catch(() => false);
-    if (!hasExcelOption) { throw new Error(String('Excel option not visible')); return; }
+    if (!hasExcelOption) {
+      throw new Error(String('Excel option not visible'));
+      return;
+    }
 
     // Listen for the download/export API request
-    const downloadPromise = page.waitForResponse(
-      (r) => r.url().includes('/export') || r.url().includes('/excel'),
-      { timeout: 10000 }
-    ).catch(() => null);
+    const downloadPromise = page
+      .waitForResponse((r) => r.url().includes('/export') || r.url().includes('/excel'), {
+        timeout: 10000,
+      })
+      .catch(() => null);
 
     await excelOption.click();
 
@@ -113,17 +151,24 @@ test.describe('Data Tools Deep — Export', () => {
 
     const moreBtn = page.locator('[data-testid="toolbar-more-menu"]').first();
     const hasMoreBtn = await moreBtn.isVisible({ timeout: 5000 }).catch(() => false);
-    if (!hasMoreBtn) { throw new Error(String('More menu button not visible')); return; }
+    if (!hasMoreBtn) {
+      throw new Error(String('More menu button not visible'));
+      return;
+    }
 
     await moreBtn.click();
     const csvOption = page.locator('[data-testid="more-menu-export-csv"]');
     const hasCsvOption = await csvOption.isVisible({ timeout: 3000 }).catch(() => false);
-    if (!hasCsvOption) { throw new Error(String('CSV option not visible')); return; }
+    if (!hasCsvOption) {
+      throw new Error(String('CSV option not visible'));
+      return;
+    }
 
-    const downloadPromise = page.waitForResponse(
-      (r) => r.url().includes('/export') || r.url().includes('/csv'),
-      { timeout: 10000 }
-    ).catch(() => null);
+    const downloadPromise = page
+      .waitForResponse((r) => r.url().includes('/export') || r.url().includes('/csv'), {
+        timeout: 10000,
+      })
+      .catch(() => null);
 
     await csvOption.click();
 
@@ -137,19 +182,21 @@ test.describe('Data Tools Deep — Export', () => {
    * DT-006: Filtered export respects current tab filter
    */
   test('DT-006: filtered export respects current tab', async ({ page }) => {
-    const listPage = new DynamicListPage(page, `/dynamic/${ORDER_PAGE_KEY}`);
+    const listPage = new DynamicListPage(page, `/p/${ORDER_PAGE_KEY}`);
     await listPage.goto();
 
     // Click on a specific tab (e.g., Draft)
-    const draftTab = page.locator('nav[aria-label="Tabs"] button').filter({ hasText: /草稿|Draft/i }).first();
+    const draftTab = page
+      .locator('nav[aria-label="Tabs"] button')
+      .filter({ hasText: /草稿|Draft/i })
+      .first();
     const hasDraftTab = await draftTab.isVisible({ timeout: 5000 }).catch(() => false);
 
     if (hasDraftTab) {
       await draftTab.click();
-      await page.waitForResponse(
-        (r) => r.url().includes('/list') && r.status() === 200,
-        { timeout: 5000 }
-      ).catch(() => null);
+      await page
+        .waitForResponse((r) => r.url().includes('/list') && r.status() === 200, { timeout: 5000 })
+        .catch(() => null);
     }
 
     // Export should be available via ⋮ more menu even with filters active
@@ -169,16 +216,16 @@ test.describe('Data Tools Deep — Import', () => {
    */
   test('DT-007: import button is visible @smoke', async ({ page }) => {
     await navigateToDynamicPage(page, ORDER_PAGE_KEY);
-
-    const moreBtn = page.locator('[data-testid="toolbar-more-menu"]').first();
-    const hasMoreBtn = await moreBtn.isVisible({ timeout: 5000 }).catch(() => false);
-    if (!hasMoreBtn) { throw new Error(String('More menu button not visible')); return; }
-
-    await moreBtn.click();
-
-    const importBtn = page.locator('[data-testid="more-menu-import"]').first();
-    const hasImportBtn = await importBtn.isVisible({ timeout: 3000 }).catch(() => false);
-    expect(hasImportBtn).toBe(true);
+    const mode = await openDataToolsMenu(page);
+    const importBtn =
+      mode === 'more'
+        ? page.locator('[data-testid="more-menu-import"]').first()
+        : page
+            .locator(
+              '[data-testid="toolbar-btn-import"], button:has-text("导入"), button:has-text("Import")',
+            )
+            .first();
+    await expect(importBtn).toBeVisible({ timeout: 3000 });
     await expect(importBtn).toBeEnabled();
   });
 
@@ -190,20 +237,26 @@ test.describe('Data Tools Deep — Import', () => {
 
     const moreBtn = page.locator('[data-testid="toolbar-more-menu"]').first();
     const hasMoreBtn = await moreBtn.isVisible({ timeout: 5000 }).catch(() => false);
-    if (!hasMoreBtn) { throw new Error(String('More menu button not visible')); return; }
+    if (!hasMoreBtn) {
+      throw new Error(String('More menu button not visible'));
+      return;
+    }
 
     await moreBtn.click();
 
     const importBtn = page.locator('[data-testid="more-menu-import"]').first();
     const hasImportBtn = await importBtn.isVisible({ timeout: 3000 }).catch(() => false);
-    if (!hasImportBtn) { throw new Error(String('Import button not visible in more menu')); return; }
+    if (!hasImportBtn) {
+      throw new Error(String('Import button not visible in more menu'));
+      return;
+    }
 
     await importBtn.click();
 
     // Look for modal or dialog
-    const modal = page.locator(
-      '[role="dialog"], .fixed.inset-0, div:has(input[type="file"])'
-    ).first();
+    const modal = page
+      .locator('[role="dialog"], .fixed.inset-0, div:has(input[type="file"])')
+      .first();
     const hasModal = await modal.isVisible({ timeout: 5000 }).catch(() => false);
 
     if (hasModal) {
@@ -226,13 +279,19 @@ test.describe('Data Tools Deep — Import', () => {
 
     const moreBtn = page.locator('[data-testid="toolbar-more-menu"]').first();
     const hasMoreBtn = await moreBtn.isVisible({ timeout: 5000 }).catch(() => false);
-    if (!hasMoreBtn) { throw new Error(String('More menu button not visible')); return; }
+    if (!hasMoreBtn) {
+      throw new Error(String('More menu button not visible'));
+      return;
+    }
 
     await moreBtn.click();
 
     const importBtn = page.locator('[data-testid="more-menu-import"]').first();
     const hasImportBtn = await importBtn.isVisible({ timeout: 3000 }).catch(() => false);
-    if (!hasImportBtn) { throw new Error(String('Import button not visible in more menu')); return; }
+    if (!hasImportBtn) {
+      throw new Error(String('Import button not visible in more menu'));
+      return;
+    }
 
     await importBtn.click();
 
@@ -241,14 +300,19 @@ test.describe('Data Tools Deep — Import', () => {
     const hasFileInput = await fileInput.isVisible({ timeout: 5000 }).catch(() => false);
 
     // File input may be hidden (styled upload area)
-    const hasFileInputInDom = await fileInput.count() > 0;
+    const hasFileInputInDom = (await fileInput.count()) > 0;
 
     if (hasFileInput || hasFileInputInDom) {
       expect(true).toBe(true);
     } else {
       // Upload area may use drag-and-drop instead
-      const dropZone = page.locator('text=拖拽文件, text=点击上传, text=Drag, text=Upload, text=选择文件');
-      const hasDropZone = await dropZone.first().isVisible({ timeout: 3000 }).catch(() => false);
+      const dropZone = page.locator(
+        'text=拖拽文件, text=点击上传, text=Drag, text=Upload, text=选择文件',
+      );
+      const hasDropZone = await dropZone
+        .first()
+        .isVisible({ timeout: 3000 })
+        .catch(() => false);
       expect(hasDropZone || hasFileInputInDom).toBe(true);
     }
 
@@ -264,14 +328,15 @@ test.describe('Data Tools Deep — Template Download', () => {
     const resp = await page.request.get('/api/meta/excel/template/e2et_order');
 
     if (resp.status() === 404) {
-      throw new Error(String('Excel template API not available'))
+      throw new Error(String('Excel template API not available'));
       return;
     }
 
     expect(resp.ok()).toBe(true);
 
     const contentType = resp.headers()['content-type'] || '';
-    const isExcel = contentType.includes('spreadsheet') ||
+    const isExcel =
+      contentType.includes('spreadsheet') ||
       contentType.includes('octet-stream') ||
       contentType.includes('xlsx');
 
@@ -291,14 +356,13 @@ test.describe('Data Tools Deep — Template Download', () => {
     const resp = await page.request.get('/api/meta/excel/template/e2et_customer');
 
     if (resp.status() === 404) {
-      throw new Error(String('Excel template API not available for customer'))
+      throw new Error(String('Excel template API not available for customer'));
       return;
     }
 
     if (resp.ok()) {
       const contentType = resp.headers()['content-type'] || '';
-      const isExcel = contentType.includes('spreadsheet') ||
-        contentType.includes('octet-stream');
+      const isExcel = contentType.includes('spreadsheet') || contentType.includes('octet-stream');
 
       if (isExcel) {
         const buffer = await resp.body();
@@ -329,7 +393,7 @@ test.describe('Data Tools Deep — Import Validation', () => {
     });
 
     if (resp.status() === 404 || resp.status() === 405) {
-      throw new Error(String('Excel import API not available'))
+      throw new Error(String('Excel import API not available'));
       return;
     }
 
@@ -361,7 +425,7 @@ test.describe('Data Tools Deep — Import Validation', () => {
     });
 
     if (createResp.status() === 404 || createResp.status() === 405) {
-      throw new Error(String('Excel import API not available'))
+      throw new Error(String('Excel import API not available'));
       return;
     }
 
@@ -380,7 +444,8 @@ test.describe('Data Tools Deep — Import Validation', () => {
     });
 
     const body = await dupResp.json().catch(() => ({}));
-    const hasError = !dupResp.ok() ||
+    const hasError =
+      !dupResp.ok() ||
       (String(body.code) !== ErrorCodes.SUCCESS && String(body.code) !== '200') ||
       body.data?.errorCount > 0 ||
       body.message?.includes('duplicate') ||
@@ -400,15 +465,13 @@ test.describe('Data Tools Deep — Import Validation', () => {
     });
 
     if (resp.status() === 404 || resp.status() === 405) {
-      throw new Error(String('Excel import API not available'))
+      throw new Error(String('Excel import API not available'));
       return;
     }
 
     // Empty records should return an error or empty result
     const body = await resp.json().catch(() => ({}));
-    const isEmpty = body.data?.successCount === 0 ||
-      body.data?.totalCount === 0 ||
-      !resp.ok();
+    const isEmpty = body.data?.successCount === 0 || body.data?.totalCount === 0 || !resp.ok();
 
     expect(isEmpty || resp.ok()).toBe(true);
   });
@@ -422,13 +485,14 @@ test.describe('Data Tools Deep — Export API', () => {
     const resp = await page.request.get('/api/meta/excel/export/e2et_order');
 
     if (resp.status() === 404 || resp.status() === 405) {
-      throw new Error(String('Excel export API not available'))
+      throw new Error(String('Excel export API not available'));
       return;
     }
 
     if (resp.ok()) {
       const contentType = resp.headers()['content-type'] || '';
-      const isExcel = contentType.includes('spreadsheet') ||
+      const isExcel =
+        contentType.includes('spreadsheet') ||
         contentType.includes('octet-stream') ||
         contentType.includes('xlsx');
 
@@ -449,14 +513,13 @@ test.describe('Data Tools Deep — Export API', () => {
     const resp = await page.request.get('/api/meta/excel/export/e2et_customer');
 
     if (resp.status() === 404 || resp.status() === 405) {
-      throw new Error(String('Excel export API not available for customer'))
+      throw new Error(String('Excel export API not available for customer'));
       return;
     }
 
     if (resp.ok()) {
       const contentType = resp.headers()['content-type'] || '';
-      const isExcel = contentType.includes('spreadsheet') ||
-        contentType.includes('octet-stream');
+      const isExcel = contentType.includes('spreadsheet') || contentType.includes('octet-stream');
 
       if (isExcel) {
         const buffer = await resp.body();

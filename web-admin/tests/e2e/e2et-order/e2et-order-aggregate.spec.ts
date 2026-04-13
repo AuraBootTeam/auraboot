@@ -111,7 +111,9 @@ test.describe('E2E Test Order — AGGREGATE SideEffect', () => {
   /**
    * AG-003: After updating item quantity, parent totals should be updated
    */
-  test('AG-003: should update aggregate after editing item quantity @critical', async ({ page }) => {
+  test('AG-003: should update aggregate after editing item quantity @critical', async ({
+    page,
+  }) => {
     const helper = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
 
     const freshPid = await helper.createViaApi({ e2et_order_title: `AggUpd ${uniqueId()}` });
@@ -151,7 +153,9 @@ test.describe('E2E Test Order — AGGREGATE SideEffect', () => {
   /**
    * AG-004: Multiple items with decimal prices — verify precision (DECIMAL 14,2)
    */
-  test('AG-004: should maintain decimal precision across multiple items @critical', async ({ page }) => {
+  test('AG-004: should maintain decimal precision across multiple items @critical', async ({
+    page,
+  }) => {
     const helper = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
 
     const freshPid = await helper.createViaApi({ e2et_order_title: `AggPrec ${uniqueId()}` });

@@ -1,5 +1,5 @@
 {
-  "kind": "Form",
+  "kind": "form",
   "id": "form_store_create",
   "version": "3.0.0",
   "title": "$i18n:form.store.title",

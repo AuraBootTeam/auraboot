@@ -45,18 +45,68 @@ test.describe.serial('Showcase Seed — Workflow & Automation', () => {
 
     const designerJson = JSON.stringify({
       nodes: [
-        { id: 'start', type: 'startEvent', position: { x: 100, y: 200 }, data: { type: 'startEvent', label: '提交报价' } },
-        { id: 'manager_review', type: 'userTask', position: { x: 300, y: 200 }, data: { type: 'userTask', label: '销售总监审批', config: { assigneeType: 'role', roleIds: ['sales_director'] } } },
-        { id: 'amount_check', type: 'exclusiveGateway', position: { x: 500, y: 200 }, data: { type: 'exclusiveGateway', label: '金额判断' } },
-        { id: 'gm_review', type: 'userTask', position: { x: 700, y: 100 }, data: { type: 'userTask', label: '总经理审批', config: { assigneeType: 'role', roleIds: ['general_manager'] } } },
-        { id: 'send_notification', type: 'serviceTask', position: { x: 700, y: 300 }, data: { type: 'serviceTask', label: '发送通知' } },
-        { id: 'end', type: 'endEvent', position: { x: 900, y: 200 }, data: { type: 'endEvent', label: '审批完成' } },
+        {
+          id: 'start',
+          type: 'startEvent',
+          position: { x: 100, y: 200 },
+          data: { type: 'startEvent', label: '提交报价' },
+        },
+        {
+          id: 'manager_review',
+          type: 'userTask',
+          position: { x: 300, y: 200 },
+          data: {
+            type: 'userTask',
+            label: '销售总监审批',
+            config: { assigneeType: 'role', roleIds: ['sales_director'] },
+          },
+        },
+        {
+          id: 'amount_check',
+          type: 'exclusiveGateway',
+          position: { x: 500, y: 200 },
+          data: { type: 'exclusiveGateway', label: '金额判断' },
+        },
+        {
+          id: 'gm_review',
+          type: 'userTask',
+          position: { x: 700, y: 100 },
+          data: {
+            type: 'userTask',
+            label: '总经理审批',
+            config: { assigneeType: 'role', roleIds: ['general_manager'] },
+          },
+        },
+        {
+          id: 'send_notification',
+          type: 'serviceTask',
+          position: { x: 700, y: 300 },
+          data: { type: 'serviceTask', label: '发送通知' },
+        },
+        {
+          id: 'end',
+          type: 'endEvent',
+          position: { x: 900, y: 200 },
+          data: { type: 'endEvent', label: '审批完成' },
+        },
       ],
       edges: [
         { id: 'f1', source: 'start', target: 'manager_review', type: 'smoothstep' },
         { id: 'f2', source: 'manager_review', target: 'amount_check', type: 'smoothstep' },
-        { id: 'f3', source: 'amount_check', target: 'gm_review', type: 'smoothstep', data: { label: '金额>10万' } },
-        { id: 'f4', source: 'amount_check', target: 'send_notification', type: 'smoothstep', data: { label: '金额<=10万' } },
+        {
+          id: 'f3',
+          source: 'amount_check',
+          target: 'gm_review',
+          type: 'smoothstep',
+          data: { label: '金额>10万' },
+        },
+        {
+          id: 'f4',
+          source: 'amount_check',
+          target: 'send_notification',
+          type: 'smoothstep',
+          data: { label: '金额<=10万' },
+        },
         { id: 'f5', source: 'gm_review', target: 'send_notification', type: 'smoothstep' },
         { id: 'f6', source: 'send_notification', target: 'end', type: 'smoothstep' },
       ],
@@ -66,7 +116,8 @@ test.describe.serial('Showcase Seed — Workflow & Automation', () => {
       data: {
         processKey,
         processName: '报价审批流程',
-        description: '报价金额10万以下销售总监直接审批，10万以上需总经理二次审批。审批完成后自动发送通知。',
+        description:
+          '报价金额10万以下销售总监直接审批，10万以上需总经理二次审批。审批完成后自动发送通知。',
         category: 'approval',
         bpmnContent: bpmnXml,
         designerJson,
@@ -114,13 +165,56 @@ test.describe.serial('Showcase Seed — Workflow & Automation', () => {
 
     const designerJson = JSON.stringify({
       nodes: [
-        { id: 'start', type: 'startEvent', position: { x: 100, y: 200 }, data: { type: 'startEvent', label: '提交请假' } },
-        { id: 'direct_manager', type: 'userTask', position: { x: 300, y: 200 }, data: { type: 'userTask', label: '直属主管审批', config: { assigneeType: 'expression', expression: '${report_to}' } } },
-        { id: 'parallel_split', type: 'parallelGateway', position: { x: 500, y: 200 }, data: { type: 'parallelGateway', label: '并行通知' } },
-        { id: 'hr_review', type: 'userTask', position: { x: 700, y: 100 }, data: { type: 'userTask', label: '人事备案', config: { assigneeType: 'role', roleIds: ['hr'] } } },
-        { id: 'calendar_update', type: 'serviceTask', position: { x: 700, y: 300 }, data: { type: 'serviceTask', label: '更新日历' } },
-        { id: 'parallel_join', type: 'parallelGateway', position: { x: 900, y: 200 }, data: { type: 'parallelGateway', label: '合并' } },
-        { id: 'end', type: 'endEvent', position: { x: 1100, y: 200 }, data: { type: 'endEvent', label: '审批完成' } },
+        {
+          id: 'start',
+          type: 'startEvent',
+          position: { x: 100, y: 200 },
+          data: { type: 'startEvent', label: '提交请假' },
+        },
+        {
+          id: 'direct_manager',
+          type: 'userTask',
+          position: { x: 300, y: 200 },
+          data: {
+            type: 'userTask',
+            label: '直属主管审批',
+            config: { assigneeType: 'expression', expression: '${report_to}' },
+          },
+        },
+        {
+          id: 'parallel_split',
+          type: 'parallelGateway',
+          position: { x: 500, y: 200 },
+          data: { type: 'parallelGateway', label: '并行通知' },
+        },
+        {
+          id: 'hr_review',
+          type: 'userTask',
+          position: { x: 700, y: 100 },
+          data: {
+            type: 'userTask',
+            label: '人事备案',
+            config: { assigneeType: 'role', roleIds: ['hr'] },
+          },
+        },
+        {
+          id: 'calendar_update',
+          type: 'serviceTask',
+          position: { x: 700, y: 300 },
+          data: { type: 'serviceTask', label: '更新日历' },
+        },
+        {
+          id: 'parallel_join',
+          type: 'parallelGateway',
+          position: { x: 900, y: 200 },
+          data: { type: 'parallelGateway', label: '合并' },
+        },
+        {
+          id: 'end',
+          type: 'endEvent',
+          position: { x: 1100, y: 200 },
+          data: { type: 'endEvent', label: '审批完成' },
+        },
       ],
       edges: [
         { id: 'f1', source: 'start', target: 'direct_manager', type: 'smoothstep' },
@@ -137,7 +231,8 @@ test.describe.serial('Showcase Seed — Workflow & Automation', () => {
       data: {
         processKey,
         processName: '请假审批流程',
-        description: '员工提交请假申请，直属主管审批通过后，人事备案和日历更新并行执行。展示并行网关能力。',
+        description:
+          '员工提交请假申请，直属主管审批通过后，人事备案和日历更新并行执行。展示并行网关能力。',
         category: 'hr',
         bpmnContent: bpmnXml,
         designerJson,
@@ -174,8 +269,11 @@ test.describe.serial('Showcase Seed — Workflow & Automation', () => {
       },
     });
     const body = await resp.json();
-    if (body.code === '0') { console.log('  Created automation: 新线索自动分配'); }
-    else { console.warn(`  Automation creation warning: ${body.message?.slice(0, 100)}`); }
+    if (body.code === '0') {
+      console.log('  Created automation: 新线索自动分配');
+    } else {
+      console.warn(`  Automation creation warning: ${body.message?.slice(0, 100)}`);
+    }
   });
 
   test('Phase W2: Automation — Opportunity Stage Notification', async ({ page }) => {
@@ -202,15 +300,19 @@ test.describe.serial('Showcase Seed — Workflow & Automation', () => {
       },
     });
     const body = await resp.json();
-    if (body.code === '0') { console.log('  Created automation: 商机阶段变更通知'); }
-    else { console.warn(`  Automation creation warning: ${body.message?.slice(0, 100)}`); }
+    if (body.code === '0') {
+      console.log('  Created automation: 商机阶段变更通知');
+    } else {
+      console.warn(`  Automation creation warning: ${body.message?.slice(0, 100)}`);
+    }
   });
 
   test('Phase W2: Automation — Daily Digest (Scheduled)', async ({ page }) => {
     const resp = await page.request.post('/api/automations', {
       data: {
         name: '每日销售数据摘要',
-        description: '每天早上9点自动统计前一天的销售数据（新线索、新商机、赢单），发送摘要通知给销售总监。',
+        description:
+          '每天早上9点自动统计前一天的销售数据（新线索、新商机、赢单），发送摘要通知给销售总监。',
         triggerType: 'scheduled',
         triggerConfig: {
           cron: '0 9 * * MON-FRI',
@@ -219,7 +321,10 @@ test.describe.serial('Showcase Seed — Workflow & Automation', () => {
         actions: [
           {
             type: 'send_notification',
-            config: { message: '昨日销售数据：新线索 ${stats.new_leads} 条，新商机 ${stats.new_opps} 个，赢单 ${stats.won_amount} 万元' },
+            config: {
+              message:
+                '昨日销售数据：新线索 ${stats.new_leads} 条，新商机 ${stats.new_opps} 个，赢单 ${stats.won_amount} 万元',
+            },
             sequence: 0,
             label: '发送摘要',
           },
@@ -231,7 +336,9 @@ test.describe.serial('Showcase Seed — Workflow & Automation', () => {
     if (body.code === '0') {
       console.log('  Created automation: 每日销售摘要 (scheduled, disabled)');
     } else {
-      console.warn(`  Scheduled automation creation failed (may not be supported in this config): ${body.message?.slice(0, 80)}`);
+      console.warn(
+        `  Scheduled automation creation failed (may not be supported in this config): ${body.message?.slice(0, 80)}`,
+      );
     }
   });
 
@@ -246,7 +353,7 @@ test.describe.serial('Showcase Seed — Workflow & Automation', () => {
         targetUrl: 'https://httpbin.org/post',
         eventType: 'record_updated',
         modelCode: 'crm_opportunity',
-        filterExpression: "crm_opp_stage != null",
+        filterExpression: 'crm_opp_stage != null',
         secret: 'showcase-webhook-secret-2025',
         headers: JSON.stringify({ 'X-Source': 'auraboot-showcase' }),
         maxRetries: 3,
@@ -255,8 +362,11 @@ test.describe.serial('Showcase Seed — Workflow & Automation', () => {
       },
     });
     const body = await resp.json();
-    if (body.code === '0') { console.log('  Created webhook: 商机阶段变更外部通知'); }
-    else { console.warn(`  Webhook creation warning: ${body.message?.slice(0, 100)}`); }
+    if (body.code === '0') {
+      console.log('  Created webhook: 商机阶段变更外部通知');
+    } else {
+      console.warn(`  Webhook creation warning: ${body.message?.slice(0, 100)}`);
+    }
   });
 
   // ═════════════════════════════════════════════════════════════════════════
@@ -284,7 +394,11 @@ test.describe.serial('Showcase Seed — Workflow & Automation', () => {
     if (body.code === '0') {
       console.log('  Created notification rule: 商机变更通知');
     } else {
-      console.warn('  Notification rule creation returned:', body.code, body.message?.slice(0, 100));
+      console.warn(
+        '  Notification rule creation returned:',
+        body.code,
+        body.message?.slice(0, 100),
+      );
     }
   });
 
@@ -308,7 +422,11 @@ test.describe.serial('Showcase Seed — Workflow & Automation', () => {
     if (body.code === '0') {
       console.log('  Created notification rule: 审批完成通知');
     } else {
-      console.warn('  Notification rule creation returned:', body.code, body.message?.slice(0, 100));
+      console.warn(
+        '  Notification rule creation returned:',
+        body.code,
+        body.message?.slice(0, 100),
+      );
     }
   });
 
@@ -329,7 +447,9 @@ test.describe.serial('Showcase Seed — Workflow & Automation', () => {
     // Check automations
     const autoResp = await page.request.get('/api/automations?page=1&size=100');
     const autoBody = await autoResp.json().catch(() => ({}));
-    console.log(`  Automations:      ${autoBody?.data?.total ?? autoBody?.data?.records?.length ?? '?'}`);
+    console.log(
+      `  Automations:      ${autoBody?.data?.total ?? autoBody?.data?.records?.length ?? '?'}`,
+    );
 
     // Check webhooks
     const whResp = await page.request.get('/api/webhooks');

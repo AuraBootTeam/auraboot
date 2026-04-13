@@ -287,7 +287,7 @@ export default function DashboardViewerPage() {
           </svg>
           <p className="mb-2 text-lg font-medium text-gray-500">{t('dashboard.empty')}</p>
           <Link
-            to="/dynamic/dashboard-management"
+            to="/p/dashboard-management"
             className="text-sm text-blue-600 hover:underline"
           >
             {t('dashboard.goto_management')}

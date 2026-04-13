@@ -12,10 +12,7 @@ export { default as OrganizationSelect } from '~/components/smart/picker/Organiz
 export { default as TimeRangePicker } from '~/components/smart/datetime/TimeRangePicker';
 export { default as CoordinatesPicker } from '~/components/smart/picker/CoordinatesPicker';
 export { default as CascadeSelect } from '~/components/smart/picker/CascadeSelect';
-export {
-  FormRef,
-  FormRefPreview,
-} from '~/components/smart/form/FormRef';
+export { FormRef, FormRefPreview } from '~/components/smart/form/FormRef';
 
 // Display Components
 export { default as Display } from '~/components/smart/display/Display';

@@ -15,30 +15,19 @@ export interface LocalizedText {
   [locale: string]: string | undefined; // 支持动态 locale
 }
 
-// Layout 配置 (新 DSL)
+// Layout 配置
 export interface LayoutConfig {
-  areas: string[]; // area 名称数组，如 ["main", "sidebar"]
-  areasConfig: Record<string, AreaLayoutConfig>; // 每个 area 的布局配置
-}
-
-export interface AreaLayoutConfig {
-  type: 'grid' | 'flex';
-  cols?: number;
-  rows?: number;
-  rowGap?: number;
-  colGap?: number;
-  direction?: 'row' | 'column';
-  justify?: 'start' | 'end' | 'center' | 'space-between' | 'space-around';
-  align?: 'start' | 'end' | 'center' | 'stretch';
-  padding?: string | number;
-  width?: number | string;
-  height?: number | string;
+  type?: 'grid' | 'stack'; // Layout mode: 'grid' (12-col) or 'stack' (vertical). Default: 'stack'
+  cols?: number;            // Grid column count (default 12, only for type='grid')
+  colGap?: number;          // Column gap in px (default 16)
+  rowGap?: number;          // Row gap in px (default 16)
+  gap?: number;             // Stack gap in px (only for type='stack')
 }
 
 // Block 配置 (新 DSL)
 export interface BlockConfig {
   id: string;
-  blockType: string; // block 类型: form-section, form-buttons, data-table, filter-form 等
+  blockType: string; // block 类型: form-section, form-buttons, table, filters 等
   title?: string | LocalizedText;
   layout?: BlockLayoutConfig;
   visibleWhen?: string;
@@ -76,19 +65,16 @@ export interface BlockConfig {
 }
 
 export interface BlockLayoutConfig {
-  colSpan?: number;
-  rowSpan?: number;
-  columns?: number;
+  col?: number;       // Start column (0-based, 0..cols-1)
+  colSpan?: number;   // Number of columns (1..cols, default 12)
+  rowSpan?: number;   // Number of rows (>= 1, default 1)
+  order?: number;     // Stable flow order for auto-layout
+  row?: number;       // Locked row position (optional, advanced)
+  columns?: number;   // Internal sub-column count (for form-section grids)
   colGap?: number;
   rowGap?: number;
 }
 
-// Area 配置
-export interface AreaConfig {
-  blocks: BlockConfig[];
-  visibleWhen?: string;
-  className?: string;
-}
 
 // DataSource 配置
 export interface DataSourceConfig {
@@ -225,7 +211,11 @@ export interface ColumnConfig {
     | 'image'
     | 'user_identity'
     | 'reference'
-    | 'button';
+    | 'button'
+    | 'url'
+    | 'email'
+    | 'color'
+    | 'link';
 
   /**
    * Enable inline editing for this column.
@@ -272,6 +262,7 @@ export interface ColumnConfig {
 // Action definition — unified button behavior
 export type ActionDef =
   | { type: 'command'; command: string }
+  | { type: 'state_transition'; command: string }
   | { type: 'navigate'; to: string; command?: string }
   | { type: 'builtin'; name: string }
   | { type: 'flow'; steps: FlowStep[] }
@@ -518,7 +509,7 @@ export interface PageDataSourceConfig {
 
 // 统一 Schema 接口
 export interface UnifiedSchema {
-  kind: 'Page' | 'List' | 'Form' | 'Detail' | 'PageLayout' | 'Dashboard' | 'Record' | 'Transaction';
+  kind: 'page' | 'list' | 'form' | 'detail' | 'page_layout' | 'dashboard' | 'composite';
   version: string;
   /** DSL schema format version (single integer, default 1). */
   schemaVersion?: number;
@@ -543,7 +534,7 @@ export interface UnifiedSchema {
 
   // Layout
   layout: LayoutConfig;
-  areas: Record<string, AreaConfig>;
+  blocks: BlockConfig[];
 
   // Field-level Data Sources
   dataSources?: Record<string, DataSourceConfig>;
@@ -575,6 +566,9 @@ export interface UnifiedSchema {
   // Multi-view support — when true, show view type tabs (Table/Kanban/Calendar/etc.)
   // Default: false (only table view, no view switcher)
   enableMultiView?: boolean;
+
+  // Page-level extension properties (e.g., showShare, showReport for detail pages)
+  extension?: Record<string, any>;
 }
 
 export interface ThemeConfig {
@@ -583,25 +577,25 @@ export interface ThemeConfig {
 
 // 表单专用 Schema
 export interface FormSchema extends UnifiedSchema {
-  kind: 'Form';
+  kind: 'form';
 }
 
 // 列表专用 Schema
 export interface ListSchema extends UnifiedSchema {
-  kind: 'List';
+  kind: 'list';
 }
 
 // 页面专用 Schema
 export interface PageSchema extends UnifiedSchema {
-  kind: 'Page';
+  kind: 'page';
 }
 
 // 详情专用 Schema
 export interface DetailSchema extends UnifiedSchema {
-  kind: 'Detail';
+  kind: 'detail';
 }
 
 // 页面布局专用 Schema
 export interface PageLayoutSchema extends UnifiedSchema {
-  kind: 'PageLayout';
+  kind: 'page_layout';
 }

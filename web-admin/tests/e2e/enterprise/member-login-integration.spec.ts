@@ -27,9 +27,11 @@ async function loginWithAssertions(page: import('@playwright/test').Page) {
   const loginPage = new LoginPage(page);
   await loginPage.waitForFormReady();
 
-  const passwordTab = page.locator(
-    '[role="tab"]:has-text("密码"), [role="tab"]:has-text("Password"), button:has-text("密码登录"), button:has-text("Password")'
-  ).first();
+  const passwordTab = page
+    .locator(
+      '[role="tab"]:has-text("密码"), [role="tab"]:has-text("Password"), button:has-text("密码登录"), button:has-text("Password")',
+    )
+    .first();
   if (await passwordTab.isVisible({ timeout: 2000 }).catch(() => false)) {
     await passwordTab.click();
     await loginPage.waitForFormReady();
@@ -55,20 +57,27 @@ async function loginWithAssertions(page: import('@playwright/test').Page) {
   await expect(loginPage.emailInput).toHaveValue(TEST_EMAIL);
   await expect(loginPage.passwordInput).toHaveValue(TEST_PASSWORD);
 
-  const submitBtn = page.locator(
-    'form button[type="submit"], ' +
-    'form button:has-text("立即登录"), ' +
-    'form button:has-text("登录"), ' +
-    'form button:has-text("Sign In"), ' +
-    'form button:has-text("Login")'
-  ).first();
+  const submitBtn = page
+    .locator(
+      'form button[type="submit"], ' +
+        'form button:has-text("立即登录"), ' +
+        'form button:has-text("登录"), ' +
+        'form button:has-text("Sign In"), ' +
+        'form button:has-text("Login")',
+    )
+    .first();
   await submitBtn.click();
   await loginPage.expectLoggedIn({ timeout: 20000 });
 
   // Validate authenticated session on a universally protected route.
   await page.goto('/personal/profile', { waitUntil: 'domcontentloaded' });
   await expect(page).toHaveURL(/\/personal\/profile/, { timeout: 10000 });
-  await expect(page.locator('h1, h2').filter({ hasText: /个人资料|Profile/i }).first()).toBeVisible({ timeout: 12000 });
+  await expect(
+    page
+      .locator('h1, h2')
+      .filter({ hasText: /个人资料|Profile/i })
+      .first(),
+  ).toBeVisible({ timeout: 12000 });
 }
 
 test.describe('Member Login Integration', () => {
@@ -111,7 +120,7 @@ test.describe('Member Login Integration', () => {
 
     // If 404, the endpoint may differ
     if (loginResp.status() === 404) {
-      throw new Error(String('Login API at /api/auth/login not found'))
+      throw new Error(String('Login API at /api/auth/login not found'));
       return;
     }
 
@@ -139,7 +148,7 @@ test.describe('Member Login Integration', () => {
     });
 
     if (loginResp.status() === 404) {
-      throw new Error(String('Login API not available'))
+      throw new Error(String('Login API not available'));
       return;
     }
 

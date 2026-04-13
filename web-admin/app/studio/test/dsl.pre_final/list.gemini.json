@@ -1,5 +1,5 @@
 {
-  "kind": "Page",
+  "kind": "page",
   "id": "page_store_list",
   "version": "3.0.0",
   "title": "$i18n:list.store.title",

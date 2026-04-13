@@ -13,6 +13,7 @@ import {
 import React, { useEffect } from 'react';
 
 import { isRouteErrorResponse } from 'react-router';
+import { isSystemTenant } from '~/constants/SpaceConstants';
 
 import { I18nProvider, useI18n } from '~/contexts/I18nContext';
 import { ThemeProvider } from '~/contexts/ThemeContext';
@@ -21,6 +22,18 @@ import { TimezoneProvider } from '~/contexts/TimezoneContext';
 import { ConfirmDialogProvider } from '~/contexts/ConfirmDialogContext';
 import { getI18nData } from '~/services/form';
 import { getUserMenus } from '~/services/menu';
+
+export interface RootLoaderData {
+  user: any;
+  permissions: any;
+  preferences: any;
+  menus: any[];
+  i18n: Record<string, string>;
+  locale: string;
+  initialTimezone?: string;
+  edition: string;
+  spaces: any[];
+}
 
 import '~/app.css';
 import '~/styles/print.css';
@@ -32,13 +45,15 @@ import '~/studio/workbench/styles/drag.css';
 
 import { getUserInfo } from '~/services/userService';
 import { isPublicRoute } from '~/middleware/sessionMiddlewareFactory';
-import { getTokenFromRequest, sessionStorage } from '~/services/session';
+import { getSessionFromRequest, getTokenFromRequest, sessionStorage } from '~/services/session';
 import { AuthProvider } from '~/contexts/AuthContext';
 import { EntitlementProvider } from '~/contexts/EntitlementContext';
 import { DslRegistryProvider } from '~/contexts/DslRegistryContext';
 import { AuraBotProvider } from '~/aurabot';
+import { QueryProvider } from '~/providers/QueryProvider';
 
 import { sessionMiddleware } from '~/middleware/auth_filter';
+import { ssrLoaderCache, ssrCacheKey } from '~/utils/ssr-cache';
 
 export const unstable_middleware = [sessionMiddleware];
 
@@ -63,7 +78,7 @@ function getTimezoneFromRequest(request: Request): string {
   }
 }
 
-export async function loader({ request }: LoaderFunctionArgs) {
+export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoaderData | Response> {
   const locale = getLocaleFromRequest(request);
   const initialTimezone = getTimezoneFromRequest(request);
   const { pathname } = new URL(request.url);
@@ -75,7 +90,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
       const bootstrapRes = await fetch(`${bootstrapUrl}/api/bootstrap/status`);
       if (bootstrapRes.ok) {
         const bootstrapResult = await bootstrapRes.json();
-        if (bootstrapResult.code === '0' && bootstrapResult.data && !bootstrapResult.data.initialized) {
+        if (
+          bootstrapResult.code === '0' &&
+          bootstrapResult.data &&
+          !bootstrapResult.data.initialized
+        ) {
           return redirect('/setup');
         }
       }
@@ -88,24 +107,63 @@ export async function loader({ request }: LoaderFunctionArgs) {
   if (isPublicRoute(pathname)) {
     const token = await getTokenFromRequest(request);
     if (!token) {
+      // SSR cache: public routes without auth produce identical loader data
+      // for the same pathname + locale combination. Cache for 30s to reduce
+      // redundant i18n fetches and backend bootstrap-status checks.
+      const cacheKey = ssrCacheKey(pathname, locale);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const cached = ssrLoaderCache.get(cacheKey) as any;
+      if (cached) {
+        return cached as RootLoaderData;
+      }
+
       const i18nData = await getI18nData(locale, request);
       const edition = process.env.EDITION || 'enterprise';
-      return { user: null, permissions: [], menus: [], i18n: i18nData, locale, initialTimezone, edition };
+      const result = {
+        user: null,
+        permissions: [],
+        preferences: null,
+        menus: [],
+        i18n: i18nData,
+        locale,
+        initialTimezone: initialTimezone ?? undefined,
+        edition,
+        spaces: [],
+      };
+      ssrLoaderCache.set(cacheKey, result);
+      return result;
     }
   }
 
   // Authenticated flow (existing logic)
-  const [{ user, permissions }, i18nData] = await Promise.all([
+  const token = await getTokenFromRequest(request);
+
+  async function fetchSpaces(): Promise<any[]> {
+    if (!token) return [];
+    try {
+      const apiUrl = process.env.BFF_INTERNAL_URL || 'http://127.0.0.1:6443';
+      const resp = await fetch(`${apiUrl}/api/tenant-selection/my-spaces`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!resp.ok) return [];
+      const result = await resp.json();
+      return result.data || [];
+    } catch {
+      return [];
+    }
+  }
+
+  const [{ user, permissions, preferences }, i18nData, spaces] = await Promise.all([
     getUserInfo(request),
     getI18nData(locale, request),
+    fetchSpaces(),
   ]);
 
   // Stale token guard: token exists but user resolution failed (e.g. DB reset)
   // → clear session and redirect to login
   if (!user && !isPublicRoute(pathname)) {
-    const token = await getTokenFromRequest(request);
     if (token) {
-      const session = await sessionStorage.getSession(request.headers.get('Cookie'));
+      const session = await getSessionFromRequest(request);
       return redirect(`/login?redirectTo=${encodeURIComponent(pathname)}`, {
         headers: {
           'Set-Cookie': await sessionStorage.destroySession(session),
@@ -121,17 +179,18 @@ export async function loader({ request }: LoaderFunctionArgs) {
     return redirect('/tenant-selection');
   }
 
-  // Reverse guard: if user already has a tenant, tenant-selection is a no-op
-  if (pathname === '/tenant-selection' && user?.tenantId) {
+  // Reverse guard: if user already has a tenant, tenant-selection is a no-op.
+  // Exception: system-tenant users can visit /tenant-selection to switch spaces.
+  if (pathname === '/tenant-selection' && user?.tenantId && !isSystemTenant(user.tenantId)) {
     return redirect('/');
   }
 
   const edition = process.env.EDITION || 'enterprise';
-  return { user, permissions, menus, i18n: i18nData, locale, initialTimezone, edition };
+  return { user, permissions, preferences, menus, i18n: i18nData, locale, initialTimezone: initialTimezone ?? undefined, edition, spaces };
 }
 
-export function useRootLoaderData() {
-  return useRouteLoaderData<typeof loader>('root');
+export function useRootLoaderData(): RootLoaderData | undefined {
+  return useRouteLoaderData<typeof loader>('root') as RootLoaderData | undefined;
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -169,29 +228,31 @@ function AppDirectionSync({ locale }: { locale: string }) {
 }
 
 export default function App() {
-  const data = useLoaderData<typeof loader>();
+  const data = useLoaderData<typeof loader>() as RootLoaderData;
 
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <EntitlementProvider>
-          <DslRegistryProvider>
-            <I18nProvider initialData={data.i18n || {}} initialLocale={data.locale}>
-              <AppDirectionSync locale={data.locale} />
-              <TimezoneProvider initialTimezone={data.initialTimezone}>
-                <ToastProvider>
-                  <ConfirmDialogProvider>
-                    <AuraBotProvider>
-                      <Outlet />
-                    </AuraBotProvider>
-                  </ConfirmDialogProvider>
-                </ToastProvider>
-              </TimezoneProvider>
-            </I18nProvider>
-          </DslRegistryProvider>
-        </EntitlementProvider>
-      </AuthProvider>
-    </ThemeProvider>
+    <QueryProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <EntitlementProvider>
+            <DslRegistryProvider>
+              <I18nProvider initialData={data.i18n || {}} initialLocale={data.locale}>
+                <AppDirectionSync locale={data.locale} />
+                <TimezoneProvider initialTimezone={data.initialTimezone}>
+                  <ToastProvider>
+                    <ConfirmDialogProvider>
+                      <AuraBotProvider>
+                        <Outlet />
+                      </AuraBotProvider>
+                    </ConfirmDialogProvider>
+                  </ToastProvider>
+                </TimezoneProvider>
+              </I18nProvider>
+            </DslRegistryProvider>
+          </EntitlementProvider>
+        </AuthProvider>
+      </ThemeProvider>
+    </QueryProvider>
   );
 }
 

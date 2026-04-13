@@ -186,6 +186,17 @@ export function createExpressionContext(overrides?: Partial<ExpressionContext>):
       }),
   };
 
+  // Inject $-prefixed aliases for expression convenience
+  // e.g., $form.status === 'draft' instead of form.status === 'draft'
+  mergedContext.$user = mergedContext.global?.user;
+  mergedContext.$form = mergedContext.form;
+  mergedContext.$state = mergedContext.state;
+  mergedContext.$record = mergedContext.row;
+  // $page is injected by usePageRuntime, default to empty object
+  if (!mergedContext.$page) {
+    mergedContext.$page = {};
+  }
+
   return mergedContext;
 }
 

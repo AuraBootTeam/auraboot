@@ -18,11 +18,7 @@
  */
 
 import { test, expect, type Page } from '../../fixtures';
-import {
-  uniqueId,
-  executeCommandViaApi,
-  todayStr,
-} from '../helpers/index';
+import { uniqueId, executeCommandViaApi, todayStr } from '../helpers/index';
 
 // ---------------------------------------------------------------------------
 // Navigation helper
@@ -48,16 +44,15 @@ async function navigateToQualityPage(
   const leafLink = nav.getByRole('link', { name: leafName });
   await leafLink.scrollIntoViewIfNeeded();
   const listResponsePromise = page.waitForResponse(
-    (r) =>
-      r.url().includes(`/api/dynamic/${modelCode}/list`) && r.status() === 200,
+    (r) => r.url().includes(`/api/dynamic/${modelCode}/list`) && r.status() === 200,
     { timeout: 15_000 },
   );
   await leafLink.evaluate((el: HTMLElement) => el.click());
   const listResponse = await listResponsePromise;
 
-  await expect(
-    page.locator('table, [class*="ant-table"]').first(),
-  ).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator('table, [class*="ant-table"]').first()).toBeVisible({
+    timeout: 10_000,
+  });
   return listResponse;
 }
 
@@ -164,9 +159,7 @@ test.describe('Quality — Core Lifecycle', () => {
   // IQC (来料检验)
   // =========================================================================
 
-  test('QC-001 @smoke: Navigate to 来料检验 list via sidebar menu', async ({
-    page,
-  }) => {
+  test('QC-001 @smoke: Navigate to 来料检验 list via sidebar menu', async ({ page }) => {
     await navigateToQualityPage(page, '来料检验', 'qc_iqc_order');
 
     // Table must have at least one row (our created record)
@@ -180,36 +173,35 @@ test.describe('Quality — Core Lifecycle', () => {
     expect(headerText).not.toMatch(/qc_iqc_/i);
   });
 
-  test('QC-002 @critical: IQC order created → complete → result PASS', async ({
-    page,
-  }) => {
+  test('QC-002 @critical: IQC order created → complete → result PASS', async ({ page }) => {
     expect(iqcOrderId).toBeTruthy();
 
     // Verify IQC record exists in the real UI list
     const listResponse = await navigateToQualityPage(page, '来料检验', 'qc_iqc_order');
     const listBody = await listResponse.json();
-    const listRecords = (listBody?.data?.records ?? listBody?.data?.data ?? []) as Array<Record<string, unknown>>;
+    const listRecords = (listBody?.data?.records ?? listBody?.data?.data ?? []) as Array<
+      Record<string, unknown>
+    >;
     expect(listRecords.length).toBeGreaterThan(0);
-    expect(listRecords.some((record) => String(record.qc_iqc_material_id) === `MAT_${UID}`)).toBe(true);
+    expect(listRecords.some((record) => String(record.qc_iqc_material_id) === `MAT_${UID}`)).toBe(
+      true,
+    );
 
     // Complete the IQC (STATE_TRANSITION: pending → PASS)
-    await executeCommandViaApi(
-      page,
-      'qc:complete_iqc',
-      {},
-      iqcOrderId,
-      'state_transition',
-    );
+    await executeCommandViaApi(page, 'qc:complete_iqc', {}, iqcOrderId, 'state_transition');
 
     // Verify the UI reflects the completed result.
     const completedListResponse = await navigateToQualityPage(page, '来料检验', 'qc_iqc_order');
     const completedBody = await completedListResponse.json();
-    const completedRecords = (completedBody?.data?.records ?? completedBody?.data?.data ?? []) as Array<Record<string, unknown>>;
+    const completedRecords = (completedBody?.data?.records ??
+      completedBody?.data?.data ??
+      []) as Array<Record<string, unknown>>;
     expect(completedRecords.length).toBeGreaterThan(0);
     expect(
-      completedRecords.some((record) =>
-        String(record.qc_iqc_material_id) === `MAT_${UID}` &&
-        /pass|合格/i.test(String(record.qc_iqc_result ?? ''))
+      completedRecords.some(
+        (record) =>
+          String(record.qc_iqc_material_id) === `MAT_${UID}` &&
+          /pass|合格/i.test(String(record.qc_iqc_result ?? '')),
       ),
     ).toBe(true);
   });
@@ -218,9 +210,7 @@ test.describe('Quality — Core Lifecycle', () => {
   // Defect Record (缺陷记录)
   // =========================================================================
 
-  test('QC-003 @smoke: Navigate to 缺陷记录 list via sidebar menu', async ({
-    page,
-  }) => {
+  test('QC-003 @smoke: Navigate to 缺陷记录 list via sidebar menu', async ({ page }) => {
     await navigateToQualityPage(page, '缺陷记录', 'qc_defect_record');
 
     const rows = page.locator('tbody tr');
@@ -233,15 +223,11 @@ test.describe('Quality — Core Lifecycle', () => {
     expect(headerText).not.toMatch(/qc_dr_/i);
   });
 
-  test('QC-004 @critical: Defect record → resolve → close lifecycle', async ({
-    page,
-  }) => {
+  test('QC-004 @critical: Defect record → resolve → close lifecycle', async ({ page }) => {
     expect(defectRecordId).toBeTruthy();
 
     // Verify record exists (status = open)
-    const resp = await page.request.get(
-      `/api/dynamic/qc_defect_record/${defectRecordId}`,
-    );
+    const resp = await page.request.get(`/api/dynamic/qc_defect_record/${defectRecordId}`);
     expect(resp.ok()).toBe(true);
     const body = await resp.json();
     const record = body?.data ?? body;
@@ -257,26 +243,16 @@ test.describe('Quality — Core Lifecycle', () => {
     );
 
     // Verify status = resolved
-    const resolvedResp = await page.request.get(
-      `/api/dynamic/qc_defect_record/${defectRecordId}`,
-    );
+    const resolvedResp = await page.request.get(`/api/dynamic/qc_defect_record/${defectRecordId}`);
     expect(resolvedResp.ok()).toBe(true);
     const resolvedBody = await resolvedResp.json();
     expect((resolvedBody?.data ?? resolvedBody).qc_dr_status).toBe('resolved');
 
     // Close the defect
-    await executeCommandViaApi(
-      page,
-      'qc:close_defect',
-      {},
-      defectRecordId,
-      'state_transition',
-    );
+    await executeCommandViaApi(page, 'qc:close_defect', {}, defectRecordId, 'state_transition');
 
     // Verify status = closed
-    const closedResp = await page.request.get(
-      `/api/dynamic/qc_defect_record/${defectRecordId}`,
-    );
+    const closedResp = await page.request.get(`/api/dynamic/qc_defect_record/${defectRecordId}`);
     expect(closedResp.ok()).toBe(true);
     const closedBody = await closedResp.json();
     expect((closedBody?.data ?? closedBody).qc_dr_status).toBe('closed');
@@ -293,9 +269,7 @@ test.describe('Quality — Core Lifecycle', () => {
   // NCR (不合格品处理)
   // =========================================================================
 
-  test('QC-005 @smoke: Navigate to 不合格品处理 list via sidebar menu', async ({
-    page,
-  }) => {
+  test('QC-005 @smoke: Navigate to 不合格品处理 list via sidebar menu', async ({ page }) => {
     await navigateToQualityPage(page, '不合格品处理', 'qc_ncr');
 
     const rows = page.locator('tbody tr');
@@ -308,15 +282,11 @@ test.describe('Quality — Core Lifecycle', () => {
     expect(headerText).not.toMatch(/qc_nc_/i);
   });
 
-  test('QC-006 @critical: NCR created → handle → close lifecycle', async ({
-    page,
-  }) => {
+  test('QC-006 @critical: NCR created → handle → close lifecycle', async ({ page }) => {
     expect(ncrId).toBeTruthy();
 
     // Verify status = open
-    const resp = await page.request.get(
-      `/api/dynamic/qc_ncr/${ncrId}`,
-    );
+    const resp = await page.request.get(`/api/dynamic/qc_ncr/${ncrId}`);
     expect(resp.ok()).toBe(true);
     const body = await resp.json();
     expect((body?.data ?? body).qc_nc_status).toBe('open');
@@ -347,9 +317,7 @@ test.describe('Quality — Core Lifecycle', () => {
   // CAPA (纠正预防措施)
   // =========================================================================
 
-  test('QC-007 @smoke: Navigate to 纠正预防措施 list via sidebar menu', async ({
-    page,
-  }) => {
+  test('QC-007 @smoke: Navigate to 纠正预防措施 list via sidebar menu', async ({ page }) => {
     await navigateToQualityPage(page, '纠正预防措施', 'qc_capa');
 
     const rows = page.locator('tbody tr');
@@ -362,9 +330,7 @@ test.describe('Quality — Core Lifecycle', () => {
     expect(headerText).not.toMatch(/qc_capa_/i);
   });
 
-  test('QC-008 @critical: CAPA created → start → verify → close lifecycle', async ({
-    page,
-  }) => {
+  test('QC-008 @critical: CAPA created → start → verify → close lifecycle', async ({ page }) => {
     expect(capaId).toBeTruthy();
 
     // Verify status = open
@@ -374,13 +340,7 @@ test.describe('Quality — Core Lifecycle', () => {
     expect((body?.data ?? body).qc_capa_status).toBe('open');
 
     // Start the CAPA (open → in_progress)
-    await executeCommandViaApi(
-      page,
-      'qc:start_capa',
-      {},
-      capaId,
-      'state_transition',
-    );
+    await executeCommandViaApi(page, 'qc:start_capa', {}, capaId, 'state_transition');
 
     const inProgressResp = await page.request.get(`/api/dynamic/qc_capa/${capaId}`);
     expect(inProgressResp.ok()).toBe(true);
@@ -388,13 +348,7 @@ test.describe('Quality — Core Lifecycle', () => {
     expect((inProgressBody?.data ?? inProgressBody).qc_capa_status).toBe('in_progress');
 
     // Submit for verification (in_progress → VERIFICATION)
-    await executeCommandViaApi(
-      page,
-      'qc:verify_capa',
-      {},
-      capaId,
-      'state_transition',
-    );
+    await executeCommandViaApi(page, 'qc:verify_capa', {}, capaId, 'state_transition');
 
     const verifyResp = await page.request.get(`/api/dynamic/qc_capa/${capaId}`);
     expect(verifyResp.ok()).toBe(true);

@@ -103,7 +103,7 @@ export const MetricEditor: React.FC<MetricEditorProps> = ({
               <button
                 type="button"
                 onClick={() => removeMetric(index)}
-                className="p-1 text-gray-400 hover:text-red-500 disabled:opacity-30 disabled:cursor-not-allowed"
+                className="p-1 text-gray-400 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-30"
                 disabled={!canRemove}
               >
                 <X className="h-4 w-4" />

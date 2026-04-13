@@ -5,35 +5,16 @@ import { dataSourceConfigSchema, pageDataSourceSchema } from './data-source.sche
 import { handlerConfigSchema } from './handler.schema';
 
 /** Kind values — includes Detail + Dashboard missing from old validator */
-export const KIND_VALUES = ['Page', 'List', 'Form', 'Detail', 'PageLayout', 'Dashboard'] as const;
+export const KIND_VALUES = ['page', 'list', 'form', 'detail', 'page_layout', 'dashboard'] as const;
 
 export const kindEnum = z.enum(KIND_VALUES);
 
-const areaLayoutConfigSchema = z
-  .object({
-    type: z.enum(['grid', 'flex']).optional(),
-    cols: z.number().optional(),
-    rows: z.number().optional(),
-    rowGap: z.number().optional(),
-    colGap: z.number().optional(),
-    direction: z.enum(['row', 'column']).optional(),
-    justify: z.enum(['start', 'end', 'center', 'space-between', 'space-around']).optional(),
-    align: z.enum(['start', 'end', 'center', 'stretch']).optional(),
-    padding: z.union([z.string(), z.number()]).optional(),
-    width: z.union([z.number(), z.string()]).optional(),
-    height: z.union([z.number(), z.string()]).optional(),
-  })
-  .passthrough();
-
 const layoutConfigSchema = z.object({
-  areas: z.array(z.string()).min(1, 'Layout areas must not be empty'),
-  areasConfig: z.record(z.string(), areaLayoutConfigSchema).optional(),
-});
-
-const areaConfigSchema = z.object({
-  blocks: z.array(blockSchema).min(1, 'Area must contain at least one block'),
-  visibleWhen: z.string().optional(),
-  className: z.string().optional(),
+  type: z.enum(['grid', 'stack']).optional(),
+  cols: z.number().optional(),
+  colGap: z.number().optional(),
+  rowGap: z.number().optional(),
+  gap: z.number().optional(),
 });
 
 const eventConfigSchema = z.object({
@@ -58,7 +39,7 @@ export const unifiedSchemaSchema = z
     dataSource: pageDataSourceSchema.optional(),
     stateBinding: z.record(z.string(), z.string()).optional(),
     layout: layoutConfigSchema,
-    areas: z.record(z.string(), areaConfigSchema),
+    blocks: z.array(blockSchema),
     dataSources: z.record(z.string(), dataSourceConfigSchema).optional(),
     handlers: z.record(z.string(), handlerConfigSchema).optional(),
     events: z.record(z.string(), eventConfigSchema).optional(),

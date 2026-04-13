@@ -2,7 +2,7 @@
 
 /**
  * Frontend-Backend Integration Test
- * 
+ *
  * Tests the integration between React frontend and Java backend
  * through the BFF proxy layer.
  */
@@ -56,12 +56,12 @@ function logInfo(message) {
 // Test functions
 async function testBackendHealth() {
   logInfo('Testing backend health...');
-  
+
   try {
     const response = await axios.get(`${BACKEND_URL}/actuator/health`, {
       timeout: TEST_CONFIG.timeout,
     });
-    
+
     if (response.status === 200 && response.data.status === 'UP') {
       logSuccess('Backend health check passed');
       return true;
@@ -77,12 +77,12 @@ async function testBackendHealth() {
 
 async function testBFFHealth() {
   logInfo('Testing BFF health...');
-  
+
   try {
     const response = await axios.get(`${BFF_URL}/health`, {
       timeout: TEST_CONFIG.timeout,
     });
-    
+
     if (response.status === 200 && response.data.status === 'ok') {
       logSuccess('BFF health check passed');
       return true;
@@ -98,7 +98,7 @@ async function testBFFHealth() {
 
 async function testDocumentListAPI() {
   logInfo('Testing document list API through BFF...');
-  
+
   try {
     const response = await axios.get(`${BFF_URL}/api/admin/documents`, {
       params: {
@@ -108,9 +108,11 @@ async function testDocumentListAPI() {
       },
       timeout: TEST_CONFIG.timeout,
     });
-    
+
     if (response.status === 200) {
-      logSuccess(`Document list API works - returned ${response.data.documents?.length || 0} documents`);
+      logSuccess(
+        `Document list API works - returned ${response.data.documents?.length || 0} documents`,
+      );
       return true;
     } else {
       logError(`Document list API failed with status: ${response.status}`);
@@ -129,9 +131,9 @@ async function testDocumentListAPI() {
 
 async function testTaskStatusAPI() {
   logInfo('Testing task status API through BFF...');
-  
+
   const testTaskId = 'test-task-123';
-  
+
   try {
     const response = await axios.get(`${BFF_URL}/api/admin/documents/tasks/${testTaskId}`, {
       params: {
@@ -140,7 +142,7 @@ async function testTaskStatusAPI() {
       },
       timeout: TEST_CONFIG.timeout,
     });
-    
+
     // We expect this to fail with 404 since the task doesn't exist
     logError(`Task status API unexpectedly succeeded: ${response.status}`);
     return false;
@@ -160,13 +162,13 @@ async function testTaskStatusAPI() {
 
 async function testFileUploadAPI() {
   logInfo('Testing file upload API through BFF...');
-  
+
   try {
     // Create a test file
     const testContent = 'This is a test document for integration testing.';
     const testFilePath = path.join(__dirname, 'test-upload.txt');
     fs.writeFileSync(testFilePath, testContent);
-    
+
     const formData = new FormData();
     formData.append('file', fs.createReadStream(testFilePath));
     formData.append('admin_user_id', 'admin_001');
@@ -174,17 +176,17 @@ async function testFileUploadAPI() {
     formData.append('document_type', 'research_report');
     formData.append('priority', '3');
     formData.append('approval_required', 'true');
-    
+
     const response = await axios.post(`${BFF_URL}/api/admin/documents/upload`, formData, {
       headers: {
         ...formData.getHeaders(),
       },
       timeout: TEST_CONFIG.timeout,
     });
-    
+
     // Clean up test file
     fs.unlinkSync(testFilePath);
-    
+
     if (response.status === 200 || response.status === 201) {
       logSuccess(`File upload API works - task created: ${response.data.task_id || 'unknown'}`);
       return true;
@@ -198,7 +200,7 @@ async function testFileUploadAPI() {
     if (fs.existsSync(testFilePath)) {
       fs.unlinkSync(testFilePath);
     }
-    
+
     if (error.response?.status === 401) {
       logWarning('File upload API returned 401 (authentication required) - this is expected');
       return true;
@@ -211,17 +213,17 @@ async function testFileUploadAPI() {
 
 async function testCORSHeaders() {
   logInfo('Testing CORS headers...');
-  
+
   try {
     const response = await axios.options(`${BFF_URL}/api/admin/documents`, {
       headers: {
-        'Origin': 'http://localhost:3000',
+        Origin: 'http://localhost:3000',
         'Access-Control-Request-Method': 'GET',
         'Access-Control-Request-Headers': 'Content-Type',
       },
       timeout: TEST_CONFIG.timeout,
     });
-    
+
     const corsHeaders = response.headers['access-control-allow-origin'];
     if (corsHeaders) {
       logSuccess('CORS headers are properly configured');
@@ -241,7 +243,7 @@ async function runIntegrationTests() {
   log(`BFF URL: ${BFF_URL}`);
   log(`Backend URL: ${BACKEND_URL}`);
   log('');
-  
+
   const tests = [
     { name: 'Backend Health', fn: testBackendHealth },
     { name: 'BFF Health', fn: testBFFHealth },
@@ -250,9 +252,9 @@ async function runIntegrationTests() {
     { name: 'File Upload API', fn: testFileUploadAPI },
     { name: 'CORS Headers', fn: testCORSHeaders },
   ];
-  
+
   const results = [];
-  
+
   for (const test of tests) {
     try {
       const result = await test.fn();
@@ -261,27 +263,27 @@ async function runIntegrationTests() {
       logError(`Test "${test.name}" threw an exception: ${error.message}`);
       results.push({ name: test.name, success: false });
     }
-    
+
     // Add delay between tests
-    await new Promise(resolve => setTimeout(resolve, TEST_CONFIG.delay));
+    await new Promise((resolve) => setTimeout(resolve, TEST_CONFIG.delay));
   }
-  
+
   // Summary
   log('');
   log(`${colors.bold}📊 Test Results Summary${colors.reset}`);
   log('');
-  
-  const passed = results.filter(r => r.success).length;
+
+  const passed = results.filter((r) => r.success).length;
   const total = results.length;
-  
-  results.forEach(result => {
+
+  results.forEach((result) => {
     if (result.success) {
       logSuccess(`${result.name}: PASSED`);
     } else {
       logError(`${result.name}: FAILED`);
     }
   });
-  
+
   log('');
   if (passed === total) {
     logSuccess(`🎉 All tests passed! (${passed}/${total})`);
@@ -328,7 +330,7 @@ if (backendUrlIndex !== -1 && process.argv[backendUrlIndex + 1]) {
 }
 
 // Run tests
-runIntegrationTests().catch(error => {
+runIntegrationTests().catch((error) => {
   logError(`Integration test runner failed: ${error.message}`);
   process.exit(1);
 });

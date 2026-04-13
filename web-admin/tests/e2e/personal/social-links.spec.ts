@@ -23,9 +23,7 @@ test.describe('Social Account Binding', () => {
    * SL-001: Page load and basic structure
    * Verify page title, all 3 provider rows, and info box.
    */
-  test('SL-001: should display page structure with all providers @smoke', async ({
-    page,
-  }) => {
+  test('SL-001: should display page structure with all providers @smoke', async ({ page }) => {
     // Set up API response listener BEFORE navigation
     const apiResponse = page.waitForResponse(
       (resp) =>
@@ -42,15 +40,9 @@ test.describe('Social Account Binding', () => {
     ).toBeVisible({ timeout: 10000 });
 
     // All 3 provider rows
-    await expect(
-      page.locator('[data-testid="social-link-wechat_web"]'),
-    ).toBeVisible();
-    await expect(
-      page.locator('[data-testid="social-link-google"]'),
-    ).toBeVisible();
-    await expect(
-      page.locator('[data-testid="social-link-apple"]'),
-    ).toBeVisible();
+    await expect(page.locator('[data-testid="social-link-wechat_web"]')).toBeVisible();
+    await expect(page.locator('[data-testid="social-link-google"]')).toBeVisible();
+    await expect(page.locator('[data-testid="social-link-apple"]')).toBeVisible();
 
     // Info box (bilingual)
     await expect(page.getByText(/About Social Login|关于社交登录/i)).toBeVisible();
@@ -61,9 +53,7 @@ test.describe('Social Account Binding', () => {
    * When no social accounts are linked, each provider should show
    * "Not linked" status and a "Bind" button.
    */
-  test('SL-002: should show bind buttons for unlinked providers', async ({
-    page,
-  }) => {
+  test('SL-002: should show bind buttons for unlinked providers', async ({ page }) => {
     const apiResponse = page.waitForResponse(
       (resp) =>
         resp.url().includes('/api/user/social-links') &&
@@ -82,9 +72,7 @@ test.describe('Social Account Binding', () => {
 
       // Either "Bind" or "Unlink" button should be visible
       const bindBtn = row.locator(`[data-testid="social-bind-${provider}"]`);
-      const unlinkBtn = row.locator(
-        `[data-testid="social-unlink-${provider}"]`,
-      );
+      const unlinkBtn = row.locator(`[data-testid="social-unlink-${provider}"]`);
       await expect(bindBtn.or(unlinkBtn)).toBeVisible();
     }
   });

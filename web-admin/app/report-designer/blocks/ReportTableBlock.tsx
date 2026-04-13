@@ -1,5 +1,5 @@
 /**
- * ReportTableBlock — renders a data-table block in design or runtime mode
+ * ReportTableBlock — renders a table block in design or runtime mode
  */
 
 import React from 'react';

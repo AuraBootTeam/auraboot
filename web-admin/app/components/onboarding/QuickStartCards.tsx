@@ -8,6 +8,7 @@ import {
   PaintBrushIcon,
   BookOpenIcon,
   ChatBubbleLeftRightIcon,
+  DevicePhoneMobileIcon,
 } from '@heroicons/react/24/outline';
 import { useAuraBot } from '~/aurabot';
 
@@ -32,6 +33,13 @@ const CARDS = [
     icon: BookOpenIcon,
     to: '/dashboards',
     color: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400',
+  },
+  {
+    title: 'Mobile Config',
+    description: 'Manage tenant and platform runtime config',
+    icon: DevicePhoneMobileIcon,
+    to: '/admin/mobile-config',
+    color: 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
   },
 ] as const;
 

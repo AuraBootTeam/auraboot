@@ -49,11 +49,11 @@ describe('Studio DesignerPreview', () => {
     mockUseSchemaRuntime.mockReset();
 
     mockConvert.mockImplementation(() => ({
-      kind: 'Form',
+      kind: 'form',
       version: '1.0.0',
       id: 'form_1',
-      layout: { areas: [], areasConfig: {} },
-      areas: {},
+      layout: { type: 'stack' },
+      blocks: [],
     }));
     mockUsePageDataSources.mockImplementation(() => ({ manager: {} }));
   });

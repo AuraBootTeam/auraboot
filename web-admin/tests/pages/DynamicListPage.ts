@@ -20,26 +20,25 @@ export class DynamicListPage extends BasePage {
 
   async goto(): Promise<void> {
     // Set up list API listener BEFORE navigation so we catch the response
-    const listResponsePromise = this.page.waitForResponse(
-      (resp) => resp.url().includes('/list') && resp.status() === 200,
-      { timeout: 10000 }
-    ).catch(() => null);
+    const listResponsePromise = this.page
+      .waitForResponse((resp) => resp.url().includes('/list') && resp.status() === 200, {
+        timeout: 10000,
+      })
+      .catch(() => null);
 
     await this.page.goto(this.path);
     await this.waitForLoad();
 
-    // Wait for spinner to disappear
+    // Wait for spinner to disappear (short timeout — spinner may already be gone)
     const spinner = this.page.locator('.animate-spin, [data-testid="loading"]');
-    try {
-      await spinner.waitFor({ state: 'visible', timeout: 2000 });
-    } catch {
-      // Spinner might already be gone
-    }
-    await expect(spinner).not.toBeVisible({ timeout: 15000 });
+    await expect(spinner).not.toBeVisible({ timeout: 5000 }).catch(() => {});
 
     // Wait for table content to appear
     const content = this.page.locator('table, [role="table"]');
-    await content.first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+    await content
+      .first()
+      .waitFor({ state: 'visible', timeout: 5000 })
+      .catch(() => {});
 
     // Wait for list data API to return
     await listResponsePromise;
@@ -50,7 +49,7 @@ export class DynamicListPage extends BasePage {
   /** Get a filter input by field name or placeholder */
   filterInput(fieldOrPlaceholder: string): Locator {
     return this.page.locator(
-      `input[name="${fieldOrPlaceholder}"], input[placeholder*="${fieldOrPlaceholder}"]`
+      `input[name="${fieldOrPlaceholder}"], input[placeholder*="${fieldOrPlaceholder}"]`,
     );
   }
 
@@ -121,21 +120,22 @@ export class DynamicListPage extends BasePage {
   /** Click a tab by its key */
   async clickTab(key: string): Promise<void> {
     const tab = this.page.locator(`[data-testid="tab-${key}"]`);
-    const listResponse = this.page.waitForResponse(
-      (r) => r.url().includes('/list') && r.status() === 200,
-      { timeout: 5000 }
-    ).catch(() => null);
+    const listResponse = this.page
+      .waitForResponse((r) => r.url().includes('/list') && r.status() === 200, { timeout: 5000 })
+      .catch(() => null);
     await tab.click();
     await listResponse;
   }
 
   /** Click a tab by text (fallback for tabs without data-testid) */
   async clickTabByText(text: string | RegExp): Promise<void> {
-    const tab = this.page.locator('nav[aria-label="Tabs"] button').filter({ hasText: text }).first();
-    const listResponse = this.page.waitForResponse(
-      (r) => r.url().includes('/list') && r.status() === 200,
-      { timeout: 5000 }
-    ).catch(() => null);
+    const tab = this.page
+      .locator('nav[aria-label="Tabs"] button')
+      .filter({ hasText: text })
+      .first();
+    const listResponse = this.page
+      .waitForResponse((r) => r.url().includes('/list') && r.status() === 200, { timeout: 5000 })
+      .catch(() => null);
     await tab.click();
     await listResponse;
   }

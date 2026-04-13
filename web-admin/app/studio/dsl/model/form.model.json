@@ -1,5 +1,5 @@
 {
-  "kind": "Form",
+  "kind": "form",
   "version": "1.0.0",
   "id": "form.meta.model",
   "title": "$i18n:form.model.title",

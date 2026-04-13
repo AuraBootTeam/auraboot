@@ -355,7 +355,7 @@ function MergeDetailPanel({
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-end bg-black/40 backdrop-blur-sm sm:items-start sm:pt-16">
       <div
-        className="relative mx-auto flex h-full w-full max-w-4xl flex-col overflow-hidden bg-white shadow-2xl dark:bg-gray-800 sm:max-h-[85vh] sm:rounded-2xl"
+        className="relative mx-auto flex h-full w-full max-w-4xl flex-col overflow-hidden bg-white shadow-2xl sm:max-h-[85vh] sm:rounded-2xl dark:bg-gray-800"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -486,12 +486,10 @@ function DataRow({
   return (
     <div
       className={`flex rounded-lg px-3 py-2 text-sm ${
-        highlight
-          ? 'bg-green-50 dark:bg-green-900/20'
-          : 'bg-gray-50 dark:bg-gray-700/30'
+        highlight ? 'bg-green-50 dark:bg-green-900/20' : 'bg-gray-50 dark:bg-gray-700/30'
       }`}
     >
-      <span className="w-32 flex-shrink-0 font-medium text-gray-500 dark:text-gray-400 capitalize">
+      <span className="w-32 flex-shrink-0 font-medium text-gray-500 capitalize dark:text-gray-400">
         {label.replace(/_/g, ' ')}
       </span>
       <span

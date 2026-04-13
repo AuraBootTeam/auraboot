@@ -15,12 +15,7 @@
  */
 
 import { test, expect } from '@playwright/test';
-import {
-  uniqueId,
-  todayStr,
-  executeCommandViaApi,
-  waitForDynamicPageLoad,
-} from '../helpers';
+import { uniqueId, todayStr, executeCommandViaApi, waitForDynamicPageLoad } from '../helpers';
 
 const uid = uniqueId('inb');
 
@@ -33,10 +28,10 @@ let productPid: string;
  */
 async function gotoInboundDetail(page: import('@playwright/test').Page, pid: string) {
   const listResp = page.waitForResponse(
-    (r) => r.url().includes('/api/dynamic/inv-inbound-line/list') && r.status() === 200,
+    (r) => r.url().includes('/api/dynamic/inv_inbound_line/list') && r.status() === 200,
     { timeout: 15_000 },
   );
-  await page.goto(`/dynamic/inv-inbound/view/${pid}`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`/p/inv_inbound/view/${pid}`, { waitUntil: 'domcontentloaded' });
   await waitForDynamicPageLoad(page);
   await listResp;
 }
@@ -145,8 +140,12 @@ test.describe('Inbound Receipt — SubTable Line Item CRUD', () => {
     // Save without filling required fields
     await page.getByTestId('subtable-save-btn').click();
 
-    await expect(page.getByTestId('subtable-error-inv_in_line_product_id')).toBeVisible({ timeout: 3_000 });
-    await expect(page.getByTestId('subtable-error-inv_in_line_qty')).toBeVisible({ timeout: 3_000 });
+    await expect(page.getByTestId('subtable-error-inv_in_line_product_id')).toBeVisible({
+      timeout: 3_000,
+    });
+    await expect(page.getByTestId('subtable-error-inv_in_line_qty')).toBeVisible({
+      timeout: 3_000,
+    });
   });
 
   test('add line via UI computes amount (qty * price)', async ({ page }) => {
@@ -169,12 +168,14 @@ test.describe('Inbound Receipt — SubTable Line Item CRUD', () => {
 
     // Wait for table refresh
     await page.waitForResponse(
-      (r) => r.url().includes('/api/dynamic/inv-inbound-line/list') && r.status() === 200,
+      (r) => r.url().includes('/api/dynamic/inv_inbound_line/list') && r.status() === 200,
       { timeout: 10_000 },
     );
 
     // Row should appear with computed amount = 255
-    const rows = page.locator('table tbody tr').filter({ hasNot: page.getByTestId('subtable-add-form') });
+    const rows = page
+      .locator('table tbody tr')
+      .filter({ hasNot: page.getByTestId('subtable-add-form') });
     await expect(rows.first()).toBeVisible({ timeout: 5_000 });
 
     const amountCell = rows.first().locator('td').nth(3);
@@ -220,11 +221,14 @@ test.describe('Inbound Receipt — SubTable Line Item CRUD', () => {
     await gotoInboundDetail(page, inboundPid);
 
     // Should have 2 rows
-    const dataRows = page.locator('table tbody tr').filter({
-      hasNot: page.getByTestId('subtable-add-form'),
-    }).filter({
-      hasNot: page.getByTestId('subtable-form-error'),
-    });
+    const dataRows = page
+      .locator('table tbody tr')
+      .filter({
+        hasNot: page.getByTestId('subtable-add-form'),
+      })
+      .filter({
+        hasNot: page.getByTestId('subtable-form-error'),
+      });
     await expect(dataRows).toHaveCount(2, { timeout: 5_000 });
 
     // Delete the first row
@@ -232,7 +236,8 @@ test.describe('Inbound Receipt — SubTable Line Item CRUD', () => {
     await expect(deleteBtn).toBeVisible({ timeout: 5_000 });
 
     const deleteResp = page.waitForResponse(
-      (r) => r.url().includes('/api/meta/commands/execute/pe:delete_wh_in_line') && r.status() === 200,
+      (r) =>
+        r.url().includes('/api/meta/commands/execute/pe:delete_wh_in_line') && r.status() === 200,
       { timeout: 10_000 },
     );
     await deleteBtn.click();
@@ -240,7 +245,7 @@ test.describe('Inbound Receipt — SubTable Line Item CRUD', () => {
 
     // Wait for refresh
     await page.waitForResponse(
-      (r) => r.url().includes('/api/dynamic/inv-inbound-line/list') && r.status() === 200,
+      (r) => r.url().includes('/api/dynamic/inv_inbound_line/list') && r.status() === 200,
       { timeout: 10_000 },
     );
 

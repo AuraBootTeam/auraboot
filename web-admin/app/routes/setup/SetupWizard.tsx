@@ -32,7 +32,12 @@ export default function SetupWizard() {
     seedDemoData: true,
   });
   const [phase, setPhase] = useState<'form' | 'progress' | 'done' | 'error'>('form');
-  const [progress, setProgress] = useState({ completedSteps: 0, totalSteps: 15, currentStep: '', status: '' });
+  const [progress, setProgress] = useState({
+    completedSteps: 0,
+    totalSteps: 15,
+    currentStep: '',
+    status: '',
+  });
   const [formError, setFormError] = useState('');
   const [setupError, setSetupError] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -117,7 +122,9 @@ export default function SetupWizard() {
             A
           </div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Welcome to AuraBoot</h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Set up your platform in a few seconds</p>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            Set up your platform in a few seconds
+          </p>
         </div>
 
         {/* Card */}
@@ -134,7 +141,7 @@ export default function SetupWizard() {
                   value={formData.companyName}
                   onChange={(e) => handleChange('companyName', e.target.value)}
                   placeholder="My Company"
-                  className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                  className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                 />
               </div>
 
@@ -148,7 +155,7 @@ export default function SetupWizard() {
                   value={formData.adminEmail}
                   onChange={(e) => handleChange('adminEmail', e.target.value)}
                   placeholder="admin@company.com"
-                  className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                  className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                 />
               </div>
 
@@ -162,7 +169,7 @@ export default function SetupWizard() {
                   value={formData.adminPassword}
                   onChange={(e) => handleChange('adminPassword', e.target.value)}
                   placeholder="At least 8 characters"
-                  className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                  className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                 />
               </div>
 
@@ -176,7 +183,7 @@ export default function SetupWizard() {
                   value={formData.confirmPassword}
                   onChange={(e) => handleChange('confirmPassword', e.target.value)}
                   placeholder="Re-enter your password"
-                  className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                  className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                 />
               </div>
 
@@ -189,7 +196,8 @@ export default function SetupWizard() {
                   className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
                 <span className="text-sm text-gray-700 dark:text-gray-300">
-                  Load demo data <span className="text-gray-400">(recommended for first-time users)</span>
+                  Load demo data{' '}
+                  <span className="text-gray-400">(recommended for first-time users)</span>
                 </span>
               </label>
 
@@ -200,7 +208,9 @@ export default function SetupWizard() {
                   onClick={() => setShowAdvanced(!showAdvanced)}
                   className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
                 >
-                  <span className={`transform transition-transform ${showAdvanced ? 'rotate-90' : ''}`}>
+                  <span
+                    className={`transform transition-transform ${showAdvanced ? 'rotate-90' : ''}`}
+                  >
                     &#9654;
                   </span>
                   Advanced Settings
@@ -212,8 +222,16 @@ export default function SetupWizard() {
                     </label>
                     <div className="space-y-2">
                       {[
-                        { value: 'single', label: 'Single Tenant', desc: 'Internal use, one organization' },
-                        { value: 'multi', label: 'Multi Tenant', desc: 'SaaS platform, multiple organizations' },
+                        {
+                          value: 'single',
+                          label: 'Single Tenant',
+                          desc: 'Internal use, one organization',
+                        },
+                        {
+                          value: 'multi',
+                          label: 'Multi Tenant',
+                          desc: 'SaaS platform, multiple organizations',
+                        },
                         { value: 'hybrid', label: 'Hybrid', desc: 'Managed hosting + marketplace' },
                       ].map((opt) => (
                         <label key={opt.value} className="flex cursor-pointer items-start gap-3">
@@ -226,7 +244,9 @@ export default function SetupWizard() {
                             className="mt-0.5 h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500"
                           />
                           <div>
-                            <div className="text-sm font-medium text-gray-700 dark:text-gray-300">{opt.label}</div>
+                            <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                              {opt.label}
+                            </div>
                             <div className="text-xs text-gray-400">{opt.desc}</div>
                           </div>
                         </label>
@@ -254,15 +274,21 @@ export default function SetupWizard() {
             <div className="space-y-6 py-4 text-center">
               <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-blue-200 border-t-blue-600" />
               <div>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Setting up your platform...</h2>
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{progress.currentStep || 'Initializing...'}</p>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Setting up your platform...
+                </h2>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                  {progress.currentStep || 'Initializing...'}
+                </p>
               </div>
               {/* Progress bar */}
               <div>
                 <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
                   <div
                     className="h-full rounded-full bg-blue-600 transition-all duration-500"
-                    style={{ width: `${Math.round((progress.completedSteps / progress.totalSteps) * 100)}%` }}
+                    style={{
+                      width: `${Math.round((progress.completedSteps / progress.totalSteps) * 100)}%`,
+                    }}
                   />
                 </div>
                 <p className="mt-2 text-xs text-gray-400">
@@ -278,7 +304,9 @@ export default function SetupWizard() {
                 &#10003;
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Setup Complete!</h2>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Setup Complete!
+                </h2>
                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                   Redirecting to login...
                 </p>
@@ -292,7 +320,9 @@ export default function SetupWizard() {
                 &#10007;
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Setup Failed</h2>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Setup Failed
+                </h2>
                 <p className="mt-1 text-sm text-red-600 dark:text-red-400">{setupError}</p>
               </div>
               <Button onClick={() => setPhase('form')} variant="outline">

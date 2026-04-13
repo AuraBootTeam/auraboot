@@ -36,6 +36,13 @@ export const FieldBase = React.forwardRef<HTMLDivElement, FieldBaseProps>(
     },
     ref,
   ) => {
+    // When there is no label, no error, and no helpText, render children
+    // directly without a wrapper div to avoid empty spacing/margin artifacts
+    // (e.g. when used inside ControlledFieldRenderer which provides its own label)
+    if (!label && !error && !helpText) {
+      return <>{children}</>;
+    }
+
     const labelElement = label ? (
       <Label
         htmlFor={id}

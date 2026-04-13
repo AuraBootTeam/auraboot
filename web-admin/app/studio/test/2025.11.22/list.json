@@ -1,6 +1,6 @@
 {
   "version": "2.1.0",
-  "kind": "Page",
+  "kind": "page",
   "metadata": {
     "id": "page_store_list",
     "entityCode": "store",

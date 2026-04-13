@@ -5,6 +5,7 @@ import { useSmartFieldContract } from '~/studio/hooks/runtime/useSmartFieldContr
 import { useSmartFieldMeta } from '~/studio/hooks/runtime/useSmartFieldMeta';
 import { useSmartText } from '~/utils/i18n';
 import { FieldBase } from '~/components/ui/field-base';
+import { useDictTree } from './useDictTree';
 
 export type TreeSelectSize = 'small' | 'medium' | 'large';
 export type TreeSelectVariant = 'default' | 'error';
@@ -64,6 +65,10 @@ interface TreeSelectProps {
   onClear?: () => void;
   /** 搜索回调 */
   onSearch?: (searchValue: string) => void;
+  /** Dict code for auto-loading tree data */
+  dictCode?: string;
+  /** Disabled state */
+  disabled?: boolean;
 }
 
 const baseStyles =
@@ -86,7 +91,7 @@ export const TreeSelect = forwardRef<HTMLDivElement, TreeSelectProps>(
     {
       label,
       name,
-      treeData,
+      treeData: externalTreeData,
       value,
       defaultValue,
       placeholder = '请选择',
@@ -107,10 +112,15 @@ export const TreeSelect = forwardRef<HTMLDivElement, TreeSelectProps>(
       onChange,
       onClear,
       onSearch,
+      dictCode,
     },
     ref,
   ) => {
     const st = useSmartText();
+
+    // Auto-load tree data from dict when dictCode is provided
+    const dictTreeData = useDictTree(dictCode, !!externalTreeData);
+    const treeData = externalTreeData || (dictTreeData as any) || [];
     const {
       labelText,
       placeholderText,

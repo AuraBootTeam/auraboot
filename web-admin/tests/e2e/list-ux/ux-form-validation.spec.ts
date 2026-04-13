@@ -38,21 +38,24 @@ async function openCrmLeadCreateForm(page: Page): Promise<void> {
   await crmBtn.evaluate((el: HTMLElement) => el.click());
   await page.waitForResponse(() => true, { timeout: 1_500 }).catch(() => null);
 
-  const leafLink = nav.locator('a[href="/dynamic/crm-lead"]').first();
+  const leafLink = nav.locator('a[href="/p/crm_lead"]').first();
   await leafLink.waitFor({ state: 'attached', timeout: 8_000 });
 
-  const listResponsePromise = page.waitForResponse(
-    (r) => r.url().includes('/api/dynamic/crm_lead') && r.status() === 200,
-    { timeout: 15_000 },
-  ).catch(() => null);
+  const listResponsePromise = page
+    .waitForResponse((r) => r.url().includes('/api/dynamic/crm_lead') && r.status() === 200, {
+      timeout: 15_000,
+    })
+    .catch(() => null);
 
   await leafLink.evaluate((el: HTMLElement) => el.click());
   await listResponsePromise;
 
   // Now click the create button
-  const createBtn = page.locator(
-    '[data-testid="toolbar-btn-create"], button:has-text("新建"), button:has-text("Create")',
-  ).first();
+  const createBtn = page
+    .locator(
+      '[data-testid="toolbar-btn-create"], button:has-text("新建"), button:has-text("Create")',
+    )
+    .first();
   await createBtn.waitFor({ state: 'visible', timeout: 10_000 });
   await createBtn.click();
   await page.waitForURL((url) => url.pathname.includes('/new'), { timeout: 10_000 });
@@ -63,7 +66,9 @@ async function openCrmLeadCreateForm(page: Page): Promise<void> {
   await spinner.waitFor({ state: 'hidden', timeout: 20_000 }).catch(() => {});
 
   // Wait for at least one form input to appear
-  const formInput = page.locator('form input, form textarea, form select, [data-testid^="form-field-"]');
+  const formInput = page.locator(
+    'form input, form textarea, form select, [data-testid^="form-field-"]',
+  );
   await formInput.first().waitFor({ state: 'visible', timeout: 15_000 });
 }
 
@@ -78,9 +83,10 @@ async function openContractCreateForm(page: Page): Promise<void> {
   const nav = page.locator('nav');
 
   // Try to find Contract menu
-  const contractLink = nav.locator('a[href="/dynamic/cc-contract"]').or(
-    nav.locator('a[href*="contract"]'),
-  ).first();
+  const contractLink = nav
+    .locator('a[href="/p/cc_contract"]')
+    .or(nav.locator('a[href*="contract"]'))
+    .first();
 
   const contractExists = await contractLink.isVisible({ timeout: 5_000 }).catch(() => false);
   if (!contractExists) {
@@ -100,17 +106,20 @@ async function openContractCreateForm(page: Page): Promise<void> {
   const linkExists = await link.isVisible({ timeout: 5_000 }).catch(() => false);
   if (!linkExists) return;
 
-  const listResponsePromise = page.waitForResponse(
-    (r) => r.url().includes('/api/dynamic/cc_contract') && r.status() === 200,
-    { timeout: 15_000 },
-  ).catch(() => null);
+  const listResponsePromise = page
+    .waitForResponse((r) => r.url().includes('/api/dynamic/cc_contract') && r.status() === 200, {
+      timeout: 15_000,
+    })
+    .catch(() => null);
 
   await link.evaluate((el: HTMLElement) => el.click());
   await listResponsePromise;
 
-  const createBtn = page.locator(
-    '[data-testid="toolbar-btn-create"], button:has-text("新建"), button:has-text("Create")',
-  ).first();
+  const createBtn = page
+    .locator(
+      '[data-testid="toolbar-btn-create"], button:has-text("新建"), button:has-text("Create")',
+    )
+    .first();
   const hasCrateBtn = await createBtn.isVisible({ timeout: 8_000 }).catch(() => false);
   if (!hasCrateBtn) return;
   await createBtn.click();
@@ -133,7 +142,9 @@ test.describe('UX Form Validation — Inline Errors and Field Types', () => {
   // UFV-001: Submit empty CRM Lead form — inline error appears near field
   // -------------------------------------------------------------------------
 
-  test('UFV-001: Submit empty form — inline error visible near field (not only toast)', async ({ page }) => {
+  test('UFV-001: Submit empty form — inline error visible near field (not only toast)', async ({
+    page,
+  }) => {
     await openCrmLeadCreateForm(page);
 
     // Layer 1 (Render): form is rendered with inputs
@@ -141,9 +152,11 @@ test.describe('UX Form Validation — Inline Errors and Field Types', () => {
     await expect(formContent.first()).toBeVisible({ timeout: 10_000 });
 
     // Click Save without filling anything
-    const saveBtn = page.locator(
-      '[data-testid^="form-btn-"], button:has-text("保存"), button:has-text("Save"), button[type="submit"]',
-    ).first();
+    const saveBtn = page
+      .locator(
+        '[data-testid^="form-btn-"], button:has-text("保存"), button:has-text("Save"), button[type="submit"]',
+      )
+      .first();
     await saveBtn.waitFor({ state: 'visible', timeout: 10_000 });
     await saveBtn.click();
 
@@ -196,9 +209,11 @@ test.describe('UX Form Validation — Inline Errors and Field Types', () => {
     await expect(formContent.first()).toBeVisible({ timeout: 10_000 });
 
     // Submit empty form
-    const saveBtn = page.locator(
-      '[data-testid^="form-btn-"], button:has-text("保存"), button:has-text("Save"), button[type="submit"]',
-    ).first();
+    const saveBtn = page
+      .locator(
+        '[data-testid^="form-btn-"], button:has-text("保存"), button:has-text("Save"), button[type="submit"]',
+      )
+      .first();
     await saveBtn.waitFor({ state: 'visible', timeout: 10_000 });
     await saveBtn.click();
 
@@ -232,7 +247,10 @@ test.describe('UX Form Validation — Inline Errors and Field Types', () => {
     if (!firstErrorElement) {
       // No inline errors found — acceptable if form uses a different validation UX
       // (e.g., error toast or top banner). Mark as inconclusive but not failed.
-      test.skip(true, 'UFV-002: no inline error elements found — form may use toast-only validation');
+      test.skip(
+        true,
+        'UFV-002: no inline error elements found — form may use toast-only validation',
+      );
       return;
     }
 
@@ -260,7 +278,9 @@ test.describe('UX Form Validation — Inline Errors and Field Types', () => {
   // UFV-003: Date fields render as DatePicker, not plain TextInput
   // -------------------------------------------------------------------------
 
-  test('UFV-003: Date fields render as date input or DatePicker (not plain text)', async ({ page }) => {
+  test('UFV-003: Date fields render as date input or DatePicker (not plain text)', async ({
+    page,
+  }) => {
     // Try CRM Lead form first
     await openCrmLeadCreateForm(page);
 
@@ -268,11 +288,11 @@ test.describe('UX Form Validation — Inline Errors and Field Types', () => {
     // DSL date fields should render as input[type="date"] or a DatePicker component
     const datePicker = page.locator(
       'input[type="date"], ' +
-      '[data-testid*="_date"] input, ' +
-      '[data-testid*="_time"] input, ' +
-      '.ant-picker input, ' +
-      '[class*="datepicker"] input, ' +
-      '[class*="date-picker"] input',
+        '[data-testid*="_date"] input, ' +
+        '[data-testid*="_time"] input, ' +
+        '.ant-picker input, ' +
+        '[class*="datepicker"] input, ' +
+        '[class*="date-picker"] input',
     );
 
     const datePickerCount = await datePicker.count();
@@ -325,9 +345,11 @@ test.describe('UX Form Validation — Inline Errors and Field Types', () => {
     await expect(formContent.first()).toBeVisible({ timeout: 10_000 });
 
     // Submit empty form
-    const saveBtn = page.locator(
-      '[data-testid^="form-btn-"], button:has-text("保存"), button:has-text("Save"), button[type="submit"]',
-    ).first();
+    const saveBtn = page
+      .locator(
+        '[data-testid^="form-btn-"], button:has-text("保存"), button:has-text("Save"), button[type="submit"]',
+      )
+      .first();
     await saveBtn.waitFor({ state: 'visible', timeout: 10_000 });
     await saveBtn.click();
 
@@ -344,7 +366,7 @@ test.describe('UX Form Validation — Inline Errors and Field Types', () => {
       const visible = await el.isVisible({ timeout: 1_000 }).catch(() => false);
       if (!visible) continue;
 
-      const text = (await el.textContent().catch(() => '') || '').trim();
+      const text = ((await el.textContent().catch(() => '')) || '').trim();
       if (text.length === 0) continue;
 
       // Layer 2 (Data): error text must NOT be a raw i18n key
@@ -355,10 +377,7 @@ test.describe('UX Form Validation — Inline Errors and Field Types', () => {
       ).not.toMatch(/^[a-z][a-z_]+\.[a-z_]+(\.[a-z_]+)*$/);
 
       // Error message must not be empty after trimming
-      expect(
-        text.length,
-        `UFV-004: error message must have visible text`,
-      ).toBeGreaterThan(0);
+      expect(text.length, `UFV-004: error message must have visible text`).toBeGreaterThan(0);
     }
   });
 
@@ -390,9 +409,11 @@ test.describe('UX Form Validation — Inline Errors and Field Types', () => {
       if (!visible) continue;
 
       visibleLabelCount++;
-      const text = (await label.textContent().catch(() => '') || '').trim()
+      const text = ((await label.textContent().catch(() => '')) || '')
+        .trim()
         // Remove required indicator (*)
-        .replace(/\s*\*\s*$/, '').trim();
+        .replace(/\s*\*\s*$/, '')
+        .trim();
 
       if (text.length === 0) continue;
 
@@ -423,9 +444,11 @@ test.describe('UX Form Validation — Inline Errors and Field Types', () => {
     const formContent = page.locator('form input, [data-testid^="form-field-"]');
     await expect(formContent.first()).toBeVisible({ timeout: 10_000 });
 
-    const saveBtn = page.locator(
-      '[data-testid^="form-btn-"], button:has-text("保存"), button:has-text("Save"), button[type="submit"]',
-    ).first();
+    const saveBtn = page
+      .locator(
+        '[data-testid^="form-btn-"], button:has-text("保存"), button:has-text("Save"), button[type="submit"]',
+      )
+      .first();
     await saveBtn.waitFor({ state: 'visible', timeout: 10_000 });
 
     // First submit (will fail validation)

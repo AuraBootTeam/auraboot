@@ -40,10 +40,6 @@ export * from './property-editors';
 export * from './shortcuts';
 export * from './preview';
 
-// Page management
-export * from './page-list';
-export * from './new-page-wizard';
-
 // Settings
 export * from './settings';
 

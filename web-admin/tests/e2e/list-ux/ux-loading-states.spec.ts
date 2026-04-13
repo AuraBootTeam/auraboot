@@ -24,10 +24,7 @@ import { uniqueId, executeCommandViaApi } from '../helpers/index';
 // Helper: navigate to a CRM page via sidebar menu
 // ---------------------------------------------------------------------------
 
-async function navigateToCrmPageViaMenu(
-  page: Page,
-  modelCode: string,
-): Promise<void> {
+async function navigateToCrmPageViaMenu(page: Page, modelCode: string): Promise<void> {
   await page.goto('/dashboards');
   await page.waitForLoadState('domcontentloaded');
 
@@ -40,7 +37,7 @@ async function navigateToCrmPageViaMenu(
   await page.waitForResponse(() => true, { timeout: 1_500 }).catch(() => null);
 
   // Click leaf link
-  const hrefPath = `/dynamic/${modelCode.replace(/_/g, '-')}`;
+  const hrefPath = `/p/${modelCode}`;
   const leafLink = nav.locator(`a[href="${hrefPath}"]`).first();
   await leafLink.waitFor({ state: 'attached', timeout: 8_000 });
   await leafLink.evaluate((el: HTMLElement) => el.click());
@@ -67,7 +64,7 @@ async function navigateToPluginPageViaMenu(
     await page.waitForResponse(() => true, { timeout: 1_500 }).catch(() => null);
   }
 
-  const hrefPath = `/dynamic/${modelCode.replace(/_/g, '-')}`;
+  const hrefPath = `/p/${modelCode}`;
   const leafLink = nav.locator(`a[href="${hrefPath}"]`).first();
   await leafLink.waitFor({ state: 'attached', timeout: 8_000 });
   await leafLink.evaluate((el: HTMLElement) => el.click());
@@ -96,12 +93,18 @@ test.describe('UX Loading States — Skeleton and Spinner Behavior', () => {
     const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     try {
-      await executeCommandViaApi(page, 'crm:create_lead', {
-        crm_lead_company: `ULS Lead ${UID}`,
-        crm_lead_contact_name: `ULS Contact ${UID}`,
-        crm_lead_source: 'website',
-        crm_lead_status: 'new',
-      }, undefined, 'create');
+      await executeCommandViaApi(
+        page,
+        'crm:create_lead',
+        {
+          crm_lead_company: `ULS Lead ${UID}`,
+          crm_lead_contact_name: `ULS Contact ${UID}`,
+          crm_lead_source: 'website',
+          crm_lead_status: 'new',
+        },
+        undefined,
+        'create',
+      );
     } catch {
       // Best-effort — list may already have data
     } finally {
@@ -113,7 +116,9 @@ test.describe('UX Loading States — Skeleton and Spinner Behavior', () => {
   // ULS-001: CRM Lead list shows skeleton THEN real data rows
   // -------------------------------------------------------------------------
 
-  test('ULS-001: CRM Lead list — skeleton visible during load, data visible after', async ({ page }) => {
+  test('ULS-001: CRM Lead list — skeleton visible during load, data visible after', async ({
+    page,
+  }) => {
     // Intercept the list API so we can control timing observations
     let listCallCount = 0;
     page.on('response', (resp) => {
@@ -125,7 +130,7 @@ test.describe('UX Loading States — Skeleton and Spinner Behavior', () => {
     // Set up the response promise BEFORE navigating so we don't miss it
     const listApiPromise = page.waitForResponse(
       (r) =>
-        (r.url().includes('/api/dynamic/crm_lead') || r.url().includes('/api/dynamic/crm-lead')) &&
+        (r.url().includes('/api/dynamic/crm_lead') || r.url().includes('/api/dynamic/crm_lead')) &&
         r.status() === 200,
       { timeout: 25_000 },
     );
@@ -141,7 +146,10 @@ test.describe('UX Loading States — Skeleton and Spinner Behavior', () => {
     // We allow a race: if it's already gone (very fast network), we accept
     const skeletonOrSpinnerWasPresent =
       (await skeleton.isVisible({ timeout: 3_000 }).catch(() => false)) ||
-      (await spinner.first().isVisible({ timeout: 3_000 }).catch(() => false));
+      (await spinner
+        .first()
+        .isVisible({ timeout: 3_000 })
+        .catch(() => false));
 
     // Wait for actual list API response
     await listApiPromise;
@@ -154,10 +162,7 @@ test.describe('UX Loading States — Skeleton and Spinner Behavior', () => {
 
     // Layer 3 (Behavior): skeleton must NOT still be visible once data is shown
     const skeletonAfterLoad = await skeleton.isVisible({ timeout: 500 }).catch(() => false);
-    expect(
-      skeletonAfterLoad,
-      'ULS-001: skeleton must disappear after data is loaded',
-    ).toBe(false);
+    expect(skeletonAfterLoad, 'ULS-001: skeleton must disappear after data is loaded').toBe(false);
 
     // Bonus: log whether skeleton was caught — useful for coverage evidence
     if (!skeletonOrSpinnerWasPresent) {
@@ -175,15 +180,18 @@ test.describe('UX Loading States — Skeleton and Spinner Behavior', () => {
     await navigateToCrmPageViaMenu(page, 'crm_lead');
 
     // Wait for the page URL to settle
-    await page.waitForURL(/\/dynamic\/crm-lead/, { timeout: 15_000 });
+    await page.waitForURL(/\/p\/crm[_-]lead/, { timeout: 15_000 });
 
     // Wait for first load to complete
-    await page.waitForResponse(
-      (r) =>
-        (r.url().includes('/api/dynamic/crm_lead') || r.url().includes('/api/dynamic/crm-lead')) &&
-        r.status() === 200,
-      { timeout: 15_000 },
-    ).catch(() => null);
+    await page
+      .waitForResponse(
+        (r) =>
+          (r.url().includes('/api/dynamic/crm_lead') ||
+            r.url().includes('/api/dynamic/crm_lead')) &&
+          r.status() === 200,
+        { timeout: 15_000 },
+      )
+      .catch(() => null);
 
     // Layer 2 (Data): verify we have table content
     const mainContent = page.locator('[data-testid="dynamic-list"], table');
@@ -198,7 +206,9 @@ test.describe('UX Loading States — Skeleton and Spinner Behavior', () => {
     // The loading row pattern is: <span class="loading loading-spinner ...">
     const inlineSpinner = page.locator('tbody .loading-spinner, tbody [class*="loading-spinner"]');
     const spinnerStuck = await inlineSpinner.isVisible({ timeout: 2_000 }).catch(() => false);
-    expect(spinnerStuck, 'ULS-002: loading spinner inside table must not be stuck after load').toBe(false);
+    expect(spinnerStuck, 'ULS-002: loading spinner inside table must not be stuck after load').toBe(
+      false,
+    );
   });
 
   // -------------------------------------------------------------------------
@@ -209,7 +219,7 @@ test.describe('UX Loading States — Skeleton and Spinner Behavior', () => {
     // Fresh page load to ensure we go through the full loading cycle
     const listResponsePromise = page.waitForResponse(
       (r) =>
-        (r.url().includes('/api/dynamic/crm_lead') || r.url().includes('/api/dynamic/crm-lead')) &&
+        (r.url().includes('/api/dynamic/crm_lead') || r.url().includes('/api/dynamic/crm_lead')) &&
         r.status() === 200,
       { timeout: 20_000 },
     );
@@ -223,9 +233,13 @@ test.describe('UX Loading States — Skeleton and Spinner Behavior', () => {
 
     // Layer 1 (Render): dynamic-page-list container must exist
     const dynamicPageContainer = page.locator('[data-testid="dynamic-page-list"]');
-    const containerExists = await dynamicPageContainer.isVisible({ timeout: 3_000 }).catch(() => false);
+    const containerExists = await dynamicPageContainer
+      .isVisible({ timeout: 3_000 })
+      .catch(() => false);
     // Container might use different naming — accept either dynamic-page-list or dynamic-list
-    const listContainer = page.locator('[data-testid="dynamic-page-list"], [data-testid="dynamic-list"]');
+    const listContainer = page.locator(
+      '[data-testid="dynamic-page-list"], [data-testid="dynamic-list"]',
+    );
     await expect(listContainer.first()).toBeVisible({ timeout: 5_000 });
 
     // Layer 3 (Behavior): skeleton must be gone
@@ -241,21 +255,26 @@ test.describe('UX Loading States — Skeleton and Spinner Behavior', () => {
     await navigateToCrmPageViaMenu(page, 'crm_lead');
 
     // Wait for initial load
-    await page.waitForResponse(
-      (r) =>
-        (r.url().includes('/api/dynamic/crm_lead') || r.url().includes('/api/dynamic/crm-lead')) &&
-        r.status() === 200,
-      { timeout: 15_000 },
-    ).catch(() => null);
+    await page
+      .waitForResponse(
+        (r) =>
+          (r.url().includes('/api/dynamic/crm_lead') ||
+            r.url().includes('/api/dynamic/crm_lead')) &&
+          r.status() === 200,
+        { timeout: 15_000 },
+      )
+      .catch(() => null);
 
     const tableRows = page.locator('tbody tr');
     await tableRows.first().waitFor({ state: 'visible', timeout: 12_000 });
     const initialRowCount = await tableRows.count();
 
     // Layer 1 (Render): find the search input
-    const searchInput = page.locator(
-      '[data-testid="search-area"] input, [placeholder*="搜索"], [placeholder*="Search"], input[type="search"]'
-    ).first();
+    const searchInput = page
+      .locator(
+        '[data-testid="filters"] input, [placeholder*="搜索"], [placeholder*="Search"], input[type="search"]',
+      )
+      .first();
 
     const hasSearch = await searchInput.isVisible({ timeout: 5_000 }).catch(() => false);
     if (!hasSearch) {
@@ -266,7 +285,7 @@ test.describe('UX Loading States — Skeleton and Spinner Behavior', () => {
     // Intercept next list API call
     const searchResponsePromise = page.waitForResponse(
       (r) =>
-        (r.url().includes('/api/dynamic/crm_lead') || r.url().includes('/api/dynamic/crm-lead')) &&
+        (r.url().includes('/api/dynamic/crm_lead') || r.url().includes('/api/dynamic/crm_lead')) &&
         r.status() === 200,
       { timeout: 10_000 },
     );
@@ -286,12 +305,15 @@ test.describe('UX Loading States — Skeleton and Spinner Behavior', () => {
 
     // Clear the search to restore state
     await searchInput.clear();
-    await page.waitForResponse(
-      (r) =>
-        (r.url().includes('/api/dynamic/crm_lead') || r.url().includes('/api/dynamic/crm-lead')) &&
-        r.status() === 200,
-      { timeout: 10_000 },
-    ).catch(() => null);
+    await page
+      .waitForResponse(
+        (r) =>
+          (r.url().includes('/api/dynamic/crm_lead') ||
+            r.url().includes('/api/dynamic/crm_lead')) &&
+          r.status() === 200,
+        { timeout: 10_000 },
+      )
+      .catch(() => null);
   });
 
   // -------------------------------------------------------------------------
@@ -309,10 +331,9 @@ test.describe('UX Loading States — Skeleton and Spinner Behavior', () => {
     await page.waitForLoadState('domcontentloaded');
 
     // Set up skeleton capture before navigating
-    const skeletonCapture = page.waitForSelector(
-      '[data-testid="list-page-skeleton"], .loading-spinner',
-      { timeout: 5_000 }
-    ).catch(() => null);
+    const skeletonCapture = page
+      .waitForSelector('[data-testid="list-page-skeleton"], .loading-spinner', { timeout: 5_000 })
+      .catch(() => null);
 
     // Navigate to CRM lead list
     const nav = page.locator('nav');
@@ -321,7 +342,7 @@ test.describe('UX Loading States — Skeleton and Spinner Behavior', () => {
     await crmBtn.evaluate((el: HTMLElement) => el.click());
     await page.waitForResponse(() => true, { timeout: 1_500 }).catch(() => null);
 
-    const hrefPath = '/dynamic/crm-lead';
+    const hrefPath = '/p/crm_lead';
     const leafLink = nav.locator(`a[href="${hrefPath}"]`).first();
     await leafLink.waitFor({ state: 'attached', timeout: 8_000 });
     await leafLink.evaluate((el: HTMLElement) => el.click());
@@ -330,12 +351,15 @@ test.describe('UX Loading States — Skeleton and Spinner Behavior', () => {
     await skeletonCapture;
 
     // Wait for list API response
-    await page.waitForResponse(
-      (r) =>
-        (r.url().includes('/api/dynamic/crm_lead') || r.url().includes('/api/dynamic/crm-lead')) &&
-        r.status() === 200,
-      { timeout: 20_000 },
-    ).catch(() => null);
+    await page
+      .waitForResponse(
+        (r) =>
+          (r.url().includes('/api/dynamic/crm_lead') ||
+            r.url().includes('/api/dynamic/crm_lead')) &&
+          r.status() === 200,
+        { timeout: 20_000 },
+      )
+      .catch(() => null);
 
     // Layer 2 (Data): final state — list is rendered
     const dynamicList = page.locator('[data-testid="dynamic-list"]');

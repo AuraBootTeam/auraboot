@@ -149,7 +149,9 @@ export default function WebFormEditorPage() {
               : typeof styleConfig.redirectUrl === 'string'
                 ? styleConfig.redirectUrl
                 : defaultStyle.redirectUrl,
-          corsOrigins: Array.isArray(corsOrigins) ? corsOrigins.join(', ') : defaultStyle.corsOrigins,
+          corsOrigins: Array.isArray(corsOrigins)
+            ? corsOrigins.join(', ')
+            : defaultStyle.corsOrigins,
         },
         createdAt: typeof data.createdAt === 'string' ? data.createdAt : '',
       });
@@ -275,9 +277,7 @@ export default function WebFormEditorPage() {
         </button>
         <div className="min-w-0 flex-1">
           <h1 className="text-base font-semibold text-gray-900 dark:text-white">{form.name}</h1>
-          {form.channelName && (
-            <p className="text-xs text-gray-400">Channel: {form.channelName}</p>
-          )}
+          {form.channelName && <p className="text-xs text-gray-400">Channel: {form.channelName}</p>}
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -540,9 +540,7 @@ function FieldEditor({
               />
             </div>
             <div>
-              <label className="mb-0.5 block text-xs text-gray-500 dark:text-gray-400">
-                Label
-              </label>
+              <label className="mb-0.5 block text-xs text-gray-500 dark:text-gray-400">Label</label>
               <input
                 type="text"
                 value={field.label}

@@ -123,9 +123,7 @@ function SortableButtonCard({
           </span>
           <span className="text-[10px] text-gray-400">{isExpanded ? '▼' : '▶'}</span>
           <span className="text-xs font-medium">{btn.code}</span>
-          <span className={`rounded px-1 py-0.5 text-[9px] ${badge.className}`}>
-            {badge.label}
-          </span>
+          <span className={`rounded px-1 py-0.5 text-[9px] ${badge.className}`}>{badge.label}</span>
         </div>
         <button
           onClick={(e) => {
@@ -304,7 +302,7 @@ export function ActionButtonEditor({ buttons, onChange, readonly }: ActionButton
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
   const sortableIds = buttons.map((btn, index) => `${btn.code}-${index}`);
@@ -333,7 +331,7 @@ export function ActionButtonEditor({ buttons, onChange, readonly }: ActionButton
         return prev;
       });
     },
-    [buttons, onChange, sortableIds]
+    [buttons, onChange, sortableIds],
   );
 
   const updateButton = useCallback(
@@ -342,7 +340,7 @@ export function ActionButtonEditor({ buttons, onChange, readonly }: ActionButton
       updated[index] = { ...updated[index], ...updates };
       onChange(updated);
     },
-    [buttons, onChange]
+    [buttons, onChange],
   );
 
   const removeButton = useCallback(
@@ -350,7 +348,7 @@ export function ActionButtonEditor({ buttons, onChange, readonly }: ActionButton
       onChange(buttons.filter((_, i) => i !== index));
       setExpandedIndex(null);
     },
-    [buttons, onChange]
+    [buttons, onChange],
   );
 
   const addButton = useCallback(() => {
@@ -374,7 +372,7 @@ export function ActionButtonEditor({ buttons, onChange, readonly }: ActionButton
       updated[index] = btn;
       onChange(updated);
     },
-    [buttons, onChange]
+    [buttons, onChange],
   );
 
   return (

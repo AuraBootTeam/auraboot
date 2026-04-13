@@ -1,5 +1,5 @@
 {
-  "kind": "List",
+  "kind": "list",
   "version": "1.0.0",
   "id": "list.store",
   "title": "$i18n:list.store.title",

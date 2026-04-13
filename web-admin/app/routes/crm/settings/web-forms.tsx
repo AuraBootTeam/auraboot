@@ -290,7 +290,10 @@ function CreateFormModal({
       <div className="mx-4 w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-gray-800">
         <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-gray-700">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">New Web Form</h3>
-          <button onClick={onClose} className="rounded-lg p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700">
+          <button
+            onClick={onClose}
+            className="rounded-lg p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700"
+          >
             <XMarkIcon className="h-5 w-5 text-gray-400" />
           </button>
         </div>

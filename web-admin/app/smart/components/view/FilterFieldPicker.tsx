@@ -100,9 +100,7 @@ export function FilterFieldPicker({
 
   if (!open || !anchorEl) return null;
 
-  const filtered = fields.filter((f) =>
-    f.label.toLowerCase().includes(search.toLowerCase()),
-  );
+  const filtered = fields.filter((f) => f.label.toLowerCase().includes(search.toLowerCase()));
 
   const commonFields = filtered.slice(0, 6);
   const otherFields = filtered.slice(6);
@@ -123,9 +121,7 @@ export function FilterFieldPicker({
       <span className="flex-shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-500">
         {typeBadge(f.fieldType)}
       </span>
-      {activeSet.has(f.fieldCode) && (
-        <span className="flex-shrink-0 text-blue-500">&#10003;</span>
-      )}
+      {activeSet.has(f.fieldCode) && <span className="flex-shrink-0 text-blue-500">&#10003;</span>}
     </button>
   );
 
@@ -155,7 +151,7 @@ export function FilterFieldPicker({
 
         {commonFields.length > 0 && (
           <>
-            <p className="px-2 pb-0.5 pt-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+            <p className="px-2 pt-1 pb-0.5 text-[10px] font-semibold tracking-wider text-gray-400 uppercase">
               Common Fields
             </p>
             {commonFields.map(renderItem)}
@@ -164,7 +160,7 @@ export function FilterFieldPicker({
 
         {otherFields.length > 0 && (
           <>
-            <p className="mt-1 px-2 pb-0.5 pt-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+            <p className="mt-1 px-2 pt-1 pb-0.5 text-[10px] font-semibold tracking-wider text-gray-400 uppercase">
               Other Fields
             </p>
             {otherFields.map(renderItem)}

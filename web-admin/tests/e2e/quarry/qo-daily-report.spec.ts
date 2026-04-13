@@ -5,11 +5,7 @@
  * Flow: create report → add product line → submit → withdraw → delete
  */
 import { test, expect } from '@playwright/test';
-import {
-  navigateToDynamicPage,
-  uniqueId,
-  executeCommandViaApi,
-} from '../helpers/index';
+import { navigateToDynamicPage, uniqueId, executeCommandViaApi } from '../helpers/index';
 import { PAGE_KEYS, getTestProjectId } from '../quarry-management.setup';
 import { ErrorCodes } from '~/services/http-client/types';
 
@@ -30,7 +26,10 @@ test.describe('QO Daily Report', () => {
   let projectId: string | null = null;
 
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json', baseURL: 'http://localhost:5173' });
+    const ctx = await browser.newContext({
+      storageState: 'tests/storage/admin.json',
+      baseURL: 'http://localhost:5173',
+    });
     const page = await ctx.newPage();
     try {
       projectId = await getTestProjectId(page);
@@ -42,41 +41,37 @@ test.describe('QO Daily Report', () => {
   });
 
   test('should navigate to daily report list page', async ({ page }) => {
-    if (!projectId) { throw new Error(String('PM/QO plugin not imported — pm:create_project command unavailable')); }
+    if (!projectId) {
+      throw new Error(String('PM/QO plugin not imported — pm:create_project command unavailable'));
+    }
     await navigateToDynamicPage(page, MODEL);
     await expect(page.locator('table, [role="table"]').first()).toBeVisible();
   });
 
   test('should create daily report and add product line', async ({ page }) => {
-    if (!projectId) { throw new Error(String('PM/QO plugin not imported — pm:create_project command unavailable')); }
+    if (!projectId) {
+      throw new Error(String('PM/QO plugin not imported — pm:create_project command unavailable'));
+    }
     // Create the report
-    const createResult = await executeCommandViaApi(
-      page,
-      'qo:create_daily_report',
-      {
-        qo_project_id: projectId,
-        qo_report_date: randomFutureDate(),
-        qo_remark: `E2E Test ${uniqueId()}`,
-      },
-    );
+    const createResult = await executeCommandViaApi(page, 'qo:create_daily_report', {
+      qo_project_id: projectId,
+      qo_report_date: randomFutureDate(),
+      qo_remark: `E2E Test ${uniqueId()}`,
+    });
     expect(createResult.code).toBe(ErrorCodes.SUCCESS);
     reportPid = createResult.recordId;
     expect(reportPid).toBeTruthy();
 
     // Add a product line (required before submit — HAS_CHILDREN validation)
-    const lineResult = await executeCommandViaApi(
-      page,
-      'qo:add_report_line',
-      {
-        qo_report_id: reportPid,
-        qo_product_category: 'stone',
-        qo_product_spec: '10-20mm',
-        qo_output: 100,
-        qo_sales_qty: 80,
-        qo_sales_amount: 8000,
-        qo_base_price: 100,
-      },
-    );
+    const lineResult = await executeCommandViaApi(page, 'qo:add_report_line', {
+      qo_report_id: reportPid,
+      qo_product_category: 'stone',
+      qo_product_spec: '10-20mm',
+      qo_output: 100,
+      qo_sales_qty: 80,
+      qo_sales_amount: 8000,
+      qo_base_price: 100,
+    });
     expect(lineResult.code).toBe(ErrorCodes.SUCCESS);
 
     // Navigate to list and verify row exists (UI verification)
@@ -85,7 +80,9 @@ test.describe('QO Daily Report', () => {
   });
 
   test('should submit daily report (draft → submitted)', async ({ page }) => {
-    if (!projectId) { throw new Error(String('PM/QO plugin not imported — pm:create_project command unavailable')); }
+    if (!projectId) {
+      throw new Error(String('PM/QO plugin not imported — pm:create_project command unavailable'));
+    }
     expect(reportPid).toBeTruthy();
 
     const result = await executeCommandViaApi(
@@ -103,7 +100,9 @@ test.describe('QO Daily Report', () => {
   });
 
   test('should prevent editing a submitted report', async ({ page }) => {
-    if (!projectId) { throw new Error(String('PM/QO plugin not imported — pm:create_project command unavailable')); }
+    if (!projectId) {
+      throw new Error(String('PM/QO plugin not imported — pm:create_project command unavailable'));
+    }
     expect(reportPid).toBeTruthy();
 
     const result = await executeCommandViaApi(
@@ -119,7 +118,9 @@ test.describe('QO Daily Report', () => {
   });
 
   test('should withdraw a submitted report (submitted → draft)', async ({ page }) => {
-    if (!projectId) { throw new Error(String('PM/QO plugin not imported — pm:create_project command unavailable')); }
+    if (!projectId) {
+      throw new Error(String('PM/QO plugin not imported — pm:create_project command unavailable'));
+    }
     expect(reportPid).toBeTruthy();
 
     const result = await executeCommandViaApi(
@@ -133,7 +134,9 @@ test.describe('QO Daily Report', () => {
   });
 
   test('should delete draft report and verify in list', async ({ page }) => {
-    if (!projectId) { throw new Error(String('PM/QO plugin not imported — pm:create_project command unavailable')); }
+    if (!projectId) {
+      throw new Error(String('PM/QO plugin not imported — pm:create_project command unavailable'));
+    }
     expect(reportPid).toBeTruthy();
 
     const result = await executeCommandViaApi(

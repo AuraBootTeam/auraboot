@@ -152,7 +152,7 @@ function CellContent({
     case 'link':
       return (
         <Link
-          to={`/dynamic/${entityCode}/${record.id}`}
+          to={`/p/${entityCode}/${record.id}`}
           className="text-blue-600 underline hover:text-blue-800"
         >
           {String(value)}

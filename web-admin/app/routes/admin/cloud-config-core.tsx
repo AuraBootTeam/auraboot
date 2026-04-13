@@ -796,7 +796,7 @@ export function ConfigEditorModal({
   const fields = PROVIDER_FIELDS[providerCode] || [];
   const availableProviders = PROVIDERS_BY_TYPE[serviceType] || [];
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Validate required fields
@@ -807,15 +807,18 @@ export function ConfigEditorModal({
     }
 
     setSaving(true);
-    onSave({
-      configLevel,
-      serviceType,
-      providerCode,
-      config: configValues,
-      enabled,
-      priority,
-    });
-    setSaving(false);
+    try {
+      await onSave({
+        configLevel,
+        serviceType,
+        providerCode,
+        config: configValues,
+        enabled,
+        priority,
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const toggleSensitiveVisibility = (key: string) => {

@@ -2,18 +2,21 @@
  * MemberPicker Component
  *
  * A user/member selection field that searches and displays team members.
- * Supports single and multi-select modes.
+ * Supports single and multi-select modes with avatar chips and search popup.
  */
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { Search, X, Plus, Loader2, Users } from 'lucide-react';
 import { cn } from '~/utils/cn';
 import { ResultHelper } from '~/utils/type';
+import { getAvatarColor, getInitials } from './avatar-utils';
 
 export interface MemberOption {
   id: string;
   name: string;
   email?: string;
   avatar?: string;
+  department?: string;
 }
 
 export interface MemberPickerProps {
@@ -34,7 +37,7 @@ export interface MemberPickerProps {
 }
 
 /**
- * MemberPicker - User/member selection field
+ * MemberPicker - User/member selection field with avatar chips
  */
 export const MemberPicker: React.FC<MemberPickerProps> = ({
   value,
@@ -58,14 +61,20 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
 
   // Close dropdown on outside click
   useEffect(() => {
+    if (!open) return;
     const handleClickOutside = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setOpen(false);
       }
     };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [open]);
+
+  // Focus search on open
+  useEffect(() => {
     if (open) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
+      requestAnimationFrame(() => searchRef.current?.focus());
     }
   }, [open]);
 
@@ -85,30 +94,29 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
               name: String(u.displayName || u.name || u.email || ''),
               email: String(u.email || ''),
               avatar: u.avatar ? String(u.avatar) : undefined,
+              department: u.department ? String(u.department) : undefined,
             }),
           );
           setOptions(users);
         }
       }
     } catch {
-      // Silently fail search
+      // CATCH: non-transactional HTTP call, safe to handle
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Load initial users and resolve selected values
+  // Load users when dropdown opens or search changes
   useEffect(() => {
     if (open) {
       searchUsers(search);
-      searchRef.current?.focus();
     }
   }, [open, search, searchUsers]);
 
   // Resolve selected member names on mount
   useEffect(() => {
     if (selectedIds.length > 0 && selectedMembers.length === 0) {
-      // Try to resolve member names
       const resolveMembers = async () => {
         const members: MemberOption[] = [];
         for (const id of selectedIds) {
@@ -123,10 +131,12 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
                     result.data.displayName || result.data.name || result.data.email || '',
                   ),
                   email: String(result.data.email || ''),
+                  department: result.data.department ? String(result.data.department) : undefined,
                 });
               }
             }
           } catch {
+            // CATCH: non-transactional HTTP call, fallback to ID display
             members.push({ id, name: id });
           }
         }
@@ -159,7 +169,8 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
   );
 
   const handleRemove = useCallback(
-    (id: string) => {
+    (id: string, e?: React.MouseEvent) => {
+      e?.stopPropagation();
       const newIds = selectedIds.filter((i) => i !== id);
       setSelectedMembers((prev) => prev.filter((m) => m.id !== id));
       onChange?.(multiple ? (newIds.length > 0 ? newIds : undefined) : undefined);
@@ -170,14 +181,21 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
   // Read-only display
   if (readOnly) {
     return (
-      <div className={cn('flex flex-wrap gap-1', className)}>
+      <div className={cn('flex flex-wrap gap-1.5', className)}>
         {selectedMembers.length > 0 ? (
           selectedMembers.map((m) => (
             <span
               key={m.id}
-              className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-sm text-blue-700"
+              className="inline-flex items-center gap-1.5 rounded-full bg-gray-50 py-0.5 pr-2.5 pl-1 text-sm text-gray-700"
             >
-              <MemberAvatar member={m} size="sm" />
+              <span
+                className={cn(
+                  'flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-white',
+                  getAvatarColor(m.name),
+                )}
+              >
+                {getInitials(m.name)}
+              </span>
               {m.name}
             </span>
           ))
@@ -190,64 +208,94 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
 
   return (
     <div ref={dropdownRef} className={cn('relative', className)}>
-      {/* Trigger */}
+      {/* Selected members display + Add button */}
       <div
-        onClick={() => !disabled && setOpen(!open)}
         className={cn(
-          'min-h-[36px] cursor-pointer rounded-md border border-gray-300 px-3 py-1.5 text-sm',
-          'flex flex-wrap items-center gap-1',
-          'focus-within:ring-2 focus-within:ring-blue-500 hover:border-blue-400',
-          disabled && 'cursor-not-allowed bg-gray-100 opacity-50',
+          'min-h-[38px] rounded-lg border px-2 py-1.5 transition-all',
+          disabled
+            ? 'cursor-not-allowed border-gray-200 bg-gray-50 opacity-60'
+            : open
+              ? 'border-blue-500 bg-white ring-2 ring-blue-100'
+              : 'border-gray-300 bg-white hover:border-gray-400',
         )}
       >
-        {selectedMembers.length > 0 ? (
-          selectedMembers.map((m) => (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {/* Selected member chips */}
+          {selectedMembers.map((m) => (
             <span
               key={m.id}
-              className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700"
+              className="inline-flex items-center gap-1 rounded-full bg-gray-100 py-0.5 pr-1 pl-0.5 text-sm text-gray-800 transition-colors hover:bg-gray-200"
             >
-              <MemberAvatar member={m} size="sm" />
-              {m.name}
+              <span
+                className={cn(
+                  'flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-white',
+                  getAvatarColor(m.name),
+                )}
+              >
+                {getInitials(m.name)}
+              </span>
+              <span className="max-w-[100px] truncate text-xs font-medium">{m.name}</span>
               {!disabled && (
                 <button
                   type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleRemove(m.id);
-                  }}
-                  className="ml-0.5 text-blue-400 hover:text-blue-600"
+                  onClick={(e) => handleRemove(m.id, e)}
+                  className="flex h-4 w-4 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-300 hover:text-gray-600"
                 >
-                  ×
+                  <X className="h-2.5 w-2.5" />
                 </button>
               )}
             </span>
-          ))
-        ) : (
-          <span className="text-gray-400">{placeholder}</span>
-        )}
+          ))}
+
+          {/* Add member button */}
+          {!disabled && (
+            <button
+              type="button"
+              onClick={() => setOpen(!open)}
+              className={cn(
+                'inline-flex items-center gap-1 rounded-full border border-dashed px-2 py-0.5 text-xs transition-colors',
+                selectedMembers.length === 0
+                  ? 'border-gray-300 text-gray-400 hover:border-gray-400 hover:text-gray-500'
+                  : 'border-gray-300 text-gray-400 hover:border-blue-400 hover:text-blue-500',
+              )}
+            >
+              <Plus className="h-3 w-3" />
+              <span>{selectedMembers.length === 0 ? placeholder : 'Add'}</span>
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Dropdown */}
-      {open && (
-        <div className="absolute top-full right-0 left-0 z-50 mt-1 max-h-64 overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg">
+      {/* Search popup dropdown */}
+      {open && !disabled && (
+        <div className="absolute top-full right-0 left-0 z-50 mt-1.5 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg">
+          {/* Search input */}
           <div className="border-b border-gray-100 p-2">
-            <input
-              ref={searchRef}
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search members..."
-              className="w-full rounded border border-gray-200 px-2 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none"
-            />
+            <div className="relative">
+              <Search className="absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <input
+                ref={searchRef}
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search members..."
+                className="w-full rounded-md border border-gray-200 bg-gray-50 py-2 pr-3 pl-9 text-sm transition-colors focus:border-blue-400 focus:bg-white focus:ring-1 focus:ring-blue-100 focus:outline-none"
+              />
+            </div>
           </div>
-          <div className="max-h-48 overflow-y-auto">
+
+          {/* Results */}
+          <div className="max-h-56 overflow-y-auto py-1">
             {loading ? (
-              <div className="px-3 py-4 text-center text-sm text-gray-400">
-                <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-gray-200 border-t-blue-500" />
-                Searching...
+              <div className="flex flex-col items-center justify-center py-8 text-gray-400">
+                <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
+                <span className="mt-2 text-xs">Searching...</span>
               </div>
             ) : options.length === 0 ? (
-              <div className="px-3 py-4 text-center text-sm text-gray-400">No members found</div>
+              <div className="flex flex-col items-center justify-center py-8 text-gray-400">
+                <Users className="h-7 w-7 text-gray-300" />
+                <span className="mt-2 text-xs">No members found</span>
+              </div>
             ) : (
               options.map((opt) => {
                 const isSelected = selectedIds.includes(opt.id);
@@ -257,30 +305,50 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
                     type="button"
                     onClick={() => handleSelect(opt)}
                     className={cn(
-                      'flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-blue-50',
-                      isSelected && 'bg-blue-50',
+                      'mx-1 flex w-[calc(100%-8px)] items-center gap-2.5 rounded-md px-2 py-2 text-left transition-colors',
+                      isSelected ? 'bg-blue-50' : 'hover:bg-gray-50',
                     )}
                   >
-                    <MemberAvatar member={opt} />
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate font-medium text-gray-700">{opt.name}</div>
-                      {opt.email && (
-                        <div className="truncate text-xs text-gray-400">{opt.email}</div>
+                    <span
+                      className={cn(
+                        'flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white',
+                        getAvatarColor(opt.name),
                       )}
+                    >
+                      {getInitials(opt.name)}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className={cn(
+                            'truncate text-sm font-medium',
+                            isSelected ? 'text-blue-700' : 'text-gray-700',
+                          )}
+                        >
+                          {opt.name}
+                        </span>
+                        {isSelected && (
+                          <svg
+                            className="h-4 w-4 flex-shrink-0 text-blue-500"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                        {opt.email && <span className="truncate">{opt.email}</span>}
+                        {opt.email && opt.department && <span>&middot;</span>}
+                        {opt.department && (
+                          <span className="truncate text-gray-500">{opt.department}</span>
+                        )}
+                      </div>
                     </div>
-                    {isSelected && (
-                      <svg
-                        className="h-4 w-4 flex-shrink-0 text-blue-500"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                    )}
                   </button>
                 );
               })
@@ -288,44 +356,6 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
           </div>
         </div>
       )}
-    </div>
-  );
-};
-
-/**
- * MemberAvatar - Small avatar display for a member
- */
-const MemberAvatar: React.FC<{ member: MemberOption; size?: 'sm' | 'md' }> = ({
-  member,
-  size = 'md',
-}) => {
-  const sizeClass = size === 'sm' ? 'w-4 h-4 text-[8px]' : 'w-6 h-6 text-xs';
-
-  if (member.avatar) {
-    return (
-      <img
-        src={member.avatar}
-        alt={member.name}
-        className={cn(sizeClass, 'rounded-full object-cover')}
-      />
-    );
-  }
-
-  const initials = member.name
-    .split(/\s+/)
-    .map((n) => n[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
-
-  return (
-    <div
-      className={cn(
-        sizeClass,
-        'flex flex-shrink-0 items-center justify-center rounded-full bg-blue-500 font-medium text-white',
-      )}
-    >
-      {initials || '?'}
     </div>
   );
 };

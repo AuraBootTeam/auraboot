@@ -25,6 +25,28 @@ import type {
 
 const API_BASE_URL = '/api/ai/aurabot';
 
+function formatFetchError(error: unknown, scope: 'chat' | 'execute'): string {
+  const action =
+    scope === 'chat'
+      ? '无法连接 AuraBot 对话服务，请确认前端 BFF(5173) 和后端(6443) 已启动。'
+      : '无法连接 AuraBot 执行服务，请确认前端 BFF(5173) 和后端(6443) 已启动。';
+  const raw =
+    error instanceof Error ? error.message : typeof error === 'string' ? error : 'Unknown error';
+  return `${action} 原始错误: ${raw}`;
+}
+
+async function readErrorMessage(response: Response): Promise<string> {
+  const fallback = `HTTP ${response.status}: ${response.statusText}`;
+  try {
+    const payload = await response.json();
+    if (payload?.message) return `${fallback} - ${payload.message}`;
+    if (payload?.context?.detail) return `${fallback} - ${payload.context.detail}`;
+    return fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -80,6 +102,28 @@ export interface ChatStreamOptions {
   ) => void;
 }
 
+export interface AuraBotConversationItem {
+  conversationId: number;
+  title: string;
+  agentCode: string;
+  agentName: string;
+  lastMessagePreview: string | null;
+  lastMessageType: string | null;
+  messageCount: number;
+  updatedAt: string;
+}
+
+export interface AuraBotConversationMessage {
+  id: number;
+  conversationId: number;
+  seq: number;
+  sender: 'user' | 'assistant' | 'system';
+  type: string;
+  content: string;
+  traceId?: string | null;
+  createdAt: string;
+}
+
 // ============================================================================
 // API Client
 // ============================================================================
@@ -88,6 +132,71 @@ export interface ChatStreamOptions {
  * AuraBot API client
  */
 export const auraBotApi = {
+  async listConversations(): Promise<AuraBotConversationItem[]> {
+    const response = await fetch(`${API_BASE_URL}/conversations`, {
+      method: 'get',
+      credentials: 'include',
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const result = await response.json();
+    return result.data || [];
+  },
+
+  async ensureConversation(agentCode?: string): Promise<AuraBotConversationItem> {
+    const response = await fetch(`${API_BASE_URL}/conversations`, {
+      method: 'post',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ agentCode }),
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const result = await response.json();
+    return result.data;
+  },
+
+  async getConversationMessages(conversationId: number): Promise<AuraBotConversationMessage[]> {
+    const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/messages?limit=100`, {
+      method: 'get',
+      credentials: 'include',
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const result = await response.json();
+    return result.data || [];
+  },
+
+  async appendUserMessage(
+    conversationId: number,
+    content: string,
+    clientMsgId: string,
+  ): Promise<AuraBotConversationMessage> {
+    const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/messages/user`, {
+      method: 'post',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ content, clientMsgId }),
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const result = await response.json();
+    return result.data;
+  },
+
+  async appendAssistantMessage(
+    conversationId: number,
+    content: string,
+    traceId?: string,
+    error?: boolean,
+  ): Promise<AuraBotConversationMessage> {
+    const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/messages/assistant`, {
+      method: 'post',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ content, traceId, error }),
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const result = await response.json();
+    return result.data;
+  },
+
   /**
    * Send a chat message and receive streaming response
    */
@@ -392,29 +501,33 @@ export const auraBotApi = {
     },
     callbacks: ChatStreamOptions,
   ): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/chat/stream`, {
-      method: 'post',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(request),
-      credentials: 'include',
-    });
+    try {
+      const response = await fetch(`${API_BASE_URL}/chat/stream`, {
+        method: 'post',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request),
+        credentials: 'include',
+      });
 
-    if (!response.ok) {
-      callbacks.onError(`HTTP ${response.status}: ${response.statusText}`);
-      return;
+      if (!response.ok) {
+        callbacks.onError(await readErrorMessage(response));
+        return;
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) {
+        callbacks.onError('No response body');
+        return;
+      }
+
+      const decoder = new TextDecoder();
+      let fullContent = '';
+      let buffer = '';
+
+      await processSSEStream(reader, decoder, buffer, fullContent, callbacks);
+    } catch (error) {
+      callbacks.onError(formatFetchError(error, 'chat'));
     }
-
-    const reader = response.body?.getReader();
-    if (!reader) {
-      callbacks.onError('No response body');
-      return;
-    }
-
-    const decoder = new TextDecoder();
-    let fullContent = '';
-    let buffer = '';
-
-    await processSSEStream(reader, decoder, buffer, fullContent, callbacks);
   },
 
   /**
@@ -425,29 +538,33 @@ export const auraBotApi = {
     request: { sessionId: string; toolId: string; confirmed: boolean },
     callbacks: ChatStreamOptions,
   ): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/execute`, {
-      method: 'post',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(request),
-      credentials: 'include',
-    });
+    try {
+      const response = await fetch(`${API_BASE_URL}/execute`, {
+        method: 'post',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request),
+        credentials: 'include',
+      });
 
-    if (!response.ok) {
-      callbacks.onError(`HTTP ${response.status}: ${response.statusText}`);
-      return;
+      if (!response.ok) {
+        callbacks.onError(await readErrorMessage(response));
+        return;
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) {
+        callbacks.onError('No response body');
+        return;
+      }
+
+      const decoder = new TextDecoder();
+      let fullContent = '';
+      let buffer = '';
+
+      await processSSEStream(reader, decoder, buffer, fullContent, callbacks);
+    } catch (error) {
+      callbacks.onError(formatFetchError(error, 'execute'));
     }
-
-    const reader = response.body?.getReader();
-    if (!reader) {
-      callbacks.onError('No response body');
-      return;
-    }
-
-    const decoder = new TextDecoder();
-    let fullContent = '';
-    let buffer = '';
-
-    await processSSEStream(reader, decoder, buffer, fullContent, callbacks);
   },
 };
 
@@ -510,7 +627,9 @@ async function processSSEStream(
                 );
                 break;
               case 'done':
-                // done event — fullContent already accumulated, traceId captured above
+                if (typeof data.content === 'string' && data.content) {
+                  fullContent = fullContent || data.content;
+                }
                 break;
               case 'error':
                 callbacks.onError(data.error || data.message || 'Unknown error', traceId);

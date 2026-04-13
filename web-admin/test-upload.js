@@ -43,7 +43,7 @@ This is a test document created for testing the engineering-grade file upload im
 
 This test validates the complete upload pipeline.
     `.trim();
-    
+
     fs.writeFileSync(TEST_FILE_PATH, testContent);
     console.log(`✅ Created test file: ${TEST_FILE_PATH}`);
   }
@@ -53,10 +53,10 @@ This test validates the complete upload pipeline.
 async function testUpload() {
   try {
     console.log('🚀 Starting file upload test...');
-    
+
     // Create test file
     createTestFile();
-    
+
     // Prepare form data
     const form = new FormData();
     form.append('file', fs.createReadStream(TEST_FILE_PATH));
@@ -68,33 +68,29 @@ async function testUpload() {
     form.append('admin_notes', 'Automated test upload via Node.js script');
     form.append('symbol', 'TEST');
     form.append('broker', 'Test Broker');
-    
+
     // Upload the file
     console.log('📤 Uploading file to BFF...');
     const startTime = Date.now();
-    
-    const response = await axios.post(
-      `${BFF_URL}/api/admin/documents/upload`,
-      form,
-      {
-        headers: {
-          ...form.getHeaders(),
-          'User-Agent': 'Upload-Test-Script/1.0'
-        },
-        timeout: 60000, // 60 seconds timeout
-        maxContentLength: Infinity,
-        maxBodyLength: Infinity
-      }
-    );
-    
+
+    const response = await axios.post(`${BFF_URL}/api/admin/documents/upload`, form, {
+      headers: {
+        ...form.getHeaders(),
+        'User-Agent': 'Upload-Test-Script/1.0',
+      },
+      timeout: 60000, // 60 seconds timeout
+      maxContentLength: Infinity,
+      maxBodyLength: Infinity,
+    });
+
     const duration = Date.now() - startTime;
-    
+
     // Validate response
     if (response.status === 200 && response.data.success) {
       console.log('✅ Upload successful!');
       console.log(`⏱️  Duration: ${duration}ms`);
       console.log('📋 Response:', JSON.stringify(response.data, null, 2));
-      
+
       // Validate response structure
       const { data } = response.data;
       if (data.task_id && data.document_id) {
@@ -110,10 +106,9 @@ async function testUpload() {
       console.log('❌ Upload failed');
       console.log('Response:', response.data);
     }
-    
   } catch (error) {
     console.log('💥 Upload test failed');
-    
+
     if (error.response) {
       console.log(`❌ HTTP ${error.response.status}: ${error.response.statusText}`);
       console.log('Response data:', error.response.data);
@@ -123,7 +118,7 @@ async function testUpload() {
     } else {
       console.log('❌ Error:', error.message);
     }
-    
+
     console.log('\n🔍 Troubleshooting:');
     console.log('1. Ensure BFF server is running on', BFF_URL);
     console.log('2. Ensure Spring Boot backend is running');
@@ -136,15 +131,14 @@ async function testUpload() {
 async function testHealth() {
   try {
     console.log('🏥 Testing health endpoints...');
-    
+
     // Test BFF health
     const bffHealth = await axios.get(`${BFF_URL}/health`, { timeout: 5000 });
     console.log('✅ BFF health check passed');
-    
+
     // Test upload service health
     const uploadHealth = await axios.get(`${BFF_URL}/api/upload/health`, { timeout: 5000 });
     console.log('✅ Upload service health check passed');
-    
   } catch (error) {
     console.log('❌ Health check failed:', error.message);
     console.log('💡 Make sure the BFF server is running with: pnpm dev:full');
@@ -154,15 +148,15 @@ async function testHealth() {
 // Main execution
 async function main() {
   console.log('🧪 Engineering-Grade File Upload Test Suite');
-  console.log('=' .repeat(50));
-  
+  console.log('='.repeat(50));
+
   // Test health first
   await testHealth();
   console.log('');
-  
+
   // Test upload
   await testUpload();
-  
+
   console.log('');
   console.log('🏁 Test completed');
 }

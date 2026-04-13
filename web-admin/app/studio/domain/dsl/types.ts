@@ -50,7 +50,7 @@ export interface DslV4Schema {
 /**
  * Page kind determines the content structure
  */
-export type PageKind = 'form' | 'list' | 'detail' | 'home';
+export type PageKind = 'form' | 'list' | 'detail' | 'home' | 'composite';
 
 // =============================================================================
 // Layout Types
@@ -123,13 +123,13 @@ export interface DslArea {
  * Block types supported in areas
  */
 export type BlockType =
-  | 'filter-form'
+  | 'filters'
   | 'form-section'
   | 'detail-section'
   | 'form-buttons'
-  | 'toolbar-buttons'
+  | 'toolbar'
   | 'selection-info'
-  | 'data-table'
+  | 'table'
   | 'stat-card'
   | 'chart-card'
   | 'text';
@@ -149,9 +149,9 @@ export interface DslBlock {
 
   // Content - varies by blockType
   title?: string;
-  fields?: DslFieldRef[]; // filter-form, form-section
-  columns?: DslColumnRef[]; // data-table
-  buttons?: DslButton[]; // toolbar-buttons, form-buttons
+  fields?: DslFieldRef[]; // filters, form-section
+  columns?: DslColumnRef[]; // table
+  buttons?: DslButton[]; // toolbar, form-buttons
   actions?: string[]; // shorthand for buttons
 
   // Block-specific props
@@ -192,7 +192,7 @@ export interface DslFieldOverride {
   required?: boolean;
   component?: string;
   placeholder?: string;
-  advanced?: boolean; // for filter-form, show in advanced section
+  advanced?: boolean; // for filters, show in advanced section
   props?: Record<string, unknown>;
 }
 
@@ -288,7 +288,7 @@ export function serializeFieldOverride(field: DslFieldOverride): DslFieldRef {
 }
 
 // =============================================================================
-// Column Types (for data-table)
+// Column Types (for table)
 // =============================================================================
 
 /**
@@ -479,61 +479,3 @@ export interface DslStep {
   terminal?: boolean;
 }
 
-// =============================================================================
-// Utility Types
-// =============================================================================
-
-/**
- * Check if DSL uses areas structure
- */
-export function isAreasBasedDsl(
-  dsl: DslV4Schema,
-): dsl is DslV4Schema & { areas: Record<string, DslArea> } {
-  return dsl.kind === 'list' || dsl.kind === 'form';
-}
-
-/**
- * Check if DSL uses floors structure
- */
-export function isFloorsBasedDsl(dsl: DslV4Schema): dsl is DslV4Schema & { floors: DslFloor[] } {
-  return dsl.kind === 'detail' || dsl.kind === 'home';
-}
-
-/**
- * Get all blocks from areas
- */
-export function getAllBlocksFromAreas(areas: Record<string, DslArea> | undefined): DslBlock[] {
-  if (!areas) return [];
-  return Object.values(areas).flatMap((area) => area.blocks);
-}
-
-/**
- * Get block by ID from areas
- */
-export function getBlockById(
-  areas: Record<string, DslArea> | undefined,
-  blockId: string,
-): DslBlock | undefined {
-  if (!areas) return undefined;
-  for (const area of Object.values(areas)) {
-    const block = area.blocks.find((b) => b.id === blockId);
-    if (block) return block;
-  }
-  return undefined;
-}
-
-/**
- * Get area name containing a block
- */
-export function getAreaForBlock(
-  areas: Record<string, DslArea> | undefined,
-  blockId: string,
-): string | undefined {
-  if (!areas) return undefined;
-  for (const [areaName, area] of Object.entries(areas)) {
-    if (area.blocks.some((b) => b.id === blockId)) {
-      return areaName;
-    }
-  }
-  return undefined;
-}

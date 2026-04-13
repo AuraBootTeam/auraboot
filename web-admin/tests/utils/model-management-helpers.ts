@@ -10,7 +10,7 @@ export class ModelManagementPage {
   constructor(private page: Page) {}
 
   // ==================== Navigation ====================
-  
+
   async goto() {
     await this.page.goto('/meta/models');
     await this.page.waitForLoadState('domcontentloaded');
@@ -27,7 +27,7 @@ export class ModelManagementPage {
   }
 
   // ==================== List Page Elements ====================
-  
+
   get searchInput() {
     return this.page.locator('input[placeholder*="搜索"], input[placeholder*="模型"]').first();
   }
@@ -53,7 +53,7 @@ export class ModelManagementPage {
   }
 
   // ==================== Form Elements ====================
-  
+
   get codeInput() {
     return this.page.locator('input[name="code"]');
   }
@@ -83,7 +83,7 @@ export class ModelManagementPage {
   }
 
   // ==================== Detail Page Tabs ====================
-  
+
   get basicInfoTab() {
     return this.page.locator('button:has-text("基本信息"), a:has-text("基本信息")');
   }
@@ -109,7 +109,7 @@ export class ModelManagementPage {
   }
 
   // ==================== Field Management Elements ====================
-  
+
   get addFieldButton() {
     return this.page.locator('button:has-text("添加字段"), button:has-text("新建字段")').first();
   }
@@ -135,7 +135,7 @@ export class ModelManagementPage {
   }
 
   // ==================== CRUD Generation Elements ====================
-  
+
   get generateCRUDButton() {
     return this.page.locator('button:has-text("生成CRUD"), button:has-text("生成页面")').first();
   }
@@ -149,7 +149,7 @@ export class ModelManagementPage {
   }
 
   // ==================== Runtime Verification Elements ====================
-  
+
   get verifyButton() {
     return this.page.locator('button:has-text("开始验证"), button:has-text("验证")').first();
   }
@@ -159,7 +159,7 @@ export class ModelManagementPage {
   }
 
   // ==================== Actions ====================
-  
+
   async searchModels(keyword: string) {
     await this.searchInput.fill(keyword);
     await this.page.keyboard.press('Enter');
@@ -181,15 +181,15 @@ export class ModelManagementPage {
     await this.codeInput.fill(data.code);
     await this.nameInput.fill(data.name);
     await this.tableNameInput.fill(data.tableName);
-    
+
     if (data.description) {
       await this.descriptionInput.fill(data.description);
     }
-    
-    if (data.category && await this.categorySelect.isVisible()) {
+
+    if (data.category && (await this.categorySelect.isVisible())) {
       await this.categorySelect.selectOption(data.category);
     }
-    
+
     await this.submitButton.click();
     await this.page.waitForLoadState('domcontentloaded');
   }
@@ -206,19 +206,19 @@ export class ModelManagementPage {
 
     await this.fieldCodeInput.fill(data.code);
     await this.fieldNameInput.fill(data.name);
-    
+
     if (await this.fieldTypeSelect.isVisible()) {
       await this.fieldTypeSelect.selectOption(data.fieldType);
     }
-    
-    if (data.required && await this.fieldRequiredCheckbox.isVisible()) {
+
+    if (data.required && (await this.fieldRequiredCheckbox.isVisible())) {
       await this.fieldRequiredCheckbox.check();
     }
-    
-    if (data.description && await this.fieldDescriptionInput.isVisible()) {
+
+    if (data.description && (await this.fieldDescriptionInput.isVisible())) {
       await this.fieldDescriptionInput.fill(data.description);
     }
-    
+
     await this.submitButton.click();
     await this.page.waitForLoadState('domcontentloaded');
   }
@@ -269,20 +269,24 @@ export class ModelManagementPage {
   }
 
   async editModel(index: number) {
-    const editButton = this.modelRows.nth(index).locator('button:has([data-testid="pencil-icon"]), a:has-text("编辑")');
+    const editButton = this.modelRows
+      .nth(index)
+      .locator('button:has([data-testid="pencil-icon"]), a:has-text("编辑")');
     await editButton.click();
     await this.page.waitForLoadState('domcontentloaded');
   }
 
   async deleteModel(index: number) {
-    const deleteButton = this.modelRows.nth(index).locator('button:has([data-testid="trash-icon"]), button:has-text("删除")');
+    const deleteButton = this.modelRows
+      .nth(index)
+      .locator('button:has([data-testid="trash-icon"]), button:has-text("删除")');
     await deleteButton.click();
-    
+
     // Handle confirmation dialog
-    this.page.on('dialog', async dialog => {
+    this.page.on('dialog', async (dialog) => {
       await dialog.accept();
     });
-    
+
     await this.page.waitForLoadState('domcontentloaded');
   }
 
@@ -309,7 +313,7 @@ export class DynamicPageHelper {
   constructor(private page: Page) {}
 
   async goto(tableName: string) {
-    await this.page.goto(`/dynamic/${tableName}`);
+    await this.page.goto(`/p/${tableName}`);
     await this.page.waitForLoadState('domcontentloaded');
   }
 
@@ -331,7 +335,10 @@ export class DynamicPageHelper {
 
   async isPageAccessible() {
     const hasTable = await this.table.isVisible().catch(() => false);
-    const hasForm = await this.page.locator('form').isVisible().catch(() => false);
+    const hasForm = await this.page
+      .locator('form')
+      .isVisible()
+      .catch(() => false);
     return hasTable || hasForm;
   }
 
@@ -346,7 +353,7 @@ export class DynamicPageHelper {
         await input.fill(String(value));
       }
     }
-    
+
     await this.page.locator('button[type="submit"]').click();
     await this.page.waitForLoadState('domcontentloaded');
   }
@@ -360,7 +367,7 @@ export class DynamicPageHelper {
  * Mock API Helpers
  */
 export async function mockModelListAPI(page: Page, models: any[] = []) {
-  await page.route('**/api/meta/models/search', async route => {
+  await page.route('**/api/meta/models/search', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -371,15 +378,15 @@ export async function mockModelListAPI(page: Page, models: any[] = []) {
           records: models,
           total: models.length,
           pageNum: 1,
-          pageSize: 10
-        }
-      })
+          pageSize: 10,
+        },
+      }),
     });
   });
 }
 
 export async function mockModelCreateAPI(page: Page, success: boolean = true) {
-  await page.route('**/api/meta/models', async route => {
+  await page.route('**/api/meta/models', async (route) => {
     if (route.request().method().toLowerCase() === 'post') {
       await route.fulfill({
         status: 200,
@@ -387,23 +394,23 @@ export async function mockModelCreateAPI(page: Page, success: boolean = true) {
         body: JSON.stringify({
           code: success ? '0' : '1',
           desc: success ? 'success' : 'create failed',
-          data: success ? { id: 1, pid: 'model-001' } : null
-        })
+          data: success ? { id: 1, pid: 'model-001' } : null,
+        }),
       });
     }
   });
 }
 
 export async function mockModelDeleteAPI(page: Page, success: boolean = true) {
-  await page.route('**/api/meta/models/*', async route => {
+  await page.route('**/api/meta/models/*', async (route) => {
     if (route.request().method().toLowerCase() === 'delete') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
           code: success ? '0' : '1',
-          desc: success ? 'success' : 'delete failed'
-        })
+          desc: success ? 'success' : 'delete failed',
+        }),
       });
     }
   });
@@ -419,7 +426,7 @@ export function generateTestModel(prefix: string = 'test') {
     name: `${prefix}测试模型`,
     tableName: `${prefix}_table_${timestamp}`,
     description: `${prefix} E2E测试用模型`,
-    category: 'business'
+    category: 'business',
   };
 }
 
@@ -429,7 +436,7 @@ export function generateTestField(prefix: string = 'test') {
     name: `${prefix}测试字段`,
     fieldType: 'string',
     required: true,
-    description: `${prefix}测试字段描述`
+    description: `${prefix}测试字段描述`,
   };
 }
 
@@ -443,7 +450,7 @@ export const mockModels = [
     category: 'business',
     status: 'active',
     description: '用户信息模型',
-    createdAt: '2024-01-01T00:00:00Z'
+    createdAt: '2024-01-01T00:00:00Z',
   },
   {
     id: 2,
@@ -454,7 +461,7 @@ export const mockModels = [
     category: 'business',
     status: 'active',
     description: '订单信息模型',
-    createdAt: '2024-01-02T00:00:00Z'
+    createdAt: '2024-01-02T00:00:00Z',
   },
   {
     id: 3,
@@ -465,6 +472,6 @@ export const mockModels = [
     category: 'business',
     status: 'draft',
     description: '产品信息模型',
-    createdAt: '2024-01-03T00:00:00Z'
-  }
+    createdAt: '2024-01-03T00:00:00Z',
+  },
 ];

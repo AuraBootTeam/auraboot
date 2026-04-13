@@ -197,8 +197,7 @@ export function useDslForm(options: UseDslFormOptions): UseDslFormReturn {
     if (pageKeyOpt) return pageKeyOpt;
     if (tableName) {
       const type = recordId ? 'detail' : 'new';
-      const normalized = tableName.replace(/-/g, '_');
-      return `${normalized}_${type}`;
+      return `${tableName}_${type}`;
     }
     return '';
   }, [pageKeyOpt, tableName, recordId]);
@@ -259,10 +258,7 @@ export function useDslForm(options: UseDslFormOptions): UseDslFormReturn {
     });
   }, []);
 
-  const getFieldValue = useCallback(
-    (field: string) => values[field],
-    [values],
-  );
+  const getFieldValue = useCallback((field: string) => values[field], [values]);
 
   const setFieldError = useCallback((field: string, message: string) => {
     setErrors((prev) => ({ ...prev, [field]: message }));

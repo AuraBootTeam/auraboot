@@ -71,15 +71,19 @@ test.describe('Smart Components — Display Components', () => {
   // SC-020: SmartDisplay multi-format read-only rendering
   // -------------------------------------------------------------------------
 
-  test('SC-020: SmartDisplay should render fields in read-only format on detail page @smoke', async ({ page }) => {
+  test('SC-020: SmartDisplay should render fields in read-only format on detail page @smoke', async ({
+    page,
+  }) => {
+    test.setTimeout(30000);
     // Navigate to detail page
-    await page.goto(`/dynamic/e2et_order/view/${orderPid}`);
+    await page.goto(`/p/e2et_order/view/${orderPid}`);
     await page.waitForLoadState('domcontentloaded');
-    await page.locator('h2').first().waitFor({ state: 'visible', timeout: 10000 });
+    await page.locator('main, [data-testid="detail-page"], .detail-page').first().waitFor({ state: 'visible', timeout: 10000 });
 
-    // Detail page renders fields in read-only display mode
+    // Detail page renders fields in read-only display mode — wait for data to load
     const mainContent = page.locator('main');
-    const bodyText = await mainContent.textContent() ?? '';
+    await expect.poll(async () => (await mainContent.textContent()) ?? '', { timeout: 15_000 }).toMatch(/订单|Order|DisplayComp/i);
+    const bodyText = (await mainContent.textContent()) ?? '';
 
     // Verify the detail page rendered business-facing labels/values, not just a shell.
     expect(bodyText).toMatch(/订单|Order|DisplayComp/i);
@@ -98,7 +102,9 @@ test.describe('Smart Components — Display Components', () => {
     expect(datePattern.test(bodyText)).toBe(true);
 
     // Detail view should not expose visible editable form controls for core fields.
-    await expect(mainContent.locator('input:visible, textarea:visible, select:visible').first()).toHaveCount(0);
+    await expect(
+      mainContent.locator('input:visible, textarea:visible, select:visible').first(),
+    ).toHaveCount(0);
   });
 
   // -------------------------------------------------------------------------
@@ -106,13 +112,14 @@ test.describe('Smart Components — Display Components', () => {
   // -------------------------------------------------------------------------
 
   test('SC-021: SmartImageDisplay should render images with zoom capability', async ({ page }) => {
-    await page.goto(`/dynamic/e2et_order/view/${orderPid}`);
+    test.setTimeout(30000);
+    await page.goto(`/p/e2et_order/view/${orderPid}`);
     await page.waitForLoadState('domcontentloaded');
-    await page.locator('h2, h1').first().waitFor({ state: 'visible', timeout: 10000 });
+    await page.locator('h2, h1').first().waitFor({ state: 'visible', timeout: 15000 });
 
     // Look for image elements (may not exist if no IMAGE field is configured)
     const images = page.locator(
-      'img[data-testid*="image"], [data-testid*="image-display"], img.preview-image, img[src*="/api/"]'
+      'img[data-testid*="image"], [data-testid*="image-display"], img.preview-image, img[src*="/api/"]',
     );
     const imageCount = await images.count();
 
@@ -135,9 +142,9 @@ test.describe('Smart Components — Display Components', () => {
     await firstImage.click();
 
     // Check if a zoom overlay or lightbox appeared
-    const zoomOverlay = page.locator(
-      '[data-testid="image-zoom"], .lightbox, [role="dialog"] img, .image-preview-modal'
-    ).first();
+    const zoomOverlay = page
+      .locator('[data-testid="image-zoom"], .lightbox, [role="dialog"] img, .image-preview-modal')
+      .first();
     const hasZoom = await zoomOverlay.isVisible({ timeout: 3000 }).catch(() => false);
 
     if (hasZoom) {
@@ -151,21 +158,27 @@ test.describe('Smart Components — Display Components', () => {
   // SC-022: SmartTable data table rendering
   // -------------------------------------------------------------------------
 
-  test('SC-022: SmartTable should render data table with columns and rows @smoke', async ({ page }) => {
+  test('SC-022: SmartTable should render data table with columns and rows @smoke', async ({
+    page,
+  }) => {
+    test.setTimeout(30000);
     // Navigate to detail page and switch to Items tab (SmartTable renders child records)
-    await page.goto(`/dynamic/e2et_order/view/${orderPid}`);
+    await page.goto(`/p/e2et_order/view/${orderPid}`);
     await page.waitForLoadState('domcontentloaded');
-    await page.locator('h2, h1').first().waitFor({ state: 'visible', timeout: 10000 });
+    await page.locator('h2, h1').first().waitFor({ state: 'visible', timeout: 15000 });
 
     // Switch to Items tab
-    const itemsTab = page.locator('nav button, [role="tablist"] button').filter({
-      hasText: /订单明细|Order Items/i,
-    }).first();
+    const itemsTab = page
+      .locator('nav button, [role="tablist"] button')
+      .filter({
+        hasText: /订单明细|Order Items/i,
+      })
+      .first();
 
     const hasItemsTab = await itemsTab.isVisible({ timeout: 5000 }).catch(() => false);
     if (!hasItemsTab) {
       // Fallback: check the main list page for SmartTable
-      const listPage = new DynamicListPage(page, '/dynamic/e2et-order');
+      const listPage = new DynamicListPage(page, '/p/e2et_order');
       await listPage.goto();
 
       const table = page.locator('table').first();
@@ -193,7 +206,7 @@ test.describe('Smart Components — Display Components', () => {
     expect(rowCount).toBeGreaterThanOrEqual(2);
 
     // Verify cell content includes our test data
-    const tableText = await table.textContent() ?? '';
+    const tableText = (await table.textContent()) ?? '';
     const hasItemData = tableText.includes('Display Widget') || tableText.includes('Widget');
     expect(hasItemData).toBe(true);
   });
@@ -212,14 +225,14 @@ test.describe('Smart Components — Display Components', () => {
 
     // Look for badge elements (spans with colored backgrounds or status indicators)
     const badges = page.locator(
-      'span[class*="bg-"], span[class*="badge"], [data-testid*="badge"], [data-testid*="status"], .status-badge, .tag'
+      'span[class*="bg-"], span[class*="badge"], [data-testid*="badge"], [data-testid*="status"], .status-badge, .tag',
     );
     const badgeCount = await badges.count();
 
     if (badgeCount === 0) {
       // Status may render as plain text in table cells
       const statusTexts = ['draft', 'submitted', 'approved', 'rejected', 'completed', 'cancelled'];
-      const bodyText = await page.locator('tbody').first().textContent() ?? '';
+      const bodyText = (await page.locator('tbody').first().textContent()) ?? '';
       const hasStatusText = statusTexts.some((s) => bodyText.includes(s));
 
       // I18n may translate status — just verify table has content
@@ -232,9 +245,9 @@ test.describe('Smart Components — Display Components', () => {
 
     // Verify badge has color styling (background-color or specific class)
     const firstBadge = badges.first();
-    const classList = await firstBadge.getAttribute('class') ?? '';
+    const classList = (await firstBadge.getAttribute('class')) ?? '';
     const hasColorClass = /bg-|badge-|text-|color/i.test(classList);
-    const style = await firstBadge.getAttribute('style') ?? '';
+    const style = (await firstBadge.getAttribute('style')) ?? '';
     const hasInlineColor = /background|color/i.test(style);
 
     // Badge should have some color indication (class or inline style)

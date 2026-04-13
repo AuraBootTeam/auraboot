@@ -7,7 +7,12 @@
 import { test, expect, type Page } from '@playwright/test';
 import { uniqueId } from '../helpers';
 
-async function createViewViaApi(page: Page, modelCode: string, name: string, viewConfig: any): Promise<string> {
+async function createViewViaApi(
+  page: Page,
+  modelCode: string,
+  name: string,
+  viewConfig: any,
+): Promise<string> {
   const resp = await page.request.post('/api/views', {
     data: { name, modelCode, viewType: 'form', scope: 'personal', viewConfig },
   });
@@ -24,7 +29,6 @@ async function getViewViaApi(page: Page, pid: string): Promise<any> {
 }
 
 test.describe('Form View (GAP-120)', () => {
-
   test('FV-001: FORM viewType accepted by API', async ({ page }) => {
     await page.goto('/');
     await page.locator('nav, [data-testid="sidebar"]').first().waitFor({ timeout: 15000 });
@@ -59,7 +63,7 @@ test.describe('Form View (GAP-120)', () => {
   });
 
   test('FV-003: form view renders in browser', async ({ page }) => {
-    await page.goto('/dynamic/e2et-order');
+    await page.goto('/p/e2et_order');
     await page.getByTestId('row-height-btn').waitFor({ state: 'visible', timeout: 30000 });
 
     // Switch to Form view type
@@ -94,7 +98,7 @@ test.describe('Form View (GAP-120)', () => {
   });
 
   test('FV-005: FORM in VIEW_TYPE_CONFIGS', async ({ page }) => {
-    await page.goto('/dynamic/e2et-order');
+    await page.goto('/p/e2et_order');
     await page.getByTestId('row-height-btn').waitFor({ state: 'visible', timeout: 30000 });
 
     // Look for Form in view type bar

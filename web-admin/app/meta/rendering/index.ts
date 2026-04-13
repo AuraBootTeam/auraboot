@@ -16,6 +16,20 @@ export { DescriptionBlockRenderer } from '~/meta/rendering/blocks/DescriptionBlo
 export { ChartBlockRenderer } from '~/meta/rendering/blocks/ChartBlockRenderer';
 export { TabsBlockRenderer } from '~/meta/rendering/blocks/TabsBlockRenderer';
 
+// Utils
+export {
+  deriveTestId,
+  listTestId,
+  formTestId,
+  fieldTestId,
+  buttonTestId,
+  tabTestId,
+  detailTestId,
+  rowTestId,
+  colTestId,
+  actionTestId,
+} from '~/meta/rendering/utils/deriveTestId';
+
 // Types
 export type { SchemaRendererProps } from '~/meta/rendering/SchemaRenderer';
 export type { BlockRendererProps } from '~/meta/rendering/BlockRenderer';

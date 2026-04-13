@@ -238,6 +238,99 @@ Smart 组件渲染（共享 useSmartComponent hook）
 
 ---
 
+## 8. 2026-03-26 登录后白屏排障记录
+
+### 8.1 现象
+
+- 访问 `http://localhost:5173/` 后，登录成功会回到根路径 `/`。
+- 页面表面上“白屏”，没有明显报错 UI。
+- 在仓库拆分初期，还叠加出现了若干启动期异常，导致问题看起来像“登录后白屏”，但实际是多个问题叠加。
+
+### 8.2 实际根因
+
+#### 根因 1：`/` 没有首页路由
+
+- `app/routes.ts` 中主布局 `DefaultLayout` 下没有 `index` route。
+- 登录成功后默认跳回 `/`，但该路径在布局下没有命中的子路由。
+- 结果是根布局正常渲染，但 `Outlet` 为空，用户看到的就是白屏。
+
+#### 根因 2：仓库从 `AuraMeta` 拆分后，SSR 依赖的环境默认值不完整
+
+- `app/services/userService.ts`
+- `app/services/menu.ts`
+- `app/tenant/TenantSelection.tsx`
+
+以上代码直接读取 `process.env.SPRING_BOOT_URL`，但当前拆分后的本地开发环境未显式注入该变量。
+
+- SSR 请求实际被拼成了 `undefined/api/auth/me`
+- `root loader` 和首页重定向 loader 在服务端阶段就会报错
+- 这会放大“白屏”现象，并让问题看起来像登录态异常
+
+#### 根因 3：启动进程仍指向旧工作区
+
+- 最初 `localhost:5173` 实际运行的是 `/Users/ghj/work/startup/phenix/AuraMeta/web-admin`
+- 不是当前仓库 `/Users/ghj/work/auraboot/auraboot-enterprise/web-admin`
+- 因此即使在当前仓库修复了路由，浏览器里也不会立即生效
+
+#### 根因 4：拆分后缺少前端依赖
+
+- `react-resizable/css/styles.css` 在 SSR 期间无法解析
+- `dev:full` 启动后首页直接返回 `500`
+- 这不是登录逻辑问题，但会阻塞验证并伪装成“页面打不开”
+
+### 8.3 修复内容
+
+#### 修复 1：为 `/` 增加 index route
+
+- 在 `app/routes.ts` 中为 `DefaultLayout` 增加 `index('./routes/_index.tsx')`
+- 新增 `app/routes/_index.tsx`
+
+行为：
+
+- 未登录时重定向到 `/login`
+- 已登录时优先跳转到首个菜单
+- 如果没有菜单，则兜底跳转到 `/reports/overview`
+
+#### 修复 2：为 `SPRING_BOOT_URL` 增加开发默认值
+
+统一补为：
+
+```ts
+process.env.SPRING_BOOT_URL || 'http://127.0.0.1:6443'
+```
+
+涉及文件：
+
+- `app/services/userService.ts`
+- `app/services/menu.ts`
+- `app/tenant/TenantSelection.tsx`
+
+这样在拆分后的本地开发环境里，即使没有显式配置 `.env`，SSR 也不会再请求 `undefined/api/...`。
+
+#### 修复 3：切换 dev server 到当前仓库
+
+- 停掉旧的 `AuraMeta/web-admin` 进程
+- 使用当前仓库的 `web-admin` 启动 `pnpm dev:full`
+
+#### 修复 4：补装缺失依赖
+
+- 增加 `react-resizable`
+
+### 8.4 验证结果
+
+- `http://localhost:5173/` 不再停留在空白页
+- 未登录访问 `/` 会正确 `302 -> /login`
+- 使用 `admin@example.com / Test2026x` 可以成功登录
+- 登录后会进入 `/dashboards`
+- 页面主框架、菜单、仪表盘主体都能正常渲染
+
+### 8.5 后续建议
+
+- 拆分仓库后，所有 SSR 侧读取 `process.env.*` 的服务代码都应带开发 fallback，避免再次出现 `undefined/api/...`
+- 根路径 `/` 必须始终有明确的首页语义，不能依赖 `/*` catch-all 或菜单逻辑兜底
+- 启动排障时先确认 `5173` 实际监听的是哪个工作区，再判断修复是否生效
+- 对拆分后的前端依赖做一次完整比对，避免运行时才发现缺包
+
 ## 8. 总结
 
 AuraBoot Runtime Platform 通过「组件元数据 + Manifest + 动态 loader + 单例 DataSourceManager」

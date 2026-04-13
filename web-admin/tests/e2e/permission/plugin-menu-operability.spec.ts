@@ -13,6 +13,7 @@
 
 import { test, expect } from '../../fixtures';
 import type { Locator } from '@playwright/test';
+import { ensureFilterFormOpen } from '../helpers/index';
 
 type MenuNode = {
   code?: string;
@@ -45,7 +46,10 @@ function isNavigablePath(path: string): boolean {
 }
 
 async function clickIfVisible(locator: Locator) {
-  const visible = await locator.first().isVisible({ timeout: 2000 }).catch(() => false);
+  const visible = await locator
+    .first()
+    .isVisible({ timeout: 2000 })
+    .catch(() => false);
   if (visible) {
     try {
       await locator.first().click({ timeout: 2000 });
@@ -60,7 +64,9 @@ async function clickIfVisible(locator: Locator) {
 test.describe('Plugin Menu Operability', () => {
   test.describe.configure({ mode: 'serial' });
 
-  test('PMO-001: menu tree is navigable and pages expose operable UI areas @critical', async ({ browser }) => {
+  test('PMO-001: menu tree is navigable and pages expose operable UI areas @critical', async ({
+    browser,
+  }) => {
     test.setTimeout(90000);
     const context = await browser.newContext({ storageState: 'tests/storage/admin.json' });
     let page = await context.newPage();
@@ -115,9 +121,11 @@ test.describe('Plugin Menu Operability', () => {
         expect(hasAppError, `path=${target.path} should not show app error`).toBe(false);
 
         // Page should expose at least one meaningful area
-        const area = page.locator(
-          'main, table, [role=\"table\"], form, [role=\"tablist\"], [data-testid=\"table-block\"], [data-testid=\"dynamic-list\"], [data-testid=\"dynamic-form\"]',
-        ).first();
+        const area = page
+          .locator(
+            'main, table, [role=\"table\"], form, [role=\"tablist\"], [data-testid=\"table-block\"], [data-testid=\"dynamic-list\"], [data-testid=\"dynamic-form\"]',
+          )
+          .first();
         const hasArea = await area.isVisible({ timeout: 5000 }).catch(() => false);
         expect(hasArea, `path=${target.path} should render operable area`).toBe(true);
 
@@ -127,6 +135,7 @@ test.describe('Plugin Menu Operability', () => {
           await expect(page.locator('body')).toBeVisible();
         }
 
+        await ensureFilterFormOpen(page);
         const clickedSearch = await clickIfVisible(
           page.locator('[data-testid="filter-search"], [data-testid="filter-btn-search"]'),
         );
@@ -135,14 +144,18 @@ test.describe('Plugin Menu Operability', () => {
         }
 
         const clickedReset = await clickIfVisible(
-          page.locator('[data-testid=\"filter-btn-reset\"], button:has-text(\"重置\"), button:has-text(\"Reset\")'),
+          page.locator(
+            '[data-testid=\"filter-btn-reset\"], button:has-text(\"重置\"), button:has-text(\"Reset\")',
+          ),
         );
         if (clickedReset) {
           await expect(page.locator('body')).toBeVisible();
         }
 
         const operableCount = await page
-          .locator('button:visible, input:visible, select:visible, textarea:visible, [role=\"tab\"]:visible')
+          .locator(
+            'button:visible, input:visible, select:visible, textarea:visible, [role=\"tab\"]:visible',
+          )
           .count()
           .catch(() => 0);
         if (operableCount > 0) withOperableAreas += 1;

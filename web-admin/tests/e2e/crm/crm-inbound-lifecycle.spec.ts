@@ -32,11 +32,7 @@ let channelApiAvailable = true;
 // Navigation helper
 // ---------------------------------------------------------------------------
 
-async function navigateViaCrmMenu(
-  page: Page,
-  href: string,
-  subMenuName?: string,
-): Promise<void> {
+async function navigateViaCrmMenu(page: Page, href: string, subMenuName?: string): Promise<void> {
   await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
 
   const nav = page.locator('nav');
@@ -121,19 +117,16 @@ test.describe('CRM Inbound Full Lifecycle @critical', () => {
     test.skip(!channelPid, 'Channel creation failed — cannot submit webhook');
 
     // Submit a lead payload via the webhook endpoint
-    const webhookResp = await page.request.post(
-      `/api/crm/inbound/${channelPid}/webhook`,
-      {
-        data: {
-          company: leadCompany,
-          name: leadName,
-          email: leadEmail,
-        },
-        headers: {
-          'X-API-Key': apiKey,
-        },
+    const webhookResp = await page.request.post(`/api/crm/inbound/${channelPid}/webhook`, {
+      data: {
+        company: leadCompany,
+        name: leadName,
+        email: leadEmail,
       },
-    );
+      headers: {
+        'X-API-Key': apiKey,
+      },
+    });
 
     // Should return 200 or 202 (accepted)
     expect(
@@ -149,51 +142,50 @@ test.describe('CRM Inbound Full Lifecycle @critical', () => {
 
     // Use API query to verify the lead was created
     // The lead may be processed asynchronously, so retry a few times
-    let found = false;
-    for (let attempt = 0; attempt < 5; attempt++) {
-      const records = await queryFilteredList(
-        page,
-        'crm-lead',
-        'crm_lead_company',
-        leadCompany,
-      );
-      if (records.length > 0) {
-        found = true;
-        break;
-      }
-      // Wait briefly before retrying
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-    }
+    const found = await expect
+      .poll(
+        async () => {
+          const records = await queryFilteredList(page, 'crm-lead', 'crm_lead_company', leadCompany);
+          return records.length > 0;
+        },
+        {
+          timeout: 12_000,
+          intervals: [1_000, 1_500, 2_000, 2_500, 3_000],
+        },
+      )
+      .toBeTruthy()
+      .then(() => true);
 
     // Also navigate to the Leads page via menu and visually verify
-    await navigateViaCrmMenu(page, '/dynamic/crm-lead');
-    await expect(page).toHaveURL(/\/dynamic\/crm-lead/);
+    await navigateViaCrmMenu(page, '/p/crm_lead');
+    await expect(page).toHaveURL(/\/p\/crm_lead(?:\?.*)?$/);
 
     // Wait for the table to appear
-    await expect(
-      page.locator('table').first(),
-    ).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('table').first()).toBeVisible({ timeout: 15000 });
 
     // If the lead was found via API, it should eventually appear in the UI
     if (found) {
       // Search for the lead in the paginated list
-      const searchInput = page.locator(
-        'input[placeholder*="Search"], input[placeholder*="search"], [data-testid="search-input"]',
-      ).first();
+      const searchInput = page
+        .locator(
+          'input[placeholder*="Search"], input[placeholder*="search"], [data-testid="search-input"]',
+        )
+        .first();
       const hasSearch = await searchInput.isVisible({ timeout: 3000 }).catch(() => false);
       if (hasSearch) {
         await searchInput.fill(leadCompany);
         await searchInput.press('Enter');
-        await page.waitForResponse(
-          (r) => r.url().includes('/list') && r.status() === 200,
-          { timeout: 8000 },
-        ).catch(() => null);
+        await page
+          .waitForResponse((r) => r.url().includes('/list') && r.status() === 200, {
+            timeout: 8000,
+          })
+          .catch(() => null);
       }
 
       // The lead company name should be visible somewhere in the table
-      await expect(
-        page.locator('tbody tr', { hasText: leadCompany }).first(),
-      ).toBeVisible({ timeout: 10000 });
+      await expect(page.locator('tbody tr', { hasText: leadCompany }).first()).toBeVisible({
+        timeout: 10000,
+      });
     }
 
     // Assert: at minimum the Leads page loaded with a table
@@ -204,9 +196,9 @@ test.describe('CRM Inbound Full Lifecycle @critical', () => {
     await navigateViaCrmMenu(page, '/crm/merge-queue');
     await expect(page).toHaveURL(/\/crm\/merge-queue/);
 
-    await expect(
-      page.getByRole('heading', { name: 'Lead Merge Queue' }),
-    ).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('heading', { name: 'Lead Merge Queue' })).toBeVisible({
+      timeout: 10000,
+    });
 
     // Filter tabs should be present
     await expect(page.locator('[data-testid="merge-tab-all"]')).toBeVisible();
@@ -221,9 +213,7 @@ test.describe('CRM Inbound Full Lifecycle @critical', () => {
     await navigateViaCrmMenu(page, '/crm/settings/web-forms', 'Settings');
     await expect(page).toHaveURL(/\/crm\/settings\/web-forms/);
 
-    await expect(
-      page.getByRole('heading', { name: 'Web Forms' }),
-    ).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('heading', { name: 'Web Forms' })).toBeVisible({ timeout: 10000 });
 
     // Either form list or empty state
     const list = page.locator('[data-testid="webform-list"]');
@@ -231,9 +221,7 @@ test.describe('CRM Inbound Full Lifecycle @critical', () => {
     await expect(list.or(empty).first()).toBeVisible({ timeout: 10000 });
 
     // "New Form" button should be visible
-    await expect(
-      page.locator('[data-testid="webform-create-btn"]'),
-    ).toBeVisible();
+    await expect(page.locator('[data-testid="webform-create-btn"]')).toBeVisible();
   });
 
   test('lifecycle-05: Calendar Sync providers render correctly', async ({ page }) => {
@@ -241,30 +229,22 @@ test.describe('CRM Inbound Full Lifecycle @critical', () => {
     await expect(page).toHaveURL(/\/crm\/settings\/calendar-sync/);
 
     // Wait for loading to finish — Calendar Sync page shows Loading until providers API returns
-    await expect(
-      page.locator('[data-testid="calendar-providers"]'),
-    ).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('[data-testid="calendar-providers"]')).toBeVisible({
+      timeout: 15000,
+    });
 
-    await expect(
-      page.getByRole('heading', { name: 'Calendar Sync', exact: true }),
-    ).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('heading', { name: 'Calendar Sync', exact: true })).toBeVisible({
+      timeout: 5000,
+    });
 
     // Both provider cards should render
-    await expect(
-      page.locator('[data-testid="calendar-provider-google"]'),
-    ).toBeVisible();
-    await expect(
-      page.locator('[data-testid="calendar-provider-microsoft"]'),
-    ).toBeVisible();
+    await expect(page.locator('[data-testid="calendar-provider-google"]')).toBeVisible();
+    await expect(page.locator('[data-testid="calendar-provider-microsoft"]')).toBeVisible();
 
     // "How Calendar Sync Works" info section should be visible
-    await expect(
-      page.getByText('How Calendar Sync Works'),
-    ).toBeVisible();
+    await expect(page.getByText('How Calendar Sync Works')).toBeVisible();
 
     // Info items should be present
-    await expect(
-      page.getByText('Sync runs automatically every 15 minutes'),
-    ).toBeVisible();
+    await expect(page.getByText('Sync runs automatically every 15 minutes')).toBeVisible();
   });
 });

@@ -61,36 +61,34 @@ const KNOWN_COMPONENTS = new Set([
 export function validateComponents(schema: UnifiedSchema): ValidationMessage[] {
   const messages: ValidationMessage[] = [];
 
-  if (!schema.areas) return messages;
+  if (!schema.blocks) return messages;
 
-  for (const [areaId, area] of Object.entries(schema.areas)) {
-    for (const [blockIdx, block] of (area.blocks || []).entries()) {
-      const bp = `areas.${areaId}.blocks[${blockIdx}]`;
+  for (const [blockIdx, block] of schema.blocks.entries()) {
+    const bp = `blocks[${blockIdx}]`;
 
-      // Check custom block has component
-      if (block.blockType === 'custom' && !block.component) {
+    // Check custom block has component
+    if (block.blockType === 'custom' && !block.component) {
+      messages.push({
+        code: 'bp_custom_no_comp',
+        path: `${bp}.component`,
+        message: 'Custom block must specify a component name',
+        severity: 'error',
+      });
+    }
+
+    // Check field components
+    for (const [fi, field] of (block.fields || []).entries()) {
+      if (field.component && !KNOWN_COMPONENTS.has(field.component)) {
         messages.push({
-          code: 'bp_custom_no_comp',
-          path: `${bp}.component`,
-          message: 'Custom block must specify a component name',
-          severity: 'error',
+          code: 'comp_unknown',
+          path: `${bp}.fields[${fi}].component`,
+          message: `Unknown component "${field.component}" — not in component registry`,
+          severity: 'warning',
+          suggestion: `Available components: ${[...KNOWN_COMPONENTS]
+            .filter((c) => c.startsWith('Smart'))
+            .slice(0, 5)
+            .join(', ')}...`,
         });
-      }
-
-      // Check field components
-      for (const [fi, field] of (block.fields || []).entries()) {
-        if (field.component && !KNOWN_COMPONENTS.has(field.component)) {
-          messages.push({
-            code: 'comp_unknown',
-            path: `${bp}.fields[${fi}].component`,
-            message: `Unknown component "${field.component}" — not in component registry`,
-            severity: 'warning',
-            suggestion: `Available components: ${[...KNOWN_COMPONENTS]
-              .filter((c) => c.startsWith('Smart'))
-              .slice(0, 5)
-              .join(', ')}...`,
-          });
-        }
       }
     }
   }

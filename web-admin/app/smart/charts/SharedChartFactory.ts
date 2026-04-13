@@ -7,6 +7,19 @@
  */
 
 import React from 'react';
+import { InboxWidget } from '~/dashboard-designer/widgets/workbench/InboxWidget';
+import { RecentWidget } from '~/dashboard-designer/widgets/workbench/RecentWidget';
+import { ShortcutsWidget } from '~/dashboard-designer/widgets/workbench/ShortcutsWidget';
+import { StatsRowWidget } from '~/dashboard-designer/widgets/workbench/StatsRowWidget';
+import { MyProcessWidget } from '~/dashboard-designer/widgets/workbench/MyProcessWidget';
+import { ProcessStatsWidget } from '~/dashboard-designer/widgets/workbench/ProcessStatsWidget';
+import { PipelineWidget } from '~/dashboard-designer/widgets/workbench/PipelineWidget';
+import { LeadsWidget } from '~/dashboard-designer/widgets/workbench/LeadsWidget';
+import { ActivitiesWidget } from '~/dashboard-designer/widgets/workbench/ActivitiesWidget';
+import { CalendarWidget } from '~/dashboard-designer/widgets/workbench/CalendarWidget';
+import { AnnouncementWidget } from '~/dashboard-designer/widgets/workbench/AnnouncementWidget';
+import { QuickNoteWidget } from '~/dashboard-designer/widgets/workbench/QuickNoteWidget';
+import { StatsCardWidget } from '~/dashboard-designer/widgets/workbench/StatsCardWidget';
 
 type LazyComponent = React.LazyExoticComponent<React.ComponentType<any>>;
 
@@ -15,6 +28,15 @@ const CHART_REGISTRY = new Map<string, LazyComponent>();
 // Register all 23 chart types (lazy imports with named export resolution)
 function reg(type: string, loader: () => Promise<{ default: React.ComponentType<any> }>) {
   CHART_REGISTRY.set(type, React.lazy(loader));
+}
+
+function regSync(type: string, component: React.ComponentType<any>) {
+  CHART_REGISTRY.set(
+    type,
+    React.lazy(async () => ({
+      default: component,
+    })),
+  );
 }
 
 reg('bar', () =>
@@ -98,6 +120,46 @@ reg('countdown', () =>
 reg('calendar', () =>
   import('~/smart/components/charts/SmartCalendar').then((m) => ({ default: m.SmartCalendar })),
 );
+reg('wordcloud', () =>
+  import('~/smart/components/charts/SmartWordCloudChart').then((m) => ({
+    default: m.SmartWordCloudChart,
+  })),
+);
+reg('combo', () =>
+  import('~/smart/components/charts/SmartComboChart').then((m) => ({
+    default: m.SmartComboChart,
+  })),
+);
+reg('nps', () =>
+  import('~/smart/components/charts/SmartNpsChart').then((m) => ({
+    default: m.SmartNpsChart,
+  })),
+);
+reg('gallery', () =>
+  import('~/smart/components/charts/SmartGallery').then((m) => ({
+    default: m.SmartGallery,
+  })),
+);
+reg('kanban', () =>
+  import('~/smart/components/charts/SmartKanban').then((m) => ({
+    default: m.SmartKanban,
+  })),
+);
+
+// Workbench widgets
+regSync('inbox', InboxWidget);
+regSync('recent', RecentWidget);
+regSync('shortcuts', ShortcutsWidget);
+regSync('stats-row', StatsRowWidget);
+regSync('my-process', MyProcessWidget);
+regSync('process-stats', ProcessStatsWidget);
+regSync('pipeline', PipelineWidget);
+regSync('leads', LeadsWidget);
+regSync('activities', ActivitiesWidget);
+regSync('calendar', CalendarWidget);
+regSync('announcement', AnnouncementWidget);
+regSync('quick-note', QuickNoteWidget);
+regSync('stats-card', StatsCardWidget);
 
 /**
  * Get a lazy-loaded chart component by type.

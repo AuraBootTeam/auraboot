@@ -3,7 +3,7 @@
  * 用于加载和管理 Schema
  *
  * 使用统一的 API 端点：/api/pages/key/{pageKey}
- * - Model 相关页面：pageKey 格式为 "{modelCode}_{pageType}"，如 "device_list"
+ * - Model 相关页面：pageKey 格式为 "{modelCode}_{kind}"，如 "device_list"
  * - Model 无关页面：pageKey 为自定义标识，如 "dashboard_main"
  */
 
@@ -11,10 +11,7 @@ import { useState, useEffect, useRef } from 'react';
 import { fetchResult } from '~/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import type { UnifiedSchema } from '~/meta/schemas/types';
-import {
-  mapApiPageTypeToSchemaKind,
-  mapRuntimePageTypeToSchemaType,
-} from '~/meta/utils/page-semantics';
+import { DslMigrator } from '~/meta/migration';
 
 /**
  * In-memory schema cache with LRU eviction.
@@ -55,7 +52,7 @@ export interface UseSchemaLoaderOptions {
    */
   tableName?: string;
   pageKey?: string;
-  type?: 'list' | 'new' | 'detail' | 'page';
+  type?: 'list' | 'form' | 'detail' | 'dashboard' | 'kanban' | 'composite';
   token?: string;
 }
 
@@ -67,26 +64,27 @@ export interface UseSchemaLoaderResult {
 }
 
 /**
- * Map frontend page type to backend schema type for pageKey generation
- */
-/**
  * PageSchemaDTO response structure
+ *
+ * Fields: kind, blocks, layout, title, profile, schemaVersion
  */
 interface PageSchemaDTO {
   pid: string;
   pageKey: string;
   modelCode: string | null;
   modelCategory: string | null;
-  pageCategory: string;
   name: string;
-  title: string;
+  title: string | Record<string, string>;
   description: string;
-  pageType: string;
+  kind: string;
   commandCode?: string;
-  dslSchema: UnifiedSchema;
-  schemaVersion: number | null;
+  blocks: any[];
+  layout: Record<string, any>;
+  profile: string;
+  schemaVersion: number;
   metaInfo: Record<string, unknown>;
   isTemplate: boolean;
+  extension?: Record<string, any>;
 }
 
 /**
@@ -103,17 +101,12 @@ export function useSchemaLoader(options: UseSchemaLoaderOptions): UseSchemaLoade
   const [error, setError] = useState<Error | null>(null);
 
   // Compute pageKey from options
-  // NOTE: URL convention uses hyphens (e.g. /dynamic/e2et-record) but
-  // page_key in DB uses underscores (e.g. e2et_record_list).
-  // We normalize hyphens to underscores when building the pageKey.
   const computePageKey = (): string => {
     if (options.pageKey) {
       return options.pageKey;
     }
     if (options.tableName && options.type) {
-      const schemaType = mapRuntimePageTypeToSchemaType(options.type);
-      const normalizedTableName = options.tableName.replace(/-/g, '_');
-      return `${normalizedTableName}_${schemaType}`;
+      return `${options.tableName}_${options.type}`;
     }
     throw new Error('Either pageKey or (tableName + type) must be provided');
   };
@@ -144,42 +137,33 @@ export function useSchemaLoader(options: UseSchemaLoaderOptions): UseSchemaLoade
         throw new Error(result.message || 'Failed to load schema');
       }
 
-      // Extract dslSchema from PageSchemaDTO
+      // Build UnifiedSchema from v2 PageSchemaDTO
       const pageSchemaDTO = result.data;
-      if (!pageSchemaDTO || !pageSchemaDTO.dslSchema) {
+      if (!pageSchemaDTO) {
         throw new Error(`No schema found for pageKey: ${pageKey}`);
       }
 
-      // Merge page-level metadata into dslSchema
-      const merged: any = { ...pageSchemaDTO.dslSchema };
-      if (!merged.title && pageSchemaDTO.title) {
-        merged.title = pageSchemaDTO.title;
-      }
-      if (!merged.pageKey && pageSchemaDTO.pageKey) {
-        merged.pageKey = pageSchemaDTO.pageKey;
-      }
-      if (!merged.pageCategory && pageSchemaDTO.pageCategory) {
-        merged.pageCategory = pageSchemaDTO.pageCategory;
-      }
-      if (!merged.commandCode && pageSchemaDTO.commandCode) {
-        merged.commandCode = pageSchemaDTO.commandCode;
-      }
-      // Runtime relies on schema.kind for renderer selection. Older DSL pages
-      // may omit kind but still provide pageType in PageSchemaDTO.
-      if (!merged.kind) {
-        const inferredKind = mapApiPageTypeToSchemaKind(pageSchemaDTO.pageType);
-        if (inferredKind) {
-          merged.kind = inferredKind;
-        }
-      }
-      // Inject schemaVersion from DB column into the runtime schema
-      if (pageSchemaDTO.schemaVersion != null && merged.schemaVersion == null) {
-        merged.schemaVersion = pageSchemaDTO.schemaVersion;
-      }
-      // Inject modelCategory for conditional rendering (e.g., Activity tab)
-      if (!merged.modelCategory && pageSchemaDTO.modelCategory) {
-        merged.modelCategory = pageSchemaDTO.modelCategory;
-      }
+      // Build raw schema from DTO — always use v2 structure
+      const raw: Record<string, any> = {
+        kind: pageSchemaDTO.kind,
+        title: pageSchemaDTO.title,
+        blocks: pageSchemaDTO.blocks || [],
+        layout: pageSchemaDTO.layout || { type: 'stack' },
+        profile: pageSchemaDTO.profile || 'admin',
+        schemaVersion: pageSchemaDTO.schemaVersion,
+        pageKey: pageSchemaDTO.pageKey,
+        commandCode: pageSchemaDTO.commandCode,
+        modelCode: pageSchemaDTO.modelCode,
+        modelCategory: pageSchemaDTO.modelCategory,
+        ...(pageSchemaDTO.extension?.dataSource && {
+          dataSource: pageSchemaDTO.extension.dataSource,
+        }),
+        // Propagate extension so consumers (e.g. relatedPages) can read it
+        ...(pageSchemaDTO.extension && { extension: pageSchemaDTO.extension }),
+      };
+
+      // Migrate to current schema version (throws on error)
+      const merged = DslMigrator.migrate(raw) as unknown as UnifiedSchema;
 
       // Dev-mode DSL validation
       if (process.env.NODE_ENV === 'development') {

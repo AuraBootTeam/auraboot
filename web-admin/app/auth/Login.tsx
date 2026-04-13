@@ -456,10 +456,7 @@ export default function LoginPage() {
               <div className="absolute top-1/2 left-1/2 h-96 w-96 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/5 blur-3xl"></div>
             </div>
             <div className="relative z-10 max-w-md text-center text-white">
-              <div className="mx-auto mb-8 flex h-20 w-20 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm">
-                <img className="h-12 w-12 rounded-lg" src="/logo192.png" alt="Logo" />
-              </div>
-              <h2 className="mb-4 text-4xl font-bold">AuraBoot</h2>
+              <h2 className="mb-4 text-5xl font-bold tracking-tight">AuraBoot</h2>
               <p className="mb-8 text-lg text-white/80">{t('auth.tagline')}</p>
               <div className="space-y-4 text-left">
                 {[

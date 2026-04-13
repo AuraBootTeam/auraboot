@@ -18,7 +18,6 @@ async function createViewViaApi(page: Page, name: string): Promise<string> {
 }
 
 test.describe('View Public Sharing (GAP-121)', () => {
-
   test('VS-001: generate share link for a view', async ({ page }) => {
     await page.goto('/');
     await page.locator('nav, [data-testid="sidebar"]').first().waitFor({ timeout: 15000 });

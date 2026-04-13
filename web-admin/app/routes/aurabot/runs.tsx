@@ -22,7 +22,7 @@ import { TraceStatusBadge } from '~/routes/ai-trace/components/TraceStatusBadge'
 interface RunRecord {
   pid: string;
   run_status: string;
-  model: string;
+  run_model: string;
   started_at: string;
   completed_at: string;
   duration_ms: number;
@@ -31,6 +31,11 @@ interface RunRecord {
   total_cost: number;
   error_message: string;
   task_title: string;
+  user_message?: string | null;
+  messages?: string | null;
+  metadata?: string | Record<string, unknown> | null;
+  session_id?: string | null;
+  trace_id?: string | null;
   agent_name: string;
   tool_calls: string | ToolCall[] | null;
   execution_plan: string | PlanStep[] | null;
@@ -40,7 +45,7 @@ interface RunRecord {
 interface ToolCall {
   tool: string;
   input: Record<string, unknown>;
-  output: string;
+  output: unknown;
   loop: number;
 }
 
@@ -49,8 +54,8 @@ interface PlanStep {
   description: string;
   toolCode: string | null;
   status: 'pending' | 'running' | 'completed' | 'failed' | 'skipped' | 'awaiting_approval';
-  result: string | null;
-  error: string | null;
+  result: unknown;
+  error: unknown;
   durationMs: number;
   requiresApproval: boolean;
   planVersion?: number;
@@ -121,6 +126,71 @@ function fmtTokens(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
   return String(n);
+}
+
+function fmtValue(value: unknown, empty = '-'): string {
+  if (value == null || value === '') return empty;
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+}
+
+function fmtJsonish(value: unknown, empty = '-'): string {
+  if (value == null || value === '') return empty;
+  if (typeof value === 'string') {
+    try {
+      return JSON.stringify(JSON.parse(value), null, 2);
+    } catch {
+      return value;
+    }
+  }
+  return fmtValue(value, empty);
+}
+
+function parseJsonObject(value: unknown): Record<string, unknown> {
+  if (!value) return {};
+  if (typeof value === 'object' && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+        ? (parsed as Record<string, unknown>)
+        : {};
+    } catch {
+      return {};
+    }
+  }
+  return {};
+}
+
+function summarizeToolOutput(output: unknown, l: (zh: string, en: string) => string): string | null {
+  if (!output || typeof output !== 'object' || Array.isArray(output)) return null;
+  const obj = output as Record<string, any>;
+  if (obj.success === false) {
+    return fmtValue(obj.error || obj.message, l('工具执行失败', 'Tool failed'));
+  }
+  const data = obj.data;
+  if (data && typeof data === 'object') {
+    if (Array.isArray(data.records)) {
+      return l('查询成功', 'Query ok') + ` · ${data.records.length} ${l('条记录', 'records')}`;
+    }
+    if (typeof data.total === 'number') {
+      return l('查询成功', 'Query ok') + ` · ${data.total} ${l('条结果', 'results')}`;
+    }
+    if (typeof data.message === 'string' && data.message.trim()) {
+      return data.message;
+    }
+  }
+  if (typeof obj.message === 'string' && obj.message.trim()) {
+    return obj.message;
+  }
+  return null;
 }
 
 function timeAgo(dateStr: string, l: (zh: string, en: string) => string): string {
@@ -208,6 +278,27 @@ function EmptyState({ text }: { text: string }) {
   );
 }
 
+function InfoPanel({
+  title,
+  value,
+  mono = true,
+}: {
+  title: string;
+  value: string;
+  mono?: boolean;
+}) {
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
+      <div className="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">{title}</div>
+      <pre
+        className={`break-words whitespace-pre-wrap ${mono ? 'font-mono text-xs' : 'text-sm'} text-gray-800 dark:text-gray-200`}
+      >
+        {value}
+      </pre>
+    </div>
+  );
+}
+
 function RunStatusIcon({ status }: { status: string }) {
   const icons: Record<string, string> = {
     running: '🔄',
@@ -274,10 +365,7 @@ export default function RunLogsPage() {
                   {l('运行记录', 'Run Logs')}
                 </h1>
                 <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
-                  {l(
-                    'Agent 运行记录与 LLM 调用追踪',
-                    'Agent run records and LLM call traces',
-                  )}
+                  {l('Agent 运行记录与 LLM 调用追踪', 'Agent run records and LLM call traces')}
                 </p>
               </div>
             </div>
@@ -460,6 +548,12 @@ function RunRow({
   retrying: boolean;
 }) {
   const canRetry = ['failed', 'timeout'].includes(run.run_status);
+  const metadata = parseJsonObject(run.metadata);
+  const taskText = fmtValue(
+    run.user_message || run.task_title || metadata.userMessage || metadata.prompt,
+  );
+  const sessionId = fmtValue(run.session_id || metadata.sessionId, '');
+  const traceId = fmtValue(run.trace_id || metadata.traceId, '');
 
   return (
     <>
@@ -476,12 +570,21 @@ function RunRow({
           <RunStatusIcon status={run.run_status} />
         </td>
         <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">
-          {run.agent_name || '-'}
+          {fmtValue(run.agent_name)}
         </td>
-        <td className="max-w-[200px] truncate px-4 py-3 text-gray-600 dark:text-gray-400">
-          {run.task_title || '-'}
+        <td className="max-w-[280px] px-4 py-3 text-gray-600 dark:text-gray-400">
+          <div className="truncate">{taskText}</div>
+          {(sessionId || traceId) && (
+            <div className="mt-1 truncate text-[11px] text-gray-400 dark:text-gray-500">
+              {[sessionId ? `session: ${sessionId}` : '', traceId ? `trace: ${traceId}` : '']
+                .filter(Boolean)
+                .join(' | ')}
+            </div>
+          )}
         </td>
-        <td className="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">{run.model || '-'}</td>
+        <td className="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">
+          {fmtValue(run.run_model)}
+        </td>
         <td className="px-4 py-3 text-right font-mono text-gray-600 dark:text-gray-400">
           {fmtDuration(run.duration_ms)}
         </td>
@@ -539,6 +642,13 @@ function RunDetailPanel({
   run: RunRecord;
   l: (zh: string, en: string) => string;
 }) {
+  const metadata = parseJsonObject(run.metadata);
+  const userProblem = fmtValue(
+    run.user_message || run.task_title || metadata.userMessage || metadata.prompt,
+  );
+  const finalResponse = fmtValue(run.messages || metadata.finalResponsePreview, '');
+  const sessionId = fmtValue(run.session_id || metadata.sessionId, '');
+  const traceId = fmtValue(run.trace_id || metadata.traceId, '');
   const rawPlan = run.execution_plan;
   const plan: PlanStep[] | null =
     typeof rawPlan === 'string'
@@ -555,6 +665,44 @@ function RunDetailPanel({
 
   return (
     <div className="space-y-4">
+      <div className="grid gap-3 md:grid-cols-2">
+        <InfoPanel
+          title={l('原始问题', 'Original Problem')}
+          value={userProblem}
+          mono={false}
+        />
+        <InfoPanel
+          title={l('会话信息', 'Session Context')}
+          value={[
+            run.pid ? `runPid: ${run.pid}` : '',
+            sessionId ? `sessionId: ${sessionId}` : '',
+            traceId ? `traceId: ${traceId}` : '',
+          ]
+            .filter(Boolean)
+            .join('\n')}
+        />
+      </div>
+
+      {finalResponse && (
+        <InfoPanel title={l('最终回复', 'Final Response')} value={finalResponse} mono={false} />
+      )}
+
+      {traceId && traceId !== '-' && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-900/20">
+          <div className="mb-2 text-xs font-medium text-blue-700 dark:text-blue-300">
+            {l('调用追踪', 'Trace')}
+          </div>
+          <a
+            href={`/aurabot/traces/${traceId}`}
+            target="_blank"
+            rel="noreferrer"
+            className="font-mono text-sm text-blue-600 underline-offset-2 hover:underline dark:text-blue-300"
+          >
+            {traceId}
+          </a>
+        </div>
+      )}
+
       {/* Error Message */}
       {detail.error_message && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-900/20">
@@ -562,7 +710,7 @@ function RunDetailPanel({
             {l('错误信息', 'Error')}
           </div>
           <pre className="font-mono text-sm break-words whitespace-pre-wrap text-red-800 dark:text-red-300">
-            {detail.error_message}
+            {fmtValue(detail.error_message)}
           </pre>
         </div>
       )}
@@ -623,7 +771,8 @@ function ToolCallItem({
   l: (zh: string, en: string) => string;
 }) {
   const [showDetail, setShowDetail] = useState(false);
-  const isError = typeof tc.output === 'string' && tc.output.startsWith('Error');
+  const outputText = fmtJsonish(tc.output, '');
+  const isError = outputText.startsWith('Error');
 
   return (
     <div
@@ -637,7 +786,7 @@ function ToolCallItem({
         <span
           className={`rounded px-1.5 py-0.5 font-mono text-xs ${isError ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'}`}
         >
-          {tc.tool}
+          {fmtValue(tc.tool)}
         </span>
         <span className="ml-auto text-xs text-gray-400">
           {l('循环', 'Loop')} {tc.loop} · {showDetail ? '▼' : '▶'}
@@ -653,16 +802,15 @@ function ToolCallItem({
           </div>
           <div>
             <div className="mb-1 text-xs font-medium text-gray-500">{l('输出', 'Output')}</div>
+            {summarizeToolOutput(tc.output, l) && (
+              <div className="mb-2 rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">
+                {summarizeToolOutput(tc.output, l)}
+              </div>
+            )}
             <pre
               className={`max-h-40 overflow-x-auto rounded p-2 font-mono text-xs ${isError ? 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300' : 'bg-gray-50 text-gray-700 dark:bg-gray-800 dark:text-gray-300'}`}
             >
-              {(() => {
-                try {
-                  return JSON.stringify(JSON.parse(tc.output), null, 2);
-                } catch {
-                  return tc.output;
-                }
-              })()}
+              {outputText}
             </pre>
           </div>
         </div>
@@ -813,7 +961,7 @@ function PlanStepsView({ plan, l }: { plan: PlanStep[]; l: (zh: string, en: stri
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-gray-800 dark:text-gray-200">
-                          {step.description}
+                          {fmtValue(step.description)}
                         </span>
                         {step.requiresApproval && (
                           <span className="rounded bg-amber-100 px-1 py-0.5 text-[10px] text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
@@ -825,7 +973,7 @@ function PlanStepsView({ plan, l }: { plan: PlanStep[]; l: (zh: string, en: stri
                       <div className="mt-1 flex items-center gap-2">
                         {step.toolCode && (
                           <span className="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-[10px] text-gray-600 dark:bg-gray-700 dark:text-gray-400">
-                            {step.toolCode}
+                            {fmtValue(step.toolCode)}
                           </span>
                         )}
                         {step.tokens != null && step.tokens > 0 && (
@@ -857,7 +1005,7 @@ function PlanStepsView({ plan, l }: { plan: PlanStep[]; l: (zh: string, en: stri
                     </div>
 
                     {/* Expand indicator */}
-                    {(step.result || step.error) && (
+                    {(step.result != null || step.error != null) && (
                       <span className="mt-1 flex-shrink-0 text-[10px] text-gray-400">
                         {isExpanded ? '▼' : '▶'}
                       </span>
@@ -865,16 +1013,16 @@ function PlanStepsView({ plan, l }: { plan: PlanStep[]; l: (zh: string, en: stri
                   </div>
 
                   {/* Expanded result/error */}
-                  {isExpanded && (step.result || step.error) && (
+                  {isExpanded && (step.result != null || step.error != null) && (
                     <div className="mt-2 border-t border-gray-100 pt-2 dark:border-gray-700">
-                      {step.result && (
+                      {step.result != null && (
                         <pre className="max-h-32 overflow-x-auto rounded bg-green-50 p-2 font-mono text-xs break-words whitespace-pre-wrap text-green-700 dark:bg-green-900/10 dark:text-green-400">
-                          {step.result}
+                          {fmtJsonish(step.result)}
                         </pre>
                       )}
-                      {step.error && (
+                      {step.error != null && (
                         <pre className="max-h-32 overflow-x-auto rounded bg-red-50 p-2 font-mono text-xs break-words whitespace-pre-wrap text-red-700 dark:bg-red-900/10 dark:text-red-300">
-                          {step.error}
+                          {fmtJsonish(step.error)}
                         </pre>
                       )}
                     </div>
@@ -918,8 +1066,8 @@ function TraceContent({ l }: { l: (zh: string, en: string) => string }) {
       const res = await fetch(`/api/ai/traces?${params}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      setTraces(data.records || []);
-      setTotal(data.total || 0);
+      setTraces(Array.isArray(data?.records) ? data.records : []);
+      setTotal(typeof data?.total === 'number' ? data.total : 0);
     } catch (e) {
       console.error('Failed to fetch traces', e);
       setTraces([]);
@@ -1052,7 +1200,13 @@ function TraceContent({ l }: { l: (zh: string, en: string) => string }) {
             ) : traces.length === 0 ? (
               <tr>
                 <td colSpan={7} className="px-4 py-12 text-center text-gray-400 dark:text-gray-500">
-                  {l('暂无追踪记录', 'No traces found')}
+                  <div>{l('暂无追踪记录', 'No traces found')}</div>
+                  <div className="mt-1 text-xs">
+                    {l(
+                      '只有成功进入 AuraBot LLM 主链路的请求才会生成 trace；纯前端网络失败不会落库。',
+                      'Only requests that reached the AuraBot LLM pipeline generate traces; browser-side network failures do not.',
+                    )}
+                  </div>
                 </td>
               </tr>
             ) : (
@@ -1070,12 +1224,27 @@ function TraceContent({ l }: { l: (zh: string, en: string) => string }) {
                     </div>
                   </td>
                   <td className="max-w-xs px-4 py-3">
-                    <div className="truncate text-gray-900 dark:text-gray-100">
-                      {t.input || '-'}
+                    <div className="truncate font-medium text-gray-900 dark:text-gray-100">
+                      {fmtValue(t.input)}
                     </div>
-                    {t.name && (
+                    {(t.sessionId || t.name) && (
                       <div className="mt-0.5 truncate text-xs text-gray-400 dark:text-gray-500">
-                        {t.name}
+                        {[fmtValue(t.name, ''), t.sessionId ? `session: ${t.sessionId}` : '']
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </div>
+                    )}
+                    <div className="mt-0.5 truncate font-mono text-[11px] text-gray-400 dark:text-gray-500">
+                      {`trace: ${t.traceId}`}
+                    </div>
+                    {t.output && (
+                      <div className="mt-1 line-clamp-2 text-xs text-gray-500 dark:text-gray-400">
+                        {fmtValue(t.output)}
+                      </div>
+                    )}
+                    {t.errorMessage && (
+                      <div className="mt-1 line-clamp-2 text-xs text-red-600 dark:text-red-400">
+                        {fmtValue(t.errorMessage)}
                       </div>
                     )}
                   </td>
@@ -1083,7 +1252,7 @@ function TraceContent({ l }: { l: (zh: string, en: string) => string }) {
                     <TraceStatusBadge status={t.status} />
                   </td>
                   <td className="px-4 py-3 font-mono text-xs text-gray-600 dark:text-gray-400">
-                    {(t.metadata?.provider_code as string) || '-'}
+                    {fmtValue(t.metadata?.provider_code)}
                   </td>
                   <td className="px-4 py-3 text-right font-mono text-gray-600 dark:text-gray-400">
                     {fmtDuration(t.durationMs)}

@@ -42,7 +42,7 @@ test.describe('Computed Fields', () => {
     await order.child('item').createForParent(orderPid, {
       e2et_item_name: 'Computed Item',
       e2et_item_qty: 10,
-      e2et_item_price: 25.50,
+      e2et_item_price: 25.5,
     });
 
     await page.close();
@@ -82,7 +82,7 @@ test.describe('Computed Fields', () => {
     }
 
     // Also verify via UI
-    await navigateToDynamicPage(page, 'e2et-order');
+    await navigateToDynamicPage(page, 'e2et_order');
 
     const listPage = page.locator('table').first();
     await expect(listPage).toBeVisible({ timeout: 10000 });
@@ -94,6 +94,11 @@ test.describe('Computed Fields', () => {
   test('CF-002: COMPUTED_READONLY field not editable', async ({ page }) => {
     // Navigate to order item form
     const order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
+
+    // Create a fresh draft order to ensure we have one to edit
+    const freshTitle = `CF002_Draft_${uniqueId()}`;
+    await order.createViaApi({ e2et_order_title: freshTitle });
+
     const listPage = await order.gotoList();
 
     // Go to draft tab and edit first order
@@ -102,7 +107,7 @@ test.describe('Computed Fields', () => {
     try {
       await clickRowActionByLocator(page, listPage.row(0), 'edit');
     } catch {
-      throw new Error(String('No editable orders in draft state'))
+      throw new Error(String('No editable orders in draft state'));
     }
     await page.waitForURL(
       (url) => url.pathname.includes('/edit') || url.pathname.includes('/new'),
@@ -111,15 +116,17 @@ test.describe('Computed Fields', () => {
     await page.waitForLoadState('domcontentloaded');
 
     // Look for subtotal field — should be read-only or disabled
-    const subtotalField = page.locator(
-      '[data-field*="subtotal"] input[disabled], [data-field*="subtotal"] input[readonly], input[name*="subtotal"][disabled], input[name*="subtotal"][readonly]'
-    ).first();
+    const subtotalField = page
+      .locator(
+        '[data-field*="subtotal"] input[disabled], [data-field*="subtotal"] input[readonly], input[name*="subtotal"][disabled], input[name*="subtotal"][readonly]',
+      )
+      .first();
     const hasDisabledSubtotal = await subtotalField.isVisible({ timeout: 5000 }).catch(() => false);
 
     // Alternatively, check the field doesn't have an editable input at all
-    const editableSubtotal = page.locator(
-      '[data-field*="subtotal"] input:not([disabled]):not([readonly])'
-    ).first();
+    const editableSubtotal = page
+      .locator('[data-field*="subtotal"] input:not([disabled]):not([readonly])')
+      .first();
     const isEditable = await editableSubtotal.isVisible({ timeout: 3000 }).catch(() => false);
 
     // At least one should be true: disabled field exists OR no editable field
@@ -131,9 +138,9 @@ test.describe('Computed Fields', () => {
    */
   test('CF-003: Cascade child to parent aggregate', async ({ page }) => {
     // Check if order has an aggregate field (e.g., total_amount)
-    const orderResp = await page.request.get(`/api/dynamic/e2et-order/${orderPid}`);
+    const orderResp = await page.request.get(`/api/dynamic/e2et_order/${orderPid}`);
     if (!orderResp.ok()) {
-      throw new Error(String('Order detail API not available'))
+      throw new Error(String('Order detail API not available'));
       return;
     }
 
@@ -145,7 +152,7 @@ test.describe('Computed Fields', () => {
     expect(order).toBeTruthy();
 
     // Navigate to list page and verify rendering
-    await navigateToDynamicPage(page, 'e2et-order');
+    await navigateToDynamicPage(page, 'e2et_order');
     const table = page.locator('table').first();
     await expect(table).toBeVisible({ timeout: 10000 });
   });
@@ -200,7 +207,7 @@ test.describe('Computed Fields', () => {
 
     if (items.length > 0) {
       const target = items.find(
-        (item) => (item as Record<string, unknown>).e2et_item_name === 'Precision Item'
+        (item) => (item as Record<string, unknown>).e2et_item_name === 'Precision Item',
       ) as Record<string, unknown> | undefined;
       const subtotal = target?.e2et_item_subtotal;
       if (subtotal !== undefined && subtotal !== null) {
@@ -248,7 +255,7 @@ test.describe('Computed Fields', () => {
    */
   test('CF-007: Computed field renders in list column', async ({ page }) => {
     // Navigate to order list and check if computed columns display
-    await navigateToDynamicPage(page, 'e2et-order');
+    await navigateToDynamicPage(page, 'e2et_order');
 
     const table = page.locator('table').first();
     await expect(table).toBeVisible({ timeout: 10000 });
@@ -268,13 +275,16 @@ test.describe('Computed Fields', () => {
     const listPage = await order.gotoList();
 
     // Look for view/detail button
-    const viewBtn = listPage.row(0).locator(
-      '[data-testid="row-action-view"], [data-testid="row-action-detail"], button:has-text("详情"), button:has-text("查看")'
-    ).first();
+    const viewBtn = listPage
+      .row(0)
+      .locator(
+        '[data-testid="row-action-view"], [data-testid="row-action-detail"], button:has-text("详情"), button:has-text("查看")',
+      )
+      .first();
     const hasViewBtn = await viewBtn.isVisible({ timeout: 5000 }).catch(() => false);
 
     if (!hasViewBtn) {
-      throw new Error(String('Detail button not available'))
+      throw new Error(String('Detail button not available'));
       return;
     }
 
@@ -340,7 +350,10 @@ test.describe('Computed Fields', () => {
 
     // The form should have loaded — verify it has content
     const formContent = page.locator('form, [data-testid*="form"]');
-    const hasForm = await formContent.first().isVisible({ timeout: 5000 }).catch(() => false);
+    const hasForm = await formContent
+      .first()
+      .isVisible({ timeout: 5000 })
+      .catch(() => false);
     expect(hasForm || disabledCount >= 0).toBe(true);
   });
 });

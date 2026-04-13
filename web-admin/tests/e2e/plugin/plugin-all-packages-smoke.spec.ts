@@ -18,19 +18,35 @@ type PluginSmokeCase = {
 };
 
 const PLUGIN_CASES: PluginSmokeCase[] = [
-  { pluginId: 'com.auraboot.project-management', pluginDir: 'project-management', modelCode: 'pm_project' },
-  { pluginId: 'com.auraboot.quarry-industry', pluginDir: 'quarry-industry', modelCode: 'qo_daily_report' },
+  {
+    pluginId: 'com.auraboot.project-management',
+    pluginDir: 'project-management',
+    modelCode: 'pm_project',
+  },
+  {
+    pluginId: 'com.auraboot.quarry-industry',
+    pluginDir: 'quarry-industry',
+    modelCode: 'qo_daily_report',
+  },
   { pluginId: 'com.auraboot.annual-plan', pluginDir: 'annual-plan', modelCode: 'ap_annual_plan' },
   { pluginId: 'com.auraboot.dual-prevention', pluginDir: 'dual-prevention', modelCode: 'dp_issue' },
   { pluginId: 'com.test.e2e-order', pluginDir: 'e2e-test-order', modelCode: 'e2et_order' },
   { pluginId: 'com.auraboot.asset-management', pluginDir: 'asset-management', modelCode: 'asset' },
   { pluginId: 'com.auraboot.crm', pluginDir: 'crm', modelCode: 'crm_lead' },
   { pluginId: 'com.auraboot.sales', pluginDir: 'sales', modelCode: 'sl_sales_quotation' },
-  { pluginId: 'com.auraboot.procurement', pluginDir: 'procurement', modelCode: 'pr_purchase_order' },
+  {
+    pluginId: 'com.auraboot.procurement',
+    pluginDir: 'procurement',
+    modelCode: 'pr_purchase_order',
+  },
   { pluginId: 'com.auraboot.inventory', pluginDir: 'inventory', modelCode: 'inv_inbound' },
   { pluginId: 'com.auraboot.finance', pluginDir: 'finance', modelCode: 'fin_account' },
   { pluginId: 'com.auraboot.quality', pluginDir: 'quality', modelCode: 'qc_iqc_order' },
-  { pluginId: 'com.auraboot.pcba-industry', pluginDir: 'pcba-industry', modelCode: 'pe_production_plan' },
+  {
+    pluginId: 'com.auraboot.pcba-manufacturing',
+    pluginDir: 'pcba-industry',
+    modelCode: 'pe_production_plan',
+  },
   {
     pluginId: 'com.auraboot.pcba-solution',
     pluginDir: 'pcba-solution',
@@ -45,9 +61,13 @@ test.describe('Plugin Package Smoke Coverage', () => {
   });
 
   for (const pluginCase of PLUGIN_CASES) {
-    test(`PLUGIN-SMOKE: ${pluginCase.pluginDir} should be installed and accessible @smoke`, async ({ page }) => {
+    test(`PLUGIN-SMOKE: ${pluginCase.pluginDir} should be installed and accessible @smoke`, async ({
+      page,
+    }) => {
       const pluginResp = await page.request.get('/api/plugins?current=1&size=300');
-      expect(pluginResp.ok(), `Plugin API should be available for ${pluginCase.pluginId}`).toBe(true);
+      expect(pluginResp.ok(), `Plugin API should be available for ${pluginCase.pluginId}`).toBe(
+        true,
+      );
       const pluginBody = await pluginResp.json().catch(() => ({}));
       const plugins = pluginBody?.data?.records ?? pluginBody?.data?.data ?? pluginBody?.data ?? [];
       const targetPlugin = Array.isArray(plugins)
@@ -77,17 +97,20 @@ test.describe('Plugin Package Smoke Coverage', () => {
       } catch (err: any) {
         // If page was closed/crashed, re-navigate
         if (err.message?.includes('closed') || err.message?.includes('Target')) {
-          throw new Error(String(`Page crashed during navigation to ${navigationModelCode}`))
+          throw new Error(String(`Page crashed during navigation to ${navigationModelCode}`));
           return;
         }
         throw err;
       }
-      await expect(page).toHaveURL(new RegExp(`/dynamic/${navigationModelCode}([/?#].*)?$`));
+      await expect(page).toHaveURL(new RegExp(`/p/${navigationModelCode}([/?#].*)?$`));
 
       const content = page.locator(
         '.ant-table, table, [role="table"], .ant-form, form, [data-testid="dynamic-list"], [data-testid="dynamic-form"]',
       );
-      await expect(content.first(), `${navigationModelCode} page should render table or form`).toBeVisible();
+      await expect(
+        content.first(),
+        `${navigationModelCode} page should render table or form`,
+      ).toBeVisible();
     });
   }
 });

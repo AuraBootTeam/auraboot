@@ -15,12 +15,7 @@ interface InboxBadgeProps {
   className?: string;
 }
 
-export function InboxBadge({
-  onClick,
-  isOpen,
-  pollInterval = 30_000,
-  className,
-}: InboxBadgeProps) {
+export function InboxBadge({ onClick, isOpen, pollInterval = 30_000, className }: InboxBadgeProps) {
   const [count, setCount] = useState(0);
 
   const fetchCount = useCallback(async () => {

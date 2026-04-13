@@ -1,7 +1,10 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useSSE } from '~/hooks/useSSE';
 import { Link } from 'react-router';
 import {
   Bars3Icon,
+  BuildingOffice2Icon,
+  Cog6ToothIcon,
   PowerIcon,
   SunIcon,
   MoonIcon,
@@ -13,10 +16,6 @@ import { useRootLoaderData } from '~/root';
 import { useTheme } from '~/contexts/ThemeContext';
 import { useI18n } from '~/contexts/I18nContext';
 import { useHydrated } from '~/hooks/useHydrated';
-import { fetchResult } from '~/services/http-client';
-import { ResultHelper } from '~/utils/type';
-import { ApprovalBadge } from '~/bpm/components/ApprovalBadge';
-import { NotificationDropdown } from '~/components/notification/NotificationDropdown';
 import { InboxHeaderWidget } from '~/components/inbox/InboxDropdown';
 import { CommandPalette } from '~/components/CommandPalette';
 import { useAuraBot } from '~/aurabot/AuraBotProvider';
@@ -49,102 +48,51 @@ export default function Header({
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [showThemeDropdown, setShowThemeDropdown] = useState(false);
   const [showLangDropdown, setShowLangDropdown] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [spaces, setSpaces] = useState<Array<{ tenantId: string; tenantName: string; tenantDisplayName: string; spaceType: string }>>([]);
 
   const userDropdownRef = useRef<HTMLDivElement>(null);
   const themeDropdownRef = useRef<HTMLDivElement>(null);
   const langDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Fetch unread notification count
-  const fetchUnreadCount = useCallback(async () => {
-    if (!user) return;
-    try {
-      const result = await fetchResult('/api/notifications/unread-count', {
-        method: 'get',
-      });
-      if (ResultHelper.isSuccess(result)) {
-        const data = result.data as { count: number } | number;
-        setUnreadCount(typeof data === 'number' ? data : data?.count || 0);
-      }
-    } catch (error) {
-      console.error('Failed to fetch unread count:', error);
-    }
-  }, [user]);
+  const workspaceLabel = locale.startsWith('zh') ? '工作空间' : 'Workspaces';
+  const platformConsoleLabel = locale.startsWith('zh') ? '平台控制台' : 'Platform Console';
 
-  // Mark all notifications as read
-  const markAllAsRead = useCallback(async () => {
-    try {
-      const result = await fetchResult('/api/notifications/read-all', {
-        method: 'put',
-      });
-      if (ResultHelper.isSuccess(result)) {
-        setUnreadCount(0);
-      }
-    } catch (error) {
-      console.error('Failed to mark all notifications as read:', error);
-    }
-  }, []);
-
-  // Connect to SSE for real-time unread count updates
+  // Lazy-load spaces for tenant switching in avatar menu
   useEffect(() => {
-    if (!showNotifications || !user) return;
+    if (!user || simplified) return;
+    fetch('/api/tenant-selection/my-spaces')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((result) => { if (result?.data) setSpaces(result.data); })
+      .catch(() => {});
+  }, [user, simplified]);
 
-    // Fetch initial count immediately for quick display
-    fetchUnreadCount();
-
-    // Establish SSE connection for real-time updates
-    const eventSource = new EventSource('/api/notifications/stream');
-
-    eventSource.addEventListener('unread-count', (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        setUnreadCount(data.count);
-      } catch (error) {
-        console.error('Failed to parse SSE unread-count event:', error);
-      }
-    });
-
-    eventSource.addEventListener('connected', () => {
-      console.debug('SSE notification stream connected');
-    });
-
-    // Data sync: capture connectionId for subscription binding
-    eventSource.addEventListener('data-sync-connected', (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.connectionId) {
-          (window as any).__auraSSEConnectionId = data.connectionId;
-          window.dispatchEvent(
-            new CustomEvent('aura:sse-connected', {
-              detail: { connectionId: data.connectionId },
-            }),
-          );
-          console.debug('DataSync SSE connected, connectionId:', data.connectionId);
-        }
-      } catch (error) {
-        console.error('Failed to parse data-sync-connected event:', error);
-      }
-    });
-
-    // Data sync: forward data change events to window for useDataSync hook
-    eventSource.addEventListener('data:changed', (event) => {
-      try {
-        const detail = JSON.parse(event.data);
-        window.dispatchEvent(new CustomEvent('aura:data-changed', { detail }));
-      } catch (error) {
-        console.error('Failed to parse data:changed event:', error);
-      }
-    });
-
-    eventSource.onerror = (error) => {
-      console.error('SSE connection error:', error);
-      // EventSource will automatically attempt to reconnect
-    };
-
-    return () => {
-      eventSource.close();
-    };
-  }, [showNotifications, user, fetchUnreadCount]);
+  // Connect to SSE for real-time data sync via useSSE hook
+  // (provides exponential backoff, tab visibility pause, and proper cleanup)
+  useSSE({
+    url: '/api/notifications/stream',
+    enabled: !!user,
+    listeners: [
+      {
+        event: 'data-sync-connected',
+        handler: (data: { connectionId?: number }) => {
+          if (data.connectionId) {
+            (window as any).__auraSSEConnectionId = data.connectionId;
+            window.dispatchEvent(
+              new CustomEvent('aura:sse-connected', {
+                detail: { connectionId: data.connectionId },
+              }),
+            );
+          }
+        },
+      },
+      {
+        event: 'data:changed',
+        handler: (detail: Record<string, unknown>) => {
+          window.dispatchEvent(new CustomEvent('aura:data-changed', { detail }));
+        },
+      },
+    ],
+  });
 
   // 处理点击外部关闭下拉菜单
   useEffect(() => {
@@ -211,6 +159,14 @@ export default function Header({
             <img className="h-8 w-8 rounded-lg" src="/logo192.png" alt="Logo" />
             <span className="ms-3 text-xl font-bold text-gray-900 dark:text-white">AuraBoot</span>
           </Link>
+
+          {/* Current tenant name — always visible context indicator */}
+          {!simplified && user?.tenantName && (
+            <span className="ms-3 hidden items-center text-sm text-gray-400 sm:flex dark:text-gray-500">
+              <span className="mx-2">·</span>
+              <span data-testid="current-tenant-name">{user.tenantName}</span>
+            </span>
+          )}
         </div>
 
         {/* 右侧：工具栏 */}
@@ -234,16 +190,8 @@ export default function Header({
             </button>
           )}
 
-          {/* 统一收件箱 - 只在非简化模式显示 */}
+          {/* Unified inbox entry point */}
           {!simplified && showNotifications && <InboxHeaderWidget />}
-
-          {/* 审批待办 - 只在非简化模式显示 */}
-          {!simplified && showNotifications && <ApprovalBadge />}
-
-          {/* 通知下拉 - 只在非简化模式显示 */}
-          {!simplified && showNotifications && (
-            <NotificationDropdown unreadCount={unreadCount} onMarkAllRead={markAllAsRead} />
-          )}
 
           {/* 语言切换 - 只在非简化模式显示 */}
           {!simplified && showLanguageSwitch && (
@@ -341,14 +289,90 @@ export default function Header({
               {showUserDropdown && (
                 <div
                   data-testid="user-dropdown"
-                  className="absolute end-0 z-50 mt-2 w-56 rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-800"
+                  className="absolute end-0 z-[70] mt-2 w-64 rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-800"
                 >
+                  {/* User info */}
                   <div className="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
                     <p className="text-sm font-medium text-gray-900 dark:text-white">
                       {user.name || t('user.defaultName')}
                     </p>
+                    <p className="truncate text-xs text-gray-500 dark:text-gray-400">
+                      {user.email}
+                    </p>
                   </div>
 
+                  {/* Tenant list */}
+                  {spaces.filter(s => s.spaceType === 'business').length > 0 && (
+                    <div className="border-b border-gray-200 py-1 dark:border-gray-700">
+                      <p className="px-4 py-1 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                        {workspaceLabel}
+                      </p>
+                      {spaces.filter(s => s.spaceType === 'business').map((space) => {
+                        const isCurrent = String(user.tenantId) === String(space.tenantId);
+                        return (
+                          <button
+                            key={space.tenantId}
+                            data-testid={`tenant-switch-${space.tenantId}`}
+                            onClick={() => {
+                              if (isCurrent) return;
+                              setShowUserDropdown(false);
+                              const form = document.createElement('form');
+                              form.method = 'POST';
+                              form.action = '/_action/switch-space';
+                              const tid = document.createElement('input');
+                              tid.type = 'hidden'; tid.name = 'tenantId'; tid.value = space.tenantId;
+                              form.appendChild(tid);
+                              const redir = document.createElement('input');
+                              redir.type = 'hidden'; redir.name = 'redirectTo'; redir.value = '/';
+                              form.appendChild(redir);
+                              document.body.appendChild(form);
+                              form.submit();
+                            }}
+                            className={`flex w-full items-center gap-3 px-4 py-2 text-sm transition-colors ${
+                              isCurrent
+                                ? 'bg-blue-50 font-medium text-blue-700 dark:bg-blue-900/20 dark:text-blue-400'
+                                : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
+                            }`}
+                          >
+                            <BuildingOffice2Icon className={`h-4 w-4 flex-shrink-0 ${isCurrent ? 'text-blue-500' : 'text-gray-400'}`} />
+                            <span className="truncate">{space.tenantDisplayName || space.tenantName}</span>
+                            {isCurrent && <span className="ms-auto text-xs text-blue-500">&#10003;</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Platform Console — only for platform_admin users */}
+                  {spaces.some(s => s.spaceType === 'platform') && (
+                    <div className="border-b border-gray-200 py-1 dark:border-gray-700">
+                      <button
+                        data-testid="platform-console-link"
+                        onClick={() => {
+                          setShowUserDropdown(false);
+                          const platformSpace = spaces.find(s => s.spaceType === 'platform');
+                          if (!platformSpace) return;
+                          const form = document.createElement('form');
+                          form.method = 'POST';
+                          form.action = '/_action/switch-space';
+                          const tid = document.createElement('input');
+                          tid.type = 'hidden'; tid.name = 'tenantId'; tid.value = platformSpace.tenantId;
+                          form.appendChild(tid);
+                          const redir = document.createElement('input');
+                          redir.type = 'hidden'; redir.name = 'redirectTo'; redir.value = '/platform/marketplace';
+                          form.appendChild(redir);
+                          document.body.appendChild(form);
+                          form.submit();
+                        }}
+                        className="flex w-full items-center gap-3 px-4 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                      >
+                        <Cog6ToothIcon className="h-4 w-4 flex-shrink-0 text-gray-400" />
+                        <span>{platformConsoleLabel}</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Logout */}
                   <Link
                     to="/logout"
                     className="flex items-center px-4 py-2 text-sm text-red-600 transition-colors hover:bg-gray-100 dark:text-red-400 dark:hover:bg-gray-700"

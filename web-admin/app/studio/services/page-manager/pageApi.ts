@@ -24,7 +24,7 @@ const API_BASE = '/api/pages';
  * List pages with filters and pagination
  */
 export async function listPages(params?: {
-  pageType?: string;
+  kind?: string;
   isTemplate?: boolean;
   isPublished?: boolean;
   keyword?: string;
@@ -193,4 +193,11 @@ export async function getPageByEntityCode(
  */
 export async function getPageByPageKey(pageKey: string): Promise<Result<PageSchemaDTO>> {
   return get<PageSchemaDTO>(`${API_BASE}/page-key/{pageKey}`, { pageKey });
+}
+
+/**
+ * List template pages (convenience wrapper around listPages)
+ */
+export async function listTemplates(): Promise<Result<PaginationResult<PageSchemaDTO>>> {
+  return listPages({ isTemplate: true, pageSize: 100 });
 }

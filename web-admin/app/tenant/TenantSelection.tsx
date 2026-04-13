@@ -1,4 +1,11 @@
-import { Form, useActionData, useNavigate, useLoaderData, type ActionFunctionArgs, type LoaderFunctionArgs } from 'react-router';
+import {
+  Form,
+  useActionData,
+  useNavigate,
+  useLoaderData,
+  type ActionFunctionArgs,
+  type LoaderFunctionArgs,
+} from 'react-router';
 import { useState, useRef, useEffect } from 'react';
 import { createUserSession, getTokenFromRequest } from '~/services/session';
 import { useTenantForm } from '~/hooks/useTenantForm';
@@ -29,7 +36,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   if (!token) return { spaces: [] };
 
   try {
-    const apiUrl = process.env.SPRING_BOOT_URL;
+    const apiUrl = process.env.SPRING_BOOT_URL || 'http://127.0.0.1:6443';
     const resp = await fetch(`${apiUrl}/api/tenant-selection/my-spaces`, {
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -79,7 +86,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   try {
-    const apiUrl = process.env.SPRING_BOOT_URL;
+    const apiUrl = process.env.SPRING_BOOT_URL || 'http://127.0.0.1:6443';
     const url = `${apiUrl}/api/tenant-selection/process`;
 
     const response = await fetch(url, {
@@ -233,7 +240,9 @@ export default function TenantSelection() {
                           {space.tenantDisplayName || space.tenantName}
                         </h3>
                         <p className="text-sm text-gray-500 dark:text-gray-400">
-                          {space.spaceType === 'platform' ? 'Platform Management' : 'Business Workspace'}
+                          {space.spaceType === 'platform'
+                            ? 'Platform Management'
+                            : 'Business Workspace'}
                         </p>
                       </div>
                       <span className="text-sm text-gray-400">&rarr;</span>

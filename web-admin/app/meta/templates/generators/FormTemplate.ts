@@ -50,22 +50,15 @@ export const FormTemplate: TemplateGenerator = {
     blocks.push(buildFormButtonsBlock(styles, classOverrides));
 
     return {
-      kind: 'Form',
+      kind: 'form',
       version: '1.0',
       id: `${model.modelCode}_form`,
       title: { 'zh-CN': `${model.displayName}表单`, 'en-US': `${model.displayName} Form` },
       layout: {
-        areas: ['main'],
-        areasConfig: {
-          main: { type: 'flex', direction: 'column', rowGap: 0 },
-        },
+        type: 'stack',
+        gap: 0,
       },
-      areas: {
-        main: {
-          blocks,
-          className: classOverrides.container ?? styles.container,
-        },
-      },
+      blocks,
       dataSources: {
         ds_detail: {
           type: 'api',

@@ -64,7 +64,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
       setLoading(false);
       return;
     }
-    const slug = modelCode.replace(/_/g, '-');
+    const slug = modelCode;
     setLoading(true);
     fetchResult<any>(`/api/dynamic/${slug}/list?pageNum=1&pageSize=200`)
       .then((result) => {
@@ -86,8 +86,17 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
     let minDate = Infinity;
     let maxDate = -Infinity;
 
-    let missingStart = 0, missingEnd = 0, missingBoth = 0, invalidDate = 0, valid = 0;
-    const issues: Array<{ recordId: string; title: string; reason: string; details: Record<string, unknown> }> = [];
+    let missingStart = 0,
+      missingEnd = 0,
+      missingBoth = 0,
+      invalidDate = 0,
+      valid = 0;
+    const issues: Array<{
+      recordId: string;
+      title: string;
+      reason: string;
+      details: Record<string, unknown>;
+    }> = [];
 
     for (const record of data) {
       const startVal = record[startField || ''];
@@ -99,17 +108,40 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
 
       if (!hasStart && !hasEnd) {
         missingBoth++;
-        if (issues.length < 10) issues.push({ recordId, title: titleVal, reason: 'missing_both', details: { startField: startField || '', endField: endField || '', startValue: startVal, endValue: endVal } });
+        if (issues.length < 10)
+          issues.push({
+            recordId,
+            title: titleVal,
+            reason: 'missing_both',
+            details: {
+              startField: startField || '',
+              endField: endField || '',
+              startValue: startVal,
+              endValue: endVal,
+            },
+          });
         continue;
       }
       if (!hasStart) {
         missingStart++;
-        if (issues.length < 10) issues.push({ recordId, title: titleVal, reason: 'missing_start', details: { startField: startField || '', startValue: startVal } });
+        if (issues.length < 10)
+          issues.push({
+            recordId,
+            title: titleVal,
+            reason: 'missing_start',
+            details: { startField: startField || '', startValue: startVal },
+          });
         continue;
       }
       if (!hasEnd) {
         missingEnd++;
-        if (issues.length < 10) issues.push({ recordId, title: titleVal, reason: 'missing_end', details: { endField: endField || '', endValue: endVal } });
+        if (issues.length < 10)
+          issues.push({
+            recordId,
+            title: titleVal,
+            reason: 'missing_end',
+            details: { endField: endField || '', endValue: endVal },
+          });
         continue;
       }
 
@@ -117,7 +149,13 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
       const end = new Date(String(endVal));
       if (isNaN(start.getTime()) || isNaN(end.getTime())) {
         invalidDate++;
-        if (issues.length < 10) issues.push({ recordId, title: titleVal, reason: 'invalid_date', details: { startValue: startVal, endValue: endVal } });
+        if (issues.length < 10)
+          issues.push({
+            recordId,
+            title: titleVal,
+            reason: 'invalid_date',
+            details: { startValue: startVal, endValue: endVal },
+          });
         continue;
       }
 
@@ -151,7 +189,14 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
       items: parsedItems,
       resources: Array.from(resourceSet).sort(),
       dateRange: { start: new Date(minDate), end: new Date(maxDate) },
-      diagnostics: { totalRecords: data.length, validRecords: valid, missingStart, missingEnd, missingBoth, invalidDate },
+      diagnostics: {
+        totalRecords: data.length,
+        validRecords: valid,
+        missingStart,
+        missingEnd,
+        missingBoth,
+        invalidDate,
+      },
       issueRecords: issues,
     };
   }, [data, startField, endField, resourceField, titleField]);
@@ -171,11 +216,18 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
   }
 
   if (loading) {
-    return <div className="flex items-center justify-center p-12"><div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" /></div>;
+    return (
+      <div className="flex items-center justify-center p-12">
+        <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+      </div>
+    );
   }
 
   // Render timeline
-  const totalDays = Math.max(Math.ceil((dateRange.end.getTime() - dateRange.start.getTime()) / DAY_MS), 1);
+  const totalDays = Math.max(
+    Math.ceil((dateRange.end.getTime() - dateRange.start.getTime()) / DAY_MS),
+    1,
+  );
   const dayWidth = 40; // px per day
   const rowHeight = 40;
   const headerHeight = 50;
@@ -201,8 +253,14 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
       />
       <div style={{ minWidth: totalDays * dayWidth + 200, position: 'relative' }}>
         {/* Header row — dates */}
-        <div className="sticky top-0 z-10 flex border-b border-gray-200 bg-gray-50" style={{ height: headerHeight }}>
-          <div className="flex-shrink-0 border-r border-gray-200 bg-gray-50 px-3 py-2 text-xs font-medium text-gray-500" style={{ width: 200 }}>
+        <div
+          className="sticky top-0 z-10 flex border-b border-gray-200 bg-gray-50"
+          style={{ height: headerHeight }}
+        >
+          <div
+            className="flex-shrink-0 border-r border-gray-200 bg-gray-50 px-3 py-2 text-xs font-medium text-gray-500"
+            style={{ width: 200 }}
+          >
             {resourceField ? 'Resource' : 'Items'}
           </div>
           <div className="relative flex-1">
@@ -222,23 +280,44 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
         {(resources.length > 0 ? resources : ['(All)']).map((resource, ri) => {
           const resourceItems = items.filter((item) => item.resource === resource);
           return (
-            <div key={resource} className="flex border-b border-gray-100" style={{ height: rowHeight }}>
+            <div
+              key={resource}
+              className="flex border-b border-gray-100"
+              style={{ height: rowHeight }}
+            >
               {/* Resource label */}
-              <div className="flex-shrink-0 border-r border-gray-200 px-3 py-2 text-xs font-medium text-gray-700 truncate" style={{ width: 200 }}>
+              <div
+                className="flex-shrink-0 truncate border-r border-gray-200 px-3 py-2 text-xs font-medium text-gray-700"
+                style={{ width: 200 }}
+              >
                 {resource}
               </div>
               {/* Timeline bars */}
               <div className="relative flex-1">
                 {resourceItems.map((item) => {
-                  const startOffset = (item.start.getTime() - dateRange.start.getTime()) / DAY_MS * dayWidth;
-                  const duration = Math.max((item.end.getTime() - item.start.getTime()) / DAY_MS * dayWidth, dayWidth / 2);
-                  const colors = ['bg-blue-200 text-blue-800', 'bg-green-200 text-green-800', 'bg-purple-200 text-purple-800', 'bg-amber-200 text-amber-800'];
+                  const startOffset =
+                    ((item.start.getTime() - dateRange.start.getTime()) / DAY_MS) * dayWidth;
+                  const duration = Math.max(
+                    ((item.end.getTime() - item.start.getTime()) / DAY_MS) * dayWidth,
+                    dayWidth / 2,
+                  );
+                  const colors = [
+                    'bg-blue-200 text-blue-800',
+                    'bg-green-200 text-green-800',
+                    'bg-purple-200 text-purple-800',
+                    'bg-amber-200 text-amber-800',
+                  ];
                   const color = colors[ri % colors.length];
                   return (
                     <div
                       key={item.id}
-                      className={`absolute top-1 rounded px-1.5 text-xs font-medium truncate cursor-pointer hover:opacity-80 ${color}`}
-                      style={{ left: startOffset, width: duration, height: rowHeight - 8, lineHeight: `${rowHeight - 8}px` }}
+                      className={`absolute top-1 cursor-pointer truncate rounded px-1.5 text-xs font-medium hover:opacity-80 ${color}`}
+                      style={{
+                        left: startOffset,
+                        width: duration,
+                        height: rowHeight - 8,
+                        lineHeight: `${rowHeight - 8}px`,
+                      }}
                       title={`${item.title} (${item.start.toLocaleDateString()} - ${item.end.toLocaleDateString()})`}
                       onClick={() => onItemClick?.(item.id)}
                       data-testid={`timeline-item-${item.id}`}
@@ -258,7 +337,11 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
             validRecords={diagnostics.validRecords}
             categories={[
               { key: 'missing_both', label: 'Missing both dates', count: diagnostics.missingBoth },
-              { key: 'missing_start', label: 'Missing start date', count: diagnostics.missingStart },
+              {
+                key: 'missing_start',
+                label: 'Missing start date',
+                count: diagnostics.missingStart,
+              },
               { key: 'missing_end', label: 'Missing end date', count: diagnostics.missingEnd },
               { key: 'invalid_date', label: 'Invalid date value', count: diagnostics.invalidDate },
             ]}

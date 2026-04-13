@@ -33,6 +33,7 @@ interface UseFieldLibraryResult {
  */
 export function useFieldLibrary({
   modelPid,
+  modelCode,
   viewModelCode,
 }: UseFieldLibraryOptions = {}): UseFieldLibraryResult {
   const [fields, setFields] = useState<MetaFieldDTO[]>([]);
@@ -60,6 +61,22 @@ export function useFieldLibrary({
           grouped[category].push(field);
         }
         setFieldsByCategory(grouped);
+      } else if (modelCode) {
+        // Load fields by model code — resolve PID first via /api/meta/models/code/{code}
+        const { get: httpGet } = await import('~/services/http-client');
+        const modelResp = await httpGet<{ pid: string }>(`/api/meta/models/code/${modelCode}`);
+        const pid = modelResp?.data?.pid;
+        if (pid) {
+          const modelFields = await fieldLibraryService.getModelFields(pid);
+          setFields(modelFields);
+          const grouped: Record<string, MetaFieldDTO[]> = {};
+          for (const field of modelFields) {
+            const category = field.semanticType || 'other';
+            if (!grouped[category]) grouped[category] = [];
+            grouped[category].push(field);
+          }
+          setFieldsByCategory(grouped);
+        }
       } else if (modelPid) {
         // Load model-bound fields
         const modelFields = await fieldLibraryService.getModelFields(modelPid);
@@ -88,7 +105,7 @@ export function useFieldLibrary({
     } finally {
       setLoading(false);
     }
-  }, [modelPid, viewModelCode]);
+  }, [modelPid, modelCode, viewModelCode]);
 
   useEffect(() => {
     loadFields();

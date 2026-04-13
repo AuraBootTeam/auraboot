@@ -26,7 +26,7 @@ const extractionCache = new WeakMap<UnifiedSchema, Set<string>>();
  * @returns Set of dataSource IDs (去重)
  */
 export function extractDataSourceIds(schema: UnifiedSchema | null): Set<string> {
-  if (!schema || !schema.areas) {
+  if (!schema || !schema.blocks) {
     return new Set<string>();
   }
 
@@ -37,35 +37,28 @@ export function extractDataSourceIds(schema: UnifiedSchema | null): Set<string> 
 
   const dataSourceIds = new Set<string>();
 
-  // 遍历所有 area
-  Object.values(schema.areas).forEach((area) => {
-    if (!area.blocks) {
-      return;
+  // 遍历所有 block
+  for (const block of schema.blocks) {
+    // 处理 form-section 类型的 block
+    if (block.blockType === 'form-section' && block.fields) {
+      block.fields.forEach((field: FieldConfig) => {
+        if (field.dataSource && typeof field.dataSource === 'string') {
+          dataSourceIds.add(field.dataSource);
+        }
+      });
     }
 
-    // 遍历所有 block
-    area.blocks.forEach((block) => {
-      // 处理 form-section 类型的 block
-      if (block.blockType === 'form-section' && block.fields) {
-        block.fields.forEach((field: FieldConfig) => {
-          if (field.dataSource && typeof field.dataSource === 'string') {
-            dataSourceIds.add(field.dataSource);
-          }
-        });
-      }
+    // 处理 filters 类型的 block
+    if (block.blockType === 'filters' && block.fields) {
+      block.fields.forEach((field: FieldConfig) => {
+        if (field.dataSource && typeof field.dataSource === 'string') {
+          dataSourceIds.add(field.dataSource);
+        }
+      });
+    }
 
-      // 处理 filter-form 类型的 block
-      if (block.blockType === 'filter-form' && block.fields) {
-        block.fields.forEach((field: FieldConfig) => {
-          if (field.dataSource && typeof field.dataSource === 'string') {
-            dataSourceIds.add(field.dataSource);
-          }
-        });
-      }
-
-      // 可扩展:未来可添加其他 blockType
-    });
-  });
+    // 可扩展:未来可添加其他 blockType
+  }
 
   // P2-6 修复: 存入缓存
   extractionCache.set(schema, dataSourceIds);

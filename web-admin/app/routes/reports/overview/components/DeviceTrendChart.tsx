@@ -61,16 +61,18 @@ export function DeviceTrendChart({ data, loading = false }: DeviceTrendChartProp
             <YAxis tick={{ fontSize: 12 }} />
             <Tooltip
               labelFormatter={(label) => `日期: ${new Date(label).toLocaleDateString('zh-CN')}`}
-              formatter={(value: any, name: string) => {
-                const nameMap: Record<string, string> = {
-                  total: '总设备数',
-                  online: '在线设备',
-                  offline: '离线设备',
-                  fault: '故障设备',
-                  maintenance: '维护设备',
-                };
-                return [value, nameMap[name] || name];
-              }}
+              formatter={
+                ((value: any, name: string) => {
+                  const nameMap: Record<string, string> = {
+                    total: '总设备数',
+                    online: '在线设备',
+                    offline: '离线设备',
+                    fault: '故障设备',
+                    maintenance: '维护设备',
+                  };
+                  return [value, nameMap[name] || name];
+                }) as any
+              }
             />
             <Legend
               formatter={(value: string) => {

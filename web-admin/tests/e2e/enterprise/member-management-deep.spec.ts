@@ -107,7 +107,10 @@ async function clearListSearch(page: import('@playwright/test').Page): Promise<v
   await searchInput.press('Enter').catch(() => null);
   await page
     .waitForResponse(
-      (r) => r.url().includes('/list') && r.request().method().toLowerCase() === 'post' && r.status() === 200,
+      (r) =>
+        r.url().includes('/list') &&
+        r.request().method().toLowerCase() === 'post' &&
+        r.status() === 200,
       { timeout: 5000 },
     )
     .catch(() => null);
@@ -135,7 +138,9 @@ async function locateMemberRow(
 ) {
   const lookup = rowLookupText(member);
   const row = await findRowInPaginatedList(page, lookup, timeout);
-  await expect(row, `member row should be visible: ${rowLookupText(member)}`).toBeVisible({ timeout });
+  await expect(row, `member row should be visible: ${rowLookupText(member)}`).toBeVisible({
+    timeout,
+  });
   return row;
 }
 
@@ -192,7 +197,7 @@ test.describe('Member Management — Deep Tests', () => {
     expect(currentStatus).not.toBeNull();
     expect(['pending', 'active']).toContain(String(currentStatus?.status ?? ''));
 
-    await navigateToDynamicPage(page, 'tenant-member');
+    await navigateToDynamicPage(page, 'tenant_member');
     await clickTabAndWaitForLoad(page, /Pending|待审批/, 5000);
 
     const lookup = rowLookupText(approvalCandidate);
@@ -206,14 +211,20 @@ test.describe('Member Management — Deep Tests', () => {
       await searchInput.press('Enter').catch(() => {});
       await page
         .waitForResponse(
-          (r) => r.url().includes('/list') && r.request().method().toLowerCase() === 'post' && r.status() === 200,
+          (r) =>
+            r.url().includes('/list') &&
+            r.request().method().toLowerCase() === 'post' &&
+            r.status() === 200,
           { timeout: 8000 },
         )
         .catch(() => null);
     }
 
     const row = await locateMemberRow(page, approvalCandidate, 12000).catch(() => null);
-    const hasApproveRow = await row?.locator('[data-testid="row-action-approve"]').isVisible({ timeout: 3000 }).catch(() => false);
+    const hasApproveRow = await row
+      ?.locator('[data-testid="row-action-approve"]')
+      .isVisible({ timeout: 3000 })
+      .catch(() => false);
     if (!hasApproveRow) {
       // Auto-active contract: member already active, no manual approval action needed.
       await clearListSearch(page);
@@ -230,14 +241,17 @@ test.describe('Member Management — Deep Tests', () => {
     await approveMember(page.request, approvalCandidate.pid!);
 
     await expect
-      .poll(async () => {
-        const current = await findMemberWithStatus(page.request, approvalCandidate.email);
-        return current?.status ?? null;
-      }, {
-        timeout: 10000,
-        intervals: [500, 1000, 2000],
-        message: 'approved member should transition to active',
-      })
+      .poll(
+        async () => {
+          const current = await findMemberWithStatus(page.request, approvalCandidate.email);
+          return current?.status ?? null;
+        },
+        {
+          timeout: 10000,
+          intervals: [500, 1000, 2000],
+          message: 'approved member should transition to active',
+        },
+      )
       .toBe('active');
 
     await clearListSearch(page);
@@ -259,7 +273,7 @@ test.describe('Member Management — Deep Tests', () => {
     expect(current).not.toBeNull();
 
     if (current?.status === 'rejected') {
-      await navigateToDynamicPage(page, 'tenant-member');
+      await navigateToDynamicPage(page, 'tenant_member');
       await clickTabAndWaitForLoad(page, /Rejected|已拒绝/, 5000, 'rejected');
       const rejectedRow = await locateMemberRow(page, candidate, 10000);
       await expect(rejectedRow).toBeVisible({ timeout: 5000 });
@@ -269,24 +283,27 @@ test.describe('Member Management — Deep Tests', () => {
     if (current?.status && current.status !== 'pending') {
       await rejectMember(page.request, candidate.pid!);
       await expect
-        .poll(async () => {
-          const latest = await findMemberWithStatus(page.request, candidate.email);
-          return latest?.status ?? null;
-        }, {
-          timeout: 10000,
-          intervals: [500, 1000, 2000],
-          message: 'member should transition to rejected',
-        })
+        .poll(
+          async () => {
+            const latest = await findMemberWithStatus(page.request, candidate.email);
+            return latest?.status ?? null;
+          },
+          {
+            timeout: 10000,
+            intervals: [500, 1000, 2000],
+            message: 'member should transition to rejected',
+          },
+        )
         .toBe('rejected');
 
-      await navigateToDynamicPage(page, 'tenant-member');
+      await navigateToDynamicPage(page, 'tenant_member');
       await clickTabAndWaitForLoad(page, /Rejected|已拒绝/, 5000, 'rejected');
       const rejectedRow = await locateMemberRow(page, candidate, 10000);
       await expect(rejectedRow).toBeVisible({ timeout: 5000 });
       return;
     }
 
-    await navigateToDynamicPage(page, 'tenant-member');
+    await navigateToDynamicPage(page, 'tenant_member');
     await clickTabAndWaitForLoad(page, /Pending|待审批/, 5000, 'pending');
 
     const row = await locateMemberRow(page, candidate, 10000);
@@ -296,7 +313,7 @@ test.describe('Member Management — Deep Tests', () => {
 
     const rejectResponse = page.waitForResponse(
       (r) => r.url().includes('/commands/execute/admin:reject_member') && r.status() === 200,
-      { timeout: 10000 }
+      { timeout: 10000 },
     );
 
     await rejectBtn.click();
@@ -304,10 +321,9 @@ test.describe('Member Management — Deep Tests', () => {
     await rejectResponse;
 
     // Wait for list reload
-    await page.waitForResponse(
-      (r) => r.url().includes('/list') && r.status() === 200,
-      { timeout: 5000 }
-    ).catch(() => null);
+    await page
+      .waitForResponse((r) => r.url().includes('/list') && r.status() === 200, { timeout: 5000 })
+      .catch(() => null);
 
     // Verify member2 moved to rejected tab
     await clickTabAndWaitForLoad(page, /Rejected|已拒绝/, 5000, 'rejected');
@@ -323,7 +339,7 @@ test.describe('Member Management — Deep Tests', () => {
       await rejectMember(page.request, testMembers[1].pid).catch(() => {});
     }
 
-    await navigateToDynamicPage(page, 'tenant-member');
+    await navigateToDynamicPage(page, 'tenant_member');
     await clickTabAndWaitForLoad(page, /Rejected|已拒绝/, 5000, 'rejected');
 
     const row = await locateMemberRow(page, testMembers[1], 6000).catch(async () => {
@@ -337,17 +353,16 @@ test.describe('Member Management — Deep Tests', () => {
 
     const restoreResponse = page.waitForResponse(
       (r) => r.url().includes('/commands/execute/admin:restore_member') && r.status() === 200,
-      { timeout: 10000 }
+      { timeout: 10000 },
     );
 
     await restoreBtn.click();
     await acceptConfirmDialog(page, 5000);
     await restoreResponse;
 
-    await page.waitForResponse(
-      (r) => r.url().includes('/list') && r.status() === 200,
-      { timeout: 5000 }
-    ).catch(() => null);
+    await page
+      .waitForResponse((r) => r.url().includes('/list') && r.status() === 200, { timeout: 5000 })
+      .catch(() => null);
 
     // Verify member2 is now on active tab
     await clickTabAndWaitForLoad(page, /Active|已激活/, 5000, 'active');
@@ -359,27 +374,28 @@ test.describe('Member Management — Deep Tests', () => {
    * MM-10: Delete member3 with confirmation dialog.
    */
   test('MM-10: should delete member with confirmation', async ({ page }) => {
-    await navigateToDynamicPage(page, 'tenant-member');
+    await navigateToDynamicPage(page, 'tenant_member');
     await clickTabAndWaitForLoad(page, /Active|已激活/, 5000, 'active');
 
     const row = await locateMemberRow(page, testMembers[2], 10000);
 
     const deleteResponse = page.waitForResponse(
       (r) => r.url().includes('/commands/execute/admin:delete_member') && r.status() === 200,
-      { timeout: 10000 }
+      { timeout: 10000 },
     );
 
     await clickRowActionByLocator(page, row, 'delete');
     await acceptConfirmDialog(page, 5000);
     await deleteResponse;
 
-    await page.waitForResponse(
-      (r) => r.url().includes('/list') && r.status() === 200,
-      { timeout: 5000 }
-    ).catch(() => null);
+    await page
+      .waitForResponse((r) => r.url().includes('/list') && r.status() === 200, { timeout: 5000 })
+      .catch(() => null);
 
     // member3 should be gone from active tab
-    await expect(page.locator('tbody tr', { hasText: rowLookupText(testMembers[2]) })).not.toBeVisible({ timeout: 5000 });
+    await expect(
+      page.locator('tbody tr', { hasText: rowLookupText(testMembers[2]) }),
+    ).not.toBeVisible({ timeout: 5000 });
 
     // Mark pid null so afterAll doesn't try to delete again
     testMembers[2].pid = null;
@@ -389,7 +405,7 @@ test.describe('Member Management — Deep Tests', () => {
    * MM-11: Cannot delete self — clicking delete on admin's own row should show error or be disabled.
    */
   test('MM-11: should prevent self-deletion', async ({ page }) => {
-    await navigateToDynamicPage(page, 'tenant-member');
+    await navigateToDynamicPage(page, 'tenant_member');
     await clickTabAndWaitForLoad(page, /Active|已激活/, 5000, 'active');
 
     // Locate the admin row by userId (table shows userId, not email)
@@ -412,7 +428,9 @@ test.describe('Member Management — Deep Tests', () => {
     await acceptConfirmDialog(page, 5000);
 
     // Expect an error toast or the delete to fail
-    const errorToast = page.locator('[class*="toast"], [role="alert"]').filter({ hasText: /cannot|不能|自己|self/ });
+    const errorToast = page
+      .locator('[class*="toast"], [role="alert"]')
+      .filter({ hasText: /cannot|不能|自己|self/ });
     const hasError = await errorToast.isVisible({ timeout: 5000 }).catch(() => false);
 
     // Either error was shown, or the row still exists (delete rejected by backend)
@@ -424,7 +442,7 @@ test.describe('Member Management — Deep Tests', () => {
    * MM-12: Leave member2 active→inactive.
    */
   test('MM-12: should mark member as left (active→inactive)', async ({ page }) => {
-    await navigateToDynamicPage(page, 'tenant-member');
+    await navigateToDynamicPage(page, 'tenant_member');
     await clickTabAndWaitForLoad(page, /Active|已激活/, 5000, 'active');
 
     const row = await locateMemberRow(page, testMembers[1], 10000);
@@ -434,21 +452,22 @@ test.describe('Member Management — Deep Tests', () => {
 
     const leaveResponse = page.waitForResponse(
       (r) => r.url().includes('/commands/execute/admin:leave_member') && r.status() === 200,
-      { timeout: 10000 }
+      { timeout: 10000 },
     );
 
     await leaveBtn.click();
     await acceptConfirmDialog(page, 5000);
     await leaveResponse;
 
-    await page.waitForResponse(
-      (r) => r.url().includes('/list') && r.status() === 200,
-      { timeout: 5000 }
-    ).catch(() => null);
+    await page
+      .waitForResponse((r) => r.url().includes('/list') && r.status() === 200, { timeout: 5000 })
+      .catch(() => null);
 
     // Verify member2 moved to inactive tab
     await clickTabAndWaitForLoad(page, /Inactive|已离职/, 5000, 'inactive');
-    const inactiveRow = page.locator('tbody tr', { hasText: rowLookupText(testMembers[1]) }).first();
+    const inactiveRow = page
+      .locator('tbody tr', { hasText: rowLookupText(testMembers[1]) })
+      .first();
     await expect(inactiveRow).toBeVisible({ timeout: 5000 });
   });
 
@@ -456,7 +475,7 @@ test.describe('Member Management — Deep Tests', () => {
    * MM-13: Status tab data isolation — each tab only shows members of that status.
    */
   test('MM-13: should show correct members per status tab', async ({ page }) => {
-    await navigateToDynamicPage(page, 'tenant-member');
+    await navigateToDynamicPage(page, 'tenant_member');
 
     // Navigate to active tab
     await clickTabAndWaitForLoad(page, /Active|已激活/, 5000, 'active');
@@ -467,7 +486,10 @@ test.describe('Member Management — Deep Tests', () => {
     const statusBadges = page.locator('tbody td .inline-flex, tbody [data-testid*="status"]');
     const badgeCount = await statusBadges.count();
     for (let i = 0; i < Math.min(badgeCount, 5); i++) {
-      const text = await statusBadges.nth(i).innerText().catch(() => '');
+      const text = await statusBadges
+        .nth(i)
+        .innerText()
+        .catch(() => '');
       if (text) {
         expect(text.toLowerCase()).toMatch(/active|已激活|激活/);
       }
@@ -478,7 +500,10 @@ test.describe('Member Management — Deep Tests', () => {
     const suspendedBadges = page.locator('tbody td .inline-flex, tbody [data-testid*="status"]');
     const suspCount = await suspendedBadges.count().catch(() => 0);
     for (let i = 0; i < Math.min(suspCount, 5); i++) {
-      const text = await suspendedBadges.nth(i).innerText().catch(() => '');
+      const text = await suspendedBadges
+        .nth(i)
+        .innerText()
+        .catch(() => '');
       if (text) {
         expect(text.toLowerCase()).toMatch(/suspended|已暂停|暂停/);
       }
@@ -489,7 +514,7 @@ test.describe('Member Management — Deep Tests', () => {
    * MM-14: i18n deep — all buttons, labels, status text are properly translated.
    */
   test('MM-14: should have proper i18n for all UI elements', async ({ page }) => {
-    await navigateToDynamicPage(page, 'tenant-member');
+    await navigateToDynamicPage(page, 'tenant_member');
     await expect(page.locator('table').first()).toBeVisible({ timeout: 15000 });
 
     // Check all visible text on the page for raw i18n keys
@@ -515,7 +540,10 @@ test.describe('Member Management — Deep Tests', () => {
     const actionButtons = page.locator('[data-testid^="row-action-"]');
     const btnCount = await actionButtons.count();
     for (let i = 0; i < btnCount; i++) {
-      const text = await actionButtons.nth(i).innerText().catch(() => '');
+      const text = await actionButtons
+        .nth(i)
+        .innerText()
+        .catch(() => '');
       expect(text.trim().length).toBeGreaterThan(0);
     }
 

@@ -13,6 +13,7 @@
 import { test, expect } from '../../fixtures';
 import {
   navigateToDynamicPage,
+  normalizeDynamicPageKey,
   waitForDynamicPageLoad,
   uniqueId,
   acceptConfirmDialog,
@@ -45,7 +46,9 @@ async function clickCreateButton(page: import('@playwright/test').Page) {
 
 async function clickSaveAndWait(page: import('@playwright/test').Page) {
   const saveBtn = page
-    .locator('[data-testid="form-btn-submit"], [data-testid="form-btn-save"], button:has-text("保存"), button:has-text("Save")')
+    .locator(
+      '[data-testid="form-btn-submit"], [data-testid="form-btn-save"], button:has-text("保存"), button:has-text("Save")',
+    )
     .first();
   await saveBtn.waitFor({ state: 'visible', timeout: 5000 });
   const currentUrl = new URL(page.url());
@@ -62,25 +65,39 @@ async function clickSaveAndWait(page: import('@playwright/test').Page) {
   return await respPromise;
 }
 
-async function fillFormField(page: import('@playwright/test').Page, fieldCode: string, value: string) {
+async function fillFormField(
+  page: import('@playwright/test').Page,
+  fieldCode: string,
+  value: string,
+) {
   const input = page
-    .locator(`[data-testid="form-field-${fieldCode}"] input, [data-field="${fieldCode}"] input, [name="${fieldCode}"]`)
+    .locator(
+      `[data-testid="form-field-${fieldCode}"] input, [data-field="${fieldCode}"] input, [name="${fieldCode}"]`,
+    )
     .first();
   await input.fill(value);
 }
 
-async function selectFormField(page: import('@playwright/test').Page, fieldCode: string, value: string) {
+async function selectFormField(
+  page: import('@playwright/test').Page,
+  fieldCode: string,
+  value: string,
+) {
   const select = page
-    .locator(`[data-testid="form-field-${fieldCode}"] select, [data-field="${fieldCode}"] select, select[name="${fieldCode}"]`)
+    .locator(
+      `[data-testid="form-field-${fieldCode}"] select, [data-field="${fieldCode}"] select, select[name="${fieldCode}"]`,
+    )
     .first();
   await select.selectOption(value);
 }
 
-async function clickRowDeleteAndConfirm(page: import('@playwright/test').Page, row: import('@playwright/test').Locator) {
-  const cmdPromise = page.waitForResponse(
-    (r) => r.url().includes('/commands/execute/'),
-    { timeout: 5000 },
-  ).catch(() => null);
+async function clickRowDeleteAndConfirm(
+  page: import('@playwright/test').Page,
+  row: import('@playwright/test').Locator,
+) {
+  const cmdPromise = page
+    .waitForResponse((r) => r.url().includes('/commands/execute/'), { timeout: 5000 })
+    .catch(() => null);
 
   await clickRowActionByLocator(page, row, 'delete');
 
@@ -192,26 +209,19 @@ test.describe('Data Permissions @gap010', () => {
 
     // Navigate to edit form via direct URL (same pattern as platform-admin-crud.spec.ts)
     const cmdQuery = `?commandCode=${encodeURIComponent('admin:update_data_permission')}`;
-    await page.goto(`/dynamic/${PAGE_KEY}/${pid}/edit${cmdQuery}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/p/${normalizeDynamicPageKey(PAGE_KEY)}/${pid}/edit${cmdQuery}`, {
+      waitUntil: 'domcontentloaded',
+    });
     await waitForFormReady(page);
 
     // Update name to verify edit works
     const updatedName = `DP-EDITED-${uniqueId()}`;
-    const nameInput = page.locator(
-      '[data-testid="form-field-name"] input, [data-field="name"] input, [name="name"]'
-    ).first();
+    const nameInput = page
+      .locator('[data-testid="form-field-name"] input, [data-field="name"] input, [name="name"]')
+      .first();
     await nameInput.fill(updatedName);
 
-    // Save and wait for command response
-    const saveBtn = page.locator('[data-testid="form-btn-submit"], [data-testid="form-btn-save"], button:has-text("Save")').first();
-    await saveBtn.waitFor({ state: 'visible', timeout: 5000 });
-    const respPromise = page.waitForResponse(
-      (r) => r.url().includes('/commands/execute/') && r.url().includes('update_data_permission'),
-      { timeout: 15000 },
-    );
-    await saveBtn.click();
-    const resp = await respPromise;
-    expect(resp.status()).toBe(200);
+    await clickSaveAndWait(page);
 
     // Verify via API
     const updated = await helper.fetchViaApi(pid).catch(() => null);
@@ -236,7 +246,9 @@ test.describe('Data Permissions @gap010', () => {
     await clickRowDeleteAndConfirm(page, row);
 
     // Verify the row is gone from the real list UI
-    await expect(page.locator('tbody tr', { hasText: deleteName })).toHaveCount(0, { timeout: 15000 });
+    await expect(page.locator('tbody tr', { hasText: deleteName })).toHaveCount(0, {
+      timeout: 15000,
+    });
   });
 
   test('DP-006: verify enabled switch is present in list', async ({ page }) => {

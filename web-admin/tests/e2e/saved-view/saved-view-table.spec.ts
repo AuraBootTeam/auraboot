@@ -56,7 +56,10 @@ test.describe('SavedView — TABLE View', () => {
     order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
     const listPage = await order.gotoList();
     // Look for column settings button
-    const colSettingsBtn = page.locator('button').filter({ hasText: /column|列|settings/i }).first();
+    const colSettingsBtn = page
+      .locator('button')
+      .filter({ hasText: /column|列|settings/i })
+      .first();
     if (await colSettingsBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
       await colSettingsBtn.click();
       // A panel should appear with checkboxes for columns
@@ -85,13 +88,15 @@ test.describe('SavedView — TABLE View', () => {
     order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
     const listPage = await order.gotoList();
     // Click on a sortable column header
-    const titleHeader = page.locator('thead th, [role="columnheader"]').filter({ hasText: /title|标题/i }).first();
+    const titleHeader = page
+      .locator('thead th, [role="columnheader"]')
+      .filter({ hasText: /title|标题/i })
+      .first();
     if (await titleHeader.isVisible({ timeout: 3000 }).catch(() => false)) {
       // Wait for list API response after sort click
-      const sortResponse = page.waitForResponse(
-        r => r.url().includes('/list') && r.status() === 200,
-        { timeout: 5000 },
-      ).catch(() => null);
+      const sortResponse = page
+        .waitForResponse((r) => r.url().includes('/list') && r.status() === 200, { timeout: 5000 })
+        .catch(() => null);
       await titleHeader.click();
       await sortResponse;
       // Table should still have rows
@@ -104,7 +109,7 @@ test.describe('SavedView — TABLE View', () => {
     // Multi-field sort is typically configured via view settings
     // Verify the API supports multiple sort parameters
     const resp = await page.request.get(
-      `/api/dynamic/e2et-order/list?current=1&size=10&sortField=e2et_order_status&sortOrder=ASC`,
+      `/api/dynamic/e2et_order/list?current=1&size=10&sortField=e2et_order_status&sortOrder=ASC`,
     );
     expect(resp.ok()).toBe(true);
     const body = await resp.json();

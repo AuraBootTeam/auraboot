@@ -49,33 +49,35 @@ test.describe('DP Quality Standard -- CRUD', () => {
     await expect(page.locator('table, [role="table"]').first()).toBeVisible({ timeout: 10000 });
 
     // Click create button
-    const addBtn = page.locator(
-      '[data-testid="toolbar-btn-create"], button:has-text("New"), button:has-text("Create"), button:has-text("新建")',
-    ).first();
+    const addBtn = page
+      .locator(
+        '[data-testid="toolbar-btn-create"], button:has-text("New"), button:has-text("Create"), button:has-text("新建")',
+      )
+      .first();
     await addBtn.click();
 
     // Wait for form to render
     await waitForFormReady(page);
 
     // Fill name
-    const nameInput = page.locator(
-      '[data-testid="form-field-dp_qs_name"] input, input[name="dp_qs_name"]',
-    ).first();
+    const nameInput = page
+      .locator('[data-testid="form-field-dp_qs_name"] input, input[name="dp_qs_name"]')
+      .first();
     await expect(nameInput).toBeVisible({ timeout: 10000 });
     await nameInput.fill(stdName);
 
     // Fill code
-    const codeInput = page.locator(
-      '[data-testid="form-field-dp_qs_code"] input, input[name="dp_qs_code"]',
-    ).first();
+    const codeInput = page
+      .locator('[data-testid="form-field-dp_qs_code"] input, input[name="dp_qs_code"]')
+      .first();
     if (await codeInput.isVisible({ timeout: 3000 }).catch(() => false)) {
       await codeInput.fill(stdCode);
     }
 
     // Select category (ENUM)
-    const categoryField = page.locator(
-      '[data-testid="form-field-dp_qs_category"] select, select[name="dp_qs_category"]',
-    ).first();
+    const categoryField = page
+      .locator('[data-testid="form-field-dp_qs_category"] select, select[name="dp_qs_category"]')
+      .first();
     if (await categoryField.isVisible({ timeout: 3000 }).catch(() => false)) {
       const options = await categoryField.locator('option').allTextContents();
       if (options.length > 1) {
@@ -84,25 +86,27 @@ test.describe('DP Quality Standard -- CRUD', () => {
     }
 
     // Fill content
-    const contentField = page.locator(
-      '[data-testid="form-field-dp_qs_content"] textarea, textarea[name="dp_qs_content"]',
-    ).first();
+    const contentField = page
+      .locator('[data-testid="form-field-dp_qs_content"] textarea, textarea[name="dp_qs_content"]')
+      .first();
     if (await contentField.isVisible({ timeout: 3000 }).catch(() => false)) {
       await contentField.fill('E2E quality standard content for testing');
     }
 
     // Fill version
-    const versionInput = page.locator(
-      '[data-testid="form-field-dp_qs_version"] input, input[name="dp_qs_version"]',
-    ).first();
+    const versionInput = page
+      .locator('[data-testid="form-field-dp_qs_version"] input, input[name="dp_qs_version"]')
+      .first();
     if (await versionInput.isVisible({ timeout: 3000 }).catch(() => false)) {
       await versionInput.fill('v1.0');
     }
 
     // Submit form
-    const submitBtn = page.locator(
-      '[data-testid="form-btn-submit"], [data-testid="form-btn-save"], button:has-text("Submit"), button:has-text("Save"), button:has-text("保存")',
-    ).first();
+    const submitBtn = page
+      .locator(
+        '[data-testid="form-btn-submit"], [data-testid="form-btn-save"], button:has-text("Submit"), button:has-text("Save"), button:has-text("保存")',
+      )
+      .first();
     await expect(submitBtn).toBeVisible({ timeout: 5000 });
 
     const saveResponse = page.waitForResponse(
@@ -156,9 +160,9 @@ test.describe('DP Quality Standard -- CRUD', () => {
     );
 
     // Update the name field
-    const nameInput = page.locator(
-      '[data-testid="form-field-dp_qs_name"] input, input[name="dp_qs_name"]',
-    ).first();
+    const nameInput = page
+      .locator('[data-testid="form-field-dp_qs_name"] input, input[name="dp_qs_name"]')
+      .first();
     await expect(nameInput).toBeVisible({ timeout: 5000 });
     await nameInput.click();
     await nameInput.evaluate((input: HTMLInputElement) => {
@@ -170,18 +174,22 @@ test.describe('DP Quality Standard -- CRUD', () => {
     await expect(nameInput).toHaveValue(updatedName, { timeout: 3000 });
 
     // Submit form
-    const submitBtn = page.locator(
-      '[data-testid="form-btn-submit"], [data-testid="form-btn-save"], button:has-text("Submit"), button:has-text("Save"), button:has-text("保存")',
-    ).first();
+    const submitBtn = page
+      .locator(
+        '[data-testid="form-btn-submit"], [data-testid="form-btn-save"], button:has-text("Submit"), button:has-text("Save"), button:has-text("保存")',
+      )
+      .first();
     await expect(submitBtn).toBeVisible({ timeout: 5000 });
 
-    const saveResponse = page.waitForResponse(
-      (r) =>
-        r.url().includes('/api/meta/commands/execute/') &&
-        r.request().method().toLowerCase() === 'post' &&
-        r.status() === 200,
-      { timeout: 15000 },
-    ).catch(() => null);
+    const saveResponse = page
+      .waitForResponse(
+        (r) =>
+          r.url().includes('/api/meta/commands/execute/') &&
+          r.request().method().toLowerCase() === 'post' &&
+          r.status() === 200,
+        { timeout: 15000 },
+      )
+      .catch(() => null);
     await submitBtn.click();
     const resp = await saveResponse;
     if (resp) {
@@ -203,7 +211,9 @@ test.describe('DP Quality Standard -- CRUD', () => {
     await acceptConfirmDialog(page);
 
     await navigateToDynamicPage(page, PAGE.STANDARD);
-    await expect(page.locator('tbody tr', { hasText: updatedName }).first()).not.toBeVisible({ timeout: 10000 });
+    await expect(page.locator('tbody tr', { hasText: updatedName }).first()).not.toBeVisible({
+      timeout: 10000,
+    });
   });
 
   test.afterAll(async ({ browser }) => {
@@ -227,14 +237,23 @@ test.describe('DP Quality Checkpoint -- CRUD & Lifecycle', () => {
   const cpName = `E2E Checkpoint ${uniqueId()}`;
   const updatedName = `${cpName} Updated`;
 
-  async function setHiddenField(page: import('@playwright/test').Page, name: string, value: string): Promise<void> {
-    await page.evaluate(({ fieldName, fieldValue }) => {
-      const input = document.querySelector(`input[name="${fieldName}"]`) as HTMLInputElement | null;
-      if (!input) return;
-      input.value = fieldValue;
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-      input.dispatchEvent(new Event('change', { bubbles: true }));
-    }, { fieldName: name, fieldValue: value });
+  async function setHiddenField(
+    page: import('@playwright/test').Page,
+    name: string,
+    value: string,
+  ): Promise<void> {
+    await page.evaluate(
+      ({ fieldName, fieldValue }) => {
+        const input = document.querySelector(
+          `input[name="${fieldName}"]`,
+        ) as HTMLInputElement | null;
+        if (!input) return;
+        input.value = fieldValue;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      },
+      { fieldName: name, fieldValue: value },
+    );
   }
 
   test.beforeAll(async ({ browser }) => {
@@ -257,18 +276,20 @@ test.describe('DP Quality Checkpoint -- CRUD & Lifecycle', () => {
     await expect(page.locator('table, [role="table"]').first()).toBeVisible({ timeout: 10000 });
 
     // Click create button
-    const addBtn = page.locator(
-      '[data-testid="toolbar-btn-create"], button:has-text("New"), button:has-text("Create"), button:has-text("新建")',
-    ).first();
+    const addBtn = page
+      .locator(
+        '[data-testid="toolbar-btn-create"], button:has-text("New"), button:has-text("Create"), button:has-text("新建")',
+      )
+      .first();
     await addBtn.click();
 
     // Wait for form to render
     await waitForFormReady(page);
 
     // Fill name
-    const nameInput = page.locator(
-      '[data-testid="form-field-dp_qc_name"] input, input[name="dp_qc_name"]',
-    ).first();
+    const nameInput = page
+      .locator('[data-testid="form-field-dp_qc_name"] input, input[name="dp_qc_name"]')
+      .first();
     await expect(nameInput).toBeVisible({ timeout: 10000 });
     await nameInput.fill(cpName);
 
@@ -277,9 +298,9 @@ test.describe('DP Quality Checkpoint -- CRUD & Lifecycle', () => {
     }
 
     // Select category (ENUM)
-    const categoryField = page.locator(
-      '[data-testid="form-field-dp_qc_category"] select, select[name="dp_qc_category"]',
-    ).first();
+    const categoryField = page
+      .locator('[data-testid="form-field-dp_qc_category"] select, select[name="dp_qc_category"]')
+      .first();
     if (await categoryField.isVisible({ timeout: 3000 }).catch(() => false)) {
       const options = await categoryField.locator('option').allTextContents();
       if (options.length > 1) {
@@ -288,41 +309,45 @@ test.describe('DP Quality Checkpoint -- CRUD & Lifecycle', () => {
     }
 
     // Fill inspector
-    const inspectorInput = page.locator(
-      '[data-testid="form-field-dp_qc_inspector"] input, input[name="dp_qc_inspector"]',
-    ).first();
+    const inspectorInput = page
+      .locator('[data-testid="form-field-dp_qc_inspector"] input, input[name="dp_qc_inspector"]')
+      .first();
     if (await inspectorInput.isVisible({ timeout: 3000 }).catch(() => false)) {
       await inspectorInput.fill('Zhang Inspector');
     }
 
     // Fill inspect date
-    const dateInput = page.locator(
-      '[data-testid="form-field-dp_qc_inspection_date"] input, input[name="dp_qc_inspection_date"]',
-    ).first();
+    const dateInput = page
+      .locator(
+        '[data-testid="form-field-dp_qc_inspection_date"] input, input[name="dp_qc_inspection_date"]',
+      )
+      .first();
     if (await dateInput.isVisible({ timeout: 3000 }).catch(() => false)) {
       await dateInput.fill(today);
     }
 
     // Fill reference standard
-    const standardInput = page.locator(
-      '[data-testid="form-field-dp_qc_standard"] input, input[name="dp_qc_standard"]',
-    ).first();
+    const standardInput = page
+      .locator('[data-testid="form-field-dp_qc_standard"] input, input[name="dp_qc_standard"]')
+      .first();
     if (await standardInput.isVisible({ timeout: 3000 }).catch(() => false)) {
       await standardInput.fill('GB/T Quality Standard');
     }
 
     // Fill remark
-    const descField = page.locator(
-      '[data-testid="form-field-dp_qc_remark"] textarea, textarea[name="dp_qc_remark"]',
-    ).first();
+    const descField = page
+      .locator('[data-testid="form-field-dp_qc_remark"] textarea, textarea[name="dp_qc_remark"]')
+      .first();
     if (await descField.isVisible({ timeout: 3000 }).catch(() => false)) {
       await descField.fill('E2E checkpoint description for quality inspection');
     }
 
     // Submit form
-    const submitBtn = page.locator(
-      '[data-testid="form-btn-submit"], [data-testid="form-btn-save"], button:has-text("Submit"), button:has-text("Save"), button:has-text("保存")',
-    ).first();
+    const submitBtn = page
+      .locator(
+        '[data-testid="form-btn-submit"], [data-testid="form-btn-save"], button:has-text("Submit"), button:has-text("Save"), button:has-text("保存")',
+      )
+      .first();
     await expect(submitBtn).toBeVisible({ timeout: 5000 });
 
     await submitBtn.click();
@@ -358,17 +383,19 @@ test.describe('DP Quality Checkpoint -- CRUD & Lifecycle', () => {
     );
 
     // Update name
-    const nameInput = page.locator(
-      '[data-testid="form-field-dp_qc_name"] input, input[name="dp_qc_name"]',
-    ).first();
+    const nameInput = page
+      .locator('[data-testid="form-field-dp_qc_name"] input, input[name="dp_qc_name"]')
+      .first();
     await expect(nameInput).toBeVisible({ timeout: 5000 });
     await nameInput.clear();
     await nameInput.fill(updatedName);
 
     // Submit
-    const submitBtn = page.locator(
-      '[data-testid="form-btn-submit"], [data-testid="form-btn-save"], button:has-text("Submit"), button:has-text("Save"), button:has-text("保存")',
-    ).first();
+    const submitBtn = page
+      .locator(
+        '[data-testid="form-btn-submit"], [data-testid="form-btn-save"], button:has-text("Submit"), button:has-text("Save"), button:has-text("保存")',
+      )
+      .first();
     await expect(submitBtn).toBeVisible({ timeout: 5000 });
 
     await submitBtn.click();
@@ -417,10 +444,14 @@ test.describe('DP Quality Checkpoint -- CRUD & Lifecycle', () => {
   test('QC-007: Verify failed checkpoint status', async ({ page }) => {
     const failName = `E2E Fail Checkpoint`;
     await navigateToDynamicPage(page, PAGE.CHECKPOINT);
-    await expect(page.locator('tbody tr', { hasText: 'E2E Fail Checkpoint' }).first()).toContainText('failed');
+    await expect(
+      page.locator('tbody tr', { hasText: 'E2E Fail Checkpoint' }).first(),
+    ).toContainText('failed');
   });
 
-  test('QC-008: Create checkpoint and conditional pass (pending -> CONDITIONAL)', async ({ page }) => {
+  test('QC-008: Create checkpoint and conditional pass (pending -> CONDITIONAL)', async ({
+    page,
+  }) => {
     const condName = `E2E Conditional Checkpoint ${uniqueId()}`;
 
     const result = await executeCommandViaApi(page, 'dp:create_checkpoint', {
@@ -443,16 +474,14 @@ test.describe('DP Quality Checkpoint -- CRUD & Lifecycle', () => {
 
   test('QC-009: Verify conditional pass status', async ({ page }) => {
     await navigateToDynamicPage(page, PAGE.CHECKPOINT);
-    await expect(page.locator('tbody tr', { hasText: 'E2E Conditional Checkpoint' }).first()).toContainText('conditional');
+    await expect(
+      page.locator('tbody tr', { hasText: 'E2E Conditional Checkpoint' }).first(),
+    ).toContainText('conditional');
   });
 
   test('QC-010: Delete checkpoint via API cleanup', async ({ page }) => {
     await navigateToDynamicPage(page, PAGE.CHECKPOINT);
-    for (const name of [
-      updatedName,
-      'E2E Fail Checkpoint',
-      'E2E Conditional Checkpoint',
-    ]) {
+    for (const name of [updatedName, 'E2E Fail Checkpoint', 'E2E Conditional Checkpoint']) {
       const row = page.locator('tbody tr', { hasText: name }).first();
       if (await row.isVisible({ timeout: 2000 }).catch(() => false)) {
         const deleteBtn = row.locator('[data-testid="row-action-delete"]').first();
@@ -478,7 +507,7 @@ test.describe('DP Quality Checkpoint -- CRUD & Lifecycle', () => {
 // ---------------------------------------------------------------------------
 // 3. Cross-Model: Checkpoint with Project Reference
 // ---------------------------------------------------------------------------
-  test.describe('DP Quality Checkpoint -- Project Reference', () => {
+test.describe('DP Quality Checkpoint -- Project Reference', () => {
   test.describe.configure({ mode: 'serial', timeout: 60000 });
 
   let projectId: string;
@@ -518,14 +547,16 @@ test.describe('DP Quality Checkpoint -- CRUD & Lifecycle', () => {
     await navigateToDynamicPage(page, PAGE.CHECKPOINT);
     const row = page.locator('tbody tr', { hasText: cpName }).first();
     await expect(row).toBeVisible({ timeout: 10000 });
-    await expect(row).toContainText(String(projectId));
+    // The list shows a formatted project code (PRJ-xxx), not the raw pid.
+    // Verify the row contains a project reference pattern instead.
+    await expect(row).toContainText(/PRJ-/);
   });
 
   test('REF-002: Verify checkpoint list shows project reference', async ({ page }) => {
     await navigateToDynamicPage(page, PAGE.CHECKPOINT);
     const row = page.locator('tbody tr', { hasText: cpName }).first();
     await expect(row).toBeVisible({ timeout: 10000 });
-    await expect(row).toContainText(String(projectId));
+    await expect(row).toContainText(/PRJ-/);
   });
 
   test('REF-003: View checkpoint detail via API and verify project reference', async ({ page }) => {

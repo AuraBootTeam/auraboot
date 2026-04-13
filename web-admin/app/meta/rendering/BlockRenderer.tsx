@@ -1,7 +1,7 @@
 /**
  * BlockRenderer - Profile-aware block dispatcher
  *
- * Resolves block renderers from the current DslProfile context.
+ * Resolves block renderers from the current RenderProfile context.
  * Falls back to the hardcoded switch-case for backward compatibility
  * when no profile is available (e.g., route components that haven't
  * been migrated to DynamicPageRenderer yet).
@@ -55,9 +55,7 @@ async function loadFallbackRenderers(): Promise<Map<string, React.ComponentType<
     ['form-buttons', formButtons.FormButtonsBlockRenderer],
     ['form-wizard', formWizard.FormWizardBlockRenderer],
     ['table', table.TableBlockRenderer],
-    ['data-table', table.TableBlockRenderer],
     ['filters', filters.FiltersBlockRenderer],
-    ['filter-form', filters.FiltersBlockRenderer],
     ['toolbar', toolbar.ToolbarBlockRenderer],
     ['action', toolbar.ToolbarBlockRenderer],
     ['description', description.DescriptionBlockRenderer],
@@ -111,7 +109,7 @@ export const BlockRenderer: React.FC<BlockRendererProps> = ({ block, runtime, ar
     if (FallbackRenderer) return FallbackRenderer;
 
     // 3. Special block types handled by page renderers
-    if (blockType === 'list-tabs' || blockType === 'sub-table' || blockType === 'monthly-grid') {
+    if (blockType === 'tabs' || blockType === 'sub-table' || blockType === 'monthly-grid') {
       return null;
     }
 
@@ -148,7 +146,7 @@ export const BlockRenderer: React.FC<BlockRendererProps> = ({ block, runtime, ar
 
   // Block types handled by page renderers (not BlockRenderer)
   if (!Renderer) {
-    if (blockType === 'list-tabs' || blockType === 'sub-table' || blockType === 'monthly-grid') {
+    if (blockType === 'tabs' || blockType === 'sub-table' || blockType === 'monthly-grid') {
       return null;
     }
 

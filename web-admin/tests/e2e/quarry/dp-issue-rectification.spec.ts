@@ -11,11 +11,7 @@
  *   Rectification: INITIATED → in_progress → submitted → ACCEPTED
  */
 import { test, expect } from '@playwright/test';
-import {
-  navigateToDynamicPage,
-  uniqueId,
-  executeCommandViaApi,
-} from '../helpers/index';
+import { navigateToDynamicPage, uniqueId, executeCommandViaApi } from '../helpers/index';
 import { PAGE_KEYS, getTestProjectId } from '../quarry-management.setup';
 import { ErrorCodes } from '~/services/http-client/types';
 
@@ -34,20 +30,16 @@ test.describe('DP Issue & Rectification', () => {
     try {
       projectId = await getTestProjectId(page);
     } catch {
-      throw new Error(String('Project not available - PM/QO plugin may not be imported'))
+      throw new Error(String('Project not available - PM/QO plugin may not be imported'));
       return;
     }
-    const result = await executeCommandViaApi(
-      page,
-      'dp:create_issue',
-      {
-        dp_issue_project_id: projectId,
-        dp_issue_title: `E2E Issue ${uniqueId()}`,
-        dp_issue_content: 'Test issue for E2E',
-        dp_issue_area: 'Test Area A',
-        dp_issue_source: 'daily_inspection',
-      },
-    );
+    const result = await executeCommandViaApi(page, 'dp:create_issue', {
+      dp_issue_project_id: projectId,
+      dp_issue_title: `E2E Issue ${uniqueId()}`,
+      dp_issue_content: 'Test issue for E2E',
+      dp_issue_area: 'Test Area A',
+      dp_issue_source: 'daily_inspection',
+    });
     expect(result.code).toBe(ErrorCodes.SUCCESS);
     issuePid = result.recordId;
     expect(issuePid).toBeTruthy();
@@ -65,7 +57,11 @@ test.describe('DP Issue & Rectification', () => {
     expect(issuePid).toBeTruthy();
 
     const result = await executeCommandViaApi(
-      page, 'dp:submit_issue', {}, issuePid, 'state_transition',
+      page,
+      'dp:submit_issue',
+      {},
+      issuePid,
+      'state_transition',
     );
     expect(result.code).toBe(ErrorCodes.SUCCESS);
   });
@@ -88,7 +84,7 @@ test.describe('DP Issue & Rectification', () => {
 
     // Verify rectification auto-created via sideEffect (linked by dp_rect_issue_id)
     const rectResp = await page.request.get(
-      `/api/dynamic/dp-rectification/list?pageSize=50&filters=${encodeURIComponent(
+      `/api/dynamic/dp_rectification/list?pageSize=50&filters=${encodeURIComponent(
         JSON.stringify([{ fieldName: 'dp_rect_issue_id', operator: 'EQ', value: issuePid }]),
       )}`,
     );
@@ -106,7 +102,11 @@ test.describe('DP Issue & Rectification', () => {
 
     // Start: INITIATED → in_progress
     let result = await executeCommandViaApi(
-      page, 'dp:start_rectification', {}, rectPid, 'state_transition',
+      page,
+      'dp:start_rectification',
+      {},
+      rectPid,
+      'state_transition',
     );
     expect(result.code).toBe(ErrorCodes.SUCCESS);
 
@@ -134,7 +134,7 @@ test.describe('DP Issue & Rectification', () => {
     expect(result.code).toBe(ErrorCodes.SUCCESS);
 
     // Verify issue status updated to RECTIFIED via sideEffect
-    const issueResp = await page.request.get(`/api/dynamic/dp-issue/${issuePid}`);
+    const issueResp = await page.request.get(`/api/dynamic/dp_issue/${issuePid}`);
     if (issueResp.ok()) {
       const issueBody = await issueResp.json();
       const issueData = issueBody.data ?? issueBody;
@@ -149,20 +149,16 @@ test.describe('DP Issue & Rectification', () => {
     try {
       projectId = await getTestProjectId(page);
     } catch {
-      throw new Error(String('Project not available - PM/QO plugin may not be imported'))
+      throw new Error(String('Project not available - PM/QO plugin may not be imported'));
       return;
     }
-    const result = await executeCommandViaApi(
-      page,
-      'dp:create_issue',
-      {
-        dp_issue_project_id: projectId,
-        dp_issue_title: `No Action ${uniqueId()}`,
-        dp_issue_content: 'Low priority item',
-        dp_issue_area: 'Area B',
-        dp_issue_source: 'daily_inspection',
-      },
-    );
+    const result = await executeCommandViaApi(page, 'dp:create_issue', {
+      dp_issue_project_id: projectId,
+      dp_issue_title: `No Action ${uniqueId()}`,
+      dp_issue_content: 'Low priority item',
+      dp_issue_area: 'Area B',
+      dp_issue_source: 'daily_inspection',
+    });
     expect(result.code).toBe(ErrorCodes.SUCCESS);
     const noActionPid = result.recordId;
 
@@ -188,34 +184,36 @@ test.describe('DP Issue & Rectification', () => {
     try {
       projectId = await getTestProjectId(page);
     } catch {
-      throw new Error(String('Project not available - PM/QO plugin may not be imported'))
+      throw new Error(String('Project not available - PM/QO plugin may not be imported'));
       return;
     }
     // Create full flow: issue → submit → triage → start → submit → reject
-    const createResult = await executeCommandViaApi(
-      page,
-      'dp:create_issue',
-      {
-        dp_issue_project_id: projectId,
-        dp_issue_title: `Reject Flow ${uniqueId()}`,
-        dp_issue_content: 'Test reject flow',
-        dp_issue_area: 'Area C',
-        dp_issue_source: 'daily_inspection',
-      },
-    );
+    const createResult = await executeCommandViaApi(page, 'dp:create_issue', {
+      dp_issue_project_id: projectId,
+      dp_issue_title: `Reject Flow ${uniqueId()}`,
+      dp_issue_content: 'Test reject flow',
+      dp_issue_area: 'Area C',
+      dp_issue_source: 'daily_inspection',
+    });
     expect(createResult.code).toBe(ErrorCodes.SUCCESS);
     const rIssuePid = createResult.recordId;
 
     await executeCommandViaApi(page, 'dp:submit_issue', {}, rIssuePid, 'state_transition');
     await executeCommandViaApi(
-      page, 'dp:triage_issue',
-      { dp_triage_decision: 'need_rectify', dp_hazard_level: 'high', dp_triage_remark: 'Fix needed' },
-      rIssuePid, 'update',
+      page,
+      'dp:triage_issue',
+      {
+        dp_triage_decision: 'need_rectify',
+        dp_hazard_level: 'high',
+        dp_triage_remark: 'Fix needed',
+      },
+      rIssuePid,
+      'update',
     );
 
     // Get auto-created rectification
     const rectResp = await page.request.get(
-      `/api/dynamic/dp-rectification/list?pageSize=50&filters=${encodeURIComponent(
+      `/api/dynamic/dp_rectification/list?pageSize=50&filters=${encodeURIComponent(
         JSON.stringify([{ fieldName: 'dp_rect_issue_id', operator: 'EQ', value: rIssuePid }]),
       )}`,
     );
@@ -227,14 +225,18 @@ test.describe('DP Issue & Rectification', () => {
     // Start → Submit → Reject
     await executeCommandViaApi(page, 'dp:start_rectification', {}, rRectPid, 'state_transition');
     await executeCommandViaApi(
-      page, 'dp:submit_rectification',
+      page,
+      'dp:submit_rectification',
       { dp_rect_result: 'Partial fix' },
-      rRectPid, 'state_transition',
+      rRectPid,
+      'state_transition',
     );
     const reject = await executeCommandViaApi(
-      page, 'dp:reject_rectification',
+      page,
+      'dp:reject_rectification',
       {},
-      rRectPid, 'state_transition',
+      rRectPid,
+      'state_transition',
     );
     expect(reject.code).toBe(ErrorCodes.SUCCESS);
 

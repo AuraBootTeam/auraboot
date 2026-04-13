@@ -71,7 +71,7 @@ export const ColumnResizeHandle = React.memo(function ColumnResizeHandle({
 
   return (
     <div
-      className="absolute right-0 top-0 h-full w-1 cursor-col-resize opacity-0 transition-opacity hover:bg-blue-400 hover:opacity-100 group-hover/th:opacity-50"
+      className="absolute top-0 right-0 h-full w-1 cursor-col-resize opacity-0 transition-opacity group-hover/th:opacity-50 hover:bg-blue-400 hover:opacity-100"
       onMouseDown={handleMouseDown}
       role="separator"
       aria-orientation="vertical"

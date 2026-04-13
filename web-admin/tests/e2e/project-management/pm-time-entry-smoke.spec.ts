@@ -73,7 +73,7 @@ test.describe('PM Time Entry Smoke Tests @smoke', () => {
   test('TE-001: Navigate to Time Entries list via menu', async ({ page }) => {
     await navigateToDynamicPage(page, 'pm-time-entry');
     await waitForDynamicPageLoad(page);
-    await expect(page).toHaveURL(/\/dynamic\/pm-time-entry/);
+    await expect(page).toHaveURL(/\/p\/pm_time_entry/);
 
     const table = page.locator(
       '.ant-table, table, [role="table"], [data-testid="dynamic-list"], [data-testid="table-block"]',
@@ -104,60 +104,31 @@ test.describe('PM Time Entry Smoke Tests @smoke', () => {
     expect(timeEntryPid, 'Time entry should be created').toBeTruthy();
 
     // Verify via API
-    const records = await queryFilteredList(
-      page,
-      'pm-time-entry',
-      'pm_te_description',
-      uid,
-    );
+    const records = await queryFilteredList(page, 'pm-time-entry', 'pm_te_description', uid);
     expect(records.length, 'Created time entry should appear in list').toBeGreaterThanOrEqual(1);
   });
 
   test('TE-003: Submit time entry (draft -> submitted)', async ({ page }) => {
     expect(timeEntryPid, 'Time entry should have been created in TE-002').toBeTruthy();
 
-    await executeCommandViaApi(
-      page,
-      'pm:submit_time_entry',
-      {},
-      timeEntryPid,
-      'update',
-    );
+    await executeCommandViaApi(page, 'pm:submit_time_entry', {}, timeEntryPid, 'update');
 
     // Verify status changed
-    const records = await queryFilteredList(
-      page,
-      'pm-time-entry',
-      'pm_te_description',
-      uid,
-      {
-        extraFilters: [{ fieldName: 'pm_te_status', operator: 'EQ', value: 'submitted' }],
-      },
-    );
+    const records = await queryFilteredList(page, 'pm-time-entry', 'pm_te_description', uid, {
+      extraFilters: [{ fieldName: 'pm_te_status', operator: 'EQ', value: 'submitted' }],
+    });
     expect(records.length, 'Time entry should be submitted').toBeGreaterThanOrEqual(1);
   });
 
   test('TE-004: Approve time entry (submitted -> approved)', async ({ page }) => {
     expect(timeEntryPid, 'Time entry should have been created in TE-002').toBeTruthy();
 
-    await executeCommandViaApi(
-      page,
-      'pm:approve_time_entry',
-      {},
-      timeEntryPid,
-      'update',
-    );
+    await executeCommandViaApi(page, 'pm:approve_time_entry', {}, timeEntryPid, 'update');
 
     // Verify status changed
-    const records = await queryFilteredList(
-      page,
-      'pm-time-entry',
-      'pm_te_description',
-      uid,
-      {
-        extraFilters: [{ fieldName: 'pm_te_status', operator: 'EQ', value: 'approved' }],
-      },
-    );
+    const records = await queryFilteredList(page, 'pm-time-entry', 'pm_te_description', uid, {
+      extraFilters: [{ fieldName: 'pm_te_status', operator: 'EQ', value: 'approved' }],
+    });
     expect(records.length, 'Time entry should be approved').toBeGreaterThanOrEqual(1);
   });
 });

@@ -6,6 +6,7 @@
  */
 
 import { test, expect } from '../../fixtures';
+import { ensureFilterFormOpen } from '../helpers/index';
 
 type MenuNode = {
   code?: string;
@@ -40,7 +41,9 @@ function flattenMenus(nodes: MenuNode[] = [], out: MenuNode[] = []): MenuNode[] 
 }
 
 function isCrashText(text: string): boolean {
-  return /Application Error|Unhandled Runtime Error|TypeError:|ReferenceError:|500 Internal Server Error/i.test(text);
+  return /Application Error|Unhandled Runtime Error|TypeError:|ReferenceError:|500 Internal Server Error/i.test(
+    text,
+  );
 }
 
 test.describe('Inventory Menu Full Coverage', () => {
@@ -56,7 +59,9 @@ test.describe('Inventory Menu Full Coverage', () => {
     const apiMenuCodes = new Set(allMenus.map((m) => m.code).filter(Boolean));
 
     for (const menu of INVENTORY_MENUS) {
-      expect(apiMenuCodes.has(menu.code), `menu code ${menu.code} should exist in user menus`).toBe(true);
+      expect(apiMenuCodes.has(menu.code), `menu code ${menu.code} should exist in user menus`).toBe(
+        true,
+      );
     }
 
     // Verify paths match
@@ -79,17 +84,22 @@ test.describe('Inventory Menu Full Coverage', () => {
       const text = (await page.locator('body').textContent()) || '';
       expect(isCrashText(text), `menu ${menu.code} (${menu.path}) should not crash`).toBe(false);
 
-      const hasContent = await page.locator(
-        'main, table, [role="table"], form, [role="tablist"], [data-testid="dynamic-list"], [data-testid="dynamic-form"]'
-      ).first().isVisible({ timeout: 8_000 }).catch(() => false);
+      const hasContent = await page
+        .locator(
+          'main, table, [role="table"], form, [role="tablist"], [data-testid="dynamic-list"], [data-testid="dynamic-form"]',
+        )
+        .first()
+        .isVisible({ timeout: 8_000 })
+        .catch(() => false);
 
       if (hasContent) {
         withContent += 1;
 
         // Probe a non-destructive interaction
-        const searchBtn = page.locator(
-          '[data-testid="filter-search"], [data-testid="filter-btn-search"]'
-        ).first();
+        await ensureFilterFormOpen(page);
+        const searchBtn = page
+          .locator('[data-testid="filter-search"], [data-testid="filter-btn-search"]')
+          .first();
         if (await searchBtn.isVisible({ timeout: 1_500 }).catch(() => false)) {
           await searchBtn.click().catch(() => {});
         }

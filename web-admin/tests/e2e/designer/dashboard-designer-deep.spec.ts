@@ -16,8 +16,14 @@ import { uniqueId } from '../helpers';
 
 async function waitForDesignerLoad(page: Page) {
   await page.waitForLoadState('networkidle').catch(() => {});
-  await page.locator('.animate-spin').waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
-  await page.locator('text=Loading page...').waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
+  await page
+    .locator('.animate-spin')
+    .waitFor({ state: 'hidden', timeout: 10000 })
+    .catch(() => {});
+  await page
+    .locator('text=Loading page...')
+    .waitFor({ state: 'hidden', timeout: 10000 })
+    .catch(() => {});
 }
 
 async function openNewDashboard(page: Page) {
@@ -32,7 +38,18 @@ async function openDashboardWithWidget(page: Page): Promise<string> {
     data: {
       title,
       scope: 'personal',
-      widgets: [{ id: 'w1', type: 'NumberCard', x: 0, y: 0, w: 4, h: 2, title: 'Test Card', config: { title: 'Test Card', label: 'Count', value: 0 } }],
+      widgets: [
+        {
+          id: 'w1',
+          type: 'NumberCard',
+          x: 0,
+          y: 0,
+          w: 4,
+          h: 2,
+          title: 'Test Card',
+          config: { title: 'Test Card', label: 'Count', value: 0 },
+        },
+      ],
       layoutConfig: { columns: 12, rowHeight: 60 },
     },
   });
@@ -99,7 +116,10 @@ test.describe('DataSourceConfig — All Fields', () => {
   test('DD-DS-02: Aggregate mode → data model select appears', async ({ page }) => {
     await openDashboardWithWidget(page);
     const panel = page.getByTestId('widget-property-panel');
-    const dsTypeSelect = panel.locator('select').filter({ has: page.locator('option:has-text("聚合查询")') }).first();
+    const dsTypeSelect = panel
+      .locator('select')
+      .filter({ has: page.locator('option:has-text("聚合查询")') })
+      .first();
     if (await dsTypeSelect.isVisible({ timeout: 3000 }).catch(() => false)) {
       await dsTypeSelect.selectOption({ label: '聚合查询' });
       await expect(panel.locator('label', { hasText: /数据模型/ })).toBeVisible({ timeout: 3000 });
@@ -111,8 +131,24 @@ test.describe('DataSourceConfig — All Fields', () => {
     const title = uniqueId('DD_Chart');
     const resp = await page.request.post('/api/dashboards', {
       data: {
-        title, scope: 'personal',
-        widgets: [{ id: 'w1', type: 'BarChart', x: 0, y: 0, w: 6, h: 4, title: 'Test Chart', config: { title: 'Test Chart', xAxis: ['A','B','C'], series: [{ name: 'S1', data: [1,2,3] }] } }],
+        title,
+        scope: 'personal',
+        widgets: [
+          {
+            id: 'w1',
+            type: 'BarChart',
+            x: 0,
+            y: 0,
+            w: 6,
+            h: 4,
+            title: 'Test Chart',
+            config: {
+              title: 'Test Chart',
+              xAxis: ['A', 'B', 'C'],
+              series: [{ name: 'S1', data: [1, 2, 3] }],
+            },
+          },
+        ],
         layoutConfig: { columns: 12, rowHeight: 60 },
       },
     });
@@ -132,7 +168,9 @@ test.describe('DataSourceConfig — All Fields', () => {
       await expect(label).toBeVisible();
     } else {
       // Some widget types may not have this field — verify at least DataSourceConfig section exists
-      await expect(panel.locator('label', { hasText: /数据源类型/ }).first()).toBeVisible({ timeout: 3000 });
+      await expect(panel.locator('label', { hasText: /数据源类型/ }).first()).toBeVisible({
+        timeout: 3000,
+      });
     }
   });
 
@@ -140,8 +178,24 @@ test.describe('DataSourceConfig — All Fields', () => {
     const title = uniqueId('DD_Chart2');
     const resp = await page.request.post('/api/dashboards', {
       data: {
-        title, scope: 'personal',
-        widgets: [{ id: 'w1', type: 'BarChart', x: 0, y: 0, w: 6, h: 4, title: 'Test Chart', config: { title: 'Test Chart', xAxis: ['A','B','C'], series: [{ name: 'S1', data: [1,2,3] }] } }],
+        title,
+        scope: 'personal',
+        widgets: [
+          {
+            id: 'w1',
+            type: 'BarChart',
+            x: 0,
+            y: 0,
+            w: 6,
+            h: 4,
+            title: 'Test Chart',
+            config: {
+              title: 'Test Chart',
+              xAxis: ['A', 'B', 'C'],
+              series: [{ name: 'S1', data: [1, 2, 3] }],
+            },
+          },
+        ],
         layoutConfig: { columns: 12, rowHeight: 60 },
       },
     });
@@ -159,24 +213,34 @@ test.describe('DataSourceConfig — All Fields', () => {
     if (await label.isVisible({ timeout: 3000 }).catch(() => false)) {
       await expect(label).toBeVisible();
     } else {
-      await expect(panel.locator('label', { hasText: /数据源类型/ }).first()).toBeVisible({ timeout: 3000 });
+      await expect(panel.locator('label', { hasText: /数据源类型/ }).first()).toBeVisible({
+        timeout: 3000,
+      });
     }
   });
 
   test('DD-DS-05: Switch to namedQuery → query select appears', async ({ page }) => {
     await openDashboardWithWidget(page);
     const panel = page.getByTestId('widget-property-panel');
-    const dsTypeSelect = panel.locator('select').filter({ has: page.locator('option:has-text("命名查询")') }).first();
+    const dsTypeSelect = panel
+      .locator('select')
+      .filter({ has: page.locator('option:has-text("命名查询")') })
+      .first();
     if (await dsTypeSelect.isVisible({ timeout: 3000 }).catch(() => false)) {
       await dsTypeSelect.selectOption({ label: '命名查询' });
-      await expect(panel.locator('label', { hasText: /命名查询/ }).last()).toBeVisible({ timeout: 3000 });
+      await expect(panel.locator('label', { hasText: /命名查询/ }).last()).toBeVisible({
+        timeout: 3000,
+      });
     }
   });
 
   test('DD-DS-06: Switch to static → JSON textarea appears', async ({ page }) => {
     await openDashboardWithWidget(page);
     const panel = page.getByTestId('widget-property-panel');
-    const dsTypeSelect = panel.locator('select').filter({ has: page.locator('option:has-text("静态数据")') }).first();
+    const dsTypeSelect = panel
+      .locator('select')
+      .filter({ has: page.locator('option:has-text("静态数据")') })
+      .first();
     if (await dsTypeSelect.isVisible({ timeout: 3000 }).catch(() => false)) {
       await dsTypeSelect.selectOption({ label: '静态数据' });
       await expect(panel.locator('textarea').first()).toBeVisible({ timeout: 3000 });
@@ -258,7 +322,9 @@ test.describe('DrilldownConfig — All Fields', () => {
     const checkbox = page.getByRole('checkbox', { name: /启用点击钻取/ });
     if (!(await checkbox.isChecked())) await checkbox.click();
     for (const action of ['过滤数据', '跳转页面', '弹窗详情', '跳转仪表盘']) {
-      await expect(page.locator('label', { hasText: action }).first()).toBeVisible({ timeout: 3000 });
+      await expect(page.locator('label', { hasText: action }).first()).toBeVisible({
+        timeout: 3000,
+      });
     }
   });
 
@@ -310,7 +376,9 @@ test.describe('DrilldownConfig — All Fields', () => {
     await openDashboardWithWidget(page);
     const checkbox = page.getByRole('checkbox', { name: /启用点击钻取/ });
     if (await checkbox.isChecked()) await checkbox.click();
-    await expect(page.locator('input[name="drilldown-action"]').first()).not.toBeVisible({ timeout: 3000 });
+    await expect(page.locator('input[name="drilldown-action"]').first()).not.toBeVisible({
+      timeout: 3000,
+    });
   });
 });
 
@@ -322,7 +390,9 @@ test.describe('StyleConfig — All Fields', () => {
   test('DD-ST-01: Theme buttons (5 themes) visible', async ({ page }) => {
     await openDashboardWithWidget(page);
     for (const theme of ['默认', '复古', '暗色', '西部', '马卡龙']) {
-      const btn = page.locator('label', { hasText: theme }).first()
+      const btn = page
+        .locator('label', { hasText: theme })
+        .first()
         .or(page.getByText(theme).first());
       if (await btn.isVisible({ timeout: 2000 }).catch(() => false)) {
         await expect(btn).toBeVisible();
@@ -423,7 +493,9 @@ test.describe('Widget Operations', () => {
     await openDashboardWithWidget(page);
     const panel = page.getByTestId('widget-property-panel');
     for (const label of ['X', 'Y', '宽度', '高度']) {
-      await expect(panel.locator('label', { hasText: label }).first()).toBeVisible({ timeout: 3000 });
+      await expect(panel.locator('label', { hasText: label }).first()).toBeVisible({
+        timeout: 3000,
+      });
     }
   });
 });
@@ -480,7 +552,9 @@ test.describe('Settings Dialog — All Fields', () => {
     await expect(dialog).toBeVisible({ timeout: 5000 });
     const titleInput = dialog.locator('input[type="text"]').first();
     await titleInput.fill(uniqueId('DD_Save'));
-    const saveBtn = dialog.locator('button:has-text("保存"), button:has-text("Save"), button.bg-blue-600').first();
+    const saveBtn = dialog
+      .locator('button:has-text("保存"), button:has-text("Save"), button.bg-blue-600')
+      .first();
     await saveBtn.click();
     await expect(dialog).not.toBeVisible({ timeout: 5000 });
   });
@@ -506,7 +580,18 @@ test.describe('Toolbar & Lifecycle', () => {
       data: {
         title,
         scope: 'personal',
-        widgets: [{ id: 'w1', type: 'NumberCard', x: 0, y: 0, w: 4, h: 2, title: 'Test Card', config: { title: 'Test Card', label: 'Count', value: 0 } }],
+        widgets: [
+          {
+            id: 'w1',
+            type: 'NumberCard',
+            x: 0,
+            y: 0,
+            w: 4,
+            h: 2,
+            title: 'Test Card',
+            config: { title: 'Test Card', label: 'Count', value: 0 },
+          },
+        ],
         layoutConfig: { columns: 12, rowHeight: 60 },
       },
     });
@@ -528,7 +613,18 @@ test.describe('Toolbar & Lifecycle', () => {
       data: {
         title,
         scope: 'personal',
-        widgets: [{ id: 'w1', type: 'NumberCard', x: 0, y: 0, w: 4, h: 2, title: 'Test Card', config: { title: 'Test Card', label: 'Count', value: 0 } }],
+        widgets: [
+          {
+            id: 'w1',
+            type: 'NumberCard',
+            x: 0,
+            y: 0,
+            w: 4,
+            h: 2,
+            title: 'Test Card',
+            config: { title: 'Test Card', label: 'Count', value: 0 },
+          },
+        ],
         layoutConfig: { columns: 12, rowHeight: 60 },
       },
     });

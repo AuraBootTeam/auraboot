@@ -73,9 +73,9 @@ test.describe('CRM Calendar Sync Settings @critical', () => {
     await expect(page).toHaveURL(/\/crm\/settings\/calendar-sync/);
 
     // Page heading is visible
-    await expect(
-      page.getByRole('heading', { name: 'Calendar Sync', exact: true }),
-    ).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('heading', { name: 'Calendar Sync', exact: true })).toBeVisible({
+      timeout: 5000,
+    });
 
     // Provider cards section is visible
     await expect(page.locator('[data-testid="calendar-providers"]')).toBeVisible();
@@ -92,13 +92,17 @@ test.describe('CRM Calendar Sync Settings @critical', () => {
     const googleCard = page.locator('[data-testid="calendar-provider-google"]');
     await expect(googleCard).toBeVisible({ timeout: 10000 });
     await expect(googleCard.getByRole('heading', { name: 'Google Calendar' })).toBeVisible();
-    await expect(googleCard.getByText('Sync CRM activities with your Google Calendar.')).toBeVisible();
+    await expect(
+      googleCard.getByText('Sync CRM activities with your Google Calendar.'),
+    ).toBeVisible();
 
     // Microsoft Outlook card
     const microsoftCard = page.locator('[data-testid="calendar-provider-microsoft"]');
     await expect(microsoftCard).toBeVisible({ timeout: 10000 });
     await expect(microsoftCard.getByRole('heading', { name: 'Microsoft Outlook' })).toBeVisible();
-    await expect(microsoftCard.getByText('Sync CRM activities with your Outlook calendar.')).toBeVisible();
+    await expect(
+      microsoftCard.getByText('Sync CRM activities with your Outlook calendar.'),
+    ).toBeVisible();
   });
 
   // -------------------------------------------------------------------------
@@ -120,8 +124,12 @@ test.describe('CRM Calendar Sync Settings @critical', () => {
     const connectGoogle = page.locator('[data-testid="connect-google"]');
     const connectMicrosoft = page.locator('[data-testid="connect-microsoft"]');
 
-    const googleConnectVisible = await connectGoogle.isVisible({ timeout: 3000 }).catch(() => false);
-    const microsoftConnectVisible = await connectMicrosoft.isVisible({ timeout: 3000 }).catch(() => false);
+    const googleConnectVisible = await connectGoogle
+      .isVisible({ timeout: 3000 })
+      .catch(() => false);
+    const microsoftConnectVisible = await connectMicrosoft
+      .isVisible({ timeout: 3000 })
+      .catch(() => false);
 
     // In the default test environment, both providers should be disconnected
     expect(googleConnectVisible || microsoftConnectVisible).toBe(true);
@@ -213,9 +221,15 @@ test.describe('CRM Calendar Sync Settings @critical', () => {
 
     // If there are direction buttons (connected), verify their labels
     if (directionBtnCount > 0) {
-      await expect(page.locator('[data-testid="sync-direction-both"]').first()).toContainText('Both');
-      await expect(page.locator('[data-testid="sync-direction-read"]').first()).toContainText('Read Only');
-      await expect(page.locator('[data-testid="sync-direction-write"]').first()).toContainText('Write Only');
+      await expect(page.locator('[data-testid="sync-direction-both"]').first()).toContainText(
+        'Both',
+      );
+      await expect(page.locator('[data-testid="sync-direction-read"]').first()).toContainText(
+        'Read Only',
+      );
+      await expect(page.locator('[data-testid="sync-direction-write"]').first()).toContainText(
+        'Write Only',
+      );
     }
   });
 
@@ -232,22 +246,32 @@ test.describe('CRM Calendar Sync Settings @critical', () => {
     const connectMicrosoft = page.locator('[data-testid="connect-microsoft"]');
 
     const googleConnected = !(await connectGoogle.isVisible({ timeout: 3000 }).catch(() => false));
-    const microsoftConnected = !(await connectMicrosoft.isVisible({ timeout: 3000 }).catch(() => false));
+    const microsoftConnected = !(await connectMicrosoft
+      .isVisible({ timeout: 3000 })
+      .catch(() => false));
 
     // For disconnected Google provider: Sync Now and Disconnect should NOT be visible
     if (!googleConnected) {
       const syncNowGoogle = page.locator('[data-testid="sync-now-google"]');
       const disconnectGoogle = page.locator('[data-testid="disconnect-google"]');
-      await expect(syncNowGoogle).not.toBeVisible({ timeout: 2000 }).catch(() => null);
-      await expect(disconnectGoogle).not.toBeVisible({ timeout: 2000 }).catch(() => null);
+      await expect(syncNowGoogle)
+        .not.toBeVisible({ timeout: 2000 })
+        .catch(() => null);
+      await expect(disconnectGoogle)
+        .not.toBeVisible({ timeout: 2000 })
+        .catch(() => null);
     }
 
     // For disconnected Microsoft provider: Sync Now and Disconnect should NOT be visible
     if (!microsoftConnected) {
       const syncNowMicrosoft = page.locator('[data-testid="sync-now-microsoft"]');
       const disconnectMicrosoft = page.locator('[data-testid="disconnect-microsoft"]');
-      await expect(syncNowMicrosoft).not.toBeVisible({ timeout: 2000 }).catch(() => null);
-      await expect(disconnectMicrosoft).not.toBeVisible({ timeout: 2000 }).catch(() => null);
+      await expect(syncNowMicrosoft)
+        .not.toBeVisible({ timeout: 2000 })
+        .catch(() => null);
+      await expect(disconnectMicrosoft)
+        .not.toBeVisible({ timeout: 2000 })
+        .catch(() => null);
     }
 
     // "How Calendar Sync Works" info box should always be visible

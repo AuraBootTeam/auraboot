@@ -10,7 +10,7 @@
  */
 
 import { test, expect } from '../../fixtures';
-
+import { ensureFilterFormOpen } from '../helpers/index';
 
 // Test plugin manifest
 const TEST_PLUGIN = {
@@ -75,7 +75,13 @@ const TEST_PLUGIN = {
 
   modelFieldBindings: [
     { modelCode: 'mtest_item', fieldCode: 'mtest_name', sequence: 10, required: true },
-    { modelCode: 'mtest_item', fieldCode: 'mtest_priority', sequence: 20, required: true, defaultValue: 'low' },
+    {
+      modelCode: 'mtest_item',
+      fieldCode: 'mtest_priority',
+      sequence: 20,
+      required: true,
+      defaultValue: 'low',
+    },
     { modelCode: 'mtest_item', fieldCode: 'mtest_quantity', sequence: 30, required: false },
   ],
 
@@ -149,10 +155,13 @@ test.describe('Plugin Import UI Verification', () => {
 
   test.beforeAll(async ({ request }) => {
     try {
-      const response = await request.post(`/api/plugins/import/execute-direct?conflictStrategy=OVERWRITE`, {
-        data: TEST_PLUGIN,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      const response = await request.post(
+        `/api/plugins/import/execute-direct?conflictStrategy=OVERWRITE`,
+        {
+          data: TEST_PLUGIN,
+          headers: { 'Content-Type': 'application/json' },
+        },
+      );
 
       if (response.ok()) {
         importResult = await response.json();
@@ -189,12 +198,16 @@ test.describe('Plugin Import UI Verification', () => {
 
     // Wait for either model content or login redirect
     const loaded = await Promise.race([
-      page.getByText('mtest_item').first().waitFor({ timeout: 8000 }).then(() => 'content'),
+      page
+        .getByText('mtest_item')
+        .first()
+        .waitFor({ timeout: 8000 })
+        .then(() => 'content'),
       page.waitForURL('**/login**', { timeout: 8000 }).then(() => 'login'),
     ]).catch(() => 'timeout');
 
     if (loaded === 'login') {
-      throw new Error(String('Redirected to login - session expired'))
+      throw new Error(String('Redirected to login - session expired'));
       return;
     }
 
@@ -214,25 +227,29 @@ test.describe('Plugin Import UI Verification', () => {
 
     // Wait for page content or login redirect
     const loaded = await Promise.race([
-      page.locator('input[placeholder*="搜索"], input[type="search"]').first().waitFor({ timeout: 8000 }).then(() => 'content'),
+      page
+        .locator('input[placeholder*="搜索"], input[type="search"]')
+        .first()
+        .waitFor({ timeout: 8000 })
+        .then(() => 'content'),
       page.waitForURL('**/login**', { timeout: 8000 }).then(() => 'login'),
     ]).catch(() => 'timeout');
 
     if (loaded === 'login') {
-      throw new Error(String('Redirected to login - session expired'))
+      throw new Error(String('Redirected to login - session expired'));
       return;
     }
 
     // Search for test dictionary by code
+    await ensureFilterFormOpen(page);
     const codeInput = page.locator('input[placeholder*="字典编码"]').first();
     if (await codeInput.isVisible({ timeout: 3000 }).catch(() => false)) {
       await codeInput.fill('mtest_priority');
       // Click search button
       const searchBtn = page.locator('[data-testid="filter-search"]');
-      const listRefresh = page.waitForResponse(
-        r => r.url().includes('/dict') && r.status() === 200,
-        { timeout: 5000 }
-      ).catch(() => null);
+      const listRefresh = page
+        .waitForResponse((r) => r.url().includes('/dict') && r.status() === 200, { timeout: 5000 })
+        .catch(() => null);
       await searchBtn.click();
       await listRefresh;
     }
@@ -259,7 +276,7 @@ test.describe('Plugin Import UI Verification', () => {
             force: true,
             decisions: {},
           },
-        }
+        },
       );
 
       if (uninstallResponse.ok()) {
@@ -281,9 +298,7 @@ test.describe('Plugin Cleanup', () => {
     // Uncomment test.skip to enable manual cleanup
 
     // Get plugin by ID
-    const historyResponse = await page.request.get(
-      `/api/plugins/import/history?limit=50`
-    );
+    const historyResponse = await page.request.get(`/api/plugins/import/history?limit=50`);
     const history = await historyResponse.json();
 
     const testPlugin = Array.isArray(history)
@@ -295,7 +310,7 @@ test.describe('Plugin Cleanup', () => {
         `/api/plugins/${testPlugin.pluginPid}/uninstall`,
         {
           data: { force: true, decisions: {} },
-        }
+        },
       );
 
       expect(uninstallResponse.ok()).toBe(true);

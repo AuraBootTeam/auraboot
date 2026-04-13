@@ -1,2 +1,6 @@
 export { generateTestSpec, type TestGenConfig } from './TestGenerator';
-export { generateMockRecords, generateFormPayload, generateInvalidPayload } from './MockDataGenerator';
+export {
+  generateMockRecords,
+  generateFormPayload,
+  generateInvalidPayload,
+} from './MockDataGenerator';

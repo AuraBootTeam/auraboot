@@ -181,7 +181,7 @@ export const RuntimeVerification: React.FC<RuntimeVerificationProps> = ({
                 {renderStatusIcon(true)}
                 <span className="text-sm text-gray-700">列表页</span>
               </div>
-              {renderPageLink(`/dynamic/${model.code}`, '访问列表页')}
+              {renderPageLink(`/p/${model.code}`, '访问列表页')}
             </div>
           )}
           {verificationResult.generatedPages.form && (
@@ -190,7 +190,7 @@ export const RuntimeVerification: React.FC<RuntimeVerificationProps> = ({
                 {renderStatusIcon(true)}
                 <span className="text-sm text-gray-700">表单页</span>
               </div>
-              {renderPageLink(`/dynamic/${model.code}/new`, '访问表单页')}
+              {renderPageLink(`/p/${model.code}/new`, '访问表单页')}
             </div>
           )}
           {verificationResult.generatedPages.detail && (
@@ -199,7 +199,7 @@ export const RuntimeVerification: React.FC<RuntimeVerificationProps> = ({
                 {renderStatusIcon(true)}
                 <span className="text-sm text-gray-700">详情页</span>
               </div>
-              {renderPageLink(`/dynamic/${model.code}/view/example`, '访问详情页')}
+              {renderPageLink(`/p/${model.code}/view/example`, '访问详情页')}
             </div>
           )}
         </div>

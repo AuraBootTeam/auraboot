@@ -19,16 +19,14 @@ export default function TrackingStats({ messageId }: TrackingStatsProps) {
   useEffect(() => {
     getTrackingStats(messageId)
       .then(setStats)
-      .catch(() => {/* non-critical */})
+      .catch(() => {
+        /* non-critical */
+      })
       .finally(() => setLoading(false));
   }, [messageId]);
 
   if (loading) {
-    return (
-      <span className="text-xs text-gray-400 dark:text-gray-500">
-        Loading tracking…
-      </span>
-    );
+    return <span className="text-xs text-gray-400 dark:text-gray-500">Loading tracking…</span>;
   }
 
   if (!stats) return null;
@@ -38,9 +36,13 @@ export default function TrackingStats({ messageId }: TrackingStatsProps) {
       className="inline-flex items-center gap-2 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs text-gray-600 dark:bg-gray-700 dark:text-gray-300"
       data-testid={`tracking-stats-${messageId}`}
     >
-      <span title="Opens">👁 {stats.opens} {stats.opens === 1 ? 'open' : 'opens'}</span>
+      <span title="Opens">
+        👁 {stats.opens} {stats.opens === 1 ? 'open' : 'opens'}
+      </span>
       <span className="text-gray-300 dark:text-gray-600">·</span>
-      <span title="Clicks">🔗 {stats.clicks} {stats.clicks === 1 ? 'click' : 'clicks'}</span>
+      <span title="Clicks">
+        🔗 {stats.clicks} {stats.clicks === 1 ? 'click' : 'clicks'}
+      </span>
     </span>
   );
 }

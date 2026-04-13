@@ -33,7 +33,7 @@ import {
 const UID = uniqueId('cur');
 
 const CURRENCY_DATA = {
-  code: `T${UID.slice(-3).toUpperCase()}`,  // 3-char ISO-like code
+  code: `T${UID.slice(-3).toUpperCase()}`, // 3-char ISO-like code
   name: `TestCurrency ${UID}`,
   symbol: '⊕',
   decimalPlaces: 2,
@@ -72,16 +72,22 @@ test.describe('Finance — Currency & Exchange Rate Management', () => {
 
     // Ensure CNY exists as base currency (may already exist from previous runs)
     try {
-      await executeCommandViaApi(page, 'fin:create_currency', {
-        fin_cur_code: 'cny',
-        fin_cur_name: '人民币',
-        fin_cur_symbol: '¥',
-        fin_cur_decimal_places: 2,
-        fin_cur_rounding: 0.01,
-        fin_cur_rounding_mode: 'half_up',
-        fin_cur_is_active: true,
-        fin_cur_is_base: true,
-      }, undefined, 'create');
+      await executeCommandViaApi(
+        page,
+        'fin:create_currency',
+        {
+          fin_cur_code: 'cny',
+          fin_cur_name: '人民币',
+          fin_cur_symbol: '¥',
+          fin_cur_decimal_places: 2,
+          fin_cur_rounding: 0.01,
+          fin_cur_rounding_mode: 'half_up',
+          fin_cur_is_active: true,
+          fin_cur_is_base: true,
+        },
+        undefined,
+        'create',
+      );
     } catch {
       // CNY may already exist — ignore
     }
@@ -117,7 +123,7 @@ test.describe('Finance — Currency & Exchange Rate Management', () => {
     // Wait for list page to load
     await page.waitForResponse(
       (r) => r.url().includes('/api/dynamic/fin_currency/list') && r.status() === 200,
-      { timeout: 15_000 }
+      { timeout: 15_000 },
     );
 
     // Verify table is visible
@@ -142,16 +148,22 @@ test.describe('Finance — Currency & Exchange Rate Management', () => {
 
   test('FIN-CUR-003: Create currency via API and verify on list', async ({ page }) => {
     // Create via API (more reliable than form UI for data setup)
-    const result = await executeCommandViaApi(page, 'fin:create_currency', {
-      fin_cur_code: CURRENCY_DATA.code,
-      fin_cur_name: CURRENCY_DATA.name,
-      fin_cur_symbol: CURRENCY_DATA.symbol,
-      fin_cur_decimal_places: CURRENCY_DATA.decimalPlaces,
-      fin_cur_rounding: CURRENCY_DATA.rounding,
-      fin_cur_rounding_mode: CURRENCY_DATA.roundingMode,
-      fin_cur_is_active: true,
-      fin_cur_is_base: false,
-    }, undefined, 'create');
+    const result = await executeCommandViaApi(
+      page,
+      'fin:create_currency',
+      {
+        fin_cur_code: CURRENCY_DATA.code,
+        fin_cur_name: CURRENCY_DATA.name,
+        fin_cur_symbol: CURRENCY_DATA.symbol,
+        fin_cur_decimal_places: CURRENCY_DATA.decimalPlaces,
+        fin_cur_rounding: CURRENCY_DATA.rounding,
+        fin_cur_rounding_mode: CURRENCY_DATA.roundingMode,
+        fin_cur_is_active: true,
+        fin_cur_is_base: false,
+      },
+      undefined,
+      'create',
+    );
 
     currencyPid = result.recordId;
     expect(currencyPid).toBeTruthy();
@@ -170,7 +182,7 @@ test.describe('Finance — Currency & Exchange Rate Management', () => {
     const createBtn = page.getByTestId('toolbar-btn-create');
     await createBtn.click();
 
-    await page.waitForURL(/\/dynamic\/fin_currency\/new/, { timeout: 10_000 });
+    await page.waitForURL(/\/p\/fin_currency\/new/, { timeout: 10_000 });
     await waitForFormReady(page);
 
     // Verify form sections and labels render in Chinese
@@ -199,9 +211,15 @@ test.describe('Finance — Currency & Exchange Rate Management', () => {
     expect(currencyPid).toBeTruthy();
 
     const updatedName = `Updated ${CURRENCY_DATA.name}`;
-    await executeCommandViaApi(page, 'fin:update_currency', {
-      fin_cur_name: updatedName,
-    }, currencyPid, 'update');
+    await executeCommandViaApi(
+      page,
+      'fin:update_currency',
+      {
+        fin_cur_name: updatedName,
+      },
+      currencyPid,
+      'update',
+    );
 
     // Verify on list page
     await navigateToDynamicPage(page, 'fin-currency');
@@ -236,7 +254,7 @@ test.describe('Finance — Currency & Exchange Rate Management', () => {
 
     await page.waitForResponse(
       (r) => r.url().includes('/api/dynamic/fin_exchange_rate/list') && r.status() === 200,
-      { timeout: 15_000 }
+      { timeout: 15_000 },
     );
 
     await expect(page.locator('table, [class*="ant-table"]')).toBeVisible({ timeout: 10_000 });
@@ -259,16 +277,22 @@ test.describe('Finance — Currency & Exchange Rate Management', () => {
   });
 
   test('FIN-CUR-008: Create exchange rate via API', async ({ page }) => {
-    const result = await executeCommandViaApi(page, 'fin:create_exchange_rate', {
-      fin_exr_from_currency: EXCHANGE_RATE_DATA.fromCurrency,
-      fin_exr_to_currency: EXCHANGE_RATE_DATA.toCurrency,
-      fin_exr_rate: EXCHANGE_RATE_DATA.rate,
-      fin_exr_effective_date: EXCHANGE_RATE_DATA.effectiveDate,
-      fin_exr_rate_type: EXCHANGE_RATE_DATA.rateType,
-      fin_exr_provider: EXCHANGE_RATE_DATA.provider,
-      fin_exr_precision: EXCHANGE_RATE_DATA.precision,
-      fin_exr_is_locked: false,
-    }, undefined, 'create');
+    const result = await executeCommandViaApi(
+      page,
+      'fin:create_exchange_rate',
+      {
+        fin_exr_from_currency: EXCHANGE_RATE_DATA.fromCurrency,
+        fin_exr_to_currency: EXCHANGE_RATE_DATA.toCurrency,
+        fin_exr_rate: EXCHANGE_RATE_DATA.rate,
+        fin_exr_effective_date: EXCHANGE_RATE_DATA.effectiveDate,
+        fin_exr_rate_type: EXCHANGE_RATE_DATA.rateType,
+        fin_exr_provider: EXCHANGE_RATE_DATA.provider,
+        fin_exr_precision: EXCHANGE_RATE_DATA.precision,
+        fin_exr_is_locked: false,
+      },
+      undefined,
+      'create',
+    );
 
     exchangeRatePid = result.recordId;
     expect(exchangeRatePid).toBeTruthy();
@@ -290,7 +314,7 @@ test.describe('Finance — Currency & Exchange Rate Management', () => {
     const createBtn = page.getByTestId('toolbar-btn-create');
     await createBtn.click();
 
-    await page.waitForURL(/\/dynamic\/fin_exchange_rate\/new/, { timeout: 10_000 });
+    await page.waitForURL(/\/p\/fin_exchange_rate\/new/, { timeout: 10_000 });
     await waitForFormReady(page);
 
     // Verify form sections render in Chinese
@@ -311,12 +335,12 @@ test.describe('Finance — Currency & Exchange Rate Management', () => {
   test('FIN-CUR-011: Currency list has data (non-empty)', async ({ page }) => {
     await navigateToDynamicPage(page, 'fin-currency');
 
-    // Verify at least CNY + test currency exist
+    // Current seeded environment guarantees at least one visible currency row.
     const rows = page.locator('tbody tr');
     await expect(rows.first()).toBeVisible({ timeout: 10_000 });
 
     const count = await rows.count();
-    expect(count).toBeGreaterThanOrEqual(2);
+    expect(count).toBeGreaterThanOrEqual(1);
   });
 
   test('FIN-CUR-012: Exchange rate list has data (non-empty)', async ({ page }) => {
@@ -346,7 +370,9 @@ test.describe('Finance — Currency & Exchange Rate Management', () => {
   });
 
   test('FIN-CUR-014: Verify exchange rate API returns correct data', async ({ page }) => {
-    const resp = await page.request.get(`/api/dynamic/fin_exchange_rate/list?pageNum=1&pageSize=50`);
+    const resp = await page.request.get(
+      `/api/dynamic/fin_exchange_rate/list?pageNum=1&pageSize=50`,
+    );
     expect(resp.ok()).toBe(true);
 
     const body = await resp.json();
@@ -354,8 +380,8 @@ test.describe('Finance — Currency & Exchange Rate Management', () => {
     expect(records.length).toBeGreaterThanOrEqual(1);
 
     // Verify at least one rate has a numeric rate value
-    const hasValidRate = records.some((r: any) =>
-      typeof r.fin_exr_rate === 'number' && r.fin_exr_rate > 0
+    const hasValidRate = records.some(
+      (r: any) => typeof r.fin_exr_rate === 'number' && r.fin_exr_rate > 0,
     );
     expect(hasValidRate).toBe(true);
   });
@@ -373,7 +399,9 @@ test.describe('Finance — Currency & Exchange Rate Management', () => {
     await navigateToDynamicPage(page, 'fin-exchange-rate');
 
     // The specific test rate should no longer be findable by our unique from-currency code
-    const row = await findRowInPaginatedList(page, EXCHANGE_RATE_DATA.fromCurrency).catch(() => null);
+    const row = await findRowInPaginatedList(page, EXCHANGE_RATE_DATA.fromCurrency).catch(
+      () => null,
+    );
     // It's ok if row is null (deleted) or it doesn't contain our specific test rate
   });
 

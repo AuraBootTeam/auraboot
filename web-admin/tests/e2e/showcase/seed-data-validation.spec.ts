@@ -48,7 +48,9 @@ test.describe('Seed Data Validation', () => {
       counts[check.label] = { actual: total, min: check.min };
       const pass = total >= check.min ? '✅' : '❌';
       console.log(`  ${pass} ${check.label.padEnd(15)} ${total} (min: ${check.min})`);
-      expect(total, `${check.label} count should be >= ${check.min}`).toBeGreaterThanOrEqual(check.min);
+      expect(total, `${check.label} count should be >= ${check.min}`).toBeGreaterThanOrEqual(
+        check.min,
+      );
     }
     console.log('═══════════════════════════\n');
   });

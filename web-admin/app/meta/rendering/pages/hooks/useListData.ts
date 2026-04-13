@@ -240,10 +240,8 @@ export function useListData({
 
   // Apply DSL pagination.pageSize when schema loads
   useEffect(() => {
-    if (!schema?.areas) return;
-    const tableBlock = Object.values(schema.areas)
-      .flatMap((area) => area.blocks)
-      .find((block) => block.blockType === 'data-table');
+    if (!schema?.blocks) return;
+    const tableBlock = schema.blocks.find((block) => block.blockType === 'table');
     const dslPageSize = tableBlock?.table?.pagination?.pageSize;
     if (dslPageSize && dslPageSize > 0) {
       setPagination((prev) => ({ ...prev, pageSize: dslPageSize }));

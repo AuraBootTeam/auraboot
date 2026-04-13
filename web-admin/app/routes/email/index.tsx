@@ -96,7 +96,9 @@ export default function EmailInboxPage() {
 
   const handleMessageClick = async (message: EmailMessage) => {
     if (!message.isRead && message.direction === 'inbound') {
-      markMessageRead(message.id).catch(() => {/* non-critical */});
+      markMessageRead(message.id).catch(() => {
+        /* non-critical */
+      });
     }
     navigate(`/email/thread/${message.gmailThreadId}`);
   };
@@ -152,14 +154,14 @@ export default function EmailInboxPage() {
       {/* Search */}
       <form onSubmit={handleSearch} className="mb-4 flex gap-2">
         <div className="relative flex-1">
-          <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <MagnifyingGlassIcon className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
             placeholder="Search emails..."
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             data-testid="email-search-input"
-            className="w-full rounded-lg border border-gray-200 bg-white py-2 pl-10 pr-4 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500"
+            className="w-full rounded-lg border border-gray-200 bg-white py-2 pr-4 pl-10 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500"
           />
         </div>
         <button
@@ -182,9 +184,7 @@ export default function EmailInboxPage() {
             data-testid="email-empty-state"
           >
             <EnvelopeIcon className="mb-3 h-10 w-10 text-gray-300 dark:text-gray-600" />
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              No emails to show
-            </p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">No emails to show</p>
           </div>
         ) : (
           items.map((message) => (
@@ -192,7 +192,7 @@ export default function EmailInboxPage() {
               key={message.id}
               onClick={() => handleMessageClick(message)}
               data-testid={`email-row-${message.id}`}
-              className={`flex w-full items-start gap-4 px-5 py-4 text-start transition-colors hover:bg-gray-50 dark:hover:bg-gray-750 ${
+              className={`dark:hover:bg-gray-750 flex w-full items-start gap-4 px-5 py-4 text-start transition-colors hover:bg-gray-50 ${
                 !message.isRead && message.direction === 'inbound'
                   ? 'bg-blue-50/40 dark:bg-blue-900/10'
                   : ''
@@ -220,12 +220,8 @@ export default function EmailInboxPage() {
                     {senderDisplay(message)}
                   </span>
                   <div className="flex flex-shrink-0 items-center gap-2">
-                    {message.hasAttachments && (
-                      <PaperClipIcon className="h-4 w-4 text-gray-400" />
-                    )}
-                    <span className="text-xs text-gray-400">
-                      {timeAgo(message.gmailDate)}
-                    </span>
+                    {message.hasAttachments && <PaperClipIcon className="h-4 w-4 text-gray-400" />}
+                    <span className="text-xs text-gray-400">{timeAgo(message.gmailDate)}</span>
                   </div>
                 </div>
                 <p

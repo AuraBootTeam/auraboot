@@ -27,8 +27,20 @@ const ASSET_MANAGEMENT_PLUGIN = {
       'name:zh-CN': '资产类别',
       dictType: 'static',
       items: [
-        { value: 'it_equipment', label: 'IT Equipment', 'label:zh-CN': 'IT设备', sortNo: 10, status: 'enabled' },
-        { value: 'office_furniture', label: 'Office Furniture', 'label:zh-CN': '办公家具', sortNo: 20, status: 'enabled' },
+        {
+          value: 'it_equipment',
+          label: 'IT Equipment',
+          'label:zh-CN': 'IT设备',
+          sortNo: 10,
+          status: 'enabled',
+        },
+        {
+          value: 'office_furniture',
+          label: 'Office Furniture',
+          'label:zh-CN': '办公家具',
+          sortNo: 20,
+          status: 'enabled',
+        },
       ],
     },
   ],
@@ -106,10 +118,13 @@ test.describe('Plugin Lifecycle API', () => {
   let importResult: ImportExecuteResult | null = null;
 
   test('C2-E02: Import plugin via API', async ({ request }) => {
-    const response = await request.post(`/api/plugins/import/execute-direct?conflictStrategy=OVERWRITE`, {
-      data: ASSET_MANAGEMENT_PLUGIN,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    const response = await request.post(
+      `/api/plugins/import/execute-direct?conflictStrategy=OVERWRITE`,
+      {
+        data: ASSET_MANAGEMENT_PLUGIN,
+        headers: { 'Content-Type': 'application/json' },
+      },
+    );
 
     expect(response.ok()).toBe(true);
     importResult = await response.json();
@@ -131,18 +146,14 @@ test.describe('Plugin Lifecycle API', () => {
     expect(importResult).not.toBeNull();
     expect(importResult!.pluginPid).toBeTruthy();
 
-    const disableResponse = await request.post(
-      `/api/plugins/${importResult!.pluginPid}/disable`
-    );
+    const disableResponse = await request.post(`/api/plugins/${importResult!.pluginPid}/disable`);
     expect(disableResponse.ok()).toBe(true);
 
     const disableData = await disableResponse.json();
     const plugin = disableData.data || disableData;
     expect(plugin.status).toBe('stopped');
 
-    const statusResponse = await request.get(
-      `/api/plugins/${importResult!.pluginPid}`
-    );
+    const statusResponse = await request.get(`/api/plugins/${importResult!.pluginPid}`);
     expect(statusResponse.ok()).toBe(true);
 
     const statusData = await statusResponse.json();
@@ -154,18 +165,14 @@ test.describe('Plugin Lifecycle API', () => {
     expect(importResult).not.toBeNull();
     expect(importResult!.pluginPid).toBeTruthy();
 
-    const enableResponse = await request.post(
-      `/api/plugins/${importResult!.pluginPid}/enable`
-    );
+    const enableResponse = await request.post(`/api/plugins/${importResult!.pluginPid}/enable`);
     expect(enableResponse.ok()).toBe(true);
 
     const enableData = await enableResponse.json();
     const plugin = enableData.data || enableData;
     expect(plugin.status).toBe('active');
 
-    const statusResponse = await request.get(
-      `/api/plugins/${importResult!.pluginPid}`
-    );
+    const statusResponse = await request.get(`/api/plugins/${importResult!.pluginPid}`);
     expect(statusResponse.ok()).toBe(true);
 
     const statusData = await statusResponse.json();

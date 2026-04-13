@@ -9,7 +9,7 @@
  */
 
 import React from 'react';
-import type { DslProfile } from '../types';
+import type { RenderProfile } from '../types';
 import { profileRegistry } from '../ProfileRegistry';
 
 // Lazy block renderers — each block type is a separate chunk
@@ -73,6 +73,11 @@ const ApprovalCommentsBlock = React.lazy(() =>
 const ListPageContent = React.lazy(() =>
   import('~/meta/rendering/pages/ListPageContent').then((m) => ({ default: m.ListPageContent })),
 );
+const CompositePageContent = React.lazy(() =>
+  import('~/meta/rendering/pages/CompositePageContent').then((m) => ({
+    default: m.CompositePageContent,
+  })),
+);
 const FormPageContent = React.lazy(() =>
   import('~/meta/rendering/pages/FormPageContent').then((m) => ({ default: m.FormPageContent })),
 );
@@ -81,23 +86,12 @@ const DetailPageContent = React.lazy(() =>
     default: m.DetailPageContent,
   })),
 );
-const RecordPageRenderer = React.lazy(() =>
-  import('~/meta/rendering/pages/RecordPageRenderer').then((m) => ({
-    default: m.RecordPageRenderer,
-  })),
-);
-const TransactionPageRenderer = React.lazy(() =>
-  import('~/meta/rendering/pages/TransactionPageRenderer').then((m) => ({
-    default: m.TransactionPageRenderer,
-  })),
-);
-
 // Skeletons stay static — they're tiny and shown during lazy loading
 import { ListPageSkeleton } from '~/meta/rendering/skeletons/ListPageSkeleton';
 import { FormPageSkeleton } from '~/meta/rendering/skeletons/FormPageSkeleton';
 import { DetailPageSkeleton } from '~/meta/rendering/skeletons/DetailPageSkeleton';
 
-const adminProfile: DslProfile = {
+const adminProfile: RenderProfile = {
   name: 'admin',
 
   blockTypes: [
@@ -106,15 +100,12 @@ const adminProfile: DslProfile = {
     'form-buttons',
     'form-wizard',
     'table',
-    'data-table',
     'filters',
-    'filter-form',
     'toolbar',
     'action',
     'description',
     'chart',
     'tabs',
-    'list-tabs',
     'sub-table',
     'monthly-grid',
     'custom',
@@ -127,33 +118,30 @@ const adminProfile: DslProfile = {
     ['form-buttons', FormButtonsBlockRenderer],
     ['form-wizard', FormWizardBlockRenderer],
     ['table', TableBlockRenderer],
-    ['data-table', TableBlockRenderer],
     ['filters', FiltersBlockRenderer],
-    ['filter-form', FiltersBlockRenderer],
     ['toolbar', ToolbarBlockRenderer],
     ['action', ToolbarBlockRenderer],
     ['description', DescriptionBlockRenderer],
     ['chart', ChartBlockRenderer],
     ['tabs', TabsBlockRenderer],
     ['approval-comments', ApprovalCommentsBlock],
-    // list-tabs, sub-table, monthly-grid are handled inline by page renderers
+    // tabs, sub-table, monthly-grid are handled inline by page renderers
   ]),
 
-  kinds: ['Page', 'List', 'Form', 'Detail', 'PageLayout', 'Dashboard', 'Record', 'Transaction'],
+  kinds: ['page', 'list', 'form', 'detail', 'page_layout', 'dashboard', 'composite'],
 
   pageRenderers: new Map<string, any>([
-    ['List', ListPageContent],
-    ['Form', FormPageContent],
-    ['Detail', DetailPageContent],
-    ['Dashboard', ListPageContent], // Dashboard uses list page content (handles isDashboard internally)
-    ['Record', RecordPageRenderer], // GAP-086: ERP header+lines layout
-    ['Transaction', TransactionPageRenderer], // GAP-086: Read-only ledger view
+    ['list', ListPageContent],
+    ['form', FormPageContent],
+    ['detail', DetailPageContent],
+    ['dashboard', ListPageContent], // Dashboard uses list page content (handles isDashboard internally)
+    ['composite', CompositePageContent],
   ]),
 
   skeletons: new Map<string, any>([
-    ['List', ListPageSkeleton],
-    ['Form', FormPageSkeleton],
-    ['Detail', DetailPageSkeleton],
+    ['list', ListPageSkeleton],
+    ['form', FormPageSkeleton],
+    ['detail', DetailPageSkeleton],
   ]),
 };
 

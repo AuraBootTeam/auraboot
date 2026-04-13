@@ -115,7 +115,7 @@ class TemplateRegistryImpl {
       ],
     };
 
-    listSchema.areas.main.blocks.push(formBlock);
+    listSchema.blocks.push(formBlock);
 
     // Override handlers for dialog mode
     listSchema.handlers = {

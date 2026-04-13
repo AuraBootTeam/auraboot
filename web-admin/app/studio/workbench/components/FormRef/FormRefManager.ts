@@ -32,6 +32,7 @@ export class FormRefManagerImpl extends EventEmitter implements FormRefManager {
   private cache = new Map<string, FormCacheItem>();
   private config: FormRefConfig;
   private loadingPromises = new Map<string, Promise<FormSchema>>();
+  private cacheCleanupTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(config: Partial<FormRefConfig> = DEFAULT_FORM_REF_CONFIG) {
     super();
@@ -44,12 +45,21 @@ export class FormRefManagerImpl extends EventEmitter implements FormRefManager {
       rendering: { ...DEFAULT_FORM_REF_CONFIG.rendering, ...(config.rendering ?? {}) },
     };
 
-    // 定期清理过期缓存
     if (this.config.cache.enabled) {
-      setInterval(() => {
+      this.cacheCleanupTimer = setInterval(() => {
         this.cleanExpiredCache();
-      }, 60000); // 每分钟清理一次
+      }, 60000);
     }
+  }
+
+  dispose(): void {
+    if (this.cacheCleanupTimer) {
+      clearInterval(this.cacheCleanupTimer);
+      this.cacheCleanupTimer = null;
+    }
+    this.cache.clear();
+    this.loadingPromises.clear();
+    this.removeAllListeners();
   }
 
   /**

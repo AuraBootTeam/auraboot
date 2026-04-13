@@ -91,7 +91,9 @@ async function clickRowActionAndGetBody(
   actionCode: string,
 ): Promise<any> {
   const commandResp = page.waitForResponse(
-    (r) => r.url().includes('/api/meta/commands/execute/') && r.request().method().toLowerCase() === 'post',
+    (r) =>
+      r.url().includes('/api/meta/commands/execute/') &&
+      r.request().method().toLowerCase() === 'post',
     { timeout: 10000 },
   );
   const listResp = page
@@ -287,22 +289,28 @@ test.describe('Finance Accounting — Account & Journal Entry', () => {
 
       // Update account name
       const updatedName = `Updated FAC Account ${uniqueId('upd')}`;
-      const nameInput = page.locator(
-        '[data-testid="form-field-fin_acc_name"] input, input[name="fin_acc_name"]',
-      ).first();
+      const nameInput = page
+        .locator('[data-testid="form-field-fin_acc_name"] input, input[name="fin_acc_name"]')
+        .first();
       if (await nameInput.isVisible({ timeout: 3000 }).catch(() => false)) {
         await nameInput.clear();
         await nameInput.fill(updatedName);
       }
 
       // Save
-      const saveBtn = page.locator(
-        '[data-testid^="form-btn-"], button:has-text("Save"), button:has-text("Submit"), button:has-text("保存"), button:has-text("提交")',
-      ).first();
-      const commandResp = page.waitForResponse(
-        (r) => r.url().includes('/api/meta/commands/execute/') && r.request().method().toLowerCase() === 'post',
-        { timeout: 10000 },
-      ).catch(() => null);
+      const saveBtn = page
+        .locator(
+          '[data-testid^="form-btn-"], button:has-text("Save"), button:has-text("Submit"), button:has-text("保存"), button:has-text("提交")',
+        )
+        .first();
+      const commandResp = page
+        .waitForResponse(
+          (r) =>
+            r.url().includes('/api/meta/commands/execute/') &&
+            r.request().method().toLowerCase() === 'post',
+          { timeout: 10000 },
+        )
+        .catch(() => null);
       await saveBtn.click();
       await commandResp;
 
@@ -338,7 +346,9 @@ test.describe('Finance Accounting — Account & Journal Entry', () => {
       const row = await findRowInPaginatedList(page, accCode);
 
       const commandResp = page.waitForResponse(
-        (r) => r.url().includes('/api/meta/commands/execute/') && r.request().method().toLowerCase() === 'post',
+        (r) =>
+          r.url().includes('/api/meta/commands/execute/') &&
+          r.request().method().toLowerCase() === 'post',
         { timeout: 10000 },
       );
       await clickRowActionByLocator(page, row, 'delete');
@@ -352,10 +362,15 @@ test.describe('Finance Accounting — Account & Journal Entry', () => {
 
       // Verify deletion — record should no longer be fetchable (allow short async window)
       await expect
-        .poll(async () => {
-          const checkResp = await page.request.get(`/api/dynamic/${PAGE_KEYS.account}/${result.recordId}`);
-          return checkResp.ok();
-        }, { timeout: 10000, intervals: [500, 1000] })
+        .poll(
+          async () => {
+            const checkResp = await page.request.get(
+              `/api/dynamic/${PAGE_KEYS.account}/${result.recordId}`,
+            );
+            return checkResp.ok();
+          },
+          { timeout: 10000, intervals: [500, 1000] },
+        )
         .toBe(false);
     });
 
@@ -389,7 +404,9 @@ test.describe('Finance Accounting — Account & Journal Entry', () => {
         );
 
         if (!result.recordId || result.code !== ErrorCodes.SUCCESS) {
-          throw new Error(`Account creation failed for type ${accType} — plugin may not be imported`);
+          throw new Error(
+            `Account creation failed for type ${accType} — plugin may not be imported`,
+          );
           return;
         }
         bucket.accounts.push(result.recordId);
@@ -468,7 +485,9 @@ test.describe('Finance Accounting — Account & Journal Entry', () => {
       await expect(table.first()).toBeVisible({ timeout: 10000 });
     });
 
-    test('FAC-007: Account field validation — required fields missing shows error', async ({ page }) => {
+    test('FAC-007: Account field validation — required fields missing shows error', async ({
+      page,
+    }) => {
       await navigateToDynamicPage(page, PAGE_KEYS.account);
 
       // Ensure create entrypoint is visible in UI.
@@ -651,8 +670,14 @@ test.describe('Finance Accounting — Account & Journal Entry', () => {
       const deactivateBtn = row.locator(
         '[data-testid="row-action-deactivate"], [data-testid="row-action-disable"], [data-testid="row-action-update_account"]',
       );
-      if (await deactivateBtn.first().isVisible({ timeout: 3000 }).catch(() => false)) {
-        const actionCode = await deactivateBtn.first()
+      if (
+        await deactivateBtn
+          .first()
+          .isVisible({ timeout: 3000 })
+          .catch(() => false)
+      ) {
+        const actionCode = await deactivateBtn
+          .first()
           .getAttribute('data-testid')
           .then((t) => t?.replace('row-action-', '') ?? 'deactivate');
         await clickRowActionAndGetBody(page, row, actionCode);
@@ -667,7 +692,10 @@ test.describe('Finance Accounting — Account & Journal Entry', () => {
       // Fallback: deactivate via edit form (change status field)
       const editDirectBtn = row.locator('[data-testid="row-action-edit"]');
       const hasEditDirect = await editDirectBtn.isVisible({ timeout: 2000 }).catch(() => false);
-      const hasEditMore = await row.locator('[data-testid="row-action-more"]').isVisible({ timeout: 1000 }).catch(() => false);
+      const hasEditMore = await row
+        .locator('[data-testid="row-action-more"]')
+        .isVisible({ timeout: 1000 })
+        .catch(() => false);
       if (!(hasEditDirect || hasEditMore)) {
         // Try API-based deactivation
         const updateResult = await executeCommandViaApi(
@@ -690,14 +718,16 @@ test.describe('Finance Accounting — Account & Journal Entry', () => {
       await form.first().waitFor({ state: 'visible', timeout: 10000 });
 
       // Try to change status to inactive
-      const statusSelect = page.locator(
-        '[data-testid="form-field-fin_acc_status"] [role="combobox"], [data-testid="form-field-fin_acc_status"] select',
-      ).first();
+      const statusSelect = page
+        .locator(
+          '[data-testid="form-field-fin_acc_status"] [role="combobox"], [data-testid="form-field-fin_acc_status"] select',
+        )
+        .first();
       if (await statusSelect.isVisible({ timeout: 3000 }).catch(() => false)) {
         await statusSelect.click();
-        const inactiveOption = page.locator(
-          '[role="option"]:has-text("inactive"), .ant-select-item:has-text("inactive")',
-        ).first();
+        const inactiveOption = page
+          .locator('[role="option"]:has-text("inactive"), .ant-select-item:has-text("inactive")')
+          .first();
         if (await inactiveOption.isVisible({ timeout: 3000 }).catch(() => false)) {
           await inactiveOption.click();
         }
@@ -706,13 +736,19 @@ test.describe('Finance Accounting — Account & Journal Entry', () => {
       }
 
       // Save
-      const saveBtn = page.locator(
-        '[data-testid^="form-btn-"], button:has-text("Save"), button:has-text("Submit"), button:has-text("保存"), button:has-text("提交")',
-      ).first();
-      const commandResp = page.waitForResponse(
-        (r) => r.url().includes('/api/meta/commands/execute/') && r.request().method().toLowerCase() === 'post',
-        { timeout: 10000 },
-      ).catch(() => null);
+      const saveBtn = page
+        .locator(
+          '[data-testid^="form-btn-"], button:has-text("Save"), button:has-text("Submit"), button:has-text("保存"), button:has-text("提交")',
+        )
+        .first();
+      const commandResp = page
+        .waitForResponse(
+          (r) =>
+            r.url().includes('/api/meta/commands/execute/') &&
+            r.request().method().toLowerCase() === 'post',
+          { timeout: 10000 },
+        )
+        .catch(() => null);
       await saveBtn.click();
       await commandResp;
 
@@ -732,7 +768,10 @@ test.describe('Finance Accounting — Account & Journal Entry', () => {
 
       let rawKeyFound = false;
       for (let i = 0; i < Math.min(headerCount, 20); i++) {
-        const text = await headers.nth(i).innerText().catch(() => '');
+        const text = await headers
+          .nth(i)
+          .innerText()
+          .catch(() => '');
         if (text.match(/^model\.\w+\.\w+\.label$/)) {
           rawKeyFound = true;
           break;
@@ -741,9 +780,9 @@ test.describe('Finance Accounting — Account & Journal Entry', () => {
       expect(rawKeyFound, 'Column headers should not contain raw i18n keys').toBe(false);
 
       // Verify page title or breadcrumb is resolved (not raw key)
-      const pageTitle = page.locator(
-        'h1, h2, [data-testid="page-title"], nav[aria-label="breadcrumb"]',
-      ).first();
+      const pageTitle = page
+        .locator('h1, h2, [data-testid="page-title"], nav[aria-label="breadcrumb"]')
+        .first();
       if (await pageTitle.isVisible({ timeout: 3000 }).catch(() => false)) {
         const titleText = await pageTitle.innerText();
         expect(titleText).not.toMatch(/^model\.\w+\.title$/);
@@ -812,7 +851,9 @@ test.describe('Finance Accounting — Account & Journal Entry', () => {
       await expect(table.first()).toBeVisible({ timeout: 15000 });
     });
 
-    test('FAC-021: Create journal entry via API, verify code auto-generated @smoke', async ({ page }) => {
+    test('FAC-021: Create journal entry via API, verify code auto-generated @smoke', async ({
+      page,
+    }) => {
       const result = await createJournalEntryViaApi(page, bucket, {
         fin_je_memo: 'E2E test journal entry — verify auto code',
       });
@@ -859,22 +900,30 @@ test.describe('Finance Accounting — Account & Journal Entry', () => {
 
       // Update description
       const updatedDesc = `E2E updated description ${uniqueId('upd')}`;
-      const descInput = page.locator(
-        '[data-testid="form-field-fin_je_memo"] input, [data-testid="form-field-fin_je_memo"] textarea, input[name="fin_je_memo"], textarea[name="fin_je_memo"]',
-      ).first();
+      const descInput = page
+        .locator(
+          '[data-testid="form-field-fin_je_memo"] input, [data-testid="form-field-fin_je_memo"] textarea, input[name="fin_je_memo"], textarea[name="fin_je_memo"]',
+        )
+        .first();
       if (await descInput.isVisible({ timeout: 3000 }).catch(() => false)) {
         await descInput.clear();
         await descInput.fill(updatedDesc);
       }
 
       // Save
-      const saveBtn = page.locator(
-        '[data-testid^="form-btn-"], button:has-text("Save"), button:has-text("Submit"), button:has-text("保存"), button:has-text("提交")',
-      ).first();
-      const commandResp = page.waitForResponse(
-        (r) => r.url().includes('/api/meta/commands/execute/') && r.request().method().toLowerCase() === 'post',
-        { timeout: 10000 },
-      ).catch(() => null);
+      const saveBtn = page
+        .locator(
+          '[data-testid^="form-btn-"], button:has-text("Save"), button:has-text("Submit"), button:has-text("保存"), button:has-text("提交")',
+        )
+        .first();
+      const commandResp = page
+        .waitForResponse(
+          (r) =>
+            r.url().includes('/api/meta/commands/execute/') &&
+            r.request().method().toLowerCase() === 'post',
+          { timeout: 10000 },
+        )
+        .catch(() => null);
       await saveBtn.click();
       await commandResp;
 
@@ -883,7 +932,9 @@ test.describe('Finance Accounting — Account & Journal Entry', () => {
       expect(updated.fin_je_entry_no).toBe(jeCode);
     });
 
-    test('FAC-023: Post journal entry (draft -> POSTED) — happy path @critical', async ({ page }) => {
+    test('FAC-023: Post journal entry (draft -> POSTED) — happy path @critical', async ({
+      page,
+    }) => {
       const result = await createJournalEntryViaApi(page, bucket, {
         fin_je_memo: 'E2E status flow test — draft to POSTED',
       });
@@ -956,7 +1007,9 @@ test.describe('Finance Accounting — Account & Journal Entry', () => {
       expect(record.fin_je_status).toBe('posted');
     });
 
-    test('FAC-024: Post journal entry fails without balanced lines (boundary)', async ({ page }) => {
+    test('FAC-024: Post journal entry fails without balanced lines (boundary)', async ({
+      page,
+    }) => {
       const result = await createJournalEntryViaApi(page, bucket, {
         fin_je_memo: 'E2E unbalanced entry — should fail to post',
       });
@@ -1044,14 +1097,9 @@ test.describe('Finance Accounting — Account & Journal Entry', () => {
         bucket.journalLines.push(creditLine.recordId);
       }
 
-      await executeCommandViaApi(
-        page,
-        'fin:post_journal_entry',
-        {},
-        result.recordId,
-        'update',
-        { allowHttpError: true },
-      );
+      await executeCommandViaApi(page, 'fin:post_journal_entry', {}, result.recordId, 'update', {
+        allowHttpError: true,
+      });
 
       let record = await fetchRecord(page, PAGE_KEYS.journalEntry, result.recordId);
       if (record.fin_je_status !== 'posted') {
@@ -1069,8 +1117,14 @@ test.describe('Finance Accounting — Account & Journal Entry', () => {
       const reverseBtn = row.locator(
         '[data-testid="row-action-reverse"], [data-testid="row-action-reverse_journal_entry"]',
       );
-      if (await reverseBtn.first().isVisible({ timeout: 3000 }).catch(() => false)) {
-        const actionCode = await reverseBtn.first()
+      if (
+        await reverseBtn
+          .first()
+          .isVisible({ timeout: 3000 })
+          .catch(() => false)
+      ) {
+        const actionCode = await reverseBtn
+          .first()
           .getAttribute('data-testid')
           .then((t) => t?.replace('row-action-', '') ?? 'reverse');
         const body = await clickRowActionAndGetBody(page, row, actionCode);
@@ -1103,7 +1157,9 @@ test.describe('Finance Accounting — Account & Journal Entry', () => {
       }
     });
 
-    test('FAC-026: Cannot edit a POSTED journal entry (read-only or no edit action)', async ({ page }) => {
+    test('FAC-026: Cannot edit a POSTED journal entry (read-only or no edit action)', async ({
+      page,
+    }) => {
       const result = await createJournalEntryViaApi(page, bucket, {
         fin_je_memo: 'E2E posted entry — should not be editable',
       });
@@ -1158,14 +1214,9 @@ test.describe('Finance Accounting — Account & Journal Entry', () => {
       }
 
       // Post the entry
-      await executeCommandViaApi(
-        page,
-        'fin:post_journal_entry',
-        {},
-        result.recordId,
-        'update',
-        { allowHttpError: true },
-      );
+      await executeCommandViaApi(page, 'fin:post_journal_entry', {}, result.recordId, 'update', {
+        allowHttpError: true,
+      });
 
       let record = await fetchRecord(page, PAGE_KEYS.journalEntry, result.recordId);
       if (record.fin_je_status !== 'posted') {
@@ -1180,25 +1231,41 @@ test.describe('Finance Accounting — Account & Journal Entry', () => {
       // Verify edit button is either hidden or disabled for POSTED entries
       const editDirectBtn = row.locator('[data-testid="row-action-edit"]');
       const editVisible = await editDirectBtn.isVisible({ timeout: 2000 }).catch(() => false);
-      const editMoreVisible = await row.locator('[data-testid="row-action-more"]').isVisible({ timeout: 1000 }).catch(() => false);
+      const editMoreVisible = await row
+        .locator('[data-testid="row-action-more"]')
+        .isVisible({ timeout: 1000 })
+        .catch(() => false);
 
       if (editVisible || editMoreVisible) {
         // Edit button is visible — it might be disabled
-        const editDisabled = editVisible ? await editDirectBtn.isDisabled().catch(() => false) : false;
+        const editDisabled = editVisible
+          ? await editDirectBtn.isDisabled().catch(() => false)
+          : false;
         if (!editDisabled) {
           // Edit button is clickable — try clicking and verify form is read-only or update fails
           await clickRowActionByLocator(page, row, 'edit');
           const form = page.locator('form, .ant-form, [data-testid="dynamic-form"]');
-          if (await form.first().isVisible({ timeout: 5000 }).catch(() => false)) {
+          if (
+            await form
+              .first()
+              .isVisible({ timeout: 5000 })
+              .catch(() => false)
+          ) {
             // Try to submit — the command should reject the update
-            const saveBtn = page.locator(
-              '[data-testid^="form-btn-"], button:has-text("Save"), button:has-text("Submit"), button:has-text("保存"), button:has-text("提交")',
-            ).first();
+            const saveBtn = page
+              .locator(
+                '[data-testid^="form-btn-"], button:has-text("Save"), button:has-text("Submit"), button:has-text("保存"), button:has-text("提交")',
+              )
+              .first();
             if (await saveBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-              const commandResp = page.waitForResponse(
-                (r) => r.url().includes('/api/meta/commands/execute/') && r.request().method().toLowerCase() === 'post',
-                { timeout: 10000 },
-              ).catch(() => null);
+              const commandResp = page
+                .waitForResponse(
+                  (r) =>
+                    r.url().includes('/api/meta/commands/execute/') &&
+                    r.request().method().toLowerCase() === 'post',
+                  { timeout: 10000 },
+                )
+                .catch(() => null);
               await saveBtn.click();
               const resp = await commandResp;
               if (resp) {
@@ -1295,16 +1362,25 @@ test.describe('Finance Accounting — Account & Journal Entry', () => {
       // Verify delete button is either hidden or disabled for POSTED entries
       const deleteDirectBtn = row.locator('[data-testid="row-action-delete"]');
       const deleteVisible = await deleteDirectBtn.isVisible({ timeout: 2000 }).catch(() => false);
-      const deleteMoreVisible = await row.locator('[data-testid="row-action-more"]').isVisible({ timeout: 1000 }).catch(() => false);
+      const deleteMoreVisible = await row
+        .locator('[data-testid="row-action-more"]')
+        .isVisible({ timeout: 1000 })
+        .catch(() => false);
 
       if (deleteVisible || deleteMoreVisible) {
-        const deleteDisabled = deleteVisible ? await deleteDirectBtn.isDisabled().catch(() => false) : false;
+        const deleteDisabled = deleteVisible
+          ? await deleteDirectBtn.isDisabled().catch(() => false)
+          : false;
         if (!deleteDisabled) {
           // Delete is clickable — attempt deletion (should fail via command handler)
-          const commandResp = page.waitForResponse(
-            (r) => r.url().includes('/api/meta/commands/execute/') && r.request().method().toLowerCase() === 'post',
-            { timeout: 10000 },
-          ).catch(() => null);
+          const commandResp = page
+            .waitForResponse(
+              (r) =>
+                r.url().includes('/api/meta/commands/execute/') &&
+                r.request().method().toLowerCase() === 'post',
+              { timeout: 10000 },
+            )
+            .catch(() => null);
           await clickRowActionByLocator(page, row, 'delete');
           await acceptConfirmDialog(page).catch(() => {});
           const resp = await commandResp;
@@ -1340,7 +1416,9 @@ test.describe('Finance Accounting — Account & Journal Entry', () => {
       const row = await findRowInPaginatedList(page, jeCode);
 
       const commandResp = page.waitForResponse(
-        (r) => r.url().includes('/api/meta/commands/execute/') && r.request().method().toLowerCase() === 'post',
+        (r) =>
+          r.url().includes('/api/meta/commands/execute/') &&
+          r.request().method().toLowerCase() === 'post',
         { timeout: 10000 },
       );
       await clickRowActionByLocator(page, row, 'delete');
@@ -1369,7 +1447,9 @@ test.describe('Finance Accounting — Account & Journal Entry', () => {
       }
     });
 
-    test('FAC-029: Journal entry with decimal amounts (boundary: 0.01, 99999999.99)', async ({ page }) => {
+    test('FAC-029: Journal entry with decimal amounts (boundary: 0.01, 99999999.99)', async ({
+      page,
+    }) => {
       // Create entry with specific total amounts via API
       const result = await createJournalEntryViaApi(page, bucket, {
         fin_je_memo: 'E2E decimal boundary test',
@@ -1424,7 +1504,10 @@ test.describe('Finance Accounting — Account & Journal Entry', () => {
 
       let rawKeyFound = false;
       for (let i = 0; i < Math.min(headerCount, 20); i++) {
-        const text = await headers.nth(i).innerText().catch(() => '');
+        const text = await headers
+          .nth(i)
+          .innerText()
+          .catch(() => '');
         if (text.match(/^model\.\w+\.\w+\.label$/)) {
           rawKeyFound = true;
           break;
@@ -1433,9 +1516,9 @@ test.describe('Finance Accounting — Account & Journal Entry', () => {
       expect(rawKeyFound, 'Column headers should not contain raw i18n keys').toBe(false);
 
       // Verify page title or breadcrumb is resolved (not raw key)
-      const pageTitle = page.locator(
-        'h1, h2, [data-testid="page-title"], nav[aria-label="breadcrumb"]',
-      ).first();
+      const pageTitle = page
+        .locator('h1, h2, [data-testid="page-title"], nav[aria-label="breadcrumb"]')
+        .first();
       if (await pageTitle.isVisible({ timeout: 3000 }).catch(() => false)) {
         const titleText = await pageTitle.innerText();
         expect(titleText).not.toMatch(/^model\.\w+\.title$/);
@@ -1445,7 +1528,10 @@ test.describe('Finance Accounting — Account & Journal Entry', () => {
       const toolbarBtns = page.locator('[data-testid^="toolbar-action-"]');
       const btnCount = await toolbarBtns.count();
       for (let i = 0; i < Math.min(btnCount, 10); i++) {
-        const btnText = await toolbarBtns.nth(i).innerText().catch(() => '');
+        const btnText = await toolbarBtns
+          .nth(i)
+          .innerText()
+          .catch(() => '');
         expect(btnText, 'Toolbar button text should not be raw i18n key').not.toMatch(
           /^action\.\w+$/,
         );
@@ -1522,7 +1608,7 @@ test.describe('Finance Accounting — Account & Journal Entry', () => {
         {
           fin_jel_entry_id: entryResult.recordId,
           fin_jel_account_id: accountId,
-          fin_jel_debit: 1000.00,
+          fin_jel_debit: 1000.0,
           fin_jel_credit: 0,
           fin_jel_description: 'E2E debit line — asset increase',
         },

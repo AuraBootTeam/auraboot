@@ -51,9 +51,12 @@ test.describe('Login Flow', () => {
 
     // Submit the actual form directly. Under full-suite load, button click can race
     // with hydration, while requestSubmit() follows the browser's real form path.
-    await loginPage.page.locator('form').first().evaluate((form: HTMLFormElement) => {
-      form.requestSubmit();
-    });
+    await loginPage.page
+      .locator('form')
+      .first()
+      .evaluate((form: HTMLFormElement) => {
+        form.requestSubmit();
+      });
 
     // Wait for login to complete (allow extra time for SSR + API)
     await loginPage.expectLoggedIn({ timeout: 20000 });

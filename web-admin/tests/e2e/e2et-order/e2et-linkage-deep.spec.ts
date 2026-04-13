@@ -51,7 +51,9 @@ test.describe('Field Linkage Depth', () => {
     const remarkContainer = formPage.fieldContainer('e2et_order_remark');
     if (await remarkContainer.isVisible({ timeout: 2000 }).catch(() => false)) {
       // Check for required indicator (asterisk or required attribute)
-      const requiredMark = remarkContainer.locator('.text-red-500, [class*="required"], span:has-text("*")');
+      const requiredMark = remarkContainer.locator(
+        '.text-red-500, [class*="required"], span:has-text("*")',
+      );
       const isRequired = await requiredMark.isVisible({ timeout: 1000 }).catch(() => false);
       // Document behavior
       expect(typeof isRequired).toBe('boolean');
@@ -65,9 +67,13 @@ test.describe('Field Linkage Depth', () => {
     await order.executeCommand('submit', pid);
     try {
       // Navigate to form for submitted order — fields should be disabled
-      await page.goto(`/dynamic/${E2ET_ORDER_CONFIG.modelCode}/${pid}/edit`);
+      await page.goto(`/p/${E2ET_ORDER_CONFIG.modelCode}/${pid}/edit`);
       await page.waitForLoadState('domcontentloaded');
-      await page.locator('h2').first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+      await page
+        .locator('h2')
+        .first()
+        .waitFor({ state: 'visible', timeout: 10000 })
+        .catch(() => {});
       // Title field should be readonly/disabled for non-draft
       const titleInput = page.locator('[data-testid="form-field-e2et_order_title"] input').first();
       if (await titleInput.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -107,7 +113,10 @@ test.describe('Field Linkage Depth', () => {
         await combobox.click();
         // Options should load from API
         const options = page.locator('[role="option"]');
-        await options.first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+        await options
+          .first()
+          .waitFor({ state: 'visible', timeout: 5000 })
+          .catch(() => {});
       }
     }
   });
@@ -135,7 +144,9 @@ test.describe('Field Linkage Depth', () => {
     }
   });
 
-  test('LK-008: linkage + edit — linked fields render correctly on edit @smoke', async ({ page }) => {
+  test('LK-008: linkage + edit — linked fields render correctly on edit @smoke', async ({
+    page,
+  }) => {
     // Create a BULK order with discount
     const pid = await order.createViaApi({
       e2et_order_title: `LinkEdit_${uniqueId()}`,
@@ -178,7 +189,12 @@ test.describe('Field Linkage Depth', () => {
     if (await remarkContainer.isVisible({ timeout: 2000 }).catch(() => false)) {
       // Fill remark
       const textarea = remarkContainer.locator('textarea, input');
-      if (await textarea.first().isVisible({ timeout: 1000 }).catch(() => false)) {
+      if (
+        await textarea
+          .first()
+          .isVisible({ timeout: 1000 })
+          .catch(() => false)
+      ) {
         await textarea.first().fill('Important remark');
       }
     }
@@ -259,7 +275,9 @@ test.describe('Field Linkage Depth', () => {
         if (await priceInput.isVisible({ timeout: 2000 }).catch(() => false)) {
           await priceInput.fill('20');
         }
-        await expect(page.locator('input, select, [role="combobox"]').first()).toBeVisible({ timeout: 3000 });
+        await expect(page.locator('input, select, [role="combobox"]').first()).toBeVisible({
+          timeout: 3000,
+        });
       }
     } finally {
       await order.deleteViaApi(pid);
@@ -284,9 +302,13 @@ test.describe('Field Linkage Depth', () => {
     });
     try {
       // Navigate to detail/view page
-      await page.goto(`/dynamic/${E2ET_ORDER_CONFIG.modelCode}/${pid}`);
+      await page.goto(`/p/${E2ET_ORDER_CONFIG.modelCode}/${pid}`);
       await page.waitForLoadState('domcontentloaded');
-      await page.locator('h2').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+      await page
+        .locator('h2')
+        .first()
+        .waitFor({ state: 'visible', timeout: 5000 })
+        .catch(() => {});
       // Fields visible based on linkage rules should render in detail view too
     } finally {
       await order.deleteViaApi(pid);
@@ -332,9 +354,17 @@ test.describe('Field Linkage Depth', () => {
     const typeContainer = formPage.fieldContainer('e2et_order_type');
     if (await typeContainer.isVisible({ timeout: 3000 }).catch(() => false)) {
       const select = typeContainer.locator('select, [role="combobox"]');
-      if (await select.first().isVisible({ timeout: 2000 }).catch(() => false)) {
+      if (
+        await select
+          .first()
+          .isVisible({ timeout: 2000 })
+          .catch(() => false)
+      ) {
         // Verify default value is set
-        const value = await select.first().inputValue().catch(() => '');
+        const value = await select
+          .first()
+          .inputValue()
+          .catch(() => '');
         expect(value).toBeDefined();
       }
     }

@@ -11,8 +11,18 @@ import { JWT_TOKEN_KEY } from '~/constants/AuthConstant';
 // Explicit HTTP agents that bypass system proxy (http_proxy/https_proxy env vars).
 // Without this, axios respects the proxy env vars and routes localhost requests
 // through the system proxy (e.g. Clash at 127.0.0.1:7891), causing 502 errors.
-const noProxyHttpAgent = new http.Agent({ keepAlive: true });
-const noProxyHttpsAgent = new https.Agent({ keepAlive: true });
+const noProxyHttpAgent = new http.Agent({
+  keepAlive: true,
+  maxSockets: 100,
+  maxFreeSockets: 20,
+  keepAliveMsecs: 30000,
+});
+const noProxyHttpsAgent = new https.Agent({
+  keepAlive: true,
+  maxSockets: 100,
+  maxFreeSockets: 20,
+  keepAliveMsecs: 30000,
+});
 
 /**
  * BFF代理服务 - 统一处理API请求代理
@@ -386,6 +396,12 @@ export class BffProxyService {
     const method = req.method.toUpperCase();
     let aborted = false;
     let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+    const abortController = new AbortController();
+    const connectionTimeout = config.sse.connectionTimeout;
+    const timeoutId = setTimeout(() => {
+      logger.info(`[${requestId}] SSE connection timeout (${connectionTimeout}ms), aborting`);
+      abortController.abort();
+    }, connectionTimeout);
 
     try {
       const headers = await this.sanitizeHeaders(req);
@@ -398,6 +414,7 @@ export class BffProxyService {
       const fetchOptions: RequestInit = {
         method,
         headers,
+        signal: abortController.signal,
       };
 
       // Add body for POST requests (method is uppercased on line 386)
@@ -409,6 +426,7 @@ export class BffProxyService {
       const onClientClose = () => {
         logger.info(`[${requestId}] Client disconnected from SSE stream`);
         aborted = true;
+        abortController.abort();
         if (reader) {
           reader.cancel().catch(() => {
             // Ignore cancel errors - connection is already closed
@@ -473,16 +491,20 @@ export class BffProxyService {
           eventCount += (chunk.match(/^data:/gm) || []).length;
         }
       } finally {
+        clearTimeout(timeoutId);
+        abortController.abort();
         reader.releaseLock();
         if (!res.writableEnded) {
           res.end();
         }
       }
     } catch (error) {
+      clearTimeout(timeoutId);
+      abortController.abort();
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
-      // Don't log error if it was just a client disconnect
-      if (!aborted) {
+      // Don't log error if it was just a client disconnect or abort
+      if (!aborted && !abortController.signal.aborted) {
         logger.error(`[${requestId}] SSE stream error: ${errorMessage}`);
       }
 

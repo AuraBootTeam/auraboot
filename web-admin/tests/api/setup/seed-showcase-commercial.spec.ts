@@ -46,18 +46,25 @@ function datetimeAt(monthOffset: number, dayOffset = 0, hour = 9): string {
 }
 
 async function cmd(
-  page: any, commandCode: string, payload: Record<string, unknown>,
-  targetRecordId?: string, operationType?: string
+  page: any,
+  commandCode: string,
+  payload: Record<string, unknown>,
+  targetRecordId?: string,
+  operationType?: string,
 ): Promise<string> {
-  const result = await executeCommandViaApi(page, commandCode, payload, targetRecordId, operationType);
+  const result = await executeCommandViaApi(
+    page,
+    commandCode,
+    payload,
+    targetRecordId,
+    operationType,
+  );
   expect(result.code).toBe('0');
   return result.recordId;
 }
 
 /** Execute a state transition command */
-async function transition(
-  page: any, commandCode: string, recordId: string
-): Promise<void> {
+async function transition(page: any, commandCode: string, recordId: string): Promise<void> {
   const result = await executeCommandViaApi(page, commandCode, {}, recordId, 'update');
   expect(result.code).toBe('0');
 }
@@ -94,7 +101,9 @@ test.describe.serial('Showcase Seed — Commercial Data', () => {
     const accBody = await accResp.json();
     accounts = accBody?.data?.records || [];
     if (accounts.length < 5) {
-      console.warn(`  WARNING: Only ${accounts.length} accounts found. Run seed-showcase-data first for full data.`);
+      console.warn(
+        `  WARNING: Only ${accounts.length} accounts found. Run seed-showcase-data first for full data.`,
+      );
       test.skip(accounts.length === 0, 'No CRM accounts — run prior seed scripts first');
     }
 
@@ -113,7 +122,9 @@ test.describe.serial('Showcase Seed — Commercial Data', () => {
     const meBody = await meResp.json();
     adminUserId = meBody?.data?.id || meBody?.data?.userId || 1;
 
-    console.log(`  Loaded: ${accounts.length} accounts, ${contacts.length} contacts, ${opportunities.length} opportunities`);
+    console.log(
+      `  Loaded: ${accounts.length} accounts, ${contacts.length} contacts, ${opportunities.length} opportunities`,
+    );
   });
 
   // ═════════════════════════════════════════════════════════════════════════
@@ -122,9 +133,9 @@ test.describe.serial('Showcase Seed — Commercial Data', () => {
 
   test('Phase C1: Create Quotes with Lines', async ({ page }) => {
     // Pick 5 opportunities in proposal/negotiation stage
-    const quoteableOpps = opportunities.filter((o: any) =>
-      ['proposal', 'negotiation', 'closed_won'].includes(o.crm_opp_stage)
-    ).slice(0, 5);
+    const quoteableOpps = opportunities
+      .filter((o: any) => ['proposal', 'negotiation', 'closed_won'].includes(o.crm_opp_stage))
+      .slice(0, 5);
 
     if (quoteableOpps.length === 0) {
       console.warn('  No quoteable opportunities found, using first 5');
@@ -132,21 +143,21 @@ test.describe.serial('Showcase Seed — Commercial Data', () => {
     }
 
     const products = [
-      { name: 'STM32F407VGT6 微控制器', price: 28.50, cost: 18.20 },
-      { name: 'TPS54331DR 降压转换器', price: 6.80, cost: 4.10 },
-      { name: 'MLCC 0805 100nF 贴片电容 (5000pcs)', price: 120.00, cost: 75.00 },
-      { name: 'ESP32-WROOM-32E WiFi模组', price: 15.60, cost: 9.80 },
-      { name: 'AMS1117-3.3 稳压芯片 (1000pcs)', price: 85.00, cost: 52.00 },
+      { name: 'STM32F407VGT6 微控制器', price: 28.5, cost: 18.2 },
+      { name: 'TPS54331DR 降压转换器', price: 6.8, cost: 4.1 },
+      { name: 'MLCC 0805 100nF 贴片电容 (5000pcs)', price: 120.0, cost: 75.0 },
+      { name: 'ESP32-WROOM-32E WiFi模组', price: 15.6, cost: 9.8 },
+      { name: 'AMS1117-3.3 稳压芯片 (1000pcs)', price: 85.0, cost: 52.0 },
       { name: 'PCBA SMT 贴片加工费 (双面)', price: 0.35, cost: 0.18 },
-      { name: 'FR4 双面 PCB 1.6mm (100pcs)', price: 480.00, cost: 310.00 },
-      { name: 'SN74HC595D 移位寄存器', price: 3.20, cost: 1.90 },
-      { name: 'GD32F103C8T6 国产替代芯片', price: 12.80, cost: 7.50 },
-      { name: 'TJA1050 CAN 收发器', price: 5.60, cost: 3.40 },
-      { name: 'USB Type-C 16P 连接器', price: 2.80, cost: 1.60 },
-      { name: 'DC-DC 模块 12V→5V/3A', price: 18.50, cost: 11.20 },
-      { name: 'NTC 10K 热敏电阻 (1000pcs)', price: 45.00, cost: 28.00 },
-      { name: '0603 LED 红色 (5000pcs)', price: 55.00, cost: 32.00 },
-      { name: '钽电容 100μF/16V D型', price: 8.50, cost: 5.10 },
+      { name: 'FR4 双面 PCB 1.6mm (100pcs)', price: 480.0, cost: 310.0 },
+      { name: 'SN74HC595D 移位寄存器', price: 3.2, cost: 1.9 },
+      { name: 'GD32F103C8T6 国产替代芯片', price: 12.8, cost: 7.5 },
+      { name: 'TJA1050 CAN 收发器', price: 5.6, cost: 3.4 },
+      { name: 'USB Type-C 16P 连接器', price: 2.8, cost: 1.6 },
+      { name: 'DC-DC 模块 12V→5V/3A', price: 18.5, cost: 11.2 },
+      { name: 'NTC 10K 热敏电阻 (1000pcs)', price: 45.0, cost: 28.0 },
+      { name: '0603 LED 红色 (5000pcs)', price: 55.0, cost: 32.0 },
+      { name: '钽电容 100μF/16V D型', price: 8.5, cost: 5.1 },
     ];
 
     const quoteStatuses = ['draft', 'reviewed', 'sent', 'accepted', 'rejected'];
@@ -168,7 +179,8 @@ test.describe.serial('Showcase Seed — Commercial Data', () => {
         crm_qt_currency: 'cny',
         crm_qt_exchange_rate: 1.0,
         crm_qt_valid_until: dateAt(15 + i, validUntilDays[i]),
-        crm_qt_terms: '1. 报价有效期30天\n2. 付款方式：月结60天\n3. 交期：收到PO后15个工作日\n4. 运费：含税含运\n5. 质保：12个月',
+        crm_qt_terms:
+          '1. 报价有效期30天\n2. 付款方式：月结60天\n3. 交期：收到PO后15个工作日\n4. 运费：含税含运\n5. 质保：12个月',
         crm_qt_notes: i === 4 ? '客户反馈价格偏高，已失去此单' : '',
         crm_qt_owner: 'admin',
       });
@@ -179,10 +191,10 @@ test.describe.serial('Showcase Seed — Commercial Data', () => {
       for (let j = 0; j < 3; j++) {
         const product = products[i * 3 + j];
         const qty = [500, 1000, 2000, 300, 5000][Math.floor(Math.random() * 5)];
-        const discount = i === 3 ? 5 : (i === 4 ? 0 : [0, 3, 5, 8][Math.floor(Math.random() * 4)]);
+        const discount = i === 3 ? 5 : i === 4 ? 0 : [0, 3, 5, 8][Math.floor(Math.random() * 4)];
         const amount = +(product.price * qty * (1 - discount / 100)).toFixed(2);
         const taxRate = 13;
-        const taxAmount = +(amount * taxRate / 100).toFixed(2);
+        const taxAmount = +((amount * taxRate) / 100).toFixed(2);
         const margin = +(amount - product.cost * qty).toFixed(2);
         const marginRate = +((margin / amount) * 100).toFixed(2);
         subtotal += amount;
@@ -230,49 +242,65 @@ test.describe.serial('Showcase Seed — Commercial Data', () => {
   test('Phase C2: Create Complaints', async ({ page }) => {
     const complaintData = [
       {
-        account: '合肥', type: 'quality', severity: 'high',
+        account: '合肥',
+        type: 'quality',
+        severity: 'high',
         desc: '上批次 LED 驱动板有 2% 不良率，客户产线停工排查',
         rootCause: '焊接温度偏差导致 BGA 虚焊，回流焊第三温区温度设置偏低 5°C',
         action: '1. 立即补货 50 片\n2. 调整回流焊温度曲线\n3. 增加 AOI 检测覆盖率至 100%',
-        status: 'closed', monthOffset: 14,
+        status: 'closed',
+        monthOffset: 14,
       },
       {
-        account: '苏州', type: 'delivery', severity: 'medium',
+        account: '苏州',
+        type: 'delivery',
+        severity: 'medium',
         desc: '订单延期 5 天交付，客户生产计划受影响',
         rootCause: '关键物料 STM32F407 供应商断货，备选供应商交期长',
         action: '1. 紧急从第三方渠道调货\n2. 建立关键物料安全库存机制\n3. 开发第二供应商',
-        status: 'resolved', monthOffset: 15,
+        status: 'resolved',
+        monthOffset: 15,
       },
       {
-        account: '杭州', type: 'service', severity: 'low',
+        account: '杭州',
+        type: 'service',
+        severity: 'low',
         desc: '技术文档版本错误，导致客户工程师按错误规格调试',
         rootCause: '文档版本管理混乱，旧版文档未及时归档',
         action: '1. 重新发送正确版本文档\n2. 建立文档版本发布流程\n3. 上线文档管理系统',
-        status: 'closed', monthOffset: 16,
+        status: 'closed',
+        monthOffset: 16,
       },
       {
-        account: '重庆', type: 'quality', severity: 'critical',
+        account: '重庆',
+        type: 'quality',
+        severity: 'critical',
         desc: '车载 BMS 控制板通信模块异常，客户要求 24h 内给出分析报告',
         rootCause: 'CAN 收发器 TJA1050 批次问题，供应商确认为次品流出',
-        action: '1. 全数召回该批次产品（200 片）\n2. 更换合格批次 TJA1050\n3. 向供应商索赔\n4. 增加来料检验项目',
-        status: 'investigating', monthOffset: 17,
+        action:
+          '1. 全数召回该批次产品（200 片）\n2. 更换合格批次 TJA1050\n3. 向供应商索赔\n4. 增加来料检验项目',
+        status: 'investigating',
+        monthOffset: 17,
       },
       {
-        account: '宁波', type: 'price', severity: 'low',
+        account: '宁波',
+        type: 'price',
+        severity: 'low',
         desc: '客户质疑本季度报价涨幅超过约定的 3% 上限',
         rootCause: '原材料涨价超预期，合同条款允许但沟通不充分',
         action: '1. 提供原材料成本变动明细\n2. 协商分担涨价比例\n3. 下季度提前预警',
-        status: 'resolved', monthOffset: 17,
+        status: 'resolved',
+        monthOffset: 17,
       },
     ];
 
     for (let i = 0; i < complaintData.length; i++) {
       const c = complaintData[i];
       // Find matching account by partial name
-      const account = accounts.find((a: any) =>
-        (a.crm_acc_name || '').includes(c.account)
-      ) || accounts[i];
-      const contact = contacts.find((ct: any) => ct.crm_ct_account_id === account?.id) || contacts[i];
+      const account =
+        accounts.find((a: any) => (a.crm_acc_name || '').includes(c.account)) || accounts[i];
+      const contact =
+        contacts.find((ct: any) => ct.crm_ct_account_id === account?.id) || contacts[i];
 
       const complaintId = await cmd(page, 'crm:create_complaint', {
         crm_cmp_code: `CMP-${dateAt(c.monthOffset, i * 2 + 1).replace(/-/g, '')}-${String(i + 1).padStart(3, '0')}`,
@@ -315,7 +343,7 @@ test.describe.serial('Showcase Seed — Commercial Data', () => {
     const topOpps = opportunities.slice(0, 6);
     for (const opp of topOpps) {
       const accountContacts = contacts.filter(
-        (c: any) => c.crm_ct_account_id === opp.crm_opp_account_id
+        (c: any) => c.crm_ct_account_id === opp.crm_opp_account_id,
       );
       if (accountContacts.length === 0) continue;
 
@@ -390,23 +418,39 @@ test.describe.serial('Showcase Seed — Commercial Data', () => {
   test('Phase C4b: Create Email Logs', async ({ page }) => {
     const emailLogs = [
       { to: '钱进', account: '宁波', subject: '报价单 QT-001 跟进', status: 'opened', month: 14 },
-      { to: '方明', account: '宁波', subject: 'BMS 控制板技术方案 V2', status: 'delivered', month: 15 },
+      {
+        to: '方明',
+        account: '宁波',
+        subject: 'BMS 控制板技术方案 V2',
+        status: 'delivered',
+        month: 15,
+      },
       { to: '沈丽芳', account: '宁波', subject: 'Q2 订单确认', status: 'sent', month: 17 },
       { to: '李婷', account: '苏州', subject: '展会感谢信', status: 'opened', month: 12 },
       { to: '张涛', account: '杭州', subject: '年度框架协议报价', status: 'opened', month: 16 },
       { to: '王磊', account: '深圳', subject: 'IoT 网关方案报价', status: 'bounced', month: 13 },
-      { to: '陈晓东', account: '东莞', subject: '连接器样品发货通知', status: 'delivered', month: 15 },
+      {
+        to: '陈晓东',
+        account: '东莞',
+        subject: '连接器样品发货通知',
+        status: 'delivered',
+        month: 15,
+      },
       { to: '刘洋', account: '成都', subject: '新能源 BMS 方案讨论', status: 'opened', month: 16 },
     ];
 
     for (let i = 0; i < emailLogs.length; i++) {
       const log = emailLogs[i];
-      const account = accounts.find((a: any) => (a.crm_acc_name || '').includes(log.account)) || accounts[i];
+      const account =
+        accounts.find((a: any) => (a.crm_acc_name || '').includes(log.account)) || accounts[i];
       const contact = contacts.find((c: any) => c.crm_ct_account_id === account?.id) || contacts[i];
 
       try {
         const logId = await cmd(page, 'crm:create_email_log', {
-          crm_el_to_address: `${log.to.toLowerCase()}@${(account?.crm_acc_name || 'company').replace(/[^a-zA-Z]/g, '').slice(0, 10).toLowerCase()}.com`,
+          crm_el_to_address: `${log.to.toLowerCase()}@${(account?.crm_acc_name || 'company')
+            .replace(/[^a-zA-Z]/g, '')
+            .slice(0, 10)
+            .toLowerCase()}.com`,
           crm_el_to_name: log.to,
           crm_el_subject: log.subject,
           crm_el_body: `<p>尊敬的${log.to}，</p><p>${log.subject}相关内容。</p><p>鑫然科技</p>`,
@@ -451,21 +495,21 @@ test.describe.serial('Showcase Seed — Commercial Data', () => {
     }
 
     const conversationMessages: Record<string, string[]> = {
-      '宁波': [
+      宁波: [
         '鑫越 Q2 订单确认了吗？钱进那边说要增加到 800 片',
         '已确认，PO 下周一发过来',
         '好的，提醒仓库备料。BMS 控制板的 STM32 库存够吗？',
         '查了一下，安全库存还有 1200 颗，够用',
         '嗯，顺便跟进一下 Q1 回款情况，已经超过账期了',
       ],
-      '杭州': [
+      杭州: [
         '曜熠年度框架的 Q2 交付计划出来了吗？',
         '正在对接技术部，6 款产品中有 2 款需要小改版',
         '改版周期多久？不能影响 4 月的交付',
         '张涛说 2 周可以完成，不影响',
         '好，把交付时间表更新到系统里',
       ],
-      '苏州': [
+      苏州: [
         '锐虎的新产线方案工程师看过了吗？',
         '吴晓峰在评估，说技术上可行但需要定制 PCB',
         '定制 PCB 加多少成本？',
@@ -476,7 +520,7 @@ test.describe.serial('Showcase Seed — Commercial Data', () => {
 
     for (const acc of aAccounts) {
       const accName = acc.crm_acc_name || '';
-      const matchKey = Object.keys(conversationMessages).find(k => accName.includes(k));
+      const matchKey = Object.keys(conversationMessages).find((k) => accName.includes(k));
       if (!matchKey) continue;
 
       try {
@@ -548,7 +592,13 @@ test.describe.serial('Showcase Seed — Commercial Data', () => {
     const deliveryLogs = [
       { status: 'delivered', httpStatus: 200, month: 15, day: 5 },
       { status: 'delivered', httpStatus: 200, month: 15, day: 12 },
-      { status: 'failed', httpStatus: 500, month: 16, day: 3, error: 'Connection refused: target server down for maintenance' },
+      {
+        status: 'failed',
+        httpStatus: 500,
+        month: 16,
+        day: 3,
+        error: 'Connection refused: target server down for maintenance',
+      },
       { status: 'delivered', httpStatus: 200, month: 16, day: 18 },
       { status: 'delivered', httpStatus: 201, month: 17, day: 7 },
     ];
@@ -578,12 +628,17 @@ test.describe.serial('Showcase Seed — Commercial Data', () => {
       `.trim();
 
       try {
-        execSync(`psql -h localhost -U ghj -d aura_boot -P pager=off -c "${sql.replace(/"/g, '\\"')}"`, {
-          timeout: 5000,
-          stdio: 'pipe',
-        });
+        execSync(
+          `psql -h localhost -U ghj -d aura_boot -P pager=off -c "${sql.replace(/"/g, '\\"')}"`,
+          {
+            timeout: 5000,
+            stdio: 'pipe',
+          },
+        );
       } catch (e) {
-        console.warn(`  Webhook delivery log ${i} insert failed: ${(e as Error).message?.slice(0, 80)}`);
+        console.warn(
+          `  Webhook delivery log ${i} insert failed: ${(e as Error).message?.slice(0, 80)}`,
+        );
       }
     }
 
@@ -605,7 +660,14 @@ test.describe.serial('Showcase Seed — Commercial Data', () => {
     const execLogs = [
       { status: 'success', trigger: 'ON_RECORD_CREATE', month: 14, day: 8, duration: 230 },
       { status: 'success', trigger: 'ON_RECORD_CREATE', month: 15, day: 15, duration: 180 },
-      { status: 'failed', trigger: 'ON_FIELD_CHANGE', month: 15, day: 22, duration: 1500, error: 'Notification service temporarily unavailable' },
+      {
+        status: 'failed',
+        trigger: 'ON_FIELD_CHANGE',
+        month: 15,
+        day: 22,
+        duration: 1500,
+        error: 'Notification service temporarily unavailable',
+      },
       { status: 'success', trigger: 'ON_FIELD_CHANGE', month: 16, day: 10, duration: 320 },
       { status: 'success', trigger: 'SCHEDULED', month: 17, day: 1, duration: 890 },
     ];
@@ -636,10 +698,13 @@ test.describe.serial('Showcase Seed — Commercial Data', () => {
       `.trim();
 
       try {
-        execSync(`psql -h localhost -U ghj -d aura_boot -P pager=off -c "${sql.replace(/"/g, '\\"')}"`, {
-          timeout: 5000,
-          stdio: 'pipe',
-        });
+        execSync(
+          `psql -h localhost -U ghj -d aura_boot -P pager=off -c "${sql.replace(/"/g, '\\"')}"`,
+          {
+            timeout: 5000,
+            stdio: 'pipe',
+          },
+        );
       } catch (e) {
         console.warn(`  Automation log ${i} insert failed: ${(e as Error).message?.slice(0, 80)}`);
       }

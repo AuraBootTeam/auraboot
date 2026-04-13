@@ -59,7 +59,7 @@ export function DataSourceEditor({
     (field: string, value: unknown) => {
       onChange({ ...dataSource, [field]: value });
     },
-    [dataSource, onChange]
+    [dataSource, onChange],
   );
 
   if (mode === 'code') {
@@ -147,14 +147,16 @@ export function DataSourceEditor({
 
       {/* Response Adaptor */}
       <div>
-        <label className="mb-1 block text-[10px] font-semibold text-gray-500">Response Adaptor</label>
+        <label className="mb-1 block text-[10px] font-semibold text-gray-500">
+          Response Adaptor
+        </label>
         <select
           className="w-full rounded border bg-gray-50 px-2 py-1 text-xs"
           value={(dataSource as any).adaptor || 'table'}
           onChange={(e) => updateField('adaptor', e.target.value)}
           disabled={readonly}
         >
-          <option value="table">table — {"{ records: [], total }"}</option>
+          <option value="table">table — {'{ records: [], total }'}</option>
           <option value="form">form — single object</option>
           <option value="raw">raw — passthrough</option>
         </select>

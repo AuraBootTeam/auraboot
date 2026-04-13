@@ -1,58 +1,20 @@
 /**
- * Page Designer - Page List Route
+ * Page Designer - List Route (Redirect)
  *
- * Management center for all pages in the page designer.
+ * The page schema list is now DSL-driven at /p/page_schema.
+ * This route redirects for backwards compatibility.
+ * The editor route (/page-designer/:id) is unchanged.
  *
- * @since 3.2.0
+ * @since 8.0.0
  */
 
-import React, { useState, useCallback } from 'react';
-import { useNavigate } from 'react-router';
-import { PageList, NewPageWizard } from '~/studio/workbench/panels';
-import type { PageMeta } from '~/studio/services/page-manager';
+import { redirect } from 'react-router';
+import type { LoaderFunctionArgs } from 'react-router';
 
-/**
- * Page Designer Management Center
- */
-export default function PageDesignerList() {
-  const navigate = useNavigate();
-  const [showWizard, setShowWizard] = useState(false);
+export const loader = async (_args: LoaderFunctionArgs) => {
+  return redirect('/p/page_schema');
+};
 
-  const handleCreateNew = useCallback(() => {
-    setShowWizard(true);
-  }, []);
-
-  const handleOpenPage = useCallback(
-    (page: PageMeta) => {
-      navigate(`/page-designer/${page.id}`);
-    },
-    [navigate],
-  );
-
-  const handleImport = useCallback(() => {
-    // TODO: Implement import functionality
-  }, []);
-
-  const handleWizardClose = useCallback(() => {
-    setShowWizard(false);
-  }, []);
-
-  const handleWizardSuccess = useCallback(
-    (pageId: string) => {
-      setShowWizard(false);
-      navigate(`/page-designer/${pageId}`);
-    },
-    [navigate],
-  );
-
-  return (
-    <>
-      <PageList onCreateNew={handleCreateNew} onOpenPage={handleOpenPage} onImport={handleImport} />
-      <NewPageWizard
-        isOpen={showWizard}
-        onClose={handleWizardClose}
-        onSuccess={handleWizardSuccess}
-      />
-    </>
-  );
+export default function PageDesignerListRedirect() {
+  return null;
 }

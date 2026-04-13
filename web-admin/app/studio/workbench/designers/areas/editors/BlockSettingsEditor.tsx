@@ -90,12 +90,12 @@ export const BlockSettingsEditor: React.FC<BlockSettingsEditorProps> = ({
  */
 function getAvailableGroups(blockType: string): PropertyGroup[] {
   switch (blockType) {
-    case 'filter-form':
+    case 'filters':
       return ['basic', 'layout', 'behavior'];
     case 'form-section':
     case 'detail-section':
       return ['basic', 'layout', 'behavior'];
-    case 'data-table':
+    case 'table':
       return ['basic', 'layout', 'data', 'appearance', 'behavior'];
     case 'stat-card':
       return ['basic', 'data', 'appearance'];
@@ -103,7 +103,7 @@ function getAvailableGroups(blockType: string): PropertyGroup[] {
       return ['basic', 'data', 'appearance'];
     case 'text':
       return ['basic', 'appearance'];
-    case 'toolbar-buttons':
+    case 'toolbar':
     case 'form-buttons':
       return ['basic', 'layout'];
     default:
@@ -206,7 +206,7 @@ const LayoutProperties: React.FC<PropertyEditorProps> = ({ block, onChange, read
       {/* Columns (for form sections) */}
       {(block.blockType === 'form-section' ||
         block.blockType === 'detail-section' ||
-        block.blockType === 'filter-form') && (
+        block.blockType === 'filters') && (
         <PropertyField label="表单列数" testId="block-columns">
           <select
             value={props.columns || 2}
@@ -242,7 +242,7 @@ const LayoutProperties: React.FC<PropertyEditorProps> = ({ block, onChange, read
       )}
 
       {/* Button layout */}
-      {(block.blockType === 'toolbar-buttons' || block.blockType === 'form-buttons') && (
+      {(block.blockType === 'toolbar' || block.blockType === 'form-buttons') && (
         <PropertyField label="按钮对齐" testId="button-align">
           <select
             value={props.align || 'left'}
@@ -269,8 +269,8 @@ const DataProperties: React.FC<PropertyEditorProps> = ({ block, onChange, readon
 
   return (
     <div className="space-y-4">
-      {/* Data source (for data-table) */}
-      {block.blockType === 'data-table' && (
+      {/* Data source (for table) */}
+      {block.blockType === 'table' && (
         <>
           <PropertyField label="数据源" testId="data-source">
             <input
@@ -399,7 +399,7 @@ const AppearanceProperties: React.FC<PropertyEditorProps> = ({ block, onChange, 
   return (
     <div className="space-y-4">
       {/* Data table appearance */}
-      {block.blockType === 'data-table' && (
+      {block.blockType === 'table' && (
         <>
           <PropertySwitch
             label="显示边框"
@@ -601,7 +601,7 @@ const BehaviorProperties: React.FC<PropertyEditorProps> = ({ block, onChange, re
       )}
 
       {/* Filter form behavior */}
-      {block.blockType === 'filter-form' && (
+      {block.blockType === 'filters' && (
         <>
           <PropertySwitch
             label="展开高级筛选"
@@ -622,7 +622,7 @@ const BehaviorProperties: React.FC<PropertyEditorProps> = ({ block, onChange, re
       )}
 
       {/* Data table behavior */}
-      {block.blockType === 'data-table' && (
+      {block.blockType === 'table' && (
         <>
           <PropertySwitch
             label="启用分页"

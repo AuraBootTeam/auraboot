@@ -14,11 +14,7 @@
 
 import { test, expect } from '../../fixtures';
 import { ErrorCodes } from '~/services/http-client/types';
-import {
-  navigateToDynamicPage,
-  uniqueId,
-  executeCommandViaApi,
-} from '../helpers';
+import { navigateToDynamicPage, uniqueId, executeCommandViaApi } from '../helpers';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -147,9 +143,11 @@ test.describe('BomTreeEditor — Smoke', () => {
     await expect(table.first()).toBeVisible({ timeout: 15000 });
 
     // Verify the create button exists (confirms the page is the list view)
-    const createBtn = page.locator(
-      '[data-testid="toolbar-btn-create"], button:has-text("New"), button:has-text("Create")'
-    ).first();
+    const createBtn = page
+      .locator(
+        '[data-testid="toolbar-btn-create"], button:has-text("New"), button:has-text("Create")',
+      )
+      .first();
     await expect(createBtn).toBeVisible({ timeout: 5000 });
   });
 
@@ -163,12 +161,10 @@ test.describe('BomTreeEditor — Smoke', () => {
     }
 
     // The BomTreeEditor fetches lines via this exact endpoint pattern
-    const filters = JSON.stringify([
-      { fieldName: FOREIGN_KEY, operator: 'EQ', value: bomPid },
-    ]);
+    const filters = JSON.stringify([{ fieldName: FOREIGN_KEY, operator: 'EQ', value: bomPid }]);
 
     const resp = await page.request.get(
-      `/api/dynamic/${LINE_MODEL}/list?pageNum=1&pageSize=500&filters=${encodeURIComponent(filters)}`
+      `/api/dynamic/${LINE_MODEL}/list?pageNum=1&pageSize=500&filters=${encodeURIComponent(filters)}`,
     );
     expect(resp.ok(), `BOM line list API should return 200`).toBe(true);
 
@@ -179,7 +175,7 @@ test.describe('BomTreeEditor — Smoke', () => {
     const records: unknown[] = body.data?.records ?? body.data?.content ?? [];
     expect(
       records.length,
-      'BOM line API should return at least 1 record for the test BOM'
+      'BOM line API should return at least 1 record for the test BOM',
     ).toBeGreaterThan(0);
   });
 
@@ -194,7 +190,9 @@ test.describe('BomTreeEditor — Smoke', () => {
       const text = (await headers.nth(i).innerText()).trim();
       if (text.length > 0) {
         expect(text, `Column ${i} should not be a raw i18n key`).not.toMatch(/^model\./);
-        expect(text, `Column ${i} should not expose the internal field prefix`).not.toMatch(/^pe_bom_/);
+        expect(text, `Column ${i} should not expose the internal field prefix`).not.toMatch(
+          /^pe_bom_/,
+        );
       }
     }
   });

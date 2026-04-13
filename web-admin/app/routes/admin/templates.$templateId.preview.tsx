@@ -80,8 +80,8 @@ export default function TemplatePreviewPage() {
       const modelGroup = groups.find((g) => g.type === 'MODEL');
       const firstModelCode = modelGroup?.items[0]?.resourceCode;
       if (firstModelCode) {
-        const routeKey = firstModelCode.replace(/_/g, '-');
-        setTimeout(() => navigate(`/dynamic/${routeKey}`), 1200);
+        const routeKey = firstModelCode;
+        setTimeout(() => navigate(`/p/${routeKey}`), 1200);
       }
     } catch (err: unknown) {
       setInstallState('error');

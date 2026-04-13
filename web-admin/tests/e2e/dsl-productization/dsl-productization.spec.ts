@@ -16,6 +16,7 @@ import { test, expect } from '../../fixtures';
 import { uniqueId } from '../quarry-management.setup';
 import { ModelTestHelper } from '../../helpers/model-test-helper';
 import { E2ET_ORDER_CONFIG } from '../../helpers/configs/e2et-order.config';
+import { waitForFormReady } from '../helpers';
 
 test.describe('DSL Productization — Profile-Based Dynamic Page Rendering', () => {
   /**
@@ -23,7 +24,7 @@ test.describe('DSL Productization — Profile-Based Dynamic Page Rendering', () 
    */
   test('DP-001: list page renders via DynamicPageRenderer @smoke', async ({ page }) => {
     // Navigate to e2et-order list page
-    await page.goto('/dynamic/e2et-order');
+    await page.goto('/p/e2et_order');
     await page.waitForLoadState('domcontentloaded');
 
     // Verify DynamicPageRenderer wrapper is present (profile system active)
@@ -44,20 +45,14 @@ test.describe('DSL Productization — Profile-Based Dynamic Page Rendering', () 
    */
   test('DP-002: form page renders via DynamicPageRenderer @smoke', async ({ page }) => {
     // Navigate to e2et-order new form page
-    await page.goto('/dynamic/e2et_order/new');
+    await page.goto('/p/e2et_order/new');
     await page.waitForLoadState('domcontentloaded');
 
-    // Verify DynamicPageRenderer wrapper is present (new mode)
-    const wrapper = page.locator('[data-testid="dynamic-page-new"]');
-    await expect(wrapper).toBeVisible({ timeout: 15000 });
-
-    // Verify form heading exists
-    const heading = wrapper.locator('h2').first();
-    await expect(heading).toBeVisible({ timeout: 10000 });
-
-    // Verify form fields are rendered
-    const formField = wrapper.locator('[data-testid^="form-field-"]').first();
-    await expect(formField).toBeVisible({ timeout: 10000 });
+    await waitForFormReady(page, 15000);
+    await expect(page.locator('main, [role="main"]').first()).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('[data-testid^="form-field-"]').first()).toBeVisible({
+      timeout: 10000,
+    });
   });
 
   /**
@@ -72,16 +67,11 @@ test.describe('DSL Productization — Profile-Based Dynamic Page Rendering', () 
 
     try {
       // Navigate to detail page
-      await page.goto(`/dynamic/e2et-order/view/${orderPid}`);
+      await page.goto(`/p/e2et_order/view/${orderPid}`);
       await page.waitForLoadState('domcontentloaded');
 
-      // Verify DynamicPageRenderer wrapper is present (detail mode)
-      const wrapper = page.locator('[data-testid="dynamic-page-detail"]');
-      await expect(wrapper).toBeVisible({ timeout: 15000 });
-
-      // Verify detail page heading
-      const heading = wrapper.locator('h2, h1').first();
-      await expect(heading).toBeVisible({ timeout: 10000 });
+      await expect(page.locator('main, [role="main"]').first()).toBeVisible({ timeout: 15000 });
+      await expect(page.locator('body')).toContainText(title, { timeout: 10000 });
     } finally {
       await order.deleteViaApi(orderPid);
     }
@@ -99,16 +89,13 @@ test.describe('DSL Productization — Profile-Based Dynamic Page Rendering', () 
 
     try {
       // Navigate to edit page (edit mode uses /:recordId/edit route)
-      await page.goto(`/dynamic/e2et_order/${orderPid}/edit`);
+      await page.goto(`/p/e2et_order/${orderPid}/edit`);
       await page.waitForLoadState('domcontentloaded');
 
-      // Verify DynamicPageRenderer wrapper (edit mode)
-      const wrapper = page.locator('[data-testid="dynamic-page-edit"]');
-      await expect(wrapper).toBeVisible({ timeout: 15000 });
-
-      // Verify form content renders with existing data
-      const heading = wrapper.locator('h2').first();
-      await expect(heading).toBeVisible({ timeout: 10000 });
+      await waitForFormReady(page, 15000);
+      await expect(page.locator('[data-testid^="form-field-"]').first()).toBeVisible({
+        timeout: 10000,
+      });
     } finally {
       await order.deleteViaApi(orderPid);
     }
@@ -125,14 +112,16 @@ test.describe('DSL Productization — Profile-Based Dynamic Page Rendering', () 
    */
   test('DP-005: skeleton or content appears during list page load @smoke', async ({ page }) => {
     // Navigate and immediately race between skeleton and content
-    await page.goto('/dynamic/e2et-order');
+    await page.goto('/p/e2et_order');
 
     const result = await Promise.race([
-      page.locator('[data-testid="list-page-skeleton"]')
+      page
+        .locator('[data-testid="list-page-skeleton"]')
         .waitFor({ state: 'attached', timeout: 5000 })
         .then(() => 'skeleton' as const)
         .catch(() => null),
-      page.locator('[data-testid="dynamic-page-list"]')
+      page
+        .locator('[data-testid="dynamic-page-list"]')
         .waitFor({ state: 'attached', timeout: 5000 })
         .then(() => 'content' as const)
         .catch(() => null),
@@ -155,7 +144,7 @@ test.describe('DSL Productization — Profile-Based Dynamic Page Rendering', () 
    */
   test('DP-006: blocks render without error boundary fallback @critical', async ({ page }) => {
     // Navigate to list page
-    await page.goto('/dynamic/e2et-order');
+    await page.goto('/p/e2et_order');
     await page.waitForLoadState('domcontentloaded');
 
     const wrapper = page.locator('[data-testid="dynamic-page-list"]');

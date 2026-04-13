@@ -12,12 +12,7 @@
  */
 
 // Login workflows
-export {
-  ensureLoggedIn,
-  performLogin,
-  performLogout,
-  TEST_CREDENTIALS,
-} from './login.workflow';
+export { ensureLoggedIn, performLogin, performLogout, TEST_CREDENTIALS } from './login.workflow';
 
 // Model workflows
 export {

@@ -40,12 +40,6 @@ export function useAutoSaveView({
         if (!pending) return;
         pendingRef.current = null;
 
-        if (!currentView) {
-          // No view to save to — changes will be lost on refresh.
-          // Implicit view creation requires a view to be selected first.
-          return;
-        }
-
         try {
           await updateViewConfig(pending);
         } catch (err) {

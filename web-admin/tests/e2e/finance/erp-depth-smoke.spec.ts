@@ -41,7 +41,6 @@ async function navigateToFinanceMenu(page: Page, menuText: RegExp, expectedUrl: 
 }
 
 test.describe('Finance Cost Accounting', () => {
-
   test('cost element page loads and shows table', async ({ page }) => {
     await navigateToFinanceMenu(page, /Cost Elements|成本要素/, /cost-elements/);
 
@@ -50,7 +49,7 @@ test.describe('Finance Cost Accounting', () => {
     await expect(table).toBeVisible({ timeout: 15000 });
 
     // Create button should be visible
-    const createBtn = page.locator('button').filter({ hasText: /create|新建/i });
+    const createBtn = page.locator('button').filter({ hasText: /new template|create|新建/i });
     await expect(createBtn.first()).toBeVisible();
   });
 
@@ -68,7 +67,7 @@ test.describe('Finance Cost Accounting', () => {
     await expect(table).toBeVisible({ timeout: 15000 });
 
     // Create button should be present
-    const createBtn = page.locator('button').filter({ hasText: /create|新建/i });
+    const createBtn = page.locator('button').filter({ hasText: /new template|create|新建/i });
     await expect(createBtn.first()).toBeVisible();
   });
 
@@ -81,7 +80,6 @@ test.describe('Finance Cost Accounting', () => {
 });
 
 test.describe('Voucher Approval Workflow', () => {
-
   test('journal entry list shows approval workflow buttons', async ({ page }) => {
     await navigateToFinanceMenu(page, /Journal Entries|凭证管理/, /journal-entries/);
 
@@ -104,7 +102,10 @@ test.describe('Voucher Approval Workflow', () => {
     const firstRow = table.locator('tbody tr').first();
     if (await firstRow.isVisible({ timeout: 5000 }).catch(() => false)) {
       // Look for a detail/view link or click the row
-      const detailLink = firstRow.locator('a, button').filter({ hasText: /view|detail|查看/i }).first();
+      const detailLink = firstRow
+        .locator('a, button')
+        .filter({ hasText: /view|detail|查看/i })
+        .first();
       if (await detailLink.isVisible({ timeout: 3000 }).catch(() => false)) {
         await detailLink.click();
         await page.waitForTimeout(1000);
@@ -112,16 +113,17 @@ test.describe('Voucher Approval Workflow', () => {
         // Detail page should show approval-related fields
         const approvalFields = page.locator('text=/Submitted|Approved|提交|审批/');
         // At least some approval fields should exist in the detail layout
-        await expect(approvalFields.first()).toBeVisible({ timeout: 5000 }).catch(() => {
-          // No data yet is acceptable, layout exists
-        });
+        await expect(approvalFields.first())
+          .toBeVisible({ timeout: 5000 })
+          .catch(() => {
+            // No data yet is acceptable, layout exists
+          });
       }
     }
   });
 });
 
 test.describe('Financial Reporting', () => {
-
   test('report template page loads via menu', async ({ page }) => {
     await navigateToFinanceMenu(page, /Report Template|报表模板/, /report-templates/);
 
@@ -129,7 +131,7 @@ test.describe('Financial Reporting', () => {
     await expect(table).toBeVisible({ timeout: 15000 });
 
     // Create button should be visible
-    const createBtn = page.locator('button').filter({ hasText: /create|新建/i });
+    const createBtn = page.locator('button').filter({ hasText: /new|new template|create|新建/i });
     await expect(createBtn.first()).toBeVisible();
   });
 
@@ -143,8 +145,8 @@ test.describe('Financial Reporting', () => {
     const codeHeader = page.locator('th').filter({ hasText: /Code|编码/ });
     await expect(codeHeader.first()).toBeVisible();
 
-    const typeHeader = page.locator('th').filter({ hasText: /Type|类型/ });
-    await expect(typeHeader.first()).toBeVisible();
+    const schemaHeader = page.locator('th').filter({ hasText: /Category|Format|Type|分类|格式|类型/i });
+    await expect(schemaHeader.first()).toBeVisible();
   });
 
   test('existing financial reports page still accessible', async ({ page }) => {

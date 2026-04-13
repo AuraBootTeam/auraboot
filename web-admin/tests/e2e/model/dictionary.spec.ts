@@ -41,7 +41,7 @@ test.describe('Dictionary Tests', () => {
 
     if (detailResponse.data!.items) {
       expect(detailResponse.data!.items.length).toBe(3);
-      const values = detailResponse.data!.items.map(i => i.value);
+      const values = detailResponse.data!.items.map((i) => i.value);
       expect(values).toContain('active');
       expect(values).toContain('inactive');
       expect(values).toContain('pending');
@@ -115,7 +115,7 @@ test.describe('Dictionary Tests', () => {
     // 3. Bind dictionary to field
     const bindResponse = await api.bindDictToField(
       fieldResponse.data!.pid,
-      dictResponse.data!.code
+      dictResponse.data!.code,
     );
     // Bind may succeed or already bound — verify it didn't error out
     expect(bindResponse).toBeTruthy();
@@ -189,9 +189,7 @@ test.describe('Dictionary Tests', () => {
   test('M-034: Dictionary version management', async ({ page, api }) => {
     // 1. Create dictionary — backend auto-publishes on create
     const dictData = createDictData('simple', {
-      items: [
-        { value: 'v1_option', label: 'Version 1 Option', sortOrder: 1 },
-      ],
+      items: [{ value: 'v1_option', label: 'Version 1 Option', sortOrder: 1 }],
     });
 
     const createResponse = await api.createDict(dictData);
@@ -268,16 +266,14 @@ test.describe('Dictionary Tests', () => {
       }
     }
 
-    const successCount = results.filter(r => r.success).length;
+    const successCount = results.filter((r) => r.success).length;
     expect(successCount).toBe(dictTypes.length);
   });
 
   test('M-035: dictionary detail tab switch and tree edit in one click', async ({ page, api }) => {
     test.setTimeout(30000);
     const dictData = createDictData('tree', {
-      items: [
-        { value: 'root_node', label: 'Root Node', sortOrder: 1 },
-      ],
+      items: [{ value: 'root_node', label: 'Root Node', sortOrder: 1 }],
     });
     const response = await api.createDict(dictData);
     expect(api.isSuccess(response)).toBe(true);
@@ -288,17 +284,22 @@ test.describe('Dictionary Tests', () => {
     const dictPid = latest.data!.pid;
     expect(dictPid).toBeTruthy();
     await expect
-      .poll(async () => {
-        const detail = await api.getDictByPid(dictPid);
-        return api.isSuccess(detail);
-      }, { timeout: 10000, intervals: [500, 1000] })
+      .poll(
+        async () => {
+          const detail = await api.getDictByPid(dictPid);
+          return api.isSuccess(detail);
+        },
+        { timeout: 10000, intervals: [500, 1000] },
+      )
       .toBe(true);
 
     await page.goto(`/meta/dict/${dictPid}`, { waitUntil: 'domcontentloaded' });
     await expect(page.locator('[data-testid="dict-tab-basic"]')).toBeVisible({ timeout: 10000 });
 
     await page.locator('[data-testid="dict-tab-items"]').click();
-    await expect(page.locator('[data-testid="dict-tab-items"]')).toHaveClass(/border-blue-500/, { timeout: 10000 });
+    await expect(page.locator('[data-testid="dict-tab-items"]')).toHaveClass(/border-blue-500/, {
+      timeout: 10000,
+    });
     await expect(page.locator('[data-testid="dict-save-items"]')).toBeVisible({ timeout: 10000 });
 
     await page.locator('[data-testid="dict-add-child-0"]').click();
@@ -309,10 +310,11 @@ test.describe('Dictionary Tests', () => {
     await rows.nth(1).locator('input').nth(1).fill('Child Node');
 
     await Promise.all([
-      page.waitForResponse((resp) =>
-        resp.request().method().toLowerCase() === 'put'
-        && resp.url().includes(`/api/meta/dict/${dictPid}/items`)
-        && resp.status() === 200
+      page.waitForResponse(
+        (resp) =>
+          resp.request().method().toLowerCase() === 'put' &&
+          resp.url().includes(`/api/meta/dict/${dictPid}/items`) &&
+          resp.status() === 200,
       ),
       page.locator('[data-testid="dict-save-items"]').click(),
     ]);

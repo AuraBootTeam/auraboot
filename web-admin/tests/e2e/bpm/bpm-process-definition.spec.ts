@@ -13,6 +13,9 @@
 
 import { test, expect } from '../../fixtures';
 
+function isProcessUpdateForbidden(message: string): boolean {
+  return /system\.process\.update|Access forbidden|Access denied/i.test(message);
+}
 
 /**
  * Minimal BPMN XML for a simple Start -> UserTask -> End process.
@@ -48,6 +51,7 @@ test.describe('BPM Process Definition Lifecycle', () => {
 
   let processPid: string | null = null;
   let processKey: string;
+  let missingProcessUpdatePermission = false;
 
   test.beforeAll(async ({ request }) => {
     processKey = generateProcessKey();
@@ -65,14 +69,21 @@ test.describe('BPM Process Definition Lifecycle', () => {
       });
 
       if (!response.ok()) {
-        console.warn(`Process definition setup: create failed ${response.status()} ${await response.text().catch(() => '')}`);
+        const bodyText = await response.text().catch(() => '');
+        console.warn(`Process definition setup: create failed ${response.status()} ${bodyText}`);
+        if (response.status() === 403 && isProcessUpdateForbidden(bodyText)) {
+          missingProcessUpdatePermission = true;
+        }
         return;
       }
 
       const data = await response.json();
       processPid = data.data?.pid || data.pid;
       if (!processPid) {
-        console.warn('Process definition setup: response missing pid:', JSON.stringify(data).slice(0, 200));
+        console.warn(
+          'Process definition setup: response missing pid:',
+          JSON.stringify(data).slice(0, 200),
+        );
       }
     } catch (error) {
       console.warn('Process definition setup failed:', error);
@@ -92,12 +103,18 @@ test.describe('BPM Process Definition Lifecycle', () => {
 
     // Race between content loading and login redirect
     const result = await Promise.race([
-      contentLocator.first().waitFor({ timeout: 8000 }).then(() => 'content'),
-      loginLocator.first().waitFor({ timeout: 8000 }).then(() => 'login'),
+      contentLocator
+        .first()
+        .waitFor({ timeout: 8000 })
+        .then(() => 'content'),
+      loginLocator
+        .first()
+        .waitFor({ timeout: 8000 })
+        .then(() => 'login'),
     ]).catch(() => 'timeout');
 
     if (result === 'login') {
-      throw new Error(String('Authentication not available in this run'))
+      throw new Error(String('Authentication not available in this run'));
       return;
     }
 
@@ -109,7 +126,14 @@ test.describe('BPM Process Definition Lifecycle', () => {
    * Navigate to the BPMN designer with the created process and verify the canvas loads.
    */
   test('D1-E03: Open process in designer', async ({ page }) => {
-    if (!processPid) { throw new Error(String('Skipped: process creation failed in beforeAll')); }
+    if (missingProcessUpdatePermission) {
+      test.skip(true, 'Missing permission: system.process.update');
+      return;
+    }
+
+    if (!processPid) {
+      throw new Error(String('Skipped: process creation failed in beforeAll'));
+    }
 
     // Navigate to BPMN designer with the process PID
     await page.goto(`/bpmn-designer?id=${processPid}`);
@@ -137,17 +161,13 @@ test.describe('BPM Process Definition Lifecycle', () => {
 
     try {
       // Undeploy first if still deployed
-      await request.post(
-        `/api/bpm/process-definitions/${processPid}/undeploy`
-      );
+      await request.post(`/api/bpm/process-definitions/${processPid}/undeploy`);
     } catch {
       // Ignore undeploy errors
     }
 
     try {
-      await request.delete(
-        `/api/bpm/process-definitions/${processPid}`
-      );
+      await request.delete(`/api/bpm/process-definitions/${processPid}`);
     } catch (error) {
       console.warn('Failed to cleanup test process definition:', error);
     }

@@ -14,14 +14,14 @@
 import { test, expect } from '../../fixtures';
 import { DynamicListPage } from '../../pages';
 
-const ORDER_PAGE_KEY = 'e2et-order';
+const ORDER_PAGE_KEY = 'e2et_order';
 
 test.describe('E2E Test Order — i18n Multi-language', () => {
   /**
    * OI-002: Header should have language switcher
    */
   test('OI-002: language switcher should exist in header', async ({ page }) => {
-    const listPage = new DynamicListPage(page, `/dynamic/${ORDER_PAGE_KEY}`);
+    const listPage = new DynamicListPage(page, `/p/${ORDER_PAGE_KEY}`);
     await listPage.goto();
 
     // Look for Globe icon button (language switcher) — keep header selectors as-is (no HeaderPage PO)
@@ -51,7 +51,7 @@ test.describe('E2E Test Order — i18n Multi-language', () => {
    * OI-003: Switching to English should change page labels
    */
   test('OI-003: page labels should reflect locale change', async ({ page }) => {
-    const listPage = new DynamicListPage(page, `/dynamic/${ORDER_PAGE_KEY}`);
+    const listPage = new DynamicListPage(page, `/p/${ORDER_PAGE_KEY}`);
     await listPage.goto();
 
     // Capture current page heading text

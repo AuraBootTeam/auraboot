@@ -4,9 +4,9 @@
  */
 export const TEST_ACCOUNTS = {
   admin: {
-    email: process.env.TEST_ADMIN_EMAIL || 'e2e@test.local',
-    password: process.env.TEST_ADMIN_PASSWORD || 'E2eTestPass2026!',
-    name: 'Test Admin',
+    email: 'admin@example.com',
+    password: 'Test2026x',
+    name: 'Admin',
   },
 } as const;
 

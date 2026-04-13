@@ -34,35 +34,56 @@ let fallbackPagePid: string | null = null;
  */
 async function openDesigner(
   page: import('@playwright/test').Page,
-  designerPage: PageDesignerPage
+  designerPage: PageDesignerPage,
 ): Promise<boolean> {
+  // Strategy 1: Try the POM's openViaList
   const loaded = await designerPage.openViaList();
   if (loaded) return true;
 
+  // Strategy 2: Try the fallback pid from beforeAll
   if (fallbackPagePid) {
     await page.goto(`/page-designer/${fallbackPagePid}`, { waitUntil: 'domcontentloaded' });
-    // Wait for the designer to fully load
-    const saveBtn = page.locator(
-      'button:has-text("Save"), button:has-text("保存"), [data-testid="toolbar-save"]'
+    const readySurface = page.locator(
+      '[data-testid="canvas-editor"], [data-testid="designer-canvas"], [data-testid^="canvas-block-"]',
     );
-    const loaded2 = await saveBtn.isVisible({ timeout: 8000 }).catch(() => false);
+    const loaded2 = await readySurface.first().isVisible({ timeout: 8000 }).catch(() => false);
     if (loaded2) return true;
-
-    // Secondary check: URL contains the pid and no loading spinner
-    if (
-      page.url().includes(`/page-designer/${fallbackPagePid}`) &&
-      !(await page.getByText('Loading page...').isVisible({ timeout: 500 }).catch(() => false))
-    ) {
-      return true;
-    }
   }
+
+  // Strategy 3: Create a page on-the-fly and open it directly
+  try {
+    const pageKey = `e2e_deep_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+    const resp = await page.request.post('/api/pages', {
+      data: {
+        name: `E2E Deep ${Date.now()}`,
+        pageKey,
+        title: 'E2E Deep Test',
+        kind: 'composite',
+        blocks: [
+          { id: 'blk_tbl', blockType: 'table', config: {}, layout: { col: 0, colSpan: 12, rowSpan: 1, order: 0 } },
+        ],
+        metaInfo: { componentCount: 1 },
+        semver: '0.1.0',
+      },
+    });
+    if (resp.ok()) {
+      const body = await resp.json();
+      const pid = body.data?.pid;
+      if (pid) {
+        fallbackPagePid = pid;
+        await page.goto(`/page-designer/${pid}`, { waitUntil: 'domcontentloaded' });
+        await page.getByTestId('canvas-editor').waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+        return await page.getByTestId('canvas-editor').isVisible().catch(() => false);
+      }
+    }
+  } catch { /* ignore */ }
 
   return false;
 }
 
 async function resolveDropZone(
   page: import('@playwright/test').Page,
-  designerPage: PageDesignerPage
+  designerPage: PageDesignerPage,
 ): Promise<import('@playwright/test').Locator> {
   if (await designerPage.canvas.isVisible({ timeout: 1000 }).catch(() => false)) {
     return designerPage.canvas;
@@ -80,9 +101,11 @@ async function resolveDropZone(
 
 async function resolvePaletteDraggable(
   page: import('@playwright/test').Page,
-  dropZone: import('@playwright/test').Locator
+  dropZone: import('@playwright/test').Locator,
 ): Promise<import('@playwright/test').Locator> {
-  const allDraggables = page.locator('[aria-roledescription="draggable"], [draggable="true"], [data-draggable]');
+  const allDraggables = page.locator(
+    '[aria-roledescription="draggable"], [draggable="true"], [data-draggable]',
+  );
   const count = await allDraggables.count();
   const dropBox = await dropZone.boundingBox();
   const dropX = dropBox ? dropBox.x : Number.MAX_SAFE_INTEGER;
@@ -102,7 +125,7 @@ async function resolvePaletteDraggable(
 async function addBlocksToCanvas(
   page: import('@playwright/test').Page,
   designerPage: PageDesignerPage,
-  targetCount: number
+  targetCount: number,
 ): Promise<void> {
   await designerPage.openComponentLibrary();
   const dropZone = await resolveDropZone(page, designerPage);
@@ -120,10 +143,15 @@ async function addBlocksToCanvas(
 
     await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2);
     await page.mouse.down();
-    await page.mouse.move(dropBox.x + dropBox.width / 2, dropBox.y + dropBox.height / 2, { steps: 12 });
+    await page.mouse.move(dropBox.x + dropBox.width / 2, dropBox.y + dropBox.height / 2, {
+      steps: 12,
+    });
     await page.mouse.up();
-    await page.locator('.react-grid-item, [data-testid="designer-canvas"] > *').first()
-      .waitFor({ state: 'attached', timeout: 3000 }).catch(() => {});
+    await page
+      .locator('.react-grid-item, [data-testid="designer-canvas"] > *')
+      .first()
+      .waitFor({ state: 'attached', timeout: 3000 })
+      .catch(() => {});
   }
 }
 
@@ -135,9 +163,13 @@ test.describe('Page Designer Deep Operations', () => {
   let designerPage: PageDesignerPage;
 
   test.beforeAll(async ({ browser }) => {
-    const context = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const storageStatePath = `${process.cwd()}/tests/storage/admin.json`;
+    const context = await browser.newContext({
+      storageState: storageStatePath,
+    });
     const p = await context.newPage();
     try {
+      // Try to find an existing page first
       const resp = await p.request.get('/api/pages?pageSize=5');
       if (resp.ok()) {
         const data = await resp.json();
@@ -146,7 +178,32 @@ test.describe('Page Designer Deep Operations', () => {
           fallbackPagePid = pages[0].pid || pages[0].id || null;
         }
       }
-    } catch { /* ignore — fallback will remain null */ }
+
+      // If no pages found, create one via API
+      if (!fallbackPagePid) {
+        const pageKey = `e2e_deep_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+        const createResp = await p.request.post('/api/pages', {
+          data: {
+            name: `E2E Deep Operations ${Date.now()}`,
+            pageKey,
+            title: 'E2E Deep Operations Test Page',
+            kind: 'composite',
+            blocks: [
+              { id: 'blk_tbl', blockType: 'table', config: {}, layout: { col: 0, colSpan: 12, rowSpan: 1, order: 0 } },
+              { id: 'blk_chart', blockType: 'chart', config: {}, layout: { col: 0, colSpan: 6, rowSpan: 1, order: 1 } },
+            ],
+            metaInfo: { componentCount: 2 },
+            semver: '0.1.0',
+          },
+        });
+        if (createResp.ok()) {
+          const body = await createResp.json();
+          fallbackPagePid = body.data?.pid || null;
+        }
+      }
+    } catch {
+      /* ignore — tests will throw if fallbackPagePid is null */
+    }
     await p.close();
     await context.close();
   });
@@ -161,7 +218,7 @@ test.describe('Page Designer Deep Operations', () => {
   test('PD-001: Block drag sort in canvas @smoke', async ({ page }) => {
     const loaded = await openDesigner(page, designerPage);
     if (!loaded) {
-      throw new Error(String('Could not open page designer'))
+      throw new Error(String('Could not open page designer'));
       return;
     }
 
@@ -197,7 +254,7 @@ test.describe('Page Designer Deep Operations', () => {
   test('PD-002: Block property edit', async ({ page }) => {
     const loaded = await openDesigner(page, designerPage);
     if (!loaded) {
-      throw new Error(String('Could not open page designer'))
+      throw new Error(String('Could not open page designer'));
       return;
     }
 
@@ -205,17 +262,20 @@ test.describe('Page Designer Deep Operations', () => {
       await addBlocksToCanvas(page, designerPage, 1);
     }
 
-    const hasBlock = await designerPage.block(0).isVisible({ timeout: 5000 }).catch(() => false);
+    const hasBlock = await designerPage
+      .block(0)
+      .isVisible({ timeout: 5000 })
+      .catch(() => false);
     if (!hasBlock) {
-      throw new Error(String('No blocks to select'))
+      throw new Error(String('No blocks to select'));
       return;
     }
 
     await designerPage.selectBlock(0);
 
-    const propertyInput = page.locator(
-      '[data-testid="designer-properties-panel"] input, .w-80 input, aside input'
-    ).first();
+    const propertyInput = page
+      .locator('[data-testid="designer-properties-panel"] input, .w-80 input, aside input')
+      .first();
     const hasInput = await propertyInput.isVisible({ timeout: 3000 }).catch(() => false);
 
     if (hasInput) {
@@ -235,16 +295,20 @@ test.describe('Page Designer Deep Operations', () => {
   test('PD-003: Save and publish workflow', async ({ page }) => {
     const loaded = await openDesigner(page, designerPage);
     if (!loaded) {
-      throw new Error(String('Could not open page designer'))
+      throw new Error(String('Could not open page designer'));
       return;
     }
 
     // Verify save button
-    const hasSaveBtn = await designerPage.saveButton.isVisible({ timeout: 10000 }).catch(() => false);
+    const hasSaveBtn = await designerPage.saveButton
+      .isVisible({ timeout: 10000 })
+      .catch(() => false);
     expect(hasSaveBtn).toBe(true);
 
     // Verify publish button
-    const hasPublishBtn = await designerPage.publishButton.isVisible({ timeout: 3000 }).catch(() => false);
+    const hasPublishBtn = await designerPage.publishButton
+      .isVisible({ timeout: 3000 })
+      .catch(() => false);
     expect(hasPublishBtn).toBe(true);
 
     // Save if not disabled
@@ -263,7 +327,7 @@ test.describe('Page Designer Deep Operations', () => {
   test('PD-004: Undo/redo operations', async ({ page }) => {
     const loaded = await openDesigner(page, designerPage);
     if (!loaded) {
-      throw new Error(String('Could not open page designer'))
+      throw new Error(String('Could not open page designer'));
       return;
     }
 
@@ -288,13 +352,15 @@ test.describe('Page Designer Deep Operations', () => {
   test('PD-005: Preview mode', async ({ page }) => {
     const loaded = await openDesigner(page, designerPage);
     if (!loaded) {
-      throw new Error(String('Could not open page designer'))
+      throw new Error(String('Could not open page designer'));
       return;
     }
 
-    const hasPreviewBtn = await designerPage.previewButton.isVisible({ timeout: 3000 }).catch(() => false);
+    const hasPreviewBtn = await designerPage.previewButton
+      .isVisible({ timeout: 3000 })
+      .catch(() => false);
     if (!hasPreviewBtn) {
-      throw new Error(String('Preview button not found'))
+      throw new Error(String('Preview button not found'));
       return;
     }
 
@@ -302,9 +368,12 @@ test.describe('Page Designer Deep Operations', () => {
 
     // Verify preview mode renders
     const previewContent = page.locator(
-      '[data-testid="preview-container"], [data-testid="designer-preview"], [role="dialog"], iframe, main'
+      '[data-testid="preview-container"], [data-testid="designer-preview"], [role="dialog"], iframe, main',
     );
-    const hasPreview = await previewContent.first().isVisible({ timeout: 5000 }).catch(() => false);
+    const hasPreview = await previewContent
+      .first()
+      .isVisible({ timeout: 5000 })
+      .catch(() => false);
     expect(hasPreview).toBe(true);
   });
 
@@ -314,16 +383,16 @@ test.describe('Page Designer Deep Operations', () => {
   test('PD-006: Field panel drag to canvas', async ({ page }) => {
     const loaded = await openDesigner(page, designerPage);
     if (!loaded) {
-      throw new Error(String('Could not open page designer'))
+      throw new Error(String('Could not open page designer'));
       return;
     }
 
     await designerPage.openComponentLibrary();
 
     // Look for field items in the palette
-    const fieldItem = page.locator(
-      '[aria-roledescription="draggable"], [draggable="true"], [data-draggable]'
-    ).first();
+    const fieldItem = page
+      .locator('[aria-roledescription="draggable"], [draggable="true"], [data-draggable]')
+      .first();
     const hasFieldItem = await fieldItem.isVisible({ timeout: 5000 }).catch(() => false);
 
     expect(hasFieldItem).toBe(true);
@@ -335,7 +404,7 @@ test.describe('Page Designer Deep Operations', () => {
   test('PD-007: Delete block from canvas', async ({ page }) => {
     const loaded = await openDesigner(page, designerPage);
     if (!loaded) {
-      throw new Error(String('Could not open page designer'))
+      throw new Error(String('Could not open page designer'));
       return;
     }
 
@@ -345,7 +414,7 @@ test.describe('Page Designer Deep Operations', () => {
 
     const blockCount = await designerPage.getBlockCount();
     if (blockCount < 1) {
-      throw new Error(String('No blocks to delete'))
+      throw new Error(String('No blocks to delete'));
       return;
     }
 
@@ -353,9 +422,11 @@ test.describe('Page Designer Deep Operations', () => {
     await designerPage.selectBlock(0);
 
     // Look for delete button in properties panel or toolbar
-    const deleteBtn = page.locator(
-      '[data-testid="delete-block"], button:has-text("删除"), button[aria-label*="delete" i], button[title*="delete" i], button[title*="删除"]'
-    ).first();
+    const deleteBtn = page
+      .locator(
+        '[data-testid="delete-block"], button:has-text("删除"), button[aria-label*="delete" i], button[title*="delete" i], button[title*="删除"]',
+      )
+      .first();
     const hasDelete = await deleteBtn.isVisible({ timeout: 3000 }).catch(() => false);
 
     if (hasDelete) {
@@ -377,7 +448,7 @@ test.describe('Page Designer Deep Operations', () => {
   test('PD-008: Outline view', async ({ page }) => {
     const loaded = await openDesigner(page, designerPage);
     if (!loaded) {
-      throw new Error(String('Could not open page designer'))
+      throw new Error(String('Could not open page designer'));
       return;
     }
 
@@ -389,9 +460,12 @@ test.describe('Page Designer Deep Operations', () => {
       await outlineTab.click();
 
       const outlineContent = page.locator(
-        '[data-testid="designer-outline"], [data-testid="designer-properties-panel"], [data-testid="designer-canvas"], text=/页面结构|Outline|主内容|工具栏/'
+        '[data-testid="designer-outline"], [data-testid="designer-properties-panel"], [data-testid="designer-canvas"], text=/页面结构|Outline|主内容|工具栏/',
       );
-      const hasOutlineContent = await outlineContent.first().isVisible({ timeout: 5000 }).catch(() => false);
+      const hasOutlineContent = await outlineContent
+        .first()
+        .isVisible({ timeout: 5000 })
+        .catch(() => false);
       if (!hasOutlineContent) {
         await expect(designerPage.saveButton).toBeVisible({ timeout: 5000 });
       } else {
@@ -409,7 +483,7 @@ test.describe('Page Designer Deep Operations', () => {
   test('PD-009: Multi-type block mix', async ({ page }) => {
     const loaded = await openDesigner(page, designerPage);
     if (!loaded) {
-      throw new Error(String('Could not open page designer'))
+      throw new Error(String('Could not open page designer'));
       return;
     }
 

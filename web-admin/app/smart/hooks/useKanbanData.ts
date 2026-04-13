@@ -152,7 +152,7 @@ export function useKanbanData(options: UseKanbanDataOptions): UseKanbanDataResul
       if (dataSource.type === 'aggregate' && dataSource.modelCode) {
         // For aggregate type with a modelCode, fetch individual records
         // from the dynamic list API (not the chart-data aggregate endpoint)
-        const slug = dataSource.modelCode.replace(/_/g, '-');
+        const slug = dataSource.modelCode;
         const params: Record<string, string> = {
           pageSize: String(dataSource.limit || 500),
           pageNum: '1',

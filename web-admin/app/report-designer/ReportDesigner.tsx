@@ -316,7 +316,7 @@ const PreviewContent: React.FC<{ report: import('./types').ReportDsl }> = ({ rep
 
       {report.body.map((block) => (
         <div key={block.id} className="mb-6">
-          {block.blockType === 'data-table' && (
+          {block.blockType === 'table' && (
             <div>
               {block.title && <h3 className="mb-2 text-base font-semibold">{block.title}</h3>}
               <table className="w-full border-collapse border border-gray-300 text-sm">

@@ -17,46 +17,44 @@ const MAX_TAB_NESTING = 2;
 export function lintPerformance(schema: UnifiedSchema): ValidationMessage[] {
   const messages: ValidationMessage[] = [];
 
-  if (!schema.areas) return messages;
+  if (!schema.blocks) return messages;
 
-  for (const [areaId, area] of Object.entries(schema.areas)) {
-    for (const [blockIdx, block] of (area.blocks || []).entries()) {
-      const bp = `areas.${areaId}.blocks[${blockIdx}]`;
+  for (const [blockIdx, block] of schema.blocks.entries()) {
+    const bp = `blocks[${blockIdx}]`;
 
-      // Check table column count
-      if (
-        (block.blockType === 'table' || block.blockType === 'data-table') &&
-        Array.isArray(block.columns)
-      ) {
-        if (block.columns.length > MAX_TABLE_COLUMNS) {
-          messages.push({
-            code: 'perf_columns',
-            path: `${bp}.columns`,
-            message: `Table has ${block.columns.length} columns (max recommended: ${MAX_TABLE_COLUMNS})`,
-            severity: 'warning',
-            suggestion:
-              'Consider using column groups, SavedView, or hiding less-used columns by default',
-          });
-        }
+    // Check table column count
+    if (
+      block.blockType === 'table' &&
+      Array.isArray(block.columns)
+    ) {
+      if (block.columns.length > MAX_TABLE_COLUMNS) {
+        messages.push({
+          code: 'perf_columns',
+          path: `${bp}.columns`,
+          message: `Table has ${block.columns.length} columns (max recommended: ${MAX_TABLE_COLUMNS})`,
+          severity: 'warning',
+          suggestion:
+            'Consider using column groups, SavedView, or hiding less-used columns by default',
+        });
       }
+    }
 
-      // Check form field count
-      if (block.blockType === 'form-section' && block.fields) {
-        if (block.fields.length > MAX_FORM_FIELDS) {
-          messages.push({
-            code: 'perf_fields',
-            path: `${bp}.fields`,
-            message: `Form section has ${block.fields.length} fields (max recommended: ${MAX_FORM_FIELDS})`,
-            severity: 'warning',
-            suggestion: 'Consider splitting into multiple form sections or using tabs',
-          });
-        }
+    // Check form field count
+    if (block.blockType === 'form-section' && block.fields) {
+      if (block.fields.length > MAX_FORM_FIELDS) {
+        messages.push({
+          code: 'perf_fields',
+          path: `${bp}.fields`,
+          message: `Form section has ${block.fields.length} fields (max recommended: ${MAX_FORM_FIELDS})`,
+          severity: 'warning',
+          suggestion: 'Consider splitting into multiple form sections or using tabs',
+        });
       }
+    }
 
-      // Check tab nesting depth
-      if (block.blockType === 'tabs' && block.tabs) {
-        checkTabNesting(block.tabs as any[], bp, 1, messages);
-      }
+    // Check tab nesting depth
+    if (block.blockType === 'tabs' && block.tabs) {
+      checkTabNesting(block.tabs as any[], bp, 1, messages);
     }
   }
 

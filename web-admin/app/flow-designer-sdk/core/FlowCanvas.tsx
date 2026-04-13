@@ -34,6 +34,7 @@ export function FlowCanvas({
     nodes,
     edges,
     selectedNodeId,
+    registryVersion,
     updateNode,
     addNode,
     addEdge: storeAddEdge,
@@ -42,7 +43,8 @@ export function FlowCanvas({
     deleteEdge,
   } = useFlowStore();
 
-  // Build node types from registry
+  // Build node types from registry.
+  // Depends on registryVersion so it recomputes after nodeRegistry.registerAll().
   const nodeTypes: NodeTypes = useMemo(() => {
     const types: NodeTypes = {};
     nodeRegistry.getAll().forEach((def) => {
@@ -53,7 +55,7 @@ export function FlowCanvas({
       types['default'] = DefaultFlowNode;
     }
     return types;
-  }, []);
+  }, [registryVersion]);
 
   // Convert store nodes to ReactFlow nodes
   const rfNodes: Node[] = useMemo(

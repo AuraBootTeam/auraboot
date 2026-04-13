@@ -28,8 +28,14 @@ export class ReportsOverviewPage extends BasePage {
     const loginLocator = this.page.locator('text=请先登录, text=欢迎登录');
 
     const result = await Promise.race([
-      headingLocator.first().waitFor({ timeout: 8000 }).then(() => 'content' as const),
-      loginLocator.first().waitFor({ timeout: 8000 }).then(() => 'login' as const),
+      headingLocator
+        .first()
+        .waitFor({ timeout: 8000 })
+        .then(() => 'content' as const),
+      loginLocator
+        .first()
+        .waitFor({ timeout: 8000 })
+        .then(() => 'login' as const),
     ]).catch(() => 'timeout' as const);
 
     if (result !== 'content') {
@@ -86,7 +92,7 @@ export class ReportsOverviewPage extends BasePage {
 
   get errorOverlay(): Locator {
     return this.page.locator(
-      '[data-testid="error-overlay"], .error-overlay, #webpack-dev-server-client-overlay'
+      '[data-testid="error-overlay"], .error-overlay, #webpack-dev-server-client-overlay',
     );
   }
 
@@ -101,6 +107,9 @@ export class ReportsOverviewPage extends BasePage {
   async waitForContentLoad(): Promise<void> {
     await this.page.waitForLoadState('domcontentloaded');
     const spinner = this.page.locator('.animate-spin');
-    await spinner.first().waitFor({ state: 'hidden', timeout: 8000 }).catch(() => {});
+    await spinner
+      .first()
+      .waitFor({ state: 'hidden', timeout: 8000 })
+      .catch(() => {});
   }
 }

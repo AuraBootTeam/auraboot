@@ -58,10 +58,11 @@ async function navigateToEmailSettings(page: any): Promise<void> {
   await settingsLink.waitFor({ state: 'attached', timeout: 10_000 });
   await settingsLink.scrollIntoViewIfNeeded().catch(() => null);
 
-  const apiPromise = page.waitForResponse(
-    (r: any) => r.url().includes('/api/email/accounts') && r.status() === 200,
-    { timeout: 15_000 },
-  ).catch(() => null);
+  const apiPromise = page
+    .waitForResponse((r: any) => r.url().includes('/api/email/accounts') && r.status() === 200, {
+      timeout: 15_000,
+    })
+    .catch(() => null);
 
   await settingsLink.evaluate((el: HTMLElement) => el.click());
   await apiPromise;
@@ -105,7 +106,9 @@ test.describe('Email Shared Mailbox', () => {
   test('T1: navigate to Email Settings page', async ({ page }) => {
     await navigateToEmailSettings(page);
 
-    await expect(page.locator('[data-testid="email-settings-page"]')).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('[data-testid="email-settings-page"]')).toBeVisible({
+      timeout: 15_000,
+    });
     await expect(page.getByText('Email Settings')).toBeVisible({ timeout: 8_000 });
   });
 
@@ -114,7 +117,9 @@ test.describe('Email Shared Mailbox', () => {
   // =========================================================================
   test('T2: shared account card displays Shared badge', async ({ page }) => {
     await navigateToEmailSettings(page);
-    await page.locator('[data-testid="email-settings-page"]').waitFor({ state: 'visible', timeout: 15_000 });
+    await page
+      .locator('[data-testid="email-settings-page"]')
+      .waitFor({ state: 'visible', timeout: 15_000 });
 
     // Wait for loading
     const spinner = page.locator('.animate-spin').first();
@@ -133,7 +138,10 @@ test.describe('Email Shared Mailbox', () => {
     }
 
     // Find a shared account card (has "Shared" badge)
-    const sharedBadge = page.locator('.rounded-full').filter({ hasText: /^Shared$/i }).first();
+    const sharedBadge = page
+      .locator('.rounded-full')
+      .filter({ hasText: /^Shared$/i })
+      .first();
     const hasSharedBadge = await sharedBadge.isVisible({ timeout: 3_000 }).catch(() => false);
 
     if (hasSharedBadge) {
@@ -154,7 +162,9 @@ test.describe('Email Shared Mailbox', () => {
   // =========================================================================
   test('T3: shared account shows members management button', async ({ page }) => {
     await navigateToEmailSettings(page);
-    await page.locator('[data-testid="email-settings-page"]').waitFor({ state: 'visible', timeout: 15_000 });
+    await page
+      .locator('[data-testid="email-settings-page"]')
+      .waitFor({ state: 'visible', timeout: 15_000 });
 
     // Wait for loading
     const spinner = page.locator('.animate-spin').first();
@@ -167,7 +177,10 @@ test.describe('Email Shared Mailbox', () => {
     if (!hasMembersBtn) {
       // No shared accounts with members button — verify basic account structure
       const accountCards = page.locator('[data-testid^="email-account-"]');
-      const hasCards = await accountCards.first().isVisible({ timeout: 3_000 }).catch(() => false);
+      const hasCards = await accountCards
+        .first()
+        .isVisible({ timeout: 3_000 })
+        .catch(() => false);
       if (hasCards) {
         // Personal accounts don't have members button — that's expected
         await expect(accountCards.first()).toBeVisible();
@@ -185,7 +198,9 @@ test.describe('Email Shared Mailbox', () => {
   // =========================================================================
   test('T4: members button expands the members panel', async ({ page }) => {
     await navigateToEmailSettings(page);
-    await page.locator('[data-testid="email-settings-page"]').waitFor({ state: 'visible', timeout: 15_000 });
+    await page
+      .locator('[data-testid="email-settings-page"]')
+      .waitFor({ state: 'visible', timeout: 15_000 });
 
     const spinner = page.locator('.animate-spin').first();
     await spinner.waitFor({ state: 'hidden', timeout: 10_000 }).catch(() => {});
@@ -199,10 +214,11 @@ test.describe('Email Shared Mailbox', () => {
     }
 
     // Click to expand members panel
-    const membersApiPromise = page.waitForResponse(
-      (r: any) => r.url().includes('/members') && r.status() === 200,
-      { timeout: 10_000 },
-    ).catch(() => null);
+    const membersApiPromise = page
+      .waitForResponse((r: any) => r.url().includes('/members') && r.status() === 200, {
+        timeout: 10_000,
+      })
+      .catch(() => null);
 
     await membersBtn.click();
     await membersApiPromise;
@@ -221,7 +237,9 @@ test.describe('Email Shared Mailbox', () => {
   // =========================================================================
   test('T5: members panel shows member roles', async ({ page }) => {
     await navigateToEmailSettings(page);
-    await page.locator('[data-testid="email-settings-page"]').waitFor({ state: 'visible', timeout: 15_000 });
+    await page
+      .locator('[data-testid="email-settings-page"]')
+      .waitFor({ state: 'visible', timeout: 15_000 });
 
     const spinner = page.locator('.animate-spin').first();
     await spinner.waitFor({ state: 'hidden', timeout: 10_000 }).catch(() => {});
@@ -244,7 +262,10 @@ test.describe('Email Shared Mailbox', () => {
     await memberLoading.waitFor({ state: 'hidden', timeout: 8_000 }).catch(() => {});
 
     const memberItems = page.locator('li.flex.items-center.justify-between');
-    const hasMembers = await memberItems.first().isVisible({ timeout: 3_000 }).catch(() => false);
+    const hasMembers = await memberItems
+      .first()
+      .isVisible({ timeout: 3_000 })
+      .catch(() => false);
 
     if (hasMembers) {
       // Members should show role text
@@ -266,13 +287,18 @@ test.describe('Email Shared Mailbox', () => {
   // =========================================================================
   test('T6: account cards show status badge (active/disconnected)', async ({ page }) => {
     await navigateToEmailSettings(page);
-    await page.locator('[data-testid="email-settings-page"]').waitFor({ state: 'visible', timeout: 15_000 });
+    await page
+      .locator('[data-testid="email-settings-page"]')
+      .waitFor({ state: 'visible', timeout: 15_000 });
 
     const spinner = page.locator('.animate-spin').first();
     await spinner.waitFor({ state: 'hidden', timeout: 10_000 }).catch(() => {});
 
     const accountCards = page.locator('[data-testid^="email-account-"]');
-    const hasCards = await accountCards.first().isVisible({ timeout: 5_000 }).catch(() => false);
+    const hasCards = await accountCards
+      .first()
+      .isVisible({ timeout: 5_000 })
+      .catch(() => false);
 
     if (!hasCards) {
       // Empty state — valid
@@ -283,7 +309,10 @@ test.describe('Email Shared Mailbox', () => {
 
     // Each card should have a status badge
     const firstCard = accountCards.first();
-    const statusBadge = firstCard.locator('.rounded-full').filter({ hasText: /active|disconnected|error/i }).first();
+    const statusBadge = firstCard
+      .locator('.rounded-full')
+      .filter({ hasText: /active|disconnected|error/i })
+      .first();
     await expect(statusBadge).toBeVisible({ timeout: 5_000 });
     await expect(statusBadge).toContainText(/active|disconnected|error/i);
   });
@@ -293,13 +322,18 @@ test.describe('Email Shared Mailbox', () => {
   // =========================================================================
   test('T7: manual sync button triggers sync operation', async ({ page }) => {
     await navigateToEmailSettings(page);
-    await page.locator('[data-testid="email-settings-page"]').waitFor({ state: 'visible', timeout: 15_000 });
+    await page
+      .locator('[data-testid="email-settings-page"]')
+      .waitFor({ state: 'visible', timeout: 15_000 });
 
     const spinner = page.locator('.animate-spin').first();
     await spinner.waitFor({ state: 'hidden', timeout: 10_000 }).catch(() => {});
 
     const accountCards = page.locator('[data-testid^="email-account-"]');
-    const hasCards = await accountCards.first().isVisible({ timeout: 5_000 }).catch(() => false);
+    const hasCards = await accountCards
+      .first()
+      .isVisible({ timeout: 5_000 })
+      .catch(() => false);
 
     if (!hasCards) {
       test.skip();
@@ -318,10 +352,12 @@ test.describe('Email Shared Mailbox', () => {
     await expect(syncBtn).toBeEnabled();
 
     // Click sync (will call the sync API)
-    const syncApiPromise = page.waitForResponse(
-      (r: any) => r.url().includes('/sync') && r.method() === 'POST' && r.status() === 200,
-      { timeout: 10_000 },
-    ).catch(() => null);
+    const syncApiPromise = page
+      .waitForResponse(
+        (r: any) => r.url().includes('/sync') && r.method() === 'POST' && r.status() === 200,
+        { timeout: 10_000 },
+      )
+      .catch(() => null);
 
     await syncBtn.click();
     await syncApiPromise;

@@ -37,7 +37,13 @@ function SendIcon({ className }: { className?: string }) {
 
 function BookIcon({ className }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+    >
       <path d="M4 19.5v-15A2.5 2.5 0 016.5 2H20v20H6.5a2.5 2.5 0 010-5H20" />
     </svg>
   );
@@ -127,13 +133,12 @@ function MessageBubble({ message, onConfirm, onCancel, isLoading }: MessageBubbl
     );
   }
 
-  // Tool result — execute_query gets a special chart card; others get collapsible table
+  // Tool result — any result with records array gets a chart card; others get collapsible table
   if (message.type === 'tool_result') {
-    const isDataQuery =
-      (message.toolName === 'builtin__execute_query' || message.toolName === 'builtin__chat_bi') &&
-      message.toolResult?.chartType;
-    if (isDataQuery) {
-      return <ChatBiResultCard result={message.toolResult as any} />;
+    // toolResult shape varies: { records, ... } or { success, data: { records, ... }, durationMs }
+    const resultData = message.toolResult?.data || message.toolResult;
+    if (resultData?.records && Array.isArray(resultData.records) && resultData.records.length > 0) {
+      return <ChatBiResultCard result={resultData as any} />;
     }
     const isModelSuggest =
       message.toolName === 'builtin__model_suggest' && message.toolResult?.modelCode;
@@ -375,7 +380,7 @@ function KnowledgeBaseSelector() {
       >
         <BookIcon className="h-4.5 w-4.5" />
         {selectedCount > 0 && (
-          <span className="min-w-[16px] rounded-full bg-blue-500 px-1 text-center text-[10px] font-bold leading-4 text-white">
+          <span className="min-w-[16px] rounded-full bg-blue-500 px-1 text-center text-[10px] leading-4 font-bold text-white">
             {selectedCount}
           </span>
         )}
@@ -444,7 +449,7 @@ function SelectedKbChips() {
   if (selected.length === 0) return null;
 
   return (
-    <div className="flex flex-wrap gap-1 px-4 pb-1 pt-2" data-testid="kb-selected-chips">
+    <div className="flex flex-wrap gap-1 px-4 pt-2 pb-1" data-testid="kb-selected-chips">
       {selected.map((kb) => (
         <span
           key={kb.pid}

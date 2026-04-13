@@ -1,5 +1,5 @@
 {
-  "kind": "Page",
+  "kind": "page",
   "version": "4.0.0",
   "id": "page.store.main",
   "title": "$i18n:page.store.main.title",

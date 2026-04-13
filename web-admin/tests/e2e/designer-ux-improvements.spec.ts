@@ -162,10 +162,7 @@ test.describe('Dashboard Designer — Drag Preview (#3)', () => {
     const canvasBox = await canvas.boundingBox();
 
     if (widgetBox && canvasBox) {
-      await page.mouse.move(
-        widgetBox.x + widgetBox.width / 2,
-        widgetBox.y + widgetBox.height / 2,
-      );
+      await page.mouse.move(widgetBox.x + widgetBox.width / 2, widgetBox.y + widgetBox.height / 2);
       await page.mouse.down();
       await page.mouse.move(canvasBox.x + canvasBox.width / 2, canvasBox.y + canvasBox.height / 2, {
         steps: 5,
@@ -225,7 +222,10 @@ test.describe('Unified Empty State (#4)', () => {
     await expect(page.getByTestId('report-canvas-empty')).toBeVisible();
 
     // Add a block
-    await page.getByTestId('block-palette').getByRole('button', { name: /Data Table/ }).click();
+    await page
+      .getByTestId('block-palette')
+      .getByRole('button', { name: /Data Table/ })
+      .click();
     const blocks = page.getByTestId('report-canvas').locator('[draggable="true"]');
     await expect(blocks).toHaveCount(1, { timeout: 10000 });
 

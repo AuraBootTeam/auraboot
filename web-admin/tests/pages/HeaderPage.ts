@@ -35,12 +35,18 @@ export class HeaderPage {
 
   /** The clickable theme button inside the toggle */
   get themeButton(): Locator {
-    return this.page.locator('[data-testid="theme-toggle"] button, [data-testid="theme-toggle"]').first();
+    return this.page
+      .locator('[data-testid="theme-toggle"] button, [data-testid="theme-toggle"]')
+      .first();
   }
 
   /** The theme dropdown panel */
   get themeDropdown(): Locator {
-    return this.page.locator('[data-testid="theme-dropdown"], [role="menu"]:has-text("浅色"), [role="menu"]:has-text("Dark")').first();
+    return this.page
+      .locator(
+        '[data-testid="theme-dropdown"], [role="menu"]:has-text("浅色"), [role="menu"]:has-text("Dark")',
+      )
+      .first();
   }
 
   /** Open the theme dropdown if current UI uses dropdown mode. */
@@ -96,20 +102,26 @@ export class HeaderPage {
   /** Assert that dark mode is active on <html> */
   async expectDarkMode(): Promise<void> {
     await expect
-      .poll(async () => {
-        const className = await this.page.locator('html').getAttribute('class');
-        return /dark/.test(className ?? '');
-      }, { timeout: 5000 })
+      .poll(
+        async () => {
+          const className = await this.page.locator('html').getAttribute('class');
+          return /dark/.test(className ?? '');
+        },
+        { timeout: 5000 },
+      )
       .toBe(true);
   }
 
   /** Assert that dark mode is NOT active on <html> */
   async expectLightMode(): Promise<void> {
     await expect
-      .poll(async () => {
-        const className = await this.page.locator('html').getAttribute('class');
-        return /dark/.test(className ?? '');
-      }, { timeout: 5000 })
+      .poll(
+        async () => {
+          const className = await this.page.locator('html').getAttribute('class');
+          return /dark/.test(className ?? '');
+        },
+        { timeout: 5000 },
+      )
       .toBe(false);
   }
 
@@ -117,16 +129,18 @@ export class HeaderPage {
 
   /** The language toggle container [data-testid="lang-toggle"] */
   get langToggle(): Locator {
-    return this.page.locator(
-      '[data-testid="lang-toggle"], [data-testid="language-switcher"], button[aria-label*="lang" i], button[aria-label*="语言"]'
-    ).first();
+    return this.page
+      .locator(
+        '[data-testid="lang-toggle"], [data-testid="language-switcher"], button[aria-label*="lang" i], button[aria-label*="语言"]',
+      )
+      .first();
   }
 
   /** The clickable language button inside the toggle */
   get langButton(): Locator {
     return this.header
       .locator(
-        '[data-testid="lang-toggle"] > button, [data-testid="language-switcher"] > button, [data-testid="lang-toggle"], [data-testid="language-switcher"], button[aria-label*="lang" i], button[aria-label*="语言"]'
+        '[data-testid="lang-toggle"] > button, [data-testid="language-switcher"] > button, [data-testid="lang-toggle"], [data-testid="language-switcher"], button[aria-label*="lang" i], button[aria-label*="语言"]',
       )
       .first();
   }
@@ -135,7 +149,7 @@ export class HeaderPage {
   get langDropdown(): Locator {
     return this.page
       .locator(
-        '[data-testid="lang-dropdown"], [role="menu"]:has-text("English"), [role="menu"]:has-text("中文"), [role="listbox"]'
+        '[data-testid="lang-dropdown"], [role="menu"]:has-text("English"), [role="menu"]:has-text("中文"), [role="listbox"]',
       )
       .first();
   }
@@ -181,9 +195,11 @@ export class HeaderPage {
 
   /** The notification link in the header */
   get notificationLink(): Locator {
-    return this.page.locator(
-      'header [data-testid="notification-bell"], header a[href="/notifications"], header [data-testid="header-notifications"], header button[aria-label*="notification" i]'
-    ).first();
+    return this.page
+      .locator(
+        'header [data-testid="notification-bell"], header a[href="/notifications"], header [data-testid="header-notifications"], header button[aria-label*="notification" i]',
+      )
+      .first();
   }
 
   /** The bell icon SVG inside the notification link */
@@ -197,7 +213,9 @@ export class HeaderPage {
     await Promise.race([
       this.page.waitForURL('**/notifications', { timeout: 10000 }),
       this.page
-        .locator('[data-testid="notification-dropdown-panel"], [data-testid="notification-panel"], [role="dialog"], [role="menu"]')
+        .locator(
+          '[data-testid="notification-dropdown-panel"], [data-testid="notification-panel"], [role="dialog"], [role="menu"]',
+        )
         .first()
         .waitFor({ state: 'visible', timeout: 10000 }),
     ]).catch(() => null);
@@ -222,9 +240,11 @@ export class HeaderPage {
 
   /** The logout link inside the user dropdown */
   get logoutLink(): Locator {
-    return this.page.locator(
-      '[data-testid="user-dropdown"] a[href="/logout"], [data-testid="user-dropdown"] a:has-text("退出"), [data-testid="user-dropdown"] a:has-text("Log Out")'
-    ).first();
+    return this.page
+      .locator(
+        '[data-testid="user-dropdown"] a[href="/logout"], [data-testid="user-dropdown"] a:has-text("退出"), [data-testid="user-dropdown"] a:has-text("Log Out")',
+      )
+      .first();
   }
 
   /** The user dropdown panel */
@@ -243,15 +263,20 @@ export class HeaderPage {
    * doesn't make auth/logout flows flaky.
    */
   async openUserMenu(): Promise<void> {
-    await expect.poll(async () => {
-      await this.userMenuButton.click().catch(async () => {
-        await this.userAvatar.click();
-      });
-      return this.userDropdown.isVisible({ timeout: 500 }).catch(() => false);
-    }, {
-      timeout: 5000,
-      intervals: [100, 250, 500, 1000],
-    }).toBe(true);
+    await expect
+      .poll(
+        async () => {
+          await this.userMenuButton.click().catch(async () => {
+            await this.userAvatar.click();
+          });
+          return this.userDropdown.isVisible({ timeout: 500 }).catch(() => false);
+        },
+        {
+          timeout: 5000,
+          intervals: [100, 250, 500, 1000],
+        },
+      )
+      .toBe(true);
 
     await expect(this.logoutLink).toBeVisible({ timeout: 5000 });
   }
@@ -287,12 +312,12 @@ export class HeaderPage {
     // Wait for navigation to logout/login page
     await this.page.waitForURL(/\/(logout|login)/, { timeout: 8000 }).catch(() => {});
 
-    // Handle logout confirmation page if present
-    const logoutButton = this.page.locator('button:has-text("Log Out")');
+    // Handle logout confirmation page if present (button text is "确认退出" in Chinese UI)
+    const logoutButton = this.page.locator('button:has-text("确认退出"), button:has-text("Log Out"), button[type="submit"]').first();
     const hasLogoutButton = await logoutButton.isVisible({ timeout: 5000 }).catch(() => false);
     if (hasLogoutButton) {
       await logoutButton.click();
-      await this.page.waitForLoadState('domcontentloaded');
+      await this.page.waitForURL(/\/login/, { timeout: 10000 }).catch(() => {});
     }
   }
 }

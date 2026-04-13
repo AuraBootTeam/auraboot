@@ -77,8 +77,7 @@ export const ReportCanvas: React.FC = () => {
 
       const currentIndex = report.body.findIndex((b) => b.id === draggedBlockId);
       // Adjust target index if dragging from before the target
-      const adjustedTarget =
-        currentIndex < dropTargetIndex ? dropTargetIndex - 1 : dropTargetIndex;
+      const adjustedTarget = currentIndex < dropTargetIndex ? dropTargetIndex - 1 : dropTargetIndex;
 
       if (currentIndex !== adjustedTarget) {
         reorderBlock(draggedBlockId, adjustedTarget);
@@ -160,14 +159,14 @@ export const ReportCanvas: React.FC = () => {
               >
                 {/* Drag handle */}
                 <div
-                  className="absolute top-2 left-2 z-10 cursor-grab rounded p-1 text-gray-400 opacity-0 transition-opacity hover:bg-gray-100 hover:text-gray-600 group-hover:opacity-100 active:cursor-grabbing"
+                  className="absolute top-2 left-2 z-10 cursor-grab rounded p-1 text-gray-400 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-gray-100 hover:text-gray-600 active:cursor-grabbing"
                   data-testid={`drag-handle-${block.id}`}
                   onMouseDown={(e) => e.stopPropagation()}
                 >
                   <GripVertical className="h-4 w-4" />
                 </div>
 
-                {block.blockType === 'data-table' && (
+                {block.blockType === 'table' && (
                   <ReportTableBlock block={block} mode="design" />
                 )}
                 {block.blockType === 'grouped-table' && (
@@ -182,9 +181,7 @@ export const ReportCanvas: React.FC = () => {
                 {block.blockType === 'cross-tab' && (
                   <ReportCrossTabBlock block={block} mode="design" />
                 )}
-                {block.blockType === 'chart' && (
-                  <ReportChartBlock block={block} mode="design" />
-                )}
+                {block.blockType === 'chart' && <ReportChartBlock block={block} mode="design" />}
                 {block.blockType === 'barcode' && (
                   <ReportBarcodeBlock block={block} mode="design" />
                 )}

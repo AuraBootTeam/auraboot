@@ -67,21 +67,26 @@ export function createDeviceTestData(overrides?: Partial<DeviceData>): DeviceDat
     price: 9999.99,
     serial_number: `SN-${timestamp}-${random}`,
     install_date: new Date().toISOString().split('T')[0],
-    ...overrides
+    ...overrides,
   };
 }
 
 /**
  * Generate multiple device test records
  */
-export function createBatchDeviceData(count: number, baseOverrides?: Partial<DeviceData>): DeviceData[] {
+export function createBatchDeviceData(
+  count: number,
+  baseOverrides?: Partial<DeviceData>,
+): DeviceData[] {
   const devices: DeviceData[] = [];
 
   for (let i = 0; i < count; i++) {
-    devices.push(createDeviceTestData({
-      ...baseOverrides,
-      device_name: `Batch Device ${i + 1}_${Date.now()}`
-    }));
+    devices.push(
+      createDeviceTestData({
+        ...baseOverrides,
+        device_name: `Batch Device ${i + 1}_${Date.now()}`,
+      }),
+    );
   }
 
   return devices;
@@ -91,12 +96,21 @@ export function createBatchDeviceData(count: number, baseOverrides?: Partial<Dev
  * Generate device data for each status
  */
 export function createDeviceForEachStatus(): DeviceData[] {
-  const statuses: DeviceStatus[] = ['inactive', 'online', 'offline', 'maintenance', 'fault', 'retired'];
+  const statuses: DeviceStatus[] = [
+    'inactive',
+    'online',
+    'offline',
+    'maintenance',
+    'fault',
+    'retired',
+  ];
 
-  return statuses.map(status => createDeviceTestData({
-    device_name: `${status} Device ${Date.now()}`,
-    status
-  }));
+  return statuses.map((status) =>
+    createDeviceTestData({
+      device_name: `${status} Device ${Date.now()}`,
+      status,
+    }),
+  );
 }
 
 // ============================================================================
@@ -123,9 +137,12 @@ export class DeviceApiClient {
    */
   async createDevice(data: DeviceData): Promise<DeviceApiResponse | null> {
     try {
-      const response = await (this.api as any).request.post(`${this.baseUrl}/api/dynamic/device_list/create`, {
-        data
-      });
+      const response = await (this.api as any).request.post(
+        `${this.baseUrl}/api/dynamic/device_list/create`,
+        {
+          data,
+        },
+      );
       const result = await response.json();
       return this.api.isSuccess(result) ? result.data : null;
     } catch (error) {
@@ -139,7 +156,9 @@ export class DeviceApiClient {
    */
   async getDevice(pid: string): Promise<DeviceApiResponse | null> {
     try {
-      const response = await (this.api as any).request.get(`${this.baseUrl}/api/dynamic/device_list/${pid}`);
+      const response = await (this.api as any).request.get(
+        `${this.baseUrl}/api/dynamic/device_list/${pid}`,
+      );
       const result = await response.json();
       return this.api.isSuccess(result) ? result.data : null;
     } catch (error) {
@@ -153,9 +172,12 @@ export class DeviceApiClient {
    */
   async updateDevice(pid: string, data: Partial<DeviceData>): Promise<DeviceApiResponse | null> {
     try {
-      const response = await (this.api as any).request.put(`${this.baseUrl}/api/dynamic/device_list/${pid}`, {
-        data
-      });
+      const response = await (this.api as any).request.put(
+        `${this.baseUrl}/api/dynamic/device_list/${pid}`,
+        {
+          data,
+        },
+      );
       const result = await response.json();
       return this.api.isSuccess(result) ? result.data : null;
     } catch (error) {
@@ -169,7 +191,9 @@ export class DeviceApiClient {
    */
   async deleteDevice(pid: string): Promise<boolean> {
     try {
-      const response = await (this.api as any).request.delete(`${this.baseUrl}/api/dynamic/device_list/${pid}`);
+      const response = await (this.api as any).request.delete(
+        `${this.baseUrl}/api/dynamic/device_list/${pid}`,
+      );
       const result = await response.json();
       return this.api.isSuccess(result);
     } catch (error) {
@@ -181,16 +205,23 @@ export class DeviceApiClient {
   /**
    * Execute device command
    */
-  async executeCommand(commandCode: string, payload: Record<string, any>, targetRecordId?: string): Promise<any> {
+  async executeCommand(
+    commandCode: string,
+    payload: Record<string, any>,
+    targetRecordId?: string,
+  ): Promise<any> {
     try {
-      const response = await (this.api as any).request.post(`${this.baseUrl}/api/meta/commands/${commandCode}/execute`, {
-        data: {
-          payload,
-          operationType: targetRecordId ? 'update' : 'create',
-          targetRecordId,
-          clientRequestId: `e2e_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
-        }
-      });
+      const response = await (this.api as any).request.post(
+        `${this.baseUrl}/api/meta/commands/${commandCode}/execute`,
+        {
+          data: {
+            payload,
+            operationType: targetRecordId ? 'update' : 'create',
+            targetRecordId,
+            clientRequestId: `e2e_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          },
+        },
+      );
       return response.json();
     } catch (error) {
       console.error('Failed to execute command:', error);
@@ -363,10 +394,12 @@ export class DeviceDetailPage {
 export async function waitForDeviceStatus(
   page: Page,
   expectedStatus: string,
-  timeout: number = 5000
+  timeout: number = 5000,
 ): Promise<boolean> {
   try {
-    await page.waitForSelector(`[data-testid="device-status"]:has-text("${expectedStatus}")`, { timeout });
+    await page.waitForSelector(`[data-testid="device-status"]:has-text("${expectedStatus}")`, {
+      timeout,
+    });
     return true;
   } catch {
     return false;

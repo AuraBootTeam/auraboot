@@ -56,6 +56,13 @@ export function usePageRuntime(
   const navigate = useNavigate();
   const { t, locale } = useI18n();
 
+  // Build $page metadata from schema
+  const pageMetadata = useMemo(() => ({
+    kind: (schema as any)?.kind,
+    modelCode: (schema as any)?.modelCode,
+    pageKey: (schema as any)?.pageKey,
+  }), [schema]);
+
   // Build expression context
   const expressionContext = useMemo(() => {
     return createExpressionContext({
@@ -69,9 +76,10 @@ export function usePageRuntime(
       },
       t,
       fetchResult,
+      $page: pageMetadata,
       ...additionalContext,
     });
-  }, [locale, t, additionalContext]);
+  }, [locale, t, pageMetadata, additionalContext]);
 
   // Initialize DataSourceManager
   const { manager: dataSourceManager } = usePageDataSources({
@@ -98,12 +106,10 @@ export function usePageRuntime(
     const codes = new Set<string>();
     if (schema?.modelCode) codes.add(schema.modelCode);
     // Extract from sub-table blocks
-    if (schema?.areas) {
-      for (const area of Object.values(schema.areas)) {
-        for (const block of (area as any).blocks || []) {
-          if (block.childModel) codes.add(block.childModel);
-          if (block.modelCode) codes.add(block.modelCode);
-        }
+    if (schema?.blocks) {
+      for (const block of schema.blocks) {
+        if ((block as any).childModel) codes.add((block as any).childModel);
+        if ((block as any).modelCode) codes.add((block as any).modelCode);
       }
     }
     return codes;

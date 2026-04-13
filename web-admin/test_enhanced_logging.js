@@ -2,7 +2,7 @@
 
 /**
  * 测试增强的BFF代理日志功能
- * 
+ *
  * 这个脚本会发送各种类型的请求来测试不同的日志场景
  */
 
@@ -18,7 +18,7 @@ async function testEnhancedLogging() {
   console.log('📋 Test 1: Successful Request');
   try {
     const response = await axios.get(`${BFF_BASE_URL}/api/actuator/health`, {
-      timeout: 5000
+      timeout: 5000,
     });
     console.log(`✅ Success: ${response.status} ${response.statusText}`);
   } catch (error) {
@@ -31,7 +31,7 @@ async function testEnhancedLogging() {
   console.log('\n📋 Test 2: Authentication Error (401)');
   try {
     const response = await axios.get(`${BFF_BASE_URL}/api/admin/documents`, {
-      timeout: 5000
+      timeout: 5000,
     });
     console.log(`✅ Success: ${response.status} ${response.statusText}`);
   } catch (error) {
@@ -48,7 +48,7 @@ async function testEnhancedLogging() {
   console.log('\n📋 Test 3: Not Found Error (404)');
   try {
     const response = await axios.get(`${BFF_BASE_URL}/api/nonexistent/endpoint`, {
-      timeout: 5000
+      timeout: 5000,
     });
     console.log(`✅ Success: ${response.status} ${response.statusText}`);
   } catch (error) {
@@ -64,16 +64,20 @@ async function testEnhancedLogging() {
   // 测试场景4: 带认证的POST请求
   console.log('\n📋 Test 4: POST Request with Authentication');
   try {
-    const response = await axios.post(`${BFF_BASE_URL}/api/admin/documents/upload`, {
-      documentType: 'test',
-      createdBy: 'test-user'
-    }, {
-      headers: {
-        'Content-Type': 'application/json',
-        'Cookie': 'session=test-session-cookie'
+    const response = await axios.post(
+      `${BFF_BASE_URL}/api/admin/documents/upload`,
+      {
+        documentType: 'test',
+        createdBy: 'test-user',
       },
-      timeout: 5000
-    });
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: 'session=test-session-cookie',
+        },
+        timeout: 5000,
+      },
+    );
     console.log(`✅ Success: ${response.status} ${response.statusText}`);
   } catch (error) {
     if (error.response) {
@@ -90,7 +94,7 @@ async function testEnhancedLogging() {
   try {
     // 尝试连接到一个不存在的端口
     const response = await axios.get(`http://localhost:9999/api/health`, {
-      timeout: 2000
+      timeout: 2000,
     });
     console.log(`✅ Success: ${response.status} ${response.statusText}`);
   } catch (error) {
@@ -107,7 +111,7 @@ async function testEnhancedLogging() {
 }
 
 function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 // 运行测试

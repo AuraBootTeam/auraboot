@@ -1,5 +1,5 @@
 {
-  "kind": "Detail",
+  "kind": "detail",
   "version": "1.0.0",
   "id": "detail.meta.model",
   "title": "$i18n:detail.model.title",

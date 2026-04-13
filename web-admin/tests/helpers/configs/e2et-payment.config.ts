@@ -12,7 +12,7 @@ import type { ModelTestConfig } from '../model-test-helper';
 
 export const E2ET_PAYMENT_CONFIG: ModelTestConfig = {
   modelCode: 'e2et_payment',
-  pageKey: 'e2et-payment',
+  pageKey: 'e2et_payment',
   namespace: 'e2et',
   commands: {
     create: 'create_payment',

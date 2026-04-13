@@ -47,13 +47,13 @@ export interface BlockPropertyPanelProps {
  * Block type info
  */
 const BLOCK_INFO: Record<string, { name: string; icon: string }> = {
-  'filter-form': { name: 'Filter Form', icon: '🔍' },
+  'filters': { name: 'Filter Form', icon: '🔍' },
   'form-section': { name: 'Form Section', icon: '📝' },
   'detail-section': { name: 'Detail Section', icon: '📄' },
   'form-buttons': { name: 'Form Buttons', icon: '✅' },
-  'toolbar-buttons': { name: 'Toolbar Buttons', icon: '🔘' },
+  'toolbar': { name: 'Toolbar Buttons', icon: '🔘' },
   'selection-info': { name: 'Selection Info', icon: '☑️' },
-  'data-table': { name: 'Data Table', icon: '📊' },
+  'table': { name: 'Data Table', icon: '📊' },
   'stat-card': { name: 'Stat Card', icon: '📈' },
   'chart-card': { name: 'Chart Card', icon: '📉' },
   text: { name: 'Text Content', icon: '📃' },
@@ -204,9 +204,9 @@ const BlockEditors: React.FC<BlockEditorsProps> = ({ block, modelCode, onChange,
     </EditorSection>,
   );
 
-  // Fields editor for filter-form, form-section, detail-section
+  // Fields editor for filters, form-section, detail-section
   if (
-    block.blockType === 'filter-form' ||
+    block.blockType === 'filters' ||
     block.blockType === 'form-section' ||
     block.blockType === 'detail-section'
   ) {
@@ -218,14 +218,14 @@ const BlockEditors: React.FC<BlockEditorsProps> = ({ block, modelCode, onChange,
           blockId={block.id}
           onChange={(fields) => onChange({ fields })}
           readonly={readonly}
-          showAdvanced={block.blockType === 'filter-form'}
+          showAdvanced={block.blockType === 'filters'}
         />
       </EditorSection>,
     );
   }
 
-  // Columns editor for data-table
-  if (block.blockType === 'data-table') {
+  // Columns editor for table
+  if (block.blockType === 'table') {
     sections.push(
       <EditorSection key="columns" title="Columns" hint="Drag fields from left panel">
         <ColumnsEditor
@@ -239,8 +239,8 @@ const BlockEditors: React.FC<BlockEditorsProps> = ({ block, modelCode, onChange,
     );
   }
 
-  // Tab filter editor for list-tabs blocks
-  if ((block as any).blockType === 'list-tabs') {
+  // Tab filter editor for tabs blocks
+  if ((block as any).blockType === 'tabs') {
     sections.push(
       <EditorSection key="tabs" title="Tabs">
         <TabFilterEditor
@@ -254,9 +254,9 @@ const BlockEditors: React.FC<BlockEditorsProps> = ({ block, modelCode, onChange,
 
   // Actions editor for buttons blocks
   if (
-    block.blockType === 'toolbar-buttons' ||
+    block.blockType === 'toolbar' ||
     block.blockType === 'form-buttons' ||
-    block.blockType === 'filter-form'
+    block.blockType === 'filters'
   ) {
     sections.push(
       <EditorSection key="actions" title="Actions">
@@ -265,7 +265,7 @@ const BlockEditors: React.FC<BlockEditorsProps> = ({ block, modelCode, onChange,
           actions={block.actions || []}
           onChange={(buttons, actions) => onChange({ buttons, actions })}
           readonly={readonly}
-          showQuickActions={block.blockType !== 'toolbar-buttons'}
+          showQuickActions={block.blockType !== 'toolbar'}
         />
       </EditorSection>,
     );

@@ -1,5 +1,4 @@
 import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
-import * as XLSX from 'xlsx';
 import {
   autoMapColumns,
   getMissingRequiredFields,
@@ -229,6 +228,7 @@ export const BomImportWizard: React.FC<BomImportWizardProps> = ({
       setParseError(null);
 
       try {
+        const XLSX = await import('xlsx');
         const data = await f.arrayBuffer();
         const workbook = XLSX.read(data, { type: 'array', cellDates: true });
 

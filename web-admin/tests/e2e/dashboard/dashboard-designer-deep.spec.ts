@@ -76,7 +76,10 @@ test.describe('Dashboard Designer Deep', () => {
     if (hasResizeHandle) {
       const handleBox = await resizeHandle.boundingBox();
       if (handleBox) {
-        await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2);
+        await page.mouse.move(
+          handleBox.x + handleBox.width / 2,
+          handleBox.y + handleBox.height / 2,
+        );
         await page.mouse.down();
         await page.mouse.move(handleBox.x + 100, handleBox.y + 50, { steps: 10 });
         await page.mouse.up();
@@ -118,9 +121,12 @@ test.describe('Dashboard Designer Deep', () => {
 
     // Should show validation warning for empty canvas
     const validationMsg = page.locator(
-      '.ant-message-warning, .ant-message-error, text=至少添加一个, text=validation, [role="alert"]'
+      '.ant-message-warning, .ant-message-error, text=至少添加一个, text=validation, [role="alert"]',
     );
-    const hasValidation = await validationMsg.first().isVisible({ timeout: 5000 }).catch(() => false);
+    const hasValidation = await validationMsg
+      .first()
+      .isVisible({ timeout: 5000 })
+      .catch(() => false);
 
     // Validation may show as toast or inline message
     expect(hasValidation || true).toBe(true);
@@ -150,7 +156,7 @@ test.describe('Dashboard Designer Deep', () => {
       if (hasPublished) {
         // Look for unpublish button
         const unpublishBtn = dp.unpublishButton.or(
-          page.locator('button:has-text("取消发布"), button:has-text("Unpublish")').first()
+          page.locator('button:has-text("取消发布"), button:has-text("Unpublish")').first(),
         );
         const hasUnpublish = await unpublishBtn.isVisible({ timeout: 3000 }).catch(() => false);
 

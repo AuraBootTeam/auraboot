@@ -1,7 +1,7 @@
 /**
  * Toolbar Preview
  *
- * Preview component for toolbar-buttons and form-buttons blocks.
+ * Preview component for toolbar and form-buttons blocks.
  */
 
 import React from 'react';

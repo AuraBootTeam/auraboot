@@ -8,8 +8,8 @@
  * CP-002 @critical : Complaint open → INVESTIGATING → resolved → closed lifecycle
  *
  * Menu paths (CRM root → direct leaf links):
- *   /dynamic/crm-quote       → model: crm_quote
- *   /dynamic/crm-complaint   → model: crm_complaint
+ *   /p/crm-quote       → model: crm_quote
+ *   /p/crm-complaint   → model: crm_complaint
  *
  * Prerequisites: crm plugin imported and all models published.
  *
@@ -23,11 +23,7 @@ import { uniqueId, executeCommandViaApi } from '../helpers/index';
 // Navigation helper
 // ---------------------------------------------------------------------------
 
-async function navigateToCrmPage(
-  page: Page,
-  leafName: string,
-  modelCode: string,
-): Promise<void> {
+async function navigateToCrmPage(page: Page, leafName: string, modelCode: string): Promise<void> {
   await page.goto('/dashboards');
   await page.waitForLoadState('domcontentloaded');
 
@@ -42,24 +38,26 @@ async function navigateToCrmPage(
   await page.waitForResponse(() => true, { timeout: 1_500 }).catch(() => null);
 
   // Use href-based selector for reliability (menu path uses hyphens)
-  const hrefPath = `/dynamic/${modelCode.replace(/_/g, '-')}`;
-  const leafLink = nav.locator(`a[href="${hrefPath}"]`).or(
-    nav.getByRole('link', { name: leafName }),
-  ).first();
+  const hrefPath = `/p/${modelCode}`;
+  const leafLink = nav
+    .locator(`a[href="${hrefPath}"]`)
+    .or(nav.getByRole('link', { name: leafName }))
+    .first();
   await leafLink.waitFor({ state: 'attached', timeout: 8_000 });
   await leafLink.scrollIntoViewIfNeeded();
 
   // Set up waitForResponse BEFORE click
-  const listResponsePromise = page.waitForResponse(
-    (r) => r.url().includes(`/api/dynamic/${modelCode}`) && r.status() === 200,
-    { timeout: 15_000 },
-  ).catch(() => null);
+  const listResponsePromise = page
+    .waitForResponse((r) => r.url().includes(`/api/dynamic/${modelCode}`) && r.status() === 200, {
+      timeout: 15_000,
+    })
+    .catch(() => null);
   await leafLink.evaluate((el: HTMLElement) => el.click());
   await listResponsePromise;
 
-  await expect(
-    page.locator('table, [class*="ant-table"]').first(),
-  ).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator('table, [class*="ant-table"]').first()).toBeVisible({
+    timeout: 10_000,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -167,15 +165,15 @@ test.describe('CRM — Quote & Complaint', () => {
     expect(headerText).not.toMatch(/crm_qt_/i);
   });
 
-  test('QT-002 @critical: Quote draft → REVIEWED → SENT → ACCEPTED', async ({
-    page,
-  }) => {
+  test('QT-002 @critical: Quote draft → REVIEWED → SENT → ACCEPTED', async ({ page }) => {
     expect(mainQuoteId).toBeTruthy();
 
     // Verify starts as draft
     let resp = await page.request.get(`/api/dynamic/crm_quote/${mainQuoteId}`);
     expect(resp.ok()).toBe(true);
-    expect((await resp.json())?.data?.crm_qt_status ?? (await resp.json()).crm_qt_status).toBe('draft');
+    expect((await resp.json())?.data?.crm_qt_status ?? (await resp.json()).crm_qt_status).toBe(
+      'draft',
+    );
 
     // draft → REVIEWED
     await executeCommandViaApi(page, 'crm:review_quote', {}, mainQuoteId, 'state_transition');
@@ -245,9 +243,7 @@ test.describe('CRM — Quote & Complaint', () => {
     expect(headerText).not.toMatch(/crm_cmp_/i);
   });
 
-  test('CP-002 @critical: Complaint open → INVESTIGATING → resolved → closed', async ({
-    page,
-  }) => {
+  test('CP-002 @critical: Complaint open → INVESTIGATING → resolved → closed', async ({ page }) => {
     expect(complaintId).toBeTruthy();
 
     // Verify starts as open
@@ -257,7 +253,13 @@ test.describe('CRM — Quote & Complaint', () => {
     expect((openBody?.data ?? openBody).crm_cmp_status).toBe('open');
 
     // open → INVESTIGATING
-    await executeCommandViaApi(page, 'crm:investigate_complaint', {}, complaintId, 'state_transition');
+    await executeCommandViaApi(
+      page,
+      'crm:investigate_complaint',
+      {},
+      complaintId,
+      'state_transition',
+    );
 
     resp = await page.request.get(`/api/dynamic/crm_complaint/${complaintId}`);
     const investigatingBody = await resp.json();

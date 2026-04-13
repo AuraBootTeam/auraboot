@@ -50,7 +50,7 @@ import type { SchemaRuntime } from '~/meta/runtime/schema-runtime';
 import type { DataSourceManager } from '~/meta/runtime/data-pipeline/DataSourceManager';
 import type { UnifiedSchema } from '~/meta/schemas/types';
 
-export type PageType = 'list' | 'new' | 'edit' | 'detail';
+export type PageType = 'list' | 'form' | 'detail' | 'dashboard' | 'kanban';
 
 export interface UseDynamicPageSetupOptions {
   /** 表名 */
@@ -109,14 +109,13 @@ export function useDynamicPageSetup(
   const { t, locale } = useI18n();
 
   // 1. 加载 Schema
-  const schemaType = type === 'edit' ? 'new' : type;
   const {
     schema,
     loading: schemaLoading,
     error: schemaError,
   } = useSchemaLoader({
     tableName,
-    type: schemaType,
+    type,
     token,
   });
 

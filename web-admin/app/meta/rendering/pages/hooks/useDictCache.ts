@@ -80,16 +80,22 @@ export function useDictCache({ dictCodes, token }: UseDictCacheOptions): UseDict
 
   // Include `loaded` in deps so function reference changes when data arrives,
   // forcing consumers to re-render with fresh dict data
-  const getDictItems = useCallback((code: string): DictItem[] => {
-    return cacheRef.current.get(code) || [];
-  }, [loaded]);
+  const getDictItems = useCallback(
+    (code: string): DictItem[] => {
+      return cacheRef.current.get(code) || [];
+    },
+    [loaded],
+  );
 
-  const getDictLabel = useCallback((code: string, value: string): string | undefined => {
-    const items = cacheRef.current.get(code);
-    if (!items) return undefined;
-    const item = items.find((i) => String(i.value) === String(value));
-    return item?.label;
-  }, [loaded]);
+  const getDictLabel = useCallback(
+    (code: string, value: string): string | undefined => {
+      const items = cacheRef.current.get(code);
+      if (!items) return undefined;
+      const item = items.find((i) => String(i.value) === String(value));
+      return item?.label;
+    },
+    [loaded],
+  );
 
   return {
     loaded,

@@ -269,16 +269,14 @@ export class SchemaRuntime {
   private getAllFormFields(): any[] {
     const fields: any[] = [];
 
-    if (!this.schema.areas) return fields;
+    if (!this.schema.blocks) return fields;
 
-    // 遍历所有区域和块
-    Object.values(this.schema.areas).forEach((area) => {
-      area.blocks.forEach((block) => {
-        if (block.fields) {
-          fields.push(...block.fields);
-        }
-      });
-    });
+    // 遍历所有块
+    for (const block of this.schema.blocks) {
+      if (block.fields) {
+        fields.push(...block.fields);
+      }
+    }
 
     return fields;
   }

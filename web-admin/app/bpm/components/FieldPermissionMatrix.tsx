@@ -147,10 +147,7 @@ export function FieldPermissionMatrix({ pageKey, permissions, onChange }: Props)
 
       {/* Field rows */}
       {fields.map((field) => (
-        <div
-          key={field.fieldCode}
-          className="grid grid-cols-[1fr_auto] items-center gap-2"
-        >
+        <div key={field.fieldCode} className="grid grid-cols-[1fr_auto] items-center gap-2">
           <span className="truncate text-sm text-gray-700" title={field.fieldCode}>
             {field.fieldLabel || field.fieldCode}
           </span>

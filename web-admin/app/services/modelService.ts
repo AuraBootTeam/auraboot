@@ -21,7 +21,7 @@ export interface RelatedPage {
   pid: string;
   code: string;
   title: string;
-  pageType: string;
+  kind: string;
   route?: string;
   [key: string]: unknown;
 }

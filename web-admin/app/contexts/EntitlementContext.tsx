@@ -57,8 +57,13 @@ export function EntitlementProvider({ children }: { children: React.ReactNode })
         const result = data.data || data;
         setEnabled(result.enabled ?? false);
         setEntitlements(result.entitlements ?? []);
+      } else {
+        // 404/500 = entitlement module not available (community edition) — silently disable
+        setEnabled(false);
+        setEntitlements([]);
       }
     } catch {
+      // Network error or module not available — entitlements disabled
       setEnabled(false);
       setEntitlements([]);
     } finally {

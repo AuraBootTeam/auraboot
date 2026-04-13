@@ -325,7 +325,7 @@ const FieldItem: React.FC<FieldItemProps> = ({
             />
           </div>
 
-          {/* Advanced (for filter-form) */}
+          {/* Advanced (for filters) */}
           {showAdvanced && (
             <div className="flex items-center justify-between">
               <label className="text-xs text-gray-500">高级筛选</label>

@@ -27,11 +27,11 @@ import { DynamicListPage, DynamicFormPage } from '../../pages';
 // Helpers
 // ---------------------------------------------------------------------------
 
-const ORDER_PAGE_KEY = 'e2et-order';
+const ORDER_PAGE_KEY = 'e2et_order';
 
 /** Navigate to new order form and wait for full render (two-stage loading). */
 async function navigateToNewOrderForm(page: import('@playwright/test').Page) {
-  const listPage = new DynamicListPage(page, `/dynamic/${ORDER_PAGE_KEY}`);
+  const listPage = new DynamicListPage(page, `/p/${ORDER_PAGE_KEY}`);
   await listPage.goto();
   await listPage.clickAdd();
   await page.waitForURL((url) => url.pathname.includes('/new'), { timeout: 10000 });
@@ -45,35 +45,53 @@ async function navigateToNewOrderForm(page: import('@playwright/test').Page) {
   // Must wait for BOTH independently — `select` appears before switch/date, so a combined
   // first-match wait exits too early.
   await Promise.all([
-    page.locator('button[role="switch"]').first().waitFor({ state: 'attached', timeout: 8000 }).catch(() => {}),
-    page.locator('input[type="date"]').first().waitFor({ state: 'attached', timeout: 8000 }).catch(() => {}),
+    page
+      .locator('button[role="switch"]')
+      .first()
+      .waitFor({ state: 'attached', timeout: 8000 })
+      .catch(() => {}),
+    page
+      .locator('input[type="date"]')
+      .first()
+      .waitFor({ state: 'attached', timeout: 8000 })
+      .catch(() => {}),
   ]);
   return { listPage, formPage };
 }
 
 /** Wait until at least one select has >1 option (dict data loaded). */
 async function waitForSelectOptions(page: import('@playwright/test').Page): Promise<void> {
-  await page.waitForFunction(() => {
-    const selects = Array.from(document.querySelectorAll('select'));
-    for (let i = 0; i < selects.length; i++) {
-      if (selects[i].options.length > 1) return true;
-    }
-    return false;
-  }, { timeout: 10000 }).catch(() => {});
+  await page
+    .waitForFunction(
+      () => {
+        const selects = Array.from(document.querySelectorAll('select'));
+        for (let i = 0; i < selects.length; i++) {
+          if (selects[i].options.length > 1) return true;
+        }
+        return false;
+      },
+      { timeout: 10000 },
+    )
+    .catch(() => {});
 }
 
 /** Verify the form actually rendered even when a specific smart component is not configured. */
 async function expectRenderedFormShell(page: import('@playwright/test').Page): Promise<void> {
-  await page.waitForFunction(() => {
-    return document.querySelectorAll(
-      '[data-testid^="form-field-"], ' +
-      '[data-testid^="form-btn-"], ' +
-      '[data-testid="dynamic-form"] [role="combobox"], ' +
-      '[data-testid="dynamic-form"] input, ' +
-      '[data-testid="dynamic-form"] select, ' +
-      '[data-testid="dynamic-form"] textarea'
-    ).length > 0;
-  }, { timeout: 10000 });
+  await page.waitForFunction(
+    () => {
+      return (
+        document.querySelectorAll(
+          '[data-testid^="form-field-"], ' +
+            '[data-testid^="form-btn-"], ' +
+            '[data-testid="dynamic-form"] [role="combobox"], ' +
+            '[data-testid="dynamic-form"] input, ' +
+            '[data-testid="dynamic-form"] select, ' +
+            '[data-testid="dynamic-form"] textarea',
+        ).length > 0
+      );
+    },
+    { timeout: 10000 },
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -132,7 +150,9 @@ test.describe('Smart Components — Form Components', () => {
   // SC-002: SmartTextarea (TEXT field)
   // -------------------------------------------------------------------------
 
-  test('SC-002: SmartTextarea should render textarea and accept multiline text @smoke', async ({ page }) => {
+  test('SC-002: SmartTextarea should render textarea and accept multiline text @smoke', async ({
+    page,
+  }) => {
     const order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
     await order.gotoEditForm(orderPid);
 
@@ -141,10 +161,15 @@ test.describe('Smart Components — Form Components', () => {
     await descFieldContainer.waitFor({ state: 'visible', timeout: 10000 });
 
     // Wait for loading skeleton to disappear inside the field
-    await page.waitForFunction(() => {
-      const el = document.querySelector('[data-testid="form-field-e2et_order_desc"]');
-      return el && !el.textContent?.includes('Loading');
-    }, { timeout: 10000 }).catch(() => {});
+    await page
+      .waitForFunction(
+        () => {
+          const el = document.querySelector('[data-testid="form-field-e2et_order_desc"]');
+          return el && !el.textContent?.includes('Loading');
+        },
+        { timeout: 10000 },
+      )
+      .catch(() => {});
 
     // order_desc is a TEXT field rendered via SmartTextarea
     const textarea = descFieldContainer.locator('textarea').first();
@@ -155,7 +180,7 @@ test.describe('Smart Components — Form Components', () => {
       const textInput = descFieldContainer.locator('input').first();
       const hasInput = await textInput.isVisible({ timeout: 3000 }).catch(() => false);
       // At minimum, the field container should be visible even if the sub-element isn't found yet
-      expect(hasInput || hasTextarea || await descFieldContainer.isVisible()).toBeTruthy();
+      expect(hasInput || hasTextarea || (await descFieldContainer.isVisible())).toBeTruthy();
       return;
     }
 
@@ -170,14 +195,16 @@ test.describe('Smart Components — Form Components', () => {
   // SC-003: SmartNumberInput (DECIMAL/INTEGER field)
   // -------------------------------------------------------------------------
 
-  test('SC-003: SmartNumberInput should render number input with decimal support @smoke', async ({ page }) => {
+  test('SC-003: SmartNumberInput should render number input with decimal support @smoke', async ({
+    page,
+  }) => {
     const order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
 
     // Create an order item to test number fields (qty, price)
     const itemPid = await order.child('item').createForParent(orderPid, {
       e2et_item_name: `NumTest ${uniqueId('N')}`,
       e2et_item_qty: 10,
-      e2et_item_price: 25.50,
+      e2et_item_price: 25.5,
     });
 
     try {
@@ -185,7 +212,7 @@ test.describe('Smart Components — Form Components', () => {
 
       // Sub-table renders number inputs (qty, price fields)
       const numberInputs = page.locator(
-        'input[type="number"], input[inputmode="decimal"], input[inputmode="numeric"]'
+        'input[type="number"], input[inputmode="decimal"], input[inputmode="numeric"]',
       );
       await numberInputs.first().waitFor({ state: 'attached', timeout: 10000 });
 
@@ -199,7 +226,10 @@ test.describe('Smart Components — Form Components', () => {
       const value = await firstNumber.inputValue();
       expect(value).toBe('42.75');
     } finally {
-      await order.child('item').deleteViaApi(itemPid).catch(() => {});
+      await order
+        .child('item')
+        .deleteViaApi(itemPid)
+        .catch(() => {});
     }
   });
 
@@ -221,7 +251,11 @@ test.describe('Smart Components — Form Components', () => {
     for (let i = 0; i < selectCount; i++) {
       const options = await selects.nth(i).locator('option').allTextContents();
       const optionText = options.join(' ');
-      if (optionText.includes('normal') || optionText.includes('bulk') || optionText.includes('express')) {
+      if (
+        optionText.includes('normal') ||
+        optionText.includes('bulk') ||
+        optionText.includes('express')
+      ) {
         // Select a different option
         await selects.nth(i).selectOption('bulk');
         const selectedValue = await selects.nth(i).inputValue();
@@ -247,15 +281,18 @@ test.describe('Smart Components — Form Components', () => {
     const { formPage } = await navigateToNewOrderForm(page);
 
     // Look for multi-select fields (multiple attribute or specific component)
-    const multiSelect = page.locator(
-      'select[multiple], [data-testid*="multi-select"], [role="listbox"][aria-multiselectable="true"]'
-    ).first();
+    const multiSelect = page
+      .locator(
+        'select[multiple], [data-testid*="multi-select"], [role="listbox"][aria-multiselectable="true"]',
+      )
+      .first();
     const hasMultiSelect = await multiSelect.isVisible({ timeout: 5000 }).catch(() => false);
 
     if (!hasMultiSelect) {
       test.info().annotations.push({
         type: 'note',
-        description: 'No multi-select field found on e2et-order form — SmartMultiSelect not configured for this model',
+        description:
+          'No multi-select field found on e2et-order form — SmartMultiSelect not configured for this model',
       });
       // Verify form renders correctly regardless
       const formButtons = page.locator('[data-testid^="form-btn-"]');
@@ -270,7 +307,9 @@ test.describe('Smart Components — Form Components', () => {
   // SC-006: SmartSwitch (BOOLEAN field)
   // -------------------------------------------------------------------------
 
-  test('SC-006: SmartSwitch should render toggle switch for boolean field @smoke', async ({ page }) => {
+  test('SC-006: SmartSwitch should render toggle switch for boolean field @smoke', async ({
+    page,
+  }) => {
     const { formPage } = await navigateToNewOrderForm(page);
 
     // order_urgent is a BOOLEAN field rendered as switch (button[role="switch"])
@@ -278,7 +317,7 @@ test.describe('Smart Components — Form Components', () => {
     const hasSwitch = await urgentSwitch.isVisible({ timeout: 5000 }).catch(() => false);
 
     if (!hasSwitch) {
-      throw new Error(String('SmartSwitch not found — BOOLEAN field may render differently'))
+      throw new Error(String('SmartSwitch not found — BOOLEAN field may render differently'));
       return;
     }
 
@@ -305,9 +344,7 @@ test.describe('Smart Components — Form Components', () => {
     const { formPage } = await navigateToNewOrderForm(page);
 
     // Look for checkbox inputs (may be rendered for boolean fields without switch)
-    const checkboxes = page.locator(
-      'input[type="checkbox"], [role="checkbox"]'
-    );
+    const checkboxes = page.locator('input[type="checkbox"], [role="checkbox"]');
     const checkboxCount = await checkboxes.count();
 
     if (checkboxCount === 0) {
@@ -333,9 +370,7 @@ test.describe('Smart Components — Form Components', () => {
     const { formPage } = await navigateToNewOrderForm(page);
 
     // Look for radio inputs or radio group
-    const radios = page.locator(
-      'input[type="radio"], [role="radio"], [role="radiogroup"]'
-    );
+    const radios = page.locator('input[type="radio"], [role="radio"], [role="radiogroup"]');
     const radioCount = await radios.count();
 
     if (radioCount === 0) {
@@ -346,7 +381,10 @@ test.describe('Smart Components — Form Components', () => {
       // ENUM fields render as combobox (Radix Select), not native select
       // Wait for combobox elements to appear (async component loading)
       const comboboxes = page.locator('[role="combobox"]');
-      await comboboxes.first().waitFor({ state: 'attached', timeout: 5000 }).catch(() => {});
+      await comboboxes
+        .first()
+        .waitFor({ state: 'attached', timeout: 5000 })
+        .catch(() => {});
       const comboboxCount = await comboboxes.count();
 
       // Also check for native select elements
@@ -365,7 +403,9 @@ test.describe('Smart Components — Form Components', () => {
   // SC-009: SmartDatePicker (DATE field)
   // -------------------------------------------------------------------------
 
-  test('SC-009: SmartDatePicker should render date input and accept date value @smoke', async ({ page }) => {
+  test('SC-009: SmartDatePicker should render date input and accept date value @smoke', async ({
+    page,
+  }) => {
     const { formPage } = await navigateToNewOrderForm(page);
 
     // order_date is a DATE field rendered via SmartDatePicker (native input[type="date"])
@@ -373,7 +413,7 @@ test.describe('Smart Components — Form Components', () => {
     const hasDate = await dateInput.isVisible({ timeout: 5000 }).catch(() => false);
 
     if (!hasDate) {
-      throw new Error(String('Date input not found on order form'))
+      throw new Error(String('Date input not found on order form'));
       return;
     }
 
@@ -424,9 +464,7 @@ test.describe('Smart Components — Form Components', () => {
   test('SC-011: SmartTimePicker should render time input', async ({ page }) => {
     const { formPage } = await navigateToNewOrderForm(page);
 
-    const timeInput = page.locator(
-      'input[type="time"], [data-testid*="time-picker"]'
-    ).first();
+    const timeInput = page.locator('input[type="time"], [data-testid*="time-picker"]').first();
     const hasTime = await timeInput.isVisible({ timeout: 3000 }).catch(() => false);
 
     if (!hasTime) {
@@ -475,14 +513,15 @@ test.describe('Smart Components — Form Components', () => {
 
     // Currency fields render as number inputs with inputmode="decimal"
     const currencyInputs = page.locator(
-      'input[inputmode="decimal"], input[type="number"], [data-testid*="currency"]'
+      'input[inputmode="decimal"], input[type="number"], [data-testid*="currency"]',
     );
     const count = await currencyInputs.count();
 
     if (count === 0) {
       test.info().annotations.push({
         type: 'note',
-        description: 'No currency-specific input found — DECIMAL fields may render as SmartNumberInput',
+        description:
+          'No currency-specific input found — DECIMAL fields may render as SmartNumberInput',
       });
       await expectRenderedFormShell(page);
       return;
@@ -505,9 +544,11 @@ test.describe('Smart Components — Form Components', () => {
     await order.gotoEditForm(orderPid);
 
     // Look for file upload elements
-    const uploadArea = page.locator(
-      'input[type="file"], [data-testid*="upload"], [data-testid*="file-input"], .upload-area, .dropzone'
-    ).first();
+    const uploadArea = page
+      .locator(
+        'input[type="file"], [data-testid*="upload"], [data-testid*="file-input"], .upload-area, .dropzone',
+      )
+      .first();
     const hasUpload = await uploadArea.isVisible({ timeout: 5000 }).catch(() => false);
 
     if (!hasUpload) {
@@ -518,7 +559,8 @@ test.describe('Smart Components — Form Components', () => {
       if (hiddenCount === 0) {
         test.info().annotations.push({
           type: 'note',
-          description: 'No file upload field found on e2et-order form — FILE/IMAGE field not configured',
+          description:
+            'No file upload field found on e2et-order form — FILE/IMAGE field not configured',
         });
       }
       return;
@@ -532,18 +574,22 @@ test.describe('Smart Components — Form Components', () => {
   // -------------------------------------------------------------------------
 
   test('SC-015: SmartTreeSelect should render tree-structured dropdown', async ({ page }) => {
+    test.setTimeout(30000);
     const { formPage } = await navigateToNewOrderForm(page);
 
     // TreeSelect renders with a specific component or as a cascader
-    const treeSelect = page.locator(
-      '[data-testid*="tree-select"], [role="tree"], .tree-select, [data-testid*="cascader"]'
-    ).first();
+    const treeSelect = page
+      .locator(
+        '[data-testid*="tree-select"], [role="tree"], .tree-select, [data-testid*="cascader"]',
+      )
+      .first();
     const hasTree = await treeSelect.isVisible({ timeout: 3000 }).catch(() => false);
 
     if (!hasTree) {
       test.info().annotations.push({
         type: 'note',
-        description: 'No tree select found on e2et-order form — REFERENCE tree field not configured',
+        description:
+          'No tree select found on e2et-order form — REFERENCE tree field not configured',
       });
       return;
     }
@@ -559,9 +605,11 @@ test.describe('Smart Components — Form Components', () => {
     const { formPage } = await navigateToNewOrderForm(page);
 
     // SmartUserSelect renders a select/combobox with user options
-    const userSelect = page.locator(
-      '[data-testid*="user-select"], [data-field*="user"] select, [data-field*="user"] [role="combobox"]'
-    ).first();
+    const userSelect = page
+      .locator(
+        '[data-testid*="user-select"], [data-field*="user"] select, [data-field*="user"] [role="combobox"]',
+      )
+      .first();
     const hasUserSelect = await userSelect.isVisible({ timeout: 3000 }).catch(() => false);
 
     if (!hasUserSelect) {
@@ -587,15 +635,18 @@ test.describe('Smart Components — Form Components', () => {
     const { formPage } = await navigateToNewOrderForm(page);
 
     // SmartOrganizationSelect renders for org/department reference fields
-    const orgSelect = page.locator(
-      '[data-testid*="org-select"], [data-field*="org"] select, [data-field*="department"] select, [data-field*="org"] [role="combobox"]'
-    ).first();
+    const orgSelect = page
+      .locator(
+        '[data-testid*="org-select"], [data-field*="org"] select, [data-field*="department"] select, [data-field*="org"] [role="combobox"]',
+      )
+      .first();
     const hasOrgSelect = await orgSelect.isVisible({ timeout: 3000 }).catch(() => false);
 
     if (!hasOrgSelect) {
       test.info().annotations.push({
         type: 'note',
-        description: 'No organization select found on e2et-order form — ORG_SELECT field not configured',
+        description:
+          'No organization select found on e2et-order form — ORG_SELECT field not configured',
       });
       return;
     }
@@ -613,14 +664,15 @@ test.describe('Smart Components — Form Components', () => {
 
     // SmartFormRef renders as a select, link, or lookup component for REFERENCE fields
     const refFields = page.locator(
-      '[data-testid*="form-ref"], [data-testid*="reference"], [data-field*="customer"] select, [data-field*="customer"] [role="combobox"], a[href*="/view/"]'
+      '[data-testid*="form-ref"], [data-testid*="reference"], [data-field*="customer"] select, [data-field*="customer"] [role="combobox"], a[href*="/view/"]',
     );
     const refCount = await refFields.count();
 
     if (refCount === 0) {
       test.info().annotations.push({
         type: 'note',
-        description: 'No reference field (SmartFormRef) found — REFERENCE field may not be on e2et-order form',
+        description:
+          'No reference field (SmartFormRef) found — REFERENCE field may not be on e2et-order form',
       });
       await expectRenderedFormShell(page);
       return;

@@ -1,12 +1,22 @@
 /**
- * Dashboard Designer 编辑页面路由
+ * Dashboard Designer edit route
+ * Lazy-loaded to reduce initial bundle size.
  */
 
+import React, { Suspense } from 'react';
 import { useParams } from 'react-router';
-import { DashboardDesigner } from '~/dashboard-designer';
+import { RouteLoadingFallback } from '~/components/RouteLoadingFallback';
+
+const DashboardDesigner = React.lazy(() =>
+  import('~/dashboard-designer').then((m) => ({ default: m.DashboardDesigner })),
+);
 
 export default function DashboardDesignerEditPage() {
   const { id } = useParams();
 
-  return <DashboardDesigner dashboardId={id} />;
+  return (
+    <Suspense fallback={<RouteLoadingFallback />}>
+      <DashboardDesigner dashboardId={id} />
+    </Suspense>
+  );
 }

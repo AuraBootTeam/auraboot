@@ -22,7 +22,7 @@ import { test, expect, type APIRequestContext } from '@playwright/test';
 
 // Use 127.0.0.1 to bypass system HTTP proxy (Node fetch doesn't respect NO_PROXY)
 const BACKEND_URL = 'http://127.0.0.1:6443';
-const TEST_USER = { email: process.env.TEST_ADMIN_EMAIL || 'e2e@test.local', password: process.env.TEST_ADMIN_PASSWORD || 'E2eTestPass2026!' };
+const TEST_USER = { email: 'admin@example.com', password: 'Test2026x' };
 const LLM_TIMEOUT = 60_000; // LLM calls can be slow (MiniMax tool loop ~15-30s)
 const AGENT_POLL_INTERVAL = 2_000;
 const AGENT_MAX_WAIT = 60_000;
@@ -84,7 +84,7 @@ async function chatWithAuraBot(
         message,
         conversationId: null,
         pageContext: {
-          path: modelCode ? `/dynamic/${modelCode}/list` : '/',
+          path: modelCode ? `/p/${modelCode}/list` : '/',
           modelCode: modelCode || null,
         },
       }),
@@ -205,7 +205,13 @@ async function dispatchAgentTask(
         });
         if (!dispatchResp.ok) {
           const err = await dispatchResp.text();
-          return { status: 'dispatch_failed', model: '', durationMs: 0, outputTokens: 0, error: err };
+          return {
+            status: 'dispatch_failed',
+            model: '',
+            durationMs: 0,
+            outputTokens: 0,
+            error: err,
+          };
         }
       }
     }
@@ -226,10 +232,9 @@ async function dispatchAgentTask(
   while (Date.now() - startTime < AGENT_MAX_WAIT) {
     await new Promise((r) => setTimeout(r, AGENT_POLL_INTERVAL));
 
-    const runResp = await fetch(
-      `${BACKEND_URL}/api/agent/run/${taskPid}/status`,
-      { headers },
-    ).catch(() => null);
+    const runResp = await fetch(`${BACKEND_URL}/api/agent/run/${taskPid}/status`, {
+      headers,
+    }).catch(() => null);
 
     if (runResp?.ok) {
       const body = await runResp.json();
@@ -247,7 +252,13 @@ async function dispatchAgentTask(
     }
   }
 
-  return { status: 'timeout', model: '', durationMs: 0, outputTokens: 0, error: 'Agent did not complete within timeout' };
+  return {
+    status: 'timeout',
+    model: '',
+    durationMs: 0,
+    outputTokens: 0,
+    error: 'Agent did not complete within timeout',
+  };
 }
 
 /**
@@ -333,7 +344,6 @@ test.describe('CRM AI Scenarios', () => {
   // Scenario 1: Sales Morning Briefing — AuraBot Data Insights
   // =========================================================================
   test.describe('Scenario 1: Sales Morning Briefing', () => {
-
     test('S1-01: Query lead status distribution', async () => {
       const result = await chatWithAuraBot(
         token,
@@ -368,7 +378,9 @@ test.describe('CRM AI Scenarios', () => {
 
       if (!result.error && result.content) {
         const mentionsSources =
-          /website|referral|exhibition|cold_call|social_media|来源|渠道|无|没有|0/.test(result.content);
+          /website|referral|exhibition|cold_call|social_media|来源|渠道|无|没有|0/.test(
+            result.content,
+          );
         expect(mentionsSources).toBe(true);
       }
 
@@ -433,10 +445,9 @@ test.describe('CRM AI Scenarios', () => {
 
       // Verify via detail API (crm_lead_code is auto-generated, cannot filter by our input value)
       const headers = authHeaders(token);
-      const detailResp = await fetch(
-        `${BACKEND_URL}/api/dynamic/crm_lead_list/${leadPid}`,
-        { headers },
-      );
+      const detailResp = await fetch(`${BACKEND_URL}/api/dynamic/crm_lead_list/${leadPid}`, {
+        headers,
+      });
       const detailBody = await detailResp.json();
       expect(detailBody.code).toBe('0');
       expect(detailBody.data?.crm_lead_score).toBe(85);
@@ -452,10 +463,9 @@ test.describe('CRM AI Scenarios', () => {
 
       // Verify status changed via detail API
       const headers = authHeaders(token);
-      const detailResp = await fetch(
-        `${BACKEND_URL}/api/dynamic/crm_lead_list/${leadPid}`,
-        { headers },
-      );
+      const detailResp = await fetch(`${BACKEND_URL}/api/dynamic/crm_lead_list/${leadPid}`, {
+        headers,
+      });
       const detailBody = await detailResp.json();
       expect(detailBody.data?.crm_lead_status).toBe('contacted');
 
@@ -470,10 +480,9 @@ test.describe('CRM AI Scenarios', () => {
 
       // Verify status changed via detail API
       const headers = authHeaders(token);
-      const detailResp = await fetch(
-        `${BACKEND_URL}/api/dynamic/crm_lead_list/${leadPid}`,
-        { headers },
-      );
+      const detailResp = await fetch(`${BACKEND_URL}/api/dynamic/crm_lead_list/${leadPid}`, {
+        headers,
+      });
       const detailBody = await detailResp.json();
       expect(detailBody.data?.crm_lead_status).toBe('qualified');
 
@@ -488,16 +497,17 @@ test.describe('CRM AI Scenarios', () => {
 
       // Verify lead status = converted via detail API
       const headers = authHeaders(token);
-      const detailResp = await fetch(
-        `${BACKEND_URL}/api/dynamic/crm_lead_list/${leadPid}`,
-        { headers },
-      );
+      const detailResp = await fetch(`${BACKEND_URL}/api/dynamic/crm_lead_list/${leadPid}`, {
+        headers,
+      });
       const detailBody = await detailResp.json();
       expect(detailBody.data?.crm_lead_status).toBe('converted');
 
       // Verify account count increased (filter API may not support contains operator)
       const accountList = await queryList(token, 'crm_account_list');
-      console.log(`  [S2-05] Lead converted. Status: ${detailBody.data?.crm_lead_status}. Total accounts: ${accountList.total}`);
+      console.log(
+        `  [S2-05] Lead converted. Status: ${detailBody.data?.crm_lead_status}. Total accounts: ${accountList.total}`,
+      );
     });
   });
 
@@ -508,11 +518,7 @@ test.describe('CRM AI Scenarios', () => {
     let complaintPid: string;
 
     test('S3-01: Query unresolved complaints', async () => {
-      const result = await chatWithAuraBot(
-        token,
-        '目前有几条未解决的投诉？',
-        'crm_complaint',
-      );
+      const result = await chatWithAuraBot(token, '目前有几条未解决的投诉？', 'crm_complaint');
 
       // Tool loop may exceed on complaint model (fewer NQ tools available)
       const hasOutput = result.content || result.toolCalls.length > 0 || result.error;
@@ -539,7 +545,9 @@ test.describe('CRM AI Scenarios', () => {
       expect(hasOutput).toBeTruthy();
 
       console.log(`  [S3-02] Error: ${result.error || 'none'}`);
-      console.log(`  [S3-02] Tools: ${result.toolCalls.length}, Content: ${(result.content || '').slice(0, 100)}`);
+      console.log(
+        `  [S3-02] Tools: ${result.toolCalls.length}, Content: ${(result.content || '').slice(0, 100)}`,
+      );
     });
 
     test('S3-03: Create a test complaint and investigate', async () => {
@@ -639,7 +647,6 @@ test.describe('CRM AI Scenarios', () => {
   // Scenario 4: Cross-Model Queries — AuraBot Complex SQL
   // =========================================================================
   test.describe('Scenario 4: Cross-Model Queries', () => {
-
     test('S4-01: Top accounts by contact count', async () => {
       const result = await chatWithAuraBot(
         token,
@@ -688,7 +695,6 @@ test.describe('CRM AI Scenarios', () => {
   // Scenario 5: Agent Patrol Task — Composite Query
   // =========================================================================
   test.describe('Scenario 5: Agent Patrol Task', () => {
-
     test('S5-01: Agent answers a business question', async () => {
       const result = await chatWithAuraBot(
         token,
@@ -711,11 +717,7 @@ test.describe('CRM AI Scenarios', () => {
     });
 
     test('S5-02: Weekly new leads summary', async () => {
-      const result = await chatWithAuraBot(
-        token,
-        '统计最近7天新增了多少条线索？',
-        'crm_lead',
-      );
+      const result = await chatWithAuraBot(token, '统计最近7天新增了多少条线索？', 'crm_lead');
 
       // May hit tool loop limit on temporal queries
       const hasOutput = result.content || result.toolCalls.length > 0 || result.error;

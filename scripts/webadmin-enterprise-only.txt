@@ -1,0 +1,96 @@
+# Enterprise-only paths — excluded from reverse-sync enterprise → core.
+# These will be extracted to auraboot-enterprise/plugins/ent-* as overlay packages.
+# Relative to web-admin/ root. One path per line. Trailing slash = directory.
+#
+# Source: docs/plans/2026-04/web-admin-split-inventory.md (adjusted for
+# 2026-04-13 OSS/Enterprise boundary decisions).
+
+# ── ent-im-chat: IM group chat ───────────────────────────────
+app/chat/components/group/
+app/chat/services/imService.ts
+app/chat/services/imSseClient.ts
+
+# ── ent-org: advanced org tree / record sharing ──────────────
+app/components/shared/OrgTreePicker.tsx
+app/components/shared/RecordShareDialog.tsx
+app/routes/enterprise/OrganizationPage.tsx
+app/routes/enterprise/organization/
+app/services/organizationService.ts
+tests/e2e/organization/
+
+# ── ent-platform-guard: cross-tenant platform admin ──────────
+app/components/PlatformGuard.tsx
+app/routes/PlatformLayout.tsx
+app/routes/platform/
+
+# ── ent-aurabot-pro: enterprise AuraBot safe hook ────────────
+app/aurabot/hooks/useAuraBotSafe.ts
+
+# ── ent-address / ent-identity: advanced pickers ─────────────
+app/components/smart/picker/AddressField.tsx
+app/components/smart/picker/avatar-utils.ts
+app/components/smart/picker/useDictTree.ts
+
+# ── ent-charts-pro: advanced visualizations ──────────────────
+app/smart/components/charts/SmartComboChart/
+app/smart/components/charts/Gallery/
+app/smart/components/charts/Kanban/
+app/smart/components/charts/Nps/
+app/smart/components/charts/WordCloud.tsx
+
+# ── ent-dashboard-designer: dashboard authoring (ENTERPRISE) ─
+# NOTE: Dashboard VIEWER + basic charts remain in core.
+# Dashboard Designer (editing UX + advanced widgets) is enterprise.
+app/dashboard-designer/components/DashboardDesigner.tsx
+app/dashboard-designer/components/DesignerCanvas.tsx
+app/dashboard-designer/components/WidgetPalette.tsx
+app/dashboard-designer/components/WidgetPropertyPanel.tsx
+app/dashboard-designer/components/DataSourceConfig.tsx
+
+# ── ent-dashboard-workbench: enterprise workbench widgets ────
+app/dashboard-designer/widgets/workbench/
+
+# ── ent-automation: advanced automation editor ───────────────
+app/smart/automation/components/AutomationEditPageImpl.tsx
+
+# ── ent-mobile-config ────────────────────────────────────────
+app/routes/admin/mobile-config.tsx
+app/routes/admin/mobile-config.shared.ts
+
+# ── ent-engagement ───────────────────────────────────────────
+app/services/engagementService.ts
+
+# ── Enterprise E2E suites (stay in enterprise repo) ──────────
+tests/e2e/chat/
+tests/e2e/automation/
+tests/e2e/connectors/
+tests/e2e/compliance/
+tests/e2e/growth/
+tests/e2e/portal/
+tests/e2e/procurement/
+tests/e2e/record-share/
+tests/e2e/regression/
+tests/e2e/showcase/sc-
+tests/e2e/acp-showcase/
+tests/e2e/agent-control-plane/
+tests/e2e/marketplace/
+tests/e2e/workbench/
+tests/e2e/aurabot/
+tests/api/setup/seed-crm-data.spec.ts
+tests/api/setup/seed-crossplatform.spec.ts
+tests/perf/
+
+# ── Enterprise-only bpm-pro tests (basic bpm tests stay core) ─
+tests/e2e/bpm/bpm-pro-
+
+# ── Enterprise workspace packages ────────────────────────────
+packages/enterprise/
+
+# ── Already shared via symlink in enterprise repo ────────────
+# packages/core is a symlink in enterprise → core's real dir; leave untouched.
+packages/core
+packages/core/
+
+# ── Enterprise branding / private assets ─────────────────────
+public/vendor/
+public/logo192-light.png

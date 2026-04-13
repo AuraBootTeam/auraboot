@@ -7,11 +7,15 @@
  * Uses simple native form components to avoid complex hook dependencies.
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import type { DslFieldOverride, BlockType } from '~/studio/domain/dsl/types';
 import { parseFieldShorthand } from '~/studio/domain/dsl/types';
 import { useDslRegistry } from '~/contexts/DslRegistryContext';
 import fieldPropertyConfig from '../configs/field-property-panel.json';
+import {
+  FieldPermissionSection,
+  type FieldPermissionValue,
+} from './FieldPermissionSection';
 
 /**
  * Static fallback for data type → component options mapping.
@@ -118,7 +122,8 @@ export const FieldPropertyEditor: React.FC<FieldPropertyEditorProps> = ({
   readonly,
 }) => {
   // DSL registry: use render components from server if available
-  const { renderComponents } = useDslRegistry();
+  const { ensureLoaded, renderComponents } = useDslRegistry();
+  useEffect(() => { ensureLoaded(); }, [ensureLoaded]);
   const DATATYPE_COMPONENT_OPTIONS = useMemo(() => {
     return (
       buildComponentOptionsFromRegistry(renderComponents) || DATATYPE_COMPONENT_OPTIONS_FALLBACK
@@ -172,6 +177,36 @@ export const FieldPropertyEditor: React.FC<FieldPropertyEditorProps> = ({
       onChange({ [fieldName]: cleanValue });
     },
     [onChange],
+  );
+
+  // Read current fieldPermission from props bag
+  const currentFieldPermission = useMemo((): FieldPermissionValue | undefined => {
+    const fp = (fieldData as DslFieldOverride & { props?: Record<string, unknown> }).props
+      ?.fieldPermission;
+    if (fp && typeof fp === 'object') {
+      const typed = fp as Record<string, unknown>;
+      return {
+        view: Array.isArray(typed.view) ? (typed.view as string[]) : [],
+        edit: Array.isArray(typed.edit) ? (typed.edit as string[]) : [],
+      };
+    }
+    return undefined;
+  }, [fieldData]);
+
+  // Update fieldPermission inside props bag
+  const handleFieldPermissionChange = useCallback(
+    (next: FieldPermissionValue | null) => {
+      const existingProps =
+        (fieldData as DslFieldOverride & { props?: Record<string, unknown> }).props ?? {};
+      if (next === null) {
+        // Remove fieldPermission key
+        const { fieldPermission: _removed, ...rest } = existingProps as Record<string, unknown>;
+        onChange({ props: Object.keys(rest).length > 0 ? rest : undefined } as Partial<DslFieldOverride>);
+      } else {
+        onChange({ props: { ...existingProps, fieldPermission: next } } as Partial<DslFieldOverride>);
+      }
+    },
+    [fieldData, onChange],
   );
 
   // Get component options based on data type
@@ -383,6 +418,14 @@ export const FieldPropertyEditor: React.FC<FieldPropertyEditorProps> = ({
       {/* Sections */}
       <div className="flex-1 overflow-auto p-3">
         {(fieldPropertyConfig.sections as SectionConfig[]).map(renderSection)}
+
+        {/* Field-level role permissions (custom section — not schema-driven because it
+            requires async role loading + checkbox UI not expressible as a PropertySchema widget) */}
+        <FieldPermissionSection
+          value={currentFieldPermission}
+          onChange={handleFieldPermissionChange}
+          disabled={readonly}
+        />
       </div>
     </div>
   );

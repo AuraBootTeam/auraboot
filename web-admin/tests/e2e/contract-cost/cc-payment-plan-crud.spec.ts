@@ -16,7 +16,12 @@
  */
 
 import { test, expect, type Page } from '@playwright/test';
-import { uniqueId, executeCommandViaApi, dateOffsetStr, navigateToDynamicPage } from '../helpers/index';
+import {
+  uniqueId,
+  executeCommandViaApi,
+  dateOffsetStr,
+  navigateToDynamicPage,
+} from '../helpers/index';
 
 test.describe('CC Payment Plan CRUD @critical', () => {
   test.describe.configure({ mode: 'serial' });
@@ -34,9 +39,11 @@ test.describe('CC Payment Plan CRUD @critical', () => {
     try {
       // Create project
       const proj = await executeCommandViaApi(
-        page, 'pm:create_project',
+        page,
+        'pm:create_project',
         { pm_project_name: `PPProject_${uid}` },
-        undefined, 'create',
+        undefined,
+        'create',
       );
       projectPid = proj.recordId;
       expect(projectPid).toBeTruthy();
@@ -44,14 +51,16 @@ test.describe('CC Payment Plan CRUD @critical', () => {
 
       // Create contract → EXECUTING
       const contract = await executeCommandViaApi(
-        page, 'cc:create_contract',
+        page,
+        'cc:create_contract',
         {
           cc_contract_name: contractName,
           cc_contract_amount: 600000,
           cc_contract_project_id: projectPid,
           cc_contract_type: 'design',
         },
-        undefined, 'create',
+        undefined,
+        'create',
       );
       contractPid = contract.recordId;
       expect(contractPid).toBeTruthy();
@@ -98,7 +107,8 @@ test.describe('CC Payment Plan CRUD @critical', () => {
   test('PP-02: Create payment plan and verify in list', async ({ page }) => {
     // Create payment plan via API
     const pp = await executeCommandViaApi(
-      page, 'cc:create_payment_plan',
+      page,
+      'cc:create_payment_plan',
       {
         cc_pp_contract_id: contractPid,
         cc_pp_period: 1,
@@ -106,7 +116,8 @@ test.describe('CC Payment Plan CRUD @critical', () => {
         cc_pp_plan_amount: 200000,
         cc_pp_remark: `E2E test payment plan ${uid}`,
       },
-      undefined, 'create',
+      undefined,
+      'create',
     );
     paymentPlanPid = pp.recordId;
     expect(paymentPlanPid, 'Payment plan should be created').toBeTruthy();
@@ -115,10 +126,9 @@ test.describe('CC Payment Plan CRUD @critical', () => {
     await navigateToPaymentPlans(page);
 
     // Wait for list to load
-    const listResponse = page.waitForResponse(
-      (r) => r.url().includes('/list') && r.status() === 200,
-      { timeout: 10000 },
-    ).catch(() => null);
+    const listResponse = page
+      .waitForResponse((r) => r.url().includes('/list') && r.status() === 200, { timeout: 10000 })
+      .catch(() => null);
     await listResponse;
 
     // Verify the created plan appears (search by contract name or PP number)
@@ -132,26 +142,30 @@ test.describe('CC Payment Plan CRUD @critical', () => {
   test('PP-03: Create multiple payment plans for contract', async ({ page }) => {
     // Plan 2 and 3
     const pp2 = await executeCommandViaApi(
-      page, 'cc:create_payment_plan',
+      page,
+      'cc:create_payment_plan',
       {
         cc_pp_contract_id: contractPid,
         cc_pp_period: 2,
         cc_pp_plan_date: dateOffsetStr(90),
         cc_pp_plan_amount: 250000,
       },
-      undefined, 'create',
+      undefined,
+      'create',
     );
     expect(pp2.recordId).toBeTruthy();
 
     const pp3 = await executeCommandViaApi(
-      page, 'cc:create_payment_plan',
+      page,
+      'cc:create_payment_plan',
       {
         cc_pp_contract_id: contractPid,
         cc_pp_period: 3,
         cc_pp_plan_date: dateOffsetStr(150),
         cc_pp_plan_amount: 150000,
       },
-      undefined, 'create',
+      undefined,
+      'create',
     );
     expect(pp3.recordId).toBeTruthy();
 
@@ -173,9 +187,11 @@ test.describe('CC Payment Plan CRUD @critical', () => {
   test('PP-04: Partial receipt state transition', async ({ page }) => {
     // Transition: pending → PARTIAL
     const result = await executeCommandViaApi(
-      page, 'cc:partial_receipt',
+      page,
+      'cc:partial_receipt',
       { cc_pp_actual_amount: 100000, cc_pp_actual_date: dateOffsetStr(0) },
-      paymentPlanPid, 'update',
+      paymentPlanPid,
+      'update',
     );
     expect(result.code).toBe('0');
   });
@@ -186,9 +202,11 @@ test.describe('CC Payment Plan CRUD @critical', () => {
   test('PP-05: Full receipt state transition', async ({ page }) => {
     // Transition: PARTIAL → RECEIVED
     const result = await executeCommandViaApi(
-      page, 'cc:confirm_receipt',
+      page,
+      'cc:confirm_receipt',
       { cc_pp_actual_amount: 200000, cc_pp_actual_date: dateOffsetStr(0) },
-      paymentPlanPid, 'update',
+      paymentPlanPid,
+      'update',
     );
     expect(result.code).toBe('0');
   });
@@ -228,14 +246,16 @@ test.describe('CC Payment Plan CRUD @critical', () => {
   test('PP-07: Overdue payments NQ returns correct data', async ({ page }) => {
     // Create an overdue payment plan (plan_date in the past, status pending)
     const overduePP = await executeCommandViaApi(
-      page, 'cc:create_payment_plan',
+      page,
+      'cc:create_payment_plan',
       {
         cc_pp_contract_id: contractPid,
         cc_pp_period: 4,
-        cc_pp_plan_date: dateOffsetStr(-30),  // 30 days overdue
+        cc_pp_plan_date: dateOffsetStr(-30), // 30 days overdue
         cc_pp_plan_amount: 100000,
       },
-      undefined, 'create',
+      undefined,
+      'create',
     );
     expect(overduePP.recordId).toBeTruthy();
 
@@ -246,6 +266,9 @@ test.describe('CC Payment Plan CRUD @critical', () => {
     expect(nqResp.ok()).toBe(true);
     const body = await nqResp.json();
     const records: any[] = body?.data?.records ?? [];
-    expect(records.length, 'cc_overdue_payments should return at least 1 overdue plan').toBeGreaterThan(0);
+    expect(
+      records.length,
+      'cc_overdue_payments should return at least 1 overdue plan',
+    ).toBeGreaterThan(0);
   });
 });

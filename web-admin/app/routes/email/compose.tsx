@@ -17,15 +17,8 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
-import {
-  PaperAirplaneIcon,
-  XMarkIcon,
-} from '@heroicons/react/24/outline';
-import {
-  listAccounts,
-  sendEmail,
-  type EmailAccount,
-} from '~/services/emailService';
+import { PaperAirplaneIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { listAccounts, sendEmail, type EmailAccount } from '~/services/emailService';
 import { useToastContext } from '~/contexts/ToastContext';
 
 function ToolbarBtn({
@@ -45,9 +38,7 @@ function ToolbarBtn({
       onClick={onClick}
       title={title}
       className={`rounded p-1.5 text-sm transition-colors ${
-        active
-          ? 'bg-blue-100 text-blue-700'
-          : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+        active ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
       }`}
     >
       {children}
@@ -171,7 +162,7 @@ export default function EmailComposePage() {
           </button>
         </div>
 
-        <div className="p-5 space-y-4">
+        <div className="space-y-4 p-5">
           {/* From account selector */}
           {accounts.length > 1 && (
             <div className="flex items-center gap-3">

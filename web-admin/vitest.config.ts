@@ -7,11 +7,16 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./vitest.setup.ts'],
-    include: ['**/__tests__/**/*.test.ts', '**/__tests__/**/*.test.tsx', '**/*.test.ts', '**/*.test.tsx'],
+    include: [
+      '**/__tests__/**/*.test.ts',
+      '**/__tests__/**/*.test.tsx',
+      '**/*.test.ts',
+      '**/*.test.tsx',
+    ],
     exclude: ['node_modules', 'build', 'tests'],
     // 性能优化配置
     testTimeout: 30000, // 单个测试最大超时时间：30秒
-    hookTimeout: 10000,  // 钩子函数超时时间：10秒
+    hookTimeout: 10000, // 钩子函数超时时间：10秒
     teardownTimeout: 5000, // 清理超时时间：5秒
     // 并发配置 - 优化内存使用
     pool: 'threads',
@@ -21,7 +26,7 @@ export default defineConfig({
         isolate: false, // 减少隔离开销
         minThreads: 1,
         maxThreads: 1, // 限制为单线程
-      }
+      },
     },
     // 性能监控
     logHeapUsage: true,
@@ -32,7 +37,7 @@ export default defineConfig({
     // 报告配置
     reporters: ['verbose', 'json'],
     outputFile: {
-      json: './test-results/results.json'
+      json: './test-results/results.json',
     },
     // 禁用 watch 模式的交互提示
     watch: false, // 禁用 watch 模式

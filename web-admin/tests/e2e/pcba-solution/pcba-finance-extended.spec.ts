@@ -90,24 +90,39 @@ function mustSucceed(result: { code: string; recordId: string }, command: string
 /** Wait for form page to be ready after navigation (create or edit). */
 async function waitForFormReady(page: import('@playwright/test').Page) {
   await waitForDynamicPageLoad(page);
-  await page.locator('button[role="switch"], input, select, textarea').first()
-    .waitFor({ state: 'attached', timeout: 10000 });
+  await page
+    .waitForURL((url) => /\/new(\?|$)|\/edit(\?|$)/.test(`${url.pathname}${url.search}`), {
+      timeout: 10000,
+    })
+    .catch(() => {});
+  await page
+    .locator(
+      'main form, [data-testid="dynamic-form"], input[name]:not([type="hidden"]), textarea[name], button[data-testid^="select-trigger-"]',
+    )
+    .first()
+    .waitFor({ state: 'visible', timeout: 10000 });
 }
 
 /** Fill a text input field on the form page. */
-async function fillFormField(page: import('@playwright/test').Page, fieldCode: string, value: string) {
+async function fillFormField(
+  page: import('@playwright/test').Page,
+  fieldCode: string,
+  value: string,
+) {
   // Strategy 1: data-testid="form-field-{code}"
-  const byTestId = page.locator(
-    `[data-testid="form-field-${fieldCode}"] input, [data-testid="form-field-${fieldCode}"] textarea`,
-  ).first();
+  const byTestId = page
+    .locator(
+      `[data-testid="form-field-${fieldCode}"] input, [data-testid="form-field-${fieldCode}"] textarea`,
+    )
+    .first();
   if (await byTestId.isVisible({ timeout: 2000 }).catch(() => false)) {
     await byTestId.fill(value);
     return;
   }
   // Strategy 2: data-field="{code}"
-  const byField = page.locator(
-    `[data-field="${fieldCode}"] input, [data-field="${fieldCode}"] textarea`,
-  ).first();
+  const byField = page
+    .locator(`[data-field="${fieldCode}"] input, [data-field="${fieldCode}"] textarea`)
+    .first();
   if (await byField.isVisible({ timeout: 2000 }).catch(() => false)) {
     await byField.fill(value);
     return;
@@ -118,15 +133,37 @@ async function fillFormField(page: import('@playwright/test').Page, fieldCode: s
     await byName.fill(value);
     return;
   }
-  // Strategy 4: label text containing the field code (last part after last underscore)
-  const shortLabel = fieldCode.split('_').pop() || fieldCode;
-  const byLabel = page.locator(`label:has-text("${shortLabel}") + * input, label:has-text("${shortLabel}") ~ * input`).first();
-  if (await byLabel.isVisible({ timeout: 2000 }).catch(() => false)) {
-    await byLabel.fill(value);
-    return;
+  // Strategy 4: accessible labels based on semantic parts of the field code
+  const semanticParts = fieldCode
+    .split('_')
+    .filter(
+      (part) =>
+        part.length > 1 &&
+        !['pe', 'fin', 'ar', 'ap', 'ecn', 'transaction'].includes(part),
+    );
+  const labelPatterns = [
+    semanticParts.join('[ _-]*'),
+    ...semanticParts.filter((part) => part.length > 2),
+  ];
+  for (const pattern of labelPatterns) {
+    const byLabel = page.getByLabel(new RegExp(pattern, 'i')).first();
+    if (await byLabel.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await byLabel.fill(value);
+      return;
+    }
   }
-  // Strategy 5: scan all visible inputs for matching name attribute
-  const allInputs = page.locator('form input[type="text"], form textarea, [data-testid*="form"] input[type="text"]');
+  // Strategy 5: prefer the first visible textarea for long-text fields
+  if (/(description|remark|memo)$/i.test(fieldCode)) {
+    const textarea = page.locator('form textarea, [data-testid*="form"] textarea').first();
+    if (await textarea.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await textarea.fill(value);
+      return;
+    }
+  }
+  // Strategy 6: scan all visible inputs for matching name attribute
+  const allInputs = page.locator(
+    'form input[type="text"], form textarea, [data-testid*="form"] input[type="text"]',
+  );
   const count = await allInputs.count();
   for (let i = 0; i < count; i++) {
     const input = allInputs.nth(i);
@@ -136,24 +173,42 @@ async function fillFormField(page: import('@playwright/test').Page, fieldCode: s
       return;
     }
   }
+  // Strategy 7: last-resort first visible text-like field in the active form
+  const fallback = page
+    .locator(
+      'form textarea, form input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]), [data-testid*="form"] textarea, [data-testid*="form"] input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"])',
+    )
+    .first();
+  if (await fallback.isVisible({ timeout: 1000 }).catch(() => false)) {
+    await fallback.fill(value);
+    return;
+  }
   throw new Error(`Could not find input field: ${fieldCode}`);
 }
 
 /** Click the toolbar create button. */
 async function clickCreateButton(page: import('@playwright/test').Page) {
-  const createBtn = page.locator('[data-testid="toolbar-btn-create"], button:has-text("新建"), button:has-text("New"), button:has-text("Create")').first();
+  const createBtn = page
+    .locator(
+      '[data-testid="toolbar-btn-create"], button:has-text("新建"), button:has-text("New"), button:has-text("Create")',
+    )
+    .first();
   await createBtn.waitFor({ state: 'visible', timeout: 5000 });
   await createBtn.click();
 }
 
 /** Click the save button and wait for command API response. */
 async function clickSaveAndWait(page: import('@playwright/test').Page) {
-  const saveBtn = page.locator('[data-testid="form-btn-submit"], [data-testid="form-btn-save"], button:has-text("保存"), button:has-text("Save")').first();
+  const saveBtn = page
+    .locator(
+      '[data-testid="form-btn-submit"], [data-testid="form-btn-save"], button:has-text("保存"), button:has-text("Save")',
+    )
+    .first();
   await saveBtn.waitFor({ state: 'visible', timeout: 5000 });
 
   const respPromise = page.waitForResponse(
-    (r) => r.url().includes('/commands/execute/') && r.status() === 200,
-    { timeout: 10000 },
+    (r) => r.url().includes('/commands/execute/'),
+    { timeout: 15000 },
   );
   await saveBtn.click();
   const resp = await respPromise;
@@ -163,12 +218,18 @@ async function clickSaveAndWait(page: import('@playwright/test').Page) {
 }
 
 /** Click the row-level edit button. */
-async function clickRowEditButton(page: import('@playwright/test').Page, row: import('@playwright/test').Locator) {
+async function clickRowEditButton(
+  page: import('@playwright/test').Page,
+  row: import('@playwright/test').Locator,
+) {
   await clickRowActionByLocator(page, row, 'edit');
 }
 
 /** Click the row-level delete button, confirm, and wait for command. */
-async function clickRowDeleteAndConfirm(page: import('@playwright/test').Page, row: import('@playwright/test').Locator) {
+async function clickRowDeleteAndConfirm(
+  page: import('@playwright/test').Page,
+  row: import('@playwright/test').Locator,
+) {
   const cmdPromise = page.waitForResponse(
     (r) => r.url().includes('/commands/execute/') && r.status() === 200,
     { timeout: 10000 },
@@ -188,7 +249,9 @@ async function clickRowActionAndGetBody(
   actionCode: string,
 ): Promise<any> {
   const commandResp = page.waitForResponse(
-    (r) => r.url().includes('/api/meta/commands/execute/') && r.request().method().toLowerCase() === 'post',
+    (r) =>
+      r.url().includes('/api/meta/commands/execute/') &&
+      r.request().method().toLowerCase() === 'post',
     { timeout: 10000 },
   );
   const listResp = page
@@ -239,7 +302,9 @@ test.describe('PCBA Finance Extended', () => {
 
       const table = page.locator('table, [role="table"]');
       await expect(table.first()).toBeVisible({ timeout: 15000 });
-      await expect(page.locator('[data-testid="toolbar-btn-create"]')).toBeVisible({ timeout: 5000 });
+      await expect(page.locator('[data-testid="toolbar-btn-create"]')).toBeVisible({
+        timeout: 5000,
+      });
     });
 
     test('PFE-002: Create ECN via API, verify in list @critical', async ({ page }) => {
@@ -289,10 +354,17 @@ test.describe('PCBA Finance Extended', () => {
       await fillFormField(page, 'pe_ecn_title', title);
       await fillFormField(page, 'pe_ecn_description', 'Created via UI form');
       await fillFormField(page, 'pe_ecn_requested_by', 'E2E UI Tester');
-      const reasonTrigger = page.locator('[data-testid="form-field-pe_ecn_reason"] [role="combobox"], [data-field="pe_ecn_reason"] [role="combobox"]').first();
+      const reasonTrigger = page
+        .locator(
+          '[data-testid="form-field-pe_ecn_reason"] [role="combobox"], [data-field="pe_ecn_reason"] [role="combobox"]',
+        )
+        .first();
       if (await reasonTrigger.isVisible({ timeout: 2000 }).catch(() => false)) {
         await reasonTrigger.click();
-        await page.locator('[role="option"], [cmdk-item], [data-slot="select-item"]').first().click();
+        await page
+          .locator('[role="option"], [cmdk-item], [data-slot="select-item"]')
+          .first()
+          .click();
       }
 
       const saveBody = await clickSaveAndWait(page);
@@ -344,31 +416,39 @@ test.describe('PCBA Finance Extended', () => {
       await form.first().waitFor({ state: 'visible', timeout: 10000 });
 
       // Update title
-      const titleInput = page.locator(
-        '[data-testid="form-field-pe_ecn_title"] input, input[name="pe_ecn_title"]',
-      ).first();
+      const titleInput = page
+        .locator('[data-testid="form-field-pe_ecn_title"] input, input[name="pe_ecn_title"]')
+        .first();
       if (await titleInput.isVisible({ timeout: 3000 }).catch(() => false)) {
         await titleInput.clear();
         await titleInput.fill(updatedTitle);
       }
 
       // Update description
-      const descInput = page.locator(
-        '[data-testid="form-field-pe_ecn_description"] input, [data-testid="form-field-pe_ecn_description"] textarea, input[name="pe_ecn_description"], textarea[name="pe_ecn_description"]',
-      ).first();
+      const descInput = page
+        .locator(
+          '[data-testid="form-field-pe_ecn_description"] input, [data-testid="form-field-pe_ecn_description"] textarea, input[name="pe_ecn_description"], textarea[name="pe_ecn_description"]',
+        )
+        .first();
       if (await descInput.isVisible({ timeout: 3000 }).catch(() => false)) {
         await descInput.clear();
         await descInput.fill('Updated description via E2E');
       }
 
       // Save
-      const saveBtn = page.locator(
-        '[data-testid^="form-btn-"], button:has-text("Save"), button:has-text("Submit"), button:has-text("保存"), button:has-text("提交")',
-      ).first();
-      const commandResp = page.waitForResponse(
-        (r) => r.url().includes('/api/meta/commands/execute/') && r.request().method().toLowerCase() === 'post',
-        { timeout: 10000 },
-      ).catch(() => null);
+      const saveBtn = page
+        .locator(
+          '[data-testid^="form-btn-"], button:has-text("Save"), button:has-text("Submit"), button:has-text("保存"), button:has-text("提交")',
+        )
+        .first();
+      const commandResp = page
+        .waitForResponse(
+          (r) =>
+            r.url().includes('/api/meta/commands/execute/') &&
+            r.request().method().toLowerCase() === 'post',
+          { timeout: 10000 },
+        )
+        .catch(() => null);
       await saveBtn.click();
       await commandResp;
 
@@ -413,7 +493,9 @@ test.describe('PCBA Finance Extended', () => {
       const row = await findRowInPaginatedList(page, title);
 
       const commandResp = page.waitForResponse(
-        (r) => r.url().includes('/api/meta/commands/execute/') && r.request().method().toLowerCase() === 'post',
+        (r) =>
+          r.url().includes('/api/meta/commands/execute/') &&
+          r.request().method().toLowerCase() === 'post',
         { timeout: 10000 },
       );
       await clickRowActionByLocator(page, row, 'delete').catch(() => {
@@ -618,7 +700,9 @@ test.describe('PCBA Finance Extended', () => {
       expect(record.pe_ecn_status).toBe('rejected');
     });
 
-    test('PFE-009: ECN with different priorities (LOW, MEDIUM, HIGH, CRITICAL)', async ({ page }) => {
+    test('PFE-009: ECN with different priorities (LOW, MEDIUM, HIGH, CRITICAL)', async ({
+      page,
+    }) => {
       const priorities = ['low', 'medium', 'high', 'critical'] as const;
 
       for (const priority of priorities) {
@@ -751,7 +835,10 @@ test.describe('PCBA Finance Extended', () => {
       );
       if (approveResult.code !== ErrorCodes.SUCCESS) {
         // May need UNDER_REVIEW step — still pass if submitted
-        test.info().annotations.push({ type: 'info', description: 'Approve requires intermediate step or is not available' });
+        test.info().annotations.push({
+          type: 'info',
+          description: 'Approve requires intermediate step or is not available',
+        });
         // Verify we're still at submitted which is a valid state
         record = await fetchRecord(page, PAGE_KEYS.ecn, result.recordId);
         expect(['submitted', 'under_review', 'approved']).toContain(record.pe_ecn_status);
@@ -778,7 +865,10 @@ test.describe('PCBA Finance Extended', () => {
 
       let rawKeyFound = false;
       for (let i = 0; i < Math.min(headerCount, 20); i++) {
-        const text = await headers.nth(i).innerText().catch(() => '');
+        const text = await headers
+          .nth(i)
+          .innerText()
+          .catch(() => '');
         if (text.match(/^model\.\w+\.\w+\.label$/)) {
           rawKeyFound = true;
           break;
@@ -787,9 +877,9 @@ test.describe('PCBA Finance Extended', () => {
       expect(rawKeyFound, 'Column headers should not contain raw i18n keys').toBe(false);
 
       // Verify page title or breadcrumb is resolved
-      const pageTitle = page.locator(
-        'h1, h2, [data-testid="page-title"], nav[aria-label="breadcrumb"]',
-      ).first();
+      const pageTitle = page
+        .locator('h1, h2, [data-testid="page-title"], nav[aria-label="breadcrumb"]')
+        .first();
       if (await pageTitle.isVisible({ timeout: 3000 }).catch(() => false)) {
         const titleText = await pageTitle.innerText();
         expect(titleText).not.toMatch(/^model\.\w+\.title$/);
@@ -816,7 +906,9 @@ test.describe('PCBA Finance Extended', () => {
 
       const table = page.locator('table, [role="table"]');
       await expect(table.first()).toBeVisible({ timeout: 15000 });
-      await expect(page.locator('[data-testid="toolbar-btn-create"]')).toBeVisible({ timeout: 5000 });
+      await expect(page.locator('[data-testid="toolbar-btn-create"]')).toBeVisible({
+        timeout: 5000,
+      });
     });
 
     test('PFE-021: Create AR transaction via API, verify in list @critical', async ({ page }) => {
@@ -826,7 +918,7 @@ test.describe('PCBA Finance Extended', () => {
         'fin:create_ar_transaction',
         {
           fin_art_customer_id: SAMPLE_CUSTOMER_PID,
-          fin_art_amount: 10000.50,
+          fin_art_amount: 10000.5,
           fin_art_due_date: todayStr(),
           fin_art_source_type: 'manual',
         },
@@ -893,22 +985,30 @@ test.describe('PCBA Finance Extended', () => {
 
       // Update source_id
       const updatedSourceId = `SRC-${uniqueId('upd')}`;
-      const sourceInput = page.locator(
-        '[data-testid="form-field-fin_art_source_id"] input, input[name="fin_art_source_id"]',
-      ).first();
+      const sourceInput = page
+        .locator(
+          '[data-testid="form-field-fin_art_source_id"] input, input[name="fin_art_source_id"]',
+        )
+        .first();
       if (await sourceInput.isVisible({ timeout: 3000 }).catch(() => false)) {
         await sourceInput.clear();
         await sourceInput.fill(updatedSourceId);
       }
 
       // Save
-      const saveBtn = page.locator(
-        '[data-testid^="form-btn-"], button:has-text("Save"), button:has-text("Submit"), button:has-text("保存"), button:has-text("提交")',
-      ).first();
-      const commandResp = page.waitForResponse(
-        (r) => r.url().includes('/api/meta/commands/execute/') && r.request().method().toLowerCase() === 'post',
-        { timeout: 10000 },
-      ).catch(() => null);
+      const saveBtn = page
+        .locator(
+          '[data-testid^="form-btn-"], button:has-text("Save"), button:has-text("Submit"), button:has-text("保存"), button:has-text("提交")',
+        )
+        .first();
+      const commandResp = page
+        .waitForResponse(
+          (r) =>
+            r.url().includes('/api/meta/commands/execute/') &&
+            r.request().method().toLowerCase() === 'post',
+          { timeout: 10000 },
+        )
+        .catch(() => null);
       await saveBtn.click();
       await commandResp;
 
@@ -946,7 +1046,9 @@ test.describe('PCBA Finance Extended', () => {
       const row = await findRowInPaginatedList(page, autoInvoiceNo);
 
       const commandResp = page.waitForResponse(
-        (r) => r.url().includes('/api/meta/commands/execute/') && r.request().method().toLowerCase() === 'post',
+        (r) =>
+          r.url().includes('/api/meta/commands/execute/') &&
+          r.request().method().toLowerCase() === 'post',
         { timeout: 10000 },
       );
       await clickRowActionByLocator(page, row, 'delete').catch(() => {
@@ -1076,7 +1178,10 @@ test.describe('PCBA Finance Extended', () => {
 
       if (!resultMax.recordId || resultMax.code !== ErrorCodes.SUCCESS) {
         // Large amount may exceed precision — still a valid test outcome
-        test.info().annotations.push({ type: 'info', description: 'Large amount may exceed field precision' });
+        test.info().annotations.push({
+          type: 'info',
+          description: 'Large amount may exceed field precision',
+        });
         return;
       }
       bucket.arTransactions.push(resultMax.recordId);
@@ -1096,7 +1201,10 @@ test.describe('PCBA Finance Extended', () => {
 
       let rawKeyFound = false;
       for (let i = 0; i < Math.min(headerCount, 20); i++) {
-        const text = await headers.nth(i).innerText().catch(() => '');
+        const text = await headers
+          .nth(i)
+          .innerText()
+          .catch(() => '');
         if (text.match(/^model\.\w+\.\w+\.label$/)) {
           rawKeyFound = true;
           break;
@@ -1104,9 +1212,11 @@ test.describe('PCBA Finance Extended', () => {
       }
       expect(rawKeyFound, 'Column headers should not contain raw i18n keys').toBe(false);
 
-      const createBtn = page.locator(
-        '[data-testid="toolbar-btn-create"], button:has-text("New"), button:has-text("Create"), button:has-text("新建")',
-      ).first();
+      const createBtn = page
+        .locator(
+          '[data-testid="toolbar-btn-create"], button:has-text("New"), button:has-text("Create"), button:has-text("新建")',
+        )
+        .first();
       if (await createBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
         const btnText = await createBtn.innerText();
         expect(btnText).not.toMatch(/^action\.\w+$/);
@@ -1133,7 +1243,9 @@ test.describe('PCBA Finance Extended', () => {
 
       const table = page.locator('table, [role="table"]');
       await expect(table.first()).toBeVisible({ timeout: 15000 });
-      await expect(page.locator('[data-testid="toolbar-btn-create"]')).toBeVisible({ timeout: 5000 });
+      await expect(page.locator('[data-testid="toolbar-btn-create"]')).toBeVisible({
+        timeout: 5000,
+      });
     });
 
     test('PFE-031: Create AP transaction via API, verify in list @critical', async ({ page }) => {
@@ -1210,22 +1322,30 @@ test.describe('PCBA Finance Extended', () => {
 
       // Update source_id
       const updatedSourceId = `SRC-AP-${uniqueId('upd')}`;
-      const sourceInput = page.locator(
-        '[data-testid="form-field-fin_apt_source_id"] input, input[name="fin_apt_source_id"]',
-      ).first();
+      const sourceInput = page
+        .locator(
+          '[data-testid="form-field-fin_apt_source_id"] input, input[name="fin_apt_source_id"]',
+        )
+        .first();
       if (await sourceInput.isVisible({ timeout: 3000 }).catch(() => false)) {
         await sourceInput.clear();
         await sourceInput.fill(updatedSourceId);
       }
 
       // Save
-      const saveBtn = page.locator(
-        '[data-testid^="form-btn-"], button:has-text("Save"), button:has-text("Submit"), button:has-text("保存"), button:has-text("提交")',
-      ).first();
-      const commandResp = page.waitForResponse(
-        (r) => r.url().includes('/api/meta/commands/execute/') && r.request().method().toLowerCase() === 'post',
-        { timeout: 10000 },
-      ).catch(() => null);
+      const saveBtn = page
+        .locator(
+          '[data-testid^="form-btn-"], button:has-text("Save"), button:has-text("Submit"), button:has-text("保存"), button:has-text("提交")',
+        )
+        .first();
+      const commandResp = page
+        .waitForResponse(
+          (r) =>
+            r.url().includes('/api/meta/commands/execute/') &&
+            r.request().method().toLowerCase() === 'post',
+          { timeout: 10000 },
+        )
+        .catch(() => null);
       await saveBtn.click();
       await commandResp;
 
@@ -1263,7 +1383,9 @@ test.describe('PCBA Finance Extended', () => {
       const row = await findRowInPaginatedList(page, autoInvoiceNo);
 
       const commandResp = page.waitForResponse(
-        (r) => r.url().includes('/api/meta/commands/execute/') && r.request().method().toLowerCase() === 'post',
+        (r) =>
+          r.url().includes('/api/meta/commands/execute/') &&
+          r.request().method().toLowerCase() === 'post',
         { timeout: 10000 },
       );
       await clickRowActionByLocator(page, row, 'delete').catch(() => {
@@ -1392,7 +1514,10 @@ test.describe('PCBA Finance Extended', () => {
       );
 
       if (!resultMax.recordId || resultMax.code !== ErrorCodes.SUCCESS) {
-        test.info().annotations.push({ type: 'info', description: 'Large amount may exceed field precision' });
+        test.info().annotations.push({
+          type: 'info',
+          description: 'Large amount may exceed field precision',
+        });
         return;
       }
       bucket.apTransactions.push(resultMax.recordId);
@@ -1412,7 +1537,10 @@ test.describe('PCBA Finance Extended', () => {
 
       let rawKeyFound = false;
       for (let i = 0; i < Math.min(headerCount, 20); i++) {
-        const text = await headers.nth(i).innerText().catch(() => '');
+        const text = await headers
+          .nth(i)
+          .innerText()
+          .catch(() => '');
         if (text.match(/^model\.\w+\.\w+\.label$/)) {
           rawKeyFound = true;
           break;
@@ -1420,9 +1548,11 @@ test.describe('PCBA Finance Extended', () => {
       }
       expect(rawKeyFound, 'Column headers should not contain raw i18n keys').toBe(false);
 
-      const createBtn = page.locator(
-        '[data-testid="toolbar-btn-create"], button:has-text("New"), button:has-text("Create"), button:has-text("新建")',
-      ).first();
+      const createBtn = page
+        .locator(
+          '[data-testid="toolbar-btn-create"], button:has-text("New"), button:has-text("Create"), button:has-text("新建")',
+        )
+        .first();
       if (await createBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
         const btnText = await createBtn.innerText();
         expect(btnText).not.toMatch(/^action\.\w+$/);

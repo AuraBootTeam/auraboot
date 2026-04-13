@@ -79,9 +79,16 @@ function getInitial(name: string): string {
 /** Deterministic color for avatar background based on string hash */
 function avatarColor(str: string): string {
   const colors = [
-    'bg-blue-500', 'bg-indigo-500', 'bg-purple-500', 'bg-pink-500',
-    'bg-rose-500', 'bg-orange-500', 'bg-amber-500', 'bg-teal-500',
-    'bg-cyan-500', 'bg-emerald-500',
+    'bg-blue-500',
+    'bg-indigo-500',
+    'bg-purple-500',
+    'bg-pink-500',
+    'bg-rose-500',
+    'bg-orange-500',
+    'bg-amber-500',
+    'bg-teal-500',
+    'bg-cyan-500',
+    'bg-emerald-500',
   ];
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
@@ -110,8 +117,7 @@ function AgentAvatar({ agent, size = 'md' }: { agent: AgentRecord; size?: 'sm' |
 
   return (
     <div
-      className={`${sizeMap[size]} rounded-full flex items-center justify-center font-semibold text-white
-        ${isAuraBot ? 'bg-gradient-to-br from-blue-500 to-violet-600' : avatarColor(agent.agent_code)}`}
+      className={`${sizeMap[size]} flex items-center justify-center rounded-full font-semibold text-white ${isAuraBot ? 'bg-gradient-to-br from-blue-500 to-violet-600' : avatarColor(agent.agent_code)}`}
     >
       {isAuraBot ? <SparklesIcon className="h-6 w-6" /> : getInitial(agent.name)}
     </div>
@@ -131,9 +137,12 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 function TypeBadge({ agentType }: { agentType: string }) {
-  const cls = TYPE_COLORS[agentType] ?? 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300';
+  const cls =
+    TYPE_COLORS[agentType] ?? 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300';
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${cls}`}>
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${cls}`}
+    >
       <CpuChipIcon className="h-3 w-3" />
       {agentType}
     </span>
@@ -144,8 +153,8 @@ function VisibilityBadge({ visibility }: { visibility: 'private' | 'team' | 'ten
   const v = visibility ?? 'private';
   if (v === 'private') {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium
-        bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
+      <span
+        className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-500 dark:bg-gray-800 dark:text-gray-400"
         data-testid="visibility-badge-private"
       >
         <LockClosedIcon className="h-3 w-3" />
@@ -155,8 +164,8 @@ function VisibilityBadge({ visibility }: { visibility: 'private' | 'team' | 'ten
   }
   if (v === 'team') {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium
-        bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-300"
+      <span
+        className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-0.5 text-[11px] font-medium text-purple-600 dark:bg-purple-900/30 dark:text-purple-300"
         data-testid="visibility-badge-team"
       >
         <UserGroupIcon className="h-3 w-3" />
@@ -166,8 +175,8 @@ function VisibilityBadge({ visibility }: { visibility: 'private' | 'team' | 'ten
   }
   // tenant
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium
-      bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300"
+    <span
+      className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-medium text-blue-600 dark:bg-blue-900/30 dark:text-blue-300"
       data-testid="visibility-badge-tenant"
     >
       <GlobeAltIcon className="h-3 w-3" />
@@ -184,47 +193,46 @@ function AuraBotCard({ agent, onChat }: { agent: AgentRecord; onChat: () => void
   const { t } = useI18n();
   return (
     <div
-      className="relative overflow-hidden rounded-xl border-2 border-blue-200 dark:border-blue-800
-        bg-gradient-to-br from-blue-50 via-white to-violet-50
-        dark:from-blue-950/40 dark:via-gray-900 dark:to-violet-950/30
-        shadow-sm hover:shadow-md transition-all duration-200 p-5"
+      className="relative overflow-hidden rounded-xl border-2 border-blue-200 bg-gradient-to-br from-blue-50 via-white to-violet-50 p-5 shadow-sm transition-all duration-200 hover:shadow-md dark:border-blue-800 dark:from-blue-950/40 dark:via-gray-900 dark:to-violet-950/30"
       data-testid="aurabot-card"
     >
       {/* Official badge ribbon */}
       <div className="absolute top-3 right-3 flex items-center gap-1.5">
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold
-          bg-blue-600 text-white">
+        <span className="inline-flex items-center gap-1 rounded-full bg-blue-600 px-2 py-0.5 text-[11px] font-semibold text-white">
           {t('ai.colleagues.badge.official', undefined, 'Official')}
         </span>
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold
-          bg-gradient-to-r from-violet-500 to-blue-500 text-white">
+        <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-violet-500 to-blue-500 px-2 py-0.5 text-[11px] font-semibold text-white">
           <BoltIcon className="h-3 w-3" />
           {t('ai.colleagues.badge.fullPower', undefined, 'Full Power')}
         </span>
       </div>
 
-      <div className="flex items-start gap-4 mt-1">
+      <div className="mt-1 flex items-start gap-4">
         <AgentAvatar agent={agent} size="lg" />
-        <div className="flex-1 min-w-0">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate text-lg font-semibold text-gray-900 dark:text-white">
             {agent.name}
           </h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">
-            {agent.description || t('ai.colleagues.aurabot.desc', undefined, 'Built-in AI assistant with full data access')}
+          <p className="mt-1 line-clamp-2 text-sm text-gray-500 dark:text-gray-400">
+            {agent.description ||
+              t(
+                'ai.colleagues.aurabot.desc',
+                undefined,
+                'Built-in AI assistant with full data access',
+              )}
           </p>
         </div>
       </div>
 
       <div className="mt-4 flex items-center justify-between">
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex flex-wrap items-center gap-2">
           <StatusBadge status={agent.status} />
           <TypeBadge agentType={agent.agent_type} />
           <VisibilityBadge visibility="tenant" />
         </div>
         <button
           onClick={onChat}
-          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium
-            bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
           data-testid="aurabot-chat-btn"
         >
           <ChatBubbleLeftRightIcon className="h-4 w-4" />
@@ -251,30 +259,27 @@ function AgentCard({
   const { t } = useI18n();
   return (
     <div
-      className="rounded-xl border border-gray-200 dark:border-gray-700
-        bg-white dark:bg-gray-900
-        shadow-sm hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600
-        transition-all duration-200 p-5"
+      className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition-all duration-200 hover:border-gray-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-900 dark:hover:border-gray-600"
       data-testid={`agent-card-${agent.agent_code}`}
     >
       <div className="flex items-start gap-3">
         <AgentAvatar agent={agent} />
-        <div className="flex-1 min-w-0">
-          <h3 className="text-base font-semibold text-gray-900 dark:text-white truncate">
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate text-base font-semibold text-gray-900 dark:text-white">
             {agent.name}
           </h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">
+          <p className="mt-0.5 line-clamp-2 text-sm text-gray-500 dark:text-gray-400">
             {agent.description || t('ai.colleagues.noDescription', undefined, 'No description')}
           </p>
         </div>
       </div>
 
-      <div className="mt-3 flex items-center gap-2 flex-wrap">
+      <div className="mt-3 flex flex-wrap items-center gap-2">
         <StatusBadge status={agent.status} />
         <TypeBadge agentType={agent.agent_type} />
         <VisibilityBadge visibility={agent.visibility} />
         {agent.model && (
-          <span className="text-[11px] text-gray-400 dark:text-gray-500 truncate">
+          <span className="truncate text-[11px] text-gray-400 dark:text-gray-500">
             {agent.model}
           </span>
         )}
@@ -283,9 +288,7 @@ function AgentCard({
       <div className="mt-4 flex items-center justify-end gap-2">
         <button
           onClick={onEdit}
-          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium
-            text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800
-            border border-gray-200 dark:border-gray-700 transition-colors"
+          className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
           data-testid={`agent-edit-${agent.agent_code}`}
         >
           <PencilSquareIcon className="h-4 w-4" />
@@ -293,8 +296,7 @@ function AgentCard({
         </button>
         <button
           onClick={onChat}
-          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium
-            bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+          className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"
           data-testid={`agent-chat-${agent.agent_code}`}
         >
           <ChatBubbleLeftRightIcon className="h-4 w-4" />
@@ -313,17 +315,20 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
   const { t } = useI18n();
   return (
     <div className="col-span-full flex flex-col items-center justify-center py-20 text-center">
-      <UserCircleIcon className="h-16 w-16 text-gray-300 dark:text-gray-600 mb-4" />
+      <UserCircleIcon className="mb-4 h-16 w-16 text-gray-300 dark:text-gray-600" />
       <h3 className="text-lg font-medium text-gray-900 dark:text-white">
         {t('ai.colleagues.empty.title', undefined, 'No AI colleagues yet')}
       </h3>
-      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 max-w-sm">
-        {t('ai.colleagues.empty.description', undefined, 'Create your first AI colleague to automate tasks and enhance your workflow.')}
+      <p className="mt-1 max-w-sm text-sm text-gray-500 dark:text-gray-400">
+        {t(
+          'ai.colleagues.empty.description',
+          undefined,
+          'Create your first AI colleague to automate tasks and enhance your workflow.',
+        )}
       </p>
       <button
         onClick={onCreate}
-        className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium
-          bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+        className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
       >
         <PlusIcon className="h-4 w-4" />
         {t('ai.colleagues.create', undefined, 'Create AI Colleague')}
@@ -338,7 +343,7 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
 
 function CardSkeleton() {
   return (
-    <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5 animate-pulse">
+    <div className="animate-pulse rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900">
       <div className="flex items-start gap-3">
         <div className="h-12 w-12 rounded-full bg-gray-200 dark:bg-gray-700" />
         <div className="flex-1 space-y-2">
@@ -379,7 +384,9 @@ export default function AIColleaguesPage() {
         setAgents(res.data.records);
       }
     } catch {
-      toast.showErrorToast(t('ai.colleagues.error.loadFailed', undefined, 'Failed to load AI colleagues'));
+      toast.showErrorToast(
+        t('ai.colleagues.error.loadFailed', undefined, 'Failed to load AI colleagues'),
+      );
     } finally {
       setLoading(false);
     }
@@ -413,21 +420,20 @@ export default function AIColleaguesPage() {
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="mx-auto max-w-7xl p-6">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
             {t('ai.colleagues.title', undefined, 'AI Colleagues')}
           </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
             {t('ai.colleagues.subtitle', undefined, 'Manage your AI team members')}
           </p>
         </div>
         <button
           onClick={handleCreate}
-          className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-medium
-            bg-blue-600 text-white hover:bg-blue-700 shadow-sm transition-colors"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700"
           data-testid="create-agent-btn"
         >
           <PlusIcon className="h-4 w-4" />
@@ -436,7 +442,7 @@ export default function AIColleaguesPage() {
       </div>
 
       {/* Card Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
         {loading ? (
           <>
             <CardSkeleton />
@@ -451,11 +457,7 @@ export default function AIColleaguesPage() {
         ) : (
           sortedAgents.map((agent) =>
             agent.agent_code === AURABOT_CODE ? (
-              <AuraBotCard
-                key={agent.pid}
-                agent={agent}
-                onChat={() => handleChat(agent)}
-              />
+              <AuraBotCard key={agent.pid} agent={agent} onChat={() => handleChat(agent)} />
             ) : (
               <AgentCard
                 key={agent.pid}

@@ -4,12 +4,11 @@
  * Receives { schema, tableName, token } from DynamicPageRenderer and uses
  * usePageRuntime for runtime setup (replacing useDynamicPageSetup).
  *
- * Contains ALL rendering logic: filter-form, toolbar, data-table, pagination,
- * list-tabs, SavedView integration, dashboard rendering, dict cache, etc.
+ * Contains ALL rendering logic: filters, toolbar, table, pagination,
+ * tabs, SavedView integration, dashboard rendering, dict cache, etc.
  */
 
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router';
 import type { PageContentProps } from '~/meta/profiles/types';
 import { usePageRuntime } from '~/meta/rendering/pages/hooks/usePageRuntime';
@@ -28,37 +27,42 @@ import { DataSourceProvider } from '~/meta/contexts/DataSourceContext';
 import { createFieldRenderer } from '~/meta/utils/createFieldRenderer';
 import { ErrorAlert } from '~/components/ErrorAlert';
 import { useAuth } from '~/contexts/AuthContext';
-import { Pagination } from '~/components/Pagination';
-import { ImportModal } from '~/smart/components/data-tools/ImportModal';
-import { ToolbarMoreMenu } from '~/meta/rendering/components/ToolbarMoreMenu';
-import FormDialog from '~/meta/runtime/actions/FormDialog';
+import { ListPageHeader } from './list/ListPageHeader';
 import { useSavedViews } from '~/smart/hooks/useSavedViews';
 import { useAutoSaveView } from '~/smart/hooks/useAutoSaveView';
 import { ViewSelector } from '~/smart/components/view/ViewSelector';
-import { ViewManagePanel } from '~/smart/components/view/ViewManagePanel';
-import { ColumnSettingsPanel } from '~/smart/components/view/ColumnSettingsPanel';
 import { RowHeightSelector } from '~/smart/components/view/RowHeightSelector';
 import { ColumnResizeHandle } from '~/smart/components/view/ColumnResizeHandle';
 import { FilterChipBar } from '~/smart/components/view/FilterChipBar';
-import { FilterFieldPicker } from '~/smart/components/view/FilterFieldPicker';
-import { FilterValuePopover } from '~/smart/components/view/FilterValuePopover';
 import type { ViewFilterConfig } from '~/smart/types/savedView';
 import type { RowHeight } from '~/smart/types/savedView';
 import { ROW_HEIGHT_CONFIG, DEFAULT_ROW_HEIGHT } from '~/smart/types/savedView';
-import { evaluateConditionalFormats, buildConditionalStyle } from '~/smart/utils/conditionalFormatEvaluator';
+import {
+  evaluateConditionalFormats,
+  buildConditionalStyle,
+} from '~/smart/utils/conditionalFormatEvaluator';
 import { SmartViewRenderer } from '~/smart/components/view/SmartViewRenderer';
-import { BulkActionToolbar } from '~/smart/components/bulk/BulkActionToolbar';
-import { BulkEditModal } from '~/smart/components/bulk/BulkEditModal';
-import { RecordPreviewDrawer } from '~/smart/components/preview/RecordPreviewDrawer';
 import type {
   SavedViewCreateRequest,
   ColumnConfig as ViewColumnConfig,
   ViewType,
+  ViewScope,
   SortConfig,
 } from '~/smart/types/savedView';
 import { modelService } from '~/services/modelService';
 import { useTimezone } from '~/contexts/TimezoneContext';
 import { deriveTestId } from '~/meta/rendering/utils/deriveTestId';
+import { RowActionButtons } from './list/RowActionButtons';
+import { DashboardContent } from './list/DashboardContent';
+import { ListTabs } from './list/ListTabs';
+import { ListPagination } from './list/ListPagination';
+import { ListModals } from './list/ListModals';
+import { SortIndicator } from './list/SortIndicator';
+import { ListToolbar } from './list/ListToolbar';
+import { ListTable } from './list/ListTable';
+import { encodeSorts, decodeSorts } from './list/useListUrlState';
+import { savedViewService } from '~/services/savedViewService';
+import { useDebouncedValue, useDebouncedCallback } from '~/hooks/useDebouncedValue';
 
 // Dict data item type
 interface DictItem {
@@ -87,445 +91,21 @@ interface InviteCodeData {
   createdAt?: string;
 }
 
-// Dashboard chart block — renders Smart chart components for chart-type blocks
-const DashboardChartBlock = React.lazy(() => import('./DashboardChartBlock'));
-
-// Dashboard stat card — renders stat cards from API datasource
-function DashboardStatCard({ block, token, locale, t }: { block: any; token: string | null | undefined; locale: string; t?: (key: string) => string }) {
-  const [stats, setStats] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const dsUrl = block.dataSource?.url || block.dataSource?.endpoint;
-    if (!dsUrl) {
-      setLoading(false);
-      return;
-    }
-    const params = new URLSearchParams();
-    if (block.dataSource?.datasourceId) params.set('datasourceId', block.dataSource.datasourceId);
-    if (block.dataSource?.maxItems) params.set('maxItems', String(block.dataSource.maxItems || 10));
-    if (block.dataSource?.params) {
-      Object.entries(block.dataSource.params).forEach(([k, v]) => params.set(k, String(v)));
-    }
-    const qs = params.toString();
-    const url = dsUrl + (qs ? (dsUrl.includes('?') ? '&' : '?') + qs : '');
-
-    fetchResult<any>(url, { method: 'get', token: token || undefined })
-      .then((res) => {
-        if (ResultHelper.isSuccess(res) && res.data) {
-          const records = res.data.records || res.data || [];
-          setStats(Array.isArray(records) ? records : [records]);
-        }
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [block, token]);
-
-  const cards = block.cards || [];
-  if (loading) {
-    return (
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        {(cards.length > 0 ? cards : [1, 2, 3, 4]).map((_: any, i: number) => (
-          <div key={i} className="h-24 animate-pulse rounded-lg bg-gray-100" />
-        ))}
-      </div>
-    );
-  }
-
-  // If block has explicit card definitions, use them
-  if (cards.length > 0) {
-    return (
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        {cards.map((card: any, i: number) => {
-          const record = stats[0] || {};
-          const value = card.field ? record[card.field] : card.valueField ? record[card.valueField] : card.value || 0;
-          return (
-            <div key={i} className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-              <p className="text-sm font-medium text-gray-500">{getLocalizedText(card.label || card.title, locale, t) || `Stat ${i + 1}`}</p>
-              <p className="mt-1 text-2xl font-semibold text-gray-900">{value ?? '—'}</p>
-              {card.description && <p className="mt-1 text-xs text-gray-400">{getLocalizedText(card.description, locale, t)}</p>}
-            </div>
-          );
-        })}
-      </div>
-    );
-  }
-
-  // Fallback: render each record as a stat card
-  return (
-    <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-      {stats.slice(0, 8).map((stat: any, i: number) => {
-        const entries = Object.entries(stat).filter(([k]) => !['id', 'pid', 'tenant_id'].includes(k));
-        const label = entries[0]?.[1];
-        const value = entries[1]?.[1];
-        return (
-          <div key={i} className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-            <p className="text-sm font-medium text-gray-500">{String(label || `Item ${i + 1}`)}</p>
-            <p className="mt-1 text-2xl font-semibold text-gray-900">{String(value ?? '—')}</p>
-          </div>
-        );
-      })}
-    </div>
-  );
+interface TenantMemberImportError {
+  rowNumber: number;
+  name?: string | null;
+  email?: string | null;
+  reason: string;
 }
 
-// Dashboard block — independently fetches data for its modelCode
-function DashboardBlockTable({ block, token }: { block: any; token: string | null | undefined }) {
-  const [rows, setRows] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState<string | null>(null);
-
-  useEffect(() => {
-    const dsUrl = block.dataSource?.url || block.dataSource?.endpoint;
-    if (!block.modelCode && !dsUrl) {
-      setLoading(false);
-      return;
-    }
-
-    let fetchUrl: string;
-    if (dsUrl) {
-      // API datasource: use the configured URL directly
-      const params = new URLSearchParams();
-      if (block.dataSource?.datasourceId) params.set('datasourceId', block.dataSource.datasourceId);
-      if (block.dataSource?.maxItems) params.set('maxItems', String(block.dataSource.maxItems));
-      if (block.dataSource?.params) {
-        Object.entries(block.dataSource.params).forEach(([k, v]) => params.set(k, String(v)));
-      }
-      const qs = params.toString();
-      fetchUrl = dsUrl + (qs ? (dsUrl.includes('?') ? '&' : '?') + qs : '');
-    } else {
-      const slug = block.modelCode.replace(/_/g, '-');
-      const params: Record<string, any> = { page: 0, size: 10 };
-      // Support both defaultFilters (array, canonical) and defaultFilter (singular, deprecated)
-      const blockFilters =
-        block.defaultFilters || (block.defaultFilter ? [block.defaultFilter] : undefined);
-      if (blockFilters && blockFilters.length > 0) {
-        const normalizedFilters = blockFilters.map((f: any) => {
-          if (f.fieldName || f.field) return f;
-          const entries = Object.entries(f);
-          if (entries.length > 0) {
-            const [key, val] = entries[0];
-            return { fieldName: key, operator: 'EQ', value: val };
-          }
-          return f;
-        });
-        params.filters = JSON.stringify(normalizedFilters);
-      }
-      const qs = new URLSearchParams();
-      Object.entries(params).forEach(([k, v]) => qs.set(k, String(v)));
-      fetchUrl = `/api/dynamic/${slug}/list?${qs.toString()}`;
-    }
-
-    fetchResult<any>(fetchUrl, {
-      method: 'get',
-      token: token || undefined,
-    })
-      .then((res) => {
-        if (ResultHelper.isSuccess(res) && res.data) {
-          setRows(res.data.records || res.data || []);
-        } else {
-          setErr(res.desc || 'Failed to load');
-        }
-      })
-      .catch((e) => setErr(e.message))
-      .finally(() => setLoading(false));
-  }, [block, token]);
-
-  const columns = block.columns || block.table?.columns || [];
-
-  if (loading) {
-    return <div className="px-4 py-6 text-center text-sm text-gray-400">Loading...</div>;
-  }
-  if (err) {
-    return <div className="px-4 py-6 text-center text-sm text-red-500">{err}</div>;
-  }
-  return (
-    <table className="min-w-full divide-y divide-gray-200">
-      <thead className="bg-gray-50">
-        <tr>
-          {columns.map((col: any) => (
-            <th
-              key={col.field}
-              className={`px-4 py-2 text-xs font-medium text-gray-500 uppercase ${
-                col.align === 'right' ? 'text-right' : 'text-left'
-              }`}
-              style={col.width ? { width: `${col.width}px` } : undefined}
-            >
-              {col.label
-                ? typeof col.label === 'string'
-                  ? col.label
-                  : col.label['zh-CN'] || col.label['en'] || col.field
-                : col.field}
-            </th>
-          ))}
-        </tr>
-      </thead>
-      <tbody className="divide-y divide-gray-200">
-        {rows.length === 0 ? (
-          <tr>
-            <td
-              colSpan={columns.length || 1}
-              className="px-4 py-4 text-center text-sm text-gray-400"
-            >
-              No data
-            </td>
-          </tr>
-        ) : (
-          rows.map((row: any, i: number) => (
-            <tr key={row.pid || row.id || i}>
-              {columns.map((col: any) => (
-                <td
-                  key={col.field}
-                  className={`px-4 py-2 text-sm text-gray-900 ${col.align === 'right' ? 'text-right' : ''}`}
-                >
-                  {row[col.field] ?? '-'}
-                </td>
-              ))}
-            </tr>
-          ))
-        )}
-      </tbody>
-    </table>
-  );
-}
-
-/**
- * DropdownMenu — Portal-rendered dropdown for row actions.
- * Positioned absolutely relative to the trigger button to avoid
- * being clipped by table overflow-x-auto containers.
- */
-function DropdownMenu({
-  menuRef,
-  moreButtons,
-  record,
-  resolveButtonLabel,
-  handleAction,
-  setOpen,
-}: {
-  menuRef: React.RefObject<HTMLDivElement | null>;
-  moreButtons: ButtonConfig[];
-  record: any;
-  resolveButtonLabel: (button: ButtonConfig) => string;
-  handleAction: (button: ButtonConfig, record?: any) => void;
-  setOpen: (v: boolean) => void;
-}) {
-  const [pos, setPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
-
-  useEffect(() => {
-    if (!menuRef.current) return;
-    const rect = menuRef.current.getBoundingClientRect();
-    setPos({
-      top: rect.bottom + 4,
-      left: rect.right - 120, // min-w-[120px] aligned to right edge
-    });
-  }, [menuRef]);
-
-  return (
-    <div
-      className="fixed z-[9999] min-w-[120px] rounded-md border border-gray-200 bg-white py-1 shadow-lg"
-      style={{ top: pos.top, left: Math.max(0, pos.left) }}
-      data-testid="row-action-dropdown"
-    >
-      {moreButtons.map((btn) => (
-        <button
-          type="button"
-          key={btn.code}
-          data-testid={`row-action-${btn.code}`}
-          onClick={(e) => {
-            e.stopPropagation();
-            setOpen(false);
-            handleAction(btn, record);
-          }}
-          className={`block w-full px-3 py-1.5 text-left text-sm transition-colors ${
-            btn.danger
-              ? 'text-red-600 hover:bg-red-50'
-              : 'text-gray-700 hover:bg-gray-50'
-          }`}
-        >
-          {resolveButtonLabel(btn)}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-/**
- * RowActionButtons — Renders primary action as a link and remaining actions
- * in a compact "..." dropdown menu. Improves UX over flat text buttons.
- */
-function RowActionButtons({
-  buttons,
-  record,
-  evaluateVisibleWhen,
-  resolveButtonLabel,
-  handleAction,
-}: {
-  buttons: ButtonConfig[];
-  record: any;
-  evaluateVisibleWhen: (expr: string | undefined, record: any) => boolean;
-  resolveButtonLabel: (button: ButtonConfig) => string;
-  handleAction: (button: ButtonConfig, record?: any) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  // Close dropdown on outside click (check both trigger and portaled dropdown)
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (menuRef.current && menuRef.current.contains(target)) return;
-      // Check if click is inside the portaled dropdown
-      const dropdown = document.querySelector('[data-testid="row-action-dropdown"]');
-      if (dropdown && dropdown.contains(target)) return;
-      setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
-
-  const visibleButtons = buttons.filter((button) =>
-    evaluateVisibleWhen(button.visibleWhen, record),
-  );
-
-  if (visibleButtons.length === 0) return null;
-
-  // If only 1 button, render it directly
-  if (visibleButtons.length === 1) {
-    const btn = visibleButtons[0];
-    return (
-      <div className="inline-flex items-center justify-start">
-        <button
-          type="button"
-          data-testid={`row-action-${btn.code}`}
-          onClick={(e) => { e.stopPropagation(); handleAction(btn, record); }}
-          className={`rounded-md px-2 py-1 text-sm font-medium transition-colors ${
-            btn.danger
-              ? 'text-red-600 hover:bg-red-50 hover:text-red-800'
-              : 'text-blue-600 hover:bg-blue-50 hover:text-blue-800'
-          }`}
-        >
-          {resolveButtonLabel(btn)}
-        </button>
-      </div>
-    );
-  }
-
-  // Primary = first non-danger button; rest go into dropdown
-  const primaryBtn = visibleButtons[0];
-  const moreButtons = visibleButtons.slice(1);
-
-  return (
-    <div className="inline-flex items-center justify-start gap-1">
-      {/* Primary action as link */}
-      <button
-        type="button"
-        data-testid={`row-action-${primaryBtn.code}`}
-        onClick={(e) => { e.stopPropagation(); handleAction(primaryBtn, record); }}
-        className="rounded-md px-2 py-1 text-sm font-medium text-blue-600 transition-colors hover:bg-blue-50 hover:text-blue-800"
-      >
-        {resolveButtonLabel(primaryBtn)}
-      </button>
-
-      {/* More actions dropdown — rendered via Portal to avoid overflow clipping */}
-      {moreButtons.length > 0 && (
-        <div className="relative" ref={menuRef}>
-          <button
-            type="button"
-            data-testid="row-action-more"
-            onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
-            className="rounded-md p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
-            aria-label="More actions"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="1" />
-              <circle cx="12" cy="5" r="1" />
-              <circle cx="12" cy="19" r="1" />
-            </svg>
-          </button>
-          {open && createPortal(
-            <DropdownMenu menuRef={menuRef} moreButtons={moreButtons} record={record} resolveButtonLabel={resolveButtonLabel} handleAction={handleAction} setOpen={setOpen} />,
-            document.body,
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// Column context menu component — appears on right-click or ⋮ click on column headers
-function ColumnContextMenu({
-  x,
-  y,
-  column,
-  currentSortDir,
-  onSort,
-  onFreeze,
-  onHide,
-  onFilterByColumn,
-  onGroupBy,
-  onClose,
-}: {
-  x: number;
-  y: number;
-  column: ColumnConfig;
-  currentSortDir?: 'asc' | 'desc';
-  onSort: (dir: 'asc' | 'desc' | 'clear') => void;
-  onFreeze: (pos: 'left' | 'right' | 'none') => void;
-  onHide: () => void;
-  onFilterByColumn: () => void;
-  onGroupBy: () => void;
-  onClose: () => void;
-}) {
-  const menuRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) onClose();
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [onClose]);
-
-  const frozenPos = column.fixed || (column as any).frozenPosition;
-  const menuItems = [
-    { icon: '↑', label: 'Sort Ascending', active: currentSortDir === 'asc', onClick: () => onSort('asc') },
-    { icon: '↓', label: 'Sort Descending', active: currentSortDir === 'desc', onClick: () => onSort('desc') },
-    currentSortDir ? { icon: '✕', label: 'Clear Sort', onClick: () => onSort('clear') } : null,
-    'divider' as const,
-    { icon: '📌', label: 'Freeze Left', active: frozenPos === 'left', onClick: () => onFreeze(frozenPos === 'left' ? 'none' : 'left') },
-    { icon: '📌', label: 'Freeze Right', active: frozenPos === 'right', onClick: () => onFreeze(frozenPos === 'right' ? 'none' : 'right') },
-    'divider' as const,
-    { icon: '👁', label: 'Hide Column', onClick: onHide },
-    { icon: '🔍', label: 'Filter by Column', onClick: onFilterByColumn },
-    'divider' as const,
-    { icon: '☰', label: 'Group by Column', onClick: onGroupBy },
-  ].filter(Boolean);
-
-  return createPortal(
-    <div
-      ref={menuRef}
-      className="fixed z-[1000] min-w-[180px] rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
-      style={{ left: Math.min(x, window.innerWidth - 200), top: Math.min(y, window.innerHeight - 300) }}
-    >
-      {menuItems.map((item, idx) => {
-        if (item === 'divider') return <div key={idx} className="my-1 h-px bg-gray-100" />;
-        if (!item || typeof item === 'string') return null;
-        return (
-          <button
-            key={idx}
-            type="button"
-            className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-gray-50 ${item.active ? 'text-blue-600 font-medium' : 'text-gray-700'}`}
-            onClick={() => { item.onClick(); onClose(); }}
-          >
-            <span className="w-4 text-center text-xs">{item.icon}</span>
-            <span className="flex-1">{item.label}</span>
-            {item.active && <span className="text-xs text-blue-500">✓</span>}
-          </button>
-        );
-      })}
-    </div>,
-    document.body,
-  );
+interface TenantMemberImportResult {
+  totalRows: number;
+  successCount: number;
+  errorCount: number;
+  existingUserBoundCount: number;
+  invitedCount: number;
+  employeeCreatedCount: number;
+  errors: TenantMemberImportError[];
 }
 
 // Quick filter chip definitions
@@ -599,16 +179,71 @@ export function ListPageContent(props: PageContentProps) {
   // P2-1 fix: destructure state for convenience
   const { filters, pagination } = pageState;
 
-  // Active sort state — initialized from SavedView or DSL defaultSort
-  const [activeSorts, setActiveSorts] = useState<SortConfig[]>([]);
-  // Active filter chips — user-added filters via chip bar (separate from filter-form)
+  // Read initial sorts, keyword, and view from URL search params
+  const urlSorts = useMemo(() => decodeSorts(searchParams.get('sort')), [searchParams]);
+  const urlKeyword = useMemo(() => searchParams.get('keyword') || '', [searchParams]);
+  const urlViewPid = useMemo(() => searchParams.get('view') || null, [searchParams]);
+
+  // Search keyword for toolbar search input
+  const [keyword, _setKeyword] = useState(urlKeyword);
+  const keywordRef = useRef(keyword);
+
+  // Debounced URL sync for keyword (300ms) — keeps input responsive while
+  // reducing URL/history updates during rapid typing
+  const syncKeywordToUrl = useDebouncedCallback(
+    (value: string) => {
+      setSearchParams(
+        (prev) => {
+          const p = new URLSearchParams(prev);
+          if (value.trim()) {
+            p.set('keyword', value.trim());
+          } else {
+            p.delete('keyword');
+          }
+          return p;
+        },
+        { replace: true },
+      );
+    },
+    300,
+  );
+
+  // Debounced auto-search: triggers loadData 300ms after the user stops typing,
+  // so results update without requiring Enter. Reduces API calls by ~60-80%
+  // compared to firing on every keystroke.
+  const debouncedSearch = useDebouncedCallback(
+    () => {
+      if (!schema) return;
+      loadData({ page: 0, size: pagination.pageSize });
+    },
+    300,
+  );
+
+  // Synchronous ref update ensures loadData always reads the latest keyword
+  // even when called in the same event cycle as a state update (e.g., Playwright fill + Enter)
+  const setKeyword = useCallback((value: string) => {
+    keywordRef.current = value;
+    _setKeyword(value);
+    // Sync keyword to URL (debounced 300ms)
+    syncKeywordToUrl(value);
+    // Auto-search after user stops typing (debounced 300ms)
+    debouncedSearch();
+  }, [syncKeywordToUrl, debouncedSearch]);
+
+  // Active sort state — initialized from URL > SavedView > DSL defaultSort
+  const [activeSorts, setActiveSorts] = useState<SortConfig[]>(() => urlSorts);
+  // Active filter chips — user-added filters via chip bar (separate from filters)
   const [chipFilters, setChipFilters] = useState<ViewFilterConfig[]>([]);
   // FilterFieldPicker state
   const [fieldPickerOpen, setFieldPickerOpen] = useState(false);
-  const [fieldPickerAnchor, setFieldPickerAnchor] = useState<{ x: number; y: number } | undefined>();
+  const [fieldPickerAnchor, setFieldPickerAnchor] = useState<
+    { x: number; y: number } | undefined
+  >();
   // FilterValuePopover state — for editing a chip's operator + value
   const [editingChipIdx, setEditingChipIdx] = useState<number | null>(null);
-  const [valuePopoverAnchor, setValuePopoverAnchor] = useState<{ x: number; y: number } | undefined>();
+  const [valuePopoverAnchor, setValuePopoverAnchor] = useState<
+    { x: number; y: number } | undefined
+  >();
 
   // Client-side grouping state
   const [groupByField, setGroupByField] = useState<string | null>(null);
@@ -628,7 +263,8 @@ export function ListPageContent(props: PageContentProps) {
   const toggleGroupCollapse = useCallback((key: string) => {
     setCollapsedGroups((prev) => {
       const next = new Set(prev);
-      if (next.has(key)) next.delete(key); else next.add(key);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
   }, []);
@@ -647,12 +283,8 @@ export function ListPageContent(props: PageContentProps) {
 
   const shouldPersistPaginationToUrlRef = useRef(urlPageNum != null || urlPageSize != null);
   const tableBlock = useMemo(() => {
-    if (!schema?.areas) return null;
-    return (
-      Object.values(schema.areas)
-        .flatMap((area: any) => area.blocks)
-        .find((block) => block.blockType === 'data-table') || null
-    );
+    if (!schema?.blocks) return null;
+    return schema.blocks.find((block: any) => block.blockType === 'table') || null;
   }, [schema]);
 
   // Sync URL pagination params -> local state (supports refresh and browser back/forward).
@@ -703,24 +335,34 @@ export function ListPageContent(props: PageContentProps) {
       if (recordId == null || recordId === '') {
         return;
       }
-      navigate(`/dynamic/${tableName}/view/${String(recordId)}`);
+      navigate(`/p/${tableName}/view/${String(recordId)}`);
     },
     [navigate, tableName],
   );
 
-  // Tab state for list-tabs
+  // Tab state for tabs
   const [activeTab, setActiveTab] = useState('all');
   const [importOpen, setImportOpen] = useState(false);
   const [viewManageOpen, setViewManageOpen] = useState(false);
   const [columnSettingsOpen, setColumnSettingsOpen] = useState(false);
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; column: ColumnConfig } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    column: ColumnConfig;
+  } | null>(null);
   const [activeQuickFilter, setActiveQuickFilter] = useState<QuickFilterKey | null>(null);
   const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const [filterFormVisible, setFilterFormVisible] = useState(false);
   const [activeViewType, setActiveViewType] = useState<ViewType>('table');
   const [startCreateViewMode, setStartCreateViewMode] = useState(false);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteCodeData, setInviteCodeData] = useState<InviteCodeData | null>(null);
+  const [memberImportDialogOpen, setMemberImportDialogOpen] = useState(false);
+  const [memberImportFile, setMemberImportFile] = useState<File | null>(null);
+  const [memberImportLoading, setMemberImportLoading] = useState(false);
+  const [memberImportError, setMemberImportError] = useState<string | null>(null);
+  const [memberImportResult, setMemberImportResult] = useState<TenantMemberImportResult | null>(null);
   const { formats: dateTimeFormats } = useTimezone();
   const loadDataRef = useRef<
     | ((params?: { page?: number; size?: number; filters?: Record<string, any> }) => Promise<void>)
@@ -731,9 +373,9 @@ export function ListPageContent(props: PageContentProps) {
   const [previewRecordId, setPreviewRecordId] = useState<string | null>(null);
 
   // SavedView integration
-  const modelCode = schema?.modelCode || tableName.replace(/-/g, '_');
+  const modelCode = schema?.modelCode || tableName;
   const pageKey = tableName;
-  const isTenantMemberPage = modelCode === 'tenant_member' || pageKey === 'tenant-member';
+  const isTenantMemberPage = modelCode === 'tenant_member' || pageKey === 'tenant_member';
   const {
     views: savedViews,
     currentView,
@@ -743,6 +385,7 @@ export function ListPageContent(props: PageContentProps) {
     deleteView: deleteSavedView,
     setDefaultView,
     duplicateView,
+    reload: reloadViews,
     loading: viewsLoading,
   } = useSavedViews({ modelCode, pageKey, autoLoad: !!schema });
 
@@ -755,6 +398,29 @@ export function ListPageContent(props: PageContentProps) {
       .then((model) => setModelPid(model.pid))
       .catch(() => setModelPid(undefined));
   }, [modelCode]);
+
+  // Handle edit view (name, description, scope) via savedViewService + reload
+  const handleEditView = useCallback(
+    async (pid: string, name: string, description: string, scope: ViewScope) => {
+      await savedViewService.updateView(pid, { name, description, scope });
+      await reloadViews();
+    },
+    [reloadViews],
+  );
+
+  // Restore view from URL ?view= parameter (highest priority)
+  useEffect(() => {
+    if (urlViewPid && savedViews.length > 0 && !viewsLoading) {
+      const match = savedViews.find((v) => v.pid === urlViewPid);
+      if (match) {
+        selectView(urlViewPid);
+        if (match.viewType && match.viewType !== 'table') {
+          setActiveViewType(match.viewType as ViewType);
+        }
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedViews, viewsLoading]); // Run when views finish loading
 
   // Apply SavedView viewConfig (pagination + filters) when view changes
   useEffect(() => {
@@ -780,7 +446,6 @@ export function ListPageContent(props: PageContentProps) {
     }
   }, [currentView, setPagination, setFilters]);
 
-
   // Dict data cache
   const dictDataCache = useRef<Map<string, DictItem[]>>(new Map());
 
@@ -788,11 +453,9 @@ export function ListPageContent(props: PageContentProps) {
   useEffect(() => {
     if (!schema) return;
 
-    // Get columns from tableBlock (safely handle missing areas)
-    const tableBlock = schema.areas
-      ? Object.values(schema.areas)
-          .flatMap((area: any) => area.blocks)
-          .find((block) => block.blockType === 'data-table')
+    // Get columns from tableBlock
+    const tableBlock = schema.blocks
+      ? schema.blocks.find((block: any) => block.blockType === 'table')
       : undefined;
 
     const rawColumns = tableBlock?.table?.columns || tableBlock?.columns;
@@ -863,16 +526,14 @@ export function ListPageContent(props: PageContentProps) {
     });
   }, [locale, filters, t, dataSourceManager]);
 
-  // Get current tab filter as QueryCondition (if list-tabs block exists)
+  // Get current tab filter as QueryCondition (if tabs block exists)
   const getTabFilter = useCallback((): {
     fieldName: string;
     operator: string;
     value: string;
   } | null => {
-    if (!schema?.areas) return null;
-    const tabsBlock = Object.values(schema.areas)
-      .flatMap((area: any) => area.blocks)
-      .find((block) => block.blockType === 'list-tabs');
+    if (!schema?.blocks) return null;
+    const tabsBlock = schema.blocks.find((block: any) => block.blockType === 'tabs');
     if (!tabsBlock?.tabs) return null;
     const currentTab = (tabsBlock.tabs as any[]).find((tab: any) => tab.key === activeTab);
     if (!currentTab?.filter) return null;
@@ -891,7 +552,7 @@ export function ListPageContent(props: PageContentProps) {
       if (tabCondition) {
         conditions.push(tabCondition);
       }
-      // Convert user filters (key-value from filter-form) to QueryCondition format
+      // Convert user filters (key-value from filters) to QueryCondition format
       if (userFilters) {
         for (const [key, value] of Object.entries(userFilters)) {
           if (value == null || value === '') continue;
@@ -929,7 +590,11 @@ export function ListPageContent(props: PageContentProps) {
           if (!cf.fieldCode) continue;
           // Skip unary operators (isNull/isNotNull) that don't need a value
           if (cf.operator === 'isNull' || cf.operator === 'isNotNull') {
-            conditions.push({ fieldName: cf.fieldCode, operator: cf.operator.toUpperCase(), value: '' });
+            conditions.push({
+              fieldName: cf.fieldCode,
+              operator: cf.operator.toUpperCase(),
+              value: '',
+            });
             continue;
           }
           if (cf.value == null || cf.value === '') continue;
@@ -980,8 +645,8 @@ export function ListPageContent(props: PageContentProps) {
           method = (schema.dataSource!.method as typeof method) || 'get';
         } else {
           // Use schema.modelCode for API endpoint when available (supports NQ-backed pages
-          // where URL tableName differs from actual model, e.g., /dynamic/crm-my-tasks → crm_activity)
-          const apiTableName = schema.modelCode ? schema.modelCode.replace(/-/g, '_') : tableName;
+          // where URL tableName differs from actual model, e.g., /p/crm-my-tasks → crm_activity)
+          const apiTableName = schema.modelCode ? schema.modelCode : tableName;
           endpoint = `${buildApiEndpoint(apiTableName)}/list`;
         }
 
@@ -1020,13 +685,26 @@ export function ListPageContent(props: PageContentProps) {
             queryParams.filters = filtersParam;
           }
           // Use active sorts (user-driven) > SavedView sorts > DSL defaultSort
-          if (activeSorts.length > 0) {
+          // Multi-field sort: use sortFields param (field:direction pairs) when >1 sort
+          if (activeSorts.length > 1) {
+            queryParams.sortFields = activeSorts
+              .map((s) => `${s.fieldCode}:${s.direction}`)
+              .join(',');
+          } else if (activeSorts.length === 1) {
             queryParams.sortField = activeSorts[0].fieldCode;
             queryParams.sortOrder = activeSorts[0].direction;
           } else if (tableBlock?.defaultSort?.field) {
             queryParams.sortField = tableBlock.defaultSort.field;
             queryParams.sortOrder = String(tableBlock.defaultSort.order || 'desc').toLowerCase();
           }
+        }
+
+        // Pass keyword search to backend (supported by DynamicController)
+        // Use ref to get latest value — avoids stale closure when Enter triggers
+        // in the same React cycle as the keyword state update
+        const currentKeyword = keywordRef.current;
+        if (currentKeyword.trim()) {
+          queryParams.keyword = currentKeyword.trim();
         }
 
         // When page uses namedQuery data source, pass queryCode to backend
@@ -1135,7 +813,7 @@ export function ListPageContent(props: PageContentProps) {
   }, [handleAction]);
 
   // Dashboard detection
-  const isDashboard = schema?.kind === 'Dashboard';
+  const isDashboard = schema?.kind === 'dashboard';
 
   // Initial data load - only execute once when schema is loaded (skip for Dashboard pages)
   // Pass current filters (which may include URL filter_* params) for the first load
@@ -1154,10 +832,8 @@ export function ListPageContent(props: PageContentProps) {
       setActiveTab(tabKey);
       // Compute tab filter directly (don't rely on getTabFilter since activeTab is stale in closure)
       let tabCondition: { fieldName: string; operator: string; value: string } | null = null;
-      if (schema?.areas) {
-        const tabsBlock = Object.values(schema.areas)
-          .flatMap((area: any) => area.blocks)
-          .find((block) => block.blockType === 'list-tabs');
+      if (schema?.blocks) {
+        const tabsBlock = schema.blocks.find((block: any) => block.blockType === 'tabs');
         const tabDef = (tabsBlock?.tabs as any[])?.find((t: any) => t.key === tabKey);
         if (tabDef?.filter) {
           tabCondition = {
@@ -1183,7 +859,7 @@ export function ListPageContent(props: PageContentProps) {
             method = (schema!.dataSource!.method as 'get' | 'post') || 'get';
           } else {
             const apiTableName = schema?.modelCode
-              ? schema.modelCode.replace(/-/g, '_')
+              ? schema.modelCode
               : tableName;
             endpoint = `${buildApiEndpoint(apiTableName)}/list`;
           }
@@ -1394,41 +1070,59 @@ export function ListPageContent(props: PageContentProps) {
 
   // Column header sort toggle: none → asc → desc → none
   // Shift+click appends to multi-sort, regular click replaces
-  const toggleSort = useCallback(
-    (fieldCode: string, multiSort = false) => {
-      setActiveSorts((prev) => {
-        const existing = prev.find((s) => s.fieldCode === fieldCode);
-        let next: SortConfig[];
-        if (!existing) {
-          // Add new sort
-          const newSort: SortConfig = { fieldCode, direction: 'asc', priority: prev.length };
-          next = multiSort ? [...prev, newSort] : [newSort];
-        } else if (existing.direction === 'asc') {
-          // asc → desc
-          next = multiSort
-            ? prev.map((s) => (s.fieldCode === fieldCode ? { ...s, direction: 'desc' as const } : s))
-            : [{ fieldCode, direction: 'desc', priority: 0 }];
-        } else {
-          // desc → clear
-          next = multiSort ? prev.filter((s) => s.fieldCode !== fieldCode) : [];
-        }
-        return next;
-      });
-    },
-    [],
+  const toggleSort = useCallback((fieldCode: string, multiSort = false) => {
+    setActiveSorts((prev) => {
+      const existing = prev.find((s) => s.fieldCode === fieldCode);
+      let next: SortConfig[];
+      if (!existing) {
+        // Add new sort
+        const newSort: SortConfig = { fieldCode, direction: 'asc', priority: prev.length };
+        next = multiSort ? [...prev, newSort] : [newSort];
+      } else if (existing.direction === 'asc') {
+        // asc → desc
+        next = multiSort
+          ? prev.map((s) => (s.fieldCode === fieldCode ? { ...s, direction: 'desc' as const } : s))
+          : [{ fieldCode, direction: 'desc', priority: 0 }];
+      } else {
+        // desc → clear
+        next = multiSort ? prev.filter((s) => s.fieldCode !== fieldCode) : [];
+      }
+      return next;
+    });
+  }, []);
+
+  // Debounced re-fetch when sorts or chip filters change (150ms).
+  // Prevents multiple rapid API calls when users adjust multiple filters
+  // or sort columns in quick succession.
+  const debouncedSortFilterValues = useDebouncedValue(
+    useMemo(() => ({ activeSorts, chipFilters }), [activeSorts, chipFilters]),
+    150,
   );
 
-  // Re-fetch data when sorts or chip filters change
   useEffect(() => {
     if (!schema) return;
     loadData({ page: 0, size: pagination.pageSize, filters });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSorts, chipFilters]);
+  }, [debouncedSortFilterValues]);
 
-  // Auto-save sorts to SavedView (debounced)
+  // Auto-save sorts to SavedView (debounced) + sync to URL
   useEffect(() => {
     if (!schema) return;
     autoSave({ sorts: activeSorts });
+    // Sync sorts to URL
+    setSearchParams(
+      (prev) => {
+        const p = new URLSearchParams(prev);
+        const encoded = encodeSorts(activeSorts);
+        if (encoded) {
+          p.set('sort', encoded);
+        } else {
+          p.delete('sort');
+        }
+        return p;
+      },
+      { replace: true },
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSorts]);
 
@@ -1456,7 +1150,7 @@ export function ListPageContent(props: PageContentProps) {
 
   const handleBulkDelete = useCallback(
     async (ids: string[]) => {
-      const mc = (schema?.modelCode || tableName).replace(/-/g, '_');
+      const mc = (schema?.modelCode || tableName);
       const resp = await fetchResult(`/api/dynamic/${mc}/batch`, {
         method: 'delete',
         params: ids,
@@ -1483,13 +1177,13 @@ export function ListPageContent(props: PageContentProps) {
   );
 
   const inferValueType = useCallback(
-    (column: ColumnConfig, value: any): ColumnConfig['valueType'] => {
+    (column: ColumnConfig, value: any, record?: DynamicEntity): ColumnConfig['valueType'] => {
       if (column.valueType) {
         return column.valueType;
       }
       const field = column.field || '';
-      // REFERENCE field: ends with _id and has _display suffix in record
-      if (field.endsWith('_id')) {
+      // REFERENCE field: either ends with _id, or has a {field}_display sibling in the record
+      if (field.endsWith('_id') || (record && record[`${field}_display`] !== undefined)) {
         return 'reference';
       }
       if (field.endsWith('_at')) {
@@ -1501,7 +1195,7 @@ export function ListPageContent(props: PageContentProps) {
       if (field.endsWith('_time')) {
         return 'time';
       }
-      if (typeof value === 'string' && /\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}/.test(value)) {
+      if (typeof value === 'string' && /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value)) {
         return 'datetime';
       }
       // Detect boolean values (native boolean or string "true"/"false")
@@ -1517,7 +1211,7 @@ export function ListPageContent(props: PageContentProps) {
   const renderCellContent = useCallback(
     (column: ColumnConfig, record: DynamicEntity, rowIndex: number) => {
       const value = record[column.field];
-      const effectiveValueType = inferValueType(column, value);
+      const effectiveValueType = inferValueType(column, value, record);
 
       // Null/undefined handling
       if (value === null || value === undefined) {
@@ -1546,7 +1240,9 @@ export function ListPageContent(props: PageContentProps) {
             };
             const colorCls = colorMap[tagColor] || colorMap.blue;
             return (
-              <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${colorCls}`}>
+              <span
+                className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${colorCls}`}
+              >
                 {item.label}
               </span>
             );
@@ -1598,7 +1294,7 @@ export function ListPageContent(props: PageContentProps) {
     async (field: string, value: any, record: Record<string, any>) => {
       const pid = record.pid || record.id;
       if (!pid) throw new Error('Record has no pid/id');
-      const slug = (schema?.modelCode || tableName.replace(/-/g, '_')).replace(/_/g, '-');
+      const slug = (schema?.modelCode || tableName);
       const result = await fetchResult<any>(`/api/dynamic/${slug}/${pid}`, {
         method: 'put',
         token: token || undefined,
@@ -1620,7 +1316,7 @@ export function ListPageContent(props: PageContentProps) {
     const fetchFilterSchema = async () => {
       try {
         const result = await fetchResult<any[]>(
-          `${buildApiEndpoint(schema?.modelCode?.replace(/-/g, '_') || tableName)}/filter-schema?queryCode=${encodeURIComponent(namedQueryCode)}`,
+          `${buildApiEndpoint(schema?.modelCode || tableName)}/filter-schema?queryCode=${encodeURIComponent(namedQueryCode)}`,
           { method: 'get', token: token || undefined },
         );
         if (ResultHelper.isSuccess(result) && result.data) {
@@ -1633,13 +1329,10 @@ export function ListPageContent(props: PageContentProps) {
     fetchFilterSchema();
   }, [namedQueryCode, token, tableName]);
 
-  // Extract regions from schema (UnifiedSchema areas.blocks)
+  // Extract blocks from schema (UnifiedSchema.blocks)
   // NOTE: These must be computed before early returns to keep hook count stable
   const allBlocks = useMemo(() => {
-    if (schema?.areas) {
-      return Object.values(schema.areas).flatMap((area: any) => area.blocks);
-    }
-    return [];
+    return schema?.blocks || [];
   }, [schema]);
 
   // Map NamedQuery uiComponent to SmartField component name
@@ -1666,7 +1359,7 @@ export function ListPageContent(props: PageContentProps) {
 
   const resolveModelFieldLabel = useCallback(
     (fieldCode: string) => {
-      const mc = schema?.modelCode || tableName.replace(/-/g, '_');
+      const mc = schema?.modelCode || tableName;
       const modelKey = `model.${mc}.${fieldCode}.label`;
       const modelLabel = t(modelKey);
       if (modelLabel && modelLabel !== modelKey) {
@@ -1683,7 +1376,7 @@ export function ListPageContent(props: PageContentProps) {
   );
 
   const filterBlock = useMemo(() => {
-    const tableBlock = allBlocks.find((b: any) => b.blockType === 'data-table');
+    const tableBlock = allBlocks.find((b: any) => b.blockType === 'table');
     const rawColumns = (tableBlock as any)?.table?.columns || (tableBlock as any)?.columns;
     const columns: ColumnConfig[] = Array.isArray(rawColumns) ? rawColumns : [];
     const columnLabelMap = new Map<string, any>();
@@ -1704,7 +1397,7 @@ export function ListPageContent(props: PageContentProps) {
         };
       });
 
-    const found = allBlocks.find((block) => block.blockType === 'filter-form');
+    const found = allBlocks.find((block: any) => block.blockType === 'filters');
     if (found) {
       const foundFields = Array.isArray((found as any).fields) ? (found as any).fields : [];
       return {
@@ -1713,10 +1406,10 @@ export function ListPageContent(props: PageContentProps) {
       };
     }
 
-    // NamedQuery data source: synthesize filter-form from param-schema
+    // NamedQuery data source: synthesize filters from param-schema
     if (namedQueryCode && nqFilterFields && nqFilterFields.length > 0) {
       return {
-        blockType: 'filter-form' as const,
+        blockType: 'filters' as const,
         fields: nqFilterFields.map((f: any) => ({
           field: f.fieldCode,
           label:
@@ -1731,7 +1424,7 @@ export function ListPageContent(props: PageContentProps) {
       };
     }
 
-    // Auto-synthesize from data-table searchFields
+    // Auto-synthesize from table searchFields
     if (
       tableBlock &&
       (tableBlock as any).searchFields &&
@@ -1739,7 +1432,7 @@ export function ListPageContent(props: PageContentProps) {
     ) {
       const searchFields = (tableBlock as any).searchFields as string[];
       return {
-        blockType: 'filter-form' as const,
+        blockType: 'filters' as const,
         fields: searchFields.map((fieldCode: string) => ({
           field: fieldCode,
           label: columnLabelMap.get(fieldCode) || resolveModelFieldLabel(fieldCode),
@@ -1755,17 +1448,43 @@ export function ListPageContent(props: PageContentProps) {
 
   const actionBlock = useMemo(() => {
     const found = allBlocks.find(
-      (block) => block.blockType === 'form-buttons' || block.blockType === 'toolbar',
+      (block: any) => block.blockType === 'form-buttons' || block.blockType === 'toolbar',
     );
     return found;
   }, [allBlocks]);
 
   // System fields on every dynamic entity — not in DSL but available in API response
   const SYSTEM_FIELD_DEFS: ColumnConfig[] = [
-    { field: 'created_at', label: t('common.field.created_at') !== 'common.field.created_at' ? t('common.field.created_at') : 'Created At', valueType: 'datetime' as any },
-    { field: 'updated_at', label: t('common.field.updated_at') !== 'common.field.updated_at' ? t('common.field.updated_at') : 'Updated At', valueType: 'datetime' as any },
-    { field: 'created_by', label: t('common.field.created_by') !== 'common.field.created_by' ? t('common.field.created_by') : 'Created By' },
-    { field: 'updated_by', label: t('common.field.updated_by') !== 'common.field.updated_by' ? t('common.field.updated_by') : 'Updated By' },
+    {
+      field: 'created_at',
+      label:
+        t('common.field.created_at') !== 'common.field.created_at'
+          ? t('common.field.created_at')
+          : 'Created At',
+      valueType: 'datetime' as any,
+    },
+    {
+      field: 'updated_at',
+      label:
+        t('common.field.updated_at') !== 'common.field.updated_at'
+          ? t('common.field.updated_at')
+          : 'Updated At',
+      valueType: 'datetime' as any,
+    },
+    {
+      field: 'created_by',
+      label:
+        t('common.field.created_by') !== 'common.field.created_by'
+          ? t('common.field.created_by')
+          : 'Created By',
+    },
+    {
+      field: 'updated_by',
+      label:
+        t('common.field.updated_by') !== 'common.field.updated_by'
+          ? t('common.field.updated_by')
+          : 'Updated By',
+    },
   ];
 
   // Get columns: prefer table.columns, fallback to block-level columns
@@ -1826,35 +1545,110 @@ export function ListPageContent(props: PageContentProps) {
     return visibleCols;
   }, [tableBlock, currentView]);
 
-  // Row click → navigate to detail page or open preview drawer
-  const handleRowClick = useCallback((record: Record<string, unknown>) => {
-    const pid = record.pid as string | undefined;
-    if (!pid) return;
+  // Column order — derived from SavedView or default column order
+  const [columnOrder, setColumnOrder] = useState<string[]>([]);
 
-    // Check DSL config for navigation preference (on schema or table block)
-    const detailNav = (schema as any)?.options?.detailNavigation
-      || (tableBlock as any)?.onRowClick;
-    if (detailNav === 'navigate' || detailNav === 'page') {
-      // Support custom URL template with {field} placeholders
-      const detailUrl = (schema as any)?.options?.detailUrl
-        || (tableBlock as any)?.detailUrl;
-      if (detailUrl) {
-        const resolved = detailUrl.replace(/\{(\w+)\}/g, (_: string, key: string) =>
-          String(record[key] ?? ''));
-        navigate(resolved);
+  // Initialize column order from SavedView or table columns
+  useEffect(() => {
+    const viewColumns = currentView?.viewConfig?.columns;
+    if (viewColumns && viewColumns.length > 0) {
+      const hasOrder = viewColumns.some((vc) => vc.order !== undefined && vc.order !== null);
+      if (hasOrder) {
+        const ordered = [...viewColumns]
+          .filter((vc) => vc.visible !== false)
+          .sort((a, b) => (a.order ?? 999) - (b.order ?? 999))
+          .map((vc) => vc.fieldCode);
+        setColumnOrder(ordered);
         return;
       }
-      const detailPageKey = (schema as any)?.options?.detailPageKey;
-      if (detailPageKey) {
-        navigate(`/dynamic/${detailPageKey.replace(/_/g, '-')}/view/${pid}`);
-      } else {
-        navigate(`/dynamic/${tableName.replace(/_/g, '-')}/view/${pid}`);
-      }
-      return;
     }
+    // Default: use tableColumns order
+    setColumnOrder(tableColumns.filter((c) => !c.isActionColumn).map((c) => c.field));
+  }, [currentView, tableColumns]);
 
-    setPreviewRecordId(pid);
-  }, [schema, tableBlock, tableName, navigate]);
+  // Resolve column label via i18n
+  const resolveColumnLabel = useCallback(
+    (column: ColumnConfig): string => {
+      if (column.label) {
+        return getLocalizedText(column.label, locale, t);
+      }
+      if (column.isActionColumn) {
+        return t('table.actions');
+      }
+      const mc = (schema?.modelCode || tableName);
+      const modelKey = `model.${mc}.${column.field}.label`;
+      const modelLabel = t(modelKey);
+      if (modelLabel !== modelKey) return modelLabel;
+      const fieldKey = `field.${column.field}.label`;
+      const fieldLabel = t(fieldKey);
+      if (fieldLabel !== fieldKey) return fieldLabel;
+      const commonKey = `common.field.${column.field}`;
+      const commonLabel = t(commonKey);
+      return commonLabel !== commonKey ? commonLabel : column.field;
+    },
+    [locale, t, schema?.modelCode, tableName],
+  );
+
+  // Column widths map from SavedView
+  const columnWidths = useMemo(() => {
+    const widths: Record<string, number> = {};
+    const viewColumns = currentView?.viewConfig?.columns;
+    if (viewColumns) {
+      for (const vc of viewColumns) {
+        if (vc.width) widths[vc.fieldCode] = vc.width;
+      }
+    }
+    return widths;
+  }, [currentView]);
+
+  // Row style from conditional formats
+  const getRowStyle = useCallback(
+    (record: Record<string, any>): React.CSSProperties | undefined => {
+      const cfStyle = evaluateConditionalFormats(
+        currentView?.viewConfig?.conditionalFormats,
+        record,
+      );
+      return buildConditionalStyle(cfStyle);
+    },
+    [currentView],
+  );
+
+  // Row click → navigate to detail page or open preview drawer
+  const handleRowClick = useCallback(
+    (record: Record<string, unknown>) => {
+      const pid = record.pid as string | undefined;
+      if (!pid) return;
+
+      // Check DSL config for navigation preference (on schema or table block)
+      const detailNav =
+        (schema as any)?.options?.detailNavigation || (tableBlock as any)?.onRowClick;
+      if (detailNav === 'navigate' || detailNav === 'page') {
+        // Support custom URL template with {field} placeholders
+        const detailUrl = (schema as any)?.options?.detailUrl || (tableBlock as any)?.detailUrl;
+        if (detailUrl) {
+          const resolved = detailUrl.replace(/\{(\w+)\}/g, (_: string, key: string) =>
+            String(record[key] ?? ''),
+          );
+          navigate(resolved);
+          return;
+        }
+        // Resolve detail page key: check extension.relatedPages.detail first, then options.detailPageKey,
+        // then fall back to the {tableName}/view/{pid} convention (which derives {tableName}_detail).
+        const relatedDetailPageKey = (schema as any)?.extension?.relatedPages?.detail;
+        const optionDetailPageKey = (schema as any)?.options?.detailPageKey;
+        const resolvedDetailPageKey = relatedDetailPageKey || optionDetailPageKey;
+        if (resolvedDetailPageKey) {
+          navigate(`/p/${resolvedDetailPageKey}/view/${pid}`);
+        } else {
+          navigate(`/p/${tableName}/view/${pid}`);
+        }
+        return;
+      }
+
+      setPreviewRecordId(pid);
+    },
+    [schema, tableBlock, tableName, navigate],
+  );
 
   // All column definitions for ColumnSettingsPanel (with labels)
   const allColumnDefs = useMemo(() => {
@@ -1870,7 +1664,7 @@ export function ListPageContent(props: PageContentProps) {
             ? col.label
             : getLocalizedText(col.label, locale, t)
           : (() => {
-              const mc = (schema?.modelCode || tableName).replace(/-/g, '_');
+              const mc = (schema?.modelCode || tableName);
               const modelKey = `model.${mc}.${col.field}.label`;
               const modelLabel = t(modelKey);
               if (modelLabel !== modelKey) return modelLabel;
@@ -1890,29 +1684,29 @@ export function ListPageContent(props: PageContentProps) {
     return [...dslCols, ...sysDefs];
   }, [tableBlock, locale, t, tableName, schema?.modelCode]);
 
-  // Auto-create a personal SavedView if none exists, then update config
+  // Auto-save view config — delegates upsert logic to backend
   const ensureViewAndUpdateConfig = useCallback(
     async (config: Partial<import('~/smart/types/savedView').ViewConfig>) => {
       try {
         if (currentView) {
           await updateViewConfig(config);
         } else {
-          // Auto-create a personal SavedView with the config
-          await createView({
-            name: 'My View',
+          // No explicit view — use backend auto-save (atomic upsert of implicit view)
+          const view = await savedViewService.autoSave({
             modelCode,
             pageKey,
-            scope: 'personal',
-            viewType: 'table',
             viewConfig: config,
-            isDefault: true,
           });
+          // Select the newly created implicit view so subsequent saves go through updateViewConfig
+          if (view) {
+            selectView(view.pid);
+          }
         }
       } catch (err) {
         console.error('[ListPageContent] Failed to save view config:', err);
       }
     },
-    [currentView, updateViewConfig, createView, modelCode, pageKey],
+    [currentView, updateViewConfig, modelCode, pageKey, selectView],
   );
 
   const { autoSave } = useAutoSaveView({
@@ -1923,12 +1717,120 @@ export function ListPageContent(props: PageContentProps) {
     },
   });
 
+  // Handle column reorder via drag-and-drop
+  const handleColumnReorder = useCallback(
+    (newOrder: string[]) => {
+      setColumnOrder(newOrder);
+      // Persist to SavedView
+      const cols = newOrder.map((fieldCode, idx) => {
+        const existing = currentView?.viewConfig?.columns?.find((c) => c.fieldCode === fieldCode);
+        return { ...(existing || { fieldCode }), fieldCode, order: idx };
+      });
+      autoSave({ columns: cols });
+    },
+    [currentView, autoSave],
+  );
+
+  // Handle column resize
+  const handleColumnResize = useCallback(
+    (field: string, width: number) => {
+      if (!currentView) return;
+      const cols = [...(currentView.viewConfig?.columns || [])];
+      const idx = cols.findIndex((c) => c.fieldCode === field);
+      if (idx >= 0) {
+        cols[idx] = { ...cols[idx], width };
+      } else {
+        cols.push({ fieldCode: field, width });
+      }
+      autoSave({ columns: cols });
+    },
+    [currentView, autoSave],
+  );
+
   // Handle column settings save -> update SavedView
   const handleColumnSettingsSave = useCallback(
     async (columns: ViewColumnConfig[]) => {
       await ensureViewAndUpdateConfig({ columns });
     },
     [ensureViewAndUpdateConfig],
+  );
+
+  // Handle toolbar action config change -> update SavedView
+  const handleToolbarConfigChange = useCallback(
+    (config: import('~/smart/types/savedView').ToolbarActionConfig[]) => {
+      autoSave({ toolbarActions: config });
+    },
+    [autoSave],
+  );
+
+  // Evaluate button visibility (visibleWhen expression)
+  const evaluateButtonVisible = useCallback(
+    (button: ButtonConfig): boolean => {
+      // If no visibleWhen expression, always visible
+      if (!button.visibleWhen) return true;
+      // Simple expression evaluation: treat as always visible for now
+      // (full expression evaluation would use createExpressionContext)
+      return true;
+    },
+    [],
+  );
+
+  // Build export filter conditions for toolbar
+  const exportFilterConditions = useMemo(() => {
+    const conditions: Array<{ field: string; operator: string; value: unknown }> = [];
+    const tabCondition = getTabFilter();
+    if (tabCondition) {
+      conditions.push({
+        field: tabCondition.fieldName,
+        operator: tabCondition.operator,
+        value: tabCondition.value,
+      });
+    }
+    if (filters) {
+      for (const [key, value] of Object.entries(filters)) {
+        if (value == null || value === '') continue;
+        if (typeof value === 'object' && ('start' in value || 'end' in value)) {
+          if ((value as any).start)
+            conditions.push({ field: key, operator: 'gte', value: String((value as any).start) });
+          if ((value as any).end)
+            conditions.push({ field: key, operator: 'lte', value: String((value as any).end) });
+        } else {
+          conditions.push({ field: key, operator: 'EQ', value: String(value) });
+        }
+      }
+    }
+    return conditions.length > 0 ? conditions : undefined;
+  }, [filters, getTabFilter]);
+
+  // Handle export from toolbar
+  const handleExport = useCallback(
+    async (format: 'xlsx' | 'csv') => {
+      try {
+        const res = await fetch(`/api/dynamic/${modelCode}/export`, {
+          method: 'post',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            format: format === 'xlsx' ? 'excel' : 'csv',
+            conditions: exportFilterConditions,
+          }),
+        });
+        if (!res.ok) throw new Error('Export request failed');
+        const data = await res.json();
+        if (!ResultHelper.isSuccess(data) || !data.data?.downloadUrl) {
+          throw new Error(data.desc || 'Export failed');
+        }
+        const link = document.createElement('a');
+        link.href = data.data.downloadUrl;
+        link.download = `${modelCode}_export.${format}`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } catch (err) {
+        console.error('Export failed:', err);
+        showErrorToast(err instanceof Error ? err.message : 'Export failed');
+      }
+    },
+    [modelCode, exportFilterConditions, showErrorToast],
   );
 
   // Row height from current view config (with fallback)
@@ -2062,8 +1964,74 @@ export function ListPageContent(props: PageContentProps) {
     }
   }, [inviteCodeData?.code, showErrorToast, showSuccessToast, token]);
 
+  const resetMemberImportState = useCallback(() => {
+    setMemberImportFile(null);
+    setMemberImportLoading(false);
+    setMemberImportError(null);
+    setMemberImportResult(null);
+  }, []);
+
+  const handleTenantMemberImport = useCallback(async () => {
+    if (!memberImportFile) {
+      setMemberImportError('请先选择 Excel 文件');
+      return;
+    }
+
+    setMemberImportLoading(true);
+    setMemberImportError(null);
+    try {
+      const XLSX = await import('xlsx');
+      const workbook = XLSX.read(await memberImportFile.arrayBuffer(), { type: 'array' });
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      if (!firstSheet) {
+        throw new Error('Excel 文件缺少可读取的工作表');
+      }
+      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(firstSheet, { defval: '' });
+      const payload = rows.map((row) => ({
+        name: String(row['姓名*'] ?? row['姓名'] ?? row['name'] ?? '').trim(),
+        email: String(row['邮箱*'] ?? row['邮箱'] ?? row['email'] ?? '').trim(),
+        phone: String(row['手机号'] ?? row['手机'] ?? row['phone'] ?? '').trim(),
+        department: String(row['部门'] ?? row['department'] ?? '').trim(),
+        position: String(row['职位'] ?? row['position'] ?? '').trim(),
+      }));
+
+      const response = await fetch('/api/tenant/members/import-rows', {
+        method: 'post',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(payload),
+      });
+      const body = await response.json().catch(() => null);
+      if (!response.ok || !body || !ResultHelper.isSuccess(body)) {
+        throw new Error(body?.message || body?.desc || '批量导入失败');
+      }
+
+      const result = body.data as TenantMemberImportResult;
+      setMemberImportResult(result);
+      if (result.successCount > 0) {
+        showSuccessToast(`已导入 ${result.successCount} 条成员记录`);
+        await loadDataRef.current?.({
+          page: 0,
+          size: pagination.pageSize,
+          filters,
+        });
+      }
+      if (result.errorCount > 0) {
+        showWarningToast(`有 ${result.errorCount} 条记录导入失败，请检查错误列表`);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '批量导入失败';
+      setMemberImportError(message);
+      showErrorToast(message);
+    } finally {
+      setMemberImportLoading(false);
+    }
+  }, [filters, memberImportFile, pagination.pageSize, showErrorToast, showSuccessToast, showWarningToast, token]);
+
   const listTabsBlock = useMemo(() => {
-    const found = allBlocks.find((block) => block.blockType === 'list-tabs');
+    const found = allBlocks.find((block: any) => block.blockType === 'tabs');
     return found;
   }, [allBlocks]);
 
@@ -2082,189 +2050,298 @@ export function ListPageContent(props: PageContentProps) {
 
   // Dashboard rendering — each block independently fetches its own data
   if (isDashboard) {
-    const dashBlocks = schema.areas
-      ? Object.values(schema.areas).flatMap((area: any) => area.blocks || [])
-      : [];
     return (
-      <DataSourceProvider manager={dataSourceManager}>
-        <div className="mx-auto w-full px-6 py-8" data-testid={deriveTestId('dashboard', modelCode, 'container')}>
-          <h2 className="mb-6 text-lg font-medium text-gray-900">
-            {schema.title ? getLocalizedText(schema.title, locale, t) : tableName}
-          </h2>
-          <div className="grid grid-cols-12 gap-4">
-            {dashBlocks.map((block: any) => {
-              const isChartBlock = block.blockType === 'chart';
-              const isStatCard = block.blockType === 'stat-card';
-              return (
-                <div
-                  key={block.id}
-                  className={isChartBlock || isStatCard ? '' : 'overflow-hidden rounded-lg bg-white shadow-sm'}
-                  style={{ gridColumn: `span ${block.layout?.colSpan || 12}` }}
-                  data-testid={`dashboard-block-${block.id}`}
-                  data-ab-testid={deriveTestId('dashboard', modelCode, 'block', block.id)}
-                  data-block-id={block.id}
-                >
-                  {isChartBlock ? (
-                    <React.Suspense
-                      fallback={
-                        <div className="flex h-64 items-center justify-center rounded-lg border border-gray-200 bg-white p-4">
-                          <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
-                        </div>
-                      }
-                    >
-                      <DashboardChartBlock
-                        block={block}
-                        locale={locale}
-                        onDrillDown={(config) => {
-                          if (config.action === 'navigate' && config.targetPage) {
-                            const params = new URLSearchParams();
-                            if (config.paramMapping) {
-                              Object.entries(config.paramMapping).forEach(([k, v]) => {
-                                params.set(`filter_${k}`, String(v));
-                              });
-                            }
-                            const qs = params.toString();
-                            navigate(`/dynamic/${config.targetPage}${qs ? `?${qs}` : ''}`);
-                          }
-                        }}
-                      />
-                    </React.Suspense>
-                  ) : isStatCard ? (
-                    <DashboardStatCard block={block} token={token} locale={locale} t={t} />
-                  ) : (
-                    <>
-                      <div className="border-b border-gray-200 bg-gray-50 px-4 py-3">
-                        <h3 className="text-sm font-medium text-gray-700">
-                          {block.title ? getLocalizedText(block.title, locale, t) : block.id}
-                        </h3>
-                      </div>
-                      <DashboardBlockTable block={block} token={token} />
-                    </>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </DataSourceProvider>
+      <DashboardContent
+        schema={schema}
+        token={token}
+        locale={locale}
+        t={t}
+        modelCode={modelCode}
+        dataSourceManager={dataSourceManager}
+        navigate={navigate}
+      />
     );
   }
 
   return (
     <DataSourceProvider manager={dataSourceManager}>
-      <div className="mx-auto w-full px-6 py-8" data-testid="dynamic-list" data-ab-testid={deriveTestId('list', modelCode, 'container')}>
+      <div
+        className="mx-auto w-full px-2 py-3"
+        data-testid="dynamic-list"
+        data-ab-testid={deriveTestId('list', modelCode, 'container')}
+      >
         <div className="rounded-lg bg-white shadow-sm">
           {/* Page title, view selector, and action buttons */}
-          <div className="border-b border-gray-200 px-6 py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <h2 className="text-lg font-medium text-gray-900">
-                  {schema.title ? getLocalizedText(schema.title, locale, t) : tableName}
-                </h2>
-                {schema.enableMultiView && (
-                  <ViewSelector
-                    views={savedViews}
-                    currentView={currentView}
-                    onSelectView={(pid) => {
-                      selectView(pid);
-                      const view = savedViews.find((v) => v.pid === pid);
-                      if (view?.viewType && view.viewType !== 'table') {
-                        setActiveViewType(view.viewType as ViewType);
-                      }
-                    }}
-                    onCreateView={(viewType) => {
-                      if (viewType) {
-                        setActiveViewType(viewType);
-                      }
-                      setStartCreateViewMode(true);
-                      setViewManageOpen(true);
-                    }}
-                    onManageViews={() => {
-                      setStartCreateViewMode(false);
-                      setViewManageOpen(true);
-                    }}
-                    loading={viewsLoading}
-                    activeViewType={activeViewType}
-                    onViewTypeChange={(vt) => {
-                      setActiveViewType(vt);
-                      // Auto-select first saved view of this type if none currently selected
-                      if (vt !== 'table' && (!currentView || currentView.viewType !== vt)) {
-                        const match = savedViews.find((v) => v.viewType === vt);
-                        if (match) selectView(match.pid);
-                      }
-                    }}
-                  />
-                )}
-              </div>
-              <div className="print-hide flex items-center gap-2" data-print="hide" data-testid={deriveTestId('list', modelCode, 'toolbar')}>
-                {isTenantMemberPage && (
+          <ListPageHeader
+            title={schema.title ? getLocalizedText(schema.title, locale, t) : tableName}
+            modelCode={modelCode}
+            savedViews={savedViews}
+            currentView={currentView}
+            viewsLoading={viewsLoading}
+            activeViewType={activeViewType}
+            onSelectView={(pid) => {
+              selectView(pid);
+              // Sync view selection to URL
+              setSearchParams((prev) => {
+                const p = new URLSearchParams(prev);
+                p.set('view', pid);
+                // Clear temporary filter/sort params when switching views
+                p.delete('sort');
+                p.delete('keyword');
+                p.delete('filters');
+                return p;
+              }, { replace: true });
+              const view = savedViews.find((v) => v.pid === pid);
+              if (view?.viewType && view.viewType !== 'table') {
+                setActiveViewType(view.viewType as ViewType);
+              }
+            }}
+            onCreateView={(viewType) => {
+              if (viewType) {
+                setActiveViewType(viewType);
+              }
+              setStartCreateViewMode(true);
+              setViewManageOpen(true);
+            }}
+            onManageViews={() => {
+              setStartCreateViewMode(false);
+              setViewManageOpen(true);
+            }}
+            onViewTypeChange={(vt) => {
+              setActiveViewType(vt);
+              if (vt !== 'table' && (!currentView || currentView.viewType !== vt)) {
+                const match = savedViews.find((v) => v.viewType === vt);
+                if (match) selectView(match.pid);
+              }
+            }}
+            buttons={actionBlock?.buttons || []}
+            toolbarActions={currentView?.viewConfig?.toolbarActions}
+            onAction={handleAction}
+            onToolbarConfigChange={handleToolbarConfigChange}
+            resolveLabel={resolveButtonLabel}
+            evaluateVisible={evaluateButtonVisible}
+            onImport={() => setImportOpen(true)}
+            onExport={handleExport}
+            exportFilters={exportFilterConditions}
+            isTenantMemberPage={isTenantMemberPage}
+            onInvite={() => setInviteDialogOpen(true)}
+            onImportMembers={() => {
+              resetMemberImportState();
+              setMemberImportDialogOpen(true);
+            }}
+          />
+
+          {isTenantMemberPage && memberImportDialogOpen && (
+            <div
+              role="dialog"
+              aria-modal="true"
+              data-testid="member-import-dialog"
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+            >
+              <div className="w-full max-w-2xl rounded-lg bg-white p-6 shadow-xl">
+                <div className="mb-4 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">批量导入成员</h3>
+                    <p className="mt-1 text-sm text-gray-500">
+                      入口归属 tenant_member。导入的主语义是批量准入，不是直接维护组织树。
+                    </p>
+                  </div>
                   <button
                     type="button"
-                    data-testid="invite-section"
-                    onClick={() => setInviteDialogOpen(true)}
-                    className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-colors duration-150 hover:bg-emerald-700"
+                    onClick={() => {
+                      setMemberImportDialogOpen(false);
+                      resetMemberImportState();
+                    }}
+                    className="text-sm text-gray-500 hover:text-gray-700"
                   >
-                    Invite
+                    关闭
                   </button>
-                )}
-                {(actionBlock?.buttons || []).map((button: ButtonConfig) => (
+                </div>
+
+                <div className="space-y-4 text-sm text-gray-700">
+                  <div className="rounded-md border border-blue-200 bg-blue-50 p-3">
+                    <p className="font-medium text-blue-900">推荐流程</p>
+                    <p className="mt-1 text-blue-800">
+                      Excel 导入先处理租户成员准入，再按邮箱复用已有 User 或创建待激活账号，最后再建立组织关系。
+                    </p>
+                  </div>
+
+                  <div className="rounded-md border border-gray-200 bg-gray-50 p-4">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <p className="font-medium text-gray-900">1. 下载模板</p>
+                        <p className="mt-1 text-xs text-gray-500">
+                          支持 `.xlsx`。必填列是姓名、邮箱；部门和职位用于补全组织关系。
+                        </p>
+                      </div>
+                      <a
+                        href="/api/tenant/members/import/template"
+                        className="inline-flex items-center justify-center rounded-md border border-blue-200 bg-white px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50"
+                      >
+                        下载模板
+                      </a>
+                    </div>
+
+                    <div className="mt-4">
+                      <p className="font-medium text-gray-900">2. 选择文件</p>
+                      <input
+                        data-testid="member-import-file-input"
+                        type="file"
+                        accept=".xlsx,.xls"
+                        onChange={(event) => {
+                          const selectedFile = event.target.files?.[0] ?? null;
+                          setMemberImportFile(selectedFile);
+                          setMemberImportError(null);
+                        }}
+                        className="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 file:mr-3 file:rounded-md file:border-0 file:bg-blue-600 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-blue-700"
+                      />
+                      {memberImportFile && (
+                        <p className="mt-2 text-xs text-gray-500">已选择: {memberImportFile.name}</p>
+                      )}
+                    </div>
+
+                    {memberImportError && (
+                      <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                        {memberImportError}
+                      </div>
+                    )}
+
+                    <div className="mt-4 flex items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMemberImportDialogOpen(false);
+                          resetMemberImportState();
+                        }}
+                        className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                      >
+                        取消
+                      </button>
+                      <button
+                        type="button"
+                        data-testid="member-import-submit"
+                        disabled={!memberImportFile || memberImportLoading}
+                        onClick={() => void handleTenantMemberImport()}
+                        className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
+                      >
+                        {memberImportLoading ? '导入中...' : '开始导入'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="font-medium text-gray-900">导入结果分三类</p>
+                    <ul className="mt-2 list-disc space-y-1 pl-5">
+                      <li>已绑定已有用户：复用现有 User，创建 TenantMember，并建立组织关系</li>
+                      <li>待激活成员：创建准入记录，发送邀请，等首次设置密码后启用登录</li>
+                      <li>冲突项：邮箱重复、同租户已存在成员、部门不存在、职位不存在</li>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <p className="font-medium text-gray-900">建议模板字段</p>
+                    <div className="mt-2 overflow-hidden rounded-md border border-gray-200">
+                      <table className="min-w-full divide-y divide-gray-200 text-sm">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-3 py-2 text-left font-medium text-gray-600">字段</th>
+                            <th className="px-3 py-2 text-left font-medium text-gray-600">必填</th>
+                            <th className="px-3 py-2 text-left font-medium text-gray-600">说明</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200 bg-white">
+                          <tr>
+                            <td className="px-3 py-2">姓名</td>
+                            <td className="px-3 py-2">是</td>
+                            <td className="px-3 py-2">员工显示名称</td>
+                          </tr>
+                          <tr>
+                            <td className="px-3 py-2">邮箱</td>
+                            <td className="px-3 py-2">是</td>
+                            <td className="px-3 py-2">作为账号识别键；优先用于复用已有 User</td>
+                          </tr>
+                          <tr>
+                            <td className="px-3 py-2">手机号</td>
+                            <td className="px-3 py-2">否</td>
+                            <td className="px-3 py-2">补充联系方式</td>
+                          </tr>
+                          <tr>
+                            <td className="px-3 py-2">部门</td>
+                            <td className="px-3 py-2">否</td>
+                            <td className="px-3 py-2">用于自动建立组织关系；不存在时进入冲突列表</td>
+                          </tr>
+                          <tr>
+                            <td className="px-3 py-2">职位</td>
+                            <td className="px-3 py-2">否</td>
+                            <td className="px-3 py-2">依赖部门/职位主数据匹配</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-amber-900">
+                    第一版实现先固定入口和规则，不默认给新导入人员生成可直接登录的密码。新用户应走邀请激活链路。
+                  </div>
+
+                  {memberImportResult && (
+                    <div
+                      data-testid="member-import-result"
+                      className="rounded-md border border-emerald-200 bg-emerald-50 p-4"
+                    >
+                      <p className="font-medium text-emerald-900">导入结果</p>
+                      <div className="mt-2 grid gap-2 text-sm text-emerald-900 md:grid-cols-2">
+                        <div>总行数: {memberImportResult.totalRows}</div>
+                        <div>成功: {memberImportResult.successCount}</div>
+                        <div>复用已有用户: {memberImportResult.existingUserBoundCount}</div>
+                        <div>待激活邀请: {memberImportResult.invitedCount}</div>
+                        <div>建立组织关系: {memberImportResult.employeeCreatedCount}</div>
+                        <div>失败: {memberImportResult.errorCount}</div>
+                      </div>
+
+                      {memberImportResult.errors.length > 0 && (
+                        <div className="mt-4 overflow-hidden rounded-md border border-amber-200 bg-white">
+                          <table className="min-w-full divide-y divide-amber-100 text-sm">
+                            <thead className="bg-amber-50">
+                              <tr>
+                                <th className="px-3 py-2 text-left font-medium text-amber-900">行号</th>
+                                <th className="px-3 py-2 text-left font-medium text-amber-900">姓名</th>
+                                <th className="px-3 py-2 text-left font-medium text-amber-900">邮箱</th>
+                                <th className="px-3 py-2 text-left font-medium text-amber-900">原因</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-amber-100">
+                              {memberImportResult.errors.slice(0, 10).map((item) => (
+                                <tr key={`${item.rowNumber}-${item.email ?? item.name ?? 'row'}`}>
+                                  <td className="px-3 py-2">{item.rowNumber}</td>
+                                  <td className="px-3 py-2">{item.name || '-'}</td>
+                                  <td className="px-3 py-2">{item.email || '-'}</td>
+                                  <td className="px-3 py-2 text-amber-900">{item.reason}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-6 flex items-center justify-end gap-2">
                   <button
                     type="button"
-                    key={button.code}
-                    data-testid={`toolbar-btn-${button.code}`}
-                    onClick={() => handleAction(button)}
-                    className={`rounded-md px-4 py-2 text-sm font-medium ${
-                      button.primary || button.variant === 'primary'
-                        ? 'bg-blue-600 text-white hover:bg-blue-700'
-                        : button.variant === 'danger' || button.danger
-                          ? 'bg-red-600 text-white hover:bg-red-700'
-                          : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
-                    }`}
+                    onClick={() => {
+                      setMemberImportDialogOpen(false);
+                      resetMemberImportState();
+                    }}
+                    className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
                   >
-                    {resolveButtonLabel(button)}
+                    关闭
                   </button>
-                ))}
-                <ToolbarMoreMenu
-                  onImport={() => setImportOpen(true)}
-                  modelCode={modelCode}
-                  filters={(() => {
-                    const conditions: Array<{ field: string; operator: string; value: unknown }> =
-                      [];
-                    const tabCondition = getTabFilter();
-                    if (tabCondition) {
-                      conditions.push({
-                        field: tabCondition.fieldName,
-                        operator: tabCondition.operator,
-                        value: tabCondition.value,
-                      });
-                    }
-                    if (filters) {
-                      for (const [key, value] of Object.entries(filters)) {
-                        if (value == null || value === '') continue;
-                        if (typeof value === 'object' && ('start' in value || 'end' in value)) {
-                          if (value.start)
-                            conditions.push({
-                              field: key,
-                              operator: 'gte',
-                              value: String(value.start),
-                            });
-                          if (value.end)
-                            conditions.push({
-                              field: key,
-                              operator: 'lte',
-                              value: String(value.end),
-                            });
-                        } else {
-                          conditions.push({ field: key, operator: 'EQ', value: String(value) });
-                        }
-                      }
-                    }
-                    return conditions.length > 0 ? conditions : undefined;
-                  })()}
-                />
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {isTenantMemberPage && inviteDialogOpen && (
             <div
@@ -2341,30 +2418,17 @@ export function ListPageContent(props: PageContentProps) {
 
           {/* List Tabs */}
           {listTabsBlock?.tabs && (listTabsBlock.tabs as any[]).length > 0 && (
-            <div className="border-b border-gray-200 px-6">
-              <nav className="-mb-px flex space-x-6" aria-label="Tabs">
-                {(listTabsBlock.tabs as any[]).map((tab: any) => (
-                  <button
-                    key={tab.key}
-                    data-testid={`tab-${tab.key}`}
-                    onClick={() => handleTabChange(tab.key)}
-                    className={`border-b-2 px-1 py-3 text-sm font-medium whitespace-nowrap ${
-                      activeTab === tab.key
-                        ? 'border-blue-500 text-blue-600'
-                        : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
-                    }`}
-                  >
-                    {typeof tab.label === 'string'
-                      ? tab.label
-                      : getLocalizedText(tab.label, locale, t)}
-                  </button>
-                ))}
-              </nav>
-            </div>
+            <ListTabs
+              tabs={listTabsBlock.tabs as any[]}
+              activeTab={activeTab}
+              onTabChange={handleTabChange}
+              locale={locale}
+              t={t}
+            />
           )}
 
           {/* Filter area - Using Smart Components with collapse/expand (hidden in print) */}
-          {filterBlock && filterBlock.fields && filterBlock.fields.length > 0 && (
+          {filterFormVisible && filterBlock && filterBlock.fields && filterBlock.fields.length > 0 && (
             <div
               data-testid="search-area"
               data-ab-testid={deriveTestId('list', modelCode, 'filters')}
@@ -2522,385 +2586,124 @@ export function ListPageContent(props: PageContentProps) {
 
           {activeViewType === 'table' ? (
             <>
-              {/* Table toolbar: quick filters (left) + row height + column settings (right) */}
-              <div
-                className="print-hide flex items-center justify-between border-b border-gray-100 px-6 py-2"
-                data-print="hide"
-              >
-                {/* Quick filter chips */}
-                <div className="flex gap-1.5" data-testid="quick-filters">
-                  {([
-                    { key: 'my_records' as QuickFilterKey, label: 'My Records', icon: '👤' },
-                    { key: 'created_today' as QuickFilterKey, label: 'Created Today', icon: '📅' },
-                    { key: 'modified_this_week' as QuickFilterKey, label: 'Modified This Week', icon: '🕐' },
-                  ]).map((qf) => (
-                    <button
-                      key={qf.key}
-                      type="button"
-                      onClick={() => handleQuickFilter(qf.key)}
-                      data-testid={`quick-filter-${qf.key}`}
-                      className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                        activeQuickFilter === qf.key
-                          ? 'bg-blue-100 text-blue-700 ring-1 ring-blue-400'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
-                    >
-                      {qf.label}
-                    </button>
-                  ))}
-                </div>
-                <div className="flex gap-1">
-                <RowHeightSelector
-                  value={currentView?.viewConfig?.rowHeight}
-                  onChange={handleRowHeightChange}
-                />
-                <button
-                  type="button"
-                  onClick={() => setColumnSettingsOpen(true)}
-                  title="Column settings"
-                  className="rounded-md p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
-                  data-testid="column-settings-btn"
-                >
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                    />
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                    />
-                  </svg>
-                </button>
-                </div>
-              </div>
+              <ListToolbar
+                keyword={keyword}
+                onKeywordChange={setKeyword}
+                onSearch={() => {
+                  // Flush debounced URL sync + cancel pending auto-search, then search immediately
+                  syncKeywordToUrl.flush();
+                  debouncedSearch.cancel();
+                  loadData({ page: 0, size: pagination.pageSize });
+                }}
+                filterFormVisible={filterFormVisible}
+                onFilterFormToggle={() => setFilterFormVisible((prev) => !prev)}
+                hasFilterBlock={!!(filterBlock && filterBlock.fields && filterBlock.fields.length > 0)}
+                activeQuickFilter={activeQuickFilter}
+                onQuickFilter={handleQuickFilter}
+                activeSorts={activeSorts}
+                onSortsChange={setActiveSorts}
+                sortableColumns={tableColumns
+                  .filter((c: ColumnConfig) => !c.isActionColumn && c.field && c.sortable !== false)
+                  .map((c: ColumnConfig) => ({
+                    field: c.field,
+                    label: c.label
+                      ? typeof c.label === 'string'
+                        ? c.label
+                        : (c.label as any)?.['zh-CN'] || c.field
+                      : (() => {
+                          const mc = (schema?.modelCode || tableName);
+                          const key = `model.${mc}.${c.field}.label`;
+                          const resolved = t(key);
+                          return resolved !== key ? resolved : c.field;
+                        })(),
+                    valueType: c.valueType || c.sorter,
+                  }))}
+                rowHeight={currentView?.viewConfig?.rowHeight}
+                onRowHeightChange={handleRowHeightChange}
+                onColumnSettingsOpen={() => setColumnSettingsOpen(true)}
+                chipFilters={chipFilters}
+                onChipFiltersChange={setChipFilters}
+                fieldMetadata={tableColumns
+                  .filter((c: ColumnConfig) => !c.isActionColumn && c.field)
+                  .map((c: ColumnConfig) => ({
+                    fieldCode: c.field,
+                    label: c.label
+                      ? typeof c.label === 'string'
+                        ? c.label
+                        : (c.label as any)?.['zh-CN'] || c.field
+                      : (() => {
+                          const mc = (schema?.modelCode || tableName);
+                          const key = `model.${mc}.${c.field}.label`;
+                          const resolved = t(key);
+                          return resolved !== key ? resolved : c.field;
+                        })(),
+                    fieldType: c.valueType || c.sorter || 'text',
+                    dictCode: c.dictCode,
+                  }))}
+                onAddFilter={(e?: React.MouseEvent) => {
+                  const rect = (e?.currentTarget as HTMLElement)?.getBoundingClientRect?.();
+                  setFieldPickerAnchor(
+                    rect ? { x: rect.left, y: rect.bottom + 4 } : { x: 300, y: 200 },
+                  );
+                  setFieldPickerOpen(true);
+                }}
+                onChipClick={(idx, e) => {
+                  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                  setValuePopoverAnchor({ x: rect.left, y: rect.bottom + 4 });
+                  setEditingChipIdx(idx);
+                }}
+                onClearAll={() => {
+                  setChipFilters([]);
+                  setActiveSorts([]);
+                }}
+              />
 
-              {/* Filter Chip Bar — always visible for "Add Filter" access */}
-              <FilterChipBar
-                  filters={chipFilters}
-                  sorts={activeSorts}
-                  fieldMetadata={tableColumns
-                    .filter((c: ColumnConfig) => !c.isActionColumn && c.field)
-                    .map((c: ColumnConfig) => ({
-                      fieldCode: c.field,
-                      label: c.label
-                        ? (typeof c.label === 'string' ? c.label : (c.label as any)?.['zh-CN'] || c.field)
-                        : (() => {
-                            const mc = (schema?.modelCode || tableName).replace(/-/g, '_');
-                            const key = `model.${mc}.${c.field}.label`;
-                            const resolved = t(key);
-                            return resolved !== key ? resolved : c.field;
-                          })(),
-                      fieldType: c.valueType || c.sorter || 'text',
-                      dictCode: c.dictCode,
-                    }))}
-                  onFiltersChange={setChipFilters}
-                  onSortsChange={setActiveSorts}
-                  onAddFilter={(e?: React.MouseEvent) => {
-                    const rect = (e?.currentTarget as HTMLElement)?.getBoundingClientRect?.();
-                    setFieldPickerAnchor(rect ? { x: rect.left, y: rect.bottom + 4 } : { x: 300, y: 200 });
-                    setFieldPickerOpen(true);
-                  }}
-                  onChipClick={(idx, e) => {
-                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                    setValuePopoverAnchor({ x: rect.left, y: rect.bottom + 4 });
-                    setEditingChipIdx(idx);
-                  }}
-                  onClearAll={() => { setChipFilters([]); setActiveSorts([]); }}
-                />
+              {/* Table area — extracted to ListTable with DnD column reorder */}
+              <ListTable
+                columns={tableColumns}
+                data={data}
+                loading={loading}
+                activeSorts={activeSorts}
+                selectedIds={selectedIds}
+                rowHeight={effectiveRowHeight}
+                modelCode={modelCode}
+                columnOrder={columnOrder}
+                onColumnReorder={handleColumnReorder}
+                onColumnResize={handleColumnResize}
+                onToggleSort={toggleSort}
+                onSelectRow={(id, _checked) => toggleRowSelection(id)}
+                onSelectAll={() => toggleSelectAll()}
+                onRowClick={handleRowClick}
+                onContextMenu={(e, column) => {
+                  setContextMenu({ x: e.clientX, y: e.clientY, column });
+                }}
+                renderCellContent={(record, column, rowIndex) =>
+                  renderCellContent(column, record, rowIndex)
+                }
+                evaluateVisibleWhen={evaluateVisibleWhen}
+                resolveButtonLabel={resolveButtonLabel}
+                handleAction={handleAction}
+                resolveColumnLabel={resolveColumnLabel}
+                columnWidths={columnWidths}
+                groupedData={groupedData}
+                groupByField={groupByField ?? undefined}
+                collapsedGroups={collapsedGroups}
+                onToggleGroupCollapse={toggleGroupCollapse}
+                getRowStyle={getRowStyle}
+                previewRecordId={previewRecordId}
+                t={t}
+                onInlineSave={handleInlineSave}
+                dictDataCache={dictDataCache.current}
+              />
 
-              {/* Table area */}
-              <div className="relative overflow-x-auto" data-testid={deriveTestId('list', modelCode, 'table')}>
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="print-hide w-10 px-3 py-3" data-print="hide">
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.size > 0 && selectedIds.size === data.length}
-                          ref={(el) => {
-                            if (el)
-                              el.indeterminate =
-                                selectedIds.size > 0 && selectedIds.size < data.length;
-                          }}
-                          onChange={toggleSelectAll}
-                          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                          data-testid="select-all-checkbox"
-                        />
-                      </th>
-                      {tableColumns.map((column: ColumnConfig) => {
-                        const sortInfo = activeSorts.find((s) => s.fieldCode === column.field);
-                        const isSortable = !column.isActionColumn && column.sortable !== false;
-                        const frozenPos = column.fixed || (column as any).frozenPosition;
-                        const isFrozenLeft = frozenPos === 'left';
-                        const isFrozenRight = frozenPos === 'right' || column.isActionColumn;
-                        return (
-                        <th
-                          key={column.field}
-                          className={`${
-                            column.isActionColumn ? 'w-px px-2 py-3' : 'px-6 py-3'
-                          } text-xs font-medium tracking-wider text-gray-500 uppercase ${
-                            column.align === 'right'
-                              ? 'text-right'
-                              : column.align === 'center'
-                                ? 'text-center'
-                                : 'text-left'
-                          } ${
-                            isFrozenRight
-                              ? 'sticky right-0 z-20 border-l border-gray-200 bg-gray-50 shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.2)]'
-                              : isFrozenLeft
-                                ? 'sticky left-0 z-20 border-r border-gray-200 bg-gray-50 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]'
-                                : ''
-                          } ${
-                            isSortable ? 'cursor-pointer select-none hover:bg-gray-100' : ''
-                          }`}
-                          style={
-                            column.width
-                              ? {
-                                  width:
-                                    typeof column.width === 'number'
-                                      ? `${column.width}px`
-                                      : column.width,
-                                }
-                              : undefined
-                          }
-                          onClick={isSortable ? (e) => toggleSort(column.field, e.shiftKey) : undefined}
-                          onContextMenu={!column.isActionColumn ? (e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setContextMenu({ x: e.clientX, y: e.clientY, column });
-                          } : undefined}
-                        >
-                          <div className="group/th relative flex items-center gap-1">
-                            <span>
-                            {column.label
-                              ? getLocalizedText(column.label, locale, t)
-                              : column.isActionColumn
-                                ? t('table.actions')
-                                : (() => {
-                                    const mc = (schema?.modelCode || tableName).replace(/-/g, '_');
-                                    const modelKey = `model.${mc}.${column.field}.label`;
-                                    const modelLabel = t(modelKey);
-                                    if (modelLabel !== modelKey) return modelLabel;
-                                    const fieldKey = `field.${column.field}.label`;
-                                    const fieldLabel = t(fieldKey);
-                                    if (fieldLabel !== fieldKey) return fieldLabel;
-                                    const commonKey = `common.field.${column.field}`;
-                                    const commonLabel = t(commonKey);
-                                    return commonLabel !== commonKey ? commonLabel : column.field;
-                                  })()}
-                            </span>
-                            {isSortable && (
-                              <span className={`text-[10px] ${sortInfo ? 'text-blue-600' : 'text-gray-300'}`}>
-                                {sortInfo?.direction === 'asc' ? '↑' : sortInfo?.direction === 'desc' ? '↓' : '↕'}
-                              </span>
-                            )}
-                            {!column.isActionColumn && (
-                              <button
-                                type="button"
-                                className="absolute right-1 top-1/2 -translate-y-1/2 rounded p-0.5 text-gray-400 opacity-0 transition-opacity hover:bg-gray-200 hover:text-gray-600 group-hover/th:opacity-100"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setContextMenu({ x: e.clientX, y: e.clientY, column });
-                                }}
-                              >
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
-                              </button>
-                            )}
-                          </div>
-                          {!column.isActionColumn && column.width && (
-                            <ColumnResizeHandle
-                              width={typeof column.width === 'number' ? column.width : parseInt(String(column.width), 10) || 100}
-                              onResize={(newWidth) => {
-                                if (!currentView) return;
-                                const cols = [...(currentView.viewConfig?.columns || [])];
-                                const idx = cols.findIndex((c) => c.fieldCode === column.field);
-                                if (idx >= 0) {
-                                  cols[idx] = { ...cols[idx], width: newWidth };
-                                } else {
-                                  cols.push({ fieldCode: column.field, width: newWidth });
-                                }
-                                autoSave({ columns: cols });
-                              }}
-                            />
-                          )}
-                        </th>
-                        );
-                      })}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200 bg-white">
-                    {loading ? (
-                      <tr>
-                        <td
-                          colSpan={(tableColumns.length || 1) + 1}
-                          className="px-6 py-4 text-center"
-                        >
-                          <div className="flex items-center justify-center">
-                            <span className="loading loading-spinner loading-md mr-2"></span>
-                            {t('message.loading')}
-                          </div>
-                        </td>
-                      </tr>
-                    ) : data.length === 0 ? (
-                      <tr>
-                        <td
-                          colSpan={(tableColumns.length || 1) + 1}
-                          className="px-6 py-4 text-center text-gray-500"
-                        >
-                          {t('table.noData')}
-                        </td>
-                      </tr>
-                    ) : (
-                      (() => {
-                        // Build rows: optionally grouped with collapsible headers
-                        const visibleData = groupedData
-                          ? data.filter((r) => !collapsedGroups.has(String(r[groupByField!] ?? '(empty)')))
-                          : data;
-                        const rowElements: React.ReactNode[] = [];
-
-                        if (groupedData) {
-                          let globalIdx = 0;
-                          for (const group of groupedData) {
-                            const isCollapsed = collapsedGroups.has(group.key);
-                            rowElements.push(
-                              <tr
-                                key={`group-${group.key}`}
-                                className="cursor-pointer bg-gray-50 hover:bg-gray-100"
-                                onClick={() => toggleGroupCollapse(group.key)}
-                              >
-                                <td
-                                  colSpan={(tableColumns.length || 1) + 1}
-                                  className="px-6 py-2 text-sm font-medium text-gray-700"
-                                >
-                                  <span className="mr-2 text-xs text-gray-400">{isCollapsed ? '▶' : '▼'}</span>
-                                  <span className="font-semibold">{groupByField}</span>
-                                  <span className="mx-1">:</span>
-                                  <span>{group.key}</span>
-                                  <span className="ml-2 text-xs text-gray-400">({group.count})</span>
-                                </td>
-                              </tr>,
-                            );
-                            if (!isCollapsed) {
-                              // Group's data rows rendered below via shared renderRow path
-                              globalIdx += group.count;
-                            }
-                          }
-                        }
-                        return rowElements;
-                      })()
-                    )}
-                    {/* Data rows */}
-                    {!loading && data.length > 0 && (groupedData
-                      ? data.filter((r) => !collapsedGroups.has(String(r[groupByField!] ?? '(empty)')))
-                      : data
-                    ).map((record, index) => {
-                        const rowId = record.pid || record.id || '';
-                        const cfStyle = evaluateConditionalFormats(currentView?.viewConfig?.conditionalFormats, record);
-                        const cfInline = buildConditionalStyle(cfStyle);
-                        return (
-                          <tr
-                            key={rowId || index}
-                            data-testid={`table-row-${index}`}
-                            className={`group hover:bg-gray-50 cursor-pointer${selectedIds.has(rowId) ? 'bg-blue-50' : ''}${previewRecordId === rowId ? 'bg-blue-50/50' : ''}`}
-                            style={{ height: `${rowHeightCfg.px}px`, ...cfInline }}
-                            onClick={() => handleRowClick(record)}
-                          >
-                            <td
-                              className={`px-3 ${rowHeightCfg.pyClass} print-hide w-10`}
-                              data-print="hide"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={selectedIds.has(rowId)}
-                                onChange={() => toggleRowSelection(rowId)}
-                                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                data-testid={`row-checkbox-${index}`}
-                              />
-                            </td>
-                            {tableColumns.map((column: ColumnConfig) => {
-                              const tdFrozenPos = column.fixed || (column as any).frozenPosition;
-                              const tdFrozenLeft = tdFrozenPos === 'left';
-                              const tdFrozenRight = tdFrozenPos === 'right' || column.isActionColumn;
-                              return (
-                              <td
-                                key={column.field}
-                                data-testid={`table-cell-${index}-${column.field}`}
-                                className={`${
-                                  column.isActionColumn
-                                    ? `px-2 ${rowHeightCfg.pyClass} w-px`
-                                    : `px-6 ${rowHeightCfg.pyClass}`
-                                } text-sm whitespace-nowrap text-gray-900 ${
-                                  column.align === 'right'
-                                    ? 'text-right'
-                                    : column.align === 'center'
-                                      ? 'text-center'
-                                      : ''
-                                } ${
-                                  tdFrozenRight
-                                    ? 'sticky right-0 z-10 border-l border-gray-200 bg-white shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.2)] group-hover:bg-gray-50'
-                                    : tdFrozenLeft
-                                      ? 'sticky left-0 z-10 border-r border-gray-200 bg-white shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] group-hover:bg-gray-50'
-                                      : ''
-                                }`}
-                              >
-                                {column.isActionColumn ? (
-                                  <div className="opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                                  <RowActionButtons
-                                    buttons={column.buttons || []}
-                                    record={record}
-                                    evaluateVisibleWhen={evaluateVisibleWhen}
-                                    resolveButtonLabel={resolveButtonLabel}
-                                    handleAction={handleAction}
-                                  />
-                                  </div>
-                                ) : column.editable ? (
-                                  <InlineEditCell
-                                    column={column}
-                                    value={record[column.field]}
-                                    record={record}
-                                    onSave={handleInlineSave}
-                                    editable
-                                    dictItems={
-                                      column.dictCode
-                                        ? (dictDataCache.current.get(column.dictCode) ?? [])
-                                        : undefined
-                                    }
-                                  >
-                                    {renderCellContent(column, record, index)}
-                                  </InlineEditCell>
-                                ) : (
-                                  renderCellContent(column, record, index)
-                                )}
-                              </td>
-                              );
-                            })}
-                          </tr>
-                        );
-                      })}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Pagination (hidden in print) */}
-              <div className="print-hide" data-print="hide">
-                <Pagination
-                  current={pagination.current}
-                  pageSize={pagination.pageSize}
-                  total={pagination.total}
-                  onChange={handlePageChange}
-                  onPageSizeChange={handlePageSizeChange}
-                  t={t}
-                />
-              </div>
-
-              {/* Bulk Action Toolbar (hidden in print) */}
-              <BulkActionToolbar
+              {/* Pagination + Bulk Action Toolbar */}
+              <ListPagination
+                current={pagination.current}
+                pageSize={pagination.pageSize}
+                total={pagination.total}
+                onPageChange={handlePageChange}
+                onPageSizeChange={handlePageSizeChange}
+                t={t}
                 selectedCount={selectedIds.size}
                 selectedIds={Array.from(selectedIds)}
                 modelCode={modelCode}
@@ -2908,24 +2711,6 @@ export function ListPageContent(props: PageContentProps) {
                 onBulkDelete={handleBulkDelete}
                 onClearSelection={() => setSelectedIds(new Set())}
               />
-
-              {/* Bulk Edit Modal */}
-              {bulkEditOpen && (
-                <BulkEditModal
-                  open={bulkEditOpen}
-                  onClose={() => setBulkEditOpen(false)}
-                  selectedIds={Array.from(selectedIds)}
-                  modelCode={modelCode}
-                  fields={tableColumns
-                    .filter((c) => !c.isActionColumn && c.field)
-                    .map((c) => ({
-                      code: c.field,
-                      name: c.field,
-                      dataType: c.valueType || 'string',
-                    }))}
-                  onUpdateComplete={handleBulkEditComplete}
-                />
-              )}
             </>
           ) : (
             <SmartViewRenderer
@@ -2940,7 +2725,7 @@ export function ListPageContent(props: PageContentProps) {
               onGanttTaskClick={navigateToRecordView}
               onOpenViewConfig={() => setViewManageOpen(true)}
               onSwitchToTableView={() => setActiveViewType('table')}
-              onCardClick={(card) => navigateToRecordView((card as any).id || (card as any).pid)}
+              onCardClick={(card) => navigateToRecordView((card as any).pid || (card as any).id)}
               onEventClick={navigateToRecordView}
               onGalleryCardClick={navigateToRecordView}
               onTreeNodeClick={navigateToRecordView}
@@ -2949,22 +2734,31 @@ export function ListPageContent(props: PageContentProps) {
             />
           )}
 
-          <ImportModal
-            open={importOpen}
-            onClose={() => setImportOpen(false)}
+          <ListModals
+            // BulkEditModal
+            bulkEditOpen={bulkEditOpen}
+            onBulkEditClose={() => setBulkEditOpen(false)}
+            selectedIds={Array.from(selectedIds)}
             modelCode={modelCode}
+            bulkEditFields={tableColumns
+              .filter((c) => !c.isActionColumn && c.field)
+              .map((c) => ({
+                code: c.field,
+                name: c.field,
+                dataType: c.valueType || 'string',
+              }))}
+            onBulkEditComplete={handleBulkEditComplete}
+            // ImportModal
+            importOpen={importOpen}
+            onImportClose={() => setImportOpen(false)}
             onImportComplete={handleImportComplete}
-          />
-
-          <FormDialog />
-
-          <ViewManagePanel
-            open={viewManageOpen}
-            onClose={() => {
+            // ViewManagePanel
+            viewManageOpen={viewManageOpen}
+            onViewManageClose={() => {
               setViewManageOpen(false);
               setStartCreateViewMode(false);
             }}
-            views={savedViews}
+            savedViews={savedViews}
             currentView={currentView}
             onCreateView={async (req: SavedViewCreateRequest) => createView(req)}
             onCreateViewSuccess={(view) => {
@@ -2978,11 +2772,15 @@ export function ListPageContent(props: PageContentProps) {
             onDuplicateView={async (pid: string, name: string) => {
               await duplicateView(pid, name);
             }}
+            onEditView={handleEditView}
             onSetDefaultView={async (pid: string) => {
               await setDefaultView(pid);
             }}
-            onSelectView={selectView}
-            modelCode={modelCode}
+            onSelectView={(pid) => {
+              selectView(pid);
+              const view = savedViews.find((v) => v.pid === pid);
+              setActiveViewType((view?.viewType as ViewType) || 'table');
+            }}
             pageKey={pageKey}
             activeViewType={activeViewType}
             startInCreateMode={startCreateViewMode}
@@ -2990,30 +2788,38 @@ export function ListPageContent(props: PageContentProps) {
             onFieldsCreated={() => {
               loadData({ page: 0, size: pagination.pageSize, filters });
             }}
-          />
-
-          <ColumnSettingsPanel
-            open={columnSettingsOpen}
-            onClose={() => setColumnSettingsOpen(false)}
-            allColumns={allColumnDefs}
+            onViewConfigSaved={reloadViews}
+            viewManageFields={tableColumns
+              .filter((c: ColumnConfig) => !c.isActionColumn && c.field)
+              .map((c: ColumnConfig) => ({
+                code: c.field,
+                name: c.label
+                  ? typeof c.label === 'string'
+                    ? c.label
+                    : (c.label as any)?.['zh-CN'] || c.field
+                  : c.field,
+                dataType: c.valueType || c.sorter || 'text',
+              }))}
+            // ColumnSettingsPanel
+            columnSettingsOpen={columnSettingsOpen}
+            onColumnSettingsClose={() => setColumnSettingsOpen(false)}
+            allColumnDefs={allColumnDefs}
             viewColumns={currentView?.viewConfig?.columns}
-            onSave={handleColumnSettingsSave}
+            onColumnSettingsSave={handleColumnSettingsSave}
             t={t}
-          />
-
-          {/* Record Preview Drawer */}
-          {/* Filter Field Picker */}
-          <FilterFieldPicker
-            open={fieldPickerOpen}
-            anchorEl={fieldPickerAnchor}
-            fields={tableColumns
+            // FilterFieldPicker
+            fieldPickerOpen={fieldPickerOpen}
+            fieldPickerAnchor={fieldPickerAnchor}
+            fieldPickerFields={tableColumns
               .filter((c: ColumnConfig) => !c.isActionColumn && c.field)
               .map((c: ColumnConfig) => ({
                 fieldCode: c.field,
                 label: c.label
-                  ? (typeof c.label === 'string' ? c.label : (c.label as any)?.['zh-CN'] || c.field)
+                  ? typeof c.label === 'string'
+                    ? c.label
+                    : (c.label as any)?.['zh-CN'] || c.field
                   : (() => {
-                      const mc = (schema?.modelCode || tableName).replace(/-/g, '_');
+                      const mc = (schema?.modelCode || tableName);
                       const key = `model.${mc}.${c.field}.label`;
                       const resolved = t(key);
                       return resolved !== key ? resolved : c.field;
@@ -3021,8 +2827,8 @@ export function ListPageContent(props: PageContentProps) {
                 fieldType: c.valueType || c.sorter || 'text',
                 dictCode: c.dictCode,
               }))}
-            activeFieldCodes={chipFilters.map((f) => f.fieldCode)}
-            onSelect={(fieldCode) => {
+            chipFilterFieldCodes={chipFilters.map((f) => f.fieldCode)}
+            onFieldPickerSelect={(fieldCode) => {
               // Add a new empty filter chip and immediately open the value popover
               const newFilter: ViewFilterConfig = {
                 fieldCode,
@@ -3041,92 +2847,72 @@ export function ListPageContent(props: PageContentProps) {
               });
               setFieldPickerOpen(false);
             }}
-            onClose={() => setFieldPickerOpen(false)}
-          />
-
-          {/* Filter Value Popover — edit operator + value of a chip */}
-          {editingChipIdx !== null && chipFilters[editingChipIdx] && (() => {
-            const cf = chipFilters[editingChipIdx];
-            const fieldMeta = tableColumns.find((c: ColumnConfig) => c.field === cf.fieldCode) as any;
-            return (
-              <FilterValuePopover
-                open
-                anchorEl={valuePopoverAnchor}
-                fieldCode={cf.fieldCode}
-                fieldLabel={fieldMeta?.label
-                  ? (typeof fieldMeta.label === 'string' ? fieldMeta.label : fieldMeta.label?.['zh-CN'] || cf.fieldCode)
-                  : (() => {
-                      const mc = (schema?.modelCode || tableName).replace(/-/g, '_');
-                      const key = `model.${mc}.${cf.fieldCode}.label`;
-                      const resolved = t(key);
-                      return resolved !== key ? resolved : cf.fieldCode;
-                    })()}
-                fieldType={fieldMeta?.valueType || fieldMeta?.sorter || 'text'}
-                dictCode={fieldMeta?.dictCode}
-                operator={cf.operator}
-                value={cf.value}
-                onApply={(operator, value) => {
-                  setChipFilters((prev) =>
-                    prev.map((f, i) => (i === editingChipIdx ? { ...f, operator: operator as any, value } : f)),
-                  );
-                  setEditingChipIdx(null);
-                }}
-                onCancel={() => setEditingChipIdx(null)}
-              />
-            );
-          })()}
-
-          {/* Column Context Menu */}
-          {contextMenu && (
-            <ColumnContextMenu
-              x={contextMenu.x}
-              y={contextMenu.y}
-              column={contextMenu.column}
-              currentSortDir={activeSorts.find((s) => s.fieldCode === contextMenu.column.field)?.direction}
-              onSort={(dir) => {
-                if (dir === 'clear') {
-                  setActiveSorts((prev) => prev.filter((s) => s.fieldCode !== contextMenu.column.field));
-                } else {
-                  setActiveSorts([{ fieldCode: contextMenu.column.field, direction: dir, priority: 0 }]);
-                }
-              }}
-              onFreeze={(_pos) => {
-                // Column freeze is handled via DSL config; for runtime, update SavedView
-                // This would require extending ViewColumnConfig with frozen support
-              }}
-              onHide={() => {
-                if (!currentView) return;
-                const cols = (currentView.viewConfig?.columns || []).map((c) =>
-                  c.fieldCode === contextMenu.column.field ? { ...c, visible: false } : c,
+            onFieldPickerClose={() => setFieldPickerOpen(false)}
+            // FilterValuePopover
+            editingChipIdx={editingChipIdx}
+            chipFilters={chipFilters}
+            valuePopoverAnchor={valuePopoverAnchor}
+            tableColumns={tableColumns}
+            schema={schema}
+            tableName={tableName}
+            onFilterApply={(operator, value) => {
+              setChipFilters((prev) =>
+                prev.map((f, i) =>
+                  i === editingChipIdx ? { ...f, operator: operator as any, value } : f,
+                ),
+              );
+              setEditingChipIdx(null);
+            }}
+            onFilterCancel={() => setEditingChipIdx(null)}
+            // ColumnContextMenu
+            contextMenu={contextMenu}
+            activeSorts={activeSorts}
+            onSort={(dir) => {
+              if (!contextMenu) return;
+              if (dir === 'clear') {
+                setActiveSorts((prev) =>
+                  prev.filter((s) => s.fieldCode !== contextMenu.column.field),
                 );
-                // If column not in saved config yet, add it as hidden
-                if (!cols.find((c) => c.fieldCode === contextMenu.column.field)) {
-                  cols.push({ fieldCode: contextMenu.column.field, visible: false });
-                }
-                updateViewConfig({ columns: cols });
-              }}
-              onFilterByColumn={() => {
-                // Placeholder — will be connected to FilterChipBar in integration step
-              }}
-              onGroupBy={() => {
-                setGroupByField((prev) =>
-                  prev === contextMenu.column.field ? null : contextMenu.column.field,
-                );
-              }}
-              onClose={() => setContextMenu(null)}
-            />
-          )}
-
-          <RecordPreviewDrawer
-            open={!!previewRecordId}
-            modelCode={modelCode}
-            recordId={previewRecordId || ''}
-            apiEndpoint={
+              } else {
+                setActiveSorts([
+                  { fieldCode: contextMenu.column.field, direction: dir, priority: 0 },
+                ]);
+              }
+            }}
+            onFreeze={(_pos) => {
+              // Column freeze is handled via DSL config; for runtime, update SavedView
+              // This would require extending ViewColumnConfig with frozen support
+            }}
+            onHide={() => {
+              if (!currentView || !contextMenu) return;
+              const cols = (currentView.viewConfig?.columns || []).map((c) =>
+                c.fieldCode === contextMenu.column.field ? { ...c, visible: false } : c,
+              );
+              // If column not in saved config yet, add it as hidden
+              if (!cols.find((c) => c.fieldCode === contextMenu.column.field)) {
+                cols.push({ fieldCode: contextMenu.column.field, visible: false });
+              }
+              updateViewConfig({ columns: cols });
+            }}
+            onFilterByColumn={() => {
+              // Placeholder — will be connected to FilterChipBar in integration step
+            }}
+            onGroupBy={() => {
+              if (!contextMenu) return;
+              setGroupByField((prev) =>
+                prev === contextMenu.column.field ? null : contextMenu.column.field,
+              );
+            }}
+            onContextMenuClose={() => setContextMenu(null)}
+            // RecordPreviewDrawer
+            previewRecordId={previewRecordId}
+            previewApiEndpoint={
               schema?.dataSource?.type === 'api'
                 ? schema.dataSource.endpoint || (schema.dataSource as any).url
                 : undefined
             }
-            onClose={() => setPreviewRecordId(null)}
+            previewDetailPageKey={(schema as any)?.extension?.relatedPages?.detail}
+            onPreviewClose={() => setPreviewRecordId(null)}
           />
         </div>
       </div>

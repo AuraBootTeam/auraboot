@@ -19,12 +19,13 @@
  * rather than wiring into internal rendering hooks directly.
  */
 
-import React, { Suspense } from 'react';
+import React, { Suspense, useEffect } from 'react';
 import { profileRegistry } from '~/meta/profiles/ProfileRegistry';
 import { ProfileProvider } from '~/meta/profiles/ProfileContext';
 import { LoadingSpinner } from '~/components/LoadingSpinner';
 import { ErrorAlert } from '~/components/ErrorAlert';
 import type { UseDslFormReturn } from '~/meta/hooks/useDslForm';
+import { useAuraBotSafe } from '~/aurabot/hooks/useAuraBotSafe';
 
 // Ensure built-in profiles are registered before resolution
 import '~/meta/profiles/admin';
@@ -73,6 +74,19 @@ export function DslFormRenderer({
   className,
 }: DslFormRendererProps) {
   const { loading, error, schema, rendererProps } = form;
+
+  // Register form fill handler with AuraBot so AI can populate fields
+  const auraBot = useAuraBotSafe();
+  useEffect(() => {
+    if (!auraBot || !form.setFieldValue) return;
+    const handler = (fields: Record<string, any>) => {
+      Object.entries(fields).forEach(([fieldCode, value]) => {
+        form.setFieldValue(fieldCode, value);
+      });
+    };
+    auraBot.registerFormFillHandler(handler);
+    return () => auraBot.unregisterFormFillHandler();
+  }, [auraBot, form.setFieldValue]);
 
   // --- 1. Loading state ---
   if (loading) {

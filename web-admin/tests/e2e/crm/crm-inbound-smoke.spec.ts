@@ -26,11 +26,7 @@ import { test, expect, type Page } from '@playwright/test';
  * Navigate to a CRM page via sidebar menu.
  * Expands the CRM root menu, then optionally a sub-menu, then clicks the leaf.
  */
-async function navigateViaCrmMenu(
-  page: Page,
-  href: string,
-  subMenuName?: string,
-): Promise<void> {
+async function navigateViaCrmMenu(page: Page, href: string, subMenuName?: string): Promise<void> {
   await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
   await page.waitForLoadState('domcontentloaded');
 
@@ -76,9 +72,9 @@ test.describe('CRM Inbound & Calendar @smoke', () => {
     await expect(page).toHaveURL(/\/crm\/settings\/inbound-channels/);
 
     // Page heading should be visible
-    await expect(
-      page.getByRole('heading', { name: 'Inbound Channels' }),
-    ).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('heading', { name: 'Inbound Channels' })).toBeVisible({
+      timeout: 10000,
+    });
 
     // Either the channel table or the empty state should be visible
     const table = page.locator('[data-testid="channel-list"]');
@@ -91,9 +87,9 @@ test.describe('CRM Inbound & Calendar @smoke', () => {
     await expect(page).toHaveURL(/\/crm\/merge-queue/);
 
     // Page heading should be visible
-    await expect(
-      page.getByRole('heading', { name: 'Lead Merge Queue' }),
-    ).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('heading', { name: 'Lead Merge Queue' })).toBeVisible({
+      timeout: 10000,
+    });
 
     // Filter tabs should be visible
     await expect(page.locator('[data-testid="merge-tab-all"]')).toBeVisible();
@@ -110,9 +106,7 @@ test.describe('CRM Inbound & Calendar @smoke', () => {
     await expect(page).toHaveURL(/\/crm\/settings\/web-forms/);
 
     // Page heading should be visible
-    await expect(
-      page.getByRole('heading', { name: 'Web Forms' }),
-    ).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('heading', { name: 'Web Forms' })).toBeVisible({ timeout: 10000 });
 
     // Either the form list or the empty state should be visible
     const list = page.locator('[data-testid="webform-list"]');
@@ -127,34 +121,26 @@ test.describe('CRM Inbound & Calendar @smoke', () => {
     // Wait for loading to finish — the Calendar Sync page shows "Loading..."
     // until the providers API returns, then renders the heading.
     // Use the provider cards as the signal that loading completed.
-    await expect(
-      page.locator('[data-testid="calendar-providers"]'),
-    ).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('[data-testid="calendar-providers"]')).toBeVisible({
+      timeout: 15000,
+    });
 
     // Page heading should be visible
-    await expect(
-      page.getByRole('heading', { name: 'Calendar Sync', exact: true }),
-    ).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('heading', { name: 'Calendar Sync', exact: true })).toBeVisible({
+      timeout: 5000,
+    });
 
     // Provider cards should be visible
-    await expect(
-      page.locator('[data-testid="calendar-providers"]'),
-    ).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('[data-testid="calendar-providers"]')).toBeVisible({
+      timeout: 10000,
+    });
 
     // Both provider cards should render
-    await expect(
-      page.locator('[data-testid="calendar-provider-google"]'),
-    ).toBeVisible();
-    await expect(
-      page.locator('[data-testid="calendar-provider-microsoft"]'),
-    ).toBeVisible();
+    await expect(page.locator('[data-testid="calendar-provider-google"]')).toBeVisible();
+    await expect(page.locator('[data-testid="calendar-provider-microsoft"]')).toBeVisible();
 
     // Connect buttons should be visible (since not connected by default)
-    await expect(
-      page.locator('[data-testid="connect-google"]'),
-    ).toBeVisible();
-    await expect(
-      page.locator('[data-testid="connect-microsoft"]'),
-    ).toBeVisible();
+    await expect(page.locator('[data-testid="connect-google"]')).toBeVisible();
+    await expect(page.locator('[data-testid="connect-microsoft"]')).toBeVisible();
   });
 });

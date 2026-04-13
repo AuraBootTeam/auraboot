@@ -40,7 +40,7 @@ import {
   extractViolations,
   type ConsistencyViolation,
 } from '~/services/consistencyRuleService';
-import { deriveTestId } from '~/meta/rendering/utils/deriveTestId';
+import { deriveTestId, buttonTestId } from '~/meta/rendering/utils/deriveTestId';
 
 /**
  * Map field dataType to Smart component name.
@@ -71,6 +71,8 @@ interface FieldMetaInfo {
   required?: boolean;
   feature?: Record<string, any>;
   ruleSchema?: Record<string, any>;
+  extension?: Record<string, any>;
+  extensionProps?: Record<string, any>;
 }
 
 function mergeRefTarget(
@@ -89,6 +91,8 @@ interface NormalizedValidationRule {
   message?: string;
   maxLength?: number;
   minLength?: number;
+  minValue?: number;
+  maxValue?: number;
   pattern?: string;
 }
 
@@ -138,6 +142,18 @@ function normalizePayloadValue(rawValue: any, dataType?: string) {
     }
   }
   return rawValue;
+}
+
+/**
+ * Extract the action type string from a button action that can be either
+ * a plain string (e.g. "save") or an object (e.g. {type: "command", command: "sc:update_showcase"}).
+ */
+function resolveActionType(action: unknown): string {
+  if (typeof action === 'string') return action;
+  if (action && typeof action === 'object' && 'type' in action) {
+    return String((action as Record<string, unknown>).type || '');
+  }
+  return '';
 }
 
 function inferEditCommandCode(commandCode: string | null, isEditMode: boolean): string | null {
@@ -215,6 +231,18 @@ function mergeFieldValidationRules(
     existingRules.push({ type: 'pattern', pattern });
   }
 
+  // constraints use "min"/"max", feature.validation uses "minValue"/"maxValue"
+  const minValue = Number(validationConfig?.minValue ?? validationConfig?.min);
+  const maxValue = Number(validationConfig?.maxValue ?? validationConfig?.max);
+  if (Number.isFinite(minValue) && !byType.has('minValue')) {
+    existingRules.push({ type: 'minValue', minValue });
+    byType.add('minValue');
+  }
+  if (Number.isFinite(maxValue) && !byType.has('maxValue')) {
+    existingRules.push({ type: 'maxValue', maxValue });
+    byType.add('maxValue');
+  }
+
   return existingRules;
 }
 
@@ -286,6 +314,13 @@ export function FormPageContent(props: PageContentProps) {
       form: {
         mode,
         ...formData,
+      },
+      $page: {
+        kind: (schema as any)?.kind,
+        modelCode: (schema as any)?.modelCode,
+        pageKey: (schema as any)?.pageKey,
+        mode,
+        recordId: recordId || undefined,
       },
     },
   });
@@ -368,50 +403,75 @@ export function FormPageContent(props: PageContentProps) {
   const [modelFields, setModelFields] = useState<Record<string, FieldMetaInfo>>({});
   useEffect(() => {
     // For page-key routes (e.g. dp_issue_triage), schema.modelCode is the real model.
-    const targetModelCode = (schema?.modelCode || tableName).replace(/-/g, '_');
-    fetchResult<{ pid: string }>(`/api/meta/models/code/${targetModelCode}`, {
+    const targetModelCode = (schema?.modelCode || tableName);
+    // Use /api/dynamic/{pageKey}/field-meta which requires model-level read permission
+    // instead of /api/meta/models/{pid}/fields which requires management permission
+    fetchResult<
+      Array<{
+        code: string;
+        dataType: string;
+        dictCode?: string;
+        refTarget?: Record<string, any> | null;
+        referenceModelCode?: string;
+        extension?: any;
+        required?: boolean;
+        feature?: Record<string, any>;
+        ruleSchema?: Record<string, any>;
+      }>
+    >(`/api/dynamic/${targetModelCode}/field-meta`, {
       method: 'get',
       token: token || undefined,
     })
-      .then((modelResp) => {
-        if (ResultHelper.isSuccess(modelResp) && modelResp.data?.pid) {
-          return fetchResult<
-            Array<{
-              code: string;
-              dataType: string;
-              dictCode?: string;
-              refTarget?: Record<string, any> | null;
-              referenceModelCode?: string;
-              extension?: any;
-              required?: boolean;
-              feature?: Record<string, any>;
-              ruleSchema?: Record<string, any>;
-            }>
-          >(`/api/meta/models/${modelResp.data.pid}/fields`, {
-            method: 'get',
-            token: token || undefined,
-          });
-        }
-        return null;
-      })
       .then((fieldsResp) => {
         if (fieldsResp && ResultHelper.isSuccess(fieldsResp) && Array.isArray(fieldsResp.data)) {
           const map: Record<string, FieldMetaInfo> = {};
           for (const f of fieldsResp.data) {
             const displayName = resolveExtensionDisplayName(f.extension, f.code, locale);
+            // Merge constraints from extension.extension.constraints into feature.validation
+            // Plugin imports store constraints (min, max, maxLength, minLength, pattern)
+            // in extension.extension.constraints, but mergeFieldValidationRules reads from
+            // feature.validation. Merge them so validation rules are picked up.
+            const extConstraints = (f.extension?.extension as any)?.constraints;
+            const mergedFeature = f.feature ? { ...f.feature } : {};
+            if (extConstraints && typeof extConstraints === 'object') {
+              mergedFeature.validation = { ...extConstraints, ...(mergedFeature.validation || {}) };
+            }
+
             map[f.code] = {
               dataType: f.dataType,
               displayName,
               dictCode: f.dictCode,
               refTarget: mergeRefTarget(f.refTarget, f.extension?.refTarget),
               // Also resolve from nested extension (plugin import may store as extension.extension.referenceModelCode or .refModelCode)
-              referenceModelCode: f.referenceModelCode
-                || (f.extension?.extension as any)?.referenceModelCode
-                || (f.extension?.extension as any)?.refModelCode,
+              referenceModelCode:
+                f.referenceModelCode ||
+                (f.extension?.extension as any)?.referenceModelCode ||
+                (f.extension?.extension as any)?.refModelCode,
               component: resolveComponentByFieldMeta(f.dataType, f.extension),
-              required: Boolean(f.required),
-              feature: f.feature,
+              required: Boolean(f.required || extConstraints?.required),
+              feature: mergedFeature,
               ruleSchema: f.ruleSchema,
+              // Preserve extension for component-specific config (levels, multiple, allowClear, etc.)
+              extension: f.extension,
+              // Pre-compute component-specific props from extension (stable reference)
+              extensionProps: f.extension
+                ? Object.fromEntries(
+                    Object.entries(f.extension).filter(
+                      ([k]) =>
+                        ![
+                          'renderComponent',
+                          'component',
+                          'uiComponent',
+                          'displayName',
+                          'description',
+                          'constraints',
+                          'precision',
+                          'scale',
+                          'readOnly',
+                        ].includes(k),
+                    ),
+                  )
+                : undefined,
             };
           }
           setModelFields(map);
@@ -421,10 +481,10 @@ export function FormPageContent(props: PageContentProps) {
   }, [tableName, schema?.modelCode, token, locale]);
 
   const validateFormBeforeSubmit = useCallback((): string[] => {
-    if (!schema?.areas) return [];
+    if (!schema?.blocks) return [];
     const errors: string[] = [];
     const submissionData = recordId ? { ...(initialFormData || {}), ...formData } : formData;
-    const blocks = Object.values(schema.areas).flatMap((area: any) => area.blocks || []);
+    const blocks = schema.blocks;
     const formSectionBlocks = blocks.filter((b: any) => b.blockType === 'form-section');
 
     for (const block of formSectionBlocks) {
@@ -445,7 +505,11 @@ export function FormPageContent(props: PageContentProps) {
         for (const rule of rules) {
           if (!rule?.type) continue;
           if (rule.type === 'required') {
-            const empty = value === undefined || value === null || value === '';
+            const empty =
+              value === undefined ||
+              value === null ||
+              value === '' ||
+              (Array.isArray(value) && value.length === 0);
             if (empty) {
               errors.push(rule.message || `${label} is required`);
               break;
@@ -482,6 +546,20 @@ export function FormPageContent(props: PageContentProps) {
               // Ignore invalid regex rule configuration.
             }
           }
+          if (rule.type === 'minValue' && Number.isFinite(rule.minValue)) {
+            const num = Number(value);
+            if (Number.isFinite(num) && num < rule.minValue!) {
+              errors.push(`${label} must be at least ${rule.minValue}`);
+              break;
+            }
+          }
+          if (rule.type === 'maxValue' && Number.isFinite(rule.maxValue)) {
+            const num = Number(value);
+            if (Number.isFinite(num) && num > rule.maxValue!) {
+              errors.push(`${label} must be at most ${rule.maxValue}`);
+              break;
+            }
+          }
         }
       }
     }
@@ -514,9 +592,11 @@ export function FormPageContent(props: PageContentProps) {
     (button: { commandCode?: string; [key: string]: any }) => {
       // L1 SDK: delegate to external submit handler when provided
       if (onSubmitOverride) {
-        const shouldValidate = ['submit', 'create', 'update', 'edit', 'save'].includes(
-          String(button.action || '').toLowerCase(),
-        );
+        const actionType = resolveActionType(button.action);
+        const shouldValidate =
+          ['submit', 'create', 'update', 'edit', 'save', 'command'].includes(
+            actionType.toLowerCase(),
+          ) || !actionType;
         if (shouldValidate) {
           const validationErrors = validateFormBeforeSubmit();
           if (validationErrors.length > 0) {
@@ -542,17 +622,28 @@ export function FormPageContent(props: PageContentProps) {
           ? { ...formData, sourceRecordId }
           : formData;
       const effectiveAction = button.action;
+      const effectiveActionType = resolveActionType(effectiveAction);
       const effectiveButton = {
         ...button,
         action: effectiveAction,
       };
+      // When action is an object like {type: "command", command: "xx:update_xx"},
+      // extract the command code from it as well.
+      const actionCommandCode =
+        effectiveAction && typeof effectiveAction === 'object'
+          ? (effectiveAction as Record<string, unknown>).command
+          : undefined;
       const effectiveCommandCode = inferEditCommandCode(
-        urlCommandCode || effectiveButton.commandCode || null,
+        urlCommandCode ||
+          effectiveButton.commandCode ||
+          (typeof actionCommandCode === 'string' ? actionCommandCode : null) ||
+          null,
         Boolean(recordId),
       );
-      const shouldValidate = ['submit', 'create', 'update', 'edit', 'save'].includes(
-        String(effectiveAction || '').toLowerCase(),
-      );
+      const shouldValidate =
+        ['submit', 'create', 'update', 'edit', 'save', 'command'].includes(
+          effectiveActionType.toLowerCase(),
+        ) || !effectiveActionType;
       if (shouldValidate) {
         const validationErrors = validateFormBeforeSubmit();
         if (validationErrors.length > 0) {
@@ -606,13 +697,13 @@ export function FormPageContent(props: PageContentProps) {
       // This avoids ambiguity from generic action routing branches (navigate/action registry).
       if (effectiveCommandCode) {
         const operationType =
-          effectiveAction === 'delete'
+          effectiveActionType === 'delete'
             ? 'delete'
-            : effectiveAction === 'create'
+            : effectiveActionType === 'create'
               ? 'create'
-              : effectiveAction === 'edit' || effectiveAction === 'update'
+              : effectiveActionType === 'edit' || effectiveActionType === 'update'
                 ? 'update'
-                : effectiveAction === 'save'
+                : effectiveActionType === 'save' || effectiveActionType === 'command'
                   ? recordId
                     ? 'update'
                     : 'create'
@@ -642,10 +733,13 @@ export function FormPageContent(props: PageContentProps) {
                 setError(result.desc || 'Consistency validation failed');
                 return;
               }
-              throw new Error(result.desc || result.message || 'Command execution failed');
+              const contextError = (result as any).context?.error;
+              throw new Error(
+                contextError || result.desc || result.message || 'Command execution failed',
+              );
             }
             setConsistencyViolations([]);
-            navigate(`/dynamic/${tableName}`);
+            navigate(`/p/${tableName}`);
           })
           .catch((err) => {
             const errorMessage = err instanceof Error ? err.message : 'Failed to execute command';
@@ -658,14 +752,14 @@ export function FormPageContent(props: PageContentProps) {
       // MODEL form path: when no commandCode is provided, persist via dynamic CRUD API.
       if (
         !effectiveButton.commandCode &&
-        (effectiveAction === 'create' || effectiveAction === 'update')
+        (effectiveActionType === 'create' || effectiveActionType === 'update')
       ) {
-        const targetModelCode = (schema?.modelCode || tableName).replace(/-/g, '_');
+        const targetModelCode = (schema?.modelCode || tableName);
         const endpoint =
-          effectiveAction === 'update'
+          effectiveActionType === 'update'
             ? `/api/dynamic/${targetModelCode}/${recordId}`
             : `/api/dynamic/${targetModelCode}`;
-        const method = effectiveAction === 'update' ? 'put' : 'post';
+        const method = effectiveActionType === 'update' ? 'put' : 'post';
         const payload =
           modelFieldEntries.length > 0
             ? Object.fromEntries(
@@ -697,7 +791,7 @@ export function FormPageContent(props: PageContentProps) {
                 ),
               );
         const normalizedPayload =
-          effectiveAction === 'update' && initialFormData
+          effectiveActionType === 'update' && initialFormData
             ? Object.fromEntries(
                 Object.entries(payload).filter(([key, value]) => {
                   const initialValue = initialFormData[key];
@@ -712,10 +806,12 @@ export function FormPageContent(props: PageContentProps) {
           token: token || undefined,
         }).then((result) => {
           if (!ResultHelper.isSuccess(result)) {
-            throw new Error(result.desc || result.message || `Failed to ${effectiveAction} record`);
+            throw new Error(
+              result.desc || result.message || `Failed to ${effectiveActionType} record`,
+            );
           }
           showSuccessToast(t('common.saveSuccess') || 'Saved successfully');
-          navigate(`/dynamic/${targetModelCode}`);
+          navigate(`/p/${targetModelCode}`);
         });
       }
 
@@ -782,10 +878,8 @@ export function FormPageContent(props: PageContentProps) {
 
   // Compute subTableBlocks early so we can use it in rendering and column derivation
   const subTableBlocks = useMemo(() => {
-    if (!schema?.areas) return [];
-    return Object.values(schema.areas)
-      .flatMap((area: any) => area.blocks)
-      .filter((b: any) => b.blockType === 'sub-table');
+    if (!schema?.blocks) return [];
+    return schema.blocks.filter((b: any) => b.blockType === 'sub-table');
   }, [schema]);
 
   // Build SubTableColumn[] directly from DSL columns (instant, no API needed)
@@ -817,28 +911,22 @@ export function FormPageContent(props: PageContentProps) {
       const childModel = block.subTable?.childModel || (block as any).childModel;
       if (!childModel || enhancedColumns[childModel]) continue;
 
-      const normalizedModel = childModel.replace(/-/g, '_');
+      const normalizedModel = childModel;
 
-      fetchResult<{ pid: string }>(`/api/meta/models/code/${normalizedModel}`, {
+      // Use /api/dynamic/{modelCode}/field-meta which requires model-level read permission
+      fetchResult<
+        Array<{
+          code: string;
+          dataType: string;
+          dictCode?: string;
+          refTarget?: Record<string, any> | null;
+          referenceModelCode?: string;
+          extension?: any;
+        }>
+      >(`/api/dynamic/${normalizedModel}/field-meta`, {
         method: 'get',
         token: token || undefined,
       })
-        .then((modelResp) => {
-          if (!ResultHelper.isSuccess(modelResp) || !modelResp.data?.pid) return null;
-          return fetchResult<
-            Array<{
-              code: string;
-              dataType: string;
-              dictCode?: string;
-              refTarget?: Record<string, any> | null;
-              referenceModelCode?: string;
-              extension?: any;
-            }>
-          >(`/api/meta/models/${modelResp.data.pid}/fields`, {
-            method: 'get',
-            token: token || undefined,
-          });
-        })
         .then((fieldsResp) => {
           if (!fieldsResp || !ResultHelper.isSuccess(fieldsResp) || !Array.isArray(fieldsResp.data))
             return;
@@ -860,9 +948,10 @@ export function FormPageContent(props: PageContentProps) {
               displayName: resolveExtensionDisplayName(f.extension, f.code, locale),
               dictCode: f.dictCode,
               refTarget: mergeRefTarget(f.refTarget, f.extension?.refTarget),
-              referenceModelCode: f.referenceModelCode
-                || (f.extension?.extension as any)?.referenceModelCode
-                || (f.extension?.extension as any)?.refModelCode,
+              referenceModelCode:
+                f.referenceModelCode ||
+                (f.extension?.extension as any)?.referenceModelCode ||
+                (f.extension?.extension as any)?.refModelCode,
               component: resolveComponentByFieldMeta(f.dataType, f.extension),
             };
           }
@@ -905,11 +994,10 @@ export function FormPageContent(props: PageContentProps) {
         const parentField = block.subTable?.parentField || (block as any).parentField;
         if (!childModel || !parentField) continue;
 
-        const childModelHyphenated = childModel.replace(/_/g, '-');
         const blockKey = block.id || `sub-table-${subTableBlocks.indexOf(block)}`;
 
         try {
-          const resp = await fetchResult<any>(`/api/dynamic/${childModelHyphenated}/list`, {
+          const resp = await fetchResult<any>(`/api/dynamic/${childModel}/list`, {
             method: 'get',
             params: {
               pageNum: 1,
@@ -956,10 +1044,8 @@ export function FormPageContent(props: PageContentProps) {
     return null;
   }
 
-  // Extract form, sub-table, and button blocks from areas
-  const allBlocks = schema.areas
-    ? Object.values(schema.areas).flatMap((area: any) => area.blocks)
-    : [];
+  // Extract form, sub-table, and button blocks
+  const allBlocks = schema.blocks || [];
 
   const formBlocks = allBlocks.filter((block: any) => block.blockType === 'form-section');
   // subTableBlocks computed via useMemo above (used for metadata fetching and rendering)
@@ -968,7 +1054,14 @@ export function FormPageContent(props: PageContentProps) {
 
   return (
     <DataSourceProvider manager={dataSourceManager}>
-      <div className="mx-auto w-full px-6 py-8" data-testid={deriveTestId('form', (schema?.modelCode || tableName).replace(/-/g, '_'), 'container')}>
+      <div
+        className="mx-auto w-full px-2 py-3"
+        data-testid={deriveTestId(
+          'form',
+          (schema?.modelCode || tableName),
+          'container',
+        )}
+      >
         <div className="rounded-lg bg-white shadow-sm">
           {/* Page Header */}
           <div className="border-b border-gray-200 px-6 py-4">
@@ -977,7 +1070,7 @@ export function FormPageContent(props: PageContentProps) {
                 {getLocalizedText(schema.title, locale, t)}
               </h2>
               <Link
-                to={`/dynamic/${tableName}`}
+                to={`/p/${tableName}`}
                 data-testid="form-back-link"
                 className="text-sm text-blue-600 hover:text-blue-800"
               >
@@ -1047,6 +1140,8 @@ export function FormPageContent(props: PageContentProps) {
                                 t,
                               );
                               const maxLength = Number(meta?.feature?.validation?.maxLength);
+                              // Use pre-computed extensionProps (stable reference from modelFields)
+                              const extensionProps = meta?.extensionProps;
                               let field = meta
                                 ? {
                                     ...rawField,
@@ -1056,13 +1151,17 @@ export function FormPageContent(props: PageContentProps) {
                                       rawField.component ||
                                       meta.component ||
                                       resolveComponentByFieldMeta(meta.dataType),
-                                    dictCode: rawField.dictCode || meta.dictCode,
+                                    dictCode:
+                                      rawField.dictCode ||
+                                      meta.dictCode ||
+                                      extensionProps?.dictCode,
                                     refTarget: mergeRefTarget(rawField.refTarget, meta.refTarget),
                                     referenceModelCode:
                                       rawField.referenceModelCode || meta.referenceModelCode,
                                     required: rawField.required ?? meta.required,
                                     validation: mergedValidationRules,
                                     props: {
+                                      ...(extensionProps || {}),
                                       ...(rawField.props || {}),
                                       ...(Number.isFinite(maxLength) &&
                                       maxLength > 0 &&
@@ -1095,7 +1194,12 @@ export function FormPageContent(props: PageContentProps) {
                                 <div
                                   key={field.field}
                                   data-testid={`form-field-${field.field}`}
-                                  data-ab-testid={deriveTestId('form', (schema?.modelCode || tableName).replace(/-/g, '_'), 'field', field.field)}
+                                  data-ab-testid={deriveTestId(
+                                    'form',
+                                    (schema?.modelCode || tableName),
+                                    'field',
+                                    field.field,
+                                  )}
                                   className={isFullWidth ? 'md:col-span-2' : ''}
                                 >
                                   {renderSmartField(field)}
@@ -1186,6 +1290,7 @@ export function FormPageContent(props: PageContentProps) {
                         type="button"
                         key={button.code}
                         data-testid={`form-btn-${button.code}`}
+                        data-ab-testid={buttonTestId('form', (schema?.modelCode || tableName), button.code)}
                         onClick={() => handleFormAction(button)}
                         disabled={loading}
                         className={`rounded-md px-4 py-2 text-sm font-medium ${

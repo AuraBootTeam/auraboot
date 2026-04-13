@@ -78,17 +78,28 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
   const isRequired =
     Boolean((field as any).required) || field.validation?.some((rule) => rule.type === 'required');
 
+  // Tree components (cascadeselect, treeselect) load their own dict data via useDictTree hook.
+  // They receive dictCode through field.props (from extensionProps).
+  const TREE_COMPONENTS = ['cascadeselect', 'treeselect'];
+  const isTreeComponent = TREE_COMPONENTS.includes(
+    String(field.component || '').toLowerCase(),
+  );
+
   // 构建组件 props
   // 如果有 dictCode 且未指定组件或组件为 SmartInput，自动使用 SmartSelect
   const componentName = useMemo(() => {
-    if (field.dictCode && (!field.component || field.component === 'SmartInput')) {
+    if (
+      field.dictCode &&
+      !isTreeComponent &&
+      (!field.component || field.component === 'SmartInput')
+    ) {
       return 'SmartSelect';
     }
     return field.component || 'SmartInput';
-  }, [field.dictCode, field.component]);
+  }, [field.dictCode, field.component, isTreeComponent]);
 
   // Resolve field label from i18n keys with progressive fallback.
-  let resolvedLabel = field.label;
+  let resolvedLabel: string | undefined = typeof field.label === 'string' ? field.label : undefined;
   if (!resolvedLabel) {
     const directFieldKey = `field.${field.field}.label`;
     const directFieldLabel = t(directFieldKey);
@@ -110,7 +121,8 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
 
   const componentProps: Record<string, any> = {
     name: field.field,
-    label: resolvedLabel,
+    // label is rendered by ControlledFieldRenderer wrapper, not passed to component
+    // to ensure consistent vertical label-above-input layout across all components
     value,
     onChange,
     disabled: isDisabled,
@@ -120,8 +132,8 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
     ...field.props, // 合并字段配置的其他 props
   };
 
-  // 如果有 dictCode 且没有 dataSource，自动生成字典数据源配置
-  if (field.dictCode && !field.dataSource) {
+  // 如果有 dictCode 且没有 dataSource，自动生成字典数据源配置（不适用于 tree 组件）
+  if (field.dictCode && !isTreeComponent && !field.dataSource) {
     const dictDataSource: DataSourceConfig = {
       type: 'api',
       endpoint: `/api/meta/dict/by-code/${field.dictCode}/data`,
@@ -180,12 +192,39 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
   const colSpan = field.layout?.colSpan || 6;
   const isFullWidth = colSpan >= 12;
 
+  // For readOnly picker components that don't have built-in readOnly rendering,
+  // display the raw value as text instead of loading the interactive component.
+  const READONLY_TEXT_COMPONENTS = [
+    'cascadeselect', 'treeselect', 'userselect', 'memberpicker',
+    'organizationselect', 'coordinatespicker', 'addressfield',
+  ];
+  const shouldRenderAsText =
+    isReadOnly &&
+    READONLY_TEXT_COMPONENTS.includes(String(componentName).toLowerCase()) &&
+    value != null &&
+    value !== '';
+
   return (
     <div
       className={`controlled-field-renderer ${isFullWidth ? 'col-span-full' : ''}`}
       data-testid={`field-${field.field}`}
     >
-      <ComponentLoader componentName={componentName} props={componentProps} />
+      {resolvedLabel && (
+        <label
+          htmlFor={field.field}
+          className="mb-1 block text-sm font-medium text-gray-700"
+        >
+          {resolvedLabel}
+          {isRequired && <span className="ml-0.5 text-red-500">*</span>}
+        </label>
+      )}
+      {shouldRenderAsText ? (
+        <div className="py-2 text-sm text-gray-900">
+          {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+        </div>
+      ) : (
+        <ComponentLoader componentName={componentName} props={componentProps} />
+      )}
     </div>
   );
 };

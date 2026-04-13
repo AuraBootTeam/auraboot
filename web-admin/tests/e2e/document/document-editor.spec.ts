@@ -16,7 +16,6 @@
 
 import { test, expect } from '../../fixtures';
 
-
 /**
  * Navigate to the Document Editor page.
  * Returns true if the page loaded successfully.
@@ -33,7 +32,10 @@ async function navigateToDocumentEditor(page: import('@playwright/test').Page): 
   const result = await Promise.race([
     headingLocator.waitFor({ timeout: 10000 }).then(() => 'content' as const),
     editorLocator.waitFor({ timeout: 10000 }).then(() => 'content' as const),
-    loginLocator.first().waitFor({ timeout: 10000 }).then(() => 'login' as const),
+    loginLocator
+      .first()
+      .waitFor({ timeout: 10000 })
+      .then(() => 'login' as const),
     errorHeading.waitFor({ timeout: 10000 }).then(() => 'error' as const),
   ]).catch(() => 'timeout' as const);
 
@@ -208,7 +210,10 @@ test.describe('Document Editor - Editing', () => {
     await expect(editor).toContainText('Bold text here');
 
     const strongTag = editor.locator('strong');
-    const hasStrong = await strongTag.first().isVisible({ timeout: 3000 }).catch(() => false);
+    const hasStrong = await strongTag
+      .first()
+      .isVisible({ timeout: 3000 })
+      .catch(() => false);
     expect(hasStrong).toBe(true);
   });
 
@@ -280,9 +285,7 @@ test.describe('Document Editor - Boundary Tests', () => {
 
     // Verify no error overlays
     const errorOverlay = page.locator(
-      '#webpack-dev-server-client-overlay, ' +
-      '[data-testid="error-overlay"], ' +
-      '.error-overlay'
+      '#webpack-dev-server-client-overlay, ' + '[data-testid="error-overlay"], ' + '.error-overlay',
     );
     const hasError = await errorOverlay.isVisible({ timeout: 1000 }).catch(() => false);
     expect(hasError).toBe(false);

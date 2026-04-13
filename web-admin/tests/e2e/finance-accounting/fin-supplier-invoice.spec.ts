@@ -122,7 +122,9 @@ test.describe('Finance — Supplier Invoice', () => {
   // SI-001 @smoke: Navigate to 供应商发票 via sidebar menu
   // -------------------------------------------------------------------------
 
-  test('SI-001 @smoke: Navigate to 供应商发票 via Finance → 财务管理 → 供应商发票', async ({ page }) => {
+  test('SI-001 @smoke: Navigate to 供应商发票 via Finance → 财务管理 → 供应商发票', async ({
+    page,
+  }) => {
     await page.goto('/dashboards');
     await page.waitForLoadState('domcontentloaded');
 
@@ -230,9 +232,7 @@ test.describe('Finance — Supplier Invoice', () => {
     await expect(row).toBeVisible({ timeout: 5_000 });
     const rowText = await row.textContent();
     expect(
-      rowText?.includes('pending') ||
-      rowText?.includes('待审批') ||
-      rowText?.includes('待审核'),
+      rowText?.includes('pending') || rowText?.includes('待审批') || rowText?.includes('待审核'),
     ).toBe(true);
   });
 
@@ -331,9 +331,7 @@ test.describe('Finance — Supplier Invoice', () => {
     expect(pendingRecords.length).toBeGreaterThan(0);
     const pendingStatus = (pendingRecords[0] as Record<string, unknown>).fin_si_status as string;
     expect(
-      pendingStatus === 'pending' ||
-      pendingStatus === '待审批' ||
-      pendingStatus === '待审核',
+      pendingStatus === 'pending' || pendingStatus === '待审批' || pendingStatus === '待审核',
     ).toBe(true);
 
     // Reject the invoice
@@ -356,7 +354,9 @@ test.describe('Finance — Supplier Invoice', () => {
     expect(rejectedRecords.length).toBeGreaterThan(0);
 
     const finalStatus = (rejectedRecords[0] as Record<string, unknown>).fin_si_status as string;
-    expect(finalStatus === 'rejected' || finalStatus === '已拒绝' || finalStatus === '已驳回').toBe(true);
+    expect(finalStatus === 'rejected' || finalStatus === '已拒绝' || finalStatus === '已驳回').toBe(
+      true,
+    );
 
     // Verify on list UI — waitForResponse set up BEFORE navigation
     await gotoInvoiceList(page);
@@ -365,9 +365,7 @@ test.describe('Finance — Supplier Invoice', () => {
     await expect(row).toBeVisible({ timeout: 5_000 });
     const rowText = await row.textContent();
     expect(
-      rowText?.includes('rejected') ||
-      rowText?.includes('已拒绝') ||
-      rowText?.includes('已驳回'),
+      rowText?.includes('rejected') || rowText?.includes('已拒绝') || rowText?.includes('已驳回'),
     ).toBe(true);
   });
 });

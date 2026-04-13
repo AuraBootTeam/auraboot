@@ -28,6 +28,7 @@ import {
   type CrmLink,
 } from '~/services/emailService';
 import TrackingStats from '~/components/email/TrackingStats';
+import { sanitizeHtml } from '~/meta/utils/sanitizeHtml';
 
 function timeAgo(dateStr: string): string {
   const d = new Date(dateStr);
@@ -92,11 +93,12 @@ function MessageCard({ message, defaultExpanded = false }: MessageCardProps) {
 
       {/* Body */}
       {expanded && (
-        <div className="border-t border-gray-100 px-5 pb-5 pt-4 dark:border-gray-700">
+        <div className="border-t border-gray-100 px-5 pt-4 pb-5 dark:border-gray-700">
           {/* Metadata */}
           <div className="mb-4 space-y-1 text-xs text-gray-500 dark:text-gray-400">
             <div>
-              <span className="font-medium">From:</span> {message.fromName
+              <span className="font-medium">From:</span>{' '}
+              {message.fromName
                 ? `${message.fromName} <${message.fromAddress}>`
                 : message.fromAddress}
             </div>
@@ -113,12 +115,11 @@ function MessageCard({ message, defaultExpanded = false }: MessageCardProps) {
           {/* HTML Body */}
           {message.bodyHtml ? (
             <div
-              className="prose prose-sm max-w-none dark:prose-invert"
-              // eslint-disable-next-line react/no-danger
-              dangerouslySetInnerHTML={{ __html: message.bodyHtml }}
+              className="prose prose-sm dark:prose-invert max-w-none"
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(message.bodyHtml) }}
             />
           ) : (
-            <pre className="whitespace-pre-wrap font-sans text-sm text-gray-700 dark:text-gray-300">
+            <pre className="font-sans text-sm whitespace-pre-wrap text-gray-700 dark:text-gray-300">
               {message.bodyText || '(Empty)'}
             </pre>
           )}
@@ -133,9 +134,7 @@ function MessageCard({ message, defaultExpanded = false }: MessageCardProps) {
           {/* Attachments */}
           {message.attachments.length > 0 && (
             <div className="mt-4 space-y-1">
-              <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                Attachments
-              </p>
+              <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Attachments</p>
               {message.attachments.map((att) => (
                 <div
                   key={att.attachmentId}
@@ -143,9 +142,7 @@ function MessageCard({ message, defaultExpanded = false }: MessageCardProps) {
                 >
                   <PaperClipIcon className="h-4 w-4 text-gray-400" />
                   <span className="text-gray-700 dark:text-gray-300">{att.filename}</span>
-                  <span className="text-xs text-gray-400">
-                    ({(att.size / 1024).toFixed(1)} KB)
-                  </span>
+                  <span className="text-xs text-gray-400">({(att.size / 1024).toFixed(1)} KB)</span>
                 </div>
               ))}
             </div>
@@ -167,27 +164,28 @@ function CrmLinksPanel({ messageId }: CrmLinksPanelProps) {
   useEffect(() => {
     getMessageLinks(messageId)
       .then(setLinks)
-      .catch(() => {/* non-critical */})
+      .catch(() => {
+        /* non-critical */
+      })
       .finally(() => setLoading(false));
   }, [messageId]);
 
   return (
     <div>
-      <h3 className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-        Linked Records
-      </h3>
+      <h3 className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Linked Records</h3>
       {loading ? (
         <div className="flex justify-center py-4">
           <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
         </div>
       ) : links.length === 0 ? (
-        <p className="text-xs text-gray-400 dark:text-gray-500">
-          No CRM records linked
-        </p>
+        <p className="text-xs text-gray-400 dark:text-gray-500">No CRM records linked</p>
       ) : (
         <ul className="space-y-2">
           {links.map((link) => (
-            <li key={link.id} className="rounded-md border border-gray-200 px-3 py-2 dark:border-gray-700">
+            <li
+              key={link.id}
+              className="rounded-md border border-gray-200 px-3 py-2 dark:border-gray-700"
+            >
               <p className="text-xs font-medium text-gray-700 dark:text-gray-300">
                 {link.recordName || `Record #${link.recordId}`}
               </p>
@@ -261,9 +259,7 @@ export default function EmailThreadPage() {
             {/* Reply button */}
             <div className="mt-4">
               <button
-                onClick={() =>
-                  navigate(`/email/compose?threadId=${threadId}`)
-                }
+                onClick={() => navigate(`/email/compose?threadId=${threadId}`)}
                 data-testid="reply-btn"
                 className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
               >
@@ -286,9 +282,7 @@ export default function EmailThreadPage() {
               </button>
 
               {/* Linked records */}
-              {lastMessage && (
-                <CrmLinksPanel messageId={lastMessage.id} />
-              )}
+              {lastMessage && <CrmLinksPanel messageId={lastMessage.id} />}
             </div>
           </aside>
         </div>

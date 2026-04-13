@@ -12,6 +12,9 @@
 import React, { useState, useCallback } from 'react';
 import type { PageMeta } from '../../../services/page-manager';
 import { PAGE_STATUS_INFO } from '../../../services/page-manager';
+import { SaveAsTemplateDialog } from '~/studio/components/SaveAsTemplateDialog';
+import { AiPageGenerateDialog } from '~/studio/components/AiPageGenerateDialog';
+import type { MergeMode } from '~/studio/components/ai-page-prompt';
 
 /**
  * DesignerToolbar props
@@ -54,6 +57,12 @@ export interface DesignerToolbarProps {
   onPublish?: () => void;
   onSettings?: () => void;
   onShortcutHelp?: () => void;
+  /** Called when AI generates a page DSL */
+  onAiGenerated?: (dsl: { kind: string; blocks: any[]; layout: any; schemaVersion: number; mergeMode?: MergeMode }) => void;
+  /** Whether the AI panel is currently open */
+  aiPanelOpen?: boolean;
+  /** Toggle AI panel visibility */
+  onToggleAiPanel?: () => void;
 }
 
 /**
@@ -147,9 +156,14 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
   onPublish,
   onSettings,
   onShortcutHelp,
+  onAiGenerated,
+  aiPanelOpen = false,
+  onToggleAiPanel,
 }) => {
   const [showZoomMenu, setShowZoomMenu] = useState(false);
   const [showDeviceMenu, setShowDeviceMenu] = useState(false);
+  const [showSaveAsTemplate, setShowSaveAsTemplate] = useState(false);
+  const [showAiGenerate, setShowAiGenerate] = useState(false);
 
   const statusInfo = pageMeta?.status ? PAGE_STATUS_INFO[pageMeta.status] : null;
 
@@ -395,10 +409,45 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
 
       {/* Right section */}
       <div className="flex items-center gap-2">
-        {/* Save status */}
-        {autoSaveEnabled && lastSavedAt && (
-          <span className="mr-2 text-xs text-gray-400">
-            {isSaving ? 'Saving...' : `Saved ${formatLastSaved(lastSavedAt)}`}
+        {/* Save status indicator */}
+        {autoSaveEnabled && (
+          <span
+            className="mr-2 flex items-center gap-1 text-xs"
+            data-testid="toolbar-save-status"
+          >
+            {isSaving ? (
+              <>
+                <svg
+                  className="h-3 w-3 animate-spin text-blue-500"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
+                </svg>
+                <span className="text-blue-500">Saving...</span>
+              </>
+            ) : lastSavedAt ? (
+              <>
+                <span className="h-2 w-2 rounded-full bg-green-500" />
+                <span className="text-gray-400">
+                  Saved {formatLastSaved(lastSavedAt)}
+                </span>
+              </>
+            ) : hasUnsavedChanges ? (
+              <span className="text-orange-500">Unsaved changes</span>
+            ) : null}
           </span>
         )}
 
@@ -484,6 +533,36 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
         />
 
         <ToolbarDivider />
+
+        {/* AI Generate — toggles the side panel */}
+        <ToolbarButton
+          icon={<span className="text-sm">&#x2728;</span>}
+          label="AI"
+          title="Toggle AI assistant panel"
+          onClick={onToggleAiPanel || (() => setShowAiGenerate(true))}
+          active={aiPanelOpen}
+          data-testid="toolbar-ai-generate"
+        />
+
+        {/* Zone H: Save as Template */}
+        {pageMeta && (
+          <ToolbarButton
+            icon={
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                />
+              </svg>
+            }
+            label="Template"
+            title="Save as Template"
+            onClick={() => setShowSaveAsTemplate(true)}
+            data-testid="toolbar-save-as-template"
+          />
+        )}
 
         {/* Zone H: Save */}
         <ToolbarButton
@@ -602,6 +681,29 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
           />
         </ToolbarGroup>
       </div>
+
+      {/* Save as Template Dialog */}
+      {pageMeta && (
+        <SaveAsTemplateDialog
+          open={showSaveAsTemplate}
+          onClose={() => setShowSaveAsTemplate(false)}
+          pagePid={pageMeta.id}
+          currentName={pageMeta.title}
+          onSuccess={() => {
+            setShowSaveAsTemplate(false);
+          }}
+        />
+      )}
+
+      {/* AI Page Generate Dialog */}
+      <AiPageGenerateDialog
+        open={showAiGenerate}
+        onClose={() => setShowAiGenerate(false)}
+        onGenerated={(dsl) => {
+          setShowAiGenerate(false);
+          onAiGenerated?.(dsl);
+        }}
+      />
     </div>
   );
 };

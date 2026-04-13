@@ -90,7 +90,8 @@ export default function FieldLibraryPage() {
 
   const navigate = useNavigate();
   const { showErrorToast } = useToastContext();
-  const { getEnumOptions } = useDslRegistry();
+  const { ensureLoaded, getEnumOptions } = useDslRegistry();
+  useEffect(() => { ensureLoaded(); }, [ensureLoaded]);
   const dataTypeOptions = getEnumOptions('DataType');
 
   // State management
@@ -440,77 +441,78 @@ export default function FieldLibraryPage() {
               data.map((field) => {
                 const owner = owners[`field:${field.code}`];
                 return (
-                <tr key={field.pid} className="hover:bg-gray-50">
-                  <td className="px-6 py-4">
-                    <input
-                      type="checkbox"
-                      checked={selectedPids.includes(field.pid)}
-                      onChange={(e) => handleSelectRow(field.pid, e.target.checked)}
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    />
-                  </td>
-                  <td className="px-6 py-4 text-sm font-medium whitespace-nowrap text-gray-900">
-                    <span className="inline-flex items-center gap-2">
-                      {field.code}
-                      {owner?.managed && (
-                        <ManagedBadge
-                          pluginName={owner.pluginName || ''}
-                          userModified={owner.userModified}
-                        />
-                      )}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-sm whitespace-nowrap text-gray-500">
-                    {field.dataType}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`rounded-full px-2 py-1 text-xs ${
-                        field.status === 'published'
-                          ? 'bg-green-100 text-green-800'
+                  <tr key={field.pid} className="hover:bg-gray-50">
+                    <td className="px-6 py-4">
+                      <input
+                        type="checkbox"
+                        checked={selectedPids.includes(field.pid)}
+                        onChange={(e) => handleSelectRow(field.pid, e.target.checked)}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                    </td>
+                    <td className="px-6 py-4 text-sm font-medium whitespace-nowrap text-gray-900">
+                      <span className="inline-flex items-center gap-2">
+                        {field.code}
+                        {owner?.managed && (
+                          <ManagedBadge
+                            pluginName={owner.pluginName || ''}
+                            userModified={owner.userModified}
+                          />
+                        )}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-sm whitespace-nowrap text-gray-500">
+                      {field.dataType}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span
+                        className={`rounded-full px-2 py-1 text-xs ${
+                          field.status === 'published'
+                            ? 'bg-green-100 text-green-800'
+                            : field.status === 'draft'
+                              ? 'bg-yellow-100 text-yellow-800'
+                              : 'bg-gray-100 text-gray-800'
+                        }`}
+                      >
+                        {field.status === 'published'
+                          ? '已发布'
                           : field.status === 'draft'
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : 'bg-gray-100 text-gray-800'
-                      }`}
-                    >
-                      {field.status === 'published'
-                        ? '已发布'
-                        : field.status === 'draft'
-                          ? '草稿'
-                          : field.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-sm whitespace-nowrap text-gray-500">
-                    v{field.version}
-                  </td>
-                  <td className="px-6 py-4 text-sm whitespace-nowrap text-gray-500">
-                    {field.required ? '是' : '否'}
-                  </td>
-                  <td className="px-6 py-4 text-sm whitespace-nowrap text-gray-500">
-                    {new Date(field.createdAt).toLocaleDateString('zh-CN')}
-                  </td>
-                  <td className="px-6 py-4 text-right text-sm font-medium whitespace-nowrap">
-                    <button
-                      onClick={() => handleView(field.pid)}
-                      className="mr-3 text-blue-600 hover:text-blue-900"
-                    >
-                      查看
-                    </button>
-                    <button
-                      onClick={() => handleViewUsage(field.pid)}
-                      className="mr-3 text-indigo-600 hover:text-indigo-900"
-                    >
-                      使用情况
-                    </button>
-                    <button
-                      onClick={() => handleViewImpact(field.pid)}
-                      className="text-purple-600 hover:text-purple-900"
-                    >
-                      影响分析
-                    </button>
-                  </td>
-                </tr>
-              )})
+                            ? '草稿'
+                            : field.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-sm whitespace-nowrap text-gray-500">
+                      v{field.version}
+                    </td>
+                    <td className="px-6 py-4 text-sm whitespace-nowrap text-gray-500">
+                      {field.required ? '是' : '否'}
+                    </td>
+                    <td className="px-6 py-4 text-sm whitespace-nowrap text-gray-500">
+                      {new Date(field.createdAt).toLocaleDateString('zh-CN')}
+                    </td>
+                    <td className="px-6 py-4 text-right text-sm font-medium whitespace-nowrap">
+                      <button
+                        onClick={() => handleView(field.pid)}
+                        className="mr-3 text-blue-600 hover:text-blue-900"
+                      >
+                        查看
+                      </button>
+                      <button
+                        onClick={() => handleViewUsage(field.pid)}
+                        className="mr-3 text-indigo-600 hover:text-indigo-900"
+                      >
+                        使用情况
+                      </button>
+                      <button
+                        onClick={() => handleViewImpact(field.pid)}
+                        className="text-purple-600 hover:text-purple-900"
+                      >
+                        影响分析
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>

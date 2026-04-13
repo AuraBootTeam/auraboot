@@ -40,7 +40,7 @@ const LOG_CONFIG: ChildModelTestConfig = {
 
 export const E2ET_ORDER_CONFIG: ModelTestConfig = {
   modelCode: 'e2et_order',
-  pageKey: 'e2et-order',
+  pageKey: 'e2et_order',
   namespace: 'e2et',
   commands: {
     create: 'create_order',

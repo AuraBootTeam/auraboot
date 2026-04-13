@@ -122,9 +122,7 @@ test.describe('CP Equipment Inspection — CRUD & Status', () => {
       'cp_ei_equipment_name',
       equipmentName,
       {
-        extraFilters: [
-          { fieldName: 'cp_ei_result', operator: 'EQ', value: 'passed' },
-        ],
+        extraFilters: [{ fieldName: 'cp_ei_result', operator: 'EQ', value: 'passed' }],
       },
     );
     expect(records.length).toBeGreaterThan(0);
@@ -173,9 +171,7 @@ test.describe('CP Equipment Inspection — CRUD & Status', () => {
       'cp_ei_equipment_name',
       equipmentName2,
       {
-        extraFilters: [
-          { fieldName: 'cp_ei_result', operator: 'EQ', value: 'failed' },
-        ],
+        extraFilters: [{ fieldName: 'cp_ei_result', operator: 'EQ', value: 'failed' }],
       },
     );
     expect(records.length).toBeGreaterThan(0);
@@ -224,10 +220,22 @@ test.describe('CP Equipment Inspection — CRUD & Status', () => {
     const p = await ctx.newPage();
     // Cleanup any remaining test records
     if (inspectionPid) {
-      await executeCommandViaApi(p, 'cp:delete_equipment_inspection', {}, inspectionPid, 'delete').catch(() => {});
+      await executeCommandViaApi(
+        p,
+        'cp:delete_equipment_inspection',
+        {},
+        inspectionPid,
+        'delete',
+      ).catch(() => {});
     }
     if (failedInspectionPid) {
-      await executeCommandViaApi(p, 'cp:delete_equipment_inspection', {}, failedInspectionPid, 'delete').catch(() => {});
+      await executeCommandViaApi(
+        p,
+        'cp:delete_equipment_inspection',
+        {},
+        failedInspectionPid,
+        'delete',
+      ).catch(() => {});
     }
     await ctx.close();
   });
@@ -256,9 +264,11 @@ test.describe('CP Log-Report Link', () => {
     await expect(page.locator('table, [role="table"]').first()).toBeVisible({ timeout: 10000 });
 
     // Click the create button to open the form
-    const addBtn = page.locator(
-      '[data-testid="toolbar-btn-create"], button:has-text("新建"), button:has-text("New"), button:has-text("Create")',
-    ).first();
+    const addBtn = page
+      .locator(
+        '[data-testid="toolbar-btn-create"], button:has-text("新建"), button:has-text("New"), button:has-text("Create")',
+      )
+      .first();
 
     // If create button is visible, click it and check the form structure
     const canCreate = await addBtn.isVisible({ timeout: 5000 }).catch(() => false);
@@ -276,9 +286,9 @@ test.describe('CP Log-Report Link', () => {
       // REFERENCE fields render as select/combobox or a lookup input
       const weeklyReportField = page.locator(
         '[data-testid="form-field-cp_log_weekly_report_id"], ' +
-        '[data-field="cp_log_weekly_report_id"], ' +
-        'label:has-text("weekly"), label:has-text("Weekly"), ' +
-        'label:has-text("周报"), label:has-text("报告")',
+          '[data-field="cp_log_weekly_report_id"], ' +
+          'label:has-text("weekly"), label:has-text("Weekly"), ' +
+          'label:has-text("周报"), label:has-text("报告")',
       );
       // The field should exist in the form (visible or at least present in DOM)
       await expect(weeklyReportField.first()).toBeAttached({ timeout: 10000 });

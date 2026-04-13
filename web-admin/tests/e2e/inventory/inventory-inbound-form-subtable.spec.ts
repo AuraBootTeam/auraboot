@@ -88,13 +88,12 @@ test.describe('Inbound Receipt Form — SubTable CRUD on Edit Page', () => {
   /** Navigate to the edit page for an inbound record */
   async function gotoEditPage(page: import('@playwright/test').Page, pid: string) {
     const listResp = page.waitForResponse(
-      (r) => r.url().includes('/api/dynamic/inv-inbound-line/list') && r.status() === 200,
+      (r) => r.url().includes('/api/dynamic/inv_inbound_line/list') && r.status() === 200,
       { timeout: 15_000 },
     );
-    await page.goto(
-      `/dynamic/inv-inbound/${pid}/edit?commandCode=pe%3Aupdate_warehouse_in`,
-      { waitUntil: 'domcontentloaded' },
-    );
+    await page.goto(`/p/inv_inbound/${pid}/edit?commandCode=pe%3Aupdate_warehouse_in`, {
+      waitUntil: 'domcontentloaded',
+    });
     await waitForFormReady(page);
     await listResp;
   }
@@ -123,8 +122,12 @@ test.describe('Inbound Receipt Form — SubTable CRUD on Edit Page', () => {
     await page.getByTestId('subtable-save-btn').click();
 
     // Validation errors should appear
-    await expect(page.getByTestId('subtable-error-inv_in_line_product_id')).toBeVisible({ timeout: 3_000 });
-    await expect(page.getByTestId('subtable-error-inv_in_line_qty')).toBeVisible({ timeout: 3_000 });
+    await expect(page.getByTestId('subtable-error-inv_in_line_product_id')).toBeVisible({
+      timeout: 3_000,
+    });
+    await expect(page.getByTestId('subtable-error-inv_in_line_qty')).toBeVisible({
+      timeout: 3_000,
+    });
   });
 
   test('edit page adds line via command with computed amount', async ({ page }) => {
@@ -146,12 +149,14 @@ test.describe('Inbound Receipt Form — SubTable CRUD on Edit Page', () => {
 
     // Wait for refresh
     await page.waitForResponse(
-      (r) => r.url().includes('/api/dynamic/inv-inbound-line/list') && r.status() === 200,
+      (r) => r.url().includes('/api/dynamic/inv_inbound_line/list') && r.status() === 200,
       { timeout: 10_000 },
     );
 
     // Row should appear with computed amount 8 * 50 = 400
-    const rows = page.locator('table tbody tr').filter({ hasNot: page.getByTestId('subtable-add-form') });
+    const rows = page
+      .locator('table tbody tr')
+      .filter({ hasNot: page.getByTestId('subtable-add-form') });
     await expect(rows.first()).toBeVisible({ timeout: 5_000 });
 
     const amountCell = rows.first().locator('td').nth(3);
@@ -161,18 +166,30 @@ test.describe('Inbound Receipt Form — SubTable CRUD on Edit Page', () => {
   test('edit page shows summary footer', async ({ page }) => {
     const inboundPid = await createDraftInbound(page);
     // Add 2 lines via API: 3*10=30, 7*20=140
-    await executeCommandViaApi(page, 'pe:add_wh_in_line', {
-      inv_in_line_receipt_id: inboundPid,
-      inv_in_line_product_id: productPid,
-      inv_in_line_qty: 3,
-      inv_in_line_price: 10,
-    }, undefined, 'create');
-    await executeCommandViaApi(page, 'pe:add_wh_in_line', {
-      inv_in_line_receipt_id: inboundPid,
-      inv_in_line_product_id: productPid,
-      inv_in_line_qty: 7,
-      inv_in_line_price: 20,
-    }, undefined, 'create');
+    await executeCommandViaApi(
+      page,
+      'pe:add_wh_in_line',
+      {
+        inv_in_line_receipt_id: inboundPid,
+        inv_in_line_product_id: productPid,
+        inv_in_line_qty: 3,
+        inv_in_line_price: 10,
+      },
+      undefined,
+      'create',
+    );
+    await executeCommandViaApi(
+      page,
+      'pe:add_wh_in_line',
+      {
+        inv_in_line_receipt_id: inboundPid,
+        inv_in_line_product_id: productPid,
+        inv_in_line_qty: 7,
+        inv_in_line_price: 20,
+      },
+      undefined,
+      'create',
+    );
 
     await gotoEditPage(page, inboundPid);
 
@@ -185,12 +202,18 @@ test.describe('Inbound Receipt Form — SubTable CRUD on Edit Page', () => {
   test('edit page can delete a line item', async ({ page }) => {
     const inboundPid = await createDraftInbound(page);
     // Add 1 line via API
-    await executeCommandViaApi(page, 'pe:add_wh_in_line', {
-      inv_in_line_receipt_id: inboundPid,
-      inv_in_line_product_id: productPid,
-      inv_in_line_qty: 2,
-      inv_in_line_price: 100,
-    }, undefined, 'create');
+    await executeCommandViaApi(
+      page,
+      'pe:add_wh_in_line',
+      {
+        inv_in_line_receipt_id: inboundPid,
+        inv_in_line_product_id: productPid,
+        inv_in_line_qty: 2,
+        inv_in_line_price: 100,
+      },
+      undefined,
+      'create',
+    );
 
     await gotoEditPage(page, inboundPid);
 
@@ -199,7 +222,8 @@ test.describe('Inbound Receipt Form — SubTable CRUD on Edit Page', () => {
     await expect(deleteBtn).toBeVisible({ timeout: 5_000 });
 
     const deleteResp = page.waitForResponse(
-      (r) => r.url().includes('/api/meta/commands/execute/pe:delete_wh_in_line') && r.status() === 200,
+      (r) =>
+        r.url().includes('/api/meta/commands/execute/pe:delete_wh_in_line') && r.status() === 200,
       { timeout: 10_000 },
     );
     await deleteBtn.click();
@@ -207,7 +231,7 @@ test.describe('Inbound Receipt Form — SubTable CRUD on Edit Page', () => {
 
     // Wait for refresh — table should be empty
     await page.waitForResponse(
-      (r) => r.url().includes('/api/dynamic/inv-inbound-line/list') && r.status() === 200,
+      (r) => r.url().includes('/api/dynamic/inv_inbound_line/list') && r.status() === 200,
       { timeout: 10_000 },
     );
 
@@ -217,10 +241,9 @@ test.describe('Inbound Receipt Form — SubTable CRUD on Edit Page', () => {
   });
 
   test('create mode shows placeholder instead of sub-table', async ({ page }) => {
-    await page.goto(
-      '/dynamic/inv-inbound/new?commandCode=pe%3Acreate_warehouse_in',
-      { waitUntil: 'domcontentloaded' },
-    );
+    await page.goto('/p/inv_inbound/new?commandCode=pe%3Acreate_warehouse_in', {
+      waitUntil: 'domcontentloaded',
+    });
     await waitForFormReady(page);
 
     // Should show placeholder text for create mode

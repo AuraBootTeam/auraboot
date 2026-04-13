@@ -107,10 +107,7 @@ test.describe('CRM Web Form Designer @critical', () => {
   });
 
   test.beforeEach(async () => {
-    test.skip(
-      !webformApiAvailable,
-      'CRM web-form API not available (backend may need restart)',
-    );
+    test.skip(!webformApiAvailable, 'CRM web-form API not available (backend may need restart)');
   });
 
   // -------------------------------------------------------------------------
@@ -326,8 +323,7 @@ test.describe('CRM Web Form Designer @critical', () => {
 
     const saveResp = page.waitForResponse(
       (r) =>
-        r.url().includes(`/api/crm/web-forms/${createdFormPid}`) &&
-        r.request().method() === 'PUT',
+        r.url().includes(`/api/crm/web-forms/${createdFormPid}`) && r.request().method() === 'PUT',
       { timeout: 10000 },
     );
     await saveBtn.click();

@@ -19,6 +19,31 @@ const __dirname = path.dirname(__filename);
 const STORAGE_DIR = path.join(__dirname, 'storage');
 const ENABLE_ROLE_AUTH = process.env.PW_ROLE_PROJECTS === '1';
 
+/**
+ * Patch saved storage state to ensure all cookies have `secure` field.
+ * Playwright on localhost omits `secure`, but `newContext({ storageState })` requires it.
+ */
+function patchStorageStateCookies(filePath: string): void {
+  try {
+    const raw = fs.readFileSync(filePath, 'utf-8');
+    const state = JSON.parse(raw);
+    if (Array.isArray(state.cookies)) {
+      let patched = false;
+      for (const cookie of state.cookies) {
+        if (cookie.secure === undefined) {
+          cookie.secure = false;
+          patched = true;
+        }
+      }
+      if (patched) {
+        fs.writeFileSync(filePath, JSON.stringify(state, null, 2));
+      }
+    }
+  } catch {
+    // ignore — file may not exist yet
+  }
+}
+
 interface TestUser {
   email: string;
   password: string;
@@ -65,7 +90,7 @@ async function autoSelectSpace(
 ): Promise<boolean> {
   try {
     const cookies = await page.context().cookies();
-    const sessionCookie = cookies.find(c => c.name === '__session');
+    const sessionCookie = cookies.find((c) => c.name === '__session');
     if (!sessionCookie) return false;
 
     // Call my-spaces to find the business tenant
@@ -152,7 +177,9 @@ async function loginViaApi(
           if (location.includes('tenant-selection')) {
             const resolved = await autoSelectSpace(page, baseURL);
             if (!resolved) {
-              console.log(`   [${user.email}] Warning: redirected to tenant-selection but auto-select failed`);
+              console.log(
+                `   [${user.email}] Warning: redirected to tenant-selection but auto-select failed`,
+              );
             }
           }
 
@@ -182,16 +209,26 @@ async function loginViaUI(
   try {
     await page.goto(`${baseURL}/login`, { waitUntil: 'domcontentloaded' });
 
-    const emailInput = page.locator('input#email, input[name="email"], input[type="email"], input[placeholder*="邮箱"], input[placeholder*="Email"]').first();
+    const emailInput = page
+      .locator(
+        'input#email, input[name="email"], input[type="email"], input[placeholder*="邮箱"], input[placeholder*="Email"]',
+      )
+      .first();
     const visible = await emailInput.isVisible({ timeout: 3000 }).catch(() => false);
     if (!visible) return false;
 
     await emailInput.fill(user.email);
-    const passwordInput = page.locator('input#password, input[name="password"], input[type="password"], input[placeholder*="密码"], input[placeholder*="Password"]').first();
+    const passwordInput = page
+      .locator(
+        'input#password, input[name="password"], input[type="password"], input[placeholder*="密码"], input[placeholder*="Password"]',
+      )
+      .first();
     await passwordInput.fill(user.password);
 
     const loginButton = page
-      .locator('button:has-text("立即登录"), button:has-text("Login"), button:has-text("Sign in"), button[type="submit"]')
+      .locator(
+        'button:has-text("立即登录"), button:has-text("Login"), button:has-text("Sign in"), button[type="submit"]',
+      )
       .first();
     await loginButton.click();
 
@@ -235,7 +272,8 @@ async function verifyStorageStateWorks(
   try {
     const raw = fs.readFileSync(storagePath, 'utf-8');
     const state = JSON.parse(raw);
-    const cookies: Array<{ name: string; value: string; domain: string; path: string }> = state.cookies || [];
+    const cookies: Array<{ name: string; value: string; domain: string; path: string }> =
+      state.cookies || [];
     if (cookies.length === 0) return false;
     // Make a request using the stored cookies to verify the session works
     const resp = await page.request.get(`${baseURL}/api/meta/current-user`, {
@@ -266,7 +304,10 @@ setup('authenticate as admin', async ({ page, baseURL: configURL }) => {
 
   // Skip re-login only if the session is not expired AND still works against backend.
   // After reset-and-init.sh the user PID changes — must validate against live API.
-  if (!isStorageExpired(storagePath) && (await verifyStorageStateWorks(page, storagePath, baseURL))) {
+  if (
+    !isStorageExpired(storagePath) &&
+    (await verifyStorageStateWorks(page, storagePath, baseURL))
+  ) {
     return;
   }
 
@@ -278,6 +319,7 @@ setup('authenticate as admin', async ({ page, baseURL: configURL }) => {
   expect(ok, 'Admin login must succeed').toBe(true);
 
   await page.context().storageState({ path: storagePath });
+  patchStorageStateCookies(storagePath);
 });
 
 // ── Operator login (optional) ───────────────────────────────────────
@@ -300,6 +342,7 @@ setup('authenticate as operator', async ({ page, baseURL: configURL }) => {
 
   if (ok) {
     await page.context().storageState({ path: storagePath });
+    patchStorageStateCookies(storagePath);
   } else {
     fs.writeFileSync(storagePath, JSON.stringify({ cookies: [], origins: [] }, null, 2));
   }
@@ -322,6 +365,7 @@ setup('authenticate as viewer', async ({ page, baseURL: configURL }) => {
 
   if (ok) {
     await page.context().storageState({ path: storagePath });
+    patchStorageStateCookies(storagePath);
   } else {
     fs.writeFileSync(storagePath, JSON.stringify({ cookies: [], origins: [] }, null, 2));
   }

@@ -20,12 +20,15 @@ import { DashboardDesignerPage } from '../../pages';
  * Navigate to dashboard designer and add a widget for interaction testing.
  */
 async function setupDesignerWithWidget(
-  page: import('@playwright/test').Page
+  page: import('@playwright/test').Page,
 ): Promise<{ designer: DashboardDesignerPage; loaded: boolean }> {
   const designer = new DashboardDesignerPage(page);
   try {
     await designer.goto();
-    await designer.paletteItem('数字卡片').waitFor({ state: 'visible', timeout: 8000 }).catch(() => {});
+    await designer
+      .paletteItem('数字卡片')
+      .waitFor({ state: 'visible', timeout: 8000 })
+      .catch(() => {});
     return { designer, loaded: true };
   } catch {
     return { designer, loaded: false };
@@ -39,7 +42,10 @@ test.describe('Dashboard Interactions', () => {
    */
   test('DI-001: widget configuration via property panel', async ({ page }) => {
     const { designer, loaded } = await setupDesignerWithWidget(page);
-    if (!loaded) { throw new Error(String('Dashboard designer not available')); return; }
+    if (!loaded) {
+      throw new Error(String('Dashboard designer not available'));
+      return;
+    }
 
     // Add a Number Card widget
     await designer.addWidget('数字卡片');
@@ -78,7 +84,10 @@ test.describe('Dashboard Interactions', () => {
    */
   test('DI-002: widget deletion from canvas', async ({ page }) => {
     const { designer, loaded } = await setupDesignerWithWidget(page);
-    if (!loaded) { throw new Error(String('Dashboard designer not available')); return; }
+    if (!loaded) {
+      throw new Error(String('Dashboard designer not available'));
+      return;
+    }
 
     // Auto-accept confirm dialog (widget deletion uses window.confirm)
     page.on('dialog', (dialog) => dialog.accept());
@@ -101,10 +110,9 @@ test.describe('Dashboard Interactions', () => {
       await deleteBtn.click();
 
       // Widget count should decrease
-      await expect.poll(
-        async () => designer.getWidgetCount(),
-        { timeout: 5000 }
-      ).toBeLessThan(initialCount);
+      await expect
+        .poll(async () => designer.getWidgetCount(), { timeout: 5000 })
+        .toBeLessThan(initialCount);
     } else {
       // Try keyboard delete
       await page.keyboard.press('Delete');
@@ -122,7 +130,10 @@ test.describe('Dashboard Interactions', () => {
    */
   test('DI-003: widget copy/duplicate', async ({ page }) => {
     const { designer, loaded } = await setupDesignerWithWidget(page);
-    if (!loaded) { throw new Error(String('Dashboard designer not available')); return; }
+    if (!loaded) {
+      throw new Error(String('Dashboard designer not available'));
+      return;
+    }
 
     // Add a Pie Chart widget
     await designer.addWidget('饼图');
@@ -142,10 +153,9 @@ test.describe('Dashboard Interactions', () => {
       await duplicateBtn.click();
 
       // Widget count should increase
-      await expect.poll(
-        async () => designer.getWidgetCount(),
-        { timeout: 5000 }
-      ).toBeGreaterThan(initialCount);
+      await expect
+        .poll(async () => designer.getWidgetCount(), { timeout: 5000 })
+        .toBeGreaterThan(initialCount);
     } else {
       // Try keyboard shortcut for copy
       await page.keyboard.press('Control+D');
@@ -162,7 +172,10 @@ test.describe('Dashboard Interactions', () => {
    */
   test('DI-004: layout drag handles present', async ({ page }) => {
     const { designer, loaded } = await setupDesignerWithWidget(page);
-    if (!loaded) { throw new Error(String('Dashboard designer not available')); return; }
+    if (!loaded) {
+      throw new Error(String('Dashboard designer not available'));
+      return;
+    }
 
     // Ensure at least two widgets exist for layout assertions.
     // Single add clicks may occasionally be dropped during UI hydration.
@@ -193,7 +206,10 @@ test.describe('Dashboard Interactions', () => {
 
     // Verify resize handles are present on grid items
     const resizeHandle = designer.canvas.locator('.react-resizable-handle');
-    const hasResizeHandle = await resizeHandle.first().isVisible({ timeout: 3000 }).catch(() => false);
+    const hasResizeHandle = await resizeHandle
+      .first()
+      .isVisible({ timeout: 3000 })
+      .catch(() => false);
 
     // Resize handles should be available for layout adjustment
     // They may only appear on hover, so just check they exist in DOM

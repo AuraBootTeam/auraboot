@@ -8,16 +8,21 @@ import { test, expect } from '@playwright/test';
 import { uniqueId } from '../helpers';
 
 test.describe('Record Comment & Activity History (GAP-123)', () => {
-
   test('RC-001: add comment to a record', async ({ page }) => {
     await page.goto('/');
     await page.locator('nav, [data-testid="sidebar"]').first().waitFor({ timeout: 15000 });
 
     // First get a record PID
-    const listResp = await page.request.get('/api/dynamic/e2et-order/list?pageNum=1&pageSize=1');
-    if (!listResp.ok()) { test.skip(true, 'No records'); return; }
+    const listResp = await page.request.get('/api/dynamic/e2et_order/list?pageNum=1&pageSize=1');
+    if (!listResp.ok()) {
+      test.skip(true, 'No records');
+      return;
+    }
     const records = (await listResp.json()).data?.records;
-    if (!records?.length) { test.skip(true, 'No records'); return; }
+    if (!records?.length) {
+      test.skip(true, 'No records');
+      return;
+    }
 
     const recordPid = records[0].pid;
     const comment = `Test comment ${uniqueId()}`;
@@ -35,9 +40,12 @@ test.describe('Record Comment & Activity History (GAP-123)', () => {
     await page.goto('/');
     await page.locator('nav, [data-testid="sidebar"]').first().waitFor({ timeout: 15000 });
 
-    const listResp = await page.request.get('/api/dynamic/e2et-order/list?pageNum=1&pageSize=1');
+    const listResp = await page.request.get('/api/dynamic/e2et_order/list?pageNum=1&pageSize=1');
     const records = (await listResp.json()).data?.records;
-    if (!records?.length) { test.skip(true, 'No records'); return; }
+    if (!records?.length) {
+      test.skip(true, 'No records');
+      return;
+    }
 
     const recordPid = records[0].pid;
 
@@ -58,9 +66,12 @@ test.describe('Record Comment & Activity History (GAP-123)', () => {
     await page.goto('/');
     await page.locator('nav, [data-testid="sidebar"]').first().waitFor({ timeout: 15000 });
 
-    const listResp = await page.request.get('/api/dynamic/e2et-order/list?pageNum=1&pageSize=1');
+    const listResp = await page.request.get('/api/dynamic/e2et_order/list?pageNum=1&pageSize=1');
     const records = (await listResp.json()).data?.records;
-    if (!records?.length) { test.skip(true, 'No records'); return; }
+    if (!records?.length) {
+      test.skip(true, 'No records');
+      return;
+    }
 
     const recordPid = records[0].pid;
     const addResp = await page.request.post(`/api/records/e2et_order/${recordPid}/comments`, {
@@ -70,9 +81,12 @@ test.describe('Record Comment & Activity History (GAP-123)', () => {
     expect(commentId).toBeTruthy();
 
     // Edit
-    const editResp = await page.request.put(`/api/records/e2et_order/${recordPid}/comments/${commentId}`, {
-      data: { content: 'Edited content' },
-    });
+    const editResp = await page.request.put(
+      `/api/records/e2et_order/${recordPid}/comments/${commentId}`,
+      {
+        data: { content: 'Edited content' },
+      },
+    );
     expect(editResp.ok()).toBeTruthy();
     const edited = (await editResp.json()).data;
     expect(edited?.is_edited).toBe(true);
@@ -83,9 +97,12 @@ test.describe('Record Comment & Activity History (GAP-123)', () => {
     await page.goto('/');
     await page.locator('nav, [data-testid="sidebar"]').first().waitFor({ timeout: 15000 });
 
-    const listResp = await page.request.get('/api/dynamic/e2et-order/list?pageNum=1&pageSize=1');
+    const listResp = await page.request.get('/api/dynamic/e2et_order/list?pageNum=1&pageSize=1');
     const records = (await listResp.json()).data?.records;
-    if (!records?.length) { test.skip(true, 'No records'); return; }
+    if (!records?.length) {
+      test.skip(true, 'No records');
+      return;
+    }
 
     const recordPid = records[0].pid;
     const addResp = await page.request.post(`/api/records/e2et_order/${recordPid}/comments`, {
@@ -94,7 +111,9 @@ test.describe('Record Comment & Activity History (GAP-123)', () => {
     const commentId = (await addResp.json()).data?.id;
 
     // Delete
-    const delResp = await page.request.delete(`/api/records/e2et_order/${recordPid}/comments/${commentId}`);
+    const delResp = await page.request.delete(
+      `/api/records/e2et_order/${recordPid}/comments/${commentId}`,
+    );
     expect(delResp.ok()).toBeTruthy();
 
     // Verify it's gone (soft-deleted)
@@ -108,9 +127,12 @@ test.describe('Record Comment & Activity History (GAP-123)', () => {
     await page.goto('/');
     await page.locator('nav, [data-testid="sidebar"]').first().waitFor({ timeout: 15000 });
 
-    const listResp = await page.request.get('/api/dynamic/e2et-order/list?pageNum=1&pageSize=1');
+    const listResp = await page.request.get('/api/dynamic/e2et_order/list?pageNum=1&pageSize=1');
     const records = (await listResp.json()).data?.records;
-    if (!records?.length) { test.skip(true, 'No records'); return; }
+    if (!records?.length) {
+      test.skip(true, 'No records');
+      return;
+    }
 
     const recordPid = records[0].pid;
     const resp = await page.request.get(`/api/records/e2et_order/${recordPid}/activity`);
@@ -123,9 +145,12 @@ test.describe('Record Comment & Activity History (GAP-123)', () => {
     await page.goto('/');
     await page.locator('nav, [data-testid="sidebar"]').first().waitFor({ timeout: 15000 });
 
-    const listResp = await page.request.get('/api/dynamic/e2et-order/list?pageNum=1&pageSize=1');
+    const listResp = await page.request.get('/api/dynamic/e2et_order/list?pageNum=1&pageSize=1');
     const records = (await listResp.json()).data?.records;
-    if (!records?.length) { test.skip(true, 'No records'); return; }
+    if (!records?.length) {
+      test.skip(true, 'No records');
+      return;
+    }
 
     const recordPid = records[0].pid;
     const resp = await page.request.post(`/api/records/e2et_order/${recordPid}/comments`, {

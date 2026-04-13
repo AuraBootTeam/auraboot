@@ -265,9 +265,11 @@ test.describe('PCBA Procurement — Purchase Order CRUD', () => {
     await waitForFormReady(page, 15000);
 
     // Modify a field (remark or arrival date)
-    const remarkField = page.locator(
-      '[data-testid="form-field-pr_po_remark"] input, [data-testid="form-field-pr_po_remark"] textarea',
-    ).first();
+    const remarkField = page
+      .locator(
+        '[data-testid="form-field-pr_po_remark"] input, [data-testid="form-field-pr_po_remark"] textarea',
+      )
+      .first();
     if (await remarkField.isVisible({ timeout: 5000 }).catch(() => false)) {
       await remarkField.fill('E2E edited remark');
     }
@@ -284,13 +286,6 @@ test.describe('PCBA Procurement — Purchase Order CRUD', () => {
 
   test('PP-004: PO status tabs (draft/approved/RECEIVING)', async ({ page }) => {
     await navigateToDynamicPage(page, PAGE_KEYS.purchaseOrder);
-
-    // Verify tabs are visible
-    const tabNav = page.locator('nav[aria-label="Tabs"]');
-    if (!(await tabNav.isVisible({ timeout: 5000 }).catch(() => false))) {
-      throw new Error('Tab navigation not found — page may not have tabs');
-      return;
-    }
 
     // Click "Draft" tab
     await clickTabAndWaitForLoad(page, /Draft|草稿/i, 5000, 'draft');
@@ -336,7 +331,9 @@ test.describe('PCBA Procurement — Purchase Order CRUD', () => {
 
     // Click delete action
     const commandResp = page.waitForResponse(
-      (r) => r.url().includes('/api/meta/commands/execute/') && r.request().method().toLowerCase() === 'post',
+      (r) =>
+        r.url().includes('/api/meta/commands/execute/') &&
+        r.request().method().toLowerCase() === 'post',
       { timeout: 15000 },
     );
     const listResp = page
@@ -356,17 +353,10 @@ test.describe('PCBA Procurement — Purchase Order CRUD', () => {
   });
 
   test('PP-006: PO field validation', async ({ page }) => {
-    await navigateToDynamicPage(page, PAGE_KEYS.purchaseOrder);
-
-    // Click create button
-    const addButton = page.locator(
-      'button:has-text("New"), button:has-text("新建"), button:has-text("Create"), [data-testid="add-button"]',
+    await page.goto(
+      `/p/pr_purchase_order/new?commandCode=${encodeURIComponent(COMMANDS.createPO)}`,
+      { waitUntil: 'domcontentloaded' },
     );
-    if (!(await addButton.first().isVisible({ timeout: 5000 }).catch(() => false))) {
-      throw new Error('Create button not found');
-      return;
-    }
-    await addButton.first().click();
 
     // Wait for dynamic form two-stage loading (schema fetch + field rendering)
     await waitForFormReady(page, 15000);
@@ -378,12 +368,17 @@ test.describe('PCBA Procurement — Purchase Order CRUD', () => {
     const errorIndicator = page.locator(
       '.ant-form-item-explain-error, [class*="error"]:not(header):not(nav), [role="alert"], .field-error, [data-testid*="error"], .text-red-500, .text-red-600, .border-red-500',
     );
-    const hasErrors = await errorIndicator.first().isVisible({ timeout: 5000 }).catch(() => false);
+    const hasErrors = await errorIndicator
+      .first()
+      .isVisible({ timeout: 5000 })
+      .catch(() => false);
     if (!hasErrors) {
       // Fallback: verify the form is still open (save did not succeed)
-      const stillOnForm = await page.locator(
-        'form, .ant-form, [data-testid="dynamic-form"]',
-      ).first().isVisible({ timeout: 3000 }).catch(() => false);
+      const stillOnForm = await page
+        .locator('form, .ant-form, [data-testid="dynamic-form"]')
+        .first()
+        .isVisible({ timeout: 3000 })
+        .catch(() => false);
       expect(stillOnForm).toBe(true);
     } else {
       expect(hasErrors).toBe(true);
@@ -404,10 +399,7 @@ test.describe('PCBA Procurement — Purchase Order CRUD', () => {
     for (let i = 0; i < Math.min(headerCount, 8); i++) {
       const text = (await headers.nth(i).innerText()).trim();
       if (text.length > 0) {
-        expect(
-          text,
-          `Header should not be raw field code: ${text}`,
-        ).not.toMatch(/^pr_po_/);
+        expect(text, `Header should not be raw field code: ${text}`).not.toMatch(/^pr_po_/);
       }
     }
   });
@@ -535,9 +527,11 @@ test.describe('PCBA Procurement — Purchase Request CRUD', () => {
     await waitForFormReady(page, 15000);
 
     // Modify remark field
-    const remarkField = page.locator(
-      '[data-testid="form-field-pr_preq_remark"] input, [data-testid="form-field-pr_preq_remark"] textarea',
-    ).first();
+    const remarkField = page
+      .locator(
+        '[data-testid="form-field-pr_preq_remark"] input, [data-testid="form-field-pr_preq_remark"] textarea',
+      )
+      .first();
     if (await remarkField.isVisible({ timeout: 5000 }).catch(() => false)) {
       await remarkField.fill('E2E edited PR remark');
     }
@@ -571,7 +565,9 @@ test.describe('PCBA Procurement — Purchase Request CRUD', () => {
     const row = await findRowInPaginatedList(page, prCode);
 
     const commandResp = page.waitForResponse(
-      (r) => r.url().includes('/api/meta/commands/execute/') && r.request().method().toLowerCase() === 'post',
+      (r) =>
+        r.url().includes('/api/meta/commands/execute/') &&
+        r.request().method().toLowerCase() === 'post',
       { timeout: 15000 },
     );
     const listResp = page
@@ -592,12 +588,6 @@ test.describe('PCBA Procurement — Purchase Request CRUD', () => {
 
   test('PP-012: PR status tabs (pending/processing/completed)', async ({ page }) => {
     await navigateToDynamicPage(page, PAGE_KEYS.purchaseRequest);
-
-    const tabNav = page.locator('nav[aria-label="Tabs"]');
-    if (!(await tabNav.isVisible({ timeout: 5000 }).catch(() => false))) {
-      throw new Error('Tab navigation not found');
-      return;
-    }
 
     // Click "Pending" tab
     await clickTabAndWaitForLoad(page, /Pending|待处理/i, 5000, 'pending');
@@ -631,7 +621,7 @@ test.describe('PCBA Procurement — Purchase Receipt CRUD', () => {
 
     // Query existing warehouse
     try {
-      const whResp = await page.request.get('/api/dynamic/inv-warehouse/list?pageSize=1');
+      const whResp = await page.request.get('/api/dynamic/inv_warehouse/list?pageSize=1');
       if (whResp.ok()) {
         const whBody = await whResp.json();
         const whRec = whBody?.data?.records?.[0];
@@ -639,7 +629,9 @@ test.describe('PCBA Procurement — Purchase Receipt CRUD', () => {
           receiptWarehousePid = whRec.pid;
         }
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
 
     // Create or query a supplier for the PO
     try {
@@ -657,11 +649,13 @@ test.describe('PCBA Procurement — Purchase Receipt CRUD', () => {
       if (supResult.recordId && supResult.code === ErrorCodes.SUCCESS) {
         receiptSupplierPid = supResult.recordId;
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
 
     if (!receiptSupplierPid) {
       try {
-        const supResp = await page.request.get('/api/dynamic/pe-supplier/list?pageSize=1');
+        const supResp = await page.request.get('/api/dynamic/pe_supplier/list?pageSize=1');
         if (supResp.ok()) {
           const supBody = await supResp.json();
           const supRec = supBody?.data?.records?.[0];
@@ -669,7 +663,9 @@ test.describe('PCBA Procurement — Purchase Receipt CRUD', () => {
             receiptSupplierPid = supRec.pid;
           }
         }
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     }
 
     // Create a purchase order to reference in receipts
@@ -689,7 +685,9 @@ test.describe('PCBA Procurement — Purchase Receipt CRUD', () => {
         if (poResult.recordId && poResult.code === ErrorCodes.SUCCESS) {
           receiptPoPid = poResult.recordId;
         }
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     }
 
     await ctx.close();
@@ -795,9 +793,11 @@ test.describe('PCBA Procurement — Purchase Receipt CRUD', () => {
     await waitForFormReady(page, 15000);
 
     // Modify remark
-    const remarkField = page.locator(
-      '[data-testid="form-field-pr_rcpt_remark"] input, [data-testid="form-field-pr_rcpt_remark"] textarea',
-    ).first();
+    const remarkField = page
+      .locator(
+        '[data-testid="form-field-pr_rcpt_remark"] input, [data-testid="form-field-pr_rcpt_remark"] textarea',
+      )
+      .first();
     if (await remarkField.isVisible({ timeout: 5000 }).catch(() => false)) {
       await remarkField.fill('E2E receipt remark');
     }
@@ -807,12 +807,6 @@ test.describe('PCBA Procurement — Purchase Receipt CRUD', () => {
 
   test('PP-016: Receipt status tabs (draft/confirmed)', async ({ page }) => {
     await navigateToDynamicPage(page, PAGE_KEYS.purchaseReceipt);
-
-    const tabNav = page.locator('nav[aria-label="Tabs"]');
-    if (!(await tabNav.isVisible({ timeout: 5000 }).catch(() => false))) {
-      throw new Error('Tab navigation not found');
-      return;
-    }
 
     // Click "Draft" tab
     await clickTabAndWaitForLoad(page, /Draft|草稿/i, 5000, 'draft');

@@ -62,7 +62,7 @@ type SearchResult =
 const RECENT_KEY = 'auraboot_recent_searches';
 const MAX_RECENT = 8;
 
-function loadRecent(): string[] {
+export function loadRecent(): string[] {
   try {
     return JSON.parse(localStorage.getItem(RECENT_KEY) || '[]');
   } catch {
@@ -70,7 +70,7 @@ function loadRecent(): string[] {
   }
 }
 
-function saveRecent(items: string[]) {
+export function saveRecent(items: string[]) {
   localStorage.setItem(RECENT_KEY, JSON.stringify(items.slice(0, MAX_RECENT)));
 }
 
@@ -200,11 +200,11 @@ export function CommandPalette() {
 
       setSearching(true);
       try {
-        // Get searchable models from menu items that use /dynamic/ paths
+        // Get searchable models from menu items that use /p/ paths
         const searchableModels = flatItems
-          .filter((m) => m.path.startsWith('/dynamic/'))
+          .filter((m) => m.path.startsWith('/p/'))
           .map((m) => ({
-            code: m.path.replace('/dynamic/', '').split('/')[0],
+            code: m.path.replace('/p/', '').split('/')[0],
             name: m.name,
           }))
           .filter((m, i, arr) => arr.findIndex((a) => a.code === m.code) === i)
@@ -223,7 +223,7 @@ export function CommandPalette() {
                   displayText: extractDisplayText(r),
                   modelCode: model.code,
                   modelName: model.name,
-                  path: `/dynamic/${model.code}/view/${r.pid || r.id}`,
+                  path: `/p/${model.code}/view/${r.pid || r.id}`,
                 }));
               }
             } catch {
@@ -602,14 +602,13 @@ export function CommandPalette() {
                     {t('search.docs', 'Docs')}
                   </div>
                   {allResults
-                    .filter(
-                      (r): r is Extract<SearchResult, { kind: 'doc' }> => r.kind === 'doc',
-                    )
+                    .filter((r): r is Extract<SearchResult, { kind: 'doc' }> => r.kind === 'doc')
                     .map((r, idx) => {
                       const globalIdx = allResults.indexOf(r);
-                      const snippet = r.hit.content.length > 120
-                        ? r.hit.content.substring(0, 120) + '...'
-                        : r.hit.content;
+                      const snippet =
+                        r.hit.content.length > 120
+                          ? r.hit.content.substring(0, 120) + '...'
+                          : r.hit.content;
                       return (
                         <ResultRow
                           key={`doc-${idx}`}

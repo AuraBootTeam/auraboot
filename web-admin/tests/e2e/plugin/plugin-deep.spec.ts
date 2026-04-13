@@ -128,7 +128,7 @@ test.describe('Plugin System Deep', () => {
         {
           data: TEST_PLUGIN_MANIFEST,
           headers: { 'Content-Type': 'application/json' },
-        }
+        },
       );
       if (response.ok()) {
         const result = await response.json();
@@ -151,10 +151,14 @@ test.describe('Plugin System Deep', () => {
   test.afterAll(async ({ request }) => {
     if (!pluginPid) return;
     try {
-      await request.post(`/api/plugins/${pluginPid}/uninstall`, {
-        data: { force: true, decisions: {} },
-      }).catch(() => {});
-    } catch { /* ignore */ }
+      await request
+        .post(`/api/plugins/${pluginPid}/uninstall`, {
+          data: { force: true, decisions: {} },
+        })
+        .catch(() => {});
+    } catch {
+      /* ignore */
+    }
   });
 
   /**
@@ -164,7 +168,10 @@ test.describe('Plugin System Deep', () => {
     await page.goto('/system/plugins');
     await page.waitForLoadState('domcontentloaded');
 
-    const is404 = await page.locator('text=404').isVisible({ timeout: 3000 }).catch(() => false);
+    const is404 = await page
+      .locator('text=404')
+      .isVisible({ timeout: 3000 })
+      .catch(() => false);
     if (is404) {
       // Try alternative path
       await page.goto('/meta/plugins');
@@ -173,9 +180,12 @@ test.describe('Plugin System Deep', () => {
 
     // Verify page has content
     const pageContent = page.locator(
-      'table, .ant-card, .ant-list, [data-testid="plugin-list"], h1, h2, [data-testid="page-title"]'
+      'table, .ant-card, .ant-list, [data-testid="plugin-list"], h1, h2, [data-testid="page-title"]',
     );
-    const hasContent = await pageContent.first().isVisible({ timeout: 10000 }).catch(() => false);
+    const hasContent = await pageContent
+      .first()
+      .isVisible({ timeout: 10000 })
+      .catch(() => false);
 
     // Also verify via API
     const pluginsResp = await page.request.get('/api/plugins');
@@ -188,12 +198,16 @@ test.describe('Plugin System Deep', () => {
    * PL-002: Plugin detail view
    */
   test('PL-002: Plugin detail view', async ({ page }) => {
-    if (!pluginPid) { throw new Error(String(`Test plugin import failed in beforeAll: ${setupFailureReason || 'unknown reason'}`)); }
+    if (!pluginPid) {
+      throw new Error(
+        String(`Test plugin import failed in beforeAll: ${setupFailureReason || 'unknown reason'}`),
+      );
+    }
 
     // Get plugin detail via API
     const resp = await page.request.get(`/api/plugins/${pluginPid}`);
     if (!resp.ok()) {
-      throw new Error(String('Plugin detail API not available'))
+      throw new Error(String('Plugin detail API not available'));
       return;
     }
 
@@ -207,7 +221,10 @@ test.describe('Plugin System Deep', () => {
     await page.waitForLoadState('domcontentloaded');
 
     const content = page.locator('main, h1, h2, [data-testid="plugin-detail"]');
-    const hasContent = await content.first().isVisible({ timeout: 10000 }).catch(() => false);
+    const hasContent = await content
+      .first()
+      .isVisible({ timeout: 10000 })
+      .catch(() => false);
 
     // Page may redirect or show 404 if detail page doesn't exist
     if (!hasContent) {
@@ -224,9 +241,11 @@ test.describe('Plugin System Deep', () => {
     await page.waitForLoadState('domcontentloaded');
 
     // Look for import/upload button
-    const importBtn = page.locator(
-      'button:has-text("导入"), button:has-text("Import"), button:has-text("上传"), button:has-text("Upload"), [data-testid*="import"], [data-testid*="upload"]'
-    ).first();
+    const importBtn = page
+      .locator(
+        'button:has-text("导入"), button:has-text("Import"), button:has-text("上传"), button:has-text("Upload"), [data-testid*="import"], [data-testid*="upload"]',
+      )
+      .first();
     const hasImport = await importBtn.isVisible({ timeout: 5000 }).catch(() => false);
 
     if (hasImport) {
@@ -234,9 +253,12 @@ test.describe('Plugin System Deep', () => {
 
       // Verify upload dialog/form appears
       const uploadForm = page.locator(
-        '[role="dialog"], .ant-modal, input[type="file"], [data-testid="upload-form"]'
+        '[role="dialog"], .ant-modal, input[type="file"], [data-testid="upload-form"]',
       );
-      const hasUploadForm = await uploadForm.first().isVisible({ timeout: 5000 }).catch(() => false);
+      const hasUploadForm = await uploadForm
+        .first()
+        .isVisible({ timeout: 5000 })
+        .catch(() => false);
 
       if (hasUploadForm) {
         // Close without uploading
@@ -259,7 +281,7 @@ test.describe('Plugin System Deep', () => {
       {
         data: TEST_PLUGIN_MANIFEST,
         headers: { 'Content-Type': 'application/json' },
-      }
+      },
     );
 
     expect(resp.ok()).toBe(true);
@@ -278,11 +300,15 @@ test.describe('Plugin System Deep', () => {
    */
   test('PL-005: Plugin dependencies', async ({ page }) => {
     // Check if plugin has dependency information
-    if (!pluginPid) { throw new Error(String(`Test plugin import failed in beforeAll: ${setupFailureReason || 'unknown reason'}`)); }
+    if (!pluginPid) {
+      throw new Error(
+        String(`Test plugin import failed in beforeAll: ${setupFailureReason || 'unknown reason'}`),
+      );
+    }
 
     const resp = await page.request.get(`/api/plugins/${pluginPid}`);
     if (!resp.ok()) {
-      throw new Error(String('Plugin detail API not available'))
+      throw new Error(String('Plugin detail API not available'));
       return;
     }
 
@@ -304,18 +330,29 @@ test.describe('Plugin System Deep', () => {
       pluginId: 'com.test.plugin-deep-uninstall',
       namespace: 'pdeu',
       models: [{ code: 'pdeu_item', displayName: 'PDEU Item', modelType: 'entity' }],
-      fields: [{ code: 'pdeu_name', displayName: 'Name', dataType: 'string', constraints: { required: true } }],
-      modelFieldBindings: [{ modelCode: 'pdeu_item', fieldCode: 'pdeu_name', sequence: 10, required: true }],
+      fields: [
+        {
+          code: 'pdeu_name',
+          displayName: 'Name',
+          dataType: 'string',
+          constraints: { required: true },
+        },
+      ],
+      modelFieldBindings: [
+        { modelCode: 'pdeu_item', fieldCode: 'pdeu_name', sequence: 10, required: true },
+      ],
       permissions: [],
     };
 
     const importResp = await page.request.post(
       '/api/plugins/import/execute-direct?conflictStrategy=OVERWRITE',
-      { data: uninstallManifest, headers: { 'Content-Type': 'application/json' } }
+      { data: uninstallManifest, headers: { 'Content-Type': 'application/json' } },
     );
 
     if (!importResp.ok()) {
-      throw new Error(String(`Could not import plugin for uninstall test — HTTP ${importResp.status()}`))
+      throw new Error(
+        String(`Could not import plugin for uninstall test — HTTP ${importResp.status()}`),
+      );
       return;
     }
 
@@ -323,7 +360,9 @@ test.describe('Plugin System Deep', () => {
     const uninstallPid = importResult.pluginPid || importResult.data?.pluginPid;
 
     if (!uninstallPid) {
-      throw new Error(String(`No plugin PID in import response: ${JSON.stringify(importResult).slice(0, 200)}`))
+      throw new Error(
+        String(`No plugin PID in import response: ${JSON.stringify(importResult).slice(0, 200)}`),
+      );
       return;
     }
 
@@ -349,28 +388,34 @@ test.describe('Plugin System Deep', () => {
    * PL-007: Version compare
    */
   test('PL-007: Version compare on re-import', async ({ page }) => {
-    if (!pluginPid) { throw new Error(String(`Test plugin import failed in beforeAll: ${setupFailureReason || 'unknown reason'}`)); }
+    if (!pluginPid) {
+      throw new Error(
+        String(`Test plugin import failed in beforeAll: ${setupFailureReason || 'unknown reason'}`),
+      );
+    }
 
     const resp = await page.request.post(
       '/api/plugins/import/execute-direct?conflictStrategy=OVERWRITE',
       {
         data: UPDATED_PLUGIN_MANIFEST,
         headers: { 'Content-Type': 'application/json' },
-      }
+      },
     );
 
     if (!resp.ok()) {
       // Fallback check: if target version is already present, treat as converged.
       const detailResp = await page.request.get(`/api/plugins/${pluginPid}`);
       if (detailResp.ok()) {
-        const detail = await detailResp.json().catch(() => ({} as any));
+        const detail = await detailResp.json().catch(() => ({}) as any);
         const plugin = detail.data || detail;
         if (plugin.version === '1.1.0') {
           return;
         }
       }
       const errBody = resp ? await resp.text().catch(() => '') : '';
-      throw new Error(String(`Import returned HTTP ${resp?.status() ?? 'unknown'}: ${errBody.slice(0, 200)}`))
+      throw new Error(
+        String(`Import returned HTTP ${resp?.status() ?? 'unknown'}: ${errBody.slice(0, 200)}`),
+      );
       return;
     }
 
@@ -383,13 +428,16 @@ test.describe('Plugin System Deep', () => {
 
     // Verify version updated — use the (possibly updated) pluginPid
     await expect
-      .poll(async () => {
-        const detailResp = await page.request.get(`/api/plugins/${pluginPid}`);
-        if (!detailResp.ok()) return '';
-        const detail = await detailResp.json().catch(() => ({} as any));
-        const plugin = detail.data || detail;
-        return String(plugin.version ?? '');
-      }, { timeout: 20000, intervals: [500, 1000, 2000] })
+      .poll(
+        async () => {
+          const detailResp = await page.request.get(`/api/plugins/${pluginPid}`);
+          if (!detailResp.ok()) return '';
+          const detail = await detailResp.json().catch(() => ({}) as any);
+          const plugin = detail.data || detail;
+          return String(plugin.version ?? '');
+        },
+        { timeout: 20000, intervals: [500, 1000, 2000] },
+      )
       .toBe('1.1.0');
   });
 
@@ -405,7 +453,7 @@ test.describe('Plugin System Deep', () => {
     });
 
     if (!previewResp.ok()) {
-      throw new Error(String(`Preview parse-directory API returned HTTP ${previewResp.status()}`))
+      throw new Error(String(`Preview parse-directory API returned HTTP ${previewResp.status()}`));
       return;
     }
 
@@ -421,7 +469,11 @@ test.describe('Plugin System Deep', () => {
    * PL-009: Auto-create permissions on import
    */
   test('PL-009: Auto-create permissions on import', async ({ page }) => {
-    if (!pluginPid) { throw new Error(String(`Test plugin import failed in beforeAll: ${setupFailureReason || 'unknown reason'}`)); }
+    if (!pluginPid) {
+      throw new Error(
+        String(`Test plugin import failed in beforeAll: ${setupFailureReason || 'unknown reason'}`),
+      );
+    }
 
     // Verify permissions were created via model-specific permissions API
     const permResp = await page.request.get('/api/permissions/model/pde_record');
@@ -433,7 +485,7 @@ test.describe('Plugin System Deep', () => {
         // Plugin import should have created permissions for pde_record model
         expect(permissions.length).toBeGreaterThan(0);
         const hasPluginPerm = permissions.some(
-          (p: any) => p.code?.includes('pde') || p.resourceCode === 'pde_record'
+          (p: any) => p.code?.includes('pde') || p.resourceCode === 'pde_record',
         );
         expect(hasPluginPerm).toBe(true);
       }
@@ -447,7 +499,7 @@ test.describe('Plugin System Deep', () => {
 
       if (Array.isArray(allModelPerms)) {
         const pdePerms = allModelPerms.filter(
-          (p: any) => p.resourceCode === 'pde_record' || p.code?.includes('pde')
+          (p: any) => p.resourceCode === 'pde_record' || p.code?.includes('pde'),
         );
         expect(pdePerms.length).toBeGreaterThanOrEqual(0);
       }
@@ -471,7 +523,7 @@ test.describe('Plugin System Deep', () => {
       {
         data: invalidManifest,
         headers: { 'Content-Type': 'application/json' },
-      }
+      },
     );
 
     // Should fail — the import with invalid data must not succeed
