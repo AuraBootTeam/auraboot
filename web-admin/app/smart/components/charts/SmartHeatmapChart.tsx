@@ -245,12 +245,7 @@ export const SmartHeatmapChart: React.FC<SmartHeatmapChartProps> = ({
 
   return (
     <div className={cn('rounded-lg border border-gray-200 bg-white p-4', className)} style={style}>
-      <ReactECharts
-        option={options}
-        style={{ height: '100%', minHeight: 0 }}
-        notMerge
-        lazyUpdate
-      />
+      <ReactECharts option={options} style={{ height: '100%', minHeight: 0 }} notMerge lazyUpdate />
     </div>
   );
 };

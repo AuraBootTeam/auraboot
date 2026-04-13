@@ -24,7 +24,6 @@
 import { test, expect } from '../../fixtures';
 import type { Page } from '../../fixtures';
 
-
 // Slot IDs matching the SLOT_IDS constant in web-admin/app/plugins/types.ts
 const SLOT_IDS = {
   PAGE_HEADER_ACTIONS: 'page:header:actions',
@@ -86,9 +85,7 @@ async function findPluginWithSlots(page: Page): Promise<boolean> {
     if (!Array.isArray(plugins)) return false;
 
     // Look for any plugin that has frontend config with slots
-    return plugins.some(
-      (p: any) => p.hasFrontend || p.manifest?.clientConfig?.slots?.length > 0
-    );
+    return plugins.some((p: any) => p.hasFrontend || p.manifest?.clientConfig?.slots?.length > 0);
   } catch {
     return false;
   }
@@ -141,7 +138,10 @@ test.describe('PluginSlot System', () => {
     await page.waitForLoadState('domcontentloaded');
 
     const slotContainer = page.locator(`[data-slot-id="${SLOT_IDS.TABLE_ROW_ACTIONS}"]`);
-    const hasSlot = await slotContainer.first().isVisible({ timeout: 5000 }).catch(() => false);
+    const hasSlot = await slotContainer
+      .first()
+      .isVisible({ timeout: 5000 })
+      .catch(() => false);
 
     if (!hasSlot) {
       // No slot contributions — verify the table still renders correctly
@@ -435,7 +435,7 @@ test.describe('PluginSlot - Structural Verification', () => {
     const response = await page.request.get(`/api/plugins`);
 
     if (!response.ok()) {
-      throw new Error(String('Plugins API not available'))
+      throw new Error(String('Plugins API not available'));
       return;
     }
 

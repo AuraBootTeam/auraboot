@@ -69,8 +69,15 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [totalCount, setTotalCount] = useState(0);
-  const [diagnostics, setDiagnostics] = useState({ totalRecords: 0, validRecords: 0, missingDate: 0, invalidDate: 0 });
-  const [issueRecords, setIssueRecords] = useState<Array<{ recordId: string; title: string; reason: string; details: Record<string, unknown> }>>([]);
+  const [diagnostics, setDiagnostics] = useState({
+    totalRecords: 0,
+    validRecords: 0,
+    missingDate: 0,
+    invalidDate: 0,
+  });
+  const [issueRecords, setIssueRecords] = useState<
+    Array<{ recordId: string; title: string; reason: string; details: Record<string, unknown> }>
+  >([]);
   const abortRef = useRef<AbortController | null>(null);
 
   const dateField = viewConfig?.calendarDateField;
@@ -133,7 +140,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
       // Diagnostics tracking
       const issues: typeof issueRecords = [];
-      let missingDate = 0, invalidDate = 0, valid = 0;
+      let missingDate = 0,
+        invalidDate = 0,
+        valid = 0;
 
       const calendarEvents: CalendarEvent[] = [];
       for (const record of result.records) {
@@ -143,12 +152,24 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
         if (!dateVal) {
           missingDate++;
-          if (issues.length < 10) issues.push({ recordId: recordPid, title: titleVal, reason: 'missing_date', details: { dateField, dateValue: dateVal } });
+          if (issues.length < 10)
+            issues.push({
+              recordId: recordPid,
+              title: titleVal,
+              reason: 'missing_date',
+              details: { dateField, dateValue: dateVal },
+            });
           continue;
         }
         if (isNaN(new Date(String(dateVal)).getTime())) {
           invalidDate++;
-          if (issues.length < 10) issues.push({ recordId: recordPid, title: titleVal, reason: 'invalid_date', details: { dateField, dateValue: dateVal } });
+          if (issues.length < 10)
+            issues.push({
+              recordId: recordPid,
+              title: titleVal,
+              reason: 'invalid_date',
+              details: { dateField, dateValue: dateVal },
+            });
           continue;
         }
 
@@ -168,7 +189,12 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         });
       }
 
-      setDiagnostics({ totalRecords: result.records.length, validRecords: valid, missingDate, invalidDate });
+      setDiagnostics({
+        totalRecords: result.records.length,
+        validRecords: valid,
+        missingDate,
+        invalidDate,
+      });
       setIssueRecords(issues);
       setEvents(calendarEvents);
     } catch (err) {

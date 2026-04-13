@@ -5,56 +5,6 @@ import { ResultHelper } from '~/utils/type';
 import { useI18n } from '~/contexts/I18nContext';
 
 // ============================================================================
-// Enterprise availability check
-// GET /api/agent/status returns { enterpriseAvailable: boolean }
-// Community edition: AgentExecutionService.isAvailable() returns false (default)
-// Enterprise edition: overrides with true
-// ============================================================================
-
-function useEnterpriseAvailable(): { loading: boolean; available: boolean } {
-  const [loading, setLoading] = useState(true);
-  const [available, setAvailable] = useState(false);
-
-  useEffect(() => {
-    get<{ enterpriseAvailable?: boolean }>('/api/agent/status')
-      .then((res) => {
-        if (ResultHelper.isSuccess(res)) {
-          setAvailable(res.data?.enterpriseAvailable === true);
-        }
-      })
-      .catch(() => {
-        /* unavailable on error */
-      })
-      .finally(() => setLoading(false));
-  }, []);
-
-  return { loading, available };
-}
-
-function EnterpriseUpsell({ l }: { l: (zh: string, en: string) => string }) {
-  return (
-    <div
-      className="flex h-full min-h-[400px] flex-col items-center justify-center p-8 text-center"
-      data-testid="enterprise-upsell"
-    >
-      <div className="mb-4 text-5xl">🚀</div>
-      <h2 className="mb-2 text-xl font-bold text-gray-900 dark:text-white">
-        {l('AuraBot Dashboard 需要企业版', 'AuraBot Dashboard requires Enterprise Edition')}
-      </h2>
-      <p className="mb-6 max-w-md text-sm text-gray-500 dark:text-gray-400">
-        {l(
-          'Agent 自动化执行、Mission Control 驾驶舱、任务编排等功能属于企业版模块。当前实例运行社区版，未加载企业 AI 模块。',
-          'Agent automation execution, Mission Control dashboard, and task orchestration are enterprise features. This instance is running community edition without the enterprise AI module.',
-        )}
-      </p>
-      <div className="flex items-center gap-2 rounded-lg bg-gray-100 px-4 py-2 font-mono text-xs text-gray-400 dark:bg-gray-800 dark:text-gray-500">
-        GET /api/agent/status → enterpriseAvailable: false
-      </div>
-    </div>
-  );
-}
-
-// ============================================================================
 // Types
 // ============================================================================
 
@@ -203,7 +153,6 @@ export default function MissionControl() {
   const { locale } = useI18n();
   const l = useCallback((zh: string, en: string) => (locale === 'zh-CN' ? zh : en), [locale]);
   const navigate = useNavigate();
-  const { loading: enterpriseLoading, available: enterpriseAvailable } = useEnterpriseAvailable();
 
   const [activeTab, setActiveTab] = useState<MCTab>('dashboard');
   const sseKey = useAgentSse();
@@ -214,16 +163,6 @@ export default function MissionControl() {
     { key: 'analytics', label: { zh: '分析', en: 'Analytics' }, icon: '📈' },
     { key: 'observations', label: { zh: '事件日志', en: 'Events' }, icon: '📡' },
   ];
-
-  // Show spinner while checking enterprise availability, then fallback if community edition
-  if (enterpriseLoading) return <Spinner />;
-  if (!enterpriseAvailable) {
-    return (
-      <div className="flex h-full flex-col" data-testid="mission-control">
-        <EnterpriseUpsell l={l} />
-      </div>
-    );
-  }
 
   return (
     <div className="flex h-full flex-col" data-testid="mission-control">
@@ -238,14 +177,14 @@ export default function MissionControl() {
         </div>
         <div className="flex items-center gap-3">
           <button
-            onClick={() => navigate('/dynamic/mission')}
+            onClick={() => navigate('/p/mission')}
             className="rounded-md bg-blue-50 px-3 py-1.5 text-sm text-blue-600 transition-colors hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50"
             data-testid="mc-view-missions"
           >
             {l('查看使命', 'View Missions')}
           </button>
           <button
-            onClick={() => navigate('/dynamic/agent-task')}
+            onClick={() => navigate('/p/agent-task')}
             className="rounded-md bg-gray-100 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
             data-testid="mc-view-all-tasks"
           >
@@ -386,13 +325,13 @@ function DashboardView({
           label={l('活跃使命', 'Active Missions')}
           value={String(kpi?.active_missions ?? 0)}
           color="blue"
-          onClick={() => navigate('/dynamic/mission')}
+          onClick={() => navigate('/p/mission')}
         />
         <KpiCard
           label={l('活跃任务', 'Active Tasks')}
           value={String(kpi?.active_tasks ?? 0)}
           color="indigo"
-          onClick={() => navigate('/dynamic/agent-task')}
+          onClick={() => navigate('/p/agent-task')}
         />
         <KpiCard
           label={l('运行中', 'Running Now')}
@@ -403,13 +342,13 @@ function DashboardView({
           label={l('待审批', 'Pending Approvals')}
           value={String(kpi?.pending_approvals ?? 0)}
           color={kpi?.pending_approvals ? 'amber' : 'green'}
-          onClick={() => navigate('/dynamic/agent-approval')}
+          onClick={() => navigate('/p/agent-approval')}
         />
         <KpiCard
           label={l('活跃 Agent', 'Active Agents')}
           value={String(kpi?.active_agents ?? 0)}
           color="emerald"
-          onClick={() => navigate('/dynamic/agent-definition')}
+          onClick={() => navigate('/p/agent-definition')}
         />
         <KpiCard
           label={l('本月成本', 'Month Cost')}
@@ -430,7 +369,7 @@ function DashboardView({
             </h3>
             <button
               className="text-xs text-blue-600 hover:underline dark:text-blue-400"
-              onClick={() => navigate('/dynamic/agent-definition')}
+              onClick={() => navigate('/p/agent-definition')}
               data-testid="mc-view-all-agents"
             >
               {l('查看全部 Agent', 'View All Agents')} &rarr;
@@ -441,7 +380,7 @@ function DashboardView({
               <div
                 key={agent.pid}
                 className="flex cursor-pointer items-center gap-3 rounded-lg border border-gray-200 p-3 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700/30"
-                onClick={() => navigate(`/dynamic/agent-definition/view/${agent.pid}`)}
+                onClick={() => navigate(`/p/agent-definition/view/${agent.pid}`)}
                 data-testid={`mc-agent-kpi-${agent.agent_code}`}
               >
                 <span className="text-xl">🤖</span>
@@ -537,7 +476,7 @@ function DashboardView({
           icon="📋"
           title={l('任务', 'Tasks')}
           desc={l('查看和管理 Agent 任务', 'View and manage agent tasks')}
-          onClick={() => navigate('/dynamic/agent-task')}
+          onClick={() => navigate('/p/agent-task')}
         />
         <QuickLink
           icon="▶️"
@@ -555,13 +494,13 @@ function DashboardView({
           icon="🛡️"
           title={l('审批', 'Approvals')}
           desc={l('处理 Agent 审批请求', 'Handle agent approval requests')}
-          onClick={() => navigate('/dynamic/agent-approval')}
+          onClick={() => navigate('/p/agent-approval')}
         />
         <QuickLink
           icon="🧠"
           title={l('记忆库', 'Memory')}
           desc={l('浏览 Agent 记忆数据', 'Browse agent memory data')}
-          onClick={() => navigate('/dynamic/agent-memory')}
+          onClick={() => navigate('/p/agent-memory')}
         />
       </div>
 
@@ -571,25 +510,25 @@ function DashboardView({
           icon="🤖"
           title={l('Agent 定义', 'Agent Definitions')}
           desc={l('管理 Agent 配置', 'Manage agent configs')}
-          onClick={() => navigate('/dynamic/agent-definition')}
+          onClick={() => navigate('/p/agent-definition')}
         />
         <QuickLink
           icon="📅"
           title={l('调度', 'Schedules')}
           desc={l('定时任务配置', 'Scheduled tasks')}
-          onClick={() => navigate('/dynamic/agent-schedule')}
+          onClick={() => navigate('/p/agent-schedule')}
         />
         <QuickLink
           icon="📦"
           title={l('产出物', 'Artifacts')}
           desc={l('Agent 生成内容', 'Agent outputs')}
-          onClick={() => navigate('/dynamic/agent-artifact')}
+          onClick={() => navigate('/p/agent-artifact')}
         />
         <QuickLink
           icon="🛡️"
           title={l('审批策略', 'Policies')}
           desc={l('审批规则配置', 'Approval rules')}
-          onClick={() => navigate('/dynamic/approval-policy')}
+          onClick={() => navigate('/p/approval-policy')}
         />
       </div>
 

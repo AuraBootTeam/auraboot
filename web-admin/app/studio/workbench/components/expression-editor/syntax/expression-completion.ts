@@ -8,6 +8,7 @@ import type { Monaco } from '@monaco-editor/react';
 import type { languages, IRange } from 'monaco-editor';
 import { EXPRESSION_LANGUAGE_ID, BUILTIN_FUNCTIONS } from './expression-language';
 import type { ExpressionContext, FieldMeta } from '../types';
+import { DOLLAR_VARIABLES } from '~/shared/designer/expression/context-variables';
 
 // Store for completion provider disposal
 let completionProviderDisposable: { dispose: () => void } | null = null;
@@ -25,7 +26,7 @@ export function registerExpressionCompletion(monaco: Monaco, context?: Expressio
   completionProviderDisposable = monaco.languages.registerCompletionItemProvider(
     EXPRESSION_LANGUAGE_ID,
     {
-      triggerCharacters: ['.', '(', '{', ' '],
+      triggerCharacters: ['.', '(', '{', ' ', '$'],
 
       provideCompletionItems: (model: any, position: any) => {
         const word = model.getWordUntilPosition(position);
@@ -61,6 +62,75 @@ export function registerExpressionCompletion(monaco: Monaco, context?: Expressio
         }
 
         const suggestions: languages.CompletionItem[] = [];
+
+        // Check for $variable. property access (e.g., $user.)
+        const dollarPropMatch = beforeCursor.match(/\$(\w+)\.\s*$/);
+        if (dollarPropMatch) {
+          const varName = dollarPropMatch[1]; // e.g. 'user', 'form'
+          const dollarVar = DOLLAR_VARIABLES.find((v) => v.name === `$${varName}`);
+          if (dollarVar) {
+            // Static children from DOLLAR_VARIABLES definition
+            dollarVar.children.forEach((child) => {
+              suggestions.push({
+                label: {
+                  label: child.name,
+                  detail: ` ${child.type}`,
+                },
+                kind: monaco.languages.CompletionItemKind.Property,
+                insertText: child.name,
+                documentation: {
+                  value: `**${child.name}**\n\nType: \`${child.type}\`\n\n${child.description}`,
+                },
+                detail: child.type,
+                range,
+              });
+            });
+
+            // Dynamic children for $form and $record — read from context
+            if (varName === 'form' && context?.form) {
+              Object.entries(context.form).forEach(([key, field]) => {
+                suggestions.push(createFieldSuggestion(monaco, key, field, range));
+              });
+            }
+            if (varName === 'record' && context?.form) {
+              // $record fields share the same model fields as $form
+              Object.entries(context.form).forEach(([key, field]) => {
+                suggestions.push(createFieldSuggestion(monaco, key, field, range));
+              });
+            }
+          }
+          return { suggestions };
+        }
+
+        // Check for $ trigger — show top-level $ variables
+        const dollarMatch = beforeCursor.match(/\$\w*$/);
+        if (dollarMatch) {
+          const dollarRange = {
+            startLineNumber: position.lineNumber,
+            endLineNumber: position.lineNumber,
+            startColumn: position.column - dollarMatch[0].length,
+            endColumn: position.column,
+          };
+
+          DOLLAR_VARIABLES.forEach((v) => {
+            suggestions.push({
+              label: {
+                label: v.name,
+                detail: ` ${v.type}`,
+                description: v.description,
+              },
+              kind: monaco.languages.CompletionItemKind.Variable,
+              insertText: v.name,
+              documentation: {
+                value: `**${v.name}**\n\n${v.description}\n\nType: \`${v.type}\``,
+              },
+              detail: v.description,
+              range: dollarRange,
+            });
+          });
+
+          return { suggestions };
+        }
 
         // Check for property access (e.g., form.)
         const propertyMatch = beforeCursor.match(/(\w+)\.\s*$/);

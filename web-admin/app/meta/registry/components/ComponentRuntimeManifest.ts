@@ -117,4 +117,7 @@ export const COMPONENT_RUNTIME_MANIFEST: Record<string, ComponentRuntimeConfig> 
   fileattachment: runtime('display', 'FileAttachmentField', {
     aliases: ['FileAttachmentField', 'fileattachment', 'file_attachment', 'attachment'],
   }),
+  addressfield: runtime('picker', 'AddressField', {
+    aliases: ['AddressField', 'address_field', 'address'],
+  }),
 };

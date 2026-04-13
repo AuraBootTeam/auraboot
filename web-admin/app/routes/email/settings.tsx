@@ -39,7 +39,9 @@ function statusBadge(status: string) {
     error: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
   };
   return (
-    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${styles[status] || styles.disconnected}`}>
+    <span
+      className={`rounded-full px-2 py-0.5 text-xs font-medium ${styles[status] || styles.disconnected}`}
+    >
       {status}
     </span>
   );
@@ -47,11 +49,13 @@ function statusBadge(status: string) {
 
 function syncModeBadge(mode: string) {
   return (
-    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-      mode === 'full'
-        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-        : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-    }`}>
+    <span
+      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+        mode === 'full'
+          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+          : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+      }`}
+    >
       {mode === 'full' ? 'Full sync' : 'Metadata only'}
     </span>
   );
@@ -101,9 +105,7 @@ function MembersPanel({ account, onClose }: MembersPanelProps) {
   return (
     <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/50">
       <div className="mb-3 flex items-center justify-between">
-        <h4 className="text-sm font-medium text-gray-900 dark:text-white">
-          Shared Members
-        </h4>
+        <h4 className="text-sm font-medium text-gray-900 dark:text-white">Shared Members</h4>
         <button
           onClick={onClose}
           className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
@@ -120,12 +122,17 @@ function MembersPanel({ account, onClose }: MembersPanelProps) {
       ) : (
         <ul className="space-y-2">
           {members.map((m) => (
-            <li key={m.id} className="flex items-center justify-between rounded-md bg-white px-3 py-2 dark:bg-gray-800">
+            <li
+              key={m.id}
+              className="flex items-center justify-between rounded-md bg-white px-3 py-2 dark:bg-gray-800"
+            >
               <div>
                 <p className="text-sm font-medium text-gray-900 dark:text-white">
                   {m.userDisplayName || `User #${m.userId}`}
                 </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">{m.userEmail} · {m.role}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {m.userEmail} · {m.role}
+                </p>
               </div>
               {m.role !== 'owner' && (
                 <button
@@ -197,9 +204,7 @@ export default function EmailSettingsPage() {
     try {
       await disconnectAccount(accountId);
       setAccounts((prev) =>
-        prev.map((a) =>
-          a.id === accountId ? { ...a, status: 'disconnected' } : a,
-        ),
+        prev.map((a) => (a.id === accountId ? { ...a, status: 'disconnected' } : a)),
       );
       showSuccessToast('Account disconnected');
       setDisconnectConfirm(null);
@@ -227,9 +232,7 @@ export default function EmailSettingsPage() {
         <div className="flex items-center gap-3">
           <Cog6ToothIcon className="h-7 w-7 text-gray-700 dark:text-gray-300" />
           <div>
-            <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
-              Email Settings
-            </h1>
+            <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Email Settings</h1>
             <p className="text-sm text-gray-500 dark:text-gray-400">
               Manage connected Gmail accounts
             </p>
@@ -319,9 +322,7 @@ export default function EmailSettingsPage() {
                   {account.accountType === 'shared' && (
                     <button
                       onClick={() =>
-                        setExpandedMembers(
-                          expandedMembers === account.id ? null : account.id,
-                        )
+                        setExpandedMembers(expandedMembers === account.id ? null : account.id)
                       }
                       title="Manage members"
                       className="rounded-lg border border-gray-200 p-1.5 text-gray-500 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700"
@@ -372,10 +373,7 @@ export default function EmailSettingsPage() {
 
               {/* Members panel */}
               {expandedMembers === account.id && (
-                <MembersPanel
-                  account={account}
-                  onClose={() => setExpandedMembers(null)}
-                />
+                <MembersPanel account={account} onClose={() => setExpandedMembers(null)} />
               )}
             </div>
           ))}

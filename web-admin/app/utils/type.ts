@@ -31,8 +31,8 @@ export const ERROR_CODES = {
  * Provides type-safe response code checking without magic strings.
  */
 export class ResultHelper {
-  static isSuccess<T>(result: { code: string }): boolean {
-    return result.code === ErrorCodes.SUCCESS;
+  static isSuccess<T>(result: { code: string | number }): boolean {
+    return String(result.code) === ErrorCodes.SUCCESS;
   }
 
   static isValidationError<T>(result: { code: string }): boolean {
@@ -85,7 +85,8 @@ export class ResultHelper {
 export type User = {
   id: string;
   pid?: string;
-  tenantId?: number;
+  tenantId?: number | string;
+  tenantName?: string;
   email: string;
   jwt?: string;
   username?: string;
@@ -95,6 +96,13 @@ export type User = {
   exp?: number; // JWT过期时间
   iat?: number; // JWT签发时间
 };
+
+export interface Preferences {
+  timezone: string;
+  dateFormat: string;
+  datetimeFormat: string;
+  timeFormat: string;
+}
 
 export interface Permission {
   id: number;

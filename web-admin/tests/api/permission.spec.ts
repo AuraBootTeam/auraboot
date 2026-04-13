@@ -12,7 +12,6 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Permission Control API', () => {
-
   test('E4-E02: Menu filtered by permission (API verification)', async ({ request }) => {
     const allMenusResponse = await request.get(`/api/menu/all`);
 
@@ -93,8 +92,8 @@ test.describe('Permission Control API', () => {
   test('E-N01: Access protected API without auth returns 401/403', async ({ request }) => {
     const unauthResponse = await request.fetch(`/api/permissions`, {
       headers: {
-        'Authorization': 'Bearer invalid-token-for-e2e-test',
-        'Cookie': '',
+        Authorization: 'Bearer invalid-token-for-e2e-test',
+        Cookie: '',
       },
     });
 
@@ -103,8 +102,8 @@ test.describe('Permission Control API', () => {
 
     const adminResponse = await request.fetch(`/api/roles/all`, {
       headers: {
-        'Authorization': 'Bearer invalid-token-for-e2e-test',
-        'Cookie': '',
+        Authorization: 'Bearer invalid-token-for-e2e-test',
+        Cookie: '',
       },
     });
 
@@ -123,7 +122,7 @@ test.describe('Permission Control API', () => {
     expect(Array.isArray(menus)).toBe(true);
 
     const checkResponse = await request.get(
-      `/api/menu/permission/check?permissionCode=system:user:read`
+      `/api/menu/permission/check?permissionCode=system:user:read`,
     );
 
     if (checkResponse.ok()) {

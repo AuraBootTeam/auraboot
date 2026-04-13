@@ -4,7 +4,15 @@
  */
 
 export type ModelType = 'entity' | 'view' | 'aggregate';
-export type FieldDataType = 'string' | 'integer' | 'decimal' | 'date' | 'datetime' | 'json' | 'reference' | 'boolean';
+export type FieldDataType =
+  | 'string'
+  | 'integer'
+  | 'decimal'
+  | 'date'
+  | 'datetime'
+  | 'json'
+  | 'reference'
+  | 'boolean';
 export type DictType = 'simple' | 'tree';
 export type VirtualType = 'computed_readonly' | 'materialized' | 'transient';
 
@@ -51,7 +59,7 @@ export function createModelData(overrides: Partial<ModelTestData> = {}): ModelTe
     description: 'E2E test model',
     namespace: 'default',
     env: 'dev',
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -82,7 +90,7 @@ export interface FieldTestData {
  */
 export function createFieldData(
   dataType: FieldDataType = 'string',
-  overrides: Partial<FieldTestData> = {}
+  overrides: Partial<FieldTestData> = {},
 ): FieldTestData {
   const code = generateCode('field');
   return {
@@ -91,14 +99,14 @@ export function createFieldData(
     feature: {
       required: false,
       unique: false,
-      ...overrides.feature
+      ...overrides.feature,
     },
     uiSchema: {
       label: `Test Field ${code}`,
       placeholder: `Enter ${dataType.toLowerCase()} value`,
-      ...overrides.uiSchema
+      ...overrides.uiSchema,
     },
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -119,7 +127,7 @@ export interface VirtualFieldTestData extends FieldTestData {
  */
 export function createVirtualFieldData(
   virtualType: VirtualType,
-  overrides: Partial<VirtualFieldTestData> = {}
+  overrides: Partial<VirtualFieldTestData> = {},
 ): VirtualFieldTestData {
   const code = generateCode('vfield');
   return {
@@ -127,20 +135,20 @@ export function createVirtualFieldData(
     dataType: 'string',
     feature: {
       required: false,
-      unique: false
+      unique: false,
     },
     extension: {
       virtualType,
       expression: overrides.extension?.expression || '#value',
       dependsOn: overrides.extension?.dependsOn || [],
       materialized: virtualType === 'materialized',
-      ...overrides.extension
+      ...overrides.extension,
     },
     uiSchema: {
       label: `Virtual Field ${code}`,
-      ...overrides.uiSchema
+      ...overrides.uiSchema,
     },
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -151,7 +159,7 @@ export interface DictTestData {
   code: string;
   name: string;
   dictType: DictType;
-  sourceType: string;  // Required: STATIC, API, SQL, etc.
+  sourceType: string; // Required: STATIC, API, SQL, etc.
   description?: string;
   items: DictItemData[];
 }
@@ -173,29 +181,30 @@ export interface DictItemData {
  */
 export function createDictData(
   dictType: DictType = 'simple',
-  overrides: Partial<DictTestData> = {}
+  overrides: Partial<DictTestData> = {},
 ): DictTestData {
   const code = generateCode('dict');
-  const defaultItems: DictItemData[] = dictType === 'tree'
-    ? [
-        { value: 'root', label: 'Root', sortOrder: 1 },
-        { value: 'child1', label: 'Child 1', parentValue: 'root', sortOrder: 2 },
-        { value: 'child2', label: 'Child 2', parentValue: 'root', sortOrder: 3 }
-      ]
-    : [
-        { value: 'option1', label: 'Option 1', sortOrder: 1 },
-        { value: 'option2', label: 'Option 2', sortOrder: 2 },
-        { value: 'option3', label: 'Option 3', sortOrder: 3 }
-      ];
+  const defaultItems: DictItemData[] =
+    dictType === 'tree'
+      ? [
+          { value: 'root', label: 'Root', sortOrder: 1 },
+          { value: 'child1', label: 'Child 1', parentValue: 'root', sortOrder: 2 },
+          { value: 'child2', label: 'Child 2', parentValue: 'root', sortOrder: 3 },
+        ]
+      : [
+          { value: 'option1', label: 'Option 1', sortOrder: 1 },
+          { value: 'option2', label: 'Option 2', sortOrder: 2 },
+          { value: 'option3', label: 'Option 3', sortOrder: 3 },
+        ];
 
   return {
     code,
     name: `Test Dictionary ${code}`,
     dictType,
-    sourceType: 'static',  // Required field - default to STATIC for manual items
+    sourceType: 'static', // Required field - default to STATIC for manual items
     description: 'E2E test dictionary',
     items: overrides.items || defaultItems,
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -218,7 +227,7 @@ export interface FieldBindingTestData {
  */
 export function createFieldBindingData(
   fieldPid: string,
-  overrides: Partial<FieldBindingTestData> = {}
+  overrides: Partial<FieldBindingTestData> = {},
 ): FieldBindingTestData {
   return {
     fieldPid,
@@ -226,7 +235,7 @@ export function createFieldBindingData(
     readonly: false,
     visible: true,
     displayOrder: 0,
-    ...overrides
+    ...overrides,
   };
 }
 

@@ -47,7 +47,11 @@ export class DashboardDesignerPage extends BasePage {
   }
 
   get heading(): Locator {
-    return this.page.locator('[data-testid="designer-toolbar"] h1, [data-testid="designer-toolbar"] [role="heading"]').first();
+    return this.page
+      .locator(
+        '[data-testid="designer-toolbar"] h1, [data-testid="designer-toolbar"] [role="heading"]',
+      )
+      .first();
   }
 
   // --- Toolbar ---
@@ -108,10 +112,13 @@ export class DashboardDesignerPage extends BasePage {
   }
 
   async save(): Promise<void> {
-    const saveResponsePromise = this.page.waitForResponse(
-      (resp) => resp.url().includes('/dashboards') && resp.request().method().toLowerCase() === 'post',
-      { timeout: 10000 }
-    ).catch(() => null);
+    const saveResponsePromise = this.page
+      .waitForResponse(
+        (resp) =>
+          resp.url().includes('/dashboards') && resp.request().method().toLowerCase() === 'post',
+        { timeout: 10000 },
+      )
+      .catch(() => null);
     const canClickSave = await this.saveButton.isEnabled().catch(() => false);
     if (canClickSave) {
       await this.saveButton.click();
@@ -123,11 +130,14 @@ export class DashboardDesignerPage extends BasePage {
 
   async waitUntilSaved(): Promise<void> {
     await expect
-      .poll(async () => {
-        const disabled = await this.saveButton.isDisabled().catch(() => false);
-        const label = (await this.saveButton.textContent().catch(() => ''))?.trim() || '';
-        return disabled && /save|保存/i.test(label);
-      }, { timeout: 10000 })
+      .poll(
+        async () => {
+          const disabled = await this.saveButton.isDisabled().catch(() => false);
+          const label = (await this.saveButton.textContent().catch(() => ''))?.trim() || '';
+          return disabled && /save|保存/i.test(label);
+        },
+        { timeout: 10000 },
+      )
       .toBe(true);
   }
 
@@ -174,11 +184,14 @@ export class DashboardDesignerPage extends BasePage {
         await item.dispatchEvent('click').catch(() => {});
       }
       const added = await expect
-        .poll(async () => {
-          const hasHeading = await widgetHeading.isVisible({ timeout: 500 }).catch(() => false);
-          const nowCount = await this.widgets.count();
-          return hasHeading || nowCount > beforeCount;
-        }, { timeout: 6000 })
+        .poll(
+          async () => {
+            const hasHeading = await widgetHeading.isVisible({ timeout: 500 }).catch(() => false);
+            const nowCount = await this.widgets.count();
+            return hasHeading || nowCount > beforeCount;
+          },
+          { timeout: 6000 },
+        )
         .toBe(true)
         .then(() => true)
         .catch(() => false);
@@ -186,11 +199,14 @@ export class DashboardDesignerPage extends BasePage {
     }
 
     await expect
-      .poll(async () => {
-        const hasHeading = await widgetHeading.isVisible({ timeout: 500 }).catch(() => false);
-        const nowCount = await this.widgets.count();
-        return hasHeading || nowCount > beforeCount;
-      }, { timeout: 12000 })
+      .poll(
+        async () => {
+          const hasHeading = await widgetHeading.isVisible({ timeout: 500 }).catch(() => false);
+          const nowCount = await this.widgets.count();
+          return hasHeading || nowCount > beforeCount;
+        },
+        { timeout: 12000 },
+      )
       .toBe(true);
     // Wait for property panel sections to fully render after widget selection
     await this.page.waitForLoadState('domcontentloaded');
@@ -263,7 +279,10 @@ export class DashboardDesignerPage extends BasePage {
   // --- Settings Dialog ---
 
   get settingsDialogTitle(): Locator {
-    return this.page.locator('[role="dialog"] h2').filter({ hasText: /设置|Settings/i }).first();
+    return this.page
+      .locator('[role="dialog"] h2')
+      .filter({ hasText: /设置|Settings/i })
+      .first();
   }
 
   get settingsTitleInput(): Locator {
@@ -297,9 +316,11 @@ export class DashboardDesignerPage extends BasePage {
 
   async saveSettings(): Promise<void> {
     const dialog = this.page.locator('[role="dialog"][aria-modal="true"]').first();
-    const saveBtn = dialog.locator(
-      'button:has-text("保存"), button:has-text("Save"), button:has-text("确定"), button.bg-blue-600'
-    ).first();
+    const saveBtn = dialog
+      .locator(
+        'button:has-text("保存"), button:has-text("Save"), button:has-text("确定"), button.bg-blue-600',
+      )
+      .first();
     await expect(saveBtn).toBeVisible({ timeout: 5000 });
     await saveBtn.click();
     // Settings save is client-side only (no API call), wait for dialog to close

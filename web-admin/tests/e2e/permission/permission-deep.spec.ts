@@ -37,7 +37,9 @@ test.describe('Permission Depth — Menu Visibility', () => {
 
     await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
 
-    const sidebar = page.locator('nav, aside, [data-testid="sidebar"], [role="navigation"]').first();
+    const sidebar = page
+      .locator('nav, aside, [data-testid="sidebar"], [role="navigation"]')
+      .first();
     await expect(sidebar).toBeVisible({ timeout: 10000 });
 
     const menuLinks = sidebar.locator('a');
@@ -55,7 +57,7 @@ test.describe('Permission Depth — Menu Visibility', () => {
   test('PM-002: menu items have permission codes', async ({ page }) => {
     const menuResp = await page.request.get('/api/menu/all');
     if (!menuResp.ok()) {
-      throw new Error(String('All menus API not accessible'))
+      throw new Error(String('All menus API not accessible'));
       return;
     }
 
@@ -64,9 +66,7 @@ test.describe('Permission Depth — Menu Visibility', () => {
     expect(Array.isArray(allMenus)).toBe(true);
 
     // Collect menus with permissionCode
-    const menusWithPermCode = flattenMenus(allMenus).filter(
-      (m: any) => m.permissionCode
-    );
+    const menusWithPermCode = flattenMenus(allMenus).filter((m: any) => m.permissionCode);
 
     // Most menus should have permission codes
     expect(menusWithPermCode.length).toBeGreaterThan(0);
@@ -112,7 +112,9 @@ test.describe('Permission Depth — Menu Visibility', () => {
     // /meta/models are <Link> elements inside the collapsed submenu.
     // We check for either the parent button text OR any child link whose href
     // starts with /meta.
-    const metaButton = sidebar.locator('button', { hasText: /Meta Management|元数据管理|模型管理/i }).first();
+    const metaButton = sidebar
+      .locator('button', { hasText: /Meta Management|元数据管理|模型管理/i })
+      .first();
     const metaLink = sidebar.locator('a[href*="/meta"]').first();
 
     const hasMetaButton = await metaButton.isVisible({ timeout: 5000 }).catch(() => false);
@@ -148,7 +150,7 @@ test.describe('Permission Depth — URL Direct Access', () => {
     });
 
     baseTest('PM-007: dynamic page URL without auth redirects to login', async ({ page }) => {
-      await page.goto(`${BASE_URL}/dynamic/e2et-order`);
+      await page.goto(`${BASE_URL}/p/e2et-order`);
       await page.waitForLoadState('domcontentloaded');
 
       const loginForm = page.locator('input#email, input[type="email"]');
@@ -165,7 +167,7 @@ test.describe('Permission Depth — URL Direct Access', () => {
    * PM-008: Non-existent dynamic page URL shows 404
    */
   test('PM-008: non-existent dynamic page shows 404', async ({ page }) => {
-    await page.goto('/dynamic/nonexistent-model-xyz-12345', { waitUntil: 'domcontentloaded' });
+    await page.goto('/p/nonexistent_model_xyz_12345', { waitUntil: 'domcontentloaded' });
 
     // The dynamic page first shows a LoadingSpinner while fetching the schema,
     // then renders ErrorAlert on failure. ErrorAlert renders:
@@ -178,18 +180,23 @@ test.describe('Permission Depth — URL Direct Access', () => {
 
     // Now check the page content for any error indicator.
     // Use textContent() to debug what's actually on the page.
-    const bodyText = await page.locator('body').textContent({ timeout: 5000 }).catch(() => '') ?? '';
+    const bodyText =
+      (await page
+        .locator('body')
+        .textContent({ timeout: 5000 })
+        .catch(() => '')) ?? '';
 
-    const hasErrorText = bodyText.includes('加载失败')
-      || bodyText.includes('Page not found')
-      || bodyText.includes('Page Unavailable')
-      || bodyText.includes('404')
-      || bodyText.includes('Not Found')
-      || bodyText.includes('Failed to load');
+    const hasErrorText =
+      bodyText.includes('加载失败') ||
+      bodyText.includes('Page not found') ||
+      bodyText.includes('Page Unavailable') ||
+      bodyText.includes('404') ||
+      bodyText.includes('Not Found') ||
+      bodyText.includes('Failed to load');
 
     // Ensure no unhandled crash
-    const hasCrash = bodyText.includes('Something went wrong')
-      || bodyText.includes('Unhandled Runtime Error');
+    const hasCrash =
+      bodyText.includes('Something went wrong') || bodyText.includes('Unhandled Runtime Error');
     expect(hasCrash).toBe(false);
 
     expect(hasErrorText).toBe(true);
@@ -201,7 +208,7 @@ test.describe('Permission Depth — Toolbar & Row Action Filtering', () => {
    * PM-009: Admin sees toolbar buttons on dynamic list page
    */
   test('PM-009: admin sees toolbar buttons on dynamic list page @smoke', async ({ page }) => {
-    await navigateToDynamicPage(page, 'e2et-order');
+    await navigateToDynamicPage(page, 'e2et_order');
 
     // Admin should see toolbar buttons
     const toolbarBtns = page.locator('[data-testid^="toolbar-btn-"]');
@@ -227,19 +234,21 @@ test.describe('Permission Depth — Toolbar & Row Action Filtering', () => {
       },
     });
     if (!createResp.ok()) {
-      throw new Error(String('Could not create test order — e2et model may not be set up'))
+      throw new Error(String('Could not create test order — e2et model may not be set up'));
       return;
     }
     const createBody = await createResp.json();
     const recordId = extractRecordId(createBody);
 
     try {
-      await navigateToDynamicPage(page, 'e2et-order');
+      await navigateToDynamicPage(page, 'e2et_order');
 
       // Wait for at least one table row
       const firstRow = page.locator('tbody tr').first();
       await expect(firstRow).toBeVisible({ timeout: 8000 });
 
+      // Hover row to reveal action buttons (opacity-0 → opacity-100 via group-hover)
+      await firstRow.hover();
       // The "detail" action has no visibleWhen — it should always render.
       // Wait for any row action button to appear (async rendering).
       const actionBtn = firstRow.locator('[data-testid^="row-action-"]').first();
@@ -250,9 +259,11 @@ test.describe('Permission Depth — Toolbar & Row Action Filtering', () => {
     } finally {
       // Cleanup
       if (recordId) {
-        await page.request.post('/api/meta/commands/execute/e2et:delete_order', {
-          data: { targetRecordId: recordId, operationType: 'delete', payload: {} },
-        }).catch(() => {});
+        await page.request
+          .post('/api/meta/commands/execute/e2et:delete_order', {
+            data: { targetRecordId: recordId, operationType: 'delete', payload: {} },
+          })
+          .catch(() => {});
       }
     }
   });
@@ -276,29 +287,31 @@ test.describe('Permission Depth — Toolbar & Row Action Filtering', () => {
       },
     });
     if (!createResp.ok()) {
-      throw new Error(String('Could not create test order — e2et model may not be set up'))
+      throw new Error(String('Could not create test order — e2et model may not be set up'));
       return;
     }
     const createBody = await createResp.json();
     const recordId = extractRecordId(createBody);
 
     try {
-      await navigateToDynamicPage(page, 'e2et-order');
+      await navigateToDynamicPage(page, 'e2et_order');
 
       // Click on Draft tab
-      const draftTab = page.locator('nav[aria-label="Tabs"] button').filter({ hasText: /草稿|Draft/i }).first();
+      const draftTab = page
+        .locator('nav[aria-label="Tabs"] button')
+        .filter({ hasText: /草稿|Draft/i })
+        .first();
       const hasDraftTab = await draftTab.isVisible({ timeout: 5000 }).catch(() => false);
 
       if (!hasDraftTab) {
-        throw new Error(String('Draft tab not visible on e2et-order page'))
+        throw new Error(String('Draft tab not visible on e2et-order page'));
         return;
       }
 
       // Set up list response listener before clicking tab
-      const listResponsePromise = page.waitForResponse(
-        (r) => r.url().includes('/list') && r.status() === 200,
-        { timeout: 8000 }
-      ).catch(() => null);
+      const listResponsePromise = page
+        .waitForResponse((r) => r.url().includes('/list') && r.status() === 200, { timeout: 8000 })
+        .catch(() => null);
 
       await draftTab.click();
       await listResponsePromise;
@@ -307,6 +320,8 @@ test.describe('Permission Depth — Toolbar & Row Action Filtering', () => {
       const firstRow = page.locator('tbody tr').first();
       await expect(firstRow).toBeVisible({ timeout: 8000 });
 
+      // Hover row to reveal action buttons
+      await firstRow.hover();
       // Draft rows should have edit and/or delete buttons
       // (visibleWhen: "['draft','rejected'].includes(row.e2et_order_status)")
       const editBtn = firstRow.locator('[data-testid="row-action-edit"]');
@@ -321,9 +336,11 @@ test.describe('Permission Depth — Toolbar & Row Action Filtering', () => {
     } finally {
       // Cleanup
       if (recordId) {
-        await page.request.post('/api/meta/commands/execute/e2et:delete_order', {
-          data: { targetRecordId: recordId, operationType: 'delete', payload: {} },
-        }).catch(() => {});
+        await page.request
+          .post('/api/meta/commands/execute/e2et:delete_order', {
+            data: { targetRecordId: recordId, operationType: 'delete', payload: {} },
+          })
+          .catch(() => {});
       }
     }
   });
@@ -332,14 +349,14 @@ test.describe('Permission Depth — Toolbar & Row Action Filtering', () => {
    * PM-012: Toolbar export/import buttons visible for admin
    */
   test('PM-012: toolbar export/import buttons visible for admin', async ({ page }) => {
-    await navigateToDynamicPage(page, 'e2et-order');
+    await navigateToDynamicPage(page, 'e2et_order');
 
-    const exportBtn = page.locator(
-      'button:has-text("Export"), button:has-text("导出"), [data-testid*="export"]'
-    ).first();
-    const importBtn = page.locator(
-      'button:has-text("Import"), button:has-text("导入"), [data-testid*="import"]'
-    ).first();
+    const exportBtn = page
+      .locator('button:has-text("Export"), button:has-text("导出"), [data-testid*="export"]')
+      .first();
+    const importBtn = page
+      .locator('button:has-text("Import"), button:has-text("导入"), [data-testid*="import"]')
+      .first();
 
     const hasExport = await exportBtn.isVisible({ timeout: 5000 }).catch(() => false);
     const hasImport = await importBtn.isVisible({ timeout: 5000 }).catch(() => false);
@@ -357,7 +374,7 @@ test.describe('Permission Depth — DYNAMIC Permission & Model Publish', () => {
     const permResp = await page.request.get('/api/permissions/resource-type/MODEL');
 
     if (!permResp.ok()) {
-      throw new Error(String('Permission API not accessible'))
+      throw new Error(String('Permission API not accessible'));
       return;
     }
 
@@ -365,13 +382,13 @@ test.describe('Permission Depth — DYNAMIC Permission & Model Publish', () => {
     const permissions = permData.data || permData;
 
     if (!Array.isArray(permissions)) {
-      throw new Error(String('Permission API returns unexpected format'))
+      throw new Error(String('Permission API returns unexpected format'));
       return;
     }
 
     // Look for DYNAMIC permissions (created when model is published)
     const dynamicPerms = permissions.filter(
-      (p: any) => p.type === 'dynamic' || p.code?.startsWith('DYNAMIC.')
+      (p: any) => p.type === 'dynamic' || p.code?.startsWith('DYNAMIC.'),
     );
 
     // e2et models should have DYNAMIC permissions
@@ -385,10 +402,15 @@ test.describe('Permission Depth — DYNAMIC Permission & Model Publish', () => {
     // Verify admin can access the permission management page
     await page.goto('/system/permissions', { waitUntil: 'domcontentloaded' });
 
-    const hasContent = await page.locator('main, [class*="container"]')
-      .isVisible({ timeout: 8000 }).catch(() => false);
-    const has403 = await page.locator('text=403, text=Forbidden, text=权限不足')
-      .first().isVisible({ timeout: 2000 }).catch(() => false);
+    const hasContent = await page
+      .locator('main, [class*="container"]')
+      .isVisible({ timeout: 8000 })
+      .catch(() => false);
+    const has403 = await page
+      .locator('text=403, text=Forbidden, text=权限不足')
+      .first()
+      .isVisible({ timeout: 2000 })
+      .catch(() => false);
 
     // Admin should have access (content visible, no 403)
     expect(hasContent && !has403).toBe(true);
@@ -417,13 +439,15 @@ test.describe('Permission Depth — Command Permission Enforcement', () => {
     // Cleanup
     const recordId = extractRecordId(body);
     if (recordId) {
-      await page.request.post('/api/meta/commands/execute/e2et:delete_order', {
-        data: {
-          targetRecordId: recordId,
-          operationType: 'delete',
-          payload: {},
-        },
-      }).catch(() => {});
+      await page.request
+        .post('/api/meta/commands/execute/e2et:delete_order', {
+          data: {
+            targetRecordId: recordId,
+            operationType: 'delete',
+            payload: {},
+          },
+        })
+        .catch(() => {});
     }
   });
 
@@ -447,7 +471,7 @@ test.describe('Permission Depth — Command Permission Enforcement', () => {
 
     // Should fail because targetRecordId is required for DELETE commands
     const body = await resp.json();
-    const isError = !resp.ok() || (String(body.code) !== ErrorCodes.SUCCESS);
+    const isError = !resp.ok() || String(body.code) !== ErrorCodes.SUCCESS;
     expect(isError).toBe(true);
   });
 
@@ -455,9 +479,12 @@ test.describe('Permission Depth — Command Permission Enforcement', () => {
    * PM-017: Non-existent command code returns error
    */
   test('PM-017: non-existent command code returns error', async ({ page }) => {
-    const resp = await page.request.post('/api/meta/commands/execute/e2et:nonexistent_command_xyz', {
-      data: { payload: {} },
-    });
+    const resp = await page.request.post(
+      '/api/meta/commands/execute/e2et:nonexistent_command_xyz',
+      {
+        data: { payload: {} },
+      },
+    );
 
     expect(resp.ok()).toBe(false);
     expect(resp.status()).toBeGreaterThanOrEqual(400);
@@ -497,7 +524,7 @@ test.describe('Permission Depth — Permission Resource Types', () => {
     const rolesResp = await page.request.get('/api/roles/all');
 
     if (!rolesResp.ok()) {
-      throw new Error(String('Roles API not accessible'))
+      throw new Error(String('Roles API not accessible'));
       return;
     }
 
@@ -505,15 +532,19 @@ test.describe('Permission Depth — Permission Resource Types', () => {
     const roles = rolesData.data || rolesData;
 
     if (!Array.isArray(roles) || roles.length === 0) {
-      throw new Error(String('No roles found'))
+      throw new Error(String('No roles found'));
       return;
     }
 
     // At least one role should exist (admin)
     expect(roles.length).toBeGreaterThan(0);
 
-    const adminRole = roles.find((r: any) =>
-      r.code === 'tenant_admin' || r.code === 'admin' || r.name === 'Admin' || r.name?.includes('管理员')
+    const adminRole = roles.find(
+      (r: any) =>
+        r.code === 'tenant_admin' ||
+        r.code === 'admin' ||
+        r.name === 'Admin' ||
+        r.name?.includes('管理员'),
     );
 
     // Admin role should exist (code is TENANT_ADMIN per default-bootstrap.json)
@@ -540,7 +571,10 @@ test.describe('Permission Depth — Permission Resource Types', () => {
 
     // No crash indicator
     const crashIndicator = page.locator('text=Something went wrong, text=Unhandled Runtime Error');
-    const hasCrash = await crashIndicator.first().isVisible({ timeout: 1000 }).catch(() => false);
+    const hasCrash = await crashIndicator
+      .first()
+      .isVisible({ timeout: 1000 })
+      .catch(() => false);
     expect(hasCrash).toBe(false);
   });
 });

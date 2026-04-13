@@ -1,13 +1,10 @@
 module.exports = {
-  content: [
-    "./app/**/*.{js,ts,jsx,tsx}",
-    "./public/**/*.html",
-  ],
+  content: ['./app/**/*.{js,ts,jsx,tsx}', './public/**/*.html'],
   darkMode: 'class', // 关键配置！
   theme: {
     extend: {
       animation: {
-        'fadeIn': 'fadeIn 0.2s ease-in-out',
+        fadeIn: 'fadeIn 0.2s ease-in-out',
       },
       keyframes: {
         fadeIn: {
@@ -17,8 +14,5 @@ module.exports = {
       },
     },
   },
-  plugins: [
-    require('tailwindcss-animate'),
-    require('tailwind-scrollbar')({ nocompatible: true }),
-  ],
-}
+  plugins: [require('tailwindcss-animate'), require('tailwind-scrollbar')({ nocompatible: true })],
+};

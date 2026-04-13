@@ -10,11 +10,7 @@
  */
 
 import { test, expect } from '../../fixtures';
-import {
-  uniqueId,
-  todayStr,
-  executeCommandViaApi,
-} from '../helpers/index';
+import { uniqueId, todayStr, executeCommandViaApi } from '../helpers/index';
 
 test.describe('Finance Dashboard @smoke', () => {
   test.describe.configure({ mode: 'serial' });
@@ -67,14 +63,18 @@ test.describe('Finance Dashboard @smoke', () => {
     await expect(page).toHaveURL(/\/finance\/financial-dashboard/, { timeout: 10000 });
 
     await Promise.all([
-      page.waitForResponse(
-        (resp) => resp.url().includes('/api/datasource/list') && resp.status() === 200,
-        { timeout: 15000 },
-      ).catch(() => null),
-      page.waitForResponse(
-        (resp) => resp.url().includes('/api/meta/chart-data') && resp.status() === 200,
-        { timeout: 15000 },
-      ).catch(() => null),
+      page
+        .waitForResponse(
+          (resp) => resp.url().includes('/api/datasource/list') && resp.status() === 200,
+          { timeout: 15000 },
+        )
+        .catch(() => null),
+      page
+        .waitForResponse(
+          (resp) => resp.url().includes('/api/meta/chart-data') && resp.status() === 200,
+          { timeout: 15000 },
+        )
+        .catch(() => null),
     ]);
 
     await page.waitForTimeout(1000);

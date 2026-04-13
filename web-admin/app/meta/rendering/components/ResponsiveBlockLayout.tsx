@@ -59,7 +59,7 @@ export const ResponsiveBlockLayout: React.FC<ResponsiveBlockLayoutProps> = ({
   }, [isSm, isMd, responsive]);
 
   const shouldUseCardView = useMemo(() => {
-    if (blockType === 'data-table' || blockType === 'table') {
+    if (blockType === 'table') {
       if (isSm && responsive?.sm?.display === 'card') return true;
       if (isMd && responsive?.md?.display === 'card') return true;
     }

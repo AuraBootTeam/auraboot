@@ -20,7 +20,7 @@ export async function openPageDesigner(page: Page): Promise<boolean> {
   // Step 1: Get first available page ID via API
   try {
     const resp = await page.request.get(
-      `/api/pages?current=1&size=1&sortField=updatedAt&sortDirection=DESC`
+      `/api/pages?current=1&size=1&sortField=updatedAt&sortDirection=DESC`,
     );
     if (resp.ok()) {
       const body = await resp.json();
@@ -32,7 +32,12 @@ export async function openPageDesigner(page: Page): Promise<boolean> {
 
         // Wait for designer toolbar (Save button)
         const saveBtn = page.locator('button:has-text("Save"), button:has-text("保存")');
-        if (await saveBtn.first().isVisible({ timeout: 10000 }).catch(() => false)) {
+        if (
+          await saveBtn
+            .first()
+            .isVisible({ timeout: 10000 })
+            .catch(() => false)
+        ) {
           return true;
         }
       }
@@ -51,7 +56,10 @@ export async function openPageDesigner(page: Page): Promise<boolean> {
 
   // Also check for page cards as fallback
   const pageCards = page.locator('main h3');
-  const hasCards = await pageCards.first().isVisible({ timeout: 3000 }).catch(() => false);
+  const hasCards = await pageCards
+    .first()
+    .isVisible({ timeout: 3000 })
+    .catch(() => false);
 
   if (!hasPages && !hasCards) {
     return false;

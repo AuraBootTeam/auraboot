@@ -542,7 +542,7 @@ export function reportToHtml(
   const bodyHtml = report.body
     .map((block) => {
       switch (block.blockType) {
-        case 'data-table':
+        case 'table':
           return renderDataTable(block, dataSets[block.dataSource] || []);
         case 'grouped-table':
           return renderGroupedTable(block, dataSets[block.dataSource] || []);

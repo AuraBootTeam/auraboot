@@ -140,10 +140,13 @@ test.describe('Asset Permission API', () => {
   let importResult: ImportExecuteResult | null = null;
 
   test('Prerequisite: Import asset-permission plugin', async ({ request }) => {
-    const response = await request.post(`/api/plugins/import/execute-direct?conflictStrategy=OVERWRITE`, {
-      data: ASSET_PERM_PLUGIN,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    const response = await request.post(
+      `/api/plugins/import/execute-direct?conflictStrategy=OVERWRITE`,
+      {
+        data: ASSET_PERM_PLUGIN,
+        headers: { 'Content-Type': 'application/json' },
+      },
+    );
 
     expect(response.ok()).toBe(true);
     importResult = await response.json();
@@ -232,8 +235,9 @@ test.describe('Asset Permission API', () => {
       return;
     }
 
-    const adminRole = roles.find((r: any) =>
-      r.code === 'tenant_admin' || r.name?.includes('Admin') || r.name?.includes('管理员')
+    const adminRole = roles.find(
+      (r: any) =>
+        r.code === 'tenant_admin' || r.name?.includes('Admin') || r.name?.includes('管理员'),
     );
 
     if (adminRole) {

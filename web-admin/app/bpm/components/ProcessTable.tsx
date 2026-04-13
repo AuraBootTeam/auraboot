@@ -13,9 +13,11 @@ function StatusBadge({ status }: { status: string }) {
     running: { label: '进行中', className: 'bg-blue-100 text-blue-800' },
     completed: { label: '已完成', className: 'bg-gray-100 text-gray-800' },
     suspended: { label: '已暂停', className: 'bg-yellow-100 text-yellow-800' },
-    TERMINATED: { label: '已终止', className: 'bg-red-100 text-red-800' },
+    terminated: { label: '已终止', className: 'bg-red-100 text-red-800' },
+    aborted: { label: '已终止', className: 'bg-red-100 text-red-800' },
   };
-  const { label, className } = config[status] || {
+  const normalizedStatus = status?.toLowerCase() || 'unknown';
+  const { label, className } = config[normalizedStatus] || {
     label: status,
     className: 'bg-gray-100 text-gray-800',
   };
@@ -172,7 +174,7 @@ function ProcessRow({
                 恢复流程
               </button>
             )}
-            {process.status !== 'completed' && process.status !== 'terminated' && (
+            {process.status !== 'completed' && process.status !== 'terminated' && process.status !== 'aborted' && (
               <button
                 className="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-gray-100"
                 onClick={() => menuAction(() => onTerminate(process))}

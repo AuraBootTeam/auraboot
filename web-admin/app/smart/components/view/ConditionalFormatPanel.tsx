@@ -6,7 +6,11 @@
  */
 
 import React, { useCallback } from 'react';
-import type { ViewConfig, ConditionalFormatRule, ConditionalFormatStyle } from '~/smart/types/savedView';
+import type {
+  ViewConfig,
+  ConditionalFormatRule,
+  ConditionalFormatStyle,
+} from '~/smart/types/savedView';
 import { CONDITIONAL_FORMAT_PRESETS } from '~/smart/types/savedView';
 
 interface FieldOption {
@@ -55,7 +59,7 @@ export const ConditionalFormatPanel: React.FC<ConditionalFormatPanelProps> = ({
     (newRules: ConditionalFormatRule[]) => {
       onChange({ ...viewConfig, conditionalFormats: newRules });
     },
-    [viewConfig, onChange]
+    [viewConfig, onChange],
   );
 
   const handleAdd = useCallback(() => {
@@ -68,14 +72,14 @@ export const ConditionalFormatPanel: React.FC<ConditionalFormatPanelProps> = ({
     (index: number) => {
       updateRules(rules.filter((_, i) => i !== index));
     },
-    [rules, updateRules]
+    [rules, updateRules],
   );
 
   const handleUpdate = useCallback(
     (index: number, patch: Partial<ConditionalFormatRule>) => {
       updateRules(rules.map((r, i) => (i === index ? { ...r, ...patch } : r)));
     },
-    [rules, updateRules]
+    [rules, updateRules],
   );
 
   const handleStyleUpdate = useCallback(
@@ -83,14 +87,14 @@ export const ConditionalFormatPanel: React.FC<ConditionalFormatPanelProps> = ({
       const rule = rules[index];
       handleUpdate(index, { style: { ...rule.style, ...stylePatch } });
     },
-    [rules, handleUpdate]
+    [rules, handleUpdate],
   );
 
   const handlePresetSelect = useCallback(
     (index: number, preset: (typeof CONDITIONAL_FORMAT_PRESETS)[number]) => {
       handleStyleUpdate(index, { backgroundColor: preset.bg, textColor: preset.text });
     },
-    [handleStyleUpdate]
+    [handleStyleUpdate],
   );
 
   return (
@@ -98,7 +102,7 @@ export const ConditionalFormatPanel: React.FC<ConditionalFormatPanelProps> = ({
       {rules.map((rule, index) => (
         <div
           key={index}
-          className="rounded-lg border border-gray-200 bg-white p-3 space-y-2"
+          className="space-y-2 rounded-lg border border-gray-200 bg-white p-3"
           data-testid={`cf-rule-${index}`}
         >
           {/* Row 1: Field + Operator + Value + Remove */}
@@ -106,7 +110,7 @@ export const ConditionalFormatPanel: React.FC<ConditionalFormatPanelProps> = ({
             <select
               value={rule.fieldCode}
               onChange={(e) => handleUpdate(index, { fieldCode: e.target.value })}
-              className="flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
               data-testid={`cf-field-${index}`}
             >
               <option value="">Select field...</option>
@@ -120,9 +124,11 @@ export const ConditionalFormatPanel: React.FC<ConditionalFormatPanelProps> = ({
             <select
               value={rule.operator}
               onChange={(e) =>
-                handleUpdate(index, { operator: e.target.value as ConditionalFormatRule['operator'] })
+                handleUpdate(index, {
+                  operator: e.target.value as ConditionalFormatRule['operator'],
+                })
               }
-              className="w-28 rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-28 rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
               data-testid={`cf-operator-${index}`}
             >
               {OPERATORS.map((op) => (
@@ -138,7 +144,7 @@ export const ConditionalFormatPanel: React.FC<ConditionalFormatPanelProps> = ({
                 value={rule.value || ''}
                 onChange={(e) => handleUpdate(index, { value: e.target.value })}
                 placeholder="Value"
-                className="w-28 rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-28 rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 data-testid={`cf-value-${index}`}
               />
             )}
@@ -151,14 +157,19 @@ export const ConditionalFormatPanel: React.FC<ConditionalFormatPanelProps> = ({
               data-testid={`cf-remove-${index}`}
             >
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
 
           {/* Row 2: Color presets + Preview */}
           <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500 w-10 flex-shrink-0">Style:</span>
+            <span className="w-10 flex-shrink-0 text-xs text-gray-500">Style:</span>
             <div className="flex gap-1">
               {CONDITIONAL_FORMAT_PRESETS.map((preset) => (
                 <button
@@ -212,7 +223,7 @@ export const ConditionalFormatPanel: React.FC<ConditionalFormatPanelProps> = ({
       <button
         type="button"
         onClick={handleAdd}
-        className="w-full rounded-md border border-dashed border-gray-300 py-1.5 text-sm text-blue-600 hover:border-blue-400 hover:text-blue-700 transition-colors"
+        className="w-full rounded-md border border-dashed border-gray-300 py-1.5 text-sm text-blue-600 transition-colors hover:border-blue-400 hover:text-blue-700"
         data-testid="cf-add-rule"
       >
         + Add Formatting Rule

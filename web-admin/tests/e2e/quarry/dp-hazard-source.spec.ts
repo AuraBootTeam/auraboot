@@ -85,15 +85,23 @@ test.describe('DP Hazard Source — CRUD', () => {
     await expect(page.locator('table, [role="table"]').first()).toBeVisible({ timeout: 10000 });
 
     const row = await findRowInPaginatedList(page, createdHsName, 15000);
-    const detailBtn = row.locator('[data-testid="row-action-detail"], [data-testid="row-action-view"]').first();
+    const detailBtn = row
+      .locator('[data-testid="row-action-detail"], [data-testid="row-action-view"]')
+      .first();
+    await row.hover();
     const hasDetailBtn = await detailBtn.isVisible({ timeout: 3000 }).catch(() => false);
     if (hasDetailBtn) {
       await detailBtn.click();
     } else {
-      await row.click();
-      await page.waitForURL(/\/dynamic\/dp-hazard-source\/view\//, { timeout: 5000 }).catch(async () => {
-        await page.goto(`/dynamic/dp-hazard-source/view/${createdHsId}`, { waitUntil: 'domcontentloaded' });
-      });
+      // Use force:true to bypass actionability checks (overlays, animations)
+      await row.click({ force: true });
+      await page
+        .waitForURL(/\/p\/dp_hazard_source\/view\//, { timeout: 5000 })
+        .catch(async () => {
+          await page.goto(`/p/dp_hazard_source/view/${createdHsId}`, {
+            waitUntil: 'domcontentloaded',
+          });
+        });
     }
 
     // Wait for detail page to load
@@ -113,30 +121,38 @@ test.describe('DP Hazard Source — CRUD', () => {
 
     const row = await findRowInPaginatedList(page, createdHsName, 15000);
     await clickRowActionByLocator(page, row, 'edit');
-    await page.waitForURL((u) => u.pathname.includes('/edit'), { timeout: 2500 }).catch(async () => {
-      await page.goto(`/dynamic/dp-hazard-source/${createdHsId}/edit`, { waitUntil: 'domcontentloaded' });
-    });
+    await page
+      .waitForURL((u) => u.pathname.includes('/edit'), { timeout: 2500 })
+      .catch(async () => {
+        await page.goto(`/p/dp_hazard_source/${createdHsId}/edit`, {
+          waitUntil: 'domcontentloaded',
+        });
+      });
 
     // Wait for form to load
     await waitForFormReady(page);
 
     // Find name input and update
-    const nameInput = page.locator(
-      '[data-testid="form-field-dp_hs_name"] input, input[name="dp_hs_name"]'
-    ).first();
+    const nameInput = page
+      .locator('[data-testid="form-field-dp_hs_name"] input, input[name="dp_hs_name"]')
+      .first();
     await expect(nameInput).toBeVisible({ timeout: 10000 });
     await nameInput.clear();
     await nameInput.fill(updatedName);
 
     // Click save button
-    const saveBtn = page.locator(
-      '[data-testid="form-btn-dp:update_hazard_source"], [data-testid="form-btn-update_hazard_source"], [data-testid="form-btn-submit"], [data-testid="form-btn-save"], button:has-text("保存"), button:has-text("Save"), button:has-text("提交"), button:has-text("Submit")'
-    ).first();
+    const saveBtn = page
+      .locator(
+        '[data-testid="form-btn-dp:update_hazard_source"], [data-testid="form-btn-update_hazard_source"], [data-testid="form-btn-submit"], [data-testid="form-btn-save"], button:has-text("保存"), button:has-text("Save"), button:has-text("提交"), button:has-text("Submit")',
+      )
+      .first();
     await expect(saveBtn).toBeVisible({ timeout: 5000 });
 
     const updateResponsePromise = page.waitForResponse(
-      (r) => r.url().includes('/api/meta/commands/execute/dp:update_hazard_source') && r.request().method().toLowerCase() === 'post',
-      { timeout: 10000 }
+      (r) =>
+        r.url().includes('/api/meta/commands/execute/dp:update_hazard_source') &&
+        r.request().method().toLowerCase() === 'post',
+      { timeout: 10000 },
     );
 
     await saveBtn.click();
@@ -145,18 +161,25 @@ test.describe('DP Hazard Source — CRUD', () => {
     expect(String((body as any)?.code ?? '')).toBe('0');
 
     // Verify record remains accessible by id after submit.
-    await expect.poll(
-      async () => {
-        const getResp = await page.request.get(`/api/dynamic/dp-hazard-source/${createdHsId}`);
-        if (!getResp.ok()) return 'missing';
-        const body = await getResp.json().catch(() => ({}));
-        const data = body.data ?? body;
-        return String((data as any)?.pid ?? (data as any)?.id ?? '');
-      },
-      { timeout: 10000, intervals: [500, 1000] },
-    ).toBe(String(createdHsId));
+    await expect
+      .poll(
+        async () => {
+          const getResp = await page.request.get(`/api/dynamic/dp_hazard_source/${createdHsId}`);
+          if (!getResp.ok()) return 'missing';
+          const body = await getResp.json().catch(() => ({}));
+          const data = body.data ?? body;
+          return String((data as any)?.pid ?? (data as any)?.id ?? '');
+        },
+        { timeout: 10000, intervals: [500, 1000] },
+      )
+      .toBe(String(createdHsId));
 
-    const updatedRecords = await queryFilteredList(page, 'dp-hazard-source', 'dp_hs_name', updatedName);
+    const updatedRecords = await queryFilteredList(
+      page,
+      'dp-hazard-source',
+      'dp_hs_name',
+      updatedName,
+    );
     expect(updatedRecords.length).toBeGreaterThan(0);
     createdHsName = updatedName;
   });
@@ -174,20 +197,24 @@ test.describe('DP Hazard Source — CRUD', () => {
     await acceptConfirmDialog(page);
 
     // Wait for list refresh
-    await page.waitForResponse(
-      (r) => r.url().includes('/list') && r.status() === 200,
-      { timeout: 10000 }
-    ).catch(() => null);
+    await page
+      .waitForResponse((r) => r.url().includes('/list') && r.status() === 200, { timeout: 10000 })
+      .catch(() => null);
 
     // Verify deletion by id to avoid name-based false positives.
-    await expect.poll(async () => {
-      const resp = await page.request.get(`/api/dynamic/dp-hazard-source/${createdHsId}`);
-      if (!resp.ok()) return 'missing';
-      const body = await resp.json().catch(() => ({}));
-      const data = body.data ?? body;
-      const id = (data as any)?.pid ?? (data as any)?.id;
-      return id ? 'exists' : 'missing';
-    }, { timeout: 10000, intervals: [400, 800, 1200] }).toBe('missing');
+    await expect
+      .poll(
+        async () => {
+          const resp = await page.request.get(`/api/dynamic/dp_hazard_source/${createdHsId}`);
+          if (!resp.ok()) return 'missing';
+          const body = await resp.json().catch(() => ({}));
+          const data = body.data ?? body;
+          const id = (data as any)?.pid ?? (data as any)?.id;
+          return id ? 'exists' : 'missing';
+        },
+        { timeout: 10000, intervals: [400, 800, 1200] },
+      )
+      .toBe('missing');
   });
 
   // ---- Create via Form UI ----
@@ -196,9 +223,9 @@ test.describe('DP Hazard Source — CRUD', () => {
     await expect(page.locator('table, [role="table"]').first()).toBeVisible({ timeout: 10000 });
 
     // Click create button in toolbar
-    const addBtn = page.locator(
-      '[data-testid="toolbar-btn-create"], button:has-text("新建")'
-    ).first();
+    const addBtn = page
+      .locator('[data-testid="toolbar-btn-create"], button:has-text("新建")')
+      .first();
     await addBtn.click();
 
     // Wait for form page
@@ -206,32 +233,42 @@ test.describe('DP Hazard Source — CRUD', () => {
 
     // Fill form fields
     const hsName = `UI Hazard ${uniqueId()}`;
-    const nameInput = page.locator(
-      '[data-testid="form-field-dp_hs_name"] input, input[name="dp_hs_name"]'
-    ).first();
+    const nameInput = page
+      .locator('[data-testid="form-field-dp_hs_name"] input, input[name="dp_hs_name"]')
+      .first();
     await expect(nameInput).toBeVisible({ timeout: 10000 });
     await nameInput.fill(hsName);
 
     // Select category (combobox component)
-    const categoryCombobox = page.locator('[data-testid="form-field-dp_hs_category"]').getByRole('combobox').first();
+    const categoryCombobox = page
+      .locator('[data-testid="form-field-dp_hs_category"]')
+      .getByRole('combobox')
+      .first();
     await categoryCombobox.click();
     await page.getByRole('option').first().click();
 
     // Select level (combobox component)
-    const levelCombobox = page.locator('[data-testid="form-field-dp_hs_level"]').getByRole('combobox').first();
+    const levelCombobox = page
+      .locator('[data-testid="form-field-dp_hs_level"]')
+      .getByRole('combobox')
+      .first();
     await levelCombobox.click();
     await page.getByRole('option').first().click();
 
     // Click save
-    const saveBtn = page.locator(
-      '[data-testid^="form-btn-"], button:has-text("保存"), button:has-text("Save")'
-    ).first();
+    const saveBtn = page
+      .locator('[data-testid^="form-btn-"], button:has-text("保存"), button:has-text("Save")')
+      .first();
     await expect(saveBtn).toBeVisible({ timeout: 5000 });
 
-    const createResponsePromise = page.waitForResponse(
-      (r) => r.url().includes('/api/meta/commands/execute/dp:create_hazard_source') && r.request().method().toLowerCase() === 'post',
-      { timeout: 10000 }
-    ).catch(() => null);
+    const createResponsePromise = page
+      .waitForResponse(
+        (r) =>
+          r.url().includes('/api/meta/commands/execute/dp:create_hazard_source') &&
+          r.request().method().toLowerCase() === 'post',
+        { timeout: 10000 },
+      )
+      .catch(() => null);
 
     await saveBtn.click();
     const resp = await createResponsePromise;
@@ -247,7 +284,9 @@ test.describe('DP Hazard Source — CRUD', () => {
     // Cleanup: delete via API
     const recordId = String((records[0] as any)?.id ?? '');
     if (recordId) {
-      await executeCommandViaApi(page, 'dp:delete_hazard_source', {}, recordId, 'delete').catch(() => {});
+      await executeCommandViaApi(page, 'dp:delete_hazard_source', {}, recordId, 'delete').catch(
+        () => {},
+      );
     }
   });
 });
@@ -259,11 +298,14 @@ test.describe('DP Issue — Hazard Source REFERENCE field', () => {
   let projectId: string | null = null;
 
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json', baseURL: 'http://localhost:5173' });
+    const ctx = await browser.newContext({
+      storageState: 'tests/storage/admin.json',
+      baseURL: 'http://localhost:5173',
+    });
     const page = await ctx.newPage();
 
     // Get a project ID (needed for dp_issue) — use pid (ULID) for REFERENCE fields
-    const projResp = await page.request.get('/api/dynamic/pm-project/list?page=0&size=1');
+    const projResp = await page.request.get('/api/dynamic/pm_project/list?page=0&size=1');
     if (projResp.ok()) {
       const projBody = await projResp.json();
       const projects = projBody.data?.records ?? projBody.data?.list ?? [];
@@ -288,14 +330,23 @@ test.describe('DP Issue — Hazard Source REFERENCE field', () => {
   });
 
   test.afterAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json', baseURL: 'http://localhost:5173' });
+    const ctx = await browser.newContext({
+      storageState: 'tests/storage/admin.json',
+      baseURL: 'http://localhost:5173',
+    });
     const page = await ctx.newPage();
     // Cleanup
     if (issueId) {
       await executeCommandViaApi(page, 'dp:delete_issue', {}, issueId, 'delete').catch(() => {});
     }
     if (hazardSourceId) {
-      await executeCommandViaApi(page, 'dp:delete_hazard_source', {}, hazardSourceId, 'delete').catch(() => {});
+      await executeCommandViaApi(
+        page,
+        'dp:delete_hazard_source',
+        {},
+        hazardSourceId,
+        'delete',
+      ).catch(() => {});
     }
     await page.close();
     await ctx.close();
@@ -321,7 +372,7 @@ test.describe('DP Issue — Hazard Source REFERENCE field', () => {
     issueId = result.recordId;
 
     // Verify via API that the reference is set
-    const issueResp = await page.request.get(`/api/dynamic/dp-issue/${issueId}`);
+    const issueResp = await page.request.get(`/api/dynamic/dp_issue/${issueId}`);
     expect(issueResp.ok()).toBe(true);
     const issueBody = await issueResp.json();
     const issueData = issueBody.data ?? issueBody;
@@ -343,10 +394,9 @@ test.describe('DP Issue — Hazard Source REFERENCE field', () => {
     const draftTab = page.locator('[data-testid="tab-draft"]').first();
     if (await draftTab.isVisible({ timeout: 3000 }).catch(() => false)) {
       await draftTab.click();
-      await page.waitForResponse(
-        (r) => r.url().includes('/list') && r.status() === 200,
-        { timeout: 10000 }
-      ).catch(() => null);
+      await page
+        .waitForResponse((r) => r.url().includes('/list') && r.status() === 200, { timeout: 10000 })
+        .catch(() => null);
     }
 
     await expect(page.locator('tbody tr').first()).toBeVisible({ timeout: 10000 });

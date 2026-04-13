@@ -7,11 +7,7 @@
  */
 
 import { useNavigate } from 'react-router';
-import {
-  CubeIcon,
-  CommandLineIcon,
-  CheckCircleIcon,
-} from '@heroicons/react/24/outline';
+import { CubeIcon, CommandLineIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import type { AppTemplate } from './templateCatalog';
 
 const COLOR_MAP: Record<string, { badge: string; accent: string }> = {
@@ -78,7 +74,7 @@ export function TemplateCard({ template, installed }: TemplateCardProps) {
 
         {/* Installed badge overlay */}
         {installed && (
-          <div className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-green-500 px-2 py-0.5 text-xs font-medium text-white shadow">
+          <div className="absolute top-2 right-2 flex items-center gap-1 rounded-full bg-green-500 px-2 py-0.5 text-xs font-medium text-white shadow">
             <CheckCircleIcon className="h-3.5 w-3.5" />
             Installed
           </div>
@@ -88,9 +84,7 @@ export function TemplateCard({ template, installed }: TemplateCardProps) {
       {/* Content */}
       <div className="p-4">
         {/* Title */}
-        <h3 className="mb-1 font-semibold text-gray-900 dark:text-white">
-          {template.name}
-        </h3>
+        <h3 className="mb-1 font-semibold text-gray-900 dark:text-white">{template.name}</h3>
 
         {/* Description */}
         <p className="mb-3 line-clamp-2 text-sm text-gray-500 dark:text-gray-400">
@@ -100,10 +94,7 @@ export function TemplateCard({ template, installed }: TemplateCardProps) {
         {/* Feature badges (first 3) */}
         <div className="mb-3 flex flex-wrap gap-1.5">
           {template.features.slice(0, 3).map((feat) => (
-            <span
-              key={feat}
-              className={`rounded-full px-2 py-0.5 text-xs font-medium ${c.badge}`}
-            >
+            <span key={feat} className={`rounded-full px-2 py-0.5 text-xs font-medium ${c.badge}`}>
               {feat}
             </span>
           ))}

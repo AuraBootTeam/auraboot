@@ -1,0 +1,37 @@
+{
+  "name": "@auraboot/dsl-types",
+  "version": "0.0.1",
+  "description": "AuraBoot DSL strong types — PageSchema, BlockSchema, FieldSchema, ColumnSchema, ActionSchema, DataSourceRef, Expression",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "src", "README.md"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AuraBootTeam/auraboot.git",
+    "directory": "packages/dsl-types"
+  },
+  "keywords": ["auraboot", "dsl", "schema", "types"],
+  "engines": {
+    "node": ">=20"
+  }
+}

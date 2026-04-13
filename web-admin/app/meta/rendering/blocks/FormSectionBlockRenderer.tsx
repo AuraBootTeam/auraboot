@@ -25,7 +25,7 @@ export const FormSectionBlockRenderer: React.FC<FormSectionBlockRendererProps> =
   const locale = context.locale || 'zh-CN';
   const t = context.t || ((key: string) => key);
 
-  // 计算网格布局样式 - 基于 layout.areasConfig.main.cols (通常是 12 列)
+  // 计算网格布局样式 - 基于 layout.cols (通常是 12 列)
   const gridStyle = useMemo(() => {
     const cols = 12; // 默认 12 列网格
     const colGap = block.layout?.colGap || 12;

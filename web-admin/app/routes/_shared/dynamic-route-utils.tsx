@@ -4,6 +4,7 @@
  */
 
 import React from 'react';
+import { sanitizeHtml } from '~/meta/utils/sanitizeHtml';
 
 // 导入并重新导出统一的 i18n 实现
 import {
@@ -53,7 +54,9 @@ interface DynamicFieldProps {
   onChange: (value: any) => void;
   readOnly?: boolean;
   locale?: string;
-  getDictItems?: (code: string) => Array<{ value: string; label: string; extension?: Record<string, any> }>;
+  getDictItems?: (
+    code: string,
+  ) => Array<{ value: string; label: string; extension?: Record<string, any> }>;
 }
 
 /**
@@ -104,7 +107,9 @@ export const DynamicField: React.FC<DynamicFieldProps> = ({
           };
           const cls = TAG_COLORS[color] || TAG_COLORS.gray;
           return (
-            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${cls}`}>
+            <span
+              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${cls}`}
+            >
               {item.label}
             </span>
           );
@@ -114,8 +119,12 @@ export const DynamicField: React.FC<DynamicFieldProps> = ({
       // 2. Boolean as visual toggle
       if (['smartswitch', 'switch', 'smartcheckbox', 'checkbox'].includes(componentType)) {
         return (
-          <div className={`relative inline-flex h-6 w-11 items-center rounded-full ${value ? 'bg-blue-600' : 'bg-gray-200'}`}>
-            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${value ? 'translate-x-6' : 'translate-x-1'}`} />
+          <div
+            className={`relative inline-flex h-6 w-11 items-center rounded-full ${value ? 'bg-blue-600' : 'bg-gray-200'}`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${value ? 'translate-x-6' : 'translate-x-1'}`}
+            />
           </div>
         );
       }
@@ -126,7 +135,10 @@ export const DynamicField: React.FC<DynamicFieldProps> = ({
         return (
           <div className="flex items-center gap-2">
             <div className="h-2 flex-1 rounded-full bg-gray-200">
-              <div className="h-2 rounded-full bg-blue-600" style={{ width: `${Math.min(pct, 100)}%` }} />
+              <div
+                className="h-2 rounded-full bg-blue-600"
+                style={{ width: `${Math.min(pct, 100)}%` }}
+              />
             </div>
             <span className="text-sm text-gray-600">{pct}%</span>
           </div>
@@ -139,8 +151,12 @@ export const DynamicField: React.FC<DynamicFieldProps> = ({
         return (
           <div className="flex gap-0.5">
             {[1, 2, 3, 4, 5].map((i) => (
-              <svg key={i} className={`h-5 w-5 ${i <= stars ? 'text-yellow-400' : 'text-gray-300'}`}
-                fill="currentColor" viewBox="0 0 20 20">
+              <svg
+                key={i}
+                className={`h-5 w-5 ${i <= stars ? 'text-yellow-400' : 'text-gray-300'}`}
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
                 <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
               </svg>
             ))}
@@ -148,7 +164,59 @@ export const DynamicField: React.FC<DynamicFieldProps> = ({
         );
       }
 
-      // 5. Date/time formatting, options lookup, null handling
+      // 5. Color picker - show color swatch
+      if (['colorpicker', 'color_picker', 'color'].includes(componentType) && value) {
+        return (
+          <div className="flex items-center gap-2 py-1">
+            <div
+              className="h-6 w-6 rounded border border-gray-300"
+              style={{ backgroundColor: String(value) }}
+            />
+            <span className="text-sm text-gray-700">{String(value)}</span>
+          </div>
+        );
+      }
+
+      // 6. Rich text - render HTML content
+      if (['richtext', 'richtexteditor', 'rich_text'].includes(componentType) && value) {
+        return (
+          <div
+            className="prose prose-sm max-w-none rounded-md border border-gray-200 bg-gray-50 p-3 text-gray-900"
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(String(value)) }}
+          />
+        );
+      }
+
+      // 7. File attachment - render download links
+      if (['fileattachment', 'file_attachment', 'attachment'].includes(componentType) && value) {
+        let files: Array<{ name: string; url: string; size?: number }> = [];
+        try {
+          files = typeof value === 'string' ? JSON.parse(value) : Array.isArray(value) ? value : [];
+        } catch { /* ignore parse errors */ }
+        if (files.length === 0) {
+          return <span className="py-1 text-sm text-gray-400">&mdash;</span>;
+        }
+        return (
+          <div className="space-y-1 py-1">
+            {files.map((f, i) => (
+              <a
+                key={i}
+                href={f.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 text-sm text-blue-600 hover:underline"
+              >
+                <svg className="h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                </svg>
+                {f.name}{f.size ? ` (${f.size < 1024 ? f.size + ' B' : f.size < 1048576 ? (f.size / 1024).toFixed(1) + ' KB' : (f.size / 1048576).toFixed(1) + ' MB'})` : ''}
+              </a>
+            ))}
+          </div>
+        );
+      }
+
+      // 8. Date/time formatting, options lookup, null handling
       let displayValue = value;
       const options = field.props?.options || [];
 
@@ -168,9 +236,35 @@ export const DynamicField: React.FC<DynamicFieldProps> = ({
         displayValue = '-';
       }
 
+      // 9. URL detection - render as clickable link
+      if (displayValue && typeof displayValue === 'string' && /^https?:\/\/.+/i.test(displayValue)) {
+        return (
+          <div className="py-1 text-sm">
+            <a href={displayValue} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 hover:underline">
+              {displayValue}
+            </a>
+          </div>
+        );
+      }
+
+      // 10. Email detection - render as mailto link
+      if (displayValue && typeof displayValue === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(displayValue)) {
+        return (
+          <div className="py-1 text-sm">
+            <a href={`mailto:${displayValue}`} className="text-blue-600 hover:text-blue-800 hover:underline">
+              {displayValue}
+            </a>
+          </div>
+        );
+      }
+
       return (
         <div className="py-1 text-sm text-gray-900">
-          {displayValue === '-' ? <span className="text-gray-400">&mdash;</span> : String(displayValue)}
+          {displayValue === '-' ? (
+            <span className="text-gray-400">&mdash;</span>
+          ) : (
+            String(displayValue)
+          )}
         </div>
       );
     }
@@ -291,7 +385,7 @@ export const DynamicField: React.FC<DynamicFieldProps> = ({
 
   return (
     <div className="mb-4">
-      <label className="mb-0.5 block text-xs font-medium uppercase tracking-wide text-gray-500">
+      <label className="mb-0.5 block text-xs font-medium tracking-wide text-gray-500 uppercase">
         {label}
         {isRequired && <span className="ml-1 text-red-500">*</span>}
       </label>
@@ -390,18 +484,13 @@ export function validateForm(
 export function getFormFields(schema: any): FieldConfig[] {
   const fields: FieldConfig[] = [];
 
-  if (!schema?.areas) return fields;
+  if (!schema?.blocks) return fields;
 
-  // Iterate through all areas and blocks to find fields
-  for (const areaKey of Object.keys(schema.areas)) {
-    const area = schema.areas[areaKey];
-    if (!area?.blocks) continue;
-
-    for (const block of area.blocks) {
-      // Check various block types that contain fields
-      if (block.fields && Array.isArray(block.fields)) {
-        fields.push(...block.fields);
-      }
+  // Iterate through all blocks to find fields
+  for (const block of schema.blocks) {
+    // Check various block types that contain fields
+    if (block.fields && Array.isArray(block.fields)) {
+      fields.push(...block.fields);
     }
   }
 

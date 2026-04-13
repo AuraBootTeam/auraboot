@@ -90,7 +90,7 @@ function generateParallelGatewayBpmn(processKey: string): string {
 async function createAndDeployProcess(
   page: import('@playwright/test').Page,
   processKey: string,
-  bpmnXml: string
+  bpmnXml: string,
 ): Promise<string | null> {
   try {
     const createResp = await page.request.post(`/api/bpm/process-definitions`, {
@@ -103,7 +103,9 @@ async function createAndDeployProcess(
       },
     });
     if (!createResp.ok()) {
-      console.warn(`BPM create failed: ${createResp.status()} ${await createResp.text().catch(() => '')}`);
+      console.warn(
+        `BPM create failed: ${createResp.status()} ${await createResp.text().catch(() => '')}`,
+      );
       return null;
     }
     const createData = await createResp.json();
@@ -115,7 +117,9 @@ async function createAndDeployProcess(
 
     const deployResp = await page.request.post(`/api/bpm/process-definitions/${pid}/deploy`);
     if (!deployResp.ok()) {
-      console.warn(`BPM deploy failed: ${deployResp.status()} ${await deployResp.text().catch(() => '')}`);
+      console.warn(
+        `BPM deploy failed: ${deployResp.status()} ${await deployResp.text().catch(() => '')}`,
+      );
       return null;
     }
     return pid;
@@ -128,7 +132,7 @@ async function createAndDeployProcess(
 async function startProcessInstance(
   page: import('@playwright/test').Page,
   processKey: string,
-  variables: Record<string, unknown> = {}
+  variables: Record<string, unknown> = {},
 ): Promise<string | null> {
   try {
     const resp = await page.request.post(`/api/bpm/process-instances`, {
@@ -139,13 +143,18 @@ async function startProcessInstance(
       },
     });
     if (!resp.ok()) {
-      console.warn(`BPM start instance failed: ${resp.status()} ${await resp.text().catch(() => '')}`);
+      console.warn(
+        `BPM start instance failed: ${resp.status()} ${await resp.text().catch(() => '')}`,
+      );
       return null;
     }
     const data = await resp.json();
     const instanceId = data.data?.instanceId || data.instanceId || null;
     if (!instanceId) {
-      console.warn('BPM start instance response missing instanceId:', JSON.stringify(data).slice(0, 200));
+      console.warn(
+        'BPM start instance response missing instanceId:',
+        JSON.stringify(data).slice(0, 200),
+      );
     }
     return instanceId;
   } catch (e) {
@@ -193,9 +202,13 @@ test.describe('BPM Deep Tests', () => {
     const context = await browser.newContext({ storageState: 'tests/storage/admin.json' });
     const page = await context.newPage();
     try {
-      await page.request.post(`/api/bpm/process-definitions/${processPid}/undeploy`).catch(() => {});
+      await page.request
+        .post(`/api/bpm/process-definitions/${processPid}/undeploy`)
+        .catch(() => {});
       await page.request.delete(`/api/bpm/process-definitions/${processPid}`).catch(() => {});
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     await page.close();
     await context.close();
   });
@@ -211,8 +224,14 @@ test.describe('BPM Deep Tests', () => {
     const loginRedirect = page.locator('text=请先登录, text=欢迎登录');
 
     const result = await Promise.race([
-      content.first().waitFor({ timeout: 10000 }).then(() => 'content'),
-      loginRedirect.first().waitFor({ timeout: 10000 }).then(() => 'login'),
+      content
+        .first()
+        .waitFor({ timeout: 10000 })
+        .then(() => 'content'),
+      loginRedirect
+        .first()
+        .waitFor({ timeout: 10000 })
+        .then(() => 'login'),
     ]).catch(() => 'timeout');
 
     if (result === 'login') {
@@ -220,8 +239,16 @@ test.describe('BPM Deep Tests', () => {
       return;
     }
 
-    const hasTable = await page.locator('table, [role="table"]').first().isVisible({ timeout: 5000 }).catch(() => false);
-    const hasEmpty = await page.getByText(/暂无|No data/i).first().isVisible({ timeout: 3000 }).catch(() => false);
+    const hasTable = await page
+      .locator('table, [role="table"]')
+      .first()
+      .isVisible({ timeout: 5000 })
+      .catch(() => false);
+    const hasEmpty = await page
+      .getByText(/暂无|No data/i)
+      .first()
+      .isVisible({ timeout: 3000 })
+      .catch(() => false);
     expect(hasTable || hasEmpty || result === 'content').toBe(true);
   });
 
@@ -235,12 +262,18 @@ test.describe('BPM Deep Tests', () => {
     await page.waitForLoadState('domcontentloaded');
 
     // Look for toggle/enable button in the process row
-    const enableBtn = page.locator('button:has-text("启用"), button:has-text("Enable"), button:has-text("禁用"), button:has-text("Disable")').first();
+    const enableBtn = page
+      .locator(
+        'button:has-text("启用"), button:has-text("Enable"), button:has-text("禁用"), button:has-text("Disable")',
+      )
+      .first();
     const hasEnableBtn = await enableBtn.isVisible({ timeout: 5000 }).catch(() => false);
 
     if (!hasEnableBtn) {
       // Some UI variants hide enable/disable or have empty state; assert page is operable.
-      const pageReady = await page.locator('main, table, h1, [data-testid="page-title"]').first()
+      const pageReady = await page
+        .locator('main, table, h1, [data-testid="page-title"]')
+        .first()
         .isVisible({ timeout: 5000 })
         .catch(() => false);
       expect(pageReady).toBe(true);
@@ -251,12 +284,15 @@ test.describe('BPM Deep Tests', () => {
     await enableBtn.click();
 
     // Wait for state change
-    await page.waitForResponse(
-      (r) => r.url().includes('/bpm/') && r.status() === 200,
-      { timeout: 5000 }
-    ).catch(() => null);
+    await page
+      .waitForResponse((r) => r.url().includes('/bpm/') && r.status() === 200, { timeout: 5000 })
+      .catch(() => null);
 
-    const updatedBtn = page.locator('button:has-text("启用"), button:has-text("Enable"), button:has-text("禁用"), button:has-text("Disable")').first();
+    const updatedBtn = page
+      .locator(
+        'button:has-text("启用"), button:has-text("Enable"), button:has-text("禁用"), button:has-text("Disable")',
+      )
+      .first();
     const updatedText = await updatedBtn.textContent().catch(() => '');
     expect(updatedText).not.toBe(initialText);
   });
@@ -270,7 +306,9 @@ test.describe('BPM Deep Tests', () => {
     await page.goto('/bpm/process-definitions');
     await page.waitForLoadState('domcontentloaded');
 
-    const startBtn = page.locator('button:has-text("发起"), button:has-text("Start"), button:has-text("启动")').first();
+    const startBtn = page
+      .locator('button:has-text("发起"), button:has-text("Start"), button:has-text("启动")')
+      .first();
     const hasStartBtn = await startBtn.isVisible({ timeout: 5000 }).catch(() => false);
 
     if (!hasStartBtn) {
@@ -281,10 +319,13 @@ test.describe('BPM Deep Tests', () => {
     }
 
     await startBtn.click();
-    await page.waitForResponse(
-      (r) => r.url().includes('/process-instances') && r.request().method().toLowerCase() === 'post',
-      { timeout: 8000 }
-    ).catch(() => null);
+    await page
+      .waitForResponse(
+        (r) =>
+          r.url().includes('/process-instances') && r.request().method().toLowerCase() === 'post',
+        { timeout: 8000 },
+      )
+      .catch(() => null);
   });
 
   /**
@@ -295,7 +336,9 @@ test.describe('BPM Deep Tests', () => {
     await page.waitForLoadState('domcontentloaded');
 
     // Wait for heading to confirm page loaded
-    await expect(page.locator('h1:has-text("任务中心"), h1:has-text("Task Center")')).toBeVisible({ timeout: 8000 });
+    await expect(page.locator('h1:has-text("任务中心"), h1:has-text("Task Center")')).toBeVisible({
+      timeout: 8000,
+    });
 
     // The task center should show either a table or an empty state
     const tableOrEmpty = page.locator('table').or(page.getByText(/暂无任务|No tasks/i));
@@ -322,15 +365,21 @@ test.describe('BPM Deep Tests', () => {
     await page.goto('/bpm/task-center');
     await page.waitForLoadState('domcontentloaded');
 
-    const approveBtn = page.locator('button:has-text("通过"), button:has-text("Approve"), button:has-text("完成"), button:has-text("Complete")').first();
+    const approveBtn = page
+      .locator(
+        'button:has-text("通过"), button:has-text("Approve"), button:has-text("完成"), button:has-text("Complete")',
+      )
+      .first();
     const hasApproveBtn = await approveBtn.isVisible({ timeout: 5000 }).catch(() => false);
 
     if (hasApproveBtn) {
       await approveBtn.click();
-      await page.waitForResponse(
-        (r) => r.url().includes('/bpm/tasks/') && r.request().method().toLowerCase() === 'post',
-        { timeout: 8000 }
-      ).catch(() => null);
+      await page
+        .waitForResponse(
+          (r) => r.url().includes('/bpm/tasks/') && r.request().method().toLowerCase() === 'post',
+          { timeout: 8000 },
+        )
+        .catch(() => null);
     } else {
       // Complete via API
       const taskId = tasks[0].taskId || tasks[0].instanceId;
@@ -371,15 +420,19 @@ test.describe('BPM Deep Tests', () => {
     await page.goto('/bpm/task-center');
     await page.waitForLoadState('domcontentloaded');
 
-    const rejectBtn = page.locator('button:has-text("拒绝"), button:has-text("Reject"), button:has-text("驳回")').first();
+    const rejectBtn = page
+      .locator('button:has-text("拒绝"), button:has-text("Reject"), button:has-text("驳回")')
+      .first();
     const hasRejectBtn = await rejectBtn.isVisible({ timeout: 5000 }).catch(() => false);
 
     if (hasRejectBtn) {
       await rejectBtn.click();
-      await page.waitForResponse(
-        (r) => r.url().includes('/bpm/tasks/') && r.request().method().toLowerCase() === 'post',
-        { timeout: 8000 }
-      ).catch(() => null);
+      await page
+        .waitForResponse(
+          (r) => r.url().includes('/bpm/tasks/') && r.request().method().toLowerCase() === 'post',
+          { timeout: 8000 },
+        )
+        .catch(() => null);
     } else {
       // Reject via API
       const taskId = tasks[0].taskId || tasks[0].instanceId;
@@ -404,7 +457,11 @@ test.describe('BPM Deep Tests', () => {
     await page.goto('/bpm/task-center');
     await page.waitForLoadState('domcontentloaded');
 
-    const completedTab = page.locator('button:has-text("已办任务"), button:has-text("Completed"), button:has-text("History")').first();
+    const completedTab = page
+      .locator(
+        'button:has-text("已办任务"), button:has-text("Completed"), button:has-text("History")',
+      )
+      .first();
     const hasTab = await completedTab.isVisible({ timeout: 8000 }).catch(() => false);
 
     if (!hasTab) {
@@ -414,8 +471,7 @@ test.describe('BPM Deep Tests', () => {
 
     await completedTab.click();
 
-    const tableOrEmpty = page.locator('table, [role="table"]')
-      .or(page.getByText(/暂无|No data/i));
+    const tableOrEmpty = page.locator('table, [role="table"]').or(page.getByText(/暂无|No data/i));
     await expect(tableOrEmpty.first()).toBeVisible({ timeout: 8000 });
   });
 
@@ -444,7 +500,9 @@ test.describe('BPM Deep Tests', () => {
 
       if (!resp.ok()) {
         const errorBody = await resp.text().catch(() => '');
-        throw new Error(`Process start with MVEL gateway conditions failed (${resp.status()}): ${errorBody.slice(0, 200)}`);
+        throw new Error(
+          `Process start with MVEL gateway conditions failed (${resp.status()}): ${errorBody.slice(0, 200)}`,
+        );
       }
 
       const data = await resp.json();
@@ -515,7 +573,7 @@ test.describe('BPM Deep Tests', () => {
       // Keep this case as deploy-time coverage to ensure DSL/definition pipeline accepts inclusive nodes.
       const detailResp = await page.request.get(`/api/bpm/process-definitions/${igPid}`);
       expect(detailResp.ok()).toBe(true);
-      const detail = await detailResp.json().catch(() => ({} as any));
+      const detail = await detailResp.json().catch(() => ({}) as any);
       const payload = detail.data || detail;
       expect(String(payload?.processKey ?? '')).toContain(igKey);
     } finally {
@@ -638,14 +696,18 @@ test.describe('BPM Deep Tests', () => {
     }
 
     // Pause
-    const pauseResp = await page.request.post(`/api/bpm/process-instances/${freshInstanceId}/suspend`);
+    const pauseResp = await page.request.post(
+      `/api/bpm/process-instances/${freshInstanceId}/suspend`,
+    );
     if (!pauseResp.ok()) {
       throw new Error('Suspend API not available');
       return;
     }
 
     // Resume
-    const resumeResp = await page.request.post(`/api/bpm/process-instances/${freshInstanceId}/resume`);
+    const resumeResp = await page.request.post(
+      `/api/bpm/process-instances/${freshInstanceId}/resume`,
+    );
     expect(resumeResp.ok()).toBe(true);
   });
 
@@ -690,10 +752,7 @@ test.describe('BPM Deep Tests', () => {
     }
 
     const targetUserId = String(
-      tasks[0].claimUserId
-      || tasks[0].assigneeUserId
-      || tasks[0].startUserId
-      || '1',
+      tasks[0].claimUserId || tasks[0].assigneeUserId || tasks[0].startUserId || '1',
     );
 
     // Try delegation API with the server contract field name (targetUserId).
@@ -730,10 +789,12 @@ test.describe('BPM Deep Tests', () => {
     }
 
     await claimBtn.click();
-    await page.waitForResponse(
-      (r) => r.url().includes('/bpm/tasks/') && r.request().method().toLowerCase() === 'post',
-      { timeout: 5000 }
-    ).catch(() => null);
+    await page
+      .waitForResponse(
+        (r) => r.url().includes('/bpm/tasks/') && r.request().method().toLowerCase() === 'post',
+        { timeout: 5000 },
+      )
+      .catch(() => null);
   });
 
   /**
@@ -746,15 +807,21 @@ test.describe('BPM Deep Tests', () => {
       return;
     }
 
-    const cancelResp = await page.request.post(`/api/bpm/process-instances/${cancelInstanceId}/cancel`, {
-      data: { reason: 'E2E test cancellation' },
-    });
+    const cancelResp = await page.request.post(
+      `/api/bpm/process-instances/${cancelInstanceId}/cancel`,
+      {
+        data: { reason: 'E2E test cancellation' },
+      },
+    );
 
     // API may use different endpoint names
     if (!cancelResp.ok()) {
-      const terminateResp = await page.request.post(`/api/bpm/process-instances/${cancelInstanceId}/terminate`, {
-        data: { reason: 'E2E test termination' },
-      });
+      const terminateResp = await page.request.post(
+        `/api/bpm/process-instances/${cancelInstanceId}/terminate`,
+        {
+          data: { reason: 'E2E test termination' },
+        },
+      );
       expect(terminateResp.status()).toBeLessThan(400);
     } else {
       expect(cancelResp.ok()).toBe(true);
@@ -770,17 +837,25 @@ test.describe('BPM Deep Tests', () => {
 
     // The BPMN designer should show a canvas or process selection
     const designerContent = page.locator(
-      '[data-testid="bpmn-designer"], canvas, .bpmn-container, svg, .designer-canvas'
+      '[data-testid="bpmn-designer"], canvas, .bpmn-container, svg, .designer-canvas',
     );
-    const hasDesigner = await designerContent.first().isVisible({ timeout: 10000 }).catch(() => false);
+    const hasDesigner = await designerContent
+      .first()
+      .isVisible({ timeout: 10000 })
+      .catch(() => false);
 
-    const is404 = await page.locator('text=404').isVisible({ timeout: 2000 }).catch(() => false);
+    const is404 = await page
+      .locator('text=404')
+      .isVisible({ timeout: 2000 })
+      .catch(() => false);
 
     if (is404) {
       // Try alternative paths
       await page.goto('/bpm/process-definitions');
       await page.waitForLoadState('domcontentloaded');
-      const editBtn = page.locator('button:has-text("编辑"), button:has-text("Edit"), button:has-text("设计")').first();
+      const editBtn = page
+        .locator('button:has-text("编辑"), button:has-text("Edit"), button:has-text("设计")')
+        .first();
       const hasEditBtn = await editBtn.isVisible({ timeout: 5000 }).catch(() => false);
       expect(hasEditBtn || true).toBe(true); // Non-blocking
     } else {
@@ -799,8 +874,13 @@ test.describe('BPM Deep Tests', () => {
     await page.waitForLoadState('domcontentloaded');
 
     // Verify designer canvas or SVG is rendered
-    const designerCanvas = page.locator('canvas, svg, .bpmn-container, [data-testid="bpmn-canvas"]');
-    const hasCanvas = await designerCanvas.first().isVisible({ timeout: 10000 }).catch(() => false);
+    const designerCanvas = page.locator(
+      'canvas, svg, .bpmn-container, [data-testid="bpmn-canvas"]',
+    );
+    const hasCanvas = await designerCanvas
+      .first()
+      .isVisible({ timeout: 10000 })
+      .catch(() => false);
 
     if (!hasCanvas) {
       // Fallback: verify process definition detail has BPMN content

@@ -35,11 +35,15 @@ test.describe('GAP-025: Designer Maturity', () => {
     }
 
     // Canvas should be visible
-    const canvas = page.locator('[data-testid="designer-canvas"], [data-testid="floors-designer-canvas"]').first();
+    const canvas = page
+      .locator('[data-testid="designer-canvas"], [data-testid="floors-designer-canvas"]')
+      .first();
     await expect(canvas).toBeVisible({ timeout: 10000 });
 
     // Properties panel should be visible
-    const propertiesPanel = page.locator('[data-testid="designer-properties-panel"], [data-testid="floors-properties-panel"]').first();
+    const propertiesPanel = page
+      .locator('[data-testid="designer-properties-panel"], [data-testid="floors-properties-panel"]')
+      .first();
     await expect(propertiesPanel).toBeVisible({ timeout: 5000 });
   });
 
@@ -176,8 +180,11 @@ test.describe('GAP-025: Designer Maturity', () => {
     await page.keyboard.press('Control+s');
 
     // Page should still be in designer (not navigated away)
-    await expect(page.locator('[data-testid="designer-canvas"], [data-testid="floors-designer-canvas"]').first())
-      .toBeVisible({ timeout: 5000 });
+    await expect(
+      page
+        .locator('[data-testid="designer-canvas"], [data-testid="floors-designer-canvas"]')
+        .first(),
+    ).toBeVisible({ timeout: 5000 });
   });
 
   /**
@@ -234,9 +241,15 @@ test.describe('GAP-025: Designer Maturity', () => {
     await expect(page.locator('h2:has-text("Preview")')).toBeVisible({ timeout: 5000 });
 
     // Should show either content or empty placeholder
-    const hasContent = await page.locator('.bg-grid-pattern, .bg-white').first()
-      .isVisible({ timeout: 3000 }).catch(() => false);
-    const hasEmpty = await page.locator('text="Empty page"').isVisible({ timeout: 3000 }).catch(() => false);
+    const hasContent = await page
+      .locator('.bg-grid-pattern, .bg-white')
+      .first()
+      .isVisible({ timeout: 3000 })
+      .catch(() => false);
+    const hasEmpty = await page
+      .locator('text="Empty page"')
+      .isVisible({ timeout: 3000 })
+      .catch(() => false);
 
     // One of them must be true
     expect(hasContent || hasEmpty).toBe(true);

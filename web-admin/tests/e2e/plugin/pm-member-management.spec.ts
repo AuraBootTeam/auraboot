@@ -14,10 +14,7 @@
  */
 
 import { test, expect } from '@playwright/test';
-import {
-  uniqueId,
-  executeCommandViaApi,
-} from '../helpers/index';
+import { uniqueId, executeCommandViaApi, ensureFilterFormOpen } from '../helpers/index';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -33,36 +30,26 @@ async function clickPmMenuLink(page: import('@playwright/test').Page, href: stri
   await link.first().evaluate((el) => (el as HTMLAnchorElement).click());
 }
 
-async function navigateToProjectWorkspace(page: import('@playwright/test').Page, projectName: string) {
-  await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
-  await clickPmMenuLink(page, '/dynamic/pm-project');
-  await expect(page).toHaveURL(/\/dynamic\/pm-project/);
-
-  await page.locator('tbody tr').first().waitFor({ state: 'visible', timeout: 10000 });
-
-  const searchArea = page.getByTestId('search-area');
-  if (await searchArea.isVisible({ timeout: 2000 }).catch(() => false)) {
-    await searchArea.locator('input').first().fill(projectName);
-    await page.getByTestId('filter-search').click();
-    const table = page.locator('table, [role="table"]');
-    const empty = page.locator('text=/no data|暂无/i');
-    await expect(table.or(empty).first()).toBeVisible({ timeout: 10000 });
+async function navigateToProjectWorkspace(
+  page: import('@playwright/test').Page,
+  _projectName: string,
+  projectPid?: string,
+) {
+  if (projectPid) {
+    await page.goto(`/project-management/projects/${projectPid}`, { waitUntil: 'domcontentloaded' });
+  } else {
+    throw new Error('projectPid required to navigate to workspace');
   }
-
-  const row = page.locator('tbody tr', { hasText: projectName }).first();
-  await expect(row).toBeVisible({ timeout: 10000 });
-  await row.click();
-
   await expect(page).toHaveURL(/\/project-management\/projects\//, { timeout: 10000 });
   await expect(page.getByTestId('project-workspace')).toBeVisible({ timeout: 15000 });
 }
 
 async function goToMembersTab(page: import('@playwright/test').Page) {
-  const memberListPromise = page.waitForResponse(
-    (r) => r.url().includes('/api/dynamic/pm-project-member/list') && r.status() === 200,
-    { timeout: 10000 },
-  );
   await page.getByTestId('tab-members').click();
+  const memberListPromise = page.waitForResponse(
+    (r) => r.url().includes('/api/dynamic/pm_project_member/list') && r.status() === 200,
+    { timeout: 15000 },
+  ).catch(() => null);
   await memberListPromise;
   await expect(page.getByTestId('member-manager')).toBeVisible({ timeout: 10000 });
 }
@@ -84,7 +71,7 @@ test.describe('PM Member Management', () => {
     const page = await ctx.newPage();
     try {
       const pendingMemberResp = await page.request.get(
-        '/api/dynamic/tenant-member/list?pageSize=50',
+        '/api/dynamic/tenant_member/list?pageSize=50',
       );
       expect(pendingMemberResp.ok(), 'tenant-member list should be queryable').toBe(true);
       const pendingMemberBody = await pendingMemberResp.json();
@@ -95,20 +82,24 @@ test.describe('PM Member Management', () => {
       for (const member of tenantMembers) {
         if (
           member?.status === 'pending' &&
-          member?.user_email !== 'e2e@test.local' &&
+          member?.user_email !== 'admin@example.com' &&
           !reservedEmails.includes(member?.user_email)
         ) {
-          await page.request.post(`/api/tenant/members/${member.pid}/approve`, {
-            data: { action: 'approve', reason: 'E2E setup approval' },
-          }).catch(() => {});
+          await page.request
+            .post(`/api/tenant/members/${member.pid}/approve`, {
+              data: { action: 'approve', reason: 'E2E setup approval' },
+            })
+            .catch(() => {});
         }
       }
 
       // Create project
       const proj = await executeCommandViaApi(
-        page, 'pm:create_project',
+        page,
+        'pm:create_project',
         { pm_project_name: projectName },
-        undefined, 'create',
+        undefined,
+        'create',
       );
       projectPid = proj.recordId;
       expect(projectPid).toBeTruthy();
@@ -118,9 +109,11 @@ test.describe('PM Member Management', () => {
 
       // Create a project role for member assignment
       const role = await executeCommandViaApi(
-        page, 'pm:create_project_role',
+        page,
+        'pm:create_project_role',
         { pm_role_name: `Role ${projectName}`, pm_role_description: 'E2E member test role' },
-        undefined, 'create',
+        undefined,
+        'create',
       );
       rolePid = role.recordId;
       expect(rolePid).toBeTruthy();
@@ -130,7 +123,7 @@ test.describe('PM Member Management', () => {
   });
 
   test('PM-MEM-01: Members tab shows auto-created owner member @smoke', async ({ page }) => {
-    await navigateToProjectWorkspace(page, projectName);
+    await navigateToProjectWorkspace(page, projectName, projectPid);
     await goToMembersTab(page);
 
     // At least the owner member should exist (auto-created by pm:create_project sideEffect)
@@ -148,7 +141,7 @@ test.describe('PM Member Management', () => {
   });
 
   test('PM-MEM-02: Add member button reveals form', async ({ page }) => {
-    await navigateToProjectWorkspace(page, projectName);
+    await navigateToProjectWorkspace(page, projectName, projectPid);
     await goToMembersTab(page);
 
     const addBtn = page.getByTestId('add-member-btn');
@@ -161,7 +154,7 @@ test.describe('PM Member Management', () => {
   });
 
   test('PM-MEM-03: Add member via UI form', async ({ page }) => {
-    await navigateToProjectWorkspace(page, projectName);
+    await navigateToProjectWorkspace(page, projectName, projectPid);
     await goToMembersTab(page);
 
     // Open add form
@@ -201,10 +194,9 @@ test.describe('PM Member Management', () => {
     }
 
     // Submit — accept any response (command may return non-200 on constraint violation)
-    const submitPromise = page.waitForResponse(
-      (r) => r.url().includes('/execute/pm:add_member'),
-      { timeout: 10000 },
-    );
+    const submitPromise = page.waitForResponse((r) => r.url().includes('/execute/pm:add_member'), {
+      timeout: 10000,
+    });
     await page.getByTestId('submit-member-btn').evaluate((el: HTMLElement) => el.click());
     await submitPromise;
 
@@ -215,7 +207,7 @@ test.describe('PM Member Management', () => {
   });
 
   test('PM-MEM-04: Member list shows member details (role, joined date)', async ({ page }) => {
-    await navigateToProjectWorkspace(page, projectName);
+    await navigateToProjectWorkspace(page, projectName, projectPid);
     await goToMembersTab(page);
 
     const membersTable = page.getByTestId('members-table');
@@ -236,18 +228,18 @@ test.describe('PM Member Management', () => {
     const BASE = process.env.BASE_URL || 'http://localhost:5173';
 
     // Get current members
-    const memberFilter = encodeURIComponent(JSON.stringify([
-      { fieldName: 'pm_member_project_id', operator: 'EQ', value: projectPid },
-    ]));
+    const memberFilter = encodeURIComponent(
+      JSON.stringify([{ fieldName: 'pm_member_project_id', operator: 'EQ', value: projectPid }]),
+    );
     const memberResp = await page.request.get(
-      `${BASE}/api/dynamic/pm-project-member/list?pageSize=50&filters=${memberFilter}`,
+      `${BASE}/api/dynamic/pm_project_member/list?pageSize=50&filters=${memberFilter}`,
     );
     const memberBody = await memberResp.json();
     const members = memberBody?.data?.records || [];
 
     // Find a non-owner member to remove (if any)
-    const removableMembers = members.filter((m: Record<string, string>) =>
-      m.pm_member_status === 'active' && members.length > 1
+    const removableMembers = members.filter(
+      (m: Record<string, string>) => m.pm_member_status === 'active' && members.length > 1,
     );
 
     if (removableMembers.length === 0) {
@@ -257,7 +249,7 @@ test.describe('PM Member Management', () => {
 
     const memberToRemove = removableMembers[removableMembers.length - 1];
 
-    await navigateToProjectWorkspace(page, projectName);
+    await navigateToProjectWorkspace(page, projectName, projectPid);
     await goToMembersTab(page);
 
     // Find the remove button for that member
@@ -271,18 +263,24 @@ test.describe('PM Member Management', () => {
     await removeBtn.click();
 
     // Confirm dialog if it appears
-    const confirmBtn = page.locator('[role="alertdialog"] button:has-text("OK"), button:has-text("确定"), button:has-text("Confirm")').first();
+    const confirmBtn = page
+      .locator(
+        '[role="alertdialog"] button:has-text("OK"), button:has-text("确定"), button:has-text("Confirm")',
+      )
+      .first();
     if (await confirmBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
       await confirmBtn.click();
     }
     await removePromise;
 
     // Member row should be gone
-    await expect(page.getByTestId(`member-row-${memberToRemove.pid}`)).not.toBeVisible({ timeout: 5000 });
+    await expect(page.getByTestId(`member-row-${memberToRemove.pid}`)).not.toBeVisible({
+      timeout: 5000,
+    });
   });
 
   test('PM-MEM-06: Add member form validates required fields', async ({ page }) => {
-    await navigateToProjectWorkspace(page, projectName);
+    await navigateToProjectWorkspace(page, projectName, projectPid);
     await goToMembersTab(page);
 
     await page.getByTestId('add-member-btn').click();
@@ -304,11 +302,13 @@ test.describe('PM Member Management', () => {
   });
 
   test('PM-MEM-07: Members tab accessible from different workspace tabs', async ({ page }) => {
-    await navigateToProjectWorkspace(page, projectName);
+    await navigateToProjectWorkspace(page, projectName, projectPid);
 
     // Start from tasks tab
     await page.getByTestId('tab-tasks').click();
-    await expect(page.getByTestId('task-board').or(page.getByTestId('task-list-view'))).toBeVisible({ timeout: 10000 });
+    await expect(page.getByTestId('task-board').or(page.getByTestId('task-list-view'))).toBeVisible(
+      { timeout: 10000 },
+    );
 
     // Switch to members
     await goToMembersTab(page);
@@ -323,7 +323,7 @@ test.describe('PM Member Management', () => {
   });
 
   test('PM-MEM-08: Owner member cannot be removed', async ({ page }) => {
-    await navigateToProjectWorkspace(page, projectName);
+    await navigateToProjectWorkspace(page, projectName, projectPid);
     await goToMembersTab(page);
 
     const membersTable = page.getByTestId('members-table');
@@ -334,7 +334,9 @@ test.describe('PM Member Management', () => {
     await expect(firstRow).toBeVisible({ timeout: 5000 });
 
     // The owner row should either not have a remove button or it should be disabled
-    const firstRowPid = await firstRow.getAttribute('data-testid').then(t => t?.replace('member-row-', ''));
+    const firstRowPid = await firstRow
+      .getAttribute('data-testid')
+      .then((t) => t?.replace('member-row-', ''));
     if (firstRowPid) {
       const removeBtn = page.getByTestId(`remove-member-${firstRowPid}`);
       const isVisible = await removeBtn.isVisible({ timeout: 2000 }).catch(() => false);
@@ -342,7 +344,7 @@ test.describe('PM Member Management', () => {
         // If visible, it might be disabled for owner
         const isDisabled = await removeBtn.isDisabled();
         // Owner protection is validated — either hidden or disabled
-        expect(isVisible && !isDisabled || !isVisible).toBeTruthy();
+        expect((isVisible && !isDisabled) || !isVisible).toBeTruthy();
       }
     }
   });

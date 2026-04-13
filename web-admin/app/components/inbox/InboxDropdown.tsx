@@ -12,12 +12,7 @@ import {
   ArrowRightIcon,
   EnvelopeOpenIcon,
 } from '@heroicons/react/24/outline';
-import {
-  listInboxItems,
-  markRead,
-  markAllRead,
-  type InboxItem,
-} from '~/services/inboxService';
+import { listInboxItems, markRead, markAllRead, type InboxItem } from '~/services/inboxService';
 import { InboxBadge } from './InboxBadge';
 
 function timeAgo(dateStr: string): string {
@@ -53,9 +48,7 @@ function priorityDot(priority: string) {
     low: 'bg-gray-300',
   };
   return (
-    <span
-      className={`inline-block h-2 w-2 rounded-full ${colors[priority] || colors.normal}`}
-    />
+    <span className={`inline-block h-2 w-2 rounded-full ${colors[priority] || colors.normal}`} />
   );
 }
 
@@ -89,10 +82,7 @@ export function InboxHeaderWidget() {
   // Close on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(e.target as Node)
-      ) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setOpen(false);
       }
     };
@@ -120,7 +110,7 @@ export function InboxHeaderWidget() {
     if (item.itemType === 'approval' && item.sourceId) {
       navigate(`/inbox?task=${item.sourceId}`);
     } else if (item.modelCode && item.recordId) {
-      navigate(`/dynamic/${item.modelCode}/${item.recordId}`);
+      navigate(`/p/${item.modelCode}/${item.recordId}`);
     } else {
       navigate('/inbox');
     }
@@ -146,9 +136,7 @@ export function InboxHeaderWidget() {
         >
           {/* Header */}
           <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3 dark:border-gray-700">
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-              Inbox
-            </h3>
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Inbox</h3>
             <button
               onClick={handleMarkAllRead}
               className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400"
@@ -176,14 +164,10 @@ export function InboxHeaderWidget() {
                   onClick={() => handleItemClick(item)}
                   data-testid={`inbox-item-${item.id}`}
                   className={`flex w-full items-start gap-3 px-4 py-3 text-start transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50 ${
-                    !item.isRead
-                      ? 'bg-blue-50/50 dark:bg-blue-900/10'
-                      : ''
+                    !item.isRead ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''
                   }`}
                 >
-                  <div className="mt-0.5 flex-shrink-0">
-                    {itemIcon(item.itemType)}
-                  </div>
+                  <div className="mt-0.5 flex-shrink-0">{itemIcon(item.itemType)}</div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       {!item.isRead && priorityDot(item.priority)}
@@ -200,9 +184,7 @@ export function InboxHeaderWidget() {
                       <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600 dark:bg-gray-700 dark:text-gray-300">
                         {item.itemType}
                       </span>
-                      <span className="text-xs text-gray-400">
-                        {timeAgo(item.createdAt)}
-                      </span>
+                      <span className="text-xs text-gray-400">{timeAgo(item.createdAt)}</span>
                     </div>
                   </div>
                 </button>

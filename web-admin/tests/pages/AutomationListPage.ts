@@ -70,11 +70,11 @@ export class AutomationListPage extends BasePage {
   }
 
   get confirmDialogLocator(): Locator {
-    return this.page.locator('[data-testid="confirm-dialog"]');
+    return this.page.locator('[data-testid="confirm-dialog"], [role="alertdialog"], [role="dialog"]:has(button:has-text("OK"))').first();
   }
 
   get confirmOkButton(): Locator {
-    return this.page.locator('[data-testid="confirm-ok"]');
+    return this.page.locator('[data-testid="confirm-ok"], [role="alertdialog"] button:has-text("OK"), [role="alertdialog"] button:has-text("确定"), [role="dialog"] button:has-text("OK"), [role="dialog"] button:has-text("确定")').first();
   }
 
   // --- Actions ---
@@ -98,18 +98,28 @@ export class AutomationListPage extends BasePage {
     await expect(this.logDialog).toBeHidden({ timeout: 3000 });
   }
 
-  /** Delete an automation: click delete, confirm, and wait for row removal. */
+  /** Delete an automation: click delete, confirm, and wait for API response. */
   async deleteAutomation(pid: string): Promise<void> {
-    const nativeDialog = this.page.waitForEvent('dialog', { timeout: 1500 }).catch(() => null);
     await this.deleteButton(pid).click();
-    const dialog = await nativeDialog;
-    if (dialog) {
-      await dialog.accept();
-      return;
-    }
 
+    // Wait for custom confirm dialog
     await expect(this.confirmDialogLocator).toBeVisible({ timeout: 5000 });
-    await this.confirmOkButton.click();
+
+    // Click confirm and wait for DELETE API response
+    const [deleteResp] = await Promise.all([
+      this.page.waitForResponse(
+        (r) => r.url().includes(`/api/automations/${pid}`) && r.request().method() === 'DELETE',
+        { timeout: 10000 },
+      ).catch(() => null),
+      this.confirmOkButton.click(),
+    ]);
+
+    // Wait for dialog to close
     await expect(this.confirmDialogLocator).toBeHidden({ timeout: 5000 });
+
+    // Wait for list to refresh
+    if (deleteResp) {
+      await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    }
   }
 }

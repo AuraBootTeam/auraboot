@@ -138,14 +138,18 @@ export function FilterValuePopover({
     if (!dictCode || !open) return;
     let cancelled = false;
     (async () => {
-      const result = await fetchResult<any>(`/api/meta/dict/by-code/${dictCode}/data`, { token: undefined });
+      const result = await fetchResult<any>(`/api/meta/dict/by-code/${dictCode}/data`, {
+        token: undefined,
+      });
       if (cancelled) return;
       if (ResultHelper.isSuccess(result) && result.data) {
         const items = Array.isArray(result.data) ? result.data : result.data.items || [];
         setDictOptions(items.map((i: any) => ({ value: i.value, label: i.label || i.value })));
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [dictCode, open]);
 
   // Sync from props when popover opens
@@ -254,9 +258,12 @@ export function FilterValuePopover({
     if ((ft === 'ENUM' || ft === 'DICT') && operator === 'in' && dictOptions.length > 0) {
       const selected = Array.isArray(value) ? value : value ? [value] : [];
       return (
-        <div className="max-h-40 overflow-y-auto space-y-1">
+        <div className="max-h-40 space-y-1 overflow-y-auto">
           {dictOptions.map((opt) => (
-            <label key={opt.value} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 px-1 py-0.5 rounded">
+            <label
+              key={opt.value}
+              className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 text-sm hover:bg-gray-50"
+            >
               <input
                 type="checkbox"
                 checked={selected.includes(opt.value)}

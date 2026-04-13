@@ -10,11 +10,7 @@
  */
 
 import { test, expect } from '@playwright/test';
-import {
-  uniqueId,
-  executeCommandViaApi,
-  dateOffsetStr,
-} from '../helpers/index';
+import { uniqueId, executeCommandViaApi, dateOffsetStr } from '../helpers/index';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -52,9 +48,11 @@ test.describe('PM My Tasks', () => {
     try {
       // Create project
       const proj = await executeCommandViaApi(
-        page, 'pm:create_project',
+        page,
+        'pm:create_project',
         { pm_project_name: projectName },
-        undefined, 'create',
+        undefined,
+        'create',
       );
       const projectPid = proj.recordId;
       expect(projectPid).toBeTruthy();
@@ -64,18 +62,19 @@ test.describe('PM My Tasks', () => {
 
       // Fetch auto-created member pid
       const BASE = process.env.BASE_URL || 'http://localhost:5173';
-      const memberFilter = encodeURIComponent(JSON.stringify([
-        { fieldName: 'pm_member_project_id', operator: 'EQ', value: projectPid },
-      ]));
+      const memberFilter = encodeURIComponent(
+        JSON.stringify([{ fieldName: 'pm_member_project_id', operator: 'EQ', value: projectPid }]),
+      );
       const memberResp = await page.request.get(
-        `${BASE}/api/dynamic/pm-project-member/list?pageSize=10&filters=${memberFilter}`,
+        `${BASE}/api/dynamic/pm_project_member/list?pageSize=10&filters=${memberFilter}`,
       );
       const memberBody = await memberResp.json();
       const memberPid = memberBody?.data?.records?.[0]?.pid;
 
       // Create TODO task assigned to current user
       await executeCommandViaApi(
-        page, 'pm:create_task',
+        page,
+        'pm:create_task',
         {
           pm_task_title: taskTitle,
           pm_task_project_id: projectPid,
@@ -84,12 +83,14 @@ test.describe('PM My Tasks', () => {
           pm_task_due_date: dateOffsetStr(3),
           ...(memberPid ? { pm_task_assignee_id: memberPid } : {}),
         },
-        undefined, 'create',
+        undefined,
+        'create',
       );
 
       // Create DONE task (for status filter testing)
       const t2 = await executeCommandViaApi(
-        page, 'pm:create_task',
+        page,
+        'pm:create_task',
         {
           pm_task_title: doneTaskTitle,
           pm_task_project_id: projectPid,
@@ -97,7 +98,8 @@ test.describe('PM My Tasks', () => {
           pm_task_priority: 'medium',
           ...(memberPid ? { pm_task_assignee_id: memberPid } : {}),
         },
-        undefined, 'create',
+        undefined,
+        'create',
       );
       await executeCommandViaApi(page, 'pm:start_task', {}, t2.recordId, 'update');
       await executeCommandViaApi(page, 'pm:complete_task', {}, t2.recordId, 'update');
@@ -113,7 +115,10 @@ test.describe('PM My Tasks', () => {
 
   test('PM-MT-02: My Tasks page displays assigned task data', async ({ page }) => {
     const apiPromise = page.waitForResponse(
-      (r) => r.url().includes('/api/datasource/list') && r.url().includes('pm_my_tasks') && r.status() === 200,
+      (r) =>
+        r.url().includes('/api/datasource/list') &&
+        r.url().includes('pm_my_tasks') &&
+        r.status() === 200,
       { timeout: 10000 },
     );
     await navigateToMyTasks(page);
@@ -202,9 +207,11 @@ test.describe('PM My Tasks', () => {
     await expect(taskRow).toBeVisible({ timeout: 10000 });
 
     // Verify due date is rendered
-    await expect(taskRow.locator('[data-testid="task-card-due-date"], text=/\\d{4}-\\d{2}-\\d{2}/')).toBeVisible({ timeout: 5000 }).catch(() => {
-      // Due date display is optional
-    });
+    await expect(taskRow.locator('[data-testid="task-card-due-date"], text=/\\d{4}-\\d{2}-\\d{2}/'))
+      .toBeVisible({ timeout: 5000 })
+      .catch(() => {
+        // Due date display is optional
+      });
   });
 
   test('PM-MT-08: Empty state when no matching tasks', async ({ page }) => {

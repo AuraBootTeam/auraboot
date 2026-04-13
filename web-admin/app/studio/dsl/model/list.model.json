@@ -1,5 +1,5 @@
 {
-  "kind": "List",
+  "kind": "list",
   "version": "1.0.0",
   "id": "list.meta.model",
   "title": "$i18n:list.model.title",

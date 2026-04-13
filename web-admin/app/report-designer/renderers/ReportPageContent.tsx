@@ -163,7 +163,7 @@ export const ReportPageContent: React.FC<ReportPageContentProps> = ({ pageKey })
         {/* Body blocks */}
         {report.body.map((block) => (
           <div key={block.id} className="mb-6">
-            {block.blockType === 'data-table' && (
+            {block.blockType === 'table' && (
               <ReportTableBlockRenderer block={block} data={dataSets[block.dataSource] || []} />
             )}
             {block.blockType === 'grouped-table' && (

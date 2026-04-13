@@ -15,7 +15,6 @@
 
 import { test, expect } from '../../fixtures';
 
-
 test.describe('Menu System', () => {
   test.describe.configure({ mode: 'serial' });
 
@@ -27,9 +26,7 @@ test.describe('Menu System', () => {
    */
   test('E5-E01: Sidebar menu tree renders @smoke', async ({ page }) => {
     // Fetch menu tree from API first
-    const menuResponse = await page.request.get(
-      `/api/menu/user`
-    );
+    const menuResponse = await page.request.get(`/api/menu/user`);
     expect(menuResponse.ok()).toBe(true);
 
     const menuData = await menuResponse.json();
@@ -81,7 +78,7 @@ test.describe('Menu System', () => {
       if (
         menu.path &&
         menu.path !== '#' &&
-        !menu.path.startsWith('/dynamic/') &&
+        !menu.path.startsWith('/p/') &&
         children.length === 0
       ) {
         targetPath = menu.path;
@@ -95,11 +92,7 @@ test.describe('Menu System', () => {
         const children = menu.children || [];
         if (children.length > 0) {
           for (const child of children) {
-            if (
-              child.path &&
-              child.path !== '#' &&
-              !child.path.startsWith('/dynamic/')
-            ) {
+            if (child.path && child.path !== '#' && !child.path.startsWith('/p/')) {
               targetPath = child.path;
               parentName = menu.name;
               break;
@@ -125,7 +118,11 @@ test.describe('Menu System', () => {
       if (isParentVisible) {
         await parentBtn.click();
         if (targetPath) {
-          await sidebar.locator(`a[href="${targetPath}"]`).first().waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+          await sidebar
+            .locator(`a[href="${targetPath}"]`)
+            .first()
+            .waitFor({ state: 'visible', timeout: 3000 })
+            .catch(() => {});
         }
       }
     }
@@ -180,7 +177,7 @@ test.describe('Menu System', () => {
     }
 
     if (!parentMenuName) {
-      throw new Error(String('No parent menu with children found'))
+      throw new Error(String('No parent menu with children found'));
       return;
     }
 
@@ -246,7 +243,7 @@ test.describe('Menu System', () => {
     // Look for icon elements within the sidebar
     // Icons can be SVGs, Lucide icons, Ant Design icons, or custom img elements
     const icons = sidebar.locator(
-      'svg, img[src*="icon"], [class*="icon"], [class*="Icon"], [data-testid*="icon"]'
+      'svg, img[src*="icon"], [class*="icon"], [class*="Icon"], [data-testid*="icon"]',
     );
     const iconCount = await icons.count();
 
@@ -254,7 +251,7 @@ test.describe('Menu System', () => {
     const menusWithIcons = localMenuTree.filter((m: any) => m.icon || m.iconName);
 
     if (menusWithIcons.length === 0) {
-      throw new Error(String('No menus have icon configuration'))
+      throw new Error(String('No menus have icon configuration'));
       return;
     }
 
@@ -273,12 +270,10 @@ test.describe('Menu System', () => {
    */
   test('E5-E05: Dynamic menu from plugin', async ({ page }) => {
     // Check if any plugin-contributed menus exist
-    const allMenusResponse = await page.request.get(
-      `/api/menu/all`
-    );
+    const allMenusResponse = await page.request.get(`/api/menu/all`);
 
     if (!allMenusResponse.ok()) {
-      throw new Error(String('All menus API not accessible'))
+      throw new Error(String('All menus API not accessible'));
       return;
     }
 
@@ -326,7 +321,7 @@ test.describe('Menu System', () => {
 
       if (menuPath) {
         const byPathResponse = await page.request.get(
-          `/api/menu/by-path?path=${encodeURIComponent(menuPath)}`
+          `/api/menu/by-path?path=${encodeURIComponent(menuPath)}`,
         );
 
         if (byPathResponse.ok()) {

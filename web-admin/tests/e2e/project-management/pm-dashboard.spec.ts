@@ -17,12 +17,7 @@
  */
 
 import { test, expect } from '../../fixtures';
-import {
-  uniqueId,
-  executeCommandViaApi,
-  todayStr,
-  dateOffsetStr,
-} from '../helpers/index';
+import { uniqueId, executeCommandViaApi, todayStr, dateOffsetStr } from '../helpers/index';
 
 test.describe('PM Dashboard @smoke', () => {
   test.describe.configure({ mode: 'serial' });
@@ -56,13 +51,7 @@ test.describe('PM Dashboard @smoke', () => {
       projectPid = proj1.recordId;
 
       // Activate project: planning → in_progress
-      await executeCommandViaApi(
-        page,
-        'pm:activate_project',
-        {},
-        projectPid,
-        'update',
-      );
+      await executeCommandViaApi(page, 'pm:activate_project', {}, projectPid, 'update');
 
       // --- Project 2: Completed ---
       const proj2 = await executeCommandViaApi(
@@ -77,20 +66,8 @@ test.describe('PM Dashboard @smoke', () => {
       );
       project2Pid = proj2.recordId;
 
-      await executeCommandViaApi(
-        page,
-        'pm:activate_project',
-        {},
-        project2Pid,
-        'update',
-      );
-      await executeCommandViaApi(
-        page,
-        'pm:complete_project',
-        {},
-        project2Pid,
-        'update',
-      );
+      await executeCommandViaApi(page, 'pm:activate_project', {}, project2Pid, 'update');
+      await executeCommandViaApi(page, 'pm:complete_project', {}, project2Pid, 'update');
 
       // --- Tasks for Project 1 ---
       // Task 1: todo (default)
@@ -121,13 +98,7 @@ test.describe('PM Dashboard @smoke', () => {
         'create',
       );
       taskPid = task2.recordId;
-      await executeCommandViaApi(
-        page,
-        'pm:start_task',
-        {},
-        taskPid,
-        'update',
-      );
+      await executeCommandViaApi(page, 'pm:start_task', {}, taskPid, 'update');
 
       // Task 3: done
       const task3 = await executeCommandViaApi(
@@ -142,20 +113,8 @@ test.describe('PM Dashboard @smoke', () => {
         undefined,
         'create',
       );
-      await executeCommandViaApi(
-        page,
-        'pm:start_task',
-        {},
-        task3.recordId,
-        'update',
-      );
-      await executeCommandViaApi(
-        page,
-        'pm:complete_task',
-        {},
-        task3.recordId,
-        'update',
-      );
+      await executeCommandViaApi(page, 'pm:start_task', {}, task3.recordId, 'update');
+      await executeCommandViaApi(page, 'pm:complete_task', {}, task3.recordId, 'update');
 
       // Task 4: overdue (due date in the past)
       await executeCommandViaApi(
@@ -208,18 +167,26 @@ test.describe('PM Dashboard @smoke', () => {
 
     // Wait for dashboard data to load — multiple API calls fire in parallel
     await Promise.all([
-      page.waitForResponse(
-        (r) => r.url().includes('/api/datasource/list') && r.url().includes('pm_dashboard_kpi') && r.status() === 200,
-        { timeout: 15000 },
-      ).catch(() => null),
-      page.waitForResponse(
-        (r) => r.url().includes('/api/meta/chart-data') && r.status() === 200,
-        { timeout: 15000 },
-      ).catch(() => null),
+      page
+        .waitForResponse(
+          (r) =>
+            r.url().includes('/api/datasource/list') &&
+            r.url().includes('pm_dashboard_kpi') &&
+            r.status() === 200,
+          { timeout: 15000 },
+        )
+        .catch(() => null),
+      page
+        .waitForResponse((r) => r.url().includes('/api/meta/chart-data') && r.status() === 200, {
+          timeout: 15000,
+        })
+        .catch(() => null),
     ]);
 
     // Wait for stat cards to render
-    await page.locator('[data-testid="dashboard-block-block_pm_kpi"]').waitFor({ state: 'visible', timeout: 10000 });
+    await page
+      .locator('[data-testid="dashboard-block-block_pm_kpi"]')
+      .waitFor({ state: 'visible', timeout: 10000 });
   }
 
   // =========================================================================
@@ -375,8 +342,12 @@ test.describe('PM Dashboard @smoke', () => {
     await gotoDashboard(page);
 
     // Wait for chart blocks to be visible before checking for error state.
-    await expect(page.locator('[data-testid="dashboard-block-block_task_trend"]')).toBeVisible({ timeout: 10000 });
-    await expect(page.locator('[data-testid="dashboard-block-block_project_status"]')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('[data-testid="dashboard-block-block_task_trend"]')).toBeVisible({
+      timeout: 10000,
+    });
+    await expect(page.locator('[data-testid="dashboard-block-block_project_status"]')).toBeVisible({
+      timeout: 10000,
+    });
 
     const chartBlockIds = [
       'block_task_trend',
@@ -498,7 +469,9 @@ test.describe('PM Dashboard @smoke', () => {
   // =========================================================================
   // TEST 11: Monthly task trend has current month data
   // =========================================================================
-  test('PM-DASH-11: Monthly task trend includes current month with created tasks', async ({ page }) => {
+  test('PM-DASH-11: Monthly task trend includes current month with created tasks', async ({
+    page,
+  }) => {
     const resp = await page.request.get(
       '/api/datasource/list?datasourceId=nq:pm_monthly_task_trend&format=records',
     );
@@ -527,7 +500,9 @@ test.describe('PM Dashboard @smoke', () => {
     const body = await resp.json();
     const records = body?.data?.records ?? [];
     // We created a time entry with 4.5 hours
-    expect(records.length, 'Should have at least 1 user with time entries').toBeGreaterThanOrEqual(1);
+    expect(records.length, 'Should have at least 1 user with time entries').toBeGreaterThanOrEqual(
+      1,
+    );
 
     // Find our user's entry and verify hours
     const hasHours = records.some((r: any) => Number(r.total_hours) >= 4.5);

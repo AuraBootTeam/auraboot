@@ -20,11 +20,11 @@ export type DropTargetType = 'fields' | 'columns' | null;
  */
 function getDropTargetType(blockType: BlockType): DropTargetType {
   switch (blockType) {
-    case 'filter-form':
+    case 'filters':
     case 'form-section':
     case 'detail-section':
       return 'fields';
-    case 'data-table':
+    case 'table':
       return 'columns';
     default:
       return null;

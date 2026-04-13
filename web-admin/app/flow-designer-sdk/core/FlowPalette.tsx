@@ -3,6 +3,7 @@ import React, { useMemo } from 'react';
 import * as LucideIcons from 'lucide-react';
 import { useSmartText } from '~/utils/i18n';
 import { nodeRegistry } from '../nodes/NodeRegistry';
+import { useFlowStore } from '../store/useFlowStore';
 import { DesignerPalette } from '~/shared/designer';
 import type { PaletteItem } from '~/shared/designer';
 
@@ -35,9 +36,11 @@ function renderNodeIcon(icon: string | undefined) {
 
 export function FlowPalette({ categoryOrder, className }: FlowPaletteProps) {
   const st = useSmartText();
+  const { registryVersion } = useFlowStore();
 
-  const categories = categoryOrder || nodeRegistry.getCategories();
-  const grouped = nodeRegistry.getByCategory();
+  // Re-read from registry whenever registryVersion changes (after registerAll)
+  const categories = useMemo(() => categoryOrder || nodeRegistry.getCategories(), [categoryOrder, registryVersion]);
+  const grouped = useMemo(() => nodeRegistry.getByCategory(), [registryVersion]);
 
   // Build category labels (resolved through i18n)
   const categoryLabels = useMemo(() => {

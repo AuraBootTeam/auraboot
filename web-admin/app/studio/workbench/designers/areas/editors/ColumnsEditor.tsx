@@ -1,7 +1,7 @@
 /**
  * Columns Editor
  *
- * Editor for configuring data-table columns.
+ * Editor for configuring table columns.
  * Also supports dropping fields from FieldLibrary.
  */
 

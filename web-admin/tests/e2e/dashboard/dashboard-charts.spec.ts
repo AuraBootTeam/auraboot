@@ -24,17 +24,23 @@ import { DashboardDesignerPage } from '../../pages';
  */
 async function navigateToDashboardDesigner(
   page: import('@playwright/test').Page,
-  designerPage: DashboardDesignerPage
+  designerPage: DashboardDesignerPage,
 ): Promise<boolean> {
   try {
     await designerPage.goto();
     // Wait for palette to fully render before returning
-    await designerPage.paletteItem('数字卡片').waitFor({ state: 'visible', timeout: 8000 }).catch(() => {});
+    await designerPage
+      .paletteItem('数字卡片')
+      .waitFor({ state: 'visible', timeout: 8000 })
+      .catch(() => {});
     return true;
   } catch {
     // goto() failed — check if login redirect happened
     const loginLocator = page.locator('text=请先登录, text=欢迎登录');
-    const isLogin = await loginLocator.first().isVisible({ timeout: 2000 }).catch(() => false);
+    const isLogin = await loginLocator
+      .first()
+      .isVisible({ timeout: 2000 })
+      .catch(() => false);
     if (isLogin) return false;
 
     // Might have loaded enough for the shell to be usable even if the first wait timed out.
@@ -208,14 +214,20 @@ test.describe('Dashboard Charts - Adding New Widgets', () => {
       return;
     }
 
-    const hasScatter = await designerPage.paletteItem('散点图').isVisible({ timeout: 8000 }).catch(() => false);
+    const hasScatter = await designerPage
+      .paletteItem('散点图')
+      .isVisible({ timeout: 8000 })
+      .catch(() => false);
     if (!hasScatter) {
       throw new Error('Scatter chart widget not available');
       return;
     }
 
     await designerPage.addWidget('散点图');
-    const propertyPanelHeader = designerPage.propertyPanel.locator('h2').filter({ hasText: /散点图|Scatter/i }).first();
+    const propertyPanelHeader = designerPage.propertyPanel
+      .locator('h2')
+      .filter({ hasText: /散点图|Scatter/i })
+      .first();
     await expect(propertyPanelHeader).toBeVisible();
   });
 
@@ -232,14 +244,20 @@ test.describe('Dashboard Charts - Adding New Widgets', () => {
       return;
     }
 
-    const hasRadar = await designerPage.paletteItem('雷达图').isVisible({ timeout: 8000 }).catch(() => false);
+    const hasRadar = await designerPage
+      .paletteItem('雷达图')
+      .isVisible({ timeout: 8000 })
+      .catch(() => false);
     if (!hasRadar) {
       throw new Error('Radar chart widget not available');
       return;
     }
 
     await designerPage.addWidget('雷达图');
-    const propertyPanelHeader = designerPage.propertyPanel.locator('h2').filter({ hasText: /雷达图|Radar/i }).first();
+    const propertyPanelHeader = designerPage.propertyPanel
+      .locator('h2')
+      .filter({ hasText: /雷达图|Radar/i })
+      .first();
     await expect(propertyPanelHeader).toBeVisible();
   });
 });
@@ -269,7 +287,10 @@ test.describe('Dashboard Charts - Widget Configuration', () => {
     await designerPage.addWidget('漏斗图');
 
     // Wait for property panel to show funnel chart header
-    const propertyPanelHeader = designerPage.propertyPanel.locator('h2').filter({ hasText: /漏斗图|Funnel/i }).first();
+    const propertyPanelHeader = designerPage.propertyPanel
+      .locator('h2')
+      .filter({ hasText: /漏斗图|Funnel/i })
+      .first();
     const headerVisible = await propertyPanelHeader.isVisible({ timeout: 8000 }).catch(() => false);
 
     if (!headerVisible) {
@@ -316,7 +337,10 @@ test.describe('Dashboard Charts - Widget Configuration', () => {
     await designerPage.addWidget('散点图');
 
     // Verify widget was added and property panel shows scatter chart header
-    const propertyPanelHeader = designerPage.propertyPanel.locator('h2').filter({ hasText: /散点图|Scatter/i }).first();
+    const propertyPanelHeader = designerPage.propertyPanel
+      .locator('h2')
+      .filter({ hasText: /散点图|Scatter/i })
+      .first();
     await expect(propertyPanelHeader).toBeVisible({ timeout: 5000 });
 
     // Look for bubble mode toggle
@@ -345,18 +369,27 @@ test.describe('Dashboard Charts - Widget Configuration', () => {
       return;
     }
 
-    const hasRadar = await designerPage.paletteItem('雷达图').isVisible({ timeout: 8000 }).catch(() => false);
+    const hasRadar = await designerPage
+      .paletteItem('雷达图')
+      .isVisible({ timeout: 8000 })
+      .catch(() => false);
     if (!hasRadar) {
       throw new Error('Radar chart widget not available');
       return;
     }
 
     await designerPage.addWidget('雷达图');
-    const propertyPanelHeader = designerPage.propertyPanel.locator('h2').filter({ hasText: /雷达图|Radar/i }).first();
+    const propertyPanelHeader = designerPage.propertyPanel
+      .locator('h2')
+      .filter({ hasText: /雷达图|Radar/i })
+      .first();
     await expect(propertyPanelHeader).toBeVisible({ timeout: 8000 });
 
     // Look for shape configuration
-    const shapeLabel = designerPage.propertyPanel.locator('label, span').filter({ hasText: /形状|Shape/i }).first();
+    const shapeLabel = designerPage.propertyPanel
+      .locator('label, span')
+      .filter({ hasText: /形状|Shape/i })
+      .first();
     await shapeLabel.scrollIntoViewIfNeeded().catch(() => {});
     const hasShapeLabel = await shapeLabel.isVisible({ timeout: 3000 }).catch(() => false);
 
@@ -429,7 +462,9 @@ test.describe('Dashboard Charts - Widget Categories', () => {
     }
 
     // Check standard categories using palette-scoped locators
-    await expect(designerPage.palette.locator('h3:has-text("指标")')).toBeVisible({ timeout: 5000 });
+    await expect(designerPage.palette.locator('h3:has-text("指标")')).toBeVisible({
+      timeout: 5000,
+    });
     await expect(designerPage.palette.locator('h3:has-text("图表")')).toBeVisible();
 
     // Check if the new "数据" category exists (for table chart)

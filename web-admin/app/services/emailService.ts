@@ -20,16 +20,16 @@ export interface EmailAccount {
   tenantId: number;
   userId: number;
   accountType: string; // 'personal' | 'shared'
-  provider: string;    // 'gmail'
+  provider: string; // 'gmail'
   emailAddress: string;
   displayName?: string;
-  syncMode: string;    // 'full' | 'metadata_only'
+  syncMode: string; // 'full' | 'metadata_only'
   syncState?: {
     lastSyncAt?: string;
     historyId?: string;
     syncStatus?: string; // 'syncing' | 'idle' | 'error'
   };
-  status: string;      // 'active' | 'disconnected' | 'error'
+  status: string; // 'active' | 'disconnected' | 'error'
   createdAt: string;
   updatedAt: string;
 }
@@ -145,7 +145,7 @@ export async function getOAuthUrl(): Promise<string | null> {
   const result = await fetchResult<string>(`${BASE}/accounts/oauth/url`, {
     method: 'get',
   });
-  return ResultHelper.isSuccess(result) ? result.data ?? null : null;
+  return ResultHelper.isSuccess(result) ? (result.data ?? null) : null;
 }
 
 /**
@@ -196,10 +196,9 @@ export async function triggerSync(accountId: number): Promise<void> {
  * List members of a shared email account.
  */
 export async function listMembers(accountId: number): Promise<EmailAccountMember[]> {
-  const result = await fetchResult<EmailAccountMember[]>(
-    `${BASE}/accounts/${accountId}/members`,
-    { method: 'get' },
-  );
+  const result = await fetchResult<EmailAccountMember[]>(`${BASE}/accounts/${accountId}/members`, {
+    method: 'get',
+  });
   if (ResultHelper.isSuccess(result) && result.data) {
     return result.data;
   }
@@ -209,11 +208,7 @@ export async function listMembers(accountId: number): Promise<EmailAccountMember
 /**
  * Add a member to a shared email account.
  */
-export async function addMember(
-  accountId: number,
-  userId: number,
-  role: string,
-): Promise<void> {
+export async function addMember(accountId: number, userId: number, role: string): Promise<void> {
   await fetchResult(`${BASE}/accounts/${accountId}/members`, {
     method: 'post',
     params: { userId, role },
@@ -259,7 +254,7 @@ export async function getThread(threadId: string): Promise<EmailThread | null> {
   const result = await fetchResult<EmailThread>(`${BASE}/threads/${threadId}`, {
     method: 'get',
   });
-  return ResultHelper.isSuccess(result) ? result.data ?? null : null;
+  return ResultHelper.isSuccess(result) ? (result.data ?? null) : null;
 }
 
 /**
@@ -269,7 +264,7 @@ export async function getMessage(messageId: number): Promise<EmailMessage | null
   const result = await fetchResult<EmailMessage>(`${BASE}/messages/${messageId}`, {
     method: 'get',
   });
-  return ResultHelper.isSuccess(result) ? result.data ?? null : null;
+  return ResultHelper.isSuccess(result) ? (result.data ?? null) : null;
 }
 
 /**
@@ -357,10 +352,9 @@ export async function getMessageLinks(messageId: number): Promise<CrmLink[]> {
  * Get tracking stats (opens/clicks) for an outbound message.
  */
 export async function getTrackingStats(messageId: number): Promise<TrackingStats> {
-  const result = await fetchResult<TrackingStats>(
-    `${BASE}/messages/${messageId}/tracking`,
-    { method: 'get' },
-  );
+  const result = await fetchResult<TrackingStats>(`${BASE}/messages/${messageId}/tracking`, {
+    method: 'get',
+  });
   if (ResultHelper.isSuccess(result) && result.data) {
     return result.data;
   }
@@ -393,7 +387,7 @@ export async function createSequence(data: {
     method: 'post',
     params: data,
   });
-  return ResultHelper.isSuccess(result) ? result.data ?? null : null;
+  return ResultHelper.isSuccess(result) ? (result.data ?? null) : null;
 }
 
 /**
@@ -403,7 +397,7 @@ export async function getSequence(sequenceId: number): Promise<EmailSequence | n
   const result = await fetchResult<EmailSequence>(`${BASE}/sequences/${sequenceId}`, {
     method: 'get',
   });
-  return ResultHelper.isSuccess(result) ? result.data ?? null : null;
+  return ResultHelper.isSuccess(result) ? (result.data ?? null) : null;
 }
 
 /**
@@ -444,11 +438,11 @@ export async function addStep(
     bodyTemplate: string;
   },
 ): Promise<EmailSequenceStep | null> {
-  const result = await fetchResult<EmailSequenceStep>(
-    `${BASE}/sequences/${sequenceId}/steps`,
-    { method: 'post', params: data },
-  );
-  return ResultHelper.isSuccess(result) ? result.data ?? null : null;
+  const result = await fetchResult<EmailSequenceStep>(`${BASE}/sequences/${sequenceId}/steps`, {
+    method: 'post',
+    params: data,
+  });
+  return ResultHelper.isSuccess(result) ? (result.data ?? null) : null;
 }
 
 /**
@@ -482,10 +476,9 @@ export async function deleteStep(sequenceId: number, stepId: number): Promise<vo
  * Get steps for a sequence.
  */
 export async function listSteps(sequenceId: number): Promise<EmailSequenceStep[]> {
-  const result = await fetchResult<EmailSequenceStep[]>(
-    `${BASE}/sequences/${sequenceId}/steps`,
-    { method: 'get' },
-  );
+  const result = await fetchResult<EmailSequenceStep[]>(`${BASE}/sequences/${sequenceId}/steps`, {
+    method: 'get',
+  });
   if (ResultHelper.isSuccess(result) && result.data) {
     return result.data;
   }
@@ -513,9 +506,7 @@ export async function enrollContacts(
 /**
  * List enrollments for a sequence.
  */
-export async function listEnrollments(
-  sequenceId: number,
-): Promise<EmailSequenceEnrollment[]> {
+export async function listEnrollments(sequenceId: number): Promise<EmailSequenceEnrollment[]> {
   const result = await fetchResult<EmailSequenceEnrollment[]>(
     `${BASE}/sequences/${sequenceId}/enrollments`,
     { method: 'get' },
@@ -529,25 +520,17 @@ export async function listEnrollments(
 /**
  * Pause an enrollment.
  */
-export async function pauseEnrollment(
-  sequenceId: number,
-  enrollmentId: number,
-): Promise<void> {
-  await fetchResult(
-    `${BASE}/sequences/${sequenceId}/enrollments/${enrollmentId}/pause`,
-    { method: 'put' },
-  );
+export async function pauseEnrollment(sequenceId: number, enrollmentId: number): Promise<void> {
+  await fetchResult(`${BASE}/sequences/${sequenceId}/enrollments/${enrollmentId}/pause`, {
+    method: 'put',
+  });
 }
 
 /**
  * Resume a paused enrollment.
  */
-export async function resumeEnrollment(
-  sequenceId: number,
-  enrollmentId: number,
-): Promise<void> {
-  await fetchResult(
-    `${BASE}/sequences/${sequenceId}/enrollments/${enrollmentId}/resume`,
-    { method: 'put' },
-  );
+export async function resumeEnrollment(sequenceId: number, enrollmentId: number): Promise<void> {
+  await fetchResult(`${BASE}/sequences/${sequenceId}/enrollments/${enrollmentId}/resume`, {
+    method: 'put',
+  });
 }

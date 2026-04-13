@@ -139,9 +139,7 @@ export default function CalendarSyncPage() {
     setConnectLoading((prev) => ({ ...prev, [provider]: true }));
     try {
       const providerKey = provider.toLowerCase();
-      const data = await apiFetch<{ authUrl: string }>(
-        `/api/crm/calendar/connect/${providerKey}`,
-      );
+      const data = await apiFetch<{ authUrl: string }>(`/api/crm/calendar/connect/${providerKey}`);
       if (data?.authUrl) {
         window.location.href = data.authUrl;
       } else {
@@ -167,17 +165,12 @@ export default function CalendarSyncPage() {
       });
       setProviders((prev) =>
         prev.map((p) =>
-          p.provider === provider
-            ? { provider, connected: false, syncDirection: 'both' }
-            : p,
+          p.provider === provider ? { provider, connected: false, syncDirection: 'both' } : p,
         ),
       );
       showToast(`${meta.name} disconnected`, 'success');
     } catch (e: unknown) {
-      showToast(
-        (e instanceof Error ? e.message : null) ?? `Failed to disconnect`,
-        'error',
-      );
+      showToast((e instanceof Error ? e.message : null) ?? `Failed to disconnect`, 'error');
     } finally {
       setDisconnectLoading((prev) => ({ ...prev, [provider]: false }));
     }
@@ -333,8 +326,10 @@ export default function CalendarSyncPage() {
                           ))}
                         </div>
                         <p className="mt-1 text-xs text-gray-400">
-                          {SYNC_DIRECTIONS.find((d) => d.value === providerStatus.syncDirection)
-                            ?.description}
+                          {
+                            SYNC_DIRECTIONS.find((d) => d.value === providerStatus.syncDirection)
+                              ?.description
+                          }
                         </p>
                       </div>
                     </div>
@@ -350,9 +345,7 @@ export default function CalendarSyncPage() {
                           className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300"
                           data-testid={`sync-now-${providerStatus.provider.toLowerCase()}`}
                         >
-                          <ArrowPathIcon
-                            className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`}
-                          />
+                          <ArrowPathIcon className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
                           {isSyncing ? 'Syncing...' : 'Sync Now'}
                         </button>
                         <button

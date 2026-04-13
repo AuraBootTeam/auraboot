@@ -13,7 +13,7 @@ async function createViewViaApi(
   page: Page,
   modelCode: string,
   name: string,
-  conditionalFormats?: any[]
+  conditionalFormats?: any[],
 ): Promise<string> {
   const resp = await page.request.post('/api/views', {
     data: {
@@ -37,7 +37,6 @@ async function getViewViaApi(page: Page, pid: string): Promise<any> {
 }
 
 test.describe('Conditional Formatting (GAP-122)', () => {
-
   test('CF-001: conditional format rules stored in viewConfig via API', async ({ page }) => {
     // Navigate to establish auth context
     await page.goto('/');
@@ -45,7 +44,12 @@ test.describe('Conditional Formatting (GAP-122)', () => {
 
     const viewName = `CF_Store_${uniqueId()}`;
     const rules = [
-      { fieldCode: 'e2et_order_status', operator: 'eq', value: 'draft', style: { backgroundColor: '#f5f5f5', textColor: '#424242' } },
+      {
+        fieldCode: 'e2et_order_status',
+        operator: 'eq',
+        value: 'draft',
+        style: { backgroundColor: '#f5f5f5', textColor: '#424242' },
+      },
     ];
     const pid = await createViewViaApi(page, 'e2et_order', viewName, rules);
     expect(pid).toBeTruthy();
@@ -65,8 +69,16 @@ test.describe('Conditional Formatting (GAP-122)', () => {
 
     const viewName = `CF_NullOps_${uniqueId()}`;
     const rules = [
-      { fieldCode: 'e2et_total_amount', operator: 'isNull', style: { backgroundColor: '#ffebee', textColor: '#b71c1c' } },
-      { fieldCode: 'e2et_total_amount', operator: 'isNotNull', style: { backgroundColor: '#e8f5e9', textColor: '#1b5e20' } },
+      {
+        fieldCode: 'e2et_total_amount',
+        operator: 'isNull',
+        style: { backgroundColor: '#ffebee', textColor: '#b71c1c' },
+      },
+      {
+        fieldCode: 'e2et_total_amount',
+        operator: 'isNotNull',
+        style: { backgroundColor: '#e8f5e9', textColor: '#1b5e20' },
+      },
     ];
     const pid = await createViewViaApi(page, 'e2et_order', viewName, rules);
     expect(pid).toBeTruthy();
@@ -148,7 +160,12 @@ test.describe('Conditional Formatting (GAP-122)', () => {
     // Create view with rules
     const viewName = `CF_Delete_${uniqueId()}`;
     const pid = await createViewViaApi(page, 'e2et_order', viewName, [
-      { fieldCode: 'e2et_order_status', operator: 'eq', value: 'draft', style: { backgroundColor: '#f5f5f5' } },
+      {
+        fieldCode: 'e2et_order_status',
+        operator: 'eq',
+        value: 'draft',
+        style: { backgroundColor: '#f5f5f5' },
+      },
     ]);
     expect(pid).toBeTruthy();
 
@@ -169,7 +186,12 @@ test.describe('Conditional Formatting (GAP-122)', () => {
 
     const viewName = `CF_Refresh_${uniqueId()}`;
     const rules = [
-      { fieldCode: 'e2et_order_status', operator: 'eq', value: 'submitted', style: { backgroundColor: '#e3f2fd', textColor: '#0d47a1' } },
+      {
+        fieldCode: 'e2et_order_status',
+        operator: 'eq',
+        value: 'submitted',
+        style: { backgroundColor: '#e3f2fd', textColor: '#0d47a1' },
+      },
     ];
 
     const pid = await createViewViaApi(page, 'e2et_order', viewName, rules);

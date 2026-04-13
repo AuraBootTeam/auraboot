@@ -79,7 +79,9 @@ export const MultiSelect = forwardRef<HTMLDivElement, MultiSelectProps>(
 
     const safeOptions = options ?? [];
     const filteredOptions = searchable
-      ? safeOptions.filter((option) => option.label.toLowerCase().includes(searchTerm.toLowerCase()))
+      ? safeOptions.filter((option) =>
+          option.label.toLowerCase().includes(searchTerm.toLowerCase()),
+        )
       : safeOptions;
 
     const safeCurrentValue = Array.isArray(currentValue) ? currentValue : [];

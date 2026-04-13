@@ -64,9 +64,15 @@ async function cmd(
   commandCode: string,
   payload: Record<string, unknown>,
   targetRecordId?: string,
-  operationType?: string
+  operationType?: string,
 ): Promise<string> {
-  const result = await executeCommandViaApi(page, commandCode, payload, targetRecordId, operationType);
+  const result = await executeCommandViaApi(
+    page,
+    commandCode,
+    payload,
+    targetRecordId,
+    operationType,
+  );
   expect(result.code).toBe('0');
   return result.recordId;
 }
@@ -93,11 +99,21 @@ test.describe.serial('Showcase Seed — Extended', () => {
       // C-tier — general accounts (30)
       { name: '绵阳鑫源电子科技有限公司', industry: 'electronics', rating: 'C', status: 'active' },
       { name: '常熟达利精密零件有限公司', industry: 'precision', rating: 'C', status: 'active' },
-      { name: '湖州南太湖光电有限公司', industry: 'optoelectronics', rating: 'C', status: 'active' },
+      {
+        name: '湖州南太湖光电有限公司',
+        industry: 'optoelectronics',
+        rating: 'C',
+        status: 'active',
+      },
       { name: '泰州海陵机电有限公司', industry: 'manufacturing', rating: 'C', status: 'active' },
       { name: '漳州龙海电子科技有限公司', industry: 'electronics', rating: 'C', status: 'active' },
       { name: '赣州稀土电子材料有限公司', industry: 'materials', rating: 'C', status: 'active' },
-      { name: '芜湖繁昌电气设备有限公司', industry: 'power_equipment', rating: 'C', status: 'active' },
+      {
+        name: '芜湖繁昌电气设备有限公司',
+        industry: 'power_equipment',
+        rating: 'C',
+        status: 'active',
+      },
       { name: '连云港港城电子有限公司', industry: 'electronics', rating: 'C', status: 'active' },
       { name: '淄博齐鑫陶瓷电子有限公司', industry: 'materials', rating: 'C', status: 'active' },
       { name: '咸阳西北电子仪器有限公司', industry: 'instruments', rating: 'C', status: 'active' },
@@ -108,30 +124,80 @@ test.describe.serial('Showcase Seed — Extended', () => {
       { name: '襄阳隆中科技有限公司', industry: 'technology', rating: 'C', status: 'active' },
       { name: '龙岩紫金矿业电子有限公司', industry: 'mining', rating: 'C', status: 'active' },
       { name: '德州鲁北电子科技有限公司', industry: 'electronics', rating: 'C', status: 'active' },
-      { name: '柳州桂中机电设备有限公司', industry: 'manufacturing', rating: 'C', status: 'active' },
-      { name: '南阳中光学电子有限公司', industry: 'optoelectronics', rating: 'C', status: 'active' },
+      {
+        name: '柳州桂中机电设备有限公司',
+        industry: 'manufacturing',
+        rating: 'C',
+        status: 'active',
+      },
+      {
+        name: '南阳中光学电子有限公司',
+        industry: 'optoelectronics',
+        rating: 'C',
+        status: 'active',
+      },
       { name: '包头稀土应用电子有限公司', industry: 'materials', rating: 'C', status: 'active' },
       { name: '银川贺兰山电子有限公司', industry: 'electronics', rating: 'C', status: 'active' },
       { name: '临沂沂蒙电子科技有限公司', industry: 'electronics', rating: 'C', status: 'active' },
       { name: '嘉兴瑞丰电子科技有限公司', industry: 'electronics', rating: 'C', status: 'active' },
       { name: '衡阳南岳电子有限公司', industry: 'electronics', rating: 'C', status: 'active' },
-      { name: '马鞍山钢城电子科技有限公司', industry: 'electronics', rating: 'C', status: 'active' },
-      { name: '绍兴越城纺织电子有限公司', industry: 'manufacturing', rating: 'C', status: 'active' },
+      {
+        name: '马鞍山钢城电子科技有限公司',
+        industry: 'electronics',
+        rating: 'C',
+        status: 'active',
+      },
+      {
+        name: '绍兴越城纺织电子有限公司',
+        industry: 'manufacturing',
+        rating: 'C',
+        status: 'active',
+      },
       { name: '上饶信州电子材料有限公司', industry: 'materials', rating: 'C', status: 'active' },
       { name: '宿迁宿豫电子科技有限公司', industry: 'electronics', rating: 'C', status: 'active' },
       { name: '六安皋城电子有限公司', industry: 'electronics', rating: 'C', status: 'active' },
-      { name: '黄冈大别山电子科技有限公司', industry: 'electronics', rating: 'C', status: 'active' },
+      {
+        name: '黄冈大别山电子科技有限公司',
+        industry: 'electronics',
+        rating: 'C',
+        status: 'active',
+      },
       // Dormant — 10 (6+ months no activity)
       { name: '哈尔滨冰城电子有限公司', industry: 'electronics', rating: 'D', status: 'inactive' },
       { name: '兰州金城科技有限公司', industry: 'technology', rating: 'D', status: 'inactive' },
       { name: '贵阳黔灵电子有限公司', industry: 'electronics', rating: 'D', status: 'inactive' },
       { name: '昆明春城电子材料有限公司', industry: 'materials', rating: 'D', status: 'inactive' },
-      { name: '南宁邕城电子科技有限公司', industry: 'electronics', rating: 'D', status: 'inactive' },
-      { name: '呼和浩特青城电子有限公司', industry: 'electronics', rating: 'D', status: 'inactive' },
-      { name: '西宁高原电子科技有限公司', industry: 'electronics', rating: 'D', status: 'inactive' },
+      {
+        name: '南宁邕城电子科技有限公司',
+        industry: 'electronics',
+        rating: 'D',
+        status: 'inactive',
+      },
+      {
+        name: '呼和浩特青城电子有限公司',
+        industry: 'electronics',
+        rating: 'D',
+        status: 'inactive',
+      },
+      {
+        name: '西宁高原电子科技有限公司',
+        industry: 'electronics',
+        rating: 'D',
+        status: 'inactive',
+      },
       { name: '拉萨雪域电子有限公司', industry: 'electronics', rating: 'D', status: 'inactive' },
-      { name: '海口椰城电子科技有限公司', industry: 'electronics', rating: 'D', status: 'inactive' },
-      { name: '乌鲁木齐天山电子有限公司', industry: 'electronics', rating: 'D', status: 'inactive' },
+      {
+        name: '海口椰城电子科技有限公司',
+        industry: 'electronics',
+        rating: 'D',
+        status: 'inactive',
+      },
+      {
+        name: '乌鲁木齐天山电子有限公司',
+        industry: 'electronics',
+        rating: 'D',
+        status: 'inactive',
+      },
     ];
 
     for (const acc of accounts) {
@@ -151,16 +217,93 @@ test.describe.serial('Showcase Seed — Extended', () => {
   // ═════════════════════════════════════════════════════════════════════════
 
   test('Phase 9: CRM — C-tier Contacts (30)', async ({ page }) => {
-    const surnames = ['赵', '钱', '孙', '李', '周', '吴', '郑', '王', '冯', '陈', '褚', '卫', '蒋', '沈', '韩', '杨', '朱', '秦', '尤', '许', '何', '吕', '施', '张', '孔', '曹', '严', '华', '金', '魏'];
-    const givenNames = ['伟', '芳', '磊', '敏', '军', '丽', '涛', '婷', '强', '娜', '刚', '燕', '勇', '霞', '明', '艳', '杰', '萍', '峰', '红', '华', '平', '鹏', '琴', '建', '凤', '龙', '梅', '辉', '兰'];
+    const surnames = [
+      '赵',
+      '钱',
+      '孙',
+      '李',
+      '周',
+      '吴',
+      '郑',
+      '王',
+      '冯',
+      '陈',
+      '褚',
+      '卫',
+      '蒋',
+      '沈',
+      '韩',
+      '杨',
+      '朱',
+      '秦',
+      '尤',
+      '许',
+      '何',
+      '吕',
+      '施',
+      '张',
+      '孔',
+      '曹',
+      '严',
+      '华',
+      '金',
+      '魏',
+    ];
+    const givenNames = [
+      '伟',
+      '芳',
+      '磊',
+      '敏',
+      '军',
+      '丽',
+      '涛',
+      '婷',
+      '强',
+      '娜',
+      '刚',
+      '燕',
+      '勇',
+      '霞',
+      '明',
+      '艳',
+      '杰',
+      '萍',
+      '峰',
+      '红',
+      '华',
+      '平',
+      '鹏',
+      '琴',
+      '建',
+      '凤',
+      '龙',
+      '梅',
+      '辉',
+      '兰',
+    ];
     const titles = ['采购', '总经理', '技术', '销售', '工程', '生产', '品质', '仓管'];
 
-    const cAccounts = Object.entries(ext.accounts).filter(([name]) => !['哈尔滨', '兰州', '贵阳', '昆明', '南宁', '呼和浩特', '西宁', '拉萨', '海口', '乌鲁木齐'].some(city => name.includes(city)));
+    const cAccounts = Object.entries(ext.accounts).filter(
+      ([name]) =>
+        ![
+          '哈尔滨',
+          '兰州',
+          '贵阳',
+          '昆明',
+          '南宁',
+          '呼和浩特',
+          '西宁',
+          '拉萨',
+          '海口',
+          '乌鲁木齐',
+        ].some((city) => name.includes(city)),
+    );
 
     let created = 0;
     for (const [accName, accId] of cAccounts) {
       const idx = created;
-      const contactName = surnames[idx % surnames.length] + givenNames[(idx * 7 + 3) % givenNames.length];
+      const contactName =
+        surnames[idx % surnames.length] + givenNames[(idx * 7 + 3) % givenNames.length];
       const id = await cmd(page, 'crm:create_contact', {
         crm_ct_account_id: accId,
         crm_ct_name: contactName,
@@ -180,30 +323,98 @@ test.describe.serial('Showcase Seed — Extended', () => {
 
   test('Phase 10: CRM — Additional Leads (60)', async ({ page }) => {
     const companies = [
-      '温岭精工电子', '义乌创新科技', '慈溪宏达电器', '余姚舜宇光电',
-      '诸暨浣纱电子', '海宁皮革城电子', '桐乡乌镇智能', '平湖独山港电子',
-      '东阳影视电子', '兰溪兰江科技', '永康五金电子', '武义温泉电子',
-      '磐安药材电子', '浦江水晶电子', '开化钱江源科技', '江山廿八都电子',
-      '龙泉青瓷电子', '云和木玩电子', '庆元香菇电子', '景宁畲族电子',
-      '松阳茶城电子', '遂昌金矿电子', '缙云仙都电子', '丽水绿谷科技',
-      '舟山群岛电子', '定海海洋科技', '普陀渔港电子', '岱山海岛电子',
-      '奉化溪口电子', '宁海前童科技', '象山渔山电子', '鄞州东钱湖科技',
-      '北仑港区电子', '镇海化工电子', '江北慈城科技', '海曙月湖电子',
-      '鹿城温州电子', '龙湾科技园电子', '瓯海梧田科技', '瑞安汽配电子',
-      '乐清柳市电器', '苍南龙港电子', '平阳鳌江科技', '文成百丈漈电子',
-      '泰顺廊桥电子', '洞头海岛科技', '永嘉楠溪电子', '德清莫干山科技',
-      '安吉竹乡电子', '长兴太湖科技', '吴兴织里电子', '南浔古镇科技',
-      '秀洲王江泾电子', '南湖红船科技', '桐庐富春电子', '建德新安科技',
-      '淳安千岛湖电子', '临安天目科技', '富阳富春江电子', '萧山机场科技',
+      '温岭精工电子',
+      '义乌创新科技',
+      '慈溪宏达电器',
+      '余姚舜宇光电',
+      '诸暨浣纱电子',
+      '海宁皮革城电子',
+      '桐乡乌镇智能',
+      '平湖独山港电子',
+      '东阳影视电子',
+      '兰溪兰江科技',
+      '永康五金电子',
+      '武义温泉电子',
+      '磐安药材电子',
+      '浦江水晶电子',
+      '开化钱江源科技',
+      '江山廿八都电子',
+      '龙泉青瓷电子',
+      '云和木玩电子',
+      '庆元香菇电子',
+      '景宁畲族电子',
+      '松阳茶城电子',
+      '遂昌金矿电子',
+      '缙云仙都电子',
+      '丽水绿谷科技',
+      '舟山群岛电子',
+      '定海海洋科技',
+      '普陀渔港电子',
+      '岱山海岛电子',
+      '奉化溪口电子',
+      '宁海前童科技',
+      '象山渔山电子',
+      '鄞州东钱湖科技',
+      '北仑港区电子',
+      '镇海化工电子',
+      '江北慈城科技',
+      '海曙月湖电子',
+      '鹿城温州电子',
+      '龙湾科技园电子',
+      '瓯海梧田科技',
+      '瑞安汽配电子',
+      '乐清柳市电器',
+      '苍南龙港电子',
+      '平阳鳌江科技',
+      '文成百丈漈电子',
+      '泰顺廊桥电子',
+      '洞头海岛科技',
+      '永嘉楠溪电子',
+      '德清莫干山科技',
+      '安吉竹乡电子',
+      '长兴太湖科技',
+      '吴兴织里电子',
+      '南浔古镇科技',
+      '秀洲王江泾电子',
+      '南湖红船科技',
+      '桐庐富春电子',
+      '建德新安科技',
+      '淳安千岛湖电子',
+      '临安天目科技',
+      '富阳富春江电子',
+      '萧山机场科技',
     ];
 
     const sources = ['exhibition', 'website', 'referral', 'cold_call', 'social_media', 'web_form'];
-    const statuses = ['new', 'new', 'new', 'contacted', 'contacted', 'contacted', 'qualified', 'qualified', 'converted', 'lost'];
+    const statuses = [
+      'new',
+      'new',
+      'new',
+      'contacted',
+      'contacted',
+      'contacted',
+      'qualified',
+      'qualified',
+      'converted',
+      'lost',
+    ];
     const requirements = [
-      '电源适配器 PCBA 加工', '智能门锁控制板', '工业传感器模块', '充电桩控制器',
-      'LED 灯条驱动板', '空气净化器主板', '智能水表通信模块', '电动工具控制板',
-      '安防摄像头 PCB', '物联网网关模块', '无线充电模组', '电机驱动板',
-      '温控器主板', '医疗设备控制板', '光伏优化器 PCBA', '储能 BMS 模块',
+      '电源适配器 PCBA 加工',
+      '智能门锁控制板',
+      '工业传感器模块',
+      '充电桩控制器',
+      'LED 灯条驱动板',
+      '空气净化器主板',
+      '智能水表通信模块',
+      '电动工具控制板',
+      '安防摄像头 PCB',
+      '物联网网关模块',
+      '无线充电模组',
+      '电机驱动板',
+      '温控器主板',
+      '医疗设备控制板',
+      '光伏优化器 PCBA',
+      '储能 BMS 模块',
     ];
 
     const surnames = ['赵', '钱', '孙', '李', '周', '吴', '郑', '王', '冯', '陈'];
@@ -211,15 +422,31 @@ test.describe.serial('Showcase Seed — Extended', () => {
 
     for (let i = 0; i < 60; i++) {
       const status = statuses[i % statuses.length];
-      const month = status === 'new' ? 17 : status === 'contacted' ? randInt(14, 16) : status === 'qualified' ? randInt(11, 14) : status === 'converted' ? randInt(3, 10) : randInt(5, 12);
-      const contactName = surnames[i % surnames.length] + givenNames[(i * 3 + 1) % givenNames.length];
+      const month =
+        status === 'new'
+          ? 17
+          : status === 'contacted'
+            ? randInt(14, 16)
+            : status === 'qualified'
+              ? randInt(11, 14)
+              : status === 'converted'
+                ? randInt(3, 10)
+                : randInt(5, 12);
+      const contactName =
+        surnames[i % surnames.length] + givenNames[(i * 3 + 1) % givenNames.length];
 
       const id = await cmd(page, 'crm:create_lead', {
         crm_lead_company: companies[i],
         crm_lead_contact_name: contactName,
         crm_lead_contact_phone: `139${String(30000001 + i).padStart(8, '0')}`,
         crm_lead_source: pick(sources),
-        crm_lead_industry: pick(['electronics', 'manufacturing', 'energy', 'consumer_electronics', 'automotive']),
+        crm_lead_industry: pick([
+          'electronics',
+          'manufacturing',
+          'energy',
+          'consumer_electronics',
+          'automotive',
+        ]),
         crm_lead_requirement: pick(requirements),
       });
 
@@ -251,7 +478,9 @@ test.describe.serial('Showcase Seed — Extended', () => {
     const listBody = await listResp.json();
     const existingAccounts: Array<{ pid: string; crm_acc_name: string; crm_acc_rating: string }> =
       listBody?.data?.records || [];
-    const abAccounts = existingAccounts.filter(a => a.crm_acc_rating === 'A' || a.crm_acc_rating === 'B');
+    const abAccounts = existingAccounts.filter(
+      (a) => a.crm_acc_rating === 'A' || a.crm_acc_rating === 'B',
+    );
 
     if (abAccounts.length < 5) {
       console.warn('  Not enough A/B accounts, skipping extended opportunities');
@@ -259,30 +488,91 @@ test.describe.serial('Showcase Seed — Extended', () => {
     }
 
     const oppNames = [
-      '传感器模组批量', '电源模块Q3', '控制板年度', 'WiFi模组方案',
-      '充电器PCBA', '安防主板批量', '智能锁控制板', '工控机主板',
-      '通信模块定制', '电机驱动批量', 'BMS小批量', '车载T-Box',
-      '物联网终端', '储能逆变器', '光伏监控板', '医疗电源板',
-      '铁路信号板', '军工电源模块', '矿用终端', '船用雷达板',
-      '电梯控制板', '空调变频模块', '洗衣机主板', '净水器控制',
-      '扫地机方案', '无人机飞控', '机器人驱动', '3D打印控制',
-      'VR头显主板', '智能音箱方案',
+      '传感器模组批量',
+      '电源模块Q3',
+      '控制板年度',
+      'WiFi模组方案',
+      '充电器PCBA',
+      '安防主板批量',
+      '智能锁控制板',
+      '工控机主板',
+      '通信模块定制',
+      '电机驱动批量',
+      'BMS小批量',
+      '车载T-Box',
+      '物联网终端',
+      '储能逆变器',
+      '光伏监控板',
+      '医疗电源板',
+      '铁路信号板',
+      '军工电源模块',
+      '矿用终端',
+      '船用雷达板',
+      '电梯控制板',
+      '空调变频模块',
+      '洗衣机主板',
+      '净水器控制',
+      '扫地机方案',
+      '无人机飞控',
+      '机器人驱动',
+      '3D打印控制',
+      'VR头显主板',
+      '智能音箱方案',
     ];
 
-    const stages = ['discovery', 'discovery', 'qualification', 'qualification', 'qualification',
-      'proposal', 'proposal', 'proposal', 'negotiation', 'negotiation',
-      'closed_won', 'closed_won', 'closed_won', 'closed_won', 'closed_won',
-      'closed_won', 'closed_won', 'closed_won', 'closed_won', 'closed_won',
-      'closed_lost', 'closed_lost', 'closed_lost', 'closed_lost',
-      'discovery', 'qualification', 'proposal', 'negotiation', 'closed_won', 'closed_lost'];
+    const stages = [
+      'discovery',
+      'discovery',
+      'qualification',
+      'qualification',
+      'qualification',
+      'proposal',
+      'proposal',
+      'proposal',
+      'negotiation',
+      'negotiation',
+      'closed_won',
+      'closed_won',
+      'closed_won',
+      'closed_won',
+      'closed_won',
+      'closed_won',
+      'closed_won',
+      'closed_won',
+      'closed_won',
+      'closed_won',
+      'closed_lost',
+      'closed_lost',
+      'closed_lost',
+      'closed_lost',
+      'discovery',
+      'qualification',
+      'proposal',
+      'negotiation',
+      'closed_won',
+      'closed_lost',
+    ];
 
     const transitionMap: Record<string, string[]> = {
       discovery: [],
       qualification: ['crm:qualify_opportunity'],
       proposal: ['crm:qualify_opportunity', 'crm:advance_opp_to_proposal'],
-      negotiation: ['crm:qualify_opportunity', 'crm:advance_opp_to_proposal', 'crm:advance_opp_to_negotiation'],
-      closed_won: ['crm:qualify_opportunity', 'crm:advance_opp_to_proposal', 'crm:advance_opp_to_negotiation', 'crm:win_opportunity'],
-      closed_lost: ['crm:qualify_opportunity', 'crm:advance_opp_to_proposal', 'crm:lose_opportunity'],
+      negotiation: [
+        'crm:qualify_opportunity',
+        'crm:advance_opp_to_proposal',
+        'crm:advance_opp_to_negotiation',
+      ],
+      closed_won: [
+        'crm:qualify_opportunity',
+        'crm:advance_opp_to_proposal',
+        'crm:advance_opp_to_negotiation',
+        'crm:win_opportunity',
+      ],
+      closed_lost: [
+        'crm:qualify_opportunity',
+        'crm:advance_opp_to_proposal',
+        'crm:lose_opportunity',
+      ],
     };
 
     for (let i = 0; i < 30; i++) {
@@ -315,39 +605,66 @@ test.describe.serial('Showcase Seed — Extended', () => {
     const types = ['call', 'call', 'call', 'email', 'email', 'visit', 'meeting', 'wechat'];
 
     const callSubjects = [
-      '电话询问项目进展', '确认交期和数量', '技术方案沟通', '价格确认',
-      '回访客户使用情况', '催款跟进', '新产品推介', '售后问题跟进',
-      '月度例行联络', '季度业绩复盘电话',
+      '电话询问项目进展',
+      '确认交期和数量',
+      '技术方案沟通',
+      '价格确认',
+      '回访客户使用情况',
+      '催款跟进',
+      '新产品推介',
+      '售后问题跟进',
+      '月度例行联络',
+      '季度业绩复盘电话',
     ];
     const callContents = [
-      '客户确认需求不变，预计下月下单。', '交期可按计划执行，客户无异议。',
-      '技术方案需要微调，增加一道AOI检测工序。', '价格已确认，等待PO。',
-      '客户反馈品质稳定，考虑增加订单量。', '上月货款已安排付款，预计本周到账。',
-      '发送新品资料，客户表示感兴趣。', '上批次问题已解决，客户满意。',
-      '保持联络，了解近期无新需求。', '回顾本季度合作情况，整体顺利。',
+      '客户确认需求不变，预计下月下单。',
+      '交期可按计划执行，客户无异议。',
+      '技术方案需要微调，增加一道AOI检测工序。',
+      '价格已确认，等待PO。',
+      '客户反馈品质稳定，考虑增加订单量。',
+      '上月货款已安排付款，预计本周到账。',
+      '发送新品资料，客户表示感兴趣。',
+      '上批次问题已解决，客户满意。',
+      '保持联络，了解近期无新需求。',
+      '回顾本季度合作情况，整体顺利。',
     ];
     const emailSubjects = [
-      '发送报价单', '技术资料发送', '订单确认函', '品质报告',
-      '月度对账单', '新品推介邮件', '展会邀请函', '年终感谢信',
+      '发送报价单',
+      '技术资料发送',
+      '订单确认函',
+      '品质报告',
+      '月度对账单',
+      '新品推介邮件',
+      '展会邀请函',
+      '年终感谢信',
     ];
     const emailContents = [
-      '附件为最新报价单，请查收确认。有效期30天。', '技术方案文档已发送，请技术部评审。',
-      '订单确认函已发送，请签字盖章回传。', '上批次品质报告：合格率99.5%。',
-      '本月对账单已发送，请财务确认。', '新品推介资料，包含3款新型MCU方案。',
-      '诚邀贵司莅临2025慕尼黑上海电子展我司展位参观。', '感谢2024年度的信任与支持，期待2025继续合作。',
+      '附件为最新报价单，请查收确认。有效期30天。',
+      '技术方案文档已发送，请技术部评审。',
+      '订单确认函已发送，请签字盖章回传。',
+      '上批次品质报告：合格率99.5%。',
+      '本月对账单已发送，请财务确认。',
+      '新品推介资料，包含3款新型MCU方案。',
+      '诚邀贵司莅临2025慕尼黑上海电子展我司展位参观。',
+      '感谢2024年度的信任与支持，期待2025继续合作。',
     ];
     const visitSubjects = [
-      '拜访客户工厂', '技术对接会议', '品质审核', '年度拜访',
-      '项目验收', '新客户首次拜访',
+      '拜访客户工厂',
+      '技术对接会议',
+      '品质审核',
+      '年度拜访',
+      '项目验收',
+      '新客户首次拜访',
     ];
     const visitContents = [
-      '参观客户产线，了解产能和质量要求。', '与客户技术团队对接新项目方案。',
-      '进行年度供应商品质审核，结果良好。', '年度拜访，总结合作成果，规划明年合作。',
-      '项目验收通过，客户确认量产。', '首次拜访新客户，了解需求和决策流程。',
+      '参观客户产线，了解产能和质量要求。',
+      '与客户技术团队对接新项目方案。',
+      '进行年度供应商品质审核，结果良好。',
+      '年度拜访，总结合作成果，规划明年合作。',
+      '项目验收通过，客户确认量产。',
+      '首次拜访新客户，了解需求和决策流程。',
     ];
-    const meetingSubjects = [
-      '季度复盘会议', '项目启动会', '技术评审会', '年度合作规划会',
-    ];
+    const meetingSubjects = ['季度复盘会议', '项目启动会', '技术评审会', '年度合作规划会'];
     const meetingContents = [
       '本季度交付准时率96%，品质合格率99.2%。下季度重点跟进新能源项目。',
       '新项目正式启动，明确分工和时间节点。预计6周完成首批交付。',
@@ -381,10 +698,13 @@ test.describe.serial('Showcase Seed — Extended', () => {
       // More activities in recent months (realistic)
       const monthWeight = Math.random();
       let month: number;
-      if (monthWeight < 0.15) month = randInt(0, 5);       // older: 15%
-      else if (monthWeight < 0.35) month = randInt(6, 10);  // mid: 20%
-      else if (monthWeight < 0.60) month = randInt(11, 14); // recent: 25%
-      else month = randInt(15, 17);                          // latest: 40%
+      if (monthWeight < 0.15)
+        month = randInt(0, 5); // older: 15%
+      else if (monthWeight < 0.35)
+        month = randInt(6, 10); // mid: 20%
+      else if (monthWeight < 0.6)
+        month = randInt(11, 14); // recent: 25%
+      else month = randInt(15, 17); // latest: 40%
 
       // Working hours: mostly 9-17, some 18-20
       const hour = Math.random() < 0.85 ? randInt(9, 17) : randInt(18, 20);
@@ -414,7 +734,8 @@ test.describe.serial('Showcase Seed — Extended', () => {
         endDate: dateAt(14, 31),
         budget: 5000,
         status: 'active',
-        description: '针对120家存量客户发送新品推介邮件，配合官网SEO引流。目标：打开率25%，转化率5%。',
+        description:
+          '针对120家存量客户发送新品推介邮件，配合官网SEO引流。目标：打开率25%，转化率5%。',
       },
       {
         name: '老客户转介绍奖励计划',
@@ -432,7 +753,8 @@ test.describe.serial('Showcase Seed — Extended', () => {
         endDate: dateAt(18, 10),
         budget: 90000,
         status: 'planned',
-        description: '计划参加2025慕尼黑上海电子展，展位升级为36平米，重点展示新能源和AI智能检测方案。',
+        description:
+          '计划参加2025慕尼黑上海电子展，展位升级为36平米，重点展示新能源和AI智能检测方案。',
       },
     ];
 
@@ -460,8 +782,20 @@ test.describe.serial('Showcase Seed — Extended', () => {
   // ═════════════════════════════════════════════════════════════════════════
 
   test('Phase 14: CRM — C-tier Small Opportunities (15)', async ({ page }) => {
-    const cAccountNames = Object.keys(ext.accounts).filter(name =>
-      !['哈尔滨', '兰州', '贵阳', '昆明', '南宁', '呼和浩特', '西宁', '拉萨', '海口', '乌鲁木齐'].some(city => name.includes(city))
+    const cAccountNames = Object.keys(ext.accounts).filter(
+      (name) =>
+        ![
+          '哈尔滨',
+          '兰州',
+          '贵阳',
+          '昆明',
+          '南宁',
+          '呼和浩特',
+          '西宁',
+          '拉萨',
+          '海口',
+          '乌鲁木齐',
+        ].some((city) => name.includes(city)),
     );
 
     const oppTemplates = [
@@ -472,15 +806,34 @@ test.describe.serial('Showcase Seed — Extended', () => {
       { name: '连接器供应', amountMin: 8000, amountMax: 40000 },
     ];
 
-    const stages = ['discovery', 'qualification', 'proposal', 'closed_won', 'closed_won',
-      'closed_won', 'closed_won', 'closed_won', 'closed_won', 'closed_won',
-      'closed_lost', 'closed_lost', 'discovery', 'qualification', 'proposal'];
+    const stages = [
+      'discovery',
+      'qualification',
+      'proposal',
+      'closed_won',
+      'closed_won',
+      'closed_won',
+      'closed_won',
+      'closed_won',
+      'closed_won',
+      'closed_won',
+      'closed_lost',
+      'closed_lost',
+      'discovery',
+      'qualification',
+      'proposal',
+    ];
 
     const transitionMap: Record<string, string[]> = {
       discovery: [],
       qualification: ['crm:qualify_opportunity'],
       proposal: ['crm:qualify_opportunity', 'crm:advance_opp_to_proposal'],
-      closed_won: ['crm:qualify_opportunity', 'crm:advance_opp_to_proposal', 'crm:advance_opp_to_negotiation', 'crm:win_opportunity'],
+      closed_won: [
+        'crm:qualify_opportunity',
+        'crm:advance_opp_to_proposal',
+        'crm:advance_opp_to_negotiation',
+        'crm:win_opportunity',
+      ],
       closed_lost: ['crm:qualify_opportunity', 'crm:lose_opportunity'],
     };
 

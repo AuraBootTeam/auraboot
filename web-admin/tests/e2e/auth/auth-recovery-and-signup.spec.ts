@@ -36,12 +36,14 @@ test.describe('Auth Recovery & Signup Deep', () => {
     await page.locator('input#email').click();
     await page.locator('input#email').fill('invalid-email');
     await page.locator('input#password').click();
-    await page.locator('input#password').fill('SomePassword1!');
+    await page.locator('input#password').fill('Test2026x');
     await page.locator('button[type="submit"]').click();
 
     // Should stay on signup and show validation message
     await expect(page).toHaveURL(/\/signup/);
-    await expect(page.locator('#email-error, [aria-describedby="email-error"]').first()).toBeVisible();
+    await expect(
+      page.locator('#email-error, [aria-describedby="email-error"]').first(),
+    ).toBeVisible();
   });
 
   test('ARS-003: forgot-password rejects malformed email', async ({ page }) => {
@@ -64,11 +66,13 @@ test.describe('Auth Recovery & Signup Deep', () => {
     await waitForAuthHydration(page);
 
     const submitResp = page.waitForResponse(
-      (r) => r.url().includes('/api/auth/forgot-password') && r.request().method().toLowerCase() === 'post',
+      (r) =>
+        r.url().includes('/api/auth/forgot-password') &&
+        r.request().method().toLowerCase() === 'post',
       { timeout: 30000 },
     );
 
-    await page.locator('input[type="email"]').first().fill('user@example.com');
+    await page.locator('input[type="email"]').first().fill('admin@example.com');
     await page.getByRole('button', { name: /send reset link/i }).click();
     const resp = await submitResp;
     expect(resp.ok()).toBe(true);
@@ -84,8 +88,8 @@ test.describe('Auth Recovery & Signup Deep', () => {
 
     const newPwd = page.locator('input[type="password"]').first();
     const confirmPwd = page.locator('input[type="password"]').nth(1);
-    await newPwd.fill('StrongPass1!');
-    await confirmPwd.fill('StrongPass1!');
+    await newPwd.fill('Test2026x');
+    await confirmPwd.fill('Test2026x');
     await page.getByRole('button', { name: /reset password/i }).click();
 
     await expect(page.getByText(/invalid reset link/i)).toBeVisible();
@@ -105,7 +109,7 @@ test.describe('Auth Recovery & Signup Deep', () => {
     await expect(page.getByText(/at least 8 characters/i)).toBeVisible();
 
     // Mismatch branch
-    await newPwd.fill('StrongPass1!');
+    await newPwd.fill('Test2026x');
     await confirmPwd.fill('Test2026y');
     await page.getByRole('button', { name: /reset password/i }).click();
     await expect(page.getByText(/passwords do not match/i)).toBeVisible();

@@ -98,10 +98,18 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
 
       {/* Panel */}
-      <div data-testid="settings-panel" className="relative flex max-h-[80vh] w-full max-w-3xl overflow-hidden rounded-xl bg-white shadow-2xl">
+      <div
+        data-testid="settings-panel"
+        className="relative flex max-h-[80vh] w-full max-w-3xl overflow-hidden rounded-xl bg-white shadow-2xl"
+      >
         {/* Sidebar */}
         <div className="w-48 border-r border-gray-200 bg-gray-50 p-4">
-          <h2 data-testid="settings-panel-heading" className="mb-4 text-lg font-semibold text-gray-900">Settings</h2>
+          <h2
+            data-testid="settings-panel-heading"
+            className="mb-4 text-lg font-semibold text-gray-900"
+          >
+            Settings
+          </h2>
           <nav className="space-y-1">
             {(Object.keys(SETTINGS_CATEGORY_INFO) as SettingsCategory[]).map((category) => {
               const info = SETTINGS_CATEGORY_INFO[category];

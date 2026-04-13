@@ -271,7 +271,7 @@ class TemplateServiceImpl implements ITemplateService {
           form: `${model.code}_form`,
           detail: `${model.code}_detail`,
         },
-        menuPath: `/dynamic/${model.code}`,
+        menuPath: `/p/${model.code}`,
         permissions: [
           `${model.code}:read`,
           `${model.code}:create`,

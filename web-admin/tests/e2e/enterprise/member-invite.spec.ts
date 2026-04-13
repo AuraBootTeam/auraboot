@@ -26,7 +26,7 @@ test.describe('Member Invite Flow', () => {
   const getBackendJwt = async (page: import('@playwright/test').Page): Promise<string> => {
     if (backendJwt) return backendJwt;
     const resp = await page.request.post(`${BACKEND_URL}/api/auth/login`, {
-      data: { email: DEFAULT_TEST_ACCOUNT.email, password: DEFAULT_TEST_ACCOUNT.password },
+      data: { email: 'admin@example.com', password: 'Test2026x' },
     });
     if (!resp.ok()) {
       throw new Error(`Failed to obtain backend JWT: HTTP ${resp.status()}`);
@@ -44,7 +44,9 @@ test.describe('Member Invite Flow', () => {
     path: string,
     data?: Record<string, unknown>,
   ) => {
-    const bffResp = await page.request.fetch(`${BASE_URL}${path}`, { method, data }).catch(() => null);
+    const bffResp = await page.request
+      .fetch(`${BASE_URL}${path}`, { method, data })
+      .catch(() => null);
     if (bffResp && bffResp.ok()) return bffResp;
     const bffBody = bffResp ? await bffResp.text().catch(() => '') : '';
     const isProxy500 = bffResp?.status() === 500 && bffBody.includes('Proxy Error');
@@ -92,16 +94,21 @@ test.describe('Member Invite Flow', () => {
     const code = await generateInviteCode(page, 7);
 
     // Navigate to member management page
-    await page.goto('/dynamic/tenant-member');
+    await page.goto('/p/tenant_member');
     await page.waitForLoadState('domcontentloaded');
     await expect(page.locator('table, [role="table"]').first()).toBeVisible({ timeout: 15000 });
 
     // Look for invite-related UI element (button/section)
-    const inviteSection = page.locator('[data-testid="invite-section"], button:has-text("invite"), button:has-text("邀请")');
-    const hasInviteUI = await inviteSection.first().isVisible({ timeout: 5000 }).catch(() => false);
+    const inviteSection = page.locator(
+      '[data-testid="invite-section"], button:has-text("invite"), button:has-text("邀请")',
+    );
+    const hasInviteUI = await inviteSection
+      .first()
+      .isVisible({ timeout: 5000 })
+      .catch(() => false);
 
     if (!hasInviteUI) {
-      throw new Error(String('Invite UI not present on member management page'))
+      throw new Error(String('Invite UI not present on member management page'));
       return;
     }
 
@@ -109,7 +116,10 @@ test.describe('Member Invite Flow', () => {
     // Verify code or invite dialog is shown
     const dialog = page.locator('[role="dialog"], [data-testid="invite-dialog"]');
     await expect(dialog).toBeVisible({ timeout: 5000 });
-    const codeVisible = await page.getByText(String(code)).isVisible({ timeout: 3000 }).catch(() => false);
+    const codeVisible = await page
+      .getByText(String(code))
+      .isVisible({ timeout: 3000 })
+      .catch(() => false);
     expect(codeVisible || (await dialog.first().isVisible())).toBe(true);
   });
 
@@ -118,12 +128,17 @@ test.describe('Member Invite Flow', () => {
    */
   test('MI-03: should create invite code with correct expiry', async ({ page }) => {
     await generateInviteCode(page, 1);
-    const currentResp = await requestWithBackendFallback(page, 'get', '/api/tenant/invite-code/current');
+    const currentResp = await requestWithBackendFallback(
+      page,
+      'get',
+      '/api/tenant/invite-code/current',
+    );
     if (!currentResp.ok()) {
       throw new Error(`Invite current API unavailable: ${currentResp.status()}`);
     }
     const currentBody = await currentResp.json();
-    const expiresAt = currentBody?.data?.expiredAt || currentBody?.data?.expiresAt || currentBody?.data?.expireDate;
+    const expiresAt =
+      currentBody?.data?.expiredAt || currentBody?.data?.expiresAt || currentBody?.data?.expireDate;
 
     if (!expiresAt) {
       const code = currentBody?.data?.code;
@@ -147,11 +162,19 @@ test.describe('Member Invite Flow', () => {
     if (!code) throw new Error('No invite code returned — cannot test revocation');
 
     // Revoke the invite code
-    const revokeResp = await requestWithBackendFallback(page, 'post', `/api/tenant/invite-code/revoke?code=${encodeURIComponent(code)}`);
+    const revokeResp = await requestWithBackendFallback(
+      page,
+      'post',
+      `/api/tenant/invite-code/revoke?code=${encodeURIComponent(code)}`,
+    );
 
     expect(revokeResp.ok()).toBe(true);
 
-    const validateResp = await requestWithBackendFallback(page, 'get', `/api/tenant/invite-code/validate?code=${encodeURIComponent(code)}`);
+    const validateResp = await requestWithBackendFallback(
+      page,
+      'get',
+      `/api/tenant/invite-code/validate?code=${encodeURIComponent(code)}`,
+    );
     expect(validateResp.ok()).toBe(true);
     const validateBody = await validateResp.json();
     expect(validateBody?.data).toBe(false);

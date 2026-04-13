@@ -17,6 +17,10 @@
 
 import { type Page, type Locator, expect } from '@playwright/test';
 
+export function normalizeDynamicPageKey(pageKey: string): string {
+  return pageKey.replace(/-/g, '_');
+}
+
 // ---------------------------------------------------------------------------
 // Test Data Generators
 // ---------------------------------------------------------------------------
@@ -59,13 +63,12 @@ export function dateOffsetStr(days: number): string {
 export async function navigateToMenuByClick(page: Page, labels: string[]): Promise<void> {
   for (const label of labels) {
     const nav = page.locator('nav, aside, [role="navigation"]').first();
-    const item = nav.getByRole('button', { name: label }).or(
-      nav.getByRole('menuitem', { name: label })
-    ).or(
-      nav.locator(`[title="${label}"]`)
-    ).or(
-      nav.locator(`text="${label}"`)
-    ).first();
+    const item = nav
+      .getByRole('button', { name: label })
+      .or(nav.getByRole('menuitem', { name: label }))
+      .or(nav.locator(`[title="${label}"]`))
+      .or(nav.locator(`text="${label}"`))
+      .first();
     await item.waitFor({ state: 'visible', timeout: 8000 });
     await item.click();
     // Wait for any loading/navigation triggered by menu click
@@ -100,15 +103,15 @@ export async function ensureSidebarExpanded(page: Page): Promise<void> {
  * @param pageKey - The dynamic page key (e.g. 'quarry_daily_report')
  */
 export async function navigateToDynamicPage(page: Page, pageKey: string): Promise<void> {
+  const normalizedPageKey = normalizeDynamicPageKey(pageKey);
   // Set up list API listener BEFORE navigation so we catch the response
   const listResponsePromise = page
-    .waitForResponse(
-      (resp) => resp.url().includes('/list') && resp.status() === 200,
-      { timeout: 10000 },
-    )
+    .waitForResponse((resp) => resp.url().includes('/list') && resp.status() === 200, {
+      timeout: 10000,
+    })
     .catch(() => null);
 
-  await page.goto(`/dynamic/${pageKey}`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`/p/${normalizedPageKey}`, { waitUntil: 'domcontentloaded' });
   await waitForDynamicPageLoad(page);
 
   // Wait for list data API to return
@@ -123,25 +126,41 @@ export async function navigateToDynamicPage(page: Page, pageKey: string): Promis
  * Wait for a dynamic page to finish loading.
  * Checks for table/form content and ensures loading spinners have disappeared.
  */
-export async function waitForDynamicPageLoad(page: Page, timeout = 15000): Promise<void> {
+export async function waitForDynamicPageLoad(page: Page, timeout = 10000): Promise<void> {
   await page.waitForLoadState('domcontentloaded');
 
-  // Wait for any loading spinner to disappear
+  // Wait for any loading spinner to disappear (don't wait for it to appear first)
   const spinner = page.locator('.animate-spin, [data-testid="loading"]');
-  try {
-    await spinner.waitFor({ state: 'visible', timeout: 2000 });
-  } catch {
-    // Spinner might already be gone - that's fine
-  }
-  await expect(spinner).not.toBeVisible({ timeout });
+  await expect(spinner).not.toBeVisible({ timeout: Math.min(timeout, 5000) }).catch(() => {});
 
   // Verify meaningful content appeared
   const content = page.locator(
-    '.ant-table, table, [data-testid="dynamic-list"], [data-testid="table-block"], form, .ant-form, [role="table"], main'
+    '.ant-table, table, [data-testid="dynamic-list"], [data-testid="table-block"], form, .ant-form, [role="table"], main',
   );
-  await content.first().waitFor({ state: 'visible', timeout }).catch(() => {
-    // Page may have a different layout - not necessarily an error
-  });
+  await content
+    .first()
+    .waitFor({ state: 'visible', timeout: Math.min(timeout, 5000) })
+    .catch(() => {
+      // Page may have a different layout - not necessarily an error
+    });
+}
+
+/**
+ * Ensure the filter form is open (visible).
+ * After the list page refactor, filter-form is hidden by default and requires
+ * clicking the toggle button to reveal it.
+ */
+export async function ensureFilterFormOpen(page: Page, timeout = 5000): Promise<void> {
+  const filterSearch = page.getByTestId('filter-search');
+  const isAlreadyVisible = await filterSearch.isVisible().catch(() => false);
+  if (isAlreadyVisible) return;
+
+  const toggle = page.getByTestId('filters-toggle');
+  const toggleVisible = await toggle.isVisible().catch(() => false);
+  if (toggleVisible) {
+    await toggle.click();
+    await filterSearch.waitFor({ state: 'visible', timeout });
+  }
 }
 
 /**
@@ -154,34 +173,44 @@ export async function waitForDynamicPageLoad(page: Page, timeout = 15000): Promi
  * This helper waits for both stages to complete by checking for
  * the presence of interactive form elements.
  */
-export async function waitForFormReady(page: Page, timeout = 15000): Promise<void> {
+export async function waitForFormReady(page: Page, timeout = 10000): Promise<void> {
   await page.waitForLoadState('domcontentloaded');
 
   // Wait for any loading spinner to disappear
   const spinner = page.locator('.animate-spin, [data-testid="loading"]');
-  await spinner.waitFor({ state: 'hidden', timeout }).catch(() => {});
+  await spinner.waitFor({ state: 'hidden', timeout: Math.min(timeout, 5000) }).catch(() => {});
 
   // Wait for form content to render (at least one interactive element)
   const formContent = page.locator(
     'form input, form textarea, form select, ' +
-    'button[role="switch"], ' +
-    '[data-testid^="form-field-"], ' +
-    '.ant-form-item, ' +
-    '[data-testid="dynamic-form"]'
+      'button[role="switch"], ' +
+      '[data-testid^="form-field-"], ' +
+      '.ant-form-item, ' +
+      '[data-testid="dynamic-form"]',
   );
-  await formContent.first().waitFor({ state: 'visible', timeout }).catch(() => {});
+  await formContent
+    .first()
+    .waitFor({ state: 'visible', timeout })
+    .catch(() => {});
 
   // Some dynamic forms render component-loader placeholders first
   // (for example "Loading SmartInput..."). Wait for those placeholders
   // to disappear before tests start targeting individual fields.
   const loadingSmartField = page.locator('text=/Loading Smart[A-Za-z]+\\.\\.\\./');
-  await loadingSmartField.first().waitFor({ state: 'hidden', timeout }).catch(() => {});
+  await loadingSmartField
+    .first()
+    .waitFor({ state: 'hidden', timeout })
+    .catch(() => {});
 }
 
 /**
  * Wait for a toast/notification message to appear and optionally assert text.
  */
-export async function waitForToast(page: Page, expectedText?: string, timeout = 5000): Promise<void> {
+export async function waitForToast(
+  page: Page,
+  expectedText?: string,
+  timeout = 5000,
+): Promise<void> {
   const toast = page.locator('[role="alert"], [data-testid="toast"], .toast-message, .ant-message');
   await toast.first().waitFor({ state: 'visible', timeout });
   if (expectedText) {
@@ -231,14 +260,20 @@ export async function fillField(page: Page, labelOrName: string, value: string):
   }
 
   // Strategy 1: Find by label
-  const byLabel = page.locator(`label:has-text("${labelOrName}") + * input, label:has-text("${labelOrName}") ~ * input`).first();
+  const byLabel = page
+    .locator(
+      `label:has-text("${labelOrName}") + * input, label:has-text("${labelOrName}") ~ * input`,
+    )
+    .first();
   if (await byLabel.isVisible({ timeout: 2000 }).catch(() => false)) {
     await byLabel.fill(value);
     return;
   }
 
   // Strategy 2: Find by name attribute
-  const byName = page.locator(`[name="${labelOrName}"], [data-field="${labelOrName}"] input`).first();
+  const byName = page
+    .locator(`[name="${labelOrName}"], [data-field="${labelOrName}"] input`)
+    .first();
   if (await byName.isVisible({ timeout: 2000 }).catch(() => false)) {
     await byName.fill(value);
     return;
@@ -257,11 +292,17 @@ export async function fillField(page: Page, labelOrName: string, value: string):
 /**
  * Select an option from an Ant Design Select or native select element.
  */
-export async function selectOption(page: Page, labelOrName: string, optionText: string): Promise<void> {
+export async function selectOption(
+  page: Page,
+  labelOrName: string,
+  optionText: string,
+): Promise<void> {
   // Strategy 1: Ant Design Select
-  const antSelect = page.locator(
-    `label:has-text("${labelOrName}") ~ * .ant-select, [data-field="${labelOrName}"] .ant-select`
-  ).first();
+  const antSelect = page
+    .locator(
+      `label:has-text("${labelOrName}") ~ * .ant-select, [data-field="${labelOrName}"] .ant-select`,
+    )
+    .first();
 
   if (await antSelect.isVisible({ timeout: 2000 }).catch(() => false)) {
     await antSelect.click();
@@ -270,9 +311,9 @@ export async function selectOption(page: Page, labelOrName: string, optionText: 
   }
 
   // Strategy 2: Native select
-  const nativeSelect = page.locator(
-    `select[name="${labelOrName}"], [data-field="${labelOrName}"] select`
-  ).first();
+  const nativeSelect = page
+    .locator(`select[name="${labelOrName}"], [data-field="${labelOrName}"] select`)
+    .first();
 
   if (await nativeSelect.isVisible({ timeout: 2000 }).catch(() => false)) {
     await nativeSelect.selectOption({ label: optionText });
@@ -280,7 +321,11 @@ export async function selectOption(page: Page, labelOrName: string, optionText: 
   }
 
   // Strategy 3: Custom select by label
-  const customSelect = page.locator(`label:has-text("${labelOrName}")`).locator('..').locator('select, [role="combobox"]').first();
+  const customSelect = page
+    .locator(`label:has-text("${labelOrName}")`)
+    .locator('..')
+    .locator('select, [role="combobox"]')
+    .first();
   if (await customSelect.isVisible({ timeout: 2000 }).catch(() => false)) {
     await customSelect.click();
     await page.getByText(optionText, { exact: false }).first().click();
@@ -318,9 +363,11 @@ export async function clickSaveButton(page: Page): Promise<void> {
     return;
   }
   // Fallback to text-based
-  const saveBtn = page.locator(
-    'button:has-text("提交"), button:has-text("保存"), button:has-text("Save"), button:has-text("Submit"), button[type="submit"]'
-  ).first();
+  const saveBtn = page
+    .locator(
+      'button:has-text("提交"), button:has-text("保存"), button:has-text("Save"), button:has-text("Submit"), button[type="submit"]',
+    )
+    .first();
   await saveBtn.waitFor({ state: 'visible', timeout: 5000 });
   await saveBtn.click();
 }
@@ -332,7 +379,7 @@ export async function confirmDialog(page: Page): Promise<void> {
   const dialog = page.locator('[role="dialog"], [role="alertdialog"], .ant-modal');
   await dialog.waitFor({ state: 'visible', timeout: 5000 });
   const okBtn = dialog.locator(
-    'button:has-text("确定"), button:has-text("确认"), button:has-text("OK"), button:has-text("Yes")'
+    'button:has-text("确定"), button:has-text("确认"), button:has-text("OK"), button:has-text("Yes")',
   );
   await okBtn.click();
   await expect(dialog).not.toBeVisible({ timeout: 5000 });
@@ -344,7 +391,9 @@ export async function confirmDialog(page: Page): Promise<void> {
 export async function cancelDialog(page: Page): Promise<void> {
   const dialog = page.locator('[role="dialog"], [role="alertdialog"], .ant-modal');
   await dialog.waitFor({ state: 'visible', timeout: 5000 });
-  const cancelBtn = dialog.locator('[data-testid="dialog-cancel"], button:has-text("取消"), button:has-text("Cancel")');
+  const cancelBtn = dialog.locator(
+    '[data-testid="dialog-cancel"], button:has-text("取消"), button:has-text("Cancel")',
+  );
   await cancelBtn.click();
   await expect(dialog).not.toBeVisible({ timeout: 5000 });
 }
@@ -373,7 +422,12 @@ export async function getCellText(page: Page, rowIndex: number, colIndex: number
  * Click a row action button (e.g. edit, delete, submit).
  * Supports both code-based (data-testid) and text-based selection.
  */
-export async function clickRowAction(page: Page, rowIndex: number, actionText: string, code?: string): Promise<void> {
+export async function clickRowAction(
+  page: Page,
+  rowIndex: number,
+  actionText: string,
+  code?: string,
+): Promise<void> {
   const row = page.locator(`[data-testid="table-row-${rowIndex}"]`);
   if (code) {
     await clickRowActionByLocator(page, row, code, actionText);
@@ -398,7 +452,24 @@ export async function clickRowActionByLocator(
   actionCode: string,
   fallbackText?: string,
 ): Promise<void> {
+  const dismissBlockingOverlay = async () => {
+    const overlay = page
+      .locator(
+        'div[data-state="open"][aria-hidden="true"].fixed.inset-0, div[data-state="open"][data-aria-hidden="true"].fixed.inset-0, .fixed.inset-0.bg-black\\/50',
+      )
+      .first();
+    const visible = await overlay.isVisible({ timeout: 300 }).catch(() => false);
+    if (!visible) return;
+
+    await page.keyboard.press('Escape').catch(() => null);
+    await overlay.waitFor({ state: 'hidden', timeout: 2000 }).catch(() => null);
+  };
+
+  await dismissBlockingOverlay();
   await row.scrollIntoViewIfNeeded().catch(() => null);
+
+  // Hover the row to reveal action buttons (opacity-0 → opacity-100 via group-hover)
+  await row.hover();
 
   // 1. Try direct button (primary slot — first rowAction is always direct)
   const directBtn = row.locator(`[data-testid="row-action-${actionCode}"]`).first();
@@ -469,7 +540,7 @@ export async function clickTabAndWaitForLoad(
   page: Page,
   tabName: string | RegExp,
   timeout = 5000,
-  tabKey?: string
+  tabKey?: string,
 ): Promise<void> {
   let tab: Locator;
   if (tabKey) {
@@ -482,10 +553,9 @@ export async function clickTabAndWaitForLoad(
     return;
   }
 
-  const listResponse = page.waitForResponse(
-    (r) => r.url().includes('/list') && r.status() === 200,
-    { timeout }
-  ).catch(() => null);
+  const listResponse = page
+    .waitForResponse((r) => r.url().includes('/list') && r.status() === 200, { timeout })
+    .catch(() => null);
 
   await tab.click();
   await listResponse;
@@ -505,20 +575,20 @@ export async function executeCommandViaApi(
   payload: Record<string, unknown> = {},
   targetRecordId?: string,
   operationType?: string,
-  options?: { allowHttpError?: boolean }
+  options?: { allowHttpError?: boolean; timeoutMs?: number },
 ): Promise<{ recordId: string; code: string }> {
   const data: Record<string, unknown> = { payload };
   if (targetRecordId) data.targetRecordId = targetRecordId;
   if (operationType) data.operationType = operationType;
 
-  const resp = await page.request.post(
-    `/api/meta/commands/execute/${commandCode}`,
-    { data }
-  );
+  const resp = await page.request.post(`/api/meta/commands/execute/${commandCode}`, {
+    data,
+    timeout: options?.timeoutMs ?? 15000,
+  });
   const body = await resp.json().catch(() => ({}));
   if (!resp.ok() && !options?.allowHttpError) {
     throw new Error(
-      `Command ${commandCode} failed with HTTP ${resp.status()}: ${JSON.stringify(body).slice(0, 500)}`
+      `Command ${commandCode} failed with HTTP ${resp.status()}: ${JSON.stringify(body).slice(0, 500)}`,
     );
   }
   const resultData = (body as any)?.data?.data ?? {};
@@ -553,10 +623,7 @@ export function extractRecordId(body: any): string {
  * Find a table row by its text content. Returns the row Locator.
  * Preferred over positional first()/last() for robustness.
  */
-export async function findRowByContent(
-  page: Page,
-  text: string
-): Promise<Locator> {
+export async function findRowByContent(page: Page, text: string): Promise<Locator> {
   const row = page.locator('tbody tr', { hasText: text }).first();
   await row.waitFor({ state: 'attached', timeout: 5000 });
   return row;
@@ -575,11 +642,13 @@ export async function findRowInPaginatedList(
   const timeLeft = () => Math.max(300, deadline - Date.now());
   const waitListResponse = async (waitTimeout: number) => {
     await page
-      .waitForResponse(
-        (r) => r.url().includes('/list') && r.status() === 200,
-        { timeout: waitTimeout },
-      )
+      .waitForResponse((r) => r.url().includes('/list') && r.status() === 200, {
+        timeout: waitTimeout,
+      })
       .catch(() => null);
+  };
+  const closeTransientSearchUi = async () => {
+    await page.keyboard.press('Escape').catch(() => null);
   };
 
   let row = page.locator('tbody tr', { hasText: title }).first();
@@ -588,10 +657,12 @@ export async function findRowInPaginatedList(
   // Strategy 0: use list search box to narrow dataset before paging.
   const searchInput = page
     .locator(
-      '[data-testid="search-input"], [data-testid="table-search-input"], input[placeholder*="搜索"], input[placeholder*="Search"]'
+      '[data-testid="list-search-input"], [data-testid="search-input"], [data-testid="table-search-input"], input[placeholder*="搜索"], input[placeholder*="Search"]',
     )
     .first();
-  const canSearch = await searchInput.isVisible({ timeout: Math.min(800, timeLeft()) }).catch(() => false);
+  const canSearch = await searchInput
+    .isVisible({ timeout: Math.min(800, timeLeft()) })
+    .catch(() => false);
   if (canSearch) {
     await searchInput.click({ timeout: Math.min(800, timeLeft()) }).catch(() => null);
     await searchInput.fill(title, { timeout: Math.min(1000, timeLeft()) }).catch(() => null);
@@ -603,21 +674,22 @@ export async function findRowInPaginatedList(
 
     const submitBtn = page
       .locator(
-        '[data-testid="search-button"], [data-testid="table-search-button"], button:has-text("搜索"), button:has-text("Search")'
+        '[data-testid="search-button"], [data-testid="table-search-button"], button:has-text("搜索"), button:has-text("Search")',
       )
       .first();
     if (await submitBtn.isVisible({ timeout: Math.min(700, timeLeft()) }).catch(() => false)) {
       await submitBtn.click({ timeout: Math.min(900, timeLeft()) }).catch(() => null);
       await waitListResponse(Math.min(1800, timeLeft()));
       row = page.locator('tbody tr', { hasText: title }).first();
-      if (await row.isVisible({ timeout: Math.min(1000, timeLeft()) }).catch(() => false)) return row;
+      if (await row.isVisible({ timeout: Math.min(1000, timeLeft()) }).catch(() => false))
+        return row;
     }
   }
 
   // Strategy 0.5: click search button and use advanced search panel/modal inputs.
   const searchTrigger = page
     .locator(
-      '[data-testid="filter-search"], [data-testid="search-button"], [data-testid="table-search-button"]'
+      '[data-testid="filter-search"], [data-testid="search-button"], [data-testid="table-search-button"]',
     )
     .first();
   const canOpenSearch = await searchTrigger
@@ -627,7 +699,7 @@ export async function findRowInPaginatedList(
     await searchTrigger.click({ timeout: Math.min(900, timeLeft()) }).catch(() => null);
     const advancedInput = page
       .locator(
-        '.ant-modal input:not([type="hidden"]), .ant-drawer input:not([type="hidden"]), .ant-popover input:not([type="hidden"]), [data-testid*="search"] input'
+        '.ant-modal input:not([type="hidden"]), .ant-drawer input:not([type="hidden"]), .ant-popover input:not([type="hidden"]), [data-testid*="search"] input',
       )
       .first();
     const hasAdvancedInput = await advancedInput
@@ -640,7 +712,7 @@ export async function findRowInPaginatedList(
 
       const submitBtn = page
         .locator(
-          '.ant-modal button:has-text("搜索"), .ant-modal button:has-text("Search"), .ant-drawer button:has-text("搜索"), .ant-drawer button:has-text("Search"), .ant-popover button:has-text("搜索"), .ant-popover button:has-text("Search")'
+          '.ant-modal button:has-text("搜索"), .ant-modal button:has-text("Search"), .ant-drawer button:has-text("搜索"), .ant-drawer button:has-text("Search"), .ant-popover button:has-text("搜索"), .ant-popover button:has-text("Search")',
         )
         .first();
       if (await submitBtn.isVisible({ timeout: Math.min(500, timeLeft()) }).catch(() => false)) {
@@ -650,8 +722,13 @@ export async function findRowInPaginatedList(
       await waitListResponse(Math.min(1800, timeLeft()));
 
       row = page.locator('tbody tr', { hasText: title }).first();
-      if (await row.isVisible({ timeout: Math.min(1000, timeLeft()) }).catch(() => false)) return row;
+      if (await row.isVisible({ timeout: Math.min(1000, timeLeft()) }).catch(() => false)) {
+        await closeTransientSearchUi();
+        return row;
+      }
     }
+
+    await closeTransientSearchUi();
   }
 
   const waitListLoaded = async () => {
@@ -662,7 +739,9 @@ export async function findRowInPaginatedList(
     for (const selector of candidates) {
       if (Date.now() >= deadline) return false;
       const btn = page.locator(selector).first();
-      const visible = await btn.isVisible({ timeout: Math.min(600, timeLeft()) }).catch(() => false);
+      const visible = await btn
+        .isVisible({ timeout: Math.min(600, timeLeft()) })
+        .catch(() => false);
       if (!visible) continue;
       const disabled = await btn.isDisabled().catch(() => false);
       if (disabled) continue;
@@ -761,6 +840,7 @@ export async function queryFilteredList(
     operator?: string;
   },
 ): Promise<Record<string, unknown>[]> {
+  const normalizedPageKey = normalizeDynamicPageKey(pageKey);
   const filters: Array<{ fieldName: string; operator: string; value: string }> = [
     {
       fieldName,
@@ -772,13 +852,16 @@ export async function queryFilteredList(
 
   const filtersParam = encodeURIComponent(JSON.stringify(filters));
   const size = options?.pageSize ?? 50;
-  const normalizedPageKey = pageKey.replace(/-/g, '_');
   const candidatePageKeys = Array.from(
     new Set([
       pageKey,
       normalizedPageKey,
+      pageKey.replace(/-/g, '_list'),
       normalizedPageKey.endsWith('_list') ? normalizedPageKey : `${normalizedPageKey}_list`,
       pageKey.endsWith('_list') ? pageKey.replace(/_list$/, '') : pageKey,
+      normalizedPageKey.endsWith('_list')
+        ? normalizedPageKey.replace(/_list$/, '')
+        : normalizedPageKey,
     ]),
   );
 
@@ -787,7 +870,7 @@ export async function queryFilteredList(
     const url = `/api/dynamic/${candidatePageKey}/list?pageNum=1&pageSize=${size}&filters=${filtersParam}`;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-      const resp = await page.request.get(url);
+      const resp = await page.request.get(url, { timeout: 10000 });
       if (!resp.ok()) {
         break;
       }

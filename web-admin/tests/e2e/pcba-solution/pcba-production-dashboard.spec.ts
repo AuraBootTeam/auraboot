@@ -10,11 +10,7 @@
  */
 
 import { test, expect } from '../../fixtures';
-import {
-  uniqueId,
-  todayStr,
-  executeCommandViaApi,
-} from '../helpers/index';
+import { uniqueId, todayStr, executeCommandViaApi } from '../helpers/index';
 
 test.describe('PCBA Production Dashboard @smoke', () => {
   test.describe.configure({ mode: 'serial' });
@@ -121,14 +117,18 @@ test.describe('PCBA Production Dashboard @smoke', () => {
     await expect(page).toHaveURL(/\/pcba-erp\/production-dashboard/, { timeout: 10000 });
 
     await Promise.all([
-      page.waitForResponse(
-        (resp) => resp.url().includes('/api/datasource/list') && resp.status() === 200,
-        { timeout: 15000 },
-      ).catch(() => null),
-      page.waitForResponse(
-        (resp) => resp.url().includes('/api/meta/chart-data') && resp.status() === 200,
-        { timeout: 15000 },
-      ).catch(() => null),
+      page
+        .waitForResponse(
+          (resp) => resp.url().includes('/api/datasource/list') && resp.status() === 200,
+          { timeout: 15000 },
+        )
+        .catch(() => null),
+      page
+        .waitForResponse(
+          (resp) => resp.url().includes('/api/meta/chart-data') && resp.status() === 200,
+          { timeout: 15000 },
+        )
+        .catch(() => null),
     ]);
 
     await page.waitForTimeout(1000);
@@ -159,7 +159,10 @@ test.describe('PCBA Production Dashboard @smoke', () => {
 
     const kpi = records[0];
     // We seeded at least 1 production plan and 1 equipment
-    expect(Number(kpi.active_plans) + Number(kpi.equipment_count), 'Should have seeded data').toBeGreaterThanOrEqual(1);
+    expect(
+      Number(kpi.active_plans) + Number(kpi.equipment_count),
+      'Should have seeded data',
+    ).toBeGreaterThanOrEqual(1);
   });
 
   test('PCBA-DASH-03: Daily output NQ is queryable via chart-data API', async ({ page }) => {

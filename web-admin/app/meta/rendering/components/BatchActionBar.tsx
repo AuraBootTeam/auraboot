@@ -1,7 +1,7 @@
 /**
  * BatchActionBar — floating batch action toolbar
  *
- * Shows when multiple rows are selected in a data-table with
+ * Shows when multiple rows are selected in a table with
  * selection.mode === 'multiple'. Supports batch delete, status change, etc.
  *
  * DSL config:

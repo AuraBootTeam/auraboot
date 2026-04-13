@@ -14,7 +14,7 @@ async function createViewViaApi(
   page: Page,
   modelCode: string,
   name: string,
-  rowHeight?: string
+  rowHeight?: string,
 ): Promise<string> {
   const resp = await page.request.post('/api/views', {
     data: {
@@ -41,9 +41,10 @@ async function getViewViaApi(page: Page, pid: string): Promise<any> {
 }
 
 test.describe('Row Height Control (GAP-127)', () => {
-
-  test('RH-001: row height selector shows 4 options (Short/Medium/Tall/Extra Tall)', async ({ page }) => {
-    await page.goto('/dynamic/e2et-order');
+  test('RH-001: row height selector shows 4 options (Short/Medium/Tall/Extra Tall)', async ({
+    page,
+  }) => {
+    await page.goto('/p/e2et_order');
     // Wait for table toolbar to render (the row-height button lives there)
     const rowHeightBtn = page.getByTestId('row-height-btn');
     await expect(rowHeightBtn).toBeVisible({ timeout: 30000 });
@@ -65,7 +66,7 @@ test.describe('Row Height Control (GAP-127)', () => {
   });
 
   test('RH-002: switching row height changes table row visual height', async ({ page }) => {
-    await page.goto('/dynamic/e2et-order');
+    await page.goto('/p/e2et_order');
     const rowHeightBtn = page.getByTestId('row-height-btn');
     await expect(rowHeightBtn).toBeVisible({ timeout: 30000 });
 
@@ -79,10 +80,11 @@ test.describe('Row Height Control (GAP-127)', () => {
     await rowHeightBtn.click();
     await page.getByTestId('row-height-option-short').click();
     // Wait for re-render
-    await page.waitForResponse(
-      (resp) => resp.url().includes('/api/views/') && resp.status() === 200,
-      { timeout: 5000 }
-    ).catch(() => {});
+    await page
+      .waitForResponse((resp) => resp.url().includes('/api/views/') && resp.status() === 200, {
+        timeout: 5000,
+      })
+      .catch(() => {});
     await page.waitForTimeout(300);
 
     const shortHeight = await firstRow.evaluate((el) => el.getBoundingClientRect().height);
@@ -91,10 +93,11 @@ test.describe('Row Height Control (GAP-127)', () => {
     // Switch to "extra-tall"
     await rowHeightBtn.click();
     await page.getByTestId('row-height-option-extra-tall').click();
-    await page.waitForResponse(
-      (resp) => resp.url().includes('/api/views/') && resp.status() === 200,
-      { timeout: 5000 }
-    ).catch(() => {});
+    await page
+      .waitForResponse((resp) => resp.url().includes('/api/views/') && resp.status() === 200, {
+        timeout: 5000,
+      })
+      .catch(() => {});
     await page.waitForTimeout(300);
 
     const tallHeight = await firstRow.evaluate((el) => el.getBoundingClientRect().height);

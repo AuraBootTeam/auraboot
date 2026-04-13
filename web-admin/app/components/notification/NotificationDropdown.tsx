@@ -168,7 +168,7 @@ export function NotificationDropdown({ unreadCount, onMarkAllRead }: Notificatio
       if (notification.sourceType && notification.sourceId) {
         // Navigate to the source entity
         const sourceTypeLower = notification.sourceType.toLowerCase();
-        navigate(`/dynamic/${sourceTypeLower}/view/${notification.sourceId}`);
+        navigate(`/p/${sourceTypeLower}/view/${notification.sourceId}`);
       } else {
         navigate('/notifications');
       }

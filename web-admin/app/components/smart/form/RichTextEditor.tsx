@@ -16,6 +16,7 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
+import { sanitizeHtml } from '~/meta/utils/sanitizeHtml';
 
 interface RichTextEditorProps {
   name: string;
@@ -139,8 +140,9 @@ export const RichTextEditor = forwardRef<HTMLDivElement, RichTextEditorProps>(
 
     if (!isVisible) return null;
 
-    // Display mode: render HTML read-only
-    if (disabledValue) {
+    // Display mode: render HTML read-only (disabled or readOnly)
+    const isReadOnly = Boolean(restProps.readOnly);
+    if (disabledValue || isReadOnly) {
       return (
         <FieldBase
           id={name}
@@ -152,7 +154,7 @@ export const RichTextEditor = forwardRef<HTMLDivElement, RichTextEditorProps>(
           <div
             ref={ref}
             className="prose prose-sm min-h-[80px] max-w-none rounded-md border border-gray-200 bg-gray-50 p-3"
-            dangerouslySetInnerHTML={{ __html: field.value || '' }}
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(field.value || '') }}
           />
         </FieldBase>
       );

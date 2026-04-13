@@ -1,9 +1,19 @@
 /**
- * BPMN设计器路由页面
+ * BPMN Designer route page
+ * Lazy-loaded to reduce initial bundle size (~55KB).
  */
 
-import { BPMNDesigner } from '~/bpmn-designer/BPMNDesigner';
+import React, { Suspense } from 'react';
+import { RouteLoadingFallback } from '~/components/RouteLoadingFallback';
+
+const BPMNDesigner = React.lazy(() =>
+  import('~/bpmn-designer/BPMNDesigner').then((m) => ({ default: m.BPMNDesigner })),
+);
 
 export default function BPMNDesignerPage() {
-  return <BPMNDesigner />;
+  return (
+    <Suspense fallback={<RouteLoadingFallback />}>
+      <BPMNDesigner />
+    </Suspense>
+  );
 }

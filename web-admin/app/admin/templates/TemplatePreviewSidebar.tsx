@@ -96,9 +96,7 @@ export function TemplatePreviewSidebar({
             >
               {template.name}
             </h2>
-            <span className="text-xs text-gray-500 dark:text-gray-400">
-              {template.category}
-            </span>
+            <span className="text-xs text-gray-500 dark:text-gray-400">{template.category}</span>
           </div>
         </div>
         <p className="text-sm leading-relaxed text-gray-600 dark:text-gray-400">
@@ -146,7 +144,10 @@ export function TemplatePreviewSidebar({
                         isExpanded ? 'rotate-90' : ''
                       }`}
                     />
-                    <GroupIcon icon={group.icon} className="h-4 w-4 flex-shrink-0 text-gray-500 dark:text-gray-400" />
+                    <GroupIcon
+                      icon={group.icon}
+                      className="h-4 w-4 flex-shrink-0 text-gray-500 dark:text-gray-400"
+                    />
                     <span className="flex-1 truncate">{group.label}</span>
                     <span className="flex-shrink-0 rounded-full bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-400">
                       {group.items.length}
@@ -155,7 +156,7 @@ export function TemplatePreviewSidebar({
 
                   {/* Group items */}
                   {isExpanded && (
-                    <div className="ml-5 mt-0.5 space-y-0.5">
+                    <div className="mt-0.5 ml-5 space-y-0.5">
                       {group.items.map((item) => {
                         const isSelected =
                           selectedItem?.type === group.type &&

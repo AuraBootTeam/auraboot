@@ -29,14 +29,18 @@ test.describe('CC Profit Analysis @smoke', () => {
     await openProfitAnalysisPage(page);
 
     // The page should render core content even if table rows are empty.
-    const content = page.locator('main, table, [role="table"], [data-testid="dynamic-list"], [data-testid="table-block"]');
+    const content = page.locator(
+      'main, table, [role="table"], [data-testid="dynamic-list"], [data-testid="table-block"]',
+    );
     await expect(content.first()).toBeVisible({ timeout: 15000 });
   });
 
   test('PA-002: Table has expected column headers', async ({ page }) => {
     await openProfitAnalysisPage(page);
 
-    const content = page.locator('main, table, [role="table"], [data-testid="dynamic-list"], [data-testid="table-block"]');
+    const content = page.locator(
+      'main, table, [role="table"], [data-testid="dynamic-list"], [data-testid="table-block"]',
+    );
     await expect(content.first()).toBeVisible({ timeout: 15000 });
 
     // Route-level assertion: page should not be forbidden/not found.
@@ -46,7 +50,9 @@ test.describe('CC Profit Analysis @smoke', () => {
   test('PA-003: Warning column renders data rows', async ({ page }) => {
     await openProfitAnalysisPage(page);
 
-    const content = page.locator('main, table, [role="table"], [data-testid="dynamic-list"], [data-testid="table-block"]');
+    const content = page.locator(
+      'main, table, [role="table"], [data-testid="dynamic-list"], [data-testid="table-block"]',
+    );
     await expect(content.first()).toBeVisible({ timeout: 15000 });
 
     // The NamedQuery should return project-level data rows
@@ -67,14 +73,18 @@ test.describe('CC Profit Analysis @smoke', () => {
     await openProfitAnalysisPage(page);
 
     // The page should at minimum render the table header even with no data
-    const content = page.locator('main, table, [role="table"], [data-testid="dynamic-list"], [data-testid="table-block"]');
+    const content = page.locator(
+      'main, table, [role="table"], [data-testid="dynamic-list"], [data-testid="table-block"]',
+    );
     await expect(content.first()).toBeVisible({ timeout: 15000 });
 
     // Page should not show an error state
     const errorIndicator = page.locator('[data-testid="error"], .text-red-500:has-text("Error")');
-    await expect(errorIndicator).not.toBeVisible({ timeout: 3000 }).catch(() => {
-      // No error element found — that's the expected happy path
-    });
+    await expect(errorIndicator)
+      .not.toBeVisible({ timeout: 3000 })
+      .catch(() => {
+        // No error element found — that's the expected happy path
+      });
   });
 
   test('PA-005: Dynamic list API returns 200 with data', async ({ page }) => {

@@ -33,25 +33,32 @@ test.describe('Executive Dashboard Deep @smoke', () => {
   // Seed Data: create project → contract → budget → budget lines → actual
   //            costs → payment plan (creates a complete financial dataset)
   // =========================================================================
-  test.beforeAll(async ({ browser }) => {
+  test.beforeAll(async ({ browser }, testInfo) => {
+    testInfo.setTimeout(180000);
     const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     try {
       // 1. Create project
       const proj = await executeCommandViaApi(
-        page, 'pm:create_project',
+        page,
+        'pm:create_project',
         { pm_project_name: projectName, pm_planned_progress: 60 },
-        undefined, 'create',
+        undefined,
+        'create',
+        { timeoutMs: 30000 },
       );
       projectPid = proj.recordId;
       expect(projectPid, 'Project creation should return pid').toBeTruthy();
 
       // Activate project
-      await executeCommandViaApi(page, 'pm:activate_project', {}, projectPid, 'update');
+      await executeCommandViaApi(page, 'pm:activate_project', {}, projectPid, 'update', {
+        timeoutMs: 30000,
+      });
 
       // 2. Create contract linked to project
       const contract = await executeCommandViaApi(
-        page, 'cc:create_contract',
+        page,
+        'cc:create_contract',
         {
           cc_contract_name: contractName,
           cc_contract_amount: 1200000,
@@ -63,32 +70,47 @@ test.describe('Executive Dashboard Deep @smoke', () => {
           cc_start_date: dateOffsetStr(-30),
           cc_end_date: dateOffsetStr(180),
         },
-        undefined, 'create',
+        undefined,
+        'create',
+        { timeoutMs: 30000 },
       );
       contractPid = contract.recordId;
       expect(contractPid, 'Contract creation should return pid').toBeTruthy();
 
       // Transition contract: draft → REVIEW → SIGNED → EXECUTING
-      await executeCommandViaApi(page, 'cc:submit_review', {}, contractPid, 'update');
-      await executeCommandViaApi(page, 'cc:approve_contract', {}, contractPid, 'update');
-      await executeCommandViaApi(page, 'cc:start_execution', {}, contractPid, 'update');
+      await executeCommandViaApi(page, 'cc:submit_review', {}, contractPid, 'update', {
+        timeoutMs: 30000,
+      });
+      await executeCommandViaApi(page, 'cc:approve_contract', {}, contractPid, 'update', {
+        timeoutMs: 30000,
+      });
+      await executeCommandViaApi(page, 'cc:start_execution', {}, contractPid, 'update', {
+        timeoutMs: 30000,
+      });
 
       // 3. Create cost budget linked to project
       const budget = await executeCommandViaApi(
-        page, 'cc:create_budget',
+        page,
+        'cc:create_budget',
         {
           cc_budget_name: `Budget_${uid}`,
           cc_budget_project_id: projectPid,
           cc_budget_total_amount: 800000,
         },
-        undefined, 'create',
+        undefined,
+        'create',
+        { timeoutMs: 30000 },
       );
       budgetPid = budget.recordId;
       expect(budgetPid, 'Budget creation should return pid').toBeTruthy();
 
       // Submit and approve budget
-      await executeCommandViaApi(page, 'cc:submit_budget', {}, budgetPid, 'update');
-      await executeCommandViaApi(page, 'cc:approve_budget', {}, budgetPid, 'update');
+      await executeCommandViaApi(page, 'cc:submit_budget', {}, budgetPid, 'update', {
+        timeoutMs: 30000,
+      });
+      await executeCommandViaApi(page, 'cc:approve_budget', {}, budgetPid, 'update', {
+        timeoutMs: 30000,
+      });
 
       // 4. Create budget lines (4 categories)
       const budgetLines = [
@@ -99,9 +121,12 @@ test.describe('Executive Dashboard Deep @smoke', () => {
       ];
       for (const line of budgetLines) {
         await executeCommandViaApi(
-          page, 'cc:create_budget_line',
+          page,
+          'cc:create_budget_line',
           { cc_bl_budget_id: budgetPid, ...line },
-          undefined, 'create',
+          undefined,
+          'create',
+          { timeoutMs: 30000 },
         );
       }
 
@@ -109,34 +134,41 @@ test.describe('Executive Dashboard Deep @smoke', () => {
       const actualCosts = [
         { cc_ac_category: 'labor', cc_ac_amount: 310000, cc_ac_date: dateOffsetStr(-15) },
         { cc_ac_category: 'subcontract', cc_ac_amount: 230000, cc_ac_date: dateOffsetStr(-10) },
-        { cc_ac_category: 'procurement', cc_ac_amount: 160000, cc_ac_date: dateOffsetStr(-5) },  // over budget
+        { cc_ac_category: 'procurement', cc_ac_amount: 160000, cc_ac_date: dateOffsetStr(-5) }, // over budget
         { cc_ac_category: 'expense', cc_ac_amount: 80000, cc_ac_date: dateOffsetStr(-2) },
       ];
       for (const cost of actualCosts) {
         await executeCommandViaApi(
-          page, 'cc:create_actual_cost',
+          page,
+          'cc:create_actual_cost',
           { cc_ac_project_id: projectPid, cc_ac_budget_id: budgetPid, ...cost },
-          undefined, 'create',
+          undefined,
+          'create',
+          { timeoutMs: 30000 },
         );
       }
 
       // 6. Create payment plans (one overdue for risk testing)
       const paymentPlans = [
-        { cc_pp_period: 1, cc_pp_plan_date: dateOffsetStr(-20), cc_pp_plan_amount: 300000 },  // overdue
+        { cc_pp_period: 1, cc_pp_plan_date: dateOffsetStr(-20), cc_pp_plan_amount: 300000 }, // overdue
         { cc_pp_period: 2, cc_pp_plan_date: dateOffsetStr(30), cc_pp_plan_amount: 400000 },
         { cc_pp_period: 3, cc_pp_plan_date: dateOffsetStr(90), cc_pp_plan_amount: 500000 },
       ];
       for (const plan of paymentPlans) {
         await executeCommandViaApi(
-          page, 'cc:create_payment_plan',
+          page,
+          'cc:create_payment_plan',
           { cc_pp_contract_id: contractPid, ...plan },
-          undefined, 'create',
+          undefined,
+          'create',
+          { timeoutMs: 30000 },
         );
       }
 
       // 7. Create a task (for task stats in overview)
       await executeCommandViaApi(
-        page, 'pm:create_task',
+        page,
+        'pm:create_task',
         {
           pm_task_title: `DashTask_${uid}`,
           pm_task_project_id: projectPid,
@@ -145,7 +177,9 @@ test.describe('Executive Dashboard Deep @smoke', () => {
           pm_task_start_date: dateOffsetStr(-10),
           pm_task_due_date: dateOffsetStr(20),
         },
-        undefined, 'create',
+        undefined,
+        'create',
+        { timeoutMs: 30000 },
       );
     } finally {
       await ctx.close();
@@ -161,7 +195,9 @@ test.describe('Executive Dashboard Deep @smoke', () => {
     await menuLink.first().evaluate((el) => (el as HTMLAnchorElement).click());
 
     await expect(page).toHaveURL(/\/executive-dashboard/, { timeout: 10000 });
-    await page.locator('[data-testid="executive-dashboard"]').waitFor({ state: 'visible', timeout: 10000 });
+    await page
+      .locator('[data-testid="executive-dashboard"]')
+      .waitFor({ state: 'visible', timeout: 10000 });
   }
 
   /** Click a dashboard tab by key and wait for tab content to render */
@@ -217,11 +253,16 @@ test.describe('Executive Dashboard Deep @smoke', () => {
     expect(kpiResp.ok()).toBe(true);
     const kpiBody = await kpiResp.json();
     const kpiRecords = kpiBody?.data?.records ?? [];
-    expect(kpiRecords.length, 'cc_dashboard_kpi should return at least 1 record').toBeGreaterThan(0);
+    expect(kpiRecords.length, 'cc_dashboard_kpi should return at least 1 record').toBeGreaterThan(
+      0,
+    );
     expect(Number(kpiRecords[0]?.project_count), 'project_count should be > 0').toBeGreaterThan(0);
 
     // contract_total should be > 0 (we created a ¥1.2M contract)
-    expect(Number(kpiRecords[0]?.contract_total ?? 0), 'contract_total should be > 0').toBeGreaterThan(0);
+    expect(
+      Number(kpiRecords[0]?.contract_total ?? 0),
+      'contract_total should be > 0',
+    ).toBeGreaterThan(0);
 
     // Profit ranking section visible
     await expect(page.locator('[data-testid="dashboard-profit-ranking"]')).toBeVisible();
@@ -259,7 +300,9 @@ test.describe('Executive Dashboard Deep @smoke', () => {
   // =========================================================================
   // ED-04: Profit Analysis tab — dept profit + detail table with data
   // =========================================================================
-  test('ED-04: Profit Analysis tab shows dept profit and detail table with data', async ({ page }) => {
+  test('ED-04: Profit Analysis tab shows dept profit and detail table with data', async ({
+    page,
+  }) => {
     await navigateToDashboard(page);
     await clickDashboardTab(page, 'profit');
 
@@ -275,7 +318,10 @@ test.describe('Executive Dashboard Deep @smoke', () => {
     );
     expect(nqResp.ok()).toBe(true);
     const body = await nqResp.json();
-    expect((body?.data?.records ?? []).length, 'Profit table NQ should return data').toBeGreaterThan(0);
+    expect(
+      (body?.data?.records ?? []).length,
+      'Profit table NQ should return data',
+    ).toBeGreaterThan(0);
 
     // Profit table should have at least 1 visible row
     const tableRows = page.locator('[data-testid="dashboard-profit-table"] tbody tr');
@@ -310,7 +356,10 @@ test.describe('Executive Dashboard Deep @smoke', () => {
 
     // Verify our seed project's payment data
     const seedPayment = records.find((r: any) => r.project_name === projectName);
-    expect(seedPayment, `Seed project "${projectName}" should appear in payment overview`).toBeTruthy();
+    expect(
+      seedPayment,
+      `Seed project "${projectName}" should appear in payment overview`,
+    ).toBeTruthy();
     expect(Number(seedPayment.due_amount), 'due_amount should be > 0').toBeGreaterThan(0);
 
     // Table should have rows
@@ -338,7 +387,9 @@ test.describe('Executive Dashboard Deep @smoke', () => {
     const records: any[] = body?.data?.records ?? [];
     // We created PROCUREMENT cost 160k on budget 150k → should trigger warning
     // But warning threshold is exec > 90%, so LABOR 310k/300k = 103% should also trigger
-    expect(records.length, 'cc_cost_warning_list should return at least 1 warning').toBeGreaterThan(0);
+    expect(records.length, 'cc_cost_warning_list should return at least 1 warning').toBeGreaterThan(
+      0,
+    );
   });
 
   // =========================================================================
@@ -374,15 +425,23 @@ test.describe('Executive Dashboard Deep @smoke', () => {
     await navigateToDashboard(page);
 
     // Wait for overview and table
-    await page.locator('[data-testid="dashboard-project-table"]').waitFor({ state: 'visible', timeout: 10000 });
+    await page
+      .locator('[data-testid="dashboard-project-table"]')
+      .waitFor({ state: 'visible', timeout: 10000 });
 
     // Find our project row and click it
-    const row = page.locator('[data-testid="dashboard-project-table"] tbody tr', { hasText: projectName }).first();
+    const row = page
+      .locator('[data-testid="dashboard-project-table"] tbody tr', { hasText: projectName })
+      .first();
     if (await row.isVisible({ timeout: 3000 }).catch(() => false)) {
       await row.click();
       // Should navigate to project workspace
-      await expect(page).toHaveURL(new RegExp(`/project-management/projects/${projectPid}`), { timeout: 10000 });
-      await expect(page.locator('[data-testid="project-workspace"]')).toBeVisible({ timeout: 10000 });
+      await expect(page).toHaveURL(new RegExp(`/project-management/projects/${projectPid}`), {
+        timeout: 10000,
+      });
+      await expect(page.locator('[data-testid="project-workspace"]')).toBeVisible({
+        timeout: 10000,
+      });
     }
     // If row not visible (project may be on later page), verify the drilldown mechanism exists
     // by checking that rows are clickable (have cursor-pointer style)

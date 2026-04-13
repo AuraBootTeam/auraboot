@@ -117,9 +117,10 @@ test.describe('Finance — Bank Reconciliation', () => {
     const nav = page.locator('nav');
 
     // Click Finance root button
-    const finBtn = nav.getByRole('button', { name: 'Finance' }).or(
-      nav.getByRole('button', { name: '财务' })
-    ).first();
+    const finBtn = nav
+      .getByRole('button', { name: 'Finance' })
+      .or(nav.getByRole('button', { name: '财务' }))
+      .first();
     await finBtn.evaluate((el: HTMLElement) => el.click());
 
     // Click 财务管理 sub-directory
@@ -157,7 +158,9 @@ test.describe('Finance — Bank Reconciliation', () => {
   // FB-002 @critical: Created bank account appears in list with active status
   // -------------------------------------------------------------------------
 
-  test('FB-002 @critical: Created bank account appears in list with active status', async ({ page }) => {
+  test('FB-002 @critical: Created bank account appears in list with active status', async ({
+    page,
+  }) => {
     expect(bankAccountId).toBeTruthy();
 
     // Verify via API
@@ -274,9 +277,10 @@ test.describe('Finance — Bank Reconciliation', () => {
     const nav = page.locator('nav');
 
     // Click Finance root button
-    const finBtn = nav.getByRole('button', { name: 'Finance' }).or(
-      nav.getByRole('button', { name: '财务' })
-    ).first();
+    const finBtn = nav
+      .getByRole('button', { name: 'Finance' })
+      .or(nav.getByRole('button', { name: '财务' }))
+      .first();
     await finBtn.evaluate((el: HTMLElement) => el.click());
 
     // Click 财务管理 sub-directory
@@ -335,9 +339,10 @@ test.describe('Finance — Bank Reconciliation', () => {
     const nav = page.locator('nav');
 
     // Click Finance root button
-    const finBtn = nav.getByRole('button', { name: 'Finance' }).or(
-      nav.getByRole('button', { name: '财务' })
-    ).first();
+    const finBtn = nav
+      .getByRole('button', { name: 'Finance' })
+      .or(nav.getByRole('button', { name: '财务' }))
+      .first();
     await finBtn.evaluate((el: HTMLElement) => el.click());
 
     // Click 财务管理 sub-directory

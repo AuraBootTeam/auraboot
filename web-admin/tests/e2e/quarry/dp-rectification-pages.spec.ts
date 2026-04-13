@@ -55,18 +55,24 @@ async function createIssueAndTriggerRectification(
   const issuePid = cr.recordId;
 
   await executeCommandViaApi(page, 'dp:submit_issue', {}, issuePid, 'state_transition');
-  await executeCommandViaApi(page, 'dp:triage_issue', {
-    dp_triage_decision: 'need_rectify',
-    dp_hazard_level: 'medium',
-    dp_triage_remark: 'Rectification page test',
-  }, issuePid, 'update');
+  await executeCommandViaApi(
+    page,
+    'dp:triage_issue',
+    {
+      dp_triage_decision: 'need_rectify',
+      dp_hazard_level: 'medium',
+      dp_triage_remark: 'Rectification page test',
+    },
+    issuePid,
+    'update',
+  );
 
   // Poll until rectification side-effect record appears.
   let rectPid = '';
   const deadline = Date.now() + 15000;
   while (Date.now() < deadline) {
     const resp = await page.request.get(
-      `/api/dynamic/dp-rectification/list?pageSize=20&filters=${encodeURIComponent(
+      `/api/dynamic/dp_rectification/list?pageSize=20&filters=${encodeURIComponent(
         JSON.stringify([{ fieldName: 'dp_rect_issue_id', operator: 'EQ', value: issuePid }]),
       )}`,
     );
@@ -93,7 +99,7 @@ async function waitRectStatus(
 ): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    const r = await page.request.get(`/api/dynamic/dp-rectification/${rectPid}`);
+    const r = await page.request.get(`/api/dynamic/dp_rectification/${rectPid}`);
     if (r.ok()) {
       const b = await r.json().catch(() => ({}));
       if (String((b.data ?? b)?.dp_rect_status ?? '') === expected) return true;
@@ -132,9 +138,8 @@ test.describe('DP Rectification — Form & Detail Page Blocks', () => {
   test('RT-01: dp_rectification_form — sections and submit button visible', async ({ page }) => {
     if (!projectId) throw new Error('Project not available');
 
-    // Navigate directly to the form page using the hyphenated URL (route parameter uses hyphens).
-    // The DSL system normalizes "dp-rectification" → "dp_rectification" → pageKey "dp_rectification_form".
-    await page.goto('http://localhost:5173/dynamic/dp-rectification/new', {
+    // Navigate directly to the form page using the underscore model code in the URL.
+    await page.goto('http://localhost:5173/p/dp_rectification/new', {
       waitUntil: 'domcontentloaded',
     });
 
@@ -146,34 +151,40 @@ test.describe('DP Rectification — Form & Detail Page Blocks', () => {
     await expect(infoSection).toBeVisible({ timeout: 10000 });
 
     // At least dp_rect_title input should be visible.
-    const titleInput = page.locator(
-      '[data-testid="form-field-dp_rect_title"] input, input[name="dp_rect_title"]',
-    ).first();
+    const titleInput = page
+      .locator('[data-testid="form-field-dp_rect_title"] input, input[name="dp_rect_title"]')
+      .first();
     await expect(titleInput).toBeVisible({ timeout: 8000 });
 
     // --- Block: block_dp_rectification_form_buttons [form-buttons] ---
     // Submit button (commandCode: dp:create_rectification) must be visible.
-    const submitBtn = page.locator(
-      '[data-testid="form-btn-dp:create_rectification"], [data-testid="form-btn-create_rectification"], [data-testid="form-btn-submit"], button:has-text("保存"), button:has-text("Submit"), button:has-text("提交")',
-    ).first();
+    const submitBtn = page
+      .locator(
+        '[data-testid="form-btn-dp:create_rectification"], [data-testid="form-btn-create_rectification"], [data-testid="form-btn-submit"], button:has-text("保存"), button:has-text("Submit"), button:has-text("提交")',
+      )
+      .first();
     await expect(submitBtn).toBeVisible({ timeout: 8000 });
 
     // Cancel button must be visible.
-    const cancelBtn = page.locator(
-      '[data-testid="form-btn-cancel"], button:has-text("取消"), button:has-text("Cancel")',
-    ).first();
+    const cancelBtn = page
+      .locator(
+        '[data-testid="form-btn-cancel"], button:has-text("取消"), button:has-text("Cancel")',
+      )
+      .first();
     await expect(cancelBtn).toBeVisible({ timeout: 5000 });
   });
 
   // ---- RT-02: Rectification detail page block rendering (INITIATED state) ----
 
-  test('RT-02: dp_rectification_detail — info/result/acceptance blocks visible', async ({ page }) => {
+  test('RT-02: dp_rectification_detail — info/result/acceptance blocks visible', async ({
+    page,
+  }) => {
     if (!projectId) throw new Error('Project not available');
 
     const { rectPid } = await createIssueAndTriggerRectification(page, projectId, 'RT02 Detail');
 
     // Navigate to detail page.
-    await page.goto(`/dynamic/dp-rectification/view/${rectPid}`, {
+    await page.goto(`/p/dp_rectification/view/${rectPid}`, {
       waitUntil: 'domcontentloaded',
     });
     await waitForDynamicPageLoad(page);
@@ -202,19 +213,25 @@ test.describe('DP Rectification — Form & Detail Page Blocks', () => {
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
 
     // In INITIATED state: "开始整改" (start) should be present (may need scroll into view).
-    const startBtn = page.locator(
-      '[data-testid="form-btn-start"], button:has-text("开始整改"), button:has-text("Start")',
-    ).first();
+    const startBtn = page
+      .locator(
+        '[data-testid="form-btn-start"], button:has-text("开始整改"), button:has-text("Start")',
+      )
+      .first();
     await startBtn.scrollIntoViewIfNeeded({ timeout: 5000 }).catch(() => {});
     const hasStartBtn = await startBtn.isVisible({ timeout: 5000 }).catch(() => false);
 
     // Navigation back control: back arrow (< icon) in header or explicit "返回" button.
-    const backBtn = page.locator(
-      '[data-testid="form-btn-back"], button:has-text("返回"), button:has-text("Back")',
-    ).first();
+    const backBtn = page
+      .locator('[data-testid="form-btn-back"], button:has-text("返回"), button:has-text("Back")')
+      .first();
     const hasBackBtn = await backBtn.isVisible({ timeout: 3000 }).catch(() => false);
     // The page-level back chevron is always present in the detail page header.
-    const headerBack = page.locator('[class*="cursor-pointer"] svg, button[aria-label*="back"], [data-testid="page-back"]').first();
+    const headerBack = page
+      .locator(
+        '[class*="cursor-pointer"] svg, button[aria-label*="back"], [data-testid="page-back"]',
+      )
+      .first();
     const hasHeaderBack = await headerBack.isVisible({ timeout: 2000 }).catch(() => false);
 
     // At minimum we need some way to go back OR a start button.
@@ -228,23 +245,27 @@ test.describe('DP Rectification — Form & Detail Page Blocks', () => {
 
     const { rectPid } = await createIssueAndTriggerRectification(page, projectId, 'RT03 Start');
 
-    await page.goto(`/dynamic/dp-rectification/view/${rectPid}`, {
+    await page.goto(`/p/dp_rectification/view/${rectPid}`, {
       waitUntil: 'domcontentloaded',
     });
     await waitForDynamicPageLoad(page);
 
     // Click "开始整改".
-    const startBtn = page.locator(
-      '[data-testid="form-btn-start"], button:has-text("开始整改"), button:has-text("Start")',
-    ).first();
+    const startBtn = page
+      .locator(
+        '[data-testid="form-btn-start"], button:has-text("开始整改"), button:has-text("Start")',
+      )
+      .first();
     await expect(startBtn).toBeVisible({ timeout: 8000 });
 
-    const startRespPromise = page.waitForResponse(
-      (r) =>
-        r.url().includes('/api/meta/commands/execute/dp:start_rectification') &&
-        r.request().method().toLowerCase() === 'post',
-      { timeout: 15000 },
-    ).catch(() => null);
+    const startRespPromise = page
+      .waitForResponse(
+        (r) =>
+          r.url().includes('/api/meta/commands/execute/dp:start_rectification') &&
+          r.request().method().toLowerCase() === 'post',
+        { timeout: 15000 },
+      )
+      .catch(() => null);
 
     await startBtn.click();
 
@@ -260,9 +281,11 @@ test.describe('DP Rectification — Form & Detail Page Blocks', () => {
     // After state transition the page should refresh: "提交整改结果" should appear,
     // "开始整改" should disappear.
     await waitForDynamicPageLoad(page);
-    const submitResultBtn = page.locator(
-      '[data-testid="form-btn-submit_result"], button:has-text("提交整改结果"), button:has-text("Submit")',
-    ).first();
+    const submitResultBtn = page
+      .locator(
+        '[data-testid="form-btn-submit_result"], button:has-text("提交整改结果"), button:has-text("Submit")',
+      )
+      .first();
     const hasSubmitBtn = await submitResultBtn.isVisible({ timeout: 5000 }).catch(() => false);
     // It's OK if the page navigated away (back to list), so we allow either outcome.
     if (!hasSubmitBtn) {
@@ -283,37 +306,45 @@ test.describe('DP Rectification — Form & Detail Page Blocks', () => {
     await executeCommandViaApi(page, 'dp:start_rectification', {}, rectPid, 'state_transition');
     expect(await waitRectStatus(page, rectPid, 'in_progress', 12000)).toBe(true);
 
-    await page.goto(`/dynamic/dp-rectification/view/${rectPid}`, {
+    await page.goto(`/p/dp_rectification/view/${rectPid}`, {
       waitUntil: 'domcontentloaded',
     });
     await waitForDynamicPageLoad(page);
 
     // "提交" (submit_result) button should be visible in in_progress state.
     // The label comes from i18n 'action.submit' which resolves to "提交".
-    const submitResultBtn = page.locator(
-      '[data-testid="form-btn-submit_result"], button:has-text("提交整改结果"), button:has-text("提交"), button:has-text("Submit")',
-    ).first();
+    const submitResultBtn = page
+      .locator(
+        '[data-testid="form-btn-submit_result"], button:has-text("提交整改结果"), button:has-text("提交"), button:has-text("Submit")',
+      )
+      .first();
     await expect(submitResultBtn).toBeVisible({ timeout: 8000 });
 
-    const submitRespPromise = page.waitForResponse(
-      (r) =>
-        r.url().includes('/api/meta/commands/execute/dp:submit_rectification') &&
-        r.request().method().toLowerCase() === 'post',
-      { timeout: 15000 },
-    ).catch(() => null);
+    const submitRespPromise = page
+      .waitForResponse(
+        (r) =>
+          r.url().includes('/api/meta/commands/execute/dp:submit_rectification') &&
+          r.request().method().toLowerCase() === 'post',
+        { timeout: 15000 },
+      )
+      .catch(() => null);
 
     await submitResultBtn.click();
 
     // May open an inline form/modal for dp_rect_result — fill if visible.
-    const resultInput = page.locator(
-      '[data-testid="form-field-dp_rect_result"] textarea, [data-testid="form-field-dp_rect_result"] input, textarea[name="dp_rect_result"]',
-    ).first();
+    const resultInput = page
+      .locator(
+        '[data-testid="form-field-dp_rect_result"] textarea, [data-testid="form-field-dp_rect_result"] input, textarea[name="dp_rect_result"]',
+      )
+      .first();
     if (await resultInput.isVisible({ timeout: 3000 }).catch(() => false)) {
       await resultInput.fill('Rectification completed — E2E test result');
       // Submit the nested form.
-      const nestedSubmit = page.locator(
-        '[data-testid="confirm-ok"], [data-testid="form-btn-submit"], button:has-text("确定"), button:has-text("保存")',
-      ).first();
+      const nestedSubmit = page
+        .locator(
+          '[data-testid="confirm-ok"], [data-testid="form-btn-submit"], button:has-text("确定"), button:has-text("保存")',
+        )
+        .first();
       if (await nestedSubmit.isVisible({ timeout: 3000 }).catch(() => false)) {
         await nestedSubmit.click();
       }
@@ -350,30 +381,36 @@ test.describe('DP Rectification — Form & Detail Page Blocks', () => {
     );
     expect(await waitRectStatus(page, rectPid, 'submitted', 12000)).toBe(true);
 
-    await page.goto(`/dynamic/dp-rectification/view/${rectPid}`, {
+    await page.goto(`/p/dp_rectification/view/${rectPid}`, {
       waitUntil: 'domcontentloaded',
     });
     await waitForDynamicPageLoad(page);
 
     // "验收通过" (accept) button should be visible (submitted state).
     // Note: button text may show as "接受" if i18n cache hasn't refreshed yet.
-    const acceptBtn = page.locator(
-      '[data-testid="form-btn-accept"], [data-testid="form-btn-dp:accept_rectification"], [data-testid="form-btn-accept_rectification"], button:has-text("验收通过"), button:has-text("接受"), button:has-text("Accept")',
-    ).first();
+    const acceptBtn = page
+      .locator(
+        '[data-testid="form-btn-accept"], [data-testid="form-btn-dp:accept_rectification"], [data-testid="form-btn-accept_rectification"], button:has-text("验收通过"), button:has-text("接受"), button:has-text("Accept")',
+      )
+      .first();
     await expect(acceptBtn).toBeVisible({ timeout: 8000 });
 
     // "验收退回" (reject) should also be visible in submitted state.
-    const rejectBtn = page.locator(
-      '[data-testid="form-btn-reject"], [data-testid="form-btn-dp:reject_rectification"], [data-testid="form-btn-reject_rectification"], button:has-text("验收退回"), button:has-text("退回"), button:has-text("Reject")',
-    ).first();
+    const rejectBtn = page
+      .locator(
+        '[data-testid="form-btn-reject"], [data-testid="form-btn-dp:reject_rectification"], [data-testid="form-btn-reject_rectification"], button:has-text("验收退回"), button:has-text("退回"), button:has-text("Reject")',
+      )
+      .first();
     await expect(rejectBtn).toBeVisible({ timeout: 5000 });
 
-    const acceptRespPromise = page.waitForResponse(
-      (r) =>
-        r.url().includes('/api/meta/commands/execute/dp:accept_rectification') &&
-        r.request().method().toLowerCase() === 'post',
-      { timeout: 15000 },
-    ).catch(() => null);
+    const acceptRespPromise = page
+      .waitForResponse(
+        (r) =>
+          r.url().includes('/api/meta/commands/execute/dp:accept_rectification') &&
+          r.request().method().toLowerCase() === 'post',
+        { timeout: 15000 },
+      )
+      .catch(() => null);
 
     await acceptBtn.click();
 
@@ -384,14 +421,16 @@ test.describe('DP Rectification — Form & Detail Page Blocks', () => {
     }
 
     // Fill acceptance remark if a form appears.
-    const acceptRemark = page.locator(
-      '[data-testid="form-field-dp_rect_accept_remark"] textarea, textarea[name="dp_rect_accept_remark"]',
-    ).first();
+    const acceptRemark = page
+      .locator(
+        '[data-testid="form-field-dp_rect_accept_remark"] textarea, textarea[name="dp_rect_accept_remark"]',
+      )
+      .first();
     if (await acceptRemark.isVisible({ timeout: 3000 }).catch(() => false)) {
       await acceptRemark.fill('Acceptance verified — E2E test');
-      const confirmSubmit = page.locator(
-        '[data-testid="confirm-ok"], button:has-text("确定"), button:has-text("保存")',
-      ).first();
+      const confirmSubmit = page
+        .locator('[data-testid="confirm-ok"], button:has-text("确定"), button:has-text("保存")')
+        .first();
       if (await confirmSubmit.isVisible({ timeout: 3000 }).catch(() => false)) {
         await confirmSubmit.click();
       }
@@ -407,7 +446,7 @@ test.describe('DP Rectification — Form & Detail Page Blocks', () => {
     expect(await waitRectStatus(page, rectPid, 'accepted', 12000)).toBe(true);
 
     // Verify issue status also advanced to RECTIFIED.
-    const issueResp = await page.request.get(`/api/dynamic/dp-issue/${issuePid}`);
+    const issueResp = await page.request.get(`/api/dynamic/dp_issue/${issuePid}`);
     if (issueResp.ok()) {
       const issueBody = await issueResp.json().catch(() => ({}));
       const issueStatus = String((issueBody.data ?? issueBody)?.dp_issue_status ?? '');
@@ -421,7 +460,7 @@ test.describe('DP Rectification — Form & Detail Page Blocks', () => {
     if (!projectId) throw new Error('Project not available');
 
     // Use any existing rectification.
-    const listResp = await page.request.get('/api/dynamic/dp-rectification/list?pageSize=1');
+    const listResp = await page.request.get('/api/dynamic/dp_rectification/list?pageSize=1');
     if (!listResp.ok()) throw new Error('Could not fetch rectification list');
     const listBody = await listResp.json().catch(() => ({}));
     const rects = listBody.data?.records ?? listBody.data?.list ?? [];
@@ -439,7 +478,7 @@ test.describe('DP Rectification — Form & Detail Page Blocks', () => {
       row = await findRowInPaginatedList(page, firstRectNo, 15000);
     } else {
       // No rect number: fall back to direct URL immediately.
-      await page.goto(`/dynamic/dp-rectification/view/${firstRectId}`, {
+      await page.goto(`/p/dp_rectification/view/${firstRectId}`, {
         waitUntil: 'domcontentloaded',
       });
       await waitForDynamicPageLoad(page);
@@ -451,7 +490,7 @@ test.describe('DP Rectification — Form & Detail Page Blocks', () => {
 
     await clickRowActionByLocator(page, row, 'detail', '查看').catch(async () => {
       // Direct URL fallback if action not found.
-      await page.goto(`/dynamic/dp-rectification/view/${firstRectId}`, {
+      await page.goto(`/p/dp_rectification/view/${firstRectId}`, {
         waitUntil: 'domcontentloaded',
       });
     });

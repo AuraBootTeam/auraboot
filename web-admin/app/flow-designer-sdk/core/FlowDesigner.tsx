@@ -43,25 +43,40 @@ export function FlowDesigner({
   autoSave = false,
   autoSaveDelay,
 }: FlowDesignerProps) {
-  const { importData, exportData, nodes, edges, setDirty, undo, redo, isDirty } = useFlowStore();
+  const { importData, exportData, nodes, edges, setDirty, undo, redo, isDirty, bumpRegistryVersion } = useFlowStore();
   const containerRef = useRef<HTMLDivElement>(null);
+  // Track whether we are currently importing data so we can suppress the
+  // onChange notification that would otherwise fire for every importData call.
+  // Without this guard, importing pre-populated node config triggers:
+  //   onChange → parent updates initialData → importData → onChange → ...
+  const isImportingRef = useRef(false);
 
-  // Register node definitions
+  // Register node definitions and bump registryVersion so FlowPalette/FlowCanvas re-render
   useEffect(() => {
     nodeRegistry.clear();
     nodeRegistry.registerAll(config.nodeDefinitions);
-  }, [config.nodeDefinitions]);
+    bumpRegistryVersion();
+  }, [config.nodeDefinitions, bumpRegistryVersion]);
 
   // Load initial data
   useEffect(() => {
     if (initialData) {
+      isImportingRef.current = true;
       importData(initialData);
+      // Reset the flag on the next microtask so that the onChange effect
+      // (which runs synchronously in the same render cycle) sees it as false
+      // only after this import batch has settled.
+      Promise.resolve().then(() => {
+        isImportingRef.current = false;
+      });
     }
   }, [initialData, importData]);
 
-  // Notify onChange
+  // Notify onChange — skip while an importData call is in progress to prevent
+  // the infinite loop: importData → nodes/edges change → onChange → parent
+  // updates initialData → importData again.
   useEffect(() => {
-    if (onChange) {
+    if (onChange && !isImportingRef.current) {
       onChange({ nodes, edges });
     }
   }, [nodes, edges, onChange]);

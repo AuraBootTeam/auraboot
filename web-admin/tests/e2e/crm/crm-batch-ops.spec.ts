@@ -26,6 +26,15 @@ test.describe('CRM Batch Operations Smoke @smoke', () => {
 
   const uid = uniqueId('batch');
 
+  async function waitForSelectableRows(page: import('@playwright/test').Page) {
+    const rowCheckboxes = page.locator('tbody tr td:first-child input[type="checkbox"]');
+    await expect
+      .poll(async () => rowCheckboxes.count(), { timeout: 10000 })
+      .toBeGreaterThan(0);
+    await rowCheckboxes.first().waitFor({ state: 'visible', timeout: 5000 });
+    return rowCheckboxes;
+  }
+
   // =========================================================================
   // DATA SETUP — Create at least 2 leads for batch selection
   // =========================================================================
@@ -70,30 +79,34 @@ test.describe('CRM Batch Operations Smoke @smoke', () => {
   // TESTS
   // =========================================================================
 
-  test('BATCH-001: Navigate to CRM leads list and verify select-all checkbox visible', async ({ page }) => {
+  test('BATCH-001: Navigate to CRM leads list and verify select-all checkbox visible', async ({
+    page,
+  }) => {
     await navigateToDynamicPage(page, 'crm-lead');
     await waitForDynamicPageLoad(page);
-    await expect(page).toHaveURL(/\/dynamic\/crm-lead/);
+    await expect(page).toHaveURL(/\/p\/crm_lead(?:\?.*)?$/);
 
-    // Wait for table rows to render
-    const rows = page.locator('tbody tr');
-    await rows.first().waitFor({ state: 'visible', timeout: 10000 });
+    const rowCheckboxes = await waitForSelectableRows(page);
 
     // Look for select-all checkbox in table header
     const selectAllCheckbox = page.locator(
-      'thead input[type="checkbox"], ' +
-      'thead [role="checkbox"], ' +
-      '[data-testid="select-all"], ' +
-      'th input[type="checkbox"]',
+      '[data-testid="select-all-checkbox"], ' +
+        'thead input[type="checkbox"], ' +
+        'thead [role="checkbox"], ' +
+        '[data-testid="select-all"], ' +
+        'th input[type="checkbox"]',
     );
-    const hasSelectAll = await selectAllCheckbox.first().isVisible({ timeout: 5000 }).catch(() => false);
+    const hasSelectAll = await selectAllCheckbox
+      .first()
+      .isVisible({ timeout: 5000 })
+      .catch(() => false);
 
     // If no select-all in header, check for row-level checkboxes
     if (!hasSelectAll) {
-      const rowCheckbox = page.locator(
-        'tbody input[type="checkbox"], tbody [role="checkbox"]',
-      );
-      const hasRowCheckbox = await rowCheckbox.first().isVisible({ timeout: 3000 }).catch(() => false);
+      const hasRowCheckbox = await rowCheckboxes
+        .first()
+        .isVisible({ timeout: 3000 })
+        .catch(() => false);
       // At least one form of selection should exist
       expect(
         hasSelectAll || hasRowCheckbox,
@@ -106,13 +119,14 @@ test.describe('CRM Batch Operations Smoke @smoke', () => {
     await navigateToDynamicPage(page, 'crm-lead');
     await waitForDynamicPageLoad(page);
 
-    const rows = page.locator('tbody tr');
-    await rows.first().waitFor({ state: 'visible', timeout: 10000 });
+    const rowCheckboxes = await waitForSelectableRows(page);
 
     // Find and click select-all checkbox
-    const selectAllCheckbox = page.locator(
-      'thead input[type="checkbox"], thead [role="checkbox"], th input[type="checkbox"]',
-    ).first();
+    const selectAllCheckbox = page
+      .locator(
+        '[data-testid="select-all-checkbox"], thead input[type="checkbox"], thead [role="checkbox"], th input[type="checkbox"]',
+      )
+      .first();
 
     const hasSelectAll = await selectAllCheckbox.isVisible({ timeout: 5000 }).catch(() => false);
     if (!hasSelectAll) {
@@ -120,42 +134,54 @@ test.describe('CRM Batch Operations Smoke @smoke', () => {
       // If the checkbox is absent, the feature is broken. Fail loudly.
       throw new Error(
         'BATCH-002: select-all checkbox not found in table header. ' +
-        'Batch selection requires a checkbox in <thead>. ' +
-        'Check BulkActionToolbar / ListPageContent for regression.',
+          'Batch selection requires a checkbox in <thead>. ' +
+          'Check BulkActionToolbar / ListPageContent for regression.',
       );
     }
 
     await selectAllCheckbox.click();
 
     // Verify row checkboxes are now checked
-    const rowCheckboxes = page.locator(
-      'tbody input[type="checkbox"], tbody [role="checkbox"]',
-    );
+    const rowCount = await rowCheckboxes.count();
+    await expect
+      .poll(
+        async () =>
+          rowCheckboxes.evaluateAll(
+            (els) =>
+              els.filter((el) => {
+                if (el instanceof HTMLInputElement) return el.checked;
+                return el.getAttribute('aria-checked') === 'true';
+              }).length,
+          ),
+        { timeout: 5000 },
+      )
+      .toBe(rowCount);
     const checkedCount = await rowCheckboxes.evaluateAll(
-      (els) => els.filter((el) => {
-        if (el instanceof HTMLInputElement) return el.checked;
-        return el.getAttribute('aria-checked') === 'true';
-      }).length,
+      (els) =>
+        els.filter((el) => {
+          if (el instanceof HTMLInputElement) return el.checked;
+          return el.getAttribute('aria-checked') === 'true';
+        }).length,
     );
-    const rowCount = await rows.count();
 
-    expect(checkedCount, 'All row checkboxes should be checked after select-all').toBeGreaterThan(0);
+    expect(checkedCount, 'All row checkboxes should be checked after select-all').toBeGreaterThan(
+      0,
+    );
     expect(checkedCount, 'Checked count should match row count').toBe(rowCount);
   });
 
-  test('BATCH-003: Individual row checkbox selection works without triggering navigation', async ({ page }) => {
+  test('BATCH-003: Individual row checkbox selection works without triggering navigation', async ({
+    page,
+  }) => {
     await navigateToDynamicPage(page, 'crm-lead');
     await waitForDynamicPageLoad(page);
 
-    const rows = page.locator('tbody tr');
-    await rows.first().waitFor({ state: 'visible', timeout: 10000 });
+    const rowCheckboxes = await waitForSelectableRows(page);
 
     const currentUrl = page.url();
 
     // Find a row checkbox
-    const firstRowCheckbox = page.locator(
-      'tbody tr:first-child input[type="checkbox"], tbody tr:first-child [role="checkbox"]',
-    ).first();
+    const firstRowCheckbox = rowCheckboxes.first();
 
     const hasRowCheckbox = await firstRowCheckbox.isVisible({ timeout: 5000 }).catch(() => false);
     if (!hasRowCheckbox) {
@@ -163,8 +189,8 @@ test.describe('CRM Batch Operations Smoke @smoke', () => {
       // If absent, the feature is broken. Fail loudly.
       throw new Error(
         'BATCH-003: row-level checkbox not found in first tbody row. ' +
-        'Individual row selection requires per-row checkboxes. ' +
-        'Check ListPageContent row-checkbox rendering for regression.',
+          'Individual row selection requires per-row checkboxes. ' +
+          'Check ListPageContent row-checkbox rendering for regression.',
       );
     }
 
@@ -182,6 +208,6 @@ test.describe('CRM Batch Operations Smoke @smoke', () => {
     expect(page.url(), 'URL should not change when clicking checkbox').toBe(currentUrl);
 
     // Verify the table is still visible (no navigation occurred)
-    await expect(rows.first()).toBeVisible();
+    await expect(page.locator('table').first()).toBeVisible();
   });
 });

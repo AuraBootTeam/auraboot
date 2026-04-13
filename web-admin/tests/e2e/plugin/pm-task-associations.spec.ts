@@ -15,11 +15,7 @@
  */
 
 import { test, expect } from '@playwright/test';
-import {
-  uniqueId,
-  executeCommandViaApi,
-  dateOffsetStr,
-} from '../helpers/index';
+import { uniqueId, executeCommandViaApi, dateOffsetStr, ensureFilterFormOpen } from '../helpers/index';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -35,26 +31,16 @@ async function clickPmMenuLink(page: import('@playwright/test').Page, href: stri
   await link.first().evaluate((el) => (el as HTMLAnchorElement).click());
 }
 
-async function navigateToProjectWorkspace(page: import('@playwright/test').Page, projectName: string) {
-  await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
-  await clickPmMenuLink(page, '/dynamic/pm-project');
-  await expect(page).toHaveURL(/\/dynamic\/pm-project/);
-
-  await page.locator('tbody tr').first().waitFor({ state: 'visible', timeout: 10000 });
-
-  const searchArea = page.getByTestId('search-area');
-  if (await searchArea.isVisible({ timeout: 2000 }).catch(() => false)) {
-    await searchArea.locator('input').first().fill(projectName);
-    await page.getByTestId('filter-search').click();
-    const table = page.locator('table, [role="table"]');
-    const empty = page.locator('text=/no data|暂无/i');
-    await expect(table.or(empty).first()).toBeVisible({ timeout: 10000 });
+async function navigateToProjectWorkspace(
+  page: import('@playwright/test').Page,
+  _projectName: string,
+  projectPid?: string,
+) {
+  if (projectPid) {
+    await page.goto(`/project-management/projects/${projectPid}`, { waitUntil: 'domcontentloaded' });
+  } else {
+    throw new Error('projectPid required to navigate to workspace');
   }
-
-  const row = page.locator('tbody tr', { hasText: projectName }).first();
-  await expect(row).toBeVisible({ timeout: 10000 });
-  await row.click();
-
   await expect(page).toHaveURL(/\/project-management\/projects\//, { timeout: 10000 });
   await expect(page.getByTestId('project-workspace')).toBeVisible({ timeout: 15000 });
 }
@@ -86,9 +72,11 @@ test.describe('PM Task Associations', () => {
     try {
       // Create project
       const proj = await executeCommandViaApi(
-        page, 'pm:create_project',
+        page,
+        'pm:create_project',
         { pm_project_name: projectName },
-        undefined, 'create',
+        undefined,
+        'create',
       );
       projectPid = proj.recordId;
       expect(projectPid).toBeTruthy();
@@ -98,7 +86,8 @@ test.describe('PM Task Associations', () => {
 
       // Create task 1 with full field data
       const t1 = await executeCommandViaApi(
-        page, 'pm:create_task',
+        page,
+        'pm:create_task',
         {
           pm_task_title: `Assoc1 ${projectName}`,
           pm_task_project_id: projectPid,
@@ -109,35 +98,40 @@ test.describe('PM Task Associations', () => {
           pm_task_due_date: dateOffsetStr(10),
           pm_task_estimated_hours: 8,
         },
-        undefined, 'create',
+        undefined,
+        'create',
       );
       task1Pid = t1.recordId;
       expect(task1Pid).toBeTruthy();
 
       // Create task 2 for dependency testing
       const t2 = await executeCommandViaApi(
-        page, 'pm:create_task',
+        page,
+        'pm:create_task',
         {
           pm_task_title: `Assoc2 ${projectName}`,
           pm_task_project_id: projectPid,
           pm_task_type: 'task',
           pm_task_priority: 'medium',
         },
-        undefined, 'create',
+        undefined,
+        'create',
       );
       task2Pid = t2.recordId;
       expect(task2Pid).toBeTruthy();
 
       // Create a label
       const lbl = await executeCommandViaApi(
-        page, 'pm:create_label',
+        page,
+        'pm:create_label',
         {
           pm_label_project_id: projectPid,
           pm_label_name: labelName,
           pm_label_color: 'blue',
           pm_label_description: 'E2E test label',
         },
-        undefined, 'create',
+        undefined,
+        'create',
       );
       labelPid = lbl.recordId;
       expect(labelPid).toBeTruthy();
@@ -151,7 +145,7 @@ test.describe('PM Task Associations', () => {
   // =========================================================================
 
   test('PM-ASSOC-01: Task detail drawer shows all info fields', async ({ page }) => {
-    await navigateToProjectWorkspace(page, projectName);
+    await navigateToProjectWorkspace(page, projectName, projectPid);
     await openTaskDetailDrawer(page, task1Pid);
 
     // Title
@@ -167,7 +161,9 @@ test.describe('PM Task Associations', () => {
     await expect(page.getByTestId('task-detail-priority')).toBeVisible();
 
     // Description
-    await expect(page.getByTestId('task-detail-description')).toContainText('detailed task description');
+    await expect(page.getByTestId('task-detail-description')).toContainText(
+      'detailed task description',
+    );
 
     // Start date
     await expect(page.getByTestId('task-detail-start-date')).toBeVisible();
@@ -180,7 +176,7 @@ test.describe('PM Task Associations', () => {
   });
 
   test('PM-ASSOC-02: Task detail edit button opens form modal', async ({ page }) => {
-    await navigateToProjectWorkspace(page, projectName);
+    await navigateToProjectWorkspace(page, projectName, projectPid);
     await openTaskDetailDrawer(page, task1Pid);
 
     // Click edit button
@@ -200,7 +196,7 @@ test.describe('PM Task Associations', () => {
   // =========================================================================
 
   test('PM-ASSOC-03: Add comment and verify it appears', async ({ page }) => {
-    await navigateToProjectWorkspace(page, projectName);
+    await navigateToProjectWorkspace(page, projectName, projectPid);
     await openTaskDetailDrawer(page, task1Pid);
 
     // Ensure comments tab is active
@@ -227,7 +223,7 @@ test.describe('PM Task Associations', () => {
     // Add a comment first
     const persistComment = `Persist ${uniqueId('prs')}`;
 
-    await navigateToProjectWorkspace(page, projectName);
+    await navigateToProjectWorkspace(page, projectName, projectPid);
     await openTaskDetailDrawer(page, task1Pid);
 
     await page.getByTestId('detail-tab-comments').click();
@@ -254,7 +250,7 @@ test.describe('PM Task Associations', () => {
   });
 
   test('PM-ASSOC-05: Activity tab records task creation and comments', async ({ page }) => {
-    await navigateToProjectWorkspace(page, projectName);
+    await navigateToProjectWorkspace(page, projectName, projectPid);
     await openTaskDetailDrawer(page, task1Pid);
 
     // Switch to activity tab
@@ -263,7 +259,9 @@ test.describe('PM Task Associations', () => {
     await expect(activitySection).toBeVisible({ timeout: 5000 });
 
     // Should have at least 1 activity entry (creation event)
-    const activityItems = activitySection.locator('div, li').filter({ hasText: /created|commented|创建|评论/ });
+    const activityItems = activitySection
+      .locator('div, li')
+      .filter({ hasText: /created|commented|创建|评论/ });
     // If no specific text, just check the section has content
     const textContent = await activitySection.textContent();
     expect(textContent!.length).toBeGreaterThan(0);
@@ -276,18 +274,20 @@ test.describe('PM Task Associations', () => {
   test('PM-ASSOC-06: Add label to task via API and verify', async ({ page }) => {
     // Add label to task via API
     const result = await executeCommandViaApi(
-      page, 'pm:add_label',
+      page,
+      'pm:add_label',
       {
         pm_tl_task_id: task1Pid,
         pm_tl_label_id: labelPid,
       },
-      undefined, 'create',
+      undefined,
+      'create',
     );
     expect(result.code).toBe('0');
   });
 
   test('PM-ASSOC-07: Labels visible in settings tab', async ({ page }) => {
-    await navigateToProjectWorkspace(page, projectName);
+    await navigateToProjectWorkspace(page, projectName, projectPid);
 
     // Go to settings tab
     await page.getByTestId('tab-settings').click();
@@ -304,17 +304,19 @@ test.describe('PM Task Associations', () => {
     // Create a label specifically for deletion
     const delLabelName = `DelLabel ${uniqueId('DL')}`;
     const delLabel = await executeCommandViaApi(
-      page, 'pm:create_label',
+      page,
+      'pm:create_label',
       {
         pm_label_project_id: projectPid,
         pm_label_name: delLabelName,
         pm_label_color: 'red',
       },
-      undefined, 'create',
+      undefined,
+      'create',
     );
     expect(delLabel.recordId).toBeTruthy();
 
-    await navigateToProjectWorkspace(page, projectName);
+    await navigateToProjectWorkspace(page, projectName, projectPid);
     await page.getByTestId('tab-settings').click();
     await expect(page.getByTestId('project-settings')).toBeVisible({ timeout: 10000 });
 
@@ -345,24 +347,26 @@ test.describe('PM Task Associations', () => {
 
   test('PM-ASSOC-09: Create task dependency via API', async ({ page }) => {
     const result = await executeCommandViaApi(
-      page, 'pm:create_task_dependency',
+      page,
+      'pm:create_task_dependency',
       {
         pm_td_task_id: task2Pid,
         pm_td_depends_on_id: task1Pid,
         pm_td_type: 'finish_to_start',
       },
-      undefined, 'create',
+      undefined,
+      'create',
     );
     expect(result.code).toBe('0');
   });
 
   test('PM-ASSOC-10: Task dependency data persists via API query', async ({ page }) => {
     const BASE = process.env.BASE_URL || 'http://localhost:5173';
-    const filter = encodeURIComponent(JSON.stringify([
-      { fieldName: 'pm_td_task_id', operator: 'EQ', value: task2Pid },
-    ]));
+    const filter = encodeURIComponent(
+      JSON.stringify([{ fieldName: 'pm_td_task_id', operator: 'EQ', value: task2Pid }]),
+    );
     const resp = await page.request.get(
-      `${BASE}/api/dynamic/pm-task-dependency/list?pageSize=10&filters=${filter}`,
+      `${BASE}/api/dynamic/pm_task_dependency/list?pageSize=10&filters=${filter}`,
     );
     const body = await resp.json();
     const deps = body?.data?.records || [];
@@ -379,20 +383,22 @@ test.describe('PM Task Associations', () => {
 
   test('PM-ASSOC-11: Watch task via API', async ({ page }) => {
     const result = await executeCommandViaApi(
-      page, 'pm:watch',
+      page,
+      'pm:watch',
       { pm_tw_task_id: task1Pid },
-      undefined, 'create',
+      undefined,
+      'create',
     );
     expect(result.code).toBe('0');
   });
 
   test('PM-ASSOC-12: Watcher record persists via dynamic list API', async ({ page }) => {
     const BASE = process.env.BASE_URL || 'http://localhost:5173';
-    const filters = encodeURIComponent(JSON.stringify([
-      { fieldName: 'pm_tw_task_id', operator: 'EQ', value: task1Pid },
-    ]));
+    const filters = encodeURIComponent(
+      JSON.stringify([{ fieldName: 'pm_tw_task_id', operator: 'EQ', value: task1Pid }]),
+    );
     const resp = await page.request.get(
-      `${BASE}/api/dynamic/pm-task-watcher/list?pageSize=10&filters=${filters}`,
+      `${BASE}/api/dynamic/pm_task_watcher/list?pageSize=10&filters=${filters}`,
     );
     const body = await resp.json();
 
@@ -409,17 +415,19 @@ test.describe('PM Task Associations', () => {
     // Create a task for deletion
     const delTaskTitle = `DeleteMe ${projectName}`;
     const delTask = await executeCommandViaApi(
-      page, 'pm:create_task',
+      page,
+      'pm:create_task',
       {
         pm_task_title: delTaskTitle,
         pm_task_project_id: projectPid,
         pm_task_type: 'task',
       },
-      undefined, 'create',
+      undefined,
+      'create',
     );
     expect(delTask.recordId).toBeTruthy();
 
-    await navigateToProjectWorkspace(page, projectName);
+    await navigateToProjectWorkspace(page, projectName, projectPid);
     await expect(page.getByTestId('task-board')).toBeVisible({ timeout: 15000 });
 
     // Find and click the delete task card
@@ -447,7 +455,9 @@ test.describe('PM Task Associations', () => {
 
     // Drawer should close and task card should be gone
     await expect(page.getByTestId('task-detail-drawer')).not.toBeVisible({ timeout: 5000 });
-    await expect(page.locator(`[data-testid="task-card-${delTask.recordId}"]`)).not.toBeVisible({ timeout: 5000 });
+    await expect(page.locator(`[data-testid="task-card-${delTask.recordId}"]`)).not.toBeVisible({
+      timeout: 5000,
+    });
   });
 
   // =========================================================================
@@ -455,7 +465,7 @@ test.describe('PM Task Associations', () => {
   // =========================================================================
 
   test('PM-ASSOC-14: Create label with color via settings UI', async ({ page }) => {
-    await navigateToProjectWorkspace(page, projectName);
+    await navigateToProjectWorkspace(page, projectName, projectPid);
 
     await page.getByTestId('tab-settings').click();
     await expect(page.getByTestId('project-settings')).toBeVisible({ timeout: 10000 });
@@ -496,7 +506,7 @@ test.describe('PM Task Associations', () => {
   // =========================================================================
 
   test('PM-ASSOC-15: Project settings form is editable and submits', async ({ page }) => {
-    await navigateToProjectWorkspace(page, projectName);
+    await navigateToProjectWorkspace(page, projectName, projectPid);
 
     await page.getByTestId('tab-settings').click();
     await expect(page.getByTestId('project-settings')).toBeVisible({ timeout: 10000 });

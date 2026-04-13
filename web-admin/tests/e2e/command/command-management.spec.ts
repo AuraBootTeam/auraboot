@@ -15,6 +15,7 @@
  */
 
 import { test, expect } from '../../fixtures';
+import { ensureFilterFormOpen } from '../helpers';
 
 test.describe('Command List', () => {
   /**
@@ -26,8 +27,12 @@ test.describe('Command List', () => {
     await page.waitForLoadState('domcontentloaded');
     await expect(page).toHaveURL(/\/meta\/models/);
     await expect(page.locator('main')).toBeVisible();
-    await expect(page.locator('button:has-text("新建模型"), button:has-text("Create")').first()).toBeVisible();
-    await expect(page.locator('input[placeholder*="搜索模型"], input[placeholder*="Search"]').first()).toBeVisible();
+    await expect(
+      page.locator('button:has-text("新建模型"), button:has-text("Create")').first(),
+    ).toBeVisible();
+    await expect(
+      page.locator('input[placeholder*="搜索模型"], input[placeholder*="Search"]').first(),
+    ).toBeVisible();
   });
 
   /**
@@ -39,9 +44,9 @@ test.describe('Command List', () => {
     await page.waitForLoadState('domcontentloaded');
 
     // Look for search input
-    const searchInput = page.locator(
-      'input[placeholder*="搜索模型"], input[placeholder*="Search"]'
-    ).first();
+    const searchInput = page
+      .locator('input[placeholder*="搜索模型"], input[placeholder*="Search"]')
+      .first();
 
     await expect(searchInput).toBeVisible();
     await searchInput.fill('e2et');
@@ -62,12 +67,17 @@ test.describe('Command Execution', () => {
     await expect(page).toHaveURL(/\/meta\/models/);
 
     // "新建模型" is a real command action on model list pages.
-    const executeBtn = page.locator(
-      '[data-testid="toolbar-btn-create"], button:has-text("新建模型"), button:has-text("新增模型"), button:has-text("Create Model"), button:has-text("Create")'
-    ).first();
+    const executeBtn = page
+      .locator(
+        '[data-testid="toolbar-btn-create"], button:has-text("新建模型"), button:has-text("新增模型"), button:has-text("Create Model"), button:has-text("Create")',
+      )
+      .first();
     await expect(executeBtn).toBeVisible();
     await executeBtn.click({ force: true });
-    const isCreateRoute = await page.waitForURL('**/meta/models/new', { timeout: 5000 }).then(() => true).catch(() => false);
+    const isCreateRoute = await page
+      .waitForURL('**/meta/models/new', { timeout: 5000 })
+      .then(() => true)
+      .catch(() => false);
     const hasInlineForm = await page
       .locator('form, .ant-form, [role="dialog"] form, [data-testid="model-form"]')
       .first()
@@ -80,7 +90,9 @@ test.describe('Command Execution', () => {
       await page.waitForLoadState('domcontentloaded');
     }
 
-    await expect(page.locator('form, .ant-form, [role="dialog"] form').first()).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('form, .ant-form, [role="dialog"] form').first()).toBeVisible({
+      timeout: 10000,
+    });
   });
 
   /**
@@ -124,6 +136,7 @@ test.describe('Command Execution', () => {
     await page.waitForLoadState('domcontentloaded');
     await expect(page).toHaveURL(/\/meta\/models/);
 
+    await ensureFilterFormOpen(page);
     const searchBtn = page.locator('[data-testid="filter-search"]');
     await expect(searchBtn).toBeVisible();
     await searchBtn.click();

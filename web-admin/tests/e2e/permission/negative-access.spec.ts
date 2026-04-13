@@ -15,7 +15,6 @@
 import { test, expect } from '../../fixtures';
 import { test as baseTest } from '@playwright/test';
 
-
 /**
  * Unauthenticated access tests.
  * Uses a fresh browser context WITHOUT storageState to simulate a visitor
@@ -115,8 +114,13 @@ test.describe('Permission - Resource Not Found', () => {
     const redirectedToList = url.endsWith('/meta/models') || url.includes('/meta/models?');
 
     // The page should NOT crash with an unhandled error
-    const crashIndicator = page.locator('text=Something went wrong, text=Unhandled Runtime Error, text=Cannot read properties');
-    const hasCrash = await crashIndicator.first().isVisible({ timeout: 1000 }).catch(() => false);
+    const crashIndicator = page.locator(
+      'text=Something went wrong, text=Unhandled Runtime Error, text=Cannot read properties',
+    );
+    const hasCrash = await crashIndicator
+      .first()
+      .isVisible({ timeout: 1000 })
+      .catch(() => false);
     expect(hasCrash).toBe(false);
 
     // At least one graceful behavior should be present
@@ -154,7 +158,7 @@ test.describe('Permission - Resource Not Found', () => {
 
     // Also verify a completely random API path returns an error
     const randomResponse = await page.request.get(
-      `/api/meta/models/this-definitely-does-not-exist-99999`
+      `/api/meta/models/this-definitely-does-not-exist-99999`,
     );
     const randomStatus = randomResponse.status();
 

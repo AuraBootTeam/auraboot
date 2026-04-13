@@ -28,9 +28,9 @@ const AREA_INFO: Record<AreaName, { icon: string; name: string }> = {
  * Block type icons
  */
 const BLOCK_TYPE_ICONS: Record<string, string> = {
-  'filter-form': '🔍',
-  'data-table': '📊',
-  'toolbar-buttons': '🔘',
+  'filters': '🔍',
+  'table': '📊',
+  'toolbar': '🔘',
   'form-section': '📝',
   'form-buttons': '✅',
   'detail-section': '📄',

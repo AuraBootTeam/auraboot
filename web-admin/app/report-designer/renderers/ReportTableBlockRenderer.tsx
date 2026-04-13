@@ -1,5 +1,5 @@
 /**
- * Runtime renderer for data-table blocks
+ * Runtime renderer for table blocks
  */
 
 import React from 'react';

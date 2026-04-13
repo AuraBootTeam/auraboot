@@ -1,5 +1,5 @@
 /**
- * VirtualTable — virtual scrolling for large data-table blocks
+ * VirtualTable — virtual scrolling for large table blocks
  *
  * When row count > threshold (default 50), enables virtual scrolling
  * to only render visible rows. Falls back to regular rendering for

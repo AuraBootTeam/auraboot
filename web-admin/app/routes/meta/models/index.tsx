@@ -124,22 +124,25 @@ export default function ModelListPage() {
   /**
    * 加载数据
    */
-  const loadData = useCallback(async (params: ModelQueryParams) => {
-    setLoading(true);
-    try {
-      const result = await modelService.findByPage(params);
-      setData(result?.data || []);
-      setPagination((prev) => ({
-        ...prev,
-        total: result?.total || 0,
-      }));
-    } catch (error) {
-      console.error('Failed to load models:', error);
-      showErrorToast('加载Model列表失败');
-    } finally {
-      setLoading(false);
-    }
-  }, [showErrorToast]);
+  const loadData = useCallback(
+    async (params: ModelQueryParams) => {
+      setLoading(true);
+      try {
+        const result = await modelService.findByPage(params);
+        setData(result?.data || []);
+        setPagination((prev) => ({
+          ...prev,
+          total: result?.total || 0,
+        }));
+      } catch (error) {
+        console.error('Failed to load models:', error);
+        showErrorToast('加载Model列表失败');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [showErrorToast],
+  );
 
   /**
    * 搜索处理
@@ -279,7 +282,15 @@ export default function ModelListPage() {
       console.error('Failed to batch delete models:', error);
       showErrorToast('批量删除失败');
     }
-  }, [selectedIds, filters, pagination.current, pagination.pageSize, loadData, showSuccessToast, showErrorToast]);
+  }, [
+    selectedIds,
+    filters,
+    pagination.current,
+    pagination.pageSize,
+    loadData,
+    showSuccessToast,
+    showErrorToast,
+  ]);
 
   /**
    * 导出Model
@@ -523,84 +534,85 @@ export default function ModelListPage() {
               data.map((model) => {
                 const owner = owners[`model:${model.code}`];
                 return (
-                <tr key={model.pid} className="hover:bg-gray-50">
-                  <td className="px-6 py-4">
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.includes(model.pid)}
-                      onChange={(e) => handleSelectRow(model.pid, e.target.checked)}
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    />
-                  </td>
-                  <td className="px-6 py-4 text-sm font-medium whitespace-nowrap text-gray-900">
-                    <span className="inline-flex items-center gap-2">
-                      {model.code}
-                      {owner?.managed && (
-                        <ManagedBadge
-                          pluginName={owner.pluginName || ''}
-                          userModified={owner.userModified}
-                        />
-                      )}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-sm whitespace-nowrap text-gray-900">
-                    {model.displayName}
-                  </td>
-                  <td className="px-6 py-4 text-sm whitespace-nowrap text-gray-500">
-                    {model.modelType === 'entity'
-                      ? '实体'
-                      : model.modelType === 'view'
-                        ? '视图'
-                        : '聚合'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`rounded-full px-2 py-1 text-xs ${
-                        model.status === 'published'
-                          ? 'bg-green-100 text-green-800'
+                  <tr key={model.pid} className="hover:bg-gray-50">
+                    <td className="px-6 py-4">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(model.pid)}
+                        onChange={(e) => handleSelectRow(model.pid, e.target.checked)}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                    </td>
+                    <td className="px-6 py-4 text-sm font-medium whitespace-nowrap text-gray-900">
+                      <span className="inline-flex items-center gap-2">
+                        {model.code}
+                        {owner?.managed && (
+                          <ManagedBadge
+                            pluginName={owner.pluginName || ''}
+                            userModified={owner.userModified}
+                          />
+                        )}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-sm whitespace-nowrap text-gray-900">
+                      {model.displayName}
+                    </td>
+                    <td className="px-6 py-4 text-sm whitespace-nowrap text-gray-500">
+                      {model.modelType === 'entity'
+                        ? '实体'
+                        : model.modelType === 'view'
+                          ? '视图'
+                          : '聚合'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span
+                        className={`rounded-full px-2 py-1 text-xs ${
+                          model.status === 'published'
+                            ? 'bg-green-100 text-green-800'
+                            : model.status === 'draft'
+                              ? 'bg-yellow-100 text-yellow-800'
+                              : 'bg-gray-100 text-gray-800'
+                        }`}
+                      >
+                        {model.status === 'published'
+                          ? '已发布'
                           : model.status === 'draft'
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : 'bg-gray-100 text-gray-800'
-                      }`}
-                    >
-                      {model.status === 'published'
-                        ? '已发布'
-                        : model.status === 'draft'
-                          ? '草稿'
-                          : '已归档'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-sm whitespace-nowrap text-gray-500">
-                    v{model.version}
-                  </td>
-                  <td className="px-6 py-4 text-sm whitespace-nowrap text-gray-500">
-                    {model.fieldCount || 0}
-                  </td>
-                  <td className="px-6 py-4 text-sm whitespace-nowrap text-gray-500">
-                    {new Date(model.createdAt).toLocaleDateString('zh-CN')}
-                  </td>
-                  <td className="px-6 py-4 text-right text-sm font-medium whitespace-nowrap">
-                    <button
-                      onClick={() => handleView(model.pid)}
-                      className="mr-3 text-blue-600 hover:text-blue-900"
-                    >
-                      查看
-                    </button>
-                    <button
-                      onClick={() => handleEdit(model.pid)}
-                      className="mr-3 text-indigo-600 hover:text-indigo-900"
-                    >
-                      编辑
-                    </button>
-                    <button
-                      onClick={() => handleDelete(model.pid, model.displayName)}
-                      className="text-red-600 hover:text-red-900"
-                    >
-                      删除
-                    </button>
-                  </td>
-                </tr>
-              )})
+                            ? '草稿'
+                            : '已归档'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-sm whitespace-nowrap text-gray-500">
+                      v{model.version}
+                    </td>
+                    <td className="px-6 py-4 text-sm whitespace-nowrap text-gray-500">
+                      {model.fieldCount || 0}
+                    </td>
+                    <td className="px-6 py-4 text-sm whitespace-nowrap text-gray-500">
+                      {new Date(model.createdAt).toLocaleDateString('zh-CN')}
+                    </td>
+                    <td className="px-6 py-4 text-right text-sm font-medium whitespace-nowrap">
+                      <button
+                        onClick={() => handleView(model.pid)}
+                        className="mr-3 text-blue-600 hover:text-blue-900"
+                      >
+                        查看
+                      </button>
+                      <button
+                        onClick={() => handleEdit(model.pid)}
+                        className="mr-3 text-indigo-600 hover:text-indigo-900"
+                      >
+                        编辑
+                      </button>
+                      <button
+                        onClick={() => handleDelete(model.pid, model.displayName)}
+                        className="text-red-600 hover:text-red-900"
+                      >
+                        删除
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>

@@ -35,12 +35,7 @@ export default function TemplateCenterPage() {
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
       results = results.filter((t) => {
-        const haystack = [
-          t.name,
-          t.description,
-          ...(t.tags ?? []),
-          ...t.features,
-        ]
+        const haystack = [t.name, t.description, ...(t.tags ?? []), ...t.features]
           .join(' ')
           .toLowerCase();
         return haystack.includes(q);
@@ -63,9 +58,7 @@ export default function TemplateCenterPage() {
       <div className="flex-1 overflow-y-auto p-6">
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            Template Center
-          </h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Template Center</h1>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
             Browse templates to quickly set up your workspace
           </p>
@@ -75,11 +68,7 @@ export default function TemplateCenterPage() {
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           <CreateBlankCard />
           {filtered.map((t) => (
-            <TemplateCard
-              key={t.id}
-              template={t}
-              installed={installedIds.has(t.id)}
-            />
+            <TemplateCard key={t.id} template={t} installed={installedIds.has(t.id)} />
           ))}
         </div>
 

@@ -122,12 +122,12 @@ test.describe('FormulaEditor API', () => {
         (fn: { name: string }) => fn.name.toUpperCase()
       );
 
-      // Verify each expected function is present in the response
+      // Verify each expected function is present in the response (case-insensitive)
       for (const expectedName of expectedNames) {
         expect(
           returnedNames,
           `Category "${category}" should contain function "${expectedName}"`
-        ).toContain(expectedName);
+        ).toContain(expectedName.toUpperCase());
       }
 
       // All returned functions should belong to this category

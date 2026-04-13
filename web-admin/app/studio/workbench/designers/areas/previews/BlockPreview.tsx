@@ -134,7 +134,7 @@ const BlockContent: React.FC<{
   readonly?: boolean;
 }> = ({ block, selectedFieldInfo, onFieldReorder, onFieldSelect, readonly }) => {
   switch (block.blockType) {
-    case 'filter-form':
+    case 'filters':
       return (
         <FilterFormPreview
           block={block}
@@ -145,7 +145,7 @@ const BlockContent: React.FC<{
         />
       );
 
-    case 'data-table':
+    case 'table':
       return <DataTablePreview block={block} />;
 
     case 'form-section':
@@ -160,7 +160,7 @@ const BlockContent: React.FC<{
         />
       );
 
-    case 'toolbar-buttons':
+    case 'toolbar':
     case 'form-buttons':
       return <ToolbarPreview block={block} />;
 

@@ -26,8 +26,18 @@ export const ReportToolbar: React.FC<ReportToolbarProps> = ({
   onToggleVersionHistory,
   versionCount,
 }) => {
-  const { report, isDirty, isSaving, previewMode, updateTitle, updatePageSettings, canUndo, canRedo, undo, redo } =
-    useReportStore();
+  const {
+    report,
+    isDirty,
+    isSaving,
+    previewMode,
+    updateTitle,
+    updatePageSettings,
+    canUndo,
+    canRedo,
+    undo,
+    redo,
+  } = useReportStore();
   const [showSettings, setShowSettings] = useState(false);
 
   if (!report) return null;

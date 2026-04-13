@@ -36,7 +36,7 @@ const existingLeadName = `Alice_${uid}`;
 const existingLeadEmail = `alice_${uid}@e2etest.com`;
 
 // Inbound leads (submitted via webhook) — DIFFERENT email, same company → fuzzy match
-const inbound1Name = `Alice_${uid}`;  // same name, different email → high fuzzy score
+const inbound1Name = `Alice_${uid}`; // same name, different email → high fuzzy score
 const inbound2Name = `Alicia_${uid}`; // similar name → fuzzy match
 
 let channelPid = '';
@@ -67,9 +67,9 @@ async function navigateToMergeQueue(page: Page): Promise<void> {
   await leafLink.evaluate((el: HTMLElement) => el.click());
 
   await page.waitForURL((url) => url.pathname === href, { timeout: 10000 });
-  await expect(
-    page.getByRole('heading', { name: 'Lead Merge Queue' }),
-  ).toBeVisible({ timeout: 10000 });
+  await expect(page.getByRole('heading', { name: 'Lead Merge Queue' })).toBeVisible({
+    timeout: 10000,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -108,7 +108,7 @@ test.describe('CRM Lead Merge Queue @critical', () => {
       }
 
       // 2. Create existing lead via dynamic API (uses actual DB column names)
-      const createLeadResp = await page.request.post('/api/dynamic/crm-lead/create', {
+      const createLeadResp = await page.request.post('/api/dynamic/crm_lead/create', {
         data: {
           crm_lead_code: `MQ-${uid}`,
           crm_lead_company: companyName,
@@ -185,8 +185,10 @@ test.describe('CRM Lead Merge Queue @critical', () => {
   });
 
   test.beforeEach(async () => {
-    test.skip(!mergeQueueApiAvailable,
-      'CRM merge queue API not available (backend may need restart)');
+    test.skip(
+      !mergeQueueApiAvailable,
+      'CRM merge queue API not available (backend may need restart)',
+    );
   });
 
   // =========================================================================
@@ -196,9 +198,7 @@ test.describe('CRM Lead Merge Queue @critical', () => {
     await navigateToMergeQueue(page);
 
     // Heading visible
-    await expect(
-      page.getByRole('heading', { name: 'Lead Merge Queue' }),
-    ).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Lead Merge Queue' })).toBeVisible();
 
     // All 4 filter tabs visible
     await expect(page.locator('[data-testid="merge-tab-all"]')).toBeVisible();
@@ -239,12 +239,13 @@ test.describe('CRM Lead Merge Queue @critical', () => {
   // mq-03: Queue has items from fuzzy-matched seed data
   // =========================================================================
   test('mq-03: Queue shows items when data exists', async ({ page }) => {
-    expect(hasMergeQueueItems,
+    expect(
+      hasMergeQueueItems,
       'Merge queue should have items after seeding fuzzy-matched leads ' +
-      '(same company, different email). If this fails, check: ' +
-      '1) Redis Stream consumer is running, ' +
-      '2) pg_trgm extension is enabled, ' +
-      '3) existing lead was created with correct column names',
+        '(same company, different email). If this fails, check: ' +
+        '1) Redis Stream consumer is running, ' +
+        '2) pg_trgm extension is enabled, ' +
+        '3) existing lead was created with correct column names',
     ).toBeTruthy();
 
     await navigateToMergeQueue(page);
@@ -272,13 +273,12 @@ test.describe('CRM Lead Merge Queue @critical', () => {
     await navigateToMergeQueue(page);
 
     // Stay on "All" tab to ensure rows are visible (Pending may be empty from prior runs)
-    await expect(
-      page.locator('[data-testid="merge-queue-list"]'),
-    ).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('[data-testid="merge-queue-list"]')).toBeVisible({ timeout: 10000 });
 
     // Click the first row → detail API call
     const detailResponse = page.waitForResponse(
-      (r) => r.url().match(/\/api\/crm\/merge-queue\/\d+$/) !== null && r.request().method() === 'GET',
+      (r) =>
+        r.url().match(/\/api\/crm\/merge-queue\/\d+$/) !== null && r.request().method() === 'GET',
       { timeout: 10000 },
     );
     await page.locator('[data-testid="merge-queue-row"]').first().click();
@@ -303,7 +303,10 @@ test.describe('CRM Lead Merge Queue @critical', () => {
     }
 
     // Close detail panel
-    const closeBtn = page.locator('.fixed.inset-0 button').filter({ has: page.locator('svg.h-5') }).first();
+    const closeBtn = page
+      .locator('.fixed.inset-0 button')
+      .filter({ has: page.locator('svg.h-5') })
+      .first();
     await closeBtn.click();
     await expect(page.getByText('Merge Review')).not.toBeVisible({ timeout: 3000 });
   });
@@ -330,7 +333,8 @@ test.describe('CRM Lead Merge Queue @critical', () => {
 
     // Click first pending row to open detail
     const detailResponse = page.waitForResponse(
-      (r) => r.url().match(/\/api\/crm\/merge-queue\/\d+$/) !== null && r.request().method() === 'GET',
+      (r) =>
+        r.url().match(/\/api\/crm\/merge-queue\/\d+$/) !== null && r.request().method() === 'GET',
       { timeout: 10000 },
     );
     await pendingRows.first().click();
@@ -381,7 +385,8 @@ test.describe('CRM Lead Merge Queue @critical', () => {
 
     // Click a pending row
     const detailResponse = page.waitForResponse(
-      (r) => r.url().match(/\/api\/crm\/merge-queue\/\d+$/) !== null && r.request().method() === 'GET',
+      (r) =>
+        r.url().match(/\/api\/crm\/merge-queue\/\d+$/) !== null && r.request().method() === 'GET',
       { timeout: 10000 },
     );
     await pendingRows.first().click();

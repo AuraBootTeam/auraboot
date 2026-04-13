@@ -46,7 +46,27 @@ export type WidgetType =
   | 'smart-pareto-chart'
   | 'smart-spc-chart'
   | 'smart-gantt-chart'
-  | 'smart-calendar';
+  | 'smart-calendar'
+  // New widgets
+  | 'smart-gallery'
+  | 'smart-kanban'
+  | 'smart-wordcloud-chart'
+  | 'smart-combo-chart'
+  | 'smart-nps-chart'
+  // Workbench widgets
+  | 'smart-inbox'
+  | 'smart-recent'
+  | 'smart-shortcuts'
+  | 'smart-stats-row'
+  | 'smart-my-process'
+  | 'smart-process-stats'
+  | 'smart-pipeline'
+  | 'smart-leads'
+  | 'smart-activities'
+  | 'smart-calendar'
+  | 'smart-announcement'
+  | 'smart-quick-note'
+  | 'smart-stats-card';
 
 /**
  * Data source type for widgets

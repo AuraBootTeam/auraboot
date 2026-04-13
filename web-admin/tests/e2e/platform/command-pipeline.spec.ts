@@ -45,7 +45,9 @@ test.describe('Command Pipeline Stages', () => {
     // crm_acc_owner should be auto-set to current user
     expect(record?.crm_acc_owner).toBeTruthy();
 
-    console.log(`  AUTO_SET verified: code=${record?.crm_acc_code}, status=${record?.crm_acc_status}`);
+    console.log(
+      `  AUTO_SET verified: code=${record?.crm_acc_code}, status=${record?.crm_acc_status}`,
+    );
   });
 
   test('SCHEMA_VALIDATE: Required field validation rejects empty name', async ({ page }) => {
@@ -56,7 +58,7 @@ test.describe('Command Pipeline Stages', () => {
       { crm_acc_industry: 'technology' }, // missing crm_acc_name
       undefined,
       'create',
-      { allowHttpError: true }
+      { allowHttpError: true },
     );
 
     // Should fail validation
@@ -86,7 +88,11 @@ test.describe('Command Pipeline Stages', () => {
   test('STATE_CHECK: Stage transition follows valid path', async ({ page }) => {
     // discovery → qualification (valid)
     const qualResult = await executeCommandViaApi(
-      page, 'crm:qualify_opportunity', {}, opportunityPid, 'update'
+      page,
+      'crm:qualify_opportunity',
+      {},
+      opportunityPid,
+      'update',
     );
     expect(qualResult.code).toBe('0');
 
@@ -101,8 +107,12 @@ test.describe('Command Pipeline Stages', () => {
   test('STATE_CHECK: Invalid transition is rejected', async ({ page }) => {
     // Try to win directly from qualification (should need proposal → negotiation first)
     const result = await executeCommandViaApi(
-      page, 'crm:win_opportunity', {}, opportunityPid, 'update',
-      { allowHttpError: true }
+      page,
+      'crm:win_opportunity',
+      {},
+      opportunityPid,
+      'update',
+      { allowHttpError: true },
     );
 
     // Should fail — can't jump from qualification to closed_won
@@ -180,17 +190,15 @@ test.describe('Command Pipeline Stages', () => {
     // Delete opportunity
     if (opportunityPid) {
       // First transition back to a deletable state if possible, or force delete
-      await executeCommandViaApi(
-        page, 'crm:delete_opportunity', {}, opportunityPid, 'delete',
-        { allowHttpError: true }
-      );
+      await executeCommandViaApi(page, 'crm:delete_opportunity', {}, opportunityPid, 'delete', {
+        allowHttpError: true,
+      });
     }
     // Delete account
     if (accountPid) {
-      await executeCommandViaApi(
-        page, 'crm:delete_account', {}, accountPid, 'delete',
-        { allowHttpError: true }
-      );
+      await executeCommandViaApi(page, 'crm:delete_account', {}, accountPid, 'delete', {
+        allowHttpError: true,
+      });
     }
     console.log('  Cleanup: test data removed');
   });

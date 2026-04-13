@@ -47,14 +47,17 @@ async function navigateToContactList(page: any): Promise<void> {
   await page.waitForResponse(() => true, { timeout: 2000 }).catch(() => null);
 
   // Click Contacts leaf link (directly under CRM root, no sub-menu)
-  const contactLink = nav.locator('a[href*="crm-contact"]').first();
+  const contactLink = nav.locator('a[href*="crm_contact"]').first();
   await contactLink.waitFor({ state: 'attached', timeout: 8_000 });
   await contactLink.scrollIntoViewIfNeeded().catch(() => null);
 
-  const listApiPromise = page.waitForResponse(
-    (r: any) => r.url().includes('/api/dynamic/crm') && r.url().includes('list') && r.status() === 200,
-    { timeout: 15_000 },
-  ).catch(() => null);
+  const listApiPromise = page
+    .waitForResponse(
+      (r: any) =>
+        r.url().includes('/api/dynamic/crm') && r.url().includes('list') && r.status() === 200,
+      { timeout: 15_000 },
+    )
+    .catch(() => null);
 
   await contactLink.evaluate((el: HTMLElement) => el.click());
   await listApiPromise;
@@ -88,19 +91,21 @@ test.describe('Email CRM Timeline', () => {
 
       // Link a test email message to the contact via seed API (if available)
       if (contactRecordId) {
-        await page.request.post('/api/email/messages/seed-link-test', {
-          data: {
-            modelCode: 'crm_contact',
-            recordId: Number(contactRecordId),
-            subject: EMAIL_SUBJECT,
-            fromAddress: `sender-${UID}@example.com`,
-            direction: 'inbound',
-            bodyText: `E2E linked email body ${UID}`,
-            gmailMessageId: `linked-${UID}`,
-            gmailThreadId: `thread-${UID}`,
-            gmailDate: new Date().toISOString(),
-          },
-        }).catch(() => null);
+        await page.request
+          .post('/api/email/messages/seed-link-test', {
+            data: {
+              modelCode: 'crm_contact',
+              recordId: Number(contactRecordId),
+              subject: EMAIL_SUBJECT,
+              fromAddress: `sender-${UID}@example.com`,
+              direction: 'inbound',
+              bodyText: `E2E linked email body ${UID}`,
+              gmailMessageId: `linked-${UID}`,
+              gmailThreadId: `thread-${UID}`,
+              gmailDate: new Date().toISOString(),
+            },
+          })
+          .catch(() => null);
       }
     } finally {
       await ctx.close();
@@ -113,9 +118,9 @@ test.describe('Email CRM Timeline', () => {
   test('T1: navigate to CRM Contacts via sidebar menu', async ({ page }) => {
     await navigateToContactList(page);
 
-    // Assert navigation succeeded — URL should contain crm-contact
+    // Assert navigation succeeded — URL should contain crm_contact
     const url = page.url();
-    expect(url).toContain('crm-contact');
+    expect(url).toContain('crm_contact');
 
     // Assert contact list or dynamic page is visible
     // Note: if the CRM contact page schema has a backend error, this may fail
@@ -179,7 +184,7 @@ test.describe('Email CRM Timeline', () => {
       }
     } else {
       // Navigate directly to the contact we created
-      await page.goto(`/dynamic/crm_contact/view/${contactRecordId}`, {
+      await page.goto(`/p/crm_contact/view/${contactRecordId}`, {
         waitUntil: 'domcontentloaded',
       });
     }
@@ -187,7 +192,10 @@ test.describe('Email CRM Timeline', () => {
     await page.waitForLoadState('domcontentloaded');
 
     // Look for an Emails tab or section in the detail view
-    const emailsTab = page.locator('button, a, [role="tab"]').filter({ hasText: /emails|邮件/i }).first();
+    const emailsTab = page
+      .locator('button, a, [role="tab"]')
+      .filter({ hasText: /emails|邮件/i })
+      .first();
     const hasEmailsTab = await emailsTab.isVisible({ timeout: 5_000 }).catch(() => false);
 
     if (hasEmailsTab) {
@@ -225,12 +233,15 @@ test.describe('Email CRM Timeline', () => {
       return;
     }
 
-    await page.goto(`/dynamic/crm_contact/view/${contactRecordId}`, {
+    await page.goto(`/p/crm_contact/view/${contactRecordId}`, {
       waitUntil: 'domcontentloaded',
     });
 
     // Click Emails tab if present
-    const emailsTab = page.locator('button, a, [role="tab"]').filter({ hasText: /emails|邮件/i }).first();
+    const emailsTab = page
+      .locator('button, a, [role="tab"]')
+      .filter({ hasText: /emails|邮件/i })
+      .first();
     const hasEmailsTab = await emailsTab.isVisible({ timeout: 5_000 }).catch(() => false);
     if (hasEmailsTab) {
       await emailsTab.click();
@@ -270,17 +281,22 @@ test.describe('Email CRM Timeline', () => {
     }
 
     // Intercept the email by-record API call
-    const emailApiPromise = page.waitForResponse(
-      (r: any) => r.url().includes('/api/email/messages/by-record') && r.status() === 200,
-      { timeout: 15_000 },
-    ).catch(() => null);
+    const emailApiPromise = page
+      .waitForResponse(
+        (r: any) => r.url().includes('/api/email/messages/by-record') && r.status() === 200,
+        { timeout: 15_000 },
+      )
+      .catch(() => null);
 
-    await page.goto(`/dynamic/crm_contact/view/${contactRecordId}`, {
+    await page.goto(`/p/crm_contact/view/${contactRecordId}`, {
       waitUntil: 'domcontentloaded',
     });
 
     // Click emails tab if present
-    const emailsTab = page.locator('button, a, [role="tab"]').filter({ hasText: /emails|邮件/i }).first();
+    const emailsTab = page
+      .locator('button, a, [role="tab"]')
+      .filter({ hasText: /emails|邮件/i })
+      .first();
     const hasEmailsTab = await emailsTab.isVisible({ timeout: 5_000 }).catch(() => false);
     if (hasEmailsTab) {
       await emailsTab.click();
@@ -289,7 +305,9 @@ test.describe('Email CRM Timeline', () => {
     await emailApiPromise;
 
     // Verify no error state
-    const errorState = page.locator('[data-testid="error-state"], .error-boundary, [class*="error"]').first();
+    const errorState = page
+      .locator('[data-testid="error-state"], .error-boundary, [class*="error"]')
+      .first();
     const hasError = await errorState.isVisible({ timeout: 2_000 }).catch(() => false);
     expect(hasError, 'Email timeline must not show an error state').toBe(false);
 

@@ -10,11 +10,7 @@
  */
 
 import { test, expect } from '../../fixtures';
-import {
-  uniqueId,
-  todayStr,
-  executeCommandViaApi,
-} from '../helpers/index';
+import { uniqueId, todayStr, executeCommandViaApi } from '../helpers/index';
 
 test.describe('Quality Dashboard @smoke', () => {
   test.describe.configure({ mode: 'serial' });
@@ -86,14 +82,18 @@ test.describe('Quality Dashboard @smoke', () => {
     await expect(page).toHaveURL(/\/quality\/quality-dashboard/, { timeout: 10000 });
 
     await Promise.all([
-      page.waitForResponse(
-        (resp) => resp.url().includes('/api/datasource/list') && resp.status() === 200,
-        { timeout: 15000 },
-      ).catch(() => null),
-      page.waitForResponse(
-        (resp) => resp.url().includes('/api/meta/chart-data') && resp.status() === 200,
-        { timeout: 15000 },
-      ).catch(() => null),
+      page
+        .waitForResponse(
+          (resp) => resp.url().includes('/api/datasource/list') && resp.status() === 200,
+          { timeout: 15000 },
+        )
+        .catch(() => null),
+      page
+        .waitForResponse(
+          (resp) => resp.url().includes('/api/meta/chart-data') && resp.status() === 200,
+          { timeout: 15000 },
+        )
+        .catch(() => null),
     ]);
 
     await page.waitForTimeout(1000);
@@ -119,7 +119,10 @@ test.describe('Quality Dashboard @smoke', () => {
     expect(records.length, 'KPI NQ should return 1 row').toBe(1);
 
     const kpi = records[0];
-    expect(Number(kpi.total_inspections), 'Should have at least 1 inspection').toBeGreaterThanOrEqual(1);
+    expect(
+      Number(kpi.total_inspections),
+      'Should have at least 1 inspection',
+    ).toBeGreaterThanOrEqual(1);
   });
 
   test('QC-DASH-03: Pass rate trend NQ is queryable via chart-data API', async ({ page }) => {

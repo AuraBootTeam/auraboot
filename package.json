@@ -1,0 +1,16 @@
+{
+  "name": "auraboot-monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "description": "AuraBoot OSS monorepo root — manages framework packages and web-admin",
+  "scripts": {
+    "build:packages": "pnpm -r --filter './packages/*' build",
+    "typecheck:packages": "pnpm -r --filter './packages/*' typecheck"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  },
+  "engines": {
+    "pnpm": ">=9"
+  }
+}

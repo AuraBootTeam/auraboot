@@ -18,7 +18,7 @@ import { uniqueId, todayStr, executeCommandViaApi } from '../e2e/helpers';
 
 const CUSTOMER_CONFIG = {
   modelCode: 'e2et_customer',
-  pageKey: 'e2et-customer',
+  pageKey: 'e2et_customer',
   namespace: 'e2et',
   commands: {
     create: 'create_customer',
@@ -93,7 +93,7 @@ test.describe('Command Pipeline — API Tests', () => {
     }
     // Verify deleted
     for (const pid of pids) {
-      const resp = await page.request.get(`/api/dynamic/e2et-order/${pid}`);
+      const resp = await page.request.get(`/api/dynamic/e2et_order/${pid}`);
       // Backend may return 400/404/200(empty) for deleted records
       expect([200, 400, 404]).toContain(resp.status());
     }
@@ -107,24 +107,25 @@ test.describe('Command Pipeline — API Tests', () => {
       const r1 = await order.executeCommand('submit', pid);
       expect(r1.code).toBe(ErrorCodes.SUCCESS);
       // Submit again — should fail (not draft anymore)
-      const r2 = await executeCommandViaApi(
-        page,
-        order.commandCode('submit'),
-        {},
-        pid,
-        undefined,
-        { allowHttpError: true },
-      );
+      const r2 = await executeCommandViaApi(page, order.commandCode('submit'), {}, pid, undefined, {
+        allowHttpError: true,
+      });
       expect(r2.code).not.toBe(ErrorCodes.SUCCESS);
     } catch (e) {
       expect(String(e)).toMatch(/precondition|status|already/i);
     } finally {
-      try { await order.executeCommand('reject', pid); } catch { /* ignore */ }
+      try {
+        await order.executeCommand('reject', pid);
+      } catch {
+        /* ignore */
+      }
       await order.deleteViaApi(pid).catch(() => {});
     }
   });
 
-  test('CP-A05: postAction CREATE_CHILDREN — side effect creates child records', async ({ page }) => {
+  test('CP-A05: postAction CREATE_CHILDREN — side effect creates child records', async ({
+    page,
+  }) => {
     const pid = await order.createViaApi();
     try {
       await order.child('item').createForParent(pid);
@@ -150,7 +151,9 @@ test.describe('Command Pipeline — API Tests', () => {
     }
   });
 
-  test('CP-A07: validation REQUIRED — server rejects missing required field @smoke', async ({ page }) => {
+  test('CP-A07: validation REQUIRED — server rejects missing required field @smoke', async ({
+    page,
+  }) => {
     // Try creating order without required title
     try {
       const result = await executeCommandViaApi(
@@ -173,7 +176,9 @@ test.describe('Command Pipeline — API Tests', () => {
     }
   });
 
-  test('CP-A08: validation UNIQUE_COMPOSITE — server rejects duplicate @smoke', async ({ page }) => {
+  test('CP-A08: validation UNIQUE_COMPOSITE — server rejects duplicate @smoke', async ({
+    page,
+  }) => {
     const code = `UNIQ_API_${Date.now()}`;
     const pid1 = await customer.createViaApi({
       e2et_customer_code: code,

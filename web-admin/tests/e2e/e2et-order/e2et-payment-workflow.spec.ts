@@ -47,7 +47,7 @@ test.describe('E2E Test Payment — Workflow', () => {
 
     // Clean up payments linked to this order
     try {
-      const resp = await page.request.get(`/api/dynamic/e2et-payment/list`);
+      const resp = await page.request.get(`/api/dynamic/e2et_payment/list`);
       if (resp.ok()) {
         const body = await resp.json();
         const records = body?.data?.records || body?.data?.list || [];
@@ -81,7 +81,7 @@ test.describe('E2E Test Payment — Workflow', () => {
     expect(payPid).toBeTruthy();
 
     // Verify on list page
-    await navigateToDynamicPage(page, 'e2et-payment');
+    await navigateToDynamicPage(page, 'e2et_payment');
     const table = page.locator('table, [role="table"]').first();
     await expect(table).toBeVisible({ timeout: 10000 });
 
@@ -118,7 +118,7 @@ test.describe('E2E Test Payment — Workflow', () => {
     // Check if BPM module is available
     const bpmResp = await page.request.get('/api/bpm/tasks/todo').catch(() => null);
     if (!bpmResp || bpmResp.status() === 404) {
-      throw new Error(String('BPM module not available'))
+      throw new Error(String('BPM module not available'));
       return;
     }
 
@@ -130,7 +130,9 @@ test.describe('E2E Test Payment — Workflow', () => {
   /**
    * PW-004: Approve payment → approved + verify UPDATE_RECORD sideEffect
    */
-  test('PW-004: should approve payment and trigger UPDATE_RECORD on order @critical', async ({ page }) => {
+  test('PW-004: should approve payment and trigger UPDATE_RECORD on order @critical', async ({
+    page,
+  }) => {
     const payment = new ModelTestHelper(page, E2ET_PAYMENT_CONFIG);
     const order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
 

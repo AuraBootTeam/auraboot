@@ -10,6 +10,7 @@ import React from 'react';
 import type { DslV4Schema, PageKind } from '~/studio/domain/dsl/types';
 import { AreasDesigner } from './AreasDesigner';
 import { FloorsDesigner } from './FloorsDesigner';
+import { CanvasEditor } from './canvas/CanvasEditor';
 
 export interface DesignerRouterProps {
   /**
@@ -46,6 +47,11 @@ export interface DesignerRouterProps {
    * Whether the page uses a custom API data source instead of a model
    */
   isCustomApiMode?: boolean;
+
+  /**
+   * Device preview width in pixels (null = default 980px)
+   */
+  deviceWidth?: number | null;
 }
 
 /**
@@ -59,6 +65,8 @@ function getDesignerName(kind: PageKind): string {
     case 'detail':
     case 'home':
       return 'FloorsDesigner';
+    case 'composite':
+      return 'CanvasEditor';
     default:
       return 'AreasDesigner';
   }
@@ -75,6 +83,7 @@ export const DesignerRouter: React.FC<DesignerRouterProps> = ({
   readonly = false,
   previewMode = false,
   isCustomApiMode,
+  deviceWidth,
 }) => {
   const designerName = getDesignerName(dsl.kind);
 
@@ -104,6 +113,19 @@ export const DesignerRouter: React.FC<DesignerRouterProps> = ({
           modelCode={modelCode || dsl.modelCode}
           readonly={readonly}
           previewMode={previewMode}
+        />
+      );
+
+    case 'composite':
+      return (
+        <CanvasEditor
+          dsl={dsl}
+          onDslChange={onDslChange}
+          onSave={onSave}
+          modelCode={modelCode || dsl.modelCode}
+          readonly={readonly}
+          previewMode={previewMode}
+          deviceWidth={deviceWidth}
         />
       );
 

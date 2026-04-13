@@ -14,7 +14,7 @@ export interface FeatureInventoryRow {
 
 const DEFAULT_INVENTORY_PATH = path.resolve(
   process.cwd(),
-  '../docs/test-reports/2026-03-03-feature-inventory-v1.csv',
+  '../docs/e2e/reports/2026-03-03-feature-inventory-v1.csv',
 );
 
 function parseCsvLine(line: string): string[] {
@@ -49,7 +49,9 @@ function parseCsvLine(line: string): string[] {
   return cols;
 }
 
-export async function loadFeatureInventory(csvPath = DEFAULT_INVENTORY_PATH): Promise<FeatureInventoryRow[]> {
+export async function loadFeatureInventory(
+  csvPath = DEFAULT_INVENTORY_PATH,
+): Promise<FeatureInventoryRow[]> {
   const raw = await fs.readFile(csvPath, 'utf-8');
   const lines = raw
     .split(/\r?\n/)
@@ -81,11 +83,11 @@ export async function loadFeatureInventory(csvPath = DEFAULT_INVENTORY_PATH): Pr
 }
 
 export function toDynamicRouteModelCode(modelCode: string): string {
-  return modelCode.replace(/_/g, '-');
+  return modelCode;
 }
 
 export function fromDynamicRouteModelCode(tableName: string): string {
-  return tableName.replace(/-/g, '_');
+  return tableName;
 }
 
 export function uniqueStrings(input: string[]): string[] {

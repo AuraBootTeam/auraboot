@@ -105,10 +105,14 @@ export const AreasDesigner: React.FC<AreasDesignerProps> = ({
 
   // Auto-detect on mount for GET APIs
   useEffect(() => {
-    if (isCustomApiMode && apiDataSource?.endpoint && (!apiDataSource.method || apiDataSource.method === 'get')) {
+    if (
+      isCustomApiMode &&
+      apiDataSource?.endpoint &&
+      (!apiDataSource.method || apiDataSource.method === 'get')
+    ) {
       apiDetection.detect();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- detect is stable (useCallback with endpoint dep)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- detect is stable (useCallback with endpoint dep)
   }, [isCustomApiMode, apiDataSource?.endpoint]);
 
   // State
@@ -256,12 +260,12 @@ export const AreasDesigner: React.FC<AreasDesignerProps> = ({
       const newBlock: DslBlock = {
         id: `block_${Date.now()}`,
         blockType,
-        span: blockType === 'data-table' ? 12 : undefined,
+        span: blockType === 'table' ? 12 : undefined,
       };
 
       // Initialize default content based on block type
       switch (blockType) {
-        case 'filter-form':
+        case 'filters':
           newBlock.fields = [];
           newBlock.actions = ['search', 'reset'];
           break;
@@ -270,11 +274,11 @@ export const AreasDesigner: React.FC<AreasDesignerProps> = ({
           newBlock.title = 'Section Title';
           newBlock.fields = [];
           break;
-        case 'data-table':
+        case 'table':
           newBlock.columns = [];
           newBlock.dataSource = 'tableData';
           break;
-        case 'toolbar-buttons':
+        case 'toolbar':
         case 'form-buttons':
           newBlock.buttons = [];
           break;

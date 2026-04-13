@@ -50,7 +50,8 @@ export function FieldCreationForm({
   onValidationChange,
   onChange,
 }: FieldCreationFormProps) {
-  const { getEnumOptions } = useDslRegistry();
+  const { ensureLoaded, getEnumOptions } = useDslRegistry();
+  useEffect(() => { ensureLoaded(); }, [ensureLoaded]);
   const DATA_TYPES =
     getEnumOptions('DataType').length > 0 ? getEnumOptions('DataType') : DATA_TYPES_FALLBACK;
 

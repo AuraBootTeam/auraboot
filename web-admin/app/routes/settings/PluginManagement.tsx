@@ -106,26 +106,22 @@ function PluginUploadTab() {
   const onDragLeave = () => setDragOver(false);
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="mx-auto max-w-2xl">
       {/* Drop zone */}
       <div
         onDrop={onDrop}
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
-        className={`
-          border-2 border-dashed rounded-xl p-12 text-center transition-colors
-          ${dragOver ? 'border-blue-500 bg-blue-50' : 'border-gray-300 bg-white hover:border-gray-400'}
-        `}
+        className={`rounded-xl border-2 border-dashed p-12 text-center transition-colors ${dragOver ? 'border-blue-500 bg-blue-50' : 'border-gray-300 bg-white hover:border-gray-400'} `}
       >
         <CloudArrowUpIcon
-          className={`w-16 h-16 mx-auto ${dragOver ? 'text-blue-500' : 'text-gray-400'}`}
+          className={`mx-auto h-16 w-16 ${dragOver ? 'text-blue-500' : 'text-gray-400'}`}
         />
         <p className="mt-4 text-lg font-medium text-gray-700">
-          Drag &amp; drop your <code className="text-sm bg-gray-100 px-1.5 py-0.5 rounded">.abp</code> file here
+          Drag &amp; drop your{' '}
+          <code className="rounded bg-gray-100 px-1.5 py-0.5 text-sm">.abp</code> file here
         </p>
-        <p className="mt-1 text-sm text-gray-500">
-          or click the button below to browse
-        </p>
+        <p className="mt-1 text-sm text-gray-500">or click the button below to browse</p>
 
         <input
           ref={fileInputRef}
@@ -146,12 +142,12 @@ function PluginUploadTab() {
         >
           {uploading ? (
             <>
-              <ArrowPathIcon className="w-4 h-4 mr-2 animate-spin" />
+              <ArrowPathIcon className="mr-2 h-4 w-4 animate-spin" />
               Uploading...
             </>
           ) : (
             <>
-              <ArrowUpTrayIcon className="w-4 h-4 mr-2" />
+              <ArrowUpTrayIcon className="mr-2 h-4 w-4" />
               Select File
             </>
           )}
@@ -162,26 +158,26 @@ function PluginUploadTab() {
       {result && (
         <div
           className={`mt-6 rounded-lg border p-4 ${
-            result.success
-              ? 'border-green-200 bg-green-50'
-              : 'border-red-200 bg-red-50'
+            result.success ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'
           }`}
         >
           <div className="flex items-start gap-3">
             {result.success ? (
-              <CheckCircleIcon className="w-6 h-6 text-green-600 flex-shrink-0 mt-0.5" />
+              <CheckCircleIcon className="mt-0.5 h-6 w-6 flex-shrink-0 text-green-600" />
             ) : (
-              <XCircleIcon className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
+              <XCircleIcon className="mt-0.5 h-6 w-6 flex-shrink-0 text-red-600" />
             )}
             <div>
               {result.success ? (
                 <>
                   <p className="font-medium text-green-800">Plugin installed successfully</p>
-                  <div className="mt-1 text-sm text-green-700 space-y-0.5">
+                  <div className="mt-1 space-y-0.5 text-sm text-green-700">
                     <p>Name: {result.pluginName}</p>
                     {result.version && <p>Version: {result.version}</p>}
                     {result.importId && (
-                      <p className="text-xs text-green-600 font-mono">Import ID: {result.importId}</p>
+                      <p className="font-mono text-xs text-green-600">
+                        Import ID: {result.importId}
+                      </p>
                     )}
                   </div>
                 </>
@@ -197,12 +193,12 @@ function PluginUploadTab() {
       )}
 
       {/* Help text */}
-      <div className="mt-8 text-sm text-gray-500 space-y-1">
+      <div className="mt-8 space-y-1 text-sm text-gray-500">
         <p className="font-medium text-gray-600">About .abp packages</p>
         <p>
-          AuraBoot Plugin packages (<code>.abp</code>) are used to install plugins
-          in air-gapped environments without marketplace connectivity. Obtain packages
-          from your plugin vendor or export them from another AuraBoot instance.
+          AuraBoot Plugin packages (<code>.abp</code>) are used to install plugins in air-gapped
+          environments without marketplace connectivity. Obtain packages from your plugin vendor or
+          export them from another AuraBoot instance.
         </p>
       </div>
     </div>
@@ -320,7 +316,7 @@ function MarketplaceEmbedTab() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <ArrowPathIcon className="w-6 h-6 animate-spin text-gray-400" />
+        <ArrowPathIcon className="h-6 w-6 animate-spin text-gray-400" />
         <span className="ml-2 text-sm text-gray-500">Loading marketplace configuration...</span>
       </div>
     );
@@ -329,12 +325,13 @@ function MarketplaceEmbedTab() {
   if (!marketplaceUrl) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center">
-        <GlobeAltIcon className="w-16 h-16 text-gray-300" />
+        <GlobeAltIcon className="h-16 w-16 text-gray-300" />
         <h3 className="mt-4 text-lg font-medium text-gray-700">Marketplace not configured</h3>
-        <p className="mt-2 text-sm text-gray-500 max-w-md">
-          No marketplace URL has been configured for this instance. Contact your administrator
-          to set the <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs">marketplace.url</code> system
-          configuration, or use the <strong>Upload</strong> tab to install plugins from .abp files.
+        <p className="mt-2 max-w-md text-sm text-gray-500">
+          No marketplace URL has been configured for this instance. Contact your administrator to
+          set the <code className="rounded bg-gray-100 px-1.5 py-0.5 text-xs">marketplace.url</code>{' '}
+          system configuration, or use the <strong>Upload</strong> tab to install plugins from .abp
+          files.
         </p>
       </div>
     );
@@ -344,8 +341,8 @@ function MarketplaceEmbedTab() {
     <div className="relative w-full" style={{ height: 'calc(100vh - 220px)' }}>
       {installing && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/70">
-          <div className="flex items-center gap-3 bg-white px-6 py-4 rounded-lg shadow-lg border">
-            <ArrowPathIcon className="w-5 h-5 animate-spin text-blue-600" />
+          <div className="flex items-center gap-3 rounded-lg border bg-white px-6 py-4 shadow-lg">
+            <ArrowPathIcon className="h-5 w-5 animate-spin text-blue-600" />
             <span className="text-sm font-medium text-gray-700">Installing plugin...</span>
           </div>
         </div>
@@ -354,7 +351,7 @@ function MarketplaceEmbedTab() {
         ref={iframeRef}
         src={marketplaceUrl}
         onLoad={handleIframeLoad}
-        className="w-full h-full border-0 rounded-lg"
+        className="h-full w-full rounded-lg border-0"
         sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
         title="AuraBoot Marketplace"
       />
@@ -375,7 +372,7 @@ export default function PluginManagementPage() {
   const [activeTab, setActiveTab] = useState<TabKey>('upload');
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="mx-auto max-w-7xl p-6">
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Plugin Management</h1>
@@ -385,19 +382,19 @@ export default function PluginManagementPage() {
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-gray-200 mb-6">
-        <nav className="flex -mb-px gap-6">
+      <div className="mb-6 border-b border-gray-200">
+        <nav className="-mb-px flex gap-6">
           {TABS.map(({ key, label, icon: Icon }) => (
             <button
               key={key}
               onClick={() => setActiveTab(key)}
-              className={`flex items-center gap-2 px-1 py-3 text-sm font-medium border-b-2 transition-colors ${
+              className={`flex items-center gap-2 border-b-2 px-1 py-3 text-sm font-medium transition-colors ${
                 activeTab === key
                   ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
               }`}
             >
-              <Icon className="w-4 h-4" />
+              <Icon className="h-4 w-4" />
               {label}
             </button>
           ))}

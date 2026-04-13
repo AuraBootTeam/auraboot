@@ -5,32 +5,55 @@
  * Allows users to create, delete, duplicate, and set default views.
  */
 
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
-  VIEW_TYPE_CONFIGS,
-  VIEW_TYPE_FIELD_REQUIREMENTS,
   type SavedView,
   type SavedViewCreateRequest,
   type ViewScope,
   type ViewType,
-  type ViewConfig,
-  type ViewFieldRequirement,
 } from '~/smart/types/savedView';
-import { KanbanConfigPanel, type FieldOption } from './KanbanConfigPanel';
-import type { ModelFieldBinding } from '~/types/model';
-import { fetchCurrentUserTeams, type TeamOption } from '~/services/teamService';
-import { CalendarConfigPanel } from './CalendarConfigPanel';
-import { GalleryConfigPanel } from './GalleryConfigPanel';
-import { GanttConfigPanel } from './GanttConfigPanel';
-import { TreeConfigPanel } from './TreeConfigPanel';
-import { ViewFilterPanel } from './ViewFilterPanel';
-import { ConditionalFormatPanel } from './ConditionalFormatPanel';
-import { SparklesIcon } from '@heroicons/react/24/solid';
+import type { FieldOption } from './KanbanConfigPanel';
 import { cn } from '~/utils/cn';
 import { confirmDialog } from '~/utils/confirmDialog';
+import { savedViewService } from '~/services/savedViewService';
 import { modelService } from '~/services/modelService';
-import { createField } from '~/services/fieldService';
-import { useViewRecommendations } from '~/smart/hooks/useViewRecommendations';
+
+/**
+ * View types that require field configuration after creation.
+ * Table and Form views don't need configuration and close immediately.
+ */
+const VIEW_TYPE_REQUIRED_FIELDS: Record<string, Array<{
+  key: string;
+  label: string;
+  required: boolean;
+}>> = {
+  kanban: [
+    { key: 'groupByField', label: 'Group By', required: true },
+    { key: 'titleField', label: 'Title Field', required: true },
+  ],
+  calendar: [
+    { key: 'calendarDateField', label: 'Date Field', required: true },
+    { key: 'calendarTitleField', label: 'Title Field', required: false },
+  ],
+  gantt: [
+    { key: 'ganttStartDateField', label: 'Start Date', required: true },
+    { key: 'ganttEndDateField', label: 'End Date', required: true },
+    { key: 'ganttTitleField', label: 'Title Field', required: false },
+  ],
+  gallery: [
+    { key: 'galleryImageField', label: 'Image Field', required: false },
+    { key: 'galleryTitleField', label: 'Title Field', required: false },
+  ],
+  tree: [
+    { key: 'treeParentField', label: 'Parent Field', required: true },
+    { key: 'treeTitleField', label: 'Title Field', required: false },
+  ],
+  timeline: [
+    { key: 'timelineStartField', label: 'Start Date', required: true },
+    { key: 'timelineEndField', label: 'End Date', required: true },
+    { key: 'timelineTitleField', label: 'Title Field', required: false },
+  ],
+};
 
 /**
  * Props for ViewManagePanel component
@@ -50,6 +73,8 @@ export interface ViewManagePanelProps {
   onDeleteView: (pid: string) => Promise<void>;
   /** Callback to duplicate a view */
   onDuplicateView: (pid: string, newName: string) => Promise<void>;
+  /** Callback to edit a view (name, description, scope) */
+  onEditView?: (pid: string, name: string, description: string, scope: ViewScope) => Promise<void>;
   /** Callback to set a view as default */
   onSetDefaultView: (pid: string) => Promise<void>;
   /** Callback when a view is selected */
@@ -70,6 +95,8 @@ export interface ViewManagePanelProps {
   modelPid?: string;
   /** Callback when fields are auto-created (to refresh parent) */
   onFieldsCreated?: () => void;
+  /** Callback after view config is saved (e.g. after config step for Kanban) to reload views */
+  onViewConfigSaved?: () => void;
 }
 
 /**
@@ -115,127 +142,34 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
   onCreateView,
   onDeleteView,
   onDuplicateView,
+  onEditView,
   onSetDefaultView,
   onSelectView,
   modelCode,
   pageKey,
-  startInCreateMode = false,
-  activeViewType,
   onCreateViewSuccess,
-  fields = [],
   modelPid,
-  onFieldsCreated,
+  fields,
+  onViewConfigSaved,
 }) => {
-  // Form state for creating new view
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [newViewName, setNewViewName] = useState('');
-  const [newViewScope, setNewViewScope] = useState<ViewScope>('personal');
-  const [newViewTeamId, setNewViewTeamId] = useState('');
-  const [newViewType, setNewViewType] = useState<ViewType>(activeViewType || 'table');
-  const [newViewConfig, setNewViewConfig] = useState<ViewConfig>({});
-  const [teamOptions, setTeamOptions] = useState<TeamOption[]>([]);
-  const [teamLoading, setTeamLoading] = useState(false);
-  const [createError, setCreateError] = useState<string | null>(null);
-
-  const [modelFields, setModelFields] = useState<ModelFieldBinding[]>([]);
-  const [autoCreateLoading, setAutoCreateLoading] = useState(false);
-
-  const enabledViewTypes = VIEW_TYPE_CONFIGS.filter((c) => c.enabled);
-
-  // Merge fields from props and loaded model fields for config panels
-  const mergedFields: FieldOption[] = useMemo(() => {
-    if (fields.length > 0) return fields;
-    return modelFields.map((f) => ({
-      code: f.fieldCode || f.code || '',
-      name: f.fieldName || f.displayName || f.fieldCode || f.code || '',
-      dataType: f.dataType || '',
-    }));
-  }, [fields, modelFields]);
-
-  // AI view recommendations based on field types
-  const recommendationFields = useMemo(() => {
-    return mergedFields.map((f) => {
-      const binding = modelFields.find((mf) => (mf.fieldCode || mf.code) === f.code);
-      return {
-        code: f.code,
-        dataType: f.dataType,
-        dictCode: binding?.dictCode,
-        referenceModelCode: (binding as unknown as Record<string, unknown>)?.referenceModelCode as string | undefined,
-      };
-    });
-  }, [mergedFields, modelFields]);
-
-  const recommendations = useViewRecommendations(modelCode, recommendationFields);
-
-  // Detect missing required fields for the selected view type
-  const missingFields: ViewFieldRequirement[] = useMemo(() => {
-    const reqs = VIEW_TYPE_FIELD_REQUIREMENTS[newViewType];
-    if (!reqs) return [];
-    const allFields = mergedFields;
-    return reqs
-      .filter((req) => req.required)
-      .filter(
-        (req) => !allFields.some((f) => req.acceptedTypes.includes(f.dataType?.toUpperCase())),
-      );
-  }, [newViewType, mergedFields]);
+  // Editing state for inline edit form
+  const [editingView, setEditingView] = useState<SavedView | null>(null);
+  const [editForm, setEditForm] = useState({ name: '', description: '', scope: 'personal' as ViewScope });
 
   // Loading states for operations
   const [loadingState, setLoadingState] = useState<{
-    type: 'create' | 'delete' | 'duplicate' | 'setDefault' | null;
+    type: 'create' | 'delete' | 'duplicate' | 'setDefault' | 'rename' | null;
     pid?: string;
   }>({ type: null });
 
   /**
-   * Reset form when panel closes
+   * Reset state when panel closes
    */
   useEffect(() => {
     if (!open) {
-      setShowCreateForm(false);
-      setNewViewName('');
-      setNewViewScope('personal');
-      setNewViewTeamId('');
-      setNewViewType(activeViewType || 'table');
-      setNewViewConfig({});
-      setCreateError(null);
       setLoadingState({ type: null });
+      setConfigStep(null);
     }
-  }, [open, activeViewType]);
-
-  useEffect(() => {
-    if (!open) return;
-    if (startInCreateMode) {
-      setShowCreateForm(true);
-      setNewViewType(activeViewType || 'table');
-    }
-  }, [open, startInCreateMode, activeViewType]);
-
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-    let mounted = true;
-    setTeamLoading(true);
-    fetchCurrentUserTeams()
-      .then((teams) => {
-        if (!mounted) {
-          return;
-        }
-        setTeamOptions(teams);
-      })
-      .catch(() => {
-        if (!mounted) {
-          return;
-        }
-        setTeamOptions([]);
-      })
-      .finally(() => {
-        if (mounted) {
-          setTeamLoading(false);
-        }
-      });
-    return () => {
-      mounted = false;
-    };
   }, [open]);
 
   /**
@@ -254,138 +188,97 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
     };
   }, [open, onClose]);
 
-  /**
-   * Load model fields when panel opens (if modelPid is available)
-   */
+  // Type picker expanded state
+  const [showTypePicker, setShowTypePicker] = useState(false);
+
+  // Config step state for view types that need field configuration
+  const [configStep, setConfigStep] = useState<{
+    viewType: ViewType;
+    viewPid: string;
+    fields: Record<string, string>;
+  } | null>(null);
+
+  // Model fields for config step dropdowns
+  const [modelFields, setModelFields] = useState<FieldOption[]>([]);
+  const [configSaving, setConfigSaving] = useState(false);
+
+  // Use fields from props (already loaded by parent from DSL schema)
+  // Fallback to API if props.fields is empty
   useEffect(() => {
-    if (!open || !modelPid) return;
-    let mounted = true;
-    modelService
-      .getModelFields(modelPid)
-      .then((bindings) => {
-        if (mounted) setModelFields(bindings);
-      })
-      .catch(() => {
-        if (mounted) setModelFields([]);
-      });
-    return () => {
-      mounted = false;
-    };
-  }, [open, modelPid]);
-
-  /**
-   * Auto-create missing fields for the selected view type
-   */
-  const handleAutoCreateFields = useCallback(async () => {
-    if (!modelPid || missingFields.length === 0) return;
-
-    setAutoCreateLoading(true);
-    setCreateError(null);
-    try {
-      const createdCodes: Record<string, string> = {};
-
-      for (const req of missingFields) {
-        if (!req.autoCreateConfig) continue;
-        await createField({
-          code: req.autoCreateConfig.code,
-          dataType: req.autoCreateConfig.dataType,
-          modelPid,
-          autoPublish: true,
-        });
-        createdCodes[req.key] = req.autoCreateConfig.code;
-      }
-
-      // Re-publish model to add new columns
-      await modelService.publish(modelPid);
-
-      // Reload model fields
-      const updated = await modelService.getModelFields(modelPid);
-      setModelFields(updated);
-
-      // Auto-populate viewConfig with newly created fields
-      setNewViewConfig((prev) => ({ ...prev, ...createdCodes }));
-
-      // Notify parent to refresh
-      onFieldsCreated?.();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to create fields';
-      setCreateError(message);
-    } finally {
-      setAutoCreateLoading(false);
-    }
-  }, [modelPid, missingFields, onFieldsCreated]);
-
-  /**
-   * Auto-suggest matching fields when view type changes
-   */
-  useEffect(() => {
-    if (newViewType === 'table') return;
-    const reqs = VIEW_TYPE_FIELD_REQUIREMENTS[newViewType];
-    if (!reqs || mergedFields.length === 0) return;
-
-    const suggestions: Record<string, string> = {};
-    for (const req of reqs) {
-      if (newViewConfig[req.key as keyof ViewConfig]) continue; // already set
-      const match = mergedFields.find((f) => req.acceptedTypes.includes(f.dataType?.toUpperCase()));
-      if (match) {
-        suggestions[req.key] = match.code;
-      }
-    }
-    if (Object.keys(suggestions).length > 0) {
-      setNewViewConfig((prev) => ({ ...prev, ...suggestions }));
-    }
-  }, [newViewType, mergedFields]); // intentionally omit newViewConfig to avoid infinite loop
-
-  /**
-   * Handle create view submission
-   */
-  const handleCreateSubmit = useCallback(async () => {
-    if (!newViewName.trim()) return;
-    if (newViewScope === 'team' && !newViewTeamId.trim()) {
-      setCreateError('Team scope requires a team ID');
+    if (!configStep) {
+      setModelFields([]);
       return;
     }
+    // Prefer fields from props (from tableColumns in ListPageContent)
+    if (fields && fields.length > 0) {
+      setModelFields(fields);
+      return;
+    }
+    // Fallback: fetch from API
+    if (modelPid) {
+      modelService
+        .getModelFields(modelPid)
+        .then((apiFields) => {
+          setModelFields(
+            apiFields.map((f) => ({
+              code: f.fieldCode,
+              name: f.displayName || f.fieldName || f.fieldCode,
+              dataType: f.dataType || 'text',
+            })),
+          );
+        })
+        .catch(() => setModelFields([]));
+    }
+  }, [configStep, fields, modelPid]);
+
+  /**
+   * One-click instant view creation (Feishu style).
+   * Click type → immediately create and switch.
+   */
+  const handleQuickCreate = useCallback(async (viewType: ViewType = 'table') => {
+    const typeLabels: Record<string, string> = {
+      table: 'Table', kanban: 'Kanban', calendar: 'Calendar', gallery: 'Gallery',
+      gantt: 'Gantt', tree: 'Tree', timeline: 'Timeline', form: 'Form',
+    };
+    const label = typeLabels[viewType] || 'Table';
+    const existing = views.filter((v) => v.scope === 'personal' && (v.viewType || 'table') === viewType);
+    const autoName = existing.length === 0 ? `${label} View` : `${label} View ${existing.length + 1}`;
 
     setLoadingState({ type: 'create' });
-    setCreateError(null);
     try {
       const createdView = await onCreateView({
-        name: newViewName.trim(),
+        name: autoName,
         modelCode,
         pageKey,
-        scope: newViewScope,
-        teamId: newViewScope === 'team' ? newViewTeamId.trim() : undefined,
-        viewType: newViewType,
-        viewConfig: Object.keys(newViewConfig).length > 0 ? newViewConfig : undefined,
+        scope: 'personal',
+        viewType,
+        isDefault: false,
       });
-      onSelectView(createdView.pid);
+      if (createdView?.pid) {
+        onSelectView(createdView.pid);
+      }
       onCreateViewSuccess?.(createdView);
-      setShowCreateForm(false);
-      setNewViewName('');
-      setNewViewScope('personal');
-      setNewViewTeamId('');
-      setNewViewType(activeViewType || 'table');
-      setNewViewConfig({});
-      setCreateError(null);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to create view';
-      setCreateError(message);
+      setShowTypePicker(false);
+
+      // Check if this view type needs field configuration
+      const requiredFields = VIEW_TYPE_REQUIRED_FIELDS[viewType];
+      if (requiredFields && createdView?.pid) {
+        // Show config step instead of closing
+        setConfigStep({
+          viewType,
+          viewPid: createdView.pid,
+          fields: {},
+        });
+      } else {
+        // Table/Form: close immediately
+        onClose();
+      }
+    } catch (err) {
+      console.error('Failed to create view:', err);
     } finally {
       setLoadingState({ type: null });
     }
-  }, [
-    newViewName,
-    newViewScope,
-    newViewTeamId,
-    newViewType,
-    newViewConfig,
-    activeViewType,
-    modelCode,
-    pageKey,
-    onCreateView,
-    onSelectView,
-    onCreateViewSuccess,
-  ]);
+  }, [views, onCreateView, modelCode, pageKey, onSelectView, onCreateViewSuccess, onClose]);
 
   /**
    * Handle delete view
@@ -407,6 +300,39 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
     },
     [onDeleteView],
   );
+
+  /**
+   * Handle edit view — open inline edit form
+   */
+  const handleEdit = useCallback((view: SavedView) => {
+    setEditingView(view);
+    setEditForm({
+      name: view.name,
+      description: view.description || '',
+      scope: view.scope,
+    });
+  }, []);
+
+  /**
+   * Save edited view metadata
+   */
+  const handleSaveEdit = useCallback(async () => {
+    if (!editingView || !editForm.name.trim()) return;
+    setLoadingState({ type: 'rename', pid: editingView.pid });
+    try {
+      await onEditView?.(editingView.pid, editForm.name.trim(), editForm.description.trim(), editForm.scope);
+      setEditingView(null);
+    } finally {
+      setLoadingState({ type: null });
+    }
+  }, [editingView, editForm, onEditView]);
+
+  /**
+   * Cancel editing
+   */
+  const handleCancelEdit = useCallback(() => {
+    setEditingView(null);
+  }, []);
 
   /**
    * Handle duplicate view
@@ -524,368 +450,153 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto">
-          {/* Create View Section */}
-          <div className="border-b border-gray-200 p-4">
-            {showCreateForm ? (
+          {/* Config Step — shown after creating a view that needs field configuration */}
+          {configStep && (
+            <div className="p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <h4 className="text-sm font-semibold text-gray-900">
+                  Configure {configStep.viewType.charAt(0).toUpperCase() + configStep.viewType.slice(1)} View
+                </h4>
+              </div>
+              <p className="mb-4 text-xs text-gray-500">
+                Select the fields to use for this view. Required fields must be set before you can finish.
+              </p>
               <div className="space-y-3">
-                <div>
-                  <label
-                    htmlFor="view-name"
-                    className="mb-1 block text-sm font-medium text-gray-700"
-                  >
-                    View Name
-                  </label>
-                  <input
-                    id="view-name"
-                    type="text"
-                    value={newViewName}
-                    onChange={(e) => setNewViewName(e.target.value)}
-                    placeholder="Enter view name"
-                    className={cn(
-                      'w-full rounded-md border border-gray-300 px-3 py-2 text-sm',
-                      'focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none',
-                      'placeholder:text-gray-400',
-                    )}
-                    autoFocus
-                  />
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="view-scope"
-                    className="mb-1 block text-sm font-medium text-gray-700"
-                  >
-                    Scope
-                  </label>
-                  <select
-                    id="view-scope"
-                    value={newViewScope}
-                    onChange={(e) => {
-                      const scope = e.target.value as ViewScope;
-                      setNewViewScope(scope);
-                      if (scope !== 'team') {
-                        setNewViewTeamId('');
+                {(VIEW_TYPE_REQUIRED_FIELDS[configStep.viewType] || []).map((fieldDef) => (
+                  <div key={fieldDef.key}>
+                    <label className="mb-1 block text-xs font-medium text-gray-600">
+                      {fieldDef.label} {fieldDef.required && <span className="text-red-500">*</span>}
+                    </label>
+                    <select
+                      value={configStep.fields[fieldDef.key] || ''}
+                      onChange={(e) =>
+                        setConfigStep((prev) =>
+                          prev
+                            ? {
+                                ...prev,
+                                fields: { ...prev.fields, [fieldDef.key]: e.target.value },
+                              }
+                            : null,
+                        )
                       }
-                    }}
-                    className={cn(
-                      'w-full rounded-md border border-gray-300 px-3 py-2 text-sm',
-                      'focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none',
-                      'bg-white',
-                    )}
-                  >
-                    <option value="personal">Personal (Only you)</option>
-                    <option value="team">Team (Visible to your team)</option>
-                    <option value="global">Global (Everyone)</option>
-                  </select>
-                </div>
-
-                {newViewScope === 'team' && (
-                  <div>
-                    <label
-                      htmlFor="view-team-id"
-                      className="mb-1 block text-sm font-medium text-gray-700"
+                      className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
                     >
-                      Team
-                    </label>
-                    {teamLoading ? (
-                      <div className="flex items-center gap-2 px-3 py-2 text-sm text-gray-500">
-                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-blue-500" />
-                        Loading teams...
-                      </div>
-                    ) : teamOptions.length > 0 ? (
-                      <select
-                        id="view-team-id"
-                        value={newViewTeamId}
-                        onChange={(e) => setNewViewTeamId(e.target.value)}
-                        className={cn(
-                          'w-full rounded-md border border-gray-300 px-3 py-2 text-sm',
-                          'focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none',
-                          'bg-white',
-                        )}
-                      >
-                        <option value="">Select team</option>
-                        {teamOptions.map((team) => (
-                          <option key={team.id} value={team.id}>
-                            {team.name}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <div className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500">
-                        You are not a member of any team. Join a team first to create team views.
-                      </div>
-                    )}
+                      <option value="">Select field...</option>
+                      {modelFields.map((f) => (
+                        <option key={f.code} value={f.code}>
+                          {f.name} ({f.dataType})
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                )}
+                ))}
+              </div>
+              <div className="mt-4 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfigStep(null);
+                    onClose();
+                  }}
+                  className="rounded-md px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100"
+                >
+                  Skip
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!configStep.viewPid) return;
+                    const viewConfig: Record<string, string> = {};
+                    for (const [key, value] of Object.entries(configStep.fields)) {
+                      if (value) viewConfig[key] = value;
+                    }
+                    setConfigSaving(true);
+                    try {
+                      await savedViewService.updateView(configStep.viewPid, { viewConfig });
+                      // Reload page to ensure the new viewConfig is applied
+                      // selectView uses local cache which is stale until re-render
+                      window.location.href = `${window.location.pathname}?view=${configStep.viewPid}`;
+                      return;
+                    } catch (err) {
+                      console.error('Failed to save view config:', err);
+                      setConfigSaving(false);
+                    }
+                    setConfigStep(null);
+                    onClose();
+                  }}
+                  disabled={
+                    configSaving ||
+                    (VIEW_TYPE_REQUIRED_FIELDS[configStep.viewType] || [])
+                      .filter((f) => f.required)
+                      .some((f) => !configStep.fields[f.key])
+                  }
+                  className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {configSaving ? 'Saving...' : 'Done'}
+                </button>
+              </div>
+            </div>
+          )}
 
-                {createError && (
-                  <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                    {createError}
-                  </div>
-                )}
-
-                {/* View Type Selector */}
-                {enabledViewTypes.length > 1 && (
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      View Type
-                    </label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {enabledViewTypes.map((vtConfig) => {
-                        const rec = recommendations.find((r) => r.viewType === vtConfig.type);
-                        return (
-                          <button
-                            key={vtConfig.type}
-                            type="button"
-                            onClick={() => {
-                              setNewViewType(vtConfig.type);
-                              setNewViewConfig({});
-                            }}
-                            className={cn(
-                              'relative rounded-md border px-3 py-2 text-sm transition-colors duration-100',
-                              newViewType === vtConfig.type
-                                ? 'border-blue-500 bg-blue-50 font-medium text-blue-700'
-                                : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-50',
-                            )}
-                          >
-                            {vtConfig.label}
-                            {rec && (
-                              <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500">
-                                <SparklesIcon className="h-2.5 w-2.5 text-white" />
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    {recommendations.length > 0 && (
-                      <div className="mt-2 text-xs text-gray-500">
-                        <SparklesIcon className="mr-1 inline h-3 w-3 text-blue-500" />
-                        Recommended views are based on your model's field types.
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Missing Fields Warning Banner */}
-                {missingFields.length > 0 && modelPid && (
-                  <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm">
-                    <div className="flex items-start gap-2">
-                      <svg
-                        className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-500"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"
-                        />
-                      </svg>
-                      <div className="flex-1">
-                        <p className="font-medium text-amber-800">
-                          Missing required fields for {newViewType} view:
-                        </p>
-                        <ul className="mt-1 list-inside list-disc text-amber-700">
-                          {missingFields.map((req) => (
-                            <li key={req.key}>
-                              {req.label} ({req.acceptedTypes.join(' / ')})
-                            </li>
-                          ))}
-                        </ul>
-                        {missingFields.some((r) => r.autoCreateConfig) && (
-                          <button
-                            type="button"
-                            onClick={handleAutoCreateFields}
-                            disabled={autoCreateLoading}
-                            className={cn(
-                              'mt-2 rounded-md bg-amber-100 px-3 py-1.5 text-xs font-medium text-amber-800',
-                              'hover:bg-amber-200 focus:ring-2 focus:ring-amber-500 focus:outline-none',
-                              'disabled:cursor-not-allowed disabled:opacity-50',
-                              'transition-colors duration-150',
-                            )}
-                          >
-                            {autoCreateLoading ? (
-                              <span className="flex items-center gap-1">
-                                <span className="h-3 w-3 animate-spin rounded-full border-2 border-amber-400 border-t-amber-700" />
-                                Creating fields...
-                              </span>
-                            ) : (
-                              'Auto-add missing fields'
-                            )}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Kanban Config Panel */}
-                {newViewType === 'kanban' && (
-                  <div className="rounded-md border border-gray-200 bg-gray-50 p-3">
-                    <h4 className="mb-3 text-sm font-medium text-gray-700">Kanban Configuration</h4>
-                    <KanbanConfigPanel
-                      viewConfig={newViewConfig}
-                      onChange={setNewViewConfig}
-                      fields={mergedFields}
-                    />
-                  </div>
-                )}
-
-                {/* Calendar Config Panel */}
-                {newViewType === 'calendar' && (
-                  <div className="rounded-md border border-gray-200 bg-gray-50 p-3">
-                    <h4 className="mb-3 text-sm font-medium text-gray-700">
-                      Calendar Configuration
-                    </h4>
-                    <CalendarConfigPanel
-                      viewConfig={newViewConfig}
-                      onChange={setNewViewConfig}
-                      fields={mergedFields}
-                    />
-                  </div>
-                )}
-
-                {/* Gallery Config Panel */}
-                {newViewType === 'gallery' && (
-                  <div className="rounded-md border border-gray-200 bg-gray-50 p-3">
-                    <h4 className="mb-3 text-sm font-medium text-gray-700">
-                      Gallery Configuration
-                    </h4>
-                    <GalleryConfigPanel
-                      viewConfig={newViewConfig}
-                      onChange={setNewViewConfig}
-                      fields={mergedFields}
-                    />
-                  </div>
-                )}
-
-                {/* Gantt Config Panel */}
-                {newViewType === 'gantt' && (
-                  <div className="rounded-md border border-gray-200 bg-gray-50 p-3">
-                    <h4 className="mb-3 text-sm font-medium text-gray-700">Gantt Configuration</h4>
-                    <GanttConfigPanel
-                      viewConfig={newViewConfig}
-                      onChange={setNewViewConfig}
-                      fields={mergedFields}
-                    />
-                  </div>
-                )}
-
-                {/* Tree Config Panel */}
-                {newViewType === 'tree' && (
-                  <div className="rounded-md border border-gray-200 bg-gray-50 p-3">
-                    <h4 className="mb-3 text-sm font-medium text-gray-700">Tree Configuration</h4>
-                    <TreeConfigPanel
-                      viewConfig={newViewConfig}
-                      onChange={setNewViewConfig}
-                      fields={mergedFields}
-                    />
-                  </div>
-                )}
-
-                {/* Filter Configuration (available for all view types) */}
-                {mergedFields.length > 0 && (
-                  <div className="rounded-md border border-gray-200 bg-gray-50 p-3">
-                    <h4 className="mb-3 text-sm font-medium text-gray-700">Filters (Optional)</h4>
-                    <ViewFilterPanel
-                      viewConfig={newViewConfig}
-                      onChange={setNewViewConfig}
-                      fields={mergedFields}
-                    />
-                  </div>
-                )}
-
-                {/* Conditional Formatting (TABLE view only) */}
-                {newViewType === 'table' && mergedFields.length > 0 && (
-                  <div className="rounded-md border border-gray-200 bg-gray-50 p-3">
-                    <h4 className="mb-3 text-sm font-medium text-gray-700">Conditional Formatting (Optional)</h4>
-                    <ConditionalFormatPanel
-                      viewConfig={newViewConfig}
-                      onChange={setNewViewConfig}
-                      fields={mergedFields}
-                    />
-                  </div>
-                )}
-
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={handleCreateSubmit}
-                    disabled={!newViewName.trim() || loadingState.type === 'create'}
-                    className={cn(
-                      'flex-1 rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white',
-                      'hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none',
-                      'disabled:cursor-not-allowed disabled:opacity-50',
-                      'transition-colors duration-150',
-                    )}
-                  >
-                    {loadingState.type === 'create' ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                        Creating...
-                      </span>
-                    ) : (
-                      'Create'
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowCreateForm(false);
-                      setNewViewName('');
-                      setNewViewScope('personal');
-                      setNewViewTeamId('');
-                      setNewViewType(activeViewType || 'table');
-                      setNewViewConfig({});
-                      setCreateError(null);
-                    }}
-                    disabled={loadingState.type === 'create'}
-                    className={cn(
-                      'rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700',
-                      'hover:bg-gray-50 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:outline-none',
-                      'disabled:cursor-not-allowed disabled:opacity-50',
-                      'transition-colors duration-150',
-                    )}
-                  >
-                    Cancel
-                  </button>
+          {/* New View Section — hidden when config step is active */}
+          {!configStep && <div className="border-b border-gray-200 p-4">
+            {showTypePicker ? (
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Choose type</span>
+                  <button type="button" onClick={() => setShowTypePicker(false)} className="text-xs text-gray-400 hover:text-gray-600">Cancel</button>
                 </div>
+                {loadingState.type === 'create' ? (
+                  <div className="flex items-center justify-center gap-2 py-4 text-sm text-blue-600">
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-blue-300 border-t-blue-600" />
+                    Creating...
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-4 gap-2">
+                    {([
+                      { type: 'table' as ViewType, icon: '≡', label: 'Table' },
+                      { type: 'kanban' as ViewType, icon: '⊞', label: 'Kanban' },
+                      { type: 'calendar' as ViewType, icon: '📅', label: 'Calendar' },
+                      { type: 'gallery' as ViewType, icon: '▦', label: 'Gallery' },
+                      { type: 'gantt' as ViewType, icon: '━', label: 'Gantt' },
+                      { type: 'tree' as ViewType, icon: '⊟', label: 'Tree' },
+                      { type: 'timeline' as ViewType, icon: '⏤', label: 'Timeline' },
+                      { type: 'form' as ViewType, icon: '☐', label: 'Form' },
+                    ]).map((vt) => (
+                      <button
+                        key={vt.type}
+                        type="button"
+                        onClick={() => handleQuickCreate(vt.type)}
+                        className="flex flex-col items-center gap-1 rounded-lg border border-gray-200 px-2 py-2.5 text-gray-600 transition-all hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600"
+                      >
+                        <span className="text-lg">{vt.icon}</span>
+                        <span className="text-[10px] font-medium">{vt.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             ) : (
               <button
                 type="button"
-                onClick={() => setShowCreateForm(true)}
+                onClick={() => setShowTypePicker(true)}
                 className={cn(
-                  'flex w-full items-center justify-center gap-2 px-4 py-2',
-                  'rounded-md bg-blue-50 text-sm font-medium text-blue-600',
-                  'hover:bg-blue-100 focus:ring-2 focus:ring-blue-500 focus:outline-none',
-                  'transition-colors duration-150',
+                  'flex w-full items-center justify-center gap-2 rounded-lg',
+                  'border-2 border-dashed border-gray-300 py-2.5',
+                  'text-sm font-medium text-blue-600',
+                  'transition-all hover:border-blue-400 hover:bg-blue-50',
                 )}
               >
-                <svg
-                  className="h-4 w-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 4v16m8-8H4"
-                  />
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
                 New View
               </button>
             )}
-          </div>
+          </div>}
 
-          {/* View List */}
-          <div className="py-2">
+          {/* View List — hidden when config step is active */}
+          {!configStep && <div className="py-2">
             {groupedViews.length === 0 ? (
               <div className="px-4 py-8 text-center text-sm text-gray-500">
                 No saved views available. Create your first view above.
@@ -903,8 +614,65 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
 
                   {/* Group Items */}
                   {group.views.map((view) => (
+                    <div key={view.pid}>
+                    {editingView?.pid === view.pid ? (
+                      /* Inline edit form */
+                      <div className="mx-2 rounded-lg border border-blue-200 bg-blue-50 p-3">
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Name</label>
+                            <input
+                              type="text"
+                              value={editForm.name}
+                              onChange={(e) => setEditForm(prev => ({ ...prev, name: e.target.value }))}
+                              className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                              autoFocus
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Description</label>
+                            <input
+                              type="text"
+                              value={editForm.description}
+                              onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))}
+                              placeholder="Optional description"
+                              className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Scope</label>
+                            <select
+                              value={editForm.scope}
+                              onChange={(e) => setEditForm(prev => ({ ...prev, scope: e.target.value as ViewScope }))}
+                              className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                            >
+                              <option value="personal">Personal</option>
+                              <option value="team">Team</option>
+                              <option value="global">Global</option>
+                            </select>
+                          </div>
+                          <div className="flex justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={handleCancelEdit}
+                              className="rounded-md px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleSaveEdit}
+                              disabled={!editForm.name.trim() || loadingState.type === 'rename'}
+                              className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                            >
+                              {loadingState.type === 'rename' ? 'Saving...' : 'Save'}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      /* Normal view row */
                     <div
-                      key={view.pid}
                       className={cn(
                         'mx-2 rounded-md px-2 py-2',
                         'hover:bg-gray-50',
@@ -989,6 +757,42 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
                             )}
                           </button>
 
+                          {/* Edit Button */}
+                          {onEditView && (
+                            <button
+                              type="button"
+                              onClick={() => handleEdit(view)}
+                              disabled={isViewLoading(view.pid)}
+                              className={cn(
+                                'rounded-md p-1.5 text-gray-400',
+                                'hover:bg-gray-100 hover:text-green-500',
+                                'focus:ring-2 focus:ring-blue-500 focus:outline-none',
+                                'disabled:cursor-not-allowed disabled:opacity-50',
+                                'transition-colors duration-150',
+                              )}
+                              title="Edit view"
+                            >
+                              {loadingState.type === 'rename' && loadingState.pid === view.pid ? (
+                                <span className="block h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-green-500" />
+                              ) : (
+                                <svg
+                                  className="h-4 w-4"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                  aria-hidden="true"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                  />
+                                </svg>
+                              )}
+                            </button>
+                          )}
+
                           {/* Duplicate Button */}
                           <button
                             type="button"
@@ -1033,14 +837,20 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
                                 const isShared = data?.data?.shared;
                                 if (isShared) {
                                   const shareUrl = data?.data?.shareUrl || '';
-                                  const action = window.confirm(`This view is shared.\n\nURL: ${shareUrl}\n\nClick OK to copy link, Cancel to revoke sharing.`);
+                                  const action = window.confirm(
+                                    `This view is shared.\n\nURL: ${shareUrl}\n\nClick OK to copy link, Cancel to revoke sharing.`,
+                                  );
                                   if (action) {
                                     navigator.clipboard.writeText(shareUrl);
                                   } else {
-                                    await fetch(`/api/views/${view.pid}/share`, { method: 'delete' });
+                                    await fetch(`/api/views/${view.pid}/share`, {
+                                      method: 'delete',
+                                    });
                                   }
                                 } else {
-                                  const password = window.prompt('Set a password (leave empty for no password):');
+                                  const password = window.prompt(
+                                    'Set a password (leave empty for no password):',
+                                  );
                                   const body: any = {};
                                   if (password) body.password = password;
                                   const resp2 = await fetch(`/api/views/${view.pid}/share`, {
@@ -1066,8 +876,18 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
                             )}
                             title="Share view"
                           >
-                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                            <svg
+                              className="h-4 w-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
+                              />
                             </svg>
                           </button>
 
@@ -1109,11 +929,13 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
                         </div>
                       </div>
                     </div>
+                    )}
+                    </div>
                   ))}
                 </div>
               ))
             )}
-          </div>
+          </div>}
         </div>
       </div>
     </>

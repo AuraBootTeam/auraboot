@@ -36,7 +36,7 @@ import { uniqueId, extractRecordId } from '../helpers/index';
 // ---------------------------------------------------------------------------
 
 const UID = uniqueId('ACF');
-const SKIP_NO_PLUGIN = 'e2e-test-order plugin not installed (com.test.e2e-order missing)';
+const SKIP_NO_MODEL = 'e2et_payment model not available (not published or not found via /api/meta/models/code/e2et_payment)';
 
 // ---------------------------------------------------------------------------
 // Shared state
@@ -103,7 +103,7 @@ async function submitPaymentViaApi(page: Page, pid: string): Promise<boolean> {
 }
 
 async function getPaymentStatus(page: Page, pid: string): Promise<string> {
-  const resp = await page.request.get(`/api/dynamic/e2et-payment/${pid}`);
+  const resp = await page.request.get(`/api/dynamic/e2et_payment/${pid}`);
   const body = await resp.json();
   return body?.data?.e2et_pay_status ?? body?.data?.status ?? 'unknown';
 }
@@ -147,7 +147,8 @@ test.describe('Approval Workflow — Complete Flow', () => {
     const page = await ctx.newPage();
     try {
       const resp = await page.request.get('/api/meta/models/code/e2et_payment');
-      modelAvailable = resp.ok();
+      const body = await resp.json().catch(() => ({}));
+      modelAvailable = resp.ok() && body?.data?.status === 'published';
     } catch {
       modelAvailable = false;
     } finally {
@@ -167,8 +168,12 @@ test.describe('Approval Workflow — Complete Flow', () => {
     await expect(content).toBeVisible({ timeout: 10000 });
 
     // No access error
-    await expect(page.locator('text=Access forbidden')).not.toBeVisible({ timeout: 2000 }).catch(() => {});
-    await expect(page.locator('text=403')).not.toBeVisible({ timeout: 2000 }).catch(() => {});
+    await expect(page.locator('text=Access forbidden'))
+      .not.toBeVisible({ timeout: 2000 })
+      .catch(() => {});
+    await expect(page.locator('text=403'))
+      .not.toBeVisible({ timeout: 2000 })
+      .catch(() => {});
   });
 
   test('ACF-002: sidebar → 审批任务 (approval inbox) page loads', async ({ page }) => {
@@ -181,16 +186,19 @@ test.describe('Approval Workflow — Complete Flow', () => {
     const content = page.locator('table, [role="table"], [class*="empty"], main').first();
     await expect(content).toBeVisible({ timeout: 10000 });
 
-    await expect(page.locator('text=Access forbidden')).not.toBeVisible({ timeout: 2000 }).catch(() => {});
+    await expect(page.locator('text=Access forbidden'))
+      .not.toBeVisible({ timeout: 2000 })
+      .catch(() => {});
   });
 
   test('ACF-003: BPM process management list loads with process definitions', async ({ page }) => {
-    await page.goto('/dynamic/bpm-process-management', { waitUntil: 'domcontentloaded' });
+    await page.goto('/p/bpm_process_management', { waitUntil: 'domcontentloaded' });
 
-    const listResp = await page.waitForResponse(
-      (r) => r.url().includes('/api/dynamic/bpm') && r.status() === 200,
-      { timeout: 15000 },
-    ).catch(() => null);
+    const listResp = await page
+      .waitForResponse((r) => r.url().includes('/api/dynamic/bpm') && r.status() === 200, {
+        timeout: 15000,
+      })
+      .catch(() => null);
 
     if (!listResp) {
       // Try alternate URL
@@ -200,12 +208,14 @@ test.describe('Approval Workflow — Complete Flow', () => {
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => null);
 
     // Verify page loaded without error
-    await expect(page.locator('text=Access forbidden')).not.toBeVisible({ timeout: 2000 }).catch(() => {});
+    await expect(page.locator('text=Access forbidden'))
+      .not.toBeVisible({ timeout: 2000 })
+      .catch(() => {});
 
     // Verify process definitions are accessible via API
-    const resp = await page.request.get('/api/bpm/process-definitions?pageNum=1&pageSize=20').catch(
-      async () => page.request.get('/api/bpm/definitions?pageNum=1&pageSize=20')
-    );
+    const resp = await page.request
+      .get('/api/bpm/process-definitions?pageNum=1&pageSize=20')
+      .catch(async () => page.request.get('/api/bpm/definitions?pageNum=1&pageSize=20'));
     if (resp && resp.ok()) {
       const body = await resp.json();
       expect(body).toBeTruthy();
@@ -216,9 +226,11 @@ test.describe('Approval Workflow — Complete Flow', () => {
   // CRITICAL: Submit and Approve Payment Flow
   // =========================================================================
 
-  test('ACF-004: create payment → submit → status changes to pending/submitted', async ({ page }) => {
+  test('ACF-004: create payment → submit → status changes to pending/submitted', async ({
+    page,
+  }) => {
     if (!modelAvailable) {
-      test.skip(true, SKIP_NO_PLUGIN);
+      test.skip(true, SKIP_NO_MODEL);
       return;
     }
 
@@ -238,7 +250,7 @@ test.describe('Approval Workflow — Complete Flow', () => {
     // Expected: 'pending' or 'submitted' or 'pending_approval'
     expect(
       ['pending', 'submitted', 'pending_approval', 'in_review'],
-      `Status after submission should be a pending state, got: ${afterStatus}`
+      `Status after submission should be a pending state, got: ${afterStatus}`,
     ).toContain(afterStatus);
 
     // Navigate to task center and verify something changed in the UI
@@ -251,7 +263,7 @@ test.describe('Approval Workflow — Complete Flow', () => {
 
   test('ACF-005: approve payment → status becomes approved', async ({ page }) => {
     if (!modelAvailable) {
-      test.skip(true, SKIP_NO_PLUGIN);
+      test.skip(true, SKIP_NO_MODEL);
       return;
     }
 
@@ -268,20 +280,24 @@ test.describe('Approval Workflow — Complete Flow', () => {
     const afterStatus = await getPaymentStatus(page, paymentPid);
     expect(
       ['approved', 'approved_pending_pay', 'completed', 'in_payment'],
-      `After approval, status should indicate approved state, got: ${afterStatus}`
+      `After approval, status should indicate approved state, got: ${afterStatus}`,
     ).toContain(afterStatus);
 
     // Navigate to task center — verify we can see the page
     await navigateToBpmPage(page, '/bpm/task-center');
 
     // Click "已办任务" tab if available
-    const completedTab = page.locator('button, [role="tab"]').filter({ hasText: /已办|Completed|已处理/ }).first();
+    const completedTab = page
+      .locator('button, [role="tab"]')
+      .filter({ hasText: /已办|Completed|已处理/ })
+      .first();
     const hasCompletedTab = await completedTab.isVisible({ timeout: 5000 }).catch(() => false);
 
     if (hasCompletedTab) {
       await completedTab.click();
       // After click, some content should be visible
-      const tableOrEmpty = page.locator('table, [role="table"]')
+      const tableOrEmpty = page
+        .locator('table, [role="table"]')
         .or(page.locator('[class*="empty"]'))
         .or(page.getByText('暂无'))
         .or(page.getByText('No data'));
@@ -291,7 +307,7 @@ test.describe('Approval Workflow — Complete Flow', () => {
 
   test('ACF-006: reject flow → payment status becomes rejected', async ({ page }) => {
     if (!modelAvailable) {
-      test.skip(true, SKIP_NO_PLUGIN);
+      test.skip(true, SKIP_NO_MODEL);
       return;
     }
 
@@ -312,13 +328,13 @@ test.describe('Approval Workflow — Complete Flow', () => {
     const afterStatus = await getPaymentStatus(page, paymentPid);
     expect(
       ['rejected', 'declined', 'returned'],
-      `After rejection, status should indicate rejected state, got: ${afterStatus}`
+      `After rejection, status should indicate rejected state, got: ${afterStatus}`,
     ).toContain(afterStatus);
   });
 
   test('ACF-007: re-submit rejected payment → back to pending state', async ({ page }) => {
     if (!modelAvailable) {
-      test.skip(true, SKIP_NO_PLUGIN);
+      test.skip(true, SKIP_NO_MODEL);
       return;
     }
 
@@ -333,7 +349,7 @@ test.describe('Approval Workflow — Complete Flow', () => {
     const rejectedStatus = await getPaymentStatus(page, paymentPid);
     expect(
       ['rejected', 'declined', 'returned'],
-      `Status should be rejected after reject command, got: ${rejectedStatus}`
+      `Status should be rejected after reject command, got: ${rejectedStatus}`,
     ).toContain(rejectedStatus);
 
     // Re-submit
@@ -344,11 +360,11 @@ test.describe('Approval Workflow — Complete Flow', () => {
       // Should be back in pending state
       expect(
         ['pending', 'submitted', 'pending_approval'],
-        `After re-submit, status should be pending, got: ${afterResubmitStatus}`
+        `After re-submit, status should be pending, got: ${afterResubmitStatus}`,
       ).toContain(afterResubmitStatus);
     } else {
       // Re-submission may be blocked by state machine — verify record still exists
-      const stillExists = await page.request.get(`/api/dynamic/e2et-payment/${paymentPid}`);
+      const stillExists = await page.request.get(`/api/dynamic/e2et_payment/${paymentPid}`);
       expect(stillExists.ok()).toBe(true);
     }
   });
@@ -364,7 +380,10 @@ test.describe('Approval Workflow — Complete Flow', () => {
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => null);
 
     // Look for tab structure (待办任务 / 已办任务 / 我发起的)
-    const todoTab = page.locator('button, [role="tab"]').filter({ hasText: /待办|Todo|Pending/ }).first();
+    const todoTab = page
+      .locator('button, [role="tab"]')
+      .filter({ hasText: /待办|Todo|Pending/ })
+      .first();
     const hasTodoTab = await todoTab.isVisible({ timeout: 8000 }).catch(() => false);
 
     expect(hasTodoTab, 'Task center must have a "待办" tab').toBe(true);
@@ -373,7 +392,8 @@ test.describe('Approval Workflow — Complete Flow', () => {
     await todoTab.click();
 
     // Should show table or empty state (TaskTable renders "暂无任务" when empty)
-    const tableOrEmpty = page.locator('table, [role="table"]')
+    const tableOrEmpty = page
+      .locator('table, [role="table"]')
       .or(page.locator('[class*="empty"]'))
       .or(page.getByText('暂无任务'))
       .or(page.getByText('暂无待办'))
@@ -388,7 +408,11 @@ test.describe('Approval Workflow — Complete Flow', () => {
 
     // Should show a table or empty state — not a blank page
     const table = page.locator('table, [role="table"], [class*="ant-table"]').first();
-    const emptyState = page.locator('[class*="empty"]').or(page.getByText('暂无')).or(page.getByText('No data')).first();
+    const emptyState = page
+      .locator('[class*="empty"]')
+      .or(page.getByText('暂无'))
+      .or(page.getByText('No data'))
+      .first();
     const content = page.locator('main, [class*="content"]').first();
 
     const hasTable = await table.isVisible({ timeout: 5000 }).catch(() => false);
@@ -397,7 +421,7 @@ test.describe('Approval Workflow — Complete Flow', () => {
 
     expect(
       hasTable || hasEmpty || hasContent,
-      'Approval inbox must render some content, not a blank page'
+      'Approval inbox must render some content, not a blank page',
     ).toBe(true);
   });
 
@@ -406,7 +430,8 @@ test.describe('Approval Workflow — Complete Flow', () => {
     await page.waitForLoadState('domcontentloaded');
 
     // Find and click completed tasks tab
-    const completedTab = page.locator('button, [role="tab"]')
+    const completedTab = page
+      .locator('button, [role="tab"]')
       .filter({ hasText: /已办|Completed|已处理|已完成/ })
       .first();
 
@@ -414,7 +439,10 @@ test.describe('Approval Workflow — Complete Flow', () => {
 
     if (!hasCompletedTab) {
       // Task center may use a different tab structure
-      const allTabs = await page.locator('[role="tab"], button').filter({ hasText: /.+/ }).allTextContents();
+      const allTabs = await page
+        .locator('[role="tab"], button')
+        .filter({ hasText: /.+/ })
+        .allTextContents();
       console.log('[ACF-010] Available tabs:', allTabs);
 
       // Verify page at least has some content
@@ -426,7 +454,8 @@ test.describe('Approval Workflow — Complete Flow', () => {
     await completedTab.click();
 
     // After click, should show table or empty state
-    const tableOrEmpty = page.locator('table, [role="table"]')
+    const tableOrEmpty = page
+      .locator('table, [role="table"]')
       .or(page.locator('[class*="empty"]'))
       .or(page.getByText('暂无'));
     await expect(tableOrEmpty.first()).toBeVisible({ timeout: 8000 });
@@ -436,14 +465,16 @@ test.describe('Approval Workflow — Complete Flow', () => {
   // API and Infrastructure
   // =========================================================================
 
-  test('ACF-011: BPM process instances by-business-key API returns valid response', async ({ page }) => {
+  test('ACF-011: BPM process instances by-business-key API returns valid response', async ({
+    page,
+  }) => {
     const nonExistentKey = `no-such-record-${Date.now()}`;
     const resp = await page.request.get('/api/bpm/process-instances/by-business-key/status', {
       params: { businessKey: nonExistentKey },
     });
 
-    // Must respond (not hang or 5xx)
-    expect(resp.status()).toBeLessThan(400);
+    // Must respond (not hang or 5xx); 400 is valid for non-existent key
+    expect(resp.status()).toBeLessThan(500);
 
     const body = await resp.json().catch(() => null);
     expect(body).not.toBeNull();
@@ -453,17 +484,21 @@ test.describe('Approval Workflow — Complete Flow', () => {
   test('ACF-012: notification bell is visible in header after navigation', async ({ page }) => {
     await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
 
-    const notificationBell = page.locator(
-      '[data-testid="notification-bell"], header a[href="/notifications"], header button[aria-label*="notification" i]'
-    ).first();
+    const notificationBell = page
+      .locator(
+        '[data-testid="inbox-badge"], [data-testid="notification-bell"], header button:has-text("Inbox"), header a[href="/notifications"], header button[aria-label*="notification" i]',
+      )
+      .first();
     const hasBell = await notificationBell.isVisible({ timeout: 8000 }).catch(() => false);
 
-    expect(hasBell, 'Notification bell must be visible in the header').toBe(true);
+    expect(hasBell, 'Header inbox/notification entry must be visible').toBe(true);
   });
 
   test('ACF-013: BPM process definitions API returns list of processes', async ({ page }) => {
     // Primary endpoint: /api/bpm/process-definitions (returns 200 with paginated list)
-    const resp = await page.request.get('/api/bpm/process-definitions?pageNum=1&pageSize=20').catch(() => null);
+    const resp = await page.request
+      .get('/api/bpm/process-definitions?pageNum=1&pageSize=20')
+      .catch(() => null);
 
     if (resp && resp.ok()) {
       const body = await resp.json();
@@ -472,9 +507,9 @@ test.describe('Approval Workflow — Complete Flow', () => {
       expect(body.data).toHaveProperty('records');
     } else {
       // Fallback: dynamic page endpoint
-      const altResp = await page.request.get(
-        '/api/dynamic/bpm-process-management/list?pageNum=1&pageSize=20'
-      ).catch(() => null);
+      const altResp = await page.request
+        .get('/api/dynamic/bpm_process_management/list?pageNum=1&pageSize=20')
+        .catch(() => null);
       if (altResp && altResp.ok()) {
         const altBody = await altResp.json();
         expect(altBody.code).toBe('0');
@@ -482,7 +517,10 @@ test.describe('Approval Workflow — Complete Flow', () => {
         expect(altBody.data).toHaveProperty('records');
       } else {
         // If neither endpoint is accessible, skip (BPM module may not be deployed)
-        test.skip(true, 'BPM process definitions endpoint not accessible — module may not be deployed');
+        test.skip(
+          true,
+          'BPM process definitions endpoint not accessible — module may not be deployed',
+        );
       }
     }
   });
@@ -491,9 +529,11 @@ test.describe('Approval Workflow — Complete Flow', () => {
   // Payment full lifecycle UI: submit → view in pending list → approve via task center
   // =========================================================================
 
-  test('ACF-014: full UI flow — submit payment → appears in task center → approve via UI', async ({ page }) => {
+  test('ACF-014: full UI flow — submit payment → appears in task center → approve via UI', async ({
+    page,
+  }) => {
     if (!modelAvailable) {
-      test.skip(true, SKIP_NO_PLUGIN);
+      test.skip(true, SKIP_NO_MODEL);
       return;
     }
 
@@ -504,7 +544,10 @@ test.describe('Approval Workflow — Complete Flow', () => {
     await navigateToBpmPage(page, '/bpm/task-center');
 
     // Look for pending tasks (the one we just submitted)
-    const todoTab = page.locator('button, [role="tab"]').filter({ hasText: /待办|Todo|Pending/ }).first();
+    const todoTab = page
+      .locator('button, [role="tab"]')
+      .filter({ hasText: /待办|Todo|Pending/ })
+      .first();
     const hasTodoTab = await todoTab.isVisible({ timeout: 8000 }).catch(() => false);
 
     if (hasTodoTab) {
@@ -512,24 +555,32 @@ test.describe('Approval Workflow — Complete Flow', () => {
     }
 
     // Check if there are approval buttons visible
-    const approveBtn = page.locator('button').filter({ hasText: /通过|Approve|批准/ }).first();
+    const approveBtn = page
+      .locator('button')
+      .filter({ hasText: /通过|Approve|批准/ })
+      .first();
     const hasApproveBtn = await approveBtn.isVisible({ timeout: 5000 }).catch(() => false);
 
     if (hasApproveBtn) {
       await approveBtn.click();
 
       // Handle confirmation if needed
-      const confirmBtn = page.locator('button').filter({ hasText: /确认|Confirm|确定/ }).first();
+      const confirmBtn = page
+        .locator('button')
+        .filter({ hasText: /确认|Confirm|确定/ })
+        .first();
       const hasConfirm = await confirmBtn.isVisible({ timeout: 3000 }).catch(() => false);
       if (hasConfirm) await confirmBtn.click();
 
-      await page.waitForResponse(
-        (r) => r.url().includes('/bpm/') && r.request().method() === 'POST',
-        { timeout: 8000 },
-      ).catch(() => null);
+      await page
+        .waitForResponse((r) => r.url().includes('/bpm/') && r.request().method() === 'POST', {
+          timeout: 8000,
+        })
+        .catch(() => null);
 
       // Toast should appear
-      const toast = page.locator('[class*="toast"], [class*="message"], [class*="notification"]')
+      const toast = page
+        .locator('[class*="toast"], [class*="message"], [class*="notification"]')
         .filter({ hasText: /成功|Success|完成/ })
         .first();
       const hasToast = await toast.isVisible({ timeout: 5000 }).catch(() => false);
@@ -538,24 +589,28 @@ test.describe('Approval Workflow — Complete Flow', () => {
       }
     } else {
       // Approval via API if UI button not available (e.g., process not deployed)
-      const approveResp = await page.request.post('/api/meta/commands/execute/e2et:approve_payment', {
-        data: { targetRecordId: paymentPid, operationType: 'update', payload: {} },
-      });
+      const approveResp = await page.request.post(
+        '/api/meta/commands/execute/e2et:approve_payment',
+        {
+          data: { targetRecordId: paymentPid, operationType: 'update', payload: {} },
+        },
+      );
       expect(approveResp.status()).toBeLessThan(400);
 
       const status = await getPaymentStatus(page, paymentPid);
       expect(
         ['approved', 'approved_pending_pay', 'completed', 'pending'],
-        `After approve command, status should indicate progress, got: ${status}`
+        `After approve command, status should indicate progress, got: ${status}`,
       ).toContain(status);
     }
 
     // Navigate to payment list and verify record still exists
-    await page.goto('/dynamic/e2et-payment', { waitUntil: 'domcontentloaded' });
-    await page.waitForResponse(
-      (r) => r.url().includes('/api/dynamic/e2et-payment') && r.status() === 200,
-      { timeout: 15000 },
-    ).catch(() => null);
+    await page.goto('/p/e2et_payment', { waitUntil: 'domcontentloaded' });
+    await page
+      .waitForResponse((r) => r.url().includes('/api/dynamic/e2et_payment') && r.status() === 200, {
+        timeout: 15000,
+      })
+      .catch(() => null);
 
     const table = page.locator('table, [class*="ant-table"]').first();
     const emptyState = page.locator('[class*="empty"]').first();

@@ -16,7 +16,7 @@
 
 import { type Page, expect } from '@playwright/test';
 import { DynamicListPage, DynamicFormPage } from '../pages';
-import { executeCommandViaApi, waitForFormReady } from '../e2e/helpers';
+import { executeCommandViaApi, normalizeDynamicPageKey, waitForFormReady } from '../e2e/helpers';
 import { ErrorCodes } from '~/services/http-client/types';
 
 // ---------------------------------------------------------------------------
@@ -50,6 +50,10 @@ export class ModelTestHelper {
     this.config = config;
   }
 
+  protected get normalizedPageKey(): string {
+    return normalizeDynamicPageKey(this.config.pageKey);
+  }
+
   // --- Config access ---
 
   /** Build full command code: 'submit' → 'e2et:submit_order' */
@@ -58,7 +62,7 @@ export class ModelTestHelper {
     if (!cmd) {
       throw new Error(
         `Unknown action "${action}" for model "${this.config.modelCode}". ` +
-        `Available: ${Object.keys(this.config.commands).join(', ')}`
+          `Available: ${Object.keys(this.config.commands).join(', ')}`,
       );
     }
     return `${this.config.namespace}:${cmd}`;
@@ -69,11 +73,7 @@ export class ModelTestHelper {
   /** Create a record via API, returning its PID. */
   async createViaApi(overrides?: Record<string, unknown>): Promise<string> {
     const payload = { ...this.config.defaultData(), ...overrides };
-    const result = await executeCommandViaApi(
-      this.page,
-      this.commandCode('create'),
-      payload,
-    );
+    const result = await executeCommandViaApi(this.page, this.commandCode('create'), payload);
     expect(result.code).toBe(ErrorCodes.SUCCESS);
     return result.recordId;
   }
@@ -95,12 +95,7 @@ export class ModelTestHelper {
     pid: string,
     payload: Record<string, unknown> = {},
   ): Promise<{ code: string; recordId: string }> {
-    return executeCommandViaApi(
-      this.page,
-      this.commandCode(action),
-      payload,
-      pid,
-    );
+    return executeCommandViaApi(this.page, this.commandCode(action), payload, pid);
   }
 
   /** Execute a sequence of state transitions on a record. */
@@ -113,9 +108,7 @@ export class ModelTestHelper {
 
   /** Fetch a single record by PID via the dynamic data API. */
   async fetchViaApi(pid: string): Promise<Record<string, unknown>> {
-    const resp = await this.page.request.get(
-      `/api/dynamic/${this.config.pageKey}/${pid}`,
-    );
+    const resp = await this.page.request.get(`/api/dynamic/${this.normalizedPageKey}/${pid}`);
     expect(resp.ok()).toBe(true);
     const body = await resp.json();
     return body.data ?? body;
@@ -129,7 +122,7 @@ export class ModelTestHelper {
     if (!childConfig) {
       throw new Error(
         `Unknown child "${name}" for model "${this.config.modelCode}". ` +
-        `Available: ${Object.keys(this.config.children ?? {}).join(', ')}`
+          `Available: ${Object.keys(this.config.children ?? {}).join(', ')}`,
       );
     }
     return new ChildModelTestHelper(this.page, childConfig);
@@ -139,19 +132,16 @@ export class ModelTestHelper {
 
   /** Navigate to the list page for this model. */
   async gotoList(): Promise<DynamicListPage> {
-    const listPage = new DynamicListPage(this.page, `/dynamic/${this.config.pageKey}`);
+    const listPage = new DynamicListPage(this.page, `/p/${this.normalizedPageKey}`);
     await listPage.goto();
     return listPage;
   }
 
   /** Navigate to the new form page. */
   async gotoNewForm(): Promise<DynamicFormPage> {
-    const formPage = new DynamicFormPage(
-      this.page,
-      `/dynamic/${this.config.pageKey}/new`,
-    );
-    await this.page.goto(`/dynamic/${this.config.pageKey}/new`);
-    await this.page.locator('h2').first().waitFor({ state: 'visible', timeout: 10000 });
+    const formPage = new DynamicFormPage(this.page, `/p/${this.normalizedPageKey}/new`);
+    await this.page.goto(`/p/${this.normalizedPageKey}/new`);
+    await this.page.waitForLoadState('domcontentloaded');
     await waitForFormReady(this.page, 10000);
     return formPage;
   }
@@ -159,14 +149,10 @@ export class ModelTestHelper {
   /** Navigate to the edit form for a specific record. */
   async gotoEditForm(pid: string): Promise<DynamicFormPage> {
     const updateCommand = this.commandCode('update');
-    const editPath = `/dynamic/${this.config.pageKey}/${pid}/edit?commandCode=${encodeURIComponent(updateCommand)}`;
-    const formPage = new DynamicFormPage(
-      this.page,
-      editPath,
-    );
+    const editPath = `/p/${this.normalizedPageKey}/${pid}/edit?commandCode=${encodeURIComponent(updateCommand)}`;
+    const formPage = new DynamicFormPage(this.page, editPath);
     await this.page.goto(editPath);
     await this.page.waitForLoadState('domcontentloaded');
-    await this.page.locator('h2').first().waitFor({ state: 'visible', timeout: 10000 });
     await waitForFormReady(this.page, 10000);
     return formPage;
   }
@@ -197,20 +183,13 @@ export class ChildModelTestHelper extends ModelTestHelper {
   }
 
   /** Create a child record for a parent, returning the child PID. */
-  async createForParent(
-    parentPid: string,
-    overrides?: Record<string, unknown>,
-  ): Promise<string> {
+  async createForParent(parentPid: string, overrides?: Record<string, unknown>): Promise<string> {
     const payload = {
       [this.childConfig.parentField]: parentPid,
       ...this.config.defaultData(),
       ...overrides,
     };
-    const result = await executeCommandViaApi(
-      this.page,
-      this.commandCode('create'),
-      payload,
-    );
+    const result = await executeCommandViaApi(this.page, this.commandCode('create'), payload);
     expect(result.code).toBe(ErrorCodes.SUCCESS);
     return result.recordId;
   }
@@ -221,7 +200,7 @@ export class ChildModelTestHelper extends ModelTestHelper {
       { fieldName: this.childConfig.parentField, operator: 'EQ', value: parentPid },
     ]);
     const resp = await this.page.request.get(
-      `/api/dynamic/${this.config.pageKey}/list?filters=${encodeURIComponent(filters)}`,
+      `/api/dynamic/${this.normalizedPageKey}/list?filters=${encodeURIComponent(filters)}`,
     );
     if (!resp.ok()) return [];
     const body = await resp.json();

@@ -69,7 +69,13 @@ const TEST_PLUGIN = {
   ],
   modelFieldBindings: [
     { modelCode: 'impta_item', fieldCode: 'impta_name', sequence: 10, required: true },
-    { modelCode: 'impta_item', fieldCode: 'impta_priority', sequence: 20, required: true, defaultValue: 'low' },
+    {
+      modelCode: 'impta_item',
+      fieldCode: 'impta_priority',
+      sequence: 20,
+      required: true,
+      defaultValue: 'low',
+    },
     { modelCode: 'impta_item', fieldCode: 'impta_quantity', sequence: 30, required: false },
   ],
   permissions: [
@@ -135,10 +141,13 @@ test.describe('Plugin Import API', () => {
   let importResult: ImportExecuteResult | null = null;
 
   test('P-001: Plugin import execution', async ({ request }) => {
-    const response = await request.post(`/api/plugins/import/execute-direct?conflictStrategy=OVERWRITE`, {
-      data: TEST_PLUGIN,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    const response = await request.post(
+      `/api/plugins/import/execute-direct?conflictStrategy=OVERWRITE`,
+      {
+        data: TEST_PLUGIN,
+        headers: { 'Content-Type': 'application/json' },
+      },
+    );
 
     expect(response.ok()).toBe(true);
     importResult = await response.json();
@@ -241,9 +250,7 @@ test.describe('Plugin Import API', () => {
       const permissions = data.data || data;
 
       if (Array.isArray(permissions)) {
-        const imptaPermissions = permissions.filter((p: any) =>
-          p.code?.startsWith('impta:')
-        );
+        const imptaPermissions = permissions.filter((p: any) => p.code?.startsWith('impta:'));
         expect(imptaPermissions.length).toBeGreaterThanOrEqual(EXPECTED_COUNTS.permission);
       }
     }
@@ -272,7 +279,7 @@ test.describe('Plugin Import API', () => {
     expect(response.ok()).toBe(true);
     const historyData = await response.json();
 
-    const history = Array.isArray(historyData) ? historyData : (historyData.data || []);
+    const history = Array.isArray(historyData) ? historyData : historyData.data || [];
 
     const testImport = history.find((h: any) => h.pluginId === TEST_PLUGIN.pluginId);
 
@@ -306,7 +313,7 @@ test.describe('Plugin Import Boundary API', () => {
       {
         data: 'This is plain text, not a valid plugin manifest',
         headers: { 'Content-Type': 'text/plain' },
-      }
+      },
     );
 
     expect(response.ok()).toBe(false);
@@ -327,9 +334,7 @@ test.describe('Plugin Import Boundary API', () => {
           code: 'idmpt_status',
           name: 'Status',
           dictType: 'static',
-          items: [
-            { value: 'ON', label: 'On', sortNo: 10, status: 'enabled' },
-          ],
+          items: [{ value: 'ON', label: 'On', sortNo: 10, status: 'enabled' }],
         },
       ],
       fields: [
@@ -351,7 +356,7 @@ test.describe('Plugin Import Boundary API', () => {
       {
         data: IDEMPOTENCY_PLUGIN,
         headers: { 'Content-Type': 'application/json' },
-      }
+      },
     );
 
     expect(firstResponse.ok()).toBe(true);
@@ -363,7 +368,7 @@ test.describe('Plugin Import Boundary API', () => {
       {
         data: IDEMPOTENCY_PLUGIN,
         headers: { 'Content-Type': 'application/json' },
-      }
+      },
     );
 
     expect(secondResponse.ok()).toBe(true);
@@ -377,7 +382,9 @@ test.describe('Plugin Import Boundary API', () => {
         await request.post(`/api/plugins/${secondResult.pluginPid}/uninstall`, {
           data: { force: true, decisions: {} },
         });
-      } catch { /* Ignore */ }
+      } catch {
+        /* Ignore */
+      }
     }
   });
 });

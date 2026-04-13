@@ -65,14 +65,16 @@ export function StoreDistributionChart({ data, loading = false }: StoreDistribut
             />
             <YAxis tickFormatter={formatYAxisLabel} tick={{ fontSize: 12 }} />
             <Tooltip
-              formatter={(value: any, name: string) => {
-                const nameMap: Record<string, string> = {
-                  count: '数量',
-                  deviceCount: '设备数量',
-                  storeCount: '门店数量',
-                };
-                return [value, nameMap[name] || name];
-              }}
+              formatter={
+                ((value: any, name: string) => {
+                  const nameMap: Record<string, string> = {
+                    count: '数量',
+                    deviceCount: '设备数量',
+                    storeCount: '门店数量',
+                  };
+                  return [value, nameMap[name] || name];
+                }) as any
+              }
               labelFormatter={(label) => `区域: ${label}`}
             />
             <Legend

@@ -65,10 +65,11 @@ async function navigateToSequenceList(page: any): Promise<void> {
   await seqLink.waitFor({ state: 'attached', timeout: 10_000 });
   await seqLink.scrollIntoViewIfNeeded().catch(() => null);
 
-  const apiPromise = page.waitForResponse(
-    (r: any) => r.url().includes('/api/email/sequences') && r.status() === 200,
-    { timeout: 15_000 },
-  ).catch(() => null);
+  const apiPromise = page
+    .waitForResponse((r: any) => r.url().includes('/api/email/sequences') && r.status() === 200, {
+      timeout: 15_000,
+    })
+    .catch(() => null);
 
   await seqLink.evaluate((el: HTMLElement) => el.click());
   await apiPromise;
@@ -119,14 +120,22 @@ test.describe('Email Sequences', () => {
   // =========================================================================
   test('T2: sequence list shows table or empty state', async ({ page }) => {
     await navigateToSequenceList(page);
-    await page.locator('[data-testid="email-sequence-list-page"]').waitFor({ state: 'visible', timeout: 15_000 });
+    await page
+      .locator('[data-testid="email-sequence-list-page"]')
+      .waitFor({ state: 'visible', timeout: 15_000 });
 
     // Wait for loading spinner to disappear
     const spinner = page.locator('.animate-spin').first();
     await spinner.waitFor({ state: 'hidden', timeout: 10_000 }).catch(() => {});
 
-    const hasTable = await page.locator('[data-testid="sequence-table"]').isVisible({ timeout: 5_000 }).catch(() => false);
-    const hasEmpty = await page.locator('[data-testid="sequence-empty-state"]').isVisible({ timeout: 3_000 }).catch(() => false);
+    const hasTable = await page
+      .locator('[data-testid="sequence-table"]')
+      .isVisible({ timeout: 5_000 })
+      .catch(() => false);
+    const hasEmpty = await page
+      .locator('[data-testid="sequence-empty-state"]')
+      .isVisible({ timeout: 3_000 })
+      .catch(() => false);
 
     expect(
       hasTable || hasEmpty,
@@ -139,7 +148,9 @@ test.describe('Email Sequences', () => {
   // =========================================================================
   test('T3: New Sequence button toggles create form', async ({ page }) => {
     await navigateToSequenceList(page);
-    await page.locator('[data-testid="email-sequence-list-page"]').waitFor({ state: 'visible', timeout: 15_000 });
+    await page
+      .locator('[data-testid="email-sequence-list-page"]')
+      .waitFor({ state: 'visible', timeout: 15_000 });
 
     const createBtn = page.locator('[data-testid="create-sequence-btn"]');
     await expect(createBtn).toBeVisible({ timeout: 8_000 });
@@ -161,7 +172,9 @@ test.describe('Email Sequences', () => {
   // =========================================================================
   test('T4: create a new sequence via form — appears in list', async ({ page }) => {
     await navigateToSequenceList(page);
-    await page.locator('[data-testid="email-sequence-list-page"]').waitFor({ state: 'visible', timeout: 15_000 });
+    await page
+      .locator('[data-testid="email-sequence-list-page"]')
+      .waitFor({ state: 'visible', timeout: 15_000 });
 
     // Open create form
     await page.locator('[data-testid="create-sequence-btn"]').click();
@@ -174,10 +187,13 @@ test.describe('Email Sequences', () => {
     await descInput.fill(SEQUENCE_DESC);
 
     // Submit — will either navigate to editor or show success toast
-    const createApiPromise = page.waitForResponse(
-      (r: any) => r.url().includes('/api/email/sequences') && r.method() === 'POST' && r.status() === 200,
-      { timeout: 15_000 },
-    ).catch(() => null);
+    const createApiPromise = page
+      .waitForResponse(
+        (r: any) =>
+          r.url().includes('/api/email/sequences') && r.method() === 'POST' && r.status() === 200,
+        { timeout: 15_000 },
+      )
+      .catch(() => null);
 
     await page.locator('button[type="submit"], button:has-text("Create")').first().click();
     const createResp = await createApiPromise;
@@ -191,19 +207,38 @@ test.describe('Email Sequences', () => {
     // Should navigate to sequence editor OR show in list
     await page.waitForLoadState('domcontentloaded');
 
-    const isOnEditor = await page.locator('[data-testid="email-sequence-editor-page"]').isVisible({ timeout: 5_000 }).catch(() => false);
+    const isOnEditor = await page
+      .locator('[data-testid="email-sequence-editor-page"]')
+      .isVisible({ timeout: 5_000 })
+      .catch(() => false);
     if (isOnEditor) {
       // Navigated to editor — sequence was created
       await expect(page.locator('[data-testid="email-sequence-editor-page"]')).toBeVisible();
       // Sequence name should be visible in header
-      const hasName = await page.getByText(SEQUENCE_NAME).isVisible({ timeout: 5_000 }).catch(() => false);
-      expect(hasName, `Created sequence name "${SEQUENCE_NAME}" must be visible in editor`).toBe(true);
+      const hasName = await page
+        .getByText(SEQUENCE_NAME)
+        .isVisible({ timeout: 5_000 })
+        .catch(() => false);
+      expect(hasName, `Created sequence name "${SEQUENCE_NAME}" must be visible in editor`).toBe(
+        true,
+      );
     } else {
       // Back on list page — sequence should be in table
       await navigateToSequenceList(page);
-      await page.locator('[data-testid="email-sequence-list-page"]').waitFor({ state: 'visible', timeout: 10_000 });
-      const hasRow = await page.locator('[data-testid="sequence-table"]').locator('tr').filter({ hasText: SEQUENCE_NAME }).first().isVisible({ timeout: 5_000 }).catch(() => false);
-      expect(hasRow, `Sequence "${SEQUENCE_NAME}" must appear in sequence list after creation`).toBe(true);
+      await page
+        .locator('[data-testid="email-sequence-list-page"]')
+        .waitFor({ state: 'visible', timeout: 10_000 });
+      const hasRow = await page
+        .locator('[data-testid="sequence-table"]')
+        .locator('tr')
+        .filter({ hasText: SEQUENCE_NAME })
+        .first()
+        .isVisible({ timeout: 5_000 })
+        .catch(() => false);
+      expect(
+        hasRow,
+        `Sequence "${SEQUENCE_NAME}" must appear in sequence list after creation`,
+      ).toBe(true);
     }
   });
 
@@ -217,10 +252,12 @@ test.describe('Email Sequences', () => {
     }
 
     // Navigate directly to sequence editor
-    const apiPromise = page.waitForResponse(
-      (r: any) => r.url().includes(`/api/email/sequences/${sequenceId}`) && r.status() === 200,
-      { timeout: 15_000 },
-    ).catch(() => null);
+    const apiPromise = page
+      .waitForResponse(
+        (r: any) => r.url().includes(`/api/email/sequences/${sequenceId}`) && r.status() === 200,
+        { timeout: 15_000 },
+      )
+      .catch(() => null);
 
     await page.goto(`/email-sequence/${sequenceId}`, { waitUntil: 'domcontentloaded' });
     await apiPromise;
@@ -246,7 +283,9 @@ test.describe('Email Sequences', () => {
     }
 
     await page.goto(`/email-sequence/${sequenceId}`, { waitUntil: 'domcontentloaded' });
-    await page.locator('[data-testid="email-sequence-editor-page"]').waitFor({ state: 'visible', timeout: 15_000 });
+    await page
+      .locator('[data-testid="email-sequence-editor-page"]')
+      .waitFor({ state: 'visible', timeout: 15_000 });
 
     // Click "Add Step" to show form
     const addStepBtn = page.locator('[data-testid="add-step-btn"]');
@@ -256,7 +295,9 @@ test.describe('Email Sequences', () => {
     await expect(addStepForm).toBeVisible({ timeout: 5_000 });
 
     // Fill step subject (required)
-    const subjectInput = addStepForm.locator('input[placeholder*="subject" i], input[placeholder*="Subject" i]').first();
+    const subjectInput = addStepForm
+      .locator('input[placeholder*="subject" i], input[placeholder*="Subject" i]')
+      .first();
     await subjectInput.fill(STEP_SUBJECT);
 
     // Fill body (optional)
@@ -264,10 +305,15 @@ test.describe('Email Sequences', () => {
     await bodyTextarea.fill(STEP_BODY);
 
     // Submit
-    const addApiPromise = page.waitForResponse(
-      (r: any) => r.url().includes(`/api/email/sequences/${sequenceId}/steps`) && r.method() === 'POST' && r.status() === 200,
-      { timeout: 15_000 },
-    ).catch(() => null);
+    const addApiPromise = page
+      .waitForResponse(
+        (r: any) =>
+          r.url().includes(`/api/email/sequences/${sequenceId}/steps`) &&
+          r.method() === 'POST' &&
+          r.status() === 200,
+        { timeout: 15_000 },
+      )
+      .catch(() => null);
 
     await addStepForm.locator('button[type="submit"], button:has-text("Add Step")').first().click();
     await addApiPromise;
@@ -291,7 +337,9 @@ test.describe('Email Sequences', () => {
     }
 
     await page.goto(`/email-sequence/${sequenceId}`, { waitUntil: 'domcontentloaded' });
-    await page.locator('[data-testid="email-sequence-editor-page"]').waitFor({ state: 'visible', timeout: 15_000 });
+    await page
+      .locator('[data-testid="email-sequence-editor-page"]')
+      .waitFor({ state: 'visible', timeout: 15_000 });
 
     // Check if activate button is available (only for draft/paused sequences)
     const activateBtn = page.locator('[data-testid="activate-sequence-btn"]');
@@ -303,10 +351,12 @@ test.describe('Email Sequences', () => {
       return;
     }
 
-    const statusApiPromise = page.waitForResponse(
-      (r: any) => r.url().includes(`/sequences/${sequenceId}/status`) && r.status() === 200,
-      { timeout: 10_000 },
-    ).catch(() => null);
+    const statusApiPromise = page
+      .waitForResponse(
+        (r: any) => r.url().includes(`/sequences/${sequenceId}/status`) && r.status() === 200,
+        { timeout: 10_000 },
+      )
+      .catch(() => null);
 
     await activateBtn.click();
     await statusApiPromise;
@@ -315,7 +365,10 @@ test.describe('Email Sequences', () => {
     await waitForToast(page, 'active', 5_000).catch(() => {});
 
     // Status badge should now say "active"
-    const statusBadge = page.locator('.rounded-full').filter({ hasText: /^active$/i }).first();
+    const statusBadge = page
+      .locator('.rounded-full')
+      .filter({ hasText: /^active$/i })
+      .first();
     await expect(statusBadge).toBeVisible({ timeout: 8_000 });
   });
 
@@ -324,13 +377,18 @@ test.describe('Email Sequences', () => {
   // =========================================================================
   test('T8: sequence table shows Name, Status, Created columns', async ({ page }) => {
     await navigateToSequenceList(page);
-    await page.locator('[data-testid="email-sequence-list-page"]').waitFor({ state: 'visible', timeout: 15_000 });
+    await page
+      .locator('[data-testid="email-sequence-list-page"]')
+      .waitFor({ state: 'visible', timeout: 15_000 });
 
     // Wait for loading
     const spinner = page.locator('.animate-spin').first();
     await spinner.waitFor({ state: 'hidden', timeout: 10_000 }).catch(() => {});
 
-    const hasTable = await page.locator('[data-testid="sequence-table"]').isVisible({ timeout: 5_000 }).catch(() => false);
+    const hasTable = await page
+      .locator('[data-testid="sequence-table"]')
+      .isVisible({ timeout: 5_000 })
+      .catch(() => false);
     if (!hasTable) {
       test.skip();
       return;
@@ -339,8 +397,18 @@ test.describe('Email Sequences', () => {
     const table = page.locator('[data-testid="sequence-table"]');
     // Column headers
     await expect(table.locator('th').filter({ hasText: /Name/i }).first()).toBeVisible();
-    await expect(table.locator('th').filter({ hasText: /Status/i }).first()).toBeVisible();
-    await expect(table.locator('th').filter({ hasText: /Created/i }).first()).toBeVisible();
+    await expect(
+      table
+        .locator('th')
+        .filter({ hasText: /Status/i })
+        .first(),
+    ).toBeVisible();
+    await expect(
+      table
+        .locator('th')
+        .filter({ hasText: /Created/i })
+        .first(),
+    ).toBeVisible();
   });
 });
 

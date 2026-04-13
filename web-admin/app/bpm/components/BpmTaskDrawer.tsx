@@ -198,9 +198,7 @@ export function BpmTaskDrawer({ taskId, open, onClose, onComplete }: BpmTaskDraw
   const isSubmitting = actionSubmitting || form.submitting;
 
   // --- Drawer width ---
-  const drawerWidthClass = fullscreen
-    ? 'w-full'
-    : 'w-full max-w-2xl';
+  const drawerWidthClass = fullscreen ? 'w-full' : 'w-full max-w-2xl';
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end" data-testid="bpm-task-drawer">
@@ -224,7 +222,8 @@ export function BpmTaskDrawer({ taskId, open, onClose, onComplete }: BpmTaskDraw
             <h2 className="truncate text-lg font-semibold text-gray-900">
               {fetchLoading
                 ? 'Loading...' // TODO: i18n
-                : taskData?.taskName || 'Task'} {/* TODO: i18n */}
+                : taskData?.taskName || 'Task'}{' '}
+              {/* TODO: i18n */}
             </h2>
             {taskData?.processName && (
               <p className="truncate text-sm text-gray-500">{taskData.processName}</p>
@@ -339,9 +338,7 @@ export function BpmTaskDrawer({ taskId, open, onClose, onComplete }: BpmTaskDraw
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium
-                text-gray-700 transition-colors hover:bg-gray-50
-                disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {/* TODO: i18n */}
               Cancel
@@ -350,9 +347,7 @@ export function BpmTaskDrawer({ taskId, open, onClose, onComplete }: BpmTaskDraw
               type="button"
               onClick={handleReject}
               disabled={isSubmitting}
-              className="rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white
-                transition-colors hover:bg-red-600
-                disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
               data-testid="bpm-drawer-reject-btn"
             >
               {/* TODO: i18n */}
@@ -362,9 +357,7 @@ export function BpmTaskDrawer({ taskId, open, onClose, onComplete }: BpmTaskDraw
               type="button"
               onClick={handleApprove}
               disabled={isSubmitting}
-              className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white
-                transition-colors hover:bg-green-700
-                disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
               data-testid="bpm-drawer-approve-btn"
             >
               {/* TODO: i18n */}

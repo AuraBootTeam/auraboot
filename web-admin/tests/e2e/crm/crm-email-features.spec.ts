@@ -16,7 +16,7 @@
  *   - crm:create_email_log autosets crm_el_status = draft (not QUEUED)
  *   - crm:send_email_log transitions draft → SENT (sets crm_el_sent_at)
  *   - crm:create_email_template autosets crm_et_status = draft (no crm_et_code field)
- *   - Both pages are dynamic DSL pages at /dynamic/crm-email-log and /dynamic/crm-email-template
+ *   - Both pages are dynamic DSL pages at /p/crm-email-log and /p/crm-email-template
  *
  * @since 7.4.0
  */
@@ -38,7 +38,7 @@ import { uniqueId, executeCommandViaApi, queryFilteredList } from '../helpers/in
  */
 async function gotoEmailPage(
   page: import('@playwright/test').Page,
-  href: '/dynamic/crm-email-log' | '/dynamic/crm-email-template',
+  href: '/p/crm_email_log' | '/p/crm_email_template',
 ): Promise<void> {
   await page.goto('/dashboards');
   await page.waitForLoadState('domcontentloaded');
@@ -49,20 +49,16 @@ async function gotoEmailPage(
   const crmButton = nav.getByRole('button', { name: 'crm' }).first();
   await crmButton.scrollIntoViewIfNeeded();
   await crmButton.evaluate((el: HTMLElement) => el.click());
-  await page
-    .waitForResponse(() => true, { timeout: 2_000 })
-    .catch(() => null);
+  await page.waitForResponse(() => true, { timeout: 2_000 }).catch(() => null);
 
   // Expand "邮件管理" (Email Management) sub-group
   const emailMgmtButton = nav.getByRole('button', { name: '邮件管理' });
   await emailMgmtButton.scrollIntoViewIfNeeded();
   await emailMgmtButton.evaluate((el: HTMLElement) => el.click());
-  await page
-    .waitForResponse(() => true, { timeout: 2_000 })
-    .catch(() => null);
+  await page.waitForResponse(() => true, { timeout: 2_000 }).catch(() => null);
 
   // Click the target child link by text (更稳定 than href selector)
-  const linkName = href === '/dynamic/crm-email-log' ? '邮件记录' : '邮件模板';
+  const linkName = href === '/p/crm_email_log' ? '邮件记录' : '邮件模板';
   const targetLink = nav.getByRole('link', { name: linkName });
   await targetLink.scrollIntoViewIfNeeded();
   await targetLink.evaluate((el: HTMLElement) => el.click());
@@ -110,7 +106,7 @@ test.describe('CRM Email Log @smoke', () => {
         {
           crm_el_subject: `Test Email ${uid}`,
           crm_el_to_address: 'test@example.com',
-          crm_el_from_address: 'sender@example.com',
+          crm_el_from_address: 'sender@auraboot.test',
           crm_el_direction: 'outbound',
         },
         undefined,
@@ -124,10 +120,10 @@ test.describe('CRM Email Log @smoke', () => {
 
   // CE-001: Smoke — page accessible via sidebar menu
   test('CE-001: Email log page loads via sidebar menu navigation', async ({ page }) => {
-    await gotoEmailPage(page, '/dynamic/crm-email-log');
+    await gotoEmailPage(page, '/p/crm_email_log');
 
     // Verify we landed on the correct page
-    await expect(page).toHaveURL(/\/dynamic\/crm-email-log/, { timeout: 10000 });
+    await expect(page).toHaveURL(/\/p\/crm_email_log/, { timeout: 10000 });
 
     // Table should be visible
     const table = page.locator('table, [role="table"]').first();
@@ -136,7 +132,7 @@ test.describe('CRM Email Log @smoke', () => {
 
   // CE-002: Seeded email log appears in the list
   test('CE-002: Email log created via API appears in the list', async ({ page }) => {
-    await gotoEmailPage(page, '/dynamic/crm-email-log');
+    await gotoEmailPage(page, '/p/crm_email_log');
 
     // Verify via API first — most reliable for paginated lists
     const records = await queryFilteredList(
@@ -151,9 +147,7 @@ test.describe('CRM Email Log @smoke', () => {
       `Email log with subject "Test Email ${uid}" should exist`,
     ).toBeGreaterThanOrEqual(1);
 
-    const found = records.find((r) =>
-      String(r.crm_el_subject ?? '').includes(`Test Email ${uid}`),
-    );
+    const found = records.find((r) => String(r.crm_el_subject ?? '').includes(`Test Email ${uid}`));
     expect(found, 'Matching email log record found in API response').toBeTruthy();
 
     // Also verify record ID from setup resolves (sanity check on create)
@@ -164,7 +158,7 @@ test.describe('CRM Email Log @smoke', () => {
 
   // CE-006: Status tabs on email log page render and filter correctly
   test('CE-006: Email log list tabs are rendered and filterable', async ({ page }) => {
-    await gotoEmailPage(page, '/dynamic/crm-email-log');
+    await gotoEmailPage(page, '/p/crm_email_log');
 
     // Tabs defined in DSL: 全部 / 草稿 / 已发送 / 已送达 / 已打开 / 已退信 / 失败
     const allTab = page
@@ -181,8 +175,7 @@ test.describe('CRM Email Log @smoke', () => {
 
     // Click Draft tab and wait for filtered list response
     const draftListResponse = page.waitForResponse(
-      (resp) =>
-        resp.url().includes('/api/dynamic/crm-email-log/list') && resp.status() === 200,
+      (resp) => resp.url().includes('/api/dynamic/crm_email_log/list') && resp.status() === 200,
       { timeout: 10000 },
     );
     await draftTab.evaluate((el: HTMLElement) => el.click());
@@ -228,7 +221,7 @@ test.describe('CRM Email Log Status Transitions @critical', () => {
         {
           crm_el_subject: `Send Test ${uid}`,
           crm_el_to_address: 'recipient@example.com',
-          crm_el_from_address: 'sender@example.com',
+          crm_el_from_address: 'sender@auraboot.test',
           crm_el_direction: 'outbound',
         },
         undefined,
@@ -259,22 +252,16 @@ test.describe('CRM Email Log Status Transitions @critical', () => {
       JSON.stringify([{ fieldName: 'crm_el_status', operator: 'EQ', value: 'sent' }]),
     );
     const resp = await page.request.get(
-      `/api/dynamic/crm-email-log/list?pageNum=1&pageSize=50&filters=${filters}`,
+      `/api/dynamic/crm_email_log/list?pageNum=1&pageSize=50&filters=${filters}`,
     );
     expect(resp.ok()).toBe(true);
     const body = await resp.json();
-    const records: Record<string, unknown>[] =
-      body?.data?.records ?? body?.data?.data ?? [];
+    const records: Record<string, unknown>[] = body?.data?.records ?? body?.data?.data ?? [];
 
     const sentRecord = records.find(
-      (r) =>
-        r.crm_el_subject &&
-        String(r.crm_el_subject).includes(`Send Test ${uid}`),
+      (r) => r.crm_el_subject && String(r.crm_el_subject).includes(`Send Test ${uid}`),
     );
-    expect(
-      sentRecord,
-      `Email log "Send Test ${uid}" should now have status SENT`,
-    ).toBeTruthy();
+    expect(sentRecord, `Email log "Send Test ${uid}" should now have status SENT`).toBeTruthy();
     expect(sentRecord?.crm_el_status, 'Status field value should be SENT').toBe('sent');
 
     // crm:send_email_log autosets crm_el_sent_at — verify it was set
@@ -288,25 +275,18 @@ test.describe('CRM Email Log Status Transitions @critical', () => {
   test('CE-004b: Email log transitions from SENT to DELIVERED', async ({ page }) => {
     expect(sendRecordId, 'Record ID from CE-004 setup must be present').not.toBe('');
 
-    await executeCommandViaApi(
-      page,
-      'crm:deliver_email_log',
-      {},
-      sendRecordId,
-      'state_transition',
-    );
+    await executeCommandViaApi(page, 'crm:deliver_email_log', {}, sendRecordId, 'state_transition');
 
     // Verify DELIVERED status
     const filters = encodeURIComponent(
       JSON.stringify([{ fieldName: 'crm_el_status', operator: 'EQ', value: 'delivered' }]),
     );
     const resp = await page.request.get(
-      `/api/dynamic/crm-email-log/list?pageNum=1&pageSize=50&filters=${filters}`,
+      `/api/dynamic/crm_email_log/list?pageNum=1&pageSize=50&filters=${filters}`,
     );
     expect(resp.ok()).toBe(true);
     const body = await resp.json();
-    const records: Record<string, unknown>[] =
-      body?.data?.records ?? body?.data?.data ?? [];
+    const records: Record<string, unknown>[] = body?.data?.records ?? body?.data?.data ?? [];
 
     const deliveredRecord = records.find((r) =>
       String(r.crm_el_subject ?? '').includes(`Send Test ${uid}`),
@@ -356,9 +336,9 @@ test.describe('CRM Email Template @critical', () => {
 
   // CE-003: Template accessible via Email Management → 邮件模板 menu
   test('CE-003: Email template page loads via sidebar menu navigation', async ({ page }) => {
-    await gotoEmailPage(page, '/dynamic/crm-email-template');
+    await gotoEmailPage(page, '/p/crm_email_template');
 
-    await expect(page).toHaveURL(/\/dynamic\/crm-email-template/, { timeout: 10000 });
+    await expect(page).toHaveURL(/\/p\/crm_email_template(?:\?.*)?$/, { timeout: 10000 });
 
     // Table should be visible
     const table = page.locator('table, [role="table"]').first();
@@ -380,9 +360,7 @@ test.describe('CRM Email Template @critical', () => {
       `Email template "Template ${uid}" should exist in API results`,
     ).toBeGreaterThanOrEqual(1);
 
-    const found = records.find((r) =>
-      String(r.crm_et_name ?? '').includes(`Template ${uid}`),
-    );
+    const found = records.find((r) => String(r.crm_et_name ?? '').includes(`Template ${uid}`));
     expect(found, 'Found the created email template in API response').toBeTruthy();
     expect(found?.crm_et_status, 'New template auto-sets status to draft').toBe('draft');
   });
@@ -405,7 +383,7 @@ test.describe('CRM Email Template @critical', () => {
       JSON.stringify([{ fieldName: 'crm_et_status', operator: 'EQ', value: 'active' }]),
     );
     const activeResp = await page.request.get(
-      `/api/dynamic/crm-email-template/list?pageNum=1&pageSize=50&filters=${activeFilters}`,
+      `/api/dynamic/crm_email_template/list?pageNum=1&pageSize=50&filters=${activeFilters}`,
     );
     expect(activeResp.ok()).toBe(true);
     const activeBody = await activeResp.json();
@@ -432,7 +410,7 @@ test.describe('CRM Email Template @critical', () => {
       JSON.stringify([{ fieldName: 'crm_et_status', operator: 'EQ', value: 'archived' }]),
     );
     const archiveResp = await page.request.get(
-      `/api/dynamic/crm-email-template/list?pageNum=1&pageSize=50&filters=${archiveFilters}`,
+      `/api/dynamic/crm_email_template/list?pageNum=1&pageSize=50&filters=${archiveFilters}`,
     );
     expect(archiveResp.ok()).toBe(true);
     const archiveBody = await archiveResp.json();
@@ -448,7 +426,7 @@ test.describe('CRM Email Template @critical', () => {
 
   // CE-005b: Status tabs on email template list page
   test('CE-005b: Email template status tabs render correctly', async ({ page }) => {
-    await gotoEmailPage(page, '/dynamic/crm-email-template');
+    await gotoEmailPage(page, '/p/crm_email_template');
 
     // Tabs: 全部 / 草稿 / 启用中 / 已归档
     const allTab = page
@@ -472,7 +450,7 @@ test.describe('CRM Email Template @critical', () => {
     // Click Archived tab and wait for filtered results
     const archivedListResponse = page.waitForResponse(
       (resp) =>
-        resp.url().includes('/api/dynamic/crm-email-template/list') && resp.status() === 200,
+        resp.url().includes('/api/dynamic/crm_email_template/list') && resp.status() === 200,
       { timeout: 10000 },
     );
     await archivedTab.evaluate((el: HTMLElement) => el.click());

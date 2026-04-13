@@ -28,7 +28,7 @@ test.describe('E2E Test Order — Excel Import/Export', () => {
     const resp = await page.request.get('/api/meta/excel/template/e2et_customer');
 
     if (resp.status() === 404) {
-      throw new Error(String('Excel template API not available for e2et_customer'))
+      throw new Error(String('Excel template API not available for e2et_customer'));
       return;
     }
 
@@ -36,7 +36,8 @@ test.describe('E2E Test Order — Excel Import/Export', () => {
 
     // Verify response is an Excel file
     const contentType = resp.headers()['content-type'] || '';
-    const isExcel = contentType.includes('spreadsheet') ||
+    const isExcel =
+      contentType.includes('spreadsheet') ||
       contentType.includes('octet-stream') ||
       contentType.includes('xlsx');
 
@@ -71,32 +72,38 @@ test.describe('E2E Test Order — Excel Import/Export', () => {
     });
 
     if (resp.status() === 404 || resp.status() === 405) {
-      throw new Error(String('Excel import API not available'))
+      throw new Error(String('Excel import API not available'));
       return;
     }
 
     // If API works, verify on UI list
     if (resp.ok()) {
-      await navigateToDynamicPage(page, 'e2et-customer');
+      await navigateToDynamicPage(page, 'e2et_customer');
 
       // Search for imported customer
-      const searchInput = page.locator(
-        '[data-testid="search-input"] input, input[placeholder*="搜索"], input[placeholder*="Search"]'
-      ).first();
+      const searchInput = page
+        .locator(
+          '[data-testid="search-input"] input, input[placeholder*="搜索"], input[placeholder*="Search"]',
+        )
+        .first();
 
       const hasSearch = await searchInput.isVisible({ timeout: 5000 }).catch(() => false);
       if (hasSearch) {
         await searchInput.fill(importCode);
         await searchInput.press('Enter');
-        await page.waitForResponse(
-          (r) => r.url().includes('/list') && r.status() === 200,
-          { timeout: 10000 }
-        ).catch(() => null);
+        await page
+          .waitForResponse((r) => r.url().includes('/list') && r.status() === 200, {
+            timeout: 10000,
+          })
+          .catch(() => null);
       }
 
       // Verify data appears in the table
-      const tableText = await page.locator('tbody, [role="rowgroup"]').first()
-        .textContent({ timeout: 5000 }).catch(() => '');
+      const tableText = await page
+        .locator('tbody, [role="rowgroup"]')
+        .first()
+        .textContent({ timeout: 5000 })
+        .catch(() => '');
       expect(tableText).toContain(importCode);
     }
   });
@@ -130,13 +137,14 @@ test.describe('E2E Test Order — Excel Import/Export', () => {
     });
 
     if (resp.status() === 404 || resp.status() === 405) {
-      throw new Error(String('Excel import API not available'))
+      throw new Error(String('Excel import API not available'));
       return;
     }
 
     // Should either fail or report errors
     const body = await resp.json().catch(() => ({}));
-    const hasErrors = !resp.ok() ||
+    const hasErrors =
+      !resp.ok() ||
       String(body.code) !== '200' ||
       body.data?.errorCount > 0 ||
       body.message?.includes('重复') ||
@@ -152,13 +160,14 @@ test.describe('E2E Test Order — Excel Import/Export', () => {
     const resp = await page.request.get('/api/meta/excel/export/e2et_order');
 
     if (resp.status() === 404 || resp.status() === 405) {
-      throw new Error(String('Excel export API not available'))
+      throw new Error(String('Excel export API not available'));
       return;
     }
 
     if (resp.ok()) {
       const contentType = resp.headers()['content-type'] || '';
-      const isExcel = contentType.includes('spreadsheet') ||
+      const isExcel =
+        contentType.includes('spreadsheet') ||
         contentType.includes('octet-stream') ||
         contentType.includes('xlsx');
 

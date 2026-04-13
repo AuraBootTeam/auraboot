@@ -18,7 +18,6 @@ function generateCode(prefix: string = 'cmd'): string {
 }
 
 test.describe('Command API', () => {
-
   test('CMD-006: should create command via API', async ({ request }) => {
     const commandData = {
       code: generateCode('cmd'),

@@ -9,7 +9,6 @@
 
 import { test, expect } from '../fixtures';
 
-
 function generateCode(prefix: string = 'nq'): string {
   const timestamp = Date.now().toString(36);
   const random = Math.random().toString(36).substring(2, 6);
@@ -118,7 +117,9 @@ test.describe('Named Query API', () => {
   /**
    * F1-N01: Create query with invalid SQL syntax
    */
-  test('F1-N01: Create query with invalid SQL returns error on test execution', async ({ page }) => {
+  test('F1-N01: Create query with invalid SQL returns error on test execution', async ({
+    page,
+  }) => {
     const invalidCode = generateCode('nq_invalid');
 
     const createResponse = await page.request.post(`/api/meta/named-queries`, {
@@ -138,15 +139,12 @@ test.describe('Named Query API', () => {
     expect(invalidPid).toBeDefined();
 
     // Test-execute — should return an error with meaningful message
-    const testResponse = await page.request.post(
-      `/api/meta/named-queries/${invalidPid}/test`,
-      {
-        data: {
-          pageNum: 1,
-          pageSize: 5,
-        },
-      }
-    );
+    const testResponse = await page.request.post(`/api/meta/named-queries/${invalidPid}/test`, {
+      data: {
+        pageNum: 1,
+        pageSize: 5,
+      },
+    });
 
     if (testResponse.ok()) {
       const testResult = await testResponse.json();
@@ -207,10 +205,9 @@ test.describe('Named Query API', () => {
       const result = await createResponse.json();
       if (result.success && result.data?.pid) {
         createdPid = result.data.pid;
-        const testResponse = await page.request.post(
-          `/api/meta/named-queries/${createdPid}/test`,
-          { data: { pageNum: 1, pageSize: 5 } }
-        );
+        const testResponse = await page.request.post(`/api/meta/named-queries/${createdPid}/test`, {
+          data: { pageNum: 1, pageSize: 5 },
+        });
         if (testResponse.ok()) {
           const testResult = await testResponse.json();
           expect(testResult.data?.success).not.toBe(true);
@@ -244,7 +241,7 @@ test.describe('Named Query API', () => {
         if (result.data?.pid) {
           const testResponse = await page.request.post(
             `/api/meta/named-queries/${result.data.pid}/test`,
-            { data: { pageNum: 1, pageSize: 5 } }
+            { data: { pageNum: 1, pageSize: 5 } },
           );
           if (testResponse.ok()) {
             const testResult = await testResponse.json();
@@ -273,7 +270,7 @@ test.describe('Named Query API', () => {
         code: injectionCode,
         title: 'SQL Injection Test',
         description: 'E2E test - SQL injection attempt',
-        fromSql: "ab_user u; DROP TABLE ab_user; --",
+        fromSql: 'ab_user u; DROP TABLE ab_user; --',
       },
     });
 
@@ -288,7 +285,7 @@ test.describe('Named Query API', () => {
           `/api/meta/named-queries/${injectionPid}/test`,
           {
             data: { pageNum: 1, pageSize: 5 },
-          }
+          },
         );
 
         if (testResponse.ok()) {
@@ -312,9 +309,7 @@ test.describe('Named Query API', () => {
     if (queryPid) {
       try {
         if (queryCode) {
-          await request.delete(
-            `/api/meta/named-queries/${queryCode}/fields/user_name`
-          );
+          await request.delete(`/api/meta/named-queries/${queryCode}/fields/user_name`);
         }
         await request.delete(`/api/meta/named-queries/${queryPid}`);
       } catch (error) {

@@ -5,8 +5,4 @@ export { ViewEmptyState } from './ViewEmptyState';
 export type { ViewEmptyStateProps, EmptyStateVariant } from './ViewEmptyState';
 
 export { ViewDiagnostics } from './ViewDiagnostics';
-export type {
-  ViewDiagnosticsProps,
-  DiagnosticCategory,
-  DiagnosticIssue,
-} from './ViewDiagnostics';
+export type { ViewDiagnosticsProps, DiagnosticCategory, DiagnosticIssue } from './ViewDiagnostics';

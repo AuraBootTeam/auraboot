@@ -70,9 +70,7 @@ export function generateFormPayload(
 /**
  * Generate an invalid form payload (missing required fields).
  */
-export function generateInvalidPayload(
-  fields: TemplateFieldMeta[],
-): Record<string, any> {
+export function generateInvalidPayload(fields: TemplateFieldMeta[]): Record<string, any> {
   const payload: Record<string, any> = {};
 
   for (const field of fields) {
@@ -131,7 +129,7 @@ function generateString(field: TemplateFieldMeta, index: number): string {
 }
 
 function generateNumber(field: TemplateFieldMeta, index: number, seed: number): number {
-  const base = (seed + index) * 17 % 1000;
+  const base = ((seed + index) * 17) % 1000;
   return base + 1;
 }
 

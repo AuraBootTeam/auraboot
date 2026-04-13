@@ -185,9 +185,7 @@ function CollapsedMenuItem({
       const rect = wrapperRef.current.getBoundingClientRect();
       const maxTop = window.innerHeight - 320;
       // In RTL the sidebar is on the right; the popover opens to the left.
-      const horizontalPos = isRTL
-        ? { right: SIDEBAR_COLLAPSED_W }
-        : { left: SIDEBAR_COLLAPSED_W };
+      const horizontalPos = isRTL ? { right: SIDEBAR_COLLAPSED_W } : { left: SIDEBAR_COLLAPSED_W };
       setPopoverStyle({
         top: Math.max(4, Math.min(rect.top, maxTop)),
         ...horizontalPos,

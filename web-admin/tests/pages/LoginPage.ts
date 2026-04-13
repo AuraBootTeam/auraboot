@@ -42,12 +42,14 @@ export class LoginPage extends BasePage {
 
   /** Submit button */
   get submitButton(): Locator {
-    return this.page.locator(
-      'form button[type="submit"], ' +
-      'form button:has-text("立即登录"), ' +
-      'form button:has-text("Login"), ' +
-      '[data-testid="login-form"] button[type="submit"]'
-    ).first();
+    return this.page
+      .locator(
+        'form button[type="submit"], ' +
+          'form button:has-text("立即登录"), ' +
+          'form button:has-text("Login"), ' +
+          '[data-testid="login-form"] button[type="submit"]',
+      )
+      .first();
   }
 
   /** Remember-me checkbox */
@@ -108,7 +110,7 @@ export class LoginPage extends BasePage {
         const href = url.toString();
         return !href.includes('/login') || href.includes('tenant-selection');
       },
-      { timeout, waitUntil: 'domcontentloaded' }
+      { timeout, waitUntil: 'domcontentloaded' },
     );
     expect(this.page.url()).not.toContain('/login');
   }

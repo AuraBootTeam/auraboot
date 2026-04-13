@@ -58,9 +58,7 @@ test.describe('Query Builder @smoke', () => {
     const resp = await page.request.post('/api/query-builder/execute', {
       data: {
         modelCode: 'e2et_record',
-        aggregations: [
-          { fieldCode: 'pid', function: 'count', alias: 'total_count' },
-        ],
+        aggregations: [{ fieldCode: 'pid', function: 'count', alias: 'total_count' }],
         limit: 10,
       },
     });

@@ -150,7 +150,7 @@ test.describe('PCBA WMS — Warehouse Inbound CRUD', () => {
     const page = await ctx.newPage();
 
     // Fetch or create a warehouse for REFERENCE fields
-    const resp = await page.request.get('/api/dynamic/inv-warehouse/list?pageSize=1');
+    const resp = await page.request.get('/api/dynamic/inv_warehouse/list?pageSize=1');
     const body = await resp.json();
     const existing = body?.data?.records?.[0]?.pid;
     if (existing) {
@@ -202,7 +202,7 @@ test.describe('PCBA WMS — Warehouse Inbound CRUD', () => {
     );
 
     if (!result.recordId || result.code !== ErrorCodes.SUCCESS) {
-      throw new Error(String('Inbound creation failed — command may not be available'))
+      throw new Error(String('Inbound creation failed — command may not be available'));
       return;
     }
     created.push({ commandCode: COMMANDS.deleteWhIn, pid: result.recordId });
@@ -231,7 +231,7 @@ test.describe('PCBA WMS — Warehouse Inbound CRUD', () => {
     );
 
     if (!result.recordId || result.code !== ErrorCodes.SUCCESS) {
-      throw new Error(String('Inbound creation failed — skipping edit test'))
+      throw new Error(String('Inbound creation failed — skipping edit test'));
       return;
     }
     created.push({ commandCode: COMMANDS.deleteWhIn, pid: result.recordId });
@@ -251,9 +251,7 @@ test.describe('PCBA WMS — Warehouse Inbound CRUD', () => {
     await formContent.first().waitFor({ state: 'visible', timeout: 10000 });
 
     // Modify source_no field
-    const sourceField = page.locator(
-      '[data-testid="form-field-inv_in_source_no"] input',
-    ).first();
+    const sourceField = page.locator('[data-testid="form-field-inv_in_source_no"] input').first();
     if (await sourceField.isVisible({ timeout: 3000 }).catch(() => false)) {
       await sourceField.fill(`E2E-SRC-${Date.now()}`);
     }
@@ -263,12 +261,6 @@ test.describe('PCBA WMS — Warehouse Inbound CRUD', () => {
 
   test('PW-004: Inbound status tabs (draft/confirmed)', async ({ page }) => {
     await navigateToDynamicPage(page, PAGE_KEYS.warehouseIn);
-
-    const tabNav = page.locator('nav[aria-label="Tabs"]');
-    if (!(await tabNav.isVisible({ timeout: 5000 }).catch(() => false))) {
-      throw new Error(String('Tab navigation not found'))
-      return;
-    }
 
     // Click "Draft" tab
     await clickTabAndWaitForLoad(page, /Draft|草稿/i, 5000, 'draft');
@@ -298,7 +290,7 @@ test.describe('PCBA WMS — Warehouse Inbound CRUD', () => {
     );
 
     if (!result.recordId || result.code !== ErrorCodes.SUCCESS) {
-      throw new Error(String('Inbound creation failed — skipping delete test'))
+      throw new Error(String('Inbound creation failed — skipping delete test'));
       return;
     }
     // Do NOT push to created — we expect this to be deleted by the test
@@ -339,7 +331,7 @@ test.describe('PCBA WMS — Warehouse Outbound CRUD', () => {
     const page = await ctx.newPage();
 
     // Fetch or create a warehouse for REFERENCE fields
-    const resp = await page.request.get('/api/dynamic/inv-warehouse/list?pageSize=1');
+    const resp = await page.request.get('/api/dynamic/inv_warehouse/list?pageSize=1');
     const body = await resp.json();
     const existing = body?.data?.records?.[0]?.pid;
     if (existing) {
@@ -391,7 +383,7 @@ test.describe('PCBA WMS — Warehouse Outbound CRUD', () => {
     );
 
     if (!result.recordId || result.code !== ErrorCodes.SUCCESS) {
-      throw new Error(String('Outbound creation failed — command may not be available'))
+      throw new Error(String('Outbound creation failed — command may not be available'));
       return;
     }
     created.push({ commandCode: COMMANDS.deleteWhOut, pid: result.recordId });
@@ -420,7 +412,7 @@ test.describe('PCBA WMS — Warehouse Outbound CRUD', () => {
     );
 
     if (!result.recordId || result.code !== ErrorCodes.SUCCESS) {
-      throw new Error(String('Outbound creation failed — skipping edit test'))
+      throw new Error(String('Outbound creation failed — skipping edit test'));
       return;
     }
     created.push({ commandCode: COMMANDS.deleteWhOut, pid: result.recordId });
@@ -440,9 +432,7 @@ test.describe('PCBA WMS — Warehouse Outbound CRUD', () => {
     await formContent.first().waitFor({ state: 'visible', timeout: 10000 });
 
     // Modify source_no field
-    const sourceField = page.locator(
-      '[data-testid="form-field-inv_out_source_no"] input',
-    ).first();
+    const sourceField = page.locator('[data-testid="form-field-inv_out_source_no"] input').first();
     if (await sourceField.isVisible({ timeout: 3000 }).catch(() => false)) {
       await sourceField.fill(`E2E-OUT-${Date.now()}`);
     }
@@ -452,12 +442,6 @@ test.describe('PCBA WMS — Warehouse Outbound CRUD', () => {
 
   test('PW-009: Outbound status tabs (draft/confirmed)', async ({ page }) => {
     await navigateToDynamicPage(page, PAGE_KEYS.warehouseOut);
-
-    const tabNav = page.locator('nav[aria-label="Tabs"]');
-    if (!(await tabNav.isVisible({ timeout: 5000 }).catch(() => false))) {
-      throw new Error(String('Tab navigation not found'))
-      return;
-    }
 
     // Click "Draft" tab
     await clickTabAndWaitForLoad(page, /Draft|草稿/i, 5000, 'draft');
@@ -487,7 +471,7 @@ test.describe('PCBA WMS — Warehouse Outbound CRUD', () => {
     );
 
     if (!result.recordId || result.code !== ErrorCodes.SUCCESS) {
-      throw new Error(String('Outbound creation failed — skipping delete test'))
+      throw new Error(String('Outbound creation failed — skipping delete test'));
       return;
     }
 
@@ -528,7 +512,7 @@ test.describe('PCBA WMS — Stock Transfer CRUD', () => {
     const page = await ctx.newPage();
 
     // Fetch existing warehouses — transfers need 2 distinct warehouses
-    const resp = await page.request.get('/api/dynamic/inv-warehouse/list?pageSize=10');
+    const resp = await page.request.get('/api/dynamic/inv_warehouse/list?pageSize=10');
     const body = await resp.json();
     const records = body?.data?.records ?? [];
 
@@ -541,7 +525,10 @@ test.describe('PCBA WMS — Stock Transfer CRUD', () => {
       const whResult = await executeCommandViaApi(
         page,
         COMMANDS.createWarehouse,
-        { inv_warehouse_name: `E2E TransferWH-To ${uniqueId()}`, inv_warehouse_code: `WH-TO-${uniqueId()}` },
+        {
+          inv_warehouse_name: `E2E TransferWH-To ${uniqueId()}`,
+          inv_warehouse_code: `WH-TO-${uniqueId()}`,
+        },
         undefined,
         'create',
         { allowHttpError: true },
@@ -553,7 +540,10 @@ test.describe('PCBA WMS — Stock Transfer CRUD', () => {
       const wh1Result = await executeCommandViaApi(
         page,
         COMMANDS.createWarehouse,
-        { inv_warehouse_name: `E2E TransferWH-From ${uniqueId()}`, inv_warehouse_code: `WH-FR-${uniqueId()}` },
+        {
+          inv_warehouse_name: `E2E TransferWH-From ${uniqueId()}`,
+          inv_warehouse_code: `WH-FR-${uniqueId()}`,
+        },
         undefined,
         'create',
         { allowHttpError: true },
@@ -564,7 +554,10 @@ test.describe('PCBA WMS — Stock Transfer CRUD', () => {
       const wh2Result = await executeCommandViaApi(
         page,
         COMMANDS.createWarehouse,
-        { inv_warehouse_name: `E2E TransferWH-To ${uniqueId()}`, inv_warehouse_code: `WH-TO-${uniqueId()}` },
+        {
+          inv_warehouse_name: `E2E TransferWH-To ${uniqueId()}`,
+          inv_warehouse_code: `WH-TO-${uniqueId()}`,
+        },
         undefined,
         'create',
         { allowHttpError: true },
@@ -606,7 +599,7 @@ test.describe('PCBA WMS — Stock Transfer CRUD', () => {
     );
 
     if (!result.recordId || result.code !== ErrorCodes.SUCCESS) {
-      throw new Error(String('Transfer creation failed — command may not be available'))
+      throw new Error(String('Transfer creation failed — command may not be available'));
       return;
     }
     created.push({ commandCode: COMMANDS.deleteTransfer, pid: result.recordId });
@@ -635,7 +628,7 @@ test.describe('PCBA WMS — Stock Transfer CRUD', () => {
     );
 
     if (!result.recordId || result.code !== ErrorCodes.SUCCESS) {
-      throw new Error(String('Transfer creation failed — skipping edit test'))
+      throw new Error(String('Transfer creation failed — skipping edit test'));
       return;
     }
     created.push({ commandCode: COMMANDS.deleteTransfer, pid: result.recordId });
@@ -655,9 +648,11 @@ test.describe('PCBA WMS — Stock Transfer CRUD', () => {
     await formContent.first().waitFor({ state: 'visible', timeout: 10000 });
 
     // Modify remark field
-    const remarkField = page.locator(
-      '[data-testid="form-field-inv_st_remark"] input, [data-testid="form-field-inv_st_remark"] textarea',
-    ).first();
+    const remarkField = page
+      .locator(
+        '[data-testid="form-field-inv_st_remark"] input, [data-testid="form-field-inv_st_remark"] textarea',
+      )
+      .first();
     if (await remarkField.isVisible({ timeout: 3000 }).catch(() => false)) {
       await remarkField.fill('E2E transfer remark');
     }
@@ -680,7 +675,7 @@ test.describe('PCBA WMS — Stock Transfer CRUD', () => {
     );
 
     if (!result.recordId || result.code !== ErrorCodes.SUCCESS) {
-      throw new Error(String('Transfer creation failed — skipping delete test'))
+      throw new Error(String('Transfer creation failed — skipping delete test'));
       return;
     }
 

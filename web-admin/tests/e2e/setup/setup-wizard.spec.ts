@@ -36,7 +36,7 @@ test.describe('Setup Wizard', () => {
     const url = page.url();
     expect(
       !url.includes('/setup'),
-      `Expected redirect away from /setup, but still at: ${url}`
+      `Expected redirect away from /setup, but still at: ${url}`,
     ).toBeTruthy();
 
     // Verify setup wizard content is NOT visible
@@ -115,7 +115,9 @@ test.describe('Setup Wizard', () => {
     await expect(page.getByRole('button', { name: 'Launch AuraBoot' })).toBeVisible();
   });
 
-  test.skip('shows error when submitting with empty email (requires empty database)', async ({ page }) => {
+  test.skip('shows error when submitting with empty email (requires empty database)', async ({
+    page,
+  }) => {
     await page.goto('/setup', { waitUntil: 'domcontentloaded' });
     await expect(page.getByText('Welcome to AuraBoot')).toBeVisible({ timeout: 10_000 });
 
@@ -138,7 +140,9 @@ test.describe('Setup Wizard', () => {
     await page.getByRole('button', { name: 'Launch AuraBoot' }).click();
 
     // Should show password length error (validation: < 8 chars)
-    await expect(page.getByText('Password must be at least 8 characters')).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByText('Password must be at least 8 characters')).toBeVisible({
+      timeout: 5_000,
+    });
   });
 
   test.skip('shows error for password mismatch (requires empty database)', async ({ page }) => {

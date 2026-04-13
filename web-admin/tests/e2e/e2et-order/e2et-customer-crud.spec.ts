@@ -12,13 +12,38 @@
  */
 
 import { test, expect } from '../../fixtures';
-import { uniqueId, navigateToDynamicPage, waitForDynamicPageLoad } from '../helpers';
+import { uniqueId, navigateToDynamicPage, waitForDynamicPageLoad, waitForFormReady } from '../helpers';
 import { ModelTestHelper } from '../../helpers/model-test-helper';
 import { E2ET_CUSTOMER_CONFIG } from '../../helpers/configs/e2et-customer.config';
 import { ErrorCodes } from '~/services/http-client/types';
 
 test.describe('E2E Test Customer — CRUD + UNIQUE_COMPOSITE', () => {
   const testCode = `CUST-${Date.now()}`;
+
+  const fillLabeledInput = async (
+    page: import('@playwright/test').Page,
+    labelText: string | string[],
+    value: string,
+  ) => {
+    for (const text of Array.isArray(labelText) ? labelText : [labelText]) {
+      const byLabel = page.getByLabel(text, { exact: false }).first();
+      if (await byLabel.isVisible({ timeout: 1500 }).catch(() => false)) {
+        await byLabel.fill(value);
+        return true;
+      }
+
+      const label = page.locator(`label:has-text("${text}")`).first();
+      if (await label.isVisible({ timeout: 1500 }).catch(() => false)) {
+        const container = label.locator('xpath=ancestor::*[self::div or self::label][1]');
+        const input = container.locator('input, textarea').first();
+        if (await input.isVisible({ timeout: 1500 }).catch(() => false)) {
+          await input.fill(value);
+          return true;
+        }
+      }
+    }
+    return false;
+  };
 
   test.afterAll(async ({ browser }) => {
     // Clean up any test customers created
@@ -28,7 +53,7 @@ test.describe('E2E Test Customer — CRUD + UNIQUE_COMPOSITE', () => {
 
     // List customers and delete those matching our test code prefix
     try {
-      const resp = await page.request.get(`/api/dynamic/e2et-customer/list`);
+      const resp = await page.request.get(`/api/dynamic/e2et_customer/list`);
       if (resp.ok()) {
         const body = await resp.json();
         const records = body?.data?.records || body?.data?.list || [];
@@ -53,39 +78,83 @@ test.describe('E2E Test Customer — CRUD + UNIQUE_COMPOSITE', () => {
     const custName = `Test Customer ${uniqueId('N')}`;
 
     // Navigate to customer list page
-    await navigateToDynamicPage(page, 'e2et-customer');
+    await navigateToDynamicPage(page, 'e2et_customer');
 
     // Click create button
-    const createBtn = page.locator('[data-testid="toolbar-btn-create"], button:has-text("新建"), button:has-text("Create")').first();
+    const createBtn = page
+      .locator(
+        '[data-testid="toolbar-btn-create"], button:has-text("新建"), button:has-text("Create")',
+      )
+      .first();
     await createBtn.waitFor({ state: 'visible', timeout: 5000 });
     await createBtn.click();
 
     // Wait for form to load
-    await page.waitForURL((url) => url.pathname.includes('/new') || url.pathname.includes('/create'), { timeout: 10000 });
+    await page.waitForURL(
+      (url) => url.pathname.includes('/new') || url.pathname.includes('/create'),
+      { timeout: 10000 },
+    );
     await waitForDynamicPageLoad(page);
+    await waitForFormReady(page, 10_000);
 
     // Wait for form fields to be ready (switch component as indicator)
-    await page.locator('button[role="switch"], input, select').first()
+    await page
+      .locator('button[role="switch"], input, select')
+      .first()
       .waitFor({ state: 'attached', timeout: 10000 });
 
     // Fill form fields
-    const codeInput = page.locator('[data-testid="form-field-e2et_cust_code"] input').first();
+    const codeInput = page
+      .locator(
+        '[data-testid="form-field-e2et_cust_code"] input, [data-testid="field-e2et_cust_code"] input, input[name="e2et_cust_code"], #e2et_cust_code',
+      )
+      .first();
     if (await codeInput.isVisible({ timeout: 3000 }).catch(() => false)) {
       await codeInput.fill(custCode);
-    } else {
+    } else if (await fillLabeledInput(page, ['客户编码', '客户编号', 'Customer Code', 'Code'], custCode)) {
+    } else if (
+      await page
+        .locator(
+          'input[placeholder*="客户编码"], input[placeholder*="客户编号"], input[placeholder*="customer code" i]',
+        )
+        .first()
+        .isVisible({ timeout: 2000 })
+        .catch(() => false)
+    ) {
       // Fallback: find input by placeholder or label
-      await page.locator('input[placeholder*="客户编码"], input[placeholder*="customer code" i]').first().fill(custCode);
+      await page
+        .locator(
+          'input[placeholder*="客户编码"], input[placeholder*="客户编号"], input[placeholder*="customer code" i]',
+        )
+        .first()
+        .fill(custCode);
     }
 
-    const nameInput = page.locator('[data-testid="form-field-e2et_cust_name"] input').first();
+    const nameInput = page
+      .locator(
+        '[data-testid="form-field-e2et_cust_name"] input, [data-testid="field-e2et_cust_name"] input, input[name="e2et_cust_name"], #e2et_cust_name',
+      )
+      .first();
     if (await nameInput.isVisible({ timeout: 2000 }).catch(() => false)) {
       await nameInput.fill(custName);
+    } else if (
+      await fillLabeledInput(page, ['客户名称', '名称', 'Customer Name', 'Name'], custName)
+    ) {
     } else {
-      await page.locator('input[placeholder*="客户名称"], input[placeholder*="customer name" i]').first().fill(custName);
+      await page
+        .locator(
+          'input[placeholder*="客户名称"], input[placeholder*="名称"], input[placeholder*="customer name" i], input[placeholder*="name" i]',
+        )
+        .first()
+        .fill(custName);
     }
 
     // Select region — native <select> rendered by smart components
-    const regionSelect = page.locator('[data-testid="form-field-e2et_cust_region"] select').first();
+    const regionSelect = page
+      .locator(
+        '[data-testid="form-field-e2et_cust_region"] select, [data-testid="field-e2et_cust_region"] select, select[name="e2et_cust_region"]',
+      )
+      .first();
     if (await regionSelect.isVisible({ timeout: 2000 }).catch(() => false)) {
       await regionSelect.selectOption('east');
     } else {
@@ -95,13 +164,17 @@ test.describe('E2E Test Customer — CRUD + UNIQUE_COMPOSITE', () => {
     }
 
     // Click save button
-    const saveBtn = page.locator('[data-testid^="form-btn-"], button:has-text("保存"), button:has-text("Save"), button[type="submit"]').first();
+    const saveBtn = page
+      .locator(
+        '[data-testid^="form-btn-"], button:has-text("保存"), button:has-text("Save"), button[type="submit"]',
+      )
+      .first();
     await saveBtn.click();
 
     // Wait for command response
     const resp = await page.waitForResponse(
       (r) => r.url().includes('/commands/execute/') && r.status() === 200,
-      { timeout: 10000 }
+      { timeout: 10000 },
     );
     const body = await resp.json();
     expect(String(body.code)).toBe(ErrorCodes.SUCCESS);
@@ -136,7 +209,10 @@ test.describe('E2E Test Customer — CRUD + UNIQUE_COMPOSITE', () => {
 
     const body = await resp.json();
     // Should fail with validation error (non-200 code or error message)
-    const isError = String(body.code) !== '200' || body.message?.includes('重复') || body.message?.includes('unique');
+    const isError =
+      String(body.code) !== '200' ||
+      body.message?.includes('重复') ||
+      body.message?.includes('unique');
     expect(isError).toBe(true);
   });
 

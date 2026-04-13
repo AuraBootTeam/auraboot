@@ -76,8 +76,8 @@ export function DeviceStatusChart({ data, loading = false }: DeviceStatusChartPr
               ))}
             </Pie>
             <Tooltip
-              formatter={(value: any, name: string) => [value, '数量']}
-              labelFormatter={(label: string) => `状态: ${label}`}
+              formatter={((value: any) => [value, '数量']) as any}
+              labelFormatter={((label: any) => `状态: ${label}`) as any}
             />
             <Legend formatter={(value: string) => value} />
           </PieChart>

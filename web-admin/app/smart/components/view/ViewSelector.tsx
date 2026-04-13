@@ -7,7 +7,6 @@
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
-  VIEW_TYPE_CONFIGS,
   type SavedView,
   type ViewScope,
   type ViewType,
@@ -196,15 +195,12 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
   onManageViews,
   onCreateView,
   activeViewType,
-  onViewTypeChange,
-  recommendations,
+  // onViewTypeChange kept in interface for new-view creation flow
   loading = false,
   className,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-
-  const enabledViewTypes = useMemo(() => VIEW_TYPE_CONFIGS.filter((c) => c.enabled), []);
 
   /**
    * Close dropdown when clicking outside
@@ -243,13 +239,13 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
   }, [isOpen]);
 
   /**
-   * Toggle dropdown open/close
+   * Click handler: directly open manage panel (no dropdown)
    */
-  const toggleDropdown = useCallback(() => {
-    if (!loading) {
-      setIsOpen((prev) => !prev);
+  const handleClick = useCallback(() => {
+    if (!loading && onManageViews) {
+      onManageViews();
     }
-  }, [loading]);
+  }, [loading, onManageViews]);
 
   /**
    * Handle view selection
@@ -307,42 +303,10 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
 
   return (
     <div ref={containerRef} className={cn('relative inline-flex items-center gap-1', className)}>
-      {/* View Type Switcher */}
-      {onViewTypeChange && enabledViewTypes.length > 1 && (
-        <div className="flex items-center rounded-md border border-gray-300 bg-white">
-          {enabledViewTypes.map((vtConfig) => {
-            const rec = recommendations?.find((r) => r.viewType === vtConfig.type);
-            return (
-              <button
-                key={vtConfig.type}
-                type="button"
-                data-testid={`view-type-${vtConfig.type.toLowerCase()}`}
-                onClick={() => onViewTypeChange(vtConfig.type)}
-                title={rec ? `${vtConfig.label} (Recommended)` : vtConfig.label}
-                className={cn(
-                  'relative inline-flex items-center gap-1.5 px-2.5 py-2 text-xs font-medium transition-colors duration-100',
-                  'first:rounded-l-md last:rounded-r-md',
-                  'hover:bg-gray-100 focus:ring-2 focus:ring-blue-500 focus:outline-none focus:ring-inset',
-                  activeViewType === vtConfig.type
-                    ? 'border-blue-200 bg-blue-100 text-blue-700'
-                    : 'text-gray-500',
-                )}
-              >
-                <ViewTypeIcon type={vtConfig.icon} className="h-4 w-4" />
-                <span>{vtConfig.label}</span>
-                {rec && (
-                  <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-blue-500" />
-                )}
-              </button>
-            );
-          })}
-        </div>
-      )}
-
       {/* Trigger Button */}
       <button
         type="button"
-        onClick={toggleDropdown}
+        onClick={handleClick}
         disabled={loading}
         className={cn(
           'flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm',

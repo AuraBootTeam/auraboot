@@ -10,10 +10,7 @@ import type { ConditionalFormatRule, ConditionalFormatStyle } from '~/smart/type
 /**
  * Evaluate a single rule against a record value.
  */
-function evaluateCondition(
-  rule: ConditionalFormatRule,
-  record: Record<string, unknown>
-): boolean {
+function evaluateCondition(rule: ConditionalFormatRule, record: Record<string, unknown>): boolean {
   if (!rule.fieldCode) return false;
 
   const rawValue = record[rule.fieldCode];
@@ -66,7 +63,7 @@ function evaluateCondition(
  */
 export function evaluateConditionalFormats(
   rules: ConditionalFormatRule[] | undefined,
-  record: Record<string, unknown>
+  record: Record<string, unknown>,
 ): ConditionalFormatStyle | null {
   if (!rules || rules.length === 0) return null;
 
@@ -83,7 +80,7 @@ export function evaluateConditionalFormats(
  * Build inline CSS style object from a ConditionalFormatStyle.
  */
 export function buildConditionalStyle(
-  style: ConditionalFormatStyle | null
+  style: ConditionalFormatStyle | null,
 ): React.CSSProperties | undefined {
   if (!style) return undefined;
 

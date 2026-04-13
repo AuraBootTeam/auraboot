@@ -6,6 +6,7 @@
  */
 
 import { test, expect } from '../../fixtures';
+import { ensureFilterFormOpen } from '../helpers/index';
 
 /**
  * Menu paths from menus.json — these are the sidebar navigation targets.
@@ -29,67 +30,85 @@ const MENU_PATHS = [
  * Model codes use hyphens: inv_warehouse -> inv-warehouse
  */
 const DYNAMIC_LIST_PATHS = [
-  '/dynamic/inv-warehouse',
-  '/dynamic/inv-warehouse-location',
-  '/dynamic/inv-inbound',
-  '/dynamic/inv-outbound',
-  '/dynamic/inv-lot',
-  '/dynamic/inv-inventory-hold',
-  '/dynamic/inv-stock-check',
-  '/dynamic/inv-transfer',
-  '/dynamic/inv-pick-order',
+  '/p/inv_warehouse',
+  '/p/inv_warehouse_location',
+  '/p/inv_inbound',
+  '/p/inv_outbound',
+  '/p/inv_lot',
+  '/p/inv_inventory_hold',
+  '/p/inv_stock_check',
+  '/p/inv_transfer',
+  '/p/inv_pick_order',
 ];
 
 const DYNAMIC_NEW_PATHS = [
-  '/dynamic/inv-warehouse/new',
-  '/dynamic/inv-warehouse-location/new',
-  '/dynamic/inv-inbound/new',
-  '/dynamic/inv-outbound/new',
-  '/dynamic/inv-lot/new',
-  '/dynamic/inv-inventory-hold/new',
-  '/dynamic/inv-stock-check/new',
-  '/dynamic/inv-transfer/new',
-  '/dynamic/inv-pick-order/new',
+  '/p/inv_warehouse/new',
+  '/p/inv_warehouse_location/new',
+  '/p/inv_inbound/new',
+  '/p/inv_outbound/new',
+  '/p/inv_lot/new',
+  '/p/inv_inventory_hold/new',
+  '/p/inv_stock_check/new',
+  '/p/inv_transfer/new',
+  '/p/inv_pick_order/new',
 ];
 
 function isCrashText(text: string): boolean {
-  return /Application Error|Unhandled Runtime Error|TypeError:|ReferenceError:|500 Internal Server Error/i.test(text);
+  return /Application Error|Unhandled Runtime Error|TypeError:|ReferenceError:|500 Internal Server Error/i.test(
+    text,
+  );
 }
 
 function hasExplicitState(text: string): boolean {
-  return /403|Forbidden|无权限|权限不足|404|Not Found|页面不存在|加载失败|Page not found/i.test(text);
+  return /403|Forbidden|无权限|权限不足|404|Not Found|页面不存在|加载失败|Page not found/i.test(
+    text,
+  );
 }
 
 async function hasVisibleSelector(
   page: import('@playwright/test').Page,
   selectors: string,
 ): Promise<boolean> {
-  return page.waitForFunction(
-    (selectorList) => {
-      const selectors = selectorList.split(',').map((item) => item.trim()).filter(Boolean);
-      return selectors.some((selector) => {
-        const el = document.querySelector(selector) as HTMLElement | null;
-        if (!el) return false;
-        const style = window.getComputedStyle(el);
-        const rect = el.getBoundingClientRect();
-        return style.visibility !== 'hidden' && style.display !== 'none' && rect.width > 0 && rect.height > 0;
-      });
-    },
-    selectors,
-    { timeout: 8_000 },
-  ).then(() => true).catch(() => false);
+  return page
+    .waitForFunction(
+      (selectorList) => {
+        const selectors = selectorList
+          .split(',')
+          .map((item) => item.trim())
+          .filter(Boolean);
+        return selectors.some((selector) => {
+          const el = document.querySelector(selector) as HTMLElement | null;
+          if (!el) return false;
+          const style = window.getComputedStyle(el);
+          const rect = el.getBoundingClientRect();
+          return (
+            style.visibility !== 'hidden' &&
+            style.display !== 'none' &&
+            rect.width > 0 &&
+            rect.height > 0
+          );
+        });
+      },
+      selectors,
+      { timeout: 8_000 },
+    )
+    .then(() => true)
+    .catch(() => false);
 }
 
 async function probeInteraction(page: import('@playwright/test').Page): Promise<void> {
-  const candidate = page.locator(
-    [
-      '[role="tab"]',
-      '[data-testid="filter-search"]',
-      '[data-testid="filter-btn-search"]',
-      'button:has-text("Reset")',
-      'button:has-text("重置")',
-    ].join(', ')
-  ).first();
+  await ensureFilterFormOpen(page);
+  const candidate = page
+    .locator(
+      [
+        '[role="tab"]',
+        '[data-testid="filter-search"]',
+        '[data-testid="filter-btn-search"]',
+        'button:has-text("Reset")',
+        'button:has-text("重置")',
+      ].join(', '),
+    )
+    .first();
 
   if (await candidate.isVisible({ timeout: 1_500 }).catch(() => false)) {
     await candidate.click().catch(() => {});
@@ -110,12 +129,19 @@ test.describe('Inventory Route Full Coverage', () => {
       const text = (await page.locator('body').textContent()) || '';
       expect(isCrashText(text), `menu route ${path} should not crash`).toBe(false);
 
-      const hasContent = await page.locator(
-        'main, table, [role="table"], form, [role="tablist"], [data-testid="dynamic-list"], [data-testid="dynamic-form"]'
-      ).first().isVisible({ timeout: 8_000 }).catch(() => false);
+      const hasContent = await page
+        .locator(
+          'main, table, [role="table"], form, [role="tablist"], [data-testid="dynamic-list"], [data-testid="dynamic-form"]',
+        )
+        .first()
+        .isVisible({ timeout: 8_000 })
+        .catch(() => false);
 
       const hasState = hasExplicitState(text);
-      expect(hasContent || hasState, `menu route ${path} should render content or explicit state`).toBe(true);
+      expect(
+        hasContent || hasState,
+        `menu route ${path} should render content or explicit state`,
+      ).toBe(true);
 
       if (hasContent) {
         withContent += 1;

@@ -29,7 +29,10 @@ export const TEST_CREDENTIALS = {
  */
 export async function ensureLoggedIn(page: Page): Promise<void> {
   // Check if on login page by looking for login form
-  const hasLoginForm = await page.locator('input#email').isVisible({ timeout: 2000 }).catch(() => false);
+  const hasLoginForm = await page
+    .locator('input#email')
+    .isVisible({ timeout: 2000 })
+    .catch(() => false);
 
   if (hasLoginForm) {
     throw new Error('Not logged in - login form is visible. Check storageState configuration.');
@@ -47,14 +50,17 @@ export async function ensureLoggedIn(page: Page): Promise<void> {
  */
 export async function performLogin(
   page: Page,
-  credentials: { email: string; password: string } = TEST_CREDENTIALS
+  credentials: { email: string; password: string } = TEST_CREDENTIALS,
 ): Promise<void> {
   // Navigate to app
   await page.goto(`/`);
   await page.waitForLoadState('domcontentloaded');
 
   // Check if already logged in
-  const hasLoginForm = await page.locator('input#email').isVisible({ timeout: 3000 }).catch(() => false);
+  const hasLoginForm = await page
+    .locator('input#email')
+    .isVisible({ timeout: 3000 })
+    .catch(() => false);
 
   if (!hasLoginForm) {
     // Already logged in
@@ -67,13 +73,13 @@ export async function performLogin(
   await page.locator('button:has-text("立即登录")').click();
 
   // Wait for login to complete
-  await page.waitForURL(
-    url => !url.pathname.includes('login'),
-    { timeout: 30000 }
-  );
+  await page.waitForURL((url) => !url.pathname.includes('login'), { timeout: 30000 });
 
   // Verify login succeeded
-  const stillOnLogin = await page.locator('input#email').isVisible().catch(() => false);
+  const stillOnLogin = await page
+    .locator('input#email')
+    .isVisible()
+    .catch(() => false);
   if (stillOnLogin) {
     throw new Error('Login failed: still on login page');
   }

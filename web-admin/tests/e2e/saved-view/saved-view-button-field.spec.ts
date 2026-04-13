@@ -8,7 +8,12 @@
 import { test, expect, type Page } from '@playwright/test';
 import { uniqueId } from '../helpers';
 
-async function createViewViaApi(page: Page, modelCode: string, name: string, viewConfig: any): Promise<string> {
+async function createViewViaApi(
+  page: Page,
+  modelCode: string,
+  name: string,
+  viewConfig: any,
+): Promise<string> {
   const resp = await page.request.post('/api/views', {
     data: { name, modelCode, viewType: 'table', scope: 'personal', viewConfig },
   });
@@ -18,7 +23,6 @@ async function createViewViaApi(page: Page, modelCode: string, name: string, vie
 }
 
 test.describe('Button Field (GAP-131)', () => {
-
   test('BF-001: button valueType registered in renderer registry', async ({ page }) => {
     // Navigate to establish auth
     await page.goto('/');
@@ -44,16 +48,14 @@ test.describe('Button Field (GAP-131)', () => {
 
     const viewName = `BF_Type_${uniqueId()}`;
     const pid = await createViewViaApi(page, 'e2et_order', viewName, {
-      columns: [
-        { fieldCode: 'e2et_order_no', visible: true, order: 0 },
-      ],
+      columns: [{ fieldCode: 'e2et_order_no', visible: true, order: 0 }],
     });
     expect(pid).toBeTruthy();
   });
 
   test('BF-003: button renderer produces clickable element', async ({ page }) => {
     // Navigate to a list page to verify rendering works without errors
-    await page.goto('/dynamic/e2et-order');
+    await page.goto('/p/e2et_order');
     const toolbar = page.getByTestId('row-height-btn');
     await expect(toolbar).toBeVisible({ timeout: 30000 });
 
@@ -66,7 +68,7 @@ test.describe('Button Field (GAP-131)', () => {
 
   test('BF-004: cell-button-click event dispatched on click', async ({ page }) => {
     // This test verifies the event dispatch mechanism
-    await page.goto('/dynamic/e2et-order');
+    await page.goto('/p/e2et_order');
     await page.getByTestId('row-height-btn').waitFor({ state: 'visible', timeout: 30000 });
 
     // Register a listener for cell-button-click events

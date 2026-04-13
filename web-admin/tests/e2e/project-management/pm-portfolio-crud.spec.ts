@@ -37,13 +37,13 @@ async function navigateToPortfolios(page: import('@playwright/test').Page): Prom
   await pmBtn.first().click();
 
   // Portfolio menu link
-  const link = nav.locator('a[href="/dynamic/pm-portfolio"]');
+  const link = nav.locator('a[href="/p/pm_portfolio"]');
   await link.first().waitFor({ state: 'attached', timeout: 8000 });
 
   const listRespPromise = page.waitForResponse(
     (r) =>
       (r.url().includes('/api/dynamic/pm_portfolio/list') ||
-        r.url().includes('/api/dynamic/pm-portfolio/list')) &&
+        r.url().includes('/api/dynamic/pm_portfolio/list')) &&
       r.status() === 200,
     { timeout: 15000 },
   );
@@ -118,7 +118,7 @@ test.describe('PM Portfolio CRUD', () => {
   test('PORTFOLIO-01 @smoke: Navigate to 项目集 list via sidebar menu', async ({ page }) => {
     await navigateToPortfolios(page);
 
-    await expect(page).toHaveURL(/\/dynamic\/pm-portfolio/);
+    await expect(page).toHaveURL(/\/p\/pm_portfolio/);
 
     const table = page.locator('table, [class*="ant-table"]').first();
     await expect(table).toBeVisible({ timeout: 10000 });
@@ -136,7 +136,10 @@ test.describe('PM Portfolio CRUD', () => {
     await expect(rows.first()).toBeVisible({ timeout: 8000 });
 
     const rowCount = await rows.count();
-    expect(rowCount, 'Should have at least 2 portfolio rows (seeded in beforeAll)').toBeGreaterThanOrEqual(2);
+    expect(
+      rowCount,
+      'Should have at least 2 portfolio rows (seeded in beforeAll)',
+    ).toBeGreaterThanOrEqual(2);
 
     // i18n: no raw field code leak
     const headerRow = page.locator('thead tr').first();
@@ -174,13 +177,7 @@ test.describe('PM Portfolio CRUD', () => {
     expect(portfolioPid, 'Portfolio should have been created in beforeAll').toBeTruthy();
 
     // Activate via API command
-    await executeCommandViaApi(
-      page,
-      'pm:activate_portfolio',
-      {},
-      portfolioPid,
-      'state_transition',
-    );
+    await executeCommandViaApi(page, 'pm:activate_portfolio', {}, portfolioPid, 'state_transition');
 
     // Verify via API
     const resp = await page.request.get(`/api/dynamic/pm_portfolio/${portfolioPid}`);
@@ -195,7 +192,9 @@ test.describe('PM Portfolio CRUD', () => {
     await expect(row).toBeVisible({ timeout: 5000 });
     const rowText = await row.textContent();
     expect(
-      rowText?.toLowerCase().includes('active') || rowText?.includes('活跃') || rowText?.includes('进行中'),
+      rowText?.toLowerCase().includes('active') ||
+        rowText?.includes('活跃') ||
+        rowText?.includes('进行中'),
       'Portfolio status badge should show active',
     ).toBe(true);
   });
@@ -217,13 +216,7 @@ test.describe('PM Portfolio CRUD', () => {
     );
 
     // Then put on hold
-    await executeCommandViaApi(
-      page,
-      'pm:hold_portfolio',
-      {},
-      holdPortfolioPid,
-      'state_transition',
-    );
+    await executeCommandViaApi(page, 'pm:hold_portfolio', {}, holdPortfolioPid, 'state_transition');
 
     // Verify via API
     const resp = await page.request.get(`/api/dynamic/pm_portfolio/${holdPortfolioPid}`);
@@ -263,13 +256,7 @@ test.describe('PM Portfolio CRUD', () => {
   test('PORTFOLIO-07 @critical: Close portfolio (active → closed)', async ({ page }) => {
     expect(portfolioPid, 'Portfolio should have been created in beforeAll').toBeTruthy();
 
-    await executeCommandViaApi(
-      page,
-      'pm:close_portfolio',
-      {},
-      portfolioPid,
-      'state_transition',
-    );
+    await executeCommandViaApi(page, 'pm:close_portfolio', {}, portfolioPid, 'state_transition');
 
     // Verify via API
     const resp = await page.request.get(`/api/dynamic/pm_portfolio/${portfolioPid}`);
@@ -284,7 +271,9 @@ test.describe('PM Portfolio CRUD', () => {
     await expect(row).toBeVisible({ timeout: 5000 });
     const rowText = await row.textContent();
     expect(
-      rowText?.toLowerCase().includes('closed') || rowText?.includes('已关闭') || rowText?.includes('关闭'),
+      rowText?.toLowerCase().includes('closed') ||
+        rowText?.includes('已关闭') ||
+        rowText?.includes('关闭'),
       'Portfolio status badge should show closed',
     ).toBe(true);
   });
@@ -296,7 +285,7 @@ test.describe('PM Portfolio CRUD', () => {
   test('PORTFOLIO-08: Portfolio creation validates required portfolio name', async ({ page }) => {
     // Navigate directly to the create form URL (DSL navigates to /new for create action)
     // This tests form validation behavior, not the Create button navigation
-    await page.goto('/dynamic/pm_portfolio/new', { waitUntil: 'domcontentloaded' });
+    await page.goto('/p/pm_portfolio/new', { waitUntil: 'domcontentloaded' });
 
     // Wait for form to render
     const form = page.locator('[data-testid="dynamic-form"], form').first();
@@ -304,14 +293,17 @@ test.describe('PM Portfolio CRUD', () => {
 
     // Submit without filling required portfolio name
     // Button may be inside or outside the form section — search page-wide via testid or role
-    const submitBtn = page.locator('[data-testid="form-btn-save"], [data-testid="form-btn-submit"]')
+    const submitBtn = page
+      .locator('[data-testid="form-btn-save"], [data-testid="form-btn-submit"]')
       .or(page.getByRole('button', { name: /Save|保存/ }))
       .first();
     await submitBtn.waitFor({ state: 'visible', timeout: 8_000 });
     await submitBtn.click();
 
     // Validation error should appear
-    const errorMsg = page.locator('[class*="error"], [class*="ant-form-item-explain-error"], .text-red-500');
+    const errorMsg = page.locator(
+      '[class*="error"], [class*="ant-form-item-explain-error"], .text-red-500',
+    );
     await expect(errorMsg.first()).toBeVisible({ timeout: 8_000 });
 
     // Page should still be at /new (form stayed open due to validation error)
@@ -322,7 +314,9 @@ test.describe('PM Portfolio CRUD', () => {
   // PORTFOLIO-09: Delete portfolio in planning state
   // =========================================================================
 
-  test('PORTFOLIO-09: Delete portfolio in planning state → disappears from list', async ({ page }) => {
+  test('PORTFOLIO-09: Delete portfolio in planning state → disappears from list', async ({
+    page,
+  }) => {
     // Create a disposable portfolio via API
     const delResp = await executeCommandViaApi(
       page,
@@ -353,7 +347,11 @@ test.describe('PM Portfolio CRUD', () => {
 
     // Verify not in list UI — navigate and search
     await navigateToPortfolios(page);
-    await page.locator('tbody tr').first().waitFor({ state: 'visible', timeout: 8000 }).catch(() => null);
+    await page
+      .locator('tbody tr')
+      .first()
+      .waitFor({ state: 'visible', timeout: 8000 })
+      .catch(() => null);
     const rows = page.locator('tbody tr', { hasText: `E2E PfDel ${UID}` });
     const count = await rows.count();
     expect(count, 'Deleted portfolio should not appear in list').toBe(0);

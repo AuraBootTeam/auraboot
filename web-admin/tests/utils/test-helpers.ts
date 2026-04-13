@@ -83,11 +83,13 @@ export class StoreListPage {
   }
 
   async deleteStore(index: number) {
-    const deleteButton = this.storeRows.nth(index).locator('button:has([data-testid="trash-icon"])');
+    const deleteButton = this.storeRows
+      .nth(index)
+      .locator('button:has([data-testid="trash-icon"])');
     await deleteButton.click();
-    
+
     // 处理确认对话框
-    this.page.on('dialog', async dialog => {
+    this.page.on('dialog', async (dialog) => {
       expect(dialog.message()).toContain('确定要删除这个门店吗？');
       await dialog.accept();
     });
@@ -100,9 +102,9 @@ export class StoreListPage {
 
   async batchDelete() {
     await this.batchDeleteButton.click();
-    
+
     // 处理确认对话框
-    this.page.on('dialog', async dialog => {
+    this.page.on('dialog', async (dialog) => {
       expect(dialog.message()).toContain('确定要删除选中的');
       await dialog.accept();
     });
@@ -133,7 +135,7 @@ export class StoreListPage {
 
 // Mock API响应工具
 export async function mockStoreListAPI(page: Page, stores: any[] = []) {
-  await page.route('**/api/stores/search', async route => {
+  await page.route('**/api/stores/search', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -144,37 +146,37 @@ export async function mockStoreListAPI(page: Page, stores: any[] = []) {
           records: stores,
           total: stores.length,
           pageNum: 1,
-          pageSize: 10
-        }
-      })
+          pageSize: 10,
+        },
+      }),
     });
   });
 }
 
 export async function mockDeleteAPI(page: Page, success: boolean = true) {
-  await page.route('**/api/stores/*', async route => {
+  await page.route('**/api/stores/*', async (route) => {
     if (route.request().method().toLowerCase() === 'delete') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
           code: success ? '0' : '1',
-          desc: success ? 'success' : 'delete failed'
-        })
+          desc: success ? 'success' : 'delete failed',
+        }),
       });
     }
   });
 }
 
 export async function mockBatchDeleteAPI(page: Page, success: boolean = true) {
-  await page.route('**/api/stores/batch-delete', async route => {
+  await page.route('**/api/stores/batch-delete', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
         code: success ? '0' : '1',
-        desc: success ? 'batch delete success' : 'batch delete failed'
-      })
+        desc: success ? 'batch delete success' : 'batch delete failed',
+      }),
     });
   });
 }
@@ -190,7 +192,7 @@ export const mockStores = [
     status: 'active',
     address: { fullAddress: '北京市朝阳区测试街道1号' },
     contactPhone: '13800138001',
-    createdAt: '2024-01-01T00:00:00Z'
+    createdAt: '2024-01-01T00:00:00Z',
   },
   {
     id: 2,
@@ -201,7 +203,7 @@ export const mockStores = [
     status: 'inactive',
     address: { fullAddress: '上海市浦东新区测试路2号' },
     contactPhone: '13800138002',
-    createdAt: '2024-01-02T00:00:00Z'
+    createdAt: '2024-01-02T00:00:00Z',
   },
   {
     id: 3,
@@ -212,6 +214,6 @@ export const mockStores = [
     status: 'closed',
     address: { fullAddress: '广州市天河区测试大道3号' },
     contactPhone: '13800138003',
-    createdAt: '2024-01-03T00:00:00Z'
-  }
+    createdAt: '2024-01-03T00:00:00Z',
+  },
 ];

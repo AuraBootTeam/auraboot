@@ -152,7 +152,7 @@ export const BlockPropertyPanel: React.FC = () => {
       />
     );
 
-    if (block.blockType === 'data-table') {
+    if (block.blockType === 'table') {
       return (
         <PanelShell title="Data Table" actions={actionBar}>
           <DataTableBlockEditor

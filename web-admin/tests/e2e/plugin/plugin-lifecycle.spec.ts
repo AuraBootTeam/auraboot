@@ -11,7 +11,6 @@
 
 import { test, expect } from '../../fixtures';
 
-
 // Asset management plugin manifest for lifecycle testing
 const ASSET_MANAGEMENT_PLUGIN = {
   pluginId: 'com.test.asset-management-lifecycle',
@@ -30,9 +29,27 @@ const ASSET_MANAGEMENT_PLUGIN = {
       'name:zh-CN': '资产类别',
       dictType: 'static',
       items: [
-        { value: 'it_equipment', label: 'IT Equipment', 'label:zh-CN': 'IT设备', sortNo: 10, status: 'enabled' },
-        { value: 'office_furniture', label: 'Office Furniture', 'label:zh-CN': '办公家具', sortNo: 20, status: 'enabled' },
-        { value: 'vehicle', label: 'Vehicle', 'label:zh-CN': '车辆', sortNo: 30, status: 'enabled' },
+        {
+          value: 'it_equipment',
+          label: 'IT Equipment',
+          'label:zh-CN': 'IT设备',
+          sortNo: 10,
+          status: 'enabled',
+        },
+        {
+          value: 'office_furniture',
+          label: 'Office Furniture',
+          'label:zh-CN': '办公家具',
+          sortNo: 20,
+          status: 'enabled',
+        },
+        {
+          value: 'vehicle',
+          label: 'Vehicle',
+          'label:zh-CN': '车辆',
+          sortNo: 30,
+          status: 'enabled',
+        },
       ],
     },
     {
@@ -41,9 +58,21 @@ const ASSET_MANAGEMENT_PLUGIN = {
       'name:zh-CN': '资产状态',
       dictType: 'static',
       items: [
-        { value: 'in_use', label: 'In Use', 'label:zh-CN': '使用中', sortNo: 10, status: 'enabled' },
+        {
+          value: 'in_use',
+          label: 'In Use',
+          'label:zh-CN': '使用中',
+          sortNo: 10,
+          status: 'enabled',
+        },
         { value: 'idle', label: 'Idle', 'label:zh-CN': '闲置', sortNo: 20, status: 'enabled' },
-        { value: 'scrapped', label: 'Scrapped', 'label:zh-CN': '报废', sortNo: 30, status: 'enabled' },
+        {
+          value: 'scrapped',
+          label: 'Scrapped',
+          'label:zh-CN': '报废',
+          sortNo: 30,
+          status: 'enabled',
+        },
       ],
     },
   ],
@@ -111,7 +140,13 @@ const ASSET_MANAGEMENT_PLUGIN = {
     { modelCode: 'amlc_asset', fieldCode: 'amlc_asset_name', sequence: 10, required: true },
     { modelCode: 'amlc_asset', fieldCode: 'amlc_asset_code', sequence: 20, required: true },
     { modelCode: 'amlc_asset', fieldCode: 'amlc_category', sequence: 30, required: true },
-    { modelCode: 'amlc_asset', fieldCode: 'amlc_status', sequence: 40, required: true, defaultValue: 'idle' },
+    {
+      modelCode: 'amlc_asset',
+      fieldCode: 'amlc_status',
+      sequence: 40,
+      required: true,
+      defaultValue: 'idle',
+    },
     { modelCode: 'amlc_asset', fieldCode: 'amlc_purchase_date', sequence: 50, required: false },
     { modelCode: 'amlc_asset', fieldCode: 'amlc_value', sequence: 60, required: false },
   ],
@@ -158,7 +193,7 @@ const ASSET_MANAGEMENT_PLUGIN = {
       code: 'amlc_list',
       name: 'Asset List',
       'name:zh-CN': '资产列表',
-      path: '/dynamic/amlc_asset',
+      path: '/p/amlc_asset',
       icon: 'List',
       type: 1,
       orderNo: 810,
@@ -192,10 +227,13 @@ test.describe('Plugin Lifecycle', () => {
 
   test.beforeAll(async ({ request }) => {
     try {
-      const response = await request.post(`/api/plugins/import/execute-direct?conflictStrategy=OVERWRITE`, {
-        data: ASSET_MANAGEMENT_PLUGIN,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      const response = await request.post(
+        `/api/plugins/import/execute-direct?conflictStrategy=OVERWRITE`,
+        {
+          data: ASSET_MANAGEMENT_PLUGIN,
+          headers: { 'Content-Type': 'application/json' },
+        },
+      );
 
       if (response.ok()) {
         importResult = await response.json();
@@ -215,16 +253,25 @@ test.describe('Plugin Lifecycle', () => {
 
     // Verify the page loaded (not a 404 or error)
     const pageTitle = page.locator('h1, h2, [data-testid="page-title"]');
-    const hasTitle = await pageTitle.first().isVisible({ timeout: 10000 }).catch(() => false);
+    const hasTitle = await pageTitle
+      .first()
+      .isVisible({ timeout: 10000 })
+      .catch(() => false);
 
     // Also check for common page elements: table, card layout, or plugin list
     const pluginContent = page.locator(
-      '.ant-table, .ant-card, .ant-list, [data-testid="plugin-list"]'
+      '.ant-table, .ant-card, .ant-list, [data-testid="plugin-list"]',
     );
-    const hasContent = await pluginContent.first().isVisible({ timeout: 5000 }).catch(() => false);
+    const hasContent = await pluginContent
+      .first()
+      .isVisible({ timeout: 5000 })
+      .catch(() => false);
 
     // Page should have loaded without 404
-    const is404 = await page.locator('text=404').isVisible({ timeout: 2000 }).catch(() => false);
+    const is404 = await page
+      .locator('text=404')
+      .isVisible({ timeout: 2000 })
+      .catch(() => false);
     expect(is404).toBe(false);
 
     // At minimum the page should have some structure
@@ -241,7 +288,9 @@ test.describe('Plugin Lifecycle', () => {
     await page.waitForLoadState('domcontentloaded');
 
     // Check sidebar for the asset management menu
-    const sidebar = page.locator('nav, aside, [data-testid="sidebar"], .sidebar, .ant-layout-sider');
+    const sidebar = page.locator(
+      'nav, aside, [data-testid="sidebar"], .sidebar, .ant-layout-sider',
+    );
     const assetMenu = page.getByText('资产管理').first();
 
     const menuVisible = await assetMenu.isVisible({ timeout: 10000 }).catch(() => false);
@@ -278,11 +327,14 @@ test.describe('Plugin Lifecycle', () => {
    * Verify the dynamic page loads correctly for the asset model
    */
   test('C2-E04: Asset list page loads correctly', async ({ page }) => {
-    await page.goto(`/dynamic/amlc_asset`);
+    await page.goto(`/p/amlc_asset`);
     await page.waitForLoadState('domcontentloaded');
 
     // Verify page loaded (not 404)
-    const is404 = await page.locator('text=404').isVisible({ timeout: 2000 }).catch(() => false);
+    const is404 = await page
+      .locator('text=404')
+      .isVisible({ timeout: 2000 })
+      .catch(() => false);
 
     if (is404) {
       // If dynamic route doesn't work, try the wildcard route
@@ -291,10 +343,11 @@ test.describe('Plugin Lifecycle', () => {
     }
 
     // Look for list page elements: table, create button, or page structure
-    const listContent = page.locator(
-      '.ant-table, table, [data-testid="dynamic-list"], .data-list'
-    );
-    const hasListContent = await listContent.first().isVisible({ timeout: 10000 }).catch(() => false);
+    const listContent = page.locator('.ant-table, table, [data-testid="dynamic-list"], .data-list');
+    const hasListContent = await listContent
+      .first()
+      .isVisible({ timeout: 10000 })
+      .catch(() => false);
 
     // Also check for model-related content via API
     const modelResponse = await page.request.get(`/api/meta/models/code/amlc_asset`);
@@ -322,7 +375,7 @@ test.describe('Plugin Lifecycle', () => {
             force: true,
             decisions: {},
           },
-        }
+        },
       );
 
       if (uninstallResponse.ok()) {

@@ -14,17 +14,15 @@
 import { test, expect } from '../../fixtures';
 import { DynamicListPage, DynamicFormPage } from '../../pages';
 import { ErrorCodes } from '~/services/http-client/types';
-import {
-  uniqueId,
-} from '../quarry-management.setup';
+import { uniqueId } from '../quarry-management.setup';
 
-const ORDER_PAGE_KEY = 'e2et-order';
+const ORDER_PAGE_KEY = 'e2et_order';
 
 /** Navigate to new order form via UI (reliable approach). */
 async function navigateToNewOrderForm(
-  page: import('@playwright/test').Page
+  page: import('@playwright/test').Page,
 ): Promise<{ listPage: DynamicListPage; formPage: DynamicFormPage }> {
-  const listPage = new DynamicListPage(page, `/dynamic/${ORDER_PAGE_KEY}`);
+  const listPage = new DynamicListPage(page, `/p/${ORDER_PAGE_KEY}`);
   await listPage.goto();
 
   await listPage.clickAdd();
@@ -40,7 +38,10 @@ async function navigateToNewOrderForm(
   await titleInput.first().waitFor({ state: 'visible', timeout: 5000 });
 
   // Wait for field metadata enrichment to complete (SmartSelect/SmartSwitch load)
-  await page.locator('select, button[role="switch"]').first().waitFor({ state: 'attached', timeout: 5000 });
+  await page
+    .locator('select, button[role="switch"]')
+    .first()
+    .waitFor({ state: 'attached', timeout: 5000 });
 
   // Wait for dict API to populate select options (BULK/NORMAL/EXPRESS)
   await waitForSelectOptions(page);
@@ -50,13 +51,18 @@ async function navigateToNewOrderForm(
 
 /** Wait until at least one select has >1 option (dict data loaded). */
 async function waitForSelectOptions(page: import('@playwright/test').Page): Promise<void> {
-  await page.waitForFunction(() => {
-    const selects = document.querySelectorAll('select');
-    for (const sel of selects) {
-      if (sel.options.length > 1) return true;
-    }
-    return false;
-  }, { timeout: 10000 }).catch(() => {});
+  await page
+    .waitForFunction(
+      () => {
+        const selects = document.querySelectorAll('select');
+        for (const sel of selects) {
+          if (sel.options.length > 1) return true;
+        }
+        return false;
+      },
+      { timeout: 10000 },
+    )
+    .catch(() => {});
 }
 
 test.describe('E2E Test Order — Linkage Rules', () => {
@@ -70,12 +76,18 @@ test.describe('E2E Test Order — Linkage Rules', () => {
 
     // Initially urgent=false → remark should be hidden
     const remarkInput = formPage.field('e2et_order_remark');
-    const remarkVisible = await remarkInput.first().isVisible({ timeout: 2000 }).catch(() => false);
+    const remarkVisible = await remarkInput
+      .first()
+      .isVisible({ timeout: 2000 })
+      .catch(() => false);
 
     // If linkage is not implemented, skip gracefully
     if (remarkVisible) {
       // Remark is already visible — linkage may not be implemented, just verify it exists
-      test.info().annotations.push({ type: 'note', description: 'Remark field visible by default — linkage may not be active' });
+      test.info().annotations.push({
+        type: 'note',
+        description: 'Remark field visible by default — linkage may not be active',
+      });
       return;
     }
 
@@ -84,7 +96,9 @@ test.describe('E2E Test Order — Linkage Rules', () => {
     const switchExists = await urgentSwitch.isVisible({ timeout: 10000 }).catch(() => false);
 
     if (!switchExists) {
-      throw new Error(String('Urgent switch not found — SmartInput may not render switch for BOOLEAN'))
+      throw new Error(
+        String('Urgent switch not found — SmartInput may not render switch for BOOLEAN'),
+      );
       return;
     }
 
@@ -108,10 +122,16 @@ test.describe('E2E Test Order — Linkage Rules', () => {
 
     // Initially type=NORMAL → discount should be hidden
     const discountInput = formPage.field('e2et_order_discount');
-    const discountVisible = await discountInput.first().isVisible({ timeout: 2000 }).catch(() => false);
+    const discountVisible = await discountInput
+      .first()
+      .isVisible({ timeout: 2000 })
+      .catch(() => false);
 
     if (discountVisible) {
-      test.info().annotations.push({ type: 'note', description: 'Discount field visible by default — linkage may not be active' });
+      test.info().annotations.push({
+        type: 'note',
+        description: 'Discount field visible by default — linkage may not be active',
+      });
       return;
     }
 
@@ -120,7 +140,7 @@ test.describe('E2E Test Order — Linkage Rules', () => {
     const selectExists = await typeSelect.isVisible({ timeout: 5000 }).catch(() => false);
 
     if (!selectExists) {
-      throw new Error(String('Type select not found — cannot test BULK linkage'))
+      throw new Error(String('Type select not found — cannot test BULK linkage'));
       return;
     }
 
@@ -140,19 +160,26 @@ test.describe('E2E Test Order — Linkage Rules', () => {
     }
 
     if (!typeSelectFound) {
-      throw new Error(String('Could not find type select with BULK option'))
+      throw new Error(String('Could not find type select with BULK option'));
       return;
     }
 
     // After selecting BULK: discount should be visible
     const discountAfter = formPage.field('e2et_order_discount');
     // Check if discount field appeared
-    const appeared = await discountAfter.first().isVisible({ timeout: 5000 }).catch(() => false);
+    const appeared = await discountAfter
+      .first()
+      .isVisible({ timeout: 5000 })
+      .catch(() => false);
     // Graceful — linkage may not be implemented yet
     if (appeared) {
       expect(appeared).toBe(true);
     } else {
-      test.info().annotations.push({ type: 'note', description: 'Discount field did not appear after BULK selection — linkage may not be active' });
+      test.info().annotations.push({
+        type: 'note',
+        description:
+          'Discount field did not appear after BULK selection — linkage may not be active',
+      });
     }
   });
 
@@ -172,7 +199,12 @@ test.describe('E2E Test Order — Linkage Rules', () => {
       await urgentSwitch.click();
       // After toggle: remark field should appear — fill it
       const remarkInput = formPage.field('e2et_order_remark');
-      if (await remarkInput.first().isVisible({ timeout: 3000 }).catch(() => false)) {
+      if (
+        await remarkInput
+          .first()
+          .isVisible({ timeout: 3000 })
+          .catch(() => false)
+      ) {
         await formPage.fillField('e2et_order_remark', 'Urgent reason');
       }
     }
@@ -190,8 +222,10 @@ test.describe('E2E Test Order — Linkage Rules', () => {
 
     // Click save button
     const cmdPromise = page.waitForResponse(
-      (r) => r.url().includes('/api/meta/commands/execute/e2et:') && r.request().method().toLowerCase() === 'post',
-      { timeout: 10000 }
+      (r) =>
+        r.url().includes('/api/meta/commands/execute/e2et:') &&
+        r.request().method().toLowerCase() === 'post',
+      { timeout: 10000 },
     );
 
     await formPage.submit();
@@ -200,10 +234,15 @@ test.describe('E2E Test Order — Linkage Rules', () => {
     expect(String(body.code) === ErrorCodes.SUCCESS).toBeTruthy();
 
     // Wait for navigation back to list
-    await page.waitForURL(
-      (url) => url.pathname.includes('e2et') && url.pathname.includes('order') && !url.pathname.includes('/new'),
-      { timeout: 15000 }
-    ).catch(() => {});
+    await page
+      .waitForURL(
+        (url) =>
+          url.pathname.includes('e2et') &&
+          url.pathname.includes('order') &&
+          !url.pathname.includes('/new'),
+        { timeout: 15000 },
+      )
+      .catch(() => {});
 
     expect(page.url()).toMatch(/e2et.order/);
     expect(page.url()).not.toContain('/new');
@@ -224,7 +263,7 @@ test.describe('E2E Test Order — Linkage Rules', () => {
     const urgentSwitch = page.locator('button[role="switch"]').first();
     const switchExists = await urgentSwitch.isVisible({ timeout: 10000 }).catch(() => false);
     if (!switchExists) {
-      throw new Error(String('Urgent switch not found — cannot test multi-linkage'))
+      throw new Error(String('Urgent switch not found — cannot test multi-linkage'));
       return;
     }
 
@@ -234,7 +273,10 @@ test.describe('E2E Test Order — Linkage Rules', () => {
     await waitForSelectOptions(page);
 
     const remarkInput = formPage.field('e2et_order_remark');
-    const remarkVisible = await remarkInput.first().isVisible({ timeout: 5000 }).catch(() => false);
+    const remarkVisible = await remarkInput
+      .first()
+      .isVisible({ timeout: 5000 })
+      .catch(() => false);
 
     // Step 2: Select type=BULK → discount should appear
     const selects = page.locator('select');
@@ -252,12 +294,15 @@ test.describe('E2E Test Order — Linkage Rules', () => {
     }
 
     if (!typeSelectFound) {
-      throw new Error(String('Could not find type select with BULK option'))
+      throw new Error(String('Could not find type select with BULK option'));
       return;
     }
 
     const discountInput = formPage.field('e2et_order_discount');
-    const discountVisible = await discountInput.first().isVisible({ timeout: 5000 }).catch(() => false);
+    const discountVisible = await discountInput
+      .first()
+      .isVisible({ timeout: 5000 })
+      .catch(() => false);
 
     // Step 3: Verify BOTH conditional fields are visible simultaneously
     if (remarkVisible && discountVisible) {

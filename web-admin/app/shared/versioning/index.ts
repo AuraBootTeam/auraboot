@@ -3,7 +3,12 @@ export type { VersionEntry, VersionOperation, OperationConfig } from './types';
 export { OPERATION_CONFIGS, getOperationConfig } from './types';
 
 // Service
-export { createVersionService, dashboardVersionService, pageSchemaVersionService, bpmnVersionService } from './versionService';
+export {
+  createVersionService,
+  dashboardVersionService,
+  pageSchemaVersionService,
+  bpmnVersionService,
+} from './versionService';
 
 // Hook
 export { useVersioning } from './useVersioning';

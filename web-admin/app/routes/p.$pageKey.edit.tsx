@@ -1,0 +1,35 @@
+/**
+ * Dynamic Edit Page — /p/{model_code}/edit/{recordId}
+ *
+ * URL segment is the model_code. PageKey derived as {model_code}_form.
+ */
+
+import { useLoaderData } from 'react-router';
+import type { LoaderFunctionArgs } from 'react-router';
+import { getTokenFromRequest } from '~/services/session';
+import { DynamicPageRenderer } from '~/meta/rendering/pages/DynamicPageRenderer';
+
+export const loader = async ({ params, request }: LoaderFunctionArgs) => {
+  const { pageKey, recordId } = params;
+  if (!pageKey || !recordId) {
+    throw new Response('Page key and record ID are required', { status: 400 });
+  }
+
+  try {
+    const token = await getTokenFromRequest(request);
+    return { tableName: pageKey, recordId, token };
+  } catch (error) {
+    console.error('Failed to load edit page:', error);
+    if (error instanceof Response) {
+      throw error;
+    }
+    throw new Response('Failed to load edit page', { status: 500 });
+  }
+};
+
+export default function DynamicFormEdit() {
+  const { tableName, recordId, token } = useLoaderData<typeof loader>();
+  return (
+    <DynamicPageRenderer tableName={tableName} pageType="form" token={token} recordId={recordId} />
+  );
+}

@@ -162,7 +162,16 @@ export function resolveBaseUrl(context: RequestContext, apiConfig?: Partial<ApiC
       return bffInternalUrl;
     }
 
-    // Priority 3: Default BFF URL
+    // Priority 3: Current request origin (dev SSR/BFF same-origin on :5173)
+    if (context.request) {
+      try {
+        return new URL(context.request.url).origin;
+      } catch {
+        // fall through to port-based fallback
+      }
+    }
+
+    // Priority 4: Default BFF URL
     const bffPort = getBffPort();
     return `http://localhost:${bffPort}`;
   }

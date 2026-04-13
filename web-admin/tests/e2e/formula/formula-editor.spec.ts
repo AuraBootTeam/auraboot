@@ -24,13 +24,13 @@ test.describe('Formula Editor', () => {
     // Use API to get the model PID directly (avoids pagination issues in list UI)
     const modelResp = await page.request.get('/api/meta/models/code/e2et_order');
     if (!modelResp.ok()) {
-      throw new Error(String('e2et_order model not available'))
+      throw new Error(String('e2et_order model not available'));
       return;
     }
     const modelData = await modelResp.json();
     const modelPid = modelData.data?.pid || modelData.pid;
     if (!modelPid) {
-      throw new Error(String('e2et_order model PID not found'))
+      throw new Error(String('e2et_order model PID not found'));
       return;
     }
 
@@ -43,18 +43,22 @@ test.describe('Formula Editor', () => {
     await expect(mainContent).toBeVisible({ timeout: 10000 });
 
     // Look for formula/expression editor trigger
-    const formulaTrigger = page.locator(
-      'button:has-text("公式"), button:has-text("Formula"), button:has-text("表达式"), button:has-text("Expression"), [data-testid*="formula"], [data-testid*="expression"]'
-    ).first();
+    const formulaTrigger = page
+      .locator(
+        'button:has-text("公式"), button:has-text("Formula"), button:has-text("表达式"), button:has-text("Expression"), [data-testid*="formula"], [data-testid*="expression"]',
+      )
+      .first();
     const hasFormula = await formulaTrigger.isVisible({ timeout: 5000 }).catch(() => false);
 
     if (hasFormula) {
       await formulaTrigger.click();
 
       // Verify editor panel/dialog opens
-      const editor = page.locator(
-        '[data-testid="formula-editor"], [role="dialog"], .formula-editor, .expression-editor, .ace_editor, .monaco-editor, textarea'
-      ).first();
+      const editor = page
+        .locator(
+          '[data-testid="formula-editor"], [role="dialog"], .formula-editor, .expression-editor, .ace_editor, .monaco-editor, textarea',
+        )
+        .first();
       const hasEditor = await editor.isVisible({ timeout: 5000 }).catch(() => false);
       expect(hasEditor).toBe(true);
     } else {
@@ -74,23 +78,32 @@ test.describe('Formula Editor', () => {
     await page.waitForLoadState('domcontentloaded');
 
     // Check if we landed on 404 or the page doesn't exist
-    const is404 = await page.locator('text=404').isVisible({ timeout: 3000 }).catch(() => false);
-    const isNotFound = await page.locator('text=Not Found').isVisible({ timeout: 1000 }).catch(() => false);
+    const is404 = await page
+      .locator('text=404')
+      .isVisible({ timeout: 3000 })
+      .catch(() => false);
+    const isNotFound = await page
+      .locator('text=Not Found')
+      .isVisible({ timeout: 1000 })
+      .catch(() => false);
     if (is404 || isNotFound) {
       // Try automations list page instead
       await page.goto('/automations');
       await page.waitForLoadState('domcontentloaded');
-      const still404 = await page.locator('text=404').isVisible({ timeout: 3000 }).catch(() => false);
+      const still404 = await page
+        .locator('text=404')
+        .isVisible({ timeout: 3000 })
+        .catch(() => false);
       if (still404) {
-        throw new Error(String('Automation pages not available'))
+        throw new Error(String('Automation pages not available'));
         return;
       }
     }
 
     // Look for function library/helper panel or any meaningful content
-    const funcLibrary = page.locator(
-      'text=函数, text=Functions, text=Function Library, [data-testid="function-library"]'
-    ).first();
+    const funcLibrary = page
+      .locator('text=函数, text=Functions, text=Function Library, [data-testid="function-library"]')
+      .first();
     const hasFuncLibrary = await funcLibrary.isVisible({ timeout: 5000 }).catch(() => false);
 
     // The editor page should have loaded — check for any input or form content
@@ -167,8 +180,8 @@ test.describe('Formula Editor', () => {
 
     if (Array.isArray(fields)) {
       // Find computed fields with expressions
-      const computedFields = fields.filter((f: any) =>
-        f.expression || f.computeExpression || f.formula
+      const computedFields = fields.filter(
+        (f: any) => f.expression || f.computeExpression || f.formula,
       );
 
       // Verify fields exist
@@ -189,7 +202,7 @@ test.describe('Formula Editor', () => {
     const hasTable = await modelTable.isVisible({ timeout: 10000 }).catch(() => false);
 
     if (!hasTable) {
-      throw new Error(String('Model list not accessible'))
+      throw new Error(String('Model list not accessible'));
       return;
     }
 
@@ -203,7 +216,10 @@ test.describe('Formula Editor', () => {
       await page.waitForLoadState('domcontentloaded');
 
       const fieldContent = page.locator('table, form, [data-testid*="field"]');
-      const hasFieldContent = await fieldContent.first().isVisible({ timeout: 10000 }).catch(() => false);
+      const hasFieldContent = await fieldContent
+        .first()
+        .isVisible({ timeout: 10000 })
+        .catch(() => false);
       expect(hasFieldContent || true).toBe(true);
     }
   });
@@ -242,9 +258,12 @@ test.describe('Formula Editor', () => {
     await page.goto('/automations');
     await page.waitForLoadState('domcontentloaded');
 
-    const is404 = await page.locator('text=404').isVisible({ timeout: 3000 }).catch(() => false);
+    const is404 = await page
+      .locator('text=404')
+      .isVisible({ timeout: 3000 })
+      .catch(() => false);
     if (is404) {
-      throw new Error(String('Automations page not available'))
+      throw new Error(String('Automations page not available'));
       return;
     }
 
@@ -261,9 +280,9 @@ test.describe('Formula Editor', () => {
       await page.waitForURL(/\/automation\/new/, { timeout: 10000 });
 
       // Verify condition section exists
-      const conditionSection = page.locator(
-        'text=条件, text=Condition, text=When, text=过滤'
-      ).first();
+      const conditionSection = page
+        .locator('text=条件, text=Condition, text=When, text=过滤')
+        .first();
       const hasCondition = await conditionSection.isVisible({ timeout: 5000 }).catch(() => false);
       expect(hasCondition || true).toBe(true);
     }

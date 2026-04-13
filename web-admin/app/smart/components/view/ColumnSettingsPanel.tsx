@@ -125,7 +125,10 @@ export const ColumnSettingsPanel: React.FC<ColumnSettingsPanelProps> = ({
       <div className="fixed inset-0 z-40 bg-black/20" onClick={onClose} />
 
       {/* Panel */}
-      <div data-testid="column-settings-panel" className="fixed top-0 right-0 z-50 flex h-full w-80 flex-col bg-white shadow-xl">
+      <div
+        data-testid="column-settings-panel"
+        className="fixed top-0 right-0 z-50 flex h-full w-80 flex-col bg-white shadow-xl"
+      >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
           <h3 className="text-sm font-semibold text-gray-900">

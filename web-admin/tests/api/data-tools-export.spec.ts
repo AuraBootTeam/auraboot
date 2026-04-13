@@ -13,7 +13,7 @@ test.describe('Data Tools Export API', () => {
    * Verify the backend export endpoint returns a response (even if not fully configured).
    */
   test('DT-E07: Export API endpoint responds', async ({ request }) => {
-    const response = await request.post('/api/dynamic/e2et-record/export', {
+    const response = await request.post('/api/dynamic/e2et_record/export', {
       data: { format: 'excel' },
     });
 

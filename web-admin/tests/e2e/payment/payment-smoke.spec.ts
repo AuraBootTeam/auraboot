@@ -15,7 +15,6 @@
 import { test, expect } from '../../fixtures';
 
 test.describe('Payment System Smoke Tests', () => {
-
   test('payment config API returns enabled status', async ({ page }) => {
     const res = await page.request.get('/api/payment/config');
     // If payment module not deployed, endpoint returns 500 (NoResourceFoundException)
@@ -117,7 +116,7 @@ test.describe('Payment System Smoke Tests', () => {
     // Verify billing link exists
     const hasBillingLink = await page.evaluate(() => {
       const links = document.querySelectorAll('a');
-      return Array.from(links).some(a => a.href.includes('/settings/billing'));
+      return Array.from(links).some((a) => a.href.includes('/settings/billing'));
     });
     expect(hasBillingLink).toBe(true);
   });

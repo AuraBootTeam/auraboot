@@ -14,9 +14,7 @@ const MODEL_CODE = 'org_department';
 
 /** Helper: get first org_department record PID, or skip test */
 async function getTestRecordPid(request: any): Promise<string | null> {
-  const listResp = await request.get(
-    `/api/dynamic/org-department/list?pageNum=1&pageSize=1`,
-  );
+  const listResp = await request.get(`/api/dynamic/org_department/list?pageNum=1&pageSize=1`);
   if (!listResp.ok()) return null;
 
   const listBody = await listResp.json();
@@ -50,7 +48,7 @@ async function expectPdfResponse(resp: any) {
 test.describe('Print / PDF Generation API', () => {
   test.beforeAll(async ({ request }) => {
     // Create a test department record via dynamic API
-    await request.post(`/api/dynamic/org-department/create`, {
+    await request.post(`/api/dynamic/org_department/create`, {
       data: {
         org_dept_code: `PRINT-E2E-${Date.now().toString().slice(-6)}`,
         org_dept_name: `E2E Print Test Dept`,
@@ -88,11 +86,12 @@ test.describe('Print / PDF Generation API', () => {
 
   test('PRINT-002: Generate PDF from invoice template', async ({ request }) => {
     const pid = await getTestRecordPid(request);
-    if (!pid) { test.skip(true, 'No org_department records'); return; }
+    if (!pid) {
+      test.skip(true, 'No org_department records');
+      return;
+    }
 
-    const pdfResp = await request.get(
-      `/api/print/${MODEL_CODE}/${pid}?template=invoice`,
-    );
+    const pdfResp = await request.get(`/api/print/${MODEL_CODE}/${pid}?template=invoice`);
     if (pdfResp.status() === 403) {
       test.skip(true, 'PRINT_GENERATE permission not assigned');
       return;
@@ -103,29 +102,34 @@ test.describe('Print / PDF Generation API', () => {
 
   test('PRINT-003: Generate PDF from quote template', async ({ request }) => {
     const pid = await getTestRecordPid(request);
-    if (!pid) { test.skip(true, 'No records available'); return; }
+    if (!pid) {
+      test.skip(true, 'No records available');
+      return;
+    }
 
-    const pdfResp = await request.get(
-      `/api/print/${MODEL_CODE}/${pid}?template=quote`,
-    );
+    const pdfResp = await request.get(`/api/print/${MODEL_CODE}/${pid}?template=quote`);
 
     await expectPdfResponse(pdfResp);
   });
 
   test('PRINT-004: Generate PDF from delivery_note template', async ({ request }) => {
     const pid = await getTestRecordPid(request);
-    if (!pid) { test.skip(true, 'No records available'); return; }
+    if (!pid) {
+      test.skip(true, 'No records available');
+      return;
+    }
 
-    const pdfResp = await request.get(
-      `/api/print/${MODEL_CODE}/${pid}?template=delivery_note`,
-    );
+    const pdfResp = await request.get(`/api/print/${MODEL_CODE}/${pid}?template=delivery_note`);
 
     await expectPdfResponse(pdfResp);
   });
 
   test('PRINT-005: HTML preview returns rendered HTML', async ({ request }) => {
     const pid = await getTestRecordPid(request);
-    if (!pid) { test.skip(true, 'No records available'); return; }
+    if (!pid) {
+      test.skip(true, 'No records available');
+      return;
+    }
 
     const previewResp = await request.get(
       `/api/print/${MODEL_CODE}/${pid}/preview?template=invoice&companyName=E2E+Test+Corp`,
@@ -145,7 +149,10 @@ test.describe('Print / PDF Generation API', () => {
 
   test('PRINT-006: Custom params are passed to template', async ({ request }) => {
     const pid = await getTestRecordPid(request);
-    if (!pid) { test.skip(true, 'No records available'); return; }
+    if (!pid) {
+      test.skip(true, 'No records available');
+      return;
+    }
 
     const previewResp = await request.get(
       `/api/print/${MODEL_CODE}/${pid}/preview?template=invoice&companyName=MyCompany&footerNote=Custom+Footer`,
@@ -161,11 +168,12 @@ test.describe('Print / PDF Generation API', () => {
 
   test('PRINT-007: Non-existent template returns error', async ({ request }) => {
     const pid = await getTestRecordPid(request);
-    if (!pid) { test.skip(true, 'No records available'); return; }
+    if (!pid) {
+      test.skip(true, 'No records available');
+      return;
+    }
 
-    const resp = await request.get(
-      `/api/print/${MODEL_CODE}/${pid}?template=nonexistent_tpl_xyz`,
-    );
+    const resp = await request.get(`/api/print/${MODEL_CODE}/${pid}?template=nonexistent_tpl_xyz`);
     expect(resp.ok()).toBe(false);
 
     const body = await resp.json().catch(() => null);

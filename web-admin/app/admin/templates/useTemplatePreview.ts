@@ -31,7 +31,17 @@ export interface PreviewGroup {
   items: ResourceChange[];
 }
 
-const GROUP_ORDER = ['MODEL', 'FIELD', 'COMMAND', 'PAGE', 'MENU', 'PERMISSION', 'DICT', 'NAMED_QUERY', 'I18N'];
+const GROUP_ORDER = [
+  'MODEL',
+  'FIELD',
+  'COMMAND',
+  'PAGE',
+  'MENU',
+  'PERMISSION',
+  'DICT',
+  'NAMED_QUERY',
+  'I18N',
+];
 
 const GROUP_LABELS: Record<string, string> = {
   MODEL: 'Data Models',
@@ -87,14 +97,12 @@ export function useTemplatePreview(template: AppTemplate | null) {
       typeMap.set(change.resourceType, list);
     }
 
-    return GROUP_ORDER
-      .filter((type) => typeMap.has(type))
-      .map((type) => ({
-        type,
-        label: GROUP_LABELS[type] || type,
-        icon: GROUP_ICONS[type] || 'cube',
-        items: typeMap.get(type)!,
-      }));
+    return GROUP_ORDER.filter((type) => typeMap.has(type)).map((type) => ({
+      type,
+      label: GROUP_LABELS[type] || type,
+      icon: GROUP_ICONS[type] || 'cube',
+      items: typeMap.get(type)!,
+    }));
   }, [preview]);
 
   return { preview, groups, loading, error };

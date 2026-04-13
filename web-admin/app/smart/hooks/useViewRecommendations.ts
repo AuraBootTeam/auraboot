@@ -33,8 +33,7 @@ export function useViewRecommendations(
       ['date', 'datetime', 'timestamp'].includes((f.dataType || '').toLowerCase()),
     );
     const dictFields = fields.filter(
-      (f) =>
-        f.dictCode || ['dict', 'enum'].includes((f.dataType || '').toLowerCase()),
+      (f) => f.dictCode || ['dict', 'enum'].includes((f.dataType || '').toLowerCase()),
     );
     const imageFields = fields.filter(
       (f) =>
@@ -42,9 +41,7 @@ export function useViewRecommendations(
         /image|photo|avatar|cover|thumbnail/i.test(f.code),
     );
     const selfRefFields = fields.filter(
-      (f) =>
-        (f.dataType || '').toLowerCase() === 'reference' &&
-        f.referenceModelCode === modelCode,
+      (f) => (f.dataType || '').toLowerCase() === 'reference' && f.referenceModelCode === modelCode,
     );
 
     if (dateFields.length >= 2) {

@@ -1,7 +1,7 @@
 /**
  * Data Table Preview
  *
- * Preview component for data-table blocks.
+ * Preview component for table blocks.
  */
 
 import React from 'react';

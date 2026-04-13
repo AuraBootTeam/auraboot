@@ -32,7 +32,7 @@ const SETTINGS_ITEMS: SettingsItem[] = [
   {
     titleKey: 'MCP Servers',
     descriptionKey: 'Connect external tool servers via MCP protocol',
-    path: '/dynamic/mcp-server',
+    path: '/p/mcp-server',
     Icon: ServerIcon,
   },
   {
@@ -44,19 +44,19 @@ const SETTINGS_ITEMS: SettingsItem[] = [
   {
     titleKey: 'Object Aliases',
     descriptionKey: 'Configure natural language aliases for data models',
-    path: '/dynamic/object-alias',
+    path: '/p/object-alias',
     Icon: TagIcon,
   },
   {
     titleKey: 'Semantic Terms',
     descriptionKey: 'Define domain-specific vocabulary',
-    path: '/dynamic/semantic-term',
+    path: '/p/semantic-term',
     Icon: BookOpenIcon,
   },
   {
     titleKey: 'Governance Policies',
     descriptionKey: 'Set approval rules for agent actions',
-    path: '/dynamic/approval-policy',
+    path: '/p/approval-policy',
     Icon: ShieldCheckIcon,
   },
 ];
@@ -66,20 +66,20 @@ export default function AISettingsPage() {
 
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-semibold mb-2">AI Settings</h1>
-      <p className="text-sm text-gray-500 mb-6">
+      <h1 className="mb-2 text-2xl font-semibold">AI Settings</h1>
+      <p className="mb-6 text-sm text-gray-500">
         Configure providers, tools, and governance for the AI center.
       </p>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
         {SETTINGS_ITEMS.map(({ titleKey, descriptionKey, path, Icon }) => (
           <button
             key={path}
             type="button"
             onClick={() => navigate(path)}
-            className="text-left p-5 border border-gray-200 rounded-lg cursor-pointer hover:shadow-md hover:border-blue-300 transition-all duration-150 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="cursor-pointer rounded-lg border border-gray-200 bg-white p-5 text-left transition-all duration-150 hover:border-blue-300 hover:shadow-md focus:ring-2 focus:ring-blue-400 focus:outline-none"
           >
-            <div className="flex items-center gap-3 mb-2">
-              <Icon className="h-6 w-6 text-blue-500 shrink-0" />
+            <div className="mb-2 flex items-center gap-3">
+              <Icon className="h-6 w-6 shrink-0 text-blue-500" />
               <h3 className="font-medium text-gray-800">{titleKey}</h3>
             </div>
             <p className="text-sm text-gray-500">{descriptionKey}</p>

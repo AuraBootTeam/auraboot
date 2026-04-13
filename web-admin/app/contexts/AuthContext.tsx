@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useMemo } from 'react';
 import { useLoaderData } from 'react-router';
-import type { User, UserPermissions } from '~/utils/type';
+import type { User, UserPermissions, Preferences } from '~/utils/type';
 
 /**
  * Permission item from legacy format
@@ -28,11 +28,13 @@ interface AuthLoaderData {
     permissions?: PermissionItem[];
     roles?: RoleItem[];
   } | null;
+  preferences?: Preferences | null;
 }
 
 interface AuthContextType {
   user: User | null;
   permissions: UserPermissions | null;
+  preferences: Preferences | null;
   token: string | null;
   isAuthenticated: boolean;
   hasPermission: (permissionCode: string) => boolean;
@@ -44,6 +46,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({
   user: null,
   permissions: null,
+  preferences: null,
   token: null,
   isAuthenticated: false,
   hasPermission: () => false,
@@ -107,6 +110,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo(
     () => ({
       user: data?.user || null,
+      preferences: data?.preferences || null,
       permissions: data?.permissions
         ? {
             permissionCodes: data.permissions.permissionCodes,

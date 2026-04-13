@@ -68,9 +68,7 @@ test.describe('BI & Reporting - Pivot API', () => {
   });
 
   test('dashboard data endpoint exists', async ({ request }) => {
-    const response = await request.get(
-      `${BASE_URL}/api/dashboards/test-id/data`
-    );
+    const response = await request.get(`${BASE_URL}/api/dashboards/test-id/data`);
 
     // Endpoint exists - may return 401 or error
     expect([200, 401, 403, 500]).toContain(response.status());

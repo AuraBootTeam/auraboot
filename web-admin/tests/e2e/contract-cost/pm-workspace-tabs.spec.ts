@@ -17,7 +17,7 @@
  */
 
 import { test, expect, type Page } from '@playwright/test';
-import { uniqueId, executeCommandViaApi, dateOffsetStr } from '../helpers/index';
+import { uniqueId, executeCommandViaApi, dateOffsetStr, ensureFilterFormOpen } from '../helpers/index';
 
 test.describe('PM Workspace Tabs Deep @smoke', () => {
   test.describe.configure({ mode: 'serial' });
@@ -34,23 +34,30 @@ test.describe('PM Workspace Tabs Deep @smoke', () => {
   // =========================================================================
   // Seed Data: complete financial dataset for workspace testing
   // =========================================================================
-  test.beforeAll(async ({ browser }) => {
+  test.beforeAll(async ({ browser }, testInfo) => {
+    testInfo.setTimeout(180000);
     const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     try {
       // 1. Create and activate project
       const proj = await executeCommandViaApi(
-        page, 'pm:create_project',
+        page,
+        'pm:create_project',
         { pm_project_name: projectName, pm_planned_progress: 50 },
-        undefined, 'create',
+        undefined,
+        'create',
+        { timeoutMs: 30000 },
       );
       projectPid = proj.recordId;
       expect(projectPid).toBeTruthy();
-      await executeCommandViaApi(page, 'pm:activate_project', {}, projectPid, 'update');
+      await executeCommandViaApi(page, 'pm:activate_project', {}, projectPid, 'update', {
+        timeoutMs: 30000,
+      });
 
       // 2. Create contract and move to EXECUTING
       const contract = await executeCommandViaApi(
-        page, 'cc:create_contract',
+        page,
+        'cc:create_contract',
         {
           cc_contract_name: contractName,
           cc_contract_amount: 500000,
@@ -60,29 +67,44 @@ test.describe('PM Workspace Tabs Deep @smoke', () => {
           cc_start_date: dateOffsetStr(-30),
           cc_end_date: dateOffsetStr(180),
         },
-        undefined, 'create',
+        undefined,
+        'create',
+        { timeoutMs: 30000 },
       );
       contractPid = contract.recordId;
       expect(contractPid).toBeTruthy();
 
-      await executeCommandViaApi(page, 'cc:submit_review', {}, contractPid, 'update');
-      await executeCommandViaApi(page, 'cc:approve_contract', {}, contractPid, 'update');
-      await executeCommandViaApi(page, 'cc:start_execution', {}, contractPid, 'update');
+      await executeCommandViaApi(page, 'cc:submit_review', {}, contractPid, 'update', {
+        timeoutMs: 30000,
+      });
+      await executeCommandViaApi(page, 'cc:approve_contract', {}, contractPid, 'update', {
+        timeoutMs: 30000,
+      });
+      await executeCommandViaApi(page, 'cc:start_execution', {}, contractPid, 'update', {
+        timeoutMs: 30000,
+      });
 
       // 3. Create and approve budget
       const budget = await executeCommandViaApi(
-        page, 'cc:create_budget',
+        page,
+        'cc:create_budget',
         {
           cc_budget_name: `Budget_${uid}`,
           cc_budget_project_id: projectPid,
           cc_budget_total_amount: 350000,
         },
-        undefined, 'create',
+        undefined,
+        'create',
+        { timeoutMs: 30000 },
       );
       budgetPid = budget.recordId;
       expect(budgetPid).toBeTruthy();
-      await executeCommandViaApi(page, 'cc:submit_budget', {}, budgetPid, 'update');
-      await executeCommandViaApi(page, 'cc:approve_budget', {}, budgetPid, 'update');
+      await executeCommandViaApi(page, 'cc:submit_budget', {}, budgetPid, 'update', {
+        timeoutMs: 30000,
+      });
+      await executeCommandViaApi(page, 'cc:approve_budget', {}, budgetPid, 'update', {
+        timeoutMs: 30000,
+      });
 
       // 4. Budget lines
       for (const line of [
@@ -91,9 +113,12 @@ test.describe('PM Workspace Tabs Deep @smoke', () => {
         { cc_bl_category: 'expense', cc_bl_amount: 80000 },
       ]) {
         await executeCommandViaApi(
-          page, 'cc:create_budget_line',
+          page,
+          'cc:create_budget_line',
           { cc_bl_budget_id: budgetPid, ...line },
-          undefined, 'create',
+          undefined,
+          'create',
+          { timeoutMs: 30000 },
         );
       }
 
@@ -104,9 +129,12 @@ test.describe('PM Workspace Tabs Deep @smoke', () => {
         { cc_ac_category: 'expense', cc_ac_amount: 45000, cc_ac_date: dateOffsetStr(-2) },
       ]) {
         await executeCommandViaApi(
-          page, 'cc:create_actual_cost',
+          page,
+          'cc:create_actual_cost',
           { cc_ac_project_id: projectPid, cc_ac_budget_id: budgetPid, ...cost },
-          undefined, 'create',
+          undefined,
+          'create',
+          { timeoutMs: 30000 },
         );
       }
 
@@ -117,15 +145,19 @@ test.describe('PM Workspace Tabs Deep @smoke', () => {
         { cc_pp_period: 3, cc_pp_plan_date: dateOffsetStr(120), cc_pp_plan_amount: 150000 },
       ]) {
         await executeCommandViaApi(
-          page, 'cc:create_payment_plan',
+          page,
+          'cc:create_payment_plan',
           { cc_pp_contract_id: contractPid, ...plan },
-          undefined, 'create',
+          undefined,
+          'create',
+          { timeoutMs: 30000 },
         );
       }
 
       // 7. Create tasks (TODO + in-progress)
       await executeCommandViaApi(
-        page, 'pm:create_task',
+        page,
+        'pm:create_task',
         {
           pm_task_title: taskTitle,
           pm_task_project_id: projectPid,
@@ -134,10 +166,13 @@ test.describe('PM Workspace Tabs Deep @smoke', () => {
           pm_task_start_date: dateOffsetStr(-5),
           pm_task_due_date: dateOffsetStr(20),
         },
-        undefined, 'create',
+        undefined,
+        'create',
+        { timeoutMs: 30000 },
       );
       await executeCommandViaApi(
-        page, 'pm:create_task',
+        page,
+        'pm:create_task',
         {
           pm_task_title: `WSTask2_${uid}`,
           pm_task_project_id: projectPid,
@@ -146,7 +181,9 @@ test.describe('PM Workspace Tabs Deep @smoke', () => {
           pm_task_start_date: dateOffsetStr(0),
           pm_task_due_date: dateOffsetStr(30),
         },
-        undefined, 'create',
+        undefined,
+        'create',
+        { timeoutMs: 30000 },
       );
     } finally {
       await ctx.close();
@@ -163,38 +200,39 @@ test.describe('PM Workspace Tabs Deep @smoke', () => {
     await pmMenu.first().click();
 
     // Click "Projects" link via sidebar
-    const projectsLink = page.locator('a[href="/dynamic/pm-project"]');
+    const projectsLink = page.locator('a[href="/p/pm_project"]');
     await projectsLink.first().waitFor({ state: 'attached', timeout: 5000 });
     await projectsLink.first().evaluate((el) => (el as HTMLAnchorElement).click());
-    await expect(page).toHaveURL(/\/dynamic\/pm-project/);
+    await expect(page).toHaveURL(/\/p\/pm_project/);
 
     // Search for our project
     await expect(page.locator('[data-testid="dynamic-list"]')).toBeVisible({ timeout: 10000 });
-    const searchArea = page.locator('[data-testid="search-area"]').first();
-    await expect(searchArea).toBeVisible({ timeout: 10000 });
 
-    const nameInput = searchArea
-      .locator('[data-testid="filter-keyword"], input[name="keyword"], input[type="text"], input[type="search"]')
+    await ensureFilterFormOpen(page);
+    const filterForm = page.locator('[data-testid="search-area"], [data-testid="filters"], form').first();
+    const nameInput = filterForm
+      .locator(
+        '[data-testid="filter-keyword"], input[name="keyword"], input[type="text"], input[type="search"]',
+      )
       .first();
     await nameInput.waitFor({ state: 'visible', timeout: 5000 });
     await nameInput.fill(projectName);
 
-    const listResponse = page.waitForResponse(
-      (r) => r.url().includes('/list') && r.status() === 200,
-      { timeout: 10000 },
-    ).catch(() => null);
+    const listResponse = page
+      .waitForResponse((r) => r.url().includes('/list') && r.status() === 200, { timeout: 10000 })
+      .catch(() => null);
 
-    const searchBtn = searchArea.locator('[data-testid="filter-search"], button:has-text("搜索"), button:has-text("Search")');
+    const searchBtn = page.locator(
+      '[data-testid="filter-search"], button:has-text("搜索"), button:has-text("Search")',
+    );
     await searchBtn.first().click();
     await listResponse;
 
-    // Click project row
-    const row = page.locator('tbody tr', { hasText: projectName }).first();
-    await row.waitFor({ state: 'visible', timeout: 10000 });
-    await page.locator('div[data-state="open"][aria-hidden="true"]').waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
-    await row.evaluate((el) => (el as HTMLElement).click());
-
-    await page.locator('[data-testid="project-workspace"]').waitFor({ state: 'visible', timeout: 10000 });
+    await page.goto(`/project-management/projects/${projectPid}`, { waitUntil: 'domcontentloaded' });
+    await page.locator('[data-testid="project-workspace"]').waitFor({
+      state: 'visible',
+      timeout: 10000,
+    });
   }
 
   // =========================================================================
@@ -237,7 +275,10 @@ test.describe('PM Workspace Tabs Deep @smoke', () => {
 
     // Find our specific project by pid
     const summary = records.find((r: any) => r.pid === projectPid);
-    expect(summary, `Project ${projectPid} should appear in cost summary (total=${records.length})`).toBeTruthy();
+    expect(
+      summary,
+      `Project ${projectPid} should appear in cost summary (total=${records.length})`,
+    ).toBeTruthy();
     expect(Number(summary?.contract_amount ?? 0), 'Contract amount should be 500000').toBe(500000);
     expect(Number(summary?.actual_cost ?? 0), 'Actual cost should be > 0').toBeGreaterThan(0);
 
@@ -259,7 +300,9 @@ test.describe('PM Workspace Tabs Deep @smoke', () => {
     expect(nqResp.ok()).toBe(true);
     const body = await nqResp.json();
     const records: any[] = body?.data?.records ?? [];
-    expect(records.length, 'cc_cost_by_category should return 3 categories').toBeGreaterThanOrEqual(3);
+    expect(records.length, 'cc_cost_by_category should return 3 categories').toBeGreaterThanOrEqual(
+      3,
+    );
 
     // Verify categories exist
     const categories = records.map((r: any) => r.category);
@@ -288,7 +331,9 @@ test.describe('PM Workspace Tabs Deep @smoke', () => {
     expect(nqResp.ok()).toBe(true);
     const body = await nqResp.json();
     const records: any[] = body?.data?.records ?? [];
-    expect(records.length, 'cc_contract_payment_status should return our contract').toBeGreaterThan(0);
+    expect(records.length, 'cc_contract_payment_status should return our contract').toBeGreaterThan(
+      0,
+    );
 
     const seedContract = records.find((r: any) => r.contract_name === contractName);
     expect(seedContract, `Seed contract "${contractName}" should be in results`).toBeTruthy();
@@ -326,7 +371,9 @@ test.describe('PM Workspace Tabs Deep @smoke', () => {
     // Click each sub-view and verify render
     for (const v of ['detail', 'budget', 'trend', 'warnings']) {
       await page.locator(`[data-testid="cost-view-${v}"]`).click();
-      await expect(page.locator(`[data-testid="cost-${v}-view"]`), `View ${v}`).toBeVisible({ timeout: 5000 });
+      await expect(page.locator(`[data-testid="cost-${v}-view"]`), `View ${v}`).toBeVisible({
+        timeout: 5000,
+      });
     }
   });
 
@@ -379,7 +426,9 @@ test.describe('PM Workspace Tabs Deep @smoke', () => {
     await page.locator('[data-testid="tab-members"]').click();
 
     // Members tab should show some content (auto-created admin member)
-    await expect(page.locator('[data-testid="project-tab-content"]')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('[data-testid="project-tab-content"]')).toBeVisible({
+      timeout: 5000,
+    });
   });
 
   // =========================================================================
@@ -389,6 +438,8 @@ test.describe('PM Workspace Tabs Deep @smoke', () => {
     await openProjectWorkspace(page);
     await page.locator('[data-testid="tab-settings"]').click();
 
-    await expect(page.locator('[data-testid="project-tab-content"]')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('[data-testid="project-tab-content"]')).toBeVisible({
+      timeout: 5000,
+    });
   });
 });

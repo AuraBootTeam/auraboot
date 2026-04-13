@@ -42,7 +42,9 @@ export const GridContainer: React.FC<GridContainerProps> = (props) => {
         <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
           <div className="rounded-xl border-2 border-dashed border-gray-300 bg-white/80 p-8 text-center">
             <div className="mb-3 text-4xl">📋</div>
-            <p className="mb-1 font-medium text-gray-600">{resolveDesignerText(DESIGNER_I18N.emptyState.canvasEmpty, locale)}</p>
+            <p className="mb-1 font-medium text-gray-600">
+              {resolveDesignerText(DESIGNER_I18N.emptyState.canvasEmpty, locale)}
+            </p>
             <p className="text-sm text-gray-400">
               {resolveDesignerText(DESIGNER_I18N.emptyState.dragFieldsOrComponents, locale)}
             </p>

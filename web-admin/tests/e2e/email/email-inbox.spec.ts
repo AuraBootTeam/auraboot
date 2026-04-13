@@ -60,10 +60,11 @@ async function navigateToEmailInbox(page: any): Promise<void> {
   await inboxLink.waitFor({ state: 'attached', timeout: 10_000 });
   await inboxLink.scrollIntoViewIfNeeded().catch(() => null);
 
-  const apiPromise = page.waitForResponse(
-    (r: any) => r.url().includes('/api/email/messages') && r.status() === 200,
-    { timeout: 15_000 },
-  ).catch(() => null);
+  const apiPromise = page
+    .waitForResponse((r: any) => r.url().includes('/api/email/messages') && r.status() === 200, {
+      timeout: 15_000,
+    })
+    .catch(() => null);
 
   await inboxLink.evaluate((el: HTMLElement) => el.click());
   await apiPromise;
@@ -88,7 +89,7 @@ test.describe('Email Inbox', () => {
               subject: SUBJECT_IN,
               fromAddress: `sender-${UID}@example.com`,
               fromName: `Sender ${UID}`,
-              toAddresses: ['test@example.com'],
+              toAddresses: ['admin@example.com'],
               bodyText: `E2E test inbound email ${UID}`,
               isRead: false,
               gmailMessageId: `msg-in-${UID}`,
@@ -98,7 +99,7 @@ test.describe('Email Inbox', () => {
             {
               direction: 'outbound',
               subject: SUBJECT_OUT,
-              fromAddress: 'test@example.com',
+              fromAddress: 'admin@example.com',
               toAddresses: [`recipient-${UID}@example.com`],
               bodyText: `E2E test outbound email ${UID}`,
               isRead: true,
@@ -139,7 +140,9 @@ test.describe('Email Inbox', () => {
   // =========================================================================
   test('T2: inbox page renders message list or empty state', async ({ page }) => {
     await navigateToEmailInbox(page);
-    await page.locator('[data-testid="email-inbox-page"]').waitFor({ state: 'visible', timeout: 15_000 });
+    await page
+      .locator('[data-testid="email-inbox-page"]')
+      .waitFor({ state: 'visible', timeout: 15_000 });
 
     const spinner = page.locator('.animate-spin').first();
     await spinner.waitFor({ state: 'hidden', timeout: 15_000 }).catch(() => {});
@@ -161,7 +164,9 @@ test.describe('Email Inbox', () => {
   // =========================================================================
   test('T3: inbox/sent/all tab buttons are visible and switch views', async ({ page }) => {
     await navigateToEmailInbox(page);
-    await page.locator('[data-testid="email-inbox-page"]').waitFor({ state: 'visible', timeout: 15_000 });
+    await page
+      .locator('[data-testid="email-inbox-page"]')
+      .waitFor({ state: 'visible', timeout: 15_000 });
 
     const inboxTab = page.locator('[data-testid="email-tab-inbound"]');
     const sentTab = page.locator('[data-testid="email-tab-outbound"]');
@@ -175,18 +180,20 @@ test.describe('Email Inbox', () => {
     await expect(sentTab).toContainText('Sent');
     await expect(allTab).toContainText('All');
 
-    const sentApiPromise = page.waitForResponse(
-      (r: any) => r.url().includes('/api/email/messages') && r.status() === 200,
-      { timeout: 10_000 },
-    ).catch(() => null);
+    const sentApiPromise = page
+      .waitForResponse((r: any) => r.url().includes('/api/email/messages') && r.status() === 200, {
+        timeout: 10_000,
+      })
+      .catch(() => null);
 
     await sentTab.click();
     await sentApiPromise;
 
-    const allApiPromise = page.waitForResponse(
-      (r: any) => r.url().includes('/api/email/messages') && r.status() === 200,
-      { timeout: 10_000 },
-    ).catch(() => null);
+    const allApiPromise = page
+      .waitForResponse((r: any) => r.url().includes('/api/email/messages') && r.status() === 200, {
+        timeout: 10_000,
+      })
+      .catch(() => null);
 
     await allTab.click();
     await allApiPromise;
@@ -197,7 +204,9 @@ test.describe('Email Inbox', () => {
   // =========================================================================
   test('T4: search input filters messages', async ({ page }) => {
     await navigateToEmailInbox(page);
-    await page.locator('[data-testid="email-inbox-page"]').waitFor({ state: 'visible', timeout: 15_000 });
+    await page
+      .locator('[data-testid="email-inbox-page"]')
+      .waitFor({ state: 'visible', timeout: 15_000 });
 
     const spinner = page.locator('.animate-spin').first();
     await spinner.waitFor({ state: 'hidden', timeout: 10_000 }).catch(() => {});
@@ -207,10 +216,11 @@ test.describe('Email Inbox', () => {
 
     await searchInput.fill(`E2E search ${UID}`);
 
-    const searchApiPromise = page.waitForResponse(
-      (r: any) => r.url().includes('/api/email/messages') && r.status() === 200,
-      { timeout: 10_000 },
-    ).catch(() => null);
+    const searchApiPromise = page
+      .waitForResponse((r: any) => r.url().includes('/api/email/messages') && r.status() === 200, {
+        timeout: 10_000,
+      })
+      .catch(() => null);
 
     await page.locator('button[type="submit"], button:has-text("Search")').first().click();
     await searchApiPromise;
@@ -223,7 +233,9 @@ test.describe('Email Inbox', () => {
   // =========================================================================
   test('T5: compose button navigates to compose page', async ({ page }) => {
     await navigateToEmailInbox(page);
-    await page.locator('[data-testid="email-inbox-page"]').waitFor({ state: 'visible', timeout: 15_000 });
+    await page
+      .locator('[data-testid="email-inbox-page"]')
+      .waitFor({ state: 'visible', timeout: 15_000 });
 
     const composeBtn = page.locator('[data-testid="compose-email-btn"]');
     await expect(composeBtn).toBeVisible({ timeout: 8_000 });
@@ -231,7 +243,9 @@ test.describe('Email Inbox', () => {
     await composeBtn.click();
     await page.waitForLoadState('domcontentloaded');
 
-    await expect(page.locator('[data-testid="email-compose-page"]')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('[data-testid="email-compose-page"]')).toBeVisible({
+      timeout: 10_000,
+    });
   });
 
   // =========================================================================
@@ -239,7 +253,9 @@ test.describe('Email Inbox', () => {
   // =========================================================================
   test('T6: clicking a message navigates to thread view', async ({ page }) => {
     await navigateToEmailInbox(page);
-    await page.locator('[data-testid="email-inbox-page"]').waitFor({ state: 'visible', timeout: 15_000 });
+    await page
+      .locator('[data-testid="email-inbox-page"]')
+      .waitFor({ state: 'visible', timeout: 15_000 });
 
     const spinner = page.locator('.animate-spin').first();
     await spinner.waitFor({ state: 'hidden', timeout: 10_000 }).catch(() => {});

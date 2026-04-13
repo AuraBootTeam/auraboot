@@ -219,7 +219,9 @@ export const SmartDropZone: React.FC<SmartDropZoneProps> = ({
           {type === 'slot' && !children && (
             <div className="smart-drop-zone__placeholder">
               <div className="smart-drop-zone__placeholder-icon">+</div>
-              <div className="smart-drop-zone__placeholder-text">{resolveDesignerText(DESIGNER_I18N.dropZone.dropHere, locale)}</div>
+              <div className="smart-drop-zone__placeholder-text">
+                {resolveDesignerText(DESIGNER_I18N.dropZone.dropHere, locale)}
+              </div>
             </div>
           )}
         </div>

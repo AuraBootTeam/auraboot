@@ -37,8 +37,6 @@ describe('DSL Generated Schema', () => {
 
   it('should have all core layout definitions', () => {
     expect(defs).toHaveProperty('LayoutConfig');
-    expect(defs).toHaveProperty('AreaConfig');
-    expect(defs).toHaveProperty('AreaLayoutConfig');
     expect(defs).toHaveProperty('BlockLayoutConfig');
   });
 
@@ -77,13 +75,13 @@ describe('DSL Generated Schema', () => {
     expect(defs.DslSchema.required).toContain('kind');
   });
 
-  it('DslSchema should have version, id, title, layout, areas as required', () => {
+  it('DslSchema should have version, id, title, layout, blocks as required', () => {
     const required = defs.DslSchema.required;
     expect(required).toContain('version');
     expect(required).toContain('id');
     expect(required).toContain('title');
     expect(required).toContain('layout');
-    expect(required).toContain('areas');
+    expect(required).toContain('blocks');
   });
 
   // --- DslSchema.kind enum ---
@@ -92,7 +90,14 @@ describe('DSL Generated Schema', () => {
     const kindProp = defs.DslSchema.properties?.kind;
     expect(kindProp?.type).toBe('string');
     expect(kindProp?.enum).toEqual(
-      expect.arrayContaining(['Page', 'List', 'Form', 'Detail', 'Dashboard', 'PageLayout', 'Record', 'Transaction'])
+      expect.arrayContaining([
+        'page',
+        'list',
+        'form',
+        'detail',
+        'dashboard',
+        'page_layout',
+      ]),
     );
   });
 
@@ -117,7 +122,7 @@ describe('DSL Generated Schema', () => {
     const vt = defs.ColumnConfig.properties?.valueType;
     expect(vt?.type).toBe('string');
     expect(vt?.enum).toEqual(
-      expect.arrayContaining(['text', 'boolean', 'date', 'currency', 'tag'])
+      expect.arrayContaining(['text', 'boolean', 'date', 'currency', 'tag']),
     );
   });
 

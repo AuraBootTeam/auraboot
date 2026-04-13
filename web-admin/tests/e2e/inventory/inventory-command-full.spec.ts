@@ -38,9 +38,11 @@ const INVENTORY_COMMANDS = [
 test.describe('Inventory Command Full Coverage', () => {
   test.setTimeout(60_000);
 
-  test('INV-CMD-001: all inventory commands are discoverable via metadata API', async ({ page }) => {
+  test('INV-CMD-001: all inventory commands are discoverable via metadata API', async ({
+    page,
+  }) => {
     // Minimal UI interaction to satisfy E2E constraint
-    await page.goto('/dynamic/inv-warehouse', { waitUntil: 'domcontentloaded' });
+    await page.goto('/p/inv_warehouse', { waitUntil: 'domcontentloaded' });
     await expect(page.locator('main')).toBeVisible({ timeout: 10_000 });
 
     let verified = 0;
@@ -60,21 +62,39 @@ test.describe('Inventory Command Full Coverage', () => {
   test('INV-CMD-002: commands are bound to correct inv_ models', async ({ page }) => {
     const modelCommandMap: Record<string, string[]> = {
       inv_warehouse: ['pe:create_warehouse', 'pe:update_warehouse', 'pe:delete_warehouse'],
-      inv_inbound: ['pe:create_warehouse_in', 'pe:update_warehouse_in', 'pe:delete_warehouse_in', 'pe:confirm_warehouse_in'],
-      inv_outbound: ['pe:create_warehouse_out', 'pe:update_warehouse_out', 'pe:delete_warehouse_out', 'pe:confirm_warehouse_out'],
-      inv_warehouse_location: ['pe:create_warehouse_location', 'pe:update_warehouse_location', 'pe:delete_warehouse_location'],
+      inv_inbound: [
+        'pe:create_warehouse_in',
+        'pe:update_warehouse_in',
+        'pe:delete_warehouse_in',
+        'pe:confirm_warehouse_in',
+      ],
+      inv_outbound: [
+        'pe:create_warehouse_out',
+        'pe:update_warehouse_out',
+        'pe:delete_warehouse_out',
+        'pe:confirm_warehouse_out',
+      ],
+      inv_warehouse_location: [
+        'pe:create_warehouse_location',
+        'pe:update_warehouse_location',
+        'pe:delete_warehouse_location',
+      ],
       inv_inventory_hold: ['pe:hold_inventory', 'pe:release_hold', 'pe:update_inventory_hold'],
     };
 
-    await page.goto('/dynamic/inv-warehouse', { waitUntil: 'domcontentloaded' });
+    await page.goto('/p/inv_warehouse', { waitUntil: 'domcontentloaded' });
     await expect(page.locator('main')).toBeVisible({ timeout: 10_000 });
 
     for (const [modelCode, commands] of Object.entries(modelCommandMap)) {
       for (const code of commands) {
-        const resp = await page.request.get(`/api/meta/commands/by-code/${encodeURIComponent(code)}`);
+        const resp = await page.request.get(
+          `/api/meta/commands/by-code/${encodeURIComponent(code)}`,
+        );
         expect(resp.ok(), `command ${code} should exist`).toBe(true);
         const body = await resp.json();
-        expect(body?.data?.modelCode, `command ${code} should be bound to model ${modelCode}`).toBe(modelCode);
+        expect(body?.data?.modelCode, `command ${code} should be bound to model ${modelCode}`).toBe(
+          modelCode,
+        );
       }
     }
   });

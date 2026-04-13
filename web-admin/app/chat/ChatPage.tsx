@@ -6,7 +6,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { useLoaderData } from 'react-router';
 import type { Route } from '~/chat/+types/ChatPage';
 import { MessageList } from '~/chat/components/MessageList';
-import { ChatInputDebug } from '~/chat/components/ChatInput.test';
+import { ChatInput } from '~/chat/components/ChatInput';
 import { ErrorDisplay, type ErrorType } from '~/chat/components/ErrorDisplay';
 import { FileUploadButton } from '~/chat/components/ChatFileUploadButton';
 import { AttachmentList } from '~/chat/components/AttachmentList';
@@ -39,11 +39,7 @@ export default function ChatPage() {
   const [showSessions, setShowSessions] = useState(false);
 
   // 加载会话历史
-  useEffect(() => {
-    loadHistory();
-  }, [sessionId]);
-
-  const loadHistory = async () => {
+  const loadHistory = useCallback(async () => {
     try {
       const history = await getSessionHistory(sessionId);
       setMessages(history);
@@ -51,7 +47,11 @@ export default function ChatPage() {
       console.error('Failed to load history:', err);
       // 历史加载失败不影响新对话
     }
-  };
+  }, [sessionId]);
+
+  useEffect(() => {
+    loadHistory();
+  }, [loadHistory]);
 
   const handleSendMessage = useCallback(
     async (content: string) => {
@@ -209,7 +209,7 @@ export default function ChatPage() {
         setIsLoading(false);
       }
     },
-    [sessionId],
+    [sessionId, token],
   );
 
   const updateAssistantMessage = (
@@ -259,7 +259,7 @@ export default function ChatPage() {
     setError(null);
   };
 
-  const handleUploadSuccess = (attachment: TemporaryAttachment) => {
+  const handleUploadSuccess = (_attachment: TemporaryAttachment) => {
     setRefreshAttachments((prev) => prev + 1);
     setShowAttachments(true);
   };
@@ -268,7 +268,7 @@ export default function ChatPage() {
     setError({ type: 'server', message: errorMessage });
   };
 
-  const handleAttachmentClick = (attachment: TemporaryAttachment) => {
+  const handleAttachmentClick = (_attachment: TemporaryAttachment) => {
     // TODO: 实现文件详情查看
   };
 
@@ -375,7 +375,7 @@ export default function ChatPage() {
               disabled={isLoading}
             />
             <div className="flex-1">
-              <ChatInputDebug
+              <ChatInput
                 onSend={handleSendMessage}
                 disabled={isLoading}
                 placeholder="请输入您的问题..."

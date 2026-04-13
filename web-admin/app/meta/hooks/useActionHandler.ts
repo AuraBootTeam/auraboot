@@ -248,18 +248,18 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
 
     switch (suffix) {
       case 'form':
-        // Route pattern: /dynamic/:tableName/:recordId/edit (see routes.ts)
+        // Route pattern: /p/:pageKey/:recordId/edit (see routes.ts)
         return recordId
-          ? `/dynamic/${modelCodePart}/${recordId}/edit`
-          : `/dynamic/${modelCodePart}/new`;
+          ? `/p/${modelCodePart}/${recordId}/edit`
+          : `/p/${modelCodePart}/new`;
       case 'detail':
       case 'view':
-        return `/dynamic/${modelCodePart}/view/${recordId}`;
+        return `/p/${modelCodePart}/view/${recordId}`;
       case 'list':
-        return `/dynamic/${modelCodePart}`;
+        return `/p/${modelCodePart}`;
       default:
         // Fallback: treat as list page
-        return `/dynamic/${modelCodePart}`;
+        return `/p/${modelCodePart}`;
     }
   }, []);
 
@@ -308,7 +308,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
             if (context.loadData) {
               await context.loadData();
             } else {
-              navigate(`/dynamic/${tableName}`);
+              navigate(`/p/${tableName}`);
             }
             return;
           }
@@ -330,6 +330,29 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
               navigate(`${path}${sep}${params.join('&')}`);
             } else {
               navigate(path);
+            }
+            return;
+          }
+
+          case 'state_transition': {
+            // state_transition commands update the target record's status field.
+            // They are DSL commands executed via the command engine, same as type=command,
+            // but always require a targetRecordId and always use operationType=update.
+            if (confirmKey) {
+              const confirmed = await showConfirmDialog(confirmKey);
+              if (!confirmed) return;
+            }
+            const targetRecordId = record?.pid || (context.data?.pid as string | undefined);
+            if (!targetRecordId) {
+              throw new Error(
+                `state_transition command ${actionDef.command} requires a target record`,
+              );
+            }
+            await executeCommand(actionDef.command, targetRecordId, {}, 'update');
+            if (context.loadData) {
+              await context.loadData();
+            } else {
+              navigate(`/p/${tableName}`);
             }
             return;
           }

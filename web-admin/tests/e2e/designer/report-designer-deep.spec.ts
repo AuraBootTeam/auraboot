@@ -23,8 +23,14 @@ import { uniqueId } from '../helpers';
 
 async function waitForDesignerLoad(page: Page) {
   await page.waitForLoadState('networkidle').catch(() => {});
-  await page.locator('.animate-spin').waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
-  await page.locator('text=Loading page...').waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
+  await page
+    .locator('.animate-spin')
+    .waitFor({ state: 'hidden', timeout: 10000 })
+    .catch(() => {});
+  await page
+    .locator('text=Loading page...')
+    .waitFor({ state: 'hidden', timeout: 10000 })
+    .catch(() => {});
 }
 
 /**
@@ -36,7 +42,10 @@ async function openReportAndAddBlock(page: Page, blockName: string) {
   await page.goto('/report-designer', { waitUntil: 'domcontentloaded' });
   await waitForDesignerLoad(page);
   await expect(page.getByTestId('block-palette')).toBeVisible({ timeout: 10000 });
-  await page.getByRole('button', { name: new RegExp(blockName, 'i') }).first().click();
+  await page
+    .getByRole('button', { name: new RegExp(blockName, 'i') })
+    .first()
+    .click();
   await expect(page.getByTestId('block-property-panel')).toBeVisible({ timeout: 5000 });
 }
 
@@ -47,7 +56,10 @@ async function openReportAndAddBand(page: Page, bandType: 'Page Header' | 'Page 
   await page.goto('/report-designer', { waitUntil: 'domcontentloaded' });
   await waitForDesignerLoad(page);
   await expect(page.getByTestId('block-palette')).toBeVisible({ timeout: 10000 });
-  await page.getByRole('button', { name: new RegExp(bandType, 'i') }).first().click();
+  await page
+    .getByRole('button', { name: new RegExp(bandType, 'i') })
+    .first()
+    .click();
   await page.waitForTimeout(300);
   const canvas = page.getByTestId('report-canvas');
   const cursorDivs = canvas.locator('.cursor-pointer');
@@ -202,7 +214,9 @@ test.describe('data-table Block — All Properties', () => {
 test.describe('grouped-table Block — All Properties', () => {
   test('RPT-GT-01: Add grouped-table block and verify panel', async ({ page }) => {
     await openReportAndAddBlock(page, 'Grouped Table');
-    await expect(page.getByTestId('block-property-panel').locator('h2', { hasText: 'Grouped Table' })).toBeVisible();
+    await expect(
+      page.getByTestId('block-property-panel').locator('h2', { hasText: 'Grouped Table' }),
+    ).toBeVisible();
   });
 
   test('RPT-GT-02: Title input', async ({ page }) => {
@@ -246,14 +260,18 @@ test.describe('grouped-table Block — All Properties', () => {
 
   test('RPT-GT-06: Show header row checkbox', async ({ page }) => {
     await openReportAndAddBlock(page, 'Grouped Table');
-    const checkbox = page.getByTestId('block-property-panel').getByRole('checkbox', { name: /show header row/i });
+    const checkbox = page
+      .getByTestId('block-property-panel')
+      .getByRole('checkbox', { name: /show header row/i });
     await expect(checkbox).toBeVisible();
     await checkbox.click();
   });
 
   test('RPT-GT-07: Cell borders checkbox', async ({ page }) => {
     await openReportAndAddBlock(page, 'Grouped Table');
-    const checkbox = page.getByTestId('block-property-panel').getByRole('checkbox', { name: /cell borders/i });
+    const checkbox = page
+      .getByTestId('block-property-panel')
+      .getByRole('checkbox', { name: /cell borders/i });
     await expect(checkbox).toBeVisible();
     await checkbox.click();
   });
@@ -266,12 +284,16 @@ test.describe('grouped-table Block — All Properties', () => {
 test.describe('stat-card Block — All Properties', () => {
   test('RPT-SC-01: Add stat-card block and verify panel', async ({ page }) => {
     await openReportAndAddBlock(page, 'Stat Card');
-    await expect(page.getByTestId('block-property-panel').locator('h2', { hasText: 'Stat Card' })).toBeVisible();
+    await expect(
+      page.getByTestId('block-property-panel').locator('h2', { hasText: 'Stat Card' }),
+    ).toBeVisible();
   });
 
   test('RPT-SC-02: Label input', async ({ page }) => {
     await openReportAndAddBlock(page, 'Stat Card');
-    const labelInput = page.getByTestId('block-property-panel').getByPlaceholder('e.g. Total Revenue');
+    const labelInput = page
+      .getByTestId('block-property-panel')
+      .getByPlaceholder('e.g. Total Revenue');
     await expect(labelInput).toBeVisible();
     await labelInput.fill('Total Revenue');
     await expect(labelInput).toHaveValue('Total Revenue');
@@ -320,12 +342,16 @@ test.describe('stat-card Block — All Properties', () => {
 test.describe('rich-text Block — All Properties', () => {
   test('RPT-RT-01: Add rich-text block and verify panel', async ({ page }) => {
     await openReportAndAddBlock(page, 'Rich Text');
-    await expect(page.getByTestId('block-property-panel').locator('h2', { hasText: 'Rich Text' })).toBeVisible();
+    await expect(
+      page.getByTestId('block-property-panel').locator('h2', { hasText: 'Rich Text' }),
+    ).toBeVisible();
   });
 
   test('RPT-RT-02: Content textarea', async ({ page }) => {
     await openReportAndAddBlock(page, 'Rich Text');
-    const textarea = page.getByTestId('block-property-panel').getByPlaceholder('Enter text content...');
+    const textarea = page
+      .getByTestId('block-property-panel')
+      .getByPlaceholder('Enter text content...');
     await expect(textarea).toBeVisible();
     const content = 'Test paragraph ' + uniqueId('RT');
     await textarea.fill(content);
@@ -382,7 +408,9 @@ test.describe('rich-text Block — All Properties', () => {
 test.describe('cross-tab Block — All Properties', () => {
   test('RPT-CT-01: Add cross-tab block and verify panel', async ({ page }) => {
     await openReportAndAddBlock(page, 'Cross Tab');
-    await expect(page.getByTestId('block-property-panel').locator('h2', { hasText: 'Cross Tab' })).toBeVisible();
+    await expect(
+      page.getByTestId('block-property-panel').locator('h2', { hasText: 'Cross Tab' }),
+    ).toBeVisible();
   });
 
   test('RPT-CT-02: Title input', async ({ page }) => {
@@ -395,7 +423,9 @@ test.describe('cross-tab Block — All Properties', () => {
 
   test('RPT-CT-03: Row Field input', async ({ page }) => {
     await openReportAndAddBlock(page, 'Cross Tab');
-    const input = page.getByTestId('block-property-panel').getByPlaceholder('Field for row grouping');
+    const input = page
+      .getByTestId('block-property-panel')
+      .getByPlaceholder('Field for row grouping');
     await expect(input).toBeVisible();
     await input.fill('region');
     await expect(input).toHaveValue('region');
@@ -403,7 +433,9 @@ test.describe('cross-tab Block — All Properties', () => {
 
   test('RPT-CT-04: Column Field input', async ({ page }) => {
     await openReportAndAddBlock(page, 'Cross Tab');
-    const input = page.getByTestId('block-property-panel').getByPlaceholder('Field for column pivot');
+    const input = page
+      .getByTestId('block-property-panel')
+      .getByPlaceholder('Field for column pivot');
     await expect(input).toBeVisible();
     await input.fill('quarter');
     await expect(input).toHaveValue('quarter');
@@ -435,14 +467,18 @@ test.describe('cross-tab Block — All Properties', () => {
 
   test('RPT-CT-08: Row totals checkbox', async ({ page }) => {
     await openReportAndAddBlock(page, 'Cross Tab');
-    const checkbox = page.getByTestId('block-property-panel').getByRole('checkbox', { name: /row totals/i });
+    const checkbox = page
+      .getByTestId('block-property-panel')
+      .getByRole('checkbox', { name: /row totals/i });
     await expect(checkbox).toBeVisible();
     await checkbox.click();
   });
 
   test('RPT-CT-09: Column totals checkbox', async ({ page }) => {
     await openReportAndAddBlock(page, 'Cross Tab');
-    const checkbox = page.getByTestId('block-property-panel').getByRole('checkbox', { name: /column totals/i });
+    const checkbox = page
+      .getByTestId('block-property-panel')
+      .getByRole('checkbox', { name: /column totals/i });
     await expect(checkbox).toBeVisible();
     await checkbox.click();
   });
@@ -455,7 +491,9 @@ test.describe('cross-tab Block — All Properties', () => {
 test.describe('chart Block — All Properties', () => {
   test('RPT-CH-01: Add chart block and verify panel', async ({ page }) => {
     await openReportAndAddBlock(page, 'Chart');
-    await expect(page.getByTestId('block-property-panel').locator('h2', { hasText: 'Chart' })).toBeVisible();
+    await expect(
+      page.getByTestId('block-property-panel').locator('h2', { hasText: 'Chart' }),
+    ).toBeVisible();
   });
 
   test('RPT-CH-02: Title input', async ({ page }) => {
@@ -478,7 +516,9 @@ test.describe('chart Block — All Properties', () => {
 
   test('RPT-CH-04: Category Field input', async ({ page }) => {
     await openReportAndAddBlock(page, 'Chart');
-    const input = page.getByTestId('block-property-panel').getByPlaceholder('Field for categories (X axis)');
+    const input = page
+      .getByTestId('block-property-panel')
+      .getByPlaceholder('Field for categories (X axis)');
     await expect(input).toBeVisible();
     await input.fill('month');
     await expect(input).toHaveValue('month');
@@ -486,7 +526,9 @@ test.describe('chart Block — All Properties', () => {
 
   test('RPT-CH-05: Value Field input', async ({ page }) => {
     await openReportAndAddBlock(page, 'Chart');
-    const input = page.getByTestId('block-property-panel').getByPlaceholder('Field for values (Y axis)');
+    const input = page
+      .getByTestId('block-property-panel')
+      .getByPlaceholder('Field for values (Y axis)');
     await expect(input).toBeVisible();
     await input.fill('total_sales');
     await expect(input).toHaveValue('total_sales');
@@ -502,7 +544,9 @@ test.describe('chart Block — All Properties', () => {
 
   test('RPT-CH-07: Width input', async ({ page }) => {
     await openReportAndAddBlock(page, 'Chart');
-    const widthInput = page.getByTestId('block-property-panel').locator('input[type="number"][min="200"]');
+    const widthInput = page
+      .getByTestId('block-property-panel')
+      .locator('input[type="number"][min="200"]');
     // Width input is below the fold in the scrollable panel — scroll it into view first
     await widthInput.scrollIntoViewIfNeeded();
     await expect(widthInput).toBeVisible();
@@ -512,7 +556,9 @@ test.describe('chart Block — All Properties', () => {
 
   test('RPT-CH-08: Height input', async ({ page }) => {
     await openReportAndAddBlock(page, 'Chart');
-    const heightInput = page.getByTestId('block-property-panel').locator('input[type="number"][min="120"]');
+    const heightInput = page
+      .getByTestId('block-property-panel')
+      .locator('input[type="number"][min="120"]');
     await expect(heightInput).toBeVisible();
     await heightInput.fill('350');
     await expect(heightInput).toHaveValue('350');
@@ -608,7 +654,9 @@ test.describe('Report Operations', () => {
     const deleteBtn = panel.locator('button[title="Delete"]');
     await expect(deleteBtn).toBeVisible();
     await deleteBtn.click();
-    await expect(panel.locator('h2', { hasText: 'Report Properties' })).toBeVisible({ timeout: 3000 });
+    await expect(panel.locator('h2', { hasText: 'Report Properties' })).toBeVisible({
+      timeout: 3000,
+    });
   });
 
   test('RPT-OP-03: Multiple block types on same canvas', async ({ page }) => {
@@ -616,9 +664,18 @@ test.describe('Report Operations', () => {
     await waitForDesignerLoad(page);
     const palette = page.getByTestId('block-palette');
     await expect(palette).toBeVisible({ timeout: 10000 });
-    await palette.getByRole('button', { name: /data table/i }).first().click();
-    await palette.getByRole('button', { name: /stat card/i }).first().click();
-    await palette.getByRole('button', { name: /rich text/i }).first().click();
+    await palette
+      .getByRole('button', { name: /data table/i })
+      .first()
+      .click();
+    await palette
+      .getByRole('button', { name: /stat card/i })
+      .first()
+      .click();
+    await palette
+      .getByRole('button', { name: /rich text/i })
+      .first()
+      .click();
     const panel = page.getByTestId('block-property-panel');
     await expect(panel.locator('h2', { hasText: 'Rich Text' })).toBeVisible({ timeout: 3000 });
   });
@@ -628,11 +685,17 @@ test.describe('Report Operations', () => {
     await waitForDesignerLoad(page);
     const palette = page.getByTestId('block-palette');
     await expect(palette).toBeVisible({ timeout: 10000 });
-    await palette.getByRole('button', { name: /data table/i }).first().click();
+    await palette
+      .getByRole('button', { name: /data table/i })
+      .first()
+      .click();
     const saveBtn = page.getByRole('button', { name: /save/i });
     await expect(saveBtn).toBeVisible({ timeout: 5000 });
     const responsePromise = page.waitForResponse(
-      (res) => res.url().includes('/api/pages') && (res.request().method().toLowerCase() === 'post' || res.request().method().toLowerCase() === 'put'),
+      (res) =>
+        res.url().includes('/api/pages') &&
+        (res.request().method().toLowerCase() === 'post' ||
+          res.request().method().toLowerCase() === 'put'),
       { timeout: 10000 },
     );
     await saveBtn.click();
@@ -645,7 +708,18 @@ test.describe('Report Operations', () => {
     await waitForDesignerLoad(page);
     const palette = page.getByTestId('block-palette');
     await expect(palette).toBeVisible({ timeout: 10000 });
-    for (const blockName of ['Data Table', 'Grouped Table', 'Stat Card', 'Rich Text', 'Cross Tab', 'Chart', 'Barcode', 'Watermark', 'Page Header', 'Page Footer']) {
+    for (const blockName of [
+      'Data Table',
+      'Grouped Table',
+      'Stat Card',
+      'Rich Text',
+      'Cross Tab',
+      'Chart',
+      'Barcode',
+      'Watermark',
+      'Page Header',
+      'Page Footer',
+    ]) {
       await expect(palette.getByRole('button', { name: new RegExp(blockName, 'i') })).toBeVisible();
     }
   });
@@ -663,14 +737,22 @@ test.describe('Report Operations', () => {
     // Add a block first so the report has content
     const palette = page.getByTestId('block-palette');
     await expect(palette).toBeVisible({ timeout: 10000 });
-    await palette.getByRole('button', { name: /data table/i }).first().click();
+    await palette
+      .getByRole('button', { name: /data table/i })
+      .first()
+      .click();
     // Save first to get a valid report PID
     const saveBtn = page.getByRole('button', { name: /save/i });
     await saveBtn.click();
-    const saveResponse = await page.waitForResponse(
-      (res) => res.url().includes('/api/pages') && (res.request().method().toLowerCase() === 'post' || res.request().method().toLowerCase() === 'put'),
-      { timeout: 10000 },
-    ).catch(() => null);
+    const saveResponse = await page
+      .waitForResponse(
+        (res) =>
+          res.url().includes('/api/pages') &&
+          (res.request().method().toLowerCase() === 'post' ||
+            res.request().method().toLowerCase() === 'put'),
+        { timeout: 10000 },
+      )
+      .catch(() => null);
     await page.waitForTimeout(500);
 
     // Click Excel export — if report was saved, it triggers API; otherwise it shows alert

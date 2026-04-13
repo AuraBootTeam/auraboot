@@ -20,7 +20,6 @@ import AdmZip from 'adm-zip';
 // Force serial execution - plugin install/uninstall tests share database state
 test.describe.configure({ mode: 'serial' });
 
-
 // Test plugin manifest for config-only package
 const CONFIG_ONLY_PLUGIN = {
   pluginId: 'com.test.pkg-config-only',
@@ -53,7 +52,13 @@ const CONFIG_ONLY_PLUGIN = {
       dictType: 'static',
       items: [
         { value: 'active', label: 'Active', 'label:zh-CN': '活跃', sortNo: 10, status: 'enabled' },
-        { value: 'inactive', label: 'Inactive', 'label:zh-CN': '非活跃', sortNo: 20, status: 'enabled' },
+        {
+          value: 'inactive',
+          label: 'Inactive',
+          'label:zh-CN': '非活跃',
+          sortNo: 20,
+          status: 'enabled',
+        },
       ],
     },
   ],
@@ -320,7 +325,7 @@ test.describe('Unified Plugin Packages', () => {
     expect(installResult!.pluginPid).toBeTruthy();
 
     const response = await page.request.get(
-      `/api/plugins/packages/${installResult!.pluginPid}/status`
+      `/api/plugins/packages/${installResult!.pluginPid}/status`,
     );
 
     expect(response.ok()).toBe(true);
@@ -343,9 +348,7 @@ test.describe('Unified Plugin Packages', () => {
    */
   test('PKG-004: Verify imported resources', async ({ page }) => {
     // Verify dictionary
-    const dictResponse = await page.request.get(
-      `/api/meta/dict/by-code/pkgtest_status`
-    );
+    const dictResponse = await page.request.get(`/api/meta/dict/by-code/pkgtest_status`);
 
     if (dictResponse.ok()) {
       const dictData = await dictResponse.json();
@@ -355,9 +358,7 @@ test.describe('Unified Plugin Packages', () => {
     }
 
     // Verify model
-    const modelResponse = await page.request.get(
-      `/api/meta/models/code/pkgtest_package`
-    );
+    const modelResponse = await page.request.get(`/api/meta/models/code/pkgtest_package`);
 
     expect(modelResponse.ok()).toBe(true);
     const modelData = await modelResponse.json();
@@ -366,9 +367,7 @@ test.describe('Unified Plugin Packages', () => {
     expect(model.code).toBe('pkgtest_package');
 
     // Verify fields bound to model
-    const fieldsResponse = await page.request.get(
-      `/api/meta/models/${model.pid}/fields`
-    );
+    const fieldsResponse = await page.request.get(`/api/meta/models/${model.pid}/fields`);
 
     if (fieldsResponse.ok()) {
       const fieldsData = await fieldsResponse.json();
@@ -408,7 +407,7 @@ test.describe('Unified Plugin Packages', () => {
     expect(installResult!.pluginPid).toBeTruthy();
 
     const response = await page.request.get(
-      `/api/plugins/packages/${installResult!.pluginPid}/uninstall/preview`
+      `/api/plugins/packages/${installResult!.pluginPid}/uninstall/preview`,
     );
 
     expect(response.ok()).toBe(true);
@@ -439,7 +438,7 @@ test.describe('Unified Plugin Packages', () => {
           removeFrontendAssets: true,
           removeBackendJar: true,
         },
-      }
+      },
     );
 
     expect(response.ok()).toBe(true);
@@ -458,9 +457,7 @@ test.describe('Unified Plugin Packages', () => {
    */
   test('PKG-008: Verify resources removed after uninstall', async ({ page }) => {
     // Model should be gone
-    const modelResponse = await page.request.get(
-      `/api/meta/models/code/pkgtest_package`
-    );
+    const modelResponse = await page.request.get(`/api/meta/models/code/pkgtest_package`);
 
     // Expect 404 or empty result
     if (modelResponse.ok()) {
@@ -477,7 +474,7 @@ test.describe('Unified Plugin Packages', () => {
     // Plugin status should not be found
     if (installResult?.pluginPid) {
       const statusResponse = await page.request.get(
-        `/api/plugins/packages/${installResult.pluginPid}/status`
+        `/api/plugins/packages/${installResult.pluginPid}/status`,
       );
 
       // Expect 404 or plugin not found
@@ -529,12 +526,15 @@ test.describe('Direct JSON Package Import', () => {
 
   test('PKG-JSON-001: Direct import via execute-direct API', async ({ page }) => {
     // Use existing import endpoint for JSON
-    const response = await page.request.post(`/api/plugins/import/execute-direct?conflictStrategy=OVERWRITE`, {
-      data: JSON_PLUGIN,
-      headers: {
-        'Content-Type': 'application/json',
+    const response = await page.request.post(
+      `/api/plugins/import/execute-direct?conflictStrategy=OVERWRITE`,
+      {
+        data: JSON_PLUGIN,
+        headers: {
+          'Content-Type': 'application/json',
+        },
       },
-    });
+    );
 
     expect(response.ok()).toBe(true);
     installResult = await response.json();
@@ -584,9 +584,7 @@ test.describe('Package History and Rollback', () => {
         modelType: 'entity',
       },
     ],
-    modelFieldBindings: [
-      { modelCode: 'rbtest_model', fieldCode: 'rbtest_field', sequence: 10 },
-    ],
+    modelFieldBindings: [{ modelCode: 'rbtest_model', fieldCode: 'rbtest_field', sequence: 10 }],
   };
 
   test('PKG-RB-001: Install package for rollback test', async ({ page }) => {
@@ -611,16 +609,16 @@ test.describe('Package History and Rollback', () => {
       expect(installResult!.canRollback).toBe(true);
       packageId = installResult!.packageId;
     } finally {
-      try { fs.unlinkSync(packagePath); } catch {}
+      try {
+        fs.unlinkSync(packagePath);
+      } catch {}
     }
   });
 
   test('PKG-RB-002: Check can-rollback status', async ({ page }) => {
     expect(packageId).toBeTruthy();
 
-    const response = await page.request.get(
-      `/api/plugins/packages/${packageId}/can-rollback`
-    );
+    const response = await page.request.get(`/api/plugins/packages/${packageId}/can-rollback`);
 
     expect(response.ok()).toBe(true);
     const result = await response.json();
@@ -630,9 +628,7 @@ test.describe('Package History and Rollback', () => {
   test('PKG-RB-003: Execute rollback', async ({ page }) => {
     expect(packageId).toBeTruthy();
 
-    const response = await page.request.post(
-      `/api/plugins/packages/${packageId}/rollback`
-    );
+    const response = await page.request.post(`/api/plugins/packages/${packageId}/rollback`);
 
     expect(response.ok()).toBe(true);
     const rollbackResult = await response.json();
@@ -642,9 +638,7 @@ test.describe('Package History and Rollback', () => {
 
   test('PKG-RB-004: Verify resources removed after rollback', async ({ page }) => {
     // Model should not exist
-    const modelResponse = await page.request.get(
-      `/api/meta/models/code/rbtest_model`
-    );
+    const modelResponse = await page.request.get(`/api/meta/models/code/rbtest_model`);
 
     // Should be 404/422 (not found) or marked deleted
     if (modelResponse.ok()) {

@@ -16,10 +16,7 @@
  */
 
 import { test, expect } from '../../fixtures';
-import {
-  navigateToDynamicPage,
-  waitForDynamicPageLoad,
-} from '../helpers/index';
+import { navigateToDynamicPage, waitForDynamicPageLoad } from '../helpers/index';
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -29,10 +26,7 @@ import {
  * Assert that a dynamic list page loads successfully.
  * Verifies that either a table or an empty-state message is visible.
  */
-async function assertListPageLoads(
-  page: import('@playwright/test').Page,
-  pageKey: string,
-) {
+async function assertListPageLoads(page: import('@playwright/test').Page, pageKey: string) {
   await navigateToDynamicPage(page, pageKey);
 
   const table = page.locator('table, [role="table"]');

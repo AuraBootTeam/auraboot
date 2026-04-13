@@ -24,7 +24,10 @@ import { fileURLToPath } from 'url';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { ErrorCodes } from '~/services/http-client/types';
 
-const PLUGINS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../plugins');
+const PLUGINS_DIR = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '../../../../plugins',
+);
 
 // ---------------------------------------------------------------------------
 // Enhanced test plugin with comprehensive field types
@@ -56,8 +59,20 @@ const E2E_PLUGIN = {
       dictType: 'static',
       items: [
         { value: 'active', label: 'Active', 'label:zh-CN': '活跃', sortNo: 10, status: 'enabled' },
-        { value: 'inactive', label: 'Inactive', 'label:zh-CN': '非活跃', sortNo: 20, status: 'enabled' },
-        { value: 'pending', label: 'Pending', 'label:zh-CN': '待处理', sortNo: 30, status: 'enabled' },
+        {
+          value: 'inactive',
+          label: 'Inactive',
+          'label:zh-CN': '非活跃',
+          sortNo: 20,
+          status: 'enabled',
+        },
+        {
+          value: 'pending',
+          label: 'Pending',
+          'label:zh-CN': '待处理',
+          sortNo: 30,
+          status: 'enabled',
+        },
       ],
     },
     {
@@ -77,9 +92,27 @@ const E2E_PLUGIN = {
       'name:zh-CN': '分类',
       dictType: 'static',
       items: [
-        { value: 'cat_a', label: 'Category A', 'label:zh-CN': '分类A', sortNo: 10, status: 'enabled' },
-        { value: 'cat_b', label: 'Category B', 'label:zh-CN': '分类B', sortNo: 20, status: 'enabled' },
-        { value: 'cat_c', label: 'Category C', 'label:zh-CN': '分类C', sortNo: 30, status: 'enabled' },
+        {
+          value: 'cat_a',
+          label: 'Category A',
+          'label:zh-CN': '分类A',
+          sortNo: 10,
+          status: 'enabled',
+        },
+        {
+          value: 'cat_b',
+          label: 'Category B',
+          'label:zh-CN': '分类B',
+          sortNo: 20,
+          status: 'enabled',
+        },
+        {
+          value: 'cat_c',
+          label: 'Category C',
+          'label:zh-CN': '分类C',
+          sortNo: 30,
+          status: 'enabled',
+        },
       ],
     },
   ],
@@ -177,7 +210,13 @@ const E2E_PLUGIN = {
     { modelCode: 'e2et_record', fieldCode: 'e2et_description', sequence: 20 },
     { modelCode: 'e2et_record', fieldCode: 'e2et_amount', sequence: 30 },
     { modelCode: 'e2et_record', fieldCode: 'e2et_count', sequence: 40 },
-    { modelCode: 'e2et_record', fieldCode: 'e2et_status', sequence: 50, required: true, defaultValue: 'active' },
+    {
+      modelCode: 'e2et_record',
+      fieldCode: 'e2et_status',
+      sequence: 50,
+      required: true,
+      defaultValue: 'active',
+    },
     { modelCode: 'e2et_record', fieldCode: 'e2et_priority', sequence: 60, defaultValue: 'medium' },
     { modelCode: 'e2et_record', fieldCode: 'e2et_categories', sequence: 70 },
     { modelCode: 'e2et_record', fieldCode: 'e2et_due_date', sequence: 80 },
@@ -228,9 +267,7 @@ const E2E_PLUGIN = {
               {
                 id: 'e2et_record_toolbar',
                 blockType: 'toolbar',
-                buttons: [
-                  { code: 'create', action: 'create', primary: true },
-                ],
+                buttons: [{ code: 'create', action: 'create', primary: true }],
               },
             ],
           },
@@ -238,7 +275,7 @@ const E2E_PLUGIN = {
             blocks: [
               {
                 id: 'e2et_record_table',
-                blockType: 'data-table',
+                blockType: 'table',
                 columns: [
                   { field: 'e2et_name', width: 200 },
                   { field: 'e2et_status', width: 100 },
@@ -308,8 +345,18 @@ const E2E_PLUGIN = {
                 id: 'e2et_record_buttons',
                 blockType: 'form-buttons',
                 buttons: [
-                  { code: 'create', action: 'create', primary: true, visibleWhen: "state.mode === 'create'" },
-                  { code: 'update', action: 'update', primary: true, visibleWhen: "state.mode === 'edit'" },
+                  {
+                    code: 'create',
+                    action: 'create',
+                    primary: true,
+                    visibleWhen: "state.mode === 'create'",
+                  },
+                  {
+                    code: 'update',
+                    action: 'update',
+                    primary: true,
+                    visibleWhen: "state.mode === 'edit'",
+                  },
                   { code: 'cancel', action: 'cancel' },
                 ],
               },
@@ -329,7 +376,7 @@ const TEST_DATA_ROWS = [
   {
     e2et_name: 'E2E Test Record Alpha',
     e2et_description: 'First test record for E2E testing',
-    e2et_amount: 1500.50,
+    e2et_amount: 1500.5,
     e2et_count: 42,
     e2et_status: 'active',
     e2et_priority: 'high',
@@ -339,7 +386,7 @@ const TEST_DATA_ROWS = [
   {
     e2et_name: 'E2E Test Record Beta',
     e2et_description: 'Second test record with different status',
-    e2et_amount: 2800.00,
+    e2et_amount: 2800.0,
     e2et_count: 17,
     e2et_status: 'pending',
     e2et_priority: 'medium',
@@ -381,7 +428,9 @@ async function obtainBackendJwt(page: import('@playwright/test').Page): Promise<
       const loginBody = await loginResp.json().catch(() => ({}));
       sharedBackendJwt = loginBody?.data?.jwt ?? null;
     }
-  } catch { /* backend may be unreachable */ }
+  } catch {
+    /* backend may be unreachable */
+  }
   return sharedBackendJwt;
 }
 
@@ -389,14 +438,20 @@ async function obtainBackendJwt(page: import('@playwright/test').Page): Promise<
  * Make a GET request with BFF-then-backend fallback.
  * If the BFF (port 5173) is unreachable, falls back to backend (port 6443) directly.
  */
-async function resilientGet(page: import('@playwright/test').Page, apiPath: string, timeout = 30000): Promise<any> {
+async function resilientGet(
+  page: import('@playwright/test').Page,
+  apiPath: string,
+  timeout = 30000,
+): Promise<any> {
   try {
     const resp = await page.request.get(apiPath, { timeout });
     if (resp.ok() || resp.status() < 500) {
       return resp;
     }
     // BFF returned 5xx — fall through to direct backend request.
-  } catch { /* BFF unreachable */ }
+  } catch {
+    /* BFF unreachable */
+  }
   // Fallback: try backend directly
   const jwt = await obtainBackendJwt(page);
   if (jwt) {
@@ -405,7 +460,9 @@ async function resilientGet(page: import('@playwright/test').Page, apiPath: stri
         timeout,
         headers: { Authorization: `Bearer ${jwt}` },
       });
-    } catch { /* backend also unreachable */ }
+    } catch {
+      /* backend also unreachable */
+    }
   }
   // Last resort: retry BFF (may have recovered)
   return page.request.get(apiPath, { timeout });
@@ -414,7 +471,11 @@ async function resilientGet(page: import('@playwright/test').Page, apiPath: stri
 /**
  * Make a POST request with BFF-then-backend fallback.
  */
-async function resilientPost(page: import('@playwright/test').Page, apiPath: string, options?: { data?: any; headers?: Record<string, string>; timeout?: number }): Promise<any> {
+async function resilientPost(
+  page: import('@playwright/test').Page,
+  apiPath: string,
+  options?: { data?: any; headers?: Record<string, string>; timeout?: number },
+): Promise<any> {
   const opts = { timeout: 30000, ...options };
   try {
     const resp = await page.request.post(apiPath, opts);
@@ -423,7 +484,9 @@ async function resilientPost(page: import('@playwright/test').Page, apiPath: str
       return resp;
     }
     // BFF returned 5xx — fall through to direct backend request.
-  } catch { /* BFF unreachable */ }
+  } catch {
+    /* BFF unreachable */
+  }
   const jwt = await obtainBackendJwt(page);
   if (jwt) {
     try {
@@ -431,7 +494,9 @@ async function resilientPost(page: import('@playwright/test').Page, apiPath: str
         ...opts,
         headers: { ...opts.headers, Authorization: `Bearer ${jwt}` },
       });
-    } catch { /* backend also unreachable */ }
+    } catch {
+      /* backend also unreachable */
+    }
   }
   return page.request.post(apiPath, opts);
 }
@@ -481,7 +546,7 @@ test.describe('E2E Test Fixtures Setup', () => {
       const response = await resilientPost(
         page,
         `/api/plugins/import/execute-direct?conflictStrategy=OVERWRITE`,
-        { data: importData, headers: importHeaders, timeout: 60000 }
+        { data: importData, headers: importHeaders, timeout: 60000 },
       );
 
       if (response?.ok()) {
@@ -490,11 +555,15 @@ test.describe('E2E Test Fixtures Setup', () => {
           console.log(`✅ Plugin imported: ${result.totalResourceCount} resources`);
           importOk = true;
         } else {
-          console.log(`⚠️ Plugin import status: ${result.status} - ${result.errorMessage || 'unknown'}`);
+          console.log(
+            `⚠️ Plugin import status: ${result.status} - ${result.errorMessage || 'unknown'}`,
+          );
         }
       } else {
         const errorText = response ? await response.text().catch(() => '') : 'unreachable';
-        console.log(`⚠️ Plugin import: ${response?.status?.() ?? 'N/A'} - ${String(errorText).substring(0, 200)}`);
+        console.log(
+          `⚠️ Plugin import: ${response?.status?.() ?? 'N/A'} - ${String(errorText).substring(0, 200)}`,
+        );
       }
     } catch (e) {
       console.log(`⚠️ Plugin import failed: ${e}`);
@@ -504,12 +573,16 @@ test.describe('E2E Test Fixtures Setup', () => {
     let verifyResp = await resilientGet(page, `/api/meta/models/code/e2et_record`);
     if (!verifyResp?.ok()) {
       const errBody = verifyResp ? await verifyResp.text().catch(() => '') : 'unreachable';
-      console.log(`⚠️ Verify attempt 1 failed: HTTP ${verifyResp?.status?.()} - ${String(errBody).substring(0, 200)}`);
-      await new Promise(r => setTimeout(r, 3000));
+      console.log(
+        `⚠️ Verify attempt 1 failed: HTTP ${verifyResp?.status?.()} - ${String(errBody).substring(0, 200)}`,
+      );
+      await new Promise((r) => setTimeout(r, 3000));
       verifyResp = await resilientGet(page, `/api/meta/models/code/e2et_record`);
       if (!verifyResp?.ok()) {
         const errBody2 = verifyResp ? await verifyResp.text().catch(() => '') : 'unreachable';
-        console.log(`⚠️ Verify attempt 2 failed: HTTP ${verifyResp?.status?.()} - ${String(errBody2).substring(0, 200)}`);
+        console.log(
+          `⚠️ Verify attempt 2 failed: HTTP ${verifyResp?.status?.()} - ${String(errBody2).substring(0, 200)}`,
+        );
       }
     }
     expect(verifyResp?.ok(), `Model verify failed with HTTP ${verifyResp?.status?.()}`).toBe(true);
@@ -547,14 +620,10 @@ test.describe('E2E Test Fixtures Setup', () => {
       }
 
       // Bind dictionary
-      const bindResp = await resilientPost(
-        page,
-        `/api/meta/fields/${fieldPid}/bind-dict`,
-        {
-          data: { dictCode },
-          headers: { 'Content-Type': 'application/json' },
-        }
-      );
+      const bindResp = await resilientPost(page, `/api/meta/fields/${fieldPid}/bind-dict`, {
+        data: { dictCode },
+        headers: { 'Content-Type': 'application/json' },
+      });
       if (bindResp?.ok()) {
         console.log(`  ✅ Dict bound: ${fieldCode} → ${dictCode}`);
       } else {
@@ -593,10 +662,7 @@ test.describe('E2E Test Fixtures Setup', () => {
         if (!pluginResp?.ok()) return new Set();
         const pluginBody = await pluginResp.json().catch(() => ({}));
         const records =
-          pluginBody?.data?.records ??
-          pluginBody?.data?.data ??
-          pluginBody?.data ??
-          [];
+          pluginBody?.data?.records ?? pluginBody?.data?.data ?? pluginBody?.data ?? [];
         if (!Array.isArray(records)) return new Set();
         return new Set(
           records
@@ -660,13 +726,13 @@ test.describe('E2E Test Fixtures Setup', () => {
         'dual-prevention': 'dp_issue',
         'e2e-test-order': 'e2et_order',
         'asset-management': 'asset',
-        'crm': 'crm_lead',
+        crm: 'crm_lead',
         'org-management': 'org_department',
-        'sales': 'sl_sales_order',
-        'procurement': 'pr_purchase_order',
-        'inventory': 'inv_inbound',
-        'finance': 'fin_account',
-        'quality': 'qc_iqc_order',
+        sales: 'sl_sales_order',
+        procurement: 'pr_purchase_order',
+        inventory: 'inv_inbound',
+        finance: 'fin_account',
+        quality: 'qc_iqc_order',
         'platform-admin': 'sla_config',
         'agent-control-plane': 'mission',
         'product-catalog': 'prod_product',
@@ -691,13 +757,13 @@ test.describe('E2E Test Fixtures Setup', () => {
         'dual-prevention': 'com.auraboot.dual-prevention',
         'e2e-test-order': 'com.test.e2e-order',
         'asset-management': 'com.auraboot.asset-management',
-        'crm': 'com.auraboot.crm',
+        crm: 'com.auraboot.crm',
         'org-management': 'com.auraboot.org-management',
-        'sales': 'com.auraboot.sales',
-        'procurement': 'com.auraboot.procurement',
-        'inventory': 'com.auraboot.inventory',
-        'finance': 'com.auraboot.finance',
-        'quality': 'com.auraboot.quality',
+        sales: 'com.auraboot.sales',
+        procurement: 'com.auraboot.procurement',
+        inventory: 'com.auraboot.inventory',
+        finance: 'com.auraboot.finance',
+        quality: 'com.auraboot.quality',
         'product-catalog': 'com.auraboot.product-catalog',
         'sales-templates': 'com.auraboot.sales-templates',
         'tax-compliance': 'com.auraboot.tax-compliance',
@@ -717,7 +783,7 @@ test.describe('E2E Test Fixtures Setup', () => {
       let isInstalledPublished = false;
       if (checkCode) {
         try {
-          const checkResp = await resilientGet(page,`/api/meta/models/code/${checkCode}`);
+          const checkResp = await resilientGet(page, `/api/meta/models/code/${checkCode}`);
           if (checkResp?.ok()) {
             const checkData = await checkResp.json();
             if (checkData.data?.status === 'published') {
@@ -734,7 +800,10 @@ test.describe('E2E Test Fixtures Setup', () => {
       let reimportReason: string | null = null;
       if (isInstalledPublished && pluginName === 'quarry-industry') {
         try {
-          const dashboardPageResp = await resilientGet(page,`/api/pages/key/qo_dashboard_data_list`);
+          const dashboardPageResp = await resilientGet(
+            page,
+            `/api/pages/key/qo_dashboard_data_list`,
+          );
           if (!dashboardPageResp?.ok()) {
             reimportReason = 'missing page qo_dashboard_data_list';
           } else {
@@ -744,12 +813,14 @@ test.describe('E2E Test Fixtures Setup', () => {
               reimportReason = 'qo_dashboard_data_list is not Dashboard DSL';
             }
           }
-        } catch { reimportReason = 'qo_dashboard_data_list check failed (network)'; }
+        } catch {
+          reimportReason = 'qo_dashboard_data_list check failed (network)';
+        }
       }
 
       if (isInstalledPublished && pluginName === 'annual-plan') {
         try {
-          const detailResp = await resilientGet(page,`/api/pages/key/ap_annual_plan_detail`);
+          const detailResp = await resilientGet(page, `/api/pages/key/ap_annual_plan_detail`);
           if (!detailResp?.ok()) {
             reimportReason = 'missing page ap_annual_plan_detail';
           } else {
@@ -760,12 +831,17 @@ test.describe('E2E Test Fixtures Setup', () => {
               reimportReason = 'ap_annual_plan_detail does not contain monthly-grid blocks';
             }
           }
-        } catch { reimportReason = 'ap_annual_plan_detail check failed (network)'; }
+        } catch {
+          reimportReason = 'ap_annual_plan_detail check failed (network)';
+        }
       }
 
       if (isInstalledPublished && pluginName === 'construction-process') {
         try {
-          const namedQueryResp = await resilientGet(page, '/api/meta/named-queries/by-code/cp_weekly_summary_nq');
+          const namedQueryResp = await resilientGet(
+            page,
+            '/api/meta/named-queries/by-code/cp_weekly_summary_nq',
+          );
           if (!namedQueryResp?.ok()) {
             reimportReason = 'missing named query cp_weekly_summary_nq';
           }
@@ -776,7 +852,7 @@ test.describe('E2E Test Fixtures Setup', () => {
 
       if (isInstalledPublished && pluginName === 'dual-prevention') {
         try {
-          const modelResp = await resilientGet(page,`/api/meta/models/code/dp_issue`);
+          const modelResp = await resilientGet(page, `/api/meta/models/code/dp_issue`);
           if (!modelResp?.ok()) {
             reimportReason = 'missing model dp_issue';
           } else {
@@ -785,7 +861,7 @@ test.describe('E2E Test Fixtures Setup', () => {
             if (!modelPid) {
               reimportReason = 'dp_issue model pid not found';
             } else {
-              const fieldsResp = await resilientGet(page,`/api/meta/models/${modelPid}/fields`);
+              const fieldsResp = await resilientGet(page, `/api/meta/models/${modelPid}/fields`);
               if (!fieldsResp?.ok()) {
                 reimportReason = 'dp_issue model fields unavailable';
               } else {
@@ -795,7 +871,9 @@ test.describe('E2E Test Fixtures Setup', () => {
                 if (!triageField) {
                   reimportReason = 'missing field dp_triage_decision';
                 } else {
-                  const dataType = String(triageField.dataType ?? triageField.data_type ?? '').toLowerCase();
+                  const dataType = String(
+                    triageField.dataType ?? triageField.data_type ?? '',
+                  ).toLowerCase();
                   if (dataType !== 'enum') {
                     reimportReason = `dp_triage_decision dataType is ${dataType || 'unknown'}, expected enum`;
                   }
@@ -803,11 +881,13 @@ test.describe('E2E Test Fixtures Setup', () => {
               }
             }
           }
-        } catch { reimportReason = 'dp_issue check failed (network)'; }
+        } catch {
+          reimportReason = 'dp_issue check failed (network)';
+        }
         if (!reimportReason) {
           const ensureSearchFields = async (pageKey: string, expectedFields: string[]) => {
             try {
-              const pageResp = await resilientGet(page,`/api/pages/key/${pageKey}`);
+              const pageResp = await resilientGet(page, `/api/pages/key/${pageKey}`);
               if (!pageResp?.ok()) return `missing page ${pageKey}`;
               const pageData = await pageResp.json().catch(() => ({}));
               const dsl = pageData.data?.dslSchema ?? pageData.data?.dsl ?? {};
@@ -818,14 +898,20 @@ test.describe('E2E Test Fixtures Setup', () => {
                 }
               }
               return null;
-            } catch { return `${pageKey} check failed (network)`; }
+            } catch {
+              return `${pageKey} check failed (network)`;
+            }
           };
 
-          reimportReason = await ensureSearchFields('dp_rectification_list', ['dp_rect_no'])
-            ?? await ensureSearchFields('dp_inspection_task_list', ['dp_task_no']);
+          reimportReason =
+            (await ensureSearchFields('dp_rectification_list', ['dp_rect_no'])) ??
+            (await ensureSearchFields('dp_inspection_task_list', ['dp_task_no']));
           if (!reimportReason) {
             try {
-              const compliancePageResp = await resilientGet(page, '/api/pages/key/dp_compliance_report_list');
+              const compliancePageResp = await resilientGet(
+                page,
+                '/api/pages/key/dp_compliance_report_list',
+              );
               if (!compliancePageResp?.ok()) {
                 reimportReason = 'missing page dp_compliance_report_list';
               }
@@ -838,7 +924,10 @@ test.describe('E2E Test Fixtures Setup', () => {
 
       if (isInstalledPublished && pluginName === 'project-management') {
         try {
-          const deviationPageResp = await resilientGet(page, '/api/pages/key/pm_schedule_deviation_list');
+          const deviationPageResp = await resilientGet(
+            page,
+            '/api/pages/key/pm_schedule_deviation_list',
+          );
           if (!deviationPageResp?.ok()) {
             reimportReason = 'missing page pm_schedule_deviation_list';
           }
@@ -879,7 +968,10 @@ test.describe('E2E Test Fixtures Setup', () => {
 
       const getCommandMeta = async (commandCode: string) => {
         try {
-          const resp = await resilientGet(page, `/api/meta/commands/by-code/${encodeURIComponent(commandCode)}`);
+          const resp = await resilientGet(
+            page,
+            `/api/meta/commands/by-code/${encodeURIComponent(commandCode)}`,
+          );
           if (!resp?.ok()) return null;
           const body = await resp.json().catch(() => ({}));
           return body?.data ?? null;
@@ -930,7 +1022,12 @@ test.describe('E2E Test Fixtures Setup', () => {
       }
 
       if (isInstalledPublished && pluginName === 'pcba-industry' && !reimportReason) {
-        const requiredCommands = ['pe:create_ecn', 'pe:submit_ecn', 'pe:approve_ecn', 'pe:create_order_confirmation'];
+        const requiredCommands = [
+          'pe:create_ecn',
+          'pe:submit_ecn',
+          'pe:approve_ecn',
+          'pe:create_order_confirmation',
+        ];
         for (const commandCode of requiredCommands) {
           if (!(await commandExists(commandCode))) {
             reimportReason = `missing command ${commandCode}`;
@@ -939,7 +1036,11 @@ test.describe('E2E Test Fixtures Setup', () => {
         }
       }
 
-      if (isInstalledPublished && (pluginName === 'pcba-industry' || pluginName === 'pcba-solution') && !reimportReason) {
+      if (
+        isInstalledPublished &&
+        (pluginName === 'pcba-industry' || pluginName === 'pcba-solution') &&
+        !reimportReason
+      ) {
         let probeSupplierId: string | null = null;
         let probeEvalId: string | null = null;
         try {
@@ -953,12 +1054,14 @@ test.describe('E2E Test Fixtures Setup', () => {
             if (targetRecordId) data.targetRecordId = targetRecordId;
             if (operationType) data.operationType = operationType;
             const resp = await page.request.post(`/api/meta/commands/execute/${code}`, { data });
-            const body = await resp.json().catch(() => ({} as any));
+            const body = await resp.json().catch(() => ({}) as any);
             const dataBody = (body as any)?.data ?? {};
             const nested = dataBody?.data ?? {};
             return {
               ok: resp.ok() && String((body as any)?.code ?? '') === '0',
-              recordId: String(nested?.recordId ?? dataBody?.recordId ?? (body as any)?.recordId ?? ''),
+              recordId: String(
+                nested?.recordId ?? dataBody?.recordId ?? (body as any)?.recordId ?? '',
+              ),
             };
           };
 
@@ -990,7 +1093,10 @@ test.describe('E2E Test Fixtures Setup', () => {
               probeEvalId = supplierEval.recordId;
               await execCommand('pe:submit_supplier_eval', {}, probeEvalId, 'update');
 
-              const detailResp = await resilientGet(page, `/api/dynamic/pe-supplier-eval/${probeEvalId}`);
+              const detailResp = await resilientGet(
+                page,
+                `/api/dynamic/pe_supplier_eval/${probeEvalId}`,
+              );
               if (!detailResp?.ok()) {
                 reimportReason = 'supplier eval probe failed: detail API unavailable';
               } else {
@@ -1006,10 +1112,14 @@ test.describe('E2E Test Fixtures Setup', () => {
           reimportReason = 'supplier eval transition probe failed';
         } finally {
           if (probeEvalId) {
-            await page.request.delete(`/api/dynamic/pe-supplier-eval/${probeEvalId}`).catch(() => {});
+            await page.request
+              .delete(`/api/dynamic/pe_supplier_eval/${probeEvalId}`)
+              .catch(() => {});
           }
           if (probeSupplierId) {
-            await page.request.delete(`/api/dynamic/pe-supplier/${probeSupplierId}`).catch(() => {});
+            await page.request
+              .delete(`/api/dynamic/pe_supplier/${probeSupplierId}`)
+              .catch(() => {});
           }
         }
       }
@@ -1027,14 +1137,15 @@ test.describe('E2E Test Fixtures Setup', () => {
               fin_pay_remark: `E2E Probe Payment ${Date.now()}`,
             },
           };
-          const resp = await page.request.post('/api/meta/commands/execute/fin:create_payment', { data });
-          const body = await resp.json().catch(() => ({} as any));
+          const resp = await page.request.post('/api/meta/commands/execute/fin:create_payment', {
+            data,
+          });
+          const body = await resp.json().catch(() => ({}) as any);
           const bodyData = (body as any)?.data ?? {};
           const nested = bodyData?.data ?? {};
           const success = resp.ok() && String((body as any)?.code ?? '') === '0';
-          probePaymentId = String(
-            nested?.recordId ?? bodyData?.recordId ?? (body as any)?.recordId ?? '',
-          ) || null;
+          probePaymentId =
+            String(nested?.recordId ?? bodyData?.recordId ?? (body as any)?.recordId ?? '') || null;
           if (!success || !probePaymentId) {
             reimportReason = `payment command probe failed (http=${resp.status()}, code=${String((body as any)?.code ?? 'unknown')})`;
           }
@@ -1042,9 +1153,11 @@ test.describe('E2E Test Fixtures Setup', () => {
           reimportReason = 'payment command probe failed';
         } finally {
           if (probePaymentId) {
-            await page.request.post('/api/meta/commands/execute/fin:delete_payment', {
-              data: { targetRecordId: probePaymentId, operationType: 'delete', payload: {} },
-            }).catch(() => {});
+            await page.request
+              .post('/api/meta/commands/execute/fin:delete_payment', {
+                data: { targetRecordId: probePaymentId, operationType: 'delete', payload: {} },
+              })
+              .catch(() => {});
           }
         }
       }
@@ -1058,7 +1171,9 @@ test.describe('E2E Test Fixtures Setup', () => {
         continue;
       }
       if (isInstalledPublished && reimportReason) {
-        console.log(`  ♻️ ${pluginName}: installed but outdated (${reimportReason}), re-importing...`);
+        console.log(
+          `  ♻️ ${pluginName}: installed but outdated (${reimportReason}), re-importing...`,
+        );
       }
 
       let imported = false;
@@ -1076,14 +1191,11 @@ test.describe('E2E Test Fixtures Setup', () => {
       // Try BFF first, then fall back to backend directly
       let submitResp: any = null;
       try {
-        submitResp = await page.request.post(
-          `/api/plugins/import/import-directory`,
-          {
-            data: importPayload,
-            timeout: 15000,
-            headers: { 'Content-Type': 'application/json' },
-          }
-        );
+        submitResp = await page.request.post(`/api/plugins/import/import-directory`, {
+          data: importPayload,
+          timeout: 15000,
+          headers: { 'Content-Type': 'application/json' },
+        });
       } catch {
         // BFF unreachable — try backend directly
         const jwt = await obtainBackendJwt(page);
@@ -1095,9 +1207,11 @@ test.describe('E2E Test Fixtures Setup', () => {
                 data: importPayload,
                 timeout: 15000,
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${jwt}` },
-              }
+              },
             );
-          } catch { /* backend also unreachable */ }
+          } catch {
+            /* backend also unreachable */
+          }
         }
       }
 
@@ -1117,9 +1231,9 @@ test.describe('E2E Test Fixtures Setup', () => {
           let taskStatus = 'pending';
 
           while (Date.now() - pollStart < maxPollMs) {
-            await new Promise(r => setTimeout(r, pollIntervalMs));
+            await new Promise((r) => setTimeout(r, pollIntervalMs));
             try {
-              const statusResp = await resilientGet(page,`/api/async-tasks/${taskCode}`);
+              const statusResp = await resilientGet(page, `/api/async-tasks/${taskCode}`);
               if (!statusResp?.ok()) continue;
               const statusData = await statusResp.json().catch(() => ({}));
               const task = statusData.data || statusData;
@@ -1129,12 +1243,16 @@ test.describe('E2E Test Fixtures Setup', () => {
               const taskError = String(task.errorMessage || task.message || '');
 
               if (taskStatus === 'completed') {
-                console.log(`  ✅ ${pluginName}: async import completed (${Math.round((Date.now() - pollStart) / 1000)}s)`);
+                console.log(
+                  `  ✅ ${pluginName}: async import completed (${Math.round((Date.now() - pollStart) / 1000)}s)`,
+                );
                 imported = true;
                 break;
               }
               if (taskStatus === 'failed') {
-                console.log(`  ⚠️ ${pluginName}: async import failed: ${task.errorMessage || 'unknown'}`);
+                console.log(
+                  `  ⚠️ ${pluginName}: async import failed: ${task.errorMessage || 'unknown'}`,
+                );
                 if (/being imported by another process/i.test(taskError) && checkCode) {
                   console.log(`  ⏳ ${pluginName}: waiting for concurrent import to finish...`);
                   const waitStart = Date.now();
@@ -1143,7 +1261,9 @@ test.describe('E2E Test Fixtures Setup', () => {
                     await new Promise((r) => setTimeout(r, 5000));
                     const status = await getModelStatus(checkCode);
                     if (status === 'published') {
-                      console.log(`  ✅ ${pluginName}: concurrent import finished (${Math.round((Date.now() - waitStart) / 1000)}s)`);
+                      console.log(
+                        `  ✅ ${pluginName}: concurrent import finished (${Math.round((Date.now() - waitStart) / 1000)}s)`,
+                      );
                       imported = true;
                       break;
                     }
@@ -1156,8 +1276,10 @@ test.describe('E2E Test Fixtures Setup', () => {
                 break;
               }
               const elapsed = Math.round((Date.now() - pollStart) / 1000);
-              if (elapsed % 15 < (pollIntervalMs / 1000) + 1) {
-                console.log(`  ⏳ ${pluginName}: ${taskStatus} ${progress}% - ${progressMsg} (${elapsed}s)`);
+              if (elapsed % 15 < pollIntervalMs / 1000 + 1) {
+                console.log(
+                  `  ⏳ ${pluginName}: ${taskStatus} ${progress}% - ${progressMsg} (${elapsed}s)`,
+                );
               }
             } catch {
               // Both BFF and backend unreachable — continue polling
@@ -1176,7 +1298,9 @@ test.describe('E2E Test Fixtures Setup', () => {
               await new Promise((r) => setTimeout(r, 5000));
               const status = await getModelStatus(checkCode);
               if (status === 'published') {
-                console.log(`  ✅ ${pluginName}: concurrent import finished (${Math.round((Date.now() - waitStart) / 1000)}s)`);
+                console.log(
+                  `  ✅ ${pluginName}: concurrent import finished (${Math.round((Date.now() - waitStart) / 1000)}s)`,
+                );
                 imported = true;
                 break;
               }
@@ -1186,7 +1310,9 @@ test.describe('E2E Test Fixtures Setup', () => {
       } else {
         const errorText = submitResp ? await submitResp.text().catch(() => '') : 'BFF unreachable';
         const statusCode = submitResp?.status?.() ?? 'N/A';
-        console.log(`  ⚠️ ${pluginName}: async submit failed HTTP ${statusCode} - ${String(errorText).substring(0, 200)}`);
+        console.log(
+          `  ⚠️ ${pluginName}: async submit failed HTTP ${statusCode} - ${String(errorText).substring(0, 200)}`,
+        );
       }
 
       // Fallback: sync import directly to backend (bypasses BFF proxy timeout)
@@ -1204,7 +1330,7 @@ test.describe('E2E Test Fixtures Setup', () => {
                   'Content-Type': 'application/json',
                   Authorization: `Bearer ${jwt}`,
                 },
-              }
+              },
             );
             if (backendResp.ok()) {
               const bd = await backendResp.json().catch(() => ({}));
@@ -1214,7 +1340,9 @@ test.describe('E2E Test Fixtures Setup', () => {
               }
             } else {
               const err = await backendResp.text();
-              console.log(`  ⚠️ ${pluginName}: sync fallback HTTP ${backendResp.status()} - ${err.substring(0, 200)}`);
+              console.log(
+                `  ⚠️ ${pluginName}: sync fallback HTTP ${backendResp.status()} - ${err.substring(0, 200)}`,
+              );
             }
           } catch (e) {
             console.log(`  ⚠️ ${pluginName}: sync fallback failed: ${e}`);
@@ -1225,7 +1353,9 @@ test.describe('E2E Test Fixtures Setup', () => {
       if (!imported && checkCode) {
         const status = await getModelStatus(checkCode);
         if (status !== 'published') {
-          console.warn(`  ⚠️ ${pluginName} import failed (model ${checkCode} status: ${status ?? 'null'}). Continuing with remaining plugins...`);
+          console.warn(
+            `  ⚠️ ${pluginName} import failed (model ${checkCode} status: ${status ?? 'null'}). Continuing with remaining plugins...`,
+          );
         }
       } else if (imported) {
         installedPluginIds = await getInstalledPluginIds();
@@ -1237,20 +1367,37 @@ test.describe('E2E Test Fixtures Setup', () => {
     // The import-directory with autoPublishPages=true should handle pages.
     // For commands, we need to publish them individually.
     // Use apiGet/apiPost for BFF-then-backend fallback resilience.
-    const commandPrefixes = ['pm:', 'qo:', 'ap:', 'dp:', 'e2et:', 'pe:', 'asset:', 'fac:', 'crm:', 'sl:', 'pr:', 'inv:', 'fin:', 'qc:'];
+    const commandPrefixes = [
+      'pm:',
+      'qo:',
+      'ap:',
+      'dp:',
+      'e2et:',
+      'pe:',
+      'asset:',
+      'fac:',
+      'crm:',
+      'sl:',
+      'pr:',
+      'inv:',
+      'fin:',
+      'qc:',
+    ];
     try {
-      const cmdsResp = await resilientGet(page,`/api/meta/commands?status=draft&size=100`);
+      const cmdsResp = await resilientGet(page, `/api/meta/commands?status=draft&size=100`);
       if (cmdsResp?.ok()) {
         const cmdsData = await cmdsResp.json();
         const commands = cmdsData.data?.records || cmdsData.data || [];
         if (Array.isArray(commands)) {
           let published = 0;
           for (const cmd of commands) {
-            if (commandPrefixes.some(p => cmd.code?.startsWith(p)) && cmd.status === 'draft') {
+            if (commandPrefixes.some((p) => cmd.code?.startsWith(p)) && cmd.status === 'draft') {
               try {
-                const pubResp = await resilientPost(page,`/api/meta/commands/${cmd.pid}/publish`);
+                const pubResp = await resilientPost(page, `/api/meta/commands/${cmd.pid}/publish`);
                 if (pubResp?.ok()) published++;
-              } catch { /* skip failed publish */ }
+              } catch {
+                /* skip failed publish */
+              }
             }
           }
           if (published > 0) {
@@ -1258,11 +1405,13 @@ test.describe('E2E Test Fixtures Setup', () => {
           }
         }
       }
-    } catch { console.log('  ⚠️ Failed to check draft commands'); }
+    } catch {
+      console.log('  ⚠️ Failed to check draft commands');
+    }
 
     // Publish any remaining draft pages from plugins
     try {
-      const pagesResp = await resilientGet(page,`/api/pages?current=1&size=200`);
+      const pagesResp = await resilientGet(page, `/api/pages?current=1&size=200`);
       if (pagesResp?.ok()) {
         const pagesData = await pagesResp.json();
         const allPages = pagesData.data?.data || pagesData.data?.records || [];
@@ -1271,9 +1420,11 @@ test.describe('E2E Test Fixtures Setup', () => {
           for (const p of allPages) {
             if (p.status === 'draft' && p.pluginPid) {
               try {
-                const pubResp = await resilientPost(page,`/api/pages/${p.pid}/publish`);
+                const pubResp = await resilientPost(page, `/api/pages/${p.pid}/publish`);
                 if (pubResp?.ok()) published++;
-              } catch { /* skip failed publish */ }
+              } catch {
+                /* skip failed publish */
+              }
             }
           }
           if (published > 0) {
@@ -1281,31 +1432,54 @@ test.describe('E2E Test Fixtures Setup', () => {
           }
         }
       }
-    } catch { console.log('  ⚠️ Failed to check draft pages'); }
+    } catch {
+      console.log('  ⚠️ Failed to check draft pages');
+    }
 
     // Publish any remaining draft VIEW models
-    for (const code of ['qo_daily_summary', 'ap_consolidated_view', 'ap_progress_view', 'ap_statistical_view', 'ap_version_summary']) {
+    for (const code of [
+      'qo_daily_summary',
+      'ap_consolidated_view',
+      'ap_progress_view',
+      'ap_statistical_view',
+      'ap_version_summary',
+    ]) {
       try {
-        const modelResp = await resilientGet(page,`/api/meta/models/code/${code}`);
+        const modelResp = await resilientGet(page, `/api/meta/models/code/${code}`);
         if (modelResp?.ok()) {
           const modelData = await modelResp.json();
           if (modelData.data?.status === 'draft') {
-            await resilientPost(page,`/api/meta/models/${modelData.data.pid}/publish`);
+            await resilientPost(page, `/api/meta/models/${modelData.data.pid}/publish`);
           }
         }
-      } catch { /* skip */ }
+      } catch {
+        /* skip */
+      }
     }
 
     const criticalModels = ['e2et_order'];
-    const optionalModels = ['prod_product', 'sl_sales_quotation', 'pm_project', 'qo_daily_report', 'ap_annual_plan', 'dp_issue', 'asset', 'fin_account'];
+    const optionalModels = [
+      'prod_product',
+      'sl_sales_quotation',
+      'pm_project',
+      'qo_daily_report',
+      'ap_annual_plan',
+      'dp_issue',
+      'asset',
+      'fin_account',
+    ];
     for (const requiredCode of criticalModels) {
       const status = await getModelStatus(requiredCode);
-      expect(status, `Critical model ${requiredCode} should be published after setup`).toBe('published');
+      expect(status, `Critical model ${requiredCode} should be published after setup`).toBe(
+        'published',
+      );
     }
     for (const optionalCode of optionalModels) {
       const status = await getModelStatus(optionalCode);
       if (status !== 'published') {
-        console.warn(`  ⚠️ Optional model ${optionalCode} is not published (status: ${status ?? 'null'}). Some tests may skip.`);
+        console.warn(
+          `  ⚠️ Optional model ${optionalCode} is not published (status: ${status ?? 'null'}). Some tests may skip.`,
+        );
       }
     }
   });
@@ -1346,8 +1520,18 @@ test.describe('E2E Test Fixtures Setup', () => {
 
     // Get all relevant plugin permissions and bind them to admin role.
     const permissionPrefixes = [
-      'ap.', 'dp.', 'qo.', 'cc.', 'cp.', 'dk.',
-      'e2et.', 'pm.', 'pe.', 'fac.', 'asset:', 'dynamic.',
+      'ap.',
+      'dp.',
+      'qo.',
+      'cc.',
+      'cp.',
+      'dk.',
+      'e2et.',
+      'pm.',
+      'pe.',
+      'fac.',
+      'asset:',
+      'dynamic.',
     ];
     const matchesPluginPermission = (code: string | undefined) =>
       !!code && permissionPrefixes.some((prefix) => code.startsWith(prefix));
@@ -1359,11 +1543,7 @@ test.describe('E2E Test Fixtures Setup', () => {
       const permsData = await permsResp.json();
       const perms = Array.isArray(permsData.data) ? permsData.data : [];
       for (const p of perms) {
-        if (
-          p.pid &&
-          matchesPluginPermission(p.code) &&
-          !currentPidSet.has(p.pid)
-        ) {
+        if (p.pid && matchesPluginPermission(p.code) && !currentPidSet.has(p.pid)) {
           missingPids.push(p.pid);
         }
       }
@@ -1376,18 +1556,14 @@ test.describe('E2E Test Fixtures Setup', () => {
 
     // Merge current + missing and sync (POST replaces all role permissions)
     const allPids = [...currentPids, ...missingPids];
-    const assignResp = await resilientPost(
-      page,
-      `/api/roles/${adminRole.pid}/permissions`,
-      {
-        data: allPids,
-        headers: { 'Content-Type': 'application/json' },
-      }
-    );
+    const assignResp = await resilientPost(page, `/api/roles/${adminRole.pid}/permissions`, {
+      data: allPids,
+      headers: { 'Content-Type': 'application/json' },
+    });
 
     if (assignResp?.ok()) {
       console.log(
-        `✅ Assigned ${missingPids.length} plugin permissions to TENANT_ADMIN (total: ${allPids.length})`
+        `✅ Assigned ${missingPids.length} plugin permissions to TENANT_ADMIN (total: ${allPids.length})`,
       );
     } else {
       console.log(`⚠️ Permission assignment failed: HTTP ${assignResp.status()}`);
@@ -1417,7 +1593,9 @@ test.describe('E2E Test Fixtures Setup', () => {
         console.log('✅ Model published successfully');
       } else {
         const errorText = publishResp ? await publishResp.text() : 'unreachable';
-        console.log(`⚠️ Publish response: ${publishResp?.status?.()} - ${String(errorText).substring(0, 200)}`);
+        console.log(
+          `⚠️ Publish response: ${publishResp?.status?.()} - ${String(errorText).substring(0, 200)}`,
+        );
         // May already be published, verify
         const recheck = await resilientGet(page, `/api/meta/models/code/e2et_record`);
         const recheckData = await recheck.json();
@@ -1445,7 +1623,12 @@ test.describe('E2E Test Fixtures Setup', () => {
           layout: {
             areas: ['toolbar', 'main'],
             areasConfig: {
-              toolbar: { type: 'flex', direction: 'row', justify: 'space-between', align: 'center' },
+              toolbar: {
+                type: 'flex',
+                direction: 'row',
+                justify: 'space-between',
+                align: 'center',
+              },
               main: { type: 'grid', cols: 12, rowGap: 0, colGap: 0 },
             },
           },
@@ -1455,9 +1638,7 @@ test.describe('E2E Test Fixtures Setup', () => {
                 {
                   id: 'e2et_record_toolbar',
                   blockType: 'toolbar',
-                  buttons: [
-                    { code: 'create', action: 'create', primary: true },
-                  ],
+                  buttons: [{ code: 'create', action: 'create', primary: true }],
                 },
               ],
             },
@@ -1465,7 +1646,7 @@ test.describe('E2E Test Fixtures Setup', () => {
               blocks: [
                 {
                   id: 'e2et_record_table',
-                  blockType: 'data-table',
+                  blockType: 'table',
                   columns: [
                     { field: 'e2et_name', width: 200 },
                     { field: 'e2et_status', width: 100 },
@@ -1537,8 +1718,18 @@ test.describe('E2E Test Fixtures Setup', () => {
                   id: 'e2et_record_buttons',
                   blockType: 'form-buttons',
                   buttons: [
-                    { code: 'create', action: 'create', primary: true, visibleWhen: "state.mode === 'create'" },
-                    { code: 'update', action: 'update', primary: true, visibleWhen: "state.mode === 'edit'" },
+                    {
+                      code: 'create',
+                      action: 'create',
+                      primary: true,
+                      visibleWhen: "state.mode === 'create'",
+                    },
+                    {
+                      code: 'update',
+                      action: 'update',
+                      primary: true,
+                      visibleWhen: "state.mode === 'edit'",
+                    },
                     { code: 'cancel', action: 'cancel' },
                   ],
                 },
@@ -1559,7 +1750,9 @@ test.describe('E2E Test Fixtures Setup', () => {
         console.log(`✅ Page already published: ${key}`);
       } else if (found && found.status !== 'published') {
         const pubResp = await resilientPost(page, `/api/pages/${found.pid}/publish`);
-        console.log(pubResp?.ok() ? `✅ Page published: ${key}` : `⚠️ Failed to publish page: ${key}`);
+        console.log(
+          pubResp?.ok() ? `✅ Page published: ${key}` : `⚠️ Failed to publish page: ${key}`,
+        );
       } else {
         const createResp = await resilientPost(page, `/api/pages`, {
           data: pageDefs[key],
@@ -1570,13 +1763,19 @@ test.describe('E2E Test Fixtures Setup', () => {
           const newPid = createData.data?.pid || createData.pid;
           if (newPid) {
             const pubResp = await resilientPost(page, `/api/pages/${newPid}/publish`);
-            console.log(pubResp?.ok() ? `✅ Page created & published: ${key}` : `⚠️ Page created but publish failed: ${key}`);
+            console.log(
+              pubResp?.ok()
+                ? `✅ Page created & published: ${key}`
+                : `⚠️ Page created but publish failed: ${key}`,
+            );
           } else {
             console.log(`✅ Page created (no pid returned): ${key}`);
           }
         } else {
           const bodyText = await createResp?.text().catch(() => 'N/A');
-          console.log(`⚠️ Failed to create page: ${key} (${createResp?.status()}) body: ${bodyText}`);
+          console.log(
+            `⚠️ Failed to create page: ${key} (${createResp?.status()}) body: ${bodyText}`,
+          );
         }
       }
     }
@@ -1584,7 +1783,13 @@ test.describe('E2E Test Fixtures Setup', () => {
     // Publish and sync e2e-test-order models.
     // Existing published models may still be missing physical tables after re-import,
     // so setup must force an explicit schema sync instead of trusting status alone.
-    const orderModels = ['e2et_order', 'e2et_order_item', 'e2et_order_log', 'e2et_customer', 'e2et_payment'];
+    const orderModels = [
+      'e2et_order',
+      'e2et_order_item',
+      'e2et_order_log',
+      'e2et_customer',
+      'e2et_payment',
+    ];
     for (const code of orderModels) {
       const mResp = await resilientGet(page, `/api/meta/models/code/${code}`);
       if (mResp?.ok()) {
@@ -1606,11 +1811,15 @@ test.describe('E2E Test Fixtures Setup', () => {
             console.log(`✅ Order model schema synced: ${code}`);
           } else {
             const bodyText = await syncResp?.text().catch(() => 'N/A');
-            console.log(`⚠️ Failed to sync order model schema: ${code} (${syncResp?.status()}) body: ${bodyText}`);
+            console.log(
+              `⚠️ Failed to sync order model schema: ${code} (${syncResp?.status()}) body: ${bodyText}`,
+            );
           }
         }
       } else {
-        console.log(`⚠️ Order model not found: ${code} (e2e-test-order plugin may not be imported yet)`);
+        console.log(
+          `⚠️ Order model not found: ${code} (e2e-test-order plugin may not be imported yet)`,
+        );
       }
     }
 
@@ -1642,7 +1851,7 @@ test.describe('E2E Test Fixtures Setup', () => {
     console.log('📝 Inserting test data...');
 
     // Check if data already exists
-    const listResp = await resilientGet(page, `/api/dynamic/e2et-record/list?page=1&size=5`);
+    const listResp = await resilientGet(page, `/api/dynamic/e2et_record/list?page=1&size=5`);
 
     if (listResp?.ok()) {
       const listData = await listResp.json();
@@ -1657,7 +1866,7 @@ test.describe('E2E Test Fixtures Setup', () => {
     // Insert test rows
     let insertedCount = 0;
     for (const row of TEST_DATA_ROWS) {
-      const insertResp = await resilientPost(page, `/api/dynamic/e2et-record`, {
+      const insertResp = await resilientPost(page, `/api/dynamic/e2et_record`, {
         data: row,
         headers: { 'Content-Type': 'application/json' },
       });
@@ -1666,7 +1875,9 @@ test.describe('E2E Test Fixtures Setup', () => {
         insertedCount++;
       } else {
         const errorText = insertResp ? await insertResp.text() : 'unreachable';
-        console.log(`⚠️ Insert failed: ${insertResp?.status?.()} - ${String(errorText).substring(0, 200)}`);
+        console.log(
+          `⚠️ Insert failed: ${insertResp?.status?.()} - ${String(errorText).substring(0, 200)}`,
+        );
       }
     }
 
@@ -1685,7 +1896,9 @@ test.describe('E2E Test Fixtures Setup', () => {
     if (checkResp?.ok()) {
       const checkData = await checkResp.json();
       if (checkData.data && checkData.data.widgets?.length > 0) {
-        console.log(`✅ Dashboard exists: ${checkData.data.widgets.length} widgets (status: ${checkData.data.status})`);
+        console.log(
+          `✅ Dashboard exists: ${checkData.data.widgets.length} widgets (status: ${checkData.data.status})`,
+        );
         return;
       }
     }
@@ -1704,21 +1917,30 @@ test.describe('E2E Test Fixtures Setup', () => {
       widgets: [
         {
           i: 'widget_total_users',
-          x: 0, y: 0, w: 3, h: 2,
+          x: 0,
+          y: 0,
+          w: 3,
+          h: 2,
           type: 'NumberCard',
           title: '用户总数',
           config: { label: '用户总数', value: 0, suffix: '人', color: '#3B82F6' },
         },
         {
           i: 'widget_total_models',
-          x: 3, y: 0, w: 3, h: 2,
+          x: 3,
+          y: 0,
+          w: 3,
+          h: 2,
           type: 'NumberCard',
           title: '模型数量',
           config: { label: '模型数量', value: 0, suffix: '个', color: '#10B981' },
         },
         {
           i: 'widget_bar_chart',
-          x: 0, y: 2, w: 6, h: 3,
+          x: 0,
+          y: 2,
+          w: 6,
+          h: 3,
           type: 'BarChart',
           title: '数据分布',
           config: {
@@ -1728,7 +1950,10 @@ test.describe('E2E Test Fixtures Setup', () => {
         },
         {
           i: 'widget_line_chart',
-          x: 6, y: 0, w: 6, h: 3,
+          x: 6,
+          y: 0,
+          w: 6,
+          h: 3,
           type: 'LineChart',
           title: '趋势图',
           config: {
@@ -1738,7 +1963,10 @@ test.describe('E2E Test Fixtures Setup', () => {
         },
         {
           i: 'widget_pie_chart',
-          x: 6, y: 3, w: 6, h: 3,
+          x: 6,
+          y: 3,
+          w: 6,
+          h: 3,
           type: 'PieChart',
           title: '类型分布',
           config: {
@@ -1792,15 +2020,32 @@ test.describe('E2E Test Fixtures Setup', () => {
         dslSchema: {
           layout: 'grid',
           columns: 12,
-          areas: [{
-            id: 'main',
-            name: '主内容区',
-            blocks: [
-              { id: 'block_stats', type: 'stats', position: { x: 0, y: 0, w: 12, h: 2 }, props: { title: '统计概览' } },
-              { id: 'block_chart', type: 'chart', position: { x: 0, y: 2, w: 6, h: 4 }, props: { title: '趋势图表' } },
-              { id: 'block_table', type: 'table', position: { x: 6, y: 2, w: 6, h: 4 }, props: { title: '数据列表' } },
-            ],
-          }],
+          areas: [
+            {
+              id: 'main',
+              name: '主内容区',
+              blocks: [
+                {
+                  id: 'block_stats',
+                  type: 'stats',
+                  position: { x: 0, y: 0, w: 12, h: 2 },
+                  props: { title: '统计概览' },
+                },
+                {
+                  id: 'block_chart',
+                  type: 'chart',
+                  position: { x: 0, y: 2, w: 6, h: 4 },
+                  props: { title: '趋势图表' },
+                },
+                {
+                  id: 'block_table',
+                  type: 'table',
+                  position: { x: 6, y: 2, w: 6, h: 4 },
+                  props: { title: '数据列表' },
+                },
+              ],
+            },
+          ],
         },
       },
       {
@@ -1812,17 +2057,39 @@ test.describe('E2E Test Fixtures Setup', () => {
         pageCategory: 'custom',
         dslSchema: {
           layout: 'vertical',
-          areas: [{
-            id: 'main',
-            name: '主内容区',
-            blocks: [
-              { id: 'block_input', type: 'input', position: { row: 0 }, props: { label: '名称', required: true } },
-              { id: 'block_select', type: 'select', position: { row: 1 }, props: { label: '类型' } },
-              { id: 'block_textarea', type: 'textarea', position: { row: 2 }, props: { label: '描述', rows: 4 } },
-              { id: 'block_number', type: 'number', position: { row: 3 }, props: { label: '数量' } },
-              { id: 'block_date', type: 'date', position: { row: 4 }, props: { label: '日期' } },
-            ],
-          }],
+          areas: [
+            {
+              id: 'main',
+              name: '主内容区',
+              blocks: [
+                {
+                  id: 'block_input',
+                  type: 'input',
+                  position: { row: 0 },
+                  props: { label: '名称', required: true },
+                },
+                {
+                  id: 'block_select',
+                  type: 'select',
+                  position: { row: 1 },
+                  props: { label: '类型' },
+                },
+                {
+                  id: 'block_textarea',
+                  type: 'textarea',
+                  position: { row: 2 },
+                  props: { label: '描述', rows: 4 },
+                },
+                {
+                  id: 'block_number',
+                  type: 'number',
+                  position: { row: 3 },
+                  props: { label: '数量' },
+                },
+                { id: 'block_date', type: 'date', position: { row: 4 }, props: { label: '日期' } },
+              ],
+            },
+          ],
         },
       },
       {
@@ -1833,14 +2100,26 @@ test.describe('E2E Test Fixtures Setup', () => {
         pageType: 'list',
         pageCategory: 'custom',
         dslSchema: {
-          areas: [{
-            id: 'main',
-            name: '主内容区',
-            blocks: [
-              { id: 'block_filter', type: 'filter', position: { row: 0 }, props: { fields: ['keyword', 'status'] } },
-              { id: 'block_table', type: 'table', position: { row: 1 }, props: { columns: ['名称', '状态', '时间'], actions: ['view', 'edit', 'delete'] } },
-            ],
-          }],
+          areas: [
+            {
+              id: 'main',
+              name: '主内容区',
+              blocks: [
+                {
+                  id: 'block_filter',
+                  type: 'filter',
+                  position: { row: 0 },
+                  props: { fields: ['keyword', 'status'] },
+                },
+                {
+                  id: 'block_table',
+                  type: 'table',
+                  position: { row: 1 },
+                  props: { columns: ['名称', '状态', '时间'], actions: ['view', 'edit', 'delete'] },
+                },
+              ],
+            },
+          ],
           toolbar: { actions: ['create', 'refresh'] },
         },
       },
@@ -1858,69 +2137,159 @@ test.describe('E2E Test Fixtures Setup', () => {
           version: '2.0.0',
           areas: {
             tabs: {
-              blocks: [{
-                id: 'block_tabs',
-                blockType: 'list-tabs',
-                tabs: [
-                  { key: 'all', label: { 'zh-CN': '全部', 'en-US': 'All' } },
-                  { key: 'personal', label: { 'zh-CN': '个人', 'en-US': 'Personal' }, filter: { field: 'scope', operator: 'EQ', value: 'personal' } },
-                  { key: 'global', label: { 'zh-CN': '全局', 'en-US': 'Global' }, filter: { field: 'scope', operator: 'EQ', value: 'global' } },
-                ],
-              }],
-            },
-            toolbar: {
-              blocks: [{
-                id: 'block_toolbar',
-                blockType: 'toolbar',
-                buttons: [{
-                  code: 'create',
-                  icon: 'Plus',
-                  action: 'create',
-                  primary: true,
-                  navigateTo: '/dashboard-designer',
-                }],
-              }],
-            },
-            filters: {
-              blocks: [{
-                id: 'block_filters',
-                blockType: 'filter-form',
-                fields: [{
-                  field: 'title',
-                  label: { 'zh-CN': '标题', 'en-US': 'Title' },
-                  component: 'SmartInput',
-                  props: { placeholder: { 'zh-CN': '搜索仪表盘标题', 'en-US': 'Search dashboard title' } },
-                }],
-                layout: { colSpan: 12, rowSpan: 1 },
-              }],
-            },
-            main: {
-              blocks: [{
-                id: 'block_table',
-                blockType: 'data-table',
-                table: {
-                  rowKey: 'pid',
-                  columns: [
-                    { field: 'title', label: { 'zh-CN': '标题', 'en-US': 'Title' }, width: 200 },
-                    { field: 'code', label: { 'zh-CN': '编码', 'en-US': 'Code' }, width: 150 },
-                    { field: 'scope', label: { 'zh-CN': '范围', 'en-US': 'Scope' }, width: 100, valueType: 'tag', tagMap: { PERSONAL: { label: 'Personal', color: 'blue' }, GLOBAL: { label: 'Global', color: 'green' } } },
-                    { field: 'status', label: { 'zh-CN': '状态', 'en-US': 'Status' }, width: 100, valueType: 'tag', tagMap: { draft: { label: 'Draft', color: 'default' }, published: { label: 'Published', color: 'green' } } },
-                    { field: 'updatedAt', label: { 'zh-CN': '更新时间', 'en-US': 'Updated At' }, width: 180, valueType: 'datetime' },
+              blocks: [
+                {
+                  id: 'block_tabs',
+                  blockType: 'tabs',
+                  tabs: [
+                    { key: 'all', label: { 'zh-CN': '全部', 'en-US': 'All' } },
                     {
-                      field: '_actions',
-                      isActionColumn: true,
-                      buttons: [
-                        { code: 'edit', icon: 'Edit', action: 'edit', navigateTo: '/dashboard-designer/{pid}' },
-                        { code: 'publish', action: 'publish', visibleWhen: "row.status === 'draft'", apiAction: { endpoint: '/api/dashboards/{pid}/publish', method: 'post', successMessage: { 'zh-CN': '发布成功', 'en-US': 'Published successfully' } } },
-                        { code: 'unpublish', action: 'unpublish', visibleWhen: "row.status === 'published'", apiAction: { endpoint: '/api/dashboards/{pid}/unpublish', method: 'post', successMessage: { 'zh-CN': '已取消发布', 'en-US': 'Unpublished successfully' } } },
-                        { code: 'delete', action: 'delete', danger: true, confirmMessageKey: 'confirm.delete', apiAction: { endpoint: '/api/dashboards/{pid}', method: 'delete', successMessage: { 'zh-CN': '删除成功', 'en-US': 'Deleted successfully' } } },
-                      ],
+                      key: 'personal',
+                      label: { 'zh-CN': '个人', 'en-US': 'Personal' },
+                      filter: { field: 'scope', operator: 'EQ', value: 'personal' },
+                    },
+                    {
+                      key: 'global',
+                      label: { 'zh-CN': '全局', 'en-US': 'Global' },
+                      filter: { field: 'scope', operator: 'EQ', value: 'global' },
                     },
                   ],
-                  pagination: { pageSize: 10 },
                 },
-                layout: { colSpan: 12, rowSpan: 1 },
-              }],
+              ],
+            },
+            toolbar: {
+              blocks: [
+                {
+                  id: 'block_toolbar',
+                  blockType: 'toolbar',
+                  buttons: [
+                    {
+                      code: 'create',
+                      icon: 'Plus',
+                      action: 'create',
+                      primary: true,
+                      navigateTo: '/dashboard-designer',
+                    },
+                  ],
+                },
+              ],
+            },
+            filters: {
+              blocks: [
+                {
+                  id: 'block_filters',
+                  blockType: 'filters',
+                  fields: [
+                    {
+                      field: 'title',
+                      label: { 'zh-CN': '标题', 'en-US': 'Title' },
+                      component: 'SmartInput',
+                      props: {
+                        placeholder: {
+                          'zh-CN': '搜索仪表盘标题',
+                          'en-US': 'Search dashboard title',
+                        },
+                      },
+                    },
+                  ],
+                  layout: { colSpan: 12, rowSpan: 1 },
+                },
+              ],
+            },
+            main: {
+              blocks: [
+                {
+                  id: 'block_table',
+                  blockType: 'table',
+                  table: {
+                    rowKey: 'pid',
+                    columns: [
+                      { field: 'title', label: { 'zh-CN': '标题', 'en-US': 'Title' }, width: 200 },
+                      { field: 'code', label: { 'zh-CN': '编码', 'en-US': 'Code' }, width: 150 },
+                      {
+                        field: 'scope',
+                        label: { 'zh-CN': '范围', 'en-US': 'Scope' },
+                        width: 100,
+                        valueType: 'tag',
+                        tagMap: {
+                          PERSONAL: { label: 'Personal', color: 'blue' },
+                          GLOBAL: { label: 'Global', color: 'green' },
+                        },
+                      },
+                      {
+                        field: 'status',
+                        label: { 'zh-CN': '状态', 'en-US': 'Status' },
+                        width: 100,
+                        valueType: 'tag',
+                        tagMap: {
+                          draft: { label: 'Draft', color: 'default' },
+                          published: { label: 'Published', color: 'green' },
+                        },
+                      },
+                      {
+                        field: 'updatedAt',
+                        label: { 'zh-CN': '更新时间', 'en-US': 'Updated At' },
+                        width: 180,
+                        valueType: 'datetime',
+                      },
+                      {
+                        field: '_actions',
+                        isActionColumn: true,
+                        buttons: [
+                          {
+                            code: 'edit',
+                            icon: 'Edit',
+                            action: 'edit',
+                            navigateTo: '/dashboard-designer/{pid}',
+                          },
+                          {
+                            code: 'publish',
+                            action: 'publish',
+                            visibleWhen: "row.status === 'draft'",
+                            apiAction: {
+                              endpoint: '/api/dashboards/{pid}/publish',
+                              method: 'post',
+                              successMessage: {
+                                'zh-CN': '发布成功',
+                                'en-US': 'Published successfully',
+                              },
+                            },
+                          },
+                          {
+                            code: 'unpublish',
+                            action: 'unpublish',
+                            visibleWhen: "row.status === 'published'",
+                            apiAction: {
+                              endpoint: '/api/dashboards/{pid}/unpublish',
+                              method: 'post',
+                              successMessage: {
+                                'zh-CN': '已取消发布',
+                                'en-US': 'Unpublished successfully',
+                              },
+                            },
+                          },
+                          {
+                            code: 'delete',
+                            action: 'delete',
+                            danger: true,
+                            confirmMessageKey: 'confirm.delete',
+                            apiAction: {
+                              endpoint: '/api/dashboards/{pid}',
+                              method: 'delete',
+                              successMessage: {
+                                'zh-CN': '删除成功',
+                                'en-US': 'Deleted successfully',
+                              },
+                            },
+                          },
+                        ],
+                      },
+                    ],
+                    pagination: { pageSize: 10 },
+                  },
+                  layout: { colSpan: 12, rowSpan: 1 },
+                },
+              ],
             },
           },
           layout: {
@@ -1952,61 +2321,181 @@ test.describe('E2E Test Fixtures Setup', () => {
           version: '1.0.0',
           areas: {
             tabs: {
-              blocks: [{
-                id: 'block_tabs',
-                blockType: 'list-tabs',
-                tabs: [
-                  { key: 'all', label: { 'zh-CN': '全部', 'en-US': 'All' } },
-                  { key: 'draft', label: { 'zh-CN': '草稿', 'en-US': 'Draft' }, filter: { field: 'status', operator: 'EQ', value: 'draft' } },
-                  { key: 'deployed', label: { 'zh-CN': '已部署', 'en-US': 'Deployed' }, filter: { field: 'status', operator: 'EQ', value: 'deployed' } },
-                  { key: 'suspended', label: { 'zh-CN': '已暂停', 'en-US': 'Suspended' }, filter: { field: 'status', operator: 'EQ', value: 'suspended' } },
-                ],
-              }],
-            },
-            toolbar: {
-              blocks: [{
-                id: 'block_toolbar',
-                blockType: 'toolbar',
-                buttons: [{
-                  code: 'create',
-                  icon: 'Plus',
-                  action: 'create',
-                  primary: true,
-                  navigateTo: '/bpmn-designer',
-                }],
-              }],
-            },
-            main: {
-              blocks: [{
-                id: 'block_table',
-                blockType: 'data-table',
-                table: {
-                  rowKey: 'pid',
-                  columns: [
-                    { field: 'processKey', label: { 'zh-CN': '流程标识', 'en-US': 'Process Key' }, width: 160 },
-                    { field: 'processName', label: { 'zh-CN': '流程名称', 'en-US': 'Process Name' }, width: 200 },
-                    { field: 'category', label: { 'zh-CN': '分类', 'en-US': 'Category' }, width: 120 },
-                    { field: 'version', label: { 'zh-CN': '版本', 'en-US': 'Version' }, width: 80 },
-                    { field: 'status', label: { 'zh-CN': '状态', 'en-US': 'Status' }, width: 100, valueType: 'tag', tagMap: { draft: { label: 'Draft', color: 'default' }, deployed: { label: 'Deployed', color: 'green' }, suspended: { label: 'Suspended', color: 'orange' } } },
-                    { field: 'deployedAt', label: { 'zh-CN': '部署时间', 'en-US': 'Deployed At' }, width: 180, valueType: 'datetime' },
+              blocks: [
+                {
+                  id: 'block_tabs',
+                  blockType: 'tabs',
+                  tabs: [
+                    { key: 'all', label: { 'zh-CN': '全部', 'en-US': 'All' } },
                     {
-                      field: '_actions',
-                      isActionColumn: true,
-                      buttons: [
-                        { code: 'edit', icon: 'Edit', action: 'edit', navigateTo: '/bpmn-designer?pid={pid}', visibleWhen: "row.status === 'draft'" },
-                        { code: 'deploy', action: 'deploy', visibleWhen: "row.status === 'draft'", apiAction: { endpoint: '/api/bpm/process-definitions/{pid}/deploy', method: 'post', successMessage: { 'zh-CN': '部署成功', 'en-US': 'Deployed successfully' } } },
-                        { code: 'suspend', action: 'suspend', visibleWhen: "row.status === 'deployed'", apiAction: { endpoint: '/api/bpm/process-definitions/{pid}/suspend', method: 'post', successMessage: { 'zh-CN': '已暂停', 'en-US': 'Suspended successfully' } } },
-                        { code: 'resume', action: 'resume', visibleWhen: "row.status === 'suspended'", apiAction: { endpoint: '/api/bpm/process-definitions/{pid}/resume', method: 'post', successMessage: { 'zh-CN': '已恢复', 'en-US': 'Resumed successfully' } } },
-                        { code: 'undeploy', action: 'undeploy', visibleWhen: "row.status === 'deployed'", confirmMessageKey: 'confirm.undeploy', apiAction: { endpoint: '/api/bpm/process-definitions/{pid}/undeploy', method: 'post', successMessage: { 'zh-CN': '已取消部署', 'en-US': 'Undeployed successfully' } } },
-                        { code: 'delete', action: 'delete', danger: true, visibleWhen: "row.status !== 'deployed'", confirmMessageKey: 'confirm.delete', apiAction: { endpoint: '/api/bpm/process-definitions/{pid}', method: 'delete', successMessage: { 'zh-CN': '删除成功', 'en-US': 'Deleted successfully' } } },
-                      ],
+                      key: 'draft',
+                      label: { 'zh-CN': '草稿', 'en-US': 'Draft' },
+                      filter: { field: 'status', operator: 'EQ', value: 'draft' },
+                    },
+                    {
+                      key: 'deployed',
+                      label: { 'zh-CN': '已部署', 'en-US': 'Deployed' },
+                      filter: { field: 'status', operator: 'EQ', value: 'deployed' },
+                    },
+                    {
+                      key: 'suspended',
+                      label: { 'zh-CN': '已暂停', 'en-US': 'Suspended' },
+                      filter: { field: 'status', operator: 'EQ', value: 'suspended' },
                     },
                   ],
-                  pagination: { pageSize: 10 },
                 },
-                rowClickNavigateTo: '/bpmn-designer?pid={pid}',
-                layout: { colSpan: 12, rowSpan: 1 },
-              }],
+              ],
+            },
+            toolbar: {
+              blocks: [
+                {
+                  id: 'block_toolbar',
+                  blockType: 'toolbar',
+                  buttons: [
+                    {
+                      code: 'create',
+                      icon: 'Plus',
+                      action: 'create',
+                      primary: true,
+                      navigateTo: '/bpmn-designer',
+                    },
+                  ],
+                },
+              ],
+            },
+            main: {
+              blocks: [
+                {
+                  id: 'block_table',
+                  blockType: 'table',
+                  table: {
+                    rowKey: 'pid',
+                    columns: [
+                      {
+                        field: 'processKey',
+                        label: { 'zh-CN': '流程标识', 'en-US': 'Process Key' },
+                        width: 160,
+                      },
+                      {
+                        field: 'processName',
+                        label: { 'zh-CN': '流程名称', 'en-US': 'Process Name' },
+                        width: 200,
+                      },
+                      {
+                        field: 'category',
+                        label: { 'zh-CN': '分类', 'en-US': 'Category' },
+                        width: 120,
+                      },
+                      {
+                        field: 'version',
+                        label: { 'zh-CN': '版本', 'en-US': 'Version' },
+                        width: 80,
+                      },
+                      {
+                        field: 'status',
+                        label: { 'zh-CN': '状态', 'en-US': 'Status' },
+                        width: 100,
+                        valueType: 'tag',
+                        tagMap: {
+                          draft: { label: 'Draft', color: 'default' },
+                          deployed: { label: 'Deployed', color: 'green' },
+                          suspended: { label: 'Suspended', color: 'orange' },
+                        },
+                      },
+                      {
+                        field: 'deployedAt',
+                        label: { 'zh-CN': '部署时间', 'en-US': 'Deployed At' },
+                        width: 180,
+                        valueType: 'datetime',
+                      },
+                      {
+                        field: '_actions',
+                        isActionColumn: true,
+                        buttons: [
+                          {
+                            code: 'edit',
+                            icon: 'Edit',
+                            action: 'edit',
+                            navigateTo: '/bpmn-designer?pid={pid}',
+                            visibleWhen: "row.status === 'draft'",
+                          },
+                          {
+                            code: 'deploy',
+                            action: 'deploy',
+                            visibleWhen: "row.status === 'draft'",
+                            apiAction: {
+                              endpoint: '/api/bpm/process-definitions/{pid}/deploy',
+                              method: 'post',
+                              successMessage: {
+                                'zh-CN': '部署成功',
+                                'en-US': 'Deployed successfully',
+                              },
+                            },
+                          },
+                          {
+                            code: 'suspend',
+                            action: 'suspend',
+                            visibleWhen: "row.status === 'deployed'",
+                            apiAction: {
+                              endpoint: '/api/bpm/process-definitions/{pid}/suspend',
+                              method: 'post',
+                              successMessage: {
+                                'zh-CN': '已暂停',
+                                'en-US': 'Suspended successfully',
+                              },
+                            },
+                          },
+                          {
+                            code: 'resume',
+                            action: 'resume',
+                            visibleWhen: "row.status === 'suspended'",
+                            apiAction: {
+                              endpoint: '/api/bpm/process-definitions/{pid}/resume',
+                              method: 'post',
+                              successMessage: {
+                                'zh-CN': '已恢复',
+                                'en-US': 'Resumed successfully',
+                              },
+                            },
+                          },
+                          {
+                            code: 'undeploy',
+                            action: 'undeploy',
+                            visibleWhen: "row.status === 'deployed'",
+                            confirmMessageKey: 'confirm.undeploy',
+                            apiAction: {
+                              endpoint: '/api/bpm/process-definitions/{pid}/undeploy',
+                              method: 'post',
+                              successMessage: {
+                                'zh-CN': '已取消部署',
+                                'en-US': 'Undeployed successfully',
+                              },
+                            },
+                          },
+                          {
+                            code: 'delete',
+                            action: 'delete',
+                            danger: true,
+                            visibleWhen: "row.status !== 'deployed'",
+                            confirmMessageKey: 'confirm.delete',
+                            apiAction: {
+                              endpoint: '/api/bpm/process-definitions/{pid}',
+                              method: 'delete',
+                              successMessage: {
+                                'zh-CN': '删除成功',
+                                'en-US': 'Deleted successfully',
+                              },
+                            },
+                          },
+                        ],
+                      },
+                    ],
+                    pagination: { pageSize: 10 },
+                  },
+                  rowClickNavigateTo: '/bpmn-designer?pid={pid}',
+                  layout: { colSpan: 12, rowSpan: 1 },
+                },
+              ],
             },
           },
           layout: {
@@ -2047,7 +2536,9 @@ test.describe('E2E Test Fixtures Setup', () => {
                 data: { ...pageConfig, pid: existingPid },
                 headers: { 'Content-Type': 'application/json' },
               });
-            } catch { /* BFF may be down, non-critical */ }
+            } catch {
+              /* BFF may be down, non-critical */
+            }
             await resilientPost(page, `/api/pages/${existingPid}/publish`);
             updatedCount++;
             continue;
@@ -2078,7 +2569,9 @@ test.describe('E2E Test Fixtures Setup', () => {
       }
     }
 
-    console.log(`✅ Pages: ${createdCount} created, ${updatedCount} updated, ${existingCount} existing`);
+    console.log(
+      `✅ Pages: ${createdCount} created, ${updatedCount} updated, ${existingCount} existing`,
+    );
   });
 
   /**
@@ -2089,7 +2582,7 @@ test.describe('E2E Test Fixtures Setup', () => {
     console.log('🏗️ Checking test project...');
 
     // Check if any project exists
-    const listResp = await resilientGet(page, `/api/dynamic/pm-project/list?page=1&size=1`);
+    const listResp = await resilientGet(page, `/api/dynamic/pm_project/list?page=1&size=1`);
 
     if (listResp?.ok()) {
       const listData = await listResp.json();
@@ -2101,21 +2594,18 @@ test.describe('E2E Test Fixtures Setup', () => {
     }
 
     // Create a test project via command API
-    const createResp = await resilientPost(page,
-      `/api/meta/commands/execute/pm:create_project`,
-      {
-        data: {
-          payload: {
-            pm_project_name: 'E2E测试矿山项目',
-            pm_project_code: 'e2e_test_001',
-            pm_project_type: 'mine',
-            pm_project_status: 'active',
-          },
-          operationType: 'create',
+    const createResp = await resilientPost(page, `/api/meta/commands/execute/pm:create_project`, {
+      data: {
+        payload: {
+          pm_project_name: 'E2E测试矿山项目',
+          pm_project_code: 'e2e_test_001',
+          pm_project_type: 'mine',
+          pm_project_status: 'active',
         },
-        headers: { 'Content-Type': 'application/json' },
-      }
-    );
+        operationType: 'create',
+      },
+      headers: { 'Content-Type': 'application/json' },
+    });
 
     if (createResp?.ok()) {
       const result = await createResp.json();
@@ -2151,7 +2641,7 @@ test.describe('E2E Test Fixtures Setup', () => {
     console.log(`  ✅ Fields: ${fieldCount} bound to model`);
 
     // Verify dynamic page accessibility
-    const dynResp = await resilientGet(page, `/api/dynamic/e2et-record/list?page=1&size=1`);
+    const dynResp = await resilientGet(page, `/api/dynamic/e2et_record/list?page=1&size=1`);
     if (dynResp?.ok()) {
       console.log('  ✅ Dynamic list API: accessible');
     } else {

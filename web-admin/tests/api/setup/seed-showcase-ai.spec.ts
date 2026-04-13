@@ -20,9 +20,15 @@ async function cmd(
   commandCode: string,
   payload: Record<string, unknown>,
   targetRecordId?: string,
-  operationType?: string
+  operationType?: string,
 ): Promise<string> {
-  const result = await executeCommandViaApi(page, commandCode, payload, targetRecordId, operationType);
+  const result = await executeCommandViaApi(
+    page,
+    commandCode,
+    payload,
+    targetRecordId,
+    operationType,
+  );
   expect(result.code).toBe('0');
   return result.recordId;
 }
@@ -43,25 +49,31 @@ test.describe.serial('Showcase Seed — AI & ACP', () => {
         agent_code: 'sales_agent',
         name: '销售助手 (Sales Agent)',
         agent_type: 'copilot',
-        description: '辅助销售团队完成日常工作：查询客户信息、分析商机、生成报价建议、跟进提醒。支持自然语言交互，自动调用 CRM 数据查询工具。',
+        description:
+          '辅助销售团队完成日常工作：查询客户信息、分析商机、生成报价建议、跟进提醒。支持自然语言交互，自动调用 CRM 数据查询工具。',
         status: 'active',
-        system_prompt: '你是鑫然科技的销售助手。你的职责是帮助销售团队更高效地工作。你可以：1. 查询客户信息、联系人、商机状态 2. 分析销售漏斗和业绩数据 3. 提供跟进建议和报价参考 4. 生成客户拜访计划。回答时使用中文，语气专业但友好。',
+        system_prompt:
+          '你是鑫然科技的销售助手。你的职责是帮助销售团队更高效地工作。你可以：1. 查询客户信息、联系人、商机状态 2. 分析销售漏斗和业绩数据 3. 提供跟进建议和报价参考 4. 生成客户拜访计划。回答时使用中文，语气专业但友好。',
       },
       {
         agent_code: 'data_analyst',
         name: '数据分析师 (Data Analyst)',
         agent_type: 'autonomous',
-        description: '自动化数据分析任务：生成销售报表、分析客户趋势、预测收入、监控 KPI 异常。可定时执行或按需触发。',
+        description:
+          '自动化数据分析任务：生成销售报表、分析客户趋势、预测收入、监控 KPI 异常。可定时执行或按需触发。',
         status: 'active',
-        system_prompt: '你是鑫然科技的数据分析师 Agent。你的职责是分析业务数据并提供洞察。输出格式：先给结论，再给数据支撑，最后给建议。使用表格展示数据。',
+        system_prompt:
+          '你是鑫然科技的数据分析师 Agent。你的职责是分析业务数据并提供洞察。输出格式：先给结论，再给数据支撑，最后给建议。使用表格展示数据。',
       },
       {
         agent_code: 'support_agent',
         name: '客服支持 (Support Agent)',
         agent_type: 'reactive',
-        description: '响应式客户服务 Agent：处理客户咨询、查询订单状态、解答产品技术问题、记录投诉和售后需求。基于知识库回答技术问题。',
+        description:
+          '响应式客户服务 Agent：处理客户咨询、查询订单状态、解答产品技术问题、记录投诉和售后需求。基于知识库回答技术问题。',
         status: 'active',
-        system_prompt: '你是鑫然科技的客户服务 Agent。你的职责是帮助客户解决问题。回答原则：先确认客户问题，再提供解决方案。技术问题引用知识库文档。无法解决时主动升级给人工。',
+        system_prompt:
+          '你是鑫然科技的客户服务 Agent。你的职责是帮助客户解决问题。回答原则：先确认客户问题，再提供解决方案。技术问题引用知识库文档。无法解决时主动升级给人工。',
       },
     ];
 
@@ -70,7 +82,9 @@ test.describe.serial('Showcase Seed — AI & ACP', () => {
         const id = await cmd(page, 'acp:create_agent_definition', agent);
         console.log(`  Created agent: ${agent.name}`);
       } catch (e) {
-        console.warn(`  Agent creation failed for ${agent.name}: ${(e as Error).message.slice(0, 120)}`);
+        console.warn(
+          `  Agent creation failed for ${agent.name}: ${(e as Error).message.slice(0, 120)}`,
+        );
       }
     }
   });
@@ -84,7 +98,8 @@ test.describe.serial('Showcase Seed — AI & ACP', () => {
     const kbResp = await page.request.post('/api/ai/knowledge-base', {
       data: {
         name: '鑫然科技产品知识库',
-        description: '包含 PCBA 工艺规范、产品参数手册、常见问题解答等技术文档。供 AuraBot 和客服 Agent 引用。',
+        description:
+          '包含 PCBA 工艺规范、产品参数手册、常见问题解答等技术文档。供 AuraBot 和客服 Agent 引用。',
       },
     });
     const kbBody = await kbResp.json().catch(() => ({}));
@@ -182,11 +197,15 @@ A: 新客户预付 50%，老客户月结 30-60 天。支持银行转账、承兑
         if (docBody?.code === '0') {
           console.log(`  Created KB doc: ${doc.title}`);
         } else {
-          console.warn(`  KB doc creation failed: ${doc.title} — ${docBody?.message?.slice(0, 80) || 'unknown'}`);
+          console.warn(
+            `  KB doc creation failed: ${doc.title} — ${docBody?.message?.slice(0, 80) || 'unknown'}`,
+          );
         }
       }
     } else {
-      console.warn(`  Knowledge base creation failed: ${kbBody?.message?.slice(0, 100) || 'unknown'}`);
+      console.warn(
+        `  Knowledge base creation failed: ${kbBody?.message?.slice(0, 100) || 'unknown'}`,
+      );
     }
   });
 

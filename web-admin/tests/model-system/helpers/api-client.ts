@@ -10,7 +10,7 @@ import type {
   FieldTestData,
   DictTestData,
   FieldBindingTestData,
-  VirtualFieldTestData
+  VirtualFieldTestData,
 } from './test-data';
 
 /**
@@ -128,7 +128,7 @@ export class ApiClient {
    */
   async createModel(data: ModelTestData): Promise<ApiResponse<ModelResponse>> {
     const response = await this.request.post(`/api/meta/models`, {
-      data
+      data,
     });
     return response.json();
   }
@@ -152,9 +152,12 @@ export class ApiClient {
   /**
    * Update model
    */
-  async updateModel(pid: string, data: Partial<ModelTestData>): Promise<ApiResponse<ModelResponse>> {
+  async updateModel(
+    pid: string,
+    data: Partial<ModelTestData>,
+  ): Promise<ApiResponse<ModelResponse>> {
     const response = await this.request.put(`/api/meta/models/${pid}`, {
-      data
+      data,
     });
     return response.json();
   }
@@ -189,7 +192,7 @@ export class ApiClient {
    */
   async rollbackModel(code: string, version: number): Promise<ApiResponse<ModelResponse>> {
     const response = await this.request.post(`/api/meta/models/code/${code}/rollback`, {
-      data: { version }
+      data: { version },
     });
     return response.json();
   }
@@ -218,9 +221,11 @@ export class ApiClient {
   /**
    * Create a field
    */
-  async createField(data: FieldTestData | VirtualFieldTestData): Promise<ApiResponse<FieldResponse>> {
+  async createField(
+    data: FieldTestData | VirtualFieldTestData,
+  ): Promise<ApiResponse<FieldResponse>> {
     const response = await this.request.post(`/api/meta/fields`, {
-      data
+      data,
     });
     return response.json();
   }
@@ -244,9 +249,12 @@ export class ApiClient {
   /**
    * Update field
    */
-  async updateField(pid: string, data: Partial<FieldTestData>): Promise<ApiResponse<FieldResponse>> {
+  async updateField(
+    pid: string,
+    data: Partial<FieldTestData>,
+  ): Promise<ApiResponse<FieldResponse>> {
     const response = await this.request.put(`/api/meta/fields/${pid}`, {
-      data
+      data,
     });
     return response.json();
   }
@@ -262,9 +270,12 @@ export class ApiClient {
   /**
    * Bind field to model
    */
-  async bindFieldToModel(modelPid: string, binding: FieldBindingTestData): Promise<ApiResponse<any>> {
+  async bindFieldToModel(
+    modelPid: string,
+    binding: FieldBindingTestData,
+  ): Promise<ApiResponse<any>> {
     const response = await this.request.post(`/api/meta/models/${modelPid}/fields/bind`, {
-      data: binding
+      data: binding,
     });
     return response.json();
   }
@@ -275,13 +286,13 @@ export class ApiClient {
   async batchBindFieldsToModel(
     modelPid: string,
     fieldPids: string[],
-    commonConfig?: Partial<FieldBindingTestData>
+    commonConfig?: Partial<FieldBindingTestData>,
   ): Promise<ApiResponse<any[]>> {
     const response = await this.request.post(`/api/meta/models/${modelPid}/fields/bind-batch`, {
       data: {
         fieldPids,
-        ...commonConfig
-      }
+        ...commonConfig,
+      },
     });
     return response.json();
   }
@@ -291,7 +302,7 @@ export class ApiClient {
    */
   async unbindFieldFromModel(modelPid: string, fieldCode: string): Promise<ApiResponse<void>> {
     const response = await this.request.delete(
-      `/api/meta/models/${modelPid}/fields/${fieldCode}/unbind`
+      `/api/meta/models/${modelPid}/fields/${fieldCode}/unbind`,
     );
     return response.json();
   }
@@ -305,7 +316,7 @@ export class ApiClient {
    */
   async createDict(data: DictTestData): Promise<ApiResponse<DictResponse>> {
     const response = await this.request.post(`/api/meta/dict`, {
-      data
+      data,
     });
     return response.json();
   }
@@ -331,7 +342,7 @@ export class ApiClient {
    */
   async updateDict(pid: string, data: Partial<DictTestData>): Promise<ApiResponse<DictResponse>> {
     const response = await this.request.put(`/api/meta/dict/${pid}`, {
-      data
+      data,
     });
     return response.json();
   }
@@ -391,7 +402,7 @@ export class ApiClient {
    */
   async bindDictToField(fieldPid: string, dictCode: string): Promise<ApiResponse<void>> {
     const response = await this.request.post(`/api/meta/fields/${fieldPid}/bind-dict`, {
-      data: { dictCode }
+      data: { dictCode },
     });
     return response.json();
   }

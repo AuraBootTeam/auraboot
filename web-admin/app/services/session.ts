@@ -3,8 +3,11 @@ import type { Result, User } from '~/utils/type';
 
 import { JWT_TOKEN_KEY, TOKEN_EXPIRY_KEY, REFRESH_TOKEN_KEY } from '~/constants/AuthConstant';
 
-const SESSION_SECRET = process.env.SESSION_SECRET;
-if (!SESSION_SECRET && process.env.NODE_ENV === 'production') {
+const processEnv = typeof process !== 'undefined' ? process.env : undefined;
+const NODE_ENV = processEnv?.NODE_ENV ?? 'development';
+const SESSION_SECRET = processEnv?.SESSION_SECRET;
+
+if (!SESSION_SECRET && NODE_ENV === 'production') {
   throw new Error('SESSION_SECRET environment variable must be set in production');
 }
 
@@ -15,7 +18,7 @@ export const sessionStorage = createCookieSessionStorage({
     path: '/',
     sameSite: 'lax',
     secrets: [SESSION_SECRET || 'dev-only-secret-do-not-use-in-production'],
-    secure: process.env.NODE_ENV === 'production',
+    secure: NODE_ENV === 'production',
   },
 });
 
@@ -82,7 +85,7 @@ export async function requireAuth(request: Request): Promise<string> {
   return token;
 }
 
-async function getSessionFromRequest(request: Request) {
+export async function getSessionFromRequest(request: Request) {
   const cookie = request.headers.get('Cookie');
   return sessionStorage.getSession(cookie);
 }

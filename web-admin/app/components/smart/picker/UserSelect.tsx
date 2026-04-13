@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { User, Search, X } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { User, Search, X, Loader2, UserX } from 'lucide-react';
 import { post } from '~/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { useSmartFieldContract } from '~/studio/hooks/runtime/useSmartFieldContract';
 import { useSmartFieldMeta } from '~/studio/hooks/runtime/useSmartFieldMeta';
 import { useSmartText } from '~/utils/i18n';
 import { FieldBase } from '~/components/ui/field-base';
-import { FieldActionButton } from '~/components/ui/field-action-button';
+import { getAvatarColor, getInitials } from './avatar-utils';
 
 interface UserOption {
   id: string;
@@ -71,6 +71,27 @@ export const UserSelect: React.FC<UserSelectProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [users, setUsers] = useState<UserOption[]>([]);
   const [loading, setLoading] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Close on outside click
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [isOpen]);
+
+  // Focus search input when dropdown opens
+  useEffect(() => {
+    if (isOpen) {
+      requestAnimationFrame(() => searchInputRef.current?.focus());
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     let cancelled = false;
@@ -141,48 +162,54 @@ export const UserSelect: React.FC<UserSelectProps> = ({
     return users.filter((user) => selectedIds.includes(user.id));
   }, [users, value]);
 
-  const handleUserSelect = (user: UserOption) => {
-    if (multiple) {
-      const currentValue = Array.isArray(value) ? value : value ? [value] : [];
-      const newValue = currentValue.includes(user.id)
-        ? currentValue.filter((id) => id !== user.id)
-        : [...currentValue, user.id];
-      onChange?.(newValue.length > 0 ? newValue : undefined);
-    } else {
-      onChange?.(user.id);
-      setIsOpen(false);
-    }
-    meta.markTouched();
-  };
+  const handleUserSelect = useCallback(
+    (user: UserOption) => {
+      if (multiple) {
+        const currentValue = Array.isArray(value) ? value : value ? [value] : [];
+        const newValue = currentValue.includes(user.id)
+          ? currentValue.filter((id) => id !== user.id)
+          : [...currentValue, user.id];
+        onChange?.(newValue.length > 0 ? newValue : undefined);
+      } else {
+        onChange?.(user.id);
+        setIsOpen(false);
+      }
+      meta.markTouched();
+    },
+    [multiple, value, onChange, meta],
+  );
 
-  const handleRemoveUser = (userId: string, event: React.MouseEvent) => {
-    event.stopPropagation();
-    if (multiple) {
-      const currentValue = Array.isArray(value) ? value : [];
-      const newValue = currentValue.filter((id) => id !== userId);
-      onChange?.(newValue.length > 0 ? newValue : undefined);
-    } else {
+  const handleRemoveUser = useCallback(
+    (userId: string, event: React.MouseEvent) => {
+      event.stopPropagation();
+      if (multiple) {
+        const currentValue = Array.isArray(value) ? value : [];
+        const newValue = currentValue.filter((id) => id !== userId);
+        onChange?.(newValue.length > 0 ? newValue : undefined);
+      } else {
+        onChange?.(undefined);
+      }
+      meta.markTouched();
+    },
+    [multiple, value, onChange, meta],
+  );
+
+  const handleClear = useCallback(
+    (event: React.MouseEvent) => {
+      event.stopPropagation();
       onChange?.(undefined);
-    }
-    meta.markTouched();
-  };
+      meta.markTouched();
+    },
+    [onChange, meta],
+  );
 
-  const handleClear = (event: React.MouseEvent) => {
-    event.stopPropagation();
-    onChange?.(undefined);
-    meta.markTouched();
-  };
-
-  const isSelected = (userId: string) => {
-    if (!value) return false;
-    return Array.isArray(value) ? value.includes(userId) : value === userId;
-  };
-
-  const displayText = () => {
-    if (selectedUsers.length === 0) return placeholderText;
-    if (selectedUsers.length === 1) return selectedUsers[0].name;
-    return st(`已选择 ${selectedUsers.length} 个用户`);
-  };
+  const isSelected = useCallback(
+    (userId: string) => {
+      if (!value) return false;
+      return Array.isArray(value) ? value.includes(userId) : value === userId;
+    },
+    [value],
+  );
 
   return (
     <FieldBase
@@ -192,105 +219,140 @@ export const UserSelect: React.FC<UserSelectProps> = ({
       error={meta.showError ? st(meta.meta.error) : undefined}
       className={`relative space-y-2 ${className}`}
     >
-      <div className="relative">
+      <div ref={dropdownRef} className="relative">
+        {/* Trigger */}
         <div
           data-testid={`user-select-trigger-${name}`}
-          className={`w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm ${disabledValue ? 'cursor-not-allowed bg-gray-50' : 'cursor-pointer bg-white hover:border-gray-400'} ${selectedUsers.length > 0 ? 'text-gray-900' : 'text-gray-500'} focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none`}
+          className={`min-h-[38px] w-full rounded-lg border px-3 py-1.5 shadow-sm transition-all ${
+            disabledValue
+              ? 'cursor-not-allowed border-gray-200 bg-gray-50'
+              : isOpen
+                ? 'cursor-pointer border-blue-500 bg-white ring-2 ring-blue-100'
+                : 'cursor-pointer border-gray-300 bg-white hover:border-gray-400'
+          }`}
           onClick={() => !disabledValue && setIsOpen(!isOpen)}
         >
-          <div className="flex items-center justify-between">
-            <div className="flex min-w-0 flex-1 items-center space-x-2">
-              <User className="h-4 w-4 flex-shrink-0 text-gray-400" />
-              {multiple && selectedUsers.length > 0 ? (
-                <div className="flex flex-1 flex-wrap gap-1">
-                  {selectedUsers.map((user) => (
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+              {selectedUsers.length > 0 ? (
+                selectedUsers.map((user) => (
+                  <span
+                    key={user.id}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 py-0.5 pr-1.5 pl-0.5 text-sm text-gray-800 transition-colors hover:bg-gray-200"
+                  >
                     <span
-                      key={user.id}
-                      className="inline-flex items-center rounded-full bg-blue-100 px-2 py-1 text-xs text-blue-800"
+                      className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-white ${getAvatarColor(user.name)}`}
                     >
-                      {user.name}
-                      {!disabledValue && (
-                        <FieldActionButton
-                          type="button"
-                          onClick={(e) => handleRemoveUser(user.id, e)}
-                          iconOnly
-                          className="ml-1 text-blue-600 hover:text-blue-800 dark:hover:text-blue-400"
-                        >
-                          <X className="h-3 w-3" />
-                        </FieldActionButton>
-                      )}
+                      {getInitials(user.name)}
                     </span>
-                  ))}
-                </div>
+                    <span className="max-w-[120px] truncate">{user.name}</span>
+                    {!disabledValue && (
+                      <button
+                        type="button"
+                        onClick={(e) => handleRemoveUser(user.id, e)}
+                        className="flex h-4 w-4 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-300 hover:text-gray-600"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    )}
+                  </span>
+                ))
               ) : (
-                <span className="truncate">{displayText()}</span>
+                <span className="py-0.5 text-sm text-gray-400">{placeholderText}</span>
               )}
             </div>
-            {selectedUsers.length > 0 && allowClear && !disabledValue && (
-              <FieldActionButton type="button" onClick={handleClear} iconOnly>
-                <X className="h-4 w-4" />
-              </FieldActionButton>
-            )}
+            <div className="flex flex-shrink-0 items-center gap-1">
+              {selectedUsers.length > 0 && allowClear && !disabledValue && (
+                <button
+                  type="button"
+                  onClick={handleClear}
+                  className="flex h-5 w-5 items-center justify-center rounded-full text-gray-300 transition-colors hover:bg-gray-100 hover:text-gray-500"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+              <User className="h-4 w-4 text-gray-400" />
+            </div>
           </div>
         </div>
 
         {/* Dropdown */}
         {isOpen && !disabledValue && (
-          <div className="absolute z-50 mt-1 w-full rounded-md border border-gray-300 bg-white shadow-lg">
+          <div className="absolute z-50 mt-1.5 w-full overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg">
             {/* Search Input */}
-            <div className="border-b p-2">
+            <div className="border-b border-gray-100 p-2">
               <div className="relative">
-                <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform text-gray-400" />
+                <Search className="absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-gray-400" />
                 <input
+                  ref={searchInputRef}
                   type="text"
                   data-testid={`user-select-search-${name}`}
                   placeholder={st('搜索用户...')}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full rounded-md border border-gray-300 py-2 pr-4 pl-10 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  className="w-full rounded-md border border-gray-200 bg-gray-50 py-2 pr-3 pl-9 text-sm transition-colors focus:border-blue-400 focus:bg-white focus:ring-1 focus:ring-blue-100 focus:outline-none"
                   onClick={(e) => e.stopPropagation()}
                 />
               </div>
             </div>
 
             {/* User List */}
-            <div className="max-h-60 overflow-y-auto">
+            <div className="max-h-60 overflow-y-auto py-1">
               {loading ? (
-                <div className="p-4 text-center text-gray-500">
-                  <div className="mx-auto h-6 w-6 animate-spin rounded-full border-b-2 border-blue-600"></div>
-                  <span className="mt-2 block">{st('加载中...')}</span>
+                <div className="flex flex-col items-center justify-center py-8 text-gray-400">
+                  <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
+                  <span className="mt-2 text-sm">{st('加载中...')}</span>
                 </div>
               ) : users.length === 0 ? (
-                <div className="p-4 text-center text-gray-500">{st('没有找到匹配的用户')}</div>
+                <div className="flex flex-col items-center justify-center py-8 text-gray-400">
+                  <UserX className="h-8 w-8 text-gray-300" />
+                  <span className="mt-2 text-sm">{st('没有找到匹配的用户')}</span>
+                </div>
               ) : (
-                users.map((user) => (
-                  <div
-                    key={user.id}
-                    data-testid={`user-select-option-${name}-${user.id}`}
-                    className={`cursor-pointer border-b border-gray-100 p-3 last:border-b-0 hover:bg-gray-50 ${isSelected(user.id) ? 'bg-blue-50 text-blue-900' : 'text-gray-900'} `}
-                    onClick={() => handleUserSelect(user)}
-                  >
-                    <div className="flex items-center space-x-3">
-                      <div className="flex-shrink-0">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-300">
-                          <User className="h-4 w-4 text-gray-600" />
-                        </div>
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center space-x-2">
-                          <span className="font-medium">{user.name}</span>
-                          {isSelected(user.id) && <span className="text-blue-600">✓</span>}
-                        </div>
-                        {user.email && <div className="text-sm text-gray-500">{user.email}</div>}
-                        {user.department && user.role && (
-                          <div className="text-sm text-gray-500">
-                            {user.department} · {user.role}
+                users.map((user) => {
+                  const selected = isSelected(user.id);
+                  return (
+                    <div
+                      key={user.id}
+                      data-testid={`user-select-option-${name}-${user.id}`}
+                      className={`mx-1 cursor-pointer rounded-md px-2 py-2 transition-colors ${
+                        selected
+                          ? 'bg-blue-50 text-blue-900'
+                          : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                      onClick={() => handleUserSelect(user)}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span
+                          className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white ${getAvatarColor(user.name)}`}
+                        >
+                          {getInitials(user.name)}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="truncate text-sm font-medium">{user.name}</span>
+                            {selected && (
+                              <svg
+                                className="h-4 w-4 flex-shrink-0 text-blue-500"
+                                fill="currentColor"
+                                viewBox="0 0 20 20"
+                              >
+                                <path
+                                  fillRule="evenodd"
+                                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                  clipRule="evenodd"
+                                />
+                              </svg>
+                            )}
                           </div>
-                        )}
+                          {user.email && (
+                            <div className="truncate text-xs text-gray-400">{user.email}</div>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>

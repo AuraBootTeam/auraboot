@@ -136,10 +136,22 @@ test.describe('DK Access Control @smoke', () => {
     const cleanupPage = await ctx.newPage();
 
     if (confidentialDocId) {
-      await executeCommandViaApi(cleanupPage, 'dk:delete_document', {}, confidentialDocId, 'delete').catch(() => {});
+      await executeCommandViaApi(
+        cleanupPage,
+        'dk:delete_document',
+        {},
+        confidentialDocId,
+        'delete',
+      ).catch(() => {});
     }
     if (publicDocId) {
-      await executeCommandViaApi(cleanupPage, 'dk:delete_document', {}, publicDocId, 'delete').catch(() => {});
+      await executeCommandViaApi(
+        cleanupPage,
+        'dk:delete_document',
+        {},
+        publicDocId,
+        'delete',
+      ).catch(() => {});
     }
 
     await cleanupPage.close();

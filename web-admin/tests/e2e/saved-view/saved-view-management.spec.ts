@@ -13,7 +13,13 @@ import { E2ET_ORDER_CONFIG } from '../../helpers/configs/e2et-order.config';
 import { uniqueId } from '../helpers';
 
 // Helper to manage views via API
-async function createViewViaApi(page: Page, modelCode: string, name: string, viewType = 'table', scope = 'personal'): Promise<string> {
+async function createViewViaApi(
+  page: Page,
+  modelCode: string,
+  name: string,
+  viewType = 'table',
+  scope = 'personal',
+): Promise<string> {
   const resp = await page.request.post('/api/views', {
     data: {
       name,
@@ -89,9 +95,7 @@ test.describe('SavedView — Management', () => {
       await page.request.put(`/api/views/${pid1}`, {
         data: {
           viewConfig: {
-            filters: [
-              { fieldCode: 'e2et_order_type', operator: 'eq', value: 'bulk' },
-            ],
+            filters: [{ fieldCode: 'e2et_order_type', operator: 'eq', value: 'bulk' }],
           },
         },
       });
@@ -110,8 +114,20 @@ test.describe('SavedView — Management', () => {
 
   test('SV-053: view scope — personal to team to global', async ({ page }) => {
     // Create views with different scopes
-    const personalView = await createViewViaApi(page, 'e2et_order', `Personal_${uniqueId()}`, 'table', 'personal');
-    const globalView = await createViewViaApi(page, 'e2et_order', `Global_${uniqueId()}`, 'table', 'global');
+    const personalView = await createViewViaApi(
+      page,
+      'e2et_order',
+      `Personal_${uniqueId()}`,
+      'table',
+      'personal',
+    );
+    const globalView = await createViewViaApi(
+      page,
+      'e2et_order',
+      `Global_${uniqueId()}`,
+      'table',
+      'global',
+    );
     if (personalView) createdViewPids.push(personalView);
     if (globalView) createdViewPids.push(globalView);
 

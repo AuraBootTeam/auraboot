@@ -15,10 +15,7 @@
  */
 
 import { test, expect } from '../../fixtures';
-import {
-  uniqueId,
-  executeCommandViaApi,
-} from '../helpers/index';
+import { uniqueId, executeCommandViaApi } from '../helpers/index';
 
 test.describe('CRM Dashboard Enhanced @smoke', () => {
   test.describe.configure({ mode: 'serial' });
@@ -115,13 +112,14 @@ test.describe('CRM Dashboard Enhanced @smoke', () => {
     await expect(page).toHaveURL(/\/crm\/dashboard/, { timeout: 10000 });
 
     // Wait for dashboard data to load
-    await page.waitForResponse(
-      (resp) =>
-        (resp.url().includes('/api/datasource/list') ||
-          resp.url().includes('/api/dynamic/')) &&
-        resp.status() === 200,
-      { timeout: 15000 },
-    ).catch(() => {});
+    await page
+      .waitForResponse(
+        (resp) =>
+          (resp.url().includes('/api/datasource/list') || resp.url().includes('/api/dynamic/')) &&
+          resp.status() === 200,
+        { timeout: 15000 },
+      )
+      .catch(() => {});
   }
 
   // =========================================================================
@@ -186,18 +184,27 @@ test.describe('CRM Dashboard Enhanced @smoke', () => {
     // Verify on page
     await gotoDashboard(page);
 
-    const opportunityTable = page.locator('h3:has-text("最新商机"), h3:has-text("Recent Opportunities")').first();
+    const opportunityTable = page
+      .locator('h3:has-text("最新商机"), h3:has-text("Recent Opportunities")')
+      .first();
     await expect(opportunityTable).toBeVisible({ timeout: 15000 });
 
     await expect
-      .poll(async () => {
-        const oppVisible = await page.locator(`text=DashEOpp_${uid}`).first().isVisible().catch(() => false);
-        const tableRows = await page.locator('table tbody tr').count();
-        return oppVisible || tableRows > 0;
-      }, {
-        timeout: 15000,
-        message: 'Dashboard should show opportunity data in tables or text',
-      })
+      .poll(
+        async () => {
+          const oppVisible = await page
+            .locator(`text=DashEOpp_${uid}`)
+            .first()
+            .isVisible()
+            .catch(() => false);
+          const tableRows = await page.locator('table tbody tr').count();
+          return oppVisible || tableRows > 0;
+        },
+        {
+          timeout: 15000,
+          message: 'Dashboard should show opportunity data in tables or text',
+        },
+      )
       .toBe(true);
   });
 
@@ -205,11 +212,18 @@ test.describe('CRM Dashboard Enhanced @smoke', () => {
     await gotoDashboard(page);
 
     // Wait for tables to actually render (gotoDashboard only waits for first API response)
-    await page.locator('table, [role="table"]').first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+    await page
+      .locator('table, [role="table"]')
+      .first()
+      .waitFor({ state: 'visible', timeout: 15000 })
+      .catch(() => {});
 
     // Check for activity data on the dashboard
     const activityText = page.locator(`text=DashEActivity_${uid}`);
-    const actVisible = await activityText.first().isVisible({ timeout: 5000 }).catch(() => false);
+    const actVisible = await activityText
+      .first()
+      .isVisible({ timeout: 5000 })
+      .catch(() => false);
 
     // Fallback: at least some tables with data
     if (!actVisible) {

@@ -20,10 +20,11 @@ export class SavedViewPage extends BasePage {
   }
 
   async goto(): Promise<void> {
-    const listResponsePromise = this.page.waitForResponse(
-      (resp) => resp.url().includes('/list') && resp.status() === 200,
-      { timeout: 10000 },
-    ).catch(() => null);
+    const listResponsePromise = this.page
+      .waitForResponse((resp) => resp.url().includes('/list') && resp.status() === 200, {
+        timeout: 10000,
+      })
+      .catch(() => null);
 
     await this.page.goto(this.path);
     await this.waitForLoad();
@@ -71,7 +72,10 @@ export class SavedViewPage extends BasePage {
       gallery: 'gallery',
       gantt: 'gantt',
     };
-    const btn = this.page.locator(`button`).filter({ hasText: new RegExp(typeMap[type], 'i') }).first();
+    const btn = this.page
+      .locator(`button`)
+      .filter({ hasText: new RegExp(typeMap[type], 'i') })
+      .first();
     if (await btn.isVisible({ timeout: 2000 }).catch(() => false)) {
       await btn.click();
       return;
@@ -79,7 +83,13 @@ export class SavedViewPage extends BasePage {
     // Fallback: try by position in the type button group
     const typeButtons = this.page.locator('.flex.rounded-lg > button, .inline-flex > button');
     const typeIndex = ['table', 'kanban', 'calendar', 'gallery', 'gantt'].indexOf(type);
-    if (typeIndex >= 0 && await typeButtons.nth(typeIndex).isVisible({ timeout: 2000 }).catch(() => false)) {
+    if (
+      typeIndex >= 0 &&
+      (await typeButtons
+        .nth(typeIndex)
+        .isVisible({ timeout: 2000 })
+        .catch(() => false))
+    ) {
       await typeButtons.nth(typeIndex).click();
     }
   }
@@ -89,9 +99,14 @@ export class SavedViewPage extends BasePage {
   /** Open the view management panel */
   async openManagePanel(): Promise<void> {
     await this.openViewSelector();
-    const manageBtn = this.page.locator('button').filter({ hasText: /manage/i }).first();
+    const manageBtn = this.page
+      .locator('button')
+      .filter({ hasText: /manage/i })
+      .first();
     await manageBtn.click();
-    await this.page.locator('[role="dialog"], [aria-modal="true"]').waitFor({ state: 'visible', timeout: 5000 });
+    await this.page
+      .locator('[role="dialog"], [aria-modal="true"]')
+      .waitFor({ state: 'visible', timeout: 5000 });
   }
 
   /** The manage panel dialog */
@@ -101,7 +116,10 @@ export class SavedViewPage extends BasePage {
 
   /** Click "New View" button in manage panel */
   async clickNewView(): Promise<void> {
-    await this.managePanel.locator('button').filter({ hasText: /new view/i }).click();
+    await this.managePanel
+      .locator('button')
+      .filter({ hasText: /new view/i })
+      .click();
   }
 
   /** Fill the new view name */
@@ -123,12 +141,19 @@ export class SavedViewPage extends BasePage {
 
   /** Submit the create view form */
   async submitCreateView(): Promise<void> {
-    const createBtn = this.managePanel.locator('button').filter({ hasText: /create/i }).first();
+    const createBtn = this.managePanel
+      .locator('button')
+      .filter({ hasText: /create/i })
+      .first();
     await createBtn.click();
   }
 
   /** Create a new view with all steps */
-  async createView(name: string, type: ViewType = 'table', scope: 'personal' | 'team' | 'global' = 'personal'): Promise<void> {
+  async createView(
+    name: string,
+    type: ViewType = 'table',
+    scope: 'personal' | 'team' | 'global' = 'personal',
+  ): Promise<void> {
     await this.openManagePanel();
     await this.clickNewView();
     await this.fillViewName(name);
@@ -146,10 +171,17 @@ export class SavedViewPage extends BasePage {
     // Hover to show action buttons
     await viewItem.hover();
     // Find the delete (trash) button near this item
-    const deleteBtn = viewItem.locator('..').locator('button').filter({ has: this.page.locator('svg') }).last();
+    const deleteBtn = viewItem
+      .locator('..')
+      .locator('button')
+      .filter({ has: this.page.locator('svg') })
+      .last();
     await deleteBtn.click();
     // Confirm deletion
-    const confirmBtn = this.page.locator('button').filter({ hasText: /ok|confirm|yes|确定|确认/i }).first();
+    const confirmBtn = this.page
+      .locator('button')
+      .filter({ hasText: /ok|confirm|yes|确定|确认/i })
+      .first();
     if (await confirmBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
       await confirmBtn.click();
     }
@@ -161,7 +193,10 @@ export class SavedViewPage extends BasePage {
     const viewItem = this.managePanel.locator('button').filter({ hasText: name }).first();
     await viewItem.hover();
     // Star icon button
-    const starBtn = viewItem.locator('..').locator('button[title*="default" i], button[title*="Default" i]').first();
+    const starBtn = viewItem
+      .locator('..')
+      .locator('button[title*="default" i], button[title*="Default" i]')
+      .first();
     await starBtn.click();
   }
 
@@ -171,7 +206,11 @@ export class SavedViewPage extends BasePage {
     const viewItem = this.managePanel.locator('button').filter({ hasText: name }).first();
     await viewItem.hover();
     // Copy icon button
-    const copyBtn = viewItem.locator('..').locator('button').filter({ has: this.page.locator('svg') }).nth(1);
+    const copyBtn = viewItem
+      .locator('..')
+      .locator('button')
+      .filter({ has: this.page.locator('svg') })
+      .nth(1);
     await copyBtn.click();
     // Handle the prompt dialog
     this.page.once('dialog', async (dialog) => {
@@ -181,7 +220,9 @@ export class SavedViewPage extends BasePage {
 
   /** Close the manage panel */
   async closeManagePanel(): Promise<void> {
-    const closeBtn = this.managePanel.locator('button[aria-label="Close panel"], button[aria-label="Close"]').first();
+    const closeBtn = this.managePanel
+      .locator('button[aria-label="Close panel"], button[aria-label="Close"]')
+      .first();
     if (await closeBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
       await closeBtn.click();
     }
@@ -199,7 +240,10 @@ export class SavedViewPage extends BasePage {
 
   /** Add a filter in the ViewFilterPanel */
   async addFilter(field: string, operator: string, value?: string): Promise<void> {
-    const addBtn = this.page.locator('button').filter({ hasText: /add filter/i }).first();
+    const addBtn = this.page
+      .locator('button')
+      .filter({ hasText: /add filter/i })
+      .first();
     await addBtn.click();
     // Select field
     const fieldSelects = this.page.locator('select').filter({ hasText: /select field/i });
@@ -220,14 +264,19 @@ export class SavedViewPage extends BasePage {
 
   /** Get column settings button */
   get columnSettingsBtn(): Locator {
-    return this.page.locator('button').filter({ hasText: /column|列/i }).first();
+    return this.page
+      .locator('button')
+      .filter({ hasText: /column|列/i })
+      .first();
   }
 
   // --- View-Specific Elements ---
 
   /** Kanban board container */
   get kanbanBoard(): Locator {
-    return this.page.locator('[data-testid="kanban-board"], .kanban-board, [class*="kanban"]').first();
+    return this.page
+      .locator('[data-testid="kanban-board"], .kanban-board, [class*="kanban"]')
+      .first();
   }
 
   /** Calendar grid container */
@@ -254,7 +303,10 @@ export class SavedViewPage extends BasePage {
 
   /** Click a sortable column header to toggle sort */
   async clickColumnSort(columnText: string): Promise<void> {
-    const header = this.page.locator('thead th, [role="columnheader"]').filter({ hasText: columnText }).first();
+    const header = this.page
+      .locator('thead th, [role="columnheader"]')
+      .filter({ hasText: columnText })
+      .first();
     await header.click();
   }
 

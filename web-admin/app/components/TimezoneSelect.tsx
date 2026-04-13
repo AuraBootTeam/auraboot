@@ -84,8 +84,9 @@ export default function TimezoneSelect({
     const curatedIana = new Set(curatedMatches.map((o) => o.value));
 
     // Then: match non-curated system timezones by IANA string
-    const fallbackMatches = allOptions
-      .filter((o) => !o.isKnown && !curatedIana.has(o.value) && o.value.toLowerCase().includes(q));
+    const fallbackMatches = allOptions.filter(
+      (o) => !o.isKnown && !curatedIana.has(o.value) && o.value.toLowerCase().includes(q),
+    );
 
     return [...curatedMatches, ...fallbackMatches];
   }, [allOptions, search]);

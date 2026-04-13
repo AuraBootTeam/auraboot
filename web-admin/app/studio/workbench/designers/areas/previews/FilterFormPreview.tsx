@@ -1,7 +1,7 @@
 /**
  * Filter Form Preview
  *
- * Preview component for filter-form blocks.
+ * Preview component for filters blocks.
  * Supports drag-and-drop reordering of filter fields.
  */
 
