@@ -1,0 +1,107 @@
+[
+  {
+    "code": "sc:create_request",
+    "displayName:zh-CN": "新建申请",
+    "displayName:en": "Create Request",
+    "type": "create",
+    "modelCode": "sc_request",
+    "inputFields": ["sc_req_title", "sc_req_description", "sc_req_priority", "sc_req_category", "sc_req_requester", "sc_req_due_date", "sc_req_amount", "sc_req_attachments"],
+    "autoSetFields": {
+      "sc_req_code": {"strategy": "auto_generate", "pattern": "REQ-{yyyyMMdd}-{seq}"},
+      "sc_req_status": {"strategy": "fixed_value", "value": "draft"}
+    },
+    "validation": {
+      "rules": [
+        {"type": "required", "fields": ["sc_req_title", "sc_req_priority", "sc_req_category"]},
+        {"type": "unique_composite", "fields": ["sc_req_code"]}
+      ]
+    },
+    "permissions": ["sc.workflow.manage"],
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "sc:update_request",
+    "displayName:zh-CN": "编辑申请",
+    "displayName:en": "Update Request",
+    "type": "update",
+    "modelCode": "sc_request",
+    "inputFields": ["sc_req_title", "sc_req_description", "sc_req_priority", "sc_req_category", "sc_req_due_date", "sc_req_amount", "sc_req_attachments"],
+    "preconditions": [
+      {"field": "sc_req_status", "operator": "IN", "value": ["draft", "revision"]}
+    ],
+    "permissions": ["sc.workflow.manage"],
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "sc:submit_request",
+    "displayName:zh-CN": "提交申请",
+    "displayName:en": "Submit Request",
+    "type": "state_transition",
+    "modelCode": "sc_request",
+    "stateField": "sc_req_status",
+    "fromStates": ["draft", "revision"],
+    "toState": "submitted",
+    "permissions": ["sc.workflow.manage"],
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "sc:cancel_request",
+    "displayName:zh-CN": "取消申请",
+    "displayName:en": "Cancel Request",
+    "type": "state_transition",
+    "modelCode": "sc_request",
+    "stateField": "sc_req_status",
+    "fromStates": ["draft", "submitted", "under_review", "approved", "rejected", "revision", "re_submitted", "in_progress", "pending_acceptance", "escalated", "on_hold"],
+    "toState": "cancelled",
+    "permissions": ["sc.workflow.manage"],
+    "cmd_risk_level": "L3"
+  },
+  {
+    "code": "sc:hold_request",
+    "displayName:zh-CN": "挂起申请",
+    "displayName:en": "Hold Request",
+    "type": "state_transition",
+    "modelCode": "sc_request",
+    "stateField": "sc_req_status",
+    "fromStates": ["submitted", "under_review", "approved", "in_progress", "pending_acceptance", "escalated"],
+    "toState": "on_hold",
+    "permissions": ["sc.workflow.manage"],
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "sc:resume_request",
+    "displayName:zh-CN": "恢复申请",
+    "displayName:en": "Resume Request",
+    "type": "state_transition",
+    "modelCode": "sc_request",
+    "stateField": "sc_req_status",
+    "fromStates": ["on_hold"],
+    "toState": "submitted",
+    "permissions": ["sc.workflow.manage"],
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "sc:archive_request",
+    "displayName:zh-CN": "归档申请",
+    "displayName:en": "Archive Request",
+    "type": "state_transition",
+    "modelCode": "sc_request",
+    "stateField": "sc_req_status",
+    "fromStates": ["completed"],
+    "toState": "archived",
+    "permissions": ["sc.workflow.manage"],
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "sc:delete_request",
+    "displayName:zh-CN": "删除申请",
+    "displayName:en": "Delete Request",
+    "type": "delete",
+    "modelCode": "sc_request",
+    "preconditions": [
+      {"field": "sc_req_status", "operator": "IN", "value": ["draft"]}
+    ],
+    "permissions": ["sc.workflow.manage"],
+    "cmd_risk_level": "L4"
+  }
+]

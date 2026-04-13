@@ -1,0 +1,42 @@
+{
+  "pageKey": "sc_task_form",
+  "modelCode": "sc_task",
+  "kind": "form",
+  "schemaVersion": 2,
+  "title": {"zh-CN": "任务表单", "en": "Task Form"},
+  "layout": {"type": "grid", "cols": 12},
+  "blocks": [
+    {
+      "id": "section_basic",
+      "blockType": "form-section",
+      "layout": {"col": 12},
+      "title": {"zh-CN": "任务信息", "en": "Task Information"},
+      "fields": [
+        {"field": "sc_task_code", "colSpan": 6, "readOnly": true},
+        {"field": "sc_task_title", "colSpan": 6},
+        {"field": "sc_task_request", "colSpan": 6, "readOnly": true}
+      ]
+    },
+    {
+      "id": "section_assignment",
+      "blockType": "form-section",
+      "layout": {"col": 12},
+      "title": {"zh-CN": "分配信息", "en": "Assignment"},
+      "fields": [
+        {"field": "sc_task_assignee", "colSpan": 6},
+        {"field": "sc_task_due_date", "colSpan": 6}
+      ]
+    },
+    {
+      "id": "section_execution",
+      "blockType": "form-section",
+      "layout": {"col": 12},
+      "title": {"zh-CN": "执行详情", "en": "Execution Details"},
+      "fields": [
+        {"field": "sc_task_description", "colSpan": 12},
+        {"field": "sc_task_progress", "colSpan": 6},
+        {"field": "sc_task_result", "colSpan": 12}
+      ]
+    }
+  ]
+}

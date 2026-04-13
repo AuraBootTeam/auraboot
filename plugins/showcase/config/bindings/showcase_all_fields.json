@@ -1,0 +1,178 @@
+[
+  {
+    "modelCode": "showcase_all_fields",
+    "fieldCode": "sc_name",
+    "sequence": 1,
+    "required": true,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "showcase_all_fields",
+    "fieldCode": "sc_code",
+    "sequence": 2,
+    "required": true,
+    "visible": true,
+    "editable": false
+  },
+  {
+    "modelCode": "showcase_all_fields",
+    "fieldCode": "sc_description",
+    "sequence": 3,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "showcase_all_fields",
+    "fieldCode": "sc_quantity",
+    "sequence": 4,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "showcase_all_fields",
+    "fieldCode": "sc_price",
+    "sequence": 5,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "showcase_all_fields",
+    "fieldCode": "sc_is_active",
+    "sequence": 6,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "showcase_all_fields",
+    "fieldCode": "sc_start_date",
+    "sequence": 7,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "showcase_all_fields",
+    "fieldCode": "sc_end_date",
+    "sequence": 8,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "showcase_all_fields",
+    "fieldCode": "sc_created_at",
+    "sequence": 9,
+    "required": false,
+    "visible": true,
+    "editable": false
+  },
+  {
+    "modelCode": "showcase_all_fields",
+    "fieldCode": "sc_status",
+    "sequence": 10,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "showcase_all_fields",
+    "fieldCode": "sc_priority",
+    "sequence": 11,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "showcase_all_fields",
+    "fieldCode": "sc_category",
+    "sequence": 12,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "showcase_all_fields",
+    "fieldCode": "sc_tags",
+    "sequence": 13,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "showcase_all_fields",
+    "fieldCode": "sc_progress",
+    "sequence": 14,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "showcase_all_fields",
+    "fieldCode": "sc_rating",
+    "sequence": 15,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "showcase_all_fields",
+    "fieldCode": "sc_color",
+    "sequence": 16,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "showcase_all_fields",
+    "fieldCode": "sc_website",
+    "sequence": 17,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "showcase_all_fields",
+    "fieldCode": "sc_email",
+    "sequence": 18,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "showcase_all_fields",
+    "fieldCode": "sc_phone",
+    "sequence": 19,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "showcase_all_fields",
+    "fieldCode": "sc_richtext_content",
+    "sequence": 20,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "showcase_all_fields",
+    "fieldCode": "sc_attachment",
+    "sequence": 21,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "showcase_all_fields",
+    "fieldCode": "sc_remark",
+    "sequence": 22,
+    "required": false,
+    "visible": true,
+    "editable": true
+  }
+]

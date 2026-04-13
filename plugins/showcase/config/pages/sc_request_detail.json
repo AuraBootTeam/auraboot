@@ -1,0 +1,122 @@
+{
+  "pageKey": "sc_request_detail",
+  "modelCode": "sc_request",
+  "kind": "detail",
+  "schemaVersion": 2,
+  "title": {"zh-CN": "申请详情", "en": "Request Detail"},
+  "layout": {"type": "grid", "cols": 12},
+  "blocks": [
+    {
+      "id": "sc_req_detail_tabs",
+      "blockType": "tabs",
+      "layout": {"col": 12},
+      "tabs": [
+        {
+          "key": "overview",
+          "label": {"zh-CN": "概览", "en": "Overview"},
+          "blocks": [
+            {
+              "id": "section_basic",
+              "blockType": "form-section",
+              "fields": [
+                {"field": "sc_req_code", "readOnly": true},
+                {"field": "sc_req_title", "readOnly": true},
+                {"field": "sc_req_category", "readOnly": true},
+                {"field": "sc_req_priority", "readOnly": true},
+                {"field": "sc_req_status", "readOnly": true}
+              ]
+            },
+            {
+              "id": "section_detail",
+              "blockType": "form-section",
+              "fields": [
+                {"field": "sc_req_requester", "readOnly": true},
+                {"field": "sc_req_amount", "readOnly": true},
+                {"field": "sc_req_due_date", "readOnly": true}
+              ]
+            },
+            {
+              "id": "section_content",
+              "blockType": "form-section",
+              "fields": [
+                {"field": "sc_req_description", "span": 2, "readOnly": true},
+                {"field": "sc_req_attachments", "span": 2, "readOnly": true}
+              ]
+            }
+          ]
+        },
+        {
+          "key": "reviews",
+          "label": {"zh-CN": "审批记录", "en": "Review Records"},
+          "blocks": [
+            {
+              "id": "sub_reviews",
+              "blockType": "sub-table",
+              "modelCode": "sc_review",
+              "foreignKey": "sc_rev_request",
+              "columns": [
+                {"field": "sc_rev_reviewer", "width": 120},
+                {"field": "sc_rev_decision", "width": 120},
+                {"field": "sc_rev_comment", "width": 250},
+                {"field": "sc_rev_level", "width": 100},
+                {"field": "sc_rev_status", "width": 120}
+              ]
+            }
+          ]
+        },
+        {
+          "key": "tasks",
+          "label": {"zh-CN": "执行任务", "en": "Tasks"},
+          "blocks": [
+            {
+              "id": "sub_tasks",
+              "blockType": "sub-table",
+              "modelCode": "sc_task",
+              "foreignKey": "sc_task_request",
+              "columns": [
+                {"field": "sc_task_code", "width": 160},
+                {"field": "sc_task_title", "width": 250},
+                {"field": "sc_task_assignee", "width": 120},
+                {"field": "sc_task_progress", "width": 120},
+                {"field": "sc_task_status", "width": 120},
+                {"field": "sc_task_due_date", "width": 120}
+              ]
+            }
+          ]
+        },
+        {
+          "key": "acceptance",
+          "label": {"zh-CN": "验收报告", "en": "Acceptance"},
+          "blocks": [
+            {
+              "id": "sub_acceptance",
+              "blockType": "sub-table",
+              "modelCode": "sc_acceptance",
+              "foreignKey": "sc_acc_request",
+              "columns": [
+                {"field": "sc_acc_inspector", "width": 120},
+                {"field": "sc_acc_result", "width": 120},
+                {"field": "sc_acc_comment", "width": 250},
+                {"field": "sc_acc_status", "width": 120}
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sc_req_detail_toolbar",
+      "blockType": "toolbar",
+      "layout": {"col": 12},
+      "buttons": [
+        {"code": "edit", "action": {"type": "navigate", "to": "sc_request_form", "command": "sc:update_request"}},
+        {"code": "submit", "action": {"type": "command", "command": "sc:submit_request"}, "visibleWhen": {"field": "sc_req_status", "operator": "IN", "value": ["draft", "revision"]}},
+        {"code": "cancel", "confirm": "cancel.confirm", "action": {"type": "command", "command": "sc:cancel_request"}, "variant": "danger"},
+        {"code": "hold", "action": {"type": "command", "command": "sc:hold_request"}, "visibleWhen": {"field": "sc_req_status", "operator": "NOT_IN", "value": ["completed", "cancelled", "archived", "on_hold", "draft"]}},
+        {"code": "resume", "action": {"type": "command", "command": "sc:resume_request"}, "visibleWhen": {"field": "sc_req_status", "operator": "EQ", "value": "on_hold"}},
+        {"code": "archive", "action": {"type": "command", "command": "sc:archive_request"}, "visibleWhen": {"field": "sc_req_status", "operator": "EQ", "value": "completed"}},
+        {"code": "delete", "confirm": "delete.confirm", "action": {"type": "command", "command": "sc:delete_request"}, "variant": "danger", "visibleWhen": {"field": "sc_req_status", "operator": "EQ", "value": "draft"}}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+[
+  {"modelCode": "sc_task", "fieldCode": "sc_task_code", "sequence": 1, "required": true, "visible": true, "editable": false},
+  {"modelCode": "sc_task", "fieldCode": "sc_task_request", "sequence": 2, "required": true, "visible": true, "editable": false},
+  {"modelCode": "sc_task", "fieldCode": "sc_task_title", "sequence": 3, "required": true, "visible": true, "editable": true},
+  {"modelCode": "sc_task", "fieldCode": "sc_task_assignee", "sequence": 4, "required": false, "visible": true, "editable": true},
+  {"modelCode": "sc_task", "fieldCode": "sc_task_description", "sequence": 5, "required": false, "visible": true, "editable": true},
+  {"modelCode": "sc_task", "fieldCode": "sc_task_progress", "sequence": 6, "required": false, "visible": true, "editable": true},
+  {"modelCode": "sc_task", "fieldCode": "sc_task_due_date", "sequence": 7, "required": false, "visible": true, "editable": true},
+  {"modelCode": "sc_task", "fieldCode": "sc_task_result", "sequence": 8, "required": false, "visible": true, "editable": true},
+  {"modelCode": "sc_task", "fieldCode": "sc_task_status", "sequence": 9, "required": true, "visible": true, "editable": false}
+]

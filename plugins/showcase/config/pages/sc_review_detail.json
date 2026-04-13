@@ -1,0 +1,33 @@
+{
+  "pageKey": "sc_review_detail",
+  "modelCode": "sc_review",
+  "kind": "detail",
+  "schemaVersion": 2,
+  "title": {"zh-CN": "审批详情", "en": "Review Detail"},
+  "layout": {"type": "grid", "cols": 12},
+  "blocks": [
+    {
+      "id": "sc_rev_detail_section",
+      "blockType": "form-section",
+      "layout": {"col": 12},
+      "fields": [
+        {"field": "sc_rev_request", "readOnly": true},
+        {"field": "sc_rev_reviewer", "readOnly": true},
+        {"field": "sc_rev_level", "readOnly": true},
+        {"field": "sc_rev_decision", "readOnly": true},
+        {"field": "sc_rev_comment", "readOnly": true},
+        {"field": "sc_rev_status", "readOnly": true}
+      ]
+    },
+    {
+      "id": "sc_rev_detail_toolbar",
+      "blockType": "toolbar",
+      "layout": {"col": 12},
+      "buttons": [
+        {"code": "approve", "action": {"type": "command", "command": "sc:approve_review"}, "visibleWhen": {"field": "sc_rev_status", "operator": "EQ", "value": "pending"}},
+        {"code": "reject", "action": {"type": "command", "command": "sc:reject_review"}, "variant": "danger", "visibleWhen": {"field": "sc_rev_status", "operator": "EQ", "value": "pending"}},
+        {"code": "request_revision", "action": {"type": "command", "command": "sc:request_revision"}, "visibleWhen": {"field": "sc_rev_status", "operator": "EQ", "value": "pending"}}
+      ]
+    }
+  ]
+}

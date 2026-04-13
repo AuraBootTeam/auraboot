@@ -1,0 +1,36 @@
+{
+  "pageKey": "sc_review_list",
+  "modelCode": "sc_review",
+  "kind": "list",
+  "schemaVersion": 2,
+  "title": {"zh-CN": "审批记录", "en": "Review Records"},
+  "layout": {"type": "grid", "cols": 12},
+  "blocks": [
+    {
+      "id": "sc_rev_tabs",
+      "blockType": "tabs",
+      "layout": {"col": 12},
+      "tabs": [
+        {"key": "all", "label": {"zh-CN": "全部", "en": "All"}, "filter": null},
+        {"key": "pending", "label": {"zh-CN": "待审批", "en": "Pending"}, "filter": {"field": "sc_rev_status", "operator": "EQ", "value": "pending"}},
+        {"key": "approved", "label": {"zh-CN": "已通过", "en": "Approved"}, "filter": {"field": "sc_rev_status", "operator": "EQ", "value": "approved"}},
+        {"key": "rejected", "label": {"zh-CN": "已拒绝", "en": "Rejected"}, "filter": {"field": "sc_rev_status", "operator": "EQ", "value": "rejected"}}
+      ]
+    },
+    {
+      "id": "sc_rev_table",
+      "blockType": "table",
+      "layout": {"col": 12},
+      "columns": [
+        {"field": "sc_rev_request", "width": 200},
+        {"field": "sc_rev_reviewer", "width": 120},
+        {"field": "sc_rev_decision", "width": 120},
+        {"field": "sc_rev_comment", "width": 250},
+        {"field": "sc_rev_level", "width": 100},
+        {"field": "sc_rev_status", "width": 120},
+        {"field": "created_at", "width": 160}
+      ],
+      "defaultSort": {"field": "created_at", "order": "desc"}
+    }
+  ]
+}
