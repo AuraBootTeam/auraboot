@@ -63,7 +63,7 @@ const defaultApiConfig: ApiEnvironmentConfig = {
   },
   k8s: {
     protocol: getEnvVar('api_protocol', 'http'),
-    domain: getEnvVar('api_service_name', 'cast-one-service'),
+    domain: getEnvVar('api_service_name', 'auraboot-platform'),
     port: getEnvVar('api_service_port') ? parseInt(getEnvVar('api_service_port')) : 6443,
     basePath: getEnvVar('api_base_path', ''),
     timeout: 30000,

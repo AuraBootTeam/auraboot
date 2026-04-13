@@ -8,9 +8,9 @@
 >
 > 详细边界见 memory:`project_oss_enterprise_boundary.md`
 
-对比来源：
-- **A (Core, possibly stale)**: `/Users/ghj/work/auraboot/auraboot/web-admin/`
-- **B (Enterprise, newer/richer)**: `/Users/ghj/work/auraboot/auraboot-enterprise/web-admin/`
+对比来源(相对路径,假设两个 repo 同级):
+- **A (Core, possibly stale)**: `auraboot/web-admin/`
+- **B (Enterprise, newer/richer)**: `auraboot-enterprise/web-admin/`
 
 方法：`diff -rq A/ B/`，忽略 `.DS_Store` / `.env*` / `.playwright-mcp/` / `.react-router/` / `node_modules/` / build artifacts。
 
