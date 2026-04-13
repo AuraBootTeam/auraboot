@@ -1,0 +1,31 @@
+{
+  "pluginId": "com.auraboot.org-management",
+  "namespace": "org",
+  "version": "1.0.0",
+  "dslVersion": 1,
+  "pluginType": "config",
+  "displayName:zh-CN": "组织管理",
+  "displayName:en": "Organization Management",
+  "description": "Platform built-in organization management: departments, positions, employees",
+  "author": "AuraBoot Team",
+  "homepage": "https://auraboot.io/plugins/org-management",
+  "minPlatformVersion": "1.0.0",
+  "dependencies": [],
+  "resourceDirs": {
+    "models": "config/models.json",
+    "fields": "config/fields",
+    "modelFieldBindings": "config/bindings",
+    "commands": "config/commands",
+    "pages": "config/pages",
+    "dicts": "config/dicts.json",
+    "permissions": "config/permissions.json",
+    "menus": "config/menus.json",
+    "i18n": "config/i18n.json"
+  },
+  "importOptions": {
+    "conflictStrategy": "overwrite",
+    "validateReferences": true,
+    "autoDeployProcesses": false,
+    "createResourcePermissions": false
+  }
+}

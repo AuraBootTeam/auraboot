@@ -1,0 +1,12 @@
+{
+  "code": "org:delete_position",
+  "displayName:zh-CN": "Delete Position",
+  "displayName:en": "Delete Position",
+  "type": "delete",
+  "modelCode": "org_position",
+  "permissions": ["ORG.hr.manage"],
+  "extension": {
+    "confirmMessage:zh-CN": "Confirm delete this position?",
+    "confirmMessage:en": "Confirm delete this position?"
+  }
+}

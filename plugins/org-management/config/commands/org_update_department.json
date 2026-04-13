@@ -1,0 +1,10 @@
+{
+  "code": "org:update_department",
+  "displayName:zh-CN": "Update Department",
+  "displayName:en": "Update Department",
+  "description": "Update department information",
+  "type": "update",
+  "modelCode": "org_department",
+  "inputFields": ["org_dept_name", "org_dept_parent_id", "org_dept_manager_id", "org_dept_order", "org_dept_status"],
+  "permissions": ["ORG.hr.manage"]
+}

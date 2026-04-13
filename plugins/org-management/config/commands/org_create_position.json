@@ -1,0 +1,10 @@
+{
+  "code": "org:create_position",
+  "displayName:zh-CN": "Create Position",
+  "displayName:en": "Create Position",
+  "description": "Create a new position",
+  "type": "create",
+  "modelCode": "org_position",
+  "inputFields": ["org_pos_code", "org_pos_name", "org_pos_dept_id", "org_pos_level", "org_pos_status"],
+  "permissions": ["ORG.hr.manage"]
+}

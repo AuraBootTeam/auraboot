@@ -1,0 +1,9 @@
+{
+  "code": "org_emp_position_id",
+  "displayName:zh-CN": "岗位",
+  "displayName:en": "Position",
+  "dataType": "reference",
+  "constraints": { "required": true },
+  "refTarget": { "targetModel": "org_position", "targetField": "org_pos_name" },
+  "extension": { "placeholder:zh-CN": "请选择岗位" }
+}

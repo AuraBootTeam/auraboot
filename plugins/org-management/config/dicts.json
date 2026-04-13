@@ -1,0 +1,164 @@
+[
+  {
+    "code": "org_dept_status",
+    "name:zh-CN": "Department Status",
+    "name:en": "Department Status",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "active",
+        "label:zh-CN": "Active",
+        "label:en": "Active",
+        "sortNo": 1,
+        "color": "#52c41a",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "inactive",
+        "label:zh-CN": "Inactive",
+        "label:en": "Inactive",
+        "sortNo": 2,
+        "color": "#d9d9d9",
+        "extension": {
+          "color": "gray"
+        }
+      }
+    ]
+  },
+  {
+    "code": "org_pos_status",
+    "name:zh-CN": "Position Status",
+    "name:en": "Position Status",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "active",
+        "label:zh-CN": "Active",
+        "label:en": "Active",
+        "sortNo": 1,
+        "color": "#52c41a",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "inactive",
+        "label:zh-CN": "Inactive",
+        "label:en": "Inactive",
+        "sortNo": 2,
+        "color": "#d9d9d9",
+        "extension": {
+          "color": "gray"
+        }
+      }
+    ]
+  },
+  {
+    "code": "org_position_level",
+    "name:zh-CN": "Position Level",
+    "name:en": "Position Level",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "staff",
+        "label:zh-CN": "Staff",
+        "label:en": "Staff",
+        "sortNo": 1,
+        "color": "#d9d9d9",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "supervisor",
+        "label:zh-CN": "Supervisor",
+        "label:en": "Supervisor",
+        "sortNo": 2,
+        "color": "#1890ff",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "manager",
+        "label:zh-CN": "Manager",
+        "label:en": "Manager",
+        "sortNo": 3,
+        "color": "#722ed1",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "director",
+        "label:zh-CN": "Director",
+        "label:en": "Director",
+        "sortNo": 4,
+        "color": "#fa8c16",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "VP",
+        "label:zh-CN": "VP",
+        "label:en": "VP",
+        "sortNo": 5,
+        "color": "#eb2f96",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "ceo",
+        "label:zh-CN": "ceo",
+        "label:en": "ceo",
+        "sortNo": 6,
+        "color": "#f5222d",
+        "extension": {
+          "color": "blue"
+        }
+      }
+    ]
+  },
+  {
+    "code": "org_emp_status",
+    "name:zh-CN": "Employee Status",
+    "name:en": "Employee Status",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "active",
+        "label:zh-CN": "Active",
+        "label:en": "Active",
+        "sortNo": 1,
+        "color": "#52c41a",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "on_leave",
+        "label:zh-CN": "On Leave",
+        "label:en": "On Leave",
+        "sortNo": 2,
+        "color": "#fa8c16",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "resigned",
+        "label:zh-CN": "Resigned",
+        "label:en": "Resigned",
+        "sortNo": 3,
+        "color": "#d9d9d9",
+        "extension": {
+          "color": "blue"
+        }
+      }
+    ]
+  }
+]

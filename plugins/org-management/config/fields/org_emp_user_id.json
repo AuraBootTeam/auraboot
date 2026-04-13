@@ -1,0 +1,12 @@
+{
+  "code": "org_emp_user_id",
+  "displayName:zh-CN": "系统用户",
+  "displayName:en": "System User",
+  "dataType": "reference",
+  "constraints": { "required": true },
+  "refTarget": { "targetModel": "ab_user", "targetField": "user_name" },
+  "extension": {
+    "placeholder:zh-CN": "请选择关联用户",
+    "renderComponent": "user-select"
+  }
+}

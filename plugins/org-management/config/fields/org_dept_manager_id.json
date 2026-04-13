@@ -1,0 +1,8 @@
+{
+  "code": "org_dept_manager_id",
+  "displayName:zh-CN": "部门负责人",
+  "displayName:en": "Department Manager",
+  "dataType": "reference",
+  "refTarget": { "targetModel": "org_employee", "targetField": "org_emp_name" },
+  "extension": { "placeholder:zh-CN": "请选择部门负责人" }
+}

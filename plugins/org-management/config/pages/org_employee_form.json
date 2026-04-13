@@ -1,0 +1,141 @@
+{
+  "pageKey": "org_employee_form",
+  "name:zh-CN": "Employee Form",
+  "name:en": "Employee Form",
+  "modelCode": "org_employee",
+  "description": "Employee create/edit form",
+  "kind": "form",
+  "schemaVersion": 2,
+  "layout": {
+    "type": "grid",
+    "cols": 12,
+    "gap": 12
+  },
+  "blocks": [
+    {
+      "id": "block_emp_basic",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "Basic Information",
+        "en": "Basic Information"
+      },
+      "layout": {
+        "colSpan": 12,
+        "rowSpan": 1
+      },
+      "columns": 2,
+      "fields": [
+        {
+          "field": "org_emp_name",
+          "layout": {
+            "colSpan": 6,
+            "rowSpan": 1
+          }
+        },
+        {
+          "field": "org_emp_code",
+          "readOnly": true,
+          "layout": {
+            "colSpan": 6,
+            "rowSpan": 1
+          }
+        },
+        {
+          "field": "org_emp_user_id",
+          "layout": {
+            "colSpan": 6,
+            "rowSpan": 1
+          }
+        },
+        {
+          "field": "org_emp_dept_id",
+          "layout": {
+            "colSpan": 6,
+            "rowSpan": 1
+          }
+        },
+        {
+          "field": "org_emp_position_id",
+          "layout": {
+            "colSpan": 6,
+            "rowSpan": 1
+          }
+        },
+        {
+          "field": "org_emp_report_to",
+          "layout": {
+            "colSpan": 6,
+            "rowSpan": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "block_emp_contact",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "Contact Information",
+        "en": "Contact Information"
+      },
+      "layout": {
+        "colSpan": 12,
+        "rowSpan": 1
+      },
+      "columns": 2,
+      "fields": [
+        {
+          "field": "org_emp_phone",
+          "layout": {
+            "colSpan": 6,
+            "rowSpan": 1
+          }
+        },
+        {
+          "field": "org_emp_email",
+          "layout": {
+            "colSpan": 6,
+            "rowSpan": 1
+          }
+        },
+        {
+          "field": "org_emp_hire_date",
+          "layout": {
+            "colSpan": 6,
+            "rowSpan": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "block_emp_actions",
+      "blockType": "form-buttons",
+      "layout": {
+        "colSpan": 12,
+        "rowSpan": 1
+      },
+      "buttons": [
+        {
+          "code": "save",
+          "primary": true,
+          "label": "save",
+          "action": {
+            "type": "command",
+            "command": "org:create_employee"
+          }
+        },
+        {
+          "code": "cancel",
+          "label": "cancel",
+          "action": {
+            "type": "builtin",
+            "name": "back"
+          }
+        }
+      ]
+    }
+  ],
+  "title": {
+    "zh-CN": "Employee Form",
+    "en": "Employee Form"
+  }
+}

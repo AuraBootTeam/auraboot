@@ -1,0 +1,7 @@
+{
+  "code": "org_emp_email",
+  "displayName:zh-CN": "邮箱",
+  "displayName:en": "Email",
+  "dataType": "string",
+  "constraints": { "maxLength": 100 }
+}

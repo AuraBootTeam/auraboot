@@ -1,0 +1,14 @@
+{
+  "code": "org:create_employee",
+  "displayName:zh-CN": "Create Employee",
+  "displayName:en": "Create Employee",
+  "description": "Create a new employee record with auto-generated code",
+  "type": "create",
+  "modelCode": "org_employee",
+  "inputFields": ["org_emp_user_id", "org_emp_name", "org_emp_dept_id", "org_emp_position_id", "org_emp_report_to", "org_emp_phone", "org_emp_email", "org_emp_hire_date"],
+  "autoSetFields": {
+    "org_emp_code": { "strategy": "auto_generate", "pattern": "EMP-{yyyyMMdd}-{seq}" },
+    "org_emp_status": { "strategy": "fixed_value", "value": "active" }
+  },
+  "permissions": ["ORG.hr.manage"]
+}

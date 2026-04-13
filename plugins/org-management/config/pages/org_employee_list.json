@@ -1,0 +1,181 @@
+{
+  "pageKey": "org_employee_list",
+  "name:zh-CN": "Employee Management",
+  "name:en": "Employee Management",
+  "modelCode": "org_employee",
+  "description": "Employee list with status tabs and CRUD",
+  "kind": "list",
+  "schemaVersion": 2,
+  "layout": {
+    "type": "grid",
+    "cols": 12
+  },
+  "blocks": [
+    {
+      "id": "block_emp_tabs",
+      "blockType": "tabs",
+      "layout": {
+        "colSpan": 12,
+        "rowSpan": 1
+      },
+      "tabs": [
+        {
+          "key": "all",
+          "label": {
+            "zh-CN": "All",
+            "en": "All"
+          },
+          "filter": null
+        },
+        {
+          "key": "active",
+          "label": {
+            "zh-CN": "Active",
+            "en": "Active"
+          },
+          "filter": {
+            "field": "org_emp_status",
+            "operator": "EQ",
+            "value": "active"
+          }
+        },
+        {
+          "key": "on_leave",
+          "label": {
+            "zh-CN": "On Leave",
+            "en": "On Leave"
+          },
+          "filter": {
+            "field": "org_emp_status",
+            "operator": "EQ",
+            "value": "on_leave"
+          }
+        },
+        {
+          "key": "resigned",
+          "label": {
+            "zh-CN": "Resigned",
+            "en": "Resigned"
+          },
+          "filter": {
+            "field": "org_emp_status",
+            "operator": "EQ",
+            "value": "resigned"
+          }
+        }
+      ]
+    },
+    {
+      "id": "block_emp_toolbar",
+      "blockType": "form-buttons",
+      "layout": {
+        "colSpan": 12,
+        "rowSpan": 1
+      },
+      "buttons": [
+        {
+          "code": "create",
+          "primary": true,
+          "icon": "Plus",
+          "label": "create",
+          "action": {
+            "type": "navigate",
+            "to": "org_employee_form",
+            "command": "org:create_employee"
+          }
+        }
+      ]
+    },
+    {
+      "id": "block_emp_table",
+      "blockType": "table",
+      "layout": {
+        "colSpan": 12,
+        "rowSpan": 1
+      },
+      "defaultSort": {
+        "field": "org_emp_name",
+        "order": "asc"
+      },
+      "searchFields": [
+        "org_emp_code",
+        "org_emp_name",
+        "org_emp_status"
+      ],
+      "table": {
+        "columns": [
+          {
+            "field": "org_emp_code",
+            "width": 150,
+            "fixed": "left"
+          },
+          {
+            "field": "org_emp_name",
+            "width": 150
+          },
+          {
+            "field": "org_emp_dept_id",
+            "width": 150
+          },
+          {
+            "field": "org_emp_position_id",
+            "width": 150
+          },
+          {
+            "field": "org_emp_report_to",
+            "width": 150
+          },
+          {
+            "field": "org_emp_phone",
+            "width": 130
+          },
+          {
+            "field": "org_emp_email",
+            "width": 180
+          },
+          {
+            "field": "org_emp_hire_date",
+            "width": 120
+          },
+          {
+            "field": "org_emp_status",
+            "width": 100,
+            "renderType": "tag",
+            "dictCode": "org_emp_status"
+          },
+          {
+            "field": "actions",
+            "isActionColumn": true,
+            "buttons": [
+              {
+                "code": "edit",
+                "icon": "Edit",
+                "label": "edit",
+                "action": {
+                  "type": "navigate",
+                  "to": "org_employee_form",
+                  "command": "org:update_employee"
+                }
+              },
+              {
+                "code": "delete",
+                "icon": "Trash2",
+                "danger": true,
+                "label": "delete",
+                "confirm": "delete.confirm",
+                "action": {
+                  "type": "command",
+                  "command": "org:delete_employee"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "title": {
+    "zh-CN": "Employee Management",
+    "en": "Employee Management"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "code": "org_dept_order",
+  "displayName:zh-CN": "排序",
+  "displayName:en": "Sort Order",
+  "dataType": "integer",
+  "constraints": { "defaultValue": "0" }
+}

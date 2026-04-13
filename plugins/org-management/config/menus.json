@@ -1,0 +1,45 @@
+[
+  {
+    "code": "org_departments",
+    "name:zh-CN": "Departments",
+    "name:en": "Departments",
+    "path": "/p/org_department",
+    "icon": "Building",
+    "type": 1,
+    "parentCode": "org_management",
+    "orderNo": 51,
+    "permissionCode": "org.hr.read",
+    "pageKey": "org_department_list",
+    "visible": false,
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    }
+  },
+  {
+    "code": "org_positions",
+    "name:zh-CN": "Positions",
+    "name:en": "Positions",
+    "path": "/p/org_position",
+    "icon": "IdCard",
+    "type": 1,
+    "parentCode": "org_management",
+    "orderNo": 52,
+    "permissionCode": "org.hr.read",
+    "pageKey": "org_position_list"
+  },
+  {
+    "code": "org_employees",
+    "name:zh-CN": "Employees",
+    "name:en": "Employees",
+    "path": "/p/org_employee",
+    "icon": "User",
+    "type": 1,
+    "parentCode": "org_management",
+    "orderNo": 53,
+    "visible": false,
+    "permissionCode": "org.hr.read",
+    "pageKey": "org_employee_list"
+  }
+]

@@ -1,0 +1,8 @@
+{
+  "code": "org_emp_name",
+  "displayName:zh-CN": "姓名",
+  "displayName:en": "Name",
+  "dataType": "string",
+  "constraints": { "required": true, "maxLength": 100 },
+  "feature": { "searchable": true, "sortable": true }
+}

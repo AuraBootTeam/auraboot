@@ -1,0 +1,44 @@
+[
+  {
+    "code": "org_department",
+    "displayName:zh-CN": "部门",
+    "displayName:en": "Department",
+    "description": "Organization department tree structure",
+    "modelType": "entity",
+    "modelCategory": "master",
+    "extension": {
+      "icon": "Building",
+      "category": "organization",
+      "titleField": "org_dept_name",
+      "subtitleField": "org_dept_code"
+    }
+  },
+  {
+    "code": "org_position",
+    "displayName:zh-CN": "岗位",
+    "displayName:en": "Position",
+    "description": "Position definition with level hierarchy",
+    "modelType": "entity",
+    "modelCategory": "master",
+    "extension": {
+      "icon": "IdCard",
+      "category": "organization",
+      "titleField": "org_pos_name",
+      "subtitleField": "org_pos_code"
+    }
+  },
+  {
+    "code": "org_employee",
+    "displayName:zh-CN": "员工",
+    "displayName:en": "Employee",
+    "description": "Employee with reporting line for approval routing",
+    "modelType": "entity",
+    "modelCategory": "master",
+    "extension": {
+      "icon": "User",
+      "category": "organization",
+      "titleField": "org_emp_name",
+      "subtitleField": "org_emp_code"
+    }
+  }
+]

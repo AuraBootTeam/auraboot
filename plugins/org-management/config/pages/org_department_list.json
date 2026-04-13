@@ -1,0 +1,158 @@
+{
+  "pageKey": "org_department_list",
+  "name:zh-CN": "Department Management",
+  "name:en": "Department Management",
+  "modelCode": "org_department",
+  "description": "Department list with status tabs and CRUD",
+  "kind": "list",
+  "schemaVersion": 2,
+  "layout": {
+    "type": "grid",
+    "cols": 12
+  },
+  "blocks": [
+    {
+      "id": "block_dept_tabs",
+      "blockType": "tabs",
+      "layout": {
+        "colSpan": 12,
+        "rowSpan": 1
+      },
+      "tabs": [
+        {
+          "key": "all",
+          "label": {
+            "zh-CN": "All",
+            "en": "All"
+          },
+          "filter": null
+        },
+        {
+          "key": "active",
+          "label": {
+            "zh-CN": "Active",
+            "en": "Active"
+          },
+          "filter": {
+            "field": "org_dept_status",
+            "operator": "EQ",
+            "value": "active"
+          }
+        },
+        {
+          "key": "inactive",
+          "label": {
+            "zh-CN": "Inactive",
+            "en": "Inactive"
+          },
+          "filter": {
+            "field": "org_dept_status",
+            "operator": "EQ",
+            "value": "inactive"
+          }
+        }
+      ]
+    },
+    {
+      "id": "block_dept_toolbar",
+      "blockType": "form-buttons",
+      "layout": {
+        "colSpan": 12,
+        "rowSpan": 1
+      },
+      "buttons": [
+        {
+          "code": "create",
+          "primary": true,
+          "icon": "Plus",
+          "label": "create",
+          "action": {
+            "type": "navigate",
+            "to": "org_department_form",
+            "command": "org:create_department"
+          }
+        }
+      ]
+    },
+    {
+      "id": "block_dept_table",
+      "blockType": "table",
+      "layout": {
+        "colSpan": 12,
+        "rowSpan": 1
+      },
+      "defaultSort": {
+        "field": "org_dept_order",
+        "order": "asc"
+      },
+      "searchFields": [
+        "org_dept_code",
+        "org_dept_name",
+        "org_dept_status"
+      ],
+      "table": {
+        "columns": [
+          {
+            "field": "org_dept_code",
+            "width": 150,
+            "fixed": "left"
+          },
+          {
+            "field": "org_dept_name",
+            "width": 200
+          },
+          {
+            "field": "org_dept_parent_id",
+            "width": 180
+          },
+          {
+            "field": "org_dept_manager_id",
+            "width": 150
+          },
+          {
+            "field": "org_dept_order",
+            "width": 100,
+            "align": "right"
+          },
+          {
+            "field": "org_dept_status",
+            "width": 100,
+            "renderType": "tag",
+            "dictCode": "org_dept_status"
+          },
+          {
+            "field": "actions",
+            "isActionColumn": true,
+            "buttons": [
+              {
+                "code": "edit",
+                "icon": "Edit",
+                "label": "edit",
+                "action": {
+                  "type": "navigate",
+                  "to": "org_department_form",
+                  "command": "org:update_department"
+                }
+              },
+              {
+                "code": "delete",
+                "icon": "Trash2",
+                "danger": true,
+                "label": "delete",
+                "confirm": "delete.confirm",
+                "action": {
+                  "type": "command",
+                  "command": "org:delete_department"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "title": {
+    "zh-CN": "Department Management",
+    "en": "Department Management"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "code": "org_emp_report_to",
+  "displayName:zh-CN": "汇报对象",
+  "displayName:en": "Reports To",
+  "dataType": "reference",
+  "refTarget": { "targetModel": "org_employee", "targetField": "org_emp_name" },
+  "extension": { "placeholder:zh-CN": "请选择直属上级" }
+}

@@ -1,0 +1,8 @@
+{
+  "code": "org_emp_status",
+  "displayName:zh-CN": "状态",
+  "displayName:en": "Status",
+  "dataType": "string",
+  "constraints": { "defaultValue": "active", "maxLength": 20 },
+  "extension": { "dictCode": "org_emp_status" }
+}
