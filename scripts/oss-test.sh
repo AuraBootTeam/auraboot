@@ -26,20 +26,31 @@ if ! command -v jq >/dev/null; then
   exit 1
 fi
 
-# Extract test_paths from scope file
-PATHS=()
-while IFS= read -r path; do
-  PATHS+=("$path")
+cd "$WEB_ADMIN_DIR"
+
+# Expand manifest test_paths (single file or dir/**) into concrete .spec.ts files.
+# Playwright CLI positional args are regex-matched against test file paths, which
+# over-matches when using directory names that appear as substrings elsewhere.
+# Pass explicit file paths to avoid cross-plugin leakage.
+FILES=()
+while IFS= read -r entry; do
+  if [[ "$entry" == *.ts ]]; then
+    [[ -f "$entry" ]] && FILES+=("$entry")
+  else
+    dir="${entry%/\*\*}"
+    while IFS= read -r f; do
+      FILES+=("$f")
+    done < <(find "$dir" -name "*.spec.ts" 2>/dev/null)
+  fi
 done < <(jq -r '.test_paths[]' "$SCOPE_FILE")
 
 echo "=== AuraBoot OSS Test Runner ==="
-echo "Scope file: $SCOPE_FILE"
-echo "Paths in scope: ${#PATHS[@]}"
+echo "Scope file:    $SCOPE_FILE"
+echo "Spec files:    ${#FILES[@]}"
 echo ""
 
 LOG="/tmp/pw-oss-$(date +%Y%m%d-%H%M%S).log"
 echo "Log: $LOG"
 echo ""
 
-cd "$WEB_ADMIN_DIR"
-NO_PROXY=localhost npx playwright test "${PATHS[@]}" "$@" 2>&1 | tee "$LOG"
+NO_PROXY=localhost npx playwright test "${FILES[@]}" "$@" 2>&1 | tee "$LOG"
