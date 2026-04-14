@@ -1,83 +1,83 @@
 [
   {
-    "code": "crms.account.manage",
+    "code": "crm.account.manage",
     "name:zh-CN": "客户管理",
     "name:en": "Account Management",
     "resourceType": "operation",
     "module": "crms"
   },
   {
-    "code": "crms.account.read",
+    "code": "crm.account.read",
     "name:zh-CN": "查看客户",
     "name:en": "View Accounts",
     "resourceType": "data",
     "module": "crms"
   },
   {
-    "code": "crms.contact.manage",
+    "code": "crm.contact.manage",
     "name:zh-CN": "联系人管理",
     "name:en": "Contact Management",
     "resourceType": "operation",
     "module": "crms"
   },
   {
-    "code": "crms.contact.read",
+    "code": "crm.contact.read",
     "name:zh-CN": "查看联系人",
     "name:en": "View Contacts",
     "resourceType": "data",
     "module": "crms"
   },
   {
-    "code": "crms.lead.manage",
+    "code": "crm.lead.manage",
     "name:zh-CN": "线索管理",
     "name:en": "Lead Management",
     "resourceType": "operation",
     "module": "crms"
   },
   {
-    "code": "crms.lead.read",
+    "code": "crm.lead.read",
     "name:zh-CN": "查看线索",
     "name:en": "View Leads",
     "resourceType": "data",
     "module": "crms"
   },
   {
-    "code": "crms.opportunity.manage",
+    "code": "crm.opportunity.manage",
     "name:zh-CN": "商机管理",
     "name:en": "Opportunity Management",
     "resourceType": "operation",
     "module": "crms"
   },
   {
-    "code": "crms.opportunity.read",
+    "code": "crm.opportunity.read",
     "name:zh-CN": "查看商机",
     "name:en": "View Opportunities",
     "resourceType": "data",
     "module": "crms"
   },
   {
-    "code": "crms.activity.manage",
+    "code": "crm.activity.manage",
     "name:zh-CN": "活动管理",
     "name:en": "Activity Management",
     "resourceType": "operation",
     "module": "crms"
   },
   {
-    "code": "crms.activity.read",
+    "code": "crm.activity.read",
     "name:zh-CN": "查看活动",
     "name:en": "View Activities",
     "resourceType": "data",
     "module": "crms"
   },
   {
-    "code": "crms.campaign.manage",
+    "code": "crm.campaign.manage",
     "name:zh-CN": "营销活动管理",
     "name:en": "Campaign Management",
     "resourceType": "operation",
     "module": "crms"
   },
   {
-    "code": "crms.campaign.read",
+    "code": "crm.campaign.read",
     "name:zh-CN": "查看营销活动",
     "name:en": "View Campaigns",
     "resourceType": "data",

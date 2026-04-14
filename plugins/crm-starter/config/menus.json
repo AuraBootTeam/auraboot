@@ -21,7 +21,7 @@
     "component": null,
     "icon": "IconBuilding",
     "type": 1,
-    "permissionCode": "crms.account.read",
+    "permissionCode": "crm.account.read",
     "orderNo": 1,
     "visible": true
   },
@@ -34,7 +34,7 @@
     "component": null,
     "icon": "IconUser",
     "type": 1,
-    "permissionCode": "crms.contact.read",
+    "permissionCode": "crm.contact.read",
     "orderNo": 2,
     "visible": true
   },
@@ -47,7 +47,7 @@
     "component": null,
     "icon": "IconRadar",
     "type": 1,
-    "permissionCode": "crms.lead.read",
+    "permissionCode": "crm.lead.read",
     "orderNo": 3,
     "visible": true
   },
@@ -60,7 +60,7 @@
     "component": null,
     "icon": "IconTarget",
     "type": 1,
-    "permissionCode": "crms.opportunity.read",
+    "permissionCode": "crm.opportunity.read",
     "orderNo": 4,
     "visible": true
   },
@@ -73,7 +73,7 @@
     "component": null,
     "icon": "IconActivity",
     "type": 1,
-    "permissionCode": "crms.activity.read",
+    "permissionCode": "crm.activity.read",
     "orderNo": 5,
     "visible": true
   },
@@ -86,7 +86,7 @@
     "component": null,
     "icon": "IconMegaphone",
     "type": 1,
-    "permissionCode": "crms.campaign.read",
+    "permissionCode": "crm.campaign.read",
     "orderNo": 6,
     "visible": true
   }

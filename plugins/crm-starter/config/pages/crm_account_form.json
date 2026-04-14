@@ -58,7 +58,7 @@
           "label": "save",
           "action": {
             "type": "command",
-            "command": "crms:update_account"
+            "command": "crm:update_account"
           }
         },
         {

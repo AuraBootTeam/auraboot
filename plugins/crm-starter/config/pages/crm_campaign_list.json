@@ -13,12 +13,12 @@
         {
           "code": "create",
           "primary": true,
-          "permissionCode": "CRMS.campaign.manage",
+          "permissionCode": "CRM.campaign.manage",
           "label": "create",
           "action": {
             "type": "navigate",
             "to": "crm_campaign_form",
-            "command": "crms:create_campaign"
+            "command": "crm:create_campaign"
           }
         }
       ]
@@ -130,7 +130,7 @@
             },
             {
               "code": "edit",
-              "permissionCode": "CRMS.campaign.manage",
+              "permissionCode": "CRM.campaign.manage",
               "label": "edit",
               "action": {
                 "type": "navigate",
@@ -140,12 +140,12 @@
             {
               "code": "delete",
               "danger": true,
-              "permissionCode": "CRMS.campaign.manage",
+              "permissionCode": "CRM.campaign.manage",
               "label": "delete",
               "confirm": "delete.confirm",
               "action": {
                 "type": "command",
-                "command": "crms:delete_campaign"
+                "command": "crm:delete_campaign"
               }
             }
           ]
