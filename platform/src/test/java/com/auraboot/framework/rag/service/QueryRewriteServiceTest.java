@@ -14,7 +14,7 @@ import static org.assertj.core.api.Assertions.*;
  */
 class QueryRewriteServiceTest {
 
-    private final QueryRewriteService service = new QueryRewriteService();
+    private final QueryRewriteService service = new QueryRewriteService(new com.auraboot.framework.rag.config.SynonymConfig());
 
     // =========================================================================
     // Query expansion
