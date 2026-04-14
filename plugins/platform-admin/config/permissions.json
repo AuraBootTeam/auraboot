@@ -48,10 +48,10 @@
     "module": "enterprise"
   },
   {
-    "code": "plugin_marketplace",
-    "name:zh-CN": "插件市场",
-    "name:en": "Plugin Marketplace",
-    "description": "Browse and install plugins from marketplace",
+    "code": "plugin_management",
+    "name:zh-CN": "插件管理",
+    "name:en": "Plugin Management",
+    "description": "Manage plugins: discover, install, upgrade, uninstall",
     "resourceType": "operation",
     "module": "system"
   },

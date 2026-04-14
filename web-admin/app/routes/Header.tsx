@@ -359,7 +359,7 @@ export default function Header({
                           tid.type = 'hidden'; tid.name = 'tenantId'; tid.value = platformSpace.tenantId;
                           form.appendChild(tid);
                           const redir = document.createElement('input');
-                          redir.type = 'hidden'; redir.name = 'redirectTo'; redir.value = '/platform/marketplace';
+                          redir.type = 'hidden'; redir.name = 'redirectTo'; redir.value = '/platform/plugins';
                           form.appendChild(redir);
                           document.body.appendChild(form);
                           form.submit();

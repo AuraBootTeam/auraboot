@@ -95,15 +95,15 @@
     "pageKey": "api_connector_list"
   },
   {
-    "code": "plugin_marketplace",
+    "code": "plugin_management",
     "parentCode": "system_management",
-    "name:zh-CN": "插件市场",
-    "name:en": "Plugin Marketplace",
-    "path": "/marketplace",
+    "name:zh-CN": "插件管理",
+    "name:en": "Plugins",
+    "path": "/plugins",
     "component": null,
-    "icon": "IconShoppingBag",
+    "icon": "IconPuzzle",
     "type": 1,
-    "permissionCode": "plugin_marketplace",
+    "permissionCode": "plugin_management",
     "orderNo": 50,
     "visible": true,
     "extension": {

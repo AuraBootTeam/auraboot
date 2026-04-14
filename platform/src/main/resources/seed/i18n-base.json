@@ -736,6 +736,11 @@
     "en-US": "Configure policy"
   },
   {
+    "key": "aurabot.ai_modeling_entry",
+    "zh-CN": "AI 建模向导",
+    "en-US": "AI Modeling Wizard"
+  },
+  {
     "key": "auth.channel.emailCode",
     "zh-CN": "邮箱验证码",
     "en-US": "Email Code"
@@ -1447,6 +1452,16 @@
     "en-US": "Installed"
   },
   {
+    "key": "plugin.permission.denied",
+    "zh-CN": "无权查看插件管理页面",
+    "en-US": "You don't have permission to view plugin management"
+  },
+  {
+    "key": "plugin.tab.discovery",
+    "zh-CN": "发现",
+    "en-US": "Discover"
+  },
+  {
     "key": "plugin.tab.history",
     "zh-CN": "导入历史",
     "en-US": "Import History"
@@ -1455,6 +1470,11 @@
     "key": "plugin.tab.installed",
     "zh-CN": "已安装插件",
     "en-US": "Installed Plugins"
+  },
+  {
+    "key": "plugin.tab.solutions",
+    "zh-CN": "行业方案",
+    "en-US": "Solutions"
   },
   {
     "key": "plugin.title",

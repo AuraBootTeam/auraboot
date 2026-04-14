@@ -185,7 +185,7 @@ export default function MarketplaceDetailPage() {
       <div className="border-b border-gray-200 bg-white px-6 py-4">
         <div className="mx-auto max-w-5xl">
           <button
-            onClick={() => navigate('/marketplace')}
+            onClick={() => navigate('/plugins?tab=discovery')}
             className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
           >
             <ArrowLeftIcon className="h-4 w-4" />

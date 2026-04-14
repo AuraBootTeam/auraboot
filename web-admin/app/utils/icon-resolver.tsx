@@ -73,6 +73,7 @@ import {
   PieChart,
   PlayCircle,
   Plus,
+  Puzzle,
   Receipt,
   RotateCcw,
   RotateCw,
@@ -169,6 +170,7 @@ const iconMap: Record<string, React.ComponentType<LucideProps>> = {
   PieChart,
   PlayCircle,
   Plus,
+  Puzzle,
   Receipt,
   RotateCcw,
   RotateCw,
@@ -199,6 +201,7 @@ const iconMap: Record<string, React.ComponentType<LucideProps>> = {
   IconCpu: Cpu,
   IconDashboard: LayoutDashboard,
   IconPlayerPlay: PlayCircle,
+  IconPuzzle: Puzzle,
   IconRobot: Cpu, // closest match for robot/agent
   IconSettings: Settings,
   IconShieldCheck: ShieldCheck,
