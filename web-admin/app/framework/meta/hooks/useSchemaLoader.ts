@@ -158,6 +158,9 @@ export function useSchemaLoader(options: UseSchemaLoaderOptions): UseSchemaLoade
         ...(pageSchemaDTO.extension?.dataSource && {
           dataSource: pageSchemaDTO.extension.dataSource,
         }),
+        ...(pageSchemaDTO.extension?.options && {
+          options: pageSchemaDTO.extension.options,
+        }),
         // Propagate extension so consumers (e.g. relatedPages) can read it
         ...(pageSchemaDTO.extension && { extension: pageSchemaDTO.extension }),
       };

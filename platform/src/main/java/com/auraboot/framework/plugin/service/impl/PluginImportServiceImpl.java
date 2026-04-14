@@ -2169,12 +2169,25 @@ public class PluginImportServiceImpl implements PluginImportService {
         }
 
         if (manifest.getPages() != null) {
+            // Keys that must live under "extension": silently dropping them has bitten us before.
+            Set<String> mustBeInExtension = Set.of(
+                    "options", "views", "kanbanConfig", "galleryConfig", "calendarConfig",
+                    "enableMultiView", "defaultFilters", "columns", "dataSource", "relatedPages");
             for (PageSchemaDTO page : manifest.getPages()) {
                 if (page == null || isBlank(page.getPageKey())) {
                     continue;
                 }
                 if (isBlank(page.getKind())) {
                     errors.add("Page '" + page.getPageKey() + "' has missing kind");
+                }
+                Map<String, Object> unknown = page.getUnknownFields();
+                if (unknown != null) {
+                    for (String key : unknown.keySet()) {
+                        if (mustBeInExtension.contains(key)) {
+                            errors.add("Page '" + page.getPageKey() + "' has top-level '" + key
+                                    + "' which is not recognized — move it under \"extension\": { \"" + key + "\": ... }");
+                        }
+                    }
                 }
             }
         }
