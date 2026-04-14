@@ -22,6 +22,5 @@ export const RESOURCES: PluginResource[] = [
   { key: 'meta.named-queries.new', path: '/meta/named-queries/new', title: { en: 'New Named Query', zh: '新建命名查询' }, menu: false, parentKey: 'meta.named-queries', permission: 'meta.named-query.read', file: './plugins/core-meta/pages/meta/named-queries/new.tsx' },
   { key: 'meta.named-queries.detail', path: '/meta/named-queries/:pid', title: { en: 'Named Query', zh: '命名查询详情' }, menu: false, parentKey: 'meta.named-queries', permission: 'meta.named-query.read', file: './plugins/core-meta/pages/meta/named-queries/$pid.tsx' },
   // Misc
-  { key: 'meta.consistency-rules', path: '/meta/consistency-rules', title: { en: 'Consistency Rules', zh: '一致性规则' }, icon: 'shield-check', menu: { order: 50, group: 'meta' }, permission: 'meta.rules.read', file: './plugins/core-meta/pages/meta/consistency-rules/index.tsx' },
-  { key: 'meta.ai-modeling', path: '/meta/ai-modeling', title: { en: 'AI Modeling', zh: 'AI 建模' }, icon: 'sparkles', menu: { order: 60, group: 'meta' }, permission: 'meta.ai-modeling.use', file: './plugins/core-meta/pages/meta/ai-modeling/index.tsx' },
+  { key: 'meta.ai-modeling', path: '/meta/ai-modeling', title: { en: 'AI Modeling', zh: 'AI 建模' }, icon: 'sparkles', menu: false, permission: 'meta.ai-modeling.use', file: './plugins/core-meta/pages/meta/ai-modeling/index.tsx' },
 ]
