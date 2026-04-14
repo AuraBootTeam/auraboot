@@ -7,9 +7,9 @@ function LandingIntro() {
         <div className="max-w-md">
           <h1 className="text-center text-3xl font-bold">
             <img
-              src="/logo192.png"
+              src="/android-chrome-192x192.png"
               className="mask mr-2 inline-block w-12 mask-circle"
-              alt="auraboot-logo"
+              alt="AuraBoot"
             />
             AuraBoot
           </h1>

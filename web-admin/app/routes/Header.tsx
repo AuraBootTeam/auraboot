@@ -156,7 +156,7 @@ export default function Header({
           )}
 
           <Link to="/" className="ms-4 flex items-center lg:ms-0">
-            <img className="h-8 w-8 rounded-lg" src="/logo192.png" alt="Logo" />
+            <img className="h-8 w-8 rounded-lg" src="/android-chrome-192x192.png" alt="AuraBoot" />
             <span className="ms-3 text-xl font-bold text-gray-900 dark:text-white">AuraBoot</span>
           </Link>
 
