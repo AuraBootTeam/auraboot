@@ -1,172 +1,146 @@
 {
   "pageKey": "crm_lead_detail",
+  "modelCode": "crm_lead",
+  "kind": "detail",
+  "layout": {
+    "type": "stack"
+  },
+  "blocks": [
+    {
+      "id": "crm_lead_detail_toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "edit",
+          "icon": "Edit",
+          "permissionCode": "CRMS.lead.manage",
+          "label": "edit",
+          "action": {
+            "type": "navigate",
+            "to": "crm_lead_form"
+          }
+        },
+        {
+          "code": "contact",
+          "label": "execute",
+          "action": {
+            "type": "command",
+            "command": "crms:contact_lead"
+          }
+        },
+        {
+          "code": "qualify",
+          "label": "execute",
+          "action": {
+            "type": "command",
+            "command": "crms:qualify_lead"
+          }
+        },
+        {
+          "code": "convert",
+          "primary": true,
+          "label": "execute",
+          "action": {
+            "type": "command",
+            "command": "crms:convert_lead"
+          }
+        },
+        {
+          "code": "lose",
+          "danger": true,
+          "label": "execute",
+          "action": {
+            "type": "command",
+            "command": "crms:lose_lead"
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_lead_tabs",
+      "blockType": "tabs",
+      "tabs": [
+        {
+          "key": "overview",
+          "label": {
+            "zh-CN": "概览",
+            "en-US": "Overview"
+          },
+          "blocks": [
+            {
+              "id": "section_basic",
+              "blockType": "form-section",
+              "title": {
+                "zh-CN": "线索信息",
+                "en-US": "Lead Information"
+              },
+              "columns": 2,
+              "fields": [
+                {
+                  "field": "crm_lead_code",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_lead_company",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_lead_contact_name",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_lead_contact_phone",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_lead_contact_email",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_lead_source",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_lead_industry",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_lead_score",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_lead_status",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_lead_assigned_to",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_lead_campaign",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_lead_requirement",
+                  "span": 2,
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_lead_lost_reason",
+                  "span": 2,
+                  "readOnly": true
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
   "name:zh-CN": "线索详情",
   "name:en": "Lead Detail",
-  "pageType": "detail",
-  "modelCode": "crm_lead",
-  "dslSchema": {
-    "id": "detail.crm_lead",
-    "kind": "Detail",
-    "version": "1.0.0",
-    "modelCode": "crm_lead",
-    "layout": {
-      "areas": [
-        "header",
-        "main"
-      ],
-      "areasConfig": {
-        "header": {
-          "type": "flex",
-          "align": "center",
-          "justify": "space-between",
-          "direction": "row"
-        },
-        "main": {
-          "type": "flex",
-          "direction": "column",
-          "rowGap": 16
-        }
-      }
-    },
-    "areas": {
-      "header": {
-        "blocks": [
-          {
-            "id": "crm_lead_detail_toolbar",
-            "blockType": "toolbar",
-            "buttons": [
-              {
-                "code": "edit",
-                "icon": "Edit",
-                "permissionCode": "CRMS.lead.manage",
-                "label": "edit",
-                "action": {
-                  "type": "navigate",
-                  "to": "crm_lead_form"
-                }
-              },
-              {
-                "code": "contact",
-                "label": "execute",
-                "action": {
-                  "type": "command",
-                  "command": "crms:contact_lead"
-                }
-              },
-              {
-                "code": "qualify",
-                "label": "execute",
-                "action": {
-                  "type": "command",
-                  "command": "crms:qualify_lead"
-                }
-              },
-              {
-                "code": "convert",
-                "primary": true,
-                "label": "execute",
-                "action": {
-                  "type": "command",
-                  "command": "crms:convert_lead"
-                }
-              },
-              {
-                "code": "lose",
-                "danger": true,
-                "label": "execute",
-                "action": {
-                  "type": "command",
-                  "command": "crms:lose_lead"
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "main": {
-        "blocks": [
-          {
-            "id": "crm_lead_tabs",
-            "blockType": "tabs",
-            "tabs": [
-              {
-                "key": "overview",
-                "label": {
-                  "zh-CN": "概览",
-                  "en-US": "Overview"
-                },
-                "blocks": [
-                  {
-                    "id": "section_basic",
-                    "blockType": "form-section",
-                    "title": {
-                      "zh-CN": "线索信息",
-                      "en-US": "Lead Information"
-                    },
-                    "columns": 2,
-                    "fields": [
-                      {
-                        "field": "crm_lead_code",
-                        "readOnly": true
-                      },
-                      {
-                        "field": "crm_lead_company",
-                        "readOnly": true
-                      },
-                      {
-                        "field": "crm_lead_contact_name",
-                        "readOnly": true
-                      },
-                      {
-                        "field": "crm_lead_contact_phone",
-                        "readOnly": true
-                      },
-                      {
-                        "field": "crm_lead_contact_email",
-                        "readOnly": true
-                      },
-                      {
-                        "field": "crm_lead_source",
-                        "readOnly": true
-                      },
-                      {
-                        "field": "crm_lead_industry",
-                        "readOnly": true
-                      },
-                      {
-                        "field": "crm_lead_score",
-                        "readOnly": true
-                      },
-                      {
-                        "field": "crm_lead_status",
-                        "readOnly": true
-                      },
-                      {
-                        "field": "crm_lead_assigned_to",
-                        "readOnly": true
-                      },
-                      {
-                        "field": "crm_lead_campaign",
-                        "readOnly": true
-                      },
-                      {
-                        "field": "crm_lead_requirement",
-                        "span": 2,
-                        "readOnly": true
-                      },
-                      {
-                        "field": "crm_lead_lost_reason",
-                        "span": 2,
-                        "readOnly": true
-                      }
-                    ]
-                  }
-                ]
-              }
-            ]
-          }
-        ]
-      }
-    }
+  "title": {
+    "zh-CN": "线索详情",
+    "en": "Lead Detail"
   }
 }

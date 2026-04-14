@@ -1,86 +1,61 @@
 {
   "pageKey": "crm_activity_form",
+  "modelCode": "crm_activity",
+  "kind": "form",
+  "layout": {
+    "type": "stack"
+  },
+  "blocks": [
+    {
+      "id": "basic",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "活动信息",
+        "en-US": "Activity Information"
+      },
+      "fields": [
+        {
+          "field": "crm_act_type",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_act_subject",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_act_date",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_act_content",
+          "colSpan": 12
+        }
+      ]
+    },
+    {
+      "id": "buttons",
+      "blockType": "form-buttons",
+      "buttons": [
+        {
+          "code": "submit",
+          "primary": true,
+          "label": "save",
+          "action": {
+            "type": "command",
+            "command": "crms:update_activity"
+          }
+        },
+        {
+          "code": "cancel",
+          "label": "cancel"
+        }
+      ]
+    }
+  ],
   "name:zh-CN": "活动表单",
   "name:en": "Activity Form",
-  "pageType": "form",
-  "modelCode": "crm_activity",
-  "dslSchema": {
-    "id": "form.crm_activity",
-    "kind": "Form",
-    "version": "1.0.0",
-    "modelCode": "crm_activity",
-    "layout": {
-      "areas": [
-        "main",
-        "footer"
-      ],
-      "areasConfig": {
-        "main": {
-          "type": "grid",
-          "cols": 12,
-          "rowGap": 16,
-          "colGap": 16
-        },
-        "footer": {
-          "type": "flex",
-          "direction": "row"
-        }
-      }
-    },
-    "areas": {
-      "main": {
-        "blocks": [
-          {
-            "id": "basic",
-            "blockType": "form-section",
-            "title": {
-              "zh-CN": "活动信息",
-              "en-US": "Activity Information"
-            },
-            "fields": [
-              {
-                "field": "crm_act_type",
-                "colSpan": 6
-              },
-              {
-                "field": "crm_act_subject",
-                "colSpan": 6
-              },
-              {
-                "field": "crm_act_date",
-                "colSpan": 6
-              },
-              {
-                "field": "crm_act_content",
-                "colSpan": 12
-              }
-            ]
-          }
-        ]
-      },
-      "footer": {
-        "blocks": [
-          {
-            "id": "buttons",
-            "blockType": "form-buttons",
-            "buttons": [
-              {
-                "code": "submit",
-                "primary": true,
-                "label": "save",
-                "action": {
-                  "type": "command",
-                  "command": "crms:update_activity"
-                }
-              },
-              {
-                "code": "cancel",
-                "label": "cancel"
-              }
-            ]
-          }
-        ]
-      }
-    }
+  "title": {
+    "zh-CN": "活动表单",
+    "en": "Activity Form"
   }
 }
