@@ -50,29 +50,35 @@ export async function publishCommand(dir: string, options: PublishOptions): Prom
     log.success('Validation passed');
     log.blank();
 
-    // Step 1: Authenticate
-    const email = options.user || process.env.AURA_USER || 'admin@example.com';
-    const password = options.password || process.env.AURA_PASSWORD || '';
+    // Step 1: Authenticate (prefer AURA_TOKEN env var to avoid lockouts on
+    // repeated publish loops; fall back to email+password login).
+    let token = process.env.AURA_TOKEN || '';
+    if (token) {
+      log.info('Using AURA_TOKEN from environment');
+    } else {
+      const email = options.user || process.env.AURA_USER || 'admin@example.com';
+      const password = options.password || process.env.AURA_PASSWORD || '';
 
-    log.info(`Authenticating as ${email}...`);
-    const loginResp = await fetch(`${options.target}/api/auth/login`, {
-      method: 'post',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    });
+      log.info(`Authenticating as ${email}...`);
+      const loginResp = await fetch(`${options.target}/api/auth/login`, {
+        method: 'post',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
 
-    if (!loginResp.ok) {
-      log.error(`Authentication failed: ${loginResp.status}`);
-      process.exit(1);
+      if (!loginResp.ok) {
+        log.error(`Authentication failed: ${loginResp.status}`);
+        process.exit(1);
+      }
+
+      const loginData = await loginResp.json() as any;
+      token = loginData.data?.jwt;
+      if (!token) {
+        log.error('Failed to get auth token');
+        process.exit(1);
+      }
+      log.success('Authenticated');
     }
-
-    const loginData = await loginResp.json() as any;
-    const token = loginData.data?.jwt;
-    if (!token) {
-      log.error('Failed to get auth token');
-      process.exit(1);
-    }
-    log.success('Authenticated');
 
     // Step 2: Import using directory-sync API
     // Build the manifest in the extended format
