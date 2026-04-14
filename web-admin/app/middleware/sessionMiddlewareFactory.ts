@@ -34,8 +34,13 @@ export const PUBLIC_API_ROUTES = [
  * @param pathname 路径
  * @returns 是否为公开路由
  */
+// Static asset extensions served from /public must bypass auth so that
+// unauthenticated pages (login / landing) can render brand assets, PWA icons, etc.
+const STATIC_ASSET_EXT = /\.(png|jpe?g|gif|svg|webp|avif|ico|webmanifest|json|txt|xml|map|js|mjs|css|woff2?|ttf|otf|mp4|webm)$/i;
+
 export function isPublicRoute(pathname: string): boolean {
   if (pathname === '/') return true;
+  if (STATIC_ASSET_EXT.test(pathname)) return true;
   return PUBLIC_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`));
 }
 
