@@ -91,8 +91,9 @@ test.describe('Showcase UX Regression', () => {
 
   // ─── A1: Marketplace has data ────────────────────────────────────────
 
-  test('A1: Marketplace page loads', async ({ page }) => {
-    await page.goto('/marketplace');
+  test('A1: Plugin management page loads', async ({ page }) => {
+    // /marketplace + /system/plugins merged into /plugins (Tabs)
+    await page.goto('/plugins?tab=discovery');
     await page.waitForLoadState('domcontentloaded');
     await page.waitForTimeout(3000);
     await expect(page.locator('body')).not.toContainText('Page not found');

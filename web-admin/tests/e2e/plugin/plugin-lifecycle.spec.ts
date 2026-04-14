@@ -245,10 +245,14 @@ test.describe('Plugin Lifecycle', () => {
 
   /**
    * C2-E01: Open plugin management page
-   * Verify that /system/plugins page is accessible and loads correctly
+   * Verify that /plugins page is accessible and loads correctly.
+   *
+   * NOTE: /system/plugins and /marketplace were merged into /plugins with Tabs
+   * (discovery / installed / history). Installed plugins live on the
+   * "installed" tab.
    */
   test('C2-E01: Plugin management page is accessible', async ({ page }) => {
-    await page.goto(`/system/plugins`);
+    await page.goto(`/plugins?tab=installed`);
     await page.waitForLoadState('domcontentloaded');
 
     // Verify the page loaded (not a 404 or error)

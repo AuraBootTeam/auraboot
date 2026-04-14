@@ -35,23 +35,26 @@ test.describe('Plugin Lifecycle', () => {
   });
 
   /**
-   * PL-02: Marketplace page loads via sidebar menu
+   * PL-02: Plugin management page loads via sidebar menu.
+   *
+   * /marketplace and /system/plugins were merged into /plugins (Tabs:
+   * discovery / installed / history). The sidebar menu now links to /plugins.
    */
-  test('PL-02: marketplace page loads with visible content', async ({ page }) => {
+  test('PL-02: plugin management page loads with visible content', async ({ page }) => {
     await page.goto('/dashboards', { waitUntil: 'load' });
 
-    // Look for marketplace link in sidebar
-    const marketplaceLink = page.locator('a[href="/marketplace"]');
-    const linkVisible = await marketplaceLink
+    // Look for plugin management link in sidebar
+    const pluginsLink = page.locator('a[href^="/plugins"]');
+    const linkVisible = await pluginsLink
       .first()
       .isVisible({ timeout: 5000 })
       .catch(() => false);
 
     if (linkVisible) {
-      await marketplaceLink.first().evaluate((el) => (el as HTMLAnchorElement).click());
-      await page.waitForURL((url) => url.pathname === '/marketplace', { timeout: 10000 });
+      await pluginsLink.first().evaluate((el) => (el as HTMLAnchorElement).click());
+      await page.waitForURL((url) => url.pathname === '/plugins', { timeout: 10000 });
     } else {
-      await page.goto('/marketplace', { waitUntil: 'domcontentloaded' });
+      await page.goto('/plugins', { waitUntil: 'domcontentloaded' });
     }
 
     await waitForDynamicPageLoad(page);
