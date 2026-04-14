@@ -591,7 +591,7 @@ export function DetailPageContent(props: PageContentProps) {
                   {t('action.back')}
                 </Link>
                 <Link
-                  to={`/p/${tableName}/${recordId}/edit`}
+                  to={`/p/${tableName}/edit/${recordId}`}
                   className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
                 >
                   {t('action.update')}
