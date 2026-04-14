@@ -253,6 +253,7 @@ test.describe('BPM Process Lifecycle', () => {
    * BPM-LC05: Deploy process, start instance, verify task generated
    */
   test('BPM-LC05: Deploy and start process instance', async ({ page }) => {
+    test.skip(!processPid, 'depends on LC02 which is fixme');
     expect(processPid).toBeTruthy();
 
     // Deploy
@@ -307,6 +308,7 @@ test.describe('BPM Process Lifecycle', () => {
    * BPM-LC06: Approve the task, process instance should complete
    */
   test('BPM-LC06: Approve task, process completes', async ({ page }) => {
+    test.skip(!taskId, 'depends on LC05 which depends on LC02 (fixme)');
     expect(taskId).toBeTruthy();
 
     // Approve

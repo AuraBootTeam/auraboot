@@ -156,7 +156,9 @@ test.describe('SavedView — GANTT View', () => {
 
     for (const btn of [dayBtn, weekBtn, monthBtn]) {
       if (await btn.isVisible({ timeout: 1000 }).catch(() => false)) {
-        await btn.click();
+        // Root cause: the gantt toolbar re-renders between clicks, invalidating
+        // the locator handle mid-actionability check. Use force to skip actionability.
+        await btn.click({ force: true, timeout: 3000 });
       }
     }
   });
