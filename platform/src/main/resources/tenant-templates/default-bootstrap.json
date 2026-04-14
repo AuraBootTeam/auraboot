@@ -45,16 +45,6 @@
       "resourceType": "menu"
     },
     {
-      "code": "page_designer",
-      "name": "页面配置",
-      "description": "访问页面配置列表和页面设计器",
-      "type": "menu",
-      "module": "meta",
-      "resource": "/p/page_schema",
-      "action": "view",
-      "resourceType": "menu"
-    },
-    {
       "code": "page.page.read",
       "name": "页面配置读取",
       "description": "读取和查看页面配置（Schema）",
@@ -215,16 +205,6 @@
       "resourceType": "menu"
     },
     {
-      "code": "scheduler_management",
-      "name": "定时任务管理",
-      "description": "管理定时任务和调度器",
-      "type": "menu",
-      "module": "system",
-      "resource": "/scheduler",
-      "action": "manage",
-      "resourceType": "menu"
-    },
-    {
       "code": "audit_log_view",
       "name": "审计日志",
       "description": "查看系统审计日志和变更记录",
@@ -270,7 +250,7 @@
       "description": "管理系统插件的安装、启用和配置",
       "type": "menu",
       "module": "system",
-      "resource": "/system/plugins",
+      "resource": "/plugins",
       "action": "manage",
       "resourceType": "menu"
     },
@@ -809,21 +789,6 @@
       "visible": true
     },
     {
-      "code": "page_designer",
-      "parentCode": "meta_management",
-      "name": "页面配置",
-      "name:zh-CN": "页面配置",
-      "name:en": "Page Configuration",
-      "path": "/p/page_schema",
-      "pageKey": "page_schema_list",
-      "component": null,
-      "icon": "layout",
-      "type": 1,
-      "permissionCode": "page_designer",
-      "orderNo": 14,
-      "visible": true
-    },
-    {
       "code": "named_query_management",
       "parentCode": "meta_management",
       "name": "命名查询",
@@ -835,20 +800,6 @@
       "type": 1,
       "permissionCode": "named_query_management",
       "orderNo": 15,
-      "visible": true
-    },
-    {
-      "code": "report_template_mgmt",
-      "parentCode": "meta_management",
-      "name": "报表模板",
-      "name:zh-CN": "报表模板",
-      "name:en": "Report Templates",
-      "path": "/report-templates",
-      "component": null,
-      "icon": "file-text",
-      "type": 1,
-      "permissionCode": "report_manage",
-      "orderNo": 16,
       "visible": true
     },
     {
@@ -878,44 +829,6 @@
       "permissionCode": "query_builder",
       "orderNo": 18,
       "visible": true
-    },
-    {
-      "code": "ai_modeling",
-      "parentCode": "meta_management",
-      "name": "AI 建模",
-      "name:zh-CN": "AI 建模",
-      "name:en": "AI Modeling",
-      "path": "/meta/ai-modeling",
-      "component": null,
-      "icon": "sparkles",
-      "type": 1,
-      "permissionCode": "meta_management",
-      "orderNo": 20,
-      "visible": true,
-      "extension": {
-        "platforms": [
-          "web"
-        ]
-      }
-    },
-    {
-      "code": "consistency_rules",
-      "parentCode": "meta_management",
-      "name": "一致性规则",
-      "name:zh-CN": "一致性规则",
-      "name:en": "Consistency Rules",
-      "path": "/meta/consistency-rules",
-      "component": null,
-      "icon": "shield-check",
-      "type": 1,
-      "permissionCode": "meta_management",
-      "orderNo": 21,
-      "visible": true,
-      "extension": {
-        "platforms": [
-          "web"
-        ]
-      }
     },
     {
       "code": "bpm_management",
@@ -1082,20 +995,6 @@
       "visible": true
     },
     {
-      "code": "ai_approvals",
-      "parentCode": "ai_center",
-      "name": "审批中心",
-      "name:zh-CN": "审批中心",
-      "name:en": "AI Approvals",
-      "path": "/p/agent_approval",
-      "component": null,
-      "icon": "IconShieldCheck",
-      "type": 1,
-      "permissionCode": "acp_agent_approval",
-      "orderNo": 15,
-      "visible": true
-    },
-    {
       "code": "ai_logs",
       "parentCode": "ai_center",
       "name": "运行日志",
@@ -1138,20 +1037,6 @@
       "visible": true
     },
     {
-      "code": "ai_mcp_servers",
-      "parentCode": "ai_settings",
-      "name": "MCP 服务器",
-      "name:zh-CN": "MCP 服务器",
-      "name:en": "MCP Servers",
-      "path": "/p/mcp_server",
-      "component": null,
-      "icon": "IconServer",
-      "type": 1,
-      "permissionCode": null,
-      "orderNo": 2,
-      "visible": true
-    },
-    {
       "code": "ai_prompts",
       "parentCode": "ai_settings",
       "name": "Prompt 模板",
@@ -1180,48 +1065,6 @@
       "visible": true
     },
     {
-      "code": "ai_object_alias",
-      "parentCode": "ai_semantic",
-      "name": "对象别名",
-      "name:zh-CN": "对象别名",
-      "name:en": "Object Aliases",
-      "path": "/p/object_alias",
-      "component": null,
-      "icon": null,
-      "type": 1,
-      "permissionCode": null,
-      "orderNo": 1,
-      "visible": true
-    },
-    {
-      "code": "ai_semantic_term",
-      "parentCode": "ai_semantic",
-      "name": "语义术语",
-      "name:zh-CN": "语义术语",
-      "name:en": "Semantic Terms",
-      "path": "/p/semantic_term",
-      "component": null,
-      "icon": null,
-      "type": 1,
-      "permissionCode": null,
-      "orderNo": 2,
-      "visible": true
-    },
-    {
-      "code": "ai_governance_policy",
-      "parentCode": "ai_settings",
-      "name": "治理策略",
-      "name:zh-CN": "治理策略",
-      "name:en": "Governance Policies",
-      "path": "/p/approval_policy",
-      "component": null,
-      "icon": null,
-      "type": 1,
-      "permissionCode": null,
-      "orderNo": 5,
-      "visible": true
-    },
-    {
       "code": "system_management",
       "parentCode": null,
       "name": "系统管理",
@@ -1239,20 +1082,6 @@
           "web"
         ]
       }
-    },
-    {
-      "code": "scheduler_management",
-      "parentCode": "system_management",
-      "name": "定时任务",
-      "name:zh-CN": "定时任务",
-      "name:en": "Scheduled Tasks",
-      "path": "/p/scheduled_task",
-      "component": null,
-      "icon": "clock-circle",
-      "type": 1,
-      "permissionCode": "scheduler_management",
-      "orderNo": 81,
-      "visible": true
     },
     {
       "code": "audit_log_view",
@@ -1274,7 +1103,7 @@
       "name": "插件管理",
       "name:zh-CN": "插件管理",
       "name:en": "Plugin Management",
-      "path": "/system/plugins",
+      "path": "/plugins",
       "component": null,
       "icon": "appstore",
       "type": 1,
