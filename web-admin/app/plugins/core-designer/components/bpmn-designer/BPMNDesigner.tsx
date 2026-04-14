@@ -94,6 +94,18 @@ export function BPMNDesigner() {
   const [isLoadingDefinition, setIsLoadingDefinition] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
+  // Expose store on window for E2E test seeding (non-production use only).
+  // Tests can call (window.__bpmnDesignerStore).getState().addNode(...) to pre-populate a valid
+  // process structure without depending on fragile react-flow drag/drop simulation.
+  useEffect(() => {
+    (window as any).__bpmnDesignerStore = useBPMNStore;
+    return () => {
+      if ((window as any).__bpmnDesignerStore === useBPMNStore) {
+        delete (window as any).__bpmnDesignerStore;
+      }
+    };
+  }, []);
+
   // Load existing process definition from URL ?pid= parameter
   useEffect(() => {
     const pid = searchParams.get('pid');
