@@ -37,7 +37,7 @@ export default function AuthSidebar({ sidebarOpen, setSidebarOpen }: AuthSidebar
         {/* 侧边栏头部 */}
         <div className="flex items-center justify-between border-b border-gray-200 p-4 dark:border-gray-700">
           <div className="flex items-center">
-            <img className="h-8 w-8 rounded-lg" src="/logo192.png" alt="Logo" />
+            <img className="h-8 w-8 rounded-lg" src="/android-chrome-192x192.png" alt="AuraBoot" />
             <span className="ml-3 text-lg font-bold text-gray-900 dark:text-white">AuraBoot</span>
           </div>
           <button
