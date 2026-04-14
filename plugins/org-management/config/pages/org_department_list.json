@@ -90,65 +90,63 @@
         "org_dept_name",
         "org_dept_status"
       ],
-      "table": {
-        "columns": [
-          {
-            "field": "org_dept_code",
-            "width": 150,
-            "fixed": "left"
-          },
-          {
-            "field": "org_dept_name",
-            "width": 200
-          },
-          {
-            "field": "org_dept_parent_id",
-            "width": 180
-          },
-          {
-            "field": "org_dept_manager_id",
-            "width": 150
-          },
-          {
-            "field": "org_dept_order",
-            "width": 100,
-            "align": "right"
-          },
-          {
-            "field": "org_dept_status",
-            "width": 100,
-            "renderType": "tag",
-            "dictCode": "org_dept_status"
-          },
-          {
-            "field": "actions",
-            "isActionColumn": true,
-            "buttons": [
-              {
-                "code": "edit",
-                "icon": "Edit",
-                "label": "edit",
-                "action": {
-                  "type": "navigate",
-                  "to": "org_department_form",
-                  "command": "org:update_department"
-                }
-              },
-              {
-                "code": "delete",
-                "icon": "Trash2",
-                "danger": true,
-                "label": "delete",
-                "confirm": "delete.confirm",
-                "action": {
-                  "type": "command",
-                  "command": "org:delete_department"
-                }
+      "columns": [
+        {
+          "field": "org_dept_code",
+          "width": 150,
+          "fixed": "left"
+        },
+        {
+          "field": "org_dept_name",
+          "width": 200
+        },
+        {
+          "field": "org_dept_parent_id",
+          "width": 180
+        },
+        {
+          "field": "org_dept_manager_id",
+          "width": 150
+        },
+        {
+          "field": "org_dept_order",
+          "width": 100,
+          "align": "right"
+        },
+        {
+          "field": "org_dept_status",
+          "width": 100,
+          "renderType": "tag",
+          "dictCode": "org_dept_status"
+        },
+        {
+          "field": "actions",
+          "isActionColumn": true,
+          "buttons": [
+            {
+              "code": "edit",
+              "icon": "Edit",
+              "label": "edit",
+              "action": {
+                "type": "navigate",
+                "to": "org_department_form",
+                "command": "org:update_department"
               }
-            ]
-          }
-        ]
-      }
+            },
+            {
+              "code": "delete",
+              "icon": "Trash2",
+              "danger": true,
+              "label": "delete",
+              "confirm": "delete.confirm",
+              "action": {
+                "type": "command",
+                "command": "org:delete_department"
+              }
+            }
+          ]
+        }
+      ]
     }
   ],
   "title": {

@@ -90,62 +90,60 @@
         "org_pos_name",
         "org_pos_status"
       ],
-      "table": {
-        "columns": [
-          {
-            "field": "org_pos_code",
-            "width": 150,
-            "fixed": "left"
-          },
-          {
-            "field": "org_pos_name",
-            "width": 200
-          },
-          {
-            "field": "org_pos_dept_id",
-            "width": 180
-          },
-          {
-            "field": "org_pos_level",
-            "width": 120,
-            "renderType": "tag",
-            "dictCode": "org_position_level"
-          },
-          {
-            "field": "org_pos_status",
-            "width": 100,
-            "renderType": "tag",
-            "dictCode": "org_pos_status"
-          },
-          {
-            "field": "actions",
-            "isActionColumn": true,
-            "buttons": [
-              {
-                "code": "edit",
-                "icon": "Edit",
-                "label": "edit",
-                "action": {
-                  "type": "navigate",
-                  "to": "org_position_form",
-                  "command": "org:update_position"
-                }
-              },
-              {
-                "code": "delete",
-                "icon": "Trash2",
-                "danger": true,
-                "label": "delete",
-                "confirm": "delete.confirm",
-                "action": {
-                  "type": "command",
-                  "command": "org:delete_position"
-                }
+      "columns": [
+        {
+          "field": "org_pos_code",
+          "width": 150,
+          "fixed": "left"
+        },
+        {
+          "field": "org_pos_name",
+          "width": 200
+        },
+        {
+          "field": "org_pos_dept_id",
+          "width": 180
+        },
+        {
+          "field": "org_pos_level",
+          "width": 120,
+          "renderType": "tag",
+          "dictCode": "org_position_level"
+        },
+        {
+          "field": "org_pos_status",
+          "width": 100,
+          "renderType": "tag",
+          "dictCode": "org_pos_status"
+        },
+        {
+          "field": "actions",
+          "isActionColumn": true,
+          "buttons": [
+            {
+              "code": "edit",
+              "icon": "Edit",
+              "label": "edit",
+              "action": {
+                "type": "navigate",
+                "to": "org_position_form",
+                "command": "org:update_position"
               }
-            ]
-          }
-        ]
-      }
+            },
+            {
+              "code": "delete",
+              "icon": "Trash2",
+              "danger": true,
+              "label": "delete",
+              "confirm": "delete.confirm",
+              "action": {
+                "type": "command",
+                "command": "org:delete_position"
+              }
+            }
+          ]
+        }
+      ]
     }
   ],
   "title": {
