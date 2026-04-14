@@ -34,7 +34,7 @@ test.use({ navigationTimeout: 15000 });
 // Constants
 // ---------------------------------------------------------------------------
 
-const DEPT_PAGE_KEY = 'org-department';
+const DEPT_PAGE_KEY = 'org_department';
 const POS_PAGE_KEY = 'org-position';
 const EMP_PAGE_KEY = 'org-employee';
 
@@ -117,9 +117,9 @@ test.describe('ORG-MENU: Sidebar menu integrity', () => {
     const orgPaths = hrefs
       .filter(
         (h) =>
-          h.includes('/org-department') ||
-          h.includes('/org-position') ||
-          h.includes('/org-employee') ||
+          h.includes('/p/org_department') ||
+          h.includes('/p/org_position') ||
+          h.includes('/p/org_employee') ||
           h.includes('/organization'),
       )
       .map((h) => {
@@ -141,11 +141,11 @@ test.describe('ORG-MENU: Sidebar menu integrity', () => {
     }
 
     // Core assertion: key org menu entries are present in the sidebar
-    expect(orgPaths.some((p) => p.includes('/org-department'))).toBe(true);
-    expect(orgPaths.some((p) => p.includes('/org-position'))).toBe(true);
+    expect(orgPaths.some((p) => p.includes('/p/org_department'))).toBe(true);
+    expect(orgPaths.some((p) => p.includes('/p/org_position'))).toBe(true);
     // Employee entry is intentionally hidden in the unified Organization sidebar to avoid
     // duplicating the member-management入口; route remains directly accessible.
-    const hasEmployeeEntry = orgPaths.some((p) => p.includes('/org-employee'));
+    const hasEmployeeEntry = orgPaths.some((p) => p.includes('/p/org_employee'));
     if (hasEmployeeEntry) {
       test.info().annotations.push({
         type: 'note',
