@@ -1,136 +1,111 @@
 {
   "pageKey": "crm_contact_list",
-  "name:zh-CN": "联系人列表",
-  "name:en": "Contacts",
-  "pageType": "list",
   "modelCode": "crm_contact",
-  "dslSchema": {
-    "id": "list.crm_contact",
-    "kind": "List",
-    "areas": {
-      "toolbar": {
-        "blocks": [
-          {
-            "id": "crm_contact_toolbar",
-            "blockType": "toolbar",
-            "buttons": [
-              {
-                "code": "create",
-                "primary": true,
-                "permissionCode": "CRMS.contact.manage",
-                "label": "create",
-                "action": {
-                  "type": "navigate",
-                  "to": "crm_contact_form",
-                  "command": "crms:create_contact"
-                }
-              }
-            ]
+  "kind": "list",
+  "layout": {
+    "type": "stack"
+  },
+  "blocks": [
+    {
+      "id": "crm_contact_toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "create",
+          "primary": true,
+          "permissionCode": "CRMS.contact.manage",
+          "label": "create",
+          "action": {
+            "type": "navigate",
+            "to": "crm_contact_form",
+            "command": "crms:create_contact"
           }
-        ]
-      },
-      "main": {
-        "blocks": [
-          {
-            "id": "crm_contact_table",
-            "blockType": "data-table",
-            "columns": [
-              {
-                "field": "crm_ct_name",
-                "width": 150,
-                "sortable": true
-              },
-              {
-                "field": "crm_ct_account_id",
-                "width": 200
-              },
-              {
-                "field": "crm_ct_title",
-                "width": 140
-              },
-              {
-                "field": "crm_ct_email",
-                "width": 200
-              },
-              {
-                "field": "crm_ct_phone",
-                "width": 140
-              },
-              {
-                "field": "crm_ct_mobile",
-                "width": 140
-              },
-              {
-                "field": "crm_ct_is_primary",
-                "width": 100
-              },
-              {
-                "field": "actions",
-                "isActionColumn": true,
-                "buttons": [
-                  {
-                    "code": "view",
-                    "permissionCode": "CRMS.contact.read",
-                    "label": "detail",
-                    "action": {
-                      "type": "navigate",
-                      "to": "crm_contact_detail"
-                    }
-                  },
-                  {
-                    "code": "edit",
-                    "permissionCode": "CRMS.contact.manage",
-                    "label": "edit",
-                    "action": {
-                      "type": "navigate",
-                      "to": "crm_contact_form"
-                    }
-                  },
-                  {
-                    "code": "delete",
-                    "danger": true,
-                    "permissionCode": "CRMS.contact.manage",
-                    "label": "delete",
-                    "confirm": "delete.confirm",
-                    "action": {
-                      "type": "command",
-                      "command": "crms:delete_contact"
-                    }
-                  }
-                ]
-              }
-            ],
-            "searchFields": [
-              "crm_ct_name",
-              "crm_ct_email"
-            ],
-            "defaultSort": {
-              "field": "created_at",
-              "order": "desc"
-            }
-          }
-        ]
-      }
-    },
-    "layout": {
-      "areas": [
-        "toolbar",
-        "main"
-      ],
-      "areasConfig": {
-        "toolbar": {
-          "type": "flex",
-          "direction": "row",
-          "justify": "space-between",
-          "align": "center"
-        },
-        "main": {
-          "type": "grid",
-          "cols": 12,
-          "rowGap": 0,
-          "colGap": 0
         }
+      ]
+    },
+    {
+      "id": "crm_contact_table",
+      "blockType": "table",
+      "columns": [
+        {
+          "field": "crm_ct_name",
+          "width": 150,
+          "sortable": true
+        },
+        {
+          "field": "crm_ct_account_id",
+          "width": 200
+        },
+        {
+          "field": "crm_ct_title",
+          "width": 140
+        },
+        {
+          "field": "crm_ct_email",
+          "width": 200
+        },
+        {
+          "field": "crm_ct_phone",
+          "width": 140
+        },
+        {
+          "field": "crm_ct_mobile",
+          "width": 140
+        },
+        {
+          "field": "crm_ct_is_primary",
+          "width": 100
+        },
+        {
+          "field": "actions",
+          "isActionColumn": true,
+          "buttons": [
+            {
+              "code": "view",
+              "permissionCode": "CRMS.contact.read",
+              "label": "detail",
+              "action": {
+                "type": "navigate",
+                "to": "crm_contact_detail"
+              }
+            },
+            {
+              "code": "edit",
+              "permissionCode": "CRMS.contact.manage",
+              "label": "edit",
+              "action": {
+                "type": "navigate",
+                "to": "crm_contact_form"
+              }
+            },
+            {
+              "code": "delete",
+              "danger": true,
+              "permissionCode": "CRMS.contact.manage",
+              "label": "delete",
+              "confirm": "delete.confirm",
+              "action": {
+                "type": "command",
+                "command": "crms:delete_contact"
+              }
+            }
+          ]
+        }
+      ],
+      "searchFields": [
+        "crm_ct_name",
+        "crm_ct_email"
+      ],
+      "defaultSort": {
+        "field": "created_at",
+        "order": "desc"
       }
     }
+  ],
+  "name:zh-CN": "联系人列表",
+  "name:en": "Contacts",
+  "title": {
+    "zh-CN": "联系人列表",
+    "en": "Contacts"
   }
 }
