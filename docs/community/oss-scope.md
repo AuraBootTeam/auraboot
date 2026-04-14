@@ -94,7 +94,7 @@ This script reads `oss-scope.json` and runs Playwright with a strict per-project
 ### Reset the OSS standalone environment
 
 ```bash
-DATABASE_USERNAME=<your-pg-user> ./scripts/reset-and-init.sh
+DATABASE_USERNAME=<your-pg-user> ./scripts/oss-reset-and-init.sh
 ```
 
 This:
@@ -117,7 +117,7 @@ Scope is a configuration, not code. To move a feature between OSS and enterprise
 1. Move the source files (Java + JSON) between repos
 2. Add / remove the plugin code in `oss-scope.json` `plugins` and the test paths in `test_paths`
 3. If a directory contains a mix of OSS and paid specs, add the specific paid files to `test_excludes`
-4. Update `scripts/reset-and-init.sh` `PLUGINS_TO_IMPORT` if a new OSS plugin should be auto-installed
+4. Update `scripts/oss-reset-and-init.sh` `PLUGINS_TO_IMPORT` if a new OSS plugin should be auto-installed
 5. Run `./scripts/oss-test.sh` to verify the suite still passes against the new scope
 
 ## Migration history

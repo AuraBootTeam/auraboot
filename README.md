@@ -96,7 +96,7 @@ git clone https://github.com/AuraBootTeam/auraboot.git
 cd auraboot
 
 # 2. Initialize the database
-./scripts/reset-and-init.sh
+./scripts/oss-reset-and-init.sh
 
 # 3. Start the backend (Spring Boot, port 6443)
 cd platform

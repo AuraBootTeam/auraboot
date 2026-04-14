@@ -11,8 +11,8 @@
 # 7.   Verify bootstrap data + import plugins via CLI
 # 8.   (Optional) Seed showcase demo data via Playwright
 #
-# Usage: ./scripts/reset-and-init.sh
-# Skip seed data: SKIP_SEED=1 ./scripts/reset-and-init.sh
+# Usage: ./scripts/oss-reset-and-init.sh
+# Skip seed data: SKIP_SEED=1 ./scripts/oss-reset-and-init.sh
 
 set -e
 
@@ -130,7 +130,7 @@ mark_initialized_flag() {
     psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -P pager=off -c "
         INSERT INTO ab_system_config (pid, config_scope, config_key, config_value, value_type, description)
         VALUES ('CFG-SYSTEM-INITIALIZED-X', 'system', 'system.initialized', 'true', 'boolean',
-                'Marked by reset-and-init.sh recovery path')
+                'Marked by oss-reset-and-init.sh recovery path')
         ON CONFLICT (config_key) DO UPDATE SET config_value = 'true', updated_at = now();
     "
 }
