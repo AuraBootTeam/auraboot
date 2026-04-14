@@ -108,8 +108,25 @@ Both flat file mode (single JSON array per resource type) and directory mode (on
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `AURA_USER` | Login email | `admin@example.com` |
-| `AURA_PASSWORD` | Login password | `Test2026x` |
+| `AURA_TOKEN` | JWT for non-interactive auth; bypasses login and `~/.aura/credentials.json` | — |
+| `AURA_API_URL` | Overrides backend base URL for all API commands | resolved from `~/.aura/config.json` |
+| `AURA_USER` | Login email (used only when `AURA_TOKEN` is not set) | `admin@example.com` |
+| `AURA_PASSWORD` | Login password (used only when `AURA_TOKEN` is not set) | `Test2026x` |
+| `AURA_DEBUG` | When non-empty, prints a stderr debug line confirming `AURA_TOKEN` is active | — |
+
+Credential priority: `--token` flag > `AURA_TOKEN` env var > `~/.aura/credentials.json` > interactive login.
+
+Example (CI / `reset-and-init.sh`):
+
+```bash
+export AURA_TOKEN=$(curl -s -X POST http://localhost:6443/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"admin@example.com","password":"Test2026x"}' \
+  | python3 -c "import sys,json;print(json.load(sys.stdin)['data']['jwt'])")
+
+aura status
+aura plugin publish plugins/showcase --yes
+```
 
 ## Development
 

@@ -19,6 +19,14 @@ export async function publishCommand(dir: string, options: PublishOptions): Prom
     const plugin = loadPlugin(dir);
     const resourceCount = countResources(plugin);
 
+    // AURA_API_URL env var overrides the default --target so non-interactive
+    // callers (CI, reset-and-init.sh) can retarget without editing the script.
+    const envApiUrl = process.env.AURA_API_URL?.trim();
+    const target = envApiUrl && envApiUrl.length > 0
+      ? envApiUrl.replace(/\/$/, '')
+      : options.target;
+    options = { ...options, target };
+
     log.header(`Publishing: ${plugin.manifest.pluginId} v${plugin.manifest.version}`);
     log.dim(`Target: ${options.target}`);
     log.dim(`${resourceCount} resources`);
