@@ -229,6 +229,33 @@ test.describe('AuraBot Panel', () => {
   });
 
   // -------------------------------------------------------------------------
+  // AIP-06b: Enter sends / Shift+Enter inserts newline
+  // -------------------------------------------------------------------------
+
+  test('AIP-06b: Enter sends message, Shift+Enter inserts newline', async ({ page }) => {
+    await gotoAppAndWaitForHeader(page);
+    const panel = await openPanel(page);
+
+    const chatInput = panel.locator('textarea');
+    await expect(chatInput).toBeVisible();
+
+    // Shift+Enter: should insert a newline, not send — input keeps the text
+    await chatInput.click();
+    await chatInput.fill('line one');
+    await chatInput.press('Shift+Enter');
+    await chatInput.pressSequentially('line two');
+    await expect(chatInput).toHaveValue(/line one\nline two/);
+
+    // Plain Enter: should invoke sendMessage — asserted by the conversations POST firing
+    const convRequest = page.waitForRequest(
+      (req) => req.url().includes('/api/ai/aurabot/') && req.method() === 'POST',
+      { timeout: 10000 },
+    );
+    await chatInput.press('Enter');
+    await convRequest;
+  });
+
+  // -------------------------------------------------------------------------
   // AIP-07: Panel persists across page navigation
   // -------------------------------------------------------------------------
 
