@@ -109,10 +109,7 @@
     "tests/e2e/saved-view/saved-view-column-settings.spec.ts",
     "tests/e2e/user/user-management.spec.ts",
 
-    "tests/e2e/admin/webhook-lifecycle.spec.ts",
-    "tests/e2e/automation/automation-management.spec.ts",
-    "tests/e2e/platform/form-redirect-regression.spec.ts",
-    "tests/e2e/search/global-search.spec.ts"
+    "tests/e2e/bpm/bpm-form-integration.spec.ts"
   ],
 
   "test_excludes_rationale": {
@@ -145,10 +142,7 @@
     "tests/e2e/saved-view/saved-view-column-settings.spec.ts": "[A] CS-007 column-order persistence relies on enterprise wiring; whole file excluded (7 passing siblings lost). See per_case_excludes_todo.",
     "tests/e2e/user/user-management.spec.ts": "[A] UM-006/UM-007 role assignment/list are enterprise; whole file excluded (9 passing siblings lost). See per_case_excludes_todo.",
 
-    "tests/e2e/admin/webhook-lifecycle.spec.ts": "[D-todo] WH-002 webhook create form pending port to OSS; WH-001 smoke currently passes but whole file excluded (4 passing siblings lost). Re-enable once feature ported.",
-    "tests/e2e/automation/automation-management.spec.ts": "[D-todo] execution-logs dialog case pending port; whole file excluded (5 passing siblings lost). Re-enable once feature ported.",
-    "tests/e2e/platform/form-redirect-regression.spec.ts": "[D-todo] redirects-away-from-edit case pending port; whole file excluded (2 passing siblings lost). Re-enable once feature ported.",
-    "tests/e2e/search/global-search.spec.ts": "[D-todo] SEARCH-01 Cmd+K trigger button pending port; whole file excluded (8 passing siblings lost). Re-enable once feature ported."
+    "tests/e2e/bpm/bpm-form-integration.spec.ts": "[A] BFI-004 asserts /api/inbox endpoint; unified Inbox API lives in enterprise platform only. OSS backend has no /api/inbox controller."
   },
 
   "per_case_excludes_todo": {
@@ -158,12 +152,6 @@
       { "file": "tests/e2e/saved-view/saved-view-column-settings.spec.ts", "case": "CS-007 column-order persistence" },
       { "file": "tests/e2e/user/user-management.spec.ts", "case": "UM-006 role assignment" },
       { "file": "tests/e2e/user/user-management.spec.ts", "case": "UM-007 role list" }
-    ],
-    "category_D_pending_port": [
-      { "file": "tests/e2e/admin/webhook-lifecycle.spec.ts", "case": "WH-002 webhook create form" },
-      { "file": "tests/e2e/automation/automation-management.spec.ts", "case": "execution-logs dialog" },
-      { "file": "tests/e2e/platform/form-redirect-regression.spec.ts", "case": "redirects-away-from-edit" },
-      { "file": "tests/e2e/search/global-search.spec.ts", "case": "SEARCH-01 Cmd+K trigger button" }
     ]
   },
 
