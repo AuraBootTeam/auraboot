@@ -1,23 +1,5 @@
 [
   {
-    "code": "org_structure",
-    "parentCode": "org_management",
-    "name:zh-CN": "组织架构",
-    "name:en": "Organization Structure",
-    "path": "/enterprise/organization",
-    "component": null,
-    "icon": "IconHierarchy",
-    "type": 1,
-    "permissionCode": "org_management",
-    "orderNo": 48,
-    "visible": true,
-    "extension": {
-      "platforms": [
-        "web"
-      ]
-    }
-  },
-  {
     "code": "admin_sla_config",
     "parentCode": "bpm_management",
     "name:zh-CN": "SLA 配置",
