@@ -1,0 +1,23 @@
+{
+  "pluginId": "com.auraboot.core-aurabot",
+  "namespace": "core-aurabot",
+  "version": "1.0.0",
+  "dslVersion": 1,
+  "pluginType": "config",
+  "displayName": "Core AuraBot Navigation",
+  "displayName:zh-CN": "AuraBot 导航",
+  "displayName:en": "Core AuraBot Navigation",
+  "description": "Navigation menus and permissions for AI Center (dashboard, colleagues, knowledge, runs, providers, prompts, semantic)",
+  "author": "AuraBoot Team",
+  "minPlatformVersion": "1.0.0",
+  "dependencies": [],
+  "resourceDirs": {
+    "permissions": "config/permissions.json",
+    "menus": "config/menus.json"
+  },
+  "importOptions": {
+    "conflictStrategy": "overwrite",
+    "validateReferences": false,
+    "createResourcePermissions": false
+  }
+}

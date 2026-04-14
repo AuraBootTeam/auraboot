@@ -1,0 +1,12 @@
+[
+  {
+    "code": "ai_center",
+    "name": "AI 中心",
+    "description": "AI中心：驾驶舱、AI同事、知识库、审批、运行日志、设置",
+    "type": "menu",
+    "module": "system",
+    "resource": "/ai",
+    "action": "view",
+    "resourceType": "menu"
+  }
+]

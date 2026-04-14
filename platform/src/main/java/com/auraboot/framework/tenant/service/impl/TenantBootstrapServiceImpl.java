@@ -217,13 +217,12 @@ public class TenantBootstrapServiceImpl implements TenantBootstrapService {
             validateRoleTemplate(role);
         }
         
-        // 验证菜单定义
-        if (template.getMenus() == null || template.getMenus().isEmpty()) {
-            throw new TemplateValidationException("模板必须包含至少一个菜单定义");
-        }
-        
-        for (MenuTemplate menu : template.getMenus()) {
-            validateMenuTemplate(menu);
+        // Bootstrap menus may be empty — functional menus belong to plugins.
+        // See docs/system-reference/reference/menu-seed-mechanism.md.
+        if (template.getMenus() != null) {
+            for (MenuTemplate menu : template.getMenus()) {
+                validateMenuTemplate(menu);
+            }
         }
         
         // Validate menu permission codes are defined in permission templates
