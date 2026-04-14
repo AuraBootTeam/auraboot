@@ -35,6 +35,7 @@ import {
   acceptConfirmDialog,
   clickRowActionByLocator,
 } from '../helpers/index';
+import { drawMinimalBPMN } from '../helpers/bpmn-designer';
 
 // ---------------------------------------------------------------------------
 // Serial mode — tests share state (created records flow through lifecycle)
@@ -277,10 +278,7 @@ test.describe('BPM Process Definition — CRUD Lifecycle', () => {
   // =========================================================================
   // D4 + D6 + D14: Create process via designer toolbar button
   // =========================================================================
-  // TODO(wave-4): BPM save requires valid process structure (start+end events), but this
-  // test only fills name/key without drawing nodes. Either add react-flow drag to seed a
-  // valid flow, or API-create draft then edit via UI. Deferred pending react-flow drag helper.
-  test.fixme('PD-003 @critical — Create process via designer toolbar -> visible in list', async ({
+  test('PD-003 @critical — Create process via designer toolbar -> visible in list', async ({
     page,
   }) => {
     test.skip(missingProcessUpdatePermission, 'Missing permission: system.process.update');
@@ -297,6 +295,11 @@ test.describe('BPM Process Definition — CRUD Lifecycle', () => {
     // Verify designer page opened
     await page.waitForURL(/bpmn-designer/, { timeout: 10_000 });
     await expect(page.locator('.react-flow')).toBeVisible({ timeout: 10_000 });
+
+    // Seed a minimal valid process (start -> end) so validate() passes when we save.
+    // Without this, handleSave() short-circuits on missing start/end events and the
+    // SaveDialog never opens, so the POST never fires.
+    await drawMinimalBPMN(page);
 
     // Fill process name and key in toolbar
     const nameInput = page.locator('[data-testid="bpmn-field-name"]');
