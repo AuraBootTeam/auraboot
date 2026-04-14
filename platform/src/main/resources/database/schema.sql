@@ -2056,6 +2056,8 @@ CREATE TABLE IF NOT EXISTS ab_scheduled_task (
     enabled         BOOLEAN NOT NULL DEFAULT TRUE,
     last_run_at     TIMESTAMPTZ,
     next_run_at     TIMESTAMPTZ,
+    created_by      BIGINT,
+    updated_by      BIGINT,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
