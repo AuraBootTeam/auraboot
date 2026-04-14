@@ -167,6 +167,7 @@ export default function PermissionManagement() {
   const handleToggleRole = async (role: Role) => {
     const disabled = role.status === 'disabled';
     const action = disabled ? 'enable' : 'disable';
+    const nextStatus = disabled ? 'active' : 'disabled';
     const result = await fetchResult<boolean>(`/api/roles/${role.pid}/${action}`, {
       method: 'put',
     });
@@ -176,7 +177,13 @@ export default function PermissionManagement() {
           t(disabled ? 'admin.permission.role.enable.success' : 'admin.permission.role.disable.success') ||
             (disabled ? 'Enabled' : 'Disabled'),
         );
-        fetchRoles();
+        // Optimistic local update: mutate just this role's status so the row
+        // stays mounted (stable key=pid) and interactive for subsequent clicks.
+        // Avoids a full fetchRoles() refetch which re-creates list array and
+        // can race against rapid user / E2E toggle sequences.
+        setRoles((prev) =>
+          prev.map((r) => (r.pid === role.pid ? { ...r, status: nextStatus } : r)),
+        );
       },
       onError: (error) => showErrorToast(error || 'Toggle failed'),
       showToast: false,
