@@ -10,8 +10,10 @@ import {
   ClockIcon,
   PlusIcon,
   TrashIcon,
+  SparklesIcon,
 } from '@heroicons/react/24/outline';
 import { useNavigate } from 'react-router';
+import { useI18n } from '~/contexts/I18nContext';
 
 interface AgentOption {
   agent_code: string;
@@ -28,6 +30,7 @@ export function AuraBotPanel() {
   const { state, sessions, closePanel, sendMessage, setSelectedAgent, newSession, selectSession, deleteSession } =
     useAuraBot();
   const navigate = useNavigate();
+  const { t } = useI18n();
   const [agents, setAgents] = useState<AgentOption[]>([AURABOT_DEFAULT]);
   const [selectorOpen, setSelectorOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -259,6 +262,17 @@ export function AuraBotPanel() {
               </div>
             )}
           </div>
+          <button
+            onClick={() => {
+              closePanel();
+              navigate('/meta/ai-modeling');
+            }}
+            className="rounded-lg p-1.5 text-indigo-400 transition-colors hover:bg-white/50 hover:text-indigo-600 dark:hover:bg-gray-700/50 dark:hover:text-indigo-300"
+            title={t('aurabot.ai_modeling_entry', undefined, 'AI Modeling Wizard')}
+            data-testid="aurabot-ai-modeling-trigger"
+          >
+            <SparklesIcon className="h-4 w-4" />
+          </button>
           <button
             onClick={() => navigate('/aurabot/providers')}
             className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-white/50 hover:text-gray-600 dark:hover:bg-gray-700/50 dark:hover:text-gray-300"
