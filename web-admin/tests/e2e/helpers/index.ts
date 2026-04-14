@@ -146,6 +146,91 @@ export async function waitForDynamicPageLoad(page: Page, timeout = 10000): Promi
 }
 
 /**
+ * Wait for a table to finish hydration before the test queries it.
+ *
+ * A freshly navigated dynamic list page briefly renders an empty <table> shell
+ * (no <thead>, no <tbody> rows) before the React column model hydrates and
+ * the data API response populates the DOM. Tests that query `thead th`
+ * immediately after navigation race against that hydration and observe
+ * zero columns.
+ *
+ * This helper blocks until ONE of:
+ *   - `thead` has at least one `th` rendered, AND
+ *     `tbody` has at least one row OR an empty-state element is visible.
+ *
+ * No timeout inflation — max 5s per AGENTS.md E2E timeout policy.
+ */
+export async function waitForTableHydration(
+  page: Page,
+  opts: { timeout?: number } = {},
+): Promise<void> {
+  const timeout = Math.min(opts.timeout ?? 5000, 5000);
+
+  // Wait for at least one header cell to be attached (column model hydrated).
+  await page
+    .locator('thead th, [role="columnheader"]')
+    .first()
+    .waitFor({ state: 'attached', timeout })
+    .catch(() => {
+      // Leave assertion failures to the caller — helper only waits.
+    });
+
+  // Wait until either a data row renders OR an empty-state element appears.
+  await expect
+    .poll(
+      async () => {
+        const rowCount = await page.locator('tbody tr').count().catch(() => 0);
+        if (rowCount > 0) return true;
+        const emptyVisible = await page
+          .locator(
+            '[data-testid="empty-state"], [data-testid="table-empty"], ' +
+              '.ant-empty, [role="status"]:has-text("No data")',
+          )
+          .first()
+          .isVisible()
+          .catch(() => false);
+        return emptyVisible;
+      },
+      { timeout, intervals: [100, 200, 400] },
+    )
+    .toBe(true)
+    .catch(() => {
+      // Swallow — callers assert on specific selectors afterwards.
+    });
+}
+
+/**
+ * Wait for space-selection UI hydration after login/navigation.
+ *
+ * After `/api/auth/login` + JWT arrival, the SPA may either:
+ *   - render a space-selection screen (multi-tenant user), or
+ *   - redirect directly to the dashboard (single-tenant user).
+ *
+ * Tests that probe for the tenant list / platform-console button need to
+ * wait for whichever branch actually hydrates, without relying on brittle
+ * `waitForTimeout` delays.
+ *
+ * Resolves as soon as one of the expected landing-UI markers is visible.
+ * Max 5s.
+ */
+export async function waitForSpaceSelection(page: Page): Promise<void> {
+  const timeout = 5000;
+  const markers = page.locator(
+    '[data-testid="tenant-selection-list"], ' +
+      '[data-testid="platform-console-link"], ' +
+      '[data-testid^="tenant-switch-"], ' +
+      '[data-testid="current-tenant-name"], ' +
+      '[data-testid="user-menu"]',
+  );
+  await markers
+    .first()
+    .waitFor({ state: 'visible', timeout })
+    .catch(() => {
+      // Caller owns the actual assertion; helper just gives hydration a chance.
+    });
+}
+
+/**
  * Ensure the filter form is open (visible).
  * After the list page refactor, filter-form is hidden by default and requires
  * clicking the toggle button to reveal it.

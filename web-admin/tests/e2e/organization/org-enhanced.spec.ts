@@ -25,6 +25,7 @@ import {
   extractRecordId,
   queryFilteredList,
   clickRowActionByLocator,
+  waitForTableHydration,
 } from '../helpers';
 
 // Override navigation timeout for org pages — they load slower under parallel workers
@@ -165,6 +166,10 @@ test.describe('ORG-I18N: Field label internationalization', () => {
    * Returns an object with all headers and those that appear to be raw field codes.
    */
   async function collectColumnHeaders(page: import('@playwright/test').Page) {
+    // Wait for the table to hydrate before querying headers —
+    // sister test ORG-001 implicitly does this by waiting for h2/table.
+    await waitForTableHydration(page);
+
     const headerCells = page.locator('thead th, [role="columnheader"]');
     const headerCount = await headerCells.count();
     const allHeaders: string[] = [];
@@ -354,9 +359,13 @@ test.describe('ORG-DEPT-CRUD: Department full lifecycle', () => {
     await page.goto(`/dynamic/${DEPT_PAGE_KEY}/${createResult.recordId}/edit`);
     await page.locator('h2').first().waitFor({ state: 'visible', timeout: 10000 });
 
-    // Wait for form to load — switch buttons appearing indicates fields are rendered
-    await page.locator('button[role="switch"]').first()
-      .waitFor({ state: 'attached', timeout: 5000 })
+    // Wait for form to load — first textbox/switch appearing indicates fields are rendered.
+    // Previously only switches were awaited, but department form has no switches — the test
+    // then raced the form field hydration and observed 0 textboxes.
+    await page
+      .locator('form input[type="text"], form textbox, [role="textbox"], button[role="switch"]')
+      .first()
+      .waitFor({ state: 'visible', timeout: 5000 })
       .catch(() => {});
 
     // Verify the form has text inputs rendered
