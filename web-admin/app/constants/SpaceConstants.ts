@@ -12,7 +12,7 @@ export const SYSTEM_TENANT_ID = 1;
 export const PLATFORM_ROUTE_PREFIX = '/platform';
 
 /** Default landing page within the platform space. */
-export const PLATFORM_HOME = '/platform/marketplace';
+export const PLATFORM_HOME = '/platform/plugins';
 
 /** Default landing page within the business space. */
 export const BUSINESS_HOME = '/';

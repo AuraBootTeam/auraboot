@@ -1,12 +1,9 @@
 /**
- * Plugin Management Page
+ * Installed tab — manage locally installed plugins.
  *
- * Provides UI for managing plugins:
- * - View installed plugins
- * - Upload new plugins (JSON manifest or ZIP)
- * - Activate/Deactivate plugins
- * - View plugin details and resources
- * - Uninstall plugins
+ * Enable / disable / uninstall / view detail + upload new plugin (JSON or ZIP)
+ * with preview-then-execute two-step import flow. Extracted from the legacy
+ * /system/plugins page.
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -23,15 +20,12 @@ import {
   CheckCircleIcon,
   XCircleIcon,
   ExclamationTriangleIcon,
-  DocumentTextIcon,
   FolderIcon,
 } from '@heroicons/react/24/outline';
-import { PuzzlePieceIcon as PuzzlePieceSolidIcon } from '@heroicons/react/24/solid';
 
-// Types
 type CompatibilityStatus = 'compatible' | 'warn_older' | 'warn_newer' | 'incompatible';
 
-interface PluginRecord {
+export interface PluginRecord {
   pid: string;
   pluginId: string;
   namespace: string;
@@ -48,20 +42,6 @@ interface PluginRecord {
   compatibilityMessage?: string;
 }
 
-interface ImportHistory {
-  importId: string;
-  pluginId: string;
-  namespace: string;
-  version: string;
-  status: 'success' | 'failed' | 'rolled_back';
-  importType: 'install' | 'upgrade';
-  sourceType: 'json' | 'zip';
-  sourceName: string;
-  startedAt: string;
-  completedAt?: string;
-  errorMessage?: string;
-}
-
 interface ImportPreviewResult {
   importId: string;
   pluginId: string;
@@ -76,80 +56,56 @@ interface ImportPreviewResult {
   actionCounts: Record<string, Record<string, number>>;
 }
 
-/**
- * Plugin Management Page Component
- */
-export default function PluginManagement() {
+interface Props {
+  onCountChange?: (count: number) => void;
+  onImportSuccess?: () => void;
+}
+
+export default function InstalledTab({ onCountChange, onImportSuccess }: Props) {
   const { showErrorToast } = useToastContext();
   const { t } = useI18n();
-  // State
+
   const [plugins, setPlugins] = useState<PluginRecord[]>([]);
-  const [importHistory, setImportHistory] = useState<ImportHistory[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'installed' | 'history'>('installed');
 
-  // Modal state
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [previewResult, setPreviewResult] = useState<ImportPreviewResult | null>(null);
   const [selectedPlugin, setSelectedPlugin] = useState<PluginRecord | null>(null);
 
-  // Fetch plugins from database (configuration plugins)
   const fetchPlugins = useCallback(async () => {
     setLoading(true);
     try {
       const response = await fetch('/api/plugins');
       if (response.ok) {
         const result = await response.json();
-        // Handle ApiResponse format: { code, data, desc }
         const data = result.data ?? result;
-        setPlugins(Array.isArray(data) ? data : []);
+        const list = Array.isArray(data) ? data : [];
+        setPlugins(list);
+        onCountChange?.(list.length);
       }
-    } catch (error) {
-      console.error('Failed to fetch plugins:', error);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [onCountChange]);
 
-  // Fetch import history
-  const fetchHistory = useCallback(async () => {
-    try {
-      const response = await fetch('/api/plugins/import/history?limit=20');
-      if (response.ok) {
-        const result = await response.json();
-        // Handle ApiResponse format: { code, data, desc }
-        const data = result.data ?? result;
-        setImportHistory(Array.isArray(data) ? data : []);
-      }
-    } catch (error) {
-      console.error('Failed to fetch import history:', error);
-    }
-  }, []);
-
-  // Initial load
   useEffect(() => {
     fetchPlugins();
-    fetchHistory();
-  }, [fetchPlugins, fetchHistory]);
+  }, [fetchPlugins]);
 
-  // Handle file upload
   const handleFileUpload = async (file: File) => {
     setUploading(true);
     try {
       const formData = new FormData();
       formData.append('file', file);
-
       const response = await fetch('/api/plugins/import/upload', {
         method: 'post',
         body: formData,
       });
-
       if (response.ok) {
         const apiResponse = await response.json();
-        // Handle ApiResponse format: { code, data, desc }
         const result: ImportPreviewResult = apiResponse.data ?? apiResponse;
         setPreviewResult(result);
         setShowUploadModal(false);
@@ -158,18 +114,13 @@ export default function PluginManagement() {
         const error = await response.json();
         showErrorToast(`Upload failed: ${error.desc || error.message || 'Unknown error'}`);
       }
-    } catch (error) {
-      console.error('Upload error:', error);
-      showErrorToast('Failed to upload file');
     } finally {
       setUploading(false);
     }
   };
 
-  // Execute import
   const executeImport = async () => {
     if (!previewResult) return;
-
     setUploading(true);
     try {
       const response = await fetch(`/api/plugins/import/${previewResult.importId}/execute`, {
@@ -181,78 +132,47 @@ export default function PluginManagement() {
           autoPublishPages: false,
         }),
       });
-
       if (response.ok) {
         setShowPreviewModal(false);
         setPreviewResult(null);
         fetchPlugins();
-        fetchHistory();
+        onImportSuccess?.();
       } else {
         const error = await response.json();
         showErrorToast(`Import failed: ${error.desc || error.message || 'Unknown error'}`);
       }
-    } catch (error) {
-      console.error('Import error:', error);
-      showErrorToast('Failed to execute import');
     } finally {
       setUploading(false);
     }
   };
 
-  // Enable plugin
   const startPlugin = async (pluginPid: string) => {
-    try {
-      const response = await fetch(`/api/plugins/${pluginPid}/enable`, {
-        method: 'post',
-      });
-      if (response.ok) {
-        fetchPlugins();
-      } else {
-        showErrorToast('Failed to enable plugin');
-      }
-    } catch (error) {
-      console.error('Enable plugin error:', error);
-    }
+    const response = await fetch(`/api/plugins/${pluginPid}/enable`, { method: 'post' });
+    if (response.ok) fetchPlugins();
+    else showErrorToast('Failed to enable plugin');
   };
 
-  // Disable plugin
   const stopPlugin = async (pluginPid: string) => {
-    try {
-      const response = await fetch(`/api/plugins/${pluginPid}/disable`, {
-        method: 'post',
-      });
-      if (response.ok) {
-        fetchPlugins();
-      } else {
-        showErrorToast('Failed to disable plugin');
-      }
-    } catch (error) {
-      console.error('Disable plugin error:', error);
-    }
+    const response = await fetch(`/api/plugins/${pluginPid}/disable`, { method: 'post' });
+    if (response.ok) fetchPlugins();
+    else showErrorToast('Failed to disable plugin');
   };
 
-  // Uninstall plugin
   const uninstallPlugin = async (pluginPid: string) => {
     if (!confirm('Are you sure you want to uninstall this plugin?')) return;
-
-    try {
-      const response = await fetch(`/api/plugins/${pluginPid}/uninstall`, {
-        method: 'post',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ removeData: false }),
-      });
-      if (response.ok) {
-        fetchPlugins();
-        fetchHistory();
-      } else {
-        showErrorToast('Failed to uninstall plugin');
-      }
-    } catch (error) {
-      console.error('Uninstall error:', error);
+    const response = await fetch(`/api/plugins/${pluginPid}/uninstall`, {
+      method: 'post',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ removeData: false }),
+    });
+    if (response.ok) {
+      fetchPlugins();
+      onImportSuccess?.();
+    } else {
+      showErrorToast('Failed to uninstall plugin');
     }
   };
 
-  // Compatibility badge — shows version compatibility status
   const CompatibilityBadge = ({
     status,
     minVersion,
@@ -264,123 +184,87 @@ export default function PluginManagement() {
   }) => {
     if (!status || status === 'compatible') {
       return minVersion ? (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-green-50 text-green-600"
-              title="Compatible with this platform version">
-          <CheckCircleIcon className="w-3 h-3" />
+        <span
+          className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-xs text-green-600"
+          title="Compatible with this platform version"
+        >
+          <CheckCircleIcon className="h-3 w-3" />
           Compatible
         </span>
       ) : null;
     }
-    const configs: Record<CompatibilityStatus, { bg: string; text: string; label: string; icon: typeof CheckCircleIcon }> = {
+    const configs: Record<
+      CompatibilityStatus,
+      { bg: string; text: string; label: string; icon: typeof CheckCircleIcon }
+    > = {
       compatible: { bg: 'bg-green-50', text: 'text-green-600', label: 'Compatible', icon: CheckCircleIcon },
       warn_newer: { bg: 'bg-amber-50', text: 'text-amber-600', label: '⚠ Version mismatch', icon: ExclamationTriangleIcon },
       warn_older: { bg: 'bg-amber-50', text: 'text-amber-600', label: '⚠ Platform too old', icon: ExclamationTriangleIcon },
       incompatible: { bg: 'bg-red-50', text: 'text-red-600', label: '✗ Incompatible', icon: XCircleIcon },
     };
-    const c = configs[status];
+    const c = configs[status] ?? configs.compatible;
     const Icon = c.icon;
     return (
       <span
-        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ${c.bg} ${c.text} cursor-help`}
+        className={`inline-flex cursor-help items-center gap-1 rounded-full px-2 py-0.5 text-xs ${c.bg} ${c.text}`}
         title={message ?? status}
       >
-        <Icon className="w-3 h-3" />
+        <Icon className="h-3 w-3" />
         {c.label}
       </span>
     );
   };
 
-  // Status badge — aligned with backend PluginStatus enum: installed, enabled, disabled, failed
   const StatusBadge = ({ status }: { status: string }) => {
-    const config: Record<string, { bg: string; text: string; icon: typeof CheckCircleIcon; labelKey: string }> = {
+    const config: Record<
+      string,
+      { bg: string; text: string; icon: typeof CheckCircleIcon; labelKey: string }
+    > = {
       installed: { bg: 'bg-blue-100', text: 'text-blue-800', icon: CheckCircleIcon, labelKey: 'plugin.status.installed' },
       enabled: { bg: 'bg-green-100', text: 'text-green-800', icon: CheckCircleIcon, labelKey: 'plugin.status.enabled' },
       disabled: { bg: 'bg-gray-100', text: 'text-gray-800', icon: StopIcon, labelKey: 'plugin.status.disabled' },
       failed: { bg: 'bg-red-100', text: 'text-red-800', icon: XCircleIcon, labelKey: 'plugin.status.failed' },
-      // Import history statuses (failed is shared with plugin status above)
-      success: { bg: 'bg-green-100', text: 'text-green-800', icon: CheckCircleIcon, labelKey: 'plugin.import.status.success' },
-      rolled_back: { bg: 'bg-yellow-100', text: 'text-yellow-800', icon: ArrowPathIcon, labelKey: 'plugin.import.status.rolledBack' },
     };
-    const c = config[status] || config.INSTALLED;
+    const c = config[status] || config.installed;
     const Icon = c.icon;
-
     return (
-      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${c.bg} ${c.text}`}>
-        <Icon className="w-3 h-3" />
+      <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium ${c.bg} ${c.text}`}>
+        <Icon className="h-3 w-3" />
         {t(c.labelKey)}
       </span>
     );
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center gap-3">
-          <PuzzlePieceSolidIcon className="w-8 h-8 text-indigo-600" />
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">{t('plugin.title')}</h1>
-            <p className="text-sm text-gray-500">{t('plugin.description')}</p>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => { fetchPlugins(); fetchHistory(); }}
-            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 flex items-center gap-2"
-          >
-            <ArrowPathIcon className="w-4 h-4" />
-            {t('plugin.action.refresh')}
-          </button>
-          <button
-            onClick={() => setShowUploadModal(true)}
-            className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 flex items-center gap-2"
-          >
-            <ArrowUpTrayIcon className="w-4 h-4" />
-            {t('plugin.action.upload')}
-          </button>
-        </div>
+    <div>
+      {/* Action bar */}
+      <div className="mb-4 flex justify-end gap-2">
+        <button
+          onClick={() => fetchPlugins()}
+          className="flex items-center gap-2 rounded-md border border-gray-300 bg-white px-4 py-2 text-gray-700 hover:bg-gray-50"
+        >
+          <ArrowPathIcon className="h-4 w-4" />
+          {t('plugin.action.refresh')}
+        </button>
+        <button
+          onClick={() => setShowUploadModal(true)}
+          className="flex items-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700"
+        >
+          <ArrowUpTrayIcon className="h-4 w-4" />
+          {t('plugin.action.upload')}
+        </button>
       </div>
 
-      {/* Tabs */}
-      <div className="border-b border-gray-200 mb-6">
-        <nav className="flex -mb-px">
-          <button
-            onClick={() => setActiveTab('installed')}
-            className={`px-6 py-3 text-sm font-medium border-b-2 ${
-              activeTab === 'installed'
-                ? 'border-indigo-500 text-indigo-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
-          >
-            <PuzzlePieceIcon className="w-4 h-4 inline mr-2" />
-            {t('plugin.tab.installed')} ({plugins.length})
-          </button>
-          <button
-            onClick={() => setActiveTab('history')}
-            className={`px-6 py-3 text-sm font-medium border-b-2 ${
-              activeTab === 'history'
-                ? 'border-indigo-500 text-indigo-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
-          >
-            <DocumentTextIcon className="w-4 h-4 inline mr-2" />
-            {t('plugin.tab.history')} ({importHistory.length})
-          </button>
-        </nav>
-      </div>
-
-      {/* Content */}
       {loading ? (
-        <div className="text-center py-12">
-          <ArrowPathIcon className="w-8 h-8 animate-spin text-gray-400 mx-auto" />
+        <div className="py-12 text-center">
+          <ArrowPathIcon className="mx-auto h-8 w-8 animate-spin text-gray-400" />
           <p className="mt-2 text-gray-500">{t('plugin.loading')}</p>
         </div>
-      ) : activeTab === 'installed' ? (
-        /* Installed Plugins */
-        <div className="bg-white rounded-lg shadow overflow-hidden">
+      ) : (
+        <div className="overflow-hidden rounded-lg bg-white shadow">
           {plugins.length === 0 ? (
-            <div className="text-center py-12">
-              <FolderIcon className="w-12 h-12 text-gray-300 mx-auto" />
+            <div className="py-12 text-center">
+              <FolderIcon className="mx-auto h-12 w-12 text-gray-300" />
               <p className="mt-2 text-gray-500">{t('plugin.empty.installed')}</p>
               <button
                 onClick={() => setShowUploadModal(true)}
@@ -401,12 +285,12 @@ export default function PluginManagement() {
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">{t('plugin.column.actions')}</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="divide-y divide-gray-200 bg-white">
                 {plugins.map((plugin) => (
                   <tr key={plugin.pid} className="hover:bg-gray-50">
                     <td className="px-6 py-4">
                       <div className="flex items-center">
-                        <PuzzlePieceIcon className="w-5 h-5 text-indigo-500 mr-3" />
+                        <PuzzlePieceIcon className="mr-3 h-5 w-5 text-indigo-500" />
                         <div>
                           <div className="text-sm font-medium text-gray-900">{plugin.displayName}</div>
                           <div className="text-xs text-gray-500">{plugin.pluginId}</div>
@@ -423,7 +307,7 @@ export default function PluginManagement() {
                         />
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-500 font-mono">{plugin.namespace}</td>
+                    <td className="px-6 py-4 font-mono text-sm text-gray-500">{plugin.namespace}</td>
                     <td className="px-6 py-4">
                       <StatusBadge status={plugin.status} />
                     </td>
@@ -433,19 +317,22 @@ export default function PluginManagement() {
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-2">
                         <button
-                          onClick={() => { setSelectedPlugin(plugin); setShowDetailModal(true); }}
+                          onClick={() => {
+                            setSelectedPlugin(plugin);
+                            setShowDetailModal(true);
+                          }}
                           className="p-1 text-gray-400 hover:text-gray-600"
                           title={t('plugin.action.viewDetail')}
                         >
-                          <EyeIcon className="w-5 h-5" />
+                          <EyeIcon className="h-5 w-5" />
                         </button>
-                        {(plugin.status === 'disabled' || plugin.status === 'installed') ? (
+                        {plugin.status === 'disabled' || plugin.status === 'installed' ? (
                           <button
                             onClick={() => startPlugin(plugin.pid)}
                             className="p-1 text-green-400 hover:text-green-600"
                             title={t('plugin.action.enable')}
                           >
-                            <PlayIcon className="w-5 h-5" />
+                            <PlayIcon className="h-5 w-5" />
                           </button>
                         ) : plugin.status === 'enabled' ? (
                           <button
@@ -453,7 +340,7 @@ export default function PluginManagement() {
                             className="p-1 text-yellow-400 hover:text-yellow-600"
                             title={t('plugin.action.disable')}
                           >
-                            <StopIcon className="w-5 h-5" />
+                            <StopIcon className="h-5 w-5" />
                           </button>
                         ) : null}
                         {plugin.status !== 'enabled' && (
@@ -462,56 +349,10 @@ export default function PluginManagement() {
                             className="p-1 text-red-400 hover:text-red-600"
                             title={t('plugin.action.uninstall')}
                           >
-                            <TrashIcon className="w-5 h-5" />
+                            <TrashIcon className="h-5 w-5" />
                           </button>
                         )}
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      ) : (
-        /* Import History */
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          {importHistory.length === 0 ? (
-            <div className="text-center py-12">
-              <DocumentTextIcon className="w-12 h-12 text-gray-300 mx-auto" />
-              <p className="mt-2 text-gray-500">{t('plugin.empty.history')}</p>
-            </div>
-          ) : (
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('plugin.column.plugin')}</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('plugin.column.version')}</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('plugin.import.column.type')}</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('plugin.column.status')}</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('plugin.import.column.source')}</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('plugin.import.column.time')}</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {importHistory.map((record) => (
-                  <tr key={record.importId} className="hover:bg-gray-50">
-                    <td className="px-6 py-4">
-                      <div className="text-sm font-medium text-gray-900">{record.pluginId}</div>
-                      <div className="text-xs text-gray-500">{record.namespace}</div>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-500">{record.version}</td>
-                    <td className="px-6 py-4 text-sm text-gray-500">
-                      {record.importType === 'install' ? t('plugin.import.type.install') : t('plugin.import.type.upgrade')}
-                    </td>
-                    <td className="px-6 py-4">
-                      <StatusBadge status={record.status} />
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-500">
-                      {record.sourceType} - {record.sourceName}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-500">
-                      {new Date(record.startedAt).toLocaleString()}
                     </td>
                   </tr>
                 ))}
@@ -523,20 +364,16 @@ export default function PluginManagement() {
 
       {/* Upload Modal */}
       {showUploadModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
-            <div className="px-6 py-4 border-b border-gray-200">
+        <div className="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black">
+          <div className="mx-4 w-full max-w-md rounded-lg bg-white shadow-xl">
+            <div className="border-b border-gray-200 px-6 py-4">
               <h3 className="text-lg font-medium text-gray-900">{t('plugin.upload.title')}</h3>
             </div>
             <div className="p-6">
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-                <ArrowUpTrayIcon className="w-12 h-12 text-gray-400 mx-auto" />
-                <p className="mt-2 text-sm text-gray-600">
-                  {t('plugin.upload.dragHint')}
-                </p>
-                <p className="mt-1 text-xs text-gray-500">
-                  {t('plugin.upload.formatHint')}
-                </p>
+              <div className="rounded-lg border-2 border-dashed border-gray-300 p-8 text-center">
+                <ArrowUpTrayIcon className="mx-auto h-12 w-12 text-gray-400" />
+                <p className="mt-2 text-sm text-gray-600">{t('plugin.upload.dragHint')}</p>
+                <p className="mt-1 text-xs text-gray-500">{t('plugin.upload.formatHint')}</p>
                 <input
                   type="file"
                   accept=".json,.zip"
@@ -549,13 +386,13 @@ export default function PluginManagement() {
                 />
                 <label
                   htmlFor="plugin-file"
-                  className="mt-4 inline-block px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 cursor-pointer"
+                  className="mt-4 inline-block cursor-pointer rounded-md bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700"
                 >
                   {uploading ? t('plugin.upload.uploading') : t('plugin.upload.selectFile')}
                 </label>
               </div>
             </div>
-            <div className="px-6 py-4 border-t border-gray-200 flex justify-end">
+            <div className="flex justify-end border-t border-gray-200 px-6 py-4">
               <button
                 onClick={() => setShowUploadModal(false)}
                 className="px-4 py-2 text-gray-700 hover:text-gray-900"
@@ -569,16 +406,15 @@ export default function PluginManagement() {
 
       {/* Preview Modal */}
       {showPreviewModal && previewResult && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col">
-            <div className="px-6 py-4 border-b border-gray-200">
+        <div className="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black">
+          <div className="mx-4 flex max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg bg-white shadow-xl">
+            <div className="border-b border-gray-200 px-6 py-4">
               <h3 className="text-lg font-medium text-gray-900">{t('plugin.preview.title')}</h3>
             </div>
-            <div className="p-6 overflow-y-auto flex-1">
-              {/* Plugin Info */}
+            <div className="flex-1 overflow-y-auto p-6">
               <div className="mb-6">
-                <h4 className="text-sm font-medium text-gray-700 mb-2">{t('plugin.preview.info')}</h4>
-                <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                <h4 className="mb-2 text-sm font-medium text-gray-700">{t('plugin.preview.info')}</h4>
+                <div className="space-y-2 rounded-lg bg-gray-50 p-4">
                   <div className="flex justify-between">
                     <span className="text-gray-500">{t('plugin.field.name')}</span>
                     <span className="font-medium">{previewResult.displayName}</span>
@@ -604,14 +440,13 @@ export default function PluginManagement() {
                 </div>
               </div>
 
-              {/* Validation */}
               {!previewResult.valid && previewResult.errors.length > 0 && (
                 <div className="mb-6">
-                  <h4 className="text-sm font-medium text-red-700 mb-2 flex items-center gap-1">
-                    <XCircleIcon className="w-4 h-4" />
+                  <h4 className="mb-2 flex items-center gap-1 text-sm font-medium text-red-700">
+                    <XCircleIcon className="h-4 w-4" />
                     {t('plugin.preview.validationErrors')}
                   </h4>
-                  <ul className="bg-red-50 rounded-lg p-4 space-y-1 text-sm text-red-700">
+                  <ul className="space-y-1 rounded-lg bg-red-50 p-4 text-sm text-red-700">
                     {previewResult.errors.map((error, i) => (
                       <li key={i}>• {error}</li>
                     ))}
@@ -621,11 +456,11 @@ export default function PluginManagement() {
 
               {previewResult.warnings.length > 0 && (
                 <div className="mb-6">
-                  <h4 className="text-sm font-medium text-yellow-700 mb-2 flex items-center gap-1">
-                    <ExclamationTriangleIcon className="w-4 h-4" />
+                  <h4 className="mb-2 flex items-center gap-1 text-sm font-medium text-yellow-700">
+                    <ExclamationTriangleIcon className="h-4 w-4" />
                     {t('plugin.preview.warnings')}
                   </h4>
-                  <ul className="bg-yellow-50 rounded-lg p-4 space-y-1 text-sm text-yellow-700">
+                  <ul className="space-y-1 rounded-lg bg-yellow-50 p-4 text-sm text-yellow-700">
                     {previewResult.warnings.map((warning, i) => (
                       <li key={i}>• {warning}</li>
                     ))}
@@ -633,11 +468,10 @@ export default function PluginManagement() {
                 </div>
               )}
 
-              {/* Action Counts */}
               {Object.keys(previewResult.actionCounts).length > 0 && (
                 <div>
-                  <h4 className="text-sm font-medium text-gray-700 mb-2">{t('plugin.preview.actionsToPlan')}</h4>
-                  <div className="bg-gray-50 rounded-lg p-4 grid grid-cols-2 gap-2 text-sm">
+                  <h4 className="mb-2 text-sm font-medium text-gray-700">{t('plugin.preview.actionsToPlan')}</h4>
+                  <div className="grid grid-cols-2 gap-2 rounded-lg bg-gray-50 p-4 text-sm">
                     {Object.entries(previewResult.actionCounts).map(([type, actions]) => (
                       <div key={type} className="flex justify-between">
                         <span className="text-gray-500">{type}</span>
@@ -654,9 +488,12 @@ export default function PluginManagement() {
                 </div>
               )}
             </div>
-            <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-2">
+            <div className="flex justify-end gap-2 border-t border-gray-200 px-6 py-4">
               <button
-                onClick={() => { setShowPreviewModal(false); setPreviewResult(null); }}
+                onClick={() => {
+                  setShowPreviewModal(false);
+                  setPreviewResult(null);
+                }}
                 className="px-4 py-2 text-gray-700 hover:text-gray-900"
               >
                 {t('plugin.action.cancel')}
@@ -664,9 +501,13 @@ export default function PluginManagement() {
               <button
                 onClick={executeImport}
                 disabled={!previewResult.valid || uploading}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                className="rounded-md bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-gray-300"
               >
-                {uploading ? t('plugin.import.importing') : previewResult.isUpgrade ? t('plugin.import.confirmUpgrade') : t('plugin.import.confirmInstall')}
+                {uploading
+                  ? t('plugin.import.importing')
+                  : previewResult.isUpgrade
+                    ? t('plugin.import.confirmUpgrade')
+                    : t('plugin.import.confirmInstall')}
               </button>
             </div>
           </div>
@@ -675,29 +516,32 @@ export default function PluginManagement() {
 
       {/* Detail Modal */}
       {showDetailModal && selectedPlugin && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4">
-            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+        <div className="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black">
+          <div className="mx-4 w-full max-w-lg rounded-lg bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
               <h3 className="text-lg font-medium text-gray-900">{t('plugin.detail.title')}</h3>
               <button
-                onClick={() => { setShowDetailModal(false); setSelectedPlugin(null); }}
+                onClick={() => {
+                  setShowDetailModal(false);
+                  setSelectedPlugin(null);
+                }}
                 className="text-gray-400 hover:text-gray-600"
               >
-                <XCircleIcon className="w-5 h-5" />
+                <XCircleIcon className="h-5 w-5" />
               </button>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="space-y-4 p-6">
               <div>
                 <label className="text-sm font-medium text-gray-500">{t('plugin.field.name')}</label>
                 <p className="text-gray-900">{selectedPlugin.displayName}</p>
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-500">Plugin ID</label>
-                <p className="text-gray-900 font-mono text-sm">{selectedPlugin.pluginId}</p>
+                <p className="font-mono text-sm text-gray-900">{selectedPlugin.pluginId}</p>
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-500">{t('plugin.column.namespace')}</label>
-                <p className="text-gray-900 font-mono text-sm">{selectedPlugin.namespace}</p>
+                <p className="font-mono text-sm text-gray-900">{selectedPlugin.namespace}</p>
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-500">{t('plugin.column.version')}</label>
@@ -710,7 +554,7 @@ export default function PluginManagement() {
                   />
                 </div>
                 {selectedPlugin.minPlatformVersion && (
-                  <p className="text-xs text-gray-400 mt-0.5">
+                  <p className="mt-0.5 text-xs text-gray-400">
                     Requires platform ≥ {selectedPlugin.minPlatformVersion}
                     {selectedPlugin.maxPlatformVersion && ` (tested up to ${selectedPlugin.maxPlatformVersion})`}
                   </p>
@@ -718,7 +562,9 @@ export default function PluginManagement() {
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-500">{t('plugin.column.status')}</label>
-                <p><StatusBadge status={selectedPlugin.status} /></p>
+                <p>
+                  <StatusBadge status={selectedPlugin.status} />
+                </p>
               </div>
               {selectedPlugin.description && (
                 <div>

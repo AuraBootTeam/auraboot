@@ -9,6 +9,6 @@ Disallow: /aurabot/
 Disallow: /enterprise/
 Disallow: /bpm/
 Disallow: /api/
-Disallow: /marketplace/
+Disallow: /plugins/
 
 Sitemap: https://www.auraboot.com/sitemap.xml
