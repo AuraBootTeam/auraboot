@@ -427,13 +427,24 @@ test.describe('C5 — Toolbar Block — Deep ActionDef Tests', () => {
    * Returns the config panel locator.
    */
   async function addAndSelectToolbar(page: Page): Promise<Locator> {
+    // Palette items are both dnd-kit useDraggable and native HTML5 draggable.
+    // The drag-init race can swallow a click, so retry once before failing.
     await page.getByTestId('canvas-left-tab-components').click();
     const paletteItem = page.getByTestId('block-palette-item-toolbar');
     await paletteItem.waitFor({ state: 'visible', timeout: 5000 });
-    await paletteItem.click();
 
-    // Wait for block to appear
-    await page.locator(BLK).first().waitFor({ state: 'visible', timeout: 5000 });
+    const firstBlock = page.locator(BLK).first();
+    const clickPalette = async () => {
+      await paletteItem.click();
+      return firstBlock
+        .waitFor({ state: 'visible', timeout: 3000 })
+        .then(() => true)
+        .catch(() => false);
+    };
+    const appeared = (await clickPalette()) || (await clickPalette());
+    if (!appeared) {
+      throw new Error('addAndSelectToolbar: toolbar block never appeared after 2 click attempts');
+    }
 
     // Click content area to select
     await page.locator('[data-testid^="canvas-block-content-"]').first().click();

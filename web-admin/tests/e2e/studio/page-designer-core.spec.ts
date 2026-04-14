@@ -51,16 +51,35 @@ async function blockCount(page: Page): Promise<number> {
 }
 
 async function addBlock(page: Page, type: string) {
+  // The palette item is both a dnd-kit useDraggable source AND a native HTML5
+  // draggable (for react-grid-layout's onDrop). Under rapid successive clicks,
+  // the browser's drag-initiation logic on pointerdown can occasionally swallow
+  // the subsequent click event, so the onAddBlock handler never fires and the
+  // count stays flat. Guard by asserting the block count advanced; retry once
+  // if not (click-loss case), then fail loudly.
   const countBefore = await blockCount(page);
-  await page.getByTestId('canvas-left-tab-components').click();
-  await page.getByTestId(`block-palette-item-${type}`).click();
-  // Wait for the block count to increase (React state update)
-  await page.waitForFunction(
-    ({ selector, expected }) => document.querySelectorAll(selector).length >= expected,
-    { selector: BLOCK_SELECTOR, expected: countBefore + 1 },
-    { timeout: 3000 },
-  ).catch(() => {});
-  await page.waitForTimeout(200);
+  const paletteItem = page.getByTestId(`block-palette-item-${type}`);
+
+  const ensureClicked = async () => {
+    await page.getByTestId('canvas-left-tab-components').click();
+    await paletteItem.click();
+    return page
+      .waitForFunction(
+        ({ selector, expected }) =>
+          document.querySelectorAll(selector).length >= expected,
+        { selector: BLOCK_SELECTOR, expected: countBefore + 1 },
+        { timeout: 2000 },
+      )
+      .then(() => true)
+      .catch(() => false);
+  };
+
+  const ok = (await ensureClicked()) || (await ensureClicked());
+  if (!ok) {
+    throw new Error(
+      `addBlock(${type}): block count did not advance from ${countBefore} after 2 click attempts`,
+    );
+  }
 }
 
 const BLOCK_SELECTOR = '[data-testid^="canvas-block-"]:not([data-testid*="-drag-"]):not([data-testid*="-remove-"]):not([data-testid*="-content-"]):not([data-testid*="-drop-"])';

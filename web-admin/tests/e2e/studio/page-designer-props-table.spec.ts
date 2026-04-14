@@ -87,29 +87,55 @@ async function openDesigner(page: Page, pid: string): Promise<void> {
 }
 
 async function addAndSelectTable(page: Page): Promise<void> {
-  // Add via quick-add button if available, fallback to palette
-  const quickAdd = page.getByTestId('canvas-quick-add-table');
-  if (await quickAdd.isVisible()) {
-    await quickAdd.click();
-  } else {
-    await page.getByTestId('canvas-left-tab-components').click();
-    await page.getByTestId('block-palette-item-table').click();
+  // The palette item double-arms both dnd-kit useDraggable and native HTML5
+  // drag; under Playwright the drag-init logic can occasionally swallow the
+  // click, so retry once if the block fails to appear.
+  const blockContent = page.locator('[data-testid^="canvas-block-content-"]').first();
+  const clickPalette = async (timeoutMs: number) => {
+    const quickAdd = page.getByTestId('canvas-quick-add-table');
+    if (await quickAdd.isVisible()) {
+      await quickAdd.click();
+    } else {
+      await page.getByTestId('canvas-left-tab-components').click();
+      await page.getByTestId('block-palette-item-table').click();
+    }
+    return blockContent
+      .waitFor({ state: 'visible', timeout: timeoutMs })
+      .then(() => true)
+      .catch(() => false);
+  };
+
+  // First attempt preserves the original long wait (15s) because initial
+  // render after page load can be slow; retry with a short wait only if the
+  // click was dropped entirely (drag-init race swallowed it).
+  const appeared = (await clickPalette(15_000)) || (await clickPalette(3000));
+  if (!appeared) {
+    throw new Error('addAndSelectTable: table block never appeared after 2 click attempts');
   }
 
-  // Wait for block to appear (may be re-rendered by React)
-  const blockContent = page.locator('[data-testid^="canvas-block-content-"]').first();
-  await blockContent.waitFor({ state: 'visible', timeout: 15_000 });
-
-  // Click to select and wait for config panel to appear
-  // Retry click if the config panel doesn't appear immediately
-  await blockContent.click({ timeout: 10_000 });
+  // Click to select and wait for config panel to appear.
+  // RGL re-keys children on layout/auto-flow changes, so the just-rendered
+  // block-content node can be detached mid-click. We retry the click in a
+  // small loop, re-resolving the locator each time, instead of letting one
+  // long click() spin on a stale node handle.
   const configPanel = page.getByTestId('table-schema-config');
-  try {
-    await configPanel.waitFor({ state: 'visible', timeout: 3000 });
-  } catch {
-    // Config panel may not have opened — try clicking block content again
-    await blockContent.click();
-    await configPanel.waitFor({ state: 'visible', timeout: 5000 });
+  let opened = false;
+  for (let attempt = 0; attempt < 4 && !opened; attempt++) {
+    try {
+      await page
+        .locator('[data-testid^="canvas-block-content-"]')
+        .first()
+        .click({ timeout: 3000 });
+      opened = await configPanel
+        .waitFor({ state: 'visible', timeout: 2000 })
+        .then(() => true)
+        .catch(() => false);
+    } catch {
+      // detached / not stable — re-resolve and retry
+    }
+  }
+  if (!opened) {
+    throw new Error('addAndSelectTable: table-schema-config did not open after 4 click attempts');
   }
 }
 
