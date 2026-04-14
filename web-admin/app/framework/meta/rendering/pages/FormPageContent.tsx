@@ -100,8 +100,17 @@ function resolveComponentByFieldMeta(
   dataType?: string,
   extension?: Record<string, any>,
 ): string | undefined {
+  // Plugin import may store under nested extension.extension (legacy shape),
+  // while runtime may also have the properties hoisted at the top level.
+  const nested = (extension as any)?.extension as Record<string, any> | undefined;
   const preferred = String(
-    extension?.renderComponent ?? extension?.component ?? extension?.uiComponent ?? '',
+    extension?.renderComponent ??
+      extension?.component ??
+      extension?.uiComponent ??
+      nested?.renderComponent ??
+      nested?.component ??
+      nested?.uiComponent ??
+      '',
   )
     .trim()
     .toLowerCase();
@@ -453,10 +462,15 @@ export function FormPageContent(props: PageContentProps) {
               ruleSchema: f.ruleSchema,
               // Preserve extension for component-specific config (levels, multiple, allowClear, etc.)
               extension: f.extension,
-              // Pre-compute component-specific props from extension (stable reference)
+              // Pre-compute component-specific props from extension (stable reference).
+              // Plugin import may store properties under nested `extension.extension`;
+              // flatten both shapes so downstream renderers see a single bag of props.
               extensionProps: f.extension
                 ? Object.fromEntries(
-                    Object.entries(f.extension).filter(
+                    Object.entries({
+                      ...((f.extension as any)?.extension ?? {}),
+                      ...f.extension,
+                    }).filter(
                       ([k]) =>
                         ![
                           'renderComponent',
@@ -468,6 +482,7 @@ export function FormPageContent(props: PageContentProps) {
                           'precision',
                           'scale',
                           'readOnly',
+                          'extension',
                         ].includes(k),
                     ),
                   )
