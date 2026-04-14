@@ -213,6 +213,7 @@ auraboot/
 
 ### Getting Started
 - [Introduction](docs/getting-started/introduction.md) — What is AuraBoot, who it's for
+- [OSS Onboarding](docs/community/getting-started.md) — Clone, bootstrap, and smoke-test the open-source core
 - [Quick Start](docs/getting-started/quick-start.md) — Docker Compose setup in 5 minutes
 - [Installation](docs/getting-started/installation.md) — Detailed installation guide
 - [Build Your First App](docs/getting-started/first-app.md) — 30-minute tutorial
