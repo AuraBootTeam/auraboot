@@ -13,12 +13,12 @@
         {
           "code": "create",
           "primary": true,
-          "permissionCode": "CRMS.activity.manage",
+          "permissionCode": "CRM.activity.manage",
           "label": "create",
           "action": {
             "type": "navigate",
             "to": "crm_activity_form",
-            "command": "crms:create_activity"
+            "command": "crm:create_activity"
           }
         }
       ]
@@ -110,7 +110,7 @@
             },
             {
               "code": "edit",
-              "permissionCode": "CRMS.activity.manage",
+              "permissionCode": "CRM.activity.manage",
               "label": "edit",
               "action": {
                 "type": "navigate",
@@ -120,12 +120,12 @@
             {
               "code": "delete",
               "danger": true,
-              "permissionCode": "CRMS.activity.manage",
+              "permissionCode": "CRM.activity.manage",
               "label": "delete",
               "confirm": "delete.confirm",
               "action": {
                 "type": "command",
-                "command": "crms:delete_activity"
+                "command": "crm:delete_activity"
               }
             }
           ]

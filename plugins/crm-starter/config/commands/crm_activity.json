@@ -1,6 +1,6 @@
 [
   {
-    "code": "crms:create_activity",
+    "code": "crm:create_activity",
     "displayName:zh-CN": "新建活动",
     "displayName:en": "Create Activity",
     "type": "create",
@@ -19,13 +19,13 @@
       }
     },
     "permissions": [
-      "CRMS.activity.manage"
+      "CRM.activity.manage"
     ],
     "agent_hint": "Create a new activity record. Key inputs: type, subject, content. Auto-set: owner, date.",
     "cmd_risk_level": "L1"
   },
   {
-    "code": "crms:update_activity",
+    "code": "crm:update_activity",
     "displayName:zh-CN": "编辑活动",
     "displayName:en": "Update Activity",
     "type": "update",
@@ -37,13 +37,13 @@
       "crm_act_date"
     ],
     "permissions": [
-      "CRMS.activity.manage"
+      "CRM.activity.manage"
     ],
     "agent_hint": "Update an existing activity record. Editable fields: type, subject, content, date.",
     "cmd_risk_level": "L1"
   },
   {
-    "code": "crms:delete_activity",
+    "code": "crm:delete_activity",
     "displayName:zh-CN": "删除活动",
     "displayName:en": "Delete Activity",
     "type": "delete",
@@ -53,31 +53,31 @@
       "confirmMessage:en": "Confirm delete this activity?"
     },
     "permissions": [
-      "CRMS.activity.manage"
+      "CRM.activity.manage"
     ],
     "agent_hint": "Delete activity record(s). This is irreversible.",
     "cmd_risk_level": "L4"
   },
   {
-    "code": "crms:detail_activity",
+    "code": "crm:detail_activity",
     "displayName:zh-CN": "查看活动",
     "displayName:en": "View Activity",
     "type": "query",
     "modelCode": "crm_activity",
     "permissions": [
-      "CRMS.activity.read"
+      "CRM.activity.read"
     ],
     "agent_hint": "Query activity records.",
     "cmd_risk_level": "L0"
   },
   {
-    "code": "crms:list_activities",
+    "code": "crm:list_activities",
     "displayName:zh-CN": "活动列表",
     "displayName:en": "List Activities",
     "type": "query",
     "modelCode": "crm_activity",
     "permissions": [
-      "CRMS.activity.read"
+      "CRM.activity.read"
     ],
     "agent_hint": "Query activity records.",
     "cmd_risk_level": "L0"

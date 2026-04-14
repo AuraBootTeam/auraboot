@@ -13,7 +13,7 @@
         {
           "code": "edit",
           "icon": "Edit",
-          "permissionCode": "CRMS.contact.manage",
+          "permissionCode": "CRM.contact.manage",
           "label": "edit",
           "action": {
             "type": "navigate",

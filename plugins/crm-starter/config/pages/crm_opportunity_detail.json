@@ -13,7 +13,7 @@
         {
           "code": "edit",
           "icon": "Edit",
-          "permissionCode": "CRMS.opportunity.manage",
+          "permissionCode": "CRM.opportunity.manage",
           "label": "edit",
           "action": {
             "type": "navigate",
@@ -22,63 +22,63 @@
         },
         {
           "code": "qualify",
-          "permissionCode": "CRMS.opportunity.manage",
+          "permissionCode": "CRM.opportunity.manage",
           "label": {
             "zh-CN": "资质审查",
             "en-US": "Qualify"
           },
           "action": {
             "type": "command",
-            "command": "crms:qualify_opportunity"
+            "command": "crm:qualify_opportunity"
           }
         },
         {
           "code": "propose",
-          "permissionCode": "CRMS.opportunity.manage",
+          "permissionCode": "CRM.opportunity.manage",
           "label": {
             "zh-CN": "提交提案",
             "en-US": "Propose"
           },
           "action": {
             "type": "command",
-            "command": "crms:propose_opportunity"
+            "command": "crm:propose_opportunity"
           }
         },
         {
           "code": "negotiate",
-          "permissionCode": "CRMS.opportunity.manage",
+          "permissionCode": "CRM.opportunity.manage",
           "label": {
             "zh-CN": "进入谈判",
             "en-US": "Negotiate"
           },
           "action": {
             "type": "command",
-            "command": "crms:negotiate_opportunity"
+            "command": "crm:negotiate_opportunity"
           }
         },
         {
           "code": "win",
-          "permissionCode": "CRMS.opportunity.manage",
+          "permissionCode": "CRM.opportunity.manage",
           "label": {
             "zh-CN": "赢单",
             "en-US": "Win"
           },
           "action": {
             "type": "command",
-            "command": "crms:win_opportunity"
+            "command": "crm:win_opportunity"
           }
         },
         {
           "code": "lose",
           "danger": true,
-          "permissionCode": "CRMS.opportunity.manage",
+          "permissionCode": "CRM.opportunity.manage",
           "label": {
             "zh-CN": "输单",
             "en-US": "Lose"
           },
           "action": {
             "type": "command",
-            "command": "crms:lose_opportunity"
+            "command": "crm:lose_opportunity"
           }
         }
       ]
