@@ -236,7 +236,6 @@ public class CommandPipelineRegistry {
                  CommandStage.PRE_INVARIANT,
                  CommandStage.CROSS_FIELD_VALIDATION,
                  CommandStage.HANDLER,
-                 CommandStage.CONSISTENCY_CHECK,
                  CommandStage.POST_INVARIANT -> true;
             default -> false;
         };
