@@ -24,7 +24,7 @@ test.describe('Command Pipeline Stages', () => {
   let opportunityPid: string;
 
   test('AUTO_SET: Account creation generates auto-code', async ({ page }) => {
-    const result = await executeCommandViaApi(page, 'crm:create_account', {
+    const result = await executeCommandViaApi(page, 'crms:create_account', {
       crm_acc_name: `Pipeline测试客户_${uid}`,
       crm_acc_industry: 'technology',
     });
@@ -54,7 +54,7 @@ test.describe('Command Pipeline Stages', () => {
     // Try to create account without required field (crm_acc_name)
     const result = await executeCommandViaApi(
       page,
-      'crm:create_account',
+      'crms:create_account',
       { crm_acc_industry: 'technology' }, // missing crm_acc_name
       undefined,
       'create',
@@ -67,7 +67,7 @@ test.describe('Command Pipeline Stages', () => {
   });
 
   test('STATE_CHECK: Opportunity creation defaults to discovery stage', async ({ page }) => {
-    const result = await executeCommandViaApi(page, 'crm:create_opportunity', {
+    const result = await executeCommandViaApi(page, 'crms:create_opportunity', {
       crm_opp_name: `Pipeline商机_${uid}`,
       crm_opp_account_id: accountPid,
       crm_opp_expected_amount: 100000,
@@ -89,7 +89,7 @@ test.describe('Command Pipeline Stages', () => {
     // discovery → qualification (valid)
     const qualResult = await executeCommandViaApi(
       page,
-      'crm:qualify_opportunity',
+      'crms:qualify_opportunity',
       {},
       opportunityPid,
       'update',
@@ -108,7 +108,7 @@ test.describe('Command Pipeline Stages', () => {
     // Try to win directly from qualification (should need proposal → negotiation first)
     const result = await executeCommandViaApi(
       page,
-      'crm:win_opportunity',
+      'crms:win_opportunity',
       {},
       opportunityPid,
       'update',
@@ -122,7 +122,7 @@ test.describe('Command Pipeline Stages', () => {
 
   test('Lead status lifecycle: new → contacted → qualified → converted', async ({ page }) => {
     // Create lead
-    const createResult = await executeCommandViaApi(page, 'crm:create_lead', {
+    const createResult = await executeCommandViaApi(page, 'crms:create_lead', {
       crm_lead_company: `Pipeline线索公司_${uid}`,
       crm_lead_contact_name: '测试联系人',
       crm_lead_source: 'website',
@@ -136,19 +136,19 @@ test.describe('Command Pipeline Stages', () => {
     expect(body?.data?.crm_lead_status).toBe('new');
 
     // new → contacted
-    await executeCommandViaApi(page, 'crm:contact_lead', {}, leadPid, 'update');
+    await executeCommandViaApi(page, 'crms:contact_lead', {}, leadPid, 'update');
     resp = await page.request.get(`/api/dynamic/crm_lead/${leadPid}`);
     body = await resp.json();
     expect(body?.data?.crm_lead_status).toBe('contacted');
 
     // contacted → qualified
-    await executeCommandViaApi(page, 'crm:qualify_lead', {}, leadPid, 'update');
+    await executeCommandViaApi(page, 'crms:qualify_lead', {}, leadPid, 'update');
     resp = await page.request.get(`/api/dynamic/crm_lead/${leadPid}`);
     body = await resp.json();
     expect(body?.data?.crm_lead_status).toBe('qualified');
 
     // qualified → converted
-    await executeCommandViaApi(page, 'crm:convert_lead', {}, leadPid, 'update');
+    await executeCommandViaApi(page, 'crms:convert_lead', {}, leadPid, 'update');
     resp = await page.request.get(`/api/dynamic/crm_lead/${leadPid}`);
     body = await resp.json();
     expect(body?.data?.crm_lead_status).toBe('converted');
@@ -157,7 +157,7 @@ test.describe('Command Pipeline Stages', () => {
   });
 
   test('Campaign status lifecycle: planned → active → completed', async ({ page }) => {
-    const createResult = await executeCommandViaApi(page, 'crm:create_campaign', {
+    const createResult = await executeCommandViaApi(page, 'crms:create_campaign', {
       crm_cpn_name: `Pipeline营销活动_${uid}`,
       crm_cpn_type: 'digital',
       crm_cpn_budget: 10000,
@@ -171,13 +171,13 @@ test.describe('Command Pipeline Stages', () => {
     expect(body?.data?.crm_cpn_status).toBe('planned');
 
     // planned → active
-    await executeCommandViaApi(page, 'crm:activate_campaign', {}, campaignPid, 'update');
+    await executeCommandViaApi(page, 'crms:activate_campaign', {}, campaignPid, 'update');
     resp = await page.request.get(`/api/dynamic/crm_campaign/${campaignPid}`);
     body = await resp.json();
     expect(body?.data?.crm_cpn_status).toBe('active');
 
     // active → completed
-    await executeCommandViaApi(page, 'crm:complete_campaign', {}, campaignPid, 'update');
+    await executeCommandViaApi(page, 'crms:complete_campaign', {}, campaignPid, 'update');
     resp = await page.request.get(`/api/dynamic/crm_campaign/${campaignPid}`);
     body = await resp.json();
     expect(body?.data?.crm_cpn_status).toBe('completed');
@@ -190,13 +190,13 @@ test.describe('Command Pipeline Stages', () => {
     // Delete opportunity
     if (opportunityPid) {
       // First transition back to a deletable state if possible, or force delete
-      await executeCommandViaApi(page, 'crm:delete_opportunity', {}, opportunityPid, 'delete', {
+      await executeCommandViaApi(page, 'crms:delete_opportunity', {}, opportunityPid, 'delete', {
         allowHttpError: true,
       });
     }
     // Delete account
     if (accountPid) {
-      await executeCommandViaApi(page, 'crm:delete_account', {}, accountPid, 'delete', {
+      await executeCommandViaApi(page, 'crms:delete_account', {}, accountPid, 'delete', {
         allowHttpError: true,
       });
     }
