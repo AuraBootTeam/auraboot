@@ -56,6 +56,8 @@ echo -e "${GREEN}   Backend service stopped${NC}"
 
 # Step 2: Stop BFF server if running
 echo -e "${YELLOW}Step 2: Stopping BFF server...${NC}"
+pkill -f "concurrently" 2>/dev/null || true
+pkill -f "pnpm dev" 2>/dev/null || true
 pkill -f "bff.server" 2>/dev/null || true
 pkill -f "react-router dev" 2>/dev/null || true
 pkill -f "vite" 2>/dev/null || true
