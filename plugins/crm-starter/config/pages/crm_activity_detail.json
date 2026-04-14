@@ -1,105 +1,79 @@
 {
   "pageKey": "crm_activity_detail",
+  "modelCode": "crm_activity",
+  "kind": "detail",
+  "layout": {
+    "type": "stack"
+  },
+  "blocks": [
+    {
+      "id": "crm_activity_detail_toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "edit",
+          "icon": "Edit",
+          "permissionCode": "CRMS.activity.manage",
+          "label": "edit",
+          "action": {
+            "type": "navigate",
+            "to": "crm_activity_form"
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_activity_tabs",
+      "blockType": "tabs",
+      "tabs": [
+        {
+          "key": "overview",
+          "label": {
+            "zh-CN": "概览",
+            "en-US": "Overview"
+          },
+          "blocks": [
+            {
+              "id": "section_basic",
+              "blockType": "form-section",
+              "title": {
+                "zh-CN": "活动信息",
+                "en-US": "Activity Information"
+              },
+              "columns": 2,
+              "fields": [
+                {
+                  "field": "crm_act_type",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_act_subject",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_act_date",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_act_owner",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_act_content",
+                  "span": 2,
+                  "readOnly": true
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
   "name:zh-CN": "活动详情",
   "name:en": "Activity Detail",
-  "pageType": "detail",
-  "modelCode": "crm_activity",
-  "dslSchema": {
-    "id": "detail.crm_activity",
-    "kind": "Detail",
-    "version": "1.0.0",
-    "modelCode": "crm_activity",
-    "layout": {
-      "areas": [
-        "header",
-        "main"
-      ],
-      "areasConfig": {
-        "header": {
-          "type": "flex",
-          "align": "center",
-          "justify": "space-between",
-          "direction": "row"
-        },
-        "main": {
-          "type": "flex",
-          "direction": "column",
-          "rowGap": 16
-        }
-      }
-    },
-    "areas": {
-      "header": {
-        "blocks": [
-          {
-            "id": "crm_activity_detail_toolbar",
-            "blockType": "toolbar",
-            "buttons": [
-              {
-                "code": "edit",
-                "icon": "Edit",
-                "permissionCode": "CRMS.activity.manage",
-                "label": "edit",
-                "action": {
-                  "type": "navigate",
-                  "to": "crm_activity_form"
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "main": {
-        "blocks": [
-          {
-            "id": "crm_activity_tabs",
-            "blockType": "tabs",
-            "tabs": [
-              {
-                "key": "overview",
-                "label": {
-                  "zh-CN": "概览",
-                  "en-US": "Overview"
-                },
-                "blocks": [
-                  {
-                    "id": "section_basic",
-                    "blockType": "form-section",
-                    "title": {
-                      "zh-CN": "活动信息",
-                      "en-US": "Activity Information"
-                    },
-                    "columns": 2,
-                    "fields": [
-                      {
-                        "field": "crm_act_type",
-                        "readOnly": true
-                      },
-                      {
-                        "field": "crm_act_subject",
-                        "readOnly": true
-                      },
-                      {
-                        "field": "crm_act_date",
-                        "readOnly": true
-                      },
-                      {
-                        "field": "crm_act_owner",
-                        "readOnly": true
-                      },
-                      {
-                        "field": "crm_act_content",
-                        "span": 2,
-                        "readOnly": true
-                      }
-                    ]
-                  }
-                ]
-              }
-            ]
-          }
-        ]
-      }
-    }
+  "title": {
+    "zh-CN": "活动详情",
+    "en": "Activity Detail"
   }
 }
