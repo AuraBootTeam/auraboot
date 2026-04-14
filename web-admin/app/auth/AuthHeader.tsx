@@ -57,7 +57,7 @@ export default function AuthHeader() {
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Left: Logo */}
         <Link to="/" className="flex items-center">
-          <img className="h-8 w-8 rounded-lg" src="/logo192.png" alt="Logo" />
+          <img className="h-8 w-8 rounded-lg" src="/android-chrome-192x192.png" alt="AuraBoot" />
           <span className="ml-3 text-xl font-bold text-gray-900 dark:text-white">AuraBoot</span>
         </Link>
 
