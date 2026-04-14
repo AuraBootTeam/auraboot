@@ -1,238 +1,97 @@
 /**
  * Resolves icon name strings (from menu config / plugin JSON) to Lucide React components.
- * Falls back to a text abbreviation when no matching icon is found.
+ *
+ * Accepts multiple naming conventions and maps them all to lucide-react:
+ * - PascalCase (direct lucide names):        "LayoutDashboard"
+ * - Tabler-style prefix:                     "IconWebhook" → "Webhook"
+ * - Lucide-style prefix:                     "LucidePuzzle" → "Puzzle"
+ * - kebab-case / Ant Design:                 "bar-chart"   → "BarChart"
+ * - snake_case:                              "bar_chart"   → "BarChart"
+ * - lowercase single word:                   "dashboard"   → "Dashboard" (via alias)
+ *
+ * No explicit whitelist: any lucide icon name works out of the box. Unknown
+ * names fall back to a text abbreviation so plugins never crash on typos.
  */
-import React, { lazy, Suspense } from 'react';
+import React from 'react';
+import * as LucideIcons from 'lucide-react';
 import type { LucideProps } from 'lucide-react';
-import {
-  AlertCircle,
-  AlertTriangle,
-  ArrowDownLeft,
-  ArrowLeftRight,
-  ArrowRight,
-  ArrowUpRight,
-  Award,
-  BadgeCheck,
-  BarChart,
-  BarChart2,
-  BarChart3,
-  BookOpen,
-  Bug,
-  Building,
-  Calculator,
-  Calendar,
-  CheckCircle,
-  CheckSquare,
-  ClipboardCheck,
-  ClipboardList,
-  Clock,
-  Cloud,
-  Cog,
-  Coins,
-  Contact,
-  Cpu,
-  CreditCard,
-  Database,
-  DollarSign,
-  Droplets,
-  ExternalLink,
-  Factory,
-  FileBarChart,
-  FileCheck,
-  FileCode,
-  FileCog,
-  FileEdit,
-  FileQuestion,
-  FileText,
-  FileWarning,
-  Fingerprint,
-  FlaskConical,
-  FolderKanban,
-  FolderTree,
-  GitBranch,
-  GitMerge,
-  HardHat,
-  Hash,
-  IdCard,
-  Landmark,
-  Layers,
-  LayoutDashboard,
-  Lightbulb,
-  LineChart,
-  Link,
-  List,
-  Lock,
-  MapPin,
-  MessageSquare,
-  Monitor,
-  Package,
-  PackageCheck,
-  PackageMinus,
-  PackagePlus,
-  PackageSearch,
-  PieChart,
-  PlayCircle,
-  Plus,
-  Puzzle,
-  Receipt,
-  RotateCcw,
-  RotateCw,
-  Route,
-  Scale,
-  ScanSearch,
-  Search,
-  Settings,
-  Shield,
-  ShieldCheck,
-  ShoppingCart,
-  Target,
-  TrendingDown,
-  TrendingUp,
-  Truck,
-  User,
-  UserCheck,
-  UserPlus,
-  Users,
-  Wallet,
-  Warehouse,
-  Wrench,
-} from 'lucide-react';
 
-// Map icon name strings → Lucide components
-// Covers: PascalCase Lucide names, Icon-prefixed Tabler names, kebab-case Ant Design names, lowercase aliases
-const iconMap: Record<string, React.ComponentType<LucideProps>> = {
-  // Lucide PascalCase (direct match)
-  AlertCircle,
-  AlertTriangle,
-  ArrowDownLeft,
-  ArrowLeftRight,
-  ArrowRight,
-  ArrowUpRight,
-  Award,
-  BadgeCheck,
-  BarChart,
-  BarChart2,
-  BarChart3,
-  BookOpen,
-  Bug,
-  Building,
-  Calculator,
-  Calendar,
-  CheckCircle,
-  CheckSquare,
-  ClipboardCheck,
-  ClipboardList,
-  Clock,
-  Cloud,
-  Cog,
-  Coins,
-  Contact,
-  Cpu,
-  CreditCard,
-  Database,
-  DollarSign,
-  Droplets,
-  ExternalLink,
-  Factory,
-  FileBarChart,
-  FileCheck,
-  FileCode,
-  FileCog,
-  FileEdit,
-  FileQuestion,
-  FileText,
-  FileWarning,
-  Fingerprint,
-  FlaskConical,
-  FolderKanban,
-  FolderTree,
-  GitBranch,
-  GitMerge,
-  HardHat,
-  Hash,
-  IdCard,
-  Landmark,
-  Layers,
-  LayoutDashboard,
-  Lightbulb,
-  LineChart,
-  Link,
-  List,
-  Lock,
-  MapPin,
-  MessageSquare,
-  Monitor,
-  Package,
-  PackageCheck,
-  PackageMinus,
-  PackagePlus,
-  PackageSearch,
-  PieChart,
-  PlayCircle,
-  Plus,
-  Puzzle,
-  Receipt,
-  RotateCcw,
-  RotateCw,
-  Route,
-  Scale,
-  ScanSearch,
-  Search,
-  Settings,
-  Shield,
-  ShieldCheck,
-  ShoppingCart,
-  Target,
-  TrendingDown,
-  TrendingUp,
-  Truck,
-  User,
-  UserCheck,
-  UserPlus,
-  Users,
-  Wallet,
-  Warehouse,
-  Wrench,
+type IconComponent = React.ComponentType<LucideProps>;
 
-  // Icon-prefixed Tabler-style aliases
-  IconApi: Link,
-  IconChecklist: ClipboardCheck,
-  IconClock: Clock,
-  IconCpu: Cpu,
-  IconDashboard: LayoutDashboard,
-  IconPlayerPlay: PlayCircle,
-  IconPuzzle: Puzzle,
-  IconRobot: Cpu, // closest match for robot/agent
-  IconSettings: Settings,
-  IconShieldCheck: ShieldCheck,
-  IconTarget: Target,
-  IconWebhook: Link,
-
-  // kebab-case / lowercase Ant Design-style aliases
-  'bar-chart': BarChart,
-  'carry-out': PackageCheck,
-  'clock-circle': Clock,
-  'deployment-unit': GitMerge,
-  field: Hash,
-  'file-search': FileQuestion,
-  apartment: Building,
-  appstore: LayoutDashboard,
-  book: BookOpen,
-  cloud: Cloud,
-  dashboard: LayoutDashboard,
-  database: Database,
-  layout: LayoutDashboard,
-  login: User,
-  monitor: Monitor,
-  project: FolderKanban,
-  safety: Shield,
-  search: Search,
-  setting: Settings,
-  table: List,
-  team: Users,
-  thunderbolt: TrendingUp,
-  tool: Wrench,
+// Aliases for legacy / non-lucide names used throughout existing plugins and bootstrap.
+// Only include entries that cannot be derived by the normalization rules below.
+const ALIASES: Record<string, string> = {
+  appstore: 'LayoutDashboard',
+  apartment: 'Building',
+  book: 'BookOpen',
+  dashboard: 'LayoutDashboard',
+  layout: 'LayoutDashboard',
+  login: 'User',
+  setting: 'Settings',
+  table: 'List',
+  team: 'Users',
+  thunderbolt: 'TrendingUp',
+  tool: 'Wrench',
+  'carry-out': 'PackageCheck',
+  'clock-circle': 'Clock',
+  'deployment-unit': 'GitMerge',
+  'file-search': 'FileQuestion',
+  field: 'Hash',
+  rocket: 'Rocket',
+  safety: 'Shield',
+  project: 'FolderKanban',
+  // Tabler-specific names that do not exist 1:1 in lucide
+  IconRobot: 'Cpu',
+  IconApi: 'Link',
+  IconWebhook: 'Link',
+  IconPlayerPlay: 'PlayCircle',
 };
+
+function toPascalCase(input: string): string {
+  return input
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join('');
+}
+
+function stripPrefix(name: string): string {
+  if (name.startsWith('Icon') && name.length > 4 && name[4] === name[4].toUpperCase()) {
+    return name.slice(4);
+  }
+  if (name.startsWith('Lucide') && name.length > 6 && name[6] === name[6].toUpperCase()) {
+    return name.slice(6);
+  }
+  return name;
+}
+
+const cache = new Map<string, IconComponent | null>();
+
+function lookup(rawName: string): IconComponent | null {
+  if (cache.has(rawName)) return cache.get(rawName) ?? null;
+
+  const icons = LucideIcons as unknown as Record<string, IconComponent>;
+  const candidates: string[] = [];
+
+  const aliased = ALIASES[rawName];
+  if (aliased) candidates.push(aliased);
+
+  candidates.push(rawName);
+  candidates.push(stripPrefix(rawName));
+  candidates.push(toPascalCase(rawName));
+  candidates.push(toPascalCase(stripPrefix(rawName)));
+
+  for (const candidate of candidates) {
+    const component = icons[candidate];
+    if (typeof component === 'function' || (component && typeof component === 'object')) {
+      cache.set(rawName, component);
+      return component;
+    }
+  }
+
+  cache.set(rawName, null);
+  return null;
+}
 
 /**
  * Resolve an icon name string to a React element.
@@ -244,13 +103,12 @@ export function resolveIcon(
   size: number = 18,
 ): React.ReactElement {
   if (iconName) {
-    const IconComponent = iconMap[iconName];
+    const IconComponent = lookup(iconName);
     if (IconComponent) {
       return <IconComponent size={size} />;
     }
   }
 
-  // Fallback: first character of menu name
   const char = (menuName || '?').charAt(0).toUpperCase();
   return (
     <span
@@ -263,8 +121,8 @@ export function resolveIcon(
 }
 
 /**
- * Check if an icon name has a known mapping.
+ * Check if an icon name resolves to a known component.
  */
 export function hasIcon(iconName: string | undefined | null): boolean {
-  return !!iconName && !!iconMap[iconName];
+  return !!iconName && !!lookup(iconName);
 }
