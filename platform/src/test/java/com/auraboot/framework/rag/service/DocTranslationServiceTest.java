@@ -15,7 +15,7 @@ import static org.assertj.core.api.Assertions.*;
  */
 class DocTranslationServiceTest {
 
-    private final DocTranslationService service = new DocTranslationService();
+    private final DocTranslationService service = new DocTranslationService(null);
 
     @Test
     @DisplayName("TR-01: Check status with no translations returns all MISSING")

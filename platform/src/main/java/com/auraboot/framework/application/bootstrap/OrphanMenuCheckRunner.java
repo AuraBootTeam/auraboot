@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.context.annotation.Profile;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -31,6 +32,7 @@ import java.util.stream.Collectors;
 @Component
 @Order(5)
 @RequiredArgsConstructor
+@Profile("!integration-test")
 public class OrphanMenuCheckRunner implements ApplicationRunner {
 
     private static final String WHITELIST_RESOURCE = "seed/platform-menu-whitelist.json";
