@@ -34,12 +34,6 @@ import type { PageContentProps } from '~/framework/meta/profiles/types';
 import { mergeRules as crossFieldMergeRules } from '~/framework/meta/validation/ruleMerger';
 import { evaluateCondition as crossFieldEvalCondition } from '~/framework/meta/validation/conditionEvaluator';
 import { evaluateAssert as crossFieldEvalAssert } from '~/framework/meta/validation/assertEvaluator';
-import ConsistencyViolationAlert from '~/ui/consistency/ConsistencyViolationAlert';
-import {
-  isConsistencyViolationError,
-  extractViolations,
-  type ConsistencyViolation,
-} from '~/shared/services/consistencyRuleService';
 import { deriveTestId, buttonTestId } from '~/framework/meta/rendering/utils/deriveTestId';
 
 /**
@@ -289,7 +283,6 @@ export function FormPageContent(props: PageContentProps) {
   // State management
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [initialFormData, setInitialFormData] = useState<Record<string, any> | null>(null);
-  const [consistencyViolations, setConsistencyViolations] = useState<ConsistencyViolation[]>([]);
 
   // Read URL params:
   // - commandCode: explicit submit command provided by navigation actions
@@ -741,19 +734,11 @@ export function FormPageContent(props: PageContentProps) {
         })
           .then((result) => {
             if (!ResultHelper.isSuccess(result)) {
-              // Check for consistency violation structured response
-              if (result.data && isConsistencyViolationError(result.data)) {
-                const violations = extractViolations(result.data);
-                setConsistencyViolations(violations);
-                setError(result.desc || 'Consistency validation failed');
-                return;
-              }
               const contextError = (result as any).context?.error;
               throw new Error(
                 contextError || result.desc || result.message || 'Command execution failed',
               );
             }
-            setConsistencyViolations([]);
             navigate(`/p/${tableName}`);
           })
           .catch((err) => {
@@ -1094,18 +1079,8 @@ export function FormPageContent(props: PageContentProps) {
             </div>
           </div>
 
-          {/* Consistency Violation Alert */}
-          {consistencyViolations.length > 0 && (
-            <div className="mx-6 mt-4">
-              <ConsistencyViolationAlert
-                violations={consistencyViolations}
-                onDismiss={() => setConsistencyViolations([])}
-              />
-            </div>
-          )}
-
           {/* Error Alert */}
-          {error && consistencyViolations.length === 0 && (
+          {error && (
             <div className="mx-6 mt-4 rounded-md border border-red-200 bg-red-50 p-4">
               <p className="text-red-600">{error}</p>
             </div>

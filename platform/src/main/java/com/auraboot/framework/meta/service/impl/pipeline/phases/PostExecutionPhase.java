@@ -26,7 +26,7 @@ import org.springframework.util.StringUtils;
 import java.util.*;
 
 /**
- * Groups consistency check, side effects, roll-up, governance snapshot, and post-action.
+ * Groups side effects, roll-up, governance snapshot, and post-action.
  */
 @Slf4j
 @Component
@@ -43,19 +43,12 @@ public class PostExecutionPhase implements CommandPhase {
     private final DynamicDataService dynamicDataService;
 
     @Autowired(required = false)
-    private com.auraboot.framework.consistency.service.ConsistencyRuleService consistencyRuleService;
-
-    @Autowired(required = false)
     private com.auraboot.framework.governance.service.GovernanceSnapshotService governanceSnapshotService;
 
     @Override public String name() { return "post_execution"; }
 
     @Override
     public void execute(CommandPipelineContext ctx) {
-        // Consistency check
-        executeConsistencyCheckPhase(ctx.getCommand(), ctx.getPayload(),
-                ctx.getFieldMapResults(), ctx.getTenantId(), ctx.getExecConfig());
-
         // Side effects
         sideEffectExecutor.executeSideEffectPhase(ctx.getExecConfig(), ctx.getPayload(),
                 ctx.getTenantId(), ctx.getUserId(), ctx.getCommand(), ctx.getRequest(), ctx.getFieldMapResults());
@@ -74,51 +67,6 @@ public class PostExecutionPhase implements CommandPhase {
     }
 
     // ==================== Inlined delegate methods ====================
-
-    private void executeConsistencyCheckPhase(CommandDefinition command,
-                                               Map<String, Object> payload,
-                                               Map<String, Object> fieldMapResults,
-                                               Long tenantId,
-                                               Map<String, Object> execConfig) {
-        if (consistencyRuleService == null) return;
-
-        String cmdType = execConfig != null ? (String) execConfig.get("type") : null;
-        boolean isCreateOrUpdate = "create".equalsIgnoreCase(cmdType) || "update".equalsIgnoreCase(cmdType);
-        if (!isCreateOrUpdate) return;
-
-        String modelCode = command.getModelCode();
-        if (!StringUtils.hasText(modelCode)) return;
-
-        try {
-            Object recordIdRaw = payload != null ? payload.get("id") : null;
-            if (recordIdRaw == null && fieldMapResults != null) recordIdRaw = fieldMapResults.get("id");
-            if (recordIdRaw == null) return;
-            String recordId = String.valueOf(recordIdRaw);
-            var violations = consistencyRuleService.validate(modelCode, recordId);
-
-            if (violations == null || violations.isEmpty()) return;
-
-            var errorViolations = violations.stream()
-                    .filter(v -> "error".equals(v.getSeverity()))
-                    .collect(java.util.stream.Collectors.toList());
-
-            var warningViolations = violations.stream()
-                    .filter(v -> !"error".equals(v.getSeverity()))
-                    .collect(java.util.stream.Collectors.toList());
-
-            for (var w : warningViolations) {
-                log.warn("Consistency warning [{}]: {}", w.getRuleCode(), w.getMessage());
-            }
-
-            if (!errorViolations.isEmpty()) {
-                throw new com.auraboot.framework.consistency.exception.ConsistencyViolationException(errorViolations);
-            }
-        } catch (com.auraboot.framework.consistency.exception.ConsistencyViolationException ex) {
-            throw ex;
-        } catch (Exception e) {
-            log.warn("Consistency check failed for model {} (non-fatal): {}", modelCode, e.getMessage());
-        }
-    }
 
     @SuppressWarnings("unchecked")
     private void executeRollUpRecalculation(String modelCode, Map<String, Object> payload,
