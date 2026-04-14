@@ -260,6 +260,9 @@
       }
     ],
     "extension": {
+      "options": {
+        "detailNavigation": "page"
+      },
       "calendarConfig": {
         "dateField": "e2et_order_date",
         "titleField": "e2et_order_title"
