@@ -1,0 +1,52 @@
+[
+  {
+    "code": "bpm_process_management",
+    "name": "流程定义",
+    "description": "管理流程定义和BPMN设计",
+    "type": "menu",
+    "module": "bpm",
+    "resource": "/p/bpm_process_management",
+    "action": "view",
+    "resourceType": "menu"
+  },
+  {
+    "code": "bpm_management",
+    "name": "流程管理",
+    "description": "访问BPM流程管理模块",
+    "type": "menu",
+    "module": "bpm",
+    "resource": "/bpm",
+    "action": "view",
+    "resourceType": "menu"
+  },
+  {
+    "code": "bpm_approval_inbox",
+    "name": "审批任务",
+    "description": "查看和处理审批任务",
+    "type": "menu",
+    "module": "bpm",
+    "resource": "/bpm/approval-inbox",
+    "action": "view",
+    "resourceType": "menu"
+  },
+  {
+    "code": "bpm_task_center",
+    "name": "任务中心",
+    "description": "查看和处理待办任务",
+    "type": "menu",
+    "module": "bpm",
+    "resource": "/bpm/task-center",
+    "action": "view",
+    "resourceType": "menu"
+  },
+  {
+    "code": "bpm_monitor",
+    "name": "流程监控",
+    "description": "监控流程实例运行状态和干预操作",
+    "type": "menu",
+    "module": "bpm",
+    "resource": "/bpm/sla-monitor",
+    "action": "view",
+    "resourceType": "menu"
+  }
+]

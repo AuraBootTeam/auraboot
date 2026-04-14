@@ -1,0 +1,77 @@
+[
+  {
+    "code": "bpm_management",
+    "parentCode": null,
+    "name": "流程管理",
+    "name:zh-CN": "流程管理",
+    "name:en": "Process Management",
+    "path": "/bpm",
+    "component": null,
+    "icon": "deployment-unit",
+    "type": 0,
+    "permissionCode": "bpm_management",
+    "orderNo": 20,
+    "visible": true,
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    }
+  },
+  {
+    "code": "bpm_process_management",
+    "parentCode": "bpm_management",
+    "name": "流程定义",
+    "name:zh-CN": "流程定义",
+    "name:en": "Process Definitions",
+    "path": "/p/bpm_process_management",
+    "component": null,
+    "icon": "project",
+    "type": 1,
+    "permissionCode": "bpm_process_management",
+    "orderNo": 21,
+    "visible": true
+  },
+  {
+    "code": "bpm_task_center",
+    "parentCode": "bpm_management",
+    "name": "任务中心",
+    "name:zh-CN": "任务中心",
+    "name:en": "Task Center",
+    "path": "/bpm/task-center",
+    "component": null,
+    "icon": "carry-out",
+    "type": 1,
+    "permissionCode": "bpm_task_center",
+    "orderNo": 22,
+    "visible": true
+  },
+  {
+    "code": "bpm_approval_inbox",
+    "parentCode": "bpm_management",
+    "name": "审批任务",
+    "name:zh-CN": "审批任务",
+    "name:en": "My Approvals",
+    "path": "/bpm/approval-inbox",
+    "component": null,
+    "icon": "audit",
+    "type": 1,
+    "permissionCode": "bpm_approval_inbox",
+    "orderNo": 23,
+    "visible": true
+  },
+  {
+    "code": "bpm_monitor",
+    "parentCode": "bpm_management",
+    "name": "流程监控",
+    "name:zh-CN": "流程监控",
+    "name:en": "Process Monitor",
+    "path": "/bpm/sla-monitor",
+    "component": null,
+    "icon": "monitor",
+    "type": 1,
+    "permissionCode": "bpm_monitor",
+    "orderNo": 23,
+    "visible": true
+  }
+]

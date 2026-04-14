@@ -1,0 +1,23 @@
+{
+  "pluginId": "com.auraboot.core-meta",
+  "namespace": "core-meta",
+  "version": "1.0.0",
+  "dslVersion": 1,
+  "pluginType": "config",
+  "displayName": "Core Meta Navigation",
+  "displayName:zh-CN": "元数据导航",
+  "displayName:en": "Core Meta Navigation",
+  "description": "Navigation menus and permissions for platform meta management (models, fields, dicts, named queries, dashboards, query builder)",
+  "author": "AuraBoot Team",
+  "minPlatformVersion": "1.0.0",
+  "dependencies": [],
+  "resourceDirs": {
+    "permissions": "config/permissions.json",
+    "menus": "config/menus.json"
+  },
+  "importOptions": {
+    "conflictStrategy": "overwrite",
+    "validateReferences": false,
+    "createResourcePermissions": false
+  }
+}

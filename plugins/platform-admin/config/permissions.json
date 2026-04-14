@@ -70,5 +70,65 @@
     "description": "Manage scheduled tasks, view execution logs",
     "resourceType": "operation",
     "module": "system"
+  },
+  {
+    "code": "audit_log_view",
+    "name": "审计日志",
+    "description": "查看系统审计日志和变更记录",
+    "type": "menu",
+    "module": "system",
+    "resource": "/audit-logs",
+    "action": "view",
+    "resourceType": "menu"
+  },
+  {
+    "code": "system_management",
+    "name": "系统管理",
+    "description": "访问系统管理模块",
+    "type": "menu",
+    "module": "system",
+    "resource": "/system",
+    "action": "view",
+    "resourceType": "menu"
+  },
+  {
+    "code": "login_channel_manage",
+    "name": "登录渠道管理",
+    "description": "管理租户登录方式（密码/短信/邮箱验证码/社交登录）",
+    "type": "menu",
+    "module": "system",
+    "resource": "/admin/login-channels",
+    "action": "manage",
+    "resourceType": "menu"
+  },
+  {
+    "code": "notification_rule_manage",
+    "name": "通知规则管理",
+    "description": "创建、编辑和管理通知触发规则",
+    "type": "menu",
+    "module": "system",
+    "resource": "/notification-rules",
+    "action": "manage",
+    "resourceType": "menu"
+  },
+  {
+    "code": "cloud_config_manage",
+    "name": "云服务配置",
+    "description": "管理短信、邮件、OAuth等云服务商配置",
+    "type": "menu",
+    "module": "system",
+    "resource": "/admin/cloud-config",
+    "action": "manage",
+    "resourceType": "menu"
+  },
+  {
+    "code": "automation.automation.read",
+    "name": "自动化查看",
+    "description": "查看自动化规则和执行日志",
+    "type": "menu",
+    "module": "system",
+    "resource": "/automations",
+    "action": "read",
+    "resourceType": "menu"
   }
 ]
