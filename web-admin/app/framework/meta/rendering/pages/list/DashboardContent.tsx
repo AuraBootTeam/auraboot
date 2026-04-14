@@ -56,10 +56,15 @@ function DashboardStatCard({
   }, [block, token]);
 
   const cards = block.cards || [];
+  const statGridStyle = {
+    display: 'grid',
+    gap: '1rem',
+    gridTemplateColumns: `repeat(${Math.max(cards.length || 1, 1)}, minmax(0, 1fr))`,
+  } as React.CSSProperties;
   if (loading) {
     return (
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        {(cards.length > 0 ? cards : [1, 2, 3, 4]).map((_: any, i: number) => (
+      <div style={statGridStyle}>
+        {(cards.length > 0 ? cards : [1]).map((_: any, i: number) => (
           <div key={i} className="h-24 animate-pulse rounded-lg bg-gray-100" />
         ))}
       </div>
@@ -69,7 +74,7 @@ function DashboardStatCard({
   // If block has explicit card definitions, use them
   if (cards.length > 0) {
     return (
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+      <div style={statGridStyle}>
         {cards.map((card: any, i: number) => {
           const record = stats[0] || {};
           const value = card.field
@@ -78,11 +83,11 @@ function DashboardStatCard({
               ? record[card.valueField]
               : card.value || 0;
           return (
-            <div key={i} className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-              <p className="text-sm font-medium text-gray-500">
+            <div key={i} className="flex min-h-[104px] flex-col justify-center rounded-lg border border-gray-200 bg-white px-5 py-4 shadow-sm transition hover:shadow-md">
+              <p className="truncate text-sm font-medium whitespace-nowrap text-gray-500">
                 {getLocalizedText(card.label || card.title, locale, t) || `Stat ${i + 1}`}
               </p>
-              <p className="mt-1 text-2xl font-semibold text-gray-900">{value ?? '—'}</p>
+              <p className="mt-2 text-3xl leading-tight font-semibold tracking-tight text-gray-900">{value ?? '—'}</p>
               {card.description && (
                 <p className="mt-1 text-xs text-gray-400">
                   {getLocalizedText(card.description, locale, t)}
@@ -96,8 +101,14 @@ function DashboardStatCard({
   }
 
   // Fallback: render each record as a stat card
+  const fallbackCount = Math.min(stats.length || 1, 4);
+  const fallbackStyle = {
+    display: 'grid',
+    gap: '1rem',
+    gridTemplateColumns: `repeat(${fallbackCount}, minmax(0, 1fr))`,
+  } as React.CSSProperties;
   return (
-    <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+    <div style={fallbackStyle}>
       {stats.slice(0, 8).map((stat: any, i: number) => {
         const entries = Object.entries(stat).filter(
           ([k]) => !['id', 'pid', 'tenant_id'].includes(k),
@@ -105,9 +116,9 @@ function DashboardStatCard({
         const label = entries[0]?.[1];
         const value = entries[1]?.[1];
         return (
-          <div key={i} className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-            <p className="text-sm font-medium text-gray-500">{String(label || `Item ${i + 1}`)}</p>
-            <p className="mt-1 text-2xl font-semibold text-gray-900">{String(value ?? '—')}</p>
+          <div key={i} className="flex min-h-[104px] flex-col justify-center rounded-lg border border-gray-200 bg-white px-5 py-4 shadow-sm transition hover:shadow-md">
+            <p className="truncate text-sm font-medium whitespace-nowrap text-gray-500">{String(label || `Item ${i + 1}`)}</p>
+            <p className="mt-2 text-3xl leading-tight font-semibold tracking-tight text-gray-900">{String(value ?? '—')}</p>
           </div>
         );
       })}
@@ -258,16 +269,26 @@ export function DashboardContent({
   return (
     <DataSourceProvider manager={dataSourceManager}>
       <div
-        className="mx-auto w-full px-2 py-3"
+        className="mx-auto w-full px-6 py-6"
         data-testid={deriveTestId('dashboard', modelCode, 'container')}
       >
-        <h2 className="mb-6 text-lg font-medium text-gray-900">
-          {schema.title ? getLocalizedText(schema.title, locale, t) : ''}
-        </h2>
-        <div className="grid grid-cols-12 gap-4">
+        {schema.title ? (
+          <h2 className="mb-6 text-xl font-semibold tracking-tight text-gray-900">
+            {getLocalizedText(schema.title, locale, t)}
+          </h2>
+        ) : null}
+        <div className="grid grid-cols-12 gap-5">
           {dashBlocks.map((block: any) => {
             const isChartBlock = block.blockType === 'chart';
             const isStatCard = block.blockType === 'stat-card';
+            const blockStyle: React.CSSProperties = {
+              gridColumn: `span ${block.layout?.colSpan || 12}`,
+            };
+            if (isChartBlock) {
+              blockStyle.minHeight = block.layout?.minHeight ?? 340;
+              blockStyle.display = 'flex';
+              blockStyle.flexDirection = 'column';
+            }
             return (
               <div
                 key={block.id}
@@ -276,7 +297,7 @@ export function DashboardContent({
                     ? ''
                     : 'overflow-hidden rounded-lg bg-white shadow-sm'
                 }
-                style={{ gridColumn: `span ${block.layout?.colSpan || 12}` }}
+                style={blockStyle}
                 data-testid={`dashboard-block-${block.id}`}
                 data-ab-testid={deriveTestId('dashboard', modelCode, 'block', block.id)}
                 data-block-id={block.id}
@@ -310,12 +331,18 @@ export function DashboardContent({
                     return (
                       <React.Suspense
                         fallback={
-                          <div className="flex h-64 items-center justify-center rounded-lg border border-gray-200 bg-white p-4">
+                          <div className="flex h-full min-h-[300px] flex-1 items-center justify-center rounded-lg border border-gray-200 bg-white p-4">
                             <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
                           </div>
                         }
                       >
-                        <ChartComp title={title} dataSource={ds} {...chartProps} />
+                        <ChartComp
+                          title={title}
+                          dataSource={ds}
+                          {...chartProps}
+                          className="flex h-full w-full flex-1 flex-col"
+                          style={{ minHeight: 300 }}
+                        />
                       </React.Suspense>
                     );
                   })()
