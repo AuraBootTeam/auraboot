@@ -58,14 +58,17 @@ const PWD_TEST_PASSWORD = 'PwdTest2026!';
 // ---------------------------------------------------------------------------
 
 async function loginViaUI(page: Page, email: string, password: string) {
-  await page.goto('/login', { waitUntil: 'load' });
+  await page.goto('/login', { waitUntil: 'domcontentloaded' });
   const emailInput = page.locator('input#email');
   await emailInput.waitFor({ state: 'visible', timeout: 5000 });
-  // Ensure React hydration: click before fill for controlled inputs
-  await emailInput.click();
+  // Wait for React hydration: controlled-input onChange handlers must be attached
+  // before .fill() mutates the DOM, otherwise React state stays empty and the
+  // form submits blank values. Probe by typing one char then clearing.
+  await emailInput.pressSequentially(' ', { delay: 10 });
+  await emailInput.fill('');
   await emailInput.fill(email);
-  await page.locator('input#password').click();
-  await page.locator('input#password').fill(password);
+  const pwd = page.locator('input#password');
+  await pwd.fill(password);
   await page
     .locator(
       'form button[type="submit"], form button:has-text("立即登录"), form button:has-text("Login"), form button:has-text("loginNow")',
