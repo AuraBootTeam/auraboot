@@ -46,8 +46,8 @@ function deriveContextFromRoute(
     };
   }
 
-  // /p/:pageKey/:recordId/edit → form (edit)
-  if (pathname.match(/^\/p\/[^/]+\/[^/]+\/edit/)) {
+  // /p/:pageKey/edit/:recordId → form (edit)
+  if (pathname.match(/^\/p\/[^/]+\/edit\/[^/]+/)) {
     const pageKey = params.pageKey || '';
     return {
       pageType: 'form',

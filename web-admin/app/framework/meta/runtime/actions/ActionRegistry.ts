@@ -231,7 +231,7 @@ actionRegistry.register('edit', ({ navigate, tableName, record }) => {
     return;
   }
   const id = record.id || record.pid;
-  navigate(`/p/${tableName}/${id}/edit`);
+  navigate(`/p/${tableName}/edit/${id}`);
 });
 
 /**
@@ -1007,7 +1007,7 @@ actionRegistry.register('ui.openContainer', ({ args, stepTarget, navigate, schem
     if (mode === 'create') {
       navigate(`/p/${modelCode}/new`);
     } else if (mode === 'edit' && id) {
-      navigate(`/p/${modelCode}/${id}/edit`);
+      navigate(`/p/${modelCode}/edit/${id}`);
     } else {
       console.warn('[ActionRegistry] ui.openContainer: unknown mode for form target:', mode);
     }
