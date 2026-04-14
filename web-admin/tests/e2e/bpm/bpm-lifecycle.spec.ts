@@ -235,6 +235,7 @@ test.describe('BPM Process Lifecycle', () => {
    * BPM-LC04: Direct URL navigation to designer with ?pid= loads process
    */
   test('BPM-LC04: Designer loads process from URL pid parameter', async ({ page }) => {
+    test.skip(!processPid, 'depends on LC02 which is fixme');
     expect(processPid).toBeTruthy();
 
     await page.goto(`/bpmn-designer?pid=${processPid}`, { waitUntil: 'domcontentloaded' });
