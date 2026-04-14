@@ -5,12 +5,12 @@
     "name:en": "CRM Starter Administrator",
     "description": "Full access to all CRM Starter modules (Accounts, Contacts, Leads)",
     "permissions": [
-      "crms.account.manage",
-      "crms.account.read",
-      "crms.contact.manage",
-      "crms.contact.read",
-      "crms.lead.manage",
-      "crms.lead.read"
+      "crm.account.manage",
+      "crm.account.read",
+      "crm.contact.manage",
+      "crm.contact.read",
+      "crm.lead.manage",
+      "crm.lead.read"
     ]
   },
   {
@@ -19,12 +19,12 @@
     "name:en": "Sales Representative",
     "description": "Manage accounts, contacts, and leads",
     "permissions": [
-      "crms.account.manage",
-      "crms.account.read",
-      "crms.contact.manage",
-      "crms.contact.read",
-      "crms.lead.manage",
-      "crms.lead.read"
+      "crm.account.manage",
+      "crm.account.read",
+      "crm.contact.manage",
+      "crm.contact.read",
+      "crm.lead.manage",
+      "crm.lead.read"
     ]
   }
 ]

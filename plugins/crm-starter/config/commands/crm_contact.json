@@ -1,6 +1,6 @@
 [
   {
-    "code": "crms:create_contact",
+    "code": "crm:create_contact",
     "displayName:zh-CN": "新建联系人",
     "displayName:en": "Create Contact",
     "type": "create",
@@ -16,13 +16,13 @@
       "crm_ct_remark"
     ],
     "permissions": [
-      "CRMS.contact.manage"
+      "CRM.contact.manage"
     ],
     "agent_hint": "Create a new crm contact record. Key inputs: account_id, name, title, email, phone.",
     "cmd_risk_level": "L1"
   },
   {
-    "code": "crms:update_contact",
+    "code": "crm:update_contact",
     "displayName:zh-CN": "编辑联系人",
     "displayName:en": "Update Contact",
     "type": "update",
@@ -38,13 +38,13 @@
       "crm_ct_remark"
     ],
     "permissions": [
-      "CRMS.contact.manage"
+      "CRM.contact.manage"
     ],
     "agent_hint": "Update an existing crm contact record. Editable fields: account_id, name, title, email, phone.",
     "cmd_risk_level": "L1"
   },
   {
-    "code": "crms:delete_contact",
+    "code": "crm:delete_contact",
     "displayName:zh-CN": "删除联系人",
     "displayName:en": "Delete Contact",
     "type": "delete",
@@ -54,31 +54,31 @@
       "confirmMessage:en": "Confirm delete this contact?"
     },
     "permissions": [
-      "CRMS.contact.manage"
+      "CRM.contact.manage"
     ],
     "agent_hint": "Delete crm contact record(s). This is irreversible.",
     "cmd_risk_level": "L4"
   },
   {
-    "code": "crms:detail_contact",
+    "code": "crm:detail_contact",
     "displayName:zh-CN": "查看联系人",
     "displayName:en": "View Contact",
     "type": "query",
     "modelCode": "crm_contact",
     "permissions": [
-      "CRMS.contact.read"
+      "CRM.contact.read"
     ],
     "agent_hint": "Query crm contact records.",
     "cmd_risk_level": "L0"
   },
   {
-    "code": "crms:list_contacts",
+    "code": "crm:list_contacts",
     "displayName:zh-CN": "联系人列表",
     "displayName:en": "List Contacts",
     "type": "query",
     "modelCode": "crm_contact",
     "permissions": [
-      "CRMS.contact.read"
+      "CRM.contact.read"
     ],
     "agent_hint": "Query crm contact records.",
     "cmd_risk_level": "L0"

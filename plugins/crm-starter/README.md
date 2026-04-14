@@ -44,7 +44,7 @@ NEW ──[contact]──> CONTACTED ──[qualify]──> QUALIFIED ──[con
                                             LOST
 ```
 
-State transition commands: `crms:contact_lead`, `crms:qualify_lead`, `crms:convert_lead`, `crms:lose_lead`
+State transition commands: `crm:contact_lead`, `crm:qualify_lead`, `crm:convert_lead`, `crm:lose_lead`
 
 ## Installation
 

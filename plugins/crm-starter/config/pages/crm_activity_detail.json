@@ -13,7 +13,7 @@
         {
           "code": "edit",
           "icon": "Edit",
-          "permissionCode": "CRMS.activity.manage",
+          "permissionCode": "CRM.activity.manage",
           "label": "edit",
           "action": {
             "type": "navigate",

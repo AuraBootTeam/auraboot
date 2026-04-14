@@ -50,7 +50,7 @@
           "label": "save",
           "action": {
             "type": "command",
-            "command": "crms:update_opportunity"
+            "command": "crm:update_opportunity"
           }
         },
         {

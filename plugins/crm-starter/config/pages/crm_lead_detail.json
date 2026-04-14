@@ -13,7 +13,7 @@
         {
           "code": "edit",
           "icon": "Edit",
-          "permissionCode": "CRMS.lead.manage",
+          "permissionCode": "CRM.lead.manage",
           "label": "edit",
           "action": {
             "type": "navigate",
@@ -25,7 +25,7 @@
           "label": "execute",
           "action": {
             "type": "command",
-            "command": "crms:contact_lead"
+            "command": "crm:contact_lead"
           }
         },
         {
@@ -33,7 +33,7 @@
           "label": "execute",
           "action": {
             "type": "command",
-            "command": "crms:qualify_lead"
+            "command": "crm:qualify_lead"
           }
         },
         {
@@ -42,7 +42,7 @@
           "label": "execute",
           "action": {
             "type": "command",
-            "command": "crms:convert_lead"
+            "command": "crm:convert_lead"
           }
         },
         {
@@ -51,7 +51,7 @@
           "label": "execute",
           "action": {
             "type": "command",
-            "command": "crms:lose_lead"
+            "command": "crm:lose_lead"
           }
         }
       ]

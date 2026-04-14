@@ -66,7 +66,7 @@
           "label": "save",
           "action": {
             "type": "command",
-            "command": "crms:update_lead"
+            "command": "crm:update_lead"
           }
         },
         {

@@ -50,7 +50,7 @@
           "label": "save",
           "action": {
             "type": "command",
-            "command": "crms:update_campaign"
+            "command": "crm:update_campaign"
           }
         },
         {
