@@ -257,11 +257,26 @@ test.describe('Showcase Smart Components', () => {
       await endDate.fill(dateOffsetStr(30));
     }
 
-    // 5. CascadeSelect — select first level
-    const cascadeFirstSelect = field(page, 'sc_cascade_category').locator('select').first();
-    await cascadeFirstSelect.scrollIntoViewIfNeeded();
-    if (await cascadeFirstSelect.isVisible({ timeout: 3_000 }).catch(() => false)) {
-      await cascadeFirstSelect.selectOption({ index: 1 }); // first real option
+    // 5. CascadeSelect — pick first option on the first level trigger.
+    // The component was upgraded from native <select> to custom dropdown triggers;
+    // match both shapes so the test survives either rendering.
+    const cascadeContainer = field(page, 'sc_cascade_category');
+    await cascadeContainer.scrollIntoViewIfNeeded().catch(() => null);
+    const cascadeNativeSelect = cascadeContainer.locator('select').first();
+    if (await cascadeNativeSelect.isVisible({ timeout: 1_000 }).catch(() => false)) {
+      await cascadeNativeSelect.selectOption({ index: 1 });
+    } else {
+      const cascadeTrigger = cascadeContainer
+        .locator('[data-testid^="cascade-trigger-"]')
+        .first();
+      if (await cascadeTrigger.isVisible({ timeout: 2_000 }).catch(() => false)) {
+        await cascadeTrigger.click();
+        const firstOption = page.locator('[role="option"]').first();
+        if (await firstOption.isVisible({ timeout: 2_000 }).catch(() => false)) {
+          await firstOption.click();
+        }
+        await page.keyboard.press('Escape').catch(() => null);
+      }
     }
 
     // 6. Priority (ensure form works end-to-end)

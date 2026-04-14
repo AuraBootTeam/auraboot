@@ -174,5 +174,101 @@
     "required": false,
     "visible": true,
     "editable": true
+  },
+  {
+    "modelCode": "showcase_all_fields",
+    "fieldCode": "sc_budget",
+    "sequence": 23,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "showcase_all_fields",
+    "fieldCode": "sc_time_slot",
+    "sequence": 24,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "showcase_all_fields",
+    "fieldCode": "sc_date_range",
+    "sequence": 25,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "showcase_all_fields",
+    "fieldCode": "sc_working_hours",
+    "sequence": 26,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "showcase_all_fields",
+    "fieldCode": "sc_cascade_category",
+    "sequence": 27,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "showcase_all_fields",
+    "fieldCode": "sc_tree_node",
+    "sequence": 28,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "showcase_all_fields",
+    "fieldCode": "sc_assignee",
+    "sequence": 29,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "showcase_all_fields",
+    "fieldCode": "sc_team_members",
+    "sequence": 30,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "showcase_all_fields",
+    "fieldCode": "sc_department",
+    "sequence": 31,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "showcase_all_fields",
+    "fieldCode": "sc_location",
+    "sequence": 32,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "showcase_all_fields",
+    "fieldCode": "sc_address",
+    "sequence": 33,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "showcase_all_fields",
+    "fieldCode": "sc_ai_summary",
+    "sequence": 34,
+    "required": false,
+    "visible": true,
+    "editable": true
   }
 ]
