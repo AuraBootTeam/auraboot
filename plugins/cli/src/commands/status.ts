@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { resolveBaseUrl, loadCredentials, loadConfig } from '../client/auth.js';
+import { resolveBaseUrl, loadCredentials, loadConfig, resolveToken } from '../client/auth.js';
 import { resolveOutputOptions, type OutputOptions } from '../output/formatter.js';
 
 interface StatusOptions {
@@ -21,7 +21,12 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
   const config = loadConfig();
   const env = options.env || config.defaultEnv;
   const baseUrl = resolveBaseUrl(env);
+  // Token resolution order: --token flag > AURA_TOKEN env > credentials file.
+  // This keeps `aura status` usable in non-interactive contexts (CI, scripts)
+  // where no credentials file exists but an AURA_TOKEN is exported.
+  const token = resolveToken({ token: options.token, env });
   const creds = loadCredentials(env);
+  const authLabel = creds?.email ?? (process.env.AURA_TOKEN ? 'AURA_TOKEN env' : '');
   const opts = resolveOutputOptions(options);
 
   const services: ServiceStatus[] = [];
@@ -31,20 +36,20 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
   services.push(backendStatus);
 
   // Check auth status
-  if (creds?.jwt) {
-    const authStatus = await checkService('Auth', `${baseUrl}/api/user/profile`, creds.jwt);
+  if (token) {
+    const authStatus = await checkService('Auth', `${baseUrl}/api/user/profile`, token);
     services.push({
       ...authStatus,
       name: 'Auth',
-      detail: authStatus.status === 'up' ? `${creds.email}` : 'Token expired',
+      detail: authStatus.status === 'up' ? authLabel : 'Token expired',
     });
   } else {
     services.push({ name: 'Auth', url: '', status: 'down', detail: 'Not logged in' });
   }
 
   // Check agent subsystem
-  if (creds?.jwt) {
-    const agentStatus = await checkService('Agent (ACP)', `${baseUrl}/api/agent/status`, creds.jwt);
+  if (token) {
+    const agentStatus = await checkService('Agent (ACP)', `${baseUrl}/api/agent/status`, token);
     services.push(agentStatus);
   }
 

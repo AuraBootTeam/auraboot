@@ -41,8 +41,16 @@ export function loadConfig(): AuraConfig {
 
 /**
  * Resolve the base URL for the given environment.
+ *
+ * Priority: AURA_API_URL env var > named environment from ~/.aura/config.json.
+ * The env var always wins so non-interactive callers (CI, reset-and-init.sh)
+ * can point the CLI at an arbitrary backend without editing config files.
  */
 export function resolveBaseUrl(env?: string): string {
+  const envUrl = process.env.AURA_API_URL;
+  if (envUrl && envUrl.trim().length > 0) {
+    return envUrl.trim().replace(/\/$/, '');
+  }
   const config = loadConfig();
   const envName = env || config.defaultEnv;
   const envConfig = config.environments[envName];
@@ -106,16 +114,29 @@ export function isTokenExpired(env?: string): boolean {
   return new Date(creds.expiresAt).getTime() <= Date.now();
 }
 
+let envTokenLogged = false;
+
 /**
  * Resolve token from: CLI flag > env var > credentials file.
  * Returns null if no token available or if the stored token has expired.
+ *
+ * When AURA_TOKEN is active, we log once at debug level (stderr) so
+ * non-interactive callers can confirm env-var auth is in effect without
+ * polluting stdout pipelines.
  */
 export function resolveToken(options: { token?: string; env?: string }): string | null {
   // 1. CLI flag (always trust explicit tokens)
   if (options.token) return options.token;
 
   // 2. Environment variable (always trust explicit tokens)
-  if (process.env.AURA_TOKEN) return process.env.AURA_TOKEN;
+  const envToken = process.env.AURA_TOKEN;
+  if (envToken && envToken.trim().length > 0) {
+    if (!envTokenLogged && process.env.AURA_DEBUG) {
+      console.error(chalk.dim('[debug] Using AURA_TOKEN from environment (bypassing credentials file)'));
+      envTokenLogged = true;
+    }
+    return envToken;
+  }
 
   // 3. Credentials file — skip expired tokens
   const creds = loadCredentials(options.env);
