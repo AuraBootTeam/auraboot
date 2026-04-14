@@ -504,6 +504,11 @@ export function AuraBotChat() {
   // Handle key press
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
+      // Ignore Enter while IME composition is active (Chinese/Japanese/Korean input)
+      if (e.nativeEvent.isComposing || e.keyCode === 229) {
+        return;
+      }
+
       // Cmd/Ctrl + Enter to send
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
         e.preventDefault();
