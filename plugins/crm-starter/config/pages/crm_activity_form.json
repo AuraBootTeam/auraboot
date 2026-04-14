@@ -42,7 +42,7 @@
           "label": "save",
           "action": {
             "type": "command",
-            "command": "crms:update_activity"
+            "command": "crm:update_activity"
           }
         },
         {

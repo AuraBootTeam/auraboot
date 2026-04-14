@@ -1,6 +1,6 @@
 [
   {
-    "code": "crms:create_account",
+    "code": "crm:create_account",
     "displayName:zh-CN": "新建客户",
     "displayName:en": "Create Account",
     "type": "create",
@@ -28,13 +28,13 @@
       }
     },
     "permissions": [
-      "CRMS.account.manage"
+      "CRM.account.manage"
     ],
     "agent_hint": "Create a new crm account record. Key inputs: name, industry, website, phone, address. Auto-generated: code, owner, status.",
     "cmd_risk_level": "L1"
   },
   {
-    "code": "crms:update_account",
+    "code": "crm:update_account",
     "displayName:zh-CN": "编辑客户",
     "displayName:en": "Update Account",
     "type": "update",
@@ -50,13 +50,13 @@
       "crm_acc_remark"
     ],
     "permissions": [
-      "CRMS.account.manage"
+      "CRM.account.manage"
     ],
     "agent_hint": "Update an existing crm account record. Editable fields: name, industry, website, phone, address.",
     "cmd_risk_level": "L1"
   },
   {
-    "code": "crms:delete_account",
+    "code": "crm:delete_account",
     "displayName:zh-CN": "删除客户",
     "displayName:en": "Delete Account",
     "type": "delete",
@@ -66,31 +66,31 @@
       "confirmMessage:en": "Confirm delete this account?"
     },
     "permissions": [
-      "CRMS.account.manage"
+      "CRM.account.manage"
     ],
     "agent_hint": "Delete crm account record(s). This is irreversible.",
     "cmd_risk_level": "L4"
   },
   {
-    "code": "crms:detail_account",
+    "code": "crm:detail_account",
     "displayName:zh-CN": "查看客户",
     "displayName:en": "View Account",
     "type": "query",
     "modelCode": "crm_account",
     "permissions": [
-      "CRMS.account.read"
+      "CRM.account.read"
     ],
     "agent_hint": "Query crm account records.",
     "cmd_risk_level": "L0"
   },
   {
-    "code": "crms:list_accounts",
+    "code": "crm:list_accounts",
     "displayName:zh-CN": "客户列表",
     "displayName:en": "List Accounts",
     "type": "query",
     "modelCode": "crm_account",
     "permissions": [
-      "CRMS.account.read"
+      "CRM.account.read"
     ],
     "agent_hint": "Query crm account records.",
     "cmd_risk_level": "L0"

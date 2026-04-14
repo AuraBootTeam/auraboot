@@ -13,7 +13,7 @@
         {
           "code": "edit",
           "icon": "Edit",
-          "permissionCode": "CRMS.account.manage",
+          "permissionCode": "CRM.account.manage",
           "label": "edit",
           "action": {
             "type": "navigate",
@@ -142,7 +142,7 @@
                     "action": {
                       "type": "navigate",
                       "to": "crm_contact_form",
-                      "command": "crms:create_contact"
+                      "command": "crm:create_contact"
                     }
                   },
                   {
@@ -151,7 +151,7 @@
                     "action": {
                       "type": "navigate",
                       "to": "crm_contact_form",
-                      "command": "crms:update_contact"
+                      "command": "crm:update_contact"
                     }
                   },
                   {
@@ -160,7 +160,7 @@
                     "label": "delete",
                     "action": {
                       "type": "command",
-                      "command": "crms:delete_contact"
+                      "command": "crm:delete_contact"
                     }
                   }
                 ]
