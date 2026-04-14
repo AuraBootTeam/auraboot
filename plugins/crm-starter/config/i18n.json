@@ -1,99 +1,898 @@
 [
-  { "key": "model.crm_account._meta.label", "zh-CN": "客户", "en-US": "Account", "source": "import", "refType": "model" },
-  { "key": "model.crm_account.crm_acc_code.label", "zh-CN": "客户编号", "en-US": "Account Code", "source": "import", "refType": "field" },
-  { "key": "model.crm_account.crm_acc_name.label", "zh-CN": "客户名称", "en-US": "Account Name", "source": "import", "refType": "field" },
-  { "key": "model.crm_account.crm_acc_industry.label", "zh-CN": "行业", "en-US": "Industry", "source": "import", "refType": "field" },
-  { "key": "model.crm_account.crm_acc_website.label", "zh-CN": "网站", "en-US": "Website", "source": "import", "refType": "field" },
-  { "key": "model.crm_account.crm_acc_phone.label", "zh-CN": "电话", "en-US": "Phone", "source": "import", "refType": "field" },
-  { "key": "model.crm_account.crm_acc_address.label", "zh-CN": "地址", "en-US": "Address", "source": "import", "refType": "field" },
-  { "key": "model.crm_account.crm_acc_rating.label", "zh-CN": "评级", "en-US": "Rating", "source": "import", "refType": "field" },
-  { "key": "model.crm_account.crm_acc_owner.label", "zh-CN": "负责人", "en-US": "Owner", "source": "import", "refType": "field" },
-  { "key": "model.crm_account.crm_acc_status.label", "zh-CN": "状态", "en-US": "Status", "source": "import", "refType": "field" },
-  { "key": "model.crm_account.crm_acc_remark.label", "zh-CN": "备注", "en-US": "Remark", "source": "import", "refType": "field" },
-
-  { "key": "model.crm_contact._meta.label", "zh-CN": "联系人", "en-US": "Contact", "source": "import", "refType": "model" },
-  { "key": "model.crm_contact.crm_ct_account_id.label", "zh-CN": "所属客户", "en-US": "Account", "source": "import", "refType": "field" },
-  { "key": "model.crm_contact.crm_ct_name.label", "zh-CN": "联系人姓名", "en-US": "Contact Name", "source": "import", "refType": "field" },
-  { "key": "model.crm_contact.crm_ct_title.label", "zh-CN": "职位", "en-US": "Job Title", "source": "import", "refType": "field" },
-  { "key": "model.crm_contact.crm_ct_email.label", "zh-CN": "邮箱", "en-US": "Email", "source": "import", "refType": "field" },
-  { "key": "model.crm_contact.crm_ct_phone.label", "zh-CN": "座机", "en-US": "Phone", "source": "import", "refType": "field" },
-  { "key": "model.crm_contact.crm_ct_mobile.label", "zh-CN": "手机", "en-US": "Mobile", "source": "import", "refType": "field" },
-  { "key": "model.crm_contact.crm_ct_is_primary.label", "zh-CN": "主要联系人", "en-US": "Primary Contact", "source": "import", "refType": "field" },
-  { "key": "model.crm_contact.crm_ct_remark.label", "zh-CN": "备注", "en-US": "Remark", "source": "import", "refType": "field" },
-
-  { "key": "model.crm_lead._meta.label", "zh-CN": "线索", "en-US": "Lead", "source": "import", "refType": "model" },
-  { "key": "model.crm_lead.crm_lead_code.label", "zh-CN": "线索编号", "en-US": "Lead Code", "source": "import", "refType": "field" },
-  { "key": "model.crm_lead.crm_lead_company.label", "zh-CN": "公司名称", "en-US": "Company Name", "source": "import", "refType": "field" },
-  { "key": "model.crm_lead.crm_lead_contact_name.label", "zh-CN": "联系人", "en-US": "Contact Name", "source": "import", "refType": "field" },
-  { "key": "model.crm_lead.crm_lead_contact_phone.label", "zh-CN": "联系电话", "en-US": "Contact Phone", "source": "import", "refType": "field" },
-  { "key": "model.crm_lead.crm_lead_contact_email.label", "zh-CN": "联系邮箱", "en-US": "Contact Email", "source": "import", "refType": "field" },
-  { "key": "model.crm_lead.crm_lead_source.label", "zh-CN": "线索来源", "en-US": "Lead Source", "source": "import", "refType": "field" },
-  { "key": "model.crm_lead.crm_lead_industry.label", "zh-CN": "行业", "en-US": "Industry", "source": "import", "refType": "field" },
-  { "key": "model.crm_lead.crm_lead_score.label", "zh-CN": "评分", "en-US": "Score", "source": "import", "refType": "field" },
-  { "key": "model.crm_lead.crm_lead_status.label", "zh-CN": "线索状态", "en-US": "Status", "source": "import", "refType": "field" },
-  { "key": "model.crm_lead.crm_lead_requirement.label", "zh-CN": "需求描述", "en-US": "Requirement", "source": "import", "refType": "field" },
-  { "key": "model.crm_lead.crm_lead_campaign.label", "zh-CN": "关联活动", "en-US": "Campaign", "source": "import", "refType": "field" },
-  { "key": "model.crm_lead.crm_lead_assigned_to.label", "zh-CN": "分配给", "en-US": "Assigned To", "source": "import", "refType": "field" },
-  { "key": "model.crm_lead.crm_lead_lost_reason.label", "zh-CN": "丢失原因", "en-US": "Lost Reason", "source": "import", "refType": "field" },
-
-  { "key": "dict.crm_account_status.label", "zh-CN": "客户状态", "en-US": "Account Status", "source": "import", "refType": "dict" },
-  { "key": "dict.crm_account_status.ACTIVE", "zh-CN": "活跃", "en-US": "Active", "source": "import", "refType": "dict_item" },
-  { "key": "dict.crm_account_status.INACTIVE", "zh-CN": "停用", "en-US": "Inactive", "source": "import", "refType": "dict_item" },
-
-  { "key": "dict.crm_account_rating.label", "zh-CN": "客户评级", "en-US": "Account Rating", "source": "import", "refType": "dict" },
-  { "key": "dict.crm_account_rating.A", "zh-CN": "A - 重点客户", "en-US": "A - Key Account", "source": "import", "refType": "dict_item" },
-  { "key": "dict.crm_account_rating.B", "zh-CN": "B - 重要客户", "en-US": "B - Important", "source": "import", "refType": "dict_item" },
-  { "key": "dict.crm_account_rating.C", "zh-CN": "C - 一般客户", "en-US": "C - Normal", "source": "import", "refType": "dict_item" },
-  { "key": "dict.crm_account_rating.D", "zh-CN": "D - 低优先级", "en-US": "D - Low Priority", "source": "import", "refType": "dict_item" },
-
-  { "key": "dict.crm_lead_status.label", "zh-CN": "线索状态", "en-US": "Lead Status", "source": "import", "refType": "dict" },
-  { "key": "dict.crm_lead_status.NEW", "zh-CN": "新建", "en-US": "New", "source": "import", "refType": "dict_item" },
-  { "key": "dict.crm_lead_status.CONTACTED", "zh-CN": "已联系", "en-US": "Contacted", "source": "import", "refType": "dict_item" },
-  { "key": "dict.crm_lead_status.QUALIFIED", "zh-CN": "已合格", "en-US": "Qualified", "source": "import", "refType": "dict_item" },
-  { "key": "dict.crm_lead_status.CONVERTED", "zh-CN": "已转化", "en-US": "Converted", "source": "import", "refType": "dict_item" },
-  { "key": "dict.crm_lead_status.LOST", "zh-CN": "已丢失", "en-US": "Lost", "source": "import", "refType": "dict_item" },
-
-  { "key": "dict.crm_lead_source.label", "zh-CN": "线索来源", "en-US": "Lead Source", "source": "import", "refType": "dict" },
-  { "key": "dict.crm_lead_source.EXHIBITION", "zh-CN": "展会", "en-US": "Exhibition", "source": "import", "refType": "dict_item" },
-  { "key": "dict.crm_lead_source.WEBSITE", "zh-CN": "网站", "en-US": "Website", "source": "import", "refType": "dict_item" },
-  { "key": "dict.crm_lead_source.REFERRAL", "zh-CN": "推荐", "en-US": "Referral", "source": "import", "refType": "dict_item" },
-  { "key": "dict.crm_lead_source.COLD_CALL", "zh-CN": "陌拜", "en-US": "Cold Call", "source": "import", "refType": "dict_item" },
-  { "key": "dict.crm_lead_source.SOCIAL_MEDIA", "zh-CN": "社交媒体", "en-US": "Social Media", "source": "import", "refType": "dict_item" },
-  { "key": "dict.crm_lead_source.OTHER", "zh-CN": "其他", "en-US": "Other", "source": "import", "refType": "dict_item" },
-
-  { "key": "dict.crm_contact_role.label", "zh-CN": "联系人角色", "en-US": "Contact Role", "source": "import", "refType": "dict" },
-  { "key": "dict.crm_contact_role.DECISION_MAKER", "zh-CN": "决策者", "en-US": "Decision Maker", "source": "import", "refType": "dict_item" },
-  { "key": "dict.crm_contact_role.TECHNICAL", "zh-CN": "技术", "en-US": "Technical", "source": "import", "refType": "dict_item" },
-  { "key": "dict.crm_contact_role.PROCUREMENT", "zh-CN": "采购", "en-US": "Procurement", "source": "import", "refType": "dict_item" },
-  { "key": "dict.crm_contact_role.INFLUENCER", "zh-CN": "影响者", "en-US": "Influencer", "source": "import", "refType": "dict_item" },
-  { "key": "dict.crm_contact_role.OTHER", "zh-CN": "其他", "en-US": "Other", "source": "import", "refType": "dict_item" },
-
-  { "key": "menu.CRMS_ROOT.label", "zh-CN": "CRM 入门", "en-US": "CRM Starter", "source": "import", "refType": "menu" },
-  { "key": "menu.CRMS_ACCOUNTS.label", "zh-CN": "客户", "en-US": "Accounts", "source": "import", "refType": "menu" },
-  { "key": "menu.CRMS_CONTACTS.label", "zh-CN": "联系人", "en-US": "Contacts", "source": "import", "refType": "menu" },
-  { "key": "menu.CRMS_LEADS.label", "zh-CN": "线索", "en-US": "Leads", "source": "import", "refType": "menu" },
-
-  { "key": "page.crm_account_list.title", "zh-CN": "客户列表", "en-US": "Accounts", "source": "import", "refType": "page" },
-  { "key": "page.crm_account_form.title", "zh-CN": "客户表单", "en-US": "Account Form", "source": "import", "refType": "page" },
-  { "key": "page.crm_account_detail.title", "zh-CN": "客户详情", "en-US": "Account Detail", "source": "import", "refType": "page" },
-  { "key": "page.crm_contact_list.title", "zh-CN": "联系人列表", "en-US": "Contacts", "source": "import", "refType": "page" },
-  { "key": "page.crm_contact_form.title", "zh-CN": "联系人表单", "en-US": "Contact Form", "source": "import", "refType": "page" },
-  { "key": "page.crm_contact_detail.title", "zh-CN": "联系人详情", "en-US": "Contact Detail", "source": "import", "refType": "page" },
-  { "key": "page.crm_lead_list.title", "zh-CN": "线索列表", "en-US": "Leads", "source": "import", "refType": "page" },
-  { "key": "page.crm_lead_form.title", "zh-CN": "线索表单", "en-US": "Lead Form", "source": "import", "refType": "page" },
-  { "key": "page.crm_lead_detail.title", "zh-CN": "线索详情", "en-US": "Lead Detail", "source": "import", "refType": "page" },
-
-  { "key": "crms.action.create", "zh-CN": "新建", "en-US": "Create", "source": "import", "refType": "ui" },
-  { "key": "crms.action.edit", "zh-CN": "编辑", "en-US": "Edit", "source": "import", "refType": "ui" },
-  { "key": "crms.action.delete", "zh-CN": "删除", "en-US": "Delete", "source": "import", "refType": "ui" },
-  { "key": "crms.action.view", "zh-CN": "查看", "en-US": "View", "source": "import", "refType": "ui" },
-  { "key": "crms.action.save", "zh-CN": "保存", "en-US": "Save", "source": "import", "refType": "ui" },
-  { "key": "crms.action.cancel", "zh-CN": "取消", "en-US": "Cancel", "source": "import", "refType": "ui" },
-  { "key": "crms.action.contact_lead", "zh-CN": "标记已联系", "en-US": "Mark Contacted", "source": "import", "refType": "ui" },
-  { "key": "crms.action.qualify_lead", "zh-CN": "标记合格", "en-US": "Qualify", "source": "import", "refType": "ui" },
-  { "key": "crms.action.convert_lead", "zh-CN": "转化", "en-US": "Convert", "source": "import", "refType": "ui" },
-  { "key": "crms.action.lose_lead", "zh-CN": "标记丢失", "en-US": "Mark Lost", "source": "import", "refType": "ui" },
-
-  { "key": "crms.section.basic_info", "zh-CN": "基本信息", "en-US": "Basic Information", "source": "import", "refType": "ui" },
-  { "key": "crms.section.lead_info", "zh-CN": "线索信息", "en-US": "Lead Information", "source": "import", "refType": "ui" }
+  {
+    "key": "model.crm_account._meta.label",
+    "zh-CN": "客户",
+    "en-US": "Account",
+    "source": "import",
+    "refType": "model"
+  },
+  {
+    "key": "model.crm_account.crm_acc_code.label",
+    "zh-CN": "客户编号",
+    "en-US": "Account Code",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_account.crm_acc_name.label",
+    "zh-CN": "客户名称",
+    "en-US": "Account Name",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_account.crm_acc_industry.label",
+    "zh-CN": "行业",
+    "en-US": "Industry",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_account.crm_acc_website.label",
+    "zh-CN": "网站",
+    "en-US": "Website",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_account.crm_acc_phone.label",
+    "zh-CN": "电话",
+    "en-US": "Phone",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_account.crm_acc_address.label",
+    "zh-CN": "地址",
+    "en-US": "Address",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_account.crm_acc_rating.label",
+    "zh-CN": "评级",
+    "en-US": "Rating",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_account.crm_acc_owner.label",
+    "zh-CN": "负责人",
+    "en-US": "Owner",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_account.crm_acc_status.label",
+    "zh-CN": "状态",
+    "en-US": "Status",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_account.crm_acc_remark.label",
+    "zh-CN": "备注",
+    "en-US": "Remark",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_contact._meta.label",
+    "zh-CN": "联系人",
+    "en-US": "Contact",
+    "source": "import",
+    "refType": "model"
+  },
+  {
+    "key": "model.crm_contact.crm_ct_account_id.label",
+    "zh-CN": "所属客户",
+    "en-US": "Account",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_contact.crm_ct_name.label",
+    "zh-CN": "联系人姓名",
+    "en-US": "Contact Name",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_contact.crm_ct_title.label",
+    "zh-CN": "职位",
+    "en-US": "Job Title",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_contact.crm_ct_email.label",
+    "zh-CN": "邮箱",
+    "en-US": "Email",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_contact.crm_ct_phone.label",
+    "zh-CN": "座机",
+    "en-US": "Phone",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_contact.crm_ct_mobile.label",
+    "zh-CN": "手机",
+    "en-US": "Mobile",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_contact.crm_ct_is_primary.label",
+    "zh-CN": "主要联系人",
+    "en-US": "Primary Contact",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_contact.crm_ct_remark.label",
+    "zh-CN": "备注",
+    "en-US": "Remark",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_lead._meta.label",
+    "zh-CN": "线索",
+    "en-US": "Lead",
+    "source": "import",
+    "refType": "model"
+  },
+  {
+    "key": "model.crm_lead.crm_lead_code.label",
+    "zh-CN": "线索编号",
+    "en-US": "Lead Code",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_lead.crm_lead_company.label",
+    "zh-CN": "公司名称",
+    "en-US": "Company Name",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_lead.crm_lead_contact_name.label",
+    "zh-CN": "联系人",
+    "en-US": "Contact Name",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_lead.crm_lead_contact_phone.label",
+    "zh-CN": "联系电话",
+    "en-US": "Contact Phone",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_lead.crm_lead_contact_email.label",
+    "zh-CN": "联系邮箱",
+    "en-US": "Contact Email",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_lead.crm_lead_source.label",
+    "zh-CN": "线索来源",
+    "en-US": "Lead Source",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_lead.crm_lead_industry.label",
+    "zh-CN": "行业",
+    "en-US": "Industry",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_lead.crm_lead_score.label",
+    "zh-CN": "评分",
+    "en-US": "Score",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_lead.crm_lead_status.label",
+    "zh-CN": "线索状态",
+    "en-US": "Status",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_lead.crm_lead_requirement.label",
+    "zh-CN": "需求描述",
+    "en-US": "Requirement",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_lead.crm_lead_campaign.label",
+    "zh-CN": "关联活动",
+    "en-US": "Campaign",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_lead.crm_lead_assigned_to.label",
+    "zh-CN": "分配给",
+    "en-US": "Assigned To",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_lead.crm_lead_lost_reason.label",
+    "zh-CN": "丢失原因",
+    "en-US": "Lost Reason",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "dict.crm_account_status.label",
+    "zh-CN": "客户状态",
+    "en-US": "Account Status",
+    "source": "import",
+    "refType": "dict"
+  },
+  {
+    "key": "dict.crm_account_status.ACTIVE",
+    "zh-CN": "活跃",
+    "en-US": "Active",
+    "source": "import",
+    "refType": "dict_item"
+  },
+  {
+    "key": "dict.crm_account_status.INACTIVE",
+    "zh-CN": "停用",
+    "en-US": "Inactive",
+    "source": "import",
+    "refType": "dict_item"
+  },
+  {
+    "key": "dict.crm_account_rating.label",
+    "zh-CN": "客户评级",
+    "en-US": "Account Rating",
+    "source": "import",
+    "refType": "dict"
+  },
+  {
+    "key": "dict.crm_account_rating.A",
+    "zh-CN": "A - 重点客户",
+    "en-US": "A - Key Account",
+    "source": "import",
+    "refType": "dict_item"
+  },
+  {
+    "key": "dict.crm_account_rating.B",
+    "zh-CN": "B - 重要客户",
+    "en-US": "B - Important",
+    "source": "import",
+    "refType": "dict_item"
+  },
+  {
+    "key": "dict.crm_account_rating.C",
+    "zh-CN": "C - 一般客户",
+    "en-US": "C - Normal",
+    "source": "import",
+    "refType": "dict_item"
+  },
+  {
+    "key": "dict.crm_account_rating.D",
+    "zh-CN": "D - 低优先级",
+    "en-US": "D - Low Priority",
+    "source": "import",
+    "refType": "dict_item"
+  },
+  {
+    "key": "dict.crm_lead_status.label",
+    "zh-CN": "线索状态",
+    "en-US": "Lead Status",
+    "source": "import",
+    "refType": "dict"
+  },
+  {
+    "key": "dict.crm_lead_status.NEW",
+    "zh-CN": "新建",
+    "en-US": "New",
+    "source": "import",
+    "refType": "dict_item"
+  },
+  {
+    "key": "dict.crm_lead_status.CONTACTED",
+    "zh-CN": "已联系",
+    "en-US": "Contacted",
+    "source": "import",
+    "refType": "dict_item"
+  },
+  {
+    "key": "dict.crm_lead_status.QUALIFIED",
+    "zh-CN": "已合格",
+    "en-US": "Qualified",
+    "source": "import",
+    "refType": "dict_item"
+  },
+  {
+    "key": "dict.crm_lead_status.CONVERTED",
+    "zh-CN": "已转化",
+    "en-US": "Converted",
+    "source": "import",
+    "refType": "dict_item"
+  },
+  {
+    "key": "dict.crm_lead_status.LOST",
+    "zh-CN": "已丢失",
+    "en-US": "Lost",
+    "source": "import",
+    "refType": "dict_item"
+  },
+  {
+    "key": "dict.crm_lead_source.label",
+    "zh-CN": "线索来源",
+    "en-US": "Lead Source",
+    "source": "import",
+    "refType": "dict"
+  },
+  {
+    "key": "dict.crm_lead_source.EXHIBITION",
+    "zh-CN": "展会",
+    "en-US": "Exhibition",
+    "source": "import",
+    "refType": "dict_item"
+  },
+  {
+    "key": "dict.crm_lead_source.WEBSITE",
+    "zh-CN": "网站",
+    "en-US": "Website",
+    "source": "import",
+    "refType": "dict_item"
+  },
+  {
+    "key": "dict.crm_lead_source.REFERRAL",
+    "zh-CN": "推荐",
+    "en-US": "Referral",
+    "source": "import",
+    "refType": "dict_item"
+  },
+  {
+    "key": "dict.crm_lead_source.COLD_CALL",
+    "zh-CN": "陌拜",
+    "en-US": "Cold Call",
+    "source": "import",
+    "refType": "dict_item"
+  },
+  {
+    "key": "dict.crm_lead_source.SOCIAL_MEDIA",
+    "zh-CN": "社交媒体",
+    "en-US": "Social Media",
+    "source": "import",
+    "refType": "dict_item"
+  },
+  {
+    "key": "dict.crm_lead_source.OTHER",
+    "zh-CN": "其他",
+    "en-US": "Other",
+    "source": "import",
+    "refType": "dict_item"
+  },
+  {
+    "key": "dict.crm_contact_role.label",
+    "zh-CN": "联系人角色",
+    "en-US": "Contact Role",
+    "source": "import",
+    "refType": "dict"
+  },
+  {
+    "key": "dict.crm_contact_role.DECISION_MAKER",
+    "zh-CN": "决策者",
+    "en-US": "Decision Maker",
+    "source": "import",
+    "refType": "dict_item"
+  },
+  {
+    "key": "dict.crm_contact_role.TECHNICAL",
+    "zh-CN": "技术",
+    "en-US": "Technical",
+    "source": "import",
+    "refType": "dict_item"
+  },
+  {
+    "key": "dict.crm_contact_role.PROCUREMENT",
+    "zh-CN": "采购",
+    "en-US": "Procurement",
+    "source": "import",
+    "refType": "dict_item"
+  },
+  {
+    "key": "dict.crm_contact_role.INFLUENCER",
+    "zh-CN": "影响者",
+    "en-US": "Influencer",
+    "source": "import",
+    "refType": "dict_item"
+  },
+  {
+    "key": "dict.crm_contact_role.OTHER",
+    "zh-CN": "其他",
+    "en-US": "Other",
+    "source": "import",
+    "refType": "dict_item"
+  },
+  {
+    "key": "menu.CRMS_ROOT.label",
+    "zh-CN": "CRM 入门",
+    "en-US": "CRM Starter",
+    "source": "import",
+    "refType": "menu"
+  },
+  {
+    "key": "menu.CRMS_ACCOUNTS.label",
+    "zh-CN": "客户",
+    "en-US": "Accounts",
+    "source": "import",
+    "refType": "menu"
+  },
+  {
+    "key": "menu.CRMS_CONTACTS.label",
+    "zh-CN": "联系人",
+    "en-US": "Contacts",
+    "source": "import",
+    "refType": "menu"
+  },
+  {
+    "key": "menu.CRMS_LEADS.label",
+    "zh-CN": "线索",
+    "en-US": "Leads",
+    "source": "import",
+    "refType": "menu"
+  },
+  {
+    "key": "page.crm_account_list.title",
+    "zh-CN": "客户列表",
+    "en-US": "Accounts",
+    "source": "import",
+    "refType": "page"
+  },
+  {
+    "key": "page.crm_account_form.title",
+    "zh-CN": "客户表单",
+    "en-US": "Account Form",
+    "source": "import",
+    "refType": "page"
+  },
+  {
+    "key": "page.crm_account_detail.title",
+    "zh-CN": "客户详情",
+    "en-US": "Account Detail",
+    "source": "import",
+    "refType": "page"
+  },
+  {
+    "key": "page.crm_contact_list.title",
+    "zh-CN": "联系人列表",
+    "en-US": "Contacts",
+    "source": "import",
+    "refType": "page"
+  },
+  {
+    "key": "page.crm_contact_form.title",
+    "zh-CN": "联系人表单",
+    "en-US": "Contact Form",
+    "source": "import",
+    "refType": "page"
+  },
+  {
+    "key": "page.crm_contact_detail.title",
+    "zh-CN": "联系人详情",
+    "en-US": "Contact Detail",
+    "source": "import",
+    "refType": "page"
+  },
+  {
+    "key": "page.crm_lead_list.title",
+    "zh-CN": "线索列表",
+    "en-US": "Leads",
+    "source": "import",
+    "refType": "page"
+  },
+  {
+    "key": "page.crm_lead_form.title",
+    "zh-CN": "线索表单",
+    "en-US": "Lead Form",
+    "source": "import",
+    "refType": "page"
+  },
+  {
+    "key": "page.crm_lead_detail.title",
+    "zh-CN": "线索详情",
+    "en-US": "Lead Detail",
+    "source": "import",
+    "refType": "page"
+  },
+  {
+    "key": "crm.action.create",
+    "zh-CN": "新建",
+    "en-US": "Create",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "crm.action.edit",
+    "zh-CN": "编辑",
+    "en-US": "Edit",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "crm.action.delete",
+    "zh-CN": "删除",
+    "en-US": "Delete",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "crm.action.view",
+    "zh-CN": "查看",
+    "en-US": "View",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "crm.action.save",
+    "zh-CN": "保存",
+    "en-US": "Save",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "crm.action.cancel",
+    "zh-CN": "取消",
+    "en-US": "Cancel",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "crm.action.contact_lead",
+    "zh-CN": "标记已联系",
+    "en-US": "Mark Contacted",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "crm.action.qualify_lead",
+    "zh-CN": "标记合格",
+    "en-US": "Qualify",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "crm.action.convert_lead",
+    "zh-CN": "转化",
+    "en-US": "Convert",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "crm.action.lose_lead",
+    "zh-CN": "标记丢失",
+    "en-US": "Mark Lost",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "crm.section.basic_info",
+    "zh-CN": "基本信息",
+    "en-US": "Basic Information",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "crm.section.lead_info",
+    "zh-CN": "线索信息",
+    "en-US": "Lead Information",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "model.crm_opportunity._meta.label",
+    "zh-CN": "商机",
+    "en-US": "Opportunity",
+    "source": "import",
+    "refType": "model"
+  },
+  {
+    "key": "model.crm_activity._meta.label",
+    "zh-CN": "活动记录",
+    "en-US": "Activity",
+    "source": "import",
+    "refType": "model"
+  },
+  {
+    "key": "model.crm_campaign._meta.label",
+    "zh-CN": "营销活动",
+    "en-US": "Campaign",
+    "source": "import",
+    "refType": "model"
+  },
+  {
+    "key": "model.crm_opportunity.crm_opp_code.label",
+    "zh-CN": "商机编号",
+    "en-US": "Opportunity Code",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_opportunity.crm_opp_name.label",
+    "zh-CN": "商机名称",
+    "en-US": "Opportunity Name",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_opportunity.crm_opp_account_id.label",
+    "zh-CN": "客户",
+    "en-US": "Account",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_opportunity.crm_opp_stage.label",
+    "zh-CN": "阶段",
+    "en-US": "Stage",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_opportunity.crm_opp_expected_amount.label",
+    "zh-CN": "预期金额",
+    "en-US": "Expected Amount",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_opportunity.crm_opp_expected_close_date.label",
+    "zh-CN": "预计成交日期",
+    "en-US": "Expected Close Date",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_opportunity.crm_opp_probability.label",
+    "zh-CN": "成交概率(%)",
+    "en-US": "Probability (%)",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_opportunity.crm_opp_owner.label",
+    "zh-CN": "负责人",
+    "en-US": "Owner",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_opportunity.crm_opp_notes.label",
+    "zh-CN": "备注",
+    "en-US": "Notes",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_activity.crm_act_type.label",
+    "zh-CN": "活动类型",
+    "en-US": "Activity Type",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_activity.crm_act_subject.label",
+    "zh-CN": "主题",
+    "en-US": "Subject",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_activity.crm_act_content.label",
+    "zh-CN": "内容",
+    "en-US": "Content",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_activity.crm_act_date.label",
+    "zh-CN": "活动日期",
+    "en-US": "Activity Date",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_activity.crm_act_owner.label",
+    "zh-CN": "负责人",
+    "en-US": "Owner",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_campaign.crm_cpn_code.label",
+    "zh-CN": "活动编号",
+    "en-US": "Campaign Code",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_campaign.crm_cpn_name.label",
+    "zh-CN": "活动名称",
+    "en-US": "Campaign Name",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_campaign.crm_cpn_type.label",
+    "zh-CN": "活动类型",
+    "en-US": "Campaign Type",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_campaign.crm_cpn_status.label",
+    "zh-CN": "状态",
+    "en-US": "Status",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_campaign.crm_cpn_start_date.label",
+    "zh-CN": "开始日期",
+    "en-US": "Start Date",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_campaign.crm_cpn_end_date.label",
+    "zh-CN": "结束日期",
+    "en-US": "End Date",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_campaign.crm_cpn_budget.label",
+    "zh-CN": "预算",
+    "en-US": "Budget",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_campaign.crm_cpn_description.label",
+    "zh-CN": "描述",
+    "en-US": "Description",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_campaign.crm_cpn_owner.label",
+    "zh-CN": "负责人",
+    "en-US": "Owner",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "page.crm_opportunity_list.title",
+    "zh-CN": "商机列表",
+    "en-US": "Opportunity",
+    "source": "import",
+    "refType": "page"
+  },
+  {
+    "key": "page.crm_opportunity_form.title",
+    "zh-CN": "商机表单",
+    "en-US": "Opportunity Form",
+    "source": "import",
+    "refType": "page"
+  },
+  {
+    "key": "page.crm_opportunity_detail.title",
+    "zh-CN": "商机详情",
+    "en-US": "Opportunity Detail",
+    "source": "import",
+    "refType": "page"
+  },
+  {
+    "key": "page.crm_activity_list.title",
+    "zh-CN": "活动记录列表",
+    "en-US": "Activity",
+    "source": "import",
+    "refType": "page"
+  },
+  {
+    "key": "page.crm_activity_form.title",
+    "zh-CN": "活动记录表单",
+    "en-US": "Activity Form",
+    "source": "import",
+    "refType": "page"
+  },
+  {
+    "key": "page.crm_activity_detail.title",
+    "zh-CN": "活动记录详情",
+    "en-US": "Activity Detail",
+    "source": "import",
+    "refType": "page"
+  },
+  {
+    "key": "page.crm_campaign_list.title",
+    "zh-CN": "营销活动列表",
+    "en-US": "Campaign",
+    "source": "import",
+    "refType": "page"
+  },
+  {
+    "key": "page.crm_campaign_form.title",
+    "zh-CN": "营销活动表单",
+    "en-US": "Campaign Form",
+    "source": "import",
+    "refType": "page"
+  },
+  {
+    "key": "page.crm_campaign_detail.title",
+    "zh-CN": "营销活动详情",
+    "en-US": "Campaign Detail",
+    "source": "import",
+    "refType": "page"
+  },
+  {
+    "key": "menu.crms_root.label",
+    "zh-CN": "crms_root",
+    "en-US": "crms_root",
+    "source": "import",
+    "refType": "menu"
+  },
+  {
+    "key": "menu.crms_accounts.label",
+    "zh-CN": "crms_accounts",
+    "en-US": "crms_accounts",
+    "source": "import",
+    "refType": "menu"
+  },
+  {
+    "key": "menu.crms_contacts.label",
+    "zh-CN": "crms_contacts",
+    "en-US": "crms_contacts",
+    "source": "import",
+    "refType": "menu"
+  },
+  {
+    "key": "menu.crms_leads.label",
+    "zh-CN": "crms_leads",
+    "en-US": "crms_leads",
+    "source": "import",
+    "refType": "menu"
+  },
+  {
+    "key": "menu.crms_opportunities.label",
+    "zh-CN": "crms_opportunities",
+    "en-US": "crms_opportunities",
+    "source": "import",
+    "refType": "menu"
+  },
+  {
+    "key": "menu.crms_activities.label",
+    "zh-CN": "crms_activities",
+    "en-US": "crms_activities",
+    "source": "import",
+    "refType": "menu"
+  },
+  {
+    "key": "menu.crms_campaigns.label",
+    "zh-CN": "crms_campaigns",
+    "en-US": "crms_campaigns",
+    "source": "import",
+    "refType": "menu"
+  }
 ]

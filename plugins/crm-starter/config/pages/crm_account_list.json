@@ -13,12 +13,12 @@
         {
           "code": "create",
           "primary": true,
-          "permissionCode": "CRMS.account.manage",
+          "permissionCode": "CRM.account.manage",
           "label": "create",
           "action": {
             "type": "navigate",
             "to": "crm_account_form",
-            "command": "crms:create_account"
+            "command": "crm:create_account"
           }
         }
       ]
@@ -111,7 +111,7 @@
             },
             {
               "code": "edit",
-              "permissionCode": "CRMS.account.manage",
+              "permissionCode": "CRM.account.manage",
               "label": "edit",
               "action": {
                 "type": "navigate",
@@ -121,12 +121,12 @@
             {
               "code": "delete",
               "danger": true,
-              "permissionCode": "CRMS.account.manage",
+              "permissionCode": "CRM.account.manage",
               "label": "delete",
               "confirm": "delete.confirm",
               "action": {
                 "type": "command",
-                "command": "crms:delete_account"
+                "command": "crm:delete_account"
               }
             }
           ]
