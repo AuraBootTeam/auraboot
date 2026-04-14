@@ -42,6 +42,21 @@ export const test = base.extend<CustomFixtures>({
     const client = new ApiClient(page);
     await use(client);
   },
+
+  /**
+   * Cap navigation-related waits (including `waitForLoadState('networkidle')`)
+   * at 3 seconds. The admin app keeps a long-lived SSE connection
+   * (`/api/notifications/stream`) open for the entire session, so
+   * Chromium never reports the network as idle. Specs that call
+   * `waitForLoadState('networkidle').catch(() => {})` rely on the wait
+   * failing quickly so the catch handler can resume the test; the
+   * default 15 s navigation timeout otherwise burns the whole per-test
+   * budget before the real assertions run.
+   */
+  page: async ({ page }, use) => {
+    page.setDefaultNavigationTimeout(3000);
+    await use(page);
+  },
 });
 
 /**
