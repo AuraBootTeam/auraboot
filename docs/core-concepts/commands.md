@@ -66,8 +66,7 @@ flowchart TD
     K --> K1["11.1 CHANGE_TRACKING<br/>Field-level change diff"]
     K1 --> L["12. HANDLER<br/>Custom handler execution"]
     L --> M["13. API_CALL<br/>External API invocation"]
-    M --> M1["13.5 CONSISTENCY_CHECK<br/>Cross-document constraints"]
-    M1 --> N["14. SIDE_EFFECT<br/>Side effect execution"]
+    M --> N["14. SIDE_EFFECT<br/>Side effect execution"]
     N --> N1["14.1 ROLL_UP<br/>Aggregate field recalc"]
     N1 --> N2["14.2 GOVERNANCE_SNAP<br/>Version snapshot"]
     N2 --> O["15. POST_ACTION<br/>Post-actions (e.g., create children)"]
@@ -185,8 +184,6 @@ Invokes custom `CommandHandler` (platform built-in) or `CommandHandlerExtension`
 Calls external APIs through `ApiConnectorService`, driven by API_CALL-type BindingRules. Supports API_KEY, BEARER, and BASIC authentication. Includes SSRF protection. The actual HTTP call executes in an `afterCommit` callback to avoid blocking the database transaction.
 
 **Skipped when:** No API_CALL binding rules are configured.
-
-**Sub-stage 13.5 CONSISTENCY_CHECK:** Evaluates cross-document consistency constraints.
 
 #### 14. SIDE_EFFECT -- Side Effect Execution
 

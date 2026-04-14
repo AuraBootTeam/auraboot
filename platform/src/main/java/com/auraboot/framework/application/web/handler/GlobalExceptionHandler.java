@@ -2,8 +2,6 @@ package com.auraboot.framework.application.web.handler;
 
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.common.dto.ApiResponse;
-import com.auraboot.framework.consistency.dto.ConsistencyViolation;
-import com.auraboot.framework.consistency.exception.ConsistencyViolationException;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.exception.ConflictException;
 import com.auraboot.framework.exception.PermissionDeniedException;
@@ -201,24 +199,6 @@ public class GlobalExceptionHandler {
 
         log.warn("Business validation failed: {}", ex.getMessage());
         ApiResponse<Map<String, String>> response = ApiResponse.errorWithContext(ResponseCode.BadParam, errors);
-        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(response);
-    }
-
-    /**
-     * Handle cross-document consistency violation exceptions.
-     * Returns HTTP 422 Unprocessable Entity with violation details.
-     */
-    @ExceptionHandler(ConsistencyViolationException.class)
-    @ResponseBody
-    public ResponseEntity<ApiResponse<Object>> handleConsistencyViolationException(
-            ConsistencyViolationException ex) {
-        log.warn("Consistency violation: {}", ex.getMessage());
-        ApiResponse<Object> response = ApiResponse.errorWithContext(
-                ResponseCode.CommonValidationFailed,
-                java.util.Map.of(
-                        "type", "consistency_violation",
-                        "violations", ex.getViolations()
-                ));
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(response);
     }
 

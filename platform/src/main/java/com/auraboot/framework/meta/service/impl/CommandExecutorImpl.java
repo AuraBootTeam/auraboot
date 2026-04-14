@@ -107,9 +107,6 @@ public class CommandExecutorImpl implements CommandExecutor {
     @Autowired(required = false)
     private com.auraboot.framework.governance.service.GovernanceSnapshotService governanceSnapshotService;
 
-    @Autowired(required = false)
-    private com.auraboot.framework.consistency.service.ConsistencyRuleService consistencyRuleService;
-
     /** Cache for column existence checks — table structure rarely changes. Bounded to prevent OOM. */
     private static final int COLUMN_CACHE_MAX_SIZE = 1024;
     private final ConcurrentHashMap<String, Boolean> columnExistsCache = new ConcurrentHashMap<>();

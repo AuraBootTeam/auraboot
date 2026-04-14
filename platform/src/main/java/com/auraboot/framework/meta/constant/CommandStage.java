@@ -60,9 +60,6 @@ public final class CommandStage {
     /** Stage 14: Handler — execute Spring bean handlers and plugin command handlers. */
     public static final int HANDLER = 14;
 
-    /** Stage 15: Consistency check — validate cross-document constraints. */
-    public static final int CONSISTENCY_CHECK = 15;
-
     /** Stage 16: Side effect — create/update related records based on conditions. */
     public static final int SIDE_EFFECT = 16;
 
@@ -114,7 +111,6 @@ public final class CommandStage {
             case COMPUTED_FIELDS -> "computed_fields";
             case CHANGE_TRACKING -> "change_tracking";
             case HANDLER -> "handler";
-            case CONSISTENCY_CHECK -> "consistency_check";
             case SIDE_EFFECT -> "side_effect";
             case ROLL_UP -> "roll_up";
             case POST_ACTION -> "post_action";
