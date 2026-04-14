@@ -12,7 +12,7 @@
 #   USERNAME=admin@example.com
 #   PASSWORD=Test2026x
 #
-# Replace /path/to with the absolute path to your AuraMeta checkout.
+# Replace /path/to with the absolute path to your AuraBoot checkout.
 
 # Nightly perf smoke (2am local time) — fast, ~5 min
 0 2 * * * /path/to/scripts/perf-ci/run-perf-regression.sh --profile smoke >> /var/log/perf-ci.log 2>&1

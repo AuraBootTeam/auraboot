@@ -5,7 +5,7 @@
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 #
 # Required env vars (set in .env or export):
-#   GHCR_REPO    — e.g. ghcr.io/your-org/aurameta-gap024
+#   GHCR_REPO    — e.g. ghcr.io/your-org/auraboot
 #   IMAGE_TAG    — e.g. latest, v1.0.0, main, or a commit sha
 #   DB_PASSWORD  — PostgreSQL password (override default)
 
