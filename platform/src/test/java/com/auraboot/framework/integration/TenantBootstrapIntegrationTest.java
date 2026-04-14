@@ -53,7 +53,9 @@ class TenantBootstrapIntegrationTest extends BaseIntegrationTest {
         assertNotNull(result, "Bootstrap result should not be null");
         assertTrue(result.isSuccess(), "Bootstrap should succeed");
         assertTrue(result.getRolesCreated() > 0, "Should create roles");
-        assertTrue(result.getMenusCreated() > 0, "Should create menus");
+        // Bootstrap may create 0 menus — functional menus belong to plugins now.
+        // See docs/system-reference/reference/menu-seed-mechanism.md.
+        assertTrue(result.getMenusCreated() >= 0, "Menus count must be non-negative");
         
         // 注意: permissionsAssigned可能为0，因为模板中只有TENANT_ADMIN角色
         // 而TENANT_ADMIN会被分配20个Permission

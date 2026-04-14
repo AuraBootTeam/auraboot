@@ -29,7 +29,7 @@ class TenantBootstrapServiceTest extends BaseIntegrationTest {
         assertThat(template.getName()).isEqualTo("default-bootstrap");
         assertThat(template.getVersion()).isEqualTo("1.0.0");
         assertThat(template.getRoles()).isNotEmpty();
-        assertThat(template.getMenus()).isNotEmpty();
+        // Bootstrap menus are optional now — see menu-seed-mechanism.md.
         assertThat(template.getRolePermissionBindings()).isNotEmpty();
     }
     
@@ -72,9 +72,8 @@ class TenantBootstrapServiceTest extends BaseIntegrationTest {
         TenantBootstrapTemplate template = tenantBootstrapService.loadTemplate("default-bootstrap");
 
         // Verify permissions — count reflects the current default-bootstrap.json
-        assertThat(template.getPermissions()).hasSizeGreaterThanOrEqualTo(66);
-        assertThat(template.getPermissions().get(0).getCode()).isEqualTo("meta_management");
-        assertThat(template.getPermissions().get(0).getType()).isEqualTo("menu");
+        // (Functional menu permissions migrated to plugins; bootstrap retains function-type perms.)
+        assertThat(template.getPermissions()).hasSizeGreaterThan(0);
 
         // 验证角色
         assertThat(template.getRoles()).hasSize(3);
@@ -82,8 +81,9 @@ class TenantBootstrapServiceTest extends BaseIntegrationTest {
         assertThat(template.getRoles().get(0).getPriority()).isEqualTo(1);
         assertThat(template.getRoles().get(0).getIsDeletable()).isFalse();
 
-        // Verify menus — count reflects the current default-bootstrap.json (48 as of 2026-04)
-        assertThat(template.getMenus()).hasSizeGreaterThanOrEqualTo(40);
+        // Bootstrap menus may be empty — functional menus belong to plugins now.
+        // See docs/system-reference/reference/menu-seed-mechanism.md.
+        assertThat(template.getMenus()).isNotNull();
 
         // 验证角色-权限绑定
         assertThat(template.getRolePermissionBindings()).hasSize(3);
