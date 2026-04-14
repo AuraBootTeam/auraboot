@@ -165,7 +165,8 @@ test.describe('Plugin System Deep', () => {
    * PL-001: Installed plugin list renders @smoke
    */
   test('PL-001: Installed plugin list renders @smoke', async ({ page }) => {
-    await page.goto('/system/plugins');
+    // /system/plugins merged into /plugins (Tabs: discovery/installed/history)
+    await page.goto('/plugins?tab=installed');
     await page.waitForLoadState('domcontentloaded');
 
     const is404 = await page
@@ -216,8 +217,9 @@ test.describe('Plugin System Deep', () => {
     expect(plugin.pluginId).toBe('com.test.plugin-deep-e2e');
     expect(plugin.version).toBe('1.0.0');
 
-    // Navigate to plugin detail page
-    await page.goto(`/system/plugins/${pluginPid}`);
+    // Navigate to plugin detail page. Detail URL is /plugins/:pluginPid after
+    // the marketplace/system-plugins merge.
+    await page.goto(`/plugins/${pluginPid}`);
     await page.waitForLoadState('domcontentloaded');
 
     const content = page.locator('main, h1, h2, [data-testid="plugin-detail"]');
@@ -237,7 +239,7 @@ test.describe('Plugin System Deep', () => {
    * PL-003: UI upload interface
    */
   test('PL-003: UI upload interface', async ({ page }) => {
-    await page.goto('/system/plugins');
+    await page.goto('/plugins?tab=installed');
     await page.waitForLoadState('domcontentloaded');
 
     // Look for import/upload button

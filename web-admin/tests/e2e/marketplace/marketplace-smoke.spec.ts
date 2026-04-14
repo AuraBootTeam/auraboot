@@ -11,7 +11,13 @@
 import { test, expect } from '../../fixtures';
 import type { Page } from '../../fixtures';
 
-/** Navigate to Marketplace via sidebar menu */
+/**
+ * Navigate to the Plugin Management page (discovery tab) via sidebar menu.
+ *
+ * NOTE: The former /marketplace and /system/plugins pages were merged into a
+ * single /plugins page with Tabs (discovery / installed / history).
+ * Discovery tab mirrors the former marketplace experience.
+ */
 async function navigateToMarketplace(page: Page) {
   await page.goto('/dashboards', { waitUntil: 'load' });
 
@@ -21,13 +27,20 @@ async function navigateToMarketplace(page: Page) {
   await sysBtn.first().waitFor({ state: 'visible', timeout: 10000 });
   await sysBtn.first().evaluate((el: HTMLElement) => el.click());
 
-  // Find the marketplace menu link in sidebar and click via DOM
-  const menuLink = page.locator('a[href="/marketplace"]');
+  // Find the plugin management menu link in sidebar and click via DOM.
+  // Menu code was renamed plugin_marketplace -> plugin_management, and its
+  // href is /plugins (default tab = installed). We then switch to discovery.
+  const menuLink = page.locator('a[href^="/plugins"]');
   await menuLink.first().waitFor({ state: 'visible', timeout: 10000 });
   await menuLink.first().evaluate((el) => (el as HTMLAnchorElement).click());
 
-  await expect(page).toHaveURL(/\/marketplace/, { timeout: 10000 });
-  await expect(page.locator('h1')).toContainText(/Plugin Marketplace|插件市场/);
+  await expect(page).toHaveURL(/\/plugins/, { timeout: 10000 });
+
+  // Activate the Discovery tab to reach the former marketplace UI.
+  const discoveryTab = page.getByRole('tab', { name: /Discovery|发现/ });
+  await discoveryTab.first().waitFor({ state: 'visible', timeout: 10000 });
+  await discoveryTab.first().click();
+  await expect(page).toHaveURL(/tab=discovery/, { timeout: 10000 });
 }
 
 test.describe('Marketplace Smoke Tests', () => {
@@ -95,8 +108,8 @@ test.describe('Marketplace Smoke Tests', () => {
     // Detail page should load
     await page.waitForLoadState('domcontentloaded');
 
-    // Should show back link
-    await expect(page.locator('text=/Back to Marketplace|返回市场/')).toBeVisible();
+    // Should show back link (text may be "Back to Plugins" / "返回插件市场" after merge)
+    await expect(page.locator('text=/Back to (Marketplace|Plugins)|返回(市场|插件)/')).toBeVisible();
 
     // Should show version history (use heading to avoid sidebar menu matches)
     await expect(page.locator('h2').filter({ hasText: /Version History|版本历史/ })).toBeVisible();

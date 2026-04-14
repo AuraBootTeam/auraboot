@@ -178,24 +178,27 @@ test.describe('Community Edition Smoke', () => {
   });
 
   /**
-   * CM-07: Plugin Marketplace page loads via sidebar
+   * CM-07: Plugin management page loads via sidebar.
+   *
+   * NOTE: /marketplace and /system/plugins were merged into /plugins with
+   * Tabs (discovery / installed / history).
    */
-  test('CM-07: Plugin Marketplace page is accessible', async ({ page }) => {
-    // Marketplace may be a top-level menu item, try sidebar navigation
+  test('CM-07: Plugin management page is accessible', async ({ page }) => {
+    // Plugin management may be a top-level menu item, try sidebar navigation
     await page.goto('/dashboards', { waitUntil: 'load' });
 
-    const marketplaceLink = page.locator('a[href="/marketplace"]');
-    const linkVisible = await marketplaceLink
+    const pluginsLink = page.locator('a[href^="/plugins"]');
+    const linkVisible = await pluginsLink
       .first()
       .isVisible({ timeout: 5000 })
       .catch(() => false);
 
     if (linkVisible) {
-      await marketplaceLink.first().evaluate((el) => (el as HTMLAnchorElement).click());
-      await page.waitForURL((url) => url.pathname === '/marketplace', { timeout: 10000 });
+      await pluginsLink.first().evaluate((el) => (el as HTMLAnchorElement).click());
+      await page.waitForURL((url) => url.pathname === '/plugins', { timeout: 10000 });
     } else {
       // Fallback: navigate directly if menu structure differs
-      await page.goto('/marketplace', { waitUntil: 'domcontentloaded' });
+      await page.goto('/plugins', { waitUntil: 'domcontentloaded' });
     }
 
     await waitForDynamicPageLoad(page);
