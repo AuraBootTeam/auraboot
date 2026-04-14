@@ -4,7 +4,7 @@
 # This script only runs the Playwright initialization tests
 # (Assumes backend and frontend are already running)
 #
-# Usage: ./scripts/init-env-only.sh [--headed]
+# Usage: ./scripts/oss-init-env-only.sh [--headed]
 #   --headed  Run tests with browser visible
 
 set -e

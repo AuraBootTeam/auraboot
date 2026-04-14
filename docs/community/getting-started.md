@@ -25,12 +25,12 @@ cd auraboot
 ## 2. Initialize the database
 
 ```bash
-./scripts/reset-and-init.sh
+./scripts/oss-reset-and-init.sh
 ```
 
 This drops and recreates the `aura_boot` database, applies `schema.sql`, and seeds the default admin tenant and user. Re-run it any time you want a clean slate — it is idempotent but destructive.
 
-If you prefer to prepare the database only (no backend/frontend startup), use `./scripts/init-env-only.sh`.
+If you prefer to prepare the database only (no backend/frontend startup), use `./scripts/oss-init-env-only.sh`.
 
 ## 3. Start the backend
 
@@ -81,7 +81,7 @@ A successful `UP` response means the database connection, Redis, and core subsys
 
 ## Troubleshooting
 
-- **`bootRun` fails with `relation does not exist`** — re-run `./scripts/reset-and-init.sh`; the schema is out of sync.
+- **`bootRun` fails with `relation does not exist`** — re-run `./scripts/oss-reset-and-init.sh`; the schema is out of sync.
 - **Frontend shows `undefined/api/...` in the network tab** — set `SPRING_BOOT_URL=http://127.0.0.1:6443` in `web-admin/.env.local`.
 - **`pnpm dev:full` cannot reach the backend** — prefix the command with `NO_PROXY=localhost` if you have a system HTTP proxy.
 - **Port already in use** — `pkill -f MetaApplication` (backend) or `pkill -f "bff.server"` (frontend), then retry.
