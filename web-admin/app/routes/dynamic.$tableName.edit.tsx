@@ -3,5 +3,6 @@ import type { LoaderFunctionArgs } from 'react-router';
 
 export function loader({ params }: LoaderFunctionArgs) {
   const tableName = params.tableName || '';
-  return redirect(`/p/${tableName}/edit`, 301);
+  const recordId = params.recordId || '';
+  return redirect(`/p/${tableName}/edit/${recordId}`, 301);
 }

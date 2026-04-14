@@ -455,6 +455,63 @@ if [ "${ADMIN_USERS}" -lt 1 ] || [ "${TENANT_COUNT}" -lt 1 ] || [ "${ADMIN_MEMBE
 fi
 echo -e "${GREEN}   Bootstrap verification passed${NC}"
 
+# Step 7.1: Ensure System Tenant exists (platform space).
+#
+# Full BootstrapEngineService.execute() creates a tenant named "System" with
+# id=1 and adds admin as a member + assigns platform_admin role. However, when
+# this script takes the "recovery" path (admin already exists but flag was not
+# set), that seeding is skipped. E2E tests in tests/e2e/auth/space-selection
+# require admin@example.com to belong to BOTH a business tenant AND the System
+# tenant, so we backfill here if missing.
+echo -e "${YELLOW}Step 7.1: Ensuring System Tenant + admin membership...${NC}"
+SYSTEM_TENANT_EXISTS=$(psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -P pager=off -tAc \
+    "SELECT COUNT(*) FROM ab_tenant WHERE name='System' AND (deleted_flag=FALSE OR deleted_flag IS NULL);" \
+    2>/dev/null || echo "0")
+
+if [ "$SYSTEM_TENANT_EXISTS" = "0" ]; then
+    echo "   System tenant missing, creating (id=1)..."
+    psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -P pager=off <<'SEEDSQL'
+-- Use id=1 to match SystemTenantContextExecutor.SYSTEM_TENANT_ID.
+INSERT INTO ab_tenant (id, pid, name, display_name, status, timezone, default_currency,
+                      created_at, updated_at, deleted_flag)
+VALUES (1, 'SYSTEM-TENANT-SEED-0001', 'System', 'System', 'active', 'utc', 'usd',
+        CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, FALSE)
+ON CONFLICT (id) DO NOTHING;
+
+-- Add admin user as member of System tenant.
+INSERT INTO ab_tenant_member (id, pid, tenant_id, user_id, status,
+                              created_at, updated_at, deleted_flag)
+SELECT
+    (SELECT COALESCE(MAX(id), 0) + 1 FROM ab_tenant_member),
+    'SYS-MEMBER-ADMIN-SEED',
+    1,
+    u.id,
+    'active',
+    CURRENT_TIMESTAMP,
+    CURRENT_TIMESTAMP,
+    FALSE
+FROM ab_user u
+WHERE u.email = 'admin@example.com'
+  AND NOT EXISTS (
+    SELECT 1 FROM ab_tenant_member tm
+    WHERE tm.tenant_id = 1 AND tm.user_id = u.id
+      AND (tm.deleted_flag = FALSE OR tm.deleted_flag IS NULL)
+  );
+SEEDSQL
+    SEEDED_MEMBER=$(psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -P pager=off -tAc \
+        "SELECT COUNT(*) FROM ab_tenant_member tm JOIN ab_user u ON u.id=tm.user_id
+         WHERE tm.tenant_id=1 AND u.email='admin@example.com'
+           AND (tm.deleted_flag=FALSE OR tm.deleted_flag IS NULL);" 2>/dev/null || echo "0")
+    if [ "$SEEDED_MEMBER" = "1" ]; then
+        echo -e "${GREEN}   System tenant + admin membership seeded${NC}"
+    else
+        echo -e "${RED}   System tenant seed failed (membership missing)${NC}"
+        exit 1
+    fi
+else
+    echo -e "${GREEN}   System tenant already exists, skipping seed${NC}"
+fi
+
 # Step 7.5: Import required plugins for seed data
 echo -e "${YELLOW}Step 7.5: Importing plugins...${NC}"
 cd "$PROJECT_ROOT"

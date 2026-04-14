@@ -309,24 +309,29 @@ test.describe('BPM Process Definition — CRUD Lifecycle', () => {
     await keyInput.click();
     await keyInput.fill(newKey);
 
-    // Save via Ctrl+S (triggers save dialog or direct save)
+    // Save via explicit toolbar save button (Ctrl+S was brittle across browsers)
     const saveResponse = page.waitForResponse(
       (r) => r.url().includes('/api/bpm/process-definitions') && ['POST', 'PUT', 'PATCH'].includes(r.request().method()),
       { timeout: 15_000 },
     );
-    await page.keyboard.press('Control+s');
+    const saveBtn = page
+      .locator('[data-testid="toolbar-save"]')
+      .or(page.getByRole('button', { name: /^(保存|Save)$/ }))
+      .first();
+    await saveBtn.waitFor({ state: 'visible', timeout: 8_000 });
+    await saveBtn.click();
 
-    // If save dialog appears, confirm it
+    // If a confirmation dialog appears, confirm it
     const saveDialog = page.locator('[role="dialog"]').first();
     if (await saveDialog.isVisible({ timeout: 3_000 }).catch(() => false)) {
       const confirmBtn = saveDialog.getByRole('button', { name: /保存|Save|确定|OK/i }).first();
       await confirmBtn.click();
     }
 
-    const resp = await saveResponse.catch(() => null);
-    if (resp) {
-      expect(resp.status()).toBeLessThan(400);
-    }
+    // Assert the save POST succeeded before navigating back to list
+    const resp = await saveResponse;
+    expect(resp.status()).toBeGreaterThanOrEqual(200);
+    expect(resp.status()).toBeLessThan(300);
 
     // [D6] Navigate back to list and verify new process appears
     await navigateToProcessDefinitionList(page);
