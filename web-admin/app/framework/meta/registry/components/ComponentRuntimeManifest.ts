@@ -5,7 +5,7 @@
 
 import type { ComponentRuntimeConfig } from '~/framework/meta/registry/components/ComponentConfig';
 
-const SMART_COMPONENTS_BASE = '../../../components/smart';
+const SMART_COMPONENTS_BASE = '../../../../ui/smart';
 
 function runtime(
   subdir: string,
