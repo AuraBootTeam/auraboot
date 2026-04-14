@@ -638,7 +638,7 @@ plugin
 plugin
   .command('import [dir]')
   .description('Import a plugin to the AuraBoot platform')
-  .option('-t, --target <url>', 'Target platform URL', 'http://localhost:5173')
+  .option('-t, --target <url>', 'Target platform URL', 'http://localhost:6443')
   .option('-u, --user <email>', 'Login email')
   .option('-p, --password <password>', 'Login password')
   .option('--yes', 'Skip confirmation prompts')
@@ -659,7 +659,7 @@ plugin
 plugin
   .command('publish [dir]')
   .description('Publish plugin to AuraBoot platform')
-  .option('-t, --target <url>', 'Target platform URL', 'http://localhost:5173')
+  .option('-t, --target <url>', 'Target platform URL', 'http://localhost:6443')
   .option('-u, --user <email>', 'Login email')
   .option('-p, --password <password>', 'Login password')
   .option('--yes', 'Skip confirmation prompts')
@@ -678,7 +678,7 @@ plugin
 plugin
   .command('diff [dir]')
   .description('Compare local plugin config vs remote platform')
-  .option('-t, --target <url>', 'Target platform URL', 'http://localhost:5173')
+  .option('-t, --target <url>', 'Target platform URL', 'http://localhost:6443')
   .option('-u, --user <email>', 'Login email')
   .option('-p, --password <password>', 'Login password')
   .action(async (dir: string | undefined, options: any) => {
