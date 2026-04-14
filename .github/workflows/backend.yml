@@ -1,0 +1,77 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'platform/**'
+      - '.github/workflows/backend.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'platform/**'
+      - '.github/workflows/backend.yml'
+
+concurrency:
+  group: backend-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build & Quality Gate (Java ${{ matrix.java }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: true
+      matrix:
+        java: ['21']
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ matrix.java }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      - name: Make gradlew executable
+        working-directory: platform
+        run: chmod +x ./gradlew
+
+      - name: Compile (main + test sources)
+        working-directory: platform
+        run: ./gradlew --no-daemon compileJava compileTestJava
+
+      - name: Checkstyle (main)
+        working-directory: platform
+        run: ./gradlew --no-daemon checkstyleMain
+
+      - name: PMD (main)
+        working-directory: platform
+        run: ./gradlew --no-daemon pmdMain
+
+      - name: Assemble jar
+        working-directory: platform
+        run: ./gradlew --no-daemon jar
+
+      - name: Upload quality reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-reports
+          path: |
+            platform/build/reports/checkstyle/
+            platform/build/reports/pmd/
+          if-no-files-found: ignore
+          retention-days: 7
