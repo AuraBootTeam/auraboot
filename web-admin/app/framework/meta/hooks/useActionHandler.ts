@@ -248,9 +248,9 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
 
     switch (suffix) {
       case 'form':
-        // Route pattern: /p/:pageKey/:recordId/edit (see routes.ts)
+        // Route pattern: /p/:pageKey/edit/:recordId (see routes.ts)
         return recordId
-          ? `/p/${modelCodePart}/${recordId}/edit`
+          ? `/p/${modelCodePart}/edit/${recordId}`
           : `/p/${modelCodePart}/new`;
       case 'detail':
       case 'view':
