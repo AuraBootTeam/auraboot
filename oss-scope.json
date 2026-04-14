@@ -1,6 +1,6 @@
 {
-  "version": "1.0",
-  "last_updated": "2026-04-13",
+  "version": "1.1",
+  "last_updated": "2026-04-14",
   "description": "Single source of truth for AuraBoot open-source scope. Defines which backend modules, plugins, and tests belong to the OSS distribution. Adjust this file when moving features between OSS and enterprise.",
 
   "platform_modules": [
@@ -101,8 +101,71 @@
     "tests/e2e/designer/designer-lifecycle.spec.ts",
     "tests/e2e/dashboard/dashboard.spec.ts",
     "tests/e2e/dashboard/dashboard-interactions.spec.ts",
-    "tests/e2e/dashboard/dashboard-management.spec.ts"
+    "tests/e2e/dashboard/dashboard-management.spec.ts",
+
+    "tests/e2e/plugin/plugin-all-packages-smoke.spec.ts",
+    "tests/e2e/organization/member-detail.spec.ts",
+    "tests/e2e/organization/org-department.spec.ts",
+    "tests/e2e/saved-view/saved-view-column-settings.spec.ts",
+    "tests/e2e/user/user-management.spec.ts",
+
+    "tests/e2e/admin/webhook-lifecycle.spec.ts",
+    "tests/e2e/automation/automation-management.spec.ts",
+    "tests/e2e/platform/form-redirect-regression.spec.ts",
+    "tests/e2e/search/global-search.spec.ts"
   ],
+
+  "test_excludes_rationale": {
+    "_note": "Explanations for each entry in test_excludes. Plain-string exclusion list is what the playwright.oss.config.ts runner consumes; this map is metadata only.",
+    "tests/e2e/dashboard/dashboard-designer.spec.ts": "[A] enterprise Dashboard Designer",
+    "tests/e2e/dashboard/dashboard-designer-deep.spec.ts": "[A] enterprise Dashboard Designer",
+    "tests/e2e/dashboard/dashboard-widget-types.spec.ts": "[A] enterprise widget types",
+    "tests/e2e/dashboard/dashboard-charts.spec.ts": "[A] advanced charts enterprise",
+    "tests/e2e/dashboard/dashboard-export.spec.ts": "[A] dashboard export enterprise",
+    "tests/e2e/designer/dashboard-designer-deep.spec.ts": "[A] enterprise Dashboard Designer",
+    "tests/e2e/designer/report-designer-deep.spec.ts": "[A] enterprise Report Designer",
+    "tests/e2e/plugin/pm-error-branches.spec.ts": "[A] project-management plugin (enterprise)",
+    "tests/e2e/plugin/pm-master-data.spec.ts": "[A] project-management plugin (enterprise)",
+    "tests/e2e/plugin/pm-member-management.spec.ts": "[A] project-management plugin (enterprise)",
+    "tests/e2e/plugin/pm-my-tasks.spec.ts": "[A] project-management plugin (enterprise)",
+    "tests/e2e/plugin/pm-project-lifecycle.spec.ts": "[A] project-management plugin (enterprise)",
+    "tests/e2e/plugin/pm-smoke.spec.ts": "[A] project-management plugin (enterprise)",
+    "tests/e2e/plugin/pm-task-associations.spec.ts": "[A] project-management plugin (enterprise)",
+    "tests/e2e/plugin/pm-workspace-interactions.spec.ts": "[A] project-management plugin (enterprise)",
+    "tests/e2e/plugin/pcba-plugin.spec.ts": "[A] pcba-manufacturing plugin (enterprise)",
+    "tests/e2e/designer/designer-unified-architecture.spec.ts": "[A] enterprise designer",
+    "tests/e2e/designer/designer-lifecycle.spec.ts": "[A] enterprise designer",
+    "tests/e2e/dashboard/dashboard.spec.ts": "[A] enterprise dashboard features",
+    "tests/e2e/dashboard/dashboard-interactions.spec.ts": "[A] enterprise dashboard features",
+    "tests/e2e/dashboard/dashboard-management.spec.ts": "[A] enterprise dashboard features",
+
+    "tests/e2e/plugin/plugin-all-packages-smoke.spec.ts": "[A] asserts 14 enterprise plugins installed (annual-plan, dual-prevention, asset-management, crm non-starter, sales, procurement, inventory, finance, quality, pcba-manufacturing, pcba-solution, project-management, quarry-industry); only e2e-test-order overlaps OSS. All 13 cases fail in OSS.",
+    "tests/e2e/organization/member-detail.spec.ts": "[A] references /dynamic/tenant-member route not shipped in OSS (all 3 cases fail).",
+    "tests/e2e/organization/org-department.spec.ts": "[A] 1/5 cases (create-department-via-...) uses enterprise-only field; whole file excluded because playwright.oss.config.ts filter is file-path level only — 4 passing sibling cases lost. See per_case_excludes_todo.",
+    "tests/e2e/saved-view/saved-view-column-settings.spec.ts": "[A] CS-007 column-order persistence relies on enterprise wiring; whole file excluded (7 passing siblings lost). See per_case_excludes_todo.",
+    "tests/e2e/user/user-management.spec.ts": "[A] UM-006/UM-007 role assignment/list are enterprise; whole file excluded (9 passing siblings lost). See per_case_excludes_todo.",
+
+    "tests/e2e/admin/webhook-lifecycle.spec.ts": "[D-todo] WH-002 webhook create form pending port to OSS; WH-001 smoke currently passes but whole file excluded (4 passing siblings lost). Re-enable once feature ported.",
+    "tests/e2e/automation/automation-management.spec.ts": "[D-todo] execution-logs dialog case pending port; whole file excluded (5 passing siblings lost). Re-enable once feature ported.",
+    "tests/e2e/platform/form-redirect-regression.spec.ts": "[D-todo] redirects-away-from-edit case pending port; whole file excluded (2 passing siblings lost). Re-enable once feature ported.",
+    "tests/e2e/search/global-search.spec.ts": "[D-todo] SEARCH-01 Cmd+K trigger button pending port; whole file excluded (8 passing siblings lost). Re-enable once feature ported."
+  },
+
+  "per_case_excludes_todo": {
+    "_note": "The current playwright.oss.config.ts filter operates at file path level only. These are the specific failing cases we actually want to skip; their sibling cases in the same files currently pass but are excluded along with them. When scope filter gains per-title support, move the file back into test_paths and list individual case titles here.",
+    "category_A_enterprise_only": [
+      { "file": "tests/e2e/organization/org-department.spec.ts", "case": "create-department-via-* (enterprise-only field)" },
+      { "file": "tests/e2e/saved-view/saved-view-column-settings.spec.ts", "case": "CS-007 column-order persistence" },
+      { "file": "tests/e2e/user/user-management.spec.ts", "case": "UM-006 role assignment" },
+      { "file": "tests/e2e/user/user-management.spec.ts", "case": "UM-007 role list" }
+    ],
+    "category_D_pending_port": [
+      { "file": "tests/e2e/admin/webhook-lifecycle.spec.ts", "case": "WH-002 webhook create form" },
+      { "file": "tests/e2e/automation/automation-management.spec.ts", "case": "execution-logs dialog" },
+      { "file": "tests/e2e/platform/form-redirect-regression.spec.ts", "case": "redirects-away-from-edit" },
+      { "file": "tests/e2e/search/global-search.spec.ts", "case": "SEARCH-01 Cmd+K trigger button" }
+    ]
+  },
 
   "excluded_paths_examples": [
     "tests/e2e/crm/**",
