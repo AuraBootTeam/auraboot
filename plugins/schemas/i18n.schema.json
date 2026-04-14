@@ -1,0 +1,44 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://auraboot.com/schemas/plugin-i18n/v1.0.0",
+  "title": "Plugin i18n.json",
+  "description": "Flat array of i18n entries. Each entry carries one key and its translations across locales. Mirrors com.auraboot.framework.plugin.dto.imports.I18nDefinitionDTO.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["key"],
+    "additionalProperties": false,
+    "properties": {
+      "key": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Dot-separated i18n key, e.g. model.sla_config._meta.label"
+      },
+      "source": {
+        "type": "string",
+        "description": "Source identifier, typically \"import\""
+      },
+      "refType": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Reference type for lineage tracking (advisory, any non-empty string)"
+      },
+      "zh-CN": { "type": "string" },
+      "en-US": { "type": "string" },
+      "ja-JP": { "type": "string" },
+      "ko-KR": { "type": "string" }
+    },
+    "patternProperties": {
+      "^[a-z]{2}-[A-Z]{2}$": {
+        "type": "string",
+        "description": "Additional locale translations (pattern: xx-XX)"
+      }
+    },
+    "anyOf": [
+      { "required": ["zh-CN"] },
+      { "required": ["en-US"] },
+      { "required": ["ja-JP"] },
+      { "required": ["ko-KR"] }
+    ]
+  }
+}
