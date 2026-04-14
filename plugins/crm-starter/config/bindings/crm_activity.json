@@ -1,0 +1,7 @@
+[
+  { "modelCode": "crm_activity", "fieldCode": "crm_act_type", "sequence": 1, "required": true, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "crm_activity", "fieldCode": "crm_act_subject", "sequence": 2, "required": true, "visible": true, "editable": true, "displayConfig": { "searchable": true, "sortable": true } },
+  { "modelCode": "crm_activity", "fieldCode": "crm_act_content", "sequence": 3, "required": false, "visible": false, "editable": true },
+  { "modelCode": "crm_activity", "fieldCode": "crm_act_date", "sequence": 4, "required": false, "visible": true, "editable": true, "displayConfig": { "sortable": true } },
+  { "modelCode": "crm_activity", "fieldCode": "crm_act_owner", "sequence": 5, "required": false, "visible": true, "editable": true }
+]

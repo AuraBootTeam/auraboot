@@ -1,102 +1,77 @@
 {
   "pageKey": "crm_account_form",
+  "modelCode": "crm_account",
+  "kind": "form",
+  "layout": {
+    "type": "stack"
+  },
+  "blocks": [
+    {
+      "id": "basic",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "基本信息",
+        "en-US": "Basic Information"
+      },
+      "fields": [
+        {
+          "field": "crm_acc_name",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_acc_industry",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_acc_website",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_acc_phone",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_acc_rating",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_acc_status",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_acc_address",
+          "colSpan": 12
+        },
+        {
+          "field": "crm_acc_remark",
+          "colSpan": 12
+        }
+      ]
+    },
+    {
+      "id": "buttons",
+      "blockType": "form-buttons",
+      "buttons": [
+        {
+          "code": "submit",
+          "primary": true,
+          "label": "save",
+          "action": {
+            "type": "command",
+            "command": "crms:update_account"
+          }
+        },
+        {
+          "code": "cancel",
+          "label": "cancel"
+        }
+      ]
+    }
+  ],
   "name:zh-CN": "客户表单",
   "name:en": "Account Form",
-  "pageType": "form",
-  "modelCode": "crm_account",
-  "dslSchema": {
-    "id": "form.crm_account",
-    "kind": "Form",
-    "version": "1.0.0",
-    "modelCode": "crm_account",
-    "layout": {
-      "areas": [
-        "main",
-        "footer"
-      ],
-      "areasConfig": {
-        "main": {
-          "type": "grid",
-          "cols": 12,
-          "rowGap": 16,
-          "colGap": 16
-        },
-        "footer": {
-          "type": "flex",
-          "direction": "row"
-        }
-      }
-    },
-    "areas": {
-      "main": {
-        "blocks": [
-          {
-            "id": "basic",
-            "blockType": "form-section",
-            "title": {
-              "zh-CN": "基本信息",
-              "en-US": "Basic Information"
-            },
-            "fields": [
-              {
-                "field": "crm_acc_name",
-                "colSpan": 6
-              },
-              {
-                "field": "crm_acc_industry",
-                "colSpan": 6
-              },
-              {
-                "field": "crm_acc_website",
-                "colSpan": 6
-              },
-              {
-                "field": "crm_acc_phone",
-                "colSpan": 6
-              },
-              {
-                "field": "crm_acc_rating",
-                "colSpan": 6
-              },
-              {
-                "field": "crm_acc_status",
-                "colSpan": 6
-              },
-              {
-                "field": "crm_acc_address",
-                "colSpan": 12
-              },
-              {
-                "field": "crm_acc_remark",
-                "colSpan": 12
-              }
-            ]
-          }
-        ]
-      },
-      "footer": {
-        "blocks": [
-          {
-            "id": "buttons",
-            "blockType": "form-buttons",
-            "buttons": [
-              {
-                "code": "submit",
-                "primary": true,
-                "label": "save",
-                "action": {
-                  "type": "command",
-                  "command": "crms:update_account"
-                }
-              },
-              {
-                "code": "cancel",
-                "label": "cancel"
-              }
-            ]
-          }
-        ]
-      }
-    }
+  "title": {
+    "zh-CN": "客户表单",
+    "en": "Account Form"
   }
 }
