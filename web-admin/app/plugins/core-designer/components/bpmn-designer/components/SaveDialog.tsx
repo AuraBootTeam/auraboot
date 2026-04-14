@@ -148,11 +148,14 @@ export function SaveDialog({ isOpen, onClose, onSave, initialData, isNew }: Save
       onClick={onClose}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="bpmn-save-dialog-title"
         className="mx-4 w-full max-w-lg rounded-lg bg-white p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-6 flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-gray-900">保存流程定义</h2>
+          <h2 id="bpmn-save-dialog-title" className="text-xl font-semibold text-gray-900">保存流程定义</h2>
           <button
             onClick={onClose}
             className="text-gray-400 transition-colors hover:text-gray-600"
