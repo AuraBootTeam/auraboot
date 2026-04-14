@@ -32,7 +32,7 @@ public class GoldenPathPluginTest {
 
     /**
      * Resolve the golden-path directory by walking up from the working directory
-     * until we find the AuraMeta repo root (identified by the presence of
+     * until we find the AuraBoot repo root (identified by the presence of
      * plugins/templates/golden-path).
      */
     private Path goldenPathDir;
