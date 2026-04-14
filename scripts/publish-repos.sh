@@ -126,7 +126,7 @@ sync_public() {
     sync_file "${MONO_ROOT}/plugins/scripts" "${dst}/plugins/scripts"
 
     # Scripts
-    sync_file "${MONO_ROOT}/scripts/reset-and-init.sh" "${dst}/scripts/reset-and-init.sh"
+    sync_file "${MONO_ROOT}/scripts/oss-reset-and-init.sh" "${dst}/scripts/oss-reset-and-init.sh"
     sync_file "${MONO_ROOT}/scripts/reset-db.sh" "${dst}/scripts/reset-db.sh"
 
     # Public docs
