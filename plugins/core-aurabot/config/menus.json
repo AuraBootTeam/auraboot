@@ -115,19 +115,5 @@
     "permissionCode": null,
     "orderNo": 3,
     "visible": true
-  },
-  {
-    "code": "ai_semantic",
-    "parentCode": "ai_settings",
-    "name": "语义配置",
-    "name:zh-CN": "语义配置",
-    "name:en": "Semantic Config",
-    "path": null,
-    "component": null,
-    "icon": "IconBrain",
-    "type": 0,
-    "permissionCode": null,
-    "orderNo": 4,
-    "visible": true
   }
 ]
