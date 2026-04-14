@@ -96,7 +96,12 @@
     "tests/e2e/plugin/pm-smoke.spec.ts",
     "tests/e2e/plugin/pm-task-associations.spec.ts",
     "tests/e2e/plugin/pm-workspace-interactions.spec.ts",
-    "tests/e2e/plugin/pcba-plugin.spec.ts"
+    "tests/e2e/plugin/pcba-plugin.spec.ts",
+    "tests/e2e/designer/designer-unified-architecture.spec.ts",
+    "tests/e2e/designer/designer-lifecycle.spec.ts",
+    "tests/e2e/dashboard/dashboard.spec.ts",
+    "tests/e2e/dashboard/dashboard-interactions.spec.ts",
+    "tests/e2e/dashboard/dashboard-management.spec.ts"
   ],
 
   "excluded_paths_examples": [
