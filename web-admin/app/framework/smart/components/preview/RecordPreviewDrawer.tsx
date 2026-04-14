@@ -140,8 +140,8 @@ export function RecordPreviewDrawer({
   const displayFields = fields || deriveFieldsFromRecord(record);
 
   const detailUrl = detailPageKey
-    ? `/p/${detailPageKey}/${recordId}`
-    : `/p/${modelCode}_detail/${recordId}`;
+    ? `/p/${detailPageKey}/view/${recordId}`
+    : `/p/${modelCode}/view/${recordId}`;
 
   if (!open) return null;
 
