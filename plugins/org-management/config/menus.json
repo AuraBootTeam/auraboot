@@ -10,7 +10,7 @@
     "orderNo": 51,
     "permissionCode": "org.hr.read",
     "pageKey": "org_department_list",
-    "visible": false,
+    "visible": true,
     "extension": {
       "platforms": [
         "web"
