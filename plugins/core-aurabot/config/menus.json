@@ -1,0 +1,133 @@
+[
+  {
+    "code": "ai_center",
+    "parentCode": null,
+    "name": "AI 中心",
+    "name:zh-CN": "AI 中心",
+    "name:en": "AI Center",
+    "path": null,
+    "component": null,
+    "icon": "brain",
+    "type": 0,
+    "permissionCode": "ai_center",
+    "orderNo": 800,
+    "visible": true,
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    }
+  },
+  {
+    "code": "ai_dashboard",
+    "parentCode": "ai_center",
+    "name": "驾驶舱",
+    "name:zh-CN": "驾驶舱",
+    "name:en": "Dashboard",
+    "path": "/aurabot/dashboard",
+    "component": null,
+    "icon": "dashboard",
+    "type": 1,
+    "permissionCode": null,
+    "orderNo": 1,
+    "visible": true
+  },
+  {
+    "code": "ai_colleagues",
+    "parentCode": "ai_center",
+    "name": "AI 同事",
+    "name:zh-CN": "AI 同事",
+    "name:en": "AI Colleagues",
+    "path": "/ai/colleagues",
+    "component": null,
+    "icon": "IconUsers",
+    "type": 1,
+    "permissionCode": null,
+    "orderNo": 5,
+    "visible": true
+  },
+  {
+    "code": "ai_knowledge",
+    "parentCode": "ai_center",
+    "name": "知识库",
+    "name:zh-CN": "知识库",
+    "name:en": "Knowledge Base",
+    "path": "/aurabot/knowledge",
+    "component": null,
+    "icon": "book-open",
+    "type": 1,
+    "permissionCode": null,
+    "orderNo": 10,
+    "visible": true
+  },
+  {
+    "code": "ai_logs",
+    "parentCode": "ai_center",
+    "name": "运行日志",
+    "name:zh-CN": "运行日志",
+    "name:en": "Run Logs",
+    "path": "/aurabot/runs",
+    "component": null,
+    "icon": "IconPlayerPlay",
+    "type": 1,
+    "permissionCode": null,
+    "orderNo": 20,
+    "visible": true
+  },
+  {
+    "code": "ai_settings",
+    "parentCode": "ai_center",
+    "name": "设置",
+    "name:zh-CN": "设置",
+    "name:en": "Settings",
+    "path": null,
+    "component": null,
+    "icon": "tool",
+    "type": 0,
+    "permissionCode": null,
+    "orderNo": 90,
+    "visible": true
+  },
+  {
+    "code": "ai_llm_providers",
+    "parentCode": "ai_settings",
+    "name": "LLM 供应商",
+    "name:zh-CN": "LLM 供应商",
+    "name:en": "LLM Providers",
+    "path": "/aurabot/providers",
+    "component": null,
+    "icon": "cloud",
+    "type": 1,
+    "permissionCode": null,
+    "orderNo": 1,
+    "visible": true
+  },
+  {
+    "code": "ai_prompts",
+    "parentCode": "ai_settings",
+    "name": "Prompt 模板",
+    "name:zh-CN": "Prompt 模板",
+    "name:en": "Prompt Templates",
+    "path": "/aurabot/prompts",
+    "component": null,
+    "icon": "file-text",
+    "type": 1,
+    "permissionCode": null,
+    "orderNo": 3,
+    "visible": true
+  },
+  {
+    "code": "ai_semantic",
+    "parentCode": "ai_settings",
+    "name": "语义配置",
+    "name:zh-CN": "语义配置",
+    "name:en": "Semantic Config",
+    "path": null,
+    "component": null,
+    "icon": "IconBrain",
+    "type": 0,
+    "permissionCode": null,
+    "orderNo": 4,
+    "visible": true
+  }
+]

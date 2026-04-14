@@ -1,0 +1,124 @@
+[
+  {
+    "code": "meta_management",
+    "parentCode": null,
+    "name": "元数据管理",
+    "name:zh-CN": "元数据管理",
+    "name:en": "Metadata Management",
+    "path": "/meta",
+    "component": null,
+    "icon": "database",
+    "type": 0,
+    "permissionCode": "meta_management",
+    "orderNo": 10,
+    "visible": true,
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    }
+  },
+  {
+    "code": "model_management",
+    "parentCode": "meta_management",
+    "name": "模型管理",
+    "name:zh-CN": "模型管理",
+    "name:en": "Model Management",
+    "path": "/meta/models",
+    "component": null,
+    "icon": "table",
+    "type": 1,
+    "permissionCode": "model_management",
+    "orderNo": 11,
+    "visible": true
+  },
+  {
+    "code": "field_management",
+    "parentCode": "meta_management",
+    "name": "字段库",
+    "name:zh-CN": "字段库",
+    "name:en": "Field Library",
+    "path": "/meta/fields",
+    "component": null,
+    "icon": "field",
+    "type": 1,
+    "permissionCode": "field_management",
+    "orderNo": 12,
+    "visible": true
+  },
+  {
+    "code": "dict_management",
+    "parentCode": "meta_management",
+    "name": "字典管理",
+    "name:zh-CN": "字典管理",
+    "name:en": "Dictionary Management",
+    "path": "/meta/dict",
+    "component": null,
+    "icon": "book",
+    "type": 1,
+    "permissionCode": "dict_management",
+    "orderNo": 13,
+    "visible": true
+  },
+  {
+    "code": "named_query_management",
+    "parentCode": "meta_management",
+    "name": "命名查询",
+    "name:zh-CN": "命名查询",
+    "name:en": "Named Queries",
+    "path": "/meta/named-queries",
+    "component": null,
+    "icon": "search",
+    "type": 1,
+    "permissionCode": "named_query_management",
+    "orderNo": 15,
+    "visible": true
+  },
+  {
+    "code": "dashboards",
+    "parentCode": null,
+    "name": "仪表盘",
+    "name:zh-CN": "仪表盘",
+    "name:en": "Dashboards",
+    "path": "/dashboards",
+    "component": null,
+    "icon": "dashboard",
+    "type": 0,
+    "permissionCode": "dashboards",
+    "orderNo": 5,
+    "visible": true,
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    }
+  },
+  {
+    "code": "dashboard_mgmt",
+    "parentCode": "meta_management",
+    "name": "仪表盘管理",
+    "name:zh-CN": "仪表盘管理",
+    "name:en": "Dashboard Management",
+    "path": "/p/dashboard_management",
+    "component": null,
+    "icon": "bar-chart",
+    "type": 1,
+    "permissionCode": "dashboard_mgmt",
+    "orderNo": 17,
+    "visible": true
+  },
+  {
+    "code": "query_builder_menu",
+    "parentCode": "meta_management",
+    "name": "查询构建器",
+    "name:zh-CN": "查询构建器",
+    "name:en": "Query Builder",
+    "path": "/query-builder",
+    "component": null,
+    "icon": "search",
+    "type": 1,
+    "permissionCode": "query_builder",
+    "orderNo": 18,
+    "visible": true
+  }
+]

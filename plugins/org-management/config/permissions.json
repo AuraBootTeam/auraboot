@@ -14,5 +14,45 @@
     "description": "Create, edit, delete departments, positions, employees",
     "resourceType": "operation",
     "module": "organization"
+  },
+  {
+    "code": "org_management",
+    "name": "Organization Management",
+    "description": "Access organization management module",
+    "type": "menu",
+    "module": "org",
+    "resource": "/organization",
+    "action": "view",
+    "resourceType": "menu"
+  },
+  {
+    "code": "permission_management",
+    "name": "权限管理",
+    "description": "管理角色和权限配置",
+    "type": "menu",
+    "module": "rbac",
+    "resource": "/enterprise/permissions",
+    "action": "manage",
+    "resourceType": "menu"
+  },
+  {
+    "code": "org_teams",
+    "name": "Team Management",
+    "description": "Manage teams (platform table)",
+    "type": "menu",
+    "module": "org",
+    "resource": "/organization/teams",
+    "action": "manage",
+    "resourceType": "menu"
+  },
+  {
+    "code": "member_management",
+    "name": "成员管理",
+    "description": "管理租户成员和用户",
+    "type": "menu",
+    "module": "tenant",
+    "resource": "/enterprise/members",
+    "action": "manage",
+    "resourceType": "menu"
   }
 ]

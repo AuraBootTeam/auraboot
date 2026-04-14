@@ -148,5 +148,160 @@
         "web"
       ]
     }
+  },
+  {
+    "code": "system_management",
+    "parentCode": null,
+    "name": "系统管理",
+    "name:zh-CN": "系统管理",
+    "name:en": "System Management",
+    "path": "/system",
+    "component": null,
+    "icon": "tool",
+    "type": 0,
+    "permissionCode": "system_management",
+    "orderNo": 950,
+    "visible": true,
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    }
+  },
+  {
+    "code": "audit_log_view",
+    "parentCode": "system_management",
+    "name": "审计日志",
+    "name:zh-CN": "审计日志",
+    "name:en": "Audit Logs",
+    "path": "/audit-logs",
+    "component": null,
+    "icon": "file-search",
+    "type": 1,
+    "permissionCode": "audit_log_view",
+    "orderNo": 83,
+    "visible": true
+  },
+  {
+    "code": "automation_menu",
+    "parentCode": "system_management",
+    "name": "自动化",
+    "name:zh-CN": "自动化",
+    "name:en": "Automation",
+    "path": "/automations",
+    "component": null,
+    "icon": "thunderbolt",
+    "type": 1,
+    "permissionCode": "automation.automation.read",
+    "orderNo": 87,
+    "visible": true
+  },
+  {
+    "code": "notification_rule_menu",
+    "parentCode": "system_management",
+    "name": "通知规则",
+    "name:zh-CN": "通知规则",
+    "name:en": "Notification Rules",
+    "path": "/notification-rules",
+    "component": null,
+    "icon": "bell",
+    "type": 1,
+    "permissionCode": "notification_rule_manage",
+    "orderNo": 88,
+    "visible": true
+  },
+  {
+    "code": "infrastructure_status",
+    "parentCode": "system_management",
+    "name": "基础设施",
+    "name:zh-CN": "基础设施",
+    "name:en": "Infrastructure",
+    "path": "/admin/infrastructure",
+    "component": null,
+    "icon": "server",
+    "type": 1,
+    "permissionCode": "system_management",
+    "orderNo": 85,
+    "visible": true
+  },
+  {
+    "code": "cloud_config_manage",
+    "parentCode": "system_management",
+    "name": "云服务配置",
+    "name:zh-CN": "云服务配置",
+    "name:en": "Cloud Configuration",
+    "path": "/admin/cloud-config",
+    "component": null,
+    "icon": "cloud",
+    "type": 1,
+    "permissionCode": "cloud_config_manage",
+    "orderNo": 88,
+    "visible": true
+  },
+  {
+    "code": "login_channel_manage",
+    "parentCode": "system_management",
+    "name": "登录渠道",
+    "name:zh-CN": "登录渠道",
+    "name:en": "Login Channels",
+    "path": "/admin/login-channels",
+    "component": null,
+    "icon": "login",
+    "type": 1,
+    "permissionCode": "login_channel_manage",
+    "orderNo": 89,
+    "visible": true
+  },
+  {
+    "code": "system_preferences",
+    "parentCode": "system_management",
+    "name": "系统偏好",
+    "name:zh-CN": "系统偏好",
+    "name:en": "System Preferences",
+    "path": "/settings/system-preferences",
+    "component": null,
+    "icon": "setting",
+    "type": 1,
+    "permissionCode": null,
+    "orderNo": 90,
+    "visible": true
+  },
+  {
+    "code": "i18n_coverage",
+    "parentCode": "system_management",
+    "name": "翻译覆盖率",
+    "name:zh-CN": "翻译覆盖率",
+    "name:en": "Translation Coverage",
+    "path": "/settings/i18n-coverage",
+    "component": null,
+    "icon": "global",
+    "type": 1,
+    "permissionCode": null,
+    "orderNo": 91,
+    "visible": true,
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    }
+  },
+  {
+    "code": "i18n_workflow",
+    "parentCode": "system_management",
+    "name": "翻译工作流",
+    "name:zh-CN": "翻译工作流",
+    "name:en": "Translation Workflow",
+    "path": "/settings/i18n-workflow",
+    "component": null,
+    "icon": "translation",
+    "type": 1,
+    "permissionCode": null,
+    "orderNo": 92,
+    "visible": true,
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    }
   }
 ]
