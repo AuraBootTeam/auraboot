@@ -10,21 +10,29 @@
 import { test, expect } from '../../fixtures';
 import type { Page } from '../../fixtures';
 
-/** Navigate to Marketplace via sidebar menu */
+/**
+ * Navigate to the Plugin Management page (discovery tab) via sidebar menu.
+ *
+ * The former /marketplace page is now the "discovery" tab on /plugins.
+ */
 async function navigateToMarketplace(page: Page) {
   await page.goto('/dashboards', { waitUntil: 'load' });
 
-  // Expand "系统管理" parent menu first
   const nav = page.locator('nav');
   const sysBtn = nav.getByRole('button', { name: /系统管理|System/ });
   await sysBtn.first().waitFor({ state: 'visible', timeout: 10000 });
   await sysBtn.first().evaluate((el: HTMLElement) => el.click());
 
-  const menuLink = page.locator('a[href="/marketplace"]');
+  const menuLink = page.locator('a[href^="/plugins"]');
   await menuLink.first().waitFor({ state: 'visible', timeout: 10000 });
   await menuLink.first().evaluate((el) => (el as HTMLAnchorElement).click());
 
-  await expect(page).toHaveURL(/\/marketplace/, { timeout: 10000 });
+  await expect(page).toHaveURL(/\/plugins/, { timeout: 10000 });
+
+  const discoveryTab = page.getByRole('tab', { name: /Discovery|发现/ });
+  await discoveryTab.first().waitFor({ state: 'visible', timeout: 10000 });
+  await discoveryTab.first().click();
+  await expect(page).toHaveURL(/tab=discovery/, { timeout: 10000 });
 }
 
 test.describe('Marketplace Upgrade Tests', () => {
@@ -113,7 +121,7 @@ test.describe('Marketplace Upgrade Tests', () => {
     await page.waitForLoadState('domcontentloaded');
 
     // Should show back link
-    await expect(page.locator('text=/Back to Marketplace|返回市场/')).toBeVisible();
+    await expect(page.locator('text=/Back to (Marketplace|Plugins)|返回(市场|插件)/')).toBeVisible();
 
     // Should show version info in the header area
     const versionTag = page.locator('span').filter({ hasText: /v\d+\.\d+/ }).first();
@@ -146,7 +154,7 @@ test.describe('Marketplace Upgrade Tests', () => {
       await expect(firstCard).toBeVisible({ timeout: 10000 });
       await firstCard.click();
       await page.waitForLoadState('domcontentloaded');
-      await expect(page.locator('text=/Back to Marketplace|返回市场/')).toBeVisible();
+      await expect(page.locator('text=/Back to (Marketplace|Plugins)|返回(市场|插件)/')).toBeVisible();
     }
   });
 

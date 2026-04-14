@@ -140,8 +140,9 @@ test.describe('Showcase Smoke Tests', () => {
     await expect(page.locator('body')).not.toContainText('Page not found');
   });
 
-  test('Marketplace has plugins', async ({ page }) => {
-    await page.goto('/marketplace');
+  test('Plugin management page has plugins', async ({ page }) => {
+    // /marketplace + /system/plugins merged into /plugins (Tabs)
+    await page.goto('/plugins?tab=discovery');
     await page.waitForLoadState('domcontentloaded');
     await page.waitForLoadState('networkidle').catch(() => null);
 
