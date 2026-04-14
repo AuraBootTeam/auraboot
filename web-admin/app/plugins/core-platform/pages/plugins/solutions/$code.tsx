@@ -1,3 +1,11 @@
+/**
+ * Solution detail page (/plugins/solutions/:code).
+ *
+ * Restored from the previously-removed /marketplace/solutions/:code route.
+ * "Back" now returns to /plugins?tab=solutions instead of the old
+ * /marketplace/solutions listing.
+ */
+
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { useToastContext } from '~/contexts/ToastContext';
@@ -98,7 +106,7 @@ export default function SolutionDetailPage() {
         setLoading(false);
       }
     })();
-  }, [code]);
+  }, [code, showErrorToast]);
 
   const handleInstall = async () => {
     if (!detail) return;
@@ -118,7 +126,6 @@ export default function SolutionDetailPage() {
         showSuccessToast(
           locale === 'zh-CN' ? '解决方案安装成功' : 'Solution installed successfully',
         );
-        // Refresh detail
         const detailRes = await fetch(
           `/api/marketplace/solutions/${encodeURIComponent(detail.code)}`,
         );
@@ -191,13 +198,14 @@ export default function SolutionDetailPage() {
       : detail.descriptionEn || detail.description;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50" data-testid="solution-detail-page">
       {/* Top bar */}
       <div className="border-b border-gray-200 bg-white px-6 py-4">
         <div className="mx-auto max-w-5xl">
           <button
-            onClick={() => navigate('/marketplace/solutions')}
+            onClick={() => navigate('/plugins?tab=solutions')}
             className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
+            data-testid="solution-detail-back"
           >
             <ArrowLeftIcon className="h-4 w-4" />
             {locale === 'zh-CN' ? '返回解决方案' : 'Back to Solutions'}
@@ -208,7 +216,6 @@ export default function SolutionDetailPage() {
       <div className="mx-auto max-w-5xl px-6 py-8">
         {/* Solution Header */}
         <div className="mb-6 overflow-hidden rounded-lg border border-gray-200 bg-white">
-          {/* Cover Banner */}
           <div className="relative h-40 bg-gradient-to-br from-indigo-600 to-purple-700">
             {detail.coverImageUrl && (
               <img src={detail.coverImageUrl} alt="" className="h-full w-full object-cover" />
@@ -253,7 +260,6 @@ export default function SolutionDetailPage() {
                 </div>
               </div>
 
-              {/* Install / Uninstall */}
               <div className="ml-6 flex flex-shrink-0 flex-col items-end gap-2">
                 {detail.installed ? (
                   <>
@@ -298,7 +304,6 @@ export default function SolutionDetailPage() {
           </div>
         </div>
 
-        {/* Install Result */}
         {installResult && (
           <div
             className={`mb-6 rounded-lg border p-4 ${installResult.success ? 'border-green-200 bg-green-50' : 'border-orange-200 bg-orange-50'}`}
@@ -381,7 +386,6 @@ export default function SolutionDetailPage() {
           </div>
         </div>
 
-        {/* Screenshots */}
         {detail.screenshots && detail.screenshots.length > 0 && (
           <div className="mb-6 rounded-lg border border-gray-200 bg-white p-6">
             <h2 className="mb-3 text-lg font-semibold text-gray-900">
@@ -401,7 +405,6 @@ export default function SolutionDetailPage() {
           </div>
         )}
 
-        {/* Description / README */}
         {detail.readmeMarkdown && (
           <div className="mb-6 rounded-lg border border-gray-200 bg-white p-6">
             <h2 className="mb-3 text-lg font-semibold text-gray-900">
@@ -413,7 +416,6 @@ export default function SolutionDetailPage() {
           </div>
         )}
 
-        {/* Tags */}
         {detail.tags && detail.tags.length > 0 && (
           <div className="mb-6 rounded-lg border border-gray-200 bg-white p-6">
             <h2 className="mb-3 text-lg font-semibold text-gray-900">Tags</h2>
@@ -430,7 +432,6 @@ export default function SolutionDetailPage() {
           </div>
         )}
 
-        {/* Reviews */}
         <ReviewSection targetType="marketplace_solution" targetId={detail.pid} />
       </div>
     </div>

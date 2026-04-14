@@ -1,7 +1,7 @@
 /**
  * Kernel Plugin Manager — view all plugins registered with the in-process
- * PluginLoader (the M2 kernel runtime). Distinct from the legacy
- * /system/plugins page which manages backend PF4J plugins (JAR uploads).
+ * PluginLoader (the M2 kernel runtime). Distinct from the unified
+ * /plugins page which manages backend PF4J plugins (JAR uploads).
  *
  * Read-only first cut; enable/disable actions follow once PluginLoader
  * exposes a disable() method (currently only install/enable/activate).
@@ -71,7 +71,7 @@ export default function KernelPluginsPage() {
         <h1 className="text-2xl font-semibold text-gray-900">Kernel Plugin Manager</h1>
         <p className="mt-1 text-sm text-gray-600">
           Plugins registered with the in-process PluginLoader. For backend (PF4J) plugin
-          management, see <a href="/system/plugins" className="text-blue-600 hover:underline">/system/plugins</a>.
+          management, see <a href="/plugins" className="text-blue-600 hover:underline">/plugins</a>.
         </p>
       </header>
 
