@@ -1,0 +1,506 @@
+[
+  {
+    "modelCode": "e2et_order",
+    "fieldCode": "e2et_order_no",
+    "sequence": 1,
+    "required": false,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "e2et_order",
+    "fieldCode": "e2et_order_title",
+    "sequence": 2,
+    "required": true,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "e2et_order",
+    "fieldCode": "e2et_order_desc",
+    "sequence": 3,
+    "required": false,
+    "visible": false,
+    "editable": true,
+    "displayConfig": {
+      "searchable": false,
+      "sortable": false
+    }
+  },
+  {
+    "modelCode": "e2et_order",
+    "fieldCode": "e2et_order_amount",
+    "sequence": 4,
+    "required": false,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "searchable": false,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "e2et_order",
+    "fieldCode": "e2et_order_qty",
+    "sequence": 5,
+    "required": false,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "searchable": false,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "e2et_order",
+    "fieldCode": "e2et_order_date",
+    "sequence": 6,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": false,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "e2et_order",
+    "fieldCode": "e2et_order_urgent",
+    "sequence": 7,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": false,
+      "sortable": false
+    }
+  },
+  {
+    "modelCode": "e2et_order",
+    "fieldCode": "e2et_order_type",
+    "sequence": 8,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "e2et_order",
+    "fieldCode": "e2et_order_status",
+    "sequence": 9,
+    "required": true,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "e2et_order",
+    "fieldCode": "e2et_order_customer",
+    "sequence": 10,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true,
+      "sortable": false
+    }
+  },
+  {
+    "modelCode": "e2et_order",
+    "fieldCode": "e2et_order_remark",
+    "sequence": 11,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": false,
+      "sortable": false
+    }
+  },
+  {
+    "modelCode": "e2et_order",
+    "fieldCode": "e2et_order_discount",
+    "sequence": 12,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": false,
+      "sortable": false
+    }
+  },
+  {
+    "modelCode": "e2et_order",
+    "fieldCode": "e2et_delivery_date",
+    "sequence": 13,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": false,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "e2et_order_item",
+    "fieldCode": "e2et_order_id",
+    "sequence": 1,
+    "required": true,
+    "visible": false,
+    "editable": false,
+    "displayConfig": {
+      "searchable": false,
+      "sortable": false
+    }
+  },
+  {
+    "modelCode": "e2et_order_item",
+    "fieldCode": "e2et_item_name",
+    "sequence": 2,
+    "required": true,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "e2et_order_item",
+    "fieldCode": "e2et_item_spec",
+    "sequence": 3,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "e2et_order_item",
+    "fieldCode": "e2et_item_qty",
+    "sequence": 4,
+    "required": true,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": false,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "e2et_order_item",
+    "fieldCode": "e2et_item_price",
+    "sequence": 5,
+    "required": true,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": false,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "e2et_order_item",
+    "fieldCode": "e2et_item_subtotal",
+    "sequence": 6,
+    "required": false,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "searchable": false,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "e2et_order_log",
+    "fieldCode": "e2et_log_order_id",
+    "sequence": 1,
+    "required": true,
+    "visible": false,
+    "editable": false,
+    "displayConfig": {
+      "searchable": false,
+      "sortable": false
+    }
+  },
+  {
+    "modelCode": "e2et_order_log",
+    "fieldCode": "e2et_log_action",
+    "sequence": 2,
+    "required": true,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "e2et_order_log",
+    "fieldCode": "e2et_log_operator",
+    "sequence": 3,
+    "required": false,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "searchable": true,
+      "sortable": false
+    }
+  },
+  {
+    "modelCode": "e2et_order_log",
+    "fieldCode": "e2et_log_time",
+    "sequence": 4,
+    "required": false,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "searchable": false,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "e2et_order_log",
+    "fieldCode": "e2et_log_remark",
+    "sequence": 5,
+    "required": false,
+    "visible": false,
+    "editable": true,
+    "displayConfig": {
+      "searchable": false,
+      "sortable": false
+    }
+  },
+  {
+    "modelCode": "e2et_customer",
+    "fieldCode": "e2et_cust_code",
+    "sequence": 1,
+    "required": true,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "e2et_customer",
+    "fieldCode": "e2et_cust_name",
+    "sequence": 2,
+    "required": true,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "e2et_customer",
+    "fieldCode": "e2et_cust_region",
+    "sequence": 3,
+    "required": true,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "e2et_customer",
+    "fieldCode": "e2et_cust_contact",
+    "sequence": 4,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": false,
+      "sortable": false
+    }
+  },
+  {
+    "modelCode": "e2et_customer",
+    "fieldCode": "e2et_cust_email",
+    "sequence": 5,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": false,
+      "sortable": false
+    }
+  },
+  {
+    "modelCode": "e2et_customer",
+    "fieldCode": "e2et_cust_active",
+    "sequence": 6,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true,
+      "sortable": false
+    }
+  },
+  {
+    "modelCode": "e2et_payment",
+    "fieldCode": "e2et_pay_no",
+    "sequence": 1,
+    "required": false,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "e2et_payment",
+    "fieldCode": "e2et_pay_order_id",
+    "sequence": 2,
+    "required": true,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true,
+      "sortable": false
+    }
+  },
+  {
+    "modelCode": "e2et_payment",
+    "fieldCode": "e2et_pay_amount",
+    "sequence": 3,
+    "required": true,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": false,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "e2et_payment",
+    "fieldCode": "e2et_pay_method",
+    "sequence": 4,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "e2et_payment",
+    "fieldCode": "e2et_pay_status",
+    "sequence": 5,
+    "required": true,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "e2et_payment",
+    "fieldCode": "e2et_pay_date",
+    "sequence": 6,
+    "required": false,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "searchable": false,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "e2et_payment",
+    "fieldCode": "e2et_pay_approver",
+    "sequence": 7,
+    "required": false,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "searchable": false,
+      "sortable": false
+    }
+  },
+  {
+    "modelCode": "e2et_payment",
+    "fieldCode": "e2et_pay_remark",
+    "sequence": 8,
+    "required": false,
+    "visible": false,
+    "editable": true,
+    "displayConfig": {
+      "searchable": false,
+      "sortable": false
+    }
+  },
+  {
+    "modelCode": "e2et_record",
+    "fieldCode": "e2et_name",
+    "sequence": 1,
+    "required": true,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "e2et_record",
+    "fieldCode": "e2et_status",
+    "sequence": 2,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "e2et_record",
+    "fieldCode": "e2et_count",
+    "sequence": 3,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": false,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "e2et_record",
+    "fieldCode": "e2et_due_date",
+    "sequence": 4,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": false,
+      "sortable": true
+    }
+  }
+]

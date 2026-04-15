@@ -1,0 +1,35 @@
+{
+  "pluginId": "com.auraboot.test-fixtures",
+  "internal": true,
+  "namespace": "e2eto",
+  "version": "2.0.0",
+  "dslVersion": 1,
+  "pluginType": "config",
+  "displayName": "Test Fixtures",
+  "displayName:zh-CN": "测试夹具",
+  "displayName:en": "Test Fixtures",
+  "description": "Internal test-fixture plugin providing e2et_order / e2et_customer / e2et_payment schemas consumed by the E2E test suite. NOT intended for production or demo import; excluded from public distribution and default bootstrap flows. Imported only when AURA_ENV=test or IMPORT_TEST_FIXTURES=true.",
+  "author": "AuraBoot",
+  "minPlatformVersion": "1.0.0",
+  "dependencies": [],
+  "resourceDirs": {
+    "dicts": "config/dicts.json",
+    "fields": "config/fields.json",
+    "models": "config/models.json",
+    "modelFieldBindings": "config/bindings.json",
+    "commands": "config/commands.json",
+    "permissions": "config/permissions.json",
+    "menus": "config/menus.json",
+    "pages": "config/pages.json",
+    "i18n": "config/i18n.json",
+    "processes": "config/processes.json",
+    "roles": "config/roles.json"
+  },
+  "importOptions": {
+    "conflictStrategy": "overwrite",
+    "validateReferences": true,
+    "autoDeployProcesses": true,
+    "autoPublishPages": true,
+    "createResourcePermissions": true
+  }
+}

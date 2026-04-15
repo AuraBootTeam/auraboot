@@ -523,6 +523,15 @@ export AURA_TOKEN="$LOGIN_JWT"
 
 # Import in dependency order: base plugins first, then dependent ones
 PLUGINS_TO_IMPORT=(core-meta core-bpm core-aurabot page-manager platform-admin org-management crm-starter showcase agent-control-plane acp-showcase)
+
+# test-fixtures is an internal-only plugin that provides e2et_order/e2et_customer/
+# e2et_payment schemas for the E2E test suite. It is excluded from demo flows and
+# public distribution; import it only when explicitly running tests.
+if [ "${AURA_ENV:-demo}" = "test" ] || [ "${IMPORT_TEST_FIXTURES:-false}" = "true" ]; then
+    echo "   Including test-fixtures (AURA_ENV=test or IMPORT_TEST_FIXTURES=true)"
+    PLUGINS_TO_IMPORT+=(test-fixtures)
+fi
+
 for plugin in "${PLUGINS_TO_IMPORT[@]}"; do
     if [ -d "plugins/$plugin" ]; then
         echo -n "   Importing $plugin... "
