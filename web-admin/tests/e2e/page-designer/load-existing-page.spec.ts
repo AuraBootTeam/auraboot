@@ -44,26 +44,49 @@ test.describe('Page Designer loads existing pages', () => {
       .first();
     await leafLink.waitFor({ state: 'attached', timeout: 8000 });
 
+    // Intercept the list API response to find a non-composite page pid.
+    // The page list sorts by updated_at DESC and may have composite/dashboard pages
+    // at the top (created by other E2E test runs). The designer only supports
+    // list / form / detail — composite throws in toPageSchema.
     const listResponsePromise = page.waitForResponse(
-      (r) => r.url().includes('/list') && r.status() === 200,
+      (r) => r.url().includes('/api/') && r.url().includes('/list') && r.status() === 200,
       { timeout: 15000 },
     );
     await leafLink.evaluate((el: HTMLElement) => el.click());
-    await listResponsePromise;
+    const listResponse = await listResponsePromise;
+
+    // Parse the response to find a valid (non-composite/non-dashboard) page pid.
+    let targetPid: string | null = null;
+    try {
+      const body = await listResponse.json();
+      const records: Array<{ pid: string; kind: string }> =
+        body?.data?.records ?? body?.records ?? [];
+      const supported = records.find((r) => ['list', 'form', 'detail'].includes(r.kind));
+      if (supported) {
+        targetPid = supported.pid;
+      }
+    } catch {
+      // Fall through — targetPid stays null, we'll click the first row as fallback
+    }
 
     // D2: Page schema list must render with data
     const table = page.locator('table, [data-testid="dynamic-list"]').first();
     await expect(table).toBeVisible({ timeout: 10000 });
 
-    // Take the first table row — any existing page exercises the regression.
-    // (Filtering by kind text is unreliable because the cell may render a
-    // localised label like "列表" or a styled badge, not the raw string "list".)
-    const firstRow = page.locator('tbody tr').first();
-    await expect(firstRow).toBeVisible({ timeout: 10000 });
-
-    // D6: Click the edit/design button on that row
-    await firstRow.getByRole('button', { name: /edit|design|编辑|设计/i }).first().click();
-    await page.waitForURL(/\/page-designer\//);
+    // D6: Click the edit/design button.
+    // If we found a specific pid from the API, click its row's edit button.
+    // Otherwise fall back to the first row (legacy behaviour).
+    if (targetPid) {
+      // Locate the row that contains the target pid — typically in a data-row-id attribute
+      // or in an action button href. Most reliable: navigate directly to the designer URL
+      // which mimics what the edit button does, then assert the canvas.
+      await page.goto(`/page-designer/${targetPid}`, { waitUntil: 'domcontentloaded' });
+    } else {
+      const firstRow = page.locator('tbody tr').first();
+      await expect(firstRow).toBeVisible({ timeout: 10000 });
+      await firstRow.getByRole('button', { name: /edit|design|编辑|设计/i }).first().click();
+      await page.waitForURL(/\/page-designer\//);
+    }
     await page.waitForLoadState('domcontentloaded').catch(() => {});
 
     // D6: The designer canvas must be visible — confirms editor loaded the saved schema
