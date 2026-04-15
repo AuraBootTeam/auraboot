@@ -148,7 +148,7 @@ class JsonToBpmnConverterTest {
                   ],
                   "edges": [
                     {"id": "e1", "source": "start", "target": "gw", "data": {}},
-                    {"id": "e2", "source": "gw", "target": "end", "data": {}}
+                    {"id": "e2", "source": "gw", "target": "end", "data": {"condition": {"type": "expression", "content": "true"}}}
                   ]
                 }
                 """;
@@ -176,7 +176,7 @@ class JsonToBpmnConverterTest {
                   "edges": [
                     {"id": "e1", "source": "start", "target": "gw", "data": {}},
                     {"id": "e2", "source": "gw", "target": "task1", "data": {"label": "Approved", "condition": {"type": "expression", "content": "approved == true"}}},
-                    {"id": "e3", "source": "gw", "target": "end", "data": {"label": "Rejected"}},
+                    {"id": "e3", "source": "gw", "target": "end", "data": {"label": "Rejected", "condition": {"type": "expression", "content": "approved != true"}}},
                     {"id": "e4", "source": "task1", "target": "end", "data": {}}
                   ]
                 }
@@ -205,7 +205,7 @@ class JsonToBpmnConverterTest {
                   "edges": [
                     {"id": "e1", "source": "start", "target": "gw", "data": {}},
                     {"id": "e2", "source": "gw", "target": "task1", "data": {"condition": {"type": "expression", "content": "x > 10"}}},
-                    {"id": "e3", "source": "gw", "target": "end", "data": {"isDefault": true}},
+                    {"id": "e3", "source": "gw", "target": "end", "data": {"isDefault": true, "condition": {"type": "expression", "content": "true"}}},
                     {"id": "e4", "source": "task1", "target": "end", "data": {}}
                   ]
                 }
@@ -233,7 +233,7 @@ class JsonToBpmnConverterTest {
                   "edges": [
                     {"id": "e1", "source": "start", "target": "gw", "data": {}},
                     {"id": "e2", "source": "gw", "target": "end1", "data": {"condition": {"type": "expression", "content": "x > 0"}}},
-                    {"id": "e3", "source": "gw", "target": "end2", "data": {"isDefault": true}}
+                    {"id": "e3", "source": "gw", "target": "end2", "data": {"isDefault": true, "condition": {"type": "expression", "content": "true"}}}
                   ]
                 }
                 """;
@@ -648,7 +648,7 @@ class JsonToBpmnConverterTest {
                   "edges": [
                     {"id": "e1", "source": "start", "target": "gw", "data": {}},
                     {"id": "e2", "source": "gw", "target": "end1", "data": {"label": "Yes", "condition": {"type": "expression", "content": "approved == true"}}},
-                    {"id": "e3", "source": "gw", "target": "end2", "data": {"label": "No"}}
+                    {"id": "e3", "source": "gw", "target": "end2", "data": {"label": "No", "condition": {"type": "expression", "content": "approved != true"}}}
                   ]
                 }
                 """;
@@ -1055,7 +1055,7 @@ class JsonToBpmnConverterTest {
                 {"id": "edge_1", "source": "node_1", "target": "node_2", "data": {}},
                 {"id": "edge_2", "source": "node_2", "target": "node_3", "data": {}},
                 {"id": "edge_3", "source": "node_3", "target": "node_4", "data": {"label": "Approved", "condition": {"type": "expression", "content": "approved == true"}}},
-                {"id": "edge_4", "source": "node_3", "target": "node_5", "data": {"label": "Rejected", "isDefault": true}},
+                {"id": "edge_4", "source": "node_3", "target": "node_5", "data": {"label": "Rejected", "isDefault": true, "condition": {"type": "expression", "content": "true"}}},
                 {"id": "edge_5", "source": "node_4", "target": "node_5", "data": {}}
               ]
             }
