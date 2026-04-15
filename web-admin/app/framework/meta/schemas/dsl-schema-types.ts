@@ -229,7 +229,7 @@ export interface RuleOverride extends CrossFieldRule {
 // ---------------------------------------------------------------------------
 
 export interface DslSchema {
-  kind: 'page' | 'list' | 'form' | 'detail' | 'page_layout' | 'dashboard';
+  kind: 'page' | 'list' | 'form' | 'detail' | 'page_layout';
   version: string;
   schemaVersion?: number;
   id: string;

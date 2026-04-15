@@ -29,7 +29,7 @@ export interface DynamicPageRendererProps {
   /** Model table name (e.g., "device", "pe-order") */
   tableName: string;
   /** Page kind — must match ab_page_schema.kind values */
-  pageType: 'list' | 'form' | 'detail' | 'dashboard' | 'kanban' | 'composite';
+  pageType: 'list' | 'form' | 'detail' | 'kanban' | 'composite';
   /** Profile name override (default resolves from schema.profile or "admin") */
   profileName?: string;
   /** Record ID for edit/detail modes */
@@ -49,7 +49,7 @@ export function DynamicPageRenderer({
   pageKey,
 }: DynamicPageRendererProps) {
   // 1. Validate pageType matches DB kind values
-  const VALID_KINDS = ['list', 'form', 'detail', 'dashboard', 'kanban', 'composite'] as const;
+  const VALID_KINDS = ['list', 'form', 'detail', 'kanban', 'composite'] as const;
   if (!VALID_KINDS.includes(pageType)) {
     return (
       <ErrorAlert
