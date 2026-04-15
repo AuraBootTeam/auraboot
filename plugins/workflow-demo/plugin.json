@@ -20,7 +20,6 @@
     {"type": "model", "code": "wd_leave_balance"},
     {"type": "command", "code": "wd:create_leave_request"},
     {"type": "command", "code": "wd:submit_leave_request"},
-    {"type": "command", "code": "wd:execute_deduct_balance"},
     {"type": "process", "code": "wd_leave_approval"}
   ],
   "requires": [],
