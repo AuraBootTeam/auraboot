@@ -1,0 +1,54 @@
+[
+  { "key": "plugin.workflow-demo.name", "zh-CN": "工作流演示", "en-US": "Workflow Demo", "source": "import", "refType": "plugin" },
+  { "key": "plugin.workflow-demo.description", "zh-CN": "OSS 工作流入门样例：请假申请端到端演示 Smart Engine 能力。", "en-US": "OSS workflow starter: leave request end-to-end Smart Engine showcase.", "source": "import", "refType": "plugin" },
+
+  { "key": "model.wd_leave_request._meta.label", "zh-CN": "请假申请", "en-US": "Leave Request", "source": "import", "refType": "model" },
+  { "key": "model.wd_leave_request._meta.description", "zh-CN": "工作流演示：请假申请主表", "en-US": "Workflow demo: leave request master table", "source": "import", "refType": "model" },
+  { "key": "model.wd_leave_request.wd_req_code.label", "zh-CN": "申请编号", "en-US": "Request Code", "source": "import", "refType": "field" },
+  { "key": "model.wd_leave_request.wd_req_applicant.label", "zh-CN": "申请人", "en-US": "Applicant", "source": "import", "refType": "field" },
+  { "key": "model.wd_leave_request.wd_req_type.label", "zh-CN": "请假类型", "en-US": "Leave Type", "source": "import", "refType": "field" },
+  { "key": "model.wd_leave_request.wd_req_start_date.label", "zh-CN": "开始日期", "en-US": "Start Date", "source": "import", "refType": "field" },
+  { "key": "model.wd_leave_request.wd_req_end_date.label", "zh-CN": "结束日期", "en-US": "End Date", "source": "import", "refType": "field" },
+  { "key": "model.wd_leave_request.wd_req_days.label", "zh-CN": "天数", "en-US": "Days", "source": "import", "refType": "field" },
+  { "key": "model.wd_leave_request.wd_req_reason.label", "zh-CN": "请假原因", "en-US": "Reason", "source": "import", "refType": "field" },
+  { "key": "model.wd_leave_request.wd_req_reason.help", "zh-CN": "可补充说明请假背景与安排", "en-US": "Optional context and handover notes", "source": "import", "refType": "field" },
+  { "key": "model.wd_leave_request.wd_req_attachments.label", "zh-CN": "附件", "en-US": "Attachments", "source": "import", "refType": "field" },
+  { "key": "model.wd_leave_request.wd_req_attachments.help", "zh-CN": "病假超过 2 天需上传附件", "en-US": "Sick leave exceeding 2 days requires attachments", "source": "import", "refType": "field" },
+  { "key": "model.wd_leave_request.wd_req_cc_users.label", "zh-CN": "抄送人", "en-US": "CC Users", "source": "import", "refType": "field" },
+  { "key": "model.wd_leave_request.wd_req_status.label", "zh-CN": "状态", "en-US": "Status", "source": "import", "refType": "field" },
+  { "key": "model.wd_leave_request.wd_req_process_instance.label", "zh-CN": "流程实例", "en-US": "Process Instance", "source": "import", "refType": "field" },
+
+  { "key": "model.wd_leave_balance._meta.label", "zh-CN": "请假余额", "en-US": "Leave Balance", "source": "import", "refType": "model" },
+  { "key": "model.wd_leave_balance._meta.description", "zh-CN": "员工年度请假余额", "en-US": "Per-employee annual leave balance", "source": "import", "refType": "model" },
+  { "key": "model.wd_leave_balance.wd_bal_employee.label", "zh-CN": "员工", "en-US": "Employee", "source": "import", "refType": "field" },
+  { "key": "model.wd_leave_balance.wd_bal_year.label", "zh-CN": "年度", "en-US": "Year", "source": "import", "refType": "field" },
+  { "key": "model.wd_leave_balance.wd_bal_annual_remaining.label", "zh-CN": "剩余年假", "en-US": "Annual Remaining", "source": "import", "refType": "field" },
+  { "key": "model.wd_leave_balance.wd_bal_sick_used.label", "zh-CN": "已用病假", "en-US": "Sick Used", "source": "import", "refType": "field" },
+
+  { "key": "dict.wd_leave_type.annual", "zh-CN": "年假", "en-US": "Annual Leave", "source": "import", "refType": "dict" },
+  { "key": "dict.wd_leave_type.sick", "zh-CN": "病假", "en-US": "Sick Leave", "source": "import", "refType": "dict" },
+  { "key": "dict.wd_leave_type.personal", "zh-CN": "事假", "en-US": "Personal Leave", "source": "import", "refType": "dict" },
+  { "key": "dict.wd_leave_type.comp", "zh-CN": "调休", "en-US": "Compensatory Leave", "source": "import", "refType": "dict" },
+
+  { "key": "dict.wd_leave_status.draft", "zh-CN": "草稿", "en-US": "Draft", "source": "import", "refType": "dict" },
+  { "key": "dict.wd_leave_status.submitted", "zh-CN": "已提交", "en-US": "Submitted", "source": "import", "refType": "dict" },
+  { "key": "dict.wd_leave_status.approving", "zh-CN": "审批中", "en-US": "Approving", "source": "import", "refType": "dict" },
+  { "key": "dict.wd_leave_status.approved", "zh-CN": "已通过", "en-US": "Approved", "source": "import", "refType": "dict" },
+  { "key": "dict.wd_leave_status.rejected", "zh-CN": "已驳回", "en-US": "Rejected", "source": "import", "refType": "dict" },
+
+  { "key": "menu.wd_root", "zh-CN": "请假 demo", "en-US": "Leave Demo", "source": "import", "refType": "menu" },
+  { "key": "menu.wd_leave_requests", "zh-CN": "我的申请", "en-US": "My Requests", "source": "import", "refType": "menu" },
+  { "key": "menu.wd_leave_balances", "zh-CN": "请假余额", "en-US": "Leave Balances", "source": "import", "refType": "menu" },
+
+  { "key": "role.wd_employee.name", "zh-CN": "员工", "en-US": "Employee", "source": "import", "refType": "role" },
+  { "key": "role.wd_manager.name", "zh-CN": "主管", "en-US": "Manager", "source": "import", "refType": "role" },
+  { "key": "role.wd_hr.name", "zh-CN": "HR", "en-US": "HR", "source": "import", "refType": "role" },
+  { "key": "role.wd_admin.name", "zh-CN": "流程管理员", "en-US": "Workflow Administrator", "source": "import", "refType": "role" },
+
+  { "key": "command.wd.create_leave_request.title", "zh-CN": "新建请假申请", "en-US": "Create Leave Request", "source": "import", "refType": "command" },
+  { "key": "command.wd.update_leave_request.title", "zh-CN": "编辑请假申请", "en-US": "Update Leave Request", "source": "import", "refType": "command" },
+  { "key": "command.wd.delete_leave_request.title", "zh-CN": "删除请假申请", "en-US": "Delete Leave Request", "source": "import", "refType": "command" },
+  { "key": "command.wd.submit_leave_request.title", "zh-CN": "提交请假申请", "en-US": "Submit Leave Request", "source": "import", "refType": "command" },
+  { "key": "command.wd.create_leave_balance.title", "zh-CN": "新建请假余额", "en-US": "Create Leave Balance", "source": "import", "refType": "command" },
+  { "key": "command.wd.update_leave_balance.title", "zh-CN": "编辑请假余额", "en-US": "Update Leave Balance", "source": "import", "refType": "command" }
+]

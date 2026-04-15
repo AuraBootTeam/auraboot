@@ -1,0 +1,44 @@
+[
+  {
+    "code": "wd.leave_request.manage",
+    "name:zh-CN": "请假申请管理",
+    "name:en": "Leave Request Management",
+    "resourceType": "operation",
+    "module": "workflow-demo"
+  },
+  {
+    "code": "wd.leave_request.read",
+    "name:zh-CN": "查看请假申请",
+    "name:en": "View Leave Requests",
+    "resourceType": "data",
+    "module": "workflow-demo"
+  },
+  {
+    "code": "wd.leave_request.submit",
+    "name:zh-CN": "提交请假申请",
+    "name:en": "Submit Leave Request",
+    "resourceType": "operation",
+    "module": "workflow-demo"
+  },
+  {
+    "code": "wd.leave_request.approve",
+    "name:zh-CN": "审批请假申请",
+    "name:en": "Approve Leave Request",
+    "resourceType": "operation",
+    "module": "workflow-demo"
+  },
+  {
+    "code": "wd.leave_balance.manage",
+    "name:zh-CN": "请假余额管理",
+    "name:en": "Leave Balance Management",
+    "resourceType": "operation",
+    "module": "workflow-demo"
+  },
+  {
+    "code": "wd.leave_balance.read",
+    "name:zh-CN": "查看请假余额",
+    "name:en": "View Leave Balances",
+    "resourceType": "data",
+    "module": "workflow-demo"
+  }
+]
