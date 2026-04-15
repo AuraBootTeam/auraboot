@@ -48,7 +48,7 @@ async function openDesigner(designerPage: PageDesignerPage) {
     .locator('text=Loading page...')
     .waitFor({ state: 'hidden', timeout: 30000 })
     .catch(() => null);
-  // AreasDesigner renders for list/form pages — wait for both canvas and left panel
+  // BlocksDesigner renders for list/form pages — wait for both canvas and left panel
   await expect(designerPage.page.locator('[data-testid="designer-canvas"]')).toBeVisible({ timeout: 15000 });
   await expect(designerPage.page.locator('[data-testid="designer-tab-fields"]')).toBeVisible({ timeout: 10000 });
 }
@@ -62,7 +62,7 @@ test.describe('Block Selection', () => {
   });
 
   test('should select block on click and show block properties', async ({ page }) => {
-    // AreasDesigner for list pages shows area sections (Filter/Toolbar/Main Content).
+    // BlocksDesigner for list pages shows area sections (Filter/Toolbar/Main Content).
     // Click on an area section label to "select" it.
     const areaSection = page.locator('[data-testid="designer-canvas"] :is(h1,h2,h3,h4,span,div)')
       .filter({ hasText: /筛选区|主内容|工具栏|Main Content|Filter|Toolbar/i })
@@ -112,7 +112,7 @@ test.describe('Designer Areas', () => {
   });
 
   test('should show area sections in left panel', async ({ page }) => {
-    // AreasDesigner left panel tabs should be visible (openDesigner already waits for them)
+    // BlocksDesigner left panel tabs should be visible (openDesigner already waits for them)
     await expect(page.locator('[data-testid="designer-tab-fields"]')).toBeVisible({ timeout: 10000 });
     await expect(page.locator('[data-testid="designer-tab-blocks"]')).toBeVisible({ timeout: 5000 });
     await expect(page.locator('[data-testid="designer-tab-outline"]')).toBeVisible({ timeout: 5000 });

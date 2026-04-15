@@ -45,23 +45,11 @@ export interface PageSchema {
 }
 
 // =============================================================================
-// Area Types (for list/form pages)
+// Block Types
 // =============================================================================
 
 /**
- * Predefined area names
- */
-export type AreaName = 'filters' | 'toolbar' | 'main';
-
-/**
- * Area contains a list of blocks
- */
-export interface DslArea {
-  blocks: DslBlock[];
-}
-
-/**
- * Block types supported in areas
+ * Block types supported in a page
  */
 export type BlockType =
   | 'filters'
@@ -311,65 +299,6 @@ export interface DslButton {
   mode?: 'drawer' | 'modal' | 'page'; // for create/edit
   confirm?: boolean | string; // confirmation message
   id?: string; // for row actions
-}
-
-// =============================================================================
-// Floor Types (for detail/home pages)
-// =============================================================================
-
-/**
- * Floor - a vertical section in detail/home pages
- */
-export interface DslFloor {
-  id: string;
-  title?: string;
-  layout?: PageLayout; // dead code — DslFloor removed in Phase 4
-  collapsible?: boolean;
-  defaultCollapsed?: boolean;
-  visible?: string; // SpEL expression
-
-  // Content
-  components?: DslComponent[];
-
-  // Special floor types
-  type?: 'TabsFloor';
-  tabs?: DslTab[];
-}
-
-/**
- * Tab within a TabsFloor
- */
-export interface DslTab {
-  key: string;
-  label: string;
-  icon?: string;
-  badge?: string; // expression for badge count
-  visible?: string;
-  content: DslComponent;
-}
-
-// =============================================================================
-// Component Types (for floor content)
-// =============================================================================
-
-/**
- * Component - reusable UI element
- */
-export interface DslComponent {
-  id?: string;
-  type: string;
-
-  // Canvas positioning
-  grid?: {
-    column: string;
-    row: string | number;
-  };
-
-  // Data binding
-  dataSource?: string;
-
-  // Generic props
-  [key: string]: unknown;
 }
 
 // =============================================================================
