@@ -16,8 +16,9 @@ import type {
   UpdatePageRequest,
   PageTemplate,
 } from './types';
+import type { PageSchema } from '../../domain/dsl/types';
 import * as pageApi from './pageApi';
-import { toPageMeta, toCreateRequest, toUpdateRequest, createDslSchemaPayload } from './converters';
+import { toPageMeta, toPageSchema, toCreateRequest, toUpdateRequest, createDslSchemaPayload } from './converters';
 import { ResultHelper } from '~/utils/type';
 
 /**
@@ -243,22 +244,22 @@ export class PageManagerService {
   }
 
   /**
-   * Get page by ID from API
+   * Get page by ID from API.
+   * Returns both the PageMeta (display/list info) and PageSchema (DSL blocks/layout).
+   * Throws if the DTO has an unsupported kind (e.g. dashboard) or missing blocks —
+   * callers must not swallow these, they indicate a corrupt/misrouted page.
    */
-  public async getPage(id: string): Promise<PageMeta | null> {
-    try {
-      const result = await pageApi.getPageByPid(id);
+  public async getPage(id: string): Promise<{ meta: PageMeta; schema: PageSchema } | null> {
+    const result = await pageApi.getPageByPid(id);
 
-      if (ResultHelper.isSuccess(result) && result.data) {
-        return toPageMeta(result.data);
-      }
-
+    if (!ResultHelper.isSuccess(result) || !result.data) {
       console.error('Failed to fetch page:', result.desc);
       return null;
-    } catch (error) {
-      console.error('Failed to fetch page:', error);
-      return null;
     }
+
+    const dto = result.data;
+    // toPageSchema throws for unsupported kinds or missing blocks — let it propagate.
+    return { meta: toPageMeta(dto), schema: toPageSchema(dto) };
   }
 
   /**
@@ -362,19 +363,21 @@ export class PageManagerService {
    * Duplicate page
    */
   public async duplicatePage(id: string): Promise<PageMeta | null> {
-    // Get original page
-    const original = await this.getPage(id);
-    if (!original) {
+    // Get original page — destructure meta for display fields
+    const result = await this.getPage(id);
+    if (!result) {
       return null;
     }
 
+    const { meta } = result;
+
     // Create new page with duplicated content
     const newPage = await this.createPage({
-      title: `${original.title} (副本)`,
-      description: original.description,
-      kind: original.kind,
-      viewModelCode: original.viewModelCode,
-      tags: original.tags,
+      title: `${meta.title} (副本)`,
+      description: meta.description,
+      kind: meta.kind,
+      viewModelCode: meta.viewModelCode,
+      tags: meta.tags,
     });
 
     return newPage;
