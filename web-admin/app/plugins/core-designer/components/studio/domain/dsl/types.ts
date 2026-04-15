@@ -1,14 +1,11 @@
 /**
- * DSL V4 Type Definitions
+ * Page Schema V2 — aligned with ab_page_schema (schemaVersion = 2).
  *
- * Core types for AuraBoot Page DSL version 4.0
+ * Migration in progress: areas/floors/components/$schema/version fields
+ * are legacy V4 carryovers and will be removed in Phase 1 of the
+ * Studio V2 unification plan.
  *
- * Design principles:
- * 1. Preserve areas structure - filters/toolbar/main for semantic regions
- * 2. Built-in handlers - common operations without explicit definition
- * 3. Model integration - fields inherit from Model, DSL only overrides
- * 4. Field shorthand - reduce configuration verbosity
- * 5. Multi-layout support - grid/flex/floor/canvas
+ * Authoritative spec: docs/plans/2026-03/2026-03-30-page-type-unification-design.md
  */
 
 // =============================================================================
