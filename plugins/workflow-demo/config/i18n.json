@@ -51,8 +51,6 @@
   { "key": "command.wd.submit_leave_request.title", "zh-CN": "提交请假申请", "en-US": "Submit Leave Request", "source": "import", "refType": "command" },
   { "key": "command.wd.create_leave_balance.title", "zh-CN": "新建请假余额", "en-US": "Create Leave Balance", "source": "import", "refType": "command" },
   { "key": "command.wd.update_leave_balance.title", "zh-CN": "编辑请假余额", "en-US": "Update Leave Balance", "source": "import", "refType": "command" },
-  { "key": "command.wd.execute_deduct_balance.title", "zh-CN": "扣减请假余额", "en-US": "Deduct Leave Balance", "source": "import", "refType": "command" },
-
   { "key": "process.wd_leave_approval.name", "zh-CN": "请假审批", "en-US": "Leave Request Approval", "source": "import", "refType": "process" },
   { "key": "process.wd_leave_approval.node.start_1", "zh-CN": "开始", "en-US": "Start", "source": "import", "refType": "process" },
   { "key": "process.wd_leave_approval.node.task_submit", "zh-CN": "员工提交", "en-US": "Employee Submit", "source": "import", "refType": "process" },
@@ -61,7 +59,8 @@
   { "key": "process.wd_leave_approval.node.task_manager_approve", "zh-CN": "主管审批", "en-US": "Manager Approve", "source": "import", "refType": "process" },
   { "key": "process.wd_leave_approval.node.task_hr_approve", "zh-CN": "HR 审批", "en-US": "HR Approve", "source": "import", "refType": "process" },
   { "key": "process.wd_leave_approval.node.gw_result", "zh-CN": "审批结果", "en-US": "Decision", "source": "import", "refType": "process" },
-  { "key": "process.wd_leave_approval.node.svc_deduct", "zh-CN": "扣减余额并通知", "en-US": "Deduct Balance & Notify", "source": "import", "refType": "process" },
+  { "key": "process.wd_leave_approval.node.svc_notify_approved", "zh-CN": "通知申请人（通过）", "en-US": "Notify Applicant (Approved)", "source": "import", "refType": "process" },
+  { "key": "process.wd_leave_approval.node.svc_notify_rejected", "zh-CN": "通知申请人（驳回）", "en-US": "Notify Applicant (Rejected)", "source": "import", "refType": "process" },
   { "key": "process.wd_leave_approval.node.end_approved", "zh-CN": "审批通过", "en-US": "Approved", "source": "import", "refType": "process" },
   { "key": "process.wd_leave_approval.node.end_rejected", "zh-CN": "已驳回", "en-US": "Rejected", "source": "import", "refType": "process" },
   { "key": "process.wd_leave_approval.edge.gw_approver_manager", "zh-CN": "主管", "en-US": "Manager", "source": "import", "refType": "process" },
@@ -79,6 +78,11 @@
 
   { "key": "notify.wd.leave_request.approved", "zh-CN": "您的请假申请已通过审批", "en-US": "Your leave request has been approved", "source": "import", "refType": "notification" },
   { "key": "notify.wd.leave_request.rejected", "zh-CN": "您的请假申请被驳回", "en-US": "Your leave request was rejected", "source": "import", "refType": "notification" },
+
+  { "key": "notification.wd_request_approved.title", "zh-CN": "请假申请已通过", "en-US": "Leave request approved", "source": "import", "refType": "notification" },
+  { "key": "notification.wd_request_approved.body", "zh-CN": "您的请假申请 {code}（{days} 天）已通过审批。", "en-US": "Your leave request {code} ({days} days) has been approved.", "source": "import", "refType": "notification" },
+  { "key": "notification.wd_request_rejected.title", "zh-CN": "请假申请被驳回", "en-US": "Leave request rejected", "source": "import", "refType": "notification" },
+  { "key": "notification.wd_request_rejected.body", "zh-CN": "您的请假申请 {code}（{days} 天）已被驳回。", "en-US": "Your leave request {code} ({days} days) was rejected.", "source": "import", "refType": "notification" },
 
   { "key": "namedQuery.wd_leave_request_approval_history.title", "zh-CN": "请假审批历史", "en-US": "Leave Approval History", "source": "import", "refType": "namedQuery" }
 ]
