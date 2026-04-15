@@ -10,5 +10,4 @@ export {
   type BlocksDesignerProps,
   type AreasDesignerProps,
 } from './BlocksDesigner';
-export { FloorsDesigner, type FloorsDesignerProps } from './FloorsDesigner';
 export { CanvasEditor, type CanvasEditorProps } from './canvas/CanvasEditor';

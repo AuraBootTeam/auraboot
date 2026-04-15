@@ -8,8 +8,6 @@
  * The default case is an exhaustive never-check that will surface at compile
  * time if a new kind is added without updating this router.
  *
- * FloorsDesigner is kept in the repo but no longer used here (Task 4.5 will
- * delete it once the detail kind is fully migrated).
  */
 
 import React from 'react';
