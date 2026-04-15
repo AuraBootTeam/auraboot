@@ -147,6 +147,10 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     private final PluginResourceMapper pluginResourceMapper;
     private final com.auraboot.framework.meta.service.impl.CommandMetadataCacheService commandMetadataCache;
 
+    // Dependencies for deploying BPMN to SmartEngine at import time.
+    private final com.auraboot.framework.bpm.converter.JsonToBpmnConverter jsonToBpmnConverter;
+    private final com.auraboot.smart.framework.engine.SmartEngine smartEngine;
+
     // Optional dependency - may not be configured in all environments
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private CacheManager cacheManager;
@@ -1226,12 +1230,51 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         processDefinitionMapper.insert(process);
 
         if (Boolean.TRUE.equals(autoDeploy)) {
-            log.info("Process {} would be deployed to SmartEngine", dto.getKey());
+            deployProcessToSmartEngine(dto, tenantId, process.getVersion());
         }
 
         return createResourceRecord(pluginPid, importId, tenantId, ResourceType.PROCESS,
                 pid, process.getId(), dto.getKey(), dto.getEffectiveName(),
                 exists ? ResourceAction.UPDATE : ResourceAction.CREATE, null, null);
+    }
+
+    /**
+     * Deploy the designerJson from a {@link ProcessDefinitionDTO} to SmartEngine
+     * as BPMN XML. Idempotent by (tenantId, processKey, version): if the
+     * process definition is already cached, skip. Failures are wrapped in
+     * {@link PluginException} so the import transaction rolls back cleanly.
+     */
+    @SuppressWarnings("unchecked")
+    private void deployProcessToSmartEngine(ProcessDefinitionDTO dto, Long tenantId, Integer version) {
+        Map<String, Object> designerJson = dto.getDesignerJson() != null
+                ? objectMapper.convertValue(dto.getDesignerJson(), new TypeReference<Map<String, Object>>() {})
+                : null;
+        if (designerJson == null || designerJson.isEmpty()) {
+            // Nothing to deploy; either BPMN XML is pre-supplied (not supported here)
+            // or the caller just wanted the DB row.
+            log.info("Process {} has no designerJson; skipping SmartEngine deploy", dto.getKey());
+            return;
+        }
+
+        // Idempotency: skip if already deployed in the SmartEngine cache.
+        boolean alreadyDeployed = smartEngine.getRepositoryQueryService()
+                .getAllCachedProcessDefinition()
+                .stream()
+                .anyMatch(pd -> dto.getKey().equals(pd.getId()));
+        if (alreadyDeployed) {
+            log.info("Process {} already deployed to SmartEngine; skipping", dto.getKey());
+            return;
+        }
+
+        try {
+            String bpmnXml = jsonToBpmnConverter.convertFromMap(designerJson);
+            smartEngine.getRepositoryCommandService().deployWithUTF8Content(bpmnXml);
+            log.info("Deployed BPMN process to SmartEngine: tenantId={}, processKey={}, version={}",
+                    tenantId, dto.getKey(), version);
+        } catch (Exception e) {
+            log.error("Failed to deploy BPMN process {} to SmartEngine: {}", dto.getKey(), e.getMessage(), e);
+            throw new PluginException("Failed to deploy process " + dto.getKey() + ": " + e.getMessage(), e);
+        }
     }
 
     @Override

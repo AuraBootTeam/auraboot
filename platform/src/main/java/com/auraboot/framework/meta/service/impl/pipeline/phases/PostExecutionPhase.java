@@ -45,6 +45,9 @@ public class PostExecutionPhase implements CommandPhase {
     @Autowired(required = false)
     private com.auraboot.framework.governance.service.GovernanceSnapshotService governanceSnapshotService;
 
+    @Autowired(required = false)
+    private com.auraboot.framework.bpm.service.BpmIntegrationService bpmIntegrationService;
+
     @Override public String name() { return "post_execution"; }
 
     @Override
@@ -187,6 +190,9 @@ public class PostExecutionPhase implements CommandPhase {
                     Map<String, Object> currentRecord = sideEffectExecutor.buildCurrentRecordContext(payload, tenantId, command, request);
                     sideEffectExecutor.executeSideEffectCreate(targetModel, fieldMapping, currentRecord, tenantId, userId);
                 }
+                case com.auraboot.framework.meta.service.impl.pipeline.PreActionConstants.POST_TYPE_START_PROCESS -> {
+                    executePostActionStartProcess(postAction, parentRecordId, payload, command);
+                }
                 case "start_approval_chain" -> {
                     String chainProcessKey = (String) postAction.get("chainProcessKey");
                     String businessKeyTemplate = (String) postAction.get("businessKey");
@@ -216,6 +222,87 @@ public class PostExecutionPhase implements CommandPhase {
                 default -> log.warn("Unknown postAction: {}", action);
             }
         }
+    }
+
+    /**
+     * Execute a {@code start_process} postAction: starts a BPM process via
+     * {@link com.auraboot.framework.bpm.service.BpmIntegrationService} and
+     * optionally writes the resulting processInstanceId back onto the current
+     * record at field {@code storeInstanceIdIn}.
+     */
+    @SuppressWarnings("unchecked")
+    private void executePostActionStartProcess(Map<String, Object> postAction, String parentRecordId,
+                                                Map<String, Object> payload, CommandDefinition command) {
+        if (bpmIntegrationService == null) {
+            throw new BusinessException(ResponseCode.BadParam,
+                    "start_process postAction requires BpmIntegrationService");
+        }
+        String processKey = (String) postAction.get("processKey");
+        if (processKey == null || processKey.isBlank()) {
+            throw new BusinessException(ResponseCode.BadParam,
+                    "start_process postAction requires 'processKey'");
+        }
+        String businessKey = resolveStartProcessTemplate(
+                (String) postAction.get("businessKey"), payload, parentRecordId, command);
+        String title = resolveStartProcessTemplate(
+                (String) postAction.get("title"), payload, parentRecordId, command);
+
+        Map<String, Object> variablesTemplate = (Map<String, Object>) postAction.get("variables");
+        Map<String, Object> variables = new HashMap<>();
+        if (variablesTemplate != null) {
+            for (Map.Entry<String, Object> entry : variablesTemplate.entrySet()) {
+                Object value = entry.getValue();
+                if (value instanceof String strValue) {
+                    value = resolveStartProcessTemplate(strValue, payload, parentRecordId, command);
+                }
+                variables.put(entry.getKey(), value);
+            }
+        }
+
+        var instance = bpmIntegrationService.startBusinessProcess(processKey, businessKey, variables, title);
+
+        String storeInstanceIdIn = (String) postAction.get("storeInstanceIdIn");
+        if (storeInstanceIdIn != null && !storeInstanceIdIn.isBlank()
+                && instance != null && instance.getInstanceId() != null
+                && parentRecordId != null && command != null && command.getModelCode() != null) {
+            try {
+                Map<String, Object> update = new HashMap<>();
+                update.put(storeInstanceIdIn, instance.getInstanceId());
+                dynamicDataService.update(command.getModelCode(), parentRecordId, update);
+            } catch (Exception e) {
+                log.warn("start_process: failed to write processInstanceId to {}.{}: {}",
+                        command.getModelCode(), storeInstanceIdIn, e.getMessage());
+            }
+        }
+    }
+
+    /**
+     * Resolve {@code ${payload.xxx}}, {@code ${recordId}}, {@code ${modelCode}}
+     * placeholders. Only whole-string exact-placeholder substitution is
+     * supported for typed returns; embedded substitution uses toString.
+     */
+    private String resolveStartProcessTemplate(String template, Map<String, Object> payload,
+                                                String parentRecordId, CommandDefinition command) {
+        if (template == null || !template.contains("${")) {
+            return template;
+        }
+        String result = template;
+        if (parentRecordId != null) {
+            result = result.replace("${recordId}", parentRecordId);
+        }
+        if (command != null && command.getModelCode() != null) {
+            result = result.replace("${modelCode}", command.getModelCode());
+        }
+        if (payload != null) {
+            for (Map.Entry<String, Object> entry : payload.entrySet()) {
+                String placeholder = "${payload." + entry.getKey() + "}";
+                if (result.contains(placeholder)) {
+                    Object v = entry.getValue();
+                    result = result.replace(placeholder, v == null ? "" : v.toString());
+                }
+            }
+        }
+        return result;
     }
 
     @SuppressWarnings("unchecked")

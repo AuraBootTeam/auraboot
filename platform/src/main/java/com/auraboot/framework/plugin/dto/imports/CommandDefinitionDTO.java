@@ -174,6 +174,13 @@ public class CommandDefinitionDTO {
     private List<Map<String, Object>> preconditions;
 
     /**
+     * Pre-flight actions executed inside the guarded-phase block before any
+     * state transition / field map / DB write. Currently supports type
+     * {@code "bpm:run-rule"} (Drools validation). See PreActionsPhase.
+     */
+    private List<Map<String, Object>> preActions;
+
+    /**
      * Declarative BPM trigger: auto-start an approval process when this command executes.
      * Example: {"processKey": "so_approval", "titleTemplate": "SO Approval: ${payload.sl_so_code}"}
      */
@@ -235,6 +242,7 @@ public class CommandDefinitionDTO {
         if (postActions != null) config.put("postActions", postActions);
         if (validation != null) config.put("validation", validation);
         if (preconditions != null) config.put("preconditions", preconditions);
+        if (preActions != null) config.put("preActions", preActions);
         if (bpmTrigger != null) config.put("bpmTrigger", bpmTrigger);
 
         return config.isEmpty() ? null : config;

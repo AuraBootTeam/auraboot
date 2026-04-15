@@ -398,3 +398,15 @@ without a UI-side transform.
   (`default-bootstrap.json` extension planned for Phase 3).
 - E2E: 4 specs per §11 remain Phase 4.
 - reset-and-init.sh OSS variant: add `workflow-demo` to the import list.
+
+## 15.7 Phase 3b 架构简化
+
+Phase 3 早期的实现把每个 `serviceTask` 都桥接回 Command Pipeline（`bpm:run-rule` / `bpm:publish-notification` / `bpm:start-process` 三个 CommandHandler），一次规则/一次通知就要穿过 16 个 phase，回调链长、异常栈难读、且 `start-process` 又会在 postAction 里再次触发 pipeline，容易形成隐式死循环。
+
+Phase 3b 把 serviceTask 从 Command Pipeline 上剥离：
+
+- **两个瘦 delegate**：`DroolsServiceTaskDelegate` / `NotificationServiceTaskDelegate` 直接实现 SmartEngine 的 `JavaDelegation`，只消费 BPMN 上的 `smart:*` 扩展属性（`ruleCode` / `factsVars` / `eventCode` / `recipientFrom` / `templateParamsVars`），不走 Command Pipeline。`JsonToBpmnConverter` 识别新节点类型 `rule-task` / `notification-task` 并输出 `smart:class="<bean>"` + `smart:<attr>` 属性。
+- **PreActionsPhase（@Order 750）**：在 `AssertPhase` 和 `PreInvariantPhase` 之间新增一段 `preActions` 执行阶段，首发支持 `bpm:run-rule`，通过 `contextLookup` 从其它模型加载上下文（例：查询申请人的 `wd_leave_balance`），拼 facts 后调 `DroolsEngineService`。规则返回 `valid=false` 直接抛 `BusinessException` 终止提交，不写任何 DB。
+- **postAction `start_process`**：`PostExecutionPhase` 新增分支，直接调 `BpmIntegrationService.startBusinessProcess` 并把返回的 `processInstanceId` 写回记录的 `storeInstanceIdIn` 字段；无 Handler 间接层。
+- **插件导入即部署**：`PluginResourceImporterImpl.importProcess` 现在在 `autoDeploy=true` 时把 `designerJson` 转 BPMN XML 并 `deployWithUTF8Content` 到 SmartEngine，按 `processKey` 做幂等跳过；失败抛 `PluginException` 让导入事务回滚。
+- **删除**：`BpmStartProcessHandler` 及其测试（上述 postAction 分支取代），保留 `BpmRunRuleHandler` / `BpmPublishNotificationHandler` 以支持仍需走 Command Pipeline 的命令式调用入口。
