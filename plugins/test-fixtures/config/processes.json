@@ -1,0 +1,130 @@
+[
+  {
+    "key": "e2et_payment_approval",
+    "name:zh-CN": "付款审批流程",
+    "name:en": "Payment Approval Process",
+    "description": "Simple payment approval workflow: manager review → approve/reject",
+    "category": "finance",
+    "extension": {
+      "modelCode": "e2et_payment"
+    },
+    "designerJson": {
+      "nodes": [
+        {
+          "id": "start_1",
+          "type": "startEvent",
+          "position": { "x": 100, "y": 300 },
+          "data": {
+            "label:zh-CN": "开始",
+            "label:en": "Start"
+          }
+        },
+        {
+          "id": "manager_review",
+          "type": "userTask",
+          "position": { "x": 350, "y": 300 },
+          "data": {
+            "label:zh-CN": "经理审批",
+            "label:en": "Manager Review",
+            "assigneeType": "role",
+            "assigneeValue": "e2et_approver",
+            "commandCodes": ["e2et:approve_payment", "e2et:reject_payment"]
+          }
+        },
+        {
+          "id": "decision_gw",
+          "type": "exclusiveGateway",
+          "position": { "x": 600, "y": 300 },
+          "data": {
+            "label:zh-CN": "审批决策",
+            "label:en": "Approval Decision"
+          }
+        },
+        {
+          "id": "approve_svc",
+          "type": "serviceTask",
+          "position": { "x": 850, "y": 200 },
+          "data": {
+            "label:zh-CN": "执行审批通过",
+            "label:en": "Execute Approve",
+            "serviceType": "command",
+            "commandCode": "e2et:approve_payment",
+            "params": {
+              "e2et_pay_status": "approved"
+            }
+          }
+        },
+        {
+          "id": "reject_svc",
+          "type": "serviceTask",
+          "position": { "x": 850, "y": 400 },
+          "data": {
+            "label:zh-CN": "执行驳回",
+            "label:en": "Execute Reject",
+            "serviceType": "command",
+            "commandCode": "e2et:reject_payment",
+            "params": {
+              "e2et_pay_status": "rejected"
+            }
+          }
+        },
+        {
+          "id": "end_approved",
+          "type": "endEvent",
+          "position": { "x": 1100, "y": 200 },
+          "data": {
+            "label:zh-CN": "结束（已审批）",
+            "label:en": "End (Approved)"
+          }
+        },
+        {
+          "id": "end_rejected",
+          "type": "endEvent",
+          "position": { "x": 1100, "y": 400 },
+          "data": {
+            "label:zh-CN": "结束（已驳回）",
+            "label:en": "End (Rejected)"
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "edge_start_review",
+          "source": "start_1",
+          "target": "manager_review"
+        },
+        {
+          "id": "edge_review_gw",
+          "source": "manager_review",
+          "target": "decision_gw"
+        },
+        {
+          "id": "edge_gw_approve",
+          "source": "decision_gw",
+          "target": "approve_svc",
+          "data": {
+            "condition": { "type": "expression", "content": "decision == 'approved'" }
+          }
+        },
+        {
+          "id": "edge_gw_reject",
+          "source": "decision_gw",
+          "target": "reject_svc",
+          "data": {
+            "condition": { "type": "expression", "content": "decision == 'rejected'" }
+          }
+        },
+        {
+          "id": "edge_approve_end",
+          "source": "approve_svc",
+          "target": "end_approved"
+        },
+        {
+          "id": "edge_reject_end",
+          "source": "reject_svc",
+          "target": "end_rejected"
+        }
+      ]
+    }
+  }
+]
