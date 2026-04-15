@@ -31,13 +31,12 @@
     "parentCode": "sc_root",
     "name:zh-CN": "组件仪表盘",
     "name:en": "Widget Dashboard",
-    "path": "/p/c/sc_arsenal_dashboard",
+    "path": "/dashboards?code=sc_arsenal_dashboard",
     "component": null,
     "icon": "IconChartBar",
     "type": 1,
     "permissionCode": "sc.showcase.read",
     "orderNo": 2,
-    "visible": true,
-    "pageKey": "sc_arsenal_dashboard"
+    "visible": true
   }
 ]
