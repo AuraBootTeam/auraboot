@@ -1,12 +1,12 @@
 /**
  * Verifies Plan 3a: kind=dashboard removed from V2 blocks.
  *
- * After removal:
- * - Former kind=dashboard pages (seeded into ab_dashboard) are accessible via
- *   /dashboards?code={pageKey}.
- * - Legacy /p/c/{pageKey} routes for those keys no longer resolve to a V2 block
- *   dashboard render. They should 404, show empty state, or redirect — anything
- *   except rendering as a V2 blocks page.
+ * After Plan 3a + 3b:
+ * - Former kind=dashboard pages live in ab_dashboard (Dashboard DSL).
+ * - They are accessed exclusively via /dashboards?code={code}.
+ * - Menus, plugin JSONs, and seed data have been updated to the new route.
+ * - Legacy /p/c/{code} has no pre-baked data — visiting it directly shows
+ *   a generic "menu not found" error (expected; no fallback redirect).
  *
  * @since 2026-04-15
  */
@@ -25,20 +25,6 @@ test.describe('Plan 3a - kind=dashboard removal', () => {
       const response = await page.goto(`/dashboards?code=${code}`);
       expect(response?.status() ?? 0).toBeLessThan(500);
       await expect(page.locator('body')).not.toContainText('500');
-    });
-
-    test(`Legacy /p/c/${code} does not render as V2 blocks dashboard`, async ({ page }) => {
-      const response = await page.goto(`/p/c/${code}`);
-      const status = response?.status() ?? 0;
-      expect([200, 302, 404]).toContain(status);
-      if (status === 200) {
-        // Client-side redirect: catch-all useEffect probes
-        // /api/dashboards/code/{code} then navigate()s to /dashboards?code=.
-        // Wait for the URL to change away from /p/c/.
-        await page.waitForURL((u) => !u.toString().endsWith(`/p/c/${code}`), { timeout: 5000 });
-        const url = page.url();
-        expect(url).toMatch(/\/dashboards\?code=/);
-      }
     });
   }
 });
