@@ -400,9 +400,10 @@ POST /api/bpm/orchestration/executions/{id}/skip/{nodeId}
 
 | Problem | Cause | Fix |
 |---------|-------|-----|
+| Deploy fails with "missing a condition expression" | Exclusive gateway has outgoing edge without condition | Add a condition to every outgoing flow (SmartEngine does not honor BPMN bare `default=` fallback; mark one as default AND give it a `true` or inverse catch-all) |
 | Deploy fails | BPMN XML validation error | Check designer JSON for disconnected nodes |
 | Task not assigned | Missing assignee rule | Configure `assigneeRules` on the UserTask node |
-| Gateway always takes default | Condition expression error | Verify variable names match (`${days}` not `${day}`) |
+| Gateway takes wrong branch | Variable typo in condition | Verify MVEL variable names exactly match `startProcess` variables (`days` not `day`, no `${...}` wrapper) |
 | Process stuck at ServiceTask | External callback not received | Check ReceiveTask callback endpoint or use retry |
 | SLA not triggering | SLA config not enabled | Verify `enabled: true` and deadline mode is correct |
 | 403 on task endpoint | Missing BPM permission | Ensure user has `bpm.task.complete` permission |
