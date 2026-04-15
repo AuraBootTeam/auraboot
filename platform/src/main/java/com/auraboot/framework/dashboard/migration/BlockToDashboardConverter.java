@@ -148,12 +148,44 @@ public final class BlockToDashboardConverter {
             widget.put("y",    yOffset);
             widget.put("w",    colSpan);
             widget.put("h",    rowSpan);
-            widget.set("config", extractConfig(block));
+
+            // Resolve widget title — publish validator requires non-blank title
+            // either at widget.title or widget.config.title. Source can be a
+            // LocalizedText map, a plain string, or missing (fall back to blockId).
+            String title = resolveWidgetTitle(block, blockId);
+            widget.put("title", title);
+
+            ObjectNode config = (ObjectNode) extractConfig(block);
+            if (!config.has("title") || !com.fasterxml.jackson.databind.node.JsonNodeType.STRING.equals(config.get("title").getNodeType())
+                    || config.get("title").asText().isBlank()) {
+                config.put("title", title);
+            }
+            widget.set("config", config);
 
             widgets.add(widget);
             yOffset += rowSpan;
         }
         return widgets;
+    }
+
+    /**
+     * Resolve the widget title from the block.  Accepts a LocalizedText map,
+     * a plain String, or falls back to the block id.
+     */
+    private static String resolveWidgetTitle(Map<String, Object> block, String blockId) {
+        Object raw = block.get("title");
+        if (raw instanceof String s && !s.isBlank()) {
+            return s;
+        }
+        if (raw instanceof Map<?, ?> map) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> titleMap = (Map<String, Object>) map;
+            String resolved = resolveTitle(titleMap);
+            if (resolved != null && !resolved.isBlank()) {
+                return resolved;
+            }
+        }
+        return blockId;
     }
 
     /**
