@@ -242,11 +242,15 @@ export interface DashboardQueryRequest {
   pageSize?: number;
 }
 
+export type WidgetTier = 'oss' | 'enterprise';
+
 /**
  * Widget definition for registry
  */
 export interface WidgetDefinition {
   type: WidgetType;
+  /** OSS 基础能力或 Enterprise 高级能力。缺省由 resolveWidgetTier 推断。 */
+  tier?: WidgetTier;
   label: string;
   icon: string;
   category: string;
