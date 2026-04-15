@@ -542,7 +542,7 @@ A: No. Only assets in `draft` status can be deleted. In-use assets must be dispo
 A: The `current_value` field is read-only and computed as `purchase_price - accumulated_depreciation`. Each depreciation record updates this value.
 
 **Q: Can I customize the approval workflow thresholds?**
-A: Yes. Edit the `processes.json` file to change the gateway condition expression (currently `${purchase_price >= 10000}`).
+A: Yes. Edit the `processes.json` file to change the gateway condition expression (currently `purchase_price >= 10000` — plain MVEL, no `${...}` wrapper).
 
 **Q: Does this plugin support barcode/QR code scanning?**
 A: The `asset_code` and `serial_number` fields are searchable and can be used with any barcode scanning integration. The mobile app supports deep links to asset detail pages.

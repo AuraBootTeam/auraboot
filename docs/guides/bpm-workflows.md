@@ -100,13 +100,24 @@ graph LR
 
 ### 3. Configure Gateway Conditions
 
-Click the edge from the ExclusiveGateway to "Manager Approve" and set the condition:
+Click the edge from the ExclusiveGateway to "Manager Approve" and set the condition
+(plain MVEL — do NOT wrap in `${...}`):
 
 ```
-${days > 3}
+days > 3
 ```
 
-Click the edge to "Direct Approve" and set it as the **default** branch.
+Click the edge to "Direct Approve" and set its condition:
+
+```
+days <= 3
+```
+
+> **Every outgoing flow on an exclusive gateway must have a condition expression.**
+> SmartEngine does not honor the BPMN `default=` fallback — the `Default Flow`
+> checkbox still emits the BPMN `default=` attribute for spec compliance, but you
+> must also provide an evaluable catch-all (e.g. `true`, or an explicit inverse like
+> `days <= 3`). Saving with a naked label-only edge is rejected with a clear error.
 
 ### 4. Configure User Task Assignees
 
@@ -320,12 +331,12 @@ Process variables are key-value pairs passed when starting a process or completi
 }
 ```
 
-**Using variables in gateway conditions:**
+**Using variables in gateway conditions (plain MVEL, no `${...}` wrapper):**
 
 ```
-${days > 3}
-${amount > 10000 && department == 'Finance'}
-${applicant != 'admin@example.com'}
+days > 3
+amount > 10000 && department == 'Finance'
+applicant != 'admin@example.com'
 ```
 
 **Using variables in assignee expressions:**
