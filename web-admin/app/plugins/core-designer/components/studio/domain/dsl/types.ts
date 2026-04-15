@@ -1,126 +1,55 @@
 /**
- * DSL V4 Type Definitions
+ * Page Schema V2 — aligned with ab_page_schema (schemaVersion = 2).
  *
- * Core types for AuraBoot Page DSL version 4.0
+ * V2 flat shape: kind/blocks/layout/profile — no areas/floors/components.
+ * Dashboard pages are handled by Dashboard Designer (separate track).
  *
- * Design principles:
- * 1. Preserve areas structure - filters/toolbar/main for semantic regions
- * 2. Built-in handlers - common operations without explicit definition
- * 3. Model integration - fields inherit from Model, DSL only overrides
- * 4. Field shorthand - reduce configuration verbosity
- * 5. Multi-layout support - grid/flex/floor/canvas
+ * Authoritative spec: docs/plans/2026-03/2026-03-30-page-type-unification-design.md
  */
 
 // =============================================================================
 // Core Types
 // =============================================================================
 
+export type LocalizedText = string | Record<string, string>;
+
 /**
- * Page schema version 4.0
+ * Page layout — stack (vertical sections) or grid (12-col).
+ * Replaces legacy DslLayoutConfig union (flex/floor/canvas/areas variants removed).
  */
-export interface DslV4Schema {
-  // Meta information
-  $schema: 'auraboot://schemas/page/v4';
-  version: '4.0.0';
-  id: string;
+export type PageLayout =
+  | { type: 'stack' }
+  | { type: 'grid'; cols: number };
+
+/**
+ * Page kind — list/form/detail only.
+ * Dashboard is handled by Dashboard Designer (separate track).
+ * Home/composite were V4 concepts; home is deleted, composite is evaluated in Task 4.6.
+ */
+export type PageKind = 'list' | 'form' | 'detail';
+
+/**
+ * Page Schema V2 — flat shape stored in ab_page_schema.blocks (JSONB).
+ */
+export interface PageSchema {
+  schemaVersion: 2;
   kind: PageKind;
-  modelCode: string;
-
-  // Layout configuration
-  layout: DslLayoutConfig;
-
-  // State management
-  state?: Record<string, unknown>;
-
-  // Content structures (mutually exclusive based on kind)
-  areas?: Record<string, DslArea>; // list/form pages
-  floors?: DslFloor[]; // detail/home pages
-  components?: DslComponent[]; // floor content components
-
-  // Data sources
-  dataSources?: Record<string, DslDataSource>;
-
-  // Custom handlers (optional, standard actions are built-in)
-  handlers?: Record<string, DslHandler>;
-
-  // Multi-view support — show view type tabs (Table/Kanban/Calendar) on list pages
-  enableMultiView?: boolean;
-}
-
-/**
- * Page kind determines the content structure
- */
-export type PageKind = 'form' | 'list' | 'detail' | 'home' | 'composite';
-
-// =============================================================================
-// Layout Types
-// =============================================================================
-
-/**
- * Layout configuration - varies by type
- */
-export type DslLayoutConfig =
-  | DslGridLayout
-  | DslFlexLayout
-  | DslFloorLayout
-  | DslCanvasLayout
-  | DslAreasLayout;
-
-export interface DslGridLayout {
-  type: 'grid';
-  columns: number;
-  gap?: number;
-  rows?: number | 'auto';
-}
-
-export interface DslFlexLayout {
-  type: 'flex';
-  direction?: 'row' | 'column';
-  justify?: 'start' | 'end' | 'center' | 'space-between' | 'space-around';
-  align?: 'start' | 'end' | 'center' | 'stretch' | 'flex-start' | 'flex-end';
-  gap?: number;
-}
-
-export interface DslFloorLayout {
-  type: 'floor';
-  gap?: number;
-}
-
-export interface DslCanvasLayout {
-  type: 'canvas';
-  grid?: {
-    columns: number;
-    rows: string | number;
-    gap: number;
-  };
-}
-
-export interface DslAreasLayout {
-  areas: string[];
-  areasConfig?: Record<
-    string,
-    Omit<DslGridLayout | DslFlexLayout, 'type'> & { type: 'grid' | 'flex' }
-  >;
-}
-
-// =============================================================================
-// Area Types (for list/form pages)
-// =============================================================================
-
-/**
- * Predefined area names
- */
-export type AreaName = 'filters' | 'toolbar' | 'main';
-
-/**
- * Area contains a list of blocks
- */
-export interface DslArea {
+  id: string;
+  pageKey?: string;
+  modelCode?: string;
+  title?: LocalizedText;
+  profile?: 'admin' | 'report';
+  layout: PageLayout;
   blocks: DslBlock[];
+  extension?: Record<string, unknown>;
 }
 
+// =============================================================================
+// Block Types
+// =============================================================================
+
 /**
- * Block types supported in areas
+ * Block types supported in a page
  */
 export type BlockType =
   | 'filters'
@@ -370,65 +299,6 @@ export interface DslButton {
   mode?: 'drawer' | 'modal' | 'page'; // for create/edit
   confirm?: boolean | string; // confirmation message
   id?: string; // for row actions
-}
-
-// =============================================================================
-// Floor Types (for detail/home pages)
-// =============================================================================
-
-/**
- * Floor - a vertical section in detail/home pages
- */
-export interface DslFloor {
-  id: string;
-  title?: string;
-  layout?: DslLayoutConfig;
-  collapsible?: boolean;
-  defaultCollapsed?: boolean;
-  visible?: string; // SpEL expression
-
-  // Content
-  components?: DslComponent[];
-
-  // Special floor types
-  type?: 'TabsFloor';
-  tabs?: DslTab[];
-}
-
-/**
- * Tab within a TabsFloor
- */
-export interface DslTab {
-  key: string;
-  label: string;
-  icon?: string;
-  badge?: string; // expression for badge count
-  visible?: string;
-  content: DslComponent;
-}
-
-// =============================================================================
-// Component Types (for floor content)
-// =============================================================================
-
-/**
- * Component - reusable UI element
- */
-export interface DslComponent {
-  id?: string;
-  type: string;
-
-  // Canvas positioning
-  grid?: {
-    column: string;
-    row: string | number;
-  };
-
-  // Data binding
-  dataSource?: string;
-
-  // Generic props
-  [key: string]: unknown;
 }
 
 // =============================================================================

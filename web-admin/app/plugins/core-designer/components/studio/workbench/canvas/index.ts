@@ -14,7 +14,3 @@ export * as CanvasContextMenu from './context-menu';
 
 // Device Preview
 export * as CanvasDevices from './devices';
-
-// Empty State
-export { EmptyStateGuide } from './EmptyStateGuide';
-export type { EmptyStateGuideProps } from './EmptyStateGuide';

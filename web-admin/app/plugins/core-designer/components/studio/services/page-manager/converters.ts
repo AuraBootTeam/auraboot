@@ -9,50 +9,41 @@
 import type {
   PageSchemaDTO,
   PageSchemaCreateRequest,
-  ApiPageType,
   ApiPageStatus,
 } from './api-types';
-import type { PageMeta, PageStatus, PageMode, CreatePageRequest } from './types';
+import type { PageMeta, PageStatus, CreatePageRequest } from './types';
+import type { PageSchema } from '../../domain/dsl/types';
+
+// Kinds handled by Dashboard Designer or deprecated — toPageSchema rejects these.
+const UNSUPPORTED_KINDS = new Set(['dashboard', 'home', 'composite', 'custom']);
 
 /**
- * Map frontend PageMode to backend ApiPageType
+ * Convert PageSchemaDTO to PageSchema (V2 flat shape).
+ * Rejects dashboard/home/composite — those go through Dashboard Designer.
+ * Throws if blocks array is missing.
  */
-export function toApiPageType(mode: PageMode): ApiPageType {
-  const mapping: Record<PageMode, ApiPageType> = {
-    grid: 'dashboard',
-    floor: 'detail',
-    form: 'form',
-    composite: 'composite',
+export function toPageSchema(dto: PageSchemaDTO): PageSchema {
+  if (UNSUPPORTED_KINDS.has(dto.kind as string)) {
+    throw new Error(
+      `PageSchema does not support kind='${dto.kind}'. ` +
+        `Dashboard is handled by Dashboard Designer; home/composite are deprecated.`,
+    );
+  }
+  if (!Array.isArray(dto.blocks)) {
+    throw new Error(`PageSchema requires blocks array (pid=${dto.pid})`);
+  }
+  return {
+    schemaVersion: 2,
+    kind: dto.kind as PageSchema['kind'],
+    id: dto.pid,
+    pageKey: dto.pageKey,
+    modelCode: dto.extension?.viewModelCode as string | undefined,
+    title: dto.title,
+    layout: (dto.layout as PageSchema['layout']) ?? { type: 'stack' },
+    blocks: dto.blocks as PageSchema['blocks'],
+    profile: dto.profile as PageSchema['profile'],
+    extension: dto.extension,
   };
-  return mapping[mode] || 'custom';
-}
-
-/**
- * Map backend ApiPageType to frontend PageMode
- */
-export function fromApiPageType(pageType: ApiPageType): PageMode {
-  const mapping: Record<ApiPageType, PageMode> = {
-    form: 'form',
-    list: 'form', // List pages use form mode
-    detail: 'floor',
-    dashboard: 'grid',
-    composite: 'composite',
-    custom: 'grid', // Default custom to grid
-  };
-  return mapping[pageType] || 'grid';
-}
-
-/**
- * Map frontend PageStatus to backend ApiPageStatus
- */
-export function toApiPageStatus(status: PageStatus): ApiPageStatus {
-  const mapping: Record<PageStatus, ApiPageStatus> = {
-    draft: 'draft',
-    published: 'published',
-    modified: 'draft', // Modified is still a draft in backend
-    archived: 'archived',
-  };
-  return mapping[status];
 }
 
 /**
@@ -69,29 +60,23 @@ export function fromApiPageStatus(apiStatus: ApiPageStatus, isPublished?: boolea
 }
 
 /**
- * Convert PageSchemaDTO to PageMeta
+ * Map frontend PageStatus to backend ApiPageStatus
+ */
+export function toApiPageStatus(status: PageStatus): ApiPageStatus {
+  const mapping: Record<PageStatus, ApiPageStatus> = {
+    draft: 'draft',
+    published: 'published',
+    modified: 'draft', // Modified is still a draft in backend
+    archived: 'archived',
+  };
+  return mapping[status];
+}
+
+/**
+ * Convert PageSchemaDTO to PageMeta.
+ * V2: uses kind instead of mode; no dslSchema synthesis.
  */
 export function toPageMeta(dto: PageSchemaDTO): PageMeta {
-  const extension = dto.extension && typeof dto.extension === 'object'
-    ? dto.extension
-    : undefined;
-
-  const compositeDslSchema =
-    dto.kind === 'composite'
-      ? {
-          kind: 'composite',
-          pageKey: dto.pageKey,
-          blocks: dto.blocks || [],
-          layout: dto.layout,
-          title: dto.title,
-          extension,
-          enableMultiView:
-            typeof extension?.enableMultiView === 'boolean'
-              ? (extension.enableMultiView as boolean)
-              : undefined,
-        }
-      : undefined;
-
   // Extract tags from the tags object
   let tags: string[] = [];
   if (dto.tags) {
@@ -102,19 +87,15 @@ export function toPageMeta(dto: PageSchemaDTO): PageMeta {
     }
   }
 
-  // Get component count from metaInfo or blocks
-  let componentCount = 0;
-  if (dto.metaInfo?.componentCount) {
-    componentCount = dto.metaInfo.componentCount as number;
-  } else if (dto.blocks) {
-    componentCount = dto.blocks.length;
-  }
-
   return {
     id: dto.pid,
-    title: (typeof dto.title === 'string' ? dto.title : dto.title?.['en-US'] || dto.title?.['zh-CN']) || dto.name,
+    pageKey: dto.pageKey,
+    title:
+      (typeof dto.title === 'string'
+        ? dto.title
+        : dto.title?.['en-US'] || dto.title?.['zh-CN']) || dto.name,
     description: dto.description,
-    mode: fromApiPageType(dto.kind),
+    kind: dto.kind as PageMeta['kind'],
     viewModelCode: dto.extension?.viewModelCode as string | undefined,
     status: fromApiPageStatus(dto.status || 'draft', dto.isPublished),
     version: dto.semver || `${dto.version || 1}.0.0`,
@@ -123,9 +104,8 @@ export function toPageMeta(dto: PageSchemaDTO): PageMeta {
     updatedAt: dto.updatedAt || new Date().toISOString(),
     tags,
     thumbnail: dto.metaInfo?.thumbnail as string | undefined,
-    componentCount,
-    dslSchema: compositeDslSchema,
-    extension,
+    componentCount: dto.blocks?.length ?? 0,
+    extension: dto.extension,
   };
 }
 
@@ -144,8 +124,8 @@ export function toUpdateRequest(page: Partial<PageMeta>): Record<string, unknown
   if (page.tags !== undefined) {
     request.tags = { list: page.tags };
   }
-  if (page.mode !== undefined) {
-    request.kind = toApiPageType(page.mode);
+  if (page.kind !== undefined) {
+    request.kind = page.kind;
   }
 
   return request;
@@ -188,7 +168,7 @@ export function toCreateRequest(request: CreatePageRequest): PageSchemaCreateReq
     pageKey,
     title: request.title,
     description: request.description,
-    kind: toApiPageType(request.mode),
+    kind: request.kind,
     blocks: [],
     metaInfo: {
       templateId: request.templateId,
@@ -243,9 +223,8 @@ export function createDslSchemaPayload(
     payload.extension = schemaExtension;
   }
   if (schema.title != null) {
-    payload.title = typeof schema.title === 'string'
-      ? schema.title
-      : JSON.stringify(schema.title);
+    payload.title =
+      typeof schema.title === 'string' ? schema.title : JSON.stringify(schema.title);
   }
   // Persist the schema version set by the frontend (CURRENT_SCHEMA_VERSION)
   if (typeof schema.schemaVersion === 'number') {

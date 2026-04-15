@@ -1,13 +1,17 @@
 /**
- * Page Designer V2 — Composite Page Lifecycle E2E Tests
+ * DEPRECATED: Composite Page Lifecycle E2E Tests
  *
- * Tests the unified block canvas editor (CanvasEditor) for kind='composite' pages.
- * All block operations are tested within a SINGLE page session to avoid
- * auto-save persistence issues across navigations.
+ * This file tested the CanvasEditor for kind='composite' pages.
+ * Composite kind was removed in V2 unification (2026-04-15).
+ * All tests in this file are SKIPPED.
  *
- * Dimensions: D1 (nav), D4 (create), D6 (verify), D8 (edit), D11 (delete), D14 (feedback)
+ * Migration:
+ * - Dashboard pages now use Dashboard DSL instead
+ * - Page Designer is for CRUD pages (list/form/detail)
+ * - Widget pages use blocks structure (kind='dashboard')
  *
  * @since 4.0.0
+ * @deprecated 4.0.0 — composite kind no longer supported
  */
 
 import { test, expect } from '../../fixtures';
@@ -21,9 +25,11 @@ const BLOCK_SEL =
   ':not([data-testid*="-content-"])' +
   ':not([data-testid*="-drop-"])';
 
-test.describe('Page Designer V2 — Composite Page Lifecycle', () => {
+test.describe('Page Designer V2 — Composite Page Lifecycle (DEPRECATED)', () => {
   test.describe.configure({ mode: 'serial' });
   test.setTimeout(60_000);
+  // Skip all tests: composite kind removed in V2 unification
+  test.describe.skip('Composite kind removed in V2 unification (2026-04-15)', () => {
 
   const PREFIX = uniqueId('PDV2');
   let createdPagePid: string;
@@ -216,4 +222,5 @@ test.describe('Page Designer V2 — Composite Page Lifecycle', () => {
     ).first();
     await expect(content).toBeVisible({ timeout: 10_000 });
   });
+  }); // end skip: composite kind removed
 });
