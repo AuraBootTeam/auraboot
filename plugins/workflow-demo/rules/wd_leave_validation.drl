@@ -1,0 +1,39 @@
+package com.auraboot.workflow_demo;
+
+import java.util.Map;
+
+// Pre-flight leave request validation.
+// Fact is a java.util.Map<String, Object> with the following keys:
+//   - type             : String  ("annual" | "sick" | "personal" | "comp")
+//   - days             : Number
+//   - balanceRemaining : Number  (annual leave remaining)
+//   - attachmentCount  : Number
+//   - _ruleResult      : Map     (output channel)
+// The rule writes into _ruleResult:
+//   - valid  : Boolean
+//   - reason : String  (i18n error code)
+
+rule "reject_insufficient_annual_balance"
+    when
+        $req: Map(
+            this["type"] == "annual",
+            ((Number) this["days"]).doubleValue() > ((Number) this["balanceRemaining"]).doubleValue()
+        )
+    then
+        Map result = (Map) $req.get("_ruleResult");
+        result.put("valid", Boolean.FALSE);
+        result.put("reason", "annual_leave_insufficient");
+end
+
+rule "reject_sick_without_attachment"
+    when
+        $req: Map(
+            this["type"] == "sick",
+            ((Number) this["days"]).doubleValue() > 2.0,
+            ((Number) this["attachmentCount"]).intValue() == 0
+        )
+    then
+        Map result = (Map) $req.get("_ruleResult");
+        result.put("valid", Boolean.FALSE);
+        result.put("reason", "sick_attachment_required");
+end

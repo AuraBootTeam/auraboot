@@ -50,5 +50,35 @@
   { "key": "command.wd.delete_leave_request.title", "zh-CN": "删除请假申请", "en-US": "Delete Leave Request", "source": "import", "refType": "command" },
   { "key": "command.wd.submit_leave_request.title", "zh-CN": "提交请假申请", "en-US": "Submit Leave Request", "source": "import", "refType": "command" },
   { "key": "command.wd.create_leave_balance.title", "zh-CN": "新建请假余额", "en-US": "Create Leave Balance", "source": "import", "refType": "command" },
-  { "key": "command.wd.update_leave_balance.title", "zh-CN": "编辑请假余额", "en-US": "Update Leave Balance", "source": "import", "refType": "command" }
+  { "key": "command.wd.update_leave_balance.title", "zh-CN": "编辑请假余额", "en-US": "Update Leave Balance", "source": "import", "refType": "command" },
+  { "key": "command.wd.execute_deduct_balance.title", "zh-CN": "扣减请假余额", "en-US": "Deduct Leave Balance", "source": "import", "refType": "command" },
+
+  { "key": "process.wd_leave_approval.name", "zh-CN": "请假审批", "en-US": "Leave Request Approval", "source": "import", "refType": "process" },
+  { "key": "process.wd_leave_approval.node.start_1", "zh-CN": "开始", "en-US": "Start", "source": "import", "refType": "process" },
+  { "key": "process.wd_leave_approval.node.task_submit", "zh-CN": "员工提交", "en-US": "Employee Submit", "source": "import", "refType": "process" },
+  { "key": "process.wd_leave_approval.node.svc_rule_route", "zh-CN": "路由规则", "en-US": "Routing Rule", "source": "import", "refType": "process" },
+  { "key": "process.wd_leave_approval.node.gw_approver", "zh-CN": "审批人分派", "en-US": "Approver Dispatch", "source": "import", "refType": "process" },
+  { "key": "process.wd_leave_approval.node.task_manager_approve", "zh-CN": "主管审批", "en-US": "Manager Approve", "source": "import", "refType": "process" },
+  { "key": "process.wd_leave_approval.node.task_hr_approve", "zh-CN": "HR 审批", "en-US": "HR Approve", "source": "import", "refType": "process" },
+  { "key": "process.wd_leave_approval.node.gw_result", "zh-CN": "审批结果", "en-US": "Decision", "source": "import", "refType": "process" },
+  { "key": "process.wd_leave_approval.node.svc_deduct", "zh-CN": "扣减余额并通知", "en-US": "Deduct Balance & Notify", "source": "import", "refType": "process" },
+  { "key": "process.wd_leave_approval.node.end_approved", "zh-CN": "审批通过", "en-US": "Approved", "source": "import", "refType": "process" },
+  { "key": "process.wd_leave_approval.node.end_rejected", "zh-CN": "已驳回", "en-US": "Rejected", "source": "import", "refType": "process" },
+  { "key": "process.wd_leave_approval.edge.gw_approver_manager", "zh-CN": "主管", "en-US": "Manager", "source": "import", "refType": "process" },
+  { "key": "process.wd_leave_approval.edge.gw_approver_hr", "zh-CN": "HR", "en-US": "HR", "source": "import", "refType": "process" },
+  { "key": "process.wd_leave_approval.edge.gw_result_approved", "zh-CN": "通过", "en-US": "Approved", "source": "import", "refType": "process" },
+  { "key": "process.wd_leave_approval.edge.gw_result_rejected", "zh-CN": "驳回", "en-US": "Rejected", "source": "import", "refType": "process" },
+
+  { "key": "error.wd_leave_validation.annual_leave_insufficient", "zh-CN": "剩余年假不足，无法提交该申请", "en-US": "Insufficient annual leave balance; cannot submit this request", "source": "import", "refType": "error" },
+  { "key": "error.wd_leave_validation.sick_attachment_required", "zh-CN": "病假超过 2 天必须上传附件", "en-US": "Sick leave exceeding 2 days requires an attachment", "source": "import", "refType": "error" },
+
+  { "key": "sla.wd_manager_approve_sla.name", "zh-CN": "主管审批 SLA", "en-US": "Manager Approval SLA", "source": "import", "refType": "sla" },
+  { "key": "sla.wd_hr_approve_sla.name", "zh-CN": "HR 审批 SLA", "en-US": "HR Approval SLA", "source": "import", "refType": "sla" },
+  { "key": "sla.event.sla_warning", "zh-CN": "请假审批即将超时，请尽快处理", "en-US": "Leave approval is about to breach its SLA; please act soon", "source": "import", "refType": "sla" },
+  { "key": "sla.event.sla_escalated", "zh-CN": "请假审批已超时，已升级至上级审批人", "en-US": "Leave approval SLA breached; escalated to the next-level approver", "source": "import", "refType": "sla" },
+
+  { "key": "notify.wd.leave_request.approved", "zh-CN": "您的请假申请已通过审批", "en-US": "Your leave request has been approved", "source": "import", "refType": "notification" },
+  { "key": "notify.wd.leave_request.rejected", "zh-CN": "您的请假申请被驳回", "en-US": "Your leave request was rejected", "source": "import", "refType": "notification" },
+
+  { "key": "namedQuery.wd_leave_request_approval_history.title", "zh-CN": "请假审批历史", "en-US": "Leave Approval History", "source": "import", "refType": "namedQuery" }
 ]

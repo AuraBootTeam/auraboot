@@ -19,7 +19,9 @@
     {"type": "model", "code": "wd_leave_request"},
     {"type": "model", "code": "wd_leave_balance"},
     {"type": "command", "code": "wd:create_leave_request"},
-    {"type": "command", "code": "wd:submit_leave_request"}
+    {"type": "command", "code": "wd:submit_leave_request"},
+    {"type": "command", "code": "wd:execute_deduct_balance"},
+    {"type": "process", "code": "wd_leave_approval"}
   ],
   "requires": [],
   "resourceDirs": {
@@ -33,6 +35,10 @@
     "roles": "config/roles.json",
     "menus": "config/menus.json",
     "pages": "config/pages",
+    "processes": "config/processes.json",
+    "namedQueries": "config/namedQueries.json",
+    "rules": "config/rules.json",
+    "sla": "config/sla.json",
     "i18n": "config/i18n.json",
     "defaultBootstrap": "config/default-bootstrap.json"
   },
@@ -43,7 +49,7 @@
     "autoPublishFields": true,
     "autoPublishCommands": true,
     "autoPublishPages": true,
-    "autoDeployProcesses": false,
+    "autoDeployProcesses": true,
     "createResourcePermissions": true
   }
 }
