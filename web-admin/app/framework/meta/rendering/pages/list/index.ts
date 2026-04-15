@@ -1,6 +1,5 @@
 export { RowActionButtons } from './RowActionButtons';
 export { ColumnContextMenu } from './ColumnContextMenu';
-export { DashboardContent } from './DashboardContent';
 export { ListTabs } from './ListTabs';
 export { ListPagination } from './ListPagination';
 export { ListModals } from './ListModals';
