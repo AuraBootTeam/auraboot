@@ -7,6 +7,7 @@ import com.auraboot.framework.exception.ConflictException;
 import com.auraboot.framework.exception.PermissionDeniedException;
 import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.exception.ValidationException;
+import com.auraboot.framework.bpm.converter.BpmnConversionException;
 import com.auraboot.framework.meta.exception.TemporalParseException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
@@ -213,6 +214,19 @@ public class GlobalExceptionHandler {
 
         ApiResponse<Object> response = ApiResponse.errorWithContext(ResponseCode.BUSINESS_ERROR, ex.getMessage());
         return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+    }
+
+    /**
+     * BPMN designer-to-XML conversion or validation failures (naked sequence flows on
+     * exclusive gateways, multiple default flows, etc.). Returns 400 with the specific
+     * cause so the designer UI can surface it instead of a generic "Internal system error".
+     */
+    @ExceptionHandler(BpmnConversionException.class)
+    @ResponseBody
+    public ResponseEntity<ApiResponse<Object>> handleBpmnConversionException(BpmnConversionException ex) {
+        log.warn("BPMN conversion failed: {}", ex.getMessage());
+        ApiResponse<Object> response = ApiResponse.errorWithContext(ResponseCode.BadParam, ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
     @ExceptionHandler(BusinessException.class)
