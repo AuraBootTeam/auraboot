@@ -653,11 +653,10 @@ export const dashboardService = {
    * Get or create the current user's personal workbench dashboard.
    */
   async getWorkbench(): Promise<Dashboard | null> {
-    // The /api/dashboards/workbench endpoint is enterprise-only
-    // (ent-dashboard-workbench). In OSS it 404/401/500s — and even in
-    // enterprise, a brand-new user has no workbench yet. Treat any failure
-    // as "not configured" so home page renders the empty-state CTA instead
-    // of getting stuck on the loading spinner or an error screen.
+    // GET /api/dashboards/workbench — available in OSS core (DashboardController).
+    // Creates a default workbench from WorkbenchTemplateProvider on first access.
+    // Return null on any failure so home page renders the empty-state CTA instead
+    // of getting stuck on a loading spinner or error screen.
     try {
       const raw = await request<Dashboard>('/workbench');
       return normalizeDashboard(raw);
