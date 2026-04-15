@@ -753,7 +753,7 @@ CREATE TABLE ab_page_schema (
     description TEXT,
 
     -- Page kind (replaces page_type + page_category)
-    kind VARCHAR(50) NOT NULL,              -- list/form/detail/dashboard
+    kind VARCHAR(50) NOT NULL,              -- list/form/detail/composite (dashboards live in ab_dashboard)
 
     -- Flat schema fields (replaces dsl_schema JSONB blob)
     schema_version INTEGER NOT NULL DEFAULT 2,
