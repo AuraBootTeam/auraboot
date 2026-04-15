@@ -128,13 +128,12 @@ const adminProfile: RenderProfile = {
     // tabs, sub-table, monthly-grid are handled inline by page renderers
   ]),
 
-  kinds: ['page', 'list', 'form', 'detail', 'page_layout', 'dashboard', 'composite'],
+  kinds: ['page', 'list', 'form', 'detail', 'page_layout', 'composite'],
 
   pageRenderers: new Map<string, any>([
     ['list', ListPageContent],
     ['form', FormPageContent],
     ['detail', DetailPageContent],
-    ['dashboard', ListPageContent], // Dashboard uses list page content (handles isDashboard internally)
     ['composite', CompositePageContent],
   ]),
 

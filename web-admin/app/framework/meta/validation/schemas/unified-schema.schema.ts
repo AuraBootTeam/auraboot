@@ -4,8 +4,8 @@ import { blockSchema } from './block.schema';
 import { dataSourceConfigSchema, pageDataSourceSchema } from './data-source.schema';
 import { handlerConfigSchema } from './handler.schema';
 
-/** Kind values — includes Detail + Dashboard missing from old validator */
-export const KIND_VALUES = ['page', 'list', 'form', 'detail', 'page_layout', 'dashboard'] as const;
+/** Kind values — detail and page_layout added; dashboard removed (use composite pages instead) */
+export const KIND_VALUES = ['page', 'list', 'form', 'detail', 'page_layout'] as const;
 
 export const kindEnum = z.enum(KIND_VALUES);
 
