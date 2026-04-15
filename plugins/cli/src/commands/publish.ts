@@ -209,5 +209,6 @@ function buildExtendedManifest(plugin: ReturnType<typeof loadPlugin>): any {
     namedQueries: plugin.resourceFiles.get('named-queries') || [],
     savedViews: plugin.resourceFiles.get('saved-views') || [],
     bindingRules: plugin.resourceFiles.get('bindingRules') || [],
+    dashboards: plugin.resourceFiles.get('dashboards') || [],
   };
 }
