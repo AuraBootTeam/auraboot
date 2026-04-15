@@ -1,15 +1,16 @@
 package com.auraboot.framework.plugin.pf4j;
 
 import com.auraboot.framework.plugin.extension.*;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.pf4j.PluginWrapper;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Registry service for plugin extensions.
@@ -23,10 +24,16 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class ExtensionRegistry {
 
     private final AuraPluginManager pluginManager;
+    private final ObjectProvider<CommandHandlerExtension> coreCommandHandlerProvider;
+
+    public ExtensionRegistry(AuraPluginManager pluginManager,
+                             ObjectProvider<CommandHandlerExtension> coreCommandHandlerProvider) {
+        this.pluginManager = pluginManager;
+        this.coreCommandHandlerProvider = coreCommandHandlerProvider;
+    }
 
     // Extension caches by type
     private final Map<String, List<CommandHandlerExtension>> commandHandlers = new ConcurrentHashMap<>();
@@ -69,7 +76,12 @@ public class ExtensionRegistry {
      */
     public List<CommandHandlerExtension> getAllCommandHandlers() {
         if (allCommandHandlers == null) {
-            allCommandHandlers = pluginManager.getExtensionsOfType(CommandHandlerExtension.class);
+            // Merge handlers from two sources:
+            // 1. PF4J plugin extensions (contributed by dynamically loaded plugins)
+            // 2. Core Spring beans (handlers baked into the platform, e.g. bpm:run-rule)
+            List<CommandHandlerExtension> pluginHandlers = pluginManager.getExtensionsOfType(CommandHandlerExtension.class);
+            List<CommandHandlerExtension> coreHandlers = coreCommandHandlerProvider.stream().toList();
+            allCommandHandlers = Stream.concat(pluginHandlers.stream(), coreHandlers.stream()).toList();
         }
         return allCommandHandlers;
     }
