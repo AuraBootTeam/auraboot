@@ -27,30 +27,21 @@ test.describe('GAP-158: Page Designer enableMultiView Settings', () => {
     const ctx = await browser.newContext({ storageState: './tests/storage/admin.json' });
     const page = await ctx.newPage();
 
-    // Create a test page via API for the Page Designer
+    // Create a test page via API for the Page Designer (V2 flat format)
     const createResp = await page.request.post('/api/pages', {
       data: {
         pageKey: testPageKey,
         name: testPageName,
         title: testPageName,
         description: `E2E test page for GAP-158 enableMultiView toggle (${uid})`,
-        kind: 'composite',
-        blocks: [{ id: 'blk1', blockType: 'table', config: {} }],
-        metaInfo: { componentCount: 1 },
-        semver: '0.1.0',
-        dslSchema: {
-          $schema: 'auraboot://schemas/page/v4',
-          version: '4.0.0',
-          id: testPageKey,
-          kind: 'composite',
-          modelCode: 'e2et_order',
-          layout: { type: 'grid', columns: 12 },
-          areas: {
-            filters: { blocks: [] },
-            toolbar: { blocks: [] },
-            main: { blocks: [{ id: 'blk1', blockType: 'table', config: {} }] },
-          },
-        },
+        kind: 'list',
+        modelCode: 'e2et_order',
+        layout: { type: 'stack' },
+        blocks: [
+          { id: 'blk-toolbar', blockType: 'toolbar', buttons: [] },
+          { id: 'blk-filters', blockType: 'filters', fields: [] },
+          { id: 'blk-table', blockType: 'table', columns: [] },
+        ],
       },
     });
 
