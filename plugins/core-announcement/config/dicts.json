@@ -1,0 +1,66 @@
+[
+  {
+    "code": "announcement_priority",
+    "name": "Announcement Priority",
+    "name:zh-CN": "公告优先级",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "normal",
+        "label": "Normal",
+        "label:zh-CN": "普通",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": { "color": "default" }
+      },
+      {
+        "value": "high",
+        "label": "High",
+        "label:zh-CN": "高",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": { "color": "orange" }
+      },
+      {
+        "value": "urgent",
+        "label": "Urgent",
+        "label:zh-CN": "紧急",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": { "color": "red" }
+      }
+    ]
+  },
+  {
+    "code": "announcement_status",
+    "name": "Announcement Status",
+    "name:zh-CN": "公告状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "draft",
+        "label": "Draft",
+        "label:zh-CN": "草稿",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": { "color": "default" }
+      },
+      {
+        "value": "published",
+        "label": "Published",
+        "label:zh-CN": "已发布",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": { "color": "green" }
+      },
+      {
+        "value": "expired",
+        "label": "Expired",
+        "label:zh-CN": "已过期",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": { "color": "gray" }
+      }
+    ]
+  }
+]

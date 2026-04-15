@@ -1,0 +1,39 @@
+[
+  {
+    "code": "announcement_root",
+    "parentCode": null,
+    "name:zh-CN": "公告管理",
+    "name:en": "Announcements",
+    "path": "/announcements",
+    "component": null,
+    "icon": "IconSpeakerphone",
+    "type": 0,
+    "permissionCode": "announcement.announcement.read",
+    "orderNo": 920,
+    "visible": true,
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    }
+  },
+  {
+    "code": "core_announcement",
+    "parentCode": "announcement_root",
+    "name:zh-CN": "系统公告",
+    "name:en": "Announcements",
+    "path": "/p/ab_announcement",
+    "pageKey": "ab_announcement_list",
+    "component": null,
+    "icon": "IconSpeakerphone",
+    "type": 1,
+    "permissionCode": "announcement.announcement.read",
+    "orderNo": 10,
+    "visible": true,
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    }
+  }
+]

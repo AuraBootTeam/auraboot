@@ -1,0 +1,60 @@
+[
+  {
+    "code": "title",
+    "displayName:zh-CN": "标题",
+    "displayName:en": "Title",
+    "dataType": "string",
+    "constraints": { "required": true, "maxLength": 256 },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "content",
+    "displayName:zh-CN": "内容",
+    "displayName:en": "Content",
+    "dataType": "text",
+    "extension": { "multiline": true }
+  },
+  {
+    "code": "priority",
+    "displayName:zh-CN": "优先级",
+    "displayName:en": "Priority",
+    "dataType": "enum",
+    "dictCode": "announcement_priority",
+    "defaultValue": "normal",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "status",
+    "displayName:zh-CN": "状态",
+    "displayName:en": "Status",
+    "dataType": "enum",
+    "dictCode": "announcement_status",
+    "defaultValue": "draft",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "pinned",
+    "displayName:zh-CN": "置顶",
+    "displayName:en": "Pinned",
+    "dataType": "boolean",
+    "defaultValue": false
+  },
+  {
+    "code": "published_by",
+    "displayName:zh-CN": "发布人ID",
+    "displayName:en": "Published By",
+    "dataType": "long"
+  },
+  {
+    "code": "published_at",
+    "displayName:zh-CN": "发布时间",
+    "displayName:en": "Published At",
+    "dataType": "datetime"
+  },
+  {
+    "code": "expires_at",
+    "displayName:zh-CN": "过期时间",
+    "displayName:en": "Expires At",
+    "dataType": "datetime"
+  }
+]

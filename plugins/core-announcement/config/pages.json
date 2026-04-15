@@ -1,0 +1,194 @@
+[
+  {
+    "pageKey": "ab_announcement_list",
+    "name:zh-CN": "系统公告",
+    "name:en": "Announcements",
+    "modelCode": "ab_announcement",
+    "kind": "list",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "stack"
+    },
+    "blocks": [
+      {
+        "id": "toolbar",
+        "blockType": "toolbar",
+        "buttons": [
+          {
+            "code": "create",
+            "variant": "primary",
+            "label": "create",
+            "action": {
+              "type": "navigate",
+              "to": "ab_announcement_form",
+              "command": "announcement:create_announcement"
+            }
+          }
+        ]
+      },
+      {
+        "id": "filters",
+        "blockType": "filters",
+        "fields": [
+          { "field": "title" },
+          { "field": "status" },
+          { "field": "priority" }
+        ]
+      },
+      {
+        "id": "table",
+        "blockType": "table",
+        "columns": [
+          {
+            "field": "title",
+            "width": 280,
+            "sortable": true
+          },
+          {
+            "field": "priority",
+            "width": 100,
+            "renderType": "tag"
+          },
+          {
+            "field": "status",
+            "width": 100,
+            "renderType": "tag"
+          },
+          {
+            "field": "pinned",
+            "width": 80
+          },
+          {
+            "field": "published_by",
+            "width": 120
+          },
+          {
+            "field": "published_at",
+            "width": 160,
+            "format": "YYYY-MM-DD HH:mm"
+          },
+          {
+            "field": "expires_at",
+            "width": 160,
+            "format": "YYYY-MM-DD HH:mm"
+          }
+        ],
+        "rowActions": [
+          {
+            "code": "view",
+            "label": "view",
+            "action": {
+              "type": "navigate",
+              "to": "ab_announcement_detail"
+            }
+          },
+          {
+            "code": "edit",
+            "label": "edit",
+            "action": {
+              "type": "navigate",
+              "to": "ab_announcement_form",
+              "command": "announcement:update_announcement"
+            }
+          },
+          {
+            "code": "delete",
+            "variant": "danger",
+            "label": "delete",
+            "confirm": "delete.confirm",
+            "action": {
+              "type": "command",
+              "command": "announcement:delete_announcement"
+            }
+          }
+        ],
+        "defaultSort": {
+          "field": "created_at",
+          "order": "desc"
+        }
+      }
+    ]
+  },
+  {
+    "pageKey": "ab_announcement_form",
+    "name:zh-CN": "公告表单",
+    "name:en": "Announcement Form",
+    "modelCode": "ab_announcement",
+    "kind": "form",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "grid",
+      "cols": 12
+    },
+    "blocks": [
+      {
+        "id": "basic",
+        "blockType": "form-section",
+        "title": {
+          "zh-CN": "基本信息",
+          "en-US": "Basic Information"
+        },
+        "fields": [
+          { "field": "title", "colSpan": 12 },
+          { "field": "priority", "colSpan": 4 },
+          { "field": "status", "colSpan": 4 },
+          { "field": "pinned", "colSpan": 4 },
+          { "field": "expires_at", "colSpan": 6 },
+          { "field": "content", "colSpan": 12 }
+        ]
+      },
+      {
+        "id": "buttons",
+        "blockType": "form-buttons",
+        "buttons": [
+          {
+            "code": "submit",
+            "primary": true,
+            "label": "save",
+            "action": {
+              "type": "command",
+              "command": "announcement:update_announcement"
+            }
+          },
+          {
+            "code": "cancel",
+            "label": "cancel"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "pageKey": "ab_announcement_detail",
+    "name:zh-CN": "公告详情",
+    "name:en": "Announcement Detail",
+    "modelCode": "ab_announcement",
+    "kind": "detail",
+    "schemaVersion": 2,
+    "layout": {
+      "type": "grid",
+      "cols": 12
+    },
+    "blocks": [
+      {
+        "id": "basic",
+        "blockType": "form-section",
+        "title": {
+          "zh-CN": "基本信息",
+          "en-US": "Basic Information"
+        },
+        "readOnly": true,
+        "fields": [
+          { "field": "title", "colSpan": 12 },
+          { "field": "priority", "colSpan": 4 },
+          { "field": "status", "colSpan": 4 },
+          { "field": "pinned", "colSpan": 4 },
+          { "field": "published_by", "colSpan": 6 },
+          { "field": "published_at", "colSpan": 6 },
+          { "field": "expires_at", "colSpan": 6 },
+          { "field": "content", "colSpan": 12 }
+        ]
+      }
+    ]
+  }
+]

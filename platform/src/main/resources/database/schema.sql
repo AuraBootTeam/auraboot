@@ -7127,6 +7127,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_ab_im_notif_pref_unique
 
 CREATE TABLE IF NOT EXISTS ab_announcement (
     id              BIGINT PRIMARY KEY,
+    pid             VARCHAR(36),
     tenant_id       BIGINT       NOT NULL,
     title           VARCHAR(256) NOT NULL,
     content         TEXT,
@@ -7138,6 +7139,8 @@ CREATE TABLE IF NOT EXISTS ab_announcement (
     expires_at      TIMESTAMPTZ,
     created_at      TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by      BIGINT,
+    updated_by      BIGINT,
     deleted_flag    BOOLEAN      DEFAULT FALSE
 );
 CREATE INDEX IF NOT EXISTS idx_announcement_tenant_status ON ab_announcement(tenant_id, status);
