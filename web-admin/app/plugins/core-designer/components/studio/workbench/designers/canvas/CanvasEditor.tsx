@@ -6,7 +6,7 @@
  * - Center: CanvasBody with title, blocks, empty state
  * - Right panel: Block config (placeholder for Task 7)
  *
- * Manages state via useCanvasBlocks and converts to/from DslV4Schema.
+ * Manages state via useCanvasBlocks and converts to/from PageSchema.
  *
  * @since 4.0.0
  */
@@ -26,7 +26,7 @@ import { initRegistry } from '~/plugins/core-designer/components/studio/registry
 // This ensures WidgetPalette, BlockPalette, and config panels all see
 // the full registry before any component renders.
 initRegistry();
-import type { DslV4Schema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
+import type { PageSchema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 import { CURRENT_SCHEMA_VERSION } from '~/framework/meta/migration';
 import type { CanvasBlock } from '~/plugins/core-designer/components/studio/domain/canvas/types';
 import { useCanvasBlocks } from '~/plugins/core-designer/components/studio/hooks/canvas/useCanvasBlocks';
@@ -46,9 +46,9 @@ import {
 import { useCanvasDragState } from './useCanvasDragState';
 
 export interface CanvasEditorProps {
-  dsl: DslV4Schema;
-  onDslChange: (dsl: DslV4Schema) => void;
-  onSave?: (dsl: DslV4Schema) => Promise<void>;
+  dsl: PageSchema;
+  onDslChange: (dsl: PageSchema) => void;
+  onSave?: (dsl: PageSchema) => Promise<void>;
   modelCode?: string;
   readonly?: boolean;
   previewMode?: boolean;
@@ -59,7 +59,7 @@ export interface CanvasEditorProps {
 /**
  * Extract canvas blocks from DSL schema
  */
-function extractBlocks(dsl: DslV4Schema): CanvasBlock[] {
+function extractBlocks(dsl: PageSchema): CanvasBlock[] {
   const raw = dsl as unknown as Record<string, unknown>;
   if (Array.isArray(raw.blocks)) {
     return raw.blocks as CanvasBlock[];
@@ -70,7 +70,7 @@ function extractBlocks(dsl: DslV4Schema): CanvasBlock[] {
 /**
  * Extract title string from DSL
  */
-function extractTitle(dsl: DslV4Schema): string {
+function extractTitle(dsl: PageSchema): string {
   const raw = dsl as unknown as Record<string, unknown>;
   if (typeof raw.title === 'string') return raw.title;
   if (raw.title && typeof raw.title === 'object') {
@@ -83,7 +83,7 @@ function extractTitle(dsl: DslV4Schema): string {
 /**
  * Extract description from DSL
  */
-function extractDescription(dsl: DslV4Schema): string {
+function extractDescription(dsl: PageSchema): string {
   const raw = dsl as unknown as Record<string, unknown>;
   return typeof raw.description === 'string' ? raw.description : '';
 }
@@ -138,7 +138,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
     isInternalChange.current = true;
 
     // Build updated DSL — strip areas/floors (not used by composite)
-    const { areas: _a, floors: _f, components: _c, ...baseDsl } = dsl as DslV4Schema & {
+    const { areas: _a, floors: _f, components: _c, ...baseDsl } = dsl as PageSchema & {
       areas?: unknown;
       floors?: unknown;
       components?: unknown;
@@ -151,7 +151,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
       title: title || undefined,
       description: description || undefined,
       schemaVersion: CURRENT_SCHEMA_VERSION,
-    } as unknown as DslV4Schema;
+    } as unknown as PageSchema;
 
     onDslChange(updatedDsl);
   }, [blocks, title, description]);

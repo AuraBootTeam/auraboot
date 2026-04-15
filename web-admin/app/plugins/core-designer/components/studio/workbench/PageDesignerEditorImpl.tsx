@@ -24,13 +24,13 @@ import { useDslHistory } from '~/plugins/core-designer/components/studio/hooks/u
 import { useDesignerShortcuts } from '~/plugins/core-designer/components/studio/hooks/shortcuts/useDesignerShortcuts';
 import { pageManagerService } from '~/plugins/core-designer/components/studio/services/page-manager';
 import type { PageMeta } from '~/plugins/core-designer/components/studio/services/page-manager';
-import type { DslV4Schema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
+import type { PageSchema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 import { DEVICE_PRESETS } from '~/plugins/core-designer/components/studio/workbench/canvas/devices/presets';
 
 /**
  * Build default DSL V4 schema for a page
  */
-function buildDefaultDslV4(page: PageMeta): DslV4Schema {
+function buildDefaultDslV4(page: PageMeta): PageSchema {
   // Detect composite pages from page mode or existing DSL
   const rawSchema = page.dslSchema as Record<string, unknown> | null;
   const isComposite = page.mode === 'composite' || rawSchema?.kind === 'composite';
@@ -43,7 +43,7 @@ function buildDefaultDslV4(page: PageMeta): DslV4Schema {
       kind: 'composite',
       modelCode: page.viewModelCode || '',
       layout: { type: 'canvas' },
-    } as DslV4Schema;
+    } as PageSchema;
   }
 
   const kind = page.mode === 'form' ? 'form' : 'list';
@@ -81,7 +81,7 @@ export default function PageDesignerEditorImpl() {
   const { showSuccessToast } = useToastContext();
 
   // DSL V4 state
-  const [dsl, setDsl] = useState<DslV4Schema | null>(null);
+  const [dsl, setDsl] = useState<PageSchema | null>(null);
 
   // DSL history for undo/redo — initialized with a placeholder, updated once DSL loads
   const dslHistory = useDslHistory(
@@ -120,7 +120,7 @@ export default function PageDesignerEditorImpl() {
           setIsCustomApiMode(detectedCustomApi);
 
           // Load DSL V4 or create default
-          const rawDsl = result.dslSchema as unknown as DslV4Schema | null;
+          const rawDsl = result.dslSchema as unknown as PageSchema | null;
           if (rawDsl && rawDsl.kind && (rawDsl.areas || rawDsl.floors || rawDsl.kind === 'composite')) {
             setDsl(rawDsl);
           } else if (result.mode === 'composite') {
@@ -144,7 +144,7 @@ export default function PageDesignerEditorImpl() {
 
   // Ref for debounced auto-save timer
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const latestDslRef = useRef<DslV4Schema | null>(null);
+  const latestDslRef = useRef<PageSchema | null>(null);
 
   // Clean up debounce timer on unmount
   useEffect(() => {
@@ -228,7 +228,7 @@ export default function PageDesignerEditorImpl() {
 
   // DSL change handler — also pushes to history and schedules auto-save
   const handleDslChange = useCallback(
-    (newDsl: DslV4Schema) => {
+    (newDsl: PageSchema) => {
       setDsl(newDsl);
       latestDslRef.current = newDsl;
       dslHistory.pushState(newDsl);
@@ -260,7 +260,7 @@ export default function PageDesignerEditorImpl() {
   const handleSettingsChange = useCallback(
     (settings: AllSettings) => {
       if (!dsl) return;
-      const updatedDsl: DslV4Schema = {
+      const updatedDsl: PageSchema = {
         ...dsl,
         enableMultiView: settings.page.enableMultiView,
       };
@@ -271,7 +271,7 @@ export default function PageDesignerEditorImpl() {
 
   // DSL save handler
   const handleDslSave = useCallback(
-    async (newDsl: DslV4Schema) => {
+    async (newDsl: PageSchema) => {
       if (!id) return;
       const rawSaveDsl = newDsl as unknown as Record<string, unknown>;
       let blockCount: number;
@@ -304,7 +304,7 @@ export default function PageDesignerEditorImpl() {
     if (updatedPage) {
       setPage(updatedPage);
       // Also reload DSL
-      const rawDsl = updatedPage.dslSchema as unknown as DslV4Schema | null;
+      const rawDsl = updatedPage.dslSchema as unknown as PageSchema | null;
       if (rawDsl && rawDsl.kind && rawDsl.areas) {
         setDsl(rawDsl);
       }
@@ -321,7 +321,7 @@ export default function PageDesignerEditorImpl() {
           ? [...existingBlocks, ...generated.blocks]
           : generated.blocks;
 
-      const aiDsl: DslV4Schema = {
+      const aiDsl: PageSchema = {
         ...(dsl || {}),
         $schema: 'auraboot://schemas/page/v4',
         version: '4.0.0',
@@ -331,7 +331,7 @@ export default function PageDesignerEditorImpl() {
         blocks: mergedBlocks,
         layout: generated.layout,
         schemaVersion: generated.schemaVersion,
-      } as DslV4Schema;
+      } as PageSchema;
       handleDslChange(aiDsl);
       showSuccessToast(
         mergeMode === 'append'

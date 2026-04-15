@@ -7,7 +7,7 @@
  */
 
 import React from 'react';
-import type { DslV4Schema, PageKind } from '~/plugins/core-designer/components/studio/domain/dsl/types';
+import type { PageSchema, PageKind } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 import { AreasDesigner } from './AreasDesigner';
 import { FloorsDesigner } from './FloorsDesigner';
 import { CanvasEditor } from './canvas/CanvasEditor';
@@ -16,17 +16,17 @@ export interface DesignerRouterProps {
   /**
    * The DSL V4 schema to edit
    */
-  dsl: DslV4Schema;
+  dsl: PageSchema;
 
   /**
    * Callback when DSL is modified
    */
-  onDslChange: (dsl: DslV4Schema) => void;
+  onDslChange: (dsl: PageSchema) => void;
 
   /**
    * Callback to save DSL
    */
-  onSave?: (dsl: DslV4Schema) => Promise<void>;
+  onSave?: (dsl: PageSchema) => Promise<void>;
 
   /**
    * Model code for field lookup

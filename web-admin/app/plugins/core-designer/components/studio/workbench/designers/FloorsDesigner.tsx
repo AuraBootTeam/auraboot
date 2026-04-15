@@ -21,7 +21,7 @@ import {
 } from '@dnd-kit/core';
 import type { DragStartEvent, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
-import type { DslV4Schema, DslFloor, DslComponent } from '~/plugins/core-designer/components/studio/domain/dsl/types';
+import type { PageSchema, DslFloor, DslComponent } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 import { useFloorsDsl } from './floors/hooks/useFloorsDsl';
 import { FloorCanvas } from './floors/FloorCanvas';
 import { FloorPropertyPanel } from './floors/FloorPropertyPanel';
@@ -29,9 +29,9 @@ import { FloorComponentLibrary } from './floors/FloorComponentLibrary';
 import { FloorOutline } from './floors/FloorOutline';
 
 export interface FloorsDesignerProps {
-  dsl: DslV4Schema;
-  onDslChange: (dsl: DslV4Schema) => void;
-  onSave?: (dsl: DslV4Schema) => Promise<void>;
+  dsl: PageSchema;
+  onDslChange: (dsl: PageSchema) => void;
+  onSave?: (dsl: PageSchema) => Promise<void>;
   modelCode?: string;
   readonly?: boolean;
   previewMode?: boolean;
