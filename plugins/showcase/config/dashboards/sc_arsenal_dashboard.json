@@ -1,0 +1,27 @@
+{
+  "code": "sc_arsenal_dashboard",
+  "title": "Showcase Arsenal Dashboard",
+  "description": "Showcase arsenal demo dashboard with sample widgets.",
+  "scope": "global",
+  "status": "published",
+  "layoutConfig": {
+    "columns": 12,
+    "rowHeight": 100,
+    "gap": 16
+  },
+  "widgets": [
+    {
+      "id": "welcome",
+      "type": "smart-rich-text",
+      "x": 0,
+      "y": 0,
+      "w": 12,
+      "h": 2,
+      "title": "Welcome",
+      "config": {
+        "title": "Welcome",
+        "content": "<h2>Showcase Arsenal</h2><p>Default OSS showcase dashboard. Customize this via Dashboard Designer (Enterprise).</p>"
+      }
+    }
+  ]
+}

@@ -13,12 +13,30 @@
   "minPlatformVersion": "1.0.0",
   "dependencies": [],
   "provides": [
-    {"type": "model", "code": "showcase_all_fields"},
-    {"type": "command", "code": "sc:create_showcase"},
-    {"type": "command", "code": "sc:update_showcase"},
-    {"type": "command", "code": "sc:delete_showcase"},
-    {"type": "command", "code": "sc:activate_showcase"},
-    {"type": "command", "code": "sc:archive_showcase"}
+    {
+      "type": "model",
+      "code": "showcase_all_fields"
+    },
+    {
+      "type": "command",
+      "code": "sc:create_showcase"
+    },
+    {
+      "type": "command",
+      "code": "sc:update_showcase"
+    },
+    {
+      "type": "command",
+      "code": "sc:delete_showcase"
+    },
+    {
+      "type": "command",
+      "code": "sc:activate_showcase"
+    },
+    {
+      "type": "command",
+      "code": "sc:archive_showcase"
+    }
   ],
   "requires": [],
   "resourceDirs": {
@@ -31,7 +49,8 @@
     "permissions": "config/permissions.json",
     "menus": "config/menus.json",
     "i18n": "config/i18n.json",
-    "roles": "config/roles.json"
+    "roles": "config/roles.json",
+    "dashboards": "config/dashboards"
   },
   "importOptions": {
     "conflictStrategy": "overwrite",
