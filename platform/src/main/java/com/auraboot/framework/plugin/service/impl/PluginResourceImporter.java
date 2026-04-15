@@ -64,6 +64,13 @@ public interface PluginResourceImporter {
     PluginResource importNamedQuery(NamedQueryDefinitionDTO dto, String pluginPid, String importId,
                                     Long tenantId, ImportRequest.ConflictStrategy conflictStrategy);
 
+    /**
+     * Import a dashboard definition from {@code config/dashboards/*.json}.
+     * This is the first-class contract (Plan #8) — no conversion needed.
+     */
+    PluginResource importDashboard(DashboardDefinitionDTO dto, String pluginPid, String importId,
+                                   Long tenantId, ImportRequest.ConflictStrategy conflictStrategy);
+
     // ==================== Rollback Operations ====================
 
     void rollbackResource(PluginResource resource);
