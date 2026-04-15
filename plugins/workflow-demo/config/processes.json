@@ -37,23 +37,13 @@
         },
         {
           "id": "svc_rule_route",
-          "type": "serviceTask",
+          "type": "rule-task",
           "position": { "x": 400, "y": 240 },
           "data": {
             "label:zh-CN": "路由规则",
             "label:en": "Routing Rule",
-            "serviceType": "command",
-            "commandCode": "bpm:run-rule",
-            "args": {
-              "ruleCode": "wd_leave_routing",
-              "facts": {
-                "days": "${days}",
-                "type": "${type}"
-              }
-            },
-            "outputMapping": {
-              "approverRole": "${_ruleResult.approverRole}"
-            }
+            "ruleCode": "wd_leave_routing",
+            "factsVars": "days,type"
           }
         },
         {
@@ -140,40 +130,26 @@
         },
         {
           "id": "svc_notify_approved",
-          "type": "serviceTask",
+          "type": "notification-task",
           "position": { "x": 1120, "y": 140 },
           "data": {
             "label:zh-CN": "通知申请人（通过）",
             "label:en": "Notify Applicant (Approved)",
-            "serviceType": "command",
-            "commandCode": "bpm:publish-notification",
-            "args": {
-              "eventCode": "wd_request_approved",
-              "recipientFrom": "applicant",
-              "templateParams": {
-                "code": "${businessKey}",
-                "days": "${days}"
-              }
-            }
+            "eventCode": "wd_request_approved",
+            "recipientFrom": "applicant",
+            "templateParamsVars": "businessKey,days"
           }
         },
         {
           "id": "svc_notify_rejected",
-          "type": "serviceTask",
+          "type": "notification-task",
           "position": { "x": 1120, "y": 340 },
           "data": {
             "label:zh-CN": "通知申请人（驳回）",
             "label:en": "Notify Applicant (Rejected)",
-            "serviceType": "command",
-            "commandCode": "bpm:publish-notification",
-            "args": {
-              "eventCode": "wd_request_rejected",
-              "recipientFrom": "applicant",
-              "templateParams": {
-                "code": "${businessKey}",
-                "days": "${days}"
-              }
-            }
+            "eventCode": "wd_request_rejected",
+            "recipientFrom": "applicant",
+            "templateParamsVars": "businessKey,days"
           }
         },
         {
