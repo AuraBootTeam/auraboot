@@ -1,9 +1,8 @@
 /**
  * Page Schema V2 — aligned with ab_page_schema (schemaVersion = 2).
  *
- * Migration in progress: areas/floors/components/$schema/version fields
- * are legacy V4 carryovers and will be removed in Phase 1 of the
- * Studio V2 unification plan.
+ * V2 flat shape: kind/blocks/layout/profile — no areas/floors/components.
+ * Dashboard pages are handled by Dashboard Designer (separate track).
  *
  * Authoritative spec: docs/plans/2026-03/2026-03-30-page-type-unification-design.md
  */
@@ -12,92 +11,37 @@
 // Core Types
 // =============================================================================
 
+export type LocalizedText = string | Record<string, string>;
+
 /**
- * Page schema version 4.0
+ * Page layout — stack (vertical sections) or grid (12-col).
+ * Replaces legacy DslLayoutConfig union (flex/floor/canvas/areas variants removed).
+ */
+export type PageLayout =
+  | { type: 'stack' }
+  | { type: 'grid'; cols: number };
+
+/**
+ * Page kind — list/form/detail only.
+ * Dashboard is handled by Dashboard Designer (separate track).
+ * Home/composite were V4 concepts; home is deleted, composite is evaluated in Task 4.6.
+ */
+export type PageKind = 'list' | 'form' | 'detail';
+
+/**
+ * Page Schema V2 — flat shape stored in ab_page_schema.blocks (JSONB).
  */
 export interface PageSchema {
-  // Meta information
-  $schema: 'auraboot://schemas/page/v4';
-  version: '4.0.0';
-  id: string;
+  schemaVersion: 2;
   kind: PageKind;
-  modelCode: string;
-
-  // Layout configuration
-  layout: DslLayoutConfig;
-
-  // State management
-  state?: Record<string, unknown>;
-
-  // Content structures (mutually exclusive based on kind)
-  areas?: Record<string, DslArea>; // list/form pages
-  floors?: DslFloor[]; // detail/home pages
-  components?: DslComponent[]; // floor content components
-
-  // Data sources
-  dataSources?: Record<string, DslDataSource>;
-
-  // Custom handlers (optional, standard actions are built-in)
-  handlers?: Record<string, DslHandler>;
-
-  // Multi-view support — show view type tabs (Table/Kanban/Calendar) on list pages
-  enableMultiView?: boolean;
-}
-
-/**
- * Page kind determines the content structure
- */
-export type PageKind = 'form' | 'list' | 'detail' | 'home' | 'composite';
-
-// =============================================================================
-// Layout Types
-// =============================================================================
-
-/**
- * Layout configuration - varies by type
- */
-export type DslLayoutConfig =
-  | DslGridLayout
-  | DslFlexLayout
-  | DslFloorLayout
-  | DslCanvasLayout
-  | DslAreasLayout;
-
-export interface DslGridLayout {
-  type: 'grid';
-  columns: number;
-  gap?: number;
-  rows?: number | 'auto';
-}
-
-export interface DslFlexLayout {
-  type: 'flex';
-  direction?: 'row' | 'column';
-  justify?: 'start' | 'end' | 'center' | 'space-between' | 'space-around';
-  align?: 'start' | 'end' | 'center' | 'stretch' | 'flex-start' | 'flex-end';
-  gap?: number;
-}
-
-export interface DslFloorLayout {
-  type: 'floor';
-  gap?: number;
-}
-
-export interface DslCanvasLayout {
-  type: 'canvas';
-  grid?: {
-    columns: number;
-    rows: string | number;
-    gap: number;
-  };
-}
-
-export interface DslAreasLayout {
-  areas: string[];
-  areasConfig?: Record<
-    string,
-    Omit<DslGridLayout | DslFlexLayout, 'type'> & { type: 'grid' | 'flex' }
-  >;
+  id: string;
+  pageKey?: string;
+  modelCode?: string;
+  title?: LocalizedText;
+  profile?: 'admin' | 'report';
+  layout: PageLayout;
+  blocks: DslBlock[];
+  extension?: Record<string, unknown>;
 }
 
 // =============================================================================
@@ -379,7 +323,7 @@ export interface DslButton {
 export interface DslFloor {
   id: string;
   title?: string;
-  layout?: DslLayoutConfig;
+  layout?: PageLayout; // dead code — DslFloor removed in Phase 4
   collapsible?: boolean;
   defaultCollapsed?: boolean;
   visible?: string; // SpEL expression
