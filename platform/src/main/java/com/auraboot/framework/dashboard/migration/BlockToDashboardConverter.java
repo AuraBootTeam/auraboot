@@ -135,8 +135,9 @@ public final class BlockToDashboardConverter {
             @SuppressWarnings("unchecked")
             Map<String, Object> block = (Map<String, Object>) blocks.get(i);
 
-            int colSpan = getInt(block, "colSpan", 12);
-            int rowSpan = getInt(block, "rowSpan", 1);
+            Map<String, Object> layout = extractLayoutMap(block);
+            int colSpan = getInt(layout, "colSpan", getInt(block, "colSpan", 12));
+            int rowSpan = getInt(layout, "rowSpan", getInt(block, "rowSpan", 1));
             String blockId = block.containsKey("id") ? String.valueOf(block.get("id")) : "widget_" + i;
             String widgetType = mapWidgetType(block);
 
@@ -217,6 +218,20 @@ public final class BlockToDashboardConverter {
                 .map(String::valueOf)
                 .findFirst()
                 .orElse("");
+    }
+
+    /**
+     * Extract a block's nested `layout` map if present. Real plugin JSONs use
+     * `{ "blockType": "chart", "layout": { "colSpan": 6, "rowSpan": 3 } }`.
+     * Returns empty map when the block has no layout object so callers can fall back.
+     */
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> extractLayoutMap(Map<String, Object> block) {
+        Object layout = block.get("layout");
+        if (layout instanceof Map<?, ?> m) {
+            return (Map<String, Object>) m;
+        }
+        return Map.of();
     }
 
     private static int getInt(Map<String, Object> map, String key, int defaultValue) {
