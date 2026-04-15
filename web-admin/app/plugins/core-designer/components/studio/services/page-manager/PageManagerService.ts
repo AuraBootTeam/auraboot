@@ -425,7 +425,7 @@ export class PageManagerService {
           id: dto.pid,
           name: (typeof dto.title === 'string' ? dto.title : dto.title?.['en-US'] || dto.title?.['zh-CN'] || dto.name) || dto.name,
           description: dto.description,
-          mode: dto.kind === 'form' ? 'form' : dto.kind === 'dashboard' ? 'grid' : 'floor',
+          mode: dto.kind === 'form' ? 'form' : 'floor',
           thumbnail: dto.metaInfo?.thumbnail as string | undefined,
           category: dto.templateCategory || '自定义模板',
           isBuiltIn: false,
