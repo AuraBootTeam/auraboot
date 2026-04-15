@@ -8,29 +8,5 @@
       "sc.showcase.manage",
       "sc.showcase.read"
     ]
-  },
-  {
-    "code": "sc_reviewer",
-    "displayName:zh-CN": "审批员",
-    "displayName:en": "Reviewer",
-    "permissions": ["sc.workflow.read", "sc.workflow.approve"]
-  },
-  {
-    "code": "sc_senior_reviewer",
-    "displayName:zh-CN": "高级审批员",
-    "displayName:en": "Senior Reviewer",
-    "permissions": ["sc.workflow.read", "sc.workflow.approve"]
-  },
-  {
-    "code": "sc_manager",
-    "displayName:zh-CN": "工作流管理员",
-    "displayName:en": "Workflow Manager",
-    "permissions": ["sc.workflow.manage", "sc.workflow.read", "sc.workflow.approve", "sc.workflow.execute"]
-  },
-  {
-    "code": "sc_executor",
-    "displayName:zh-CN": "执行人",
-    "displayName:en": "Executor",
-    "permissions": ["sc.workflow.read", "sc.workflow.execute"]
   }
 ]
