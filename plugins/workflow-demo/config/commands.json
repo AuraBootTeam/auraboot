@@ -65,11 +65,48 @@
     "type": "state_transition",
     "modelCode": "wd_leave_request",
     "stateField": "wd_req_status",
-    "fromStates": ["draft"],
+    "fromStates": ["draft", "rejected"],
     "toState": "submitted",
     "permissions": ["wd.leave_request.submit"],
-    "agent_hint": "Submit a draft leave request for approval. Phase 2 will add Drools pre-flight validation and start a BPM process instance.",
-    "cmd_risk_level": "L2"
+    "agent_hint": "Submit a draft leave request. Runs Drools validation (wd_leave_validation) pre-flight; on success starts BPM process wd_leave_approval and stores the process instance id on wd_req_process_instance.",
+    "cmd_risk_level": "L2",
+    "extension": {
+      "confirmMessage:zh-CN": "确认提交该请假申请？提交后将进入审批流程。",
+      "confirmMessage:en": "Confirm submission? The request will enter the approval workflow.",
+      "preflightRule": {
+        "ruleCode": "wd_leave_validation",
+        "factBuilder": {
+          "type": "${record.wd_req_type}",
+          "days": "${record.wd_req_days}",
+          "balanceRemaining": "${balance.wd_bal_annual_remaining}",
+          "attachmentCount": "${record.wd_req_attachments.size}"
+        },
+        "balanceLookup": {
+          "modelCode": "wd_leave_balance",
+          "filter": {
+            "wd_bal_employee": "${record.wd_req_applicant}",
+            "wd_bal_year": "${record.wd_req_start_date.year}"
+          },
+          "resultAlias": "balance"
+        },
+        "onInvalid": {
+          "throwException": "BusinessException",
+          "messageKeyPrefix": "error.wd_leave_validation.",
+          "messageKeyFromField": "reason"
+        }
+      },
+      "startProcess": {
+        "processKey": "wd_leave_approval",
+        "businessKeyField": "wd_req_code",
+        "variables": {
+          "applicant": "${record.wd_req_applicant}",
+          "type": "${record.wd_req_type}",
+          "days": "${record.wd_req_days}",
+          "leaveRequestId": "${record.pid}"
+        },
+        "storeInstanceIdIn": "wd_req_process_instance"
+      }
+    }
   },
   {
     "code": "wd:create_leave_balance",
@@ -100,5 +137,46 @@
     "permissions": ["wd.leave_balance.manage"],
     "agent_hint": "Update an employee's leave balance.",
     "cmd_risk_level": "L1"
+  },
+  {
+    "code": "wd:execute_deduct_balance",
+    "displayName:zh-CN": "扣减请假余额",
+    "displayName:en": "Deduct Leave Balance",
+    "description": "Service-task command invoked by svc_deduct node after final approval. Decrements wd_bal_annual_remaining (for annual/comp) or increments wd_bal_sick_used (for sick), then publishes an in-app notification to the applicant.",
+    "type": "update",
+    "modelCode": "wd_leave_balance",
+    "permissions": ["wd.leave_balance.manage"],
+    "agent_hint": "Internal command called from the BPM svc_deduct serviceTask. Not intended for direct UI invocation.",
+    "cmd_risk_level": "L2",
+    "extension": {
+      "invokedBy": "serviceTask",
+      "processKey": "wd_leave_approval",
+      "nodeId": "svc_deduct",
+      "deductionRules": [
+        {
+          "whenLeaveType": "annual",
+          "field": "wd_bal_annual_remaining",
+          "operation": "subtract",
+          "amountExpr": "${process.days}"
+        },
+        {
+          "whenLeaveType": "comp",
+          "field": "wd_bal_annual_remaining",
+          "operation": "subtract",
+          "amountExpr": "${process.days}"
+        },
+        {
+          "whenLeaveType": "sick",
+          "field": "wd_bal_sick_used",
+          "operation": "add",
+          "amountExpr": "${process.days}"
+        }
+      ],
+      "notification": {
+        "eventType": "request_approved",
+        "recipient": "${process.applicant}",
+        "templateKey": "notify.wd.leave_request.approved"
+      }
+    }
   }
 ]
