@@ -1100,7 +1100,7 @@ export function ListPageContent(props: PageContentProps) {
   );
 
   useEffect(() => {
-    if (!schema) return;
+    if (!schema || isDashboard) return;
     loadData({ page: 0, size: pagination.pageSize, filters });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSortFilterValues]);
