@@ -12,22 +12,19 @@
 export type PageStatus = 'draft' | 'published' | 'modified' | 'archived';
 
 /**
- * Page mode/type
- */
-export type PageMode = 'grid' | 'floor' | 'form' | 'composite';
-
-/**
  * Page metadata
  */
 export interface PageMeta {
   /** Page unique ID */
   id: string;
+  /** Page key */
+  pageKey?: string;
   /** Page title */
   title: string;
   /** Page description */
   description?: string;
-  /** Page mode */
-  mode: PageMode;
+  /** Page kind (V2: list | form | detail) */
+  kind: 'list' | 'form' | 'detail';
   /** Associated ViewModel code */
   viewModelCode?: string;
   /** Page status */
@@ -62,8 +59,8 @@ export interface PageListFilter {
   query?: string;
   /** Filter by status */
   status?: PageStatus | 'all';
-  /** Filter by mode */
-  mode?: PageMode | 'all';
+  /** Filter by kind */
+  kind?: 'list' | 'form' | 'detail' | 'all';
   /** Filter by ViewModel */
   viewModelCode?: string;
   /** Filter by tags */
@@ -114,15 +111,15 @@ export interface CreatePageRequest {
   pageKey?: string;
   /** Page description */
   description?: string;
-  /** Page mode */
-  mode: PageMode;
+  /** Page kind (V2: list | form | detail) */
+  kind: 'list' | 'form' | 'detail';
   /** Associated ViewModel code */
   viewModelCode?: string;
   /** Template ID to use */
   templateId?: string;
   /** Initial tags */
   tags?: string[];
-  /** Layout preset (for form mode) */
+  /** Layout preset (for form kind) */
   layoutPreset?: 'cols-2' | 'cols-3' | 'cols-4';
 }
 
@@ -148,8 +145,8 @@ export interface PageTemplate {
   name: string;
   /** Template description */
   description?: string;
-  /** Template mode */
-  mode: PageMode;
+  /** Template kind (V2: list | form | detail) */
+  kind: 'list' | 'form' | 'detail';
   /** Template thumbnail */
   thumbnail?: string;
   /** Template category */
@@ -159,31 +156,26 @@ export interface PageTemplate {
 }
 
 /**
- * Mode display info
+ * Kind display info
  */
-export const PAGE_MODE_INFO: Record<
-  PageMode,
+export const PAGE_KIND_INFO: Record<
+  'list' | 'form' | 'detail',
   { label: string; icon: string; description: string }
 > = {
-  grid: {
-    label: '网格模式',
+  list: {
+    label: '列表页',
     icon: 'M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z',
-    description: '12列自由布局，适合仪表盘',
-  },
-  floor: {
-    label: '楼层模式',
-    icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4',
-    description: 'Tab → 楼层 → 区块，适合复杂表单',
+    description: '表格+筛选+工具栏，标准列表视图',
   },
   form: {
-    label: '表单模式',
+    label: '表单页',
     icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
     description: '标准表单，支持2/3/4列布局',
   },
-  composite: {
-    label: '组合模式',
-    icon: 'M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0010.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z',
-    description: '组合多个区块，灵活布局',
+  detail: {
+    label: '详情页',
+    icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4',
+    description: '只读详情展示，支持分组区块',
   },
 };
 
