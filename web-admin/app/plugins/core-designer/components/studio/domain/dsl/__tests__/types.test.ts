@@ -1,6 +1,11 @@
 import { describe, it, expectTypeOf } from 'vitest';
 import type { PageSchema } from '../types';
 
+// Helper: keys of T that are NOT optional
+type RequiredKeys<T> = {
+  [K in keyof T]-?: {} extends Pick<T, K> ? never : K;
+}[keyof T];
+
 describe('PageSchema V2', () => {
   it('requires schemaVersion literal 2', () => {
     expectTypeOf<PageSchema['schemaVersion']>().toEqualTypeOf<2>();
@@ -10,10 +15,10 @@ describe('PageSchema V2', () => {
     expectTypeOf<PageSchema['kind']>().toEqualTypeOf<'list' | 'form' | 'detail'>();
   });
 
-  it('blocks is required (not optional)', () => {
-    const s = {} as PageSchema;
-    // @ts-expect-error blocks is required
-    const { blocks: _b } = s as Omit<PageSchema, 'blocks'>;
+  it('required fields are exactly: schemaVersion, kind, id, layout, blocks', () => {
+    expectTypeOf<RequiredKeys<PageSchema>>().toEqualTypeOf<
+      'schemaVersion' | 'kind' | 'id' | 'layout' | 'blocks'
+    >();
   });
 
   it('removed legacy fields', () => {
@@ -39,13 +44,15 @@ describe('PageSchema V2', () => {
   });
 
   it('layout is stack or grid-with-cols only', () => {
-    const stack: PageSchema['layout'] = { type: 'stack' };
-    const grid: PageSchema['layout'] = { type: 'grid', cols: 12 };
+    const _stack: PageSchema['layout'] = { type: 'stack' };
+    const _grid: PageSchema['layout'] = { type: 'grid', cols: 12 };
     // @ts-expect-error flex removed
-    const flex: PageSchema['layout'] = { type: 'flex' };
+    const _flex: PageSchema['layout'] = { type: 'flex' };
     // @ts-expect-error canvas removed
-    const canvas: PageSchema['layout'] = { type: 'canvas' };
+    const _canvas: PageSchema['layout'] = { type: 'canvas' };
     // @ts-expect-error floor removed
-    const floor: PageSchema['layout'] = { type: 'floor' };
+    const _floor: PageSchema['layout'] = { type: 'floor' };
+    // silence unused-locals
+    void _stack; void _grid; void _flex; void _canvas; void _floor;
   });
 });
