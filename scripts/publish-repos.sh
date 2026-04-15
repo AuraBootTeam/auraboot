@@ -119,7 +119,6 @@ sync_public() {
 
     # Public plugins
     sync_file "${MONO_ROOT}/plugins/crm-starter" "${dst}/plugins/crm-starter"
-    sync_file "${MONO_ROOT}/plugins/e2e-test-order" "${dst}/plugins/e2e-test-order"
     sync_file "${MONO_ROOT}/plugins/cli" "${dst}/plugins/cli"
     sync_file "${MONO_ROOT}/plugins/schemas" "${dst}/plugins/schemas"
     sync_file "${MONO_ROOT}/plugins/templates" "${dst}/plugins/templates"
@@ -166,7 +165,7 @@ sync_solutions() {
     local dst="${DIR_SOLUTIONS}"
 
     # Commercial plugins (all except public ones)
-    local public_plugins="crm-starter e2e-test-order cli schemas templates scripts platform"
+    local public_plugins="crm-starter cli schemas templates scripts platform"
 
     for plugin_dir in "${MONO_ROOT}"/plugins/*/; do
         local plugin_name=$(basename "${plugin_dir}")
