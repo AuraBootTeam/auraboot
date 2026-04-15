@@ -1,0 +1,59 @@
+[
+  {
+    "ruleCode": "wd_leave_validation",
+    "ruleName": "Leave Request Validation",
+    "ruleName:zh-CN": "请假申请前置校验",
+    "ruleName:en": "Leave Request Validation",
+    "ruleType": "VALIDATION",
+    "description": "Pre-flight check run by wd:submit_leave_request before starting the BPM process. Blocks annual leave with insufficient balance and sick leave >2 days without attachment.",
+    "enabled": true,
+    "version": 1,
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["annual", "sick", "personal", "comp"] },
+        "days": { "type": "number" },
+        "balanceRemaining": { "type": "number" },
+        "attachmentCount": { "type": "integer" }
+      },
+      "required": ["type", "days"]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "valid": { "type": "boolean" },
+        "reason": {
+          "type": "string",
+          "enum": ["annual_leave_insufficient", "sick_attachment_required"]
+        }
+      }
+    },
+    "ruleContentFile": "rules/wd_leave_validation.drl",
+    "ruleContent": "package com.auraboot.workflow_demo;\n\nimport java.util.Map;\n\nrule \"reject_insufficient_annual_balance\"\n    when\n        $req: Map(\n            this[\"type\"] == \"annual\",\n            ((Number) this[\"days\"]).doubleValue() > ((Number) this[\"balanceRemaining\"]).doubleValue()\n        )\n    then\n        Map result = (Map) $req.get(\"_ruleResult\");\n        result.put(\"valid\", Boolean.FALSE);\n        result.put(\"reason\", \"annual_leave_insufficient\");\nend\n\nrule \"reject_sick_without_attachment\"\n    when\n        $req: Map(\n            this[\"type\"] == \"sick\",\n            ((Number) this[\"days\"]).doubleValue() > 2.0,\n            ((Number) this[\"attachmentCount\"]).intValue() == 0\n        )\n    then\n        Map result = (Map) $req.get(\"_ruleResult\");\n        result.put(\"valid\", Boolean.FALSE);\n        result.put(\"reason\", \"sick_attachment_required\");\nend\n"
+  },
+  {
+    "ruleCode": "wd_leave_routing",
+    "ruleName": "Leave Request Routing",
+    "ruleName:zh-CN": "请假申请审批人分派",
+    "ruleName:en": "Leave Request Routing",
+    "ruleType": "CONDITION",
+    "description": "Called from svc_rule_route serviceTask. Routes short leave (<3 days) to manager, long leave (>=3 days) to HR.",
+    "enabled": true,
+    "version": 1,
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "days": { "type": "number" }
+      },
+      "required": ["days"]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "approverRole": { "type": "string", "enum": ["manager", "hr"] }
+      }
+    },
+    "ruleContentFile": "rules/wd_leave_routing.drl",
+    "ruleContent": "package com.auraboot.workflow_demo;\n\nimport java.util.Map;\n\nrule \"route_short_to_manager\"\n    when\n        $req: Map(\n            ((Number) this[\"days\"]).doubleValue() < 3.0\n        )\n    then\n        Map result = (Map) $req.get(\"_ruleResult\");\n        result.put(\"approverRole\", \"manager\");\nend\n\nrule \"route_long_to_hr\"\n    when\n        $req: Map(\n            ((Number) this[\"days\"]).doubleValue() >= 3.0\n        )\n    then\n        Map result = (Map) $req.get(\"_ruleResult\");\n        result.put(\"approverRole\", \"hr\");\nend\n"
+  }
+]

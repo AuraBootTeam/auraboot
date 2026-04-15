@@ -1,0 +1,30 @@
+package com.auraboot.workflow_demo;
+
+import java.util.Map;
+
+// In-process approver routing for wd_leave_approval.
+// Fact is a java.util.Map<String, Object> with key:
+//   - days        : Number
+//   - _ruleResult : Map (output channel)
+// The rule writes into _ruleResult:
+//   - approverRole : String  ("manager" | "hr")
+
+rule "route_short_to_manager"
+    when
+        $req: Map(
+            ((Number) this["days"]).doubleValue() < 3.0
+        )
+    then
+        Map result = (Map) $req.get("_ruleResult");
+        result.put("approverRole", "manager");
+end
+
+rule "route_long_to_hr"
+    when
+        $req: Map(
+            ((Number) this["days"]).doubleValue() >= 3.0
+        )
+    then
+        Map result = (Map) $req.get("_ruleResult");
+        result.put("approverRole", "hr");
+end
