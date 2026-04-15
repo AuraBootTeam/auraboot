@@ -29,8 +29,9 @@ export function JsonViewer({ data, maxHeight = '400px' }: Props) {
       <div className="absolute top-1 right-1 z-10 flex gap-1">
         <button
           onClick={handleCopy}
-          className="rounded bg-white/80 px-1.5 py-0.5 text-xs text-gray-400 opacity-0 transition-opacity group-hover:opacity-100 hover:text-gray-600 dark:bg-gray-800/80 dark:hover:text-gray-300"
+          className="rounded border border-gray-200 bg-white px-2 py-0.5 text-xs text-gray-600 shadow-sm hover:bg-gray-50 hover:text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
           title="Copy"
+          data-testid="json-viewer-copy"
         >
           {copied ? 'Copied' : 'Copy'}
         </button>
