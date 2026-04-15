@@ -1,7 +1,7 @@
 /**
  * Unified Inbox Service — API client for /api/inbox endpoints.
  *
- * Data source: ab_inbox_item table via MobileInboxController.
+ * Data source: ab_inbox_item table via InboxController.
  * Used by InboxBadge, InboxDropdown, and UnifiedInboxPage.
  *
  * @since 6.4.0
