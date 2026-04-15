@@ -1,0 +1,17 @@
+[
+  {
+    "code": "ab_announcement",
+    "displayName:zh-CN": "系统公告",
+    "displayName:en": "Announcement",
+    "description": "System-wide announcements for tenants",
+    "modelType": "entity",
+    "modelCategory": "master",
+    "extension": {
+      "titleField": "title",
+      "subtitleField": "status",
+      "tableName": "ab_announcement",
+      "softDelete": true,
+      "skipTableCreation": true
+    }
+  }
+]

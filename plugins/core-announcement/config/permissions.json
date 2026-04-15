@@ -1,0 +1,18 @@
+[
+  {
+    "code": "announcement.announcement.read",
+    "name:zh-CN": "公告查看",
+    "name:en": "Announcement Read",
+    "description": "View system announcements list and details",
+    "resourceType": "operation",
+    "module": "system"
+  },
+  {
+    "code": "announcement.announcement.manage",
+    "name:zh-CN": "公告管理",
+    "name:en": "Announcement Management",
+    "description": "Create, update and delete system announcements",
+    "resourceType": "operation",
+    "module": "system"
+  }
+]

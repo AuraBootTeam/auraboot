@@ -1,0 +1,29 @@
+[
+  {
+    "code": "announcement:create_announcement",
+    "displayName:zh-CN": "创建公告",
+    "displayName:en": "Create Announcement",
+    "type": "create",
+    "modelCode": "ab_announcement",
+    "inputFields": ["title", "content", "priority", "status", "pinned", "expires_at"]
+  },
+  {
+    "code": "announcement:update_announcement",
+    "displayName:zh-CN": "更新公告",
+    "displayName:en": "Update Announcement",
+    "type": "update",
+    "modelCode": "ab_announcement",
+    "inputFields": ["title", "content", "priority", "status", "pinned", "expires_at"]
+  },
+  {
+    "code": "announcement:delete_announcement",
+    "displayName:zh-CN": "删除公告",
+    "displayName:en": "Delete Announcement",
+    "type": "delete",
+    "modelCode": "ab_announcement",
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此公告？",
+      "confirmMessage:en": "Confirm delete this announcement?"
+    }
+  }
+]
