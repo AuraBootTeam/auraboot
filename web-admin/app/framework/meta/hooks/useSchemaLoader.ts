@@ -52,7 +52,7 @@ export interface UseSchemaLoaderOptions {
    */
   tableName?: string;
   pageKey?: string;
-  type?: 'list' | 'form' | 'detail' | 'dashboard' | 'kanban' | 'composite';
+  type?: 'list' | 'form' | 'detail' | 'kanban' | 'composite';
   token?: string;
 }
 

@@ -50,7 +50,7 @@ import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import type { DataSourceManager } from '~/framework/meta/runtime/data-pipeline/DataSourceManager';
 import type { UnifiedSchema } from '~/framework/meta/schemas/types';
 
-export type PageType = 'list' | 'form' | 'detail' | 'dashboard' | 'kanban';
+export type PageType = 'list' | 'form' | 'detail' | 'kanban';
 
 export interface UseDynamicPageSetupOptions {
   /** 表名 */
