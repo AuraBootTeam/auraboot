@@ -92,7 +92,7 @@ describe('PageManagerService.getPage', () => {
 
   it('returns null when backend returns error code', async () => {
     vi.spyOn(pageApi, 'getPageByPid').mockResolvedValue({
-      code: 404,
+      code: '404' as any,
       desc: 'Not found',
       data: undefined as any,
     });
@@ -123,5 +123,100 @@ describe('PageManagerService.getPage', () => {
 
     const service = PageManagerService.getInstance();
     await expect(service.getPage('pid-no-blocks')).rejects.toThrow(/blocks/i);
+  });
+});
+
+describe('PageManagerService.updatePageSchema', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    (PageManagerService as any).instance = undefined;
+  });
+
+  it('accepts PageSchema object and derives blockCount from blocks.length', async () => {
+    const updatePageSpy = vi.spyOn(pageApi, 'updatePage').mockResolvedValue({
+      code: '0',
+      desc: 'ok',
+      data: listPageDto as any,
+    });
+
+    const service = PageManagerService.getInstance();
+
+    // Build a minimal PageSchema with 2 blocks
+    const pageSchema = {
+      schemaVersion: 2,
+      kind: 'list',
+      id: 'pid-update-test',
+      layout: { type: 'stack' },
+      blocks: [
+        { id: 'block-1', blockType: 'filters' },
+        { id: 'block-2', blockType: 'table' },
+      ],
+    } as any;
+
+    await service.updatePageSchema('pid-update-test', pageSchema);
+
+    // Verify pageApi.updatePage was called
+    expect(updatePageSpy).toHaveBeenCalledWith(
+      'pid-update-test',
+      expect.objectContaining({
+        blocks: pageSchema.blocks,
+        layout: pageSchema.layout,
+        metaInfo: expect.objectContaining({
+          componentCount: 2, // blockCount = blocks.length
+        }),
+      }),
+    );
+  });
+
+  it('computes blockCount=0 when blocks array is empty', async () => {
+    const updatePageSpy = vi.spyOn(pageApi, 'updatePage').mockResolvedValue({
+      code: '0',
+      desc: 'ok',
+      data: listPageDto as any,
+    });
+
+    const service = PageManagerService.getInstance();
+
+    const emptySchema = {
+      schemaVersion: 2,
+      kind: 'form',
+      id: 'pid-empty',
+      layout: { type: 'stack' },
+      blocks: [],
+    } as any;
+
+    await service.updatePageSchema('pid-empty', emptySchema);
+
+    expect(updatePageSpy).toHaveBeenCalledWith(
+      'pid-empty',
+      expect.objectContaining({
+        blocks: [],
+        metaInfo: expect.objectContaining({
+          componentCount: 0,
+        }),
+      }),
+    );
+  });
+
+  it('throws error when API call fails', async () => {
+    vi.spyOn(pageApi, 'updatePage').mockResolvedValue({
+      code: 500 as any,
+      desc: 'Internal server error',
+      data: undefined as any,
+    });
+
+    const service = PageManagerService.getInstance();
+
+    const schema = {
+      schemaVersion: 2,
+      kind: 'detail',
+      id: 'pid-error',
+      layout: { type: 'grid', cols: 12 },
+      blocks: [{ id: 'block-1', blockType: 'detail-section' }],
+    } as any;
+
+    await expect(service.updatePageSchema('pid-error', schema)).rejects.toThrow(
+      /Internal server error|Failed to save/,
+    );
   });
 });
