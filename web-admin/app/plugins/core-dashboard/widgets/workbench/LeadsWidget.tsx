@@ -54,6 +54,8 @@ export function LeadsWidget({ title, maxItems = 5, className = '' }: LeadsWidget
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  // crmUnavailable: true when the CRM module is not installed (API error, e.g. table does not exist)
+  const [crmUnavailable, setCrmUnavailable] = useState(false);
 
   const resolvedTitle = title || t('workbench.leads.title', {}, 'New Leads');
 
@@ -72,7 +74,11 @@ export function LeadsWidget({ title, maxItems = 5, className = '' }: LeadsWidget
           setError(true);
         }
       } catch {
-        if (!cancelled) setError(true);
+        if (!cancelled) {
+          // Network/server error most likely means CRM table is missing (OSS without CRM module)
+          setError(true);
+          setCrmUnavailable(true);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -103,6 +109,26 @@ export function LeadsWidget({ title, maxItems = 5, className = '' }: LeadsWidget
               <div className="h-5 w-14 animate-pulse rounded-full bg-gray-100" />
             </div>
           ))}
+        </div>
+      </div>
+    );
+  }
+
+  // --- CRM unavailable (module not installed) ---
+  if (crmUnavailable) {
+    return (
+      <div className={`flex h-full flex-col ${className}`} data-testid="leads-crm-unavailable">
+        <div className="mb-3 flex items-center justify-between px-1">
+          <span className="text-sm font-semibold text-gray-900">{resolvedTitle}</span>
+        </div>
+        <div className="flex flex-1 flex-col items-center justify-center text-gray-400">
+          <span className="mb-1 text-2xl">{'📦'}</span>
+          <span className="text-sm font-medium text-gray-500">
+            {t('workbench.leads.crmUnavailable', {}, 'CRM module not installed')}
+          </span>
+          <span className="mt-1 text-xs text-gray-400">
+            {t('workbench.leads.crmUnavailableHint', {}, 'Install the CRM plugin to track leads')}
+          </span>
         </div>
       </div>
     );
