@@ -20,11 +20,10 @@
     "parentCode": "ACS_ROOT",
     "name:zh-CN": "ACP 驾驶舱",
     "name:en": "ACP Dashboard",
-    "path": "/p/c/acs_dashboard",
+    "path": "/dashboards?code=acs_dashboard",
     "icon": "IconDashboard",
     "type": 1,
     "permissionCode": "acs.showcase.manage",
-    "pageKey": "acs_dashboard",
     "orderNo": 1,
     "visible": true
   },
