@@ -10,4 +10,3 @@ export {
   type BlocksDesignerProps,
   type AreasDesignerProps,
 } from './BlocksDesigner';
-export { CanvasEditor, type CanvasEditorProps } from './canvas/CanvasEditor';
