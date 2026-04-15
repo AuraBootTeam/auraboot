@@ -53,7 +53,6 @@ import { modelService } from '~/shared/services/modelService';
 import { useTimezone } from '~/contexts/TimezoneContext';
 import { deriveTestId } from '~/framework/meta/rendering/utils/deriveTestId';
 import { RowActionButtons } from './list/RowActionButtons';
-import { DashboardContent } from './list/DashboardContent';
 import { ListTabs } from './list/ListTabs';
 import { ListPagination } from './list/ListPagination';
 import { ListModals } from './list/ListModals';
@@ -812,19 +811,16 @@ export function ListPageContent(props: PageContentProps) {
     return () => window.removeEventListener('cell-button-click', handler);
   }, [handleAction]);
 
-  // Dashboard detection
-  const isDashboard = schema?.kind === 'dashboard';
-
-  // Initial data load - only execute once when schema is loaded (skip for Dashboard pages)
+  // Initial data load - only execute once when schema is loaded
   // Pass current filters (which may include URL filter_* params) for the first load
   useEffect(() => {
-    if (schema && !isDashboard) {
+    if (schema) {
       loadDataRef.current?.({ page: pagination.current - 1, size: pagination.pageSize, filters });
     }
-    // Intentionally only react to schema/dashboard changes.
+    // Intentionally only react to schema changes.
     // Pagination or filter updates are handled by explicit user actions.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [schema, isDashboard]);
+  }, [schema]);
 
   // Handle tab change - reload data with tab filter
   const handleTabChange = useCallback(
@@ -2044,21 +2040,6 @@ export function ListPageContent(props: PageContentProps) {
           setError(null);
           window.location.reload();
         }}
-      />
-    );
-  }
-
-  // Dashboard rendering — each block independently fetches its own data
-  if (isDashboard) {
-    return (
-      <DashboardContent
-        schema={schema}
-        token={token}
-        locale={locale}
-        t={t}
-        modelCode={modelCode}
-        dataSourceManager={dataSourceManager}
-        navigate={navigate}
       />
     );
   }
