@@ -180,7 +180,7 @@ export interface NodeHookEntry {
 export interface ConditionExpression {
   type: 'expression' | 'script';
   content: string;
-  language?: 'javascript' | 'groovy' | 'juel';
+  language?: 'mvel' | 'juel';
   ruleCode?: string; // Reference to BPM rule engine rule code
 }
 

@@ -135,6 +135,10 @@ public class JsonToBpmnConverter {
         writer.writeAttribute("isExecutable", "true");
         writer.writeCharacters("\n");
 
+        // Validate exclusive gateway outgoing flows (each must have a condition or be marked default;
+        // at most one default per gateway). Fail fast before writing invalid BPMN.
+        validateExclusiveGatewayFlows(nodes, edges);
+
         // Collect default flow IDs for gateways to set the "default" attribute later.
         // We need to pre-process to find which gateway has which default flow.
         Map<String, String> gatewayDefaultFlows = collectGatewayDefaultFlows(nodes, edges);
@@ -205,6 +209,61 @@ public class JsonToBpmnConverter {
         }
 
         return result;
+    }
+
+    /**
+     * Validate that every exclusive gateway's outgoing sequence flows satisfy:
+     * (a) at most one flow marked as default (via edge.data.isDefault or gateway config defaultFlow/Id);
+     * (b) <strong>every</strong> outgoing flow has a non-empty conditionExpression content,
+     *     including any flow flagged as default. SmartEngine requires all outgoing flows to
+     *     carry an evaluable condition — the BPMN spec's bare {@code default=} fallback is not
+     *     supported by the engine, so we surface that as a hard validation error rather than
+     *     letting the engine reject the deployment with an opaque message at runtime.
+     * Throws BpmnConversionException with gatewayId + edgeId so the caller can surface a precise error.
+     */
+    private void validateExclusiveGatewayFlows(JsonNode nodes, JsonNode edges) {
+        if (!nodes.isArray() || !edges.isArray()) return;
+
+        for (JsonNode node : nodes) {
+            if (!"exclusiveGateway".equals(getNodeType(node))) continue;
+            String gatewayId = node.path("id").asText();
+
+            // Collect outgoing edges
+            List<JsonNode> outgoing = new ArrayList<>();
+            for (JsonNode edge : edges) {
+                if (gatewayId.equals(edge.path("source").asText())) {
+                    outgoing.add(edge);
+                }
+            }
+            if (outgoing.isEmpty()) continue;
+
+            // (a) at most one default
+            List<String> defaultEdgeIds = new ArrayList<>();
+            for (JsonNode edge : outgoing) {
+                if (edge.path("data").path("isDefault").asBoolean(false)) {
+                    defaultEdgeIds.add(edge.path("id").asText());
+                }
+            }
+            if (defaultEdgeIds.size() > 1) {
+                throw new BpmnConversionException(
+                        "Exclusive gateway '" + gatewayId + "' has multiple default flows: " + defaultEdgeIds);
+            }
+
+            // (b) every outgoing flow must carry a non-empty condition
+            for (JsonNode edge : outgoing) {
+                String edgeId = edge.path("id").asText();
+                JsonNode condition = edge.path("data").path("condition");
+                boolean hasCondition = !condition.isMissingNode() && !condition.isNull()
+                        && !condition.path("content").asText("").trim().isEmpty();
+                if (!hasCondition) {
+                    throw new BpmnConversionException(
+                            "Sequence flow '" + edgeId + "' from exclusive gateway '" + gatewayId
+                                    + "' is missing a condition expression (every outgoing flow must "
+                                    + "carry an evaluable expression — SmartEngine does not honor BPMN "
+                                    + "default-flow fallback)");
+                }
+            }
+        }
     }
 
     // ==================== Node Writers ====================
@@ -584,9 +643,13 @@ public class JsonToBpmnConverter {
             writer.writeStartElement("conditionExpression");
 
             String conditionType = getTextOrDefault(condition, "type", "expression");
-            // SmartEngine uses xsi:type="mvel" or type="mvel" for MVEL expressions
             if ("expression".equals(conditionType)) {
                 writer.writeAttribute(XSI_NAMESPACE, "type", "tFormalExpression");
+            } else if ("script".equals(conditionType)) {
+                String language = getTextOrNull(condition, "language");
+                if (language != null) {
+                    writer.writeAttribute("language", language);
+                }
             }
 
             String content = condition.path("content").asText();

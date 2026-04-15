@@ -31,6 +31,7 @@ export function EdgeEditor({
       </div>
 
       <ConditionExpressionEditor
+        key={edgeId}
         condition={data?.condition}
         onChange={(condition: ConditionExpression) => onUpdate(edgeId, { condition })}
       />
