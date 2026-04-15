@@ -1,0 +1,11 @@
+{
+  "pluginId": "test-dashboard-contract",
+  "namespace": "tdc",
+  "version": "1.0.0",
+  "displayName": "Test Dashboard Contract Plugin",
+  "description": "Fixture plugin for integration testing config/dashboards/*.json contract (Plan #8)",
+  "minPlatformVersion": "1.0.0",
+  "resourceDirs": {
+    "dashboards": "config/dashboards"
+  }
+}
