@@ -1,0 +1,56 @@
+{
+  "pageKey": "wd_leave_request_form",
+  "modelCode": "wd_leave_request",
+  "kind": "form",
+  "layout": { "type": "stack" },
+  "blocks": [
+    {
+      "id": "basic",
+      "blockType": "form-section",
+      "title": { "zh-CN": "基本信息", "en": "Basic Information" },
+      "columns": 2,
+      "fields": [
+        { "field": "wd_req_applicant", "colSpan": 6 },
+        { "field": "wd_req_type", "colSpan": 6 }
+      ]
+    },
+    {
+      "id": "leave_detail",
+      "blockType": "form-section",
+      "title": { "zh-CN": "请假详情", "en": "Leave Details" },
+      "columns": 2,
+      "fields": [
+        { "field": "wd_req_start_date", "colSpan": 6 },
+        { "field": "wd_req_end_date", "colSpan": 6 },
+        { "field": "wd_req_days", "colSpan": 6 },
+        { "field": "wd_req_reason", "colSpan": 12 }
+      ]
+    },
+    {
+      "id": "attachments_cc",
+      "blockType": "form-section",
+      "title": { "zh-CN": "附件与抄送", "en": "Attachments & CC" },
+      "columns": 2,
+      "fields": [
+        { "field": "wd_req_attachments", "colSpan": 12 },
+        { "field": "wd_req_cc_users", "colSpan": 12 }
+      ]
+    },
+    {
+      "id": "buttons",
+      "blockType": "form-buttons",
+      "buttons": [
+        {
+          "code": "submit",
+          "primary": true,
+          "label": "save",
+          "action": { "type": "command", "command": "wd:update_leave_request" }
+        },
+        { "code": "cancel", "label": "cancel" }
+      ]
+    }
+  ],
+  "name:zh-CN": "请假申请表单",
+  "name:en": "Leave Request Form",
+  "title": { "zh-CN": "请假申请表单", "en": "Leave Request Form" }
+}

@@ -1,0 +1,90 @@
+[
+  {
+    "code": "wd_leave_type",
+    "name": "Leave Type",
+    "name:zh-CN": "请假类型",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "annual",
+        "label": "Annual Leave",
+        "label:zh-CN": "年假",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": { "color": "blue", "limit_by_balance": true, "require_attachment_gt": 0 }
+      },
+      {
+        "value": "sick",
+        "label": "Sick Leave",
+        "label:zh-CN": "病假",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": { "color": "orange", "limit_by_balance": false, "require_attachment_gt": 2 }
+      },
+      {
+        "value": "personal",
+        "label": "Personal Leave",
+        "label:zh-CN": "事假",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": { "color": "gray", "limit_by_balance": false, "require_attachment_gt": 0 }
+      },
+      {
+        "value": "comp",
+        "label": "Compensatory Leave",
+        "label:zh-CN": "调休",
+        "sortNo": 40,
+        "status": "enabled",
+        "extension": { "color": "green", "limit_by_balance": true, "require_attachment_gt": 0 }
+      }
+    ]
+  },
+  {
+    "code": "wd_leave_status",
+    "name": "Leave Status",
+    "name:zh-CN": "请假状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "draft",
+        "label": "Draft",
+        "label:zh-CN": "草稿",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": { "color": "gray" }
+      },
+      {
+        "value": "submitted",
+        "label": "Submitted",
+        "label:zh-CN": "已提交",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": { "color": "blue" }
+      },
+      {
+        "value": "approving",
+        "label": "Approving",
+        "label:zh-CN": "审批中",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": { "color": "orange" }
+      },
+      {
+        "value": "approved",
+        "label": "Approved",
+        "label:zh-CN": "已通过",
+        "sortNo": 40,
+        "status": "enabled",
+        "extension": { "color": "green" }
+      },
+      {
+        "value": "rejected",
+        "label": "Rejected",
+        "label:zh-CN": "已驳回",
+        "sortNo": 50,
+        "status": "enabled",
+        "extension": { "color": "red" }
+      }
+    ]
+  }
+]

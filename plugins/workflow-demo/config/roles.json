@@ -1,0 +1,55 @@
+[
+  {
+    "code": "wd_employee",
+    "name:zh-CN": "员工",
+    "name:en": "Employee",
+    "description": "Regular employee: can submit and view own leave requests and balance.",
+    "permissions": [
+      "wd.leave_request.read",
+      "wd.leave_request.manage",
+      "wd.leave_request.submit",
+      "wd.leave_balance.read"
+    ]
+  },
+  {
+    "code": "wd_manager",
+    "name:zh-CN": "主管",
+    "name:en": "Manager",
+    "description": "Line manager: approves short leave (routed by Drools).",
+    "permissions": [
+      "wd.leave_request.read",
+      "wd.leave_request.manage",
+      "wd.leave_request.submit",
+      "wd.leave_request.approve",
+      "wd.leave_balance.read"
+    ]
+  },
+  {
+    "code": "wd_hr",
+    "name:zh-CN": "HR",
+    "name:en": "HR",
+    "description": "HR: approves long leave and maintains balance records.",
+    "permissions": [
+      "wd.leave_request.read",
+      "wd.leave_request.manage",
+      "wd.leave_request.submit",
+      "wd.leave_request.approve",
+      "wd.leave_balance.read",
+      "wd.leave_balance.manage"
+    ]
+  },
+  {
+    "code": "wd_admin",
+    "name:zh-CN": "流程管理员",
+    "name:en": "Workflow Administrator",
+    "description": "Workflow admin: full access including rules / SLA configuration.",
+    "permissions": [
+      "wd.leave_request.read",
+      "wd.leave_request.manage",
+      "wd.leave_request.submit",
+      "wd.leave_request.approve",
+      "wd.leave_balance.read",
+      "wd.leave_balance.manage"
+    ]
+  }
+]
