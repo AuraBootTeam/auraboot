@@ -46,8 +46,7 @@ const OPERATORS: { value: string; label: string; i18nKey?: string }[] = [
 const UNARY_OPERATORS = new Set(['is_empty', 'is_not_empty']);
 
 const LANGUAGES: { value: string; label: string }[] = [
-  { value: 'javascript', label: 'JavaScript' },
-  { value: 'groovy', label: 'Groovy' },
+  { value: 'mvel', label: 'MVEL' },
   { value: 'juel', label: 'JUEL' },
 ];
 
@@ -172,7 +171,7 @@ export function ConditionExpressionEditor({ condition, onChange }: ConditionExpr
   const [content, setContent] = useState(condition?.content || '');
   const [type, setType] = useState<ConditionExpression['type']>(condition?.type || 'expression');
   const [language, setLanguage] = useState<ConditionExpression['language']>(
-    condition?.language || 'javascript',
+    condition?.language || 'mvel',
   );
 
   // Parse warning when switching from advanced to simple fails
@@ -218,6 +217,12 @@ export function ConditionExpressionEditor({ condition, onChange }: ConditionExpr
   }, [rules, logicalOp]);
 
   const switchToSimple = useCallback(() => {
+    if (!content.trim()) {
+      // Empty content: switch cleanly without warning
+      setParseWarning(false);
+      setMode('simple');
+      return;
+    }
     const parsed = tryParseRules(content);
     if (parsed) {
       setRules(parsed.rules);
@@ -449,7 +454,7 @@ export function ConditionExpressionEditor({ condition, onChange }: ConditionExpr
               <div className="flex-1">
                 <label className="mb-0.5 block text-[10px] font-medium text-gray-500">{t('bpmn.condition.language')}</label>
                 <select
-                  value={language || 'javascript'}
+                  value={language || 'mvel'}
                   onChange={(e) =>
                     handleLanguageChange(e.target.value as ConditionExpression['language'])
                   }

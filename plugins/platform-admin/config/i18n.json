@@ -321,6 +321,8 @@
   { "key": "bpmn.validate.task_no_outgoing", "zh-CN": "任务节点 \"{label}\" 缺少输出连线", "en-US": "Task node \"{label}\" is missing outgoing edges", "source": "import", "refType": "ui" },
   { "key": "bpmn.validate.gateway_no_incoming", "zh-CN": "网关 \"{label}\" 必须有输入连线", "en-US": "Gateway \"{label}\" must have incoming edges", "source": "import", "refType": "ui" },
   { "key": "bpmn.validate.exclusive_gateway_min_outgoing", "zh-CN": "排他网关 \"{label}\" 至少需要两条输出连线", "en-US": "Exclusive gateway \"{label}\" requires at least two outgoing edges", "source": "import", "refType": "ui" },
+  { "key": "bpmn.validate.exclusive_gateway_multiple_defaults", "zh-CN": "排他网关 \"{label}\" 至多只能有一条默认流向，当前有 {count} 条", "en-US": "Exclusive gateway \"{label}\" can have at most one default flow, found {count}", "source": "import", "refType": "ui" },
+  { "key": "bpmn.validate.exclusive_gateway_edge_missing_condition", "zh-CN": "排他网关 \"{label}\" 的出边 \"{edgeLabel}\" 缺少条件表达式（每条出边都必须填写可求值的表达式，引擎不支持仅靠默认流向兜底）", "en-US": "Outgoing edge \"{edgeLabel}\" of exclusive gateway \"{label}\" is missing a condition expression (every outgoing flow must carry an evaluable expression; engine does not honor bare default-flow fallback)", "source": "import", "refType": "ui" },
 
   { "key": "bpmn.common.description", "zh-CN": "描述", "en-US": "Description", "source": "import", "refType": "ui" },
   { "key": "bpmn.common.delete", "zh-CN": "删除", "en-US": "Delete", "source": "import", "refType": "ui" },
