@@ -3,6 +3,12 @@
  */
 
 export { DesignerRouter, type DesignerRouterProps } from './DesignerRouter';
-export { AreasDesigner, type AreasDesignerProps } from './AreasDesigner';
+// BlocksDesigner replaces AreasDesigner (Task 4.4): exports legacy AreasDesigner alias
+export {
+  BlocksDesigner,
+  AreasDesigner,
+  type BlocksDesignerProps,
+  type AreasDesignerProps,
+} from './BlocksDesigner';
 export { FloorsDesigner, type FloorsDesignerProps } from './FloorsDesigner';
 export { CanvasEditor, type CanvasEditorProps } from './canvas/CanvasEditor';
