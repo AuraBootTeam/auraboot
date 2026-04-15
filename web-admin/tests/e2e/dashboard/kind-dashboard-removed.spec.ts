@@ -32,8 +32,12 @@ test.describe('Plan 3a - kind=dashboard removal', () => {
       const status = response?.status() ?? 0;
       expect([200, 302, 404]).toContain(status);
       if (status === 200) {
+        // Client-side redirect: catch-all useEffect probes
+        // /api/dashboards/code/{code} then navigate()s to /dashboards?code=.
+        // Wait for the URL to change away from /p/c/.
+        await page.waitForURL((u) => !u.toString().endsWith(`/p/c/${code}`), { timeout: 5000 });
         const url = page.url();
-        expect(url).not.toMatch(new RegExp(`/p/c/${code}$`));
+        expect(url).toMatch(/\/dashboards\?code=/);
       }
     });
   }

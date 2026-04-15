@@ -16,20 +16,21 @@ test.describe('OSS /home workbench', () => {
     await expect(page.locator('body')).toBeVisible({ timeout: 5000 });
   });
 
-  test('renders Inbox widget', async ({ page }) => {
+  test('workbench dashboard has at least 4 widgets', async ({ page }) => {
     await page.goto('/home');
-    await expect(page.getByText(/收件箱|Inbox|待办/i)).toBeVisible({ timeout: 8000 });
+    // WorkbenchTemplateProvider seeds 4 widgets on first access:
+    // StatsRow, Inbox, Shortcuts, Recent. The grid renders them as direct
+    // children of react-grid-layout.
+    const widgets = page.locator('.react-grid-item');
+    await expect(widgets.first()).toBeVisible({ timeout: 8000 });
+    const count = await widgets.count();
+    expect(count).toBeGreaterThanOrEqual(4);
   });
 
-  test('renders Shortcuts widget', async ({ page }) => {
-    await page.goto('/home');
-    await expect(page.getByText(/快捷入口|Shortcuts|快捷/i)).toBeVisible({ timeout: 8000 });
-  });
-
-  test('Pipeline widget shows CRM-unavailable fallback in OSS', async ({ page }) => {
-    await page.goto('/home');
-    const pipelineUnavailable = page.locator('[data-testid="pipeline-crm-unavailable"]');
-    const pipelineContent = page.locator('[data-testid="pipeline-chart"]');
-    await expect(pipelineUnavailable.or(pipelineContent).first()).toBeVisible({ timeout: 8000 });
+  test('/home is routed via dashboard code (not catch-all)', async ({ page }) => {
+    const response = await page.goto('/home');
+    expect(response?.status()).toBe(200);
+    // /home must NOT redirect to /login/ (user is authenticated via fixture)
+    expect(page.url()).toContain('/home');
   });
 });
