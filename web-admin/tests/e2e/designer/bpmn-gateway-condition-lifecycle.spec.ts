@@ -358,11 +358,13 @@ test('D7: backend rejects deploy with naked label-only edge (the original bug)',
     const pid = (await create.json()).data?.pid;
     const deploy = await page.request.post(`/api/bpm/process-definitions/${pid}/deploy`);
     expect(deploy.ok(), 'Deploy of naked-edge process must be rejected').toBeFalsy();
+    expect(deploy.status(), 'Validation errors should surface as 400 not 500').toBe(400);
     const errBody = await deploy.json().catch(() => ({}));
-    const msg = JSON.stringify(errBody);
-    expect(msg).toMatch(/missing a condition expression|conditionExpression|e2/i);
+    // The new GlobalExceptionHandler mapping puts the specific message in context
+    const detail = JSON.stringify(errBody.context ?? errBody);
+    expect(detail).toMatch(/missing a condition expression/);
+    expect(detail).toMatch(/e2/);
   } else {
-    // Backend may also reject at create time — also acceptable
     const errBody = await create.json().catch(() => ({}));
     expect(JSON.stringify(errBody)).toMatch(/missing a condition expression|condition/i);
   }
@@ -403,8 +405,10 @@ test('D8: backend rejects two isDefault edges on one gateway', async ({ page }) 
     const pid = (await create.json()).data?.pid;
     const deploy = await page.request.post(`/api/bpm/process-definitions/${pid}/deploy`);
     expect(deploy.ok()).toBeFalsy();
+    expect(deploy.status()).toBe(400);
     const errBody = await deploy.json().catch(() => ({}));
-    expect(JSON.stringify(errBody)).toMatch(/multiple default flows|multiple defaults/i);
+    const detail = JSON.stringify(errBody.context ?? errBody);
+    expect(detail).toMatch(/multiple default flows/i);
   } else {
     const errBody = await create.json().catch(() => ({}));
     expect(JSON.stringify(errBody)).toMatch(/multiple default|default/i);
