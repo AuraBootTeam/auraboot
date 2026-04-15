@@ -28,70 +28,29 @@ import type { PageSchema } from '~/plugins/core-designer/components/studio/domai
 import { DEVICE_PRESETS } from '~/plugins/core-designer/components/studio/workbench/canvas/devices/presets';
 
 /**
- * Build default DSL V4 schema for a page
- */
-function buildDefaultDslV4(page: PageMeta): PageSchema {
-  // Detect composite pages from page mode or existing DSL
-  const rawSchema = page.dslSchema as Record<string, unknown> | null;
-  const isComposite = page.mode === 'composite' || rawSchema?.kind === 'composite';
-
-  if (isComposite) {
-    return {
-      $schema: 'auraboot://schemas/page/v4',
-      version: '4.0.0',
-      id: page.id,
-      kind: 'composite',
-      modelCode: page.viewModelCode || '',
-      layout: { type: 'canvas' },
-    } as PageSchema;
-  }
-
-  const kind = page.mode === 'form' ? 'form' : 'list';
-  return {
-    $schema: 'auraboot://schemas/page/v4',
-    version: '4.0.0',
-    id: page.id,
-    kind,
-    modelCode: page.viewModelCode || '',
-    layout: { type: 'grid', columns: 12 },
-    areas:
-      kind === 'list'
-        ? {
-            filters: { blocks: [] },
-            toolbar: { blocks: [] },
-            main: { blocks: [] },
-          }
-        : {
-            main: { blocks: [] },
-          },
-  };
-}
-
-/**
  * Page Designer Editor — full implementation with toolbar, canvas, and panels.
  */
 export default function PageDesignerEditorImpl() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [page, setPage] = useState<PageMeta | null>(null);
+  const [meta, setMeta] = useState<PageMeta | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isCustomApiMode, setIsCustomApiMode] = useState(false);
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
   const { showSuccessToast } = useToastContext();
 
-  // DSL V4 state
-  const [dsl, setDsl] = useState<PageSchema | null>(null);
+  // PageSchema V2 state
+  const [schema, setSchema] = useState<PageSchema | null>(null);
 
-  // DSL history for undo/redo — initialized with a placeholder, updated once DSL loads
+  // DSL history for undo/redo — initialized with a placeholder, updated once schema loads
   const dslHistory = useDslHistory(
-    dsl || {
-      $schema: 'auraboot://schemas/page/v4',
-      version: '4.0.0',
+    schema || {
+      schemaVersion: 2 as const,
       id: '',
-      kind: 'list',
+      kind: 'list' as const,
       modelCode: '',
-      layout: { type: 'grid', columns: 12 },
+      layout: { type: 'grid' as const, cols: 12 },
+      blocks: [],
     },
   );
 
@@ -109,33 +68,17 @@ export default function PageDesignerEditorImpl() {
     pageManagerService
       .getPage(id)
       .then((result) => {
-        if (result) {
-          setPage(result);
-
-          // Detect custom API mode before DSL cast
-          const rawSchema = result.dslSchema as Record<string, any> | null;
-          // CUSTOM pages have dataSource.type === 'api' — they may still have
-          // a placeholder modelCode in the DSL, so we check dataSource type only
-          const detectedCustomApi = !!(rawSchema && rawSchema.dataSource?.type === 'api');
-          setIsCustomApiMode(detectedCustomApi);
-
-          // Load DSL V4 or create default
-          const rawDsl = result.dslSchema as unknown as PageSchema | null;
-          if (rawDsl && rawDsl.kind && (rawDsl.areas || rawDsl.floors || rawDsl.kind === 'composite')) {
-            setDsl(rawDsl);
-          } else if (result.mode === 'composite') {
-            // Composite page with empty/null dslSchema — build default canvas DSL
-            setDsl(buildDefaultDslV4(result));
-          } else {
-            setDsl(buildDefaultDslV4(result));
-          }
-        } else {
+        if (!result) {
           setError('Page not found');
+          return;
         }
+        setMeta(result.meta);
+        setSchema(result.schema);
       })
-      .catch((err) => {
+      .catch((err: unknown) => {
         console.error('Failed to load page:', err);
-        setError('Failed to load page');
+        const message = err instanceof Error ? err.message : 'Failed to load page';
+        setError(message);
       })
       .finally(() => {
         setLoading(false);
@@ -144,7 +87,7 @@ export default function PageDesignerEditorImpl() {
 
   // Ref for debounced auto-save timer
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const latestDslRef = useRef<PageSchema | null>(null);
+  const latestSchemaRef = useRef<PageSchema | null>(null);
 
   // Clean up debounce timer on unmount
   useEffect(() => {
@@ -156,64 +99,35 @@ export default function PageDesignerEditorImpl() {
   }, []);
 
   const handleSave = useCallback(async () => {
-    // Use latestDslRef for the most current DSL (avoids stale closure from debounced auto-save)
-    const currentDsl = latestDslRef.current || dsl;
-    if (!id || !currentDsl) return;
+    // Use latestSchemaRef for the most current schema (avoids stale closure from debounced auto-save)
+    const currentSchema = latestSchemaRef.current || schema;
+    if (!id || !currentSchema) return;
 
-    // Count blocks — composite pages store blocks at top level
-    const rawDsl = currentDsl as unknown as Record<string, unknown>;
-    let blockCount: number;
-    if (currentDsl.kind === 'composite' && Array.isArray(rawDsl.blocks)) {
-      blockCount = (rawDsl.blocks as unknown[]).length;
-    } else {
-      blockCount = Object.values(currentDsl.areas || {}).reduce(
-        (sum, area) => sum + (area.blocks?.length || 0),
-        0,
-      );
-    }
-    await pageManagerService.updatePageSchema(
-      id,
-      currentDsl as unknown as Record<string, unknown>,
-      blockCount,
-    );
-  }, [id, dsl]);
+    await pageManagerService.updatePageSchema(id, currentSchema);
+  }, [id, schema]);
 
   const handlePublish = useCallback(async () => {
-    if (!id || !dsl) return;
+    if (!id || !schema) return;
 
-    // First save the current DSL — composite pages store blocks at top level
-    const rawPublishDsl = dsl as unknown as Record<string, unknown>;
-    let blockCount: number;
-    if (dsl.kind === 'composite' && Array.isArray(rawPublishDsl.blocks)) {
-      blockCount = (rawPublishDsl.blocks as unknown[]).length;
-    } else {
-      blockCount = Object.values(dsl.areas || {}).reduce(
-        (sum, area) => sum + (area.blocks?.length || 0),
-        0,
-      );
-    }
-    await pageManagerService.updatePageSchema(
-      id,
-      dsl as unknown as Record<string, unknown>,
-      blockCount,
-    );
+    // First save the current schema
+    await pageManagerService.updatePageSchema(id, schema);
 
     // Then publish the page
-    const updatedPage = await pageManagerService.publishPage(id);
-    if (updatedPage) {
-      setPage(updatedPage);
+    const updatedMeta = await pageManagerService.publishPage(id);
+    if (updatedMeta) {
+      setMeta(updatedMeta);
       showSuccessToast('Page published successfully');
     }
-  }, [id, dsl, showSuccessToast]);
+  }, [id, schema, showSuccessToast]);
 
   // Toolbar state
   const { state: toolbarState, actions: toolbarActions } = useToolbarState({
-    pageMeta: page || undefined,
+    pageMeta: meta || undefined,
     onSave: handleSave,
     onPublish: handlePublish,
   });
 
-  // Debounced auto-save — fires 2 seconds after the last DSL change.
+  // Debounced auto-save — fires 2 seconds after the last schema change.
   // Defined after toolbarActions so the save callback is always current.
   const scheduleAutoSave = useCallback(() => {
     if (autoSaveTimerRef.current) {
@@ -226,12 +140,12 @@ export default function PageDesignerEditorImpl() {
     }, 2000);
   }, [toolbarActions]);
 
-  // DSL change handler — also pushes to history and schedules auto-save
-  const handleDslChange = useCallback(
-    (newDsl: PageSchema) => {
-      setDsl(newDsl);
-      latestDslRef.current = newDsl;
-      dslHistory.pushState(newDsl);
+  // Schema change handler — also pushes to history and schedules auto-save
+  const handleSchemaChange = useCallback(
+    (newSchema: PageSchema) => {
+      setSchema(newSchema);
+      latestSchemaRef.current = newSchema;
+      dslHistory.pushState(newSchema);
       toolbarActions.markUnsaved();
       scheduleAutoSave();
     },
@@ -242,7 +156,7 @@ export default function PageDesignerEditorImpl() {
   const handleUndo = useCallback(() => {
     const prev = dslHistory.undo();
     if (prev) {
-      setDsl(prev);
+      setSchema(prev);
       toolbarActions.markUnsaved();
     }
   }, [dslHistory, toolbarActions]);
@@ -251,43 +165,32 @@ export default function PageDesignerEditorImpl() {
   const handleRedo = useCallback(() => {
     const next = dslHistory.redo();
     if (next) {
-      setDsl(next);
+      setSchema(next);
       toolbarActions.markUnsaved();
     }
   }, [dslHistory, toolbarActions]);
 
-  // Settings -> DSL sync handler
+  // Settings -> schema sync handler
   const handleSettingsChange = useCallback(
     (settings: AllSettings) => {
-      if (!dsl) return;
-      const updatedDsl: PageSchema = {
-        ...dsl,
-        enableMultiView: settings.page.enableMultiView,
+      if (!schema) return;
+      const updatedSchema: PageSchema = {
+        ...schema,
+        extension: {
+          ...schema.extension,
+          enableMultiView: settings.page.enableMultiView,
+        },
       };
-      handleDslChange(updatedDsl);
+      handleSchemaChange(updatedSchema);
     },
-    [dsl, handleDslChange],
+    [schema, handleSchemaChange],
   );
 
-  // DSL save handler
-  const handleDslSave = useCallback(
-    async (newDsl: PageSchema) => {
+  // Schema save handler (called by DesignerRouter sub-components on explicit save)
+  const handleSchemaSave = useCallback(
+    async (newSchema: PageSchema) => {
       if (!id) return;
-      const rawSaveDsl = newDsl as unknown as Record<string, unknown>;
-      let blockCount: number;
-      if (newDsl.kind === 'composite' && Array.isArray(rawSaveDsl.blocks)) {
-        blockCount = (rawSaveDsl.blocks as unknown[]).length;
-      } else {
-        blockCount = Object.values(newDsl.areas || {}).reduce(
-          (sum, area) => sum + (area.blocks?.length || 0),
-          0,
-        );
-      }
-      await pageManagerService.updatePageSchema(
-        id,
-        newDsl as unknown as Record<string, unknown>,
-        blockCount,
-      );
+      await pageManagerService.updatePageSchema(id, newSchema);
       toolbarActions.markSaved();
     },
     [id, toolbarActions],
@@ -300,14 +203,10 @@ export default function PageDesignerEditorImpl() {
   // Reload page data after rollback
   const handleRollbackSuccess = useCallback(async () => {
     if (!id) return;
-    const updatedPage = await pageManagerService.getPage(id);
-    if (updatedPage) {
-      setPage(updatedPage);
-      // Also reload DSL
-      const rawDsl = updatedPage.dslSchema as unknown as PageSchema | null;
-      if (rawDsl && rawDsl.kind && rawDsl.areas) {
-        setDsl(rawDsl);
-      }
+    const result = await pageManagerService.getPage(id);
+    if (result) {
+      setMeta(result.meta);
+      setSchema(result.schema);
     }
   }, [id]);
 
@@ -315,31 +214,29 @@ export default function PageDesignerEditorImpl() {
   const handleAiGenerated = useCallback(
     (generated: { kind: string; blocks: any[]; layout: any; schemaVersion: number; mergeMode?: MergeMode }) => {
       const mergeMode: MergeMode = generated.mergeMode || 'replace';
-      const existingBlocks = (dsl as any)?.blocks || [];
+      const existingBlocks = schema?.blocks ?? [];
       const mergedBlocks =
         mergeMode === 'append'
           ? [...existingBlocks, ...generated.blocks]
           : generated.blocks;
 
-      const aiDsl: PageSchema = {
-        ...(dsl || {}),
-        $schema: 'auraboot://schemas/page/v4',
-        version: '4.0.0',
-        id: page?.id || '',
-        kind: (generated.kind as any) || 'composite',
-        modelCode: dsl?.modelCode || page?.viewModelCode || '',
+      const aiSchema: PageSchema = {
+        ...(schema || {}),
+        schemaVersion: 2 as const,
+        id: meta?.id || '',
+        kind: (generated.kind as PageSchema['kind']) || 'list',
+        modelCode: schema?.modelCode || meta?.viewModelCode || '',
         blocks: mergedBlocks,
         layout: generated.layout,
-        schemaVersion: generated.schemaVersion,
-      } as PageSchema;
-      handleDslChange(aiDsl);
+      };
+      handleSchemaChange(aiSchema);
       showSuccessToast(
         mergeMode === 'append'
           ? `Added ${generated.blocks.length} block(s) to canvas`
           : 'Page layout generated by AI',
       );
     },
-    [dsl, page, handleDslChange, showSuccessToast],
+    [schema, meta, handleSchemaChange, showSuccessToast],
   );
 
   // Keyboard shortcuts — must be called before any early returns (React hooks rule)
@@ -412,7 +309,7 @@ export default function PageDesignerEditorImpl() {
     <div className="flex h-screen flex-col bg-gray-50">
       {/* Toolbar */}
       <DesignerToolbar
-        pageMeta={page || undefined}
+        pageMeta={meta || undefined}
         hasUnsavedChanges={toolbarState.hasUnsavedChanges}
         canUndo={dslHistory.canUndo}
         canRedo={dslHistory.canRedo}
@@ -444,13 +341,13 @@ export default function PageDesignerEditorImpl() {
       {/* Designer + AI Panel */}
       <div className="flex flex-1 overflow-hidden">
         <div className="flex-1 overflow-hidden">
-          {dsl && (
+          {schema && (
             <DesignerRouter
-              dsl={dsl}
-              onDslChange={handleDslChange}
-              onSave={handleDslSave}
-              modelCode={dsl.modelCode || page?.viewModelCode}
-              isCustomApiMode={isCustomApiMode}
+              dsl={schema}
+              onDslChange={handleSchemaChange}
+              onSave={handleSchemaSave}
+              modelCode={schema.modelCode || meta?.viewModelCode}
+              isCustomApiMode={schema.extension?.customApi != null}
               deviceWidth={deviceWidth}
             />
           )}
@@ -462,9 +359,9 @@ export default function PageDesignerEditorImpl() {
           onToggle={() => setAiPanelOpen(false)}
           onGenerated={handleAiGenerated}
           pageId={id || ''}
-          modelCode={dsl?.modelCode || page?.viewModelCode}
-          currentBlocks={(dsl as any)?.blocks}
-          schemaVersion={(dsl as any)?.schemaVersion}
+          modelCode={schema?.modelCode || meta?.viewModelCode}
+          currentBlocks={schema?.blocks}
+          schemaVersion={schema?.schemaVersion}
         />
       </div>
 
@@ -472,7 +369,9 @@ export default function PageDesignerEditorImpl() {
       <SettingsPanel
         isOpen={toolbarState.showSettings}
         onClose={toolbarActions.toggleSettings}
-        initialSettings={{ page: { enableMultiView: dsl?.enableMultiView ?? false } }}
+        initialSettings={{
+          page: { enableMultiView: schema?.extension?.enableMultiView === true },
+        }}
         onSettingsChange={handleSettingsChange}
       />
 
@@ -487,17 +386,17 @@ export default function PageDesignerEditorImpl() {
         isOpen={toolbarState.showVersionHistory}
         onClose={toolbarActions.toggleVersionHistory}
         pagePid={id!}
-        pageTitle={page?.title}
+        pageTitle={meta?.title}
         onRollbackSuccess={handleRollbackSuccess}
       />
 
       {/* Preview Modal */}
-      {dsl && (
+      {schema && (
         <PreviewModal
           isOpen={toolbarState.showPreview}
           onClose={toolbarActions.togglePreview}
-          schema={dsl}
-          pageTitle={page?.title}
+          schema={schema}
+          pageTitle={meta?.title}
         />
       )}
     </div>
