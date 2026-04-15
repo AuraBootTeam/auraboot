@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.connection.Message;
 import org.springframework.data.redis.connection.MessageListener;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -18,21 +19,23 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Redis Pub/Sub for multi-instance IM message broadcasting.
+ * Redis Pub/Sub implementation of {@link ImMessageBroadcaster} for multi-node deployments.
  *
  * When a message needs to be pushed to users, it is published to a Redis channel.
  * All application instances subscribe to this channel and push to locally-connected
  * WebSocket sessions. This ensures messages reach users regardless of which instance
  * they are connected to.
  *
- * Also works in single-instance mode (self-publish, self-consume).
+ * <p>Only active when {@code auraboot.im.broadcaster=redis}. For single-node deployments
+ * use the default {@link LocalBroadcaster} instead.
  *
  * @since 6.2.0
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class ImRedisPubSub implements MessageListener {
+@ConditionalOnProperty(prefix = "auraboot.im", name = "broadcaster", havingValue = "redis")
+public class RedisBroadcaster implements MessageListener, ImMessageBroadcaster {
 
     public static final String CHANNEL = "im:broadcast";
 
@@ -46,6 +49,7 @@ public class ImRedisPubSub implements MessageListener {
     /**
      * Publish a message to be delivered to specific users via all instances.
      */
+    @Override
     public void publish(List<Long> targetUserIds, WsFrame frame) {
         try {
             BroadcastPayload payload = new BroadcastPayload();
@@ -56,15 +60,8 @@ public class ImRedisPubSub implements MessageListener {
             String json = objectMapper.writeValueAsString(payload);
             redisTemplate.convertAndSend(CHANNEL, json);
         } catch (Exception e) {
-            log.error("Failed to publish IM broadcast to Redis", e);
+            log.error("RedisBroadcaster failed to publish IM broadcast", e);
         }
-    }
-
-    /**
-     * Publish a message to a single user.
-     */
-    public void publishToUser(Long userId, WsFrame frame) {
-        publish(List.of(userId), frame);
     }
 
     /**
@@ -90,12 +87,12 @@ public class ImRedisPubSub implements MessageListener {
                             session.sendMessage(textMessage);
                         }
                     } catch (IOException e) {
-                        log.warn("Failed to push to session {}", session.getId(), e);
+                        log.warn("RedisBroadcaster failed to push to session {}", session.getId(), e);
                     }
                 }
             }
         } catch (Exception e) {
-            log.error("Failed to process IM broadcast from Redis", e);
+            log.error("RedisBroadcaster failed to process IM broadcast from Redis", e);
         }
     }
 

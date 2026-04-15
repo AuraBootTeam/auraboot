@@ -15,7 +15,7 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 import com.auraboot.framework.im.mapper.ImConversationMemberMapper;
-import com.auraboot.framework.im.pubsub.ImRedisPubSub;
+import com.auraboot.framework.im.pubsub.ImMessageBroadcaster;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -41,7 +41,7 @@ public class ImEventListener {
     private final ImWebSocketHandler webSocketHandler;
     private final ImNotificationPreferenceService preferenceService;
     private final ObjectMapper objectMapper;
-    private final ImRedisPubSub redisPubSub;
+    private final ImMessageBroadcaster broadcaster;
     private final ImConversationMemberMapper memberMapper;
 
     /**
@@ -153,7 +153,7 @@ public class ImEventListener {
                             "createdAt", saved.getCreatedAt().toString()
                     ))
                     .build();
-            redisPubSub.publish(memberIds, frame);
+            broadcaster.publish(memberIds, frame);
 
             log.debug("Dual-delivery to object conversation: eventId={}, convId={}, seq={}",
                     event.getEventId(), objConv.getId(), saved.getSeq());

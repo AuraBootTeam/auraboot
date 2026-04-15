@@ -1,7 +1,7 @@
 package com.auraboot.framework.inbox.adapter;
 
 import com.auraboot.framework.im.dto.WsFrame;
-import com.auraboot.framework.im.pubsub.ImRedisPubSub;
+import com.auraboot.framework.im.pubsub.ImMessageBroadcaster;
 import com.auraboot.framework.inbox.model.InboxItem;
 import com.auraboot.framework.inbox.service.InboxRealtimePushPort;
 import lombok.RequiredArgsConstructor;
@@ -24,7 +24,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class ImInboxRealtimePushAdapter implements InboxRealtimePushPort {
 
-    private final ImRedisPubSub redisPubSub;
+    private final ImMessageBroadcaster broadcaster;
 
     @Override
     public void pushNewItem(InboxItem item) {
@@ -44,7 +44,7 @@ public class ImInboxRealtimePushAdapter implements InboxRealtimePushPort {
                 .data(data)
                 .build();
 
-        redisPubSub.publishToUser(item.getUserId(), frame);
+        broadcaster.publishToUser(item.getUserId(), frame);
         log.debug("Pushed INBOX_NEW to userId={}", item.getUserId());
     }
 }
