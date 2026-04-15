@@ -8,7 +8,7 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.im.dto.WsFrame;
 import com.auraboot.framework.im.mapper.ImConversationMemberMapper;
 import com.auraboot.framework.im.model.ImMessage;
-import com.auraboot.framework.im.pubsub.ImRedisPubSub;
+import com.auraboot.framework.im.pubsub.ImMessageBroadcaster;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -33,7 +33,7 @@ public class ImAiService {
 
     private final LlmProviderFactory llmProviderFactory;
     private final ImMessageService messageService;
-    private final ImRedisPubSub redisPubSub;
+    private final ImMessageBroadcaster broadcaster;
     private final ImConversationMemberMapper memberMapper;
 
     private static final String AI_SYSTEM_PROMPT = """
@@ -164,6 +164,6 @@ public class ImAiService {
                 .build();
 
         List<Long> memberIds = memberMapper.findHumanMemberIds(conversationId, tenantId);
-        redisPubSub.publish(memberIds, frame);
+        broadcaster.publish(memberIds, frame);
     }
 }

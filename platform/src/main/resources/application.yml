@@ -438,6 +438,10 @@ aura:
   event:
     transport: local     # local | redis | rabbitmq
 
+  # IM broadcaster mode
+  im:
+    broadcaster: local   # local (single-node, no Redis required) | redis (multi-node, requires Redis)
+
   # Infrastructure: HTTP Client
   http:
     connect-timeout: 5s
