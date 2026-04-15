@@ -120,9 +120,9 @@ test.describe('Plugin Lifecycle', () => {
     const rowCountBefore = await getTableRowCount(page);
     // rowCountBefore may be 0 if no seed data — still valid for idempotency test
 
-    // Step 2: Reimport the e2e-test-order plugin
+    // Step 2: Reimport the test-fixtures plugin
     const importResp = await page.request.post('/api/plugins/import/import-directory-sync', {
-      data: { directory: 'plugins/e2e-test-order' },
+      data: { directory: 'plugins/test-fixtures' },
       headers: { 'Content-Type': 'application/json' },
       failOnStatusCode: false,
     });

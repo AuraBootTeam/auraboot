@@ -164,8 +164,13 @@ sync_solutions() {
     log "Syncing auraboot-solutions (private)..."
     local dst="${DIR_SOLUTIONS}"
 
-    # Commercial plugins (all except public ones)
+    # Commercial plugins (all except public ones).
+    #
+    # `test-fixtures` is an internal-only test-fixture plugin (provides
+    # e2et_order / e2et_customer / e2et_payment for the E2E suite).
+    # Intentionally excluded from both OSS and commercial distribution.
     local public_plugins="crm-starter cli schemas templates scripts platform"
+    local internal_plugins="test-fixtures"
 
     for plugin_dir in "${MONO_ROOT}"/plugins/*/; do
         local plugin_name=$(basename "${plugin_dir}")
@@ -179,7 +184,16 @@ sync_solutions() {
             fi
         done
 
-        if [ "${is_public}" = false ]; then
+        # Skip internal-only plugins (never distributed)
+        local is_internal=false
+        for ip in ${internal_plugins}; do
+            if [ "${plugin_name}" = "${ip}" ]; then
+                is_internal=true
+                break
+            fi
+        done
+
+        if [ "${is_public}" = false ] && [ "${is_internal}" = false ]; then
             sync_file "${plugin_dir}" "${dst}/plugins/${plugin_name}"
         fi
     done

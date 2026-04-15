@@ -120,7 +120,7 @@ public class TestSeedController {
             log.info("Test tenant already exists, skipping bootstrap and only refreshing plugin state");
         }
 
-        // 5.5 Install e2e-test-order plugin into the new test tenant so iOS/Playwright
+        // 5.5 Install test-fixtures plugin into the new test tenant so iOS/Playwright
         // tests can navigate to browse_e2et_order_list without manual intervention.
         installE2eTestPlugin(tenant, user);
 
@@ -220,12 +220,12 @@ public class TestSeedController {
     }
 
     /**
-     * Install the e2e-test-order plugin into the given tenant so that iOS/Playwright
+     * Install the test-fixtures plugin into the given tenant so that iOS/Playwright
      * E2E tests can navigate to the e2et menu without manual plugin publishing.
      * <p>
      * The plugin directory is resolved relative to the Spring Boot working directory
      * ({@code user.dir}), which is the {@code platform/} module root at runtime.
-     * The plugins directory sits one level above: {@code ../plugins/e2e-test-order}.
+     * The plugins directory sits one level above: {@code ../plugins/test-fixtures}.
      * <p>
      * Failure is non-fatal — logs a warning and continues so that seed never breaks
      * due to a missing plugin directory (e.g. CI environments without the full tree).
@@ -234,9 +234,9 @@ public class TestSeedController {
         MetaContext.setContext(tenant.getId(), user.getId(), user.getPid(), user.getEmail());
         try {
             importTestPlugin("../plugins/project-management", "project-management", tenant.getId());
-            importTestPlugin("../plugins/e2e-test-order", "e2e-test-order", tenant.getId());
+            importTestPlugin("../plugins/test-fixtures", "test-fixtures", tenant.getId());
         } catch (Exception e) {
-            log.warn("e2e-test-order plugin install threw exception for tenant {}: {}",
+            log.warn("test-fixtures plugin install threw exception for tenant {}: {}",
                     tenant.getId(), e.getMessage());
         } finally {
             MetaContext.clear();
