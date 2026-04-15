@@ -118,6 +118,16 @@ export default function TraceDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<DetailTab>('timeline');
+  const [copiedAll, setCopiedAll] = useState(false);
+
+  const handleCopyFullTrace = useCallback(() => {
+    if (!trace) return;
+    const payload = JSON.stringify({ trace, spans }, null, 2);
+    navigator.clipboard.writeText(payload).then(() => {
+      setCopiedAll(true);
+      setTimeout(() => setCopiedAll(false), 1500);
+    });
+  }, [trace, spans]);
 
   useEffect(() => {
     async function load() {
@@ -226,8 +236,18 @@ export default function TraceDetailPage() {
               </div>
             </div>
 
-            <div className="text-sm text-gray-500 dark:text-gray-400">
-              {spans.length} {l('个 Span', 'spans')}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleCopyFullTrace}
+                className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                data-testid="copy-full-trace"
+                title={l('复制完整 trace (trace + spans) 为 JSON', 'Copy full trace (trace + spans) as JSON')}
+              >
+                {copiedAll ? l('已复制', 'Copied') : l('复制完整 JSON', 'Copy full JSON')}
+              </button>
+              <span className="text-sm text-gray-500 dark:text-gray-400">
+                {spans.length} {l('个 Span', 'spans')}
+              </span>
             </div>
           </div>
 
@@ -601,14 +621,14 @@ function IOView({ trace, l }: { trace: TraceData; l: (zh: string, en: string) =>
         <h3 className="mb-3 text-sm font-semibold text-gray-900 dark:text-white">
           {l('输入', 'Input')}
         </h3>
-        <JsonViewer data={trace.input} maxHeight="300px" />
+        <JsonViewer data={trace.input} maxHeight="600px" />
       </div>
 
       <div className="rounded-lg border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800">
         <h3 className="mb-3 text-sm font-semibold text-gray-900 dark:text-white">
           {l('输出', 'Output')}
         </h3>
-        <JsonViewer data={trace.output} maxHeight="300px" />
+        <JsonViewer data={trace.output} maxHeight="600px" />
       </div>
 
       {trace.metadata && Object.keys(trace.metadata).length > 0 && (
