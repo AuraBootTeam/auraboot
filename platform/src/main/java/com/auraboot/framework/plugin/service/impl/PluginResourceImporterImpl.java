@@ -44,6 +44,7 @@ import com.auraboot.framework.dashboard.migration.BlockToDashboardConverter;
 import com.auraboot.framework.dashboard.service.DashboardService;
 import com.auraboot.framework.plugin.dto.imports.BindingRuleDTO;
 import com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTO;
+import com.auraboot.framework.plugin.dto.imports.DashboardDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.DictDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.FieldDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.ImportRequest;
@@ -1369,6 +1370,97 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                     created.getPid(), null, dto.getPageKey(), dto.getEffectiveName(),
                     ResourceAction.CREATE, null, null);
         }
+    }
+
+    /**
+     * Import a dashboard from the first-class {@code config/dashboards/*.json} contract (Plan #8).
+     *
+     * <p>Unlike the legacy {@code kind=dashboard} page path (which uses {@link BlockToDashboardConverter}),
+     * the input is already in Dashboard DSL format, so widgets are used directly.
+     *
+     * <p>Conflict strategy is honoured at the dashboard level (by code):
+     * <ul>
+     *   <li>ERROR       → throw if a dashboard with the same code already exists</li>
+     *   <li>SKIP        → return a SKIP record when dashboard already exists</li>
+     *   <li>OVERWRITE / OVERWRITE_SAFE → update widgets + layout in place</li>
+     * </ul>
+     */
+    @Override
+    public PluginResource importDashboard(DashboardDefinitionDTO dto, String pluginPid, String importId,
+                                          Long tenantId, ImportRequest.ConflictStrategy conflictStrategy) {
+        log.info("Importing dashboard '{}' from config/dashboards/", dto.getCode());
+
+        if (!dto.isValid()) {
+            throw new PluginException(
+                    "Invalid dashboard definition '%s': code, title and widgets are required".formatted(dto.getCode()));
+        }
+
+        // Build widgets JsonNode from the raw List<Object>
+        com.fasterxml.jackson.databind.JsonNode widgetsNode = objectMapper.valueToTree(dto.getWidgets());
+        com.fasterxml.jackson.databind.JsonNode layoutConfigNode = buildDashboardLayoutConfig(dto.getLayoutConfig());
+
+        DashboardDTO existing = dashboardService.findByCode(dto.getCode());
+
+        if (existing != null && conflictStrategy == ImportRequest.ConflictStrategy.ERROR) {
+            throw new PluginException("Dashboard already exists: " + dto.getCode());
+        }
+
+        if (existing != null && conflictStrategy == ImportRequest.ConflictStrategy.SKIP) {
+            log.info("Dashboard '{}' already exists — skipping (SKIP strategy)", dto.getCode());
+            return createResourceRecord(pluginPid, importId, tenantId, ResourceType.PAGE,
+                    existing.getPid(), null, dto.getCode(), dto.getTitle(),
+                    ResourceAction.SKIP, null, null);
+        }
+
+        if (existing != null) {
+            // OVERWRITE or OVERWRITE_SAFE — update in place
+            DashboardUpdateRequest updateReq = new DashboardUpdateRequest();
+            updateReq.setTitle(dto.getTitle());
+            updateReq.setDescription(dto.getDescription());
+            updateReq.setScope(dto.getEffectiveScope());
+            updateReq.setLayoutConfig(layoutConfigNode);
+            updateReq.setWidgets(widgetsNode);
+            dashboardService.update(existing.getPid(), updateReq);
+            log.info("Dashboard updated from config/dashboards/: code={}, pid={}", dto.getCode(), existing.getPid());
+            return createResourceRecord(pluginPid, importId, tenantId, ResourceType.PAGE,
+                    existing.getPid(), null, dto.getCode(), dto.getTitle(),
+                    ResourceAction.UPDATE, null, null);
+        } else {
+            DashboardCreateRequest createReq = new DashboardCreateRequest();
+            createReq.setCode(dto.getCode());
+            createReq.setTitle(dto.getTitle());
+            createReq.setDescription(dto.getDescription());
+            createReq.setScope(dto.getEffectiveScope());
+            createReq.setSortOrder(dto.getSortOrder() != null ? dto.getSortOrder() : 0);
+            createReq.setLayoutConfig(layoutConfigNode);
+            createReq.setWidgets(widgetsNode);
+            DashboardDTO created = dashboardService.create(createReq);
+            // Plugin dashboards are published immediately unless status=draft
+            if (!"draft".equals(dto.getEffectiveStatus())) {
+                dashboardService.publish(created.getPid());
+            }
+            log.info("Dashboard created from config/dashboards/: code={}, pid={}", dto.getCode(), created.getPid());
+            return createResourceRecord(pluginPid, importId, tenantId, ResourceType.PAGE,
+                    created.getPid(), null, dto.getCode(), dto.getTitle(),
+                    ResourceAction.CREATE, null, null);
+        }
+    }
+
+    /**
+     * Build a dashboard layoutConfig JsonNode from a raw map.
+     * Applies defaults when the map is null or missing keys.
+     */
+    private com.fasterxml.jackson.databind.JsonNode buildDashboardLayoutConfig(Map<String, Object> rawLayout) {
+        com.fasterxml.jackson.databind.node.ObjectNode cfg = objectMapper.createObjectNode();
+        int columns   = rawLayout != null && rawLayout.get("columns")   instanceof Number n ? n.intValue() : 12;
+        int rowHeight = rawLayout != null && rawLayout.get("rowHeight") instanceof Number n ? n.intValue() : 100;
+        int gap       = rawLayout != null && rawLayout.get("gap")       instanceof Number n ? n.intValue() : 16;
+        String compact = rawLayout != null && rawLayout.get("compactType") instanceof String s ? s : "vertical";
+        cfg.put("columns",     columns);
+        cfg.put("rowHeight",   rowHeight);
+        cfg.put("gap",         gap);
+        cfg.put("compactType", compact);
+        return cfg;
     }
 
     @Override

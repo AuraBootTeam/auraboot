@@ -126,6 +126,12 @@ public class PluginManifestExtended extends PluginManifest {
      */
     private List<SavedViewDefinitionDTO> savedViews;
 
+    /**
+     * Dashboard definitions to import from {@code config/dashboards/*.json}.
+     * This is the first-class contract (Plan #8); no BlockToDashboardConverter step is needed.
+     */
+    private List<DashboardDefinitionDTO> dashboards;
+
     // ==================== Directory-based Configuration ====================
 
     /**
@@ -490,7 +496,8 @@ public class PluginManifestExtended extends PluginManifest {
                 || (dicts != null && !dicts.isEmpty())
                 || (i18nResources != null && !i18nResources.isEmpty())
                 || (namedQueries != null && !namedQueries.isEmpty())
-                || (savedViews != null && !savedViews.isEmpty());
+                || (savedViews != null && !savedViews.isEmpty())
+                || (dashboards != null && !dashboards.isEmpty());
     }
 
     /**
@@ -512,7 +519,8 @@ public class PluginManifestExtended extends PluginManifest {
                 Map.entry("dicts", dicts != null ? dicts.size() : 0),
                 Map.entry("i18nResources", i18nResources != null ? i18nResources.size() : 0),
                 Map.entry("namedQueries", namedQueries != null ? namedQueries.size() : 0),
-                Map.entry("savedViews", savedViews != null ? savedViews.size() : 0)
+                Map.entry("savedViews", savedViews != null ? savedViews.size() : 0),
+                Map.entry("dashboards", dashboards != null ? dashboards.size() : 0)
         );
     }
 
@@ -538,6 +546,7 @@ public class PluginManifestExtended extends PluginManifest {
         if (dicts != null) dicts.removeIf(d -> isCommentObject(d.getCode(), d.getUnknownFields()));
         if (namedQueries != null) namedQueries.removeIf(n -> isCommentObject(n.getCode(), n.getUnknownFields()));
         if (savedViews != null) savedViews.removeIf(s -> isCommentObject(s.getUniqueKey(), s.getUnknownFields()));
+        if (dashboards != null) dashboards.removeIf(d -> isCommentObject(d.getCode(), d.getUnknownFields()));
         if (i18nResources != null) i18nResources.removeIf(i -> i.getKey() == null || i.getKey().isBlank());
     }
 

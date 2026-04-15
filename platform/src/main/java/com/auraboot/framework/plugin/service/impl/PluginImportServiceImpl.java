@@ -416,6 +416,16 @@ public class PluginImportServiceImpl implements PluginImportService {
                 }
             }
 
+            // Load dashboards (first-class contract: config/dashboards/*.json)
+            if (resourceDirs.containsKey("dashboards")) {
+                List<com.auraboot.framework.plugin.dto.imports.DashboardDefinitionDTO> dashboards =
+                        loadResourceListFromZip(files, resourceDirs.get("dashboards"),
+                                com.auraboot.framework.plugin.dto.imports.DashboardDefinitionDTO.class);
+                if (!dashboards.isEmpty()) {
+                    manifest.setDashboards(mergeResourceList(manifest.getDashboards(), dashboards));
+                }
+            }
+
             log.info("Loaded resources from ZIP resourceDirs: {}", manifest.getResourceCounts());
 
         } catch (Exception e) {
@@ -1178,7 +1188,12 @@ public class PluginImportServiceImpl implements PluginImportService {
                 }
                 case BINDING_RULE -> importBindingRules(manifest, request, result, pluginPid, importId, tenantId);
                 case NAMED_QUERY -> importNamedQueries(manifest, request, result, pluginPid, importId, tenantId);
-                case PAGE -> importPages(manifest, request, result, pluginPid, importId, tenantId);
+                case PAGE -> {
+                    importPages(manifest, request, result, pluginPid, importId, tenantId);
+                    // Also import first-class dashboards (config/dashboards/*.json, Plan #8).
+                    // These are keyed to the PAGE import stage so they run after models/queries are in place.
+                    importDashboards(manifest, request, result, pluginPid, importId, tenantId);
+                }
                 case SAVED_VIEW -> importSavedViews(manifest, result, tenantId);
                 case PROCESS -> importProcesses(manifest, request, result, pluginPid, importId, tenantId);
                 case I18N -> importI18nResources(manifest, result, tenantId);
@@ -1681,6 +1696,32 @@ public class PluginImportServiceImpl implements PluginImportService {
                     request.getConflictStrategy(), request.getAutoPublishPages());
             if (resource != null) {
                 captureImportSnapshot(resource, page);
+                saveOrUpdatePluginResource(resource, tenantId);
+                result.incrementResourceCount(ResourceType.PAGE, resource.getActionEnum());
+                if (resource.getResourcePid() != null) {
+                    result.addCreatedResource(ResourceType.PAGE, resource.getResourcePid());
+                }
+            }
+        }
+    }
+
+    /**
+     * Import first-class dashboard definitions from {@code config/dashboards/*.json} (Plan #8).
+     * Dashboards are emitted as PAGE resource records so the existing resource-tracking
+     * infrastructure (PluginResource, rollback) is reused without adding a new ResourceType.
+     */
+    private void importDashboards(PluginManifestExtended manifest, ImportRequest request,
+                                  ImportExecuteResult result, String pluginPid, String importId, Long tenantId) {
+        if (manifest.getDashboards() == null || manifest.getDashboards().isEmpty()) return;
+
+        for (com.auraboot.framework.plugin.dto.imports.DashboardDefinitionDTO dto : manifest.getDashboards()) {
+            if (!dto.isValid()) {
+                log.warn("Skipping invalid dashboard definition: code={}", dto.getCode());
+                continue;
+            }
+            PluginResource resource = resourceImporter.importDashboard(dto, pluginPid, importId, tenantId,
+                    request.getConflictStrategy());
+            if (resource != null) {
                 saveOrUpdatePluginResource(resource, tenantId);
                 result.incrementResourceCount(ResourceType.PAGE, resource.getActionEnum());
                 if (resource.getResourcePid() != null) {
