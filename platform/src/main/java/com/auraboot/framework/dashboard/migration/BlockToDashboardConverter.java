@@ -71,6 +71,32 @@ public final class BlockToDashboardConverter {
         return dashboard;
     }
 
+    /**
+     * Overload for plugin import path: accepts the plugin-import DTO variant
+     * ({@link com.auraboot.framework.plugin.dto.imports.PageSchemaDTO}) which has the same
+     * relevant fields (pageKey, title, description, layout, blocks) as the meta DTO.
+     *
+     * @param page plugin import page schema DTO (kind must be "dashboard")
+     * @return populated Dashboard entity
+     */
+    public static Dashboard convert(com.auraboot.framework.plugin.dto.imports.PageSchemaDTO page) {
+        Dashboard dashboard = new Dashboard();
+
+        dashboard.setPid(UniqueIdGenerator.generate());
+        dashboard.setCode(page.getPageKey());
+        dashboard.setTitle(resolveTitle(page.getTitle()));
+        dashboard.setDescription(page.getDescription());
+        dashboard.setScope("global");
+        dashboard.setStatus(StatusConstants.PUBLISHED);
+        dashboard.setIsDefault(false);
+        dashboard.setSortOrder(0);
+
+        dashboard.setLayoutConfig(buildLayoutConfigFromMap(page.getLayout()));
+        dashboard.setWidgets(buildWidgets(page.getBlocks()));
+
+        return dashboard;
+    }
+
     // ------------------------------------------------------------------ private helpers
 
     /**
@@ -79,8 +105,14 @@ public final class BlockToDashboardConverter {
      * otherwise use defaults: columns=12, rowHeight=100, gap=16.
      */
     private static com.fasterxml.jackson.databind.JsonNode buildLayoutConfig(PageSchemaDTO page) {
+        return buildLayoutConfigFromMap(page.getLayout());
+    }
+
+    /**
+     * Build layout config from a raw Map (used by both overloads of convert).
+     */
+    private static com.fasterxml.jackson.databind.JsonNode buildLayoutConfigFromMap(Map<String, Object> layout) {
         ObjectNode cfg = MAPPER.createObjectNode();
-        Map<String, Object> layout = page.getLayout();
 
         cfg.put("columns",   getInt(layout, "columns",   12));
         cfg.put("rowHeight", getInt(layout, "rowHeight", 100));

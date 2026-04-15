@@ -36,6 +36,12 @@ import com.auraboot.framework.permission.dto.PermissionCreateRequest;
 import com.auraboot.framework.permission.dto.PermissionDTO;
 import com.auraboot.framework.permission.mapper.PermissionMapper;
 import com.auraboot.framework.permission.service.PermissionService;
+import com.auraboot.framework.dashboard.dto.DashboardCreateRequest;
+import com.auraboot.framework.dashboard.dto.DashboardDTO;
+import com.auraboot.framework.dashboard.dto.DashboardUpdateRequest;
+import com.auraboot.framework.dashboard.entity.Dashboard;
+import com.auraboot.framework.dashboard.migration.BlockToDashboardConverter;
+import com.auraboot.framework.dashboard.service.DashboardService;
 import com.auraboot.framework.plugin.dto.imports.BindingRuleDTO;
 import com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.DictDefinitionDTO;
@@ -106,6 +112,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     private final MenuService menuService;
     private final PageSchemaService pageSchemaService;
     private final NamedQueryService namedQueryService;
+    private final DashboardService dashboardService;
 
     // Infrastructure dependencies
     // LEGITIMATE: JdbcTemplate kept only for resurrectSoftDeleted() which uses dynamic table names
@@ -1230,6 +1237,11 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     public PluginResource importPage(PageSchemaDTO dto, String pluginPid, String importId,
                                       Long tenantId, ImportRequest.ConflictStrategy conflictStrategy,
                                       Boolean autoPublish) {
+        // kind=dashboard is routed to the Dashboard DSL subsystem, bypassing ab_page_schema
+        if ("dashboard".equals(dto.getKind())) {
+            return importDashboardPage(dto, pluginPid, importId, tenantId, conflictStrategy);
+        }
+
         boolean exists = checkPageExists(tenantId, dto.getPageKey());
 
         if (exists && conflictStrategy == ImportRequest.ConflictStrategy.ERROR) {
@@ -1293,6 +1305,68 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
 
             return createResourceRecord(pluginPid, importId, tenantId, ResourceType.PAGE,
                     pid, null, dto.getPageKey(), dto.getEffectiveName(),
+                    ResourceAction.CREATE, null, null);
+        }
+    }
+
+    /**
+     * Import a kind=dashboard plugin page by routing it to the Dashboard DSL subsystem.
+     * The page is converted via {@link BlockToDashboardConverter} and persisted via
+     * {@link DashboardService}. This bypasses {@code ab_page_schema} entirely.
+     *
+     * <p>Conflict strategy is honoured at the dashboard level (by code):
+     * <ul>
+     *   <li>ERROR  → throw if dashboard with same code already exists</li>
+     *   <li>SKIP   → return SKIP record if already exists</li>
+     *   <li>OVERWRITE / OVERWRITE_SAFE → update in place</li>
+     * </ul>
+     */
+    private PluginResource importDashboardPage(PageSchemaDTO dto, String pluginPid, String importId,
+                                               Long tenantId, ImportRequest.ConflictStrategy conflictStrategy) {
+        log.info("Plugin page '{}' has kind=dashboard — auto-converting to Dashboard DSL", dto.getPageKey());
+
+        Dashboard converted = BlockToDashboardConverter.convert(dto);
+        DashboardDTO existing = dashboardService.findByCode(converted.getCode());
+
+        if (existing != null && conflictStrategy == ImportRequest.ConflictStrategy.ERROR) {
+            throw new PluginException("Dashboard already exists: " + dto.getPageKey());
+        }
+
+        if (existing != null && conflictStrategy == ImportRequest.ConflictStrategy.SKIP) {
+            return createResourceRecord(pluginPid, importId, tenantId, ResourceType.PAGE,
+                    existing.getPid(), null, dto.getPageKey(), dto.getEffectiveName(),
+                    ResourceAction.SKIP, null, null);
+        }
+
+        if (existing != null) {
+            // OVERWRITE or OVERWRITE_SAFE — update in place
+            DashboardUpdateRequest updateReq = new DashboardUpdateRequest();
+            updateReq.setTitle(converted.getTitle());
+            updateReq.setDescription(converted.getDescription());
+            updateReq.setScope(converted.getScope());
+            updateReq.setLayoutConfig(converted.getLayoutConfig());
+            updateReq.setWidgets(converted.getWidgets());
+            dashboardService.update(existing.getPid(), updateReq);
+            log.info("Dashboard updated: code={}, pid={}", dto.getPageKey(), existing.getPid());
+            return createResourceRecord(pluginPid, importId, tenantId, ResourceType.PAGE,
+                    existing.getPid(), null, dto.getPageKey(), dto.getEffectiveName(),
+                    ResourceAction.UPDATE, null, null);
+        } else {
+            // Create new dashboard
+            DashboardCreateRequest createReq = new DashboardCreateRequest();
+            createReq.setCode(converted.getCode());
+            createReq.setTitle(converted.getTitle() != null && !converted.getTitle().isBlank()
+                    ? converted.getTitle() : dto.getPageKey());
+            createReq.setDescription(converted.getDescription());
+            createReq.setScope(converted.getScope());
+            createReq.setLayoutConfig(converted.getLayoutConfig());
+            createReq.setWidgets(converted.getWidgets());
+            DashboardDTO created = dashboardService.create(createReq);
+            // Publish immediately (create sets status=draft by default)
+            dashboardService.publish(created.getPid());
+            log.info("Dashboard created and published: code={}, pid={}", dto.getPageKey(), created.getPid());
+            return createResourceRecord(pluginPid, importId, tenantId, ResourceType.PAGE,
+                    created.getPid(), null, dto.getPageKey(), dto.getEffectiveName(),
                     ResourceAction.CREATE, null, null);
         }
     }
