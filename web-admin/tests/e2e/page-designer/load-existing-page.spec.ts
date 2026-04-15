@@ -55,15 +55,14 @@ test.describe('Page Designer loads existing pages', () => {
     const table = page.locator('table, [data-testid="dynamic-list"]').first();
     await expect(table).toBeVisible({ timeout: 10000 });
 
-    // Find first row with kind=list
-    const listRow = page.locator('tbody tr').filter({ hasText: /\blist\b/i }).first();
-    if ((await listRow.count()) === 0) {
-      test.skip(true, 'No list-kind page in ab_page_schema to exercise regression');
-      return;
-    }
+    // Take the first table row — any existing page exercises the regression.
+    // (Filtering by kind text is unreliable because the cell may render a
+    // localised label like "列表" or a styled badge, not the raw string "list".)
+    const firstRow = page.locator('tbody tr').first();
+    await expect(firstRow).toBeVisible({ timeout: 10000 });
 
     // D6: Click the edit/design button on that row
-    await listRow.getByRole('button', { name: /edit|design|编辑|设计/i }).first().click();
+    await firstRow.getByRole('button', { name: /edit|design|编辑|设计/i }).first().click();
     await page.waitForURL(/\/page-designer\//);
     await page.waitForLoadState('domcontentloaded').catch(() => {});
 
@@ -87,10 +86,12 @@ test.describe('Page Designer loads existing pages', () => {
     // Force-navigate to designer with a bogus pid to exercise the error path
     await page.goto('/page-designer/nonexistent-pid-9999', { waitUntil: 'domcontentloaded' });
 
-    // Should show error state, not crash or blank screen
-    const errorIndicator = page.locator(
-      'text=/not found|failed|error/i, [data-testid="error-state"]',
-    );
+    // Should show error state, not crash or blank screen.
+    // Use .or() to combine a text matcher with a CSS selector — mixing them in
+    // a single locator string with a comma is invalid and throws a SyntaxError.
+    const errorIndicator = page
+      .getByText(/not found|failed|error/i)
+      .or(page.locator('[data-testid="error-state"]'));
     await expect(errorIndicator.first()).toBeVisible({ timeout: 5000 });
   });
 });

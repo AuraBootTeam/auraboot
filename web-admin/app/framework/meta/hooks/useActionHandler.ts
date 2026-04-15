@@ -197,7 +197,11 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
    *   - "automation:{pid}" -> /automation/{pid}
    * - Legacy "{modelCode}_{pageType}" e.g. "qo_daily_report_form"
    */
-  const resolveNavigateTo = useCallback((pageKey: string, record?: Record<string, any>) => {
+  const resolveNavigateTo = useCallback((pageKey: string | undefined, record?: Record<string, any>) => {
+    if (!pageKey) {
+      console.error('[useActionHandler] navigate action is missing both "to" and "url" fields');
+      return '';
+    }
     const recordId = record?.pid || record?.id;
 
     // Absolute path with template variables — OCP compliant
@@ -314,7 +318,9 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
           }
 
           case 'navigate': {
-            const path = resolveNavigateTo(actionDef.to, record);
+            // Support both `to` (canonical) and `url` (legacy alias used in some DSL configs)
+            const navTarget = (actionDef as any).to ?? (actionDef as any).url;
+            const path = resolveNavigateTo(navTarget, record);
             if (actionDef.command) {
               const isEditAction =
                 normalizedButton.label === 'edit' ||
