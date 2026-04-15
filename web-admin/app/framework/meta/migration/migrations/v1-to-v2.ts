@@ -6,15 +6,15 @@ export function migrateV1toV2(dsl: Record<string, any>): Record<string, any> {
 
   // Convert pageType to kind
   if (result.pageType && !result.kind) {
+    // kind=dashboard removed 2026-04-15 — dashboards live in ab_dashboard,
+    // legacy DASHBOARD page_type entries fall through to 'list' default.
     const typeMap: Record<string, string> = {
       'LIST': 'list',
       'FORM': 'form',
       'DETAIL': 'detail',
-      'DASHBOARD': 'dashboard',
       'list': 'list',
       'form': 'form',
       'detail': 'detail',
-      'dashboard': 'dashboard',
     };
     result.kind = typeMap[result.pageType] ?? 'list';
     delete result.pageType;

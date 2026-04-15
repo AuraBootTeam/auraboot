@@ -64,7 +64,6 @@
   {"key": "page.acs_demo_request_list.title", "zh-CN": "AI 业务请求", "en-US": "AI Business Requests", "refType": "page"},
   {"key": "page.acs_demo_request_form.title", "zh-CN": "AI 请求表单", "en-US": "AI Request Form", "refType": "page"},
   {"key": "page.acs_demo_request_detail.title", "zh-CN": "AI 请求详情", "en-US": "AI Request Detail", "refType": "page"},
-  {"key": "page.acs_dashboard.title", "zh-CN": "ACP 驾驶舱", "en-US": "ACP Dashboard", "refType": "page"},
   {"key": "page.acs_safety_rule_list.title", "zh-CN": "安全阀门规则", "en-US": "Safety Valve Rules", "refType": "page"},
   {"key": "page.acs_safety_rule_form.title", "zh-CN": "安全规则表单", "en-US": "Safety Rule Form", "refType": "page"},
 
