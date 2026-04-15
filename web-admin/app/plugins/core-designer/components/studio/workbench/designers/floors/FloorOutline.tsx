@@ -6,10 +6,10 @@
  */
 
 import React, { useState } from 'react';
-import type { DslV4Schema, DslFloor, DslComponent } from '~/plugins/core-designer/components/studio/domain/dsl/types';
+import type { PageSchema, DslFloor, DslComponent } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 
 export interface FloorOutlineProps {
-  dsl: DslV4Schema;
+  dsl: PageSchema;
   selectedFloorId: string | null;
   selectedComponentId: string | null;
   onFloorClick: (floorId: string) => void;

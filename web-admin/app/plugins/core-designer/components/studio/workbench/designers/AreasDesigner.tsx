@@ -19,7 +19,7 @@ import {
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import type { DragStartEvent, DragEndEvent, DragOverEvent, Active } from '@dnd-kit/core';
 import type {
-  DslV4Schema,
+  PageSchema,
   DslBlock,
   DslArea,
   AreaName,
@@ -39,9 +39,9 @@ import { DRAG_TYPES } from '~/plugins/core-designer/components/studio/workbench/
 import { useApiSchemaDetection } from '~/plugins/core-designer/components/studio/hooks/fields/useApiSchemaDetection';
 
 export interface AreasDesignerProps {
-  dsl: DslV4Schema;
-  onDslChange: (dsl: DslV4Schema) => void;
-  onSave?: (dsl: DslV4Schema) => Promise<void>;
+  dsl: PageSchema;
+  onDslChange: (dsl: PageSchema) => void;
+  onSave?: (dsl: PageSchema) => Promise<void>;
   modelCode?: string;
   readonly?: boolean;
   previewMode?: boolean;

@@ -6,12 +6,12 @@
  */
 
 import { useCallback } from 'react';
-import type { DslV4Schema, DslFloor, DslComponent, DslTab } from '~/plugins/core-designer/components/studio/domain/dsl/types';
+import type { PageSchema, DslFloor, DslComponent, DslTab } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 
 const generateId = () => `floor_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 const generateComponentId = () => `comp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
-export function useFloorsDsl(dsl: DslV4Schema, onDslChange: (dsl: DslV4Schema) => void) {
+export function useFloorsDsl(dsl: PageSchema, onDslChange: (dsl: PageSchema) => void) {
   const floors = dsl.floors || [];
 
   const updateFloors = useCallback(

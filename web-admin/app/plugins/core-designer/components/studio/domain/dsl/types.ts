@@ -18,7 +18,7 @@
 /**
  * Page schema version 4.0
  */
-export interface DslV4Schema {
+export interface PageSchema {
   // Meta information
   $schema: 'auraboot://schemas/page/v4';
   version: '4.0.0';

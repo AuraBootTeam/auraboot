@@ -1,14 +1,14 @@
 /**
  * PreviewModal Component
  *
- * Device-responsive preview for DslV4Schema pages.
+ * Device-responsive preview for PageSchema pages.
  * Supports both areas-based (list/form) and floors-based (detail/home) DSL.
  *
  * @since 4.0.0
  */
 
 import React, { useCallback, useMemo } from 'react';
-import type { DslV4Schema, DslBlock, DslFloor, DslComponent } from '~/plugins/core-designer/components/studio/domain/dsl/types';
+import type { PageSchema, DslBlock, DslFloor, DslComponent } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 
 /**
  * Device preset configurations
@@ -27,7 +27,7 @@ type DeviceType = keyof typeof DEVICE_PRESETS;
 export interface PreviewModalProps {
   isOpen: boolean;
   onClose: () => void;
-  schema?: DslV4Schema;
+  schema?: PageSchema;
   pageTitle?: string;
 }
 
