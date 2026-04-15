@@ -12,33 +12,5 @@
     "name:en": "View Showcase",
     "resourceType": "data",
     "module": "sc"
-  },
-  {
-    "code": "sc.workflow.manage",
-    "displayName:zh-CN": "工作流管理",
-    "displayName:en": "Workflow Manage",
-    "resourceType": "operation",
-    "module": "sc"
-  },
-  {
-    "code": "sc.workflow.read",
-    "displayName:zh-CN": "工作流查看",
-    "displayName:en": "Workflow Read",
-    "resourceType": "data",
-    "module": "sc"
-  },
-  {
-    "code": "sc.workflow.approve",
-    "displayName:zh-CN": "工作流审批",
-    "displayName:en": "Workflow Approve",
-    "resourceType": "operation",
-    "module": "sc"
-  },
-  {
-    "code": "sc.workflow.execute",
-    "displayName:zh-CN": "工作流执行",
-    "displayName:en": "Workflow Execute",
-    "resourceType": "operation",
-    "module": "sc"
   }
 ]

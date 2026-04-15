@@ -18,33 +18,7 @@
     {"type": "command", "code": "sc:update_showcase"},
     {"type": "command", "code": "sc:delete_showcase"},
     {"type": "command", "code": "sc:activate_showcase"},
-    {"type": "command", "code": "sc:archive_showcase"},
-    {"type": "model", "code": "sc_request"},
-    {"type": "model", "code": "sc_review"},
-    {"type": "model", "code": "sc_task"},
-    {"type": "model", "code": "sc_acceptance"},
-    {"type": "command", "code": "sc:create_request"},
-    {"type": "command", "code": "sc:update_request"},
-    {"type": "command", "code": "sc:submit_request"},
-    {"type": "command", "code": "sc:cancel_request"},
-    {"type": "command", "code": "sc:hold_request"},
-    {"type": "command", "code": "sc:resume_request"},
-    {"type": "command", "code": "sc:archive_request"},
-    {"type": "command", "code": "sc:delete_request"},
-    {"type": "command", "code": "sc:create_review"},
-    {"type": "command", "code": "sc:approve_review"},
-    {"type": "command", "code": "sc:reject_review"},
-    {"type": "command", "code": "sc:request_revision"},
-    {"type": "command", "code": "sc:create_task"},
-    {"type": "command", "code": "sc:assign_task"},
-    {"type": "command", "code": "sc:start_task"},
-    {"type": "command", "code": "sc:update_task_progress"},
-    {"type": "command", "code": "sc:complete_task"},
-    {"type": "command", "code": "sc:cancel_task"},
-    {"type": "command", "code": "sc:create_acceptance"},
-    {"type": "command", "code": "sc:pass_acceptance"},
-    {"type": "command", "code": "sc:fail_acceptance"},
-    {"type": "process", "code": "sc_workflow_main"}
+    {"type": "command", "code": "sc:archive_showcase"}
   ],
   "requires": [],
   "resourceDirs": {
@@ -57,9 +31,7 @@
     "permissions": "config/permissions.json",
     "menus": "config/menus.json",
     "i18n": "config/i18n.json",
-    "roles": "config/roles.json",
-    "processes": "config/processes.json",
-    "namedQueries": "config/namedQueries.json"
+    "roles": "config/roles.json"
   },
   "importOptions": {
     "conflictStrategy": "overwrite",
@@ -68,7 +40,6 @@
     "autoPublishFields": true,
     "autoPublishCommands": true,
     "autoPublishPages": true,
-    "autoDeployProcesses": true,
     "createResourcePermissions": true
   }
 }

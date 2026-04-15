@@ -66,7 +66,6 @@ This document defines what is and is not part of AuraBoot's open-source distribu
 | `showcase` | `sc` | 1+ | 20+ field-type demo + Smart Components |
 | `agent-control-plane` | `acp` | — | AI Mission Control (8 LLM providers) |
 | `acp-showcase` | `acs` | — | ACP demo bundle |
-| `e2e-test-order` | `e2eto` | 1 | E2E test fixture |
 
 ## What is NOT in OSS (commercial editions)
 
