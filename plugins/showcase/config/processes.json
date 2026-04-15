@@ -255,13 +255,13 @@
       "edges": [
         {"id": "e1", "source": "start_1", "target": "submit_task"},
         {"id": "e2", "source": "submit_task", "target": "amount_gw"},
-        {"id": "e3", "source": "amount_gw", "target": "review_l1", "data": {"conditionExpression": "${sc_req_amount < 10000}", "label:zh-CN": "< 10000"}},
-        {"id": "e4", "source": "amount_gw", "target": "review_l1_high", "data": {"conditionExpression": "${sc_req_amount >= 10000}", "label:zh-CN": ">= 10000"}},
+        {"id": "e3", "source": "amount_gw", "target": "review_l1", "data": {"condition": {"type": "expression", "content": "sc_req_amount < 10000"}, "label:zh-CN": "< 10000"}},
+        {"id": "e4", "source": "amount_gw", "target": "review_l1_high", "data": {"condition": {"type": "expression", "content": "sc_req_amount >= 10000"}, "label:zh-CN": ">= 10000"}},
         {"id": "e5", "source": "review_l1", "target": "result_gw"},
         {"id": "e6", "source": "review_l1_high", "target": "review_l2"},
         {"id": "e7", "source": "review_l2", "target": "result_gw"},
-        {"id": "e8", "source": "result_gw", "target": "create_task_svc", "data": {"conditionExpression": "${sc_rev_decision == 'approved'}", "label:zh-CN": "通过"}},
-        {"id": "e9", "source": "result_gw", "target": "reject_svc", "data": {"conditionExpression": "${sc_rev_decision == 'rejected' || sc_rev_decision == 'need_revision'}", "label:zh-CN": "拒绝/修订"}},
+        {"id": "e8", "source": "result_gw", "target": "create_task_svc", "data": {"condition": {"type": "expression", "content": "sc_rev_decision == 'approved'"}, "label:zh-CN": "通过"}},
+        {"id": "e9", "source": "result_gw", "target": "reject_svc", "data": {"condition": {"type": "expression", "content": "sc_rev_decision == 'rejected' || sc_rev_decision == 'need_revision'"}, "label:zh-CN": "拒绝/修订"}},
         {"id": "e10", "source": "reject_svc", "target": "revision_task"},
         {"id": "e11", "source": "revision_task", "target": "amount_gw"},
         {"id": "e12", "source": "create_task_svc", "target": "assign_task"},
@@ -270,8 +270,8 @@
         {"id": "e15", "source": "execute_task", "target": "create_acc_svc"},
         {"id": "e16", "source": "create_acc_svc", "target": "acceptance_task"},
         {"id": "e17", "source": "acceptance_task", "target": "acc_result_gw"},
-        {"id": "e18", "source": "acc_result_gw", "target": "complete_svc", "data": {"conditionExpression": "${sc_acc_result == 'passed'}", "label:zh-CN": "通过"}},
-        {"id": "e19", "source": "acc_result_gw", "target": "redo_svc", "data": {"conditionExpression": "${sc_acc_result == 'failed'}", "label:zh-CN": "不通过"}},
+        {"id": "e18", "source": "acc_result_gw", "target": "complete_svc", "data": {"condition": {"type": "expression", "content": "sc_acc_result == 'passed'"}, "label:zh-CN": "通过"}},
+        {"id": "e19", "source": "acc_result_gw", "target": "redo_svc", "data": {"condition": {"type": "expression", "content": "sc_acc_result == 'failed'"}, "label:zh-CN": "不通过"}},
         {"id": "e20", "source": "redo_svc", "target": "assign_task"},
         {"id": "e21", "source": "complete_svc", "target": "end_1"}
       ]
