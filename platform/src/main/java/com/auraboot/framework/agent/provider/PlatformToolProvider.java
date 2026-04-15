@@ -16,6 +16,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -174,7 +176,7 @@ public class PlatformToolProvider implements ToolProvider {
             rows = dynamicDataMapper.selectByQueryWithoutTenant(sql, queryParams);
         } catch (Exception e) {
             log.warn("platform.execute_sql failed: {}", e.getMessage());
-            return errorResult("Query execution failed: " + e.getMessage());
+            return enrichSqlError(sql, e.getMessage());
         }
 
         if (rows == null) rows = Collections.emptyList();
@@ -212,7 +214,7 @@ public class PlatformToolProvider implements ToolProvider {
      */
     private Map<String, Object> listModels(Map<String, Object> params) {
         String keyword = getStringParam(params, "keyword");
-        boolean includeFields = Boolean.TRUE.equals(params.get("includeFields"));
+        boolean includeFields = parseBool(params.get("includeFields"));
 
         var modelsPage = metaModelService.searchModels(1, 50, keyword, null, null, null, null, true);
         if (modelsPage == null || modelsPage.getRecords() == null) {
@@ -397,6 +399,87 @@ public class PlatformToolProvider implements ToolProvider {
 
     // ==================== Helpers ====================
 
+    private static final Pattern COLUMN_NOT_EXIST = Pattern.compile(
+            "column \"?([\\w\\.]+)\"? (?:of relation \"?(\\w+)\"? )?does not exist",
+            Pattern.CASE_INSENSITIVE);
+    private static final Pattern TABLE_NOT_EXIST = Pattern.compile(
+            "relation \"?(\\w+)\"? does not exist",
+            Pattern.CASE_INSENSITIVE);
+    private static final Pattern FROM_TABLE = Pattern.compile(
+            "\\bfrom\\s+(mt_\\w+)",
+            Pattern.CASE_INSENSITIVE);
+
+    /**
+     * Turn opaque SQL errors into actionable guidance for the LLM.
+     * On "column does not exist" / "relation does not exist", attach the model's
+     * available fields so the LLM can self-correct and retry.
+     */
+    private Map<String, Object> enrichSqlError(String sql, String rawError) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("success", false);
+        result.put("error", "Query execution failed: " + rawError);
+
+        if (rawError == null) return result;
+
+        Matcher colMatch = COLUMN_NOT_EXIST.matcher(rawError);
+        Matcher tableMatch = TABLE_NOT_EXIST.matcher(rawError);
+        String failedColumn = colMatch.find() ? colMatch.group(1) : null;
+        String failedTable = tableMatch.find() ? tableMatch.group(1) : null;
+
+        // Fall back to parsing FROM clause to locate the model
+        String targetTable = failedTable;
+        if (targetTable == null) {
+            Matcher fromMatch = FROM_TABLE.matcher(sql == null ? "" : sql);
+            if (fromMatch.find()) targetTable = fromMatch.group(1);
+        }
+
+        if (targetTable != null && targetTable.startsWith("mt_")) {
+            String modelCode = targetTable.substring(3);
+            try {
+                Optional<ModelDefinition> def = metaModelService.getModelDefinition(modelCode);
+                if (def.isPresent() && def.get().getFields() != null) {
+                    List<Map<String, String>> fields = def.get().getFields().stream()
+                            .filter(f -> !SystemFieldConstants.isSystemField(f.getCode()))
+                            .map(f -> {
+                                Map<String, String> fm = new LinkedHashMap<>();
+                                fm.put("code", f.getCode());
+                                fm.put("column", f.getColumnName() != null ? f.getColumnName() : f.getCode());
+                                fm.put("label", f.getDisplayName());
+                                return fm;
+                            })
+                            .collect(Collectors.toList());
+                    result.put("modelCode", modelCode);
+                    result.put("table", targetTable);
+                    result.put("availableFields", fields);
+                    if (failedColumn != null) {
+                        result.put("failedColumn", failedColumn);
+                        result.put("recovery",
+                                "The column '" + failedColumn + "' does not exist in table '" + targetTable
+                                        + "'. Review 'availableFields' above, pick the closest match by label/code"
+                                        + " (e.g. Chinese '行业' may map to 'industry_type', 'trade', 'category',"
+                                        + " or be absent entirely), then retry platform.execute_sql ONCE with the"
+                                        + " corrected column. If no field is semantically close, tell the user"
+                                        + " the data is not captured and suggest alternative dimensions from"
+                                        + " availableFields.");
+                    } else {
+                        result.put("recovery",
+                                "Review 'availableFields' and retry with a valid column name.");
+                    }
+                    return result;
+                }
+            } catch (Exception lookupErr) {
+                log.debug("enrichSqlError lookup failed for {}: {}", modelCode, lookupErr.getMessage());
+            }
+        }
+
+        if (failedTable != null) {
+            result.put("recovery",
+                    "Table '" + failedTable + "' does not exist. Call platform.list_models"
+                            + " with includeFields=true to discover valid tables. Remember the 'mt_' prefix.");
+        }
+        return result;
+    }
+
     private static Map<String, Object> errorResult(String message) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("success", false);
@@ -407,5 +490,13 @@ public class PlatformToolProvider implements ToolProvider {
     private static String getStringParam(Map<String, Object> params, String key) {
         Object val = params.get(key);
         return val != null ? val.toString() : null;
+    }
+
+    /** Accept Boolean, "true"/"false" strings, or 1/0 numbers (LLMs often stringify). */
+    private static boolean parseBool(Object val) {
+        if (val == null) return false;
+        if (val instanceof Boolean b) return b;
+        if (val instanceof Number n) return n.intValue() != 0;
+        return "true".equalsIgnoreCase(val.toString().trim());
     }
 }
