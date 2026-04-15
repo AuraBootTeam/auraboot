@@ -2,19 +2,19 @@
  * Designer Router
  *
  * Routes to the appropriate designer based on page kind.
- * - list/form -> AreasDesigner (understands filters/toolbar/main)
- * - detail    -> FloorsDesigner (understands floors[])
+ * - list / form / detail -> BlocksDesigner (V2 flat schema.blocks)
  *
  * PageKind is narrowed to 'list' | 'form' | 'detail' (Task 3.1).
- * home and composite branches have been removed — the default case
- * is an exhaustive never-check that will surface at compile time if
- * new kinds are added without updating this router.
+ * The default case is an exhaustive never-check that will surface at compile
+ * time if a new kind is added without updating this router.
+ *
+ * FloorsDesigner is kept in the repo but no longer used here (Task 4.5 will
+ * delete it once the detail kind is fully migrated).
  */
 
 import React from 'react';
 import type { PageSchema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
-import { AreasDesigner } from './AreasDesigner';
-import { FloorsDesigner } from './FloorsDesigner';
+import { BlocksDesigner } from './BlocksDesigner';
 
 export interface DesignerRouterProps {
   /**
@@ -74,29 +74,16 @@ export function DesignerRouter({
   switch (schema.kind) {
     case 'list':
     case 'form':
+    case 'detail':
       return (
-        // TODO: Task 4.4 — update AreasDesigner props to accept schema/onSchemaChange directly
-        <AreasDesigner
-          dsl={schema}
-          onDslChange={onSchemaChange}
+        <BlocksDesigner
+          schema={schema}
+          onSchemaChange={onSchemaChange}
           onSave={onSave}
           modelCode={modelCode || schema.modelCode}
           readonly={readonly}
           previewMode={previewMode}
           isCustomApiMode={isCustomApiMode}
-        />
-      );
-
-    case 'detail':
-      return (
-        // TODO: Task 4.5 — update FloorsDesigner props to accept schema/onSchemaChange directly
-        <FloorsDesigner
-          dsl={schema}
-          onDslChange={onSchemaChange}
-          onSave={onSave}
-          modelCode={modelCode || schema.modelCode}
-          readonly={readonly}
-          previewMode={previewMode}
         />
       );
 
