@@ -347,8 +347,8 @@ export default function PageDesignerEditorImpl() {
         <div className="flex-1 overflow-hidden">
           {schema && (
             <DesignerRouter
-              dsl={schema}
-              onDslChange={handleSchemaChange}
+              schema={schema}
+              onSchemaChange={handleSchemaChange}
               onSave={handleSchemaSave}
               modelCode={schema.modelCode || meta?.viewModelCode}
               isCustomApiMode={schema.extension?.customApi != null}
