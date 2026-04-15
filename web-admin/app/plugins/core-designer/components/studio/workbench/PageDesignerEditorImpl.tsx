@@ -74,6 +74,7 @@ export default function PageDesignerEditorImpl() {
         }
         setMeta(result.meta);
         setSchema(result.schema);
+        dslHistory.pushState(result.schema);  // seed history with real loaded schema
       })
       .catch((err: unknown) => {
         console.error('Failed to load page:', err);
@@ -207,12 +208,15 @@ export default function PageDesignerEditorImpl() {
     if (result) {
       setMeta(result.meta);
       setSchema(result.schema);
+      dslHistory.pushState(result.schema);  // seed history with rolled-back schema
+    } else {
+      setError('Page not found after rollback');
     }
-  }, [id]);
+  }, [id, dslHistory]);
 
   // Shared AI merge handler — used by both toolbar (legacy dialog) and AI panel
   const handleAiGenerated = useCallback(
-    (generated: { kind: string; blocks: any[]; layout: any; schemaVersion: number; mergeMode?: MergeMode }) => {
+    (generated: { kind: PageSchema['kind']; blocks: PageSchema['blocks']; layout: PageSchema['layout']; schemaVersion: 2; mergeMode?: MergeMode }) => {
       const mergeMode: MergeMode = generated.mergeMode || 'replace';
       const existingBlocks = schema?.blocks ?? [];
       const mergedBlocks =

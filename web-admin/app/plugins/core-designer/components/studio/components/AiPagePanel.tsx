@@ -17,6 +17,7 @@ import {
   type MergeMode,
 } from './ai-page-prompt';
 import { AiQuickCommands } from './AiQuickCommands';
+import type { PageSchema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 
 // ============================================================================
 // Types
@@ -40,10 +41,10 @@ export interface AiPagePanelProps {
   onToggle: () => void;
   /** Called when AI generates page DSL */
   onGenerated: (dsl: {
-    kind: string;
-    blocks: any[];
-    layout: any;
-    schemaVersion: number;
+    kind: PageSchema['kind'];
+    blocks: PageSchema['blocks'];
+    layout: PageSchema['layout'];
+    schemaVersion: 2;
     mergeMode: MergeMode;
   }) => void;
   /** Current page ID — used for conversation persistence */
