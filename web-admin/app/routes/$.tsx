@@ -66,7 +66,7 @@ export default function CatchAllRoute() {
   const [renderPage, setRenderPage] = useState<{
     tableName: string;
     pageKey?: string;
-    pageType: 'list' | 'form' | 'detail' | 'dashboard' | 'kanban';
+    pageType: 'list' | 'form' | 'detail' | 'kanban';
   } | null>(null);
 
   useEffect(() => {
@@ -143,7 +143,7 @@ export default function CatchAllRoute() {
         // Step 3: Resolve rendering strategy based on page configuration
         const { modelCode, kind } = pageInfo;
         // Pass kind directly — must match ab_page_schema.kind values
-        const VALID_KINDS = ['list', 'form', 'detail', 'dashboard', 'kanban'] as const;
+        const VALID_KINDS = ['list', 'form', 'detail', 'kanban'] as const;
         type PageKind = (typeof VALID_KINDS)[number];
         const resolvedKind = (kind || 'list') as string;
         if (!VALID_KINDS.includes(resolvedKind as PageKind)) {
