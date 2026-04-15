@@ -5,7 +5,7 @@ import com.auraboot.framework.im.dto.*;
 import com.auraboot.framework.im.mapper.ImConversationMemberMapper;
 import com.auraboot.framework.im.model.ImConstants;
 import com.auraboot.framework.im.model.ImMessage;
-import com.auraboot.framework.im.pubsub.ImRedisPubSub;
+import com.auraboot.framework.im.pubsub.ImMessageBroadcaster;
 import com.auraboot.framework.im.service.ImChatPushService;
 import com.auraboot.framework.im.service.ImConversationService;
 import com.auraboot.framework.im.service.ImMessageService;
@@ -32,7 +32,7 @@ public class ImWebSocketHandler extends TextWebSocketHandler {
     private final ImMessageService messageService;
     private final ImConversationService conversationService;
     private final ImConversationMemberMapper memberMapper;
-    private final ImRedisPubSub redisPubSub;
+    private final ImMessageBroadcaster broadcaster;
     private final ObjectMapper objectMapper;
     private final org.springframework.context.ApplicationContext applicationContext;
 
@@ -40,14 +40,14 @@ public class ImWebSocketHandler extends TextWebSocketHandler {
                                ImMessageService messageService,
                                ImConversationService conversationService,
                                ImConversationMemberMapper memberMapper,
-                               ImRedisPubSub redisPubSub,
+                               ImMessageBroadcaster broadcaster,
                                ObjectMapper objectMapper,
                                org.springframework.context.ApplicationContext applicationContext) {
         this.sessionRegistry = sessionRegistry;
         this.messageService = messageService;
         this.conversationService = conversationService;
         this.memberMapper = memberMapper;
-        this.redisPubSub = redisPubSub;
+        this.broadcaster = broadcaster;
         this.objectMapper = objectMapper;
         this.applicationContext = applicationContext;
     }
@@ -234,7 +234,7 @@ public class ImWebSocketHandler extends TextWebSocketHandler {
                 receiptData.put("isGroup", true);
             }
 
-            redisPubSub.publish(otherMembers, WsFrame.builder()
+            broadcaster.publish(otherMembers, WsFrame.builder()
                     .type("read_receipt")
                     .data(receiptData)
                     .build());
@@ -250,7 +250,7 @@ public class ImWebSocketHandler extends TextWebSocketHandler {
         List<Long> memberIds = memberMapper.findHumanMemberIds(conversationId, tenantId);
         List<Long> otherMembers = memberIds.stream().filter(id -> !id.equals(userId)).toList();
         if (!otherMembers.isEmpty()) {
-            redisPubSub.publish(otherMembers, WsFrame.builder()
+            broadcaster.publish(otherMembers, WsFrame.builder()
                     .type("typing_indicator")
                     .data(Map.of(
                             "conversationId", conversationId,
@@ -279,7 +279,7 @@ public class ImWebSocketHandler extends TextWebSocketHandler {
         List<Long> humanMemberIds = memberMapper.findHumanMemberIds(recalled.getConversationId(), tenantId);
         List<Long> otherMembers = humanMemberIds.stream().filter(id -> !id.equals(userId)).toList();
         if (!otherMembers.isEmpty()) {
-            redisPubSub.publish(otherMembers, WsFrame.builder()
+            broadcaster.publish(otherMembers, WsFrame.builder()
                     .type("message_recalled")
                     .data(Map.of(
                             "messageId", recalled.getId(),
@@ -314,7 +314,7 @@ public class ImWebSocketHandler extends TextWebSocketHandler {
                 ))
                 .build();
 
-        redisPubSub.publish(otherMembers, messageFrame);
+        broadcaster.publish(otherMembers, messageFrame);
     }
 
     /**
@@ -322,7 +322,7 @@ public class ImWebSocketHandler extends TextWebSocketHandler {
      * Uses Redis Pub/Sub so all instances can deliver to their local sessions.
      */
     public void pushToUser(Long userId, WsFrame frame) {
-        redisPubSub.publishToUser(userId, frame);
+        broadcaster.publishToUser(userId, frame);
     }
 
     /**
@@ -330,7 +330,7 @@ public class ImWebSocketHandler extends TextWebSocketHandler {
      * Used by controllers for group management events (dissolve, leave, rename).
      */
     public void broadcastEvent(List<Long> userIds, String eventType, Map<String, Object> data) {
-        redisPubSub.publish(userIds, WsFrame.builder().type(eventType).data(data).build());
+        broadcaster.publish(userIds, WsFrame.builder().type(eventType).data(data).build());
     }
 
     private void sendFrame(WebSocketSession session, WsFrame frame) {
