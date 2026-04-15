@@ -1,5 +1,5 @@
 /**
- * useDslHistory Hook
+ * usePageSchemaHistory Hook
  *
  * Manages DSL undo/redo history as JSON snapshots.
  * Independent from the Zustand designer store — operates on PageSchema directly.
@@ -31,7 +31,7 @@ export interface DslHistoryActions {
  *
  * @param initialDsl - The initial DSL to seed history with
  */
-export function useDslHistory(initialDsl: PageSchema): DslHistoryState & DslHistoryActions {
+export function usePageSchemaHistory(initialDsl: PageSchema): DslHistoryState & DslHistoryActions {
   // Use refs for the history stack to avoid re-renders on every push
   const historyRef = useRef<string[]>([JSON.stringify(initialDsl)]);
   const indexRef = useRef(0);
@@ -86,4 +86,4 @@ export function useDslHistory(initialDsl: PageSchema): DslHistoryState & DslHist
   return { canUndo, canRedo, pushState, undo, redo };
 }
 
-export default useDslHistory;
+export default usePageSchemaHistory;

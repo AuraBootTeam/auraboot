@@ -20,7 +20,7 @@ import {
 } from '~/plugins/core-designer/components/studio/workbench/panels';
 import type { AllSettings } from '~/plugins/core-designer/components/studio/workbench/panels/settings/types';
 import { useToolbarState } from '~/plugins/core-designer/components/studio/hooks/workbench/useToolbarState';
-import { useDslHistory } from '~/plugins/core-designer/components/studio/hooks/useDslHistory';
+import { usePageSchemaHistory } from '~/plugins/core-designer/components/studio/hooks/usePageSchemaHistory';
 import { useDesignerShortcuts } from '~/plugins/core-designer/components/studio/hooks/shortcuts/useDesignerShortcuts';
 import { pageManagerService } from '~/plugins/core-designer/components/studio/services/page-manager';
 import type { PageMeta } from '~/plugins/core-designer/components/studio/services/page-manager';
@@ -43,7 +43,7 @@ export default function PageDesignerEditorImpl() {
   const [schema, setSchema] = useState<PageSchema | null>(null);
 
   // DSL history for undo/redo — initialized with a placeholder, updated once schema loads
-  const dslHistory = useDslHistory(
+  const dslHistory = usePageSchemaHistory(
     schema || {
       schemaVersion: 2 as const,
       id: '',
