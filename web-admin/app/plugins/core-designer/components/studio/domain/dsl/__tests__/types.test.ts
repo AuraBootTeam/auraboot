@@ -25,7 +25,7 @@ describe('PageSchema V2', () => {
     // @ts-expect-error components removed
     s.components;
     // @ts-expect-error $schema removed
-    s['$schema'];
+    s.$schema;
     // @ts-expect-error version removed
     s.version;
     // @ts-expect-error state removed
