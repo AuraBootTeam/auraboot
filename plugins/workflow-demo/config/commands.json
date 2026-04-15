@@ -71,33 +71,40 @@
     "permissions": ["wd.leave_request.submit"],
     "agent_hint": "Submit a draft leave request. Fails fast with BusinessException if Drools wd_leave_validation yields valid=false. On success starts BPM process wd_leave_approval and writes its instance id onto wd_req_process_instance.",
     "cmd_risk_level": "L2",
-    "sideEffects": [
+    "preActions": [
       {
-        "condition": "true",
-        "actions": [
+        "type": "bpm:run-rule",
+        "ruleCode": "wd_leave_validation",
+        "contextLookup": [
           {
-            "type": "bpm:run-rule",
-            "ruleCode": "wd_leave_validation",
-            "facts": {
-              "type": "${record.wd_req_type}",
-              "days": "${record.wd_req_days}",
-              "balanceRemaining": "${balance.wd_bal_annual_remaining}",
-              "attachmentCount": "${record.wd_req_attachments.length}"
-            }
-          },
-          {
-            "type": "bpm:start-process",
-            "processKey": "wd_leave_approval",
-            "businessKey": "${record.pid}",
-            "title": "${record.wd_req_code}",
-            "variables": {
-              "applicantId": "${record.wd_req_applicant}",
-              "days": "${record.wd_req_days}",
-              "type": "${record.wd_req_type}"
-            },
-            "storeInstanceIdIn": "wd_req_process_instance"
+            "modelCode": "wd_leave_balance",
+            "filters": [
+              {"field": "wd_bal_employee", "op": "=", "value": "${payload.wd_req_applicant}"}
+            ],
+            "exposeAs": "balance"
           }
-        ]
+        ],
+        "facts": {
+          "type": "${payload.wd_req_type}",
+          "days": "${payload.wd_req_days}",
+          "balanceRemaining": "${balance.wd_bal_annual_remaining}",
+          "attachmentCount": "${payload.wd_req_attachments.length}"
+        }
+      }
+    ],
+    "postActions": [
+      {
+        "type": "start_process",
+        "processKey": "wd_leave_approval",
+        "businessKey": "${recordId}",
+        "title": "${payload.wd_req_code}",
+        "variables": {
+          "applicantId": "${payload.wd_req_applicant}",
+          "days": "${payload.wd_req_days}",
+          "type": "${payload.wd_req_type}",
+          "recordId": "${recordId}"
+        },
+        "storeInstanceIdIn": "wd_req_process_instance"
       }
     ],
     "extension": {
