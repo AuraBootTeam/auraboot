@@ -467,17 +467,22 @@ export class PageManagerService {
 
   /**
    * Update page schema (DSL)
+   *
+   * Accepts a PageSchema object and derives blockCount from schema.blocks.length.
+   * Callers no longer need to compute blockCount manually.
    */
   public async updatePageSchema(
     id: string,
-    schema: Record<string, unknown>,
-    componentCount: number,
+    schema: PageSchema,
   ): Promise<void> {
     // Cache locally first for auto-save
-    this.cacheDraft(id, schema);
+    this.cacheDraft(id, schema as unknown as Record<string, unknown>);
+
+    // Compute blockCount from schema.blocks
+    const blockCount = schema.blocks?.length ?? 0;
 
     // Update via API
-    const payload = createDslSchemaPayload(schema, componentCount);
+    const payload = createDslSchemaPayload(schema as unknown as Record<string, unknown>, blockCount);
     const result = await pageApi.updatePage(id, payload);
 
     if (!ResultHelper.isSuccess(result)) {
@@ -491,11 +496,13 @@ export class PageManagerService {
 
   /**
    * Update page status (legacy method for compatibility)
+   * @deprecated Use updatePageSchema directly instead
    */
   public async updatePageStatus(id: string, componentCount: number): Promise<void> {
     const cached = this.getCachedDraft(id);
     if (cached) {
-      await this.updatePageSchema(id, cached, componentCount);
+      // Cast cached draft to PageSchema — assumes it's already a valid schema
+      await this.updatePageSchema(id, cached as unknown as PageSchema);
     }
   }
 
