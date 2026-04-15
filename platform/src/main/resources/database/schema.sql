@@ -7120,3 +7120,36 @@ CREATE TABLE IF NOT EXISTS ab_im_notification_preference (
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_ab_im_notif_pref_unique
     ON ab_im_notification_preference(tenant_id, user_id, COALESCE(model_code, ''), COALESCE(operation_type, ''));
+
+-- =====================================================================
+-- SECTION: Workbench — Announcements & User Notes
+-- =====================================================================
+
+CREATE TABLE IF NOT EXISTS ab_announcement (
+    id              BIGINT PRIMARY KEY,
+    tenant_id       BIGINT       NOT NULL,
+    title           VARCHAR(256) NOT NULL,
+    content         TEXT,
+    priority        VARCHAR(16)  NOT NULL DEFAULT 'normal',
+    status          VARCHAR(16)  NOT NULL DEFAULT 'draft',
+    pinned          BOOLEAN      NOT NULL DEFAULT FALSE,
+    published_by    BIGINT,
+    published_at    TIMESTAMPTZ,
+    expires_at      TIMESTAMPTZ,
+    created_at      TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_flag    BOOLEAN      DEFAULT FALSE
+);
+CREATE INDEX IF NOT EXISTS idx_announcement_tenant_status ON ab_announcement(tenant_id, status);
+COMMENT ON TABLE ab_announcement IS 'Workbench announcements visible to all tenant users';
+
+CREATE TABLE IF NOT EXISTS ab_user_note (
+    id              BIGINT PRIMARY KEY,
+    user_id         BIGINT       NOT NULL,
+    tenant_id       BIGINT       NOT NULL,
+    content         TEXT,
+    created_at      TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_user_note_user ON ab_user_note(user_id, tenant_id);
+COMMENT ON TABLE ab_user_note IS 'Personal quick notes per user on the workbench';
