@@ -1,0 +1,27 @@
+{
+  "code": "acs_dashboard",
+  "title": "ACP Showcase Dashboard",
+  "description": "ACP showcase demo dashboard.",
+  "scope": "global",
+  "status": "published",
+  "layoutConfig": {
+    "columns": 12,
+    "rowHeight": 100,
+    "gap": 16
+  },
+  "widgets": [
+    {
+      "id": "welcome",
+      "type": "smart-rich-text",
+      "x": 0,
+      "y": 0,
+      "w": 12,
+      "h": 2,
+      "title": "ACP Showcase",
+      "config": {
+        "title": "ACP Showcase",
+        "content": "<h2>ACP Showcase</h2><p>Agent Control Plane showcase dashboard.</p>"
+      }
+    }
+  ]
+}

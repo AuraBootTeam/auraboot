@@ -1,0 +1,27 @@
+{
+  "code": "sc_workflow_dashboard",
+  "title": "Showcase Workflow Dashboard",
+  "description": "Showcase workflow demo dashboard.",
+  "scope": "global",
+  "status": "published",
+  "layoutConfig": {
+    "columns": 12,
+    "rowHeight": 100,
+    "gap": 16
+  },
+  "widgets": [
+    {
+      "id": "welcome",
+      "type": "smart-rich-text",
+      "x": 0,
+      "y": 0,
+      "w": 12,
+      "h": 2,
+      "title": "Workflow",
+      "config": {
+        "title": "Workflow",
+        "content": "<h2>Workflow Showcase</h2><p>Placeholder dashboard for workflow demos.</p>"
+      }
+    }
+  ]
+}
