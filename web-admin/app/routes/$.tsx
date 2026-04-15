@@ -89,6 +89,22 @@ export default function CatchAllRoute() {
         });
 
         if (!ResultHelper.isSuccess(menuResult) || !menuResult.data) {
+          // Fallback: for /p/c/{code} paths without a menu entry, check if
+          // the code resolves to an ab_dashboard record (legacy kind=dashboard
+          // pages migrated to Dashboard DSL per Plan 3a). If so, redirect.
+          const pcMatch = location.pathname.match(/^\/p\/c\/([^/]+)$/);
+          if (pcMatch) {
+            const code = pcMatch[1];
+            const dashResult = await fetchResult<{ code?: string }>(
+              `/api/dashboards/code/${code}`,
+              { method: 'get', token },
+            );
+            if (ResultHelper.isSuccess(dashResult) && dashResult.data?.code) {
+              setRedirecting(true);
+              navigate(`/dashboards?code=${encodeURIComponent(code)}`, { replace: true });
+              return;
+            }
+          }
           setError(`Menu configuration not found for path "${location.pathname}"`);
           setLoading(false);
           return;
@@ -135,6 +151,20 @@ export default function CatchAllRoute() {
         }
 
         if (!pageInfo) {
+          // Fallback: check if pageKey matches an ab_dashboard code.
+          // After Plan 3a, legacy /p/c/{code} for former kind=dashboard pages
+          // should transparently redirect to /dashboards?code={code}.
+          if (pageKey) {
+            const dashResult = await fetchResult<{ code?: string }>(
+              `/api/dashboards/code/${pageKey}`,
+              { method: 'get', token },
+            );
+            if (ResultHelper.isSuccess(dashResult) && dashResult.data?.code) {
+              setRedirecting(true);
+              navigate(`/dashboards?code=${encodeURIComponent(pageKey)}`, { replace: true });
+              return;
+            }
+          }
           setError(`Page configuration not found for menu "${menu.name}"`);
           setLoading(false);
           return;
