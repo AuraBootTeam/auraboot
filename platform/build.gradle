@@ -166,6 +166,7 @@ dependencies {
     implementation 'com.github.ben-manes.caffeine:caffeine:3.1.8'
     implementation 'org.springframework.boot:spring-boot-starter-data-jdbc'
     implementation 'org.springframework.boot:spring-boot-starter-mail'
+    implementation 'org.springframework.boot:spring-boot-starter-websocket'    // IM WebSocket
 
     // MyBatis Plus
     implementation 'com.baomidou:mybatis-plus-spring-boot3-starter'
@@ -237,6 +238,7 @@ dependencies {
     // 测试
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'io.projectreactor:reactor-test' // For testing reactive code
+    testImplementation 'org.springframework.boot:spring-boot-starter-websocket'   // ImChatPushService test
     mockitoAgent('org.mockito:mockito-core') {
         transitive = false
     }
