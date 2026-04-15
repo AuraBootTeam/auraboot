@@ -1,0 +1,167 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://auraboot.com/schemas/plugin-dashboard.schema.json",
+  "title": "AuraBoot Plugin Dashboard",
+  "description": "Schema for config/dashboards/*.json — the first-class plugin dashboard contract (Plan #8). Each file declares one dashboard in Dashboard DSL format, ready for direct import into ab_dashboard without any conversion step.",
+  "type": "object",
+  "required": ["code", "title", "widgets"],
+  "additionalProperties": false,
+  "properties": {
+    "code": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "description": "Unique dashboard code within the tenant. Must be lowercase snake_case and unique per tenant."
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "description": "Display title for the dashboard."
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 500,
+      "description": "Optional description shown in the dashboard list."
+    },
+    "scope": {
+      "type": "string",
+      "enum": ["global", "personal", "team"],
+      "default": "global",
+      "description": "Visibility scope. Plugin dashboards should use 'global'."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["draft", "published"],
+      "default": "published",
+      "description": "Lifecycle status. Plugin dashboards default to 'published'."
+    },
+    "sortOrder": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "Sort weight for ordering dashboards in the list."
+    },
+    "layoutConfig": {
+      "type": "object",
+      "description": "Grid layout parameters. Defaults are applied when omitted.",
+      "additionalProperties": false,
+      "properties": {
+        "columns": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 24,
+          "default": 12,
+          "description": "Number of grid columns."
+        },
+        "rowHeight": {
+          "type": "integer",
+          "minimum": 20,
+          "default": 100,
+          "description": "Height of each row unit in pixels."
+        },
+        "gap": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 16,
+          "description": "Gap between widgets in pixels."
+        },
+        "compactType": {
+          "type": "string",
+          "enum": ["vertical", "horizontal", "null"],
+          "default": "vertical",
+          "description": "Compaction direction for react-grid-layout."
+        }
+      }
+    },
+    "widgets": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Array of widget definitions. At least one widget is required.",
+      "items": {
+        "$ref": "#/$defs/widgetDefinition"
+      }
+    }
+  },
+  "$defs": {
+    "widgetDefinition": {
+      "type": "object",
+      "required": ["id", "type", "x", "y", "w", "h"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Unique widget ID within the dashboard."
+        },
+        "type": {
+          "type": "string",
+          "description": "Widget type. Convention: smart-{kind}-chart for chart widgets, smart-number-card for stat cards, smart-table-chart for tables, smart-rich-text for text blocks.",
+          "examples": [
+            "smart-bar-chart",
+            "smart-line-chart",
+            "smart-pie-chart",
+            "smart-number-card",
+            "smart-table-chart",
+            "smart-rich-text"
+          ]
+        },
+        "x": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Horizontal position in grid columns."
+        },
+        "y": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Vertical position in grid rows."
+        },
+        "w": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Widget width in grid columns."
+        },
+        "h": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Widget height in grid rows."
+        },
+        "title": {
+          "type": "string",
+          "description": "Widget display title (resolved string, not LocalizedText)."
+        },
+        "config": {
+          "type": "object",
+          "description": "Widget-specific configuration. Shape depends on widget type.",
+          "properties": {
+            "title": {
+              "type": "string",
+              "description": "Title shown inside the widget card."
+            },
+            "dataSource": {
+              "type": "object",
+              "description": "Data source configuration.",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": ["namedQuery", "model", "static"],
+                  "description": "Data source type."
+                },
+                "code": {
+                  "type": "string",
+                  "description": "Named query code or model code."
+                }
+              }
+            },
+            "visualization": {
+              "type": "object",
+              "description": "Chart visualization options (axes, colors, labels, etc.)."
+            }
+          },
+          "additionalProperties": true
+        }
+      }
+    }
+  }
+}

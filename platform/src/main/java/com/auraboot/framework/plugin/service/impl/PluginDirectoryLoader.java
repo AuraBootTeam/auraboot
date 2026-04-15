@@ -1,6 +1,7 @@
 package com.auraboot.framework.plugin.service.impl;
 
 import com.auraboot.framework.plugin.dto.imports.*;
+import com.auraboot.framework.plugin.dto.imports.DashboardDefinitionDTO;
 import com.auraboot.framework.plugin.exception.PluginException;
 import com.auraboot.framework.plugin.source.PluginSource;
 import com.auraboot.framework.plugin.source.FileSystemPluginSource;
@@ -265,6 +266,15 @@ public class PluginDirectoryLoader {
                 manifest.setSavedViews(mergeList(manifest.getSavedViews(), savedViews));
             }
         }
+
+        // Load dashboards (first-class contract: config/dashboards/*.json)
+        if (resourceDirs.containsKey("dashboards")) {
+            List<DashboardDefinitionDTO> dashboards = loadResourceList(
+                    pluginDir.resolve(resourceDirs.get("dashboards")), DashboardDefinitionDTO.class);
+            if (!dashboards.isEmpty()) {
+                manifest.setDashboards(mergeList(manifest.getDashboards(), dashboards));
+            }
+        }
     }
 
     /**
@@ -431,6 +441,8 @@ public class PluginDirectoryLoader {
                 manifest::getNamedQueries, manifest::setNamedQueries);
         loadSourceResource(source, resourceDirs, "savedViews", SavedViewDefinitionDTO.class,
                 manifest::getSavedViews, manifest::setSavedViews);
+        loadSourceResource(source, resourceDirs, "dashboards", DashboardDefinitionDTO.class,
+                manifest::getDashboards, manifest::setDashboards);
     }
 
     @FunctionalInterface
