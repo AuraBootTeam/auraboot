@@ -107,7 +107,7 @@ After completion, http://localhost:5173 is a fully functional OSS deployment.
 
 ### Test naming-space convention
 
-When writing platform-tier tests (`tests/e2e/platform/**`, `integration/**`, `cross-module/**`), use OSS namespaces only (`crms` / `org` / `admin` / `pgm` / `sc` / `e2eto` / `acp`). Business-domain tests (`tests/e2e/sales/**`, `finance/**`, etc.) follow the open-source status of their domain and should be added to `oss-scope.json` `test_excludes` if paid. See the rule in the enterprise standards doc `docs/standards/testing-e2e-web.md`.
+When writing platform-tier tests (`tests/e2e/platform/**`, `integration/**`, `cross-module/**`), use OSS namespaces only (`crms` / `org` / `admin` / `pgm` / `sc` / `e2et` / `acp`). The `e2et` namespace belongs to the internal `test-fixtures` plugin (renamed from `e2e-test-order`); it is opt-in via `AURA_ENV=test` and excluded from public distribution. Business-domain tests (`tests/e2e/sales/**`, `finance/**`, etc.) follow the open-source status of their domain and should be added to `oss-scope.json` `test_excludes` if paid. See the rule in the enterprise standards doc `docs/standards/testing-e2e-web.md`.
 
 ## Adjusting scope
 
