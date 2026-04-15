@@ -50,7 +50,6 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({ isOpen, onClose, pageM
       data.metadata = {
         title: pageMeta.title,
         description: pageMeta.description,
-        mode: pageMeta.mode,
         version: pageMeta.version,
         createdAt: pageMeta.createdAt,
         updatedAt: pageMeta.updatedAt,

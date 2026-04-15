@@ -393,10 +393,6 @@ export const ImportPanel: React.FC<ImportPanelProps> = ({
                         <span className="text-gray-900">{validation.data.metadata.title}</span>
                       </div>
                       <div>
-                        <span className="text-gray-500">模式:</span>{' '}
-                        <span className="text-gray-900">{validation.data.metadata.mode}</span>
-                      </div>
-                      <div>
                         <span className="text-gray-500">版本:</span>{' '}
                         <span className="text-gray-900">{validation.data.metadata.version}</span>
                       </div>
