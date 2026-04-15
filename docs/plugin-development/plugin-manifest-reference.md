@@ -169,7 +169,7 @@ Maps resource types to file paths relative to the plugin root. The import system
 | 3 | `models` | Model definitions | JSON array |
 | 4 | `bindings` | Model-field binding relationships | JSON array or directory of files |
 | 5 | `commands` | Command definitions | JSON array or directory of files |
-| 6 | `processes` | BPMN process definitions | JSON array |
+| 6 | `processes` | BPMN process definitions (see [Process designerJson contract](#process-designerjson-contract)) | JSON array |
 | 7 | `permissions` | Permission definitions | JSON array |
 | 8 | `roles` | Role definitions | JSON array |
 | 9 | `menus` | Menu tree definitions | JSON array |
@@ -216,6 +216,76 @@ Controls how the plugin import system handles conflicts and post-import actions.
 | `autoPublishPages` | `boolean` | `false` | Automatically publish page schemas after import. |
 | `autoDeployProcesses` | `boolean` | `false` | Automatically deploy BPMN processes after import. |
 | `createResourcePermissions` | `boolean` | `false` | Automatically create DYNAMIC permissions for published models (CRUD permissions). |
+
+---
+
+## Process designerJson contract
+
+`processes.json` entries may define the workflow either inline as BPMN XML
+(`bpmnContent`), as a file reference (`bpmnFile`), or — most common — as a
+React Flow `designerJson` object that is converted to BPMN at deploy time.
+
+When using `designerJson`, **every outgoing sequence flow of an exclusive
+gateway must carry a non-empty condition** under `data.condition.content`.
+SmartEngine rejects BPMN `default=` fallback at runtime; marking an edge with
+`isDefault: true` emits the attribute for spec compliance but does NOT
+exempt the edge from needing an evaluable condition (use `"true"` or an
+explicit inverse as the catch-all).
+
+### Correct shape
+
+```json
+{
+  "key": "sc_workflow_main",
+  "autoDeploy": true,
+  "designerJson": {
+    "nodes": [
+      { "id": "start_1", "type": "startEvent" },
+      { "id": "gw", "type": "exclusiveGateway" },
+      { "id": "approve", "type": "userTask", "data": { "label:zh-CN": "审批" } },
+      { "id": "auto",    "type": "userTask", "data": { "label:zh-CN": "自动通过" } },
+      { "id": "end_1", "type": "endEvent" }
+    ],
+    "edges": [
+      { "id": "e1", "source": "start_1", "target": "gw" },
+      {
+        "id": "e_approve",
+        "source": "gw",
+        "target": "approve",
+        "data": {
+          "label:zh-CN": "> 5 万",
+          "condition": { "type": "expression", "content": "amount > 50000" }
+        }
+      },
+      {
+        "id": "e_auto",
+        "source": "gw",
+        "target": "auto",
+        "data": {
+          "label:zh-CN": "其他",
+          "isDefault": true,
+          "condition": { "type": "expression", "content": "true" }
+        }
+      },
+      { "id": "e_approve_end", "source": "approve", "target": "end_1" },
+      { "id": "e_auto_end",    "source": "auto",    "target": "end_1" }
+    ]
+  }
+}
+```
+
+### Common mistakes (rejected at deploy time)
+
+| Anti-pattern | Why it fails |
+|-------------|--------------|
+| `data.conditionExpression: "..."` (wrong field name) | Converter only reads `data.condition.content`; the edge is treated as naked and F5 validation rejects deploy |
+| `{ "conditionExpression": "..." }` at edge root | Same — wrong field location |
+| `"${amount > 1000}"` | SmartEngine evaluates plain MVEL; the `${...}` wrapper is Java-EL and not supported as a gateway condition |
+| Using only `isDefault: true` without `condition` | SmartEngine does not honor BPMN `default=` fallback; every outgoing edge needs an evaluable expression |
+| Two edges both marked `isDefault: true` on one gateway | Rejected as "multiple default flows" |
+
+The full shape is enforced by the `plugin-manifest.schema.json` JSON Schema
+(see `plugins/schemas/plugin-manifest.schema.json` under `$defs.processDefinition.properties.designerJson`).
 
 ---
 
