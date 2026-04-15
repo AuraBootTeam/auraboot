@@ -1657,7 +1657,88 @@
         },
         "designerJson": {
           "type": "object",
-          "description": "Designer JSON (React Flow format) as alternative to bpmnFile/bpmnContent"
+          "description": "Designer JSON (React Flow format) as alternative to bpmnFile/bpmnContent",
+          "properties": {
+            "nodes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["id", "type"],
+                "properties": {
+                  "id": { "type": "string" },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "startEvent", "endEvent", "userTask", "serviceTask",
+                      "receiveTask", "exclusiveGateway", "parallelGateway",
+                      "inclusiveGateway", "callActivity"
+                    ]
+                  },
+                  "position": {
+                    "type": "object",
+                    "properties": {
+                      "x": { "type": "number" },
+                      "y": { "type": "number" }
+                    }
+                  },
+                  "data": { "type": "object" }
+                }
+              }
+            },
+            "edges": {
+              "type": "array",
+              "description": "Sequence flows. For exclusive-gateway outgoing edges, every edge MUST carry a non-empty data.condition.content — SmartEngine does not honor the BPMN default= attribute alone. The isDefault flag is still allowed alongside a condition for spec compliance / interop with other BPMN tools.",
+              "items": {
+                "type": "object",
+                "required": ["id", "source", "target"],
+                "properties": {
+                  "id": { "type": "string" },
+                  "source": { "type": "string", "description": "Source node id" },
+                  "target": { "type": "string", "description": "Target node id" },
+                  "type": { "type": "string", "description": "React Flow edge type, e.g. smoothstep" },
+                  "data": {
+                    "type": "object",
+                    "description": "Edge data. DO NOT use top-level conditionExpression or data.conditionExpression — those field names are ignored by the BPMN converter and will cause deploy to fail with 'missing a condition expression'.",
+                    "properties": {
+                      "label": { "type": "string", "description": "Display label on the edge" },
+                      "label:zh-CN": { "type": "string" },
+                      "label:en": { "type": "string" },
+                      "isDefault": {
+                        "type": "boolean",
+                        "description": "Marks this edge as the gateway's default flow (emits BPMN default= attribute). Does NOT exempt the edge from the condition requirement — still must provide a non-empty condition (e.g. 'true' or an explicit inverse)."
+                      },
+                      "condition": {
+                        "type": "object",
+                        "description": "Condition expression. Required on every outgoing edge of an exclusiveGateway.",
+                        "required": ["content"],
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": ["expression", "script"],
+                            "default": "expression"
+                          },
+                          "content": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "Plain MVEL expression (do NOT wrap in ${...}). Examples: 'amount >= 50000', 'status == \\'approved\\'', 'true' as catch-all."
+                          },
+                          "language": {
+                            "type": "string",
+                            "enum": ["mvel", "juel"],
+                            "description": "Required when type=script. SmartEngine primarily supports MVEL."
+                          },
+                          "ruleCode": {
+                            "type": "string",
+                            "description": "Optional reference to a BPM rule engine rule code"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
         },
         "extension": {
           "type": "object",
