@@ -1,0 +1,41 @@
+[
+  {
+    "code": "wd_root",
+    "parentCode": null,
+    "name:zh-CN": "请假 demo",
+    "name:en": "Leave Demo",
+    "path": null,
+    "component": null,
+    "icon": "IconCalendarCheck",
+    "type": 0,
+    "permissionCode": null,
+    "orderNo": 230,
+    "visible": true
+  },
+  {
+    "code": "wd_leave_requests",
+    "parentCode": "wd_root",
+    "name:zh-CN": "我的申请",
+    "name:en": "My Requests",
+    "path": "/p/wd_leave_request",
+    "component": null,
+    "icon": "IconFileText",
+    "type": 1,
+    "permissionCode": "wd.leave_request.read",
+    "orderNo": 1,
+    "visible": true
+  },
+  {
+    "code": "wd_leave_balances",
+    "parentCode": "wd_root",
+    "name:zh-CN": "请假余额",
+    "name:en": "Leave Balances",
+    "path": "/p/wd_leave_balance",
+    "component": null,
+    "icon": "IconWallet",
+    "type": 1,
+    "permissionCode": "wd.leave_balance.read",
+    "orderNo": 2,
+    "visible": true
+  }
+]
