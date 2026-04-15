@@ -165,7 +165,7 @@ class BpmGatewayTest extends BaseIntegrationTest {
             assertNotNull(instance, "Process instance should be created");
 
             TaskInstance submitTask = findFirstTask(instance.getInstanceId());
-            Assumptions.assumeTrue(submitTask != null, "Submit task should be created");
+            assertNotNull(submitTask, "Submit task should be created");
 
             // Act: complete submit task with approved=true -> should route to approved_task
             Map<String, Object> variables = new HashMap<>();
@@ -182,9 +182,9 @@ class BpmGatewayTest extends BaseIntegrationTest {
             } else {
                 log.info("D5-01 PASSED: Submit task completed, gateway evaluated (no pending task found - may have auto-completed)");
             }
-        } catch (Exception e) {
-            log.warn("D5-01: Gateway true branch test failed: {}", e.getMessage());
-            Assumptions.assumeTrue(false, "SmartEngine not available: " + e.getMessage());
+        } catch (RuntimeException e) {
+            log.error("D5-01: Gateway true branch test failed", e);
+            throw e;
         }
     }
 
@@ -200,7 +200,7 @@ class BpmGatewayTest extends BaseIntegrationTest {
             assertNotNull(instance, "Process instance should be created");
 
             TaskInstance submitTask = findFirstTask(instance.getInstanceId());
-            Assumptions.assumeTrue(submitTask != null, "Submit task should be created");
+            assertNotNull(submitTask, "Submit task should be created");
 
             // Act: complete submit task with approved=false -> should route to rejected_task (default flow)
             Map<String, Object> variables = new HashMap<>();
@@ -217,9 +217,9 @@ class BpmGatewayTest extends BaseIntegrationTest {
             } else {
                 log.info("D5-02 PASSED: Submit task completed, gateway evaluated (no pending task found - may have auto-completed)");
             }
-        } catch (Exception e) {
-            log.warn("D5-02: Gateway false branch test failed: {}", e.getMessage());
-            Assumptions.assumeTrue(false, "SmartEngine not available: " + e.getMessage());
+        } catch (RuntimeException e) {
+            log.error("D5-02: Gateway false branch test failed", e);
+            throw e;
         }
     }
 
@@ -235,7 +235,7 @@ class BpmGatewayTest extends BaseIntegrationTest {
             assertNotNull(instance, "Process instance should be created");
 
             TaskInstance submitTask = findFirstTask(instance.getInstanceId());
-            Assumptions.assumeTrue(submitTask != null, "Submit task should be created");
+            assertNotNull(submitTask, "Submit task should be created");
 
             // Act: complete submit task with approved=false (not matching the condition "approved == true")
             // SmartEngine MVEL evaluates all condition expressions, so the variable must exist
@@ -254,9 +254,9 @@ class BpmGatewayTest extends BaseIntegrationTest {
             } else {
                 log.info("D5-03 PASSED: Submit task completed, default flow evaluated (no pending task found)");
             }
-        } catch (Exception e) {
-            log.warn("D5-03: Default flow test failed: {}", e.getMessage());
-            Assumptions.assumeTrue(false, "SmartEngine not available: " + e.getMessage());
+        } catch (RuntimeException e) {
+            log.error("D5-03: Default flow test failed", e);
+            throw e;
         }
     }
 
@@ -294,7 +294,7 @@ class BpmGatewayTest extends BaseIntegrationTest {
 
             // Act: complete the single task
             TaskInstance task = findFirstTask(instance.getInstanceId());
-            Assumptions.assumeTrue(task != null, "Task should be created");
+            assertNotNull(task, "Task should be created");
 
             Map<String, Object> completeVars = new HashMap<>();
             completeVars.put("result", "done");
@@ -332,9 +332,9 @@ class BpmGatewayTest extends BaseIntegrationTest {
             }
 
             log.info("D5-04 PASSED: Process reached EndEvent and completed successfully");
-        } catch (Exception e) {
-            log.warn("D5-04: Process completion test failed: {}", e.getMessage());
-            Assumptions.assumeTrue(false, "SmartEngine not available: " + e.getMessage());
+        } catch (RuntimeException e) {
+            log.error("D5-04: Process completion test failed", e);
+            throw e;
         }
     }
 }

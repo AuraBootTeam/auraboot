@@ -467,13 +467,20 @@ public class BpmnToJsonConverter {
             edgeData.put("isDefault", true);
         }
 
-        // Parse condition expression
+        // Parse condition expression. Preserve "language" attribute (e.g. mvel/juel) so the
+        // designer round-trip keeps script-type conditions intact.
         Element conditionElement = findChildElement(element, "conditionExpression");
         if (conditionElement != null) {
             String conditionContent = conditionElement.getTextContent();
             if (conditionContent != null && !conditionContent.trim().isEmpty()) {
                 ObjectNode condition = objectMapper.createObjectNode();
-                condition.put("type", "expression");
+                String language = conditionElement.getAttribute("language");
+                if (language != null && !language.isEmpty()) {
+                    condition.put("type", "script");
+                    condition.put("language", language);
+                } else {
+                    condition.put("type", "expression");
+                }
                 condition.put("content", conditionContent.trim());
                 edgeData.set("condition", condition);
             }

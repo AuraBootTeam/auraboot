@@ -429,6 +429,34 @@ export const useBPMNStore = create<BPMNStore>()(
                   type: 'error',
                 });
               }
+
+              // Each outgoing edge must have either a non-empty condition or be marked default
+              const defaultEdges = outgoingEdges.filter((e) => e.data?.isDefault === true);
+              if (defaultEdges.length > 1) {
+                errors.push({
+                  nodeId: node.id,
+                  message: 'bpmn.validate.exclusive_gateway_multiple_defaults',
+                  messageParams: { label: node.data.label, count: String(defaultEdges.length) },
+                  type: 'error',
+                });
+              }
+              // SmartEngine evaluates every outgoing flow; bare BPMN default-flow fallback
+              // is not honored at runtime. Require every outgoing edge to carry a condition.
+              outgoingEdges.forEach((edge) => {
+                const content = edge.data?.condition?.content?.trim();
+                if (!content) {
+                  errors.push({
+                    nodeId: node.id,
+                    edgeId: edge.id,
+                    message: 'bpmn.validate.exclusive_gateway_edge_missing_condition',
+                    messageParams: {
+                      label: node.data.label,
+                      edgeLabel: edge.data?.label || edge.id,
+                    },
+                    type: 'error',
+                  });
+                }
+              });
             }
           });
 
