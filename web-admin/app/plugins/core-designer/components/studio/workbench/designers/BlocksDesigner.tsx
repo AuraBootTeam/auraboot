@@ -2,7 +2,7 @@
  * Blocks Designer
  *
  * Unified designer for list/form/detail pages using V2 flat PageSchema.blocks.
- * Replaces the old AreasDesigner (which used schema.areas) — Task 4.4.
+ * Unified designer for list/form/detail pages (replaced legacy AreasDesigner, Task 4.4).
  *
  * Layout:
  *   Left sidebar  — BlockLibrary (palette filtered by schema.kind)
@@ -55,8 +55,6 @@ export interface BlocksDesignerProps {
   isCustomApiMode?: boolean;
 }
 
-// Legacy alias for any residual imports — remove after full migration
-export type AreasDesignerProps = BlocksDesignerProps;
 
 /**
  * Left panel tab types
@@ -640,8 +638,5 @@ export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
     </DndContext>
   );
 };
-
-// Legacy alias for any residual imports
-export { BlocksDesigner as AreasDesigner };
 
 export default BlocksDesigner;

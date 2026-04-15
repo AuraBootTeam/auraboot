@@ -48,14 +48,14 @@ async function openDesigner(designerPage: PageDesignerPage) {
     .locator('text=Loading page...')
     .waitFor({ state: 'hidden', timeout: 30000 })
     .catch(() => null);
-  // AreasDesigner renders for list/form pages; wait for both canvas and left panel tabs
+  // BlocksDesigner renders for list/form pages; wait for both canvas and left panel tabs
   await expect(designerPage.page.locator('[data-testid="designer-canvas"]')).toBeVisible({ timeout: 15000 });
   await expect(designerPage.page.locator('[data-testid="designer-tab-fields"]')).toBeVisible({ timeout: 10000 });
 }
 
 /**
  * Open the BlockLibrary and assert that the Smart Components tab is visible.
- * Uses AreasDesigner's "Blocks" left panel tab, which renders BlockLibrary
+ * Uses BlocksDesigner's "Blocks" left panel tab, which renders BlockLibrary
  * containing both "Blocks" and "Smart Components" sub-tabs.
  */
 async function openBlockLibraryAndAssertSmartTab(page: import('@playwright/test').Page) {
@@ -73,7 +73,7 @@ test.describe('Smart Components Library', () => {
   });
 
   test('should display component library with Blocks and Smart Components tabs', async ({ page }) => {
-    // Click the "Blocks" tab in AreasDesigner left panel to open BlockLibrary
+    // Click the "Blocks" tab in BlocksDesigner left panel to open BlockLibrary
     await page.locator('[data-testid="designer-tab-blocks"]').click();
 
     await expect(page.locator('[data-testid="library-tab-blocks"]')).toBeVisible({ timeout: 5000 });
