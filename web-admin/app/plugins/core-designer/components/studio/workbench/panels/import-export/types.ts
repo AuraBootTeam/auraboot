@@ -37,7 +37,6 @@ export interface ExportedPageData {
   metadata?: {
     title: string;
     description?: string;
-    mode: string;
     version: string;
     createdAt: string;
     updatedAt: string;
