@@ -102,7 +102,15 @@ public class AuraBotChatService {
         if (resolved.isReadOnly()) {
             hint.append("- The user wants to QUERY data. Prefer nq_* (named query) tools — they are pre-built and optimized.\n");
             hint.append("- Use platform_execute_sql ONLY if no named query matches the question.\n");
-            hint.append("- Call platform_list_models at most ONCE if you need to learn table schemas.\n");
+            hint.append("- Before calling platform_execute_sql on a table you have NOT already seen the schema for,\n");
+            hint.append("  FIRST call platform_list_models with includeFields=true AND a keyword narrowing the scope\n");
+            hint.append("  (e.g. keyword='crm_account' — NOT empty). Do NOT guess Chinese-to-English field names\n");
+            hint.append("  (e.g. '行业' is not guaranteed to be 'industry'; it may be 'industry_type', 'trade',\n");
+            hint.append("  'category', or absent). One schema call is enough — the response will contain the fields.\n");
+            hint.append("- If platform_execute_sql returns an error with 'availableFields' and 'recovery', you MUST\n");
+            hint.append("  read availableFields, pick the closest semantic match, and retry ONCE with the corrected\n");
+            hint.append("  column. Only tell the user the dimension is unavailable if no field is a reasonable match,\n");
+            hint.append("  and in that case suggest 2-3 alternative dimensions from availableFields.\n");
         } else {
             hint.append("- The user wants to MODIFY data. Use the cmd_* tools to execute the operation.\n");
             hint.append("- Describe what you will do BEFORE calling the tool.\n");
@@ -110,7 +118,7 @@ public class AuraBotChatService {
 
         hint.append("\nRules:\n");
         hint.append("- Table names use 'mt_' prefix (e.g., model 'crm_lead' → table 'mt_crm_lead').\n");
-        hint.append("- Each tool may be called at most 2 times.\n");
+        hint.append("- Each tool may be called at most 5 times per turn; total tool rounds capped by the runtime.\n");
         hint.append("- NEVER call the same tool with identical parameters twice.\n");
         hint.append("- Present results as tables in Chinese.\n");
         hint.append("- If a tool fails, explain the error clearly.\n");
@@ -381,9 +389,9 @@ public class AuraBotChatService {
                     String toolName = block.getName();
                     Map<String, Object> input = block.getInput() != null ? block.getInput() : Map.of();
 
-                    // Per-tool rate limit: max 2 calls per tool
+                    // Per-tool rate limit: max 5 calls per tool (industry norm for agent loops)
                     int callCount = toolCallCounts.merge(toolName, 1, Integer::sum);
-                    if (callCount > 2) {
+                    if (callCount > 5) {
                         log.warn("Tool {} exceeded call limit ({}), injecting limit message", toolName, callCount);
                         toolResultBlocks.add(buildToolResultBlock(toolId, Map.of(
                                 "success", false,
