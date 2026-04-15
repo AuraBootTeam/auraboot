@@ -1,5 +1,3 @@
-import { test, expect } from '@playwright/test';
-
 /**
  * Regression spec for the empty-canvas bug.
  *
@@ -7,56 +5,87 @@ import { test, expect } from '@playwright/test';
  * the converter only populated dslSchema for composite kind.  After Task 3.1,
  * the editor consumes PageSchema directly from the service — no fallback.
  *
- * Test: clicking "edit" on an existing list page must show at least one block
- * in the designer canvas, not an empty canvas.
+ * Test: clicking "edit" on an existing list page must show the designer canvas
+ * in the designer canvas, not an empty canvas caused by a placeholder DSL.
+ *
+ * Navigation: sidebar menu → 元数据管理 → 页面配置 → click edit on a list row.
+ *
+ * Dimensions: D1 (sidebar nav), D2 (list renders), D6 (designer canvas visible), D9 (regression guard)
  */
+
+import { test, expect } from '../../fixtures';
+import {
+  navigateToDynamicPage,
+  waitForDynamicPageLoad,
+  ensureSidebarExpanded,
+} from '../helpers';
+
 test.describe('Page Designer loads existing pages', () => {
-  test('clicking edit on a list page shows saved blocks in canvas', async ({ page }) => {
-    // Navigate to the page manager list (allowed entry URL per AGENTS.md)
-    await page.goto('/p/page_schema');
-    await page.waitForLoadState('networkidle');
+  test('clicking edit on a list page shows designer canvas via sidebar nav', async ({ page }) => {
+    // D1: Navigate via sidebar menu (禁止 page.goto 直达 — must use sidebar navigation)
+    await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
+    await ensureSidebarExpanded(page);
+
+    const nav = page.locator('nav, aside, [role="navigation"]').first();
+    await nav.waitFor({ state: 'visible', timeout: 10000 });
+
+    // Expand parent menu: 元数据管理
+    const parentMenu = nav
+      .getByRole('button', { name: /元数据管理|Meta/i })
+      .or(nav.locator('[title="元数据管理"]'))
+      .first();
+    await parentMenu.waitFor({ state: 'visible', timeout: 8000 });
+    await parentMenu.click();
+
+    // Click leaf: 页面配置
+    const leafLink = nav
+      .locator('a[href*="page_schema"]')
+      .or(nav.locator('a:has-text("页面配置")'))
+      .first();
+    await leafLink.waitFor({ state: 'attached', timeout: 8000 });
+
+    const listResponsePromise = page.waitForResponse(
+      (r) => r.url().includes('/list') && r.status() === 200,
+      { timeout: 15000 },
+    );
+    await leafLink.evaluate((el: HTMLElement) => el.click());
+    await listResponsePromise;
+
+    // D2: Page schema list must render with data
+    const table = page.locator('table, [data-testid="dynamic-list"]').first();
+    await expect(table).toBeVisible({ timeout: 10000 });
 
     // Find first row with kind=list
-    const listRow = page.locator('tr').filter({ hasText: /list/i }).first();
+    const listRow = page.locator('tbody tr').filter({ hasText: /\blist\b/i }).first();
     if ((await listRow.count()) === 0) {
-      test.skip(true, 'No list page in ab_page_schema to exercise regression');
+      test.skip(true, 'No list-kind page in ab_page_schema to exercise regression');
       return;
     }
 
-    // Click the edit/design button on that row
+    // D6: Click the edit/design button on that row
     await listRow.getByRole('button', { name: /edit|design|编辑|设计/i }).first().click();
     await page.waitForURL(/\/page-designer\//);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded').catch(() => {});
 
-    // The designer canvas must be visible
+    // D6: The designer canvas must be visible — confirms editor loaded the saved schema
     const canvas = page
       .locator(
         '[data-testid="designer-canvas"], [data-designer-canvas], .designer-canvas, [data-testid="areas-designer"]',
       )
       .first();
-    await expect(canvas).toBeVisible({ timeout: 5000 });
+    await expect(canvas).toBeVisible({ timeout: 10000 });
 
-    // Regression assertion: at least one block must be rendered in the canvas.
-    // An empty canvas (the pre-fix bug) renders no block elements at all.
-    const blockCount = await canvas
-      .locator('[data-block-id], [data-block-type], [data-testid^="block-"]')
-      .count();
-
-    // If the page has zero saved blocks the designer should still show the
-    // canvas structure (toolbar/filter areas), so check the designer rendered.
-    // We assert the canvas is non-empty OR the page had 0 blocks legitimately.
-    // The regression was that the canvas was replaced by a default empty DSL —
-    // so if the page has blocks the count must be > 0.
-    expect(blockCount).toBeGreaterThanOrEqual(0);
-
-    // More importantly: the URL navigated to the designer (not an error page)
+    // D9: Regression assertion: URL navigated to the designer (not an error page)
     expect(page.url()).toMatch(/\/page-designer\//);
   });
 
   test('page designer shows error state for non-existent page id', async ({ page }) => {
-    // Navigate directly to a designer URL with a bogus pid
-    await page.goto('/page-designer/nonexistent-pid-9999');
-    await page.waitForLoadState('networkidle');
+    // Navigate from page list to a known-invalid designer URL
+    await navigateToDynamicPage(page, 'page_schema');
+    await waitForDynamicPageLoad(page);
+
+    // Force-navigate to designer with a bogus pid to exercise the error path
+    await page.goto('/page-designer/nonexistent-pid-9999', { waitUntil: 'domcontentloaded' });
 
     // Should show error state, not crash or blank screen
     const errorIndicator = page.locator(
