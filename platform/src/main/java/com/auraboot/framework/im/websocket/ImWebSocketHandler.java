@@ -155,13 +155,17 @@ public class ImWebSocketHandler extends TextWebSocketHandler {
             log.debug("ImAiService not available, skipping @AI check", e);
         }
 
-        // Create MENTION inbox items for @mentioned users
+        // Create MENTION inbox items for @mentioned users (enterprise-only integration)
         try {
-            var inboxImListener = applicationContext.getBean(
-                    com.auraboot.framework.inbox.listener.InboxImListener.class);
-            inboxImListener.onMessageSent(saved, userId, tenantId);
+            Class<?> inboxImListenerClass = Class.forName(
+                    "com.auraboot.framework.inbox.listener.InboxImListener");
+            var inboxImListener = applicationContext.getBean(inboxImListenerClass);
+            inboxImListenerClass.getMethod("onMessageSent", ImMessage.class, Long.class, Long.class)
+                    .invoke(inboxImListener, saved, userId, tenantId);
+        } catch (ClassNotFoundException | NoClassDefFoundError e) {
+            log.debug("InboxImListener not available (enterprise feature), skipping mention inbox", e);
         } catch (Exception e) {
-            log.debug("InboxImListener not available, skipping mention inbox", e);
+            log.debug("InboxImListener invocation failed", e);
         }
     }
 
