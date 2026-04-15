@@ -5,6 +5,7 @@
 
 import type { WidgetDefinition, WidgetType, PropertySchema } from '../types';
 import { DesignerRegistry } from '~/shared/designer';
+import { resolveWidgetTier } from '../registry/widgetManifest';
 
 /**
  * Common property schemas for data source configuration
@@ -1593,8 +1594,10 @@ const widgetDefinitions: WidgetDefinition[] = [
 class WidgetRegistry extends DesignerRegistry<WidgetDefinition> {
   constructor() {
     super();
-    // Register default widgets
-    widgetDefinitions.forEach((def) => this.register(def));
+    // Register default widgets with auto-tagged tier via manifest
+    widgetDefinitions.forEach((def) =>
+      this.register({ ...def, tier: def.tier ?? resolveWidgetTier(def.type) })
+    );
   }
 }
 

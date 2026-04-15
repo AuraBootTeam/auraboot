@@ -7,6 +7,8 @@ export { DashboardViewer } from './components/DashboardViewer';
 export { useDashboardStore } from './store/useDashboardStore';
 export { dashboardService } from './services/dashboardService';
 export { widgetRegistry } from './widgets/widgetRegistry';
+export { getWidgetDefinitions } from './registry/getWidgetDefinitions';
+export { getCurrentEditionTier } from './registry/edition';
 
 // Types
 export type {
