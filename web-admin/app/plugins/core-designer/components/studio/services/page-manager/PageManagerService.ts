@@ -15,7 +15,6 @@ import type {
   CreatePageRequest,
   UpdatePageRequest,
   PageTemplate,
-  PageMode,
 } from './types';
 import * as pageApi from './pageApi';
 import { toPageMeta, toCreateRequest, toUpdateRequest, createDslSchemaPayload } from './converters';
@@ -29,7 +28,7 @@ const DEFAULT_TEMPLATES: PageTemplate[] = [
     id: 'tpl-customer-detail',
     name: '客户详情',
     description: '客户信息展示与编辑',
-    mode: 'floor',
+    kind: 'detail',
     category: '业务模板',
     isBuiltIn: true,
   },
@@ -37,31 +36,31 @@ const DEFAULT_TEMPLATES: PageTemplate[] = [
     id: 'tpl-order-form',
     name: '订单表单',
     description: '订单创建与编辑',
-    mode: 'form',
+    kind: 'form',
     category: '业务模板',
     isBuiltIn: true,
   },
   {
-    id: 'tpl-dashboard',
-    name: '数据看板',
-    description: '数据统计与可视化',
-    mode: 'grid',
+    id: 'tpl-order-list',
+    name: '订单列表',
+    description: '订单数据列表视图',
+    kind: 'list',
     category: '业务模板',
     isBuiltIn: true,
   },
   {
-    id: 'tpl-blank-grid',
-    name: '空白网格页',
-    description: '从空白开始的网格布局',
-    mode: 'grid',
+    id: 'tpl-blank-list',
+    name: '空白列表页',
+    description: '从空白开始的列表布局',
+    kind: 'list',
     category: '空白模板',
     isBuiltIn: true,
   },
   {
-    id: 'tpl-blank-floor',
-    name: '空白楼层页',
-    description: '从空白开始的楼层布局',
-    mode: 'floor',
+    id: 'tpl-blank-detail',
+    name: '空白详情页',
+    description: '从空白开始的详情布局',
+    kind: 'detail',
     category: '空白模板',
     isBuiltIn: true,
   },
@@ -69,7 +68,7 @@ const DEFAULT_TEMPLATES: PageTemplate[] = [
     id: 'tpl-blank-form',
     name: '空白表单页',
     description: '从空白开始的表单布局',
-    mode: 'form',
+    kind: 'form',
     category: '空白模板',
     isBuiltIn: true,
   },
@@ -212,8 +211,8 @@ export class PageManagerService {
 
         // Apply local filters that backend doesn't support
         let filteredItems = items;
-        if (filter.mode && filter.mode !== 'all') {
-          filteredItems = items.filter((p) => p.mode === filter.mode);
+        if (filter.kind && filter.kind !== 'all') {
+          filteredItems = items.filter((p) => p.kind === filter.kind);
         }
         if (filter.viewModelCode) {
           filteredItems = filteredItems.filter((p) => p.viewModelCode === filter.viewModelCode);
@@ -373,7 +372,7 @@ export class PageManagerService {
     const newPage = await this.createPage({
       title: `${original.title} (副本)`,
       description: original.description,
-      mode: original.mode,
+      kind: original.kind,
       viewModelCode: original.viewModelCode,
       tags: original.tags,
     });
@@ -416,26 +415,31 @@ export class PageManagerService {
   /**
    * Get templates
    */
-  public async getTemplates(mode?: PageMode): Promise<PageTemplate[]> {
+  public async getTemplates(kind?: 'list' | 'form' | 'detail'): Promise<PageTemplate[]> {
     // Try to fetch from API first
     try {
       const result = await pageApi.getTemplates();
       if (ResultHelper.isSuccess(result) && result.data) {
-        const apiTemplates: PageTemplate[] = result.data.map((dto) => ({
-          id: dto.pid,
-          name: (typeof dto.title === 'string' ? dto.title : dto.title?.['en-US'] || dto.title?.['zh-CN'] || dto.name) || dto.name,
-          description: dto.description,
-          mode: dto.kind === 'form' ? 'form' : 'floor',
-          thumbnail: dto.metaInfo?.thumbnail as string | undefined,
-          category: dto.templateCategory || '自定义模板',
-          isBuiltIn: false,
-        }));
+        const apiTemplates: PageTemplate[] = result.data
+          .filter((dto) => dto.kind === 'list' || dto.kind === 'form' || dto.kind === 'detail')
+          .map((dto) => ({
+            id: dto.pid,
+            name:
+              (typeof dto.title === 'string'
+                ? dto.title
+                : dto.title?.['en-US'] || dto.title?.['zh-CN'] || dto.name) || dto.name,
+            description: dto.description,
+            kind: dto.kind as 'list' | 'form' | 'detail',
+            thumbnail: dto.metaInfo?.thumbnail as string | undefined,
+            category: dto.templateCategory || '自定义模板',
+            isBuiltIn: false,
+          }));
 
         // Combine with default templates
         const allTemplates = [...DEFAULT_TEMPLATES, ...apiTemplates];
 
-        if (mode) {
-          return allTemplates.filter((t) => t.mode === mode);
+        if (kind) {
+          return allTemplates.filter((t) => t.kind === kind);
         }
         return allTemplates;
       }
@@ -444,8 +448,8 @@ export class PageManagerService {
     }
 
     // Fallback to default templates
-    if (mode) {
-      return this.templates.filter((t) => t.mode === mode);
+    if (kind) {
+      return this.templates.filter((t) => t.kind === kind);
     }
     return [...this.templates];
   }
