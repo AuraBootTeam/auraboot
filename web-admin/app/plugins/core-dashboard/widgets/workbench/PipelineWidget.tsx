@@ -49,6 +49,8 @@ export function PipelineWidget({ title, className = '' }: PipelineWidgetProps) {
   const [data, setData] = useState<PipelineData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  // crmUnavailable: true when backend returned empty stages (CRM module not installed in OSS)
+  const [crmUnavailable, setCrmUnavailable] = useState(false);
 
   const resolvedTitle = title || t('workbench.pipeline.title', {}, 'Sales Pipeline');
 
@@ -60,6 +62,10 @@ export function PipelineWidget({ title, className = '' }: PipelineWidgetProps) {
         const result = await get<PipelineData>('/api/workbench/pipeline');
         if (!cancelled && result.code === '0' && result.data) {
           setData(result.data);
+          // Empty stages means CRM module is not installed (backend returns empty DTO when table is missing)
+          if (result.data.stages.length === 0) {
+            setCrmUnavailable(true);
+          }
         } else if (!cancelled) {
           setError(true);
         }
@@ -101,6 +107,26 @@ export function PipelineWidget({ title, className = '' }: PipelineWidgetProps) {
               />
             </div>
           ))}
+        </div>
+      </div>
+    );
+  }
+
+  // --- CRM unavailable (module not installed, backend returned empty stages) ---
+  if (crmUnavailable) {
+    return (
+      <div className={`flex h-full flex-col ${className}`} data-testid="pipeline-crm-unavailable">
+        <div className="mb-3 flex items-center justify-between px-1">
+          <span className="text-sm font-semibold text-gray-900">{resolvedTitle}</span>
+        </div>
+        <div className="flex flex-1 flex-col items-center justify-center text-gray-400">
+          <span className="mb-1 text-2xl">{'📦'}</span>
+          <span className="text-sm font-medium text-gray-500">
+            {t('workbench.pipeline.crmUnavailable', {}, 'CRM module not installed')}
+          </span>
+          <span className="mt-1 text-xs text-gray-400">
+            {t('workbench.pipeline.crmUnavailableHint', {}, 'Install the CRM plugin to enable sales pipeline')}
+          </span>
         </div>
       </div>
     );
