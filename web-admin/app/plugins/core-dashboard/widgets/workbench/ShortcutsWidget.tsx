@@ -9,7 +9,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useI18n } from '~/contexts/I18nContext';
 import { listFavorites, removeFavorite, reorderFavorites } from '~/shared/services/engagementService';
 import type { UserEngagement } from '~/shared/services/engagementService';
-import { AddFavoriteModal } from './AddFavoriteModal';
+import { AddFavoriteModal } from '~/plugins/core-dashboard/widgets/workbench/AddFavoriteModal';
 
 export interface ShortcutItem {
   label: string;
