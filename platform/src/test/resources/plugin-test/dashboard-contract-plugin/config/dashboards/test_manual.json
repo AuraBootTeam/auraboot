@@ -1,0 +1,46 @@
+{
+  "code": "tdc_manual_dashboard",
+  "title": "Test Manual Dashboard",
+  "description": "Fixture dashboard for integration test of the config/dashboards/*.json contract",
+  "scope": "global",
+  "status": "published",
+  "sortOrder": 0,
+  "layoutConfig": {
+    "columns": 12,
+    "rowHeight": 100,
+    "gap": 16,
+    "compactType": "vertical"
+  },
+  "widgets": [
+    {
+      "id": "w1",
+      "type": "smart-bar-chart",
+      "x": 0,
+      "y": 0,
+      "w": 6,
+      "h": 3,
+      "title": "Revenue by Month",
+      "config": {
+        "title": "Revenue by Month",
+        "dataSource": {
+          "type": "static"
+        }
+      }
+    },
+    {
+      "id": "w2",
+      "type": "smart-number-card",
+      "x": 6,
+      "y": 0,
+      "w": 6,
+      "h": 3,
+      "title": "Total Revenue",
+      "config": {
+        "title": "Total Revenue",
+        "dataSource": {
+          "type": "static"
+        }
+      }
+    }
+  ]
+}
