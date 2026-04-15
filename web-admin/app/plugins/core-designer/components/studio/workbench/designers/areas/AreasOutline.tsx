@@ -6,11 +6,11 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import type { DslV4Schema, DslBlock, AreaName } from '~/plugins/core-designer/components/studio/domain/dsl/types';
+import type { PageSchema, DslBlock, AreaName } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 import { parseFieldShorthand, parseColumnShorthand } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 
 export interface AreasOutlineProps {
-  dsl: DslV4Schema;
+  dsl: PageSchema;
   selectedBlockId: string | null;
   onBlockClick: (blockId: string) => void;
 }
