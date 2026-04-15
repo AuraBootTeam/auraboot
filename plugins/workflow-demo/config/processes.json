@@ -3,7 +3,7 @@
     "key": "wd_leave_approval",
     "name:zh-CN": "请假审批",
     "name:en": "Leave Request Approval",
-    "description": "OSS workflow demo: leave request approval flow with Drools-based routing and SLA on approver tasks",
+    "description": "OSS workflow demo: leave request approval flow with Drools-based routing, SLA on approver tasks, and approved/rejected notification serviceTasks.",
     "category": "approval",
     "designerJson": {
       "nodes": [
@@ -42,9 +42,18 @@
           "data": {
             "label:zh-CN": "路由规则",
             "label:en": "Routing Rule",
-            "serviceType": "rule",
-            "ruleCode": "wd_leave_routing",
-            "outputVariable": "approverRole"
+            "serviceType": "command",
+            "commandCode": "bpm:run-rule",
+            "args": {
+              "ruleCode": "wd_leave_routing",
+              "facts": {
+                "days": "${days}",
+                "type": "${type}"
+              }
+            },
+            "outputMapping": {
+              "approverRole": "${_ruleResult.approverRole}"
+            }
           }
         },
         {
@@ -130,14 +139,41 @@
           }
         },
         {
-          "id": "svc_deduct",
+          "id": "svc_notify_approved",
           "type": "serviceTask",
           "position": { "x": 1120, "y": 140 },
           "data": {
-            "label:zh-CN": "扣减余额并通知",
-            "label:en": "Deduct Balance & Notify",
+            "label:zh-CN": "通知申请人（通过）",
+            "label:en": "Notify Applicant (Approved)",
             "serviceType": "command",
-            "commandCode": "wd:execute_deduct_balance"
+            "commandCode": "bpm:publish-notification",
+            "args": {
+              "eventCode": "wd_request_approved",
+              "recipientFrom": "applicant",
+              "templateParams": {
+                "code": "${businessKey}",
+                "days": "${days}"
+              }
+            }
+          }
+        },
+        {
+          "id": "svc_notify_rejected",
+          "type": "serviceTask",
+          "position": { "x": 1120, "y": 340 },
+          "data": {
+            "label:zh-CN": "通知申请人（驳回）",
+            "label:en": "Notify Applicant (Rejected)",
+            "serviceType": "command",
+            "commandCode": "bpm:publish-notification",
+            "args": {
+              "eventCode": "wd_request_rejected",
+              "recipientFrom": "applicant",
+              "templateParams": {
+                "code": "${businessKey}",
+                "days": "${days}"
+              }
+            }
           }
         },
         {
@@ -152,7 +188,7 @@
         {
           "id": "end_rejected",
           "type": "endEvent",
-          "position": { "x": 1120, "y": 340 },
+          "position": { "x": 1300, "y": 340 },
           "data": {
             "label:zh-CN": "已驳回",
             "label:en": "Rejected"
@@ -223,7 +259,7 @@
         {
           "id": "flow_result_approved",
           "source": "gw_result",
-          "target": "svc_deduct",
+          "target": "svc_notify_approved",
           "data": {
             "label:zh-CN": "通过",
             "label:en": "Approved",
@@ -233,7 +269,7 @@
         {
           "id": "flow_result_rejected",
           "source": "gw_result",
-          "target": "end_rejected",
+          "target": "svc_notify_rejected",
           "data": {
             "label:zh-CN": "驳回",
             "label:en": "Rejected",
@@ -241,9 +277,17 @@
           }
         },
         {
-          "id": "flow_deduct_end",
-          "source": "svc_deduct",
+          "id": "flow_notify_approved_end",
+          "source": "svc_notify_approved",
           "target": "end_approved",
+          "data": {
+            "conditionExpression": "${true}"
+          }
+        },
+        {
+          "id": "flow_notify_rejected_end",
+          "source": "svc_notify_rejected",
+          "target": "end_rejected",
           "data": {
             "conditionExpression": "${true}"
           }
