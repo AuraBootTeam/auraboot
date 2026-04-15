@@ -10,11 +10,12 @@
 import React, { useState, useRef } from 'react';
 import { auraBotApi } from '~/plugins/core-aurabot/services/auraBotApi';
 import { buildPageGenerationPrompt, parsePageDslResponse } from './ai-page-prompt';
+import type { PageSchema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 
 export interface AiPageGenerateDialogProps {
   open: boolean;
   onClose: () => void;
-  onGenerated: (dsl: { kind: string; blocks: any[]; layout: any; schemaVersion: number }) => void;
+  onGenerated: (dsl: { kind: PageSchema['kind']; blocks: PageSchema['blocks']; layout: PageSchema['layout']; schemaVersion: 2 }) => void;
   modelCode?: string;
   modelFields?: Array<{ code: string; name: string; type: string }>;
 }
