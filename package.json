@@ -2,10 +2,12 @@
   "name": "auraboot-monorepo",
   "version": "0.0.0",
   "private": true,
-  "description": "AuraBoot OSS monorepo root — manages framework packages and web-admin",
+  "description": "AuraBoot OSS monorepo root \u2014 manages framework packages and web-admin",
   "scripts": {
     "build:packages": "pnpm -r --filter './packages/*' build",
-    "typecheck:packages": "pnpm -r --filter './packages/*' typecheck"
+    "typecheck:packages": "pnpm -r --filter './packages/*' typecheck",
+    "validate:plugins": "node scripts/validate-plugin-i18n.mjs && node scripts/validate-plugin-dashboards.mjs",
+    "validate:dashboards": "node scripts/validate-plugin-dashboards.mjs"
   },
   "devDependencies": {
     "typescript": "^5.4.0"
