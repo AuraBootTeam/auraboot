@@ -264,6 +264,7 @@ export type ActionDef =
   | { type: 'command'; command: string }
   | { type: 'state_transition'; command: string }
   | { type: 'navigate'; to: string; command?: string }
+  | { type: 'navigate'; url: string; command?: string }
   | { type: 'builtin'; name: string }
   | { type: 'flow'; steps: FlowStep[] }
   | { type: 'flow'; handler: string };

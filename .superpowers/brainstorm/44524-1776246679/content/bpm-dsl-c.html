@@ -1,0 +1,130 @@
+<h2>方案 C · A+B 组合 详解</h2>
+<p class="subtitle">列表页按钮走 action，详情页审批视图走 bpm-panel block</p>
+
+<div class="section">
+  <h3>A 面：action.executionMode = "bpm"</h3>
+  <p>只扩现有 action，不改协议。引擎识别 <code>executionMode: "bpm"</code> 后，不走 Command/Automation，直接走 <code>BpmStartProcessService</code>。</p>
+  <pre style="background:#f3f4f6;padding:12px;border-radius:6px;font-size:13px;overflow-x:auto">{
+  "code": "submit_leave_approval",
+  "label": { "zh_CN": "提交审批" },
+  "executionMode": "bpm",
+  "bpm": {
+    "processKey": "leave_request",
+    "businessKeyField": "id",
+    "variables": { "days": "$.days", "reason": "$.reason" },
+    "formBindingRef": "leave_request_form",
+    "onSuccess": { "toast": "已提交", "refresh": true }
+  },
+  "placement": ["list.toolbar", "detail.toolbar"],
+  "permission": "leave_request.submit"
+}</pre>
+  <p><strong>关键点</strong>：</p>
+  <ul>
+    <li><code>businessKeyField</code>：告诉引擎用哪个字段做流程业务主键（同一记录不能重复发起）</li>
+    <li><code>variables</code>：JSONPath 从当前记录抽流程变量（供规则/网关/SLA 使用）</li>
+    <li><code>formBindingRef</code>：引用已存在的表单绑定，避免重复配置</li>
+    <li><code>placement</code>：复用 action 现有的位置语义，列表工具栏/详情工具栏都能放</li>
+    <li><strong>权限/i18n/审计</strong>全部自动继承 action 基建</li>
+  </ul>
+</div>
+
+<div class="section">
+  <h3>B 面：blockType = "bpm-panel"</h3>
+  <p>新 blockType，放在详情页，渲染"当前审批状态 + 流程图 + 审批操作区 + 历史"。</p>
+  <pre style="background:#f3f4f6;padding:12px;border-radius:6px;font-size:13px;overflow-x:auto">{
+  "blockType": "bpm-panel",
+  "id": "approval",
+  "bpm": {
+    "processKey": "leave_request",
+    "businessKeyField": "id",
+    "sections": {
+      "status":      { "visible": true, "showAssignees": true, "showSla": true },
+      "diagram":     { "visible": true, "highlightActiveNode": true },
+      "operations":  {
+        "visible": true,
+        "operations": ["approve", "reject", "addSign", "transfer", "withdraw", "cc"],
+        "approveForm": { "fieldsFromNode": true, "commentRequired": false },
+        "rejectForm":  { "commentRequired": true }
+      },
+      "history":     { "visible": true, "showComments": true, "showAttachments": true }
+    }
+  },
+  "visibleWhen": "record.process_instance_id != null"
+}</pre>
+  <p><strong>4 个内置 section（可独立开关）</strong>：</p>
+  <ol>
+    <li><strong>status</strong>：当前节点、当前审批人头像组、SLA 剩余时间</li>
+    <li><strong>diagram</strong>：BPMN 缩略图 + 高亮当前节点（复用 core-designer 的只读渲染器）</li>
+    <li><strong>operations</strong>：根据当前用户是否为候选审批人 + 权限动态显示按钮组；每种操作背后调用已有的 TaskController endpoint</li>
+    <li><strong>history</strong>：审批历史时间线（审批人/操作/意见/附件），来自 <code>BpmAuditService</code></li>
+  </ol>
+  <p><strong>可见性</strong>：<code>visibleWhen</code> 让尚未发起流程的记录不渲染这块，发起后自动出现。</p>
+</div>
+
+<div class="section">
+  <h3>详情页典型布局</h3>
+  <div class="mockup">
+    <div class="mockup-header">leave_request · 详情页</div>
+    <div class="mockup-body">
+      <div style="display:flex;gap:12px">
+        <div style="flex:1;border:1px solid #e5e7eb;padding:12px;border-radius:6px">
+          <div class="label">form-section</div>
+          <div style="margin-top:8px;color:#374151">请假表单字段（员工/时长/原因/附件）</div>
+        </div>
+        <div style="flex:1;border:2px solid #3b82f6;padding:12px;border-radius:6px;background:#eff6ff">
+          <div class="label" style="color:#3b82f6">bpm-panel（新）</div>
+          <div style="margin-top:8px;font-size:13px">
+            <div>📍 当前节点：<strong>部门经理审批</strong> · 👤 张经理 · ⏱ 剩 2h</div>
+            <div style="margin:8px 0;padding:8px;background:white;border-radius:4px;color:#6b7280">[BPMN 缩略图 高亮当前节点]</div>
+            <div style="display:flex;gap:4px;flex-wrap:wrap">
+              <button class="mock-button">通过</button>
+              <button class="mock-button">驳回</button>
+              <button class="mock-button">加签</button>
+              <button class="mock-button">转办</button>
+              <button class="mock-button">撤回</button>
+              <button class="mock-button">抄送</button>
+            </div>
+            <div style="margin-top:8px;padding-top:8px;border-top:1px dashed #e5e7eb;color:#6b7280">
+              📜 历史：李四 提交 → 王五 通过 (2h前)
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>PropertySchema 新增</h3>
+  <ul>
+    <li><code>action.executionMode</code>：新增 <code>"bpm"</code> 枚举值；dependsOn 触发 <code>action.bpm</code> 子对象显示</li>
+    <li><code>action.bpm</code>：processKey（流程选择器，从 BPM 引擎拉列表）、businessKeyField（字段选择器）、variables（JSONPath 键值对）、formBindingRef（表单绑定选择器）</li>
+    <li><code>blockType: "bpm-panel"</code> 本身的 Schema：processKey + 4 个 section 各自的开关/子配置</li>
+    <li>全部走 <code>SchemaBlockConfigPanel</code> 自动渲染（遵守 Studio 硬约束）</li>
+  </ul>
+</div>
+
+<div class="section">
+  <h3>前后端改动清单（方案 C 的边界）</h3>
+  <div class="pros-cons">
+    <div class="pros">
+      <h4>新增</h4>
+      <ul>
+        <li>后端：<code>/tasks/{id}/withdraw</code> + <code>/tasks/{id}/cc</code> endpoint</li>
+        <li>后端：<code>BpmActionExecutor</code>（处理 <code>executionMode:bpm</code>）</li>
+        <li>前端：<code>BpmPanelBlock.tsx</code> 4 个 section 子组件</li>
+        <li>前端：<code>ActionExecutionMode</code> 枚举扩 <code>bpm</code> 分支</li>
+        <li>PropertySchema + ConfigPanel 对应改动</li>
+      </ul>
+    </div>
+    <div class="cons">
+      <h4>不动</h4>
+      <ul>
+        <li>SmartEngine 适配层</li>
+        <li>BPMN 设计器</li>
+        <li>Command / Automation 现有路径（保留作为"复杂编排"备选）</li>
+        <li>表单运行时</li>
+      </ul>
+    </div>
+  </div>
+</div>
