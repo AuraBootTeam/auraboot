@@ -102,6 +102,8 @@ public class PluginImportServiceImpl implements PluginImportService {
     private final AutoPermissionAssignmentService autoPermissionAssignmentService;
     private final ApplicationEventPublisher applicationEventPublisher;
     private final com.auraboot.framework.meta.template.generator.DocumentCommandGenerator documentCommandGenerator;
+    private final com.auraboot.framework.bpm.rule.DroolsRuleService droolsRuleService;
+    private final com.auraboot.framework.bpm.service.SlaConfigService slaConfigService;
 
     private final ObjectMapper objectMapper = createObjectMapper();
 
@@ -1204,6 +1206,11 @@ public class PluginImportServiceImpl implements PluginImportService {
                     manifest.getPluginId(), type, elapsedMs);
         }
 
+        // Import Drools rules and SLA configs (extension resources — not tracked via
+        // PluginResource / ResourceType to avoid enum/DB check-constraint churn).
+        importRules(manifest);
+        importSlaConfigs(manifest);
+
         // Post-processing: Auto-publish DRAFT models and sync PUBLISHED models
         autoPublishAndSyncModels(importedModelCodes, request, manifest.getNamespace());
 
@@ -1781,6 +1788,45 @@ public class PluginImportServiceImpl implements PluginImportService {
                     result.addCreatedResource(ResourceType.NAMED_QUERY, resource.getResourcePid());
                 }
             }
+        }
+    }
+
+    private void importRules(PluginManifestExtended manifest) {
+        if (manifest.getRules() == null || manifest.getRules().isEmpty()) return;
+        int created = 0;
+        for (BpmRuleDefinitionDTO dto : manifest.getRules()) {
+            if (!dto.isValid()) {
+                log.warn("Skipping invalid rule (missing ruleCode): index={}",
+                        manifest.getRules().indexOf(dto));
+                continue;
+            }
+            if (dto.getRuleContent() == null || dto.getRuleContent().isBlank()) {
+                log.warn("Skipping rule '{}' — no ruleContent or resolved ruleContentFile",
+                        dto.getRuleCode());
+                continue;
+            }
+            droolsRuleService.importRule(dto);
+            created++;
+        }
+        if (created > 0) {
+            log.info("Imported {} Drools rule(s) for plugin {}", created, manifest.getPluginId());
+        }
+    }
+
+    private void importSlaConfigs(PluginManifestExtended manifest) {
+        if (manifest.getSlaConfigs() == null || manifest.getSlaConfigs().isEmpty()) return;
+        int created = 0;
+        for (SlaConfigDefinitionDTO dto : manifest.getSlaConfigs()) {
+            if (!dto.isValid()) {
+                log.warn("Skipping invalid SLA config (missing name): index={}",
+                        manifest.getSlaConfigs().indexOf(dto));
+                continue;
+            }
+            slaConfigService.importSlaConfig(dto);
+            created++;
+        }
+        if (created > 0) {
+            log.info("Imported {} SLA config(s) for plugin {}", created, manifest.getPluginId());
         }
     }
 
