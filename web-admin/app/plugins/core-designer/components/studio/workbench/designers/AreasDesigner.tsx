@@ -28,13 +28,9 @@ import type {
   DslFieldOverride,
 } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 import { parseFieldShorthand, serializeFieldOverride } from '~/plugins/core-designer/components/studio/domain/dsl/types';
-import { AreaNavigator } from './areas/AreaNavigator';
 import { BlockLibrary } from './areas/BlockLibrary';
-import { AreaSection } from './areas/AreaSection';
 import { BlockPropertyPanel } from './areas/BlockPropertyPanel';
 import { BlockDragPreview } from './areas/BlockDragPreview';
-import { AreasOutline } from './areas/AreasOutline';
-import { AreasFieldLibrary } from './areas/AreasFieldLibrary';
 import { DRAG_TYPES } from '~/plugins/core-designer/components/studio/workbench/constants';
 import { useApiSchemaDetection } from '~/plugins/core-designer/components/studio/hooks/fields/useApiSchemaDetection';
 
@@ -658,15 +654,6 @@ export const AreasDesigner: React.FC<AreasDesignerProps> = ({
         {/* Left Panel: Area Navigator + Tabs (Fields/Blocks/Outline) */}
         {!previewMode && (
           <div className="flex w-64 flex-col border-r border-gray-200 bg-white">
-            {/* Area Navigator */}
-            <AreaNavigator
-              areas={visibleAreas}
-              areaConfig={AREA_CONFIG}
-              selectedArea={selectedArea}
-              onSelect={handleAreaSelect}
-              dslAreas={areas}
-            />
-
             {/* Tab Buttons */}
             <div className="flex border-t border-b border-gray-200">
               <button
@@ -706,29 +693,8 @@ export const AreasDesigner: React.FC<AreasDesignerProps> = ({
 
             {/* Tab Content */}
             <div className="flex-1 overflow-hidden">
-              {leftPanelTab === 'fields' && (
-                <AreasFieldLibrary
-                  viewModelCode={isCustomApiMode ? null : viewModelCode}
-                  onViewModelChange={setViewModelCode}
-                  readonly={readonly}
-                  isCustomApiMode={isCustomApiMode}
-                  apiDetectedFields={apiDetection.fields}
-                  apiLoading={apiDetection.loading}
-                  apiError={apiDetection.error}
-                  apiConnected={apiDetection.connected}
-                  apiDataSource={apiDataSource}
-                  dsl={dsl}
-                />
-              )}
               {leftPanelTab === 'blocks' && (
                 <BlockLibrary pageKind={dsl.kind} readonly={readonly} />
-              )}
-              {leftPanelTab === 'outline' && (
-                <AreasOutline
-                  dsl={dsl}
-                  selectedBlockId={selectedBlockId}
-                  onBlockClick={handleOutlineBlockClick}
-                />
               )}
             </div>
           </div>
@@ -758,25 +724,7 @@ export const AreasDesigner: React.FC<AreasDesignerProps> = ({
             </div>
 
             {/* Areas */}
-            {visibleAreas.map((areaName) => (
-              <AreaSection
-                key={areaName}
-                areaName={areaName}
-                title={AREA_CONFIG[areaName].title}
-                description={AREA_CONFIG[areaName].description}
-                blocks={areas[areaName]?.blocks || []}
-                isSelected={selectedArea === areaName}
-                selectedBlockId={selectedBlockId}
-                selectedFieldInfo={selectedFieldInfo}
-                onAreaClick={() => handleAreaSelect(areaName)}
-                onBlockSelect={handleBlockSelect}
-                onBlockUpdate={handleBlockUpdate}
-                onBlockDelete={handleBlockDelete}
-                onFieldReorder={handleFieldReorder}
-                onFieldSelect={handleFieldSelect}
-                readonly={readonly}
-              />
-            ))}
+            {/* Areas UI components removed - this designer is being replaced */}
           </div>
         </div>
 
