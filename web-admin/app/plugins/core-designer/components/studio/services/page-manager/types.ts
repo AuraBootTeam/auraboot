@@ -50,8 +50,6 @@ export interface PageMeta {
   thumbnail?: string;
   /** Component count */
   componentCount?: number;
-  /** DSL Schema (page structure and layout) */
-  dslSchema?: Record<string, unknown>;
   /** Extension metadata persisted by backend */
   extension?: Record<string, unknown>;
 }
