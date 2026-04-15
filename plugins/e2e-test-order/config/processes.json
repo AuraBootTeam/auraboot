@@ -102,13 +102,17 @@
           "id": "edge_gw_approve",
           "source": "decision_gw",
           "target": "approve_svc",
-          "conditionExpression": "${decision == 'approved'}"
+          "data": {
+            "condition": { "type": "expression", "content": "decision == 'approved'" }
+          }
         },
         {
           "id": "edge_gw_reject",
           "source": "decision_gw",
           "target": "reject_svc",
-          "conditionExpression": "${decision == 'rejected'}"
+          "data": {
+            "condition": { "type": "expression", "content": "decision == 'rejected'" }
+          }
         },
         {
           "id": "edge_approve_end",
