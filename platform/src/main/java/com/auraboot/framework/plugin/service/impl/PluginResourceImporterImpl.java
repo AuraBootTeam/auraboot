@@ -1256,6 +1256,14 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             return;
         }
 
+        // designerJson typically contains only {nodes, edges} — the process key/name live
+        // on the DTO root. Propagate them so JsonToBpmnConverter emits <process id="<key>">
+        // instead of the default "process_1", which would collide across imports.
+        designerJson.putIfAbsent("key", dto.getKey());
+        if (dto.getEffectiveName() != null) {
+            designerJson.putIfAbsent("name", dto.getEffectiveName());
+        }
+
         // Idempotency: skip if already deployed in the SmartEngine cache.
         boolean alreadyDeployed = smartEngine.getRepositoryQueryService()
                 .getAllCachedProcessDefinition()
