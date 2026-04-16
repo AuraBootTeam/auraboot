@@ -1,5 +1,6 @@
 package com.auraboot.framework.bpm;
 
+import com.auraboot.framework.bpm.audit.BpmAuditOperation;
 import com.auraboot.framework.bpm.model.WithdrawPolicy;
 import com.auraboot.framework.bpm.service.WithdrawService;
 import com.auraboot.framework.exception.BusinessException;
@@ -29,7 +30,7 @@ class WithdrawServiceIntegrationTest extends BaseIntegrationTest {
 
         assertThat(fixture.getProcessStatus(setup.instanceId())).isEqualTo("withdrawn");
         assertThat(fixture.findAuditRecords(setup.instanceId()))
-                .anyMatch(r -> "withdraw".equalsIgnoreCase(r.getOperation()));
+                .anyMatch(r -> BpmAuditOperation.WITHDRAW.matches(r.getOperation()));
     }
 
     @Test
