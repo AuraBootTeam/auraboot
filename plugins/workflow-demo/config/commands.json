@@ -1,0 +1,139 @@
+[
+  {
+    "code": "wd:create_leave_request",
+    "displayName:zh-CN": "新建请假申请",
+    "displayName:en": "Create Leave Request",
+    "type": "create",
+    "modelCode": "wd_leave_request",
+    "inputFields": [
+      "wd_req_applicant",
+      "wd_req_type",
+      "wd_req_start_date",
+      "wd_req_end_date",
+      "wd_req_days",
+      "wd_req_reason",
+      "wd_req_attachments",
+      "wd_req_cc_users"
+    ],
+    "autoSetFields": {
+      "wd_req_code": {
+        "strategy": "auto_generate",
+        "pattern": "WDLR-{yyyyMMdd}-{seq}"
+      },
+      "wd_req_status": {
+        "strategy": "fixed_value",
+        "value": "draft"
+      }
+    },
+    "permissions": [
+      "wd.leave_request.manage"
+    ],
+    "agent_hint": "Create a draft leave request. Key inputs: applicant, type, start_date, end_date, days.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "wd:update_leave_request",
+    "displayName:zh-CN": "编辑请假申请",
+    "displayName:en": "Update Leave Request",
+    "type": "update",
+    "modelCode": "wd_leave_request",
+    "inputFields": [
+      "wd_req_type",
+      "wd_req_start_date",
+      "wd_req_end_date",
+      "wd_req_days",
+      "wd_req_reason",
+      "wd_req_attachments",
+      "wd_req_cc_users"
+    ],
+    "permissions": [
+      "wd.leave_request.manage"
+    ],
+    "agent_hint": "Update an existing draft leave request.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "wd:delete_leave_request",
+    "displayName:zh-CN": "删除请假申请",
+    "displayName:en": "Delete Leave Request",
+    "type": "delete",
+    "modelCode": "wd_leave_request",
+    "permissions": [
+      "wd.leave_request.manage"
+    ],
+    "agent_hint": "Delete a draft leave request.",
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "wd:submit_leave_request",
+    "displayName:zh-CN": "提交请假申请",
+    "displayName:en": "Submit Leave Request",
+    "description": "Submit a draft leave request. Runs Drools pre-flight validation (wd_leave_validation), starts the wd_leave_approval process, then transitions wd_req_status from draft|rejected to submitted.",
+    "type": "state_transition",
+    "modelCode": "wd_leave_request",
+    "stateField": "wd_req_status",
+    "fromStates": [
+      "draft",
+      "rejected"
+    ],
+    "toState": "submitted",
+    "permissions": [
+      "wd.leave_request.submit"
+    ],
+    "agent_hint": "Submit a draft leave request. Starts BPM process wd_leave_approval and writes its instance id onto wd_req_process_instance.",
+    "cmd_risk_level": "L2",
+    "postActions": [
+      {
+        "type": "start_process",
+        "processKey": "wd_leave_approval",
+        "businessKey": "${recordId}",
+        "title": "${recordId}",
+        "variables": {
+          "days": "${payload.wd_req_days}",
+          "type": "${payload.wd_req_type}",
+          "recordId": "${recordId}",
+          "applicantUserId": "${payload.wd_req_applicant}"
+        },
+        "storeInstanceIdIn": "wd_req_process_instance"
+      }
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认提交该请假申请？提交后将进入审批流程。",
+      "confirmMessage:en": "Confirm submission? The request will enter the approval workflow."
+    }
+  },
+  {
+    "code": "wd:create_leave_balance",
+    "displayName:zh-CN": "新建请假余额",
+    "displayName:en": "Create Leave Balance",
+    "type": "create",
+    "modelCode": "wd_leave_balance",
+    "inputFields": [
+      "wd_bal_employee",
+      "wd_bal_year",
+      "wd_bal_annual_remaining",
+      "wd_bal_sick_used"
+    ],
+    "permissions": [
+      "wd.leave_balance.manage"
+    ],
+    "agent_hint": "Create a leave balance record for an employee in a given year.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "wd:update_leave_balance",
+    "displayName:zh-CN": "编辑请假余额",
+    "displayName:en": "Update Leave Balance",
+    "type": "update",
+    "modelCode": "wd_leave_balance",
+    "inputFields": [
+      "wd_bal_annual_remaining",
+      "wd_bal_sick_used"
+    ],
+    "permissions": [
+      "wd.leave_balance.manage"
+    ],
+    "agent_hint": "Update an employee's leave balance.",
+    "cmd_risk_level": "L1"
+  }
+]

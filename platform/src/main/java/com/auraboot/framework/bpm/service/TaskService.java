@@ -15,6 +15,8 @@ import org.springframework.stereotype.Service;
 
 import com.auraboot.smart.framework.engine.model.instance.TaskAssigneeInstance;
 
+import com.auraboot.smart.framework.engine.model.instance.VariableInstance;
+
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -211,6 +213,12 @@ public class TaskService {
         vars.put("_comment", comment != null ? comment : "");
         vars.put(RequestMapSpecialKeyConstant.TENANT_ID, tenantId);
 
+        // SmartEngine does not reload persisted variables into the signal context
+        // when resuming after a userTask. Merge them so downstream serviceTasks
+        // (e.g. DroolsServiceTaskDelegate, NotificationServiceTaskDelegate) can
+        // read startup-time variables like startUserId / applicantUserId / days.
+        mergePersistedVariables(task.getProcessInstanceId(), tenantId, vars);
+
         smartEngine.getTaskCommandService().complete(taskId, vars);
 
         bpmAuditService.auditTaskOperation("task_approve", taskId, task.getProcessInstanceId(),
@@ -242,6 +250,8 @@ public class TaskService {
         vars.put("_action", "reject");
         vars.put("_comment", comment != null ? comment : "");
         vars.put(RequestMapSpecialKeyConstant.TENANT_ID, tenantId);
+
+        mergePersistedVariables(task.getProcessInstanceId(), tenantId, vars);
 
         smartEngine.getTaskCommandService().complete(taskId, vars);
 
@@ -413,5 +423,29 @@ public class TaskService {
 
     private String getCurrentUserId() {
         return com.auraboot.framework.bpm.util.BpmSecurityUtil.getCurrentUserId();
+    }
+
+    /**
+     * SmartEngine does not reload persisted variables into the execution
+     * context when resuming after a wait point (userTask). Load them from
+     * {@code se_variable_instance} and merge into the vars map so downstream
+     * serviceTasks can access startup-time variables (startUserId, etc.).
+     * Caller-supplied keys take precedence (putIfAbsent).
+     */
+    private void mergePersistedVariables(String processInstanceId, String tenantId,
+                                         Map<String, Object> vars) {
+        try {
+            List<VariableInstance> persisted = smartEngine.getVariableQueryService()
+                    .findProcessInstanceVariableList(processInstanceId, tenantId);
+            if (persisted != null) {
+                for (VariableInstance vi : persisted) {
+                    if (vi.getFieldKey() != null && vi.getFieldValue() != null) {
+                        vars.putIfAbsent(vi.getFieldKey(), vi.getFieldValue());
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to load persisted process variables for PI={}: {}", processInstanceId, e.getMessage());
+        }
     }
 }

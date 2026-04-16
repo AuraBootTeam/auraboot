@@ -1,0 +1,22 @@
+[
+  {
+    "code": "wd_leave_request_approval_history",
+    "title:zh-CN": "请假审批历史",
+    "title:en": "Leave Approval History",
+    "description": "Approval task timeline for a given leave request process instance. Consumed by the wd_leave_request_detail page sub-table.",
+    "status": "published",
+    "fromSql": "SELECT t.pid AS pid, t.chain_node_id AS \"nodeId\", t.task_title AS \"taskName\", t.actual_approver_id AS assignee, t.status AS status, (t.approval_data->>'taskResult') AS result, t.approval_comment AS comment, t.created_at AS \"startedAt\", t.completed_at AS \"completedAt\" FROM ab_approval_task t WHERE t.tenant_id = #{params.tenantId} AND t.chain_execution_id = #{params.processInstanceId} ORDER BY t.created_at ASC",
+    "outputFields": [
+      { "fieldCode": "pid", "columnExpr": "pid", "dataType": "string", "sortable": false },
+      { "fieldCode": "nodeId", "columnExpr": "\"nodeId\"", "dataType": "string", "sortable": false },
+      { "fieldCode": "taskName", "columnExpr": "\"taskName\"", "dataType": "string", "sortable": false },
+      { "fieldCode": "assignee", "columnExpr": "assignee", "dataType": "number", "sortable": false },
+      { "fieldCode": "status", "columnExpr": "status", "dataType": "string", "sortable": false },
+      { "fieldCode": "result", "columnExpr": "result", "dataType": "string", "sortable": false },
+      { "fieldCode": "comment", "columnExpr": "comment", "dataType": "string", "sortable": false },
+      { "fieldCode": "startedAt", "columnExpr": "\"startedAt\"", "dataType": "date", "sortable": true },
+      { "fieldCode": "completedAt", "columnExpr": "\"completedAt\"", "dataType": "date", "sortable": true }
+    ],
+    "tags": ["workflow-demo", "bpm"]
+  }
+]

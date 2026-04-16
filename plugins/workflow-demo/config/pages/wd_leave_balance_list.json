@@ -1,0 +1,58 @@
+{
+  "pageKey": "wd_leave_balance_list",
+  "modelCode": "wd_leave_balance",
+  "kind": "list",
+  "layout": { "type": "stack" },
+  "blocks": [
+    {
+      "id": "wd_leave_balance_filters",
+      "blockType": "filters",
+      "fields": [
+        { "field": "wd_bal_employee" },
+        { "field": "wd_bal_year" }
+      ]
+    },
+    {
+      "id": "wd_leave_balance_toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "create",
+          "primary": true,
+          "permissionCode": "wd.leave_balance.manage",
+          "label": "create",
+          "action": {
+            "type": "navigate",
+            "to": "/p/wd_leave_balance/new"
+          }
+        }
+      ]
+    },
+    {
+      "id": "wd_leave_balance_table",
+      "blockType": "table",
+      "columns": [
+        { "field": "wd_bal_employee", "width": 160 },
+        { "field": "wd_bal_year", "width": 100, "sortable": true },
+        { "field": "wd_bal_annual_remaining", "width": 140, "sortable": true, "editable": true },
+        { "field": "wd_bal_sick_used", "width": 140, "sortable": true, "editable": true },
+        {
+          "field": "actions",
+          "isActionColumn": true,
+          "buttons": [
+            {
+              "code": "edit",
+              "permissionCode": "wd.leave_balance.manage",
+              "label": "edit",
+              "action": { "type": "command", "command": "wd:update_leave_balance" }
+            }
+          ]
+        }
+      ],
+      "defaultSort": { "field": "wd_bal_year", "order": "desc" }
+    }
+  ],
+  "name:zh-CN": "请假余额",
+  "name:en": "Leave Balances",
+  "title": { "zh-CN": "请假余额", "en": "Leave Balances" }
+}

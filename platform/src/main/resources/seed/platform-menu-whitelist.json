@@ -1,4 +1,17 @@
 {
   "description": "Menu codes allowed to exist in ab_menu with plugin_pid IS NULL. Any orphan menu not listed here will cause startup to fail. Keep this list empty unless a menu is truly platform-level (no plugin can own it, and all tenants need it).",
-  "allowedCodes": []
+  "allowedCodes": [
+    "platform_overview",
+    "platform_tenants",
+    "platform_commerce",
+    "platform_marketplace",
+    "platform_licenses",
+    "platform_infra",
+    "platform_cloud_config",
+    "platform_templates",
+    "platform_plugins",
+    "platform_system",
+    "platform_audit_logs",
+    "platform_settings"
+  ]
 }
