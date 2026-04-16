@@ -1,6 +1,7 @@
 package com.auraboot.framework.bpm;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.bpm.audit.BpmAuditOperation;
 import com.auraboot.framework.bpm.audit.BpmAuditService;
 import com.auraboot.framework.bpm.entity.BpmAuditRecordEntity;
 import com.auraboot.framework.bpm.model.WithdrawPolicy;
@@ -116,8 +117,8 @@ public class TestBpmFixture {
         // Explicitly record process start audit so WithdrawService can resolve the initiator.
         // We use auditProcessOperation directly (not recordProcessStart) because recordProcessStart
         // does NOT include startUserId in details — but WithdrawService looks for details.startUserId
-        // from the "process_start" audit record to resolve the initiator when getStartUserId() is null.
-        auditService.auditProcessOperation("process_start", instanceId, null,
+        // from the PROCESS_START audit record to resolve the initiator when getProcessInitiator() is null.
+        auditService.auditProcessOperation(BpmAuditOperation.PROCESS_START.code(), instanceId, null,
                 Map.of("startUserId", initiatorId,
                        "processDefinitionId", processKey,
                        "businessKey", "biz-" + keySuffix));
@@ -147,7 +148,8 @@ public class TestBpmFixture {
             throw new IllegalStateException("Task not found for approval: " + taskId);
         }
         // Record approve audit entry (mirrors what TaskService.approveTask does)
-        auditService.auditTaskOperation("task_approve", taskId, task.getProcessInstanceId(),
+        auditService.auditTaskOperation(BpmAuditOperation.TASK_APPROVE.code(), taskId,
+                task.getProcessInstanceId(),
                 BpmSecurityUtil.getCurrentUserId(), null, comment, null);
 
         // Complete the task via SmartEngine
