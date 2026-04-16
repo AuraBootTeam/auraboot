@@ -44,10 +44,3 @@ export interface CanvasBlock {
   layout?: BlockLayoutConfig;
 }
 
-export interface CompositePageSchema {
-  kind: 'composite';
-  title?: LocalizedText;
-  description?: string;
-  layout?: LayoutConfig;
-  blocks: CanvasBlock[];
-}
