@@ -1,32 +1,38 @@
 import { useCallback } from 'react';
 import type { LinkageRule, LinkageAction } from '~/plugins/core-designer/components/studio/workbench/panels/linkage/types';
 import { createLinkageRule } from '~/plugins/core-designer/components/studio/workbench/panels/linkage/types';
-import { useDesignerStore } from '~/plugins/core-designer/components/studio/hooks/store/useDesignerStore';
+import { useCanvasEditorState } from '~/plugins/core-designer/components/studio/hooks/store/useCanvasEditorState';
+import type { FormSchema } from '~/plugins/core-designer/components/studio/domain/schema/types';
+
+export interface UseLinkageRulesOptions {
+  /** Current page schema (schema half) */
+  schema: FormSchema;
+  /** Called when linkageRules should be updated in the schema */
+  onSchemaChange: (next: FormSchema) => void;
+}
 
 /**
  * Hook for managing linkage rules in the designer.
- * Rules are persisted in PageSchema.linkageRules via useDesignerStore.
+ * The schema half flows in via props; UI selection state lives in useCanvasEditorState.
  *
  * @since 3.5.0
  */
-export function useLinkageRules() {
-  const pageSchema = useDesignerStore((state) => state.pageSchema);
-  const { updatePageSchema } = useDesignerStore();
-
-  const rules: LinkageRule[] = pageSchema?.linkageRules ?? [];
+export function useLinkageRules({ schema, onSchemaChange }: UseLinkageRulesOptions) {
+  const rules: LinkageRule[] = schema?.linkageRules ?? [];
 
   // Local helper to update linkageRules in the schema
   const setRules = useCallback(
     (updater: (prev: LinkageRule[]) => LinkageRule[]) => {
-      updatePageSchema((draft) => {
-        draft.linkageRules = updater(draft.linkageRules ?? []);
+      onSchemaChange({
+        ...schema,
+        linkageRules: updater(schema.linkageRules ?? []),
       });
     },
-    [updatePageSchema],
+    [schema, onSchemaChange],
   );
 
-  const selectedRuleId = useDesignerStore((state) => state.linkageSelectedRuleId);
-  const setLinkageSelectedRuleId = useDesignerStore((state) => state.setLinkageSelectedRuleId);
+  const selectedRuleId = useCanvasEditorState((state) => state.linkageSelectedRuleId);
+  const setLinkageSelectedRuleId = useCanvasEditorState((state) => state.setLinkageSelectedRuleId);
   const setSelectedRuleId = useCallback(
     (id: string | null) => {
       setLinkageSelectedRuleId(id);

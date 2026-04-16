@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { getCommandManager, eventDomainManager } from '~/plugins/core-designer/components/studio/services/managers';
-import { useDesignerStore } from '~/plugins/core-designer/components/studio/hooks/store/useDesignerStore';
+import { useCanvasEditorState } from '~/plugins/core-designer/components/studio/hooks/store/useCanvasEditorState';
 import {
   BatchRemoveComponentsCommand,
   UpdateComponentPropsCommand,
@@ -37,7 +37,7 @@ export const MultiSelectManager: React.FC<MultiSelectManagerProps> = ({
   const selectionBoxRef = useRef<HTMLDivElement>(null);
   const multiSelectRef = useRef<HTMLDivElement>(null);
 
-  const { selectComponent } = useDesignerStore();
+  const { selectComponent } = useCanvasEditorState();
 
   const handleMouseDown = useCallback(
     (event: React.MouseEvent) => {

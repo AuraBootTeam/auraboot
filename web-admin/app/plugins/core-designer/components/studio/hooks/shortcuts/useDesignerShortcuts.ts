@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useCallback } from 'react';
-import { useDesignerStore } from '~/plugins/core-designer/components/studio/hooks/store/useDesignerStore';
+import { useCanvasEditorState } from '~/plugins/core-designer/components/studio/hooks/store/useCanvasEditorState';
 import { useClipboard } from '~/plugins/core-designer/components/studio/services/clipboard';
 
 export interface ShortcutDefinition {
@@ -49,6 +49,10 @@ export const SHORTCUTS: ShortcutDefinition[] = [
 export interface UseDesignerShortcutsOptions {
   /** Enable shortcuts */
   enabled?: boolean;
+  /** All component IDs (for select-all). Derived from schema.components by the caller. */
+  allComponentIds?: string[];
+  /** Called when the selected component should be removed from the schema */
+  onRemoveComponent?: (id: string) => void;
   /** Save handler */
   onSave?: () => void;
   /** Undo handler */
@@ -65,9 +69,19 @@ export interface UseDesignerShortcutsOptions {
  * Designer shortcuts hook
  */
 export function useDesignerShortcuts(options: UseDesignerShortcutsOptions = {}): void {
-  const { enabled = true, onSave, onUndo, onRedo, onZoomIn, onZoomOut, onZoomReset } = options;
+  const {
+    enabled = true,
+    allComponentIds = [],
+    onRemoveComponent,
+    onSave,
+    onUndo,
+    onRedo,
+    onZoomIn,
+    onZoomOut,
+    onZoomReset,
+  } = options;
 
-  const { components, selectedComponentId, selectComponent, removeComponent } = useDesignerStore();
+  const { selectedComponentId, selectComponent } = useCanvasEditorState();
 
   // clearSelection helper
   const clearSelection = useCallback(() => {
@@ -79,19 +93,18 @@ export function useDesignerShortcuts(options: UseDesignerShortcutsOptions = {}):
   // Delete handler
   const handleDelete = useCallback(() => {
     if (selectedComponentId) {
-      removeComponent(selectedComponentId);
+      onRemoveComponent?.(selectedComponentId);
       clearSelection();
     }
-  }, [selectedComponentId, removeComponent, clearSelection]);
+  }, [selectedComponentId, onRemoveComponent, clearSelection]);
 
   // Select all handler
   const handleSelectAll = useCallback(() => {
-    const allIds = Object.keys(components);
-    if (allIds.length > 0) {
+    if (allComponentIds.length > 0) {
       // Select first component (multi-select handled separately)
-      selectComponent(allIds[0]);
+      selectComponent(allComponentIds[0]);
     }
-  }, [components, selectComponent]);
+  }, [allComponentIds, selectComponent]);
 
   // Main keyboard handler
   useEffect(() => {
