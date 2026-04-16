@@ -29,6 +29,29 @@ export type PageLayout =
 export type PageKind = 'list' | 'form' | 'detail';
 
 /**
+ * Typed extension bag for PageSchema.
+ * All page-level feature flags and runtime hints live here.
+ */
+export interface PageSchemaExtension {
+  viewModelCode?: string;
+  viewModel?: {
+    mode?: 'entity' | 'namedQuery';
+    baseEntityCode?: string;
+    namedQueryCode?: string;
+  };
+  customApi?: {
+    listEndpoint?: string;
+    detailEndpoint?: string;
+    method?: 'GET' | 'POST';
+  };
+  render?: {
+    enableMultiView?: boolean;
+  };
+  afterSubmitRedirect?: string;
+  plugin?: Record<string, unknown>;
+}
+
+/**
  * Page Schema V2 — flat shape stored in ab_page_schema.blocks (JSONB).
  */
 export interface PageSchema {
@@ -41,7 +64,7 @@ export interface PageSchema {
   profile?: 'admin' | 'report';
   layout: PageLayout;
   blocks: DslBlock[];
-  extension?: Record<string, unknown>;
+  extension?: PageSchemaExtension;
 }
 
 // =============================================================================

@@ -179,7 +179,10 @@ export default function PageDesignerEditorImpl() {
         ...schema,
         extension: {
           ...schema.extension,
-          enableMultiView: settings.page.enableMultiView,
+          render: {
+            ...schema.extension?.render,
+            enableMultiView: settings.page.enableMultiView,
+          },
         },
       };
       handleSchemaChange(updatedSchema);
@@ -374,7 +377,7 @@ export default function PageDesignerEditorImpl() {
         isOpen={toolbarState.showSettings}
         onClose={toolbarActions.toggleSettings}
         initialSettings={{
-          page: { enableMultiView: schema?.extension?.enableMultiView === true },
+          page: { enableMultiView: schema?.extension?.render?.enableMultiView === true },
         }}
         onSettingsChange={handleSettingsChange}
       />
