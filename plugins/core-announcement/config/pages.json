@@ -59,10 +59,6 @@
             "width": 80
           },
           {
-            "field": "published_by",
-            "width": 120
-          },
-          {
             "field": "published_at",
             "width": 160,
             "format": "YYYY-MM-DD HH:mm"
