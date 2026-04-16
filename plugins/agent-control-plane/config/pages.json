@@ -2445,7 +2445,7 @@
     "name:en": "Mission Control",
     "modelCode": "mission",
     "description": "Agent Control Plane Mission Control dashboard with KPIs, run trends, cost analysis, task distribution, approvals, and recent runs",
-    "kind": "dashboard",
+    "kind": "composite",
     "schemaVersion": 2,
     "layout": {
       "type": "grid",

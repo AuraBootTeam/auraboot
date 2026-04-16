@@ -5,7 +5,10 @@
     "displayName:en": "Create Announcement",
     "type": "create",
     "modelCode": "ab_announcement",
-    "inputFields": ["title", "content", "priority", "status", "pinned", "expires_at"]
+    "inputFields": ["title", "content", "priority", "pinned", "expires_at"],
+    "autoSetFields": {
+      "status": { "strategy": "fixed_value", "value": "draft" }
+    }
   },
   {
     "code": "announcement:update_announcement",
@@ -13,7 +16,7 @@
     "displayName:en": "Update Announcement",
     "type": "update",
     "modelCode": "ab_announcement",
-    "inputFields": ["title", "content", "priority", "status", "pinned", "expires_at"]
+    "inputFields": ["title", "content", "priority", "pinned", "expires_at"]
   },
   {
     "code": "announcement:delete_announcement",
@@ -24,6 +27,56 @@
     "extension": {
       "confirmMessage:zh-CN": "确认删除此公告？",
       "confirmMessage:en": "Confirm delete this announcement?"
+    }
+  },
+  {
+    "code": "announcement:publish",
+    "displayName:zh-CN": "发布",
+    "displayName:en": "Publish",
+    "type": "state_transition",
+    "modelCode": "ab_announcement",
+    "stateField": "status",
+    "fromStates": ["draft"],
+    "toState": "published",
+    "autoSetFields": {
+      "published_at": { "strategy": "current_datetime" },
+      "published_by": { "strategy": "current_user" }
+    },
+    "extension": {
+      "confirmMessage:zh-CN": "确认发布此公告？发布后将对所有用户可见。",
+      "confirmMessage:en": "Confirm publish? It will be visible to all users."
+    }
+  },
+  {
+    "code": "announcement:archive",
+    "displayName:zh-CN": "撤回",
+    "displayName:en": "Archive",
+    "type": "state_transition",
+    "modelCode": "ab_announcement",
+    "stateField": "status",
+    "fromStates": ["published"],
+    "toState": "archived",
+    "extension": {
+      "confirmMessage:zh-CN": "确认撤回此公告？撤回后将不再展示。",
+      "confirmMessage:en": "Confirm archive? It will no longer be displayed."
+    }
+  },
+  {
+    "code": "announcement:republish",
+    "displayName:zh-CN": "重新发布",
+    "displayName:en": "Republish",
+    "type": "state_transition",
+    "modelCode": "ab_announcement",
+    "stateField": "status",
+    "fromStates": ["archived"],
+    "toState": "published",
+    "autoSetFields": {
+      "published_at": { "strategy": "current_datetime" },
+      "published_by": { "strategy": "current_user" }
+    },
+    "extension": {
+      "confirmMessage:zh-CN": "确认重新发布此公告？",
+      "confirmMessage:en": "Confirm republish this announcement?"
     }
   }
 ]

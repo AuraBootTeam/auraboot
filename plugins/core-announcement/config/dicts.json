@@ -54,10 +54,18 @@
         "extension": { "color": "green" }
       },
       {
+        "value": "archived",
+        "label": "Archived",
+        "label:zh-CN": "已撤回",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": { "color": "gray" }
+      },
+      {
         "value": "expired",
         "label": "Expired",
         "label:zh-CN": "已过期",
-        "sortNo": 30,
+        "sortNo": 40,
         "status": "enabled",
         "extension": { "color": "gray" }
       }
