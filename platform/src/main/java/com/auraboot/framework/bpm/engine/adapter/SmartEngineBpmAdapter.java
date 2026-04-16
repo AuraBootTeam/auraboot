@@ -201,6 +201,18 @@ public class SmartEngineBpmAdapter implements BpmEngine {
         return historyLog.getOrDefault(processInstanceId, List.of());
     }
 
+    // ── Query helpers ──────────────────────────────────────────────────
+
+    @Override
+    public boolean hasRunningInstanceForBusinessKey(String processKey, String businessKey) {
+        // TODO: replace with SmartEngine query by processDefinitionId + bizUniqueId + status=running
+        return instances.values().stream()
+                .anyMatch(info ->
+                        processKey.equals(info.getProcessDefinitionKey())
+                        && businessKey.equals(info.getBusinessKey())
+                        && info.getStatus() == ProcessInstanceInfo.ProcessStatus.RUNNING);
+    }
+
     // ── Metadata ───────────────────────────────────────────────────────
 
     @Override
