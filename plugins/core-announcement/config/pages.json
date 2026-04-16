@@ -59,10 +59,6 @@
             "width": 80
           },
           {
-            "field": "published_by",
-            "width": 120
-          },
-          {
             "field": "published_at",
             "width": 160,
             "format": "YYYY-MM-DD HH:mm"
@@ -89,7 +85,40 @@
               "type": "navigate",
               "to": "ab_announcement_form",
               "command": "announcement:update_announcement"
-            }
+            },
+            "visibleWhen": "record.status === 'draft'"
+          },
+          {
+            "code": "publish",
+            "label": { "zh-CN": "发布", "en": "Publish" },
+            "variant": "primary",
+            "confirm": "publish.confirm",
+            "action": {
+              "type": "command",
+              "command": "announcement:publish"
+            },
+            "visibleWhen": "record.status === 'draft'"
+          },
+          {
+            "code": "archive",
+            "label": { "zh-CN": "撤回", "en": "Archive" },
+            "confirm": "archive.confirm",
+            "action": {
+              "type": "command",
+              "command": "announcement:archive"
+            },
+            "visibleWhen": "record.status === 'published'"
+          },
+          {
+            "code": "republish",
+            "label": { "zh-CN": "重新发布", "en": "Republish" },
+            "variant": "primary",
+            "confirm": "republish.confirm",
+            "action": {
+              "type": "command",
+              "command": "announcement:republish"
+            },
+            "visibleWhen": "record.status === 'archived'"
           },
           {
             "code": "delete",
@@ -99,7 +128,8 @@
             "action": {
               "type": "command",
               "command": "announcement:delete_announcement"
-            }
+            },
+            "visibleWhen": "record.status === 'draft' || record.status === 'archived'"
           }
         ],
         "defaultSort": {
@@ -130,9 +160,8 @@
         },
         "fields": [
           { "field": "title", "colSpan": 12 },
-          { "field": "priority", "colSpan": 4 },
-          { "field": "status", "colSpan": 4 },
-          { "field": "pinned", "colSpan": 4 },
+          { "field": "priority", "colSpan": 6 },
+          { "field": "pinned", "colSpan": 6 },
           { "field": "expires_at", "colSpan": 6 },
           { "field": "content", "colSpan": 12 }
         ]

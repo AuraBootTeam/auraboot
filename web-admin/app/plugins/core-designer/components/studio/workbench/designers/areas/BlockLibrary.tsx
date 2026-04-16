@@ -13,6 +13,7 @@ import { SmartComponentLibrary } from './SmartComponentLibrary';
 export interface BlockLibraryProps {
   pageKind: PageKind;
   readonly?: boolean;
+  onAddBlock?: (type: BlockType) => void;
 }
 
 /**
@@ -155,19 +156,26 @@ const BLOCK_TYPES: BlockTypeInfo[] = [
 interface DraggableBlockItemProps {
   blockInfo: BlockTypeInfo;
   disabled?: boolean;
+  onAdd?: (type: BlockType) => void;
 }
 
-const DraggableBlockItem: React.FC<DraggableBlockItemProps> = ({ blockInfo, disabled }) => {
+const DraggableBlockItem: React.FC<DraggableBlockItemProps> = ({ blockInfo, disabled, onAdd }) => {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `library:${blockInfo.type}`,
     disabled,
   });
+
+  const handleClick = () => {
+    if (!disabled && onAdd) onAdd(blockInfo.type);
+  };
 
   return (
     <div
       ref={setNodeRef}
       {...listeners}
       {...attributes}
+      onClick={handleClick}
+      data-testid={`block-palette-item-${blockInfo.type}`}
       className={`flex items-center gap-3 rounded-lg border p-3 transition-all ${
         isDragging
           ? 'border-blue-300 bg-blue-50 opacity-50'
@@ -273,7 +281,7 @@ const CategoryTabs: React.FC<CategoryTabsProps> = ({ categories, selected, onSel
   );
 };
 
-export const BlockLibrary: React.FC<BlockLibraryProps> = ({ pageKind: rawPageKind, readonly }) => {
+export const BlockLibrary: React.FC<BlockLibraryProps> = ({ pageKind: rawPageKind, readonly, onAddBlock }) => {
   // Normalize to lowercase — DB stores PascalCase (e.g. "List") but
   // BLOCK_TYPES.availableIn uses lowercase ("list").
   const pageKind = (rawPageKind?.toLowerCase() ?? 'list') as PageKind;
@@ -421,6 +429,7 @@ export const BlockLibrary: React.FC<BlockLibraryProps> = ({ pageKind: rawPageKin
                           key={blockInfo.type}
                           blockInfo={blockInfo}
                           disabled={readonly}
+                          onAdd={onAddBlock}
                         />
                       ))}
                     </div>
