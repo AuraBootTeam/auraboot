@@ -216,9 +216,6 @@ export function createDslSchemaPayload(
     schema.extension && typeof schema.extension === 'object'
       ? { ...(schema.extension as Record<string, unknown>) }
       : {};
-  if (typeof schema.enableMultiView === 'boolean') {
-    schemaExtension.enableMultiView = schema.enableMultiView;
-  }
   if (Object.keys(schemaExtension).length > 0) {
     payload.extension = schemaExtension;
   }
