@@ -7,7 +7,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Save, Check, AlertCircle, Clock, Wifi, WifiOff } from 'lucide-react';
 import { getVersionManager } from '~/plugins/core-designer/components/studio/services/managers';
-import type { PageSchema } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { PageSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 import { VersionType } from '~/plugins/core-designer/components/studio/domain/metadata/types';
 
 /**

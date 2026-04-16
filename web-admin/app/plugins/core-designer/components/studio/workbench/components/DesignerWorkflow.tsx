@@ -22,10 +22,9 @@ import { UserCursors } from '~/plugins/core-designer/components/studio/services/
 import { VersionPanel } from '~/plugins/core-designer/components/studio/workbench/panels/version/VersionPanel';
 import { AutoSave } from '~/plugins/core-designer/components/studio/workbench/components/system/AutoSave';
 import { getVersionManager } from '~/plugins/core-designer/components/studio/services/managers';
-import { useDesignerStore } from '~/plugins/core-designer/components/studio/hooks/store/useDesignerStore';
 import { useSchemaIO } from '~/plugins/core-designer/components/studio/hooks/workbench/useSchemaIO';
 import { notificationService } from '~/plugins/core-designer/components/studio/services/workflow/notifications';
-import type { FormSchema } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { FormSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 
 /**
  * 设计器工作流属性
@@ -135,13 +134,20 @@ export const DesignerWorkflow: React.FC<DesignerWorkflowProps> = ({
     }
 
     const [id1, id2] = selectedIds;
+    const comp1 = (schema.components || []).find((c) => c.id === id1);
+    const comp2 = (schema.components || []).find((c) => c.id === id2);
 
-    // 使用 Zustand store 的 swapComponents 方法
-    const store = useDesignerStore.getState();
-    store.swapComponents(id1, id2);
+    if (!comp1 || !comp2 || !comp1.position || !comp2.position) return;
 
+    const updatedComponents = (schema.components || []).map((comp) => {
+      if (comp.id === id1) return { ...comp, position: comp2.position };
+      if (comp.id === id2) return { ...comp, position: comp1.position };
+      return comp;
+    });
+
+    onSchemaChange({ ...schema, components: updatedComponents });
     notificationService.success('组件位置已交换');
-  }, [selectedIds]);
+  }, [selectedIds, schema, onSchemaChange]);
 
   // 导入页面
   const handleImport = useCallback(

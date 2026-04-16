@@ -2,7 +2,7 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { DesignerPreview } from '~/plugins/core-designer/components/studio/workbench/runtime/DesignerPreview';
-import type { FormSchema } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { FormSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 
 vi.mock('~/framework/meta/rendering/SchemaRenderer', () => ({
   SchemaRendererWithContainer: ({ runtime }: any) => (

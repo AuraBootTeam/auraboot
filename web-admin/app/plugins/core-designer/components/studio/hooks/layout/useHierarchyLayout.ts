@@ -9,7 +9,7 @@
  */
 
 import { useCallback, useMemo, useState } from 'react';
-import { useDesignerStore } from '~/plugins/core-designer/components/studio/hooks/store/useDesignerStore';
+import type { FormSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 import type {
   TabContainerConfig,
   TabItemConfig,
@@ -92,27 +92,30 @@ export interface UseHierarchyLayoutReturn {
   disableHierarchyMode: () => void;
 }
 
-export function useHierarchyLayout(): UseHierarchyLayoutReturn {
-  const { pageSchema, updatePageSchema } = useDesignerStore();
+export interface UseHierarchyLayoutOptions {
+  schema: FormSchema;
+  onSchemaChange: (next: FormSchema) => void;
+}
+
+export function useHierarchyLayout({ schema, onSchemaChange }: UseHierarchyLayoutOptions): UseHierarchyLayoutReturn {
   const [selection, setSelection] = useState<HierarchySelection>({});
 
   const hierarchy = useMemo<TabContainerConfig>(() => {
-    return pageSchema?.hierarchy || DEFAULT_HIERARCHY;
-  }, [pageSchema?.hierarchy]);
+    return schema?.hierarchy || DEFAULT_HIERARCHY;
+  }, [schema?.hierarchy]);
 
-  const isHierarchyMode = !!pageSchema?.hierarchy;
+  const isHierarchyMode = !!schema?.hierarchy;
 
-  // Helper to update hierarchy in store
+  // Helper to update hierarchy immutably
   const updateHierarchy = useCallback(
-    (updater: (h: TabContainerConfig) => void) => {
-      updatePageSchema((schema) => {
-        if (!schema.hierarchy) {
-          schema.hierarchy = JSON.parse(JSON.stringify(DEFAULT_HIERARCHY));
-        }
-        updater(schema.hierarchy!);
-      });
+    (mutator: (h: TabContainerConfig) => void) => {
+      const currentHierarchy: TabContainerConfig = schema?.hierarchy
+        ? JSON.parse(JSON.stringify(schema.hierarchy))
+        : JSON.parse(JSON.stringify(DEFAULT_HIERARCHY));
+      mutator(currentHierarchy);
+      onSchemaChange({ ...schema, hierarchy: currentHierarchy });
     },
-    [updatePageSchema],
+    [schema, onSchemaChange],
   );
 
   // --- Selection ---
@@ -362,18 +365,15 @@ export function useHierarchyLayout(): UseHierarchyLayoutReturn {
 
   // --- Mode ---
   const enableHierarchyMode = useCallback(() => {
-    updatePageSchema((schema) => {
-      if (!schema.hierarchy) {
-        schema.hierarchy = JSON.parse(JSON.stringify(DEFAULT_HIERARCHY));
-      }
-    });
-  }, [updatePageSchema]);
+    if (!schema.hierarchy) {
+      onSchemaChange({ ...schema, hierarchy: JSON.parse(JSON.stringify(DEFAULT_HIERARCHY)) });
+    }
+  }, [schema, onSchemaChange]);
 
   const disableHierarchyMode = useCallback(() => {
-    updatePageSchema((schema) => {
-      delete schema.hierarchy;
-    });
-  }, [updatePageSchema]);
+    const { hierarchy: _, ...rest } = schema as FormSchema & { hierarchy?: TabContainerConfig };
+    onSchemaChange(rest as FormSchema);
+  }, [schema, onSchemaChange]);
 
   return {
     hierarchy,

@@ -13,7 +13,7 @@ import {
   type ImportOptions,
   type ExportedPageData,
 } from './types';
-import type { FormSchema } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { FormSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 
 /**
  * ImportPanel props

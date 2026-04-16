@@ -1,4 +1,4 @@
-import type { Component, PageSchema } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { Component, PageSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 
 /**
  * 命令接口 - 所有命令都必须实现此接口

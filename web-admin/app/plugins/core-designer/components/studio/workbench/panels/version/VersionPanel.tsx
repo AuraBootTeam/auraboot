@@ -28,7 +28,7 @@ import {
   type CreateVersionRequest,
   type PublishVersionRequest,
 } from '~/plugins/core-designer/components/studio/domain/metadata/types';
-import type { PageSchema } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { PageSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 
 /**
  * 版本面板属性

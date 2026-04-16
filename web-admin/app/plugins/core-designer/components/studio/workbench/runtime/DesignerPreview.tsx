@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import type { NavigateFunction } from 'react-router';
 import { createExpressionContext } from '~/framework/meta/runtime/expression/context';
 import { SchemaRendererWithContainer } from '~/framework/meta/rendering/SchemaRenderer';
-import type { FormSchema } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { FormSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 import {
   convertSchemaToUnified,
   usePageDataSources,

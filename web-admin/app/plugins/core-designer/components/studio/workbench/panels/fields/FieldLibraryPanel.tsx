@@ -1,15 +1,21 @@
 import React, { useCallback } from 'react';
 import { useFieldLibrary } from '~/plugins/core-designer/components/studio/hooks/fields/useFieldLibrary';
-import { useDesignerStore } from '~/plugins/core-designer/components/studio/hooks/store/useDesignerStore';
+import { useCanvasEditorState } from '~/plugins/core-designer/components/studio/hooks/store/useCanvasEditorState';
 import { FieldItem } from './FieldItem';
 import { FieldCategoryFilter } from './FieldCategoryFilter';
 import { SEMANTIC_TYPE_INFO, DATA_TYPE_COMPONENT_MAP, type MetaFieldDTO } from './types';
-import type { Component } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { Component } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 
 interface FieldLibraryPanelProps {
   modelPid?: string;
   modelCode?: string;
   viewModelCode?: string;
+  /** All placed components — for computing next empty position */
+  components?: Component[];
+  /** Number of layout columns (default 12) */
+  layoutColumns?: number;
+  /** Called when a new component should be added to the schema */
+  onAddComponent?: (component: Component) => void;
 }
 
 /**
@@ -87,6 +93,9 @@ export const FieldLibraryPanel: React.FC<FieldLibraryPanelProps> = ({
   modelPid,
   modelCode,
   viewModelCode,
+  components = [],
+  layoutColumns = 12,
+  onAddComponent,
 }) => {
   const {
     filteredFields,
@@ -101,7 +110,7 @@ export const FieldLibraryPanel: React.FC<FieldLibraryPanelProps> = ({
     refresh,
   } = useFieldLibrary({ modelPid, modelCode, viewModelCode });
 
-  const { components, addComponent, selectComponent, pageSchema } = useDesignerStore();
+  const { selectComponent } = useCanvasEditorState();
 
   /**
    * Handle double-click on a field to quickly add it to the canvas.
@@ -109,9 +118,7 @@ export const FieldLibraryPanel: React.FC<FieldLibraryPanelProps> = ({
   const handleFieldDoubleClick = useCallback(
     (field: MetaFieldDTO) => {
       const componentConfig = resolveComponentConfig(field);
-      const allComponents = Object.values(components);
-      const columns = pageSchema?.layout?.columns || 12;
-      const position = findNextEmptyPosition(allComponents, columns);
+      const position = findNextEmptyPosition(components, layoutColumns);
 
       const newComponent: Component = {
         id: `comp_${Date.now()}_${field.code}`,
@@ -128,10 +135,10 @@ export const FieldLibraryPanel: React.FC<FieldLibraryPanelProps> = ({
         children: [],
       };
 
-      addComponent(newComponent);
+      onAddComponent?.(newComponent);
       selectComponent(newComponent.id);
     },
-    [components, pageSchema, addComponent, selectComponent],
+    [components, layoutColumns, onAddComponent, selectComponent],
   );
 
   return (

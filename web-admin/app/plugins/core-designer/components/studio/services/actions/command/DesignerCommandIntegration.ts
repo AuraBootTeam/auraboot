@@ -8,7 +8,7 @@ import {
   HistoryStack,
   type HistoryStackConfig,
 } from '~/plugins/core-designer/components/studio/services/actions/command/HistoryStack';
-import type { Component, PageSchema, Position } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { Component, PageSchema, Position } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 
 // 设计器状态接口
 export interface DesignerState {
