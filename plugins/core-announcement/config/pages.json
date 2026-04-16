@@ -92,6 +92,7 @@
             "code": "publish",
             "label": { "zh-CN": "发布", "en": "Publish" },
             "variant": "primary",
+            "confirm": "publish.confirm",
             "action": {
               "type": "command",
               "command": "announcement:publish"
@@ -101,6 +102,7 @@
           {
             "code": "archive",
             "label": { "zh-CN": "撤回", "en": "Archive" },
+            "confirm": "archive.confirm",
             "action": {
               "type": "command",
               "command": "announcement:archive"
@@ -111,6 +113,7 @@
             "code": "republish",
             "label": { "zh-CN": "重新发布", "en": "Republish" },
             "variant": "primary",
+            "confirm": "republish.confirm",
             "action": {
               "type": "command",
               "command": "announcement:republish"
