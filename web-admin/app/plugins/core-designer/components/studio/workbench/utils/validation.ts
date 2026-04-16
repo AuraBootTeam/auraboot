@@ -4,7 +4,7 @@
  * Schema 和组件验证相关的工具函数
  */
 
-import type { FormSchema, Block } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { FormSchema, Block } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 
 /**
  * 验证结果接口

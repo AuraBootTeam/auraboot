@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import type { LinkageRule, LinkageAction } from '~/plugins/core-designer/components/studio/workbench/panels/linkage/types';
 import { createLinkageRule } from '~/plugins/core-designer/components/studio/workbench/panels/linkage/types';
 import { useCanvasEditorState } from '~/plugins/core-designer/components/studio/hooks/store/useCanvasEditorState';
-import type { FormSchema } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { FormSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 
 export interface UseLinkageRulesOptions {
   /** Current page schema (schema half) */

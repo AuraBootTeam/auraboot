@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import type { PageSchema } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { PageSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 import type { Version } from '~/plugins/core-designer/components/studio/domain/metadata/types';
 import {
   CollaborationProvider,

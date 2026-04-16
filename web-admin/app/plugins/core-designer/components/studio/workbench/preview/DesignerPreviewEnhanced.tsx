@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import type { FormSchema } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { FormSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 import type { PreviewMode, PreviewFieldDef } from './types';
 import { generateMockData } from './MockDataGenerator';
 import { MockDataPanel } from './MockDataPanel';

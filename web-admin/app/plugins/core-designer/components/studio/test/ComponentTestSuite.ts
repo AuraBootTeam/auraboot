@@ -3,7 +3,7 @@
  * 用于测试所有Smart组件在设计器中的功能
  */
 
-import type { PageSchema, Block } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { PageSchema, Block } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 
 export interface ComponentTestCase {
   type: string;

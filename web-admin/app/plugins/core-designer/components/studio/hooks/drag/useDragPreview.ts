@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useDndMonitor } from '@dnd-kit/core';
 import { DragPreviewSystem } from '~/plugins/core-designer/components/studio/services/layout/drag-preview/DragPreviewSystem';
-import type { ComponentSchema } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { ComponentSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 import type {
   DragPreviewConfig,
   GhostEffectConfig,

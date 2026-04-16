@@ -1,7 +1,7 @@
 import { useDraggable } from '@dnd-kit/core';
 import { useEffect } from 'react';
 import { DRAG_TYPES } from '~/plugins/core-designer/components/studio/workbench/constants';
-import type { Component } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { Component } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 import type { DraggableWrapperData } from '~/plugins/core-designer/components/studio/workbench/canvas/drag/DraggableWrapper/types';
 
 export const useDraggableWrapper = (

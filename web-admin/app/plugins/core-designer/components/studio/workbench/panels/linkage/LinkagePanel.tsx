@@ -2,7 +2,7 @@ import React from 'react';
 import { useLinkageRules } from '~/plugins/core-designer/components/studio/hooks/linkage/useLinkageRules';
 import { LinkageRuleEditor } from './LinkageRuleEditor';
 import type { LinkageRule } from './types';
-import type { FormSchema } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { FormSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 
 interface LinkagePanelProps {
   schema: FormSchema;
