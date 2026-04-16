@@ -3,9 +3,9 @@
  * 用于在设计器中测试所有Smart组件的功能
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import ComponentTestSuite, { type ComponentTestCase } from '~/plugins/core-designer/components/studio/test/ComponentTestSuite';
-import { useDesignerStore } from '~/plugins/core-designer/components/studio/hooks/store/useDesignerStore';
+import type { FormSchema } from '~/plugins/core-designer/components/studio/domain/schema/types';
 
 interface TestResult {
   type: string;
@@ -26,8 +26,7 @@ export const ComponentTester: React.FC<ComponentTesterProps> = ({ onTestComplete
   const [currentTest, setCurrentTest] = useState<string>('');
   const [isRunning, setIsRunning] = useState(false);
   const [progress, setProgress] = useState(0);
-
-  const { setPageSchema, pageSchema } = useDesignerStore();
+  const [pageSchema, setPageSchema] = useState<FormSchema | null>(null);
 
   // 运行所有组件测试
   const runAllTests = async () => {
@@ -112,7 +111,7 @@ export const ComponentTester: React.FC<ComponentTesterProps> = ({ onTestComplete
 
       // 临时添加到页面Schema中进行渲染测试
       const testSchema = {
-        ...pageSchema,
+        ...(pageSchema || {}),
         components: [testComponent],
       };
 
@@ -143,7 +142,7 @@ export const ComponentTester: React.FC<ComponentTesterProps> = ({ onTestComplete
 
   // 加载测试页面
   const loadTestPage = () => {
-    const testPageSchema = testSuite.generateTestPageSchema();
+    const testPageSchema = testSuite.generateTestPageSchema() as FormSchema;
     setPageSchema(testPageSchema);
   };
 

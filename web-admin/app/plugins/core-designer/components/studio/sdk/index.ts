@@ -1,4 +1,4 @@
-import { useDesignerStore, type DesignerStore } from '~/plugins/core-designer/components/studio/hooks/store/useDesignerStore';
+import { useCanvasEditorState, type CanvasEditorState } from '~/plugins/core-designer/components/studio/hooks/store/useCanvasEditorState';
 import { getSchemaManager, type SchemaManager } from '~/plugins/core-designer/components/studio/services/schema/SchemaManager';
 import { getLayoutManager, type LayoutManager } from '~/plugins/core-designer/components/studio/services/layout/LayoutManager';
 import {
@@ -32,8 +32,8 @@ function ensureComponentRegistry() {
 }
 
 export interface DesignerSDK {
-  useStore: typeof useDesignerStore;
-  getStore: () => DesignerStore;
+  useStore: typeof useCanvasEditorState;
+  getStore: () => CanvasEditorState;
   schemaManager: SchemaManager;
   layoutManager: LayoutManager;
   pageStateManager: IPageStateManager;
@@ -55,8 +55,8 @@ export function getDesignerSDK(): DesignerSDK {
     ensureComponentRegistry();
 
     sdkInstance = {
-      useStore: useDesignerStore,
-      getStore: () => useDesignerStore.getState(),
+      useStore: useCanvasEditorState,
+      getStore: () => useCanvasEditorState.getState(),
       schemaManager: getSchemaManager(),
       layoutManager: getLayoutManager(),
       pageStateManager: getPageStateManager(),
@@ -75,7 +75,7 @@ export function getDesignerSDK(): DesignerSDK {
   return sdkInstance;
 }
 
-export { useDesignerStore } from '~/plugins/core-designer/components/studio/hooks/store/useDesignerStore';
+export { useCanvasEditorState } from '~/plugins/core-designer/components/studio/hooks/store/useCanvasEditorState';
 export {
   actionRegistry,
   useSchemaRuntime,

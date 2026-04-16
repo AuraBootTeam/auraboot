@@ -8,8 +8,13 @@
 
 import { useState, useCallback, useMemo } from 'react';
 import type { MenuItem } from './ContextMenu';
-import { useDesignerStore } from '~/plugins/core-designer/components/studio/hooks/store/useDesignerStore';
+import { useCanvasEditorState } from '~/plugins/core-designer/components/studio/hooks/store/useCanvasEditorState';
 import { useClipboard } from '~/plugins/core-designer/components/studio/services/clipboard';
+
+export interface ContextMenuOptions {
+  /** Called when a component should be removed from the schema */
+  onRemoveComponent?: (id: string) => void;
+}
 
 export interface ContextMenuState {
   isOpen: boolean;
@@ -31,14 +36,16 @@ export interface UseContextMenuResult {
 /**
  * Context menu hook
  */
-export function useContextMenu(): UseContextMenuResult {
+export function useContextMenu(options: ContextMenuOptions = {}): UseContextMenuResult {
+  const { onRemoveComponent } = options;
+
   const [state, setState] = useState<ContextMenuState>({
     isOpen: false,
     position: { x: 0, y: 0 },
     targetComponentId: null,
   });
 
-  const { selectedComponentId, selectComponent, removeComponent } = useDesignerStore();
+  const { selectedComponentId, selectComponent } = useCanvasEditorState();
 
   const { copy, cut, paste, duplicate, hasContent } = useClipboard();
 
@@ -119,7 +126,7 @@ export function useContextMenu(): UseContextMenuResult {
       danger: true,
       onClick: () => {
         if (selectedComponentId) {
-          removeComponent(selectedComponentId);
+          onRemoveComponent?.(selectedComponentId);
           selectComponent(null);
         }
       },
@@ -164,7 +171,7 @@ export function useContextMenu(): UseContextMenuResult {
     cut,
     paste,
     duplicate,
-    removeComponent,
+    onRemoveComponent,
     selectComponent,
   ]);
 

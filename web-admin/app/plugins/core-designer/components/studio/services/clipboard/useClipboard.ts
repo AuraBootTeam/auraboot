@@ -8,7 +8,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { clipboardManager } from './ClipboardManager';
-import { useDesignerStore } from '~/plugins/core-designer/components/studio/hooks/store/useDesignerStore';
+import { useCanvasEditorState } from '~/plugins/core-designer/components/studio/hooks/store/useCanvasEditorState';
 import type { Component, Position } from '~/plugins/core-designer/components/studio/domain/schema/types';
 import type { PasteOptions } from './types';
 
@@ -17,6 +17,12 @@ interface UseClipboardOptions {
   pageId?: string;
   /** Enable keyboard shortcuts */
   enableShortcuts?: boolean;
+  /** Components dictionary — derived from schema.components by the caller */
+  components?: Record<string, Component>;
+  /** Called when new components should be added to the schema */
+  onAddComponents?: (components: Component[]) => void;
+  /** Called when a component should be removed from the schema */
+  onRemoveComponent?: (id: string) => void;
   /** Callback when components are pasted */
   onPaste?: (components: Component[]) => void;
   /** Callback when components are cut (for removal) */
@@ -44,13 +50,20 @@ interface UseClipboardResult {
  * Clipboard operations hook
  */
 export function useClipboard(options: UseClipboardOptions = {}): UseClipboardResult {
-  const { pageId, enableShortcuts = true, onPaste, onCut } = options;
+  const {
+    pageId,
+    enableShortcuts = true,
+    components = {},
+    onAddComponents,
+    onRemoveComponent,
+    onPaste,
+    onCut,
+  } = options;
 
   const [hasContent, setHasContent] = useState(clipboardManager.hasContent());
   const [contentCount, setContentCount] = useState(clipboardManager.getContentCount());
 
-  const { selectedComponentId, components, addComponent, removeComponent, selectComponent } =
-    useDesignerStore();
+  const { selectedComponentId, selectComponent } = useCanvasEditorState();
 
   // Get selected components (single selection for now)
   const getSelectedComponents = useCallback((): Component[] => {
@@ -88,9 +101,7 @@ export function useClipboard(options: UseClipboardOptions = {}): UseClipboardRes
 
       if (result.success && result.components) {
         // Add pasted components
-        result.components.forEach((component) => {
-          addComponent(component);
-        });
+        onAddComponents?.(result.components);
 
         // Select pasted components (select first one for now - multi-select not supported yet)
         if (result.components.length >= 1) {
@@ -100,14 +111,14 @@ export function useClipboard(options: UseClipboardOptions = {}): UseClipboardRes
         // Remove cut components if this was a cut operation
         const cutIds = clipboardManager.getCutComponentIds();
         if (cutIds.length > 0) {
-          cutIds.forEach((id) => removeComponent(id));
+          cutIds.forEach((id) => onRemoveComponent?.(id));
           clipboardManager.clearCutState();
         }
 
         onPaste?.(result.components);
       }
     },
-    [addComponent, selectComponent, removeComponent, onPaste],
+    [onAddComponents, selectComponent, onRemoveComponent, onPaste],
   );
 
   // Duplicate
@@ -118,16 +129,14 @@ export function useClipboard(options: UseClipboardOptions = {}): UseClipboardRes
     const result = clipboardManager.duplicate(selected, pageId);
 
     if (result.success && result.components) {
-      result.components.forEach((component) => {
-        addComponent(component);
-      });
+      onAddComponents?.(result.components);
 
       // Select duplicated components
       if (result.components.length === 1) {
         selectComponent(result.components[0].id);
       }
     }
-  }, [getSelectedComponents, pageId, addComponent, selectComponent]);
+  }, [getSelectedComponents, pageId, onAddComponents, selectComponent]);
 
   // Check if cut
   const isCut = useCallback((componentId: string): boolean => {
