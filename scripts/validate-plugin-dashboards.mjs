@@ -4,8 +4,9 @@
  * dashboard contract (plugins/schemas/dashboards.schema.json).
  *
  * Usage:
- *   node scripts/validate-plugin-dashboards.mjs            # validate all plugins
- *   node scripts/validate-plugin-dashboards.mjs showcase   # validate one plugin
+ *   node scripts/validate-plugin-dashboards.mjs                          # validate all plugins in this repo
+ *   node scripts/validate-plugin-dashboards.mjs showcase                 # validate one plugin
+ *   node scripts/validate-plugin-dashboards.mjs --plugins-dir /path/to/plugins  # scan external plugins dir
  *
  * Exit code:
  *   0 — all files valid
@@ -13,12 +14,20 @@
  */
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = dirname(__dirname);
-const pluginsDir = join(repoRoot, 'plugins');
 const schemaPath = join(repoRoot, 'plugins', 'schemas', 'dashboards.schema.json');
+
+// Parse --plugins-dir flag
+const args = process.argv.slice(2);
+let pluginsDir = join(repoRoot, 'plugins');
+const pluginsDirIdx = args.indexOf('--plugins-dir');
+if (pluginsDirIdx !== -1 && args[pluginsDirIdx + 1]) {
+  pluginsDir = resolve(args[pluginsDirIdx + 1]);
+  args.splice(pluginsDirIdx, 2);
+}
 
 if (!existsSync(schemaPath)) {
   console.error(`Schema not found: ${schemaPath}`);
@@ -56,15 +65,24 @@ function validateDashboard(obj, filePath) {
         errors.push(`widgets[${i}] must be an object`);
         return;
       }
-      for (const field of ['type']) {
-        if (typeof w[field] !== 'string') {
-          errors.push(`widgets[${i}].${field} must be a string`);
+      // Required string fields per schema
+      for (const field of ['id', 'type']) {
+        if (typeof w[field] !== 'string' || w[field].length === 0) {
+          errors.push(`widgets[${i}].${field} is required and must be a non-empty string`);
         }
       }
+      // Required integer fields per schema
       for (const field of ['x', 'y', 'w', 'h']) {
-        if (w[field] !== undefined && typeof w[field] !== 'number') {
-          errors.push(`widgets[${i}].${field} must be a number`);
+        if (typeof w[field] !== 'number' || !Number.isInteger(w[field])) {
+          errors.push(`widgets[${i}].${field} is required and must be an integer`);
         }
+      }
+      // w and h must be >= 1
+      if (typeof w.w === 'number' && w.w < 1) {
+        errors.push(`widgets[${i}].w must be >= 1`);
+      }
+      if (typeof w.h === 'number' && w.h < 1) {
+        errors.push(`widgets[${i}].h must be >= 1`);
       }
     });
   }
@@ -95,7 +113,7 @@ function validateFile(filePath) {
   return validateDashboard(content, filePath);
 }
 
-const targets = process.argv.slice(2);
+const targets = args;
 const plugins = targets.length
   ? targets
   : readdirSync(pluginsDir).filter((name) => {

@@ -89,7 +89,37 @@
               "type": "navigate",
               "to": "ab_announcement_form",
               "command": "announcement:update_announcement"
-            }
+            },
+            "visibleWhen": { "field": "status", "operator": "eq", "value": "draft" }
+          },
+          {
+            "code": "publish",
+            "label": { "zh-CN": "发布", "en": "Publish" },
+            "variant": "primary",
+            "action": {
+              "type": "command",
+              "command": "announcement:publish"
+            },
+            "visibleWhen": { "field": "status", "operator": "eq", "value": "draft" }
+          },
+          {
+            "code": "archive",
+            "label": { "zh-CN": "撤回", "en": "Archive" },
+            "action": {
+              "type": "command",
+              "command": "announcement:archive"
+            },
+            "visibleWhen": { "field": "status", "operator": "eq", "value": "published" }
+          },
+          {
+            "code": "republish",
+            "label": { "zh-CN": "重新发布", "en": "Republish" },
+            "variant": "primary",
+            "action": {
+              "type": "command",
+              "command": "announcement:republish"
+            },
+            "visibleWhen": { "field": "status", "operator": "eq", "value": "archived" }
           },
           {
             "code": "delete",
@@ -99,7 +129,8 @@
             "action": {
               "type": "command",
               "command": "announcement:delete_announcement"
-            }
+            },
+            "visibleWhen": { "field": "status", "operator": "in", "value": ["draft", "archived"] }
           }
         ],
         "defaultSort": {
@@ -130,9 +161,8 @@
         },
         "fields": [
           { "field": "title", "colSpan": 12 },
-          { "field": "priority", "colSpan": 4 },
-          { "field": "status", "colSpan": 4 },
-          { "field": "pinned", "colSpan": 4 },
+          { "field": "priority", "colSpan": 6 },
+          { "field": "pinned", "colSpan": 6 },
           { "field": "expires_at", "colSpan": 6 },
           { "field": "content", "colSpan": 12 }
         ]
