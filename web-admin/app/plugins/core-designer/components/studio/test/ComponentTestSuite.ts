@@ -3,7 +3,7 @@
  * 用于测试所有Smart组件在设计器中的功能
  */
 
-import type { PageSchema, Block } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
+import type { CanvasSchema, Block } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 
 export interface ComponentTestCase {
   type: string;
@@ -310,7 +310,7 @@ export class ComponentTestSuite {
   /**
    * 生成测试页面Schema
    */
-  generateTestPageSchema(): PageSchema {
+  generateTestPageSchema(): CanvasSchema {
     const components: Block[] = [];
 
     this.testCases.forEach((testCase, index) => {

@@ -1,4 +1,4 @@
-import type { Component, PageSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
+import type { Component, CanvasSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 
 /**
  * 命令接口 - 所有命令都必须实现此接口
@@ -63,9 +63,9 @@ export abstract class BaseCommand implements Command {
 export class AddComponentCommand extends BaseCommand {
   private component: Component;
   private targetIndex: number;
-  private pageSchema: PageSchema;
+  private pageSchema: CanvasSchema;
 
-  constructor(component: Component, targetIndex: number, pageSchema: PageSchema) {
+  constructor(component: Component, targetIndex: number, pageSchema: CanvasSchema) {
     super('add_component', `添加组件: ${component.type}`);
     this.component = component;
     this.targetIndex = targetIndex;
@@ -93,9 +93,9 @@ export class AddComponentCommand extends BaseCommand {
 export class RemoveComponentCommand extends BaseCommand {
   private component: Component;
   private originalIndex: number;
-  private pageSchema: PageSchema;
+  private pageSchema: CanvasSchema;
 
-  constructor(component: Component, originalIndex: number, pageSchema: PageSchema) {
+  constructor(component: Component, originalIndex: number, pageSchema: CanvasSchema) {
     super('remove_component', `删除组件: ${component.type}`);
     this.component = component;
     this.originalIndex = originalIndex;
@@ -124,9 +124,9 @@ export class MoveComponentCommand extends BaseCommand {
   private componentId: string;
   private fromIndex: number;
   private toIndex: number;
-  private pageSchema: PageSchema;
+  private pageSchema: CanvasSchema;
 
-  constructor(componentId: string, fromIndex: number, toIndex: number, pageSchema: PageSchema) {
+  constructor(componentId: string, fromIndex: number, toIndex: number, pageSchema: CanvasSchema) {
     super('move_component', `移动组件: ${componentId}`);
     this.componentId = componentId;
     this.fromIndex = fromIndex;
@@ -158,13 +158,13 @@ export class UpdateComponentCommand extends BaseCommand {
   private componentId: string;
   private oldProps: Record<string, any>;
   private newProps: Record<string, any>;
-  private pageSchema: PageSchema;
+  private pageSchema: CanvasSchema;
 
   constructor(
     componentId: string,
     oldProps: Record<string, any>,
     newProps: Record<string, any>,
-    pageSchema: PageSchema,
+    pageSchema: CanvasSchema,
   ) {
     super('update_component', `更新组件属性: ${componentId}`);
     this.componentId = componentId;
@@ -303,7 +303,7 @@ export class CommandFactory {
   static createAddComponentCommand(
     component: Component,
     targetIndex: number,
-    pageSchema: PageSchema,
+    pageSchema: CanvasSchema,
   ): AddComponentCommand {
     return new AddComponentCommand(component, targetIndex, pageSchema);
   }
@@ -311,7 +311,7 @@ export class CommandFactory {
   static createRemoveComponentCommand(
     component: Component,
     originalIndex: number,
-    pageSchema: PageSchema,
+    pageSchema: CanvasSchema,
   ): RemoveComponentCommand {
     return new RemoveComponentCommand(component, originalIndex, pageSchema);
   }
@@ -320,7 +320,7 @@ export class CommandFactory {
     componentId: string,
     fromIndex: number,
     toIndex: number,
-    pageSchema: PageSchema,
+    pageSchema: CanvasSchema,
   ): MoveComponentCommand {
     return new MoveComponentCommand(componentId, fromIndex, toIndex, pageSchema);
   }
@@ -329,7 +329,7 @@ export class CommandFactory {
     componentId: string,
     oldProps: Record<string, any>,
     newProps: Record<string, any>,
-    pageSchema: PageSchema,
+    pageSchema: CanvasSchema,
   ): UpdateComponentCommand {
     return new UpdateComponentCommand(componentId, oldProps, newProps, pageSchema);
   }

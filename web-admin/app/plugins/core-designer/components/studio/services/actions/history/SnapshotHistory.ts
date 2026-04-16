@@ -1,5 +1,5 @@
 import type { Command } from '~/plugins/core-designer/components/studio/services/actions/command/Command';
-import type { PageSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
+import type { CanvasSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 
 /**
  * 历史状态快照
@@ -10,7 +10,7 @@ export interface HistorySnapshot {
   /** 快照时间戳 */
   timestamp: number;
   /** 页面Schema状态 */
-  pageSchema: PageSchema;
+  pageSchema: CanvasSchema;
   /** 关联的命令 */
   command?: Command;
   /** 快照描述 */
@@ -67,7 +67,7 @@ export class HistoryStack {
    * 创建快照
    */
   createSnapshot(
-    pageSchema: PageSchema,
+    pageSchema: CanvasSchema,
     command?: Command,
     description: string = '状态快照',
   ): HistorySnapshot {
@@ -103,7 +103,7 @@ export class HistoryStack {
   /**
    * 推送命令到历史栈
    */
-  pushCommand(command: Command, pageSchema: PageSchema, description?: string): void {
+  pushCommand(command: Command, pageSchema: CanvasSchema, description?: string): void {
     const snapshot = this.createSnapshot(pageSchema, command, description || command.description);
     this.push(snapshot);
   }
@@ -312,8 +312,8 @@ export class HistoryStack {
 export class HistoryManager {
   private static instance: HistoryManager;
   private historyStack: HistoryStack;
-  private pageSchemaGetter: (() => PageSchema) | null = null;
-  private pageSchemaUpdater: ((schema: PageSchema) => void) | null = null;
+  private pageSchemaGetter: (() => CanvasSchema) | null = null;
+  private pageSchemaUpdater: ((schema: CanvasSchema) => void) | null = null;
 
   private constructor() {
     this.historyStack = HistoryStack.getInstance();
@@ -329,14 +329,14 @@ export class HistoryManager {
   /**
    * 设置页面Schema获取器
    */
-  setPageSchemaGetter(getter: () => PageSchema): void {
+  setPageSchemaGetter(getter: () => CanvasSchema): void {
     this.pageSchemaGetter = getter;
   }
 
   /**
    * 设置页面Schema更新器
    */
-  setPageSchemaUpdater(updater: (schema: PageSchema) => void): void {
+  setPageSchemaUpdater(updater: (schema: CanvasSchema) => void): void {
     this.pageSchemaUpdater = updater;
   }
 

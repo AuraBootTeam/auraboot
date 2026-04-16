@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { DragStartEvent, DragEndEvent } from '@dnd-kit/core';
-import type { FormSchema, Component, Position } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
+import type { CanvasSchema, Component, Position } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 import { useCanvasEditorState, getDesignerSDK } from '~/plugins/core-designer/components/studio/sdk';
 import { DRAG_TYPES } from '~/plugins/core-designer/components/studio/workbench/constants';
 import { eventDomainManager } from '~/plugins/core-designer/components/studio/services/actions/event/EventDomainManager';
@@ -13,13 +13,13 @@ const { componentRegistry, pageStateManager: stateManager } = designerSDK;
 
 export interface DesignerControllerOptions {
   pageId: string;
-  initialSchema?: FormSchema;
+  initialSchema?: CanvasSchema;
   previewMode?: boolean;
   readonly?: boolean;
   collaborationConfig?: DesignerWorkflowProps['collaborationConfig'];
-  onSchemaChange?: (schema: FormSchema) => void;
-  onSave?: (schema: FormSchema) => Promise<void>;
-  onPublish?: (schema: FormSchema) => Promise<void>;
+  onSchemaChange?: (schema: CanvasSchema) => void;
+  onSave?: (schema: CanvasSchema) => Promise<void>;
+  onPublish?: (schema: CanvasSchema) => Promise<void>;
 }
 
 export interface DraggedComponentPreview {
@@ -35,17 +35,17 @@ export interface DraggedComponentPreview {
 export interface DesignerControllerResult {
   loading: boolean;
   error: string | null;
-  schema: FormSchema;
+  schema: CanvasSchema;
   activeDragId: string | null;
   draggedComponent: DraggedComponentPreview | null;
-  handleSchemaChange: (schema: FormSchema) => void;
+  handleSchemaChange: (schema: CanvasSchema) => void;
   handleDragStart: (event: DragStartEvent) => void;
   handleDragEnd: (event: DragEndEvent) => void;
   saveSchema: () => Promise<void>;
   publishSchema: () => Promise<void>;
 }
 
-export const DEFAULT_DESIGNER_SCHEMA: FormSchema = createDefaultSchema();
+export const DEFAULT_DESIGNER_SCHEMA: CanvasSchema = createDefaultSchema();
 
 export function useDesignerController(
   options: DesignerControllerOptions,
@@ -58,7 +58,7 @@ export function useDesignerController(
     onPublish,
   } = options;
 
-  const [currentSchema, setCurrentSchema] = useState<FormSchema>(initialSchema);
+  const [currentSchema, setCurrentSchema] = useState<CanvasSchema>(initialSchema);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -108,7 +108,7 @@ export function useDesignerController(
   }, []);
 
   const handleSchemaChange = useCallback(
-    (schema: FormSchema) => {
+    (schema: CanvasSchema) => {
       setCurrentSchema(schema);
       stateManager.setState({ schema }, 'handleSchemaChange');
       onSchemaChange?.(schema);
