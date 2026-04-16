@@ -520,12 +520,8 @@ public class PageSchemaServiceImpl implements PageSchemaService {
             throw new ValidationException(ResponseCode.CommonValidationFailed, "Page kind must not be empty");
         }
 
-        // Composite pages allow empty blocks (user builds incrementally)
-        boolean isComposite = "composite".equals(request.getKind());
-        if (!isComposite && (request.getBlocks() == null || request.getBlocks().isEmpty())) {
-            throw new ValidationException(ResponseCode.CommonValidationFailed, "Blocks must not be empty");
-        }
-
+        // Blocks may be empty at creation — user builds the page incrementally in the designer.
+        // Validation of publishable state happens at publish time, not at create time.
         if (request.getBlocks() != null && !request.getBlocks().isEmpty() && !validateBlocks(request.getBlocks())) {
             throw new ValidationException(ResponseCode.CommonValidationFailed, "Blocks format is invalid");
         }
