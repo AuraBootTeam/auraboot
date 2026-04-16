@@ -2,7 +2,7 @@
  * 版本管理系统类型定义
  */
 
-import type { PageSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
+import type { CanvasSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 
 /**
  * 版本状态枚举
@@ -37,7 +37,7 @@ export interface Version {
   /** 版本类型 */
   type: VersionType;
   /** 页面Schema */
-  schema: PageSchema;
+  schema: CanvasSchema;
   /** 创建时间 */
   createdAt: Date;
   /** 更新时间 */
@@ -101,7 +101,7 @@ export interface VersionDifference {
  */
 export interface CreateVersionRequest {
   /** 页面Schema */
-  schema: PageSchema;
+  schema: CanvasSchema;
   /** 版本类型 */
   type: VersionType;
   /** 版本描述 */
@@ -121,7 +121,7 @@ export interface UpdateVersionRequest {
   /** 版本ID */
   versionId: string;
   /** 页面Schema */
-  schema?: PageSchema;
+  schema?: CanvasSchema;
   /** 版本描述 */
   description?: string;
   /** 变更日志 */

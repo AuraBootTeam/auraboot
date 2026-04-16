@@ -100,16 +100,6 @@ export interface CanvasSchema {
 }
 
 /**
- * @deprecated Use CanvasSchema instead. Kept for backwards compatibility.
- */
-export type PageSchema = CanvasSchema;
-
-/**
- * @deprecated Use CanvasSchema instead. Kept for backwards compatibility.
- */
-export type FormSchema = CanvasSchema;
-
-/**
  * Layout configuration interface
  */
 export interface LayoutBreakpoint {
