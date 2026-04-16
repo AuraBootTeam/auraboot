@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { convertSchemaToUnified } from '~/plugins/core-designer/components/studio/workbench/panels/preview/toUnified';
-import type { FormSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
+import type { CanvasSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 
-const createBaseSchema = (): FormSchema => ({
+const createBaseSchema = (): CanvasSchema => ({
   id: 'form_1',
   kind: 'form',
   title: '测试表单',
