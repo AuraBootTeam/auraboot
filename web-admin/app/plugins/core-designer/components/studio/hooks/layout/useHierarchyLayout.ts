@@ -9,7 +9,7 @@
  */
 
 import { useCallback, useMemo, useState } from 'react';
-import type { FormSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
+import type { CanvasSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 import type {
   TabContainerConfig,
   TabItemConfig,
@@ -93,8 +93,8 @@ export interface UseHierarchyLayoutReturn {
 }
 
 export interface UseHierarchyLayoutOptions {
-  schema: FormSchema;
-  onSchemaChange: (next: FormSchema) => void;
+  schema: CanvasSchema;
+  onSchemaChange: (next: CanvasSchema) => void;
 }
 
 export function useHierarchyLayout({ schema, onSchemaChange }: UseHierarchyLayoutOptions): UseHierarchyLayoutReturn {
@@ -371,8 +371,8 @@ export function useHierarchyLayout({ schema, onSchemaChange }: UseHierarchyLayou
   }, [schema, onSchemaChange]);
 
   const disableHierarchyMode = useCallback(() => {
-    const { hierarchy: _, ...rest } = schema as FormSchema & { hierarchy?: TabContainerConfig };
-    onSchemaChange(rest as FormSchema);
+    const { hierarchy: _, ...rest } = schema as CanvasSchema & { hierarchy?: TabContainerConfig };
+    onSchemaChange(rest as CanvasSchema);
   }, [schema, onSchemaChange]);
 
   return {

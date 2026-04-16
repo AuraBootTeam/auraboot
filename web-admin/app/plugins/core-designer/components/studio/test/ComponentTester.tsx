@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import ComponentTestSuite, { type ComponentTestCase } from '~/plugins/core-designer/components/studio/test/ComponentTestSuite';
-import type { FormSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
+import type { CanvasSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 
 interface TestResult {
   type: string;
@@ -26,7 +26,7 @@ export const ComponentTester: React.FC<ComponentTesterProps> = ({ onTestComplete
   const [currentTest, setCurrentTest] = useState<string>('');
   const [isRunning, setIsRunning] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [pageSchema, setPageSchema] = useState<FormSchema | null>(null);
+  const [pageSchema, setPageSchema] = useState<CanvasSchema | null>(null);
 
   // 运行所有组件测试
   const runAllTests = async () => {
@@ -142,7 +142,7 @@ export const ComponentTester: React.FC<ComponentTesterProps> = ({ onTestComplete
 
   // 加载测试页面
   const loadTestPage = () => {
-    const testPageSchema = testSuite.generateTestPageSchema() as FormSchema;
+    const testPageSchema = testSuite.generateTestPageSchema() as CanvasSchema;
     setPageSchema(testPageSchema);
   };
 

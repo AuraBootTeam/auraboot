@@ -1,9 +1,9 @@
 /**
- * PageSchema 版本管理相关的 React Hooks
+ * CanvasSchema 版本管理相关的 React Hooks
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { PageSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
+import type { CanvasSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 import type {
   PageSchemaVersion,
   CreatePageSchemaVersionRequest,
@@ -15,10 +15,10 @@ import { getPageSchemaVersionManager } from '~/plugins/core-designer/components/
 import { VersionStatus, VersionType } from '~/plugins/core-designer/components/studio/domain/metadata/types';
 
 /**
- * PageSchema 版本管理 Hook
+ * CanvasSchema 版本管理 Hook
  */
 export function usePageSchemaVersion(pageId: string, config?: Partial<PageSchemaVersionConfig>) {
-  const [currentSchema, setCurrentSchema] = useState<PageSchema | null>(null);
+  const [currentSchema, setCurrentSchema] = useState<CanvasSchema | null>(null);
   const [currentVersion, setCurrentVersion] = useState<PageSchemaVersion | null>(null);
   const [publishedVersion, setPublishedVersion] = useState<PageSchemaVersion | null>(null);
   const [loading, setLoading] = useState(false);
@@ -68,7 +68,7 @@ export function usePageSchemaVersion(pageId: string, config?: Partial<PageSchema
    * 保存草稿
    */
   const saveDraft = useCallback(
-    async (schema: PageSchema, description?: string) => {
+    async (schema: CanvasSchema, description?: string) => {
       try {
         setSaving(true);
         setError(null);
@@ -213,7 +213,7 @@ export function usePageSchemaVersion(pageId: string, config?: Partial<PageSchema
    * 更新 Schema（触发自动保存）
    */
   const updateSchema = useCallback(
-    (schema: PageSchema) => {
+    (schema: CanvasSchema) => {
       setCurrentSchema(schema);
       setHasUnsavedChanges(true);
 
@@ -293,7 +293,7 @@ export function usePageSchemaVersion(pageId: string, config?: Partial<PageSchema
 }
 
 /**
- * PageSchema 版本列表 Hook
+ * CanvasSchema 版本列表 Hook
  */
 export function usePageSchemaVersionList(pageId: string) {
   const [versions, setVersions] = useState<PageSchemaVersion[]>([]);
@@ -337,7 +337,7 @@ export function usePageSchemaVersionList(pageId: string) {
 }
 
 /**
- * PageSchema 版本比较 Hook
+ * CanvasSchema 版本比较 Hook
  */
 export function usePageSchemaVersionComparison() {
   const [comparing, setComparing] = useState(false);
@@ -395,7 +395,7 @@ export function usePageSchemaVersionComparison() {
 /**
  * 比较两个 Schema 的差异
  */
-function compareSchemas(schemaA: PageSchema, schemaB: PageSchema): any[] {
+function compareSchemas(schemaA: CanvasSchema, schemaB: CanvasSchema): any[] {
   const differences: any[] = [];
 
   // 比较基本属性
@@ -482,11 +482,11 @@ function compareSchemas(schemaA: PageSchema, schemaB: PageSchema): any[] {
 }
 
 /**
- * PageSchema 自动保存 Hook
+ * CanvasSchema 自动保存 Hook
  */
 export function usePageSchemaAutoSave(
   pageId: string,
-  schema: PageSchema | null,
+  schema: CanvasSchema | null,
   enabled: boolean = true,
 ) {
   const [lastSaved, setLastSaved] = useState<Date | null>(null);

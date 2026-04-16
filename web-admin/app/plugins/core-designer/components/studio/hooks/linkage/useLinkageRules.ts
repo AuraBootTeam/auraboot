@@ -2,13 +2,13 @@ import { useCallback } from 'react';
 import type { LinkageRule, LinkageAction } from '~/plugins/core-designer/components/studio/workbench/panels/linkage/types';
 import { createLinkageRule } from '~/plugins/core-designer/components/studio/workbench/panels/linkage/types';
 import { useCanvasEditorState } from '~/plugins/core-designer/components/studio/hooks/store/useCanvasEditorState';
-import type { FormSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
+import type { CanvasSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 
 export interface UseLinkageRulesOptions {
   /** Current page schema (schema half) */
-  schema: FormSchema;
+  schema: CanvasSchema;
   /** Called when linkageRules should be updated in the schema */
-  onSchemaChange: (next: FormSchema) => void;
+  onSchemaChange: (next: CanvasSchema) => void;
 }
 
 /**
