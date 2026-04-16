@@ -75,7 +75,7 @@
     "code": "wd_req_attachments",
     "displayName:zh-CN": "附件",
     "displayName:en": "Attachments",
-    "dataType": "attachment",
+    "dataType": "file",
     "description": "Supporting documents (sick leave > 2 days requires attachment).",
     "extension": {
       "multiple": true,

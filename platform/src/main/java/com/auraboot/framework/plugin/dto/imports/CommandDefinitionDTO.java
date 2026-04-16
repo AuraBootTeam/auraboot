@@ -161,7 +161,7 @@ public class CommandDefinitionDTO {
     /**
      * Post-actions executed after main operation (e.g., CREATE_CHILDREN).
      */
-    private List<PostActionConfig> postActions;
+    private List<Map<String, Object>> postActions;
 
     /**
      * Validation rules.
