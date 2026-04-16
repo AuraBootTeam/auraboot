@@ -7,7 +7,7 @@
     "modelCode": "ab_announcement",
     "inputFields": ["title", "content", "priority", "pinned", "expires_at"],
     "autoSetFields": {
-      "status": { "strategy": "FIXED_VALUE", "value": "draft" }
+      "status": { "strategy": "fixed_value", "value": "draft" }
     }
   },
   {
@@ -39,8 +39,8 @@
     "fromStates": ["draft"],
     "toState": "published",
     "autoSetFields": {
-      "published_at": { "strategy": "CURRENT_TIMESTAMP" },
-      "published_by": { "strategy": "CURRENT_USER_ID" }
+      "published_at": { "strategy": "current_datetime" },
+      "published_by": { "strategy": "current_user" }
     },
     "extension": {
       "confirmMessage:zh-CN": "确认发布此公告？发布后将对所有用户可见。",
@@ -71,8 +71,8 @@
     "fromStates": ["archived"],
     "toState": "published",
     "autoSetFields": {
-      "published_at": { "strategy": "CURRENT_TIMESTAMP" },
-      "published_by": { "strategy": "CURRENT_USER_ID" }
+      "published_at": { "strategy": "current_datetime" },
+      "published_by": { "strategy": "current_user" }
     },
     "extension": {
       "confirmMessage:zh-CN": "确认重新发布此公告？",
