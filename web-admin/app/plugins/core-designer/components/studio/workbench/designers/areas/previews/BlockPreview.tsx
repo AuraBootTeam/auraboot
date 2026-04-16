@@ -94,6 +94,7 @@ export const BlockPreview: React.FC<BlockPreviewProps> = ({
               onDelete();
             }}
             className="rounded bg-red-500 p-1.5 text-white transition-colors hover:bg-red-600"
+            data-testid="block-delete"
             title="删除"
           >
             <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
