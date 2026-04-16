@@ -92,7 +92,8 @@ public class ImEventListener {
     }
 
     private boolean shouldNotify(CommandCompletedEvent event) {
-        return NOTIFIABLE_OPERATIONS.contains(event.getOperationType());
+        String op = event.getOperationType();
+        return op != null && NOTIFIABLE_OPERATIONS.contains(op);
     }
 
     private void deliverNotification(CommandCompletedEvent event, Long actorId, Long tenantId) {
@@ -150,7 +151,7 @@ public class ImEventListener {
                             "messageType", saved.getMessageType(),
                             "content", saved.getContent() != null ? saved.getContent() : "",
                             "cardPayload", saved.getCardPayload() != null ? saved.getCardPayload() : "",
-                            "createdAt", saved.getCreatedAt().toString()
+                            "createdAt", saved.getCreatedAt() != null ? saved.getCreatedAt().toString() : ""
                     ))
                     .build();
             broadcaster.publish(memberIds, frame);
@@ -226,7 +227,7 @@ public class ImEventListener {
                         "messageType", message.getMessageType(),
                         "content", message.getContent() != null ? message.getContent() : "",
                         "cardPayload", message.getCardPayload() != null ? message.getCardPayload() : "",
-                        "createdAt", message.getCreatedAt().toString()
+                        "createdAt", message.getCreatedAt() != null ? message.getCreatedAt().toString() : ""
                 ))
                 .build();
 
