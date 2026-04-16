@@ -82,6 +82,19 @@ public interface BpmEngine {
      */
     List<HistoryRecord> getProcessHistory(String processInstanceId);
 
+    // ── Query helpers ──────────────────────────────────────────────────
+
+    /**
+     * Return true if there is at least one running process instance for the given
+     * processKey + businessKey combination. Used by BpmActionExecutor to reject
+     * duplicate submissions.
+     *
+     * @param processKey  the process definition key
+     * @param businessKey the business correlation key to check
+     * @return true if a running instance exists
+     */
+    boolean hasRunningInstanceForBusinessKey(String processKey, String businessKey);
+
     // ── Metadata ───────────────────────────────────────────────────────
 
     /**
