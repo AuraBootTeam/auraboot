@@ -2,7 +2,7 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { DesignerPreview } from '~/plugins/core-designer/components/studio/workbench/runtime/DesignerPreview';
-import type { FormSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
+import type { CanvasSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 
 vi.mock('~/framework/meta/rendering/SchemaRenderer', () => ({
   SchemaRendererWithContainer: ({ runtime }: any) => (
@@ -20,7 +20,7 @@ vi.mock('~/plugins/core-designer/components/studio/services/runtime/SchemaRuntim
   useSchemaRuntime: (params: any) => mockUseSchemaRuntime(params),
 }));
 
-const baseSchema: FormSchema = {
+const baseSchema: CanvasSchema = {
   id: 'form_1',
   kind: 'form',
   name: '测试表单',

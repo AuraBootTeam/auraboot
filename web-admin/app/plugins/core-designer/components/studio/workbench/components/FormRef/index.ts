@@ -5,7 +5,7 @@
  */
 
 import type {
-  FormSchema,
+  CanvasSchema,
   FormFieldConfig,
   FormRefConfig,
   FormRefManager,
@@ -21,7 +21,7 @@ export type {
   FormValidationRule,
   FormFieldConfig,
   FormLayoutConfig,
-  FormSchema,
+  CanvasSchema,
   FormRefProps,
   FormRefState,
   FormRefManager,
@@ -134,7 +134,7 @@ export const FormRefUtils = {
   /**
    * 创建默认的表单配置
    */
-  createDefaultFormSchema: (id: string, title: string): FormSchema => ({
+  createDefaultCanvasSchema: (id: string, title: string): CanvasSchema => ({
     id,
     name: title,
     title,
@@ -171,7 +171,7 @@ export const FormRefUtils = {
   /**
    * 验证表单数据
    */
-  validateFormData: (data: Record<string, any>, schema: FormSchema): Record<string, string[]> => {
+  validateFormData: (data: Record<string, any>, schema: CanvasSchema): Record<string, string[]> => {
     const errors: Record<string, string[]> = {};
 
     schema.fields.forEach((field) => {
@@ -260,7 +260,7 @@ export const FormRefUtils = {
   /**
    * 转换表单数据
    */
-  transformFormData: (data: Record<string, any>, schema: FormSchema): Record<string, any> => {
+  transformFormData: (data: Record<string, any>, schema: CanvasSchema): Record<string, any> => {
     const transformed: Record<string, any> = {};
 
     schema.fields.forEach((field) => {
@@ -292,14 +292,14 @@ export const FormRefUtils = {
   /**
    * 克隆表单配置
    */
-  cloneFormSchema: (schema: FormSchema): FormSchema => {
+  cloneCanvasSchema: (schema: CanvasSchema): CanvasSchema => {
     return JSON.parse(JSON.stringify(schema));
   },
 
   /**
    * 合并表单配置
    */
-  mergeFormSchema: (base: FormSchema, override: Partial<FormSchema>): FormSchema => {
+  mergeCanvasSchema: (base: CanvasSchema, override: Partial<CanvasSchema>): CanvasSchema => {
     return {
       ...base,
       ...override,
@@ -315,7 +315,7 @@ export const FormRefUtils = {
   /**
    * 生成表单快照
    */
-  createFormSnapshot: (schema: FormSchema, data: Record<string, any>): string => {
+  createFormSnapshot: (schema: CanvasSchema, data: Record<string, any>): string => {
     return JSON.stringify({
       schema,
       data,
@@ -328,7 +328,7 @@ export const FormRefUtils = {
    */
   restoreFormSnapshot: (
     snapshot: string,
-  ): { schema: FormSchema; data: Record<string, any>; timestamp: number } | null => {
+  ): { schema: CanvasSchema; data: Record<string, any>; timestamp: number } | null => {
     try {
       return JSON.parse(snapshot);
     } catch {

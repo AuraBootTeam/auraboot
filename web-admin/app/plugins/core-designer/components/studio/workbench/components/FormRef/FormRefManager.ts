@@ -7,7 +7,7 @@
 import { EventEmitter } from 'events';
 import type {
   FormRefManager,
-  FormSchema,
+  CanvasSchema,
   FormRefMode,
   FormRefConfig,
   FormRefEvents,
@@ -20,7 +20,7 @@ import type {
  * 表单缓存项
  */
 interface FormCacheItem {
-  schema: FormSchema;
+  schema: CanvasSchema;
   timestamp: Date;
   ttl: number;
 }
@@ -31,7 +31,7 @@ interface FormCacheItem {
 export class FormRefManagerImpl extends EventEmitter implements FormRefManager {
   private cache = new Map<string, FormCacheItem>();
   private config: FormRefConfig;
-  private loadingPromises = new Map<string, Promise<FormSchema>>();
+  private loadingPromises = new Map<string, Promise<CanvasSchema>>();
   private cacheCleanupTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(config: Partial<FormRefConfig> = DEFAULT_FORM_REF_CONFIG) {
@@ -65,7 +65,7 @@ export class FormRefManagerImpl extends EventEmitter implements FormRefManager {
   /**
    * 加载表单
    */
-  async loadForm(formId: string, mode: FormRefMode): Promise<FormSchema> {
+  async loadForm(formId: string, mode: FormRefMode): Promise<CanvasSchema> {
     // 检查缓存
     if (this.config.cache.enabled && mode === 'pointer') {
       const cached = this.getCachedForm(formId);
@@ -81,7 +81,7 @@ export class FormRefManagerImpl extends EventEmitter implements FormRefManager {
     }
 
     // 开始加载
-    const loadPromise = this.fetchFormSchema(formId, mode);
+    const loadPromise = this.fetchCanvasSchema(formId, mode);
     this.loadingPromises.set(formId, loadPromise);
 
     try {
@@ -105,7 +105,7 @@ export class FormRefManagerImpl extends EventEmitter implements FormRefManager {
   /**
    * 获取缓存的表单
    */
-  getCachedForm(formId: string): FormSchema | null {
+  getCachedForm(formId: string): CanvasSchema | null {
     if (!this.config.cache.enabled) {
       return null;
     }
@@ -129,7 +129,7 @@ export class FormRefManagerImpl extends EventEmitter implements FormRefManager {
   /**
    * 设置缓存的表单
    */
-  setCachedForm(formId: string, schema: FormSchema): void {
+  setCachedForm(formId: string, schema: CanvasSchema): void {
     if (!this.config.cache.enabled) {
       return;
     }
@@ -165,7 +165,7 @@ export class FormRefManagerImpl extends EventEmitter implements FormRefManager {
    * 验证表单
    */
   validateForm(
-    schema: FormSchema,
+    schema: CanvasSchema,
     data: Record<string, any>,
   ): {
     isValid: boolean;
@@ -203,7 +203,7 @@ export class FormRefManagerImpl extends EventEmitter implements FormRefManager {
   /**
    * 提交表单
    */
-  async submitForm(schema: FormSchema, data: Record<string, any>): Promise<any> {
+  async submitForm(schema: CanvasSchema, data: Record<string, any>): Promise<any> {
     // 验证表单
     const validation = this.validateForm(schema, data);
     if (!validation.isValid) {
@@ -227,7 +227,7 @@ export class FormRefManagerImpl extends EventEmitter implements FormRefManager {
   /**
    * 转换数据
    */
-  transformData(schema: FormSchema, data: Record<string, any>): Record<string, any> {
+  transformData(schema: CanvasSchema, data: Record<string, any>): Record<string, any> {
     const transformed = { ...data };
 
     // 应用字段级转换
@@ -287,7 +287,7 @@ export class FormRefManagerImpl extends EventEmitter implements FormRefManager {
   /**
    * 重置表单数据
    */
-  resetFormData(schema: FormSchema): Record<string, any> {
+  resetFormData(schema: CanvasSchema): Record<string, any> {
     const data: Record<string, any> = {};
 
     schema.fields.forEach((field) => {
@@ -329,7 +329,7 @@ export class FormRefManagerImpl extends EventEmitter implements FormRefManager {
   /**
    * 从 API 获取表单 Schema
    */
-  private async fetchFormSchema(formId: string, mode: FormRefMode): Promise<FormSchema> {
+  private async fetchCanvasSchema(formId: string, mode: FormRefMode): Promise<CanvasSchema> {
     const url = `${this.config.api.baseUrl}/forms/${formId}`;
     const params = new URLSearchParams({ mode });
 
@@ -353,7 +353,7 @@ export class FormRefManagerImpl extends EventEmitter implements FormRefManager {
   /**
    * 标准化表单 Schema
    */
-  private normalizeSchema(schema: any): FormSchema {
+  private normalizeSchema(schema: any): CanvasSchema {
     // 确保必需字段存在
     return {
       id: schema.id || '',
