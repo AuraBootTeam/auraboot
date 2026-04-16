@@ -25,7 +25,9 @@
         "value": "draft"
       }
     },
-    "permissions": ["wd.leave_request.manage"],
+    "permissions": [
+      "wd.leave_request.manage"
+    ],
     "agent_hint": "Create a draft leave request. Key inputs: applicant, type, start_date, end_date, days.",
     "cmd_risk_level": "L1"
   },
@@ -44,7 +46,9 @@
       "wd_req_attachments",
       "wd_req_cc_users"
     ],
-    "permissions": ["wd.leave_request.manage"],
+    "permissions": [
+      "wd.leave_request.manage"
+    ],
     "agent_hint": "Update an existing draft leave request.",
     "cmd_risk_level": "L1"
   },
@@ -54,7 +58,9 @@
     "displayName:en": "Delete Leave Request",
     "type": "delete",
     "modelCode": "wd_leave_request",
-    "permissions": ["wd.leave_request.manage"],
+    "permissions": [
+      "wd.leave_request.manage"
+    ],
     "agent_hint": "Delete a draft leave request.",
     "cmd_risk_level": "L2"
   },
@@ -66,9 +72,14 @@
     "type": "state_transition",
     "modelCode": "wd_leave_request",
     "stateField": "wd_req_status",
-    "fromStates": ["draft", "rejected"],
+    "fromStates": [
+      "draft",
+      "rejected"
+    ],
     "toState": "submitted",
-    "permissions": ["wd.leave_request.submit"],
+    "permissions": [
+      "wd.leave_request.submit"
+    ],
     "agent_hint": "Submit a draft leave request. Fails fast with BusinessException if Drools wd_leave_validation yields valid=false. On success starts BPM process wd_leave_approval and writes its instance id onto wd_req_process_instance.",
     "cmd_risk_level": "L2",
     "preActions": [
@@ -79,7 +90,11 @@
           {
             "modelCode": "wd_leave_balance",
             "filters": [
-              {"field": "wd_bal_employee", "op": "=", "value": "${payload.wd_req_applicant}"}
+              {
+                "field": "wd_bal_employee",
+                "op": "=",
+                "value": "${payload.wd_req_applicant}"
+              }
             ],
             "exposeAs": "balance"
           }
@@ -99,10 +114,10 @@
         "businessKey": "${recordId}",
         "title": "${payload.wd_req_code}",
         "variables": {
-          "applicantId": "${payload.wd_req_applicant}",
           "days": "${payload.wd_req_days}",
           "type": "${payload.wd_req_type}",
-          "recordId": "${recordId}"
+          "recordId": "${recordId}",
+          "applicantUserId": "${payload.wd_req_applicant}"
         },
         "storeInstanceIdIn": "wd_req_process_instance"
       }
@@ -124,7 +139,9 @@
       "wd_bal_annual_remaining",
       "wd_bal_sick_used"
     ],
-    "permissions": ["wd.leave_balance.manage"],
+    "permissions": [
+      "wd.leave_balance.manage"
+    ],
     "agent_hint": "Create a leave balance record for an employee in a given year.",
     "cmd_risk_level": "L1"
   },
@@ -138,7 +155,9 @@
       "wd_bal_annual_remaining",
       "wd_bal_sick_used"
     ],
-    "permissions": ["wd.leave_balance.manage"],
+    "permissions": [
+      "wd.leave_balance.manage"
+    ],
     "agent_hint": "Update an employee's leave balance.",
     "cmd_risk_level": "L1"
   }
