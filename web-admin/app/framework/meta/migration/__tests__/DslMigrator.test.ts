@@ -64,11 +64,11 @@ describe('DslMigrator', () => {
       expect(() => DslMigrator.migrate(future)).toThrow('newer than app version');
     });
 
-    it('sets composite layout to grid in v3→v4', () => {
-      const v3 = { kind: 'composite', schemaVersion: 3, blocks: [], layout: { type: 'stack' } };
+    it('bumps schemaVersion to 4 in v3→v4 without touching layout', () => {
+      const v3 = { kind: 'list', schemaVersion: 3, blocks: [], layout: { type: 'stack' } };
       const result = DslMigrator.migrate(v3);
-      expect(result.layout.type).toBe('grid');
-      expect(result.layout.cols).toBe(12);
+      expect(result.schemaVersion).toBe(4);
+      expect(result.layout.type).toBe('stack');
     });
   });
 
