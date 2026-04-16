@@ -1,8 +1,7 @@
 # Workflow Demo Plugin 设计文档
 
-> 文档日期：2026-04-15（2026-04-15 晚：根据 OSS 平台能力调研修订）
+> 文档日期：2026-04-15
 > 插件目标：OSS 官方**工作流入门样例**，一个插件串起 Smart Engine 全栈能力（流程设计器 / 页面配置 / 任务中心 / SLA / Drools / 通知）。业务上下文选最普适的"请假申请"。
-> **插件身份**：100% 配置（零 Java）。所有运行时能力通过 OSS 核心新增的 3 个通用 handler 承载。
 
 ## 1. 背景
 
@@ -84,7 +83,6 @@ comp    | 调休 | limit_by_balance=true,  require_attachment_gt=0
 - **合法性校验**放在 Command 层（提交前），非法申请根本不进流程 —— 避免产生注定 terminate 的实例
 - **路由分派**放在流程内 serviceTask —— 运行时决策，方便审计和可视化
 - 两处**都用 Drools**，demo 一次覆盖"前置校验"和"流程内规则调用"两种集成模式
-- **审批结果只改请假单状态**，不触动 `wd_leave_balance`。余额结转（计提/调账/跨年度）是真实 HR 系统的 concern，超出 demo 范围。balance 表作为"HR 角色管理的受控数据"存在，不参与审批逻辑
 
 ```
 startEvent
@@ -94,27 +92,26 @@ startEvent
        ├─ manager → userTask(主管审批)  ← SLA
        └─ hr      → userTask(HR 审批)
        → exclusiveGateway(gw_result：任务结果?)
-            ├─ approved → serviceTask(发"通过"通知) → endEvent(approved)
-            └─ rejected → serviceTask(发"驳回"通知) → endEvent(rejected)
+            ├─ approved → serviceTask(扣减余额+通知) → endEvent(approved)
+            └─ rejected → endEvent(rejected)
 ```
 
-**节点清单（11 节点，5 类全覆盖）**
+**节点清单（10 节点，5 类全覆盖）**
 
-| id | type | commandCode / config | 说明 |
-|---|---|---|---|
-| start_1 | startEvent | — | 流程起点 |
-| task_submit | userTask | formPageKey=wd_leave_request_form | 员工填写 |
-| svc_rule_route | serviceTask | `bpm:run-rule`，ruleCode=`wd_leave_routing` | 写 `approverRole` 到流程变量 |
-| gw_approver | exclusiveGateway | `approverRole == 'manager' / 'hr'` | 分流 |
-| task_manager_approve | userTask | role=`wd_manager` + SLA | 主管审批 |
-| task_hr_approve | userTask | role=`wd_hr` + SLA | HR 审批 |
-| gw_result | exclusiveGateway | `taskResult == 'approved' / 'rejected'` | 分流 |
-| svc_notify_approved | serviceTask | `bpm:publish-notification`，eventCode=`wd_request_approved` | 通知申请人 |
-| svc_notify_rejected | serviceTask | `bpm:publish-notification`，eventCode=`wd_request_rejected` | 通知申请人 |
-| end_approved | endEvent | — | 通过终态 |
-| end_rejected | endEvent | — | 驳回终态 |
+| id | type | 说明 |
+|---|---|---|
+| start_1 | startEvent | 流程起点 |
+| task_submit | userTask | 员工填写表单（formPageKey=wd_leave_request_form） |
+| svc_rule_route | serviceTask | 调 Drools：输出 `{approverRole}` 写入流程变量 |
+| gw_approver | exclusiveGateway | `approverRole == 'manager' / 'hr'` 分流 |
+| task_manager_approve | userTask | 主管审批（assigneeType=role/wd_manager）**挂 SLA** |
+| task_hr_approve | userTask | HR 审批（assigneeType=role/wd_hr）**挂 SLA** |
+| gw_result | exclusiveGateway | `taskResult == 'approved' / 'rejected'` 分流 |
+| svc_deduct | serviceTask | 扣减余额 + 发通知 |
+| end_approved | endEvent | 审批通过终态 |
+| end_rejected | endEvent | 驳回终态 |
 
-5 类统计：startEvent×1 + userTask×3 + serviceTask×3 + exclusiveGateway×2 + endEvent×2 = 11。
+5 类节点统计：startEvent×1 + userTask×3 + serviceTask×2 + exclusiveGateway×2 + endEvent×2 = 10。
 
 边：9 条，全部带 `conditionExpression`（遵循 `project_smartengine_default_flow` 约束，无 default flow）。
 
@@ -232,10 +229,11 @@ seed 用户：给 `admin@example.com` 叠加 `wd_admin` 角色，另外 bootstra
 | 触发点 | 事件 | 接收人 |
 |---|---|---|
 | userTask 创建 | `task_assigned` | 审批人 |
-| SLA 20s | `sla_warning` | 审批人 |
-| SLA 30s | `sla_escalated` | 审批人 + 上级 |
-| svc_notify_approved | `wd_request_approved` | 申请人 + 抄送人 |
-| svc_notify_rejected | `wd_request_rejected` | 申请人 |
+| SLA 20h | `sla_warning` | 审批人 |
+| SLA 24h | `sla_escalated` | 审批人 + 上级 |
+| end_approved | `request_approved` | 申请人 |
+| end_rejected | `request_rejected` | 申请人 |
+| end_terminated | `request_terminated` | 申请人 |
 
 ## 11. E2E 测试（4 spec，金标准级）
 
@@ -296,7 +294,7 @@ plugins/workflow-demo/
 
 1. **Phase 1 · 骨架**：models / fields / bindings / dicts / commands / permissions / roles / menus / i18n / pages（3 页）
 2. **Phase 2 · 流程**：processes.json（含 designerJson）+ rules.json（Drools DRL）+ sla.json + namedQueries（审批历史查询）
-3. **Phase 3 · 平台通用能力 + 插件接线**：OSS 核心新增 3 个通用 BPM handler（`bpm:run-rule` / `bpm:start-process` / `bpm:publish-notification`），loader 增加 `rules` / `sla` 分支，`BpmRuleService.importRule()` / `SlaConfigService.importSlaConfig()` 两个 upsert 方法；workflow-demo commands.json 改用通用 handler 串联，去掉扣余额相关节点；seed + bootstrap + oss-reset-and-init.sh 接入
+3. **Phase 3 · Seed + 集成**：default-bootstrap 装订角色和 demo 用户；seed 脚本灌余额数据；oss-reset-and-init.sh 加入导入序列
 4. **Phase 4 · E2E**：4 个 spec 写完，全部按金标准 14 维度断言通过
 
 每 Phase 完成即可 commit + push，不要求一次性完成。
@@ -340,35 +338,35 @@ Consequences:
   without unescaping newlines. `ruleContentFile` is a forward-compatible hint
   for the loader.
 
-### 15.3 `extension.*` 钩子方案作废，改为 3 个通用 BPM handler
+### 15.3 Commands are declarative, not a free-form pipeline
 
-**2026-04-15 晚更新**：Phase 2 里写的 `extension.preflightRule` / `extension.startProcess`
-/ `extension.deductionRules` 这几个钩子，平台 pipeline 根本不会读取 —— 属于虚构字段。
-经平台能力调研（`2026-04-15` 晚），Phase 3 改为在 OSS 核心加 3 个通用
-`CommandHandlerExtension`，全部 plugin 声明式复用：
+Existing OSS/enterprise commands use declarative fields
+(`type`, `inputFields`, `autoSetFields`, `validation`, `preconditions`,
+`postActions`, `cascadeDelete`, `extension`). There is no stock pipeline step
+for "run Drools rule" nor "start BPM process"; those are attached to the
+process via `extension.triggerCommand` and executed by `BpmProcessStarter`
+(not shown in OSS).
 
-| commandCode | 职责 | 基于 |
-|---|---|---|
-| `bpm:run-rule` | `args.ruleCode` + `args.facts` → 调 `DroolsEngineService.evaluate()` → 返回规则输出 | 薄包装 |
-| `bpm:start-process` | `args.processKey` + `args.businessKey` + `args.variables` → 调 `BpmIntegrationService.startBusinessProcess()` | 参照 `BuiltinStartApprovalHandler` |
-| `bpm:publish-notification` | `args.eventCode` + `args.recipientFrom` + `args.templateParams` → 调 `NotificationService.send()` | 薄包装 |
+`wd:submit_leave_request` therefore keeps `type: state_transition` and
+declares its phase-2 behaviour inside `extension`:
 
-调用约定：Command pipeline 的 `HandlerPhase` 已经从 `ExtensionRegistry` 按
-`commandCode` 拿到 handler，插件 `commands.json` 只需声明 `type: handler` +
-`handlerCode: bpm:run-rule` + 业务参数即可。
+- `extension.preflightRule` — `ruleCode`, `factBuilder` (EL-style
+  placeholders), `balanceLookup`, and `onInvalid.throwException` hint
+- `extension.startProcess` — `processKey`, `variables`,
+  `storeInstanceIdIn: "wd_req_process_instance"`
 
-**业务选择**：审批通过/驳回**只改状态 + 发通知**，不触动 `wd_leave_balance`。
-余额的结转/计提/调账是真实 HR 系统的 concern，超出 demo 范围。因此放弃
-`wd:execute_deduct_balance` 命令及对应的 svc_deduct 节点。
+The runtime wiring (a Phase 3 backend task) must:
 
-**工作流节点调整**：
-- 原 `svc_deduct`（approved 分支后）拆成 `svc_notify_approved` / `svc_notify_rejected` 两个 serviceTask，各自调 `bpm:publish-notification`，节点总数 10 → 11
-- 没有 "extension" 字段虚构，`wd:submit_leave_request` 改为 Command pipeline 调用 `bpm:run-rule`（校验）+ `bpm:start-process`（启流程）两步
+1. Read `extension.preflightRule` before the state transition, resolve the
+   balance record, evaluate the DRL, and throw `BusinessException(messageKey)`
+   on `valid=false`.
+2. After the transition, start the process defined in `extension.startProcess`
+   and persist the returned `processInstanceId` into the named field.
 
-### 15.3a Phase 2 `commands.json` / `processes.json` 需要按新约定重写
-
-Phase 2 提交的 `commands.json` 中 `extension.*` 字段、`wd:execute_deduct_balance`
-命令、以及 `processes.json` 的 `svc_deduct` 节点将在 Phase 3 统一改造。
+`wd:execute_deduct_balance` uses the same shape under
+`extension.deductionRules` and `extension.notification`; the BPM engine's
+serviceTask runner (Phase 3) must honor them when it sees
+`commandCode: wd:execute_deduct_balance` on the `svc_deduct` node.
 
 ### 15.4 Edges all carry conditionExpression — including unconditional ones
 
@@ -388,38 +386,27 @@ camelCase (quoted identifiers) so the detail-page sub-table's
 `taskName / assignee / result / comment / completedAt` bindings resolve
 without a UI-side transform.
 
-### 15.6 Phase 3 工作清单（最终版）
+### 15.6 Phase 3 gaps (tracked, not delivered in this commit)
 
-**OSS 核心（`auraboot/platform`）**
+- Backend: extend `PluginDirectoryLoader` with `rules` and `sla` branches;
+  add importer methods for `BpmRule` and `SlaConfigEntity`.
+- Backend: implement the `extension.preflightRule` / `extension.startProcess`
+  hooks on `CommandPipeline` (or whatever runs `state_transition`).
+- Backend: implement `extension.deductionRules` + `extension.notification`
+  on the `serviceTask` runner.
+- Seed: 5 demo employees + per-year `wd_leave_balance` rows
+  (`default-bootstrap.json` extension planned for Phase 3).
+- E2E: 4 specs per §11 remain Phase 4.
+- reset-and-init.sh OSS variant: add `workflow-demo` to the import list.
 
-1. 新增 3 个 handler：
-   - `framework/bpm/handler/BpmRunRuleHandler.java`（~60 行）
-   - `framework/bpm/handler/BpmStartProcessHandler.java`（参照 `BuiltinStartApprovalHandler`，~80 行）
-   - `framework/bpm/handler/BpmPublishNotificationHandler.java`（~50 行）
-   - 每个 handler 注册到 `ExtensionRegistry`，按 commandCode 匹配
-2. `framework/plugin/service/impl/PluginDirectoryLoader.java` 增加 `rules` 和 `sla` 两个分支（~30 行）
-3. `framework/plugin/service/impl/PluginImportServiceImpl.java` 增加 `importRules()` / `importSlaConfigs()` 调用
-4. `framework/bpm/rule/DroolsRuleService.java` 增加 `importRule(RuleDefinitionDTO)` upsert（by ruleCode）
-5. `framework/bpm/service/SlaConfigService.java` 增加 `importSlaConfig(SlaConfigDTO)` upsert（by slaCode）
-6. DRL 文件加载：当 `rules.json` 项带 `ruleContentFile: "rules/xxx.drl"`，loader 读文件内容填充 `ruleContent` 后再入库
-7. 单元测试 / 集成测试配套
+## 15.7 Phase 3b 架构简化
 
-**workflow-demo 插件改造（`auraboot/plugins/workflow-demo`）**
+Phase 3 早期的实现把每个 `serviceTask` 都桥接回 Command Pipeline（`bpm:run-rule` / `bpm:publish-notification` / `bpm:start-process` 三个 CommandHandler），一次规则/一次通知就要穿过 16 个 phase，回调链长、异常栈难读、且 `start-process` 又会在 postAction 里再次触发 pipeline，容易形成隐式死循环。
 
-1. `commands.json` 重写：
-   - 删 `wd:execute_deduct_balance`
-   - `wd:submit_leave_request` 拆成 pipeline 形态，step1 = `bpm:run-rule`（wd_leave_validation）、step2 = `bpm:start-process`（wd_leave_approval）、step3 = 状态迁移到 submitted
-2. `processes.json` 重写：
-   - 删 svc_deduct 节点及相关边
-   - 加 svc_notify_approved / svc_notify_rejected 两个 serviceTask，commandCode = `bpm:publish-notification`
-3. `rules.json` 清理：去掉任何扣减相关的规则（只保留 validation + routing 两组）
-4. `sla.json` 保持 30s 不变
-5. i18n 补充 `wd_request_approved` / `wd_request_rejected` 通知模板
-6. `default-bootstrap.json` 加 seed 用户绑定
+Phase 3b 把 serviceTask 从 Command Pipeline 上剥离：
 
-**集成**
-
-- `scripts/oss-reset-and-init.sh` 把 `workflow-demo` 加入默认导入序列
-- Seed（Phase 3 末或 Phase 4 初）：5 个 demo 员工 + 预置 `wd_leave_balance`
-
-**Phase 4 保留不变**：4 个 E2E spec。
+- **两个瘦 delegate**：`DroolsServiceTaskDelegate` / `NotificationServiceTaskDelegate` 直接实现 SmartEngine 的 `JavaDelegation`，只消费 BPMN 上的 `smart:*` 扩展属性（`ruleCode` / `factsVars` / `eventCode` / `recipientFrom` / `templateParamsVars`），不走 Command Pipeline。`JsonToBpmnConverter` 识别新节点类型 `rule-task` / `notification-task` 并输出 `smart:class="<bean>"` + `smart:<attr>` 属性。
+- **PreActionsPhase（@Order 750）**：在 `AssertPhase` 和 `PreInvariantPhase` 之间新增一段 `preActions` 执行阶段，首发支持 `bpm:run-rule`，通过 `contextLookup` 从其它模型加载上下文（例：查询申请人的 `wd_leave_balance`），拼 facts 后调 `DroolsEngineService`。规则返回 `valid=false` 直接抛 `BusinessException` 终止提交，不写任何 DB。
+- **postAction `start_process`**：`PostExecutionPhase` 新增分支，直接调 `BpmIntegrationService.startBusinessProcess` 并把返回的 `processInstanceId` 写回记录的 `storeInstanceIdIn` 字段；无 Handler 间接层。
+- **插件导入即部署**：`PluginResourceImporterImpl.importProcess` 现在在 `autoDeploy=true` 时把 `designerJson` 转 BPMN XML 并 `deployWithUTF8Content` 到 SmartEngine，按 `processKey` 做幂等跳过；失败抛 `PluginException` 让导入事务回滚。
+- **删除**：`BpmStartProcessHandler` 及其测试（上述 postAction 分支取代），保留 `BpmRunRuleHandler` / `BpmPublishNotificationHandler` 以支持仍需走 Command Pipeline 的命令式调用入口。

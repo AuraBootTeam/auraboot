@@ -1,0 +1,60 @@
+[
+  {
+    "slaKey": "wd_manager_approve_sla",
+    "name": "Manager Approval SLA",
+    "name:zh-CN": "主管审批 SLA",
+    "name:en": "Manager Approval SLA",
+    "targetType": "NODE",
+    "targetKey": "task_manager_approve",
+    "processKey": "wd_leave_approval",
+    "nodeId": "task_manager_approve",
+    "domainCode": "wd_leave_request",
+    "modelCode": "wd_leave_request",
+    "deadlineMode": "FIXED",
+    "deadlineValue": "PT30S",
+    "timeoutSeconds": 30,
+    "warningBeforeSeconds": 10,
+    "businessCalendar": false,
+    "warningRules": [
+      {
+        "beforeSeconds": 10,
+        "eventType": "sla_warning",
+        "notifyTargets": ["assignee"]
+      }
+    ],
+    "suspendPolicy": "pause",
+    "escalationTargetType": "role_parent",
+    "escalationTargetValue": "wd_manager",
+    "enabled": true,
+    "description": "Demo-only 30s timeout so E2E can observe escalation. Production should set deadlineValue to PT24H."
+  },
+  {
+    "slaKey": "wd_hr_approve_sla",
+    "name": "HR Approval SLA",
+    "name:zh-CN": "HR 审批 SLA",
+    "name:en": "HR Approval SLA",
+    "targetType": "NODE",
+    "targetKey": "task_hr_approve",
+    "processKey": "wd_leave_approval",
+    "nodeId": "task_hr_approve",
+    "domainCode": "wd_leave_request",
+    "modelCode": "wd_leave_request",
+    "deadlineMode": "FIXED",
+    "deadlineValue": "PT30S",
+    "timeoutSeconds": 30,
+    "warningBeforeSeconds": 10,
+    "businessCalendar": false,
+    "warningRules": [
+      {
+        "beforeSeconds": 10,
+        "eventType": "sla_warning",
+        "notifyTargets": ["assignee"]
+      }
+    ],
+    "suspendPolicy": "pause",
+    "escalationTargetType": "role_parent",
+    "escalationTargetValue": "wd_hr",
+    "enabled": true,
+    "description": "Demo-only 30s timeout so E2E can observe escalation. Production should set deadlineValue to PT24H."
+  }
+]

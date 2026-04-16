@@ -1,0 +1,30 @@
+[
+  {
+    "code": "wd_leave_request",
+    "displayName:zh-CN": "请假申请",
+    "displayName:en": "Leave Request",
+    "description": "Leave request with workflow-enabled approval lifecycle.",
+    "modelType": "entity",
+    "modelCategory": "entity",
+    "extension": {
+      "icon": "CalendarCheck",
+      "category": "workflow-demo",
+      "titleField": "wd_req_code",
+      "subtitleField": "wd_req_applicant"
+    }
+  },
+  {
+    "code": "wd_leave_balance",
+    "displayName:zh-CN": "请假余额",
+    "displayName:en": "Leave Balance",
+    "description": "Per-employee per-year leave balance (annual / sick).",
+    "modelType": "entity",
+    "modelCategory": "master",
+    "extension": {
+      "icon": "Wallet",
+      "category": "workflow-demo",
+      "titleField": "wd_bal_employee",
+      "subtitleField": "wd_bal_year"
+    }
+  }
+]

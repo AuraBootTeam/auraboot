@@ -279,6 +279,59 @@ public class PluginDirectoryLoader {
                 manifest.setDashboards(mergeList(manifest.getDashboards(), dashboards));
             }
         }
+
+        // Load rules (Drools)
+        if (resourceDirs.containsKey("rules")) {
+            List<BpmRuleDefinitionDTO> rules = loadResourceList(
+                    pluginDir.resolve(resourceDirs.get("rules")), BpmRuleDefinitionDTO.class);
+            if (!rules.isEmpty()) {
+                for (BpmRuleDefinitionDTO rule : rules) {
+                    inlineDrlContent(pluginDir, rule);
+                }
+                manifest.setRules(mergeList(manifest.getRules(), rules));
+            }
+        }
+
+        // Load SLA configs
+        if (resourceDirs.containsKey("sla")) {
+            List<SlaConfigDefinitionDTO> slaConfigs = loadResourceList(
+                    pluginDir.resolve(resourceDirs.get("sla")), SlaConfigDefinitionDTO.class);
+            if (!slaConfigs.isEmpty()) {
+                manifest.setSlaConfigs(mergeList(manifest.getSlaConfigs(), slaConfigs));
+            }
+        }
+    }
+
+    /**
+     * If the rule declares a {@code ruleContentFile} and has no inline
+     * {@code ruleContent}, read the DRL file into {@code ruleContent}.
+     * Having both is an ambiguous source and rejected.
+     */
+    private void inlineDrlContent(Path pluginDir, BpmRuleDefinitionDTO rule) {
+        String relPath = rule.getRuleContentFile();
+        if (relPath == null || relPath.isBlank()) {
+            return;
+        }
+        boolean hasInline = rule.getRuleContent() != null && !rule.getRuleContent().isBlank();
+        if (hasInline) {
+            throw new PluginException("Rule '" + rule.getRuleCode()
+                    + "' declares both ruleContent and ruleContentFile — pick one");
+        }
+        Path drlPath = pluginDir.resolve(relPath).normalize();
+        if (!drlPath.startsWith(pluginDir.normalize())) {
+            throw new PluginException("Rule '" + rule.getRuleCode()
+                    + "' ruleContentFile escapes plugin directory: " + relPath);
+        }
+        if (!Files.exists(drlPath)) {
+            throw new PluginException("Rule '" + rule.getRuleCode()
+                    + "' ruleContentFile not found: " + relPath);
+        }
+        try {
+            rule.setRuleContent(Files.readString(drlPath));
+        } catch (IOException e) {
+            throw new PluginException("Failed to read DRL file for rule '" + rule.getRuleCode()
+                    + "': " + e.getMessage(), e);
+        }
     }
 
     /**
@@ -447,6 +500,44 @@ public class PluginDirectoryLoader {
                 manifest::getSavedViews, manifest::setSavedViews);
         loadSourceResource(source, resourceDirs, "dashboards", DashboardDefinitionDTO.class,
                 manifest::getDashboards, manifest::setDashboards);
+
+        // Rules (DRL-on-disk inlining via ruleContentFile)
+        if (resourceDirs.containsKey("rules")) {
+            List<BpmRuleDefinitionDTO> rules = loadResourceListFromSource(
+                    source, resourceDirs.get("rules"), BpmRuleDefinitionDTO.class);
+            if (!rules.isEmpty()) {
+                for (BpmRuleDefinitionDTO rule : rules) {
+                    inlineDrlContentFromSource(source, rule);
+                }
+                manifest.setRules(mergeList(manifest.getRules(), rules));
+            }
+        }
+
+        // SLA configs
+        loadSourceResource(source, resourceDirs, "sla", SlaConfigDefinitionDTO.class,
+                manifest::getSlaConfigs, manifest::setSlaConfigs);
+    }
+
+    private void inlineDrlContentFromSource(PluginSource source, BpmRuleDefinitionDTO rule) {
+        String relPath = rule.getRuleContentFile();
+        if (relPath == null || relPath.isBlank()) {
+            return;
+        }
+        boolean hasInline = rule.getRuleContent() != null && !rule.getRuleContent().isBlank();
+        if (hasInline) {
+            throw new PluginException("Rule '" + rule.getRuleCode()
+                    + "' declares both ruleContent and ruleContentFile — pick one");
+        }
+        if (!source.exists(relPath)) {
+            throw new PluginException("Rule '" + rule.getRuleCode()
+                    + "' ruleContentFile not found: " + relPath);
+        }
+        try {
+            rule.setRuleContent(source.readString(relPath));
+        } catch (IOException e) {
+            throw new PluginException("Failed to read DRL file for rule '" + rule.getRuleCode()
+                    + "': " + e.getMessage(), e);
+        }
     }
 
     @FunctionalInterface

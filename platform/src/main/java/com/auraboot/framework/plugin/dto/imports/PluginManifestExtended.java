@@ -132,6 +132,16 @@ public class PluginManifestExtended extends PluginManifest {
      */
     private List<DashboardDefinitionDTO> dashboards;
 
+    /**
+     * Drools rule definitions to import (maps to {@code ab_bpm_rule}).
+     */
+    private List<BpmRuleDefinitionDTO> rules;
+
+    /**
+     * SLA config definitions to import (maps to {@code ab_sla_config}).
+     */
+    private List<SlaConfigDefinitionDTO> slaConfigs;
+
     // ==================== Directory-based Configuration ====================
 
     /**
@@ -497,7 +507,9 @@ public class PluginManifestExtended extends PluginManifest {
                 || (i18nResources != null && !i18nResources.isEmpty())
                 || (namedQueries != null && !namedQueries.isEmpty())
                 || (savedViews != null && !savedViews.isEmpty())
-                || (dashboards != null && !dashboards.isEmpty());
+                || (dashboards != null && !dashboards.isEmpty())
+                || (rules != null && !rules.isEmpty())
+                || (slaConfigs != null && !slaConfigs.isEmpty());
     }
 
     /**
@@ -520,7 +532,9 @@ public class PluginManifestExtended extends PluginManifest {
                 Map.entry("i18nResources", i18nResources != null ? i18nResources.size() : 0),
                 Map.entry("namedQueries", namedQueries != null ? namedQueries.size() : 0),
                 Map.entry("savedViews", savedViews != null ? savedViews.size() : 0),
-                Map.entry("dashboards", dashboards != null ? dashboards.size() : 0)
+                Map.entry("dashboards", dashboards != null ? dashboards.size() : 0),
+                Map.entry("rules", rules != null ? rules.size() : 0),
+                Map.entry("slaConfigs", slaConfigs != null ? slaConfigs.size() : 0)
         );
     }
 

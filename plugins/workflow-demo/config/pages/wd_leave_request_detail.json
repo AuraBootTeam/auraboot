@@ -1,0 +1,85 @@
+{
+  "pageKey": "wd_leave_request_detail",
+  "modelCode": "wd_leave_request",
+  "kind": "detail",
+  "layout": { "type": "stack" },
+  "blocks": [
+    {
+      "id": "wd_leave_request_detail_toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "edit",
+          "icon": "Edit",
+          "permissionCode": "wd.leave_request.manage",
+          "label": "edit",
+          "action": { "type": "navigate", "to": "wd_leave_request_form" }
+        },
+        {
+          "code": "submit",
+          "primary": true,
+          "permissionCode": "wd.leave_request.submit",
+          "label": "execute",
+          "action": { "type": "command", "command": "wd:submit_leave_request" }
+        }
+      ]
+    },
+    {
+      "id": "wd_leave_request_tabs",
+      "blockType": "tabs",
+      "tabs": [
+        {
+          "key": "overview",
+          "label": { "zh-CN": "基本信息", "en": "Overview" },
+          "blocks": [
+            {
+              "id": "section_basic",
+              "blockType": "form-section",
+              "title": { "zh-CN": "申请信息", "en": "Request Information" },
+              "columns": 2,
+              "fields": [
+                { "field": "wd_req_code", "readOnly": true },
+                { "field": "wd_req_status", "readOnly": true },
+                { "field": "wd_req_applicant", "readOnly": true },
+                { "field": "wd_req_type", "readOnly": true },
+                { "field": "wd_req_start_date", "readOnly": true },
+                { "field": "wd_req_end_date", "readOnly": true },
+                { "field": "wd_req_days", "readOnly": true },
+                { "field": "wd_req_process_instance", "readOnly": true },
+                { "field": "wd_req_reason", "span": 2, "readOnly": true },
+                { "field": "wd_req_attachments", "span": 2, "readOnly": true },
+                { "field": "wd_req_cc_users", "span": 2, "readOnly": true }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "approval_history",
+          "label": { "zh-CN": "审批历史", "en": "Approval History" },
+          "blocks": [
+            {
+              "id": "approval_history_subtable",
+              "blockType": "sub-table",
+              "title": { "zh-CN": "审批历史", "en": "Approval History" },
+              "dataSource": {
+                "kind": "namedQuery",
+                "queryCode": "wd_leave_request_approval_history",
+                "params": { "processInstanceId": "${wd_req_process_instance}" }
+              },
+              "columns": [
+                { "field": "taskName", "label": { "zh-CN": "节点", "en": "Node" } },
+                { "field": "assignee", "label": { "zh-CN": "审批人", "en": "Assignee" } },
+                { "field": "result", "label": { "zh-CN": "结果", "en": "Result" } },
+                { "field": "comment", "label": { "zh-CN": "意见", "en": "Comment" } },
+                { "field": "completedAt", "label": { "zh-CN": "完成时间", "en": "Completed At" } }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "name:zh-CN": "请假申请详情",
+  "name:en": "Leave Request Detail",
+  "title": { "zh-CN": "请假申请详情", "en": "Leave Request Detail" }
+}
