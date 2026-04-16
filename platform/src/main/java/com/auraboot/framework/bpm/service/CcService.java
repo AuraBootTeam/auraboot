@@ -143,8 +143,10 @@ public class CcService {
             item.setUserId(receiverId);
             item.setItemType("bpm_cc");
             item.setClientItemId("bpm_cc_" + record.getId() + "_" + receiverId);
-            item.setTitle("Process CC: " + processKey);
-            item.setSubtitle(comment == null ? "" : comment);
+            // i18n reference — rendered by UI; processKey provides context via subtitle
+            item.setTitle("$i18n:bpm.cc.inbox.title");
+            item.setSubtitle(processKey + (comment != null && !comment.isBlank()
+                    ? ": " + comment : ""));
             item.setSourceType("bpm");
             item.setSourceId(processInstanceId);
             item.setDeepLink("/p/bpm/process/" + processInstanceId);
