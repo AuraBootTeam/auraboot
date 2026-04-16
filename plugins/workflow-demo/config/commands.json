@@ -112,7 +112,7 @@
         "type": "start_process",
         "processKey": "wd_leave_approval",
         "businessKey": "${recordId}",
-        "title": "${payload.wd_req_code}",
+        "title": "${recordId}",
         "variables": {
           "days": "${payload.wd_req_days}",
           "type": "${payload.wd_req_type}",

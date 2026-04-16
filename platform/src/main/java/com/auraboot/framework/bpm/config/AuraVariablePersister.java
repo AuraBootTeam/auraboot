@@ -74,13 +74,27 @@ public class AuraVariablePersister implements VariablePersister {
         if (value == null) {
             return null;
         }
-        if ("java.lang.String".equals(type) || "string".equals(type)) {
-            return value;
-        }
-        try {
-            return MAPPER.readValue(value, Object.class);
-        } catch (Exception e) {
-            return value;
-        }
+        // Restore original types so Drools MVEL constraints like
+        // ((Number) this["days"]).doubleValue() work across segments.
+        return switch (type) {
+            case "java.lang.String", "string" -> value;
+            case "java.lang.Integer", "int" -> {
+                try { yield Integer.parseInt(value); }
+                catch (NumberFormatException e) { yield value; }
+            }
+            case "java.lang.Long", "long" -> {
+                try { yield Long.parseLong(value); }
+                catch (NumberFormatException e) { yield value; }
+            }
+            case "java.lang.Double", "double" -> {
+                try { yield Double.parseDouble(value); }
+                catch (NumberFormatException e) { yield value; }
+            }
+            case "java.lang.Boolean", "boolean" -> Boolean.parseBoolean(value);
+            default -> {
+                try { yield MAPPER.readValue(value, Object.class); }
+                catch (Exception e) { yield value; }
+            }
+        };
     }
 }
