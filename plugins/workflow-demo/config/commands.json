@@ -80,33 +80,8 @@
     "permissions": [
       "wd.leave_request.submit"
     ],
-    "agent_hint": "Submit a draft leave request. Fails fast with BusinessException if Drools wd_leave_validation yields valid=false. On success starts BPM process wd_leave_approval and writes its instance id onto wd_req_process_instance.",
+    "agent_hint": "Submit a draft leave request. Starts BPM process wd_leave_approval and writes its instance id onto wd_req_process_instance.",
     "cmd_risk_level": "L2",
-    "preActions": [
-      {
-        "type": "bpm:run-rule",
-        "ruleCode": "wd_leave_validation",
-        "contextLookup": [
-          {
-            "modelCode": "wd_leave_balance",
-            "filters": [
-              {
-                "field": "wd_bal_employee",
-                "op": "=",
-                "value": "${payload.wd_req_applicant}"
-              }
-            ],
-            "exposeAs": "balance"
-          }
-        ],
-        "facts": {
-          "type": "${payload.wd_req_type}",
-          "days": "${payload.wd_req_days}",
-          "balanceRemaining": "${balance.wd_bal_annual_remaining}",
-          "attachmentCount": "${payload.wd_req_attachments.length}"
-        }
-      }
-    ],
     "postActions": [
       {
         "type": "start_process",
