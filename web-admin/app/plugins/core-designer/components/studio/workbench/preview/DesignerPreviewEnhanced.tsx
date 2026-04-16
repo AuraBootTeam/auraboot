@@ -1,11 +1,11 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import type { FormSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
+import type { CanvasSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 import type { PreviewMode, PreviewFieldDef } from './types';
 import { generateMockData } from './MockDataGenerator';
 import { MockDataPanel } from './MockDataPanel';
 
 interface DesignerPreviewEnhancedProps {
-  schema: FormSchema;
+  schema: CanvasSchema;
 }
 
 /**
@@ -232,7 +232,7 @@ function renderFieldInput(field: PreviewFieldDef, value: string) {
 /**
  * Extract field definitions from schema components.
  */
-function extractFieldsFromSchema(schema: FormSchema): PreviewFieldDef[] {
+function extractFieldsFromSchema(schema: CanvasSchema): PreviewFieldDef[] {
   const fields: PreviewFieldDef[] = [];
 
   function walkComponents(components: any[]) {

@@ -2,11 +2,11 @@ import React from 'react';
 import { useLinkageRules } from '~/plugins/core-designer/components/studio/hooks/linkage/useLinkageRules';
 import { LinkageRuleEditor } from './LinkageRuleEditor';
 import type { LinkageRule } from './types';
-import type { FormSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
+import type { CanvasSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 
 interface LinkagePanelProps {
-  schema: FormSchema;
-  onSchemaChange: (next: FormSchema) => void;
+  schema: CanvasSchema;
+  onSchemaChange: (next: CanvasSchema) => void;
   fieldOptions?: { code: string; label: string }[];
   readonly?: boolean;
 }

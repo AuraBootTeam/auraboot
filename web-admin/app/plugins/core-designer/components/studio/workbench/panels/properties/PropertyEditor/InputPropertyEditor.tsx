@@ -1,7 +1,7 @@
 /**
  * InputPropertyEditor 组件
  * 专门用于编辑SmartInput组件属性的编辑器
- * 基于FormSchema驱动的属性面板
+ * 基于CanvasSchema驱动的属性面板
  */
 
 import React, { useState, useCallback, useEffect } from 'react';

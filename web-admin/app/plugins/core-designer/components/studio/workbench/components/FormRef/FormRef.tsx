@@ -14,7 +14,7 @@ import { globalEventBus } from '~/plugins/core-designer/components/studio/servic
 import type {
   FormRefProps,
   FormRefState,
-  FormSchema,
+  CanvasSchema,
   FormRefStatus,
   FormRefConfig,
 } from '~/plugins/core-designer/components/studio/workbench/components/FormRef/types';
@@ -52,7 +52,7 @@ export const FormRef: React.FC<FormRefProps> = ({
 
   // 组件状态
   const [status, setStatus] = useState<FormRefStatus>('loading');
-  const [schema, setSchema] = useState<FormSchema | null>(snapshot || null);
+  const [schema, setSchema] = useState<CanvasSchema | null>(snapshot || null);
   const [formData, setFormData] = useState<Record<string, any>>(value);
   const [errors, setErrors] = useState<Record<string, string[]>>({});
   const [isValid, setIsValid] = useState(true);
@@ -98,7 +98,7 @@ export const FormRef: React.FC<FormRefProps> = ({
       try {
         setStatus('loading');
 
-        let formSchema: FormSchema;
+        let formSchema: CanvasSchema;
 
         if (mode === 'snapshot' && snapshot) {
           // 快照模式，直接使用提供的 schema

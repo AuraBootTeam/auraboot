@@ -4,12 +4,12 @@
  * Schema 管理相关的工具函数
  */
 
-import type { FormSchema, Block, LayoutConfig, ThemeConfig } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
+import type { CanvasSchema, Block, LayoutConfig, ThemeConfig } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 
 /**
  * 创建默认的 Schema
  */
-export function createDefaultSchema(): FormSchema {
+export function createDefaultSchema(): CanvasSchema {
   return {
     id: `schema_${Date.now()}`,
     kind: 'form',
@@ -98,14 +98,14 @@ export function createDefaultTheme(): ThemeConfig {
 /**
  * 克隆 Schema
  */
-export function cloneSchema(schema: FormSchema): FormSchema {
+export function cloneSchema(schema: CanvasSchema): CanvasSchema {
   return JSON.parse(JSON.stringify(schema));
 }
 
 /**
  * 合并 Schema
  */
-export function mergeSchema(target: FormSchema, source: Partial<FormSchema>): FormSchema {
+export function mergeSchema(target: CanvasSchema, source: Partial<CanvasSchema>): CanvasSchema {
   return {
     ...target,
     ...source,
@@ -119,7 +119,7 @@ export function mergeSchema(target: FormSchema, source: Partial<FormSchema>): Fo
 /**
  * 查找组件
  */
-export function findComponent(schema: FormSchema, componentId: string): Block | null {
+export function findComponent(schema: CanvasSchema, componentId: string): Block | null {
   const findInComponents = (components: Block[]): Block | null => {
     for (const component of components) {
       if (component.id === componentId) {
@@ -139,7 +139,7 @@ export function findComponent(schema: FormSchema, componentId: string): Block | 
 /**
  * 获取组件路径
  */
-export function getComponentPath(schema: FormSchema, componentId: string): string[] {
+export function getComponentPath(schema: CanvasSchema, componentId: string): string[] {
   const path: string[] = [];
 
   const findPath = (components: Block[], currentPath: string[]): boolean => {
@@ -166,7 +166,7 @@ export function getComponentPath(schema: FormSchema, componentId: string): strin
 /**
  * 移除组件
  */
-export function removeComponent(schema: FormSchema, componentId: string): FormSchema {
+export function removeComponent(schema: CanvasSchema, componentId: string): CanvasSchema {
   const newSchema = cloneSchema(schema);
 
   const removeFromComponents = (components: Block[]): boolean => {
@@ -190,10 +190,10 @@ export function removeComponent(schema: FormSchema, componentId: string): FormSc
  * 更新组件
  */
 export function updateComponent(
-  schema: FormSchema,
+  schema: CanvasSchema,
   componentId: string,
   updates: Partial<Block>,
-): FormSchema {
+): CanvasSchema {
   const newSchema = cloneSchema(schema);
   const component = findComponent(newSchema, componentId);
 
