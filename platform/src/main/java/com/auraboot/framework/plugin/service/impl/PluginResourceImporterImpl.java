@@ -1268,7 +1268,19 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         // dev-iteration updates from taking effect without a backend restart.
         try {
             String bpmnXml = jsonToBpmnConverter.convertFromMap(designerJson);
-            smartEngine.getRepositoryCommandService().deployWithUTF8Content(bpmnXml);
+            // Ensure BPMN has version attribute (SmartEngine requires it)
+            String versionStr = String.valueOf(version);
+            if (!bpmnXml.contains("version=\"")) {
+                bpmnXml = bpmnXml.replaceFirst(
+                        "(<process\\s+[^>]*)(>)",
+                        "$1 version=\"" + versionStr + ".0.0\"$2");
+            }
+            // Use tenant-aware deploy so the cache key includes tenantId.
+            // Without tenantId the key is processKey:version; but ProcessEngineService.startProcess
+            // passes TENANT_ID in variables, causing SmartEngine to look up by
+            // processKey:version:tenantId — which would be absent.
+            smartEngine.getRepositoryCommandService()
+                    .deployWithUTF8Content(bpmnXml, String.valueOf(tenantId));
             log.info("Deployed BPMN process to SmartEngine: tenantId={}, processKey={}, version={}",
                     tenantId, dto.getKey(), version);
         } catch (Exception e) {
