@@ -55,11 +55,10 @@ agent:
   anthropic:
     api-key: ${ANTHROPIC_API_KEY:}
 
-# Dev-mode: enable all actuator endpoints for debugging; disable OTLP exporter (no collector in local dev)
+# Dev-mode: enable all actuator endpoints for debugging; disable tracing (no OTLP collector in local dev)
 management:
-  otlp:
-    tracing:
-      endpoint: ""
+  tracing:
+    enabled: false
   endpoints:
     web:
       exposure:
