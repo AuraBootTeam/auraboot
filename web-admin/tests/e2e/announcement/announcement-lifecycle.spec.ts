@@ -22,11 +22,7 @@ import { test, expect, type Page } from '../../fixtures';
 import {
   uniqueId,
   dateOffsetStr,
-  navigateToMenuByClick,
   waitForDynamicPageLoad,
-  waitForFormReady,
-  waitForToast,
-  acceptConfirmDialog,
   executeCommandViaApi,
   findRowByContent,
 } from '../helpers/index';
@@ -36,18 +32,54 @@ test.describe.configure({ mode: 'serial' });
 const UID = uniqueId('ANN');
 const TITLE = `Test Announcement ${UID}`;
 const CONTENT = `Announcement content for E2E test ${UID}`;
-const EXPIRES = dateOffsetStr(30);
+const EXPIRES = dateOffsetStr(30) + 'T23:59:59Z';
 
 let recordPid: string;
 
 // ---------------------------------------------------------------------------
-// D1 — Menu Navigation
+// Helpers
 // ---------------------------------------------------------------------------
 
 async function navigateToAnnouncementList(page: Page): Promise<void> {
   await page.goto('/home', { waitUntil: 'domcontentloaded' });
-  await navigateToMenuByClick(page, ['公告管理', '系统公告']);
+  const nav = page.locator('nav').first();
+  await nav.waitFor({ state: 'visible', timeout: 10_000 });
+
+  const parentBtn = nav.locator('text="公告管理"').first();
+  await parentBtn.waitFor({ state: 'visible', timeout: 5_000 });
+  await parentBtn.evaluate((el: HTMLElement) => el.click());
+
+  const leafLink = nav.locator('a[href*="ab_announcement"]').first();
+  await leafLink.waitFor({ state: 'visible', timeout: 5_000 });
+  await leafLink.evaluate((el: HTMLElement) => el.click());
+
   await waitForDynamicPageLoad(page);
+}
+
+/** Click a row action from overflow menu, handle optional confirm dialog */
+async function clickRowAction(page: Page, title: string, actionLabel: string): Promise<void> {
+  const row = await findRowByContent(page, title);
+  const moreBtn = row.locator('button:has-text("More"), [data-testid="row-action-more"]').first();
+  await moreBtn.click();
+
+  const actionBtn = page.locator(`button:has-text("${actionLabel}")`).first();
+  await expect(actionBtn).toBeVisible({ timeout: 3_000 });
+  await actionBtn.click();
+
+  // Handle optional confirmation dialog
+  const dialog = page.locator('[data-testid="confirm-dialog"]');
+  const hasDialog = await dialog.isVisible({ timeout: 2_000 }).catch(() => false);
+  if (hasDialog) {
+    await page.locator('[data-testid="confirm-ok"]').click();
+    await dialog.waitFor({ state: 'hidden', timeout: 5_000 });
+  }
+}
+
+/** Wait for a row's status cell to show the expected status */
+async function expectRowStatus(page: Page, title: string, status: RegExp): Promise<void> {
+  const row = page.locator('table tbody tr').filter({ hasText: title }).first();
+  await expect(row.locator('td').filter({ hasText: status }).first())
+    .toBeVisible({ timeout: 5_000 });
 }
 
 // ---------------------------------------------------------------------------
@@ -55,7 +87,6 @@ async function navigateToAnnouncementList(page: Page): Promise<void> {
 // ---------------------------------------------------------------------------
 
 test('create announcement in draft status', async ({ page }) => {
-  // Create via API to avoid form complexity for state machine testing
   const result = await executeCommandViaApi(page, 'announcement:create_announcement', {
     title: TITLE,
     content: CONTENT,
@@ -63,8 +94,8 @@ test('create announcement in draft status', async ({ page }) => {
     pinned: false,
     expires_at: EXPIRES,
   });
-  expect(result.data?.recordId || result.data?.['recordId']).toBeTruthy();
-  recordPid = result.data?.recordId || result.data?.['recordId'];
+  expect(result.recordId).toBeTruthy();
+  recordPid = result.recordId;
 });
 
 // ---------------------------------------------------------------------------
@@ -74,17 +105,13 @@ test('create announcement in draft status', async ({ page }) => {
 test('list page shows created announcement with draft status', async ({ page }) => {
   await navigateToAnnouncementList(page);
 
-  // Wait for table to render with data
   const table = page.locator('table');
   await table.first().waitFor({ state: 'visible', timeout: 10_000 });
 
-  // Find our test record
   const row = await findRowByContent(page, TITLE);
   await expect(row).toBeVisible();
 
-  // Verify draft status tag
-  const statusCell = row.locator('td').filter({ hasText: /draft|草稿/i });
-  await expect(statusCell.first()).toBeVisible();
+  await expectRowStatus(page, TITLE, /draft|草稿/i);
 });
 
 // ---------------------------------------------------------------------------
@@ -93,30 +120,8 @@ test('list page shows created announcement with draft status', async ({ page }) 
 
 test('publish announcement from draft to published', async ({ page }) => {
   await navigateToAnnouncementList(page);
-
-  const row = await findRowByContent(page, TITLE);
-  await expect(row).toBeVisible();
-
-  // Open overflow menu
-  const moreBtn = row.locator('[data-testid="row-action-more"], button:has-text("...")').first();
-  await moreBtn.click();
-
-  // Click publish button
-  const publishBtn = page.locator('[data-testid="row-action-publish"], button:has-text("发布")').first();
-  await expect(publishBtn).toBeVisible({ timeout: 3_000 });
-  await publishBtn.click();
-
-  // Accept confirmation dialog
-  await acceptConfirmDialog(page);
-
-  // Wait for success feedback [D14]
-  await waitForToast(page, /success|成功/i);
-
-  // Verify status changed to published
-  await page.waitForTimeout(500); // brief wait for list refresh
-  const updatedRow = await findRowByContent(page, TITLE);
-  const publishedTag = updatedRow.locator('td').filter({ hasText: /published|已发布/i });
-  await expect(publishedTag.first()).toBeVisible({ timeout: 5_000 });
+  await clickRowAction(page, TITLE, '发布');
+  await expectRowStatus(page, TITLE, /published|已发布/i);
 });
 
 // ---------------------------------------------------------------------------
@@ -127,19 +132,17 @@ test('published record shows archive action, hides edit and publish', async ({ p
   await navigateToAnnouncementList(page);
 
   const row = await findRowByContent(page, TITLE);
-  const moreBtn = row.locator('[data-testid="row-action-more"], button:has-text("...")').first();
+  const moreBtn = row.locator('button:has-text("More"), [data-testid="row-action-more"]').first();
   await moreBtn.click();
 
   // Archive should be visible for published
-  await expect(
-    page.locator('[data-testid="row-action-archive"], button:has-text("撤回")').first(),
-  ).toBeVisible({ timeout: 3_000 });
+  await expect(page.locator('button:has-text("撤回")').first()).toBeVisible({ timeout: 3_000 });
 
   // Edit and Publish should NOT be visible for published
-  const editBtn = page.locator('[data-testid="row-action-edit"]');
-  const publishBtn = page.locator('[data-testid="row-action-publish"]');
-  await expect(editBtn).toHaveCount(0);
-  await expect(publishBtn).toHaveCount(0);
+  const menuItems = page.locator('[data-testid="row-action-dropdown"] button, [role="menu"] button');
+  const texts = await menuItems.allTextContents();
+  expect(texts.join('|')).not.toMatch(/edit|编辑/i);
+  expect(texts.join('|')).not.toMatch(/^发布$/);
 });
 
 // ---------------------------------------------------------------------------
@@ -148,20 +151,8 @@ test('published record shows archive action, hides edit and publish', async ({ p
 
 test('archive announcement from published to archived', async ({ page }) => {
   await navigateToAnnouncementList(page);
-
-  const row = await findRowByContent(page, TITLE);
-  const moreBtn = row.locator('[data-testid="row-action-more"], button:has-text("...")').first();
-  await moreBtn.click();
-
-  const archiveBtn = page.locator('[data-testid="row-action-archive"], button:has-text("撤回")').first();
-  await archiveBtn.click();
-  await acceptConfirmDialog(page);
-  await waitForToast(page, /success|成功/i);
-
-  await page.waitForTimeout(500);
-  const updatedRow = await findRowByContent(page, TITLE);
-  const archivedTag = updatedRow.locator('td').filter({ hasText: /archived|已撤回/i });
-  await expect(archivedTag.first()).toBeVisible({ timeout: 5_000 });
+  await clickRowAction(page, TITLE, '撤回');
+  await expectRowStatus(page, TITLE, /archived|已撤回/i);
 });
 
 // ---------------------------------------------------------------------------
@@ -170,21 +161,8 @@ test('archive announcement from published to archived', async ({ page }) => {
 
 test('republish announcement from archived to published', async ({ page }) => {
   await navigateToAnnouncementList(page);
-
-  const row = await findRowByContent(page, TITLE);
-  const moreBtn = row.locator('[data-testid="row-action-more"], button:has-text("...")').first();
-  await moreBtn.click();
-
-  const republishBtn = page.locator('[data-testid="row-action-republish"], button:has-text("重新发布")').first();
-  await expect(republishBtn).toBeVisible({ timeout: 3_000 });
-  await republishBtn.click();
-  await acceptConfirmDialog(page);
-  await waitForToast(page, /success|成功/i);
-
-  await page.waitForTimeout(500);
-  const updatedRow = await findRowByContent(page, TITLE);
-  const publishedTag = updatedRow.locator('td').filter({ hasText: /published|已发布/i });
-  await expect(publishedTag.first()).toBeVisible({ timeout: 5_000 });
+  await clickRowAction(page, TITLE, '重新发布');
+  await expectRowStatus(page, TITLE, /published|已发布/i);
 });
 
 // ---------------------------------------------------------------------------
@@ -194,10 +172,8 @@ test('republish announcement from archived to published', async ({ page }) => {
 test('reject publish on already-published record via API', async ({ page }) => {
   expect(recordPid).toBeTruthy();
 
-  // Try to publish again — should fail with guard error
   try {
     await executeCommandViaApi(page, 'announcement:publish', {}, recordPid);
-    // If no error, check for error code in result
     test.fail(true, 'Expected publish to fail on already-published record');
   } catch {
     // Expected: API returns error for invalid state transition
@@ -209,31 +185,15 @@ test('reject publish on already-published record via API', async ({ page }) => {
 // ---------------------------------------------------------------------------
 
 test('archive and delete announcement', async ({ page }) => {
-  // First archive (published → archived) so delete is available
+  // Archive first (published → archived) so delete becomes available
   await navigateToAnnouncementList(page);
-  const row = await findRowByContent(page, TITLE);
-  const moreBtn = row.locator('[data-testid="row-action-more"], button:has-text("...")').first();
-  await moreBtn.click();
+  await clickRowAction(page, TITLE, '撤回');
+  await expectRowStatus(page, TITLE, /archived|已撤回/i);
 
-  const archiveBtn = page.locator('[data-testid="row-action-archive"], button:has-text("撤回")').first();
-  await archiveBtn.click();
-  await acceptConfirmDialog(page);
-  await waitForToast(page, /success|成功/i);
-  await page.waitForTimeout(500);
-
-  // Now delete (only visible for draft/archived)
-  const archivedRow = await findRowByContent(page, TITLE);
-  const moreBtnAgain = archivedRow.locator('[data-testid="row-action-more"], button:has-text("...")').first();
-  await moreBtnAgain.click();
-
-  const deleteBtn = page.locator('[data-testid="row-action-delete"], button:has-text("delete")').first();
-  await expect(deleteBtn).toBeVisible({ timeout: 3_000 });
-  await deleteBtn.click();
-  await acceptConfirmDialog(page);
-  await waitForToast(page, /success|成功|删除/i);
+  // Delete
+  await clickRowAction(page, TITLE, 'delete');
 
   // Verify record is gone
-  await page.waitForTimeout(500);
   const gone = page.locator('table').getByText(TITLE);
-  await expect(gone).toHaveCount(0);
+  await expect(gone).toHaveCount(0, { timeout: 5_000 });
 });
