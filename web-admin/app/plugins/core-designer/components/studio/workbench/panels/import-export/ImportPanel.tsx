@@ -13,7 +13,7 @@ import {
   type ImportOptions,
   type ExportedPageData,
 } from './types';
-import type { FormSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
+import type { CanvasSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 
 /**
  * ImportPanel props
@@ -24,7 +24,7 @@ export interface ImportPanelProps {
   /** Close callback */
   onClose: () => void;
   /** Import success callback */
-  onImport: (schema: FormSchema, metadata?: ExportedPageData['metadata']) => Promise<void>;
+  onImport: (schema: CanvasSchema, metadata?: ExportedPageData['metadata']) => Promise<void>;
   /** Current page exists */
   hasExistingPage?: boolean;
 }
@@ -162,7 +162,7 @@ export const ImportPanel: React.FC<ImportPanelProps> = ({
 
     setImporting(true);
     try {
-      const schema = validation.data.schema as unknown as FormSchema;
+      const schema = validation.data.schema as unknown as CanvasSchema;
       const metadata = validation.data.metadata;
       const finalMetadata =
         options.importAsNew && options.customTitle && metadata

@@ -14,7 +14,7 @@ import {
   type ExportedPageData,
   type ExportFormat,
 } from './types';
-import type { FormSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
+import type { CanvasSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 import type { PageMeta } from '~/plugins/core-designer/components/studio/services/page-manager';
 
 /**
@@ -28,7 +28,7 @@ export interface ExportPanelProps {
   /** Page metadata */
   pageMeta?: PageMeta;
   /** Page schema to export */
-  schema?: FormSchema;
+  schema?: CanvasSchema;
 }
 
 /**

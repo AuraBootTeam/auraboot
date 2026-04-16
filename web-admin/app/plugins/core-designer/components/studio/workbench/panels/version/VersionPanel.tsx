@@ -28,14 +28,14 @@ import {
   type CreateVersionRequest,
   type PublishVersionRequest,
 } from '~/plugins/core-designer/components/studio/domain/metadata/types';
-import type { PageSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
+import type { CanvasSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 
 /**
  * 版本面板属性
  */
 export interface VersionPanelProps {
   pageId: string;
-  schema?: PageSchema;
+  schema?: CanvasSchema;
   onVersionChange?: (version: Version) => void;
   onClose?: () => void;
   className?: string;

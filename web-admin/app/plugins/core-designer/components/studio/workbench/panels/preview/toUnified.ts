@@ -1,12 +1,12 @@
 import type { UnifiedSchema, BlockConfig, FieldConfig, ThemeConfig } from '~/framework/meta/schemas/types';
-import type { FormSchema, Block, Component } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
+import type { CanvasSchema, Block, Component } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 
 /**
- * Convert the studio FormSchema into the runtime UnifiedSchema format.
+ * Convert the studio CanvasSchema into the runtime UnifiedSchema format.
  * Currently mirrors the legacy designer implementation to keep behaviour
  * identical while the migration progresses.
  */
-export function convertSchemaToUnified(schema: FormSchema): UnifiedSchema {
+export function convertSchemaToUnified(schema: CanvasSchema): UnifiedSchema {
   const layoutColumns = schema.layout?.columns || 1;
   const spacing = schema.layout?.spacing ?? (schema.layout as any)?.gap ?? 16;
   const padding = schema.layout?.padding ?? 16;
@@ -123,7 +123,7 @@ function buildValidation(props: Record<string, any> = {}): FieldConfig['validati
   return rules;
 }
 
-function convertTheme(schema: FormSchema): ThemeConfig | undefined {
+function convertTheme(schema: CanvasSchema): ThemeConfig | undefined {
   if (!schema.theme) {
     return undefined;
   }

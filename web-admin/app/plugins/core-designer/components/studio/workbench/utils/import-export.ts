@@ -4,7 +4,7 @@
  * 提供 Schema 导入导出相关的工具函数
  */
 
-import type { FormSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
+import type { CanvasSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 import { validateSchema, type ValidationResult } from '~/plugins/core-designer/components/studio/workbench/utils/validation';
 import { createDefaultSchema } from '~/plugins/core-designer/components/studio/workbench/utils/schemaUtils';
 
@@ -29,7 +29,7 @@ export interface ExportOptions {
 export interface ImportOptions {
   validate?: boolean;
   merge?: boolean;
-  baseSchema?: FormSchema;
+  baseSchema?: CanvasSchema;
 }
 
 /**
@@ -37,7 +37,7 @@ export interface ImportOptions {
  */
 export interface ImportResult {
   success: boolean;
-  schema?: FormSchema;
+  schema?: CanvasSchema;
   validation?: ValidationResult;
   error?: string;
 }
@@ -46,7 +46,7 @@ export interface ImportResult {
  * 导出 Schema 为 JSON 字符串
  */
 export function exportSchema(
-  schema: FormSchema,
+  schema: CanvasSchema,
   options: ExportOptions = { format: 'json' },
 ): string {
   try {
@@ -70,7 +70,7 @@ export function exportSchema(
  */
 export function importSchema(data: string, options: ImportOptions = {}): ImportResult {
   try {
-    let schema: FormSchema;
+    let schema: CanvasSchema;
 
     // 尝试解析不同格式
     try {
@@ -125,7 +125,7 @@ export function importSchema(data: string, options: ImportOptions = {}): ImportR
 /**
  * 导出为 JSON 格式
  */
-function exportToJson(schema: FormSchema, options: ExportOptions): string {
+function exportToJson(schema: CanvasSchema, options: ExportOptions): string {
   const exportData = prepareExportData(schema, options);
 
   if (options.minify) {
@@ -138,7 +138,7 @@ function exportToJson(schema: FormSchema, options: ExportOptions): string {
 /**
  * 导出为 YAML 格式
  */
-function exportToYaml(schema: FormSchema, options: ExportOptions): string {
+function exportToYaml(schema: CanvasSchema, options: ExportOptions): string {
   const exportData = prepareExportData(schema, options);
 
   // 简单的 YAML 序列化实现
@@ -149,7 +149,7 @@ function exportToYaml(schema: FormSchema, options: ExportOptions): string {
 /**
  * 导出为 XML 格式
  */
-function exportToXml(schema: FormSchema, options: ExportOptions): string {
+function exportToXml(schema: CanvasSchema, options: ExportOptions): string {
   const exportData = prepareExportData(schema, options);
 
   let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
@@ -163,7 +163,7 @@ function exportToXml(schema: FormSchema, options: ExportOptions): string {
 /**
  * 准备导出数据
  */
-function prepareExportData(schema: FormSchema, options: ExportOptions): any {
+function prepareExportData(schema: CanvasSchema, options: ExportOptions): any {
   const data: any = JSON.parse(JSON.stringify(schema));
 
   if (!options.includeMetadata) {
@@ -270,7 +270,7 @@ function escapeXml(str: string): string {
 /**
  * 简单的 YAML 解析器
  */
-function parseYaml(yamlStr: string): FormSchema {
+function parseYaml(yamlStr: string): CanvasSchema {
   // 这是一个非常简单的 YAML 解析实现
   // 在实际项目中，建议使用 js-yaml 库
   const lines = yamlStr.split('\n').filter((line) => line.trim() && !line.trim().startsWith('#'));
@@ -301,7 +301,7 @@ function parseYaml(yamlStr: string): FormSchema {
     }
   });
 
-  return result as FormSchema;
+  return result as CanvasSchema;
 }
 
 /**
@@ -329,7 +329,7 @@ function parseYamlValue(value: string): any {
 /**
  * 简单的 XML 解析器
  */
-function parseXml(xmlStr: string): FormSchema {
+function parseXml(xmlStr: string): CanvasSchema {
   // 这是一个非常简单的 XML 解析实现
   // 在实际项目中，建议使用 DOMParser 或专门的 XML 解析库
 
@@ -353,7 +353,7 @@ function parseXml(xmlStr: string): FormSchema {
     }
   }
 
-  return result as FormSchema;
+  return result as CanvasSchema;
 }
 
 /**
@@ -371,7 +371,7 @@ function unescapeXml(str: string): string {
 /**
  * 合并两个 Schema
  */
-function mergeSchemas(base: FormSchema, override: FormSchema): FormSchema {
+function mergeSchemas(base: CanvasSchema, override: CanvasSchema): CanvasSchema {
   return {
     ...base,
     ...override,
@@ -386,7 +386,7 @@ function mergeSchemas(base: FormSchema, override: FormSchema): FormSchema {
  * 导出为文件下载
  */
 export function downloadSchema(
-  schema: FormSchema,
+  schema: CanvasSchema,
   filename: string,
   options: ExportOptions = { format: 'json' },
 ): void {
@@ -464,7 +464,7 @@ function getContentType(format: ExportFormat): string {
 /**
  * 创建 Schema 模板
  */
-export function createSchemaTemplate(type: 'basic' | 'advanced' | 'custom'): FormSchema {
+export function createSchemaTemplate(type: 'basic' | 'advanced' | 'custom'): CanvasSchema {
   const baseSchema = createDefaultSchema();
 
   switch (type) {

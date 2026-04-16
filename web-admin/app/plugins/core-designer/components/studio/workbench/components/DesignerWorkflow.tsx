@@ -24,7 +24,7 @@ import { AutoSave } from '~/plugins/core-designer/components/studio/workbench/co
 import { getVersionManager } from '~/plugins/core-designer/components/studio/services/managers';
 import { useSchemaIO } from '~/plugins/core-designer/components/studio/hooks/workbench/useSchemaIO';
 import { notificationService } from '~/plugins/core-designer/components/studio/services/workflow/notifications';
-import type { FormSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
+import type { CanvasSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 
 /**
  * 设计器工作流属性
@@ -33,9 +33,9 @@ export interface DesignerWorkflowProps {
   /** 页面ID */
   pageId: string;
   /** 当前Schema */
-  schema: FormSchema;
+  schema: CanvasSchema;
   /** Schema变更回调 */
-  onSchemaChange: (schema: FormSchema) => void;
+  onSchemaChange: (schema: CanvasSchema) => void;
   /** 发布回调 */
   onPublish?: () => Promise<void>;
   /** 预览模式 */
@@ -79,7 +79,7 @@ export const DesignerWorkflow: React.FC<DesignerWorkflowProps> = ({
 
   // 监听Schema变更
   const handleSchemaChange = useCallback(
-    (newSchema: FormSchema) => {
+    (newSchema: CanvasSchema) => {
       onSchemaChange(newSchema);
     },
     [onSchemaChange],
@@ -291,7 +291,7 @@ const CollaborationCursors: React.FC<{ containerRef: React.RefObject<HTMLElement
  * 预览模态框属性
  */
 interface PreviewModalProps {
-  schema: FormSchema;
+  schema: CanvasSchema;
   onClose: () => void;
 }
 
