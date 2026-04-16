@@ -1,10 +1,14 @@
 /**
- * Schema types for the designer core
+ * Canvas-local designer types.
  *
- * Defines the core types used by the schema management system
+ * These types are internal to the studio canvas and workbench layers.
+ * They describe the designer's in-memory component/block model which is
+ * separate from the DSL types in domain/dsl/types.ts.
+ *
+ * @since 3.2.0
  */
 
-import type { TabContainerConfig } from './layout-hierarchy';
+import type { TabContainerConfig } from '~/plugins/core-designer/components/studio/domain/schema/layout-hierarchy';
 import type { LinkageRule } from '~/plugins/core-designer/components/studio/workbench/panels/linkage/types';
 
 // Schema compatibility alias
@@ -62,7 +66,10 @@ export interface Block {
 }
 
 /**
- * Page Schema interface - represents the complete page structure
+ * Page Schema interface - represents the complete page structure in the designer.
+ *
+ * NOTE: This is the designer-internal model. The canonical runtime PageSchema
+ * lives in domain/dsl/types.ts.
  */
 export interface PageSchema {
   id: string;

@@ -16,7 +16,7 @@ import type {
   FormLayoutConfig,
 } from './types';
 import { PAGE_MODES, getModeConfig } from './modes';
-import type { Component, Position } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { Component, Position } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 
 /**
  * Mode change listener

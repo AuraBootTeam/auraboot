@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import type { Component } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { Component } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 import { Input } from '~/ui/smart/form/Input';
 import { Select } from '~/ui/smart/form/Select';
 import { Checkbox } from '~/ui/smart/form/Checkbox';

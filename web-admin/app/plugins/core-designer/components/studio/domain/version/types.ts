@@ -3,7 +3,7 @@
  * Copied from the legacy designer layer to remove direct dependencies.
  */
 
-import type { PageSchema } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { PageSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 
 export enum VersionStatus {
   draft = 'draft',

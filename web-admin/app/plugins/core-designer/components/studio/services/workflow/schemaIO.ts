@@ -1,4 +1,4 @@
-import type { FormSchema } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { FormSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 import { getPageStateManager } from '~/plugins/core-designer/components/studio/services/state/PageStateManager';
 
 export interface SchemaExportOptions {

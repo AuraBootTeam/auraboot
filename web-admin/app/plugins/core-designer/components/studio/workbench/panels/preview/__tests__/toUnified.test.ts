@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { convertSchemaToUnified } from '~/plugins/core-designer/components/studio/domain/schema/converters/toUnified';
-import type { FormSchema } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import { convertSchemaToUnified } from '~/plugins/core-designer/components/studio/workbench/panels/preview/toUnified';
+import type { FormSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 
 const createBaseSchema = (): FormSchema => ({
   id: 'form_1',
