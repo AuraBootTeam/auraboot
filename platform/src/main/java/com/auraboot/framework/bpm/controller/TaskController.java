@@ -4,6 +4,7 @@ import com.auraboot.smart.framework.engine.model.instance.ProcessInstance;
 import com.auraboot.smart.framework.engine.model.instance.TaskInstance;
 import com.auraboot.smart.framework.engine.service.param.query.TaskInstanceQueryByAssigneeParam;
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.bpm.service.CcService;
 import com.auraboot.framework.bpm.service.ProcessEngineService;
 import com.auraboot.framework.bpm.service.TaskService;
 import com.auraboot.framework.bpm.service.WithdrawService;
@@ -38,6 +39,7 @@ public class TaskController {
     private final TaskService taskService;
     private final ProcessEngineService processEngineService;
     private final WithdrawService withdrawService;
+    private final CcService ccService;
 
     /**
      * 查询待办任务
@@ -173,6 +175,21 @@ public class TaskController {
         log.info("Withdrawing process via task: {}", taskId);
         withdrawService.withdraw(taskId, request.reason());
         return ApiResponse.success();
+    }
+
+    /**
+     * CC (carbon copy) a process to specified users via a current task.
+     * Subject to the process-level ccPolicy (initiator/assignee/all).
+     */
+    @PostMapping("/{taskId}/cc")
+    @RequirePermission(MetaPermission.WORKFLOW_EXECUTE)
+    @Operation(summary = "CC process", description = "Send a CC notification for the process to specified users; subject to ccPolicy")
+    public ApiResponse<Long> ccTask(
+            @PathVariable String taskId,
+            @RequestBody CcRequest request) {
+        log.info("CC task: {} to {}", taskId, request.receiverUserIds());
+        var record = ccService.cc(taskId, request.receiverUserIds(), request.comment());
+        return ApiResponse.success(record.getId());
     }
 
     /**
@@ -321,4 +338,5 @@ public class TaskController {
     public record AddSignRequest(String userId, String reason) {}
     public record RemoveSignRequest(String userId, String reason) {}
     public record WithdrawRequest(String reason) {}
+    public record CcRequest(List<Long> receiverUserIds, String comment) {}
 }
