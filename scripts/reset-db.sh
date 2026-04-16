@@ -28,6 +28,9 @@ if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
 fi
 
 echo ""
+echo "Step 0: Ensuring database role 'auraboot' exists..."
+psql -d postgres -c "DO \$\$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'auraboot') THEN CREATE ROLE auraboot WITH LOGIN SUPERUSER; RAISE NOTICE 'Role auraboot created'; ELSE RAISE NOTICE 'Role auraboot already exists'; END IF; END \$\$;" 2>/dev/null || true
+
 echo "Step 1: Terminating existing connections to '$DB_NAME'..."
 psql -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '$DB_NAME' AND pid <> pg_backend_pid();" 2>/dev/null || true
 
