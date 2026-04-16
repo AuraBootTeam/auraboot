@@ -4,6 +4,7 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.bpm.audit.BpmAuditOperation;
 import com.auraboot.framework.bpm.audit.BpmAuditService;
 import com.auraboot.framework.bpm.entity.BpmAuditRecordEntity;
+import com.auraboot.framework.bpm.model.CcPolicy;
 import com.auraboot.framework.bpm.model.WithdrawPolicy;
 import com.auraboot.framework.bpm.service.ProcessDeploymentService;
 import com.auraboot.framework.bpm.util.BpmSecurityUtil;
@@ -63,14 +64,34 @@ public class TestBpmFixture {
     private final BpmAuditService auditService;
     private final SmartEngine smartEngine;
 
-    public record ProcessSetup(String instanceId, String taskId) {}
+    /**
+     * Process setup result.
+     * assigneeId is set to 0L for processes started without an explicit assignee;
+     * CcPolicy-based setup populates it with a real test user id.
+     */
+    public record ProcessSetup(String instanceId, String taskId, Long assigneeId) {
+        /** Backwards-compat constructor for callers that don't need assigneeId. */
+        public ProcessSetup(String instanceId, String taskId) {
+            this(instanceId, taskId, 0L);
+        }
+    }
 
     /**
      * Deploy a process with given key+policy, start it as the current user.
      * The initiator is the current username (matching BpmSecurityUtil.getCurrentUserId()).
      */
     public ProcessSetup startProcess(String keySuffix, WithdrawPolicy policy) {
-        return startProcessWithInitiator(keySuffix, BpmSecurityUtil.getCurrentUserId(), policy);
+        return startProcessWithInitiator(keySuffix, BpmSecurityUtil.getCurrentUserId(),
+                policy, CcPolicy.ALL);
+    }
+
+    /**
+     * Deploy a process with the given CcPolicy, start it as the current user.
+     * The fixture uses a fixed test assignee user id (888L) so CcPolicy=assignee tests work.
+     */
+    public ProcessSetup startProcess(String keySuffix, CcPolicy ccPolicy) {
+        return startProcessWithInitiator(keySuffix, BpmSecurityUtil.getCurrentUserId(),
+                WithdrawPolicy.STRICT, ccPolicy);
     }
 
     /**
@@ -78,14 +99,14 @@ public class TestBpmFixture {
      * Uses synthetic username "user-{userId}" as the initiator (matching switchCurrentUserTo).
      */
     public ProcessSetup startProcessAsUser(String keySuffix, Long userId, WithdrawPolicy policy) {
-        return startProcessWithInitiator(keySuffix, "user-" + userId, policy);
+        return startProcessWithInitiator(keySuffix, "user-" + userId, policy, CcPolicy.ALL);
     }
 
     /**
      * Deploy a process with the given initiatorId stored as PROCESS_INSTANCE_START_USER_ID.
      */
     private ProcessSetup startProcessWithInitiator(String keySuffix, String initiatorId,
-            WithdrawPolicy policy) {
+            WithdrawPolicy withdrawPolicy, CcPolicy ccPolicy) {
         String processKey = "test-withdraw-" + keySuffix + "-" + UniqueIdGenerator.generate();
         String tenantId = MetaContext.getCurrentTenantIdAsString();
 
@@ -97,8 +118,9 @@ public class TestBpmFixture {
                         "test", bpmn, null, null, null);
         BpmProcessDefinition def = deploymentService.create(req);
 
-        // 2. Set the withdraw policy before deploying
-        def.setWithdrawPolicy(policy.code());
+        // 2. Set the withdraw and cc policies before deploying
+        def.setWithdrawPolicy(withdrawPolicy.code());
+        def.setCcPolicy(ccPolicy.code());
         processDefinitionMapper.updateById(def);
 
         deploymentService.deploy(def.getPid());
@@ -132,9 +154,18 @@ public class TestBpmFixture {
         }
         String taskId = tasks.get(0).getInstanceId();
 
-        log.debug("TestBpmFixture: started key={}, instanceId={}, taskId={}, initiator={}",
-                processKey, instanceId, taskId, initiatorId);
-        return new ProcessSetup(instanceId, taskId);
+        // Assignee id: use the claimUserId from the task if present; otherwise use a fixed
+        // test user id (888L) so cc-policy tests can switch to "the assignee".
+        Long assigneeId = 888L;
+        TaskInstance firstTask = tasks.get(0);
+        if (firstTask.getClaimUserId() != null && !firstTask.getClaimUserId().isBlank()) {
+            try { assigneeId = Long.parseLong(firstTask.getClaimUserId()); }
+            catch (NumberFormatException ignored) {}
+        }
+
+        log.debug("TestBpmFixture: started key={}, instanceId={}, taskId={}, initiator={}, assigneeId={}",
+                processKey, instanceId, taskId, initiatorId, assigneeId);
+        return new ProcessSetup(instanceId, taskId, assigneeId);
     }
 
     /**
