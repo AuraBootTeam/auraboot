@@ -90,7 +90,7 @@
               "to": "ab_announcement_form",
               "command": "announcement:update_announcement"
             },
-            "visibleWhen": { "field": "status", "operator": "eq", "value": "draft" }
+            "visibleWhen": "record.status === 'draft'"
           },
           {
             "code": "publish",
@@ -100,7 +100,7 @@
               "type": "command",
               "command": "announcement:publish"
             },
-            "visibleWhen": { "field": "status", "operator": "eq", "value": "draft" }
+            "visibleWhen": "record.status === 'draft'"
           },
           {
             "code": "archive",
@@ -109,7 +109,7 @@
               "type": "command",
               "command": "announcement:archive"
             },
-            "visibleWhen": { "field": "status", "operator": "eq", "value": "published" }
+            "visibleWhen": "record.status === 'published'"
           },
           {
             "code": "republish",
@@ -119,7 +119,7 @@
               "type": "command",
               "command": "announcement:republish"
             },
-            "visibleWhen": { "field": "status", "operator": "eq", "value": "archived" }
+            "visibleWhen": "record.status === 'archived'"
           },
           {
             "code": "delete",
@@ -130,7 +130,7 @@
               "type": "command",
               "command": "announcement:delete_announcement"
             },
-            "visibleWhen": { "field": "status", "operator": "in", "value": ["draft", "archived"] }
+            "visibleWhen": "record.status === 'draft' || record.status === 'archived'"
           }
         ],
         "defaultSort": {
