@@ -253,7 +253,11 @@ public class PostExecutionPhase implements CommandPhase {
             for (Map.Entry<String, Object> entry : variablesTemplate.entrySet()) {
                 Object value = entry.getValue();
                 if (value instanceof String strValue) {
-                    value = resolveStartProcessTemplate(strValue, payload, parentRecordId, command);
+                    // Preserve original types when the entire template is a single placeholder
+                    // (e.g. "${payload.wd_req_days}" → Integer 2, not String "2"). Drools
+                    // constraints like `((Number) this["days"]).doubleValue()` require this.
+                    Object typed = resolveTypedPlaceholder(strValue, payload, parentRecordId, command);
+                    value = (typed != null) ? typed : resolveStartProcessTemplate(strValue, payload, parentRecordId, command);
                 }
                 variables.put(entry.getKey(), value);
             }
@@ -274,6 +278,35 @@ public class PostExecutionPhase implements CommandPhase {
                         command.getModelCode(), storeInstanceIdIn, e.getMessage());
             }
         }
+    }
+
+    /**
+     * If the template is a single whole-string placeholder like
+     * {@code "${payload.wd_req_days}"} or {@code "${recordId}"}, return the
+     * raw typed value (Integer, Boolean, etc.) so downstream components that
+     * need typed values (Drools constraints, SmartEngine numeric compare)
+     * don't receive a stringified form. Returns null if the template is not a
+     * whole-string placeholder or the value cannot be resolved.
+     */
+    private Object resolveTypedPlaceholder(String template, Map<String, Object> payload,
+                                           String parentRecordId, CommandDefinition command) {
+        if (template == null || !template.startsWith("${") || !template.endsWith("}")) {
+            return null;
+        }
+        String inner = template.substring(2, template.length() - 1);
+        if (inner.contains("${") || inner.contains("}")) {
+            return null; // compound templates → fall back to string substitution
+        }
+        if ("recordId".equals(inner)) {
+            return parentRecordId;
+        }
+        if ("modelCode".equals(inner) && command != null) {
+            return command.getModelCode();
+        }
+        if (inner.startsWith("payload.") && payload != null) {
+            return payload.get(inner.substring("payload.".length()));
+        }
+        return null;
     }
 
     /**

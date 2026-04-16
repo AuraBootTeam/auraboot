@@ -522,7 +522,7 @@ cd "$PROJECT_ROOT"
 export AURA_TOKEN="$LOGIN_JWT"
 
 # Import in dependency order: base plugins first, then dependent ones
-PLUGINS_TO_IMPORT=(core-meta core-bpm core-aurabot page-manager platform-admin org-management crm-starter showcase agent-control-plane acp-showcase)
+PLUGINS_TO_IMPORT=(core-meta core-bpm core-aurabot page-manager platform-admin org-management crm-starter showcase agent-control-plane acp-showcase workflow-demo)
 
 # test-fixtures is an internal-only plugin that provides e2et_order/e2et_customer/
 # e2et_payment schemas for the E2E test suite. It is excluded from demo flows and
