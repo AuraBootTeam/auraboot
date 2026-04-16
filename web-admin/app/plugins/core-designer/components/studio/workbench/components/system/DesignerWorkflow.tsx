@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import type { PageSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
+import type { CanvasSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 import type { Version } from '~/plugins/core-designer/components/studio/domain/metadata/types';
 import {
   CollaborationProvider,
@@ -23,8 +23,8 @@ import {
 
 export interface DesignerWorkflowProps {
   pageId: string;
-  initialSchema: PageSchema;
-  onSchemaChange: (schema: PageSchema) => void;
+  initialSchema: CanvasSchema;
+  onSchemaChange: (schema: CanvasSchema) => void;
   children: React.ReactNode;
   enableAutoSave?: boolean;
   collaborationConfig?: {
@@ -46,7 +46,7 @@ const DesignerWorkflowContent: React.FC<DesignerWorkflowContentProps> = ({
   initialConflicts = [],
   onConflictsChange,
 }) => {
-  const [schema, setSchema] = useState<PageSchema>(initialSchema);
+  const [schema, setSchema] = useState<CanvasSchema>(initialSchema);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [showVersionPanel, setShowVersionPanel] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
@@ -68,7 +68,7 @@ const DesignerWorkflowContent: React.FC<DesignerWorkflowContentProps> = ({
   }, [initialConflicts]);
 
   const handleSchemaUpdate = useCallback(
-    (nextSchema: PageSchema) => {
+    (nextSchema: CanvasSchema) => {
       setSchema(nextSchema);
       onSchemaChange(nextSchema);
     },
@@ -226,7 +226,7 @@ export const DesignerWorkflow: React.FC<DesignerWorkflowProps> = ({
 );
 
 interface PreviewModalProps {
-  schema: PageSchema;
+  schema: CanvasSchema;
   onClose: () => void;
 }
 

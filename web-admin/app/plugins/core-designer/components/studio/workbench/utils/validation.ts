@@ -4,7 +4,7 @@
  * Schema 和组件验证相关的工具函数
  */
 
-import type { FormSchema, Block } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
+import type { CanvasSchema, Block } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 
 /**
  * 验证结果接口
@@ -38,7 +38,7 @@ export interface ValidationWarning {
 /**
  * 验证 Schema
  */
-export function validateSchema(schema: FormSchema): ValidationResult {
+export function validateSchema(schema: CanvasSchema): ValidationResult {
   const errors: ValidationError[] = [];
   const warnings: ValidationWarning[] = [];
 

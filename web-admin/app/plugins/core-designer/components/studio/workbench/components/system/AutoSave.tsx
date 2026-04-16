@@ -7,7 +7,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Save, Check, AlertCircle, Clock, Wifi, WifiOff } from 'lucide-react';
 import { getVersionManager } from '~/plugins/core-designer/components/studio/services/managers';
-import type { PageSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
+import type { CanvasSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 import { VersionType } from '~/plugins/core-designer/components/studio/domain/metadata/types';
 
 /**
@@ -20,7 +20,7 @@ export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error' | 'offline';
  */
 export interface AutoSaveProps {
   pageId: string;
-  schema: PageSchema;
+  schema: CanvasSchema;
   onSave?: (success: boolean) => void;
   autoSaveInterval?: number; // 自动保存间隔（毫秒）
   debounceDelay?: number; // 防抖延迟（毫秒）
@@ -119,7 +119,7 @@ export function AutoSave({
   const versionManager = getVersionManager();
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const autoSaveIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const lastSchemaRef = useRef<PageSchema>(schema);
+  const lastSchemaRef = useRef<CanvasSchema>(schema);
   const isSavingRef = useRef(false);
 
   /**
@@ -343,7 +343,7 @@ export function AutoSave({
  */
 export function useAutoSave(
   pageId: string,
-  schema: PageSchema,
+  schema: CanvasSchema,
   options: {
     autoSaveInterval?: number;
     debounceDelay?: number;
@@ -356,7 +356,7 @@ export function useAutoSave(
 
   const versionManager = getVersionManager();
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const lastSchemaRef = useRef<PageSchema>(schema);
+  const lastSchemaRef = useRef<CanvasSchema>(schema);
 
   const performSave = useCallback(async () => {
     try {

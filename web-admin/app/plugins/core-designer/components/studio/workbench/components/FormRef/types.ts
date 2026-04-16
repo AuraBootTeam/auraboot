@@ -117,7 +117,7 @@ export interface FormLayoutConfig {
 /**
  * 表单 Schema 定义
  */
-export interface FormSchema {
+export interface CanvasSchema {
   id: string;
   name: string;
   title: string;
@@ -181,7 +181,7 @@ export interface FormRefProps {
   mode: FormRefMode;
 
   // 快照模式下的表单 Schema
-  snapshot?: FormSchema;
+  snapshot?: CanvasSchema;
 
   // 数据绑定
   value?: Record<string, any>;
@@ -214,7 +214,7 @@ export interface FormRefProps {
   // 事件处理
   onFieldChange?: (fieldName: string, value: any) => void;
   onValidationChange?: (isValid: boolean, errors: Record<string, string[]>) => void;
-  onLoad?: (schema: FormSchema) => void;
+  onLoad?: (schema: CanvasSchema) => void;
   onError?: (error: Error) => void;
 
   // 动作系统集成
@@ -231,7 +231,7 @@ export interface FormRefState extends ComponentState {
     formId: string;
     mode: FormRefMode;
     status: FormRefStatus;
-    schema: FormSchema | null;
+    schema: CanvasSchema | null;
     data: Record<string, any>;
     errors: Record<string, string[]>;
     isValid: boolean;
@@ -247,16 +247,16 @@ export interface FormRefState extends ComponentState {
  */
 export interface FormRefManager {
   // 表单加载
-  loadForm(formId: string, mode: FormRefMode): Promise<FormSchema>;
+  loadForm(formId: string, mode: FormRefMode): Promise<CanvasSchema>;
 
   // 表单缓存
-  getCachedForm(formId: string): FormSchema | null;
-  setCachedForm(formId: string, schema: FormSchema): void;
+  getCachedForm(formId: string): CanvasSchema | null;
+  setCachedForm(formId: string, schema: CanvasSchema): void;
   clearCache(formId?: string): void;
 
   // 表单验证
   validateForm(
-    schema: FormSchema,
+    schema: CanvasSchema,
     data: Record<string, any>,
   ): {
     isValid: boolean;
@@ -264,10 +264,10 @@ export interface FormRefManager {
   };
 
   // 表单提交
-  submitForm(schema: FormSchema, data: Record<string, any>): Promise<any>;
+  submitForm(schema: CanvasSchema, data: Record<string, any>): Promise<any>;
 
   // 数据转换
-  transformData(schema: FormSchema, data: Record<string, any>): Record<string, any>;
+  transformData(schema: CanvasSchema, data: Record<string, any>): Record<string, any>;
 
   // 事件监听
   on(event: string, callback: Function): void;
@@ -290,7 +290,7 @@ export interface FormRefContext {
   };
 
   // 当前表单状态
-  currentForm: FormSchema | null;
+  currentForm: CanvasSchema | null;
   formData: Record<string, any>;
 
   // 操作方法
@@ -315,7 +315,7 @@ export interface FormFieldRenderer {
  * 表单事件类型
  */
 export interface FormRefEvents {
-  'form:load': { formId: string; schema: FormSchema };
+  'form:load': { formId: string; schema: CanvasSchema };
   'form:error': { formId: string; error: Error };
   'form:change': { formId: string; data: Record<string, any> };
   'form:submit': { formId: string; data: Record<string, any> };
