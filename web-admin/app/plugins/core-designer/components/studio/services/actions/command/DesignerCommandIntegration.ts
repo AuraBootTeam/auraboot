@@ -8,11 +8,11 @@ import {
   HistoryStack,
   type HistoryStackConfig,
 } from '~/plugins/core-designer/components/studio/services/actions/command/HistoryStack';
-import type { Component, PageSchema, Position } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
+import type { Component, CanvasSchema, Position } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 
 // 设计器状态接口
 export interface DesignerState {
-  pageSchema: PageSchema;
+  pageSchema: CanvasSchema;
   selectedComponents: string[];
   focusedComponent: string | null;
   layoutConfig: any;
@@ -20,7 +20,7 @@ export interface DesignerState {
 
 // 设计器操作接口
 export interface DesignerActions {
-  setPageSchema: (schema: PageSchema) => void;
+  setPageSchema: (schema: CanvasSchema) => void;
   addComponent: (component: Component, position?: Position) => void;
   removeComponent: (componentId: string) => void;
   updateComponent: (componentId: string, updates: Partial<Component>) => void;

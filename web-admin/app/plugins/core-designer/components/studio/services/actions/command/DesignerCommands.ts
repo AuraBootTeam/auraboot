@@ -5,7 +5,7 @@
  */
 
 import { BaseCommand } from '~/plugins/core-designer/components/studio/services/actions/command/Command';
-import type { FormSchema, Block } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
+import type { CanvasSchema, Block } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 import { getSchemaManager } from '~/plugins/core-designer/components/studio/services/schema/SchemaManager';
 
 /**
@@ -158,10 +158,10 @@ export class MoveComponentCommand extends BaseCommand {
  * 更新页面配置命令
  */
 export class UpdatePageConfigCommand extends BaseCommand {
-  private newConfig: Partial<FormSchema>;
-  private oldConfig?: Partial<FormSchema>;
+  private newConfig: Partial<CanvasSchema>;
+  private oldConfig?: Partial<CanvasSchema>;
 
-  constructor(newConfig: Partial<FormSchema>, metadata?: Record<string, any>) {
+  constructor(newConfig: Partial<CanvasSchema>, metadata?: Record<string, any>) {
     super('update_page_config', '更新页面配置', metadata);
     this.newConfig = newConfig;
   }
@@ -427,7 +427,7 @@ export class DesignerCommandFactory {
    * 创建更新页面配置命令
    */
   createUpdatePageConfigCommand(
-    newConfig: Partial<FormSchema>,
+    newConfig: Partial<CanvasSchema>,
     metadata?: Record<string, any>,
   ): UpdatePageConfigCommand {
     return new UpdatePageConfigCommand(newConfig, metadata);

@@ -3,7 +3,7 @@
  * Copied from the legacy designer layer to remove direct dependencies.
  */
 
-import type { PageSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
+import type { CanvasSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 
 export enum VersionStatus {
   draft = 'draft',
@@ -23,7 +23,7 @@ export interface Version {
   version: string;
   status: VersionStatus;
   type: VersionType;
-  schema: PageSchema;
+  schema: CanvasSchema;
   createdAt: Date | string;
   updatedAt: Date | string;
   createdBy: string;
@@ -58,7 +58,7 @@ export interface VersionDiff {
 
 export interface CreateVersionRequest {
   pageId: string;
-  schema?: PageSchema;
+  schema?: CanvasSchema;
   type: VersionType;
   description?: string;
   changelog?: string;
@@ -68,7 +68,7 @@ export interface CreateVersionRequest {
 
 export interface UpdateVersionRequest {
   versionId: string;
-  schema?: PageSchema;
+  schema?: CanvasSchema;
   description?: string;
   changelog?: string;
   tags?: string[];
