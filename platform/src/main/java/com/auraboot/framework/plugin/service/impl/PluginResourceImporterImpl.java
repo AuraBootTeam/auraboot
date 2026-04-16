@@ -40,7 +40,6 @@ import com.auraboot.framework.dashboard.dto.DashboardCreateRequest;
 import com.auraboot.framework.dashboard.dto.DashboardDTO;
 import com.auraboot.framework.dashboard.dto.DashboardUpdateRequest;
 import com.auraboot.framework.dashboard.entity.Dashboard;
-import com.auraboot.framework.dashboard.migration.BlockToDashboardConverter;
 import com.auraboot.framework.dashboard.service.DashboardService;
 import com.auraboot.framework.plugin.dto.imports.BindingRuleDTO;
 import com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTO;
@@ -1238,11 +1237,6 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     public PluginResource importPage(PageSchemaDTO dto, String pluginPid, String importId,
                                       Long tenantId, ImportRequest.ConflictStrategy conflictStrategy,
                                       Boolean autoPublish) {
-        // kind=dashboard is routed to the Dashboard DSL subsystem, bypassing ab_page_schema
-        if ("dashboard".equals(dto.getKind())) {
-            return importDashboardPage(dto, pluginPid, importId, tenantId, conflictStrategy);
-        }
-
         boolean exists = checkPageExists(tenantId, dto.getPageKey());
 
         if (exists && conflictStrategy == ImportRequest.ConflictStrategy.ERROR) {
@@ -1311,72 +1305,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     }
 
     /**
-     * Import a kind=dashboard plugin page by routing it to the Dashboard DSL subsystem.
-     * The page is converted via {@link BlockToDashboardConverter} and persisted via
-     * {@link DashboardService}. This bypasses {@code ab_page_schema} entirely.
-     *
-     * <p>Conflict strategy is honoured at the dashboard level (by code):
-     * <ul>
-     *   <li>ERROR  → throw if dashboard with same code already exists</li>
-     *   <li>SKIP   → return SKIP record if already exists</li>
-     *   <li>OVERWRITE / OVERWRITE_SAFE → update in place</li>
-     * </ul>
-     */
-    private PluginResource importDashboardPage(PageSchemaDTO dto, String pluginPid, String importId,
-                                               Long tenantId, ImportRequest.ConflictStrategy conflictStrategy) {
-        log.info("Plugin page '{}' has kind=dashboard — auto-converting to Dashboard DSL", dto.getPageKey());
-
-        Dashboard converted = BlockToDashboardConverter.convert(dto);
-        DashboardDTO existing = dashboardService.findByCode(converted.getCode());
-
-        if (existing != null && conflictStrategy == ImportRequest.ConflictStrategy.ERROR) {
-            throw new PluginException("Dashboard already exists: " + dto.getPageKey());
-        }
-
-        if (existing != null && conflictStrategy == ImportRequest.ConflictStrategy.SKIP) {
-            return createResourceRecord(pluginPid, importId, tenantId, ResourceType.PAGE,
-                    existing.getPid(), null, dto.getPageKey(), dto.getEffectiveName(),
-                    ResourceAction.SKIP, null, null);
-        }
-
-        if (existing != null) {
-            // OVERWRITE or OVERWRITE_SAFE — update in place
-            DashboardUpdateRequest updateReq = new DashboardUpdateRequest();
-            updateReq.setTitle(converted.getTitle());
-            updateReq.setDescription(converted.getDescription());
-            updateReq.setScope(converted.getScope());
-            updateReq.setLayoutConfig(converted.getLayoutConfig());
-            updateReq.setWidgets(converted.getWidgets());
-            dashboardService.update(existing.getPid(), updateReq);
-            log.info("Dashboard updated: code={}, pid={}", dto.getPageKey(), existing.getPid());
-            return createResourceRecord(pluginPid, importId, tenantId, ResourceType.PAGE,
-                    existing.getPid(), null, dto.getPageKey(), dto.getEffectiveName(),
-                    ResourceAction.UPDATE, null, null);
-        } else {
-            // Create new dashboard
-            DashboardCreateRequest createReq = new DashboardCreateRequest();
-            createReq.setCode(converted.getCode());
-            createReq.setTitle(converted.getTitle() != null && !converted.getTitle().isBlank()
-                    ? converted.getTitle() : dto.getPageKey());
-            createReq.setDescription(converted.getDescription());
-            createReq.setScope(converted.getScope());
-            createReq.setLayoutConfig(converted.getLayoutConfig());
-            createReq.setWidgets(converted.getWidgets());
-            DashboardDTO created = dashboardService.create(createReq);
-            // Publish immediately (create sets status=draft by default)
-            dashboardService.publish(created.getPid());
-            log.info("Dashboard created and published: code={}, pid={}", dto.getPageKey(), created.getPid());
-            return createResourceRecord(pluginPid, importId, tenantId, ResourceType.PAGE,
-                    created.getPid(), null, dto.getPageKey(), dto.getEffectiveName(),
-                    ResourceAction.CREATE, null, null);
-        }
-    }
-
-    /**
      * Import a dashboard from the first-class {@code config/dashboards/*.json} contract (Plan #8).
-     *
-     * <p>Unlike the legacy {@code kind=dashboard} page path (which uses {@link BlockToDashboardConverter}),
-     * the input is already in Dashboard DSL format, so widgets are used directly.
      *
      * <p>Conflict strategy is honoured at the dashboard level (by code):
      * <ul>
