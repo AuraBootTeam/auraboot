@@ -73,11 +73,6 @@ const ApprovalCommentsBlock = React.lazy(() =>
 const ListPageContent = React.lazy(() =>
   import('~/framework/meta/rendering/pages/ListPageContent').then((m) => ({ default: m.ListPageContent })),
 );
-const CompositePageContent = React.lazy(() =>
-  import('~/framework/meta/rendering/pages/CompositePageContent').then((m) => ({
-    default: m.CompositePageContent,
-  })),
-);
 const FormPageContent = React.lazy(() =>
   import('~/framework/meta/rendering/pages/FormPageContent').then((m) => ({ default: m.FormPageContent })),
 );
@@ -128,13 +123,12 @@ const adminProfile: RenderProfile = {
     // tabs, sub-table, monthly-grid are handled inline by page renderers
   ]),
 
-  kinds: ['page', 'list', 'form', 'detail', 'page_layout', 'composite'],
+  kinds: ['page', 'list', 'form', 'detail', 'page_layout'],
 
   pageRenderers: new Map<string, any>([
     ['list', ListPageContent],
     ['form', FormPageContent],
     ['detail', DetailPageContent],
-    ['composite', CompositePageContent],
   ]),
 
   skeletons: new Map<string, any>([

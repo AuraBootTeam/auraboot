@@ -57,7 +57,7 @@ ${modelContext}
 ## Output Format
 
 {
-  "kind": "list" | "form" | "detail" | "dashboard" | "composite",
+  "kind": "list" | "form" | "detail",
   "schemaVersion": ${versionInfo},
   "_mergeMode": "replace" | "append",
   "blocks": [ ...BlockConfig objects... ],

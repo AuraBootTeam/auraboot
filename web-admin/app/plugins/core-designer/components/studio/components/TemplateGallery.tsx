@@ -47,7 +47,7 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({ onSelect, sele
     return true;
   });
 
-  const KINDS = ['all', 'list', 'form', 'detail', 'dashboard', 'composite'];
+  const KINDS = ['all', 'list', 'form', 'detail'];
 
   if (loading) {
     return (
