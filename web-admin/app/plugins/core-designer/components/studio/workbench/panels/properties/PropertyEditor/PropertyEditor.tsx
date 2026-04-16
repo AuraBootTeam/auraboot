@@ -6,15 +6,16 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { PropertyGroup } from '~/plugins/core-designer/components/studio/workbench/panels/properties/PropertyEditor/PropertyGroup';
 import { PropertyInput } from '~/plugins/core-designer/components/studio/workbench/panels/properties/PropertyEditor/PropertyInput';
-import { useDesignerStore } from '~/plugins/core-designer/components/studio/hooks/store/useDesignerStore';
 import { getPropertyPersistenceManager } from '~/plugins/core-designer/components/studio/services/state/PropertyPersistenceManager';
 import { useLocalizedText } from '~/utils/i18n';
 import type { ComponentConfig } from '~/ui/smart/types';
-import type { Component } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { Component } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 
 export interface PropertyEditorProps {
   component: Component;
   config: ComponentConfig;
+  /** Called when component props should be updated in the schema */
+  onComponentChange?: (id: string, updates: Partial<Component>) => void;
   onPropertyChange?: (propertyName: string, value: any) => void;
   onValidationError?: (propertyName: string, error: string | null) => void;
 }
@@ -22,13 +23,13 @@ export interface PropertyEditorProps {
 export const PropertyEditor: React.FC<PropertyEditorProps> = ({
   component,
   config,
+  onComponentChange,
   onPropertyChange,
   onValidationError,
 }) => {
   const lt = useLocalizedText();
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['basic']));
-  const updateComponent = useDesignerStore((state) => state.updateComponent);
 
   // ✅ 当组件切换时，从localStorage加载最新属性
   useEffect(() => {
@@ -39,8 +40,8 @@ export const PropertyEditor: React.FC<PropertyEditorProps> = ({
       const savedProperties = await persistenceManager.loadComponentProperties(component.id);
 
       if (savedProperties && Object.keys(savedProperties).length > 0) {
-        // 将保存的属性合并到组件的props中
-        updateComponent(component.id, {
+        // Merge saved props back into component via onComponentChange
+        onComponentChange?.(component.id, {
           props: {
             ...component.props,
             ...savedProperties,
@@ -186,7 +187,7 @@ export const PropertyEditor: React.FC<PropertyEditorProps> = ({
             }
           }
 
-          updateComponent(component.id, updates);
+          onComponentChange?.(component.id, updates);
 
           // ✅ 保存到 localStorage 以支持导出
           const persistenceManager = getPropertyPersistenceManager();
@@ -205,7 +206,7 @@ export const PropertyEditor: React.FC<PropertyEditorProps> = ({
       onPropertyChange,
       onValidationError,
       component,
-      updateComponent,
+      onComponentChange,
     ],
   );
 

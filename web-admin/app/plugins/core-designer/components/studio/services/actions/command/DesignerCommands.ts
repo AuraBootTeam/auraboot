@@ -5,7 +5,7 @@
  */
 
 import { BaseCommand } from '~/plugins/core-designer/components/studio/services/actions/command/Command';
-import type { FormSchema, Block } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { FormSchema, Block } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 import { getSchemaManager } from '~/plugins/core-designer/components/studio/services/schema/SchemaManager';
 
 /**

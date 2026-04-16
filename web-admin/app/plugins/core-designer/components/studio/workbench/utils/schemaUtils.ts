@@ -4,7 +4,7 @@
  * Schema 管理相关的工具函数
  */
 
-import type { FormSchema, Block, LayoutConfig, ThemeConfig } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { FormSchema, Block, LayoutConfig, ThemeConfig } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 
 /**
  * 创建默认的 Schema

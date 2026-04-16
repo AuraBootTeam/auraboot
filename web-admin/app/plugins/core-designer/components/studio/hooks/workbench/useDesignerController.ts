@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { DragStartEvent, DragEndEvent } from '@dnd-kit/core';
-import type { FormSchema, Component, Position } from '~/plugins/core-designer/components/studio/domain/schema/types';
-import { useDesignerStore, getDesignerSDK } from '~/plugins/core-designer/components/studio/sdk';
+import type { FormSchema, Component, Position } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
+import { useCanvasEditorState, getDesignerSDK } from '~/plugins/core-designer/components/studio/sdk';
 import { DRAG_TYPES } from '~/plugins/core-designer/components/studio/workbench/constants';
 import { eventDomainManager } from '~/plugins/core-designer/components/studio/services/actions/event/EventDomainManager';
 import { globalShortcutManager } from '~/plugins/core-designer/components/studio/services/actions/event/GlobalShortcutManager';
@@ -64,20 +64,12 @@ export function useDesignerController(
   const [activeId, setActiveId] = useState<string | null>(null);
   const [draggedComponent, setDraggedComponent] = useState<DraggedComponentPreview | null>(null);
 
-  const {
-    addComponent,
-    updateComponent,
-    removeComponent,
-    swapComponents,
-    selectComponent,
-    setPageSchema,
-  } = useDesignerStore();
+  const { selectComponent } = useCanvasEditorState();
 
   // 初始化设计器状态
   useEffect(() => {
-    setPageSchema(initialSchema);
     setCurrentSchema(initialSchema);
-  }, [initialSchema, setPageSchema]);
+  }, [initialSchema]);
 
   useEffect(() => {
     const initializeDesigner = async () => {
@@ -205,8 +197,7 @@ export function useDesignerController(
         );
 
         if (targetComponent && targetComponent.id !== dragged.id) {
-          swapComponents(dragged.id, targetComponent.id);
-
+          // Swap positions immutably
           const updatedComponents = (currentSchema.components || []).map((comp: Component) => {
             if (comp.id === dragged.id) {
               return { ...comp, position: targetComponent.position };
@@ -217,15 +208,9 @@ export function useDesignerController(
             return comp;
           });
 
-          const updatedSchema = {
-            ...currentSchema,
-            components: updatedComponents,
-          };
-
-          handleSchemaChange(updatedSchema);
+          handleSchemaChange({ ...currentSchema, components: updatedComponents });
         } else {
-          updateComponent(dragged.id, { position: targetPosition });
-
+          // Move to target position
           const updatedComponents = (currentSchema.components || []).map((comp: Component) => {
             if (comp.id === dragged.id) {
               return { ...comp, position: targetPosition };
@@ -233,10 +218,7 @@ export function useDesignerController(
             return comp;
           });
 
-          handleSchemaChange({
-            ...currentSchema,
-            components: updatedComponents,
-          });
+          handleSchemaChange({ ...currentSchema, components: updatedComponents });
         }
       }
 
@@ -302,7 +284,6 @@ export function useDesignerController(
           children: [],
         };
 
-        addComponent(newComponent);
         selectComponent(newComponent.id);
 
         handleSchemaChange({
@@ -314,14 +295,7 @@ export function useDesignerController(
       setActiveId(null);
       setDraggedComponent(null);
     },
-    [
-      currentSchema,
-      addComponent,
-      updateComponent,
-      swapComponents,
-      selectComponent,
-      handleSchemaChange,
-    ],
+    [currentSchema, selectComponent, handleSchemaChange],
   );
 
   return {
