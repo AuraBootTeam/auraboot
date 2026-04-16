@@ -113,8 +113,6 @@ export function modeSupports(
  */
 export function getModeByKind(kind: string): PageMode {
   switch (kind) {
-    case 'home':
-      return 'grid';
     case 'list':
     case 'detail':
       return 'floor';
