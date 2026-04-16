@@ -1,0 +1,83 @@
+{
+  "pageKey": "wd_leave_request_list",
+  "modelCode": "wd_leave_request",
+  "kind": "list",
+  "layout": { "type": "stack" },
+  "blocks": [
+    {
+      "id": "wd_leave_request_filters",
+      "blockType": "filters",
+      "fields": [
+        { "field": "wd_req_status" },
+        { "field": "wd_req_type" },
+        { "field": "wd_req_applicant" }
+      ]
+    },
+    {
+      "id": "wd_leave_request_toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "create",
+          "primary": true,
+          "permissionCode": "wd.leave_request.manage",
+          "label": "create",
+          "action": {
+            "type": "navigate",
+            "to": "/p/wd_leave_request/new"
+          }
+        }
+      ]
+    },
+    {
+      "id": "wd_leave_request_table",
+      "blockType": "table",
+      "columns": [
+        { "field": "wd_req_code", "width": 160, "sortable": true },
+        { "field": "wd_req_applicant", "width": 140 },
+        { "field": "wd_req_type", "width": 120, "renderType": "tag", "dictCode": "wd_leave_type" },
+        { "field": "wd_req_start_date", "width": 120, "sortable": true },
+        { "field": "wd_req_end_date", "width": 120, "sortable": true },
+        { "field": "wd_req_days", "width": 80, "sortable": true },
+        { "field": "wd_req_status", "width": 120, "renderType": "tag", "dictCode": "wd_leave_status" },
+        {
+          "field": "actions",
+          "isActionColumn": true,
+          "buttons": [
+            {
+              "code": "view",
+              "label": "detail",
+              "action": { "type": "navigate", "to": "wd_leave_request_detail" }
+            },
+            {
+              "code": "edit",
+              "permissionCode": "wd.leave_request.manage",
+              "label": "edit",
+              "action": { "type": "navigate", "to": "wd_leave_request_form" }
+            },
+            {
+              "code": "submit",
+              "primary": true,
+              "permissionCode": "wd.leave_request.submit",
+              "label": "execute",
+              "action": { "type": "command", "command": "wd:submit_leave_request" }
+            },
+            {
+              "code": "delete",
+              "danger": true,
+              "permissionCode": "wd.leave_request.manage",
+              "label": "delete",
+              "confirm": "delete.confirm",
+              "action": { "type": "command", "command": "wd:delete_leave_request" }
+            }
+          ]
+        }
+      ],
+      "searchFields": ["wd_req_code"],
+      "defaultSort": { "field": "created_at", "order": "desc" }
+    }
+  ],
+  "name:zh-CN": "请假申请列表",
+  "name:en": "Leave Requests",
+  "title": { "zh-CN": "请假申请列表", "en": "Leave Requests" }
+}

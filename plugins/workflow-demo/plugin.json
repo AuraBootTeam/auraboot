@@ -1,0 +1,54 @@
+{
+  "pluginId": "com.auraboot.workflow-demo",
+  "namespace": "wd",
+  "version": "1.0.0",
+  "dslVersion": 1,
+  "pluginType": "config",
+  "displayName": "Workflow Demo",
+  "displayName:zh-CN": "工作流演示",
+  "displayName:en": "Workflow Demo",
+  "description": "OSS workflow demo plugin showcasing Smart Engine end-to-end capabilities using a leave-request business scenario (process designer, pages, tasks, SLA, Drools, notifications).",
+  "author": "AuraBoot Team",
+  "homepage": "https://auraboot.io/plugins/workflow-demo",
+  "minPlatformVersion": "1.0.0",
+  "dependencies": [
+    "com.auraboot.core-bpm",
+    "com.auraboot.core-meta"
+  ],
+  "provides": [
+    {"type": "model", "code": "wd_leave_request"},
+    {"type": "model", "code": "wd_leave_balance"},
+    {"type": "command", "code": "wd:create_leave_request"},
+    {"type": "command", "code": "wd:submit_leave_request"},
+    {"type": "process", "code": "wd_leave_approval"}
+  ],
+  "requires": [],
+  "resourceDirs": {
+    "dicts": "config/dicts.json",
+    "models": "config/models.json",
+    "fields": "config/fields.json",
+    "modelFieldBindings": "config/bindings.json",
+    "commands": "config/commands.json",
+    "bindingRules": "config/bindingRules.json",
+    "permissions": "config/permissions.json",
+    "roles": "config/roles.json",
+    "menus": "config/menus.json",
+    "pages": "config/pages",
+    "processes": "config/processes.json",
+    "namedQueries": "config/namedQueries.json",
+    "rules": "config/rules.json",
+    "sla": "config/sla.json",
+    "i18n": "config/i18n.json",
+    "defaultBootstrap": "config/default-bootstrap.json"
+  },
+  "importOptions": {
+    "conflictStrategy": "overwrite",
+    "validateReferences": true,
+    "autoPublishModels": true,
+    "autoPublishFields": true,
+    "autoPublishCommands": true,
+    "autoPublishPages": true,
+    "autoDeployProcesses": true,
+    "createResourcePermissions": true
+  }
+}

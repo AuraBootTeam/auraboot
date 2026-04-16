@@ -1,0 +1,317 @@
+[
+  {
+    "key": "wd_leave_approval",
+    "name:zh-CN": "请假审批",
+    "name:en": "Leave Request Approval",
+    "description": "OSS workflow demo: leave request approval flow with Drools-based routing, SLA on approver tasks, and approved/rejected notification serviceTasks.",
+    "category": "approval",
+    "designerJson": {
+      "nodes": [
+        {
+          "id": "start_1",
+          "type": "startEvent",
+          "position": {
+            "x": 80,
+            "y": 240
+          },
+          "data": {
+            "label:zh-CN": "开始",
+            "label:en": "Start"
+          }
+        },
+        {
+          "id": "svc_rule_route",
+          "type": "rule-task",
+          "position": {
+            "x": 400,
+            "y": 240
+          },
+          "data": {
+            "label:zh-CN": "路由规则",
+            "label:en": "Routing Rule",
+            "ruleCode": "wd_leave_routing",
+            "factsVars": "days,type"
+          }
+        },
+        {
+          "id": "gw_approver",
+          "type": "exclusiveGateway",
+          "position": {
+            "x": 580,
+            "y": 240
+          },
+          "data": {
+            "label:zh-CN": "审批人分派",
+            "label:en": "Approver Dispatch"
+          }
+        },
+        {
+          "id": "task_manager_approve",
+          "type": "userTask",
+          "position": {
+            "x": 760,
+            "y": 140
+          },
+          "data": {
+            "label:zh-CN": "主管审批",
+            "label:en": "Manager Approve",
+            "assigneeType": "role",
+            "assigneeValue": "wd_manager",
+            "formPageKey": "wd_leave_request_detail",
+            "slaKey": "wd_manager_approve_sla",
+            "taskActions": [
+              {
+                "key": "approve",
+                "label:zh-CN": "通过",
+                "label:en": "Approve",
+                "type": "complete",
+                "resultVariable": "taskResult",
+                "resultValue": "approved"
+              },
+              {
+                "key": "reject",
+                "label:zh-CN": "驳回",
+                "label:en": "Reject",
+                "type": "complete",
+                "resultVariable": "taskResult",
+                "resultValue": "rejected",
+                "requireComment": true
+              }
+            ]
+          }
+        },
+        {
+          "id": "task_hr_approve",
+          "type": "userTask",
+          "position": {
+            "x": 760,
+            "y": 340
+          },
+          "data": {
+            "label:zh-CN": "HR 审批",
+            "label:en": "HR Approve",
+            "assigneeType": "role",
+            "assigneeValue": "wd_hr",
+            "formPageKey": "wd_leave_request_detail",
+            "slaKey": "wd_hr_approve_sla",
+            "taskActions": [
+              {
+                "key": "approve",
+                "label:zh-CN": "通过",
+                "label:en": "Approve",
+                "type": "complete",
+                "resultVariable": "taskResult",
+                "resultValue": "approved"
+              },
+              {
+                "key": "reject",
+                "label:zh-CN": "驳回",
+                "label:en": "Reject",
+                "type": "complete",
+                "resultVariable": "taskResult",
+                "resultValue": "rejected",
+                "requireComment": true
+              }
+            ]
+          }
+        },
+        {
+          "id": "gw_result",
+          "type": "exclusiveGateway",
+          "position": {
+            "x": 940,
+            "y": 240
+          },
+          "data": {
+            "label:zh-CN": "审批结果",
+            "label:en": "Decision"
+          }
+        },
+        {
+          "id": "svc_notify_approved",
+          "type": "notification-task",
+          "position": {
+            "x": 1120,
+            "y": 140
+          },
+          "data": {
+            "label:zh-CN": "通知申请人（通过）",
+            "label:en": "Notify Applicant (Approved)",
+            "eventCode": "wd_request_approved",
+            "recipientFrom": "applicant",
+            "templateParamsVars": "businessKey,days"
+          }
+        },
+        {
+          "id": "svc_notify_rejected",
+          "type": "notification-task",
+          "position": {
+            "x": 1120,
+            "y": 340
+          },
+          "data": {
+            "label:zh-CN": "通知申请人（驳回）",
+            "label:en": "Notify Applicant (Rejected)",
+            "eventCode": "wd_request_rejected",
+            "recipientFrom": "applicant",
+            "templateParamsVars": "businessKey,days"
+          }
+        },
+        {
+          "id": "end_approved",
+          "type": "endEvent",
+          "position": {
+            "x": 1300,
+            "y": 140
+          },
+          "data": {
+            "label:zh-CN": "审批通过",
+            "label:en": "Approved"
+          }
+        },
+        {
+          "id": "end_rejected",
+          "type": "endEvent",
+          "position": {
+            "x": 1300,
+            "y": 340
+          },
+          "data": {
+            "label:zh-CN": "已驳回",
+            "label:en": "Rejected"
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "flow_start_submit",
+          "source": "start_1",
+          "target": "svc_rule_route",
+          "data": {
+            "condition": {
+              "content": "${true}",
+              "type": "expression"
+            }
+          }
+        },
+        {
+          "id": "flow_route_gw",
+          "source": "svc_rule_route",
+          "target": "gw_approver",
+          "data": {
+            "condition": {
+              "content": "${true}",
+              "type": "expression"
+            }
+          }
+        },
+        {
+          "id": "flow_gw_manager",
+          "source": "gw_approver",
+          "target": "task_manager_approve",
+          "data": {
+            "label:zh-CN": "主管",
+            "label:en": "Manager",
+            "condition": {
+              "content": "${approverRole == 'manager'}",
+              "type": "expression"
+            }
+          }
+        },
+        {
+          "id": "flow_gw_hr",
+          "source": "gw_approver",
+          "target": "task_hr_approve",
+          "data": {
+            "label:zh-CN": "HR",
+            "label:en": "HR",
+            "condition": {
+              "content": "${approverRole == 'hr'}",
+              "type": "expression"
+            }
+          }
+        },
+        {
+          "id": "flow_manager_result",
+          "source": "task_manager_approve",
+          "target": "gw_result",
+          "data": {
+            "condition": {
+              "content": "${true}",
+              "type": "expression"
+            }
+          }
+        },
+        {
+          "id": "flow_hr_result",
+          "source": "task_hr_approve",
+          "target": "gw_result",
+          "data": {
+            "condition": {
+              "content": "${true}",
+              "type": "expression"
+            }
+          }
+        },
+        {
+          "id": "flow_result_approved",
+          "source": "gw_result",
+          "target": "svc_notify_approved",
+          "data": {
+            "label:zh-CN": "通过",
+            "label:en": "Approved",
+            "condition": {
+              "content": "${taskResult == 'approved'}",
+              "type": "expression"
+            }
+          }
+        },
+        {
+          "id": "flow_result_rejected",
+          "source": "gw_result",
+          "target": "svc_notify_rejected",
+          "data": {
+            "label:zh-CN": "驳回",
+            "label:en": "Rejected",
+            "condition": {
+              "content": "${taskResult == 'rejected'}",
+              "type": "expression"
+            }
+          }
+        },
+        {
+          "id": "flow_notify_approved_end",
+          "source": "svc_notify_approved",
+          "target": "end_approved",
+          "data": {
+            "condition": {
+              "content": "${true}",
+              "type": "expression"
+            }
+          }
+        },
+        {
+          "id": "flow_notify_rejected_end",
+          "source": "svc_notify_rejected",
+          "target": "end_rejected",
+          "data": {
+            "condition": {
+              "content": "${true}",
+              "type": "expression"
+            }
+          }
+        }
+      ],
+      "viewport": {
+        "x": 0,
+        "y": 0,
+        "zoom": 1.0
+      }
+    },
+    "extension": {
+      "modelCode": "wd_leave_request",
+      "triggerCommand": "wd:submit_leave_request",
+      "processInstanceField": "wd_req_process_instance"
+    }
+  }
+]

@@ -1,0 +1,152 @@
+[
+  {
+    "code": "wd_req_code",
+    "displayName:zh-CN": "申请编号",
+    "displayName:en": "Request Code",
+    "dataType": "string",
+    "description": "Auto-generated leave request code.",
+    "constraints": { "required": true, "maxLength": 50 },
+    "feature": { "searchable": true, "sortable": true },
+    "extension": {
+      "readOnly": true,
+      "placeholder:zh-CN": "系统自动生成",
+      "placeholder:en": "Auto generated"
+    }
+  },
+  {
+    "code": "wd_req_applicant",
+    "displayName:zh-CN": "申请人",
+    "displayName:en": "Applicant",
+    "dataType": "reference",
+    "description": "User submitting the leave request.",
+    "constraints": { "required": true },
+    "extension": {
+      "refModelCode": "sys_user",
+      "refDisplayField": "username"
+    }
+  },
+  {
+    "code": "wd_req_type",
+    "displayName:zh-CN": "请假类型",
+    "displayName:en": "Leave Type",
+    "dataType": "enum",
+    "dictCode": "wd_leave_type",
+    "constraints": { "required": true },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "wd_req_start_date",
+    "displayName:zh-CN": "开始日期",
+    "displayName:en": "Start Date",
+    "dataType": "date",
+    "constraints": { "required": true },
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "wd_req_end_date",
+    "displayName:zh-CN": "结束日期",
+    "displayName:en": "End Date",
+    "dataType": "date",
+    "constraints": { "required": true },
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "wd_req_days",
+    "displayName:zh-CN": "天数",
+    "displayName:en": "Days",
+    "dataType": "decimal",
+    "description": "Number of leave days (supports half-day increments).",
+    "constraints": { "required": true, "precision": 6, "scale": 1 },
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "wd_req_reason",
+    "displayName:zh-CN": "请假原因",
+    "displayName:en": "Reason",
+    "dataType": "text",
+    "constraints": { "maxLength": 4000 },
+    "extension": {
+      "multiline": true,
+      "placeholder:zh-CN": "请输入请假原因",
+      "placeholder:en": "Enter reason for leave"
+    }
+  },
+  {
+    "code": "wd_req_attachments",
+    "displayName:zh-CN": "附件",
+    "displayName:en": "Attachments",
+    "dataType": "file",
+    "description": "Supporting documents (sick leave > 2 days requires attachment).",
+    "extension": {
+      "multiple": true,
+      "maxCount": 10
+    }
+  },
+  {
+    "code": "wd_req_cc_users",
+    "displayName:zh-CN": "抄送人",
+    "displayName:en": "CC Users",
+    "dataType": "reference",
+    "description": "Users to copy on approval notifications.",
+    "extension": {
+      "refModelCode": "sys_user",
+      "refDisplayField": "username",
+      "multiple": true
+    }
+  },
+  {
+    "code": "wd_req_status",
+    "displayName:zh-CN": "状态",
+    "displayName:en": "Status",
+    "dataType": "enum",
+    "dictCode": "wd_leave_status",
+    "defaultValue": "draft",
+    "description": "Leave request lifecycle status. Managed by state-transition commands.",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "wd_req_process_instance",
+    "displayName:zh-CN": "流程实例",
+    "displayName:en": "Process Instance",
+    "dataType": "string",
+    "description": "BPM process instance id linked to this request.",
+    "constraints": { "maxLength": 64 },
+    "extension": { "readOnly": true }
+  },
+
+  {
+    "code": "wd_bal_employee",
+    "displayName:zh-CN": "员工",
+    "displayName:en": "Employee",
+    "dataType": "reference",
+    "constraints": { "required": true },
+    "extension": {
+      "refModelCode": "sys_user",
+      "refDisplayField": "username"
+    }
+  },
+  {
+    "code": "wd_bal_year",
+    "displayName:zh-CN": "年度",
+    "displayName:en": "Year",
+    "dataType": "integer",
+    "constraints": { "required": true },
+    "feature": { "searchable": true, "sortable": true }
+  },
+  {
+    "code": "wd_bal_annual_remaining",
+    "displayName:zh-CN": "剩余年假",
+    "displayName:en": "Annual Remaining",
+    "dataType": "decimal",
+    "constraints": { "precision": 6, "scale": 1 },
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "wd_bal_sick_used",
+    "displayName:zh-CN": "已用病假",
+    "displayName:en": "Sick Used",
+    "dataType": "decimal",
+    "constraints": { "precision": 6, "scale": 1 },
+    "feature": { "sortable": true }
+  }
+]

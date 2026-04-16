@@ -1,5 +1,6 @@
 package com.auraboot.framework.bpm.converter;
 
+import com.auraboot.framework.bpm.chain.BpmServiceTaskConstants;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -280,7 +281,15 @@ public class JsonToBpmnConverter {
             case "startEvent" -> writeStartEvent(writer, nodeId, label);
             case "endEvent" -> writeEndEvent(writer, nodeId, label);
             case "userTask" -> writeUserTask(writer, nodeId, label, config);
-            case "serviceTask" -> writeServiceTask(writer, nodeId, label, config);
+            case "serviceTask" -> writeServiceTask(writer, nodeId, label, config, null);
+            case BpmServiceTaskConstants.NODE_TYPE_RULE_TASK ->
+                    // rule-task reads smart:* attrs directly off node.data
+                    // (no nested data.config indirection).
+                    writeServiceTask(writer, nodeId, label, data,
+                            BpmServiceTaskConstants.NODE_TYPE_RULE_TASK);
+            case BpmServiceTaskConstants.NODE_TYPE_NOTIFICATION_TASK ->
+                    writeServiceTask(writer, nodeId, label, data,
+                            BpmServiceTaskConstants.NODE_TYPE_NOTIFICATION_TASK);
             case "receiveTask" -> writeReceiveTask(writer, nodeId, label, config);
             case "exclusiveGateway" -> writeExclusiveGateway(writer, nodeId, label, gatewayDefaultFlows.get(nodeId));
             case "parallelGateway" -> writeParallelGateway(writer, nodeId, label, gatewayDefaultFlows.get(nodeId));
@@ -408,8 +417,8 @@ public class JsonToBpmnConverter {
         }
     }
 
-    private void writeServiceTask(XMLStreamWriter writer, String id, String name, JsonNode config)
-            throws XMLStreamException {
+    private void writeServiceTask(XMLStreamWriter writer, String id, String name, JsonNode config,
+                                   String subType) throws XMLStreamException {
         JsonNode multiInstance = config != null ? config.path("multiInstance") : null;
         boolean hasMultiInstance = multiInstance != null && !multiInstance.isMissingNode()
                 && multiInstance.path("enabled").asBoolean(false);
@@ -425,7 +434,52 @@ public class JsonToBpmnConverter {
             writer.writeAttribute("name", name);
         }
 
-        if (config != null && !config.isMissingNode()) {
+        if (BpmServiceTaskConstants.NODE_TYPE_RULE_TASK.equals(subType)) {
+            // Dedicated SmartEngine delegate for Drools evaluation.
+            writer.writeAttribute(SMART_NAMESPACE, "class", BpmServiceTaskConstants.BEAN_DROOLS_DELEGATE);
+            if (config != null && !config.isMissingNode()) {
+                String ruleCode = getTextOrNull(config, BpmServiceTaskConstants.ATTR_RULE_CODE);
+                if (ruleCode == null) {
+                    throw new BpmnConversionException("rule-task '" + id + "' missing '"
+                            + BpmServiceTaskConstants.ATTR_RULE_CODE + "' in config");
+                }
+                writer.writeAttribute(SMART_NAMESPACE, BpmServiceTaskConstants.ATTR_RULE_CODE, ruleCode);
+                String factsVars = getTextOrNull(config, BpmServiceTaskConstants.ATTR_FACTS_VARS);
+                if (factsVars != null) {
+                    writer.writeAttribute(SMART_NAMESPACE,
+                            BpmServiceTaskConstants.ATTR_FACTS_VARS, factsVars);
+                }
+            } else {
+                throw new BpmnConversionException("rule-task '" + id + "' missing config");
+            }
+        } else if (BpmServiceTaskConstants.NODE_TYPE_NOTIFICATION_TASK.equals(subType)) {
+            // Dedicated SmartEngine delegate for notification publishing.
+            writer.writeAttribute(SMART_NAMESPACE, "class",
+                    BpmServiceTaskConstants.BEAN_NOTIFICATION_DELEGATE);
+            if (config != null && !config.isMissingNode()) {
+                String eventCode = getTextOrNull(config, BpmServiceTaskConstants.ATTR_EVENT_CODE);
+                if (eventCode == null) {
+                    throw new BpmnConversionException("notification-task '" + id + "' missing '"
+                            + BpmServiceTaskConstants.ATTR_EVENT_CODE + "' in config");
+                }
+                writer.writeAttribute(SMART_NAMESPACE,
+                        BpmServiceTaskConstants.ATTR_EVENT_CODE, eventCode);
+                String recipientFrom = getTextOrNull(config,
+                        BpmServiceTaskConstants.ATTR_RECIPIENT_FROM);
+                if (recipientFrom != null) {
+                    writer.writeAttribute(SMART_NAMESPACE,
+                            BpmServiceTaskConstants.ATTR_RECIPIENT_FROM, recipientFrom);
+                }
+                String templateParamsVars = getTextOrNull(config,
+                        BpmServiceTaskConstants.ATTR_TEMPLATE_PARAMS_VARS);
+                if (templateParamsVars != null) {
+                    writer.writeAttribute(SMART_NAMESPACE,
+                            BpmServiceTaskConstants.ATTR_TEMPLATE_PARAMS_VARS, templateParamsVars);
+                }
+            } else {
+                throw new BpmnConversionException("notification-task '" + id + "' missing config");
+            }
+        } else if (config != null && !config.isMissingNode()) {
             String serviceType = getTextOrNull(config, "serviceType");
             String className = getTextOrNull(config, "className");
 
