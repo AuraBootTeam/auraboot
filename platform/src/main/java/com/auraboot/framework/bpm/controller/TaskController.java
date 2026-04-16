@@ -6,6 +6,7 @@ import com.auraboot.smart.framework.engine.service.param.query.TaskInstanceQuery
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.bpm.service.ProcessEngineService;
 import com.auraboot.framework.bpm.service.TaskService;
+import com.auraboot.framework.bpm.service.WithdrawService;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.permission.annotation.RequirePermission;
@@ -36,6 +37,7 @@ public class TaskController {
 
     private final TaskService taskService;
     private final ProcessEngineService processEngineService;
+    private final WithdrawService withdrawService;
 
     /**
      * 查询待办任务
@@ -155,6 +157,21 @@ public class TaskController {
         
         taskService.transferTask(taskId, request.getTargetUserId(), request.getComment());
         
+        return ApiResponse.success();
+    }
+
+    /**
+     * Withdraw a process instance via a current task.
+     * The caller must be the process initiator; withdrawal is subject to the process-level withdrawPolicy.
+     */
+    @PostMapping("/{taskId}/withdraw")
+    @RequirePermission(MetaPermission.WORKFLOW_EXECUTE)
+    @Operation(summary = "Withdraw process", description = "Initiator withdraws the process instance; subject to withdrawPolicy (strict/loose/none)")
+    public ApiResponse<Void> withdrawTask(
+            @PathVariable String taskId,
+            @RequestBody WithdrawRequest request) {
+        log.info("Withdrawing process via task: {}", taskId);
+        withdrawService.withdraw(taskId, request.reason());
         return ApiResponse.success();
     }
 
@@ -303,4 +320,5 @@ public class TaskController {
     public record RollbackTaskRequest(String targetActivityId, String reason) {}
     public record AddSignRequest(String userId, String reason) {}
     public record RemoveSignRequest(String userId, String reason) {}
+    public record WithdrawRequest(String reason) {}
 }

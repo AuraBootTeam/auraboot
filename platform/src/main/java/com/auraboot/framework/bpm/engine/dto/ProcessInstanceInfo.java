@@ -26,6 +26,7 @@ public class ProcessInstanceInfo {
         RUNNING,
         SUSPENDED,
         COMPLETED,
-        CANCELLED
+        CANCELLED,
+        WITHDRAWN
     }
 }
