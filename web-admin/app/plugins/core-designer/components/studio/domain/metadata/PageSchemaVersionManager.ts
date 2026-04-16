@@ -8,7 +8,7 @@
  * - 本地缓存和离线支持
  */
 
-import type { PageSchema } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { PageSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 import type {
   Version,
   VersionManager,

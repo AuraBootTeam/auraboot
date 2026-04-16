@@ -4,7 +4,7 @@
  * 设计器相关常量定义
  */
 
-import type { ThemeConfig } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { ThemeConfig } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 import type { ComponentCategory } from '~/plugins/core-designer/components/studio/workbench/palette/ComponentPalette/types';
 
 /**

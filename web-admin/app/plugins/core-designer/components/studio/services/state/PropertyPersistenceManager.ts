@@ -4,7 +4,7 @@
  * 集成撤销/重做功能
  */
 
-import type { Component } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { Component } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 import { UpdatePropertyCommand } from '~/plugins/core-designer/components/studio/services/actions/command/DesignerCommands';
 
 /**

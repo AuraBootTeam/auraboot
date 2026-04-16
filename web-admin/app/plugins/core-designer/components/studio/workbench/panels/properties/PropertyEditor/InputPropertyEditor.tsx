@@ -8,19 +8,21 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { Input } from '~/ui/smart/form/Input';
 import { Select } from '~/ui/smart/form/Select';
 import { Checkbox } from '~/ui/smart/form/Checkbox';
-import { useDesignerStore } from '~/plugins/core-designer/components/studio/hooks/store/useDesignerStore';
-import type { Component } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { Component } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 
 // 导入属性面板配置
 import propertyPanelConfig from '~/plugins/core-designer/components/studio/workbench/panels/properties/property-panel-input.json';
 
 export interface InputPropertyEditorProps {
   component: Component;
+  /** Called when component props should be updated in the schema */
+  onComponentChange?: (id: string, updates: Partial<Component>) => void;
   onPropertyChange?: (propertyName: string, value: any) => void;
 }
 
 export const InputPropertyEditor: React.FC<InputPropertyEditorProps> = ({
   component,
+  onComponentChange,
   onPropertyChange,
 }) => {
   const [formData, setFormData] = useState<Record<string, any>>({});
@@ -28,8 +30,6 @@ export const InputPropertyEditor: React.FC<InputPropertyEditorProps> = ({
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
     new Set(['basic', 'validation', 'behavior', 'layout', 'appearance']),
   );
-
-  const updateComponent = useDesignerStore((state) => state.updateComponent);
 
   // 初始化表单数据
   useEffect(() => {
@@ -137,7 +137,7 @@ export const InputPropertyEditor: React.FC<InputPropertyEditorProps> = ({
           }
         }
 
-        updateComponent(component.id, updates);
+        onComponentChange?.(component.id, updates);
 
         // 调用外部回调
         if (onPropertyChange) {
@@ -145,7 +145,7 @@ export const InputPropertyEditor: React.FC<InputPropertyEditorProps> = ({
         }
       }
     },
-    [component, validateField, updateComponent, onPropertyChange],
+    [component, validateField, onComponentChange, onPropertyChange],
   );
 
   // 切换分组展开状态

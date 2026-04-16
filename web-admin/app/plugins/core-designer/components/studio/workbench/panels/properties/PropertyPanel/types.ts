@@ -1,4 +1,4 @@
-import type { Component } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { Component } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 import type { LayoutSettings } from '~/plugins/core-designer/components/studio/workbench/components/toolbar/DesignerHeader/types';
 
 export interface ComponentType {
