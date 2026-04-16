@@ -1,14 +1,14 @@
 /**
  * PreviewModal Component
  *
- * Device-responsive preview for DslV4Schema pages.
- * Supports both areas-based (list/form) and floors-based (detail/home) DSL.
+ * Device-responsive preview for PageSchema V2 pages.
+ * Renders schema.blocks uniformly via a LayoutContainer dispatching on layout.type.
  *
- * @since 4.0.0
+ * @since 5.0.0
  */
 
 import React, { useCallback, useMemo } from 'react';
-import type { DslV4Schema, DslBlock, DslFloor, DslComponent } from '~/plugins/core-designer/components/studio/domain/dsl/types';
+import type { PageSchema, DslBlock, PageLayout } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 
 /**
  * Device preset configurations
@@ -27,7 +27,7 @@ type DeviceType = keyof typeof DEVICE_PRESETS;
 export interface PreviewModalProps {
   isOpen: boolean;
   onClose: () => void;
-  schema?: DslV4Schema;
+  schema?: PageSchema;
   pageTitle?: string;
 }
 
@@ -45,64 +45,19 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
 
   const deviceDimensions = useMemo(() => DEVICE_PRESETS[device], [device]);
 
-  // Count total elements for footer
-  const elementCount = useMemo(() => {
-    if (!schema) return 0;
-    if (schema.areas) {
-      return Object.values(schema.areas).reduce((sum, area) => sum + (area.blocks?.length || 0), 0);
-    }
-    if (schema.floors) {
-      return schema.floors.reduce(
-        (sum, floor) => sum + (floor.components?.length || 0) + (floor.tabs?.length || 0),
-        0,
-      );
-    }
-    return 0;
-  }, [schema]);
+  // Count total blocks for footer
+  const elementCount = useMemo(() => schema?.blocks?.length ?? 0, [schema]);
 
-  // Render page content based on DSL structure
+  // Render page content using V2 flat blocks + layout
   const renderPageContent = useCallback(() => {
-    if (!schema) {
-      return <EmptyPagePlaceholder />;
-    }
-
-    // Areas-based DSL (list/form)
-    if (schema.areas) {
-      const areaEntries = Object.entries(schema.areas);
-      const hasContent = areaEntries.some(([, area]) => area.blocks?.length > 0);
-      if (!hasContent) return <EmptyPagePlaceholder />;
-
-      return (
-        <div className={`h-full w-full space-y-4 p-4 ${showGrid ? 'bg-grid-pattern' : 'bg-white'}`}>
-          {areaEntries.map(
-            ([areaName, area]) =>
-              area.blocks?.length > 0 && (
-                <div key={areaName} className="space-y-3">
-                  <div className="text-[10px] font-medium tracking-wider text-gray-400 uppercase">
-                    {areaName}
-                  </div>
-                  {area.blocks.map((block, idx) => (
-                    <BlockPreview key={block.id || idx} block={block} showGrid={showGrid} />
-                  ))}
-                </div>
-              ),
-          )}
-        </div>
-      );
-    }
-
-    // Floors-based DSL (detail/home)
-    if (schema.floors && schema.floors.length > 0) {
-      return (
-        <div className={`h-full w-full space-y-4 p-4 ${showGrid ? 'bg-grid-pattern' : 'bg-white'}`}>
-          {schema.floors.map((floor, idx) => (
-            <FloorPreview key={floor.id || idx} floor={floor} showGrid={showGrid} />
-          ))}
-        </div>
-      );
-    }
-
-    return <EmptyPagePlaceholder />;
+    if (!schema || schema.blocks.length === 0) return <EmptyPagePlaceholder />;
+    return (
+      <LayoutContainer layout={schema.layout} showGrid={showGrid}>
+        {schema.blocks.map((block) => (
+          <BlockPreview key={block.id} block={block} showGrid={showGrid} />
+        ))}
+      </LayoutContainer>
+    );
   }, [schema, showGrid]);
 
   if (!isOpen) return null;
@@ -242,7 +197,28 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
 };
 
 // =============================================================================
-// Block Preview (for areas-based DSL)
+// Layout Container — dispatches on schema.layout.type
+// =============================================================================
+
+const LayoutContainer: React.FC<{
+  layout: PageLayout;
+  showGrid: boolean;
+  children: React.ReactNode;
+}> = ({ layout, showGrid, children }) => {
+  const base = `h-full w-full p-4 ${showGrid ? 'bg-grid-pattern' : 'bg-white'}`;
+  if (layout.type === 'grid') {
+    return (
+      <div className={`${base} grid gap-4`} style={{ gridTemplateColumns: `repeat(${layout.cols}, minmax(0, 1fr))` }}>
+        {children}
+      </div>
+    );
+  }
+  // default: stack
+  return <div className={`${base} flex flex-col gap-4`}>{children}</div>;
+};
+
+// =============================================================================
+// Block Preview
 // =============================================================================
 
 const BlockPreview: React.FC<{ block: DslBlock; showGrid: boolean }> = ({ block, showGrid }) => {
@@ -380,78 +356,6 @@ const BlockPreview: React.FC<{ block: DslBlock; showGrid: boolean }> = ({ block,
         </div>
       );
   }
-};
-
-// =============================================================================
-// Floor Preview (for floors-based DSL)
-// =============================================================================
-
-const FLOOR_COMP_ICONS: Record<string, string> = {
-  'detail-section': '📄',
-  'sub-table': '📊',
-  'stat-card': '📈',
-  timeline: '🕐',
-  'action-buttons': '🔘',
-  'welcome-banner': '🏠',
-  'quick-links': '🔗',
-  'stat-cards': '📊',
-  'recent-list': '📋',
-  'chart-card': '📉',
-};
-
-const FloorPreview: React.FC<{ floor: DslFloor; showGrid: boolean }> = ({ floor, showGrid }) => {
-  const borderClass = showGrid
-    ? 'border border-dashed border-blue-300 bg-blue-50/30'
-    : 'border border-gray-200 bg-gray-50';
-
-  return (
-    <div className={`${borderClass} rounded-lg p-3`}>
-      {/* Floor title */}
-      <div className="mb-2 flex items-center justify-between">
-        <div className="text-sm font-medium text-gray-700">{floor.title || 'Floor'}</div>
-        {floor.collapsible && <span className="text-[10px] text-gray-400">collapsible</span>}
-      </div>
-
-      {/* Tabs or components */}
-      {floor.type === 'TabsFloor' && floor.tabs ? (
-        <div>
-          <div className="mb-2 flex border-b border-gray-200">
-            {floor.tabs.map((tab, i) => (
-              <div
-                key={tab.key}
-                className={`px-3 py-1.5 text-xs ${
-                  i === 0 ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'
-                }`}
-              >
-                {tab.icon && <span className="mr-1">{tab.icon}</span>}
-                {tab.label}
-              </div>
-            ))}
-          </div>
-          {floor.tabs[0] && <ComponentPreviewCard component={floor.tabs[0].content} />}
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 gap-2">
-          {(floor.components || []).map((comp, i) => (
-            <ComponentPreviewCard key={comp.id || i} component={comp} />
-          ))}
-          {(!floor.components || floor.components.length === 0) && (
-            <div className="col-span-2 py-4 text-center text-xs text-gray-400">No components</div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
-
-const ComponentPreviewCard: React.FC<{ component: DslComponent }> = ({ component }) => {
-  const icon = FLOOR_COMP_ICONS[component.type] || '📦';
-  return (
-    <div className="flex items-center gap-2 rounded border border-gray-100 bg-white p-2">
-      <span className="text-base">{icon}</span>
-      <span className="text-xs text-gray-600">{component.type}</span>
-    </div>
-  );
 };
 
 // =============================================================================

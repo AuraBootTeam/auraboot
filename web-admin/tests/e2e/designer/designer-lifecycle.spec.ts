@@ -265,7 +265,7 @@ test.describe.serial('Report Designer Lifecycle (DL-RPT)', () => {
     expect(resp.status()).toBeLessThan(400);
   });
 
-  test('DL-RPT-05: Backend data verify — pageCategory REPORT, dslSchema non-empty', async ({
+  test('DL-RPT-05: Backend data verify — profile=report, blocks array present', async ({
     page,
   }) => {
     if (!pid) {
@@ -305,7 +305,7 @@ test.describe.serial('Report Designer Lifecycle (DL-RPT)', () => {
     expect(data.profile).toBe('report');
     expect(data.kind).toBe('composite');
     expect(['draft', 'published']).toContain(data.status);
-    expect(Array.isArray(data.blocks) || !!data.dslSchema).toBe(true);
+    expect(Array.isArray(data.blocks)).toBe(true);
   });
 });
 

@@ -1,17 +1,17 @@
 /**
- * Page Designer V2 — Deep Component Coverage E2E Tests
+ * DEPRECATED: Deep Component Coverage E2E Tests
  *
- * Tests EVERY interactive element in the CanvasEditor:
- *   - Left panel: BlockPalette (8 block types + search), FieldPalette, OutlinePanel
- *   - Center: InlineTitle, EmptyCanvas, CanvasBody (block cards, selection, deletion, drop zone)
- *   - Right panel: BlockConfigPanel routing, TableBlockConfig (all toggles + selects),
- *     FormSectionConfig (mode, command, columns, fields), ChartBlockConfig (3 data modes, 4 chart types),
- *     TabsBlockConfig (add/rename/delete), SubTableConfig, StatCardConfig, PageSettingsPanel
- *   - Runtime: CompositePageContent rendering
+ * This file tested the CanvasEditor for kind='composite' pages.
+ * Composite kind was removed in V2 unification (2026-04-15).
+ * All tests in this file are SKIPPED.
  *
- * Named *-deep.spec.ts to run in chromium-deep project (120s timeout, 30s action timeout).
+ * Migration:
+ * - Dashboard pages now use Dashboard DSL instead
+ * - Page Designer is for CRUD pages (list/form/detail)
+ * - Widget pages use blocks structure (kind='dashboard')
  *
  * @since 4.0.0
+ * @deprecated 4.0.0 — composite kind no longer supported
  */
 
 import { test, expect, type Page } from '../../fixtures';
@@ -85,6 +85,9 @@ async function waitForSave(page: Page): Promise<void> {
     { timeout: 10_000 },
   );
 }
+
+// Skip all tests: composite kind removed in V2 unification
+test.describe.skip('Composite kind removed in V2 unification (2026-04-15)', () => {
 
 // =============================================================================
 // Section 1: Layout Structure
@@ -800,3 +803,4 @@ test.describe('Left Panel Tabs', () => {
     await expect(page.getByTestId('block-palette')).toBeVisible();
   });
 });
+}); // end skip: composite kind removed

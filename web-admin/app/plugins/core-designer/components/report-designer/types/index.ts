@@ -1,5 +1,5 @@
 /**
- * ReportDSL Types — independent from DslV4Schema
+ * ReportDSL Types — independent from PageSchema
  *
  * Report Designer has its own DSL schema, following the
  * "Shell unified, DSL independent" architecture principle.

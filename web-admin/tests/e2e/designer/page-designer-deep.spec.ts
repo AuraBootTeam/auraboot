@@ -37,23 +37,17 @@ async function createAndOpenPage(page: Page): Promise<string> {
     await waitForDesignerLoad(page);
     return pid;
   }
-  // Use LIST type (simpler schema) matching lifecycle test pattern
+  // Use list kind (simpler schema) matching lifecycle test pattern
   const dynamicKey = `pdd_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
   const resp = await page.request.post('/api/pages', {
     data: {
       pageKey: dynamicKey,
       name: testId,
       title: testId,
-      pageType: 'list',
-      pageCategory: 'model',
+      kind: 'list',
       modelCode: 'ab_user',
-      dslSchema: {
-        kind: 'List',
-        version: '4.0.0',
-        modelCode: 'ab_user',
-        layout: { type: 'areas' },
-        areas: { main: { blocks: [] } },
-      },
+      blocks: [],
+      layout: { type: 'stack' },
     },
   });
   const body = await resp.json();
@@ -216,14 +210,13 @@ test.describe('Toolbar State & Actions', () => {
 /* ================================================================== */
 
 test.describe('Backend Verify', () => {
-  test('PDD-BV-01: GET verify dslSchema', async ({ page }) => {
+  test('PDD-BV-01: GET verify V2 schema fields', async ({ page }) => {
     await createAndOpenPage(page);
     const resp = await page.request.get(`/api/pages/${pid}`);
     expect(resp.ok()).toBeTruthy();
     const { data } = await resp.json();
-    expect(data.dslSchema).toBeTruthy();
-    const schema = typeof data.dslSchema === 'string' ? JSON.parse(data.dslSchema) : data.dslSchema;
-    expect(schema.kind).toBeTruthy();
+    expect(data.kind).toBeTruthy();
+    expect(Array.isArray(data.blocks)).toBe(true);
   });
 
   test('PDD-BV-02: Publish → published', async ({ page }) => {

@@ -15,6 +15,7 @@ import { PAGE_STATUS_INFO } from '../../../services/page-manager';
 import { SaveAsTemplateDialog } from '~/plugins/core-designer/components/studio/components/SaveAsTemplateDialog';
 import { AiPageGenerateDialog } from '~/plugins/core-designer/components/studio/components/AiPageGenerateDialog';
 import type { MergeMode } from '~/plugins/core-designer/components/studio/components/ai-page-prompt';
+import type { PageSchema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 
 /**
  * DesignerToolbar props
@@ -58,7 +59,7 @@ export interface DesignerToolbarProps {
   onSettings?: () => void;
   onShortcutHelp?: () => void;
   /** Called when AI generates a page DSL */
-  onAiGenerated?: (dsl: { kind: string; blocks: any[]; layout: any; schemaVersion: number; mergeMode?: MergeMode }) => void;
+  onAiGenerated?: (dsl: { kind: PageSchema['kind']; blocks: PageSchema['blocks']; layout: PageSchema['layout']; schemaVersion: 2; mergeMode?: MergeMode }) => void;
   /** Whether the AI panel is currently open */
   aiPanelOpen?: boolean;
   /** Toggle AI panel visibility */

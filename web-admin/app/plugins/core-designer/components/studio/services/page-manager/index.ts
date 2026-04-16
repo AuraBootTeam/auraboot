@@ -10,7 +10,6 @@
 export type {
   PageMeta,
   PageStatus,
-  PageMode,
   PageListFilter,
   PageListSort,
   PageListPagination,
@@ -20,7 +19,7 @@ export type {
   PageTemplate,
 } from './types';
 
-export { PAGE_MODE_INFO, PAGE_STATUS_INFO } from './types';
+export { PAGE_KIND_INFO, PAGE_STATUS_INFO } from './types';
 
 // API Types (wire format)
 export type {
@@ -40,13 +39,13 @@ export * as pageApi from './pageApi';
 
 // Type Converters
 export {
+  toPageSchema,
   toPageMeta,
-  toApiPageType,
-  fromApiPageType,
   toApiPageStatus,
   fromApiPageStatus,
   toCreateRequest,
   toUpdateRequest,
+  createDslSchemaPayload,
 } from './converters';
 
 // Service
