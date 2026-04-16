@@ -458,7 +458,7 @@ export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
 
             <div className="flex-1 overflow-hidden">
               {leftPanelTab === 'blocks' && (
-                <BlockLibrary pageKind={schema.kind} readonly={readonly} />
+                <BlockLibrary pageKind={schema.kind} readonly={readonly} onAddBlock={addBlock} />
               )}
               {leftPanelTab === 'outline' && (
                 <div className="overflow-auto p-3">
