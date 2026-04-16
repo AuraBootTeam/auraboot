@@ -53,7 +53,7 @@
           {
             "code": "edit",
             "label": "edit",
-            "action": { "type": "navigate", "url": "/page-designer/{pid}" }
+            "action": { "type": "navigate", "to": "/page-designer/{pid}" }
           },
           {
             "code": "publish",

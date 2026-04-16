@@ -5,7 +5,6 @@
  * - Undo/Redo via keyboard shortcuts
  * - Preview modal opens and shows content
  * - Device switcher in preview
- * - FloorsDesigner 3-panel layout
  * - Keyboard shortcuts (Ctrl+S save)
  *
  * @since 4.0.0
@@ -35,14 +34,12 @@ test.describe('GAP-025: Designer Maturity', () => {
     }
 
     // Canvas should be visible
-    const canvas = page
-      .locator('[data-testid="designer-canvas"], [data-testid="floors-designer-canvas"]')
-      .first();
+    const canvas = page.locator('[data-testid="designer-canvas"]').first();
     await expect(canvas).toBeVisible({ timeout: 10000 });
 
     // Properties panel should be visible
     const propertiesPanel = page
-      .locator('[data-testid="designer-properties-panel"], [data-testid="floors-properties-panel"]')
+      .locator('[data-testid="designer-properties-panel"]')
       .first();
     await expect(propertiesPanel).toBeVisible({ timeout: 5000 });
   });
@@ -181,41 +178,17 @@ test.describe('GAP-025: Designer Maturity', () => {
 
     // Page should still be in designer (not navigated away)
     await expect(
-      page
-        .locator('[data-testid="designer-canvas"], [data-testid="floors-designer-canvas"]')
-        .first(),
+      page.locator('[data-testid="designer-canvas"]').first(),
     ).toBeVisible({ timeout: 5000 });
   });
 
   /**
-   * G25-E06: FloorsDesigner — add floor button visible for detail/home pages
-   * Checks that the "Add Floor" button exists in the FloorsDesigner.
+   * G25-E06: FloorsDesigner — SKIPPED
+   * FloorsDesigner was removed in V2 unification (Task 4.5).
+   * All kinds (list/form/detail) now use the unified BlocksDesigner.
    */
-  test('G25-E06: FloorsDesigner add floor button', async ({ page }) => {
-    // Try to find a detail-kind page
-    await page.goto('/page-designer', { waitUntil: 'domcontentloaded' });
-
-    const loaded = await designerPage.openViaList();
-    if (!loaded) {
-      test.skip(true, 'No pages available in designer');
-      return;
-    }
-
-    // Check if we're in floors designer mode
-    const addFloorBtn = page.locator('[data-testid="floors-add-floor-btn"]');
-    const floorsCanvas = page.locator('[data-testid="floors-designer-canvas"]');
-
-    // If we're in floors mode, verify add floor button
-    if (await floorsCanvas.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await expect(addFloorBtn).toBeVisible({ timeout: 3000 });
-
-      // Click add floor
-      await addFloorBtn.click();
-
-      // A floor section should appear
-      const floorSection = page.locator('[data-testid^="floor-section-"]').first();
-      await expect(floorSection).toBeVisible({ timeout: 5000 });
-    }
+  test.skip('G25-E06: FloorsDesigner add floor button', () => {
+    // FloorsDesigner removed in V2 unification — BlocksDesigner handles all kinds
   });
 
   /**
