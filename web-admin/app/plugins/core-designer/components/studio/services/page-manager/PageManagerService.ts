@@ -85,7 +85,7 @@ const DRAFT_CACHE_KEY = 'aura-page-designer-drafts';
  */
 export class PageManagerService {
   private static instance: PageManagerService;
-  private draftCache: Map<string, { schema: Record<string, unknown>; timestamp: number }> =
+  private draftCache: Map<string, { schema: PageSchema; timestamp: number }> =
     new Map();
   private templates: PageTemplate[] = [...DEFAULT_TEMPLATES];
 
@@ -130,7 +130,7 @@ export class PageManagerService {
       if (stored) {
         const data = JSON.parse(stored) as Record<
           string,
-          { schema: Record<string, unknown>; timestamp: number }
+          { schema: PageSchema; timestamp: number }
         >;
         Object.entries(data).forEach(([key, value]) => {
           this.draftCache.set(key, value);
@@ -148,7 +148,7 @@ export class PageManagerService {
     if (!this.isBrowser()) return;
 
     try {
-      const data: Record<string, { schema: Record<string, unknown>; timestamp: number }> = {};
+      const data: Record<string, { schema: PageSchema; timestamp: number }> = {};
       this.draftCache.forEach((value, key) => {
         data[key] = value;
       });
@@ -161,7 +161,7 @@ export class PageManagerService {
   /**
    * Cache draft schema locally
    */
-  public cacheDraft(pageId: string, schema: Record<string, unknown>): void {
+  public cacheDraft(pageId: string, schema: PageSchema): void {
     this.draftCache.set(pageId, {
       schema,
       timestamp: Date.now(),
@@ -172,7 +172,7 @@ export class PageManagerService {
   /**
    * Get cached draft schema
    */
-  public getCachedDraft(pageId: string): Record<string, unknown> | null {
+  public getCachedDraft(pageId: string): PageSchema | null {
     const cached = this.draftCache.get(pageId);
     return cached?.schema || null;
   }
@@ -446,13 +446,13 @@ export class PageManagerService {
     schema: PageSchema,
   ): Promise<void> {
     // Cache locally first for auto-save
-    this.cacheDraft(id, schema as unknown as Record<string, unknown>);
+    this.cacheDraft(id, schema);
 
     // Compute blockCount from schema.blocks
     const blockCount = schema.blocks?.length ?? 0;
 
     // Update via API
-    const payload = createDslSchemaPayload(schema as unknown as Record<string, unknown>, blockCount);
+    const payload = createDslSchemaPayload(schema, blockCount);
     const result = await pageApi.updatePage(id, payload);
 
     if (!ResultHelper.isSuccess(result)) {
@@ -472,7 +472,7 @@ export class PageManagerService {
     const cached = this.getCachedDraft(id);
     if (cached) {
       // Cast cached draft to PageSchema — assumes it's already a valid schema
-      await this.updatePageSchema(id, cached as unknown as PageSchema);
+      await this.updatePageSchema(id, cached);
     }
   }
 

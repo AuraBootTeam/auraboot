@@ -192,7 +192,7 @@ export function toCreateRequest(request: CreatePageRequest): PageSchemaCreateReq
  *   - metaInfo
  */
 export function createDslSchemaPayload(
-  schema: Record<string, unknown>,
+  schema: PageSchema,
   componentCount: number,
 ): Record<string, unknown> {
   const payload: Record<string, unknown> = {
@@ -200,32 +200,18 @@ export function createDslSchemaPayload(
       componentCount,
       lastModified: new Date().toISOString(),
     },
+    blocks: schema.blocks,
+    layout: schema.layout,
+    kind: schema.kind,
+    schemaVersion: schema.schemaVersion,
   };
 
-  // Map DSL fields to backend DTO fields
-  if (Array.isArray(schema.blocks)) {
-    payload.blocks = schema.blocks;
-  }
-  if (schema.layout != null) {
-    payload.layout = schema.layout;
-  }
-  if (typeof schema.kind === 'string') {
-    payload.kind = schema.kind;
-  }
-  const schemaExtension =
-    schema.extension && typeof schema.extension === 'object'
-      ? { ...(schema.extension as Record<string, unknown>) }
-      : {};
-  if (Object.keys(schemaExtension).length > 0) {
-    payload.extension = schemaExtension;
+  if (schema.extension && Object.keys(schema.extension).length > 0) {
+    payload.extension = { ...schema.extension };
   }
   if (schema.title != null) {
     payload.title =
       typeof schema.title === 'string' ? schema.title : JSON.stringify(schema.title);
-  }
-  // Persist the schema version set by the frontend (CURRENT_SCHEMA_VERSION)
-  if (typeof schema.schemaVersion === 'number') {
-    payload.schemaVersion = schema.schemaVersion;
   }
 
   return payload;
