@@ -416,6 +416,7 @@ export function DetailPageContent(props: PageContentProps) {
                     .map((button: ButtonConfig) => (
                       <button
                         key={button.code}
+                        data-testid={`toolbar-btn-${button.code}`}
                         data-ab-testid={buttonTestId('detail', schema?.modelCode || tableName, button.code)}
                         onClick={() => handleAction(button, recordData)}
                         disabled={actionLoading}
@@ -681,6 +682,7 @@ function DetailBlockRenderer({
               return (
                 <div
                   key={field.field}
+                  data-testid={`form-field-${field.field}`}
                   className={`${isFullWidth ? 'md:col-span-2' : ''} border-b border-gray-100 pb-4`}
                 >
                   <DynamicField
@@ -852,7 +854,7 @@ function FallbackDetailView({
   return (
     <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
       {fields.map((field: FieldConfig) => (
-        <div key={field.field} className={field.span === 2 ? 'md:col-span-2' : ''}>
+        <div key={field.field} data-testid={`form-field-${field.field}`} className={field.span === 2 ? 'md:col-span-2' : ''}>
           <DynamicField
             field={field}
             value={recordData ? recordData[field.field] : undefined}
