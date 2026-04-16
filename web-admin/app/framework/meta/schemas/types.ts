@@ -509,7 +509,7 @@ export interface PageDataSourceConfig {
 
 // 统一 Schema 接口
 export interface UnifiedSchema {
-  kind: 'page' | 'list' | 'form' | 'detail' | 'page_layout' | 'composite';
+  kind: 'page' | 'list' | 'form' | 'detail' | 'page_layout';
   version: string;
   /** DSL schema format version (single integer, default 1). */
   schemaVersion?: number;
