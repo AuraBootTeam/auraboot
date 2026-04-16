@@ -3770,6 +3770,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_bpm_rule_pid ON ab_bpm_rule(pid)
 -- ================================================================
 CREATE TABLE IF NOT EXISTS ab_bpm_cc_record (
     id BIGSERIAL PRIMARY KEY,
+    pid VARCHAR(26) UNIQUE NOT NULL,
     tenant_id BIGINT NOT NULL,
     process_instance_id VARCHAR(64) NOT NULL,
     task_id VARCHAR(64),
@@ -3778,12 +3779,20 @@ CREATE TABLE IF NOT EXISTS ab_bpm_cc_record (
     comment TEXT,
     read_state JSONB NOT NULL DEFAULT '{}'::jsonb,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
     deleted_flag BOOLEAN NOT NULL DEFAULT FALSE
 );
 
-CREATE INDEX IF NOT EXISTS idx_cc_process_instance ON ab_bpm_cc_record(process_instance_id);
-CREATE INDEX IF NOT EXISTS idx_cc_tenant ON ab_bpm_cc_record(tenant_id);
-CREATE INDEX IF NOT EXISTS idx_cc_sender ON ab_bpm_cc_record(sender_id);
+DROP INDEX IF EXISTS idx_cc_process_instance;
+DROP INDEX IF EXISTS idx_cc_tenant;
+DROP INDEX IF EXISTS idx_cc_sender;
+
+CREATE INDEX IF NOT EXISTS idx_bpm_cc_process_instance ON ab_bpm_cc_record(process_instance_id)
+    WHERE (deleted_flag = FALSE OR deleted_flag IS NULL);
+CREATE INDEX IF NOT EXISTS idx_bpm_cc_tenant ON ab_bpm_cc_record(tenant_id)
+    WHERE (deleted_flag = FALSE OR deleted_flag IS NULL);
+CREATE INDEX IF NOT EXISTS idx_bpm_cc_sender ON ab_bpm_cc_record(sender_id)
+    WHERE (deleted_flag = FALSE OR deleted_flag IS NULL);
 
 -- BPM Chain Execution: persistent state for command chains with UserTask (approval) nodes
 CREATE TABLE IF NOT EXISTS ab_chain_execution (
