@@ -7,8 +7,8 @@ import com.auraboot.framework.bpm.model.CcPolicy;
 import com.auraboot.framework.bpm.service.CcService;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.integration.BaseIntegrationTest;
-import com.auraboot.framework.inbox.model.InboxItem;
 import com.auraboot.framework.inbox.service.InboxService;
+import com.auraboot.smart.framework.engine.SmartEngine;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,6 +25,7 @@ class CcServiceIntegrationTest extends BaseIntegrationTest {
     @Autowired private BpmCcRecordMapper ccMapper;
     @Autowired private InboxService inboxService;
     @Autowired private TestBpmFixture fixture;
+    @Autowired private SmartEngine smartEngine;
 
     @Test
     @DisplayName("Policy=all, initiator sends cc: records + notifies + audits")
@@ -45,6 +46,32 @@ class CcServiceIntegrationTest extends BaseIntegrationTest {
         var inbox501 = inboxService.listByUser(501L, MetaContext.getCurrentTenantId(),
                 "bpm_cc", "pending", 0, 10);
         assertThat(inbox501.getRecords()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("Policy=all, assignee sends cc: accepted and recorded")
+    void allPolicyAssigneeBranchCc() {
+        var setup = fixture.startProcess("cc-all-assignee-pos", CcPolicy.ALL);
+
+        // Claim the task as user 888 so task.getClaimUserId() == "888" in CcService
+        smartEngine.getTaskCommandService().claim(
+                setup.taskId(), "888", MetaContext.getCurrentTenantIdAsString());
+
+        // Switch current user to the task assignee (888L)
+        fixture.switchCurrentUserTo(setup.assigneeId());
+
+        BpmCcRecord record = ccService.cc(setup.taskId(), List.of(777L), "assignee-sends-cc");
+
+        assertThat(record.getId()).isNotNull();
+        assertThat(record.getSenderId()).isEqualTo(setup.assigneeId()); // 888L
+        assertThat(record.getReceiverUserIds()).containsExactly(777L);
+
+        // Inbox notification pushed to receiver 777
+        var inboxItems = inboxService.listByUser(777L, MetaContext.getCurrentTenantId(),
+                "bpm_cc", "pending", 0, 10);
+        assertThat(inboxItems.getRecords()).hasSize(1);
+        // Title must use the i18n reference, not a hardcoded string
+        assertThat(inboxItems.getRecords().get(0).getTitle()).isEqualTo("$i18n:bpm.cc.inbox.title");
     }
 
     @Test
