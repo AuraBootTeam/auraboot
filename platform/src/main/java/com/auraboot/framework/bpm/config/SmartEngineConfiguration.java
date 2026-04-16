@@ -14,6 +14,7 @@ import com.auraboot.smart.framework.engine.configuration.TaskAssigneeDispatcher;
 import com.auraboot.smart.framework.engine.configuration.impl.DefaultProcessEngineConfiguration;
 import com.auraboot.smart.framework.engine.configuration.impl.DefaultListenerExecutor;
 import com.auraboot.smart.framework.engine.configuration.impl.DefaultSmartEngine;
+import com.auraboot.smart.framework.engine.persister.database.service.RelationshipDatabaseSupervisionInstanceStorage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -52,6 +53,7 @@ public class SmartEngineConfiguration implements ApplicationContextAware {
         configuration.setIdGenerator(new TimeBasedIdGenerator());
         configuration.setInstanceAccessor(new DualModeInstanceAccessor());
         configuration.getOptionContainer().put(ConfigurationOption.TRANSFER_ENABLED_OPTION);
+        configuration.setVariablePersister(new AuraVariablePersister());
 
         if (taskAssigneeDispatcher != null) {
             configuration.setTaskAssigneeDispatcher(taskAssigneeDispatcher);
@@ -82,6 +84,11 @@ public class SmartEngineConfiguration implements ApplicationContextAware {
 
         log.info("SmartEngine instance built successfully (dual-mode)");
         return smartEngine;
+    }
+
+    @Bean("supervisionInstanceStorage")
+    public RelationshipDatabaseSupervisionInstanceStorage supervisionInstanceStorage() {
+        return new RelationshipDatabaseSupervisionInstanceStorage();
     }
 
     @Override

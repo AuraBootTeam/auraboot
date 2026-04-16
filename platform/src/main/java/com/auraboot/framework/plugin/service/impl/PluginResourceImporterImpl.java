@@ -1264,16 +1264,9 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             designerJson.putIfAbsent("name", dto.getEffectiveName());
         }
 
-        // Idempotency: skip if already deployed in the SmartEngine cache.
-        boolean alreadyDeployed = smartEngine.getRepositoryQueryService()
-                .getAllCachedProcessDefinition()
-                .stream()
-                .anyMatch(pd -> dto.getKey().equals(pd.getId()));
-        if (alreadyDeployed) {
-            log.info("Process {} already deployed to SmartEngine; skipping", dto.getKey());
-            return;
-        }
-
+        // Always (re)deploy: SmartEngine cache is keyed by (id, version) and handles
+        // idempotent re-registration internally. Skipping based on key alone prevented
+        // dev-iteration updates from taking effect without a backend restart.
         try {
             String bpmnXml = jsonToBpmnConverter.convertFromMap(designerJson);
             smartEngine.getRepositoryCommandService().deployWithUTF8Content(bpmnXml);
