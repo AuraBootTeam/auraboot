@@ -299,36 +299,6 @@ export class PageManagerService {
   }
 
   /**
-   * Create a blank composite page (used by one-click create in page list)
-   * Returns the new page's pid for immediate navigation to the editor.
-   */
-  public async createCompositePage(): Promise<string> {
-    const name = `page_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-    const pageKey = `composite_${Date.now().toString(36)}`;
-
-    const result = await pageApi.createPage({
-      name,
-      pageKey,
-      title: 'Untitled',
-      kind: 'composite',
-      blocks: [],
-      metaInfo: { componentCount: 0 },
-      semver: '0.1.0',
-    });
-
-    if (ResultHelper.isSuccess(result) && result.data) {
-      return result.data.pid;
-    }
-
-    const errorMsg = result.desc || `Create failed (code: ${result.code})`;
-    console.error('[PageManagerService] createCompositePage failed:', {
-      code: result.code,
-      desc: result.desc,
-    });
-    throw new Error(errorMsg);
-  }
-
-  /**
    * Update page via API
    */
   public async updatePage(id: string, request: UpdatePageRequest): Promise<PageMeta | null> {
