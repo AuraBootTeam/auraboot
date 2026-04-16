@@ -197,7 +197,11 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
    *   - "automation:{pid}" -> /automation/{pid}
    * - Legacy "{modelCode}_{pageType}" e.g. "qo_daily_report_form"
    */
-  const resolveNavigateTo = useCallback((pageKey: string, record?: Record<string, any>) => {
+  const resolveNavigateTo = useCallback((pageKey: string | undefined, record?: Record<string, any>) => {
+    if (!pageKey) {
+      console.error('[useActionHandler] navigate action is missing both "to" and "url" fields');
+      return '';
+    }
     const recordId = record?.pid || record?.id;
 
     // Absolute path with template variables — OCP compliant

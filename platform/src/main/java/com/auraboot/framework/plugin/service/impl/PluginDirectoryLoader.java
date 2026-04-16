@@ -267,10 +267,14 @@ public class PluginDirectoryLoader {
             }
         }
 
-        // Load dashboards (first-class contract: config/dashboards/*.json)
-        if (resourceDirs.containsKey("dashboards")) {
+        // Load dashboards (first-class contract: config/dashboards/*.json).
+        // Convention over configuration: scan `config/dashboards/` even if the
+        // plugin didn't explicitly declare it in resourceDirs.
+        String dashboardsPath = resourceDirs.getOrDefault("dashboards", "config/dashboards");
+        Path dashboardsDir = pluginDir.resolve(dashboardsPath);
+        if (Files.exists(dashboardsDir) && Files.isDirectory(dashboardsDir)) {
             List<DashboardDefinitionDTO> dashboards = loadResourceList(
-                    pluginDir.resolve(resourceDirs.get("dashboards")), DashboardDefinitionDTO.class);
+                    dashboardsDir, DashboardDefinitionDTO.class);
             if (!dashboards.isEmpty()) {
                 manifest.setDashboards(mergeList(manifest.getDashboards(), dashboards));
             }

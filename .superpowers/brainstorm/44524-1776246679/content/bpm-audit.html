@@ -1,0 +1,40 @@
+<h2>BPM 闭环 · OSS 现状盘点</h2>
+<p class="subtitle">意外发现：大部分已经在 OSS，只是缺少"闭环"感</p>
+
+<div class="section">
+  <h3>✅ 已在 OSS（auraboot 仓）</h3>
+  <table style="width:100%;border-collapse:collapse">
+    <thead>
+      <tr style="background:#f3f4f6"><th style="text-align:left;padding:8px">能力</th><th style="text-align:left;padding:8px">位置</th><th style="text-align:left;padding:8px">规模</th></tr>
+    </thead>
+    <tbody>
+      <tr><td style="padding:8px">BPMN 运行时（start/claim/complete/transfer/addSign）</td><td style="padding:8px"><code>framework/bpm/engine/</code>（SmartEngine 适配）</td><td style="padding:8px">16.7k LOC / 144 files</td></tr>
+      <tr style="background:#fafafa"><td style="padding:8px">BPMN 图形设计器</td><td style="padding:8px"><code>core-designer/bpmn-designer</code>（xyflow + JSON↔BPMN XML）</td><td style="padding:8px">后端 1.2k / 前端整块</td></tr>
+      <tr><td style="padding:8px">表单设计器 & 表单运行时</td><td style="padding:8px"><code>core-designer</code> + <code>framework/form/</code>（Schema-driven）</td><td style="padding:8px">~2k 后端</td></tr>
+      <tr style="background:#fafafa"><td style="padding:8px">规则引擎（Drools）</td><td style="padding:8px"><code>framework/bpm/rule/</code></td><td style="padding:8px">~2.5k LOC / 6 files</td></tr>
+      <tr><td style="padding:8px"><strong>SLA 定义 / 定时器 / 升级 / 看板</strong></td><td style="padding:8px"><code>framework/bpm/service/Sla*</code> + <code>SlaMonitorPanel.tsx</code> + Quartz</td><td style="padding:8px">~2k LOC / 5 files</td></tr>
+      <tr style="background:#fafafa"><td style="padding:8px">审批语义：加签 / 转办</td><td style="padding:8px"><code>TaskController</code> <code>/add-sign</code> <code>/transfer</code></td><td style="padding:8px">已实现</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="section">
+  <h3>⚠️ OSS 缺口（需要补齐才算"闭环"）</h3>
+  <ul>
+    <li><strong>撤回 withdraw</strong>：发起人撤回进行中流程 — 未实现</li>
+    <li><strong>抄送 cc</strong>：<code>CcRequest</code> DTO 存在但无 endpoint</li>
+    <li><strong>规则可视化编辑器</strong>：Drools 规则当前只能写文本，没 UI 构造器</li>
+    <li><strong>SLA 可视化配置器</strong>：SLA 规则当前 JSON 配置，没拖拽式时间线/升级链编辑 UI</li>
+    <li><strong>CRUD → BPM 触发</strong>：目前经 Command + Automation 间接触发，无 page DSL 的 <code>bpm</code> block 原生入口</li>
+    <li><strong>E2E 闭环测试</strong>：发起→审批→加签→SLA 超时→升级→撤回 全链路 spec 缺失</li>
+  </ul>
+</div>
+
+<div class="section">
+  <h3>❌ 仍在企业版的 BPM 相关</h3>
+  <ul>
+    <li><code>ent-automation</code> 里的 <code>startProcess</code> 动作节点 — 按新决策整体搬 OSS</li>
+    <li><strong>没有独立的 ent-bpm-pro 包</strong>（memory 里的命名是预规划，未落地）</li>
+  </ul>
+  <p style="color:#6b7280"><em>结论：BPM 闭环开源 90% 已完成，剩下是"补缺口 + 对外宣称闭环"的工作。</em></p>
+</div>
