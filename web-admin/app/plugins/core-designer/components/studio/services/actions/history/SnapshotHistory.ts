@@ -1,5 +1,5 @@
 import type { Command } from '~/plugins/core-designer/components/studio/services/actions/command/Command';
-import type { PageSchema } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { PageSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 
 /**
  * 历史状态快照

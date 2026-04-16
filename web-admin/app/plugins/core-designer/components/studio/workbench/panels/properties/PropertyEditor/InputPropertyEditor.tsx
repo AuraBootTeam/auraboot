@@ -8,7 +8,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { Input } from '~/ui/smart/form/Input';
 import { Select } from '~/ui/smart/form/Select';
 import { Checkbox } from '~/ui/smart/form/Checkbox';
-import type { Component } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { Component } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 
 // 导入属性面板配置
 import propertyPanelConfig from '~/plugins/core-designer/components/studio/workbench/panels/properties/property-panel-input.json';

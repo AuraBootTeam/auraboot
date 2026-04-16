@@ -1,4 +1,4 @@
-import type { ComponentSchema } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { ComponentSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 
 /**
  * 拖拽预览配置

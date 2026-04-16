@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import type { FormSchema } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { FormSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 import { applyImportedSchema, buildSchemaExport } from '~/plugins/core-designer/components/studio/services/workflow/schemaIO';
 
 interface UseSchemaIOOptions {

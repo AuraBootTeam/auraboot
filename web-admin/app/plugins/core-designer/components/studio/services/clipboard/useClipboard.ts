@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { clipboardManager } from './ClipboardManager';
 import { useCanvasEditorState } from '~/plugins/core-designer/components/studio/hooks/store/useCanvasEditorState';
-import type { Component, Position } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { Component, Position } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 import type { PasteOptions } from './types';
 
 interface UseClipboardOptions {

@@ -4,7 +4,7 @@
  * 管理页面设计器的布局操作，包括组件的布局计算和管理
  */
 
-import type { Block, LayoutConfig } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { Block, LayoutConfig } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 
 /**
  * 布局管理器接口

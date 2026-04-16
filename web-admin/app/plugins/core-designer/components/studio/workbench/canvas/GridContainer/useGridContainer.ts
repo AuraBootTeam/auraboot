@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { Component } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { Component } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 import type { GridContainerProps } from '~/plugins/core-designer/components/studio/workbench/canvas/GridContainer/types';
 
 export const useGridContainer = ({

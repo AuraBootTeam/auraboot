@@ -6,7 +6,7 @@
  * @since 3.2.0
  */
 
-import type { Component, Position } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { Component, Position } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 import type { ClipboardData, SerializedComponent, ClipboardResult, PasteOptions } from './types';
 
 /**
