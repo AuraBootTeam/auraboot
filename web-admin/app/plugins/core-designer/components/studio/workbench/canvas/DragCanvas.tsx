@@ -2,7 +2,7 @@
 import React from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { useDragPreview } from '~/plugins/core-designer/components/studio/hooks/drag/useDragPreview';
-import type { Component } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { Component } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 import { useI18n } from '~/contexts/I18nContext';
 import { DESIGNER_I18N, resolveDesignerText } from '~/shared/designer';
 

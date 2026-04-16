@@ -24,7 +24,7 @@ import { AutoSave } from '~/plugins/core-designer/components/studio/workbench/co
 import { getVersionManager } from '~/plugins/core-designer/components/studio/services/managers';
 import { useSchemaIO } from '~/plugins/core-designer/components/studio/hooks/workbench/useSchemaIO';
 import { notificationService } from '~/plugins/core-designer/components/studio/services/workflow/notifications';
-import type { FormSchema } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { FormSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 
 /**
  * 设计器工作流属性

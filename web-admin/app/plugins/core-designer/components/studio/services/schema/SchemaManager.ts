@@ -5,7 +5,7 @@
  * Callers must inject the current schema and a callback to propagate changes.
  */
 
-import type { FormSchema, Block } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { FormSchema, Block } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 
 /**
  * Schema manager interface

@@ -1,5 +1,5 @@
 import type { UnifiedSchema, BlockConfig, FieldConfig, ThemeConfig } from '~/framework/meta/schemas/types';
-import type { FormSchema, Block, Component } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { FormSchema, Block, Component } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 
 /**
  * Convert the studio FormSchema into the runtime UnifiedSchema format.

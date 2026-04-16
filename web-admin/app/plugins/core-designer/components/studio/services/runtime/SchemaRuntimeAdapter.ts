@@ -8,4 +8,4 @@ export { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
 export { executeSchemaHandler } from '~/framework/meta/hooks/executeSchemaHandler';
 export { useSchemaRuntime } from '~/framework/meta/hooks/useSchemaRuntime';
 export { usePageDataSources } from '~/framework/meta/hooks/usePageDataSources';
-export { convertSchemaToUnified } from '~/plugins/core-designer/components/studio/domain/schema/converters/toUnified';
+export { convertSchemaToUnified } from '~/plugins/core-designer/components/studio/workbench/panels/preview/toUnified';

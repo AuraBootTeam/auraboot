@@ -9,7 +9,7 @@
  */
 
 import { useCallback, useMemo, useState } from 'react';
-import type { FormSchema } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { FormSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 import type {
   TabContainerConfig,
   TabItemConfig,

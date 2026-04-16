@@ -2,7 +2,7 @@
  * 版本管理系统类型定义
  */
 
-import type { PageSchema } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { PageSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 
 /**
  * 版本状态枚举

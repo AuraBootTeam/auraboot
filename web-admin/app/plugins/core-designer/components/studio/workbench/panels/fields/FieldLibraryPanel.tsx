@@ -4,7 +4,7 @@ import { useCanvasEditorState } from '~/plugins/core-designer/components/studio/
 import { FieldItem } from './FieldItem';
 import { FieldCategoryFilter } from './FieldCategoryFilter';
 import { SEMANTIC_TYPE_INFO, DATA_TYPE_COMPONENT_MAP, type MetaFieldDTO } from './types';
-import type { Component } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { Component } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 
 interface FieldLibraryPanelProps {
   modelPid?: string;

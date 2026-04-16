@@ -9,7 +9,7 @@ import { PropertyInput } from '~/plugins/core-designer/components/studio/workben
 import { getPropertyPersistenceManager } from '~/plugins/core-designer/components/studio/services/state/PropertyPersistenceManager';
 import { useLocalizedText } from '~/utils/i18n';
 import type { ComponentConfig } from '~/ui/smart/types';
-import type { Component } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { Component } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 
 export interface PropertyEditorProps {
   component: Component;
