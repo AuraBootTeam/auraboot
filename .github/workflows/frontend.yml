@@ -6,6 +6,9 @@ on:
     paths:
       - 'web-admin/**'
       - 'packages/**'
+      - 'plugins/**/config/dashboards/**'
+      - 'plugins/schemas/dashboards.schema.json'
+      - 'scripts/validate-plugin-dashboards.mjs'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
       - 'package.json'
@@ -15,6 +18,9 @@ on:
     paths:
       - 'web-admin/**'
       - 'packages/**'
+      - 'plugins/**/config/dashboards/**'
+      - 'plugins/schemas/dashboards.schema.json'
+      - 'scripts/validate-plugin-dashboards.mjs'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
       - 'package.json'
@@ -65,3 +71,6 @@ jobs:
       - name: Unit tests (vitest)
         working-directory: web-admin
         run: pnpm test:unit
+
+      - name: Validate dashboard contracts
+        run: node scripts/validate-plugin-dashboards.mjs

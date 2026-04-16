@@ -18,9 +18,9 @@ async function createBlankPage(page: Page): Promise<string> {
   const name = uniqueId('core');
   const pageKey = `e2e_core_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
   const resp = await page.request.post('/api/pages', {
-    data: { name, pageKey, title: name, kind: 'composite', blocks: [], metaInfo: { componentCount: 0 }, semver: '0.1.0' },
+    data: { name, pageKey, title: name, kind: 'list', blocks: [], metaInfo: { componentCount: 0 }, semver: '0.1.0' },
   });
-  expect(resp.ok()).toBeTruthy();
+  expect(resp.ok(), `createBlankPage failed: ${resp.status()}`).toBeTruthy();
   const body = await resp.json();
   return body.data.pid;
 }
@@ -30,38 +30,32 @@ async function createPageWithBlock(page: Page, blockType: string): Promise<strin
   const pageKey = `e2e_core_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
   const resp = await page.request.post('/api/pages', {
     data: {
-      name, pageKey, title: name, kind: 'composite',
+      name, pageKey, title: name, kind: 'list',
       blocks: [{ id: 'blk_pre', blockType, config: {}, layout: { col: 0, colSpan: 12, rowSpan: 1, order: 0 } }],
       metaInfo: { componentCount: 1 }, semver: '0.1.0',
     },
   });
-  expect(resp.ok()).toBeTruthy();
+  expect(resp.ok(), `createPageWithBlock(${blockType}) failed: ${resp.status()}`).toBeTruthy();
   const body = await resp.json();
   return body.data.pid;
 }
 
 async function open(page: Page, pid: string) {
   await page.goto(`/page-designer/${pid}`, { waitUntil: 'domcontentloaded' });
-  await page.getByTestId('canvas-editor').waitFor({ state: 'visible', timeout: 15000 });
+  await page.getByTestId('designer-canvas').waitFor({ state: 'visible', timeout: 15000 });
 }
 
 async function blockCount(page: Page): Promise<number> {
-  // Match only the root block element, not sub-elements (drag-handle, remove, content)
-  return page.locator('[data-testid^="canvas-block-"]:not([data-testid*="-drag-"]):not([data-testid*="-remove-"]):not([data-testid*="-content-"]):not([data-testid*="-drop-"])').count();
+  return page.locator(BLOCK_SELECTOR).count();
 }
 
 async function addBlock(page: Page, type: string) {
-  // The palette item is both a dnd-kit useDraggable source AND a native HTML5
-  // draggable (for react-grid-layout's onDrop). Under rapid successive clicks,
-  // the browser's drag-initiation logic on pointerdown can occasionally swallow
-  // the subsequent click event, so the onAddBlock handler never fires and the
-  // count stays flat. Guard by asserting the block count advanced; retry once
-  // if not (click-loss case), then fail loudly.
   const countBefore = await blockCount(page);
+  // Switch to blocks tab then click palette item (click-to-add via onAddBlock)
   const paletteItem = page.getByTestId(`block-palette-item-${type}`);
 
   const ensureClicked = async () => {
-    await page.getByTestId('canvas-left-tab-components').click();
+    await page.getByTestId('designer-tab-blocks').click();
     await paletteItem.click();
     return page
       .waitForFunction(
@@ -82,7 +76,8 @@ async function addBlock(page: Page, type: string) {
   }
 }
 
-const BLOCK_SELECTOR = '[data-testid^="canvas-block-"]:not([data-testid*="-drag-"]):not([data-testid*="-remove-"]):not([data-testid*="-content-"]):not([data-testid*="-drop-"])';
+// BlocksDesigner uses data-testid="sortable-block" on each block wrapper
+const BLOCK_SELECTOR = '[data-testid="sortable-block"]';
 
 async function selectFirstBlock(page: Page) {
   await page.locator(BLOCK_SELECTOR).first().click();
@@ -187,7 +182,7 @@ test.describe('Widget 添加', () => {
     await selectFirstBlock(page);
 
     // 切到 Widgets tab → 点击 Text Input
-    await page.getByTestId('canvas-left-tab-widgets').click();
+    await page.getByTestId('designer-tab-fields').click();
     await page.getByTestId('widget-palette-item-text').click();
     await page.waitForTimeout(300);
 
@@ -195,7 +190,7 @@ test.describe('Widget 添加', () => {
     expect(await blockCount(page)).toBe(1); // still 1 form-section
 
     // form-section 内应该have widget field (renders as "Text Input" via WidgetRegistry)
-    const blockContent = page.locator('[data-testid^="canvas-block-content-"]').first();
+    const blockContent = page.locator('[data-testid="sortable-block"]').first();
     await expect(blockContent.locator('text=/Text Input|widget_/')).toBeVisible({ timeout: 3000 });
   });
 
@@ -210,7 +205,7 @@ test.describe('Widget 添加', () => {
     await page.waitForTimeout(200);
 
     // 切到 Widgets → 点击 Number
-    await page.getByTestId('canvas-left-tab-widgets').click();
+    await page.getByTestId('designer-tab-fields').click();
     await page.getByTestId('widget-palette-item-number').click();
     await page.waitForTimeout(300);
 
@@ -233,7 +228,7 @@ test.describe('Block 删除', () => {
     expect(await blockCount(page)).toBe(2); // blank page + 2 added
 
     // 删除第一个
-    await page.locator('[data-testid^="canvas-block-remove-"]').first().click();
+    await page.locator('[data-testid="block-delete"]').first().click();
     expect(await blockCount(page)).toBe(1);
   });
 });
@@ -348,14 +343,14 @@ test.describe('Outline 同步', () => {
     await addBlock(page, 'form-section');
 
     // 切到 Outline tab
-    await page.getByTestId('canvas-left-tab-outline').click();
+    await page.getByTestId('designer-tab-outline').click();
 
     // 应有 3 项 (blank page + 3 added)
     const outlineItems = page.getByTestId('outline-panel').locator('[data-testid^="outline-item-"]');
     await expect(outlineItems).toHaveCount(3, { timeout: 5000 });
 
     // 删除第一个 canvas block
-    await page.locator('[data-testid^="canvas-block-remove-"]').first().click();
+    await page.locator('[data-testid="block-delete"]').first().click();
     await page.waitForTimeout(300);
 
     // outline 应变 2 项

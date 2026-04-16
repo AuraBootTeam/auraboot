@@ -41,7 +41,7 @@
   },
   {
     "code": "published_by",
-    "displayName:zh-CN": "发布人ID",
+    "displayName:zh-CN": "发布人",
     "displayName:en": "Published By",
     "dataType": "long"
   },
