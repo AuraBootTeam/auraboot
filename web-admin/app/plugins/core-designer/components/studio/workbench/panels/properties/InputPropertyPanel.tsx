@@ -1,6 +1,6 @@
 /**
  * InputPropertyPanel - SmartInput组件专用属性面板
- * 基于FormSchema配置驱动的属性编辑器
+ * 基于CanvasSchema配置驱动的属性编辑器
  * 支持实时自动保存
  */
 
