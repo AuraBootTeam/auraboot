@@ -334,16 +334,16 @@ export const createPageStateManager = (initialState?: Partial<PageState>) => {
   return new PageStateManager(initialState);
 };
 
-// Zustand Designer Store
+// Canvas Editor State (Zustand UI-only store)
 export {
-  useDesignerStore,
-  usePageSchema,
-  useLayoutConfig,
+  useCanvasEditorState,
   useSelectedComponent,
+  useSelectComponent,
+  useLeftPanelTab,
+  useRightPanelTab,
+  useSetLeftPanelTab,
+  useSetRightPanelTab,
+  useIsPreviewMode,
   useIsLoading,
-  useComponents,
-  useDesignerActions,
-  type DesignerState,
-  type DesignerActions,
-  type DesignerStore,
-} from '~/plugins/core-designer/components/studio/hooks/store/useDesignerStore';
+  type CanvasEditorState,
+} from '~/plugins/core-designer/components/studio/hooks/store/useCanvasEditorState';

@@ -2,8 +2,11 @@ import React from 'react';
 import { useLinkageRules } from '~/plugins/core-designer/components/studio/hooks/linkage/useLinkageRules';
 import { LinkageRuleEditor } from './LinkageRuleEditor';
 import type { LinkageRule } from './types';
+import type { FormSchema } from '~/plugins/core-designer/components/studio/domain/schema/types';
 
 interface LinkagePanelProps {
+  schema: FormSchema;
+  onSchemaChange: (next: FormSchema) => void;
   fieldOptions?: { code: string; label: string }[];
   readonly?: boolean;
 }
@@ -15,6 +18,8 @@ interface LinkagePanelProps {
  * @since 3.5.0
  */
 export const LinkagePanel: React.FC<LinkagePanelProps> = ({
+  schema,
+  onSchemaChange,
   fieldOptions = [],
   readonly = false,
 }) => {
@@ -32,7 +37,7 @@ export const LinkagePanel: React.FC<LinkagePanelProps> = ({
     updateAction,
     toggleRuleEnabled,
     duplicateRule,
-  } = useLinkageRules();
+  } = useLinkageRules({ schema, onSchemaChange });
 
   return (
     <div className="flex h-full flex-col">

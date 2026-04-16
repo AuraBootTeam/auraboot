@@ -31,8 +31,8 @@ vi.mock('~/plugins/core-designer/components/studio/services/managers', () => ({
   eventDomainManager: mocks.eventDomain,
 }));
 
-vi.mock('~/plugins/core-designer/components/studio/hooks/store/useDesignerStore', () => ({
-  useDesignerStore: () => ({
+vi.mock('~/plugins/core-designer/components/studio/hooks/store/useCanvasEditorState', () => ({
+  useCanvasEditorState: () => ({
     selectComponent: mocks.selectComponent,
   }),
 }));

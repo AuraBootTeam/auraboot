@@ -7,7 +7,6 @@
  */
 
 import { useState, useCallback, useMemo } from 'react';
-import { useDesignerStore } from '../store/useDesignerStore';
 import type { PageMeta } from '../../services/page-manager';
 
 /**
@@ -89,9 +88,13 @@ export function useToolbarState(options: UseToolbarStateOptions = {}): {
 } {
   const { pageMeta, onSave, onPublish, autoSaveEnabled = true } = options;
 
-  // Store integration
-  const store = useDesignerStore();
-  const { undo, redo, reset, canUndo, canRedo } = store;
+  // canUndo/canRedo: stubs defaulting to false until real undo stack (CommandManager) is wired.
+  // Real undo/redo flows from usePageSchemaHistory in PageDesignerEditorImpl via onUndo/onRedo options.
+  const canUndo = false;
+  const canRedo = false;
+  const undo = useCallback(() => {}, []);
+  const redo = useCallback(() => {}, []);
+  const reset = useCallback(() => {}, []);
 
   // Local state
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);

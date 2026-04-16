@@ -1,17 +1,17 @@
 /**
  * Schema Manager
  *
- * 管理页面设计器的 Schema 操作，包括组件的增删改查等
+ * Stateless utility for schema operations (add/remove/update/query components).
+ * Callers must inject the current schema and a callback to propagate changes.
  */
 
 import type { FormSchema, Block } from '~/plugins/core-designer/components/studio/domain/schema/types';
-import { useDesignerStore } from '~/plugins/core-designer/components/studio/hooks/store/useDesignerStore';
 
 /**
- * Schema 管理器接口
+ * Schema manager interface
  */
 export interface SchemaManager {
-  // 组件操作
+  // Component mutations
   addComponent(parentId: string, component: Block, index?: number): Promise<Block>;
   removeComponent(componentId: string): Promise<void>;
   updateComponent(componentId: string, updates: Partial<Block>): Promise<void>;
@@ -20,133 +20,54 @@ export interface SchemaManager {
   moveComponent(componentId: string, newParentId: string, newIndex?: number): Promise<void>;
   reorderComponents(parentId: string, newOrder: string[]): Promise<void>;
 
-  // Schema 操作
+  // Schema mutations
   getSchema(): Promise<FormSchema>;
   updateSchema(updates: Partial<FormSchema>): Promise<void>;
   updateComponentProps(componentId: string, props: Record<string, any>): Promise<void>;
 
-  // 查询操作
+  // Queries
   findComponents(predicate: (component: Block) => boolean): Promise<Block[]>;
   getComponentsByType(type: string): Promise<Block[]>;
   getComponentPath(componentId: string): Promise<string[]>;
 }
 
 /**
- * Schema 管理器实现
+ * Schema manager implementation — stateless; schema is injected via bind().
  */
 class SchemaManagerImpl implements SchemaManager {
-  private getStore() {
-    return useDesignerStore.getState();
+  private _schema: FormSchema | null = null;
+  private _onChange: ((schema: FormSchema) => void) | null = null;
+
+  /**
+   * Bind a live schema + onChange callback so the manager knows what to read/write.
+   * Call this whenever the parent component re-renders with a new schema reference.
+   */
+  bind(schema: FormSchema, onChange: (schema: FormSchema) => void): void {
+    this._schema = schema;
+    this._onChange = onChange;
   }
 
-  async addComponent(parentId: string, component: Block, index?: number): Promise<Block> {
-    const store = this.getStore();
-    const schema = store.pageSchema;
-
-    if (!schema) {
-      throw new Error('No schema available');
+  private getSchema_(): FormSchema {
+    if (!this._schema) {
+      throw new Error('SchemaManager: schema not bound — call bind(schema, onChange) first');
     }
-
-    // 生成唯一ID
-    if (!component.id) {
-      component.id = `component_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    }
-
-    // 如果是根级组件
-    if (parentId === 'root' || !parentId) {
-      if (!schema.components) {
-        schema.components = [];
-      }
-
-      if (index !== undefined && index >= 0 && index < schema.components.length) {
-        schema.components.splice(index, 0, component);
-      } else {
-        schema.components.push(component);
-      }
-    } else {
-      // 查找父组件
-      const parent = await this.getComponent(parentId);
-      if (!parent) {
-        throw new Error(`Parent component not found: ${parentId}`);
-      }
-
-      if (!parent.children) {
-        parent.children = [];
-      }
-
-      if (index !== undefined && index >= 0 && index < parent.children.length) {
-        parent.children.splice(index, 0, component);
-      } else {
-        parent.children.push(component);
-      }
-    }
-
-    // 更新 store
-    store.setPageSchema({ ...schema });
-    store.addComponent(component);
-
-    return component;
+    return this._schema;
   }
 
-  async removeComponent(componentId: string): Promise<void> {
-    const store = this.getStore();
-    const schema = store.pageSchema;
-
-    if (!schema) {
-      throw new Error('No schema available');
-    }
-
-    // 递归查找并移除组件
-    const removeFromArray = (components: Block[]): boolean => {
-      for (let i = 0; i < components.length; i++) {
-        if (components[i].id === componentId) {
-          components.splice(i, 1);
-          return true;
-        }
-
-        if (components[i].children && removeFromArray(components[i].children!)) {
-          return true;
-        }
-      }
-      return false;
-    };
-
-    if (schema.components) {
-      removeFromArray(schema.components);
-    }
-
-    // 更新 store
-    store.setPageSchema({ ...schema });
-    store.removeComponent(componentId);
+  private emit(schema: FormSchema): void {
+    this._schema = schema;
+    this._onChange?.(schema);
   }
 
-  async updateComponent(componentId: string, updates: Partial<Block>): Promise<void> {
-    const component = await this.getComponent(componentId);
-    if (!component) {
-      throw new Error(`Component not found: ${componentId}`);
-    }
-
-    Object.assign(component, updates);
-
-    const store = this.getStore();
-    store.updateComponent(componentId, updates);
-  }
+  // ─── Component queries ────────────────────────────────────────────
 
   async getComponent(componentId: string): Promise<Block | null> {
-    const store = this.getStore();
-    const schema = store.pageSchema;
+    const schema = this.getSchema_();
+    if (!schema.components) return null;
 
-    if (!schema || !schema.components) {
-      return null;
-    }
-
-    // 递归查找组件
     const findComponent = (components: Block[]): Block | null => {
       for (const component of components) {
-        if (component.id === componentId) {
-          return component;
-        }
-
+        if (component.id === componentId) return component;
         if (component.children) {
           const found = findComponent(component.children);
           if (found) return found;
@@ -161,25 +82,16 @@ class SchemaManagerImpl implements SchemaManager {
   async getComponentParent(
     componentId: string,
   ): Promise<{ parentId: string; index: number } | null> {
-    const store = this.getStore();
-    const schema = store.pageSchema;
+    const schema = this.getSchema_();
+    if (!schema.components) return null;
 
-    if (!schema || !schema.components) {
-      return null;
-    }
-
-    // 递归查找父组件
     const findParent = (
       components: Block[],
       parentId: string = 'root',
     ): { parentId: string; index: number } | null => {
       for (let i = 0; i < components.length; i++) {
         const component = components[i];
-
-        if (component.id === componentId) {
-          return { parentId, index: i };
-        }
-
+        if (component.id === componentId) return { parentId, index: i };
         if (component.children) {
           const found = findParent(component.children, component.id);
           if (found) return found;
@@ -191,126 +103,16 @@ class SchemaManagerImpl implements SchemaManager {
     return findParent(schema.components);
   }
 
-  async moveComponent(componentId: string, newParentId: string, newIndex?: number): Promise<void> {
-    // 先获取组件
-    const component = await this.getComponent(componentId);
-    if (!component) {
-      throw new Error(`Component not found: ${componentId}`);
-    }
-
-    // 移除组件
-    await this.removeComponent(componentId);
-
-    // 添加到新位置
-    await this.addComponent(newParentId, component, newIndex);
-  }
-
-  async reorderComponents(parentId: string, newOrder: string[]): Promise<void> {
-    const store = this.getStore();
-    const schema = store.pageSchema;
-
-    if (!schema) {
-      throw new Error('No schema available');
-    }
-
-    let targetComponents: Block[];
-
-    if (parentId === 'root' || !parentId) {
-      if (!schema.components) return;
-      targetComponents = schema.components;
-    } else {
-      const parent = await this.getComponent(parentId);
-      if (!parent || !parent.children) {
-        throw new Error(`Parent component not found or has no children: ${parentId}`);
-      }
-      targetComponents = parent.children;
-    }
-
-    // 按新顺序重新排列
-    const reorderedComponents: Block[] = [];
-
-    for (const componentId of newOrder) {
-      const component = targetComponents.find((c) => c.id === componentId);
-      if (component) {
-        reorderedComponents.push(component);
-      }
-    }
-
-    // 添加不在新顺序中的组件
-    for (const component of targetComponents) {
-      if (!newOrder.includes(component.id)) {
-        reorderedComponents.push(component);
-      }
-    }
-
-    // 更新数组
-    if (parentId === 'root' || !parentId) {
-      schema.components = reorderedComponents;
-    } else {
-      const parent = await this.getComponent(parentId);
-      if (parent) {
-        parent.children = reorderedComponents;
-      }
-    }
-
-    // 更新 store
-    store.setPageSchema({ ...schema });
-  }
-
-  async getSchema(): Promise<FormSchema> {
-    const store = this.getStore();
-    const schema = store.pageSchema;
-
-    if (!schema) {
-      throw new Error('No schema available');
-    }
-
-    return schema;
-  }
-
-  async updateSchema(updates: Partial<FormSchema>): Promise<void> {
-    const store = this.getStore();
-    const currentSchema = store.pageSchema;
-
-    if (!currentSchema) {
-      throw new Error('No schema available');
-    }
-
-    const updatedSchema = { ...currentSchema, ...updates };
-    store.setPageSchema(updatedSchema);
-  }
-
-  async updateComponentProps(componentId: string, props: Record<string, any>): Promise<void> {
-    const component = await this.getComponent(componentId);
-    if (!component) {
-      throw new Error(`Component not found: ${componentId}`);
-    }
-
-    component.props = { ...component.props, ...props };
-
-    const store = this.getStore();
-    store.updateComponent(componentId, { props: component.props });
-  }
-
   async findComponents(predicate: (component: Block) => boolean): Promise<Block[]> {
-    const store = this.getStore();
-    const schema = store.pageSchema;
-
-    if (!schema || !schema.components) {
-      return [];
-    }
+    const schema = this.getSchema_();
+    if (!schema.components) return [];
 
     const results: Block[] = [];
 
     const searchComponents = (components: Block[]) => {
       for (const component of components) {
-        if (predicate(component)) {
-          results.push(component);
-        }
-
-        if (component.children) {
-          searchComponents(component.children);
-        }
+        if (predicate(component)) results.push(component);
+        if (component.children) searchComponents(component.children);
       }
     };
 
@@ -323,27 +125,19 @@ class SchemaManagerImpl implements SchemaManager {
   }
 
   async getComponentPath(componentId: string): Promise<string[]> {
-    const store = this.getStore();
-    const schema = store.pageSchema;
-
-    if (!schema || !schema.components) {
-      return [];
-    }
+    const schema = this.getSchema_();
+    if (!schema.components) return [];
 
     const path: string[] = [];
 
     const findPath = (components: Block[], currentPath: string[] = []): boolean => {
       for (const component of components) {
         const newPath = [...currentPath, component.id];
-
         if (component.id === componentId) {
           path.push(...newPath);
           return true;
         }
-
-        if (component.children && findPath(component.children, newPath)) {
-          return true;
-        }
+        if (component.children && findPath(component.children, newPath)) return true;
       }
       return false;
     };
@@ -351,15 +145,154 @@ class SchemaManagerImpl implements SchemaManager {
     findPath(schema.components);
     return path;
   }
+
+  // ─── Schema queries ───────────────────────────────────────────────
+
+  async getSchema(): Promise<FormSchema> {
+    return this.getSchema_();
+  }
+
+  // ─── Schema mutations (immutable) ────────────────────────────────
+
+  async addComponent(parentId: string, component: Block, index?: number): Promise<Block> {
+    const schema = this.getSchema_();
+
+    const newComponent = {
+      ...component,
+      id: component.id || `component_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    };
+
+    // Deep-clone the component tree to avoid mutation
+    const cloneComponents = (components: Block[]): Block[] =>
+      components.map((c) => ({
+        ...c,
+        children: c.children ? cloneComponents(c.children) : c.children,
+      }));
+
+    const insertInto = (components: Block[]): Block[] => {
+      if (index !== undefined && index >= 0 && index < components.length) {
+        const copy = [...components];
+        copy.splice(index, 0, newComponent);
+        return copy;
+      }
+      return [...components, newComponent];
+    };
+
+    let updatedSchema: FormSchema;
+
+    if (!parentId || parentId === 'root') {
+      const current = cloneComponents(schema.components || []);
+      updatedSchema = { ...schema, components: insertInto(current) };
+    } else {
+      const addToParent = (components: Block[]): Block[] =>
+        components.map((c) => {
+          if (c.id === parentId) {
+            return { ...c, children: insertInto(c.children ? cloneComponents(c.children) : []) };
+          }
+          if (c.children) return { ...c, children: addToParent(c.children) };
+          return c;
+        });
+
+      updatedSchema = { ...schema, components: addToParent(schema.components || []) };
+    }
+
+    this.emit(updatedSchema);
+    return newComponent;
+  }
+
+  async removeComponent(componentId: string): Promise<void> {
+    const schema = this.getSchema_();
+
+    const removeFromArray = (components: Block[]): Block[] =>
+      components
+        .filter((c) => c.id !== componentId)
+        .map((c) => ({
+          ...c,
+          children: c.children ? removeFromArray(c.children) : c.children,
+        }));
+
+    const updatedComponents = removeFromArray(schema.components || []);
+    this.emit({ ...schema, components: updatedComponents });
+  }
+
+  async updateComponent(componentId: string, updates: Partial<Block>): Promise<void> {
+    const schema = this.getSchema_();
+
+    const updateInArray = (components: Block[]): Block[] =>
+      components.map((c) => {
+        if (c.id === componentId) return { ...c, ...updates };
+        if (c.children) return { ...c, children: updateInArray(c.children) };
+        return c;
+      });
+
+    this.emit({ ...schema, components: updateInArray(schema.components || []) });
+  }
+
+  async moveComponent(componentId: string, newParentId: string, newIndex?: number): Promise<void> {
+    const component = await this.getComponent(componentId);
+    if (!component) throw new Error(`Component not found: ${componentId}`);
+
+    // Remove first, then re-add — each step calls emit, so bind schema again after remove
+    await this.removeComponent(componentId);
+    await this.addComponent(newParentId, component, newIndex);
+  }
+
+  async reorderComponents(parentId: string, newOrder: string[]): Promise<void> {
+    const schema = this.getSchema_();
+
+    const reorder = (components: Block[]): Block[] => {
+      const reordered: Block[] = [];
+      for (const id of newOrder) {
+        const found = components.find((c) => c.id === id);
+        if (found) reordered.push(found);
+      }
+      // Append any components not in newOrder
+      for (const c of components) {
+        if (!newOrder.includes(c.id)) reordered.push(c);
+      }
+      return reordered;
+    };
+
+    let updatedSchema: FormSchema;
+
+    if (!parentId || parentId === 'root') {
+      updatedSchema = { ...schema, components: reorder(schema.components || []) };
+    } else {
+      const reorderInParent = (components: Block[]): Block[] =>
+        components.map((c) => {
+          if (c.id === parentId) return { ...c, children: reorder(c.children || []) };
+          if (c.children) return { ...c, children: reorderInParent(c.children) };
+          return c;
+        });
+
+      updatedSchema = { ...schema, components: reorderInParent(schema.components || []) };
+    }
+
+    this.emit(updatedSchema);
+  }
+
+  async updateSchema(updates: Partial<FormSchema>): Promise<void> {
+    const schema = this.getSchema_();
+    this.emit({ ...schema, ...updates });
+  }
+
+  async updateComponentProps(componentId: string, props: Record<string, any>): Promise<void> {
+    const component = await this.getComponent(componentId);
+    if (!component) throw new Error(`Component not found: ${componentId}`);
+
+    await this.updateComponent(componentId, { props: { ...component.props, ...props } });
+  }
 }
 
-// 全局实例
-let globalSchemaManager: SchemaManager | null = null;
+// ─── Singleton ────────────────────────────────────────────────────
+
+let globalSchemaManager: SchemaManagerImpl | null = null;
 
 /**
- * 获取全局 Schema 管理器实例
+ * Get the global SchemaManager instance.
+ * Call `getSchemaManager().bind(schema, onChange)` before invoking any mutation methods.
  */
-export function getSchemaManager(): SchemaManager {
+export function getSchemaManager(): SchemaManagerImpl {
   if (!globalSchemaManager) {
     globalSchemaManager = new SchemaManagerImpl();
   }
@@ -367,7 +300,7 @@ export function getSchemaManager(): SchemaManager {
 }
 
 /**
- * 创建新的 Schema 管理器实例
+ * Create a fresh SchemaManager instance (useful for tests).
  */
 export function createSchemaManager(): SchemaManager {
   return new SchemaManagerImpl();
