@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useDroppable, useDndMonitor } from '@dnd-kit/core';
 import { DRAG_TYPES } from '~/plugins/core-designer/components/studio/workbench/constants';
-import type { Component } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { Component } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 import type { GridCellProps } from '~/plugins/core-designer/components/studio/workbench/canvas/GridCell/types';
 
 export const useGridCell = ({ row, column, component }: GridCellProps) => {

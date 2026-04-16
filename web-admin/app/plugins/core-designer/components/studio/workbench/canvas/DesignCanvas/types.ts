@@ -1,4 +1,4 @@
-import type { Component } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { Component } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 
 export interface DesignCanvasProps {
   columns?: number;

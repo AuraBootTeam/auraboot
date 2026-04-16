@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { DragStartEvent, DragEndEvent } from '@dnd-kit/core';
-import type { FormSchema, Component, Position } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { FormSchema, Component, Position } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 import { useCanvasEditorState, getDesignerSDK } from '~/plugins/core-designer/components/studio/sdk';
 import { DRAG_TYPES } from '~/plugins/core-designer/components/studio/workbench/constants';
 import { eventDomainManager } from '~/plugins/core-designer/components/studio/services/actions/event/EventDomainManager';
