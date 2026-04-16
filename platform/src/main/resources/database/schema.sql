@@ -2525,6 +2525,16 @@ COMMENT ON COLUMN ab_bpm_process_definition.timeout_hours IS 'Hours before a pen
 COMMENT ON COLUMN ab_bpm_process_definition.timeout_action IS 'Action on timeout: ESCALATE, AUTO_APPROVE, AUTO_REJECT';
 COMMENT ON COLUMN ab_bpm_process_definition.escalate_to_user_id IS 'User to notify when timeout_action=ESCALATE';
 
+-- Approval withdrawal and cc policies
+ALTER TABLE ab_bpm_process_definition
+    ADD COLUMN IF NOT EXISTS withdraw_policy VARCHAR(20) NOT NULL DEFAULT 'strict',
+    ADD COLUMN IF NOT EXISTS cc_policy VARCHAR(20) NOT NULL DEFAULT 'all',
+    ADD COLUMN IF NOT EXISTS required_permissions JSONB NOT NULL DEFAULT '{}'::jsonb;
+
+COMMENT ON COLUMN ab_bpm_process_definition.withdraw_policy IS 'Withdrawal policy: strict (initiator only), loose (anyone)';
+COMMENT ON COLUMN ab_bpm_process_definition.cc_policy IS 'CC policy: all (all nodes), none (no cc), initiator (initiator only)';
+COMMENT ON COLUMN ab_bpm_process_definition.required_permissions IS 'Required permissions map {permission: boolean}';
+
 -- =====================================================================
 -- Add plugin_pid column to existing tables for tracking plugin ownership
 -- =====================================================================
@@ -3754,6 +3764,26 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_bpm_rule_code
 CREATE UNIQUE INDEX IF NOT EXISTS idx_bpm_rule_pid ON ab_bpm_rule(pid)
     WHERE (deleted_flag = FALSE);
 
+-- ================================================================
+-- BPM CC Record — 抄送记录表
+-- 每条记录代表一次"抄送行为"，承载 sender/receivers/comment/read_state
+-- ================================================================
+CREATE TABLE IF NOT EXISTS ab_bpm_cc_record (
+    id BIGSERIAL PRIMARY KEY,
+    tenant_id BIGINT NOT NULL,
+    process_instance_id VARCHAR(64) NOT NULL,
+    task_id VARCHAR(64),
+    sender_id BIGINT NOT NULL,
+    receiver_user_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
+    comment TEXT,
+    read_state JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    deleted_flag BOOLEAN NOT NULL DEFAULT FALSE
+);
+
+CREATE INDEX IF NOT EXISTS idx_cc_process_instance ON ab_bpm_cc_record(process_instance_id);
+CREATE INDEX IF NOT EXISTS idx_cc_tenant ON ab_bpm_cc_record(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_cc_sender ON ab_bpm_cc_record(sender_id);
 
 -- BPM Chain Execution: persistent state for command chains with UserTask (approval) nodes
 CREATE TABLE IF NOT EXISTS ab_chain_execution (
