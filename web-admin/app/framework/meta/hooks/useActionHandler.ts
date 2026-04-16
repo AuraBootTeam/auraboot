@@ -318,9 +318,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
           }
 
           case 'navigate': {
-            // Support both `to` (canonical) and `url` (legacy alias used in some DSL configs)
-            const navTarget = (actionDef as any).to ?? (actionDef as any).url;
-            const path = resolveNavigateTo(navTarget, record);
+            const path = resolveNavigateTo(actionDef.to, record);
             if (actionDef.command) {
               const isEditAction =
                 normalizedButton.label === 'edit' ||
