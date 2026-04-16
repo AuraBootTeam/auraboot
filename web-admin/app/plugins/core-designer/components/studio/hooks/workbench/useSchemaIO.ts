@@ -1,10 +1,10 @@
 import { useCallback } from 'react';
-import type { FormSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
+import type { CanvasSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 import { applyImportedSchema, buildSchemaExport } from '~/plugins/core-designer/components/studio/services/workflow/schemaIO';
 
 interface UseSchemaIOOptions {
   pageId: string;
-  onSchemaImported?: (schema: FormSchema) => void;
+  onSchemaImported?: (schema: CanvasSchema) => void;
 }
 
 export function useSchemaIO({ pageId, onSchemaImported }: UseSchemaIOOptions) {
