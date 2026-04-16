@@ -14,8 +14,8 @@
       { "fieldCode": "status", "columnExpr": "status", "dataType": "string", "sortable": false },
       { "fieldCode": "result", "columnExpr": "result", "dataType": "string", "sortable": false },
       { "fieldCode": "comment", "columnExpr": "comment", "dataType": "string", "sortable": false },
-      { "fieldCode": "startedAt", "columnExpr": "\"startedAt\"", "dataType": "datetime", "sortable": true },
-      { "fieldCode": "completedAt", "columnExpr": "\"completedAt\"", "dataType": "datetime", "sortable": true }
+      { "fieldCode": "startedAt", "columnExpr": "\"startedAt\"", "dataType": "date", "sortable": true },
+      { "fieldCode": "completedAt", "columnExpr": "\"completedAt\"", "dataType": "date", "sortable": true }
     ],
     "tags": ["workflow-demo", "bpm"]
   }

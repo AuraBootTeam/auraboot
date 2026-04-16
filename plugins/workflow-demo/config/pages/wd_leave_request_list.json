@@ -24,8 +24,7 @@
           "label": "create",
           "action": {
             "type": "navigate",
-            "to": "wd_leave_request_form",
-            "command": "wd:create_leave_request"
+            "to": "/p/wd_leave_request/new"
           }
         }
       ]

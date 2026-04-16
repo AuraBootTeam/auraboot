@@ -10,35 +10,22 @@
         {
           "id": "start_1",
           "type": "startEvent",
-          "position": { "x": 80, "y": 240 },
+          "position": {
+            "x": 80,
+            "y": 240
+          },
           "data": {
             "label:zh-CN": "开始",
             "label:en": "Start"
           }
         },
         {
-          "id": "task_submit",
-          "type": "userTask",
-          "position": { "x": 220, "y": 240 },
-          "data": {
-            "label:zh-CN": "员工提交",
-            "label:en": "Employee Submit",
-            "assigneeType": "initiator",
-            "formPageKey": "wd_leave_request_form",
-            "taskActions": [
-              {
-                "key": "submit",
-                "label:zh-CN": "提交",
-                "label:en": "Submit",
-                "type": "complete"
-              }
-            ]
-          }
-        },
-        {
           "id": "svc_rule_route",
           "type": "rule-task",
-          "position": { "x": 400, "y": 240 },
+          "position": {
+            "x": 400,
+            "y": 240
+          },
           "data": {
             "label:zh-CN": "路由规则",
             "label:en": "Routing Rule",
@@ -49,7 +36,10 @@
         {
           "id": "gw_approver",
           "type": "exclusiveGateway",
-          "position": { "x": 580, "y": 240 },
+          "position": {
+            "x": 580,
+            "y": 240
+          },
           "data": {
             "label:zh-CN": "审批人分派",
             "label:en": "Approver Dispatch"
@@ -58,7 +48,10 @@
         {
           "id": "task_manager_approve",
           "type": "userTask",
-          "position": { "x": 760, "y": 140 },
+          "position": {
+            "x": 760,
+            "y": 140
+          },
           "data": {
             "label:zh-CN": "主管审批",
             "label:en": "Manager Approve",
@@ -90,7 +83,10 @@
         {
           "id": "task_hr_approve",
           "type": "userTask",
-          "position": { "x": 760, "y": 340 },
+          "position": {
+            "x": 760,
+            "y": 340
+          },
           "data": {
             "label:zh-CN": "HR 审批",
             "label:en": "HR Approve",
@@ -122,7 +118,10 @@
         {
           "id": "gw_result",
           "type": "exclusiveGateway",
-          "position": { "x": 940, "y": 240 },
+          "position": {
+            "x": 940,
+            "y": 240
+          },
           "data": {
             "label:zh-CN": "审批结果",
             "label:en": "Decision"
@@ -131,7 +130,10 @@
         {
           "id": "svc_notify_approved",
           "type": "notification-task",
-          "position": { "x": 1120, "y": 140 },
+          "position": {
+            "x": 1120,
+            "y": 140
+          },
           "data": {
             "label:zh-CN": "通知申请人（通过）",
             "label:en": "Notify Applicant (Approved)",
@@ -143,7 +145,10 @@
         {
           "id": "svc_notify_rejected",
           "type": "notification-task",
-          "position": { "x": 1120, "y": 340 },
+          "position": {
+            "x": 1120,
+            "y": 340
+          },
           "data": {
             "label:zh-CN": "通知申请人（驳回）",
             "label:en": "Notify Applicant (Rejected)",
@@ -155,7 +160,10 @@
         {
           "id": "end_approved",
           "type": "endEvent",
-          "position": { "x": 1300, "y": 140 },
+          "position": {
+            "x": 1300,
+            "y": 140
+          },
           "data": {
             "label:zh-CN": "审批通过",
             "label:en": "Approved"
@@ -164,7 +172,10 @@
         {
           "id": "end_rejected",
           "type": "endEvent",
-          "position": { "x": 1300, "y": 340 },
+          "position": {
+            "x": 1300,
+            "y": 340
+          },
           "data": {
             "label:zh-CN": "已驳回",
             "label:en": "Rejected"
@@ -175,17 +186,12 @@
         {
           "id": "flow_start_submit",
           "source": "start_1",
-          "target": "task_submit",
-          "data": {
-            "conditionExpression": "${true}"
-          }
-        },
-        {
-          "id": "flow_submit_route",
-          "source": "task_submit",
           "target": "svc_rule_route",
           "data": {
-            "conditionExpression": "${true}"
+            "condition": {
+              "content": "${true}",
+              "type": "expression"
+            }
           }
         },
         {
@@ -193,7 +199,10 @@
           "source": "svc_rule_route",
           "target": "gw_approver",
           "data": {
-            "conditionExpression": "${true}"
+            "condition": {
+              "content": "${true}",
+              "type": "expression"
+            }
           }
         },
         {
@@ -203,7 +212,10 @@
           "data": {
             "label:zh-CN": "主管",
             "label:en": "Manager",
-            "conditionExpression": "${approverRole == 'manager'}"
+            "condition": {
+              "content": "${approverRole == 'manager'}",
+              "type": "expression"
+            }
           }
         },
         {
@@ -213,7 +225,10 @@
           "data": {
             "label:zh-CN": "HR",
             "label:en": "HR",
-            "conditionExpression": "${approverRole == 'hr'}"
+            "condition": {
+              "content": "${approverRole == 'hr'}",
+              "type": "expression"
+            }
           }
         },
         {
@@ -221,7 +236,10 @@
           "source": "task_manager_approve",
           "target": "gw_result",
           "data": {
-            "conditionExpression": "${true}"
+            "condition": {
+              "content": "${true}",
+              "type": "expression"
+            }
           }
         },
         {
@@ -229,7 +247,10 @@
           "source": "task_hr_approve",
           "target": "gw_result",
           "data": {
-            "conditionExpression": "${true}"
+            "condition": {
+              "content": "${true}",
+              "type": "expression"
+            }
           }
         },
         {
@@ -239,7 +260,10 @@
           "data": {
             "label:zh-CN": "通过",
             "label:en": "Approved",
-            "conditionExpression": "${taskResult == 'approved'}"
+            "condition": {
+              "content": "${taskResult == 'approved'}",
+              "type": "expression"
+            }
           }
         },
         {
@@ -249,7 +273,10 @@
           "data": {
             "label:zh-CN": "驳回",
             "label:en": "Rejected",
-            "conditionExpression": "${taskResult == 'rejected'}"
+            "condition": {
+              "content": "${taskResult == 'rejected'}",
+              "type": "expression"
+            }
           }
         },
         {
@@ -257,7 +284,10 @@
           "source": "svc_notify_approved",
           "target": "end_approved",
           "data": {
-            "conditionExpression": "${true}"
+            "condition": {
+              "content": "${true}",
+              "type": "expression"
+            }
           }
         },
         {
@@ -265,11 +295,18 @@
           "source": "svc_notify_rejected",
           "target": "end_rejected",
           "data": {
-            "conditionExpression": "${true}"
+            "condition": {
+              "content": "${true}",
+              "type": "expression"
+            }
           }
         }
       ],
-      "viewport": { "x": 0, "y": 0, "zoom": 1.0 }
+      "viewport": {
+        "x": 0,
+        "y": 0,
+        "zoom": 1.0
+      }
     },
     "extension": {
       "modelCode": "wd_leave_request",

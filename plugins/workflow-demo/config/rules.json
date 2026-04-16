@@ -28,8 +28,7 @@
         }
       }
     },
-    "ruleContentFile": "rules/wd_leave_validation.drl",
-    "ruleContent": "package com.auraboot.workflow_demo;\n\nimport java.util.Map;\n\nrule \"reject_insufficient_annual_balance\"\n    when\n        $req: Map(\n            this[\"type\"] == \"annual\",\n            ((Number) this[\"days\"]).doubleValue() > ((Number) this[\"balanceRemaining\"]).doubleValue()\n        )\n    then\n        Map result = (Map) $req.get(\"_ruleResult\");\n        result.put(\"valid\", Boolean.FALSE);\n        result.put(\"reason\", \"annual_leave_insufficient\");\nend\n\nrule \"reject_sick_without_attachment\"\n    when\n        $req: Map(\n            this[\"type\"] == \"sick\",\n            ((Number) this[\"days\"]).doubleValue() > 2.0,\n            ((Number) this[\"attachmentCount\"]).intValue() == 0\n        )\n    then\n        Map result = (Map) $req.get(\"_ruleResult\");\n        result.put(\"valid\", Boolean.FALSE);\n        result.put(\"reason\", \"sick_attachment_required\");\nend\n"
+    "ruleContentFile": "rules/wd_leave_validation.drl"
   },
   {
     "ruleCode": "wd_leave_routing",
@@ -53,7 +52,6 @@
         "approverRole": { "type": "string", "enum": ["manager", "hr"] }
       }
     },
-    "ruleContentFile": "rules/wd_leave_routing.drl",
-    "ruleContent": "package com.auraboot.workflow_demo;\n\nimport java.util.Map;\n\nrule \"route_short_to_manager\"\n    when\n        $req: Map(\n            ((Number) this[\"days\"]).doubleValue() < 3.0\n        )\n    then\n        Map result = (Map) $req.get(\"_ruleResult\");\n        result.put(\"approverRole\", \"manager\");\nend\n\nrule \"route_long_to_hr\"\n    when\n        $req: Map(\n            ((Number) this[\"days\"]).doubleValue() >= 3.0\n        )\n    then\n        Map result = (Map) $req.get(\"_ruleResult\");\n        result.put(\"approverRole\", \"hr\");\nend\n"
+    "ruleContentFile": "rules/wd_leave_routing.drl"
   }
 ]

@@ -22,8 +22,8 @@
           "permissionCode": "wd.leave_balance.manage",
           "label": "create",
           "action": {
-            "type": "command",
-            "command": "wd:create_leave_balance"
+            "type": "navigate",
+            "to": "/p/wd_leave_balance/new"
           }
         }
       ]
