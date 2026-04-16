@@ -1,4 +1,4 @@
-import type { FormSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
+import type { CanvasSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 import { getPageStateManager } from '~/plugins/core-designer/components/studio/services/state/PageStateManager';
 
 export interface SchemaExportOptions {
@@ -61,16 +61,16 @@ export async function buildSchemaExport(
   };
 }
 
-export async function applyImportedSchema(importData: any): Promise<FormSchema | null> {
+export async function applyImportedSchema(importData: any): Promise<CanvasSchema | null> {
   const stateManager = getPageStateManager();
   await stateManager.importState(importData);
 
   if (importData?.schema) {
-    return importData.schema as FormSchema;
+    return importData.schema as CanvasSchema;
   }
 
   if (importData?.pageSchema) {
-    return importData.pageSchema as FormSchema;
+    return importData.pageSchema as CanvasSchema;
   }
 
   return null;

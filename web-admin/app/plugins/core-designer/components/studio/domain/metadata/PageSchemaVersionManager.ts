@@ -1,5 +1,5 @@
 /**
- * PageSchema 版本管理器
+ * CanvasSchema 版本管理器
  *
  * 负责管理页面设计器的 Schema 版本，包括：
  * - 草稿保存和自动保存
@@ -8,7 +8,7 @@
  * - 本地缓存和离线支持
  */
 
-import type { PageSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
+import type { CanvasSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 import type {
   Version,
   VersionManager,
@@ -22,10 +22,10 @@ import { VersionStatus, VersionType } from '~/plugins/core-designer/components/s
 import { getVersionManager } from '~/plugins/core-designer/components/studio/domain/metadata/VersionManager';
 
 /**
- * PageSchema 版本数据
+ * CanvasSchema 版本数据
  */
 export interface PageSchemaVersion extends Version {
-  schema: PageSchema;
+  schema: CanvasSchema;
   previewUrl?: string;
   thumbnailUrl?: string;
   dependencies?: string[];
@@ -36,26 +36,26 @@ export interface PageSchemaVersion extends Version {
 }
 
 /**
- * PageSchema 版本创建请求
+ * CanvasSchema 版本创建请求
  */
 export interface CreatePageSchemaVersionRequest extends Omit<CreateVersionRequest, 'schema'> {
-  schema: PageSchema;
+  schema: CanvasSchema;
   autoSave?: boolean;
   generatePreview?: boolean;
   generateThumbnail?: boolean;
 }
 
 /**
- * PageSchema 版本更新请求
+ * CanvasSchema 版本更新请求
  */
 export interface UpdatePageSchemaVersionRequest extends Omit<UpdateVersionRequest, 'schema'> {
-  schema?: PageSchema;
+  schema?: CanvasSchema;
   generatePreview?: boolean;
   generateThumbnail?: boolean;
 }
 
 /**
- * PageSchema 版本管理配置
+ * CanvasSchema 版本管理配置
  */
 export interface PageSchemaVersionConfig extends VersionConfig {
   // 自动保存配置
@@ -90,14 +90,14 @@ export interface PageSchemaVersionConfig extends VersionConfig {
 }
 
 /**
- * PageSchema 版本管理器
+ * CanvasSchema 版本管理器
  */
 export class PageSchemaVersionManager {
   private versionManager: VersionManager;
   private config: PageSchemaVersionConfig;
   private autoSaveTimer: NodeJS.Timeout | null = null;
   private schemaCache = new Map<string, PageSchemaVersion>();
-  private pendingChanges = new Map<string, PageSchema>();
+  private pendingChanges = new Map<string, CanvasSchema>();
 
   constructor(config: Partial<PageSchemaVersionConfig> = {}) {
     this.config = {
@@ -169,7 +169,7 @@ export class PageSchemaVersionManager {
   }
 
   /**
-   * 创建新的 PageSchema 版本
+   * 创建新的 CanvasSchema 版本
    */
   async createVersion(
     pageId: string,
@@ -219,13 +219,13 @@ export class PageSchemaVersionManager {
 
       return pageSchemaVersion;
     } catch (error) {
-      console.error('Failed to create PageSchema version:', error);
+      console.error('Failed to create CanvasSchema version:', error);
       throw error;
     }
   }
 
   /**
-   * 更新 PageSchema 版本
+   * 更新 CanvasSchema 版本
    */
   async updateVersion(request: UpdatePageSchemaVersionRequest): Promise<PageSchemaVersion> {
     try {
@@ -278,7 +278,7 @@ export class PageSchemaVersionManager {
 
       return pageSchemaVersion;
     } catch (error) {
-      console.error('Failed to update PageSchema version:', error);
+      console.error('Failed to update CanvasSchema version:', error);
       throw error;
     }
   }
@@ -288,7 +288,7 @@ export class PageSchemaVersionManager {
    */
   async saveDraft(
     pageId: string,
-    schema: PageSchema,
+    schema: CanvasSchema,
     description?: string,
   ): Promise<PageSchemaVersion> {
     try {
@@ -442,7 +442,7 @@ export class PageSchemaVersionManager {
   /**
    * 标记 Schema 变更（用于自动保存）
    */
-  markSchemaChanged(pageId: string, schema: PageSchema): void {
+  markSchemaChanged(pageId: string, schema: CanvasSchema): void {
     if (this.config.autoSave) {
       this.pendingChanges.set(pageId, schema);
     }
@@ -458,7 +458,7 @@ export class PageSchemaVersionManager {
   /**
    * 验证 Schema
    */
-  private validateSchema(schema: PageSchema): void {
+  private validateSchema(schema: CanvasSchema): void {
     if (!schema) {
       throw new Error('Schema cannot be empty');
     }
@@ -499,7 +499,7 @@ export class PageSchemaVersionManager {
   /**
    * 生成预览图
    */
-  private async generatePreview(schema: PageSchema): Promise<string> {
+  private async generatePreview(schema: CanvasSchema): Promise<string> {
     try {
       // 这里应该调用预览生成服务
       // 暂时返回占位符
@@ -513,7 +513,7 @@ export class PageSchemaVersionManager {
   /**
    * 生成缩略图
    */
-  private async generateThumbnail(schema: PageSchema): Promise<string> {
+  private async generateThumbnail(schema: CanvasSchema): Promise<string> {
     try {
       // 这里应该调用缩略图生成服务
       // 暂时返回占位符
@@ -527,7 +527,7 @@ export class PageSchemaVersionManager {
   /**
    * 提取依赖项
    */
-  private extractDependencies(schema: PageSchema): string[] {
+  private extractDependencies(schema: CanvasSchema): string[] {
     const dependencies: Set<string> = new Set();
 
     // 提取组件依赖
@@ -561,7 +561,7 @@ export class PageSchemaVersionManager {
   /**
    * 检查兼容性
    */
-  private checkCompatibility(schema: PageSchema): { minVersion: string; maxVersion: string } {
+  private checkCompatibility(schema: CanvasSchema): { minVersion: string; maxVersion: string } {
     // 根据 Schema 特性确定兼容性
     let minVersion = '1.0.0';
     let maxVersion = '999.999.999';
@@ -634,7 +634,7 @@ export class PageSchemaVersionManager {
 let globalPageSchemaVersionManager: PageSchemaVersionManager | null = null;
 
 /**
- * 获取全局 PageSchema 版本管理器实例
+ * 获取全局 CanvasSchema 版本管理器实例
  */
 export function getPageSchemaVersionManager(
   config?: Partial<PageSchemaVersionConfig>,
@@ -646,7 +646,7 @@ export function getPageSchemaVersionManager(
 }
 
 /**
- * 创建新的 PageSchema 版本管理器实例
+ * 创建新的 CanvasSchema 版本管理器实例
  */
 export function createPageSchemaVersionManager(
   config?: Partial<PageSchemaVersionConfig>,

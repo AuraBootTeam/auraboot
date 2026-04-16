@@ -5,7 +5,7 @@
  * Callers must inject the current schema and a callback to propagate changes.
  */
 
-import type { FormSchema, Block } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
+import type { CanvasSchema, Block } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 
 /**
  * Schema manager interface
@@ -21,8 +21,8 @@ export interface SchemaManager {
   reorderComponents(parentId: string, newOrder: string[]): Promise<void>;
 
   // Schema mutations
-  getSchema(): Promise<FormSchema>;
-  updateSchema(updates: Partial<FormSchema>): Promise<void>;
+  getSchema(): Promise<CanvasSchema>;
+  updateSchema(updates: Partial<CanvasSchema>): Promise<void>;
   updateComponentProps(componentId: string, props: Record<string, any>): Promise<void>;
 
   // Queries
@@ -35,26 +35,26 @@ export interface SchemaManager {
  * Schema manager implementation — stateless; schema is injected via bind().
  */
 class SchemaManagerImpl implements SchemaManager {
-  private _schema: FormSchema | null = null;
-  private _onChange: ((schema: FormSchema) => void) | null = null;
+  private _schema: CanvasSchema | null = null;
+  private _onChange: ((schema: CanvasSchema) => void) | null = null;
 
   /**
    * Bind a live schema + onChange callback so the manager knows what to read/write.
    * Call this whenever the parent component re-renders with a new schema reference.
    */
-  bind(schema: FormSchema, onChange: (schema: FormSchema) => void): void {
+  bind(schema: CanvasSchema, onChange: (schema: CanvasSchema) => void): void {
     this._schema = schema;
     this._onChange = onChange;
   }
 
-  private getSchema_(): FormSchema {
+  private getSchema_(): CanvasSchema {
     if (!this._schema) {
       throw new Error('SchemaManager: schema not bound — call bind(schema, onChange) first');
     }
     return this._schema;
   }
 
-  private emit(schema: FormSchema): void {
+  private emit(schema: CanvasSchema): void {
     this._schema = schema;
     this._onChange?.(schema);
   }
@@ -148,7 +148,7 @@ class SchemaManagerImpl implements SchemaManager {
 
   // ─── Schema queries ───────────────────────────────────────────────
 
-  async getSchema(): Promise<FormSchema> {
+  async getSchema(): Promise<CanvasSchema> {
     return this.getSchema_();
   }
 
@@ -178,7 +178,7 @@ class SchemaManagerImpl implements SchemaManager {
       return [...components, newComponent];
     };
 
-    let updatedSchema: FormSchema;
+    let updatedSchema: CanvasSchema;
 
     if (!parentId || parentId === 'root') {
       const current = cloneComponents(schema.components || []);
@@ -253,7 +253,7 @@ class SchemaManagerImpl implements SchemaManager {
       return reordered;
     };
 
-    let updatedSchema: FormSchema;
+    let updatedSchema: CanvasSchema;
 
     if (!parentId || parentId === 'root') {
       updatedSchema = { ...schema, components: reorder(schema.components || []) };
@@ -271,7 +271,7 @@ class SchemaManagerImpl implements SchemaManager {
     this.emit(updatedSchema);
   }
 
-  async updateSchema(updates: Partial<FormSchema>): Promise<void> {
+  async updateSchema(updates: Partial<CanvasSchema>): Promise<void> {
     const schema = this.getSchema_();
     this.emit({ ...schema, ...updates });
   }
