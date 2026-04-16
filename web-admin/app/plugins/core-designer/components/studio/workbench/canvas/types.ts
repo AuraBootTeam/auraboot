@@ -11,9 +11,6 @@
 import type { TabContainerConfig } from '~/plugins/core-designer/components/studio/domain/schema/layout-hierarchy';
 import type { LinkageRule } from '~/plugins/core-designer/components/studio/workbench/panels/linkage/types';
 
-// Schema compatibility alias
-export type FormSchema = PageSchema;
-
 export interface Position {
   row: number;
   column: number;
@@ -66,14 +63,16 @@ export interface Block {
 }
 
 /**
- * Page Schema interface - represents the complete page structure in the designer.
+ * Canvas-internal schema — represents the complete page structure in the designer workbench.
  *
  * NOTE: This is the designer-internal model. The canonical runtime PageSchema
  * lives in domain/dsl/types.ts.
+ *
+ * @alias CanvasSchema kept for backwards compat within workbench/
  */
-export interface PageSchema {
+export interface CanvasSchema {
   id: string;
-  kind: 'home' | 'list' | 'form';
+  kind: 'list' | 'form';
   name?: string;
   title: string;
   description?: string;
@@ -99,6 +98,16 @@ export interface PageSchema {
   };
   linkageRules?: LinkageRule[];
 }
+
+/**
+ * @deprecated Use CanvasSchema instead. Kept for backwards compatibility.
+ */
+export type PageSchema = CanvasSchema;
+
+/**
+ * @deprecated Use CanvasSchema instead. Kept for backwards compatibility.
+ */
+export type FormSchema = CanvasSchema;
 
 /**
  * Layout configuration interface

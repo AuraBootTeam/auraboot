@@ -338,7 +338,7 @@ export class ComponentTestSuite {
 
     return {
       id: 'component-test-page',
-      kind: 'home',
+      kind: 'list',
       name: '组件测试页面',
       title: '智能组件测试页面',
       description: '用于测试所有Smart组件的功能和属性',
