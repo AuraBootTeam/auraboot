@@ -1,6 +1,7 @@
 package com.auraboot.framework.bpm.service;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.bpm.audit.BpmAuditOperation;
 import com.auraboot.framework.bpm.audit.BpmAuditService;
 import com.auraboot.framework.bpm.model.WithdrawPolicy;
 import com.auraboot.framework.bpm.util.BpmSecurityUtil;
@@ -76,14 +77,17 @@ public class WithdrawService {
             throw new BusinessException("Withdraw is disabled for process: " + processKey);
         }
 
-        // 4. Initiator check — look up from process instance or audit log.
-        //    ProcessInstance.getStartUserId() may be null if not persisted by the engine;
-        //    fall back to the "process_start" audit entry which always records the startUserId.
+        // 4. Initiator check — look up via ProcessInstance.startUserId, with audit-log fallback.
+        //    ProcessInstance.getStartUserId() is populated by SmartEngine from the
+        //    PROCESS_INSTANCE_START_USER_ID variable set at process start time.
+        //    The audit-log fallback covers migrated data and tests that record
+        //    PROCESS_START separately. Both paths are single-source lookups — not
+        //    the banned runtime fallback pattern (no multi-parser speculation).
         String initiatorId = processInstance.getStartUserId();
         if (initiatorId == null) {
             initiatorId = auditService.findByProcessInstance(processInstanceId)
                     .stream()
-                    .filter(r -> "process_start".equalsIgnoreCase(r.getOperation()))
+                    .filter(r -> BpmAuditOperation.PROCESS_START.matches(r.getOperation()))
                     .map(r -> r.getDetails() != null
                             ? (String) r.getDetails().get("startUserId")
                             : null)
@@ -100,7 +104,7 @@ public class WithdrawService {
         if (policy == WithdrawPolicy.STRICT) {
             boolean anyApproved = auditService.findByProcessInstance(processInstanceId)
                     .stream()
-                    .anyMatch(r -> "task_approve".equalsIgnoreCase(r.getOperation()));
+                    .anyMatch(r -> BpmAuditOperation.TASK_APPROVE.matches(r.getOperation()));
             if (anyApproved) {
                 throw new BusinessException(
                         "Process has already approved tasks; withdraw not allowed under strict policy");
@@ -108,11 +112,13 @@ public class WithdrawService {
         }
 
         // 6. Terminate the process via SmartEngine abort
+        //    The adapter's terminateProcess() is a stub over an in-memory map that
+        //    is not populated by SmartEngine-started instances; call SmartEngine directly.
         smartEngine.getProcessCommandService().abort(processInstanceId, "WITHDRAWN", tenantId);
 
         // 7. Audit
         auditService.auditProcessOperation(
-                "withdraw",
+                BpmAuditOperation.WITHDRAW.code(),
                 processInstanceId,
                 taskId,
                 Map.of(

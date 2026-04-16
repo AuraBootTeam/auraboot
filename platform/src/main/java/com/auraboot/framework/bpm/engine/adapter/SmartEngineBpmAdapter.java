@@ -1,5 +1,6 @@
 package com.auraboot.framework.bpm.engine.adapter;
 
+import com.auraboot.framework.bpm.audit.BpmAuditOperation;
 import com.auraboot.framework.bpm.engine.BpmEngine;
 import com.auraboot.framework.bpm.engine.dto.HistoryRecord;
 import com.auraboot.framework.bpm.engine.dto.ProcessInstanceInfo;
@@ -46,18 +47,6 @@ public class SmartEngineBpmAdapter implements BpmEngine {
     /** History log: processInstanceId -> records */
     private final Map<String, List<HistoryRecord>> historyLog = new ConcurrentHashMap<>();
 
-    /**
-     * Initiator map: processInstanceId -> userId (String, e.g. username or numeric id).
-     * Populated by startProcess; used for withdraw policy checks.
-     */
-    private final Map<String, String> initiatorMap = new ConcurrentHashMap<>();
-
-    /**
-     * Approved task log: processInstanceId -> list of taskIds that were completed with _action=approve.
-     * Populated by {@link #recordApprovedTask}; used for strict-withdraw checks.
-     */
-    private final Map<String, List<String>> approvedTasksMap = new ConcurrentHashMap<>();
-
     // ── Process lifecycle ──────────────────────────────────────────────
 
     @Override
@@ -89,16 +78,6 @@ public class SmartEngineBpmAdapter implements BpmEngine {
                 .build();
 
         instances.put(instanceId, info);
-
-        // Store initiator from variables (key used by ProcessEngineService)
-        if (variables != null && variables.containsKey(
-                com.auraboot.smart.framework.engine.constant.RequestMapSpecialKeyConstant.PROCESS_INSTANCE_START_USER_ID)) {
-            Object uid = variables.get(
-                    com.auraboot.smart.framework.engine.constant.RequestMapSpecialKeyConstant.PROCESS_INSTANCE_START_USER_ID);
-            if (uid != null) {
-                initiatorMap.put(instanceId, uid.toString());
-            }
-        }
 
         // Create an initial user task so getActiveTasks is meaningful
         String taskId = UUID.randomUUID().toString();
@@ -238,99 +217,6 @@ public class SmartEngineBpmAdapter implements BpmEngine {
                     "Process instance is not running: " + processInstanceId);
         }
         return info;
-    }
-
-    // ── Withdraw support ──────────────────────────────────────────────
-
-    /**
-     * Look up a task by its ID across all active tasks.
-     * Returns {@code null} if not found.
-     */
-    public TaskInfo findTaskById(String taskId) {
-        return tasks.get(taskId);
-    }
-
-    /**
-     * Inject a new user task into the process (test fixture only).
-     * Used to simulate a multi-step process after the first task is approved.
-     *
-     * @param processInstanceId the process instance to inject into
-     * @param taskDefinitionKey the definition key for the injected task
-     * @return the ID of the injected task
-     */
-    public String injectTask(String processInstanceId, String taskDefinitionKey) {
-        ProcessInstanceInfo info = instances.get(processInstanceId);
-        if (info == null) {
-            throw new BpmEngineException(ENGINE_TYPE,
-                    "Cannot inject task: process instance not found: " + processInstanceId);
-        }
-        String taskId = UUID.randomUUID().toString();
-        TaskInfo injected = TaskInfo.builder()
-                .taskId(taskId)
-                .taskName("Injected: " + taskDefinitionKey)
-                .taskDefinitionKey(taskDefinitionKey)
-                .processInstanceId(processInstanceId)
-                .createTime(LocalDateTime.now())
-                .variables(new HashMap<>())
-                .build();
-        tasks.put(taskId, injected);
-        // Ensure instance is RUNNING
-        if (info.getStatus() != ProcessInstanceInfo.ProcessStatus.RUNNING) {
-            info.setStatus(ProcessInstanceInfo.ProcessStatus.RUNNING);
-        }
-        log.info("[SmartEngine] Injected task {} ({}) into process {}", taskId, taskDefinitionKey, processInstanceId);
-        return taskId;
-    }
-
-    /**
-     * Return the username/userId of the user who started this process instance.
-     * Returns {@code null} if not known.
-     */
-    public String getProcessInitiator(String processInstanceId) {
-        return initiatorMap.get(processInstanceId);
-    }
-
-    /**
-     * Record that a task was approved (used by TestBpmFixture to simulate approved state).
-     */
-    public void recordApprovedTask(String processInstanceId, String taskId) {
-        approvedTasksMap.computeIfAbsent(processInstanceId, k -> new ArrayList<>()).add(taskId);
-    }
-
-    /**
-     * Return true if any task in this process instance was previously approved.
-     * Used by strict-withdraw check.
-     */
-    public boolean hasApprovedTask(String processInstanceId) {
-        List<String> approved = approvedTasksMap.get(processInstanceId);
-        return approved != null && !approved.isEmpty();
-    }
-
-    /**
-     * Terminate (withdraw) a process instance.
-     * Sets status to WITHDRAWN and removes all active tasks.
-     *
-     * @param processInstanceId the process instance to terminate
-     * @param reason            reason for termination
-     */
-    public void terminateProcess(String processInstanceId, String reason) {
-        ProcessInstanceInfo info = instances.get(processInstanceId);
-        if (info == null) {
-            throw new BpmEngineException(ENGINE_TYPE,
-                    "Process instance not found: " + processInstanceId);
-        }
-        if (info.getStatus() == ProcessInstanceInfo.ProcessStatus.COMPLETED
-                || info.getStatus() == ProcessInstanceInfo.ProcessStatus.CANCELLED
-                || info.getStatus() == ProcessInstanceInfo.ProcessStatus.WITHDRAWN) {
-            throw new BpmEngineException(ENGINE_TYPE,
-                    "Process instance is already terminated: " + processInstanceId);
-        }
-        // TODO: replace with SmartEngine terminate/abort API
-        info.setStatus(ProcessInstanceInfo.ProcessStatus.WITHDRAWN);
-        info.setEndTime(LocalDateTime.now());
-        tasks.values().removeIf(t -> t.getProcessInstanceId().equals(processInstanceId));
-        appendHistory(processInstanceId, "withdraw", "Process Withdrawn: " + reason, "endEvent", null);
-        log.info("[SmartEngine] Withdrawn process instance {}: {}", processInstanceId, reason);
     }
 
     private void appendHistory(String processInstanceId, String activityId,
