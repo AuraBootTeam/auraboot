@@ -1,6 +1,6 @@
 import React, { useCallback, useRef, useEffect, useMemo } from 'react';
 import { Copy, Trash2, Move, RotateCcw, Settings } from 'lucide-react';
-import type { Component } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { Component } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 
 export interface SelectionOverlayProps {
   selectedComponents: Array<

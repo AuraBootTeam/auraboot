@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import ComponentTestSuite, { type ComponentTestCase } from '~/plugins/core-designer/components/studio/test/ComponentTestSuite';
-import type { FormSchema } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { FormSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 
 interface TestResult {
   type: string;

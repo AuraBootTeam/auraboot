@@ -4,7 +4,7 @@
  * 提供 Schema 导入导出相关的工具函数
  */
 
-import type { FormSchema } from '~/plugins/core-designer/components/studio/domain/schema/types';
+import type { FormSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 import { validateSchema, type ValidationResult } from '~/plugins/core-designer/components/studio/workbench/utils/validation';
 import { createDefaultSchema } from '~/plugins/core-designer/components/studio/workbench/utils/schemaUtils';
 
