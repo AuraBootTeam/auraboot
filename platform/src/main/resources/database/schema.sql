@@ -434,6 +434,10 @@ CREATE TABLE IF NOT EXISTS ab_meta_model (
     model_category       VARCHAR(50),               -- DOCUMENT, MASTER, TRANSACTION, ACTIVITY, REFERENCE, ENTITY
     data_sensitivity     VARCHAR(20) DEFAULT 'internal', -- PUBLIC, INTERNAL, CONFIDENTIAL, RESTRICTED
     lifecycle_description TEXT,                      -- e.g. "NEW → QUALIFIED → CONVERTED"
+    source_type          VARCHAR(20) NOT NULL DEFAULT 'physical'
+                          CHECK (source_type IN ('physical','namedQuery','endpoint','sqlView')),
+    source_ref           TEXT,
+    capabilities         JSONB NOT NULL DEFAULT '{}'::jsonb,
     version INT NOT NULL,
     semver TEXT,
     is_current BOOLEAN NOT NULL DEFAULT FALSE,
@@ -941,6 +945,19 @@ DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_meta_model_status') THEN
         ALTER TABLE ab_meta_model ADD CONSTRAINT chk_meta_model_status CHECK (status IN ('draft', 'published', 'archived'));
+    END IF;
+END $$;
+
+-- Phase 1 virtual model storage contract:
+-- physical models must have table_name; virtual models must have source_ref.
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_model_source') THEN
+        ALTER TABLE ab_meta_model
+            ADD CONSTRAINT chk_model_source CHECK (
+                (source_type = 'physical' AND table_name IS NOT NULL) OR
+                (source_type <> 'physical' AND source_ref IS NOT NULL)
+            );
     END IF;
 END $$;
 
