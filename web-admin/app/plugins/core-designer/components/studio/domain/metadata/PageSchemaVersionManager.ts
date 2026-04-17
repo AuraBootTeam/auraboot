@@ -98,6 +98,8 @@ export class PageSchemaVersionManager {
   private autoSaveTimer: NodeJS.Timeout | null = null;
   private schemaCache = new Map<string, PageSchemaVersion>();
   private pendingChanges = new Map<string, CanvasSchema>();
+  /** Tracks the actor associated with each pending auto-save entry. */
+  private pendingActors = new Map<string, string>();
 
   constructor(config: Partial<PageSchemaVersionConfig> = {}) {
     this.config = {
@@ -155,11 +157,18 @@ export class PageSchemaVersionManager {
     if (this.pendingChanges.size === 0) return;
 
     const changes = Array.from(this.pendingChanges.entries());
+    const actors = new Map(this.pendingActors);
     this.pendingChanges.clear();
+    this.pendingActors.clear();
 
     for (const [pageId, schema] of changes) {
       try {
-        await this.saveDraft(pageId, schema);
+        // Background timer has no user context — actor stored at markSchemaChanged call site
+        const actor = actors.get(pageId);
+        if (!actor) {
+          console.warn('[PageSchemaVersionManager] pendingActors miss for pageId=' + pageId + ', falling back to system');
+        }
+        await this.saveDraft(pageId, schema, actor ?? 'system');
       } catch (error) {
         console.error(`Auto-save failed for page ${pageId}:`, error);
         // 重新加入待保存队列
@@ -170,10 +179,13 @@ export class PageSchemaVersionManager {
 
   /**
    * 创建新的 CanvasSchema 版本
+   *
+   * @param actor - caller identity (email or username) from auth context
    */
   async createVersion(
     pageId: string,
     request: CreatePageSchemaVersionRequest,
+    actor: string,
   ): Promise<PageSchemaVersion> {
     try {
       // 验证 Schema
@@ -196,7 +208,7 @@ export class PageSchemaVersionManager {
         schema: request.schema,
       };
 
-      const version = await this.versionManager.createVersion(pageId, versionRequest);
+      const version = await this.versionManager.createVersion(pageId, versionRequest, actor);
 
       const pageSchemaVersion: PageSchemaVersion = {
         ...version,
@@ -226,8 +238,10 @@ export class PageSchemaVersionManager {
 
   /**
    * 更新 CanvasSchema 版本
+   *
+   * @param actor - caller identity from auth context
    */
-  async updateVersion(request: UpdatePageSchemaVersionRequest): Promise<PageSchemaVersion> {
+  async updateVersion(request: UpdatePageSchemaVersionRequest, actor: string): Promise<PageSchemaVersion> {
     try {
       // 验证 Schema
       if (request.schema) {
@@ -256,7 +270,7 @@ export class PageSchemaVersionManager {
         schema: request.schema,
       };
 
-      const version = await this.versionManager.updateVersion(versionRequest);
+      const version = await this.versionManager.updateVersion(versionRequest, actor);
 
       const pageSchemaVersion: PageSchemaVersion = {
         ...version,
@@ -285,10 +299,13 @@ export class PageSchemaVersionManager {
 
   /**
    * 保存草稿
+   *
+   * @param actor - caller identity from auth context
    */
   async saveDraft(
     pageId: string,
     schema: CanvasSchema,
+    actor: string,
     description?: string,
   ): Promise<PageSchemaVersion> {
     try {
@@ -301,7 +318,7 @@ export class PageSchemaVersionManager {
           versionId: existingDraft.id,
           schema,
           description: description || `自动保存 - ${new Date().toLocaleString()}`,
-        });
+        }, actor);
       } else {
         // 创建新草稿
         return await this.createVersion(pageId, {
@@ -309,7 +326,7 @@ export class PageSchemaVersionManager {
           description: description || '草稿版本',
           type: VersionType.PATCH,
           autoSave: true,
-        });
+        }, actor);
       }
     } catch (error) {
       console.error('Failed to save draft:', error);
@@ -319,10 +336,12 @@ export class PageSchemaVersionManager {
 
   /**
    * 发布版本
+   *
+   * @param actor - caller identity from auth context
    */
-  async publishVersion(pageId: string, request: PublishVersionRequest): Promise<PageSchemaVersion> {
+  async publishVersion(pageId: string, request: PublishVersionRequest, actor: string): Promise<PageSchemaVersion> {
     try {
-      const version = await this.versionManager.publishVersion(pageId, request.versionId, request);
+      const version = await this.versionManager.publishVersion(pageId, request.versionId, request, actor);
       const pageSchemaVersion = version as PageSchemaVersion;
 
       // 更新缓存
@@ -344,13 +363,16 @@ export class PageSchemaVersionManager {
 
   /**
    * 回滚版本
+   *
+   * @param actor - caller identity from auth context
    */
   async rollbackVersion(
     pageId: string,
     request: RollbackVersionRequest,
+    actor: string,
   ): Promise<PageSchemaVersion> {
     try {
-      const version = await this.versionManager.rollbackVersion(pageId, request);
+      const version = await this.versionManager.rollbackVersion(pageId, request, actor);
       const pageSchemaVersion = version as PageSchemaVersion;
 
       // 更新缓存
@@ -441,10 +463,14 @@ export class PageSchemaVersionManager {
 
   /**
    * 标记 Schema 变更（用于自动保存）
+   *
+   * @param actor - caller identity from auth context; stored so the background
+   *   timer can use the correct actor when it flushes pending changes.
    */
-  markSchemaChanged(pageId: string, schema: CanvasSchema): void {
+  markSchemaChanged(pageId: string, schema: CanvasSchema, actor: string): void {
     if (this.config.autoSave) {
       this.pendingChanges.set(pageId, schema);
+      this.pendingActors.set(pageId, actor);
     }
   }
 
@@ -627,6 +653,7 @@ export class PageSchemaVersionManager {
 
     this.schemaCache.clear();
     this.pendingChanges.clear();
+    this.pendingActors.clear();
   }
 }
 
