@@ -11,7 +11,6 @@ import type {
   UpdateVersionRequest,
   PublishVersionRequest,
   RollbackVersionRequest,
-  VersionDiff,
   VersionEvent,
   VersionEventListener,
   VersionSync,
@@ -355,51 +354,6 @@ export function useVersionOperations(pageId: string) {
     duplicateVersion,
     archiveVersion,
     restoreVersion,
-  };
-}
-
-/**
- * 版本比较 Hook
- */
-export function useVersionComparison(pageId: string) {
-  const [diff, setDiff] = useState<VersionDiff | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const versionManager = getVersionManager();
-
-  const compareVersions = useCallback(
-    async (versionAId: string, versionBId: string) => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const versionDiff = await versionManager.compareVersions(pageId, versionAId, versionBId);
-        setDiff(versionDiff);
-        return versionDiff;
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : '比较版本失败';
-        setError(errorMessage);
-        setDiff(null);
-        throw new Error(errorMessage);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [versionManager],
-  );
-
-  const clearComparison = useCallback(() => {
-    setDiff(null);
-    setError(null);
-  }, []);
-
-  return {
-    diff,
-    loading,
-    error,
-    compareVersions,
-    clearComparison,
   };
 }
 
