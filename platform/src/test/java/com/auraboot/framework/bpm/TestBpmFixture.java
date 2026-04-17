@@ -35,15 +35,22 @@ import java.util.Map;
 public class TestBpmFixture {
 
     /**
-     * Minimal 2-step approval process: start → approve (userTask) → second (userTask) → end.
-     * The second userTask ensures the process stays RUNNING after the first approval.
+     * Minimal 2-step approval process: start → approval (userTask) → second_approval (userTask) → end.
+     * Process and task have <smart:properties> with aura.* keys for policy testing.
+     * Format args: %1$s = processKey, %2$s = withdrawPolicy code, %3$s = ccPolicy code.
      */
     private static final String MINIMAL_BPMN_TEMPLATE = """
             <?xml version="1.0" encoding="UTF-8"?>
             <definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
-                         xmlns:smart="http://smart.alibaba.com"
+                         xmlns:smart="http://smartengine.org/schema/process"
                          targetNamespace="http://auraboot.com/bpm">
-                <process id="%s" isExecutable="true">
+                <process id="%1$s" isExecutable="true">
+                    <extensionElements>
+                        <smart:properties>
+                            <smart:property name="aura.withdrawPolicy" value="%2$s"/>
+                            <smart:property name="aura.ccPolicy" value="%3$s"/>
+                        </smart:properties>
+                    </extensionElements>
                     <startEvent id="start"/>
                     <userTask id="approval" name="First Approval"
                               smart:assigneeType="user"
@@ -109,7 +116,8 @@ public class TestBpmFixture {
      * @param processKey the exact process key to deploy (must be stable across duplicate checks)
      */
     public void deployProcess(String processKey) {
-        String bpmn = String.format(MINIMAL_BPMN_TEMPLATE, processKey);
+        String bpmn = String.format(MINIMAL_BPMN_TEMPLATE,
+                processKey, WithdrawPolicy.STRICT.code(), CcPolicy.ALL.code());
         ProcessDeploymentService.CreateProcessRequest req =
                 new ProcessDeploymentService.CreateProcessRequest(
                         processKey, "Test Action " + processKey, "Fixture process",
@@ -128,17 +136,13 @@ public class TestBpmFixture {
         String tenantId = MetaContext.getCurrentTenantIdAsString();
 
         // 1. Deploy via ProcessDeploymentService (handles BPMN registration)
-        String bpmn = String.format(MINIMAL_BPMN_TEMPLATE, processKey);
+        String bpmn = String.format(MINIMAL_BPMN_TEMPLATE,
+                processKey, withdrawPolicy.code(), ccPolicy.code());
         ProcessDeploymentService.CreateProcessRequest req =
                 new ProcessDeploymentService.CreateProcessRequest(
                         processKey, "Test Withdraw " + keySuffix, "Fixture process",
                         "test", bpmn, null, null, null);
         BpmProcessDefinition def = deploymentService.create(req);
-
-        // 2. Set the withdraw and cc policies before deploying
-        def.setWithdrawPolicy(withdrawPolicy.code());
-        def.setCcPolicy(ccPolicy.code());
-        processDefinitionMapper.updateById(def);
 
         deploymentService.deploy(def.getPid());
 
