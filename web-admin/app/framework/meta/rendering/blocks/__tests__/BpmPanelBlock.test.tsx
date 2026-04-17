@@ -11,13 +11,23 @@
  */
 
 import React from 'react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, act } from '@testing-library/react';
 
 const getInstanceForRecordMock = vi.fn();
 
 vi.mock('~/plugins/core-bpm/services/bpmWorkbenchService', () => ({
   getInstanceForRecord: (...args: unknown[]) => getInstanceForRecordMock(...args),
+}));
+
+// BpmDiagramSection pulls in @xyflow/react which requires browser-only APIs
+// (ResizeObserver, DOMMatrix) that jsdom does not ship. The panel-level test
+// only cares that the diagram slot gets mounted with the instance; its
+// internals have dedicated coverage in BpmDiagramSection.test.tsx.
+vi.mock('~/plugins/core-bpm/components/panel/BpmDiagramSection', () => ({
+  BpmDiagramSection: ({ instance }: { instance: { instanceId: string } | null }) => (
+    <div data-testid="bpm-diagram-stub" data-instance-id={instance?.instanceId ?? ''} />
+  ),
 }));
 
 import { BpmPanelBlock } from '../BpmPanelBlock';
@@ -34,6 +44,14 @@ const READY_INSTANCE = {
 describe('BpmPanelBlock', () => {
   beforeEach(() => {
     getInstanceForRecordMock.mockReset();
+  });
+
+  // Vitest config uses `isolate: false` so DOM state leaks across tests
+  // unless we reset the body between runs. Testing Library's named `cleanup`
+  // export is not surfaced in the installed `@types` so we reset the body
+  // directly - same pattern as BpmStatusSection.test.tsx.
+  afterEach(() => {
+    document.body.innerHTML = '';
   });
 
   it('renders the loading state while the instance request is pending', async () => {

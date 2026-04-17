@@ -487,13 +487,13 @@ export async function getMyStartedProcesses(): Promise<ProcessInstance[]> {
 //       returns ProcessInstanceStatusDTO (instanceId, processDefinitionId, status,
 //       currentNodes, completedNodes, variables).
 //
-//   - getDiagramForInstance:  GET /api/bpm/process-definitions/{pid}/bpmn
-//     → backed by ProcessDefinitionController#getBpmn, returns BPMN XML string.
-//       Note: the path parameter is the process definition PID (not the business
-//       process key). Status DTO.processDefinitionId carries that PID.
-//
 //   - listAuditEvents:        GET /api/bpm/monitor/instances/{processInstanceId}/audit
 //     → backed by BpmMonitorController#getAuditTrail, returns List<BpmAuditRecordEntity>.
+//
+// Diagram rendering uses the existing `getProcessDefinitionByKey` helper
+// from `core-designer/services/bpmnService`; no separate BPMN-XML wrapper
+// lives here. The backend `GET /api/bpm/process-definitions/{pid}/bpmn`
+// endpoint is still available for plugins that want raw BPMN XML.
 //
 // These helpers do NOT perform multi-path response fallback. Any deviation from
 // the expected envelope surfaces as an error.
@@ -587,22 +587,6 @@ export async function getInstanceForRecord(
     return null;
   }
   throw new Error(desc || 'Failed to get process instance for record');
-}
-
-/**
- * Fetch the BPMN XML for the process definition that owns the given instance.
- *
- * The plan-level phrasing "by instance" is implemented as a two-step call:
- * the caller already holds `BpmInstanceForRecord.processDefinitionId` from
- * `getInstanceForRecord`, so this helper accepts the PID directly and fetches
- * the XML from the process-definitions endpoint.
- */
-export async function getDiagramForInstance(processDefinitionPid: string): Promise<string> {
-  const result = await get<string>(`/api/bpm/process-definitions/${processDefinitionPid}/bpmn`);
-  if (!isSuccess(result.code) || !result.data) {
-    throw new Error(result.desc || 'Failed to get process BPMN diagram');
-  }
-  return result.data;
 }
 
 /**
