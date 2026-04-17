@@ -63,12 +63,6 @@ const TabsBlockRenderer = React.lazy(() =>
     default: m.TabsBlockRenderer,
   })),
 );
-const ApprovalCommentsBlock = React.lazy(() =>
-  import('~/framework/meta/rendering/blocks/ApprovalCommentsBlock').then((m) => ({
-    default: m.ApprovalCommentsBlock,
-  })),
-);
-
 // Lazy page content renderers — largest components, biggest savings
 const ListPageContent = React.lazy(() =>
   import('~/framework/meta/rendering/pages/ListPageContent').then((m) => ({ default: m.ListPageContent })),
@@ -104,7 +98,6 @@ const adminProfile: RenderProfile = {
     'sub-table',
     'monthly-grid',
     'custom',
-    'approval-comments',
   ],
 
   blockRenderers: new Map<string, any>([
@@ -119,7 +112,6 @@ const adminProfile: RenderProfile = {
     ['description', DescriptionBlockRenderer],
     ['chart', ChartBlockRenderer],
     ['tabs', TabsBlockRenderer],
-    ['approval-comments', ApprovalCommentsBlock],
     // tabs, sub-table, monthly-grid are handled inline by page renderers
   ]),
 

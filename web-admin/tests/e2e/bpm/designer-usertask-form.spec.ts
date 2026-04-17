@@ -347,13 +347,10 @@ test.describe('BPM Designer UserTask formPageKey Lifecycle', { tag: ['@bpm-regre
   // B3.2 — start instance, see SmartEngine task in Task Center, verify
   //        backend form-binding contract end-to-end via /api/bpm/forms/task.
   //
-  // NOTE ON SCOPE: The BpmTaskDrawer (DSL form renderer) is driven from
-  // ApprovalInbox, which reads from ab_approval_task. That table is
-  // populated only by the command-chain orchestration path
-  // (ApprovalChainExecutor); a bare SmartEngine userTask started through
-  // /api/bpm/process-instances does NOT bridge to ab_approval_task at
-  // present. The DSL-form-in-drawer rendering is therefore exercised by
-  // bpm-form-integration.spec.ts which seeds approval_task rows directly.
+  // NOTE ON SCOPE: The BpmTaskDrawer (DSL form renderer) is driven by the
+  // SmartEngine task pipeline via /api/bpm/tasks/todo and /api/bpm/forms/task.
+  // Here we only assert the UI-visible contract — full DSL-form-in-drawer
+  // rendering is exercised by bpm-form-integration.spec.ts.
   //
   // Here in B3 we instead assert:
   //   1) UI: the task appears in Task Center (SmartEngine-backed

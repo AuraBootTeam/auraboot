@@ -168,7 +168,7 @@ describe('BpmPermissionService.resolvePermissions', () => {
 
   it('prefers backend canonical _startUserId over SmartEngine-native startUserId', () => {
     // Both keys present but disagree — _startUserId wins because that is what
-    // ApprovalChainExecutor writes (and AssigneeResolverService reads first).
+    // BpmIntegrationService writes (and AssigneeResolverService reads first).
     const i = instance({
       variables: { _startUserId: 'u-100', startUserId: 'u-999' },
     });
