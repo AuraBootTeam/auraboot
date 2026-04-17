@@ -3,9 +3,12 @@
  */
 
 import React from 'react';
-import type { BlockConfig } from '~/framework/meta/schemas/types';
+import { useNavigate } from 'react-router';
+import type { BlockConfig, ButtonConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
+import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
+import { useAuth } from '~/contexts/AuthContext';
 
 export interface ToolbarBlockRendererProps {
   block: BlockConfig;
@@ -19,15 +22,46 @@ export const ToolbarBlockRenderer: React.FC<ToolbarBlockRendererProps> = ({ bloc
   const t = context.t || ((key: string) => key);
   const buttons = block.buttons || [];
 
-  // 处理按钮点击
-  const handleButtonClick = async (button: any) => {
-    if (button.handler) {
-      try {
-        await runtime.executeHandler(button.handler, {});
-      } catch (err) {
-        console.error('Button handler failed:', err);
-      }
+  // 路由 / 鉴权上下文 — useActionHandler hook 要求
+  const navigate = useNavigate();
+  const { token } = useAuth();
+  const schema = runtime.getSchema();
+  const tableName = (schema as any).modelCode || schema.id || '';
+  const dataSourceManager = runtime.getDataSourceManager();
+
+  const { handleAction } = useActionHandler({
+    runtime,
+    navigate,
+    tableName,
+    context: {},
+    dataSourceManager,
+    locale,
+    t,
+    token: token || undefined,
+  });
+
+  // 处理按钮点击 - 委托给 useActionHandler
+  // Toolbar 通常无 record（列表页工具栏），传 undefined 是合法的
+  const handleButtonClick = (button: ButtonConfig) => {
+    // Legacy compatibility: bare `button.handler` (not wrapped in events.onClick)
+    // is not recognized by normalizeAction — normalize it here to preserve
+    // original behavior where `button.handler` on a toolbar button was fire-able.
+    const normalized: ButtonConfig =
+      button.handler && !button.events?.onClick && !button.action
+        ? { ...button, events: { ...(button.events || {}), onClick: { handler: button.handler } } }
+        : button;
+
+    // Preserve original gate: only fire for buttons with a recognized action source.
+    if (
+      !normalized.events?.onClick &&
+      !normalized.action &&
+      !normalized.commandCode &&
+      !normalized.navigateTo &&
+      !normalized.apiAction
+    ) {
+      return;
     }
+    handleAction(normalized, undefined);
   };
 
   return (

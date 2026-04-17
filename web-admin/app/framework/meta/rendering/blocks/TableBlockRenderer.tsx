@@ -5,6 +5,7 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router';
 import type { BlockConfig, ColumnConfig, ButtonConfig, TreeConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
@@ -12,6 +13,8 @@ import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { sanitizeHtml } from '~/framework/meta/utils/sanitizeHtml';
 import { useTreeData } from '~/framework/meta/hooks/useTreeData';
+import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
+import { useAuth } from '~/contexts/AuthContext';
 
 export interface TableBlockRendererProps {
   block: BlockConfig;
@@ -32,6 +35,23 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
 
   const evaluator = runtime.getEvaluator();
   const dataSourceManager = runtime.getDataSourceManager();
+
+  // 路由 / 鉴权上下文 — useActionHandler hook 要求
+  const navigate = useNavigate();
+  const { token } = useAuth();
+  const schema = runtime.getSchema();
+  const tableName = (schema as any).modelCode || schema.id || '';
+
+  const { handleAction: dispatchAction } = useActionHandler({
+    runtime,
+    navigate,
+    tableName,
+    context: {},
+    dataSourceManager,
+    locale,
+    t,
+    token: token || undefined,
+  });
 
   const columns: ColumnConfig[] = Array.isArray(block.columns)
     ? (block.columns as ColumnConfig[])
@@ -248,15 +268,27 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
     );
   };
 
-  // 处理操作按钮点击
-  const handleAction = async (button: ButtonConfig, row: any) => {
-    if (button.handler) {
-      try {
-        await runtime.executeHandler(button.handler, { row });
-      } catch (err) {
-        console.error('Action handler failed:', err);
-      }
+  // 处理操作按钮点击 - 委托给 useActionHandler
+  // Legacy compatibility: bare `button.handler` (not wrapped in events.onClick) is
+  // not recognized by normalizeAction — normalize it here to preserve original
+  // behavior where `button.handler` on a row action was fire-able.
+  const handleAction = (button: ButtonConfig, row: any) => {
+    const normalized: ButtonConfig =
+      button.handler && !button.events?.onClick && !button.action
+        ? { ...button, events: { ...(button.events || {}), onClick: { handler: button.handler } } }
+        : button;
+
+    // Preserve original gate: only fire for buttons with a recognized action source.
+    if (
+      !normalized.events?.onClick &&
+      !normalized.action &&
+      !normalized.commandCode &&
+      !normalized.navigateTo &&
+      !normalized.apiAction
+    ) {
+      return;
     }
+    dispatchAction(normalized, row);
   };
 
   return (
