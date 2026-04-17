@@ -1196,6 +1196,19 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             extension.put("designerJson", dto.getDesignerJson());
         }
 
+        // Derive form bindings from designerJson node `data.formPageKey` when the
+        // DTO did not declare an explicit top-level `formBindings` map. Plugin
+        // authors editing processes.json in designer form carry the user-task ↔
+        // page binding inline on each node; without this derivation the
+        // BpmProcessDefinition.form_bindings column stays empty and runtime
+        // /api/bpm/forms/task/{id} returns a null formBinding even though the
+        // page exists. Explicit DTO-level formBindings always win so callers
+        // that already supply the richer FormBindingConfig shape are untouched.
+        Map<String, Object> derivedFormBindings = null;
+        if (dto.getFormBindings() == null || dto.getFormBindings().isEmpty()) {
+            derivedFormBindings = deriveFormBindingsFromDesigner(dto);
+        }
+
         // Determine BPMN XML at import time so the DB row always carries a
         // non-empty bpmn_content when we are (auto-)deploying. SmartEngine
         // registration still happens in deployProcessToSmartEngine, but now we
@@ -1215,9 +1228,9 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                 .category(dto.getCategory())
                 .bpmnContent(initialBpmnContent)
                 .extension(extension.isEmpty() ? null : extension)
-                .formBindings(dto.getFormBindings() != null
+                .formBindings(dto.getFormBindings() != null && !dto.getFormBindings().isEmpty()
                         ? objectMapper.convertValue(dto.getFormBindings(), new TypeReference<>() {})
-                        : new HashMap<>())
+                        : (derivedFormBindings != null ? derivedFormBindings : new HashMap<>()))
                 .businessDataBindings(dto.getBusinessDataBindings() != null
                         ? Map.of("bindings", dto.getBusinessDataBindings())
                         : new HashMap<>())
@@ -1281,6 +1294,69 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             log.error("Failed to compile BPMN for {}: {}", dto.getKey(), e.getMessage(), e);
             throw new PluginException("Failed to compile BPMN for " + dto.getKey() + ": " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * Scan {@code dto.designerJson.nodes} and derive a {@code formBindings}
+     * map compatible with {@link com.auraboot.framework.bpm.dto.FormBindingConfig}
+     * for every {@code userTask} node that carries {@code data.formPageKey}.
+     *
+     * <p>Resulting map shape (keyed by node id): <pre>
+     *   { "task_manager_approve": { "formType": "PAGE", "formRef": "wd_leave_request_detail" } }
+     * </pre>
+     *
+     * <p>If the referenced page does not exist in {@code ab_page_schema}, we log
+     * a warning but still emit the binding — deploy-time / runtime form lookup
+     * will surface the missing page with a clearer error. This matches the
+     * project's fail-late philosophy for form bindings (page may be imported
+     * later in the same transaction).
+     *
+     * @return a non-empty map with derived bindings, or {@code null} if the
+     *         designerJson has no qualifying userTask nodes.
+     */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> deriveFormBindingsFromDesigner(ProcessDefinitionDTO dto) {
+        Map<String, Object> designerJson = dto.getDesignerJson();
+        if (designerJson == null || designerJson.isEmpty()) {
+            return null;
+        }
+        Object nodesObj = designerJson.get("nodes");
+        if (!(nodesObj instanceof List<?> nodes) || nodes.isEmpty()) {
+            return null;
+        }
+        Map<String, Object> derived = new LinkedHashMap<>();
+        for (Object nodeObj : nodes) {
+            if (!(nodeObj instanceof Map)) continue;
+            Map<String, Object> node = (Map<String, Object>) nodeObj;
+            Object type = node.get("type");
+            if (!"userTask".equals(type)) continue;
+            Object dataObj = node.get("data");
+            if (!(dataObj instanceof Map)) continue;
+            Map<String, Object> data = (Map<String, Object>) dataObj;
+            Object pageKeyObj = data.get("formPageKey");
+            if (!(pageKeyObj instanceof String pageKey) || pageKey.isBlank()) continue;
+            Object nodeIdObj = node.get("id");
+            if (!(nodeIdObj instanceof String nodeId) || nodeId.isBlank()) continue;
+
+            // Verify the page exists; warn (not throw) so a stale reference
+            // does not wedge the entire plugin import. Deploy-time runtime
+            // will report the missing page through the form probe endpoint.
+            try {
+                if (pageSchemaMapper.selectAnyByPageKey(pageKey) == null) {
+                    log.warn("Process {} node {} declares formPageKey={} but no matching row in ab_page_schema; binding will be emitted anyway",
+                            dto.getKey(), nodeId, pageKey);
+                }
+            } catch (Exception e) {
+                log.warn("Failed to verify page_key={} for process {} node {}: {}",
+                        pageKey, dto.getKey(), nodeId, e.getMessage());
+            }
+
+            Map<String, Object> binding = new LinkedHashMap<>();
+            binding.put("formType", "PAGE");
+            binding.put("formRef", pageKey);
+            derived.put(nodeId, binding);
+        }
+        return derived.isEmpty() ? null : derived;
     }
 
     private String stampVersion(String bpmnXml, Integer version) {
