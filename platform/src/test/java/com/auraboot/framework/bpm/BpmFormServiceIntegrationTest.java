@@ -3,6 +3,7 @@ package com.auraboot.framework.bpm;
 import com.auraboot.smart.framework.engine.model.instance.ProcessInstance;
 import com.auraboot.framework.bpm.dto.FormBindingConfig;
 import com.auraboot.framework.bpm.dto.ProcessStartRequest;
+import com.auraboot.framework.bpm.dto.TaskActionDef;
 import com.auraboot.framework.bpm.dto.TaskSubmitRequest;
 import com.auraboot.framework.bpm.enums.SaveStrategy;
 import com.auraboot.framework.bpm.service.BpmFormService;
@@ -589,5 +590,169 @@ class BpmFormServiceIntegrationTest extends BaseIntegrationTest {
         verify(processEngineService, never()).startProcess(anyString(), anyString(), any());
 
         log.info("START-33 PASSED: Command failure prevents process start");
+    }
+
+    // ==================== getTaskActionsForNode Tests ====================
+
+    @Test
+    @Order(40)
+    @DisplayName("TA-40: returns declared approve/reject taskActions from designerJson")
+    void ta40_returnsDeclaredTaskActions() {
+        long ts = System.currentTimeMillis();
+        String processKey = "ta_process_" + ts;
+        BpmProcessDefinition def = new BpmProcessDefinition();
+        def.setPid(UniqueIdGenerator.generate());
+        def.setProcessKey(processKey);
+        def.setProcessName("TA Process " + ts);
+        def.setBpmnContent("<definitions/>");
+        def.setIsCurrent(true);
+        def.setDeletedFlag(false);
+        // Column default is '[]'::jsonb; PluginSettingsTypeHandler expects an
+        // object — explicitly initialise to an empty map so select round-trips.
+        def.setBusinessDataBindings(new HashMap<>());
+        def.setFormBindings(new HashMap<>());
+        Map<String, Object> designer = new HashMap<>();
+        designer.put("nodes", List.of(
+                Map.of(
+                        "id", "task_manager_approve",
+                        "type", "userTask",
+                        "data", Map.of(
+                                "taskActions", List.of(
+                                        Map.of(
+                                                "key", "approve",
+                                                "type", "complete",
+                                                "resultVariable", "taskResult",
+                                                "resultValue", "approved"
+                                        ),
+                                        Map.of(
+                                                "key", "reject",
+                                                "type", "complete",
+                                                "resultVariable", "taskResult",
+                                                "resultValue", "rejected",
+                                                "requireComment", true
+                                        )
+                                )
+                        )
+                )
+        ));
+        def.setExtension(Map.of("designerJson", designer));
+        processDefinitionMapper.insert(def);
+
+        List<TaskActionDef> actions = formService.getTaskActionsForNode(
+                processKey, "task_manager_approve");
+
+        assertThat(actions).isNotNull().hasSize(2);
+        assertThat(actions.get(0).getKey()).isEqualTo("approve");
+        assertThat(actions.get(0).getType()).isEqualTo("complete");
+        assertThat(actions.get(0).getResultVariable()).isEqualTo("taskResult");
+        assertThat(actions.get(0).getResultValue()).isEqualTo("approved");
+        assertThat(actions.get(1).getKey()).isEqualTo("reject");
+        assertThat(actions.get(1).getResultValue()).isEqualTo("rejected");
+        assertThat(actions.get(1).getRequireComment()).isTrue();
+
+        log.info("TA-40 PASSED: taskActions parsed from designerJson");
+    }
+
+    @Test
+    @Order(41)
+    @DisplayName("TA-41: returns null when process has no designerJson")
+    void ta41_noDesignerJsonReturnsNull() {
+        long ts = System.currentTimeMillis();
+        String processKey = "ta_no_designer_" + ts;
+        BpmProcessDefinition def = new BpmProcessDefinition();
+        def.setPid(UniqueIdGenerator.generate());
+        def.setProcessKey(processKey);
+        def.setProcessName("TA No Designer " + ts);
+        def.setBpmnContent("<definitions/>");
+        def.setIsCurrent(true);
+        def.setDeletedFlag(false);
+        // Column default is '[]'::jsonb; PluginSettingsTypeHandler expects an
+        // object — explicitly initialise to an empty map so select round-trips.
+        def.setBusinessDataBindings(new HashMap<>());
+        def.setFormBindings(new HashMap<>());
+        processDefinitionMapper.insert(def);
+
+        assertThat(formService.getTaskActionsForNode(processKey, "any-node")).isNull();
+
+        log.info("TA-41 PASSED: null returned when designerJson absent");
+    }
+
+    @Test
+    @Order(42)
+    @DisplayName("TA-42: returns null when node id does not match any designerJson node")
+    void ta42_unknownNodeReturnsNull() {
+        long ts = System.currentTimeMillis();
+        String processKey = "ta_unknown_node_" + ts;
+        BpmProcessDefinition def = new BpmProcessDefinition();
+        def.setPid(UniqueIdGenerator.generate());
+        def.setProcessKey(processKey);
+        def.setProcessName("TA Unknown Node " + ts);
+        def.setBpmnContent("<definitions/>");
+        def.setIsCurrent(true);
+        def.setDeletedFlag(false);
+        // Column default is '[]'::jsonb; PluginSettingsTypeHandler expects an
+        // object — explicitly initialise to an empty map so select round-trips.
+        def.setBusinessDataBindings(new HashMap<>());
+        def.setFormBindings(new HashMap<>());
+        Map<String, Object> designer = Map.of(
+                "nodes", List.of(
+                        Map.of(
+                                "id", "task_manager_approve",
+                                "type", "userTask",
+                                "data", Map.of(
+                                        "taskActions", List.of(
+                                                Map.of(
+                                                        "key", "approve",
+                                                        "type", "complete",
+                                                        "resultVariable", "taskResult",
+                                                        "resultValue", "approved"
+                                                )
+                                        )
+                                )
+                        )
+                )
+        );
+        def.setExtension(Map.of("designerJson", designer));
+        processDefinitionMapper.insert(def);
+
+        assertThat(formService.getTaskActionsForNode(processKey, "nonexistent_node"))
+                .isNull();
+
+        log.info("TA-42 PASSED: unknown nodeId returns null");
+    }
+
+    @Test
+    @Order(43)
+    @DisplayName("TA-43: returns null when node has no taskActions array")
+    void ta43_nodeWithoutTaskActionsReturnsNull() {
+        long ts = System.currentTimeMillis();
+        String processKey = "ta_no_actions_" + ts;
+        BpmProcessDefinition def = new BpmProcessDefinition();
+        def.setPid(UniqueIdGenerator.generate());
+        def.setProcessKey(processKey);
+        def.setProcessName("TA No Actions " + ts);
+        def.setBpmnContent("<definitions/>");
+        def.setIsCurrent(true);
+        def.setDeletedFlag(false);
+        // Column default is '[]'::jsonb; PluginSettingsTypeHandler expects an
+        // object — explicitly initialise to an empty map so select round-trips.
+        def.setBusinessDataBindings(new HashMap<>());
+        def.setFormBindings(new HashMap<>());
+        Map<String, Object> designer = Map.of(
+                "nodes", List.of(
+                        Map.of(
+                                "id", "plain_userTask",
+                                "type", "userTask",
+                                "data", Map.of("label", "审批")
+                        )
+                )
+        );
+        def.setExtension(Map.of("designerJson", designer));
+        processDefinitionMapper.insert(def);
+
+        assertThat(formService.getTaskActionsForNode(processKey, "plain_userTask"))
+                .isNull();
+
+        log.info("TA-43 PASSED: node without taskActions returns null");
     }
 }
