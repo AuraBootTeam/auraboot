@@ -146,7 +146,7 @@ export function TaskTable({
               </th>
             )}
             <th className="px-4 py-3">任务名称</th>
-            <th className="px-4 py-3">流程</th>
+            <th className="px-4 py-3">业务单号</th>
             <th className="w-16 px-4 py-3">优先级</th>
             <th className="px-4 py-3">创建时间</th>
             <th className="px-4 py-3">截止日期</th>
@@ -235,16 +235,27 @@ function TaskRow({
             <button
               className="truncate text-left font-medium text-blue-600 hover:text-blue-800 hover:underline"
               onClick={() => onOpenDetail(task)}
+              data-testid="task-name-button"
             >
               {task.taskName || task.title || '未命名任务'}
             </button>
-            {task.businessKey && (
-              <span className="truncate text-xs text-gray-500">{task.businessKey}</span>
+            {/*
+              Secondary line shows processDefinitionKey (internal identifier)
+              so the user knows which process definition the task belongs to.
+              The primary business-meaningful reference (businessKey) moved
+              into its own column so it can be sorted/scanned.
+            */}
+            {task.processDefinitionKey && (
+              <span className="truncate text-xs text-gray-500" data-testid="task-process-key">
+                {task.processDefinitionKey}
+              </span>
             )}
           </div>
         </div>
       </td>
-      <td className="px-4 py-3 text-gray-600">{task.processDefinitionKey}</td>
+      <td className="px-4 py-3 font-mono text-xs text-gray-700" data-testid="task-business-key">
+        {task.businessKey || <span className="text-gray-400">-</span>}
+      </td>
       <td className="px-4 py-3">
         <PriorityBadge priority={task.priority} />
       </td>
