@@ -56,13 +56,7 @@ public class CommandChainDefinition {
          * Failure triggers compensation sub-process or manual intervention.
          * Suitable for: external API calls, long-running operations.
          */
-        SAGA,
-
-        /**
-         * Chain pauses at UserTask nodes, creates persistent approval tasks,
-         * and resumes on approve/reject. State persisted in ab_chain_execution.
-         */
-        APPROVAL
+        SAGA
     }
 
     @Data

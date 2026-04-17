@@ -155,7 +155,7 @@ function addPageTypeDiscriminator(schema) {
         properties: {
           areas: {
             description: 'Detail pages typically contain tabs with sub-tables',
-            'x-recommended-block-types': ['tabs', 'sub-table', 'form-section', 'description', 'approval-comments'],
+            'x-recommended-block-types': ['tabs', 'sub-table', 'form-section', 'description'],
           },
         },
       },

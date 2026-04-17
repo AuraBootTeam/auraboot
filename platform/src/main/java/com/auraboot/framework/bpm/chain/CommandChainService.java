@@ -53,7 +53,6 @@ public class CommandChainService {
 
     private final SmartEngine smartEngine;
     private final JsonToBpmnConverter jsonToBpmnConverter;
-    private final ApprovalChainExecutor approvalChainExecutor;
     private final com.auraboot.framework.bpm.chain.saga.SagaExecutor sagaExecutor;
 
     /**
@@ -68,8 +67,6 @@ public class CommandChainService {
                                             Map<String, Object> payload) {
         if (chain.getChainMode() == ChainMode.LOCAL_TX) {
             return executeChainLocalTx(chain, businessKey, payload);
-        } else if (chain.getChainMode() == ChainMode.APPROVAL) {
-            return approvalChainExecutor.startChain(chain, businessKey, payload);
         } else {
             return executeChainSaga(chain, businessKey, payload);
         }
