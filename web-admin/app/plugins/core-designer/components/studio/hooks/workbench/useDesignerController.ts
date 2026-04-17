@@ -5,18 +5,25 @@ import { useCanvasEditorState, getDesignerSDK } from '~/plugins/core-designer/co
 import { DRAG_TYPES } from '~/plugins/core-designer/components/studio/workbench/constants';
 import { eventDomainManager } from '~/plugins/core-designer/components/studio/services/actions/event/EventDomainManager';
 import { globalShortcutManager } from '~/plugins/core-designer/components/studio/services/actions/event/GlobalShortcutManager';
-import type { DesignerWorkflowProps } from '~/plugins/core-designer/components/studio/workbench/components/DesignerWorkflow';
 import { createDefaultSchema } from '~/plugins/core-designer/components/studio/workbench/utils/schemaUtils';
 
 const designerSDK = getDesignerSDK();
 const { componentRegistry, pageStateManager: stateManager } = designerSDK;
+
+interface ControllerCollaborationConfig {
+  enabled: boolean;
+  websocketUrl?: string;
+  userId: string;
+  userName: string;
+  userAvatar?: string;
+}
 
 export interface DesignerControllerOptions {
   pageId: string;
   initialSchema?: CanvasSchema;
   previewMode?: boolean;
   readonly?: boolean;
-  collaborationConfig?: DesignerWorkflowProps['collaborationConfig'];
+  collaborationConfig?: ControllerCollaborationConfig;
   onSchemaChange?: (schema: CanvasSchema) => void;
   onSave?: (schema: CanvasSchema) => Promise<void>;
   onPublish?: (schema: CanvasSchema) => Promise<void>;

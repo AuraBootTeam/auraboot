@@ -28,6 +28,8 @@ import { ApiService } from '~/shared/services/ApiService';
  * 版本管理器实现类
  */
 export class VersionManagerImpl implements VersionManager {
+  private static _warnedGetCurrentUser = false;
+
   private apiService: ApiService;
   private eventListeners: Map<VersionEventType, VersionEventListener[]> = new Map();
   private config: VersionConfig;
@@ -626,10 +628,21 @@ export class VersionManagerImpl implements VersionManager {
   }
 
   /**
-   * 获取当前用户
+   * @experimental Not wired to auth. Returns a placeholder actor string.
+   *   Data created via this manager will have polluted createdBy/updatedBy —
+   *   follow-up task: have public API accept `actor` param explicitly.
+   *
+   * NOTE: Until this is wired to auth, every version created via AutoSave /
+   * publish / rollback / saveDraft will have createdBy='system' (or
+   * whatever placeholder this returns). This is visible in VersionDetail
+   * UI and version listings — audit trails are effectively broken until F1.
    */
   private getCurrentUser(): string {
-    // TODO: 从认证系统获取当前用户
+    if (!VersionManagerImpl._warnedGetCurrentUser) {
+      VersionManagerImpl._warnedGetCurrentUser = true;
+      // eslint-disable-next-line no-console
+      console.warn('[VersionManager] getCurrentUser() is not wired to auth — returning placeholder actor. (warned once)');
+    }
     return 'current_user';
   }
 
@@ -644,25 +657,28 @@ export class VersionManagerImpl implements VersionManager {
   }
 
   /**
-   * 验证版本Schema
+   * @experimental Deep schema validation is TODO. Currently only checks that
+   *   a non-empty `id` exists. Do not rely on this for correctness.
+   *   See plan 2026-04-17-studio-v2-cleanup.md T4.
    */
   private async validateVersionSchema(schema: any): Promise<void> {
-    // TODO: 实现Schema验证逻辑
     if (!schema || !schema.id) {
       throw new Error('Invalid schema');
     }
+    // Deep validation intentionally not implemented — see plan 2026-04-17-studio-v2-cleanup.
   }
 
   /**
-   * 计算差异
+   * @experimental Deep diff not implemented. Always throws to prevent the UI
+   *   from silently displaying "no differences" when the diff is simply
+   *   unimplemented. UI callers MUST catch and render an 'unavailable' state.
+   *   See plan 2026-04-17-studio-v2-cleanup.md T4.
    */
-  private calculateDifferences(schemaA: any, schemaB: any): VersionDifference[] {
-    const differences: VersionDifference[] = [];
-
-    // TODO: 实现深度比较逻辑
-    // 这里简化实现，实际应该递归比较所有属性
-
-    return differences;
+  private calculateDifferences(_schemaA: any, _schemaB: any): VersionDifference[] {
+    throw new Error(
+      'VersionManager.calculateDifferences is not implemented. ' +
+      'Callers must catch this error and render an unavailable/placeholder state.'
+    );
   }
 
   /**
