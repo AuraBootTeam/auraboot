@@ -20,7 +20,7 @@
       "list-tabs": {
         "blocks": [{
           "id": "tcrm_opp_tabs",
-          "blockType": "list-tabs",
+          "blockType": "tabs",
           "tabs": [
             { "key": "all", "label": { "en": "All", "zh-CN": "全部" }, "filter": null },
             { "key": "prospecting", "label": { "en": "Prospecting", "zh-CN": "初步接洽" }, "filter": { "field": "tcrm_op_stage", "value": "prospecting", "operator": "EQ" } },
@@ -34,7 +34,7 @@
       "main": {
         "blocks": [{
           "id": "tcrm_opp_table",
-          "blockType": "data-table",
+          "blockType": "table",
           "columns": [
             { "field": "tcrm_op_code", "width": 150, "sortable": true },
             { "field": "tcrm_op_name", "width": 200, "sortable": true },

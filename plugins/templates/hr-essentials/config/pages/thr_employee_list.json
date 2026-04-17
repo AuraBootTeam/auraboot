@@ -20,7 +20,7 @@
       "list-tabs": {
         "blocks": [{
           "id": "thr_employee_tabs",
-          "blockType": "list-tabs",
+          "blockType": "tabs",
           "tabs": [
             { "key": "all", "label": { "en": "All", "zh-CN": "全部" }, "filter": null },
             { "key": "active", "label": { "en": "Active", "zh-CN": "在职" }, "filter": { "field": "thr_em_status", "value": "active", "operator": "EQ" } },
@@ -32,7 +32,7 @@
       "main": {
         "blocks": [{
           "id": "thr_employee_table",
-          "blockType": "data-table",
+          "blockType": "table",
           "columns": [
             { "field": "thr_em_code", "width": 160, "sortable": true },
             { "field": "thr_em_name", "width": 150, "sortable": true },

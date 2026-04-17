@@ -209,7 +209,7 @@
         },
         {
           "id": "block_fields_list",
-          "blockType": "data-table",
+          "blockType": "table",
           "layout": { "colSpan": 12, "rowSpan": 1 },
           "visibleWhen": "${state.activeTab === 'fields'}",
           "table": {
@@ -307,7 +307,7 @@
         },
         {
           "id": "block_permissions_list",
-          "blockType": "data-table",
+          "blockType": "table",
           "layout": { "colSpan": 12, "rowSpan": 1 },
           "visibleWhen": "${state.activeTab === 'permissions'}",
           "table": {
@@ -339,7 +339,7 @@
         },
         {
           "id": "block_versions_list",
-          "blockType": "data-table",
+          "blockType": "table",
           "layout": { "colSpan": 12, "rowSpan": 1 },
           "visibleWhen": "${state.activeTab === 'versions'}",
           "table": {
@@ -412,7 +412,7 @@
         },
         {
           "id": "block_pages_list",
-          "blockType": "data-table",
+          "blockType": "table",
           "layout": { "colSpan": 12, "rowSpan": 1 },
           "visibleWhen": "${state.activeTab === 'pages'}",
           "table": {
