@@ -24,6 +24,14 @@ export interface BpmTaskDrawerProps {
   open: boolean;
   onClose: () => void;
   onComplete: () => void;
+  /**
+   * Pre-seed the decision radio when the drawer opens. Callers that know the
+   * user already clicked a specific action (e.g. BpmOperationsSection's
+   * approve/reject buttons routing a form-bound task through the drawer) pass
+   * 'approve' | 'reject' here so the footer does not default back to
+   * 'approve'. Omitting it preserves the historic default of 'approve'.
+   */
+  defaultDecision?: 'approve' | 'reject';
 }
 
 /** Shape returned by GET /api/bpm/forms/task/{taskId} */
@@ -68,12 +76,18 @@ function buildMappedVariables(
 // Component
 // ---------------------------------------------------------------------------
 
-export function BpmTaskDrawer({ taskId, open, onClose, onComplete }: BpmTaskDrawerProps) {
+export function BpmTaskDrawer({
+  taskId,
+  open,
+  onClose,
+  onComplete,
+  defaultDecision,
+}: BpmTaskDrawerProps) {
   // --- Local state ---
   const [taskData, setTaskData] = useState<TaskFormData | null>(null);
   const [fetchLoading, setFetchLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
-  const [decision, setDecision] = useState('approve');
+  const [decision, setDecision] = useState<string>(defaultDecision ?? 'approve');
   const [comment, setComment] = useState('');
   const [actionSubmitting, setActionSubmitting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -185,12 +199,12 @@ export function BpmTaskDrawer({ taskId, open, onClose, onComplete }: BpmTaskDraw
   // --- Reset state on close ---
   useEffect(() => {
     if (!open) {
-      setDecision('approve');
+      setDecision(defaultDecision ?? 'approve');
       setComment('');
       setActionError(null);
       setFullscreen(false);
     }
-  }, [open]);
+  }, [open, defaultDecision]);
 
   // --- Don't render when closed ---
   if (!open) return null;
