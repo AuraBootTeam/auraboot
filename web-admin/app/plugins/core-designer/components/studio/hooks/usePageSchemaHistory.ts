@@ -24,6 +24,12 @@ export interface DslHistoryActions {
   undo: () => PageSchema | null;
   /** Redo — returns next DSL state or null if nothing to redo */
   redo: () => PageSchema | null;
+  /**
+   * Reset history to a clean initial state with the given DSL.
+   * Clears past and future stacks so the user cannot undo past this point.
+   * Use after loading a saved page to prevent undoing back to the placeholder.
+   */
+  resetHistory: (initial: PageSchema) => void;
 }
 
 /**
@@ -83,7 +89,16 @@ export function usePageSchemaHistory(initialDsl: PageSchema): DslHistoryState & 
     return JSON.parse(historyRef.current[indexRef.current]);
   }, [syncFlags]);
 
-  return { canUndo, canRedo, pushState, undo, redo };
+  const resetHistory = useCallback(
+    (initial: PageSchema) => {
+      historyRef.current = [JSON.stringify(initial)];
+      indexRef.current = 0;
+      syncFlags();
+    },
+    [syncFlags],
+  );
+
+  return { canUndo, canRedo, pushState, undo, redo, resetHistory };
 }
 
 export default usePageSchemaHistory;

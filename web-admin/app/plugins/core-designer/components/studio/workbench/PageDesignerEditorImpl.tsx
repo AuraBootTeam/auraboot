@@ -74,7 +74,7 @@ export default function PageDesignerEditorImpl() {
         }
         setMeta(result.meta);
         setSchema(result.schema);
-        dslHistory.pushState(result.schema);  // seed history with real loaded schema
+        dslHistory.resetHistory(result.schema);  // reset history so undo cannot reach placeholder
       })
       .catch((err: unknown) => {
         console.error('Failed to load page:', err);
@@ -211,7 +211,7 @@ export default function PageDesignerEditorImpl() {
     if (result) {
       setMeta(result.meta);
       setSchema(result.schema);
-      dslHistory.pushState(result.schema);  // seed history with rolled-back schema
+      dslHistory.resetHistory(result.schema);  // reset history so undo cannot reach pre-rollback state
     } else {
       setError('Page not found after rollback');
     }
