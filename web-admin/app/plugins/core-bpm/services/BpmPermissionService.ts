@@ -22,7 +22,7 @@
  *   Layer 2 — Identity-derived.
  *     - {@code canWithdraw}: instance is running AND currentUser is the
  *       process initiator, resolved from variables (backend canonical key
- *       {@code _startUserId} per {@code ApprovalChainExecutor}, with
+ *       {@code _startUserId} written by {@code BpmIntegrationService}, with
  *       {@code startUserId} as the SmartEngine-native fallback).
  *     - {@code canApprove} / {@code canReject}: instance is running AND
  *       currentUser id matches at least one current-node assignee.
@@ -56,11 +56,9 @@ const RUNNING_STATUS = 'running';
  * SmartEngine's {@code ProcessInstance.startUserId} and is always populated.
  *
  * Variable-key fallback ordered by backend preference: {@code _startUserId} is
- * the canonical key written by {@code ApprovalChainExecutor}
- * ({@code platform/.../chain/ApprovalChainExecutor.java:90}) and consumed first
- * by {@code AssigneeResolverService} (lines 123-125). {@code startUserId} is
- * the legacy fallback written by {@code BpmIntegrationService} for SmartEngine-
- * native starts. We intentionally do NOT probe {@code initiatorUserId} /
+ * the canonical key written by {@code BpmIntegrationService} and consumed first
+ * by {@code AssigneeResolverService}. {@code startUserId} is the SmartEngine-
+ * native fallback. We intentionally do NOT probe {@code initiatorUserId} /
  * {@code applicantUserId} — those are notification-payload keys on the event
  * bus, never written to process variables, so probing them was dead code.
  *

@@ -69,7 +69,7 @@
               "columns": [
                 { "field": "taskName", "label": { "zh-CN": "节点", "en": "Node" } },
                 { "field": "assignee", "label": { "zh-CN": "审批人", "en": "Assignee" } },
-                { "field": "result", "label": { "zh-CN": "结果", "en": "Result" } },
+                { "field": "status", "label": { "zh-CN": "状态", "en": "Status" } },
                 { "field": "comment", "label": { "zh-CN": "意见", "en": "Comment" } },
                 { "field": "completedAt", "label": { "zh-CN": "完成时间", "en": "Completed At" } }
               ]
