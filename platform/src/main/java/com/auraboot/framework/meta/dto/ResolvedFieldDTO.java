@@ -102,10 +102,10 @@ public class ResolvedFieldDTO {
         // sortable/filterable default true for simple scalar types (string/number/date), false for json/text/blob.
         dto.setSortable(feature != null && feature.getSortable() != null
                 ? feature.getSortable()
-                : defaultSortableForType(field.getDataType()));
+                : defaultQueryableForType(field.getDataType()));
         dto.setFilterable(feature != null && feature.getFilterable() != null
                 ? feature.getFilterable()
-                : defaultSortableForType(field.getDataType()));
+                : defaultQueryableForType(field.getDataType()));
         // writable = not readonly and not virtual (computed fields are not user-writable).
         dto.setWritable(computeWritable(feature));
 
@@ -132,11 +132,12 @@ public class ResolvedFieldDTO {
         dto.setSourceType("named_query_field");
         dto.setVisible(true);
         dto.setEditable(false); // Named query fields are read-only by default
-        // Populate editor flags: trust NamedQueryField.sortable; default filterable by dataType; writable=false (query-sourced).
+        // Populate editor flags: trust NamedQueryField.sortable; NamedQueryField has no filterable column,
+        // so filterable defaults by dataType (queryable-by-type whitelist). writable=false (query-sourced).
         dto.setSortable(nqField.getSortable() != null
                 ? nqField.getSortable()
-                : defaultSortableForType(nqField.getDataType()));
-        dto.setFilterable(defaultSortableForType(nqField.getDataType()));
+                : defaultQueryableForType(nqField.getDataType()));
+        dto.setFilterable(defaultQueryableForType(nqField.getDataType()));
         dto.setWritable(false);
         return dto;
     }
@@ -162,8 +163,8 @@ public class ResolvedFieldDTO {
         }
 
         // Virtual-only computed fields: default to queryable by type, never writable.
-        dto.setSortable(defaultSortableForType(dto.getDataType()));
-        dto.setFilterable(defaultSortableForType(dto.getDataType()));
+        dto.setSortable(defaultQueryableForType(dto.getDataType()));
+        dto.setFilterable(defaultQueryableForType(dto.getDataType()));
         dto.setWritable(false);
         return dto;
     }
@@ -199,7 +200,7 @@ public class ResolvedFieldDTO {
 
     // ==================== Flag Defaulting Helpers ====================
 
-    private static final Set<String> SORTABLE_SCALAR_TYPES = Set.of(
+    private static final Set<String> QUERYABLE_SCALAR_TYPES = Set.of(
             "string", "enum", "dict",
             "integer", "int", "long", "bigint",
             "decimal", "numeric", "float", "double",
@@ -208,13 +209,17 @@ public class ResolvedFieldDTO {
     );
 
     /**
-     * Default sortable/filterable flag by data type.
-     * Simple scalars (string/number/boolean/date) → true;
+     * Default queryable flag (used for both sortable and filterable) when the source
+     * doesn't explicitly specify one. Sortable and filterable share the same scalar-type
+     * whitelist today; keeping a single helper makes the shared-default intent explicit
+     * and prevents silent divergence if the two flags are ever mis-wired.
+     * <p>
+     * Simple scalars (string/number/boolean/date/enum/dict) → true;
      * JSON/text/blob/reference/unknown → false.
      */
-    private static Boolean defaultSortableForType(String dataType) {
+    private static Boolean defaultQueryableForType(String dataType) {
         if (dataType == null) return Boolean.FALSE;
-        return SORTABLE_SCALAR_TYPES.contains(dataType.toLowerCase(Locale.ROOT));
+        return QUERYABLE_SCALAR_TYPES.contains(dataType.toLowerCase(Locale.ROOT));
     }
 
     /**
