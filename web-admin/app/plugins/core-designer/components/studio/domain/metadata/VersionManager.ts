@@ -626,10 +626,22 @@ export class VersionManagerImpl implements VersionManager {
   }
 
   /**
-   * 获取当前用户
+   * @experimental Not wired to auth yet. Returns a placeholder actor string.
+   * Callers (createVersion, publishVersion, lockVersion, etc.) use this for
+   * createdBy/lockedBy fields — the value is intentionally fake until the auth
+   * integration is implemented.
+   *
+   * NOTE: This method is intentionally NOT changed to throw because it is
+   * called on every normal AutoSave path (createVersion). Throwing here would
+   * break the editor's save loop. The silent-fake behavior is documented as a
+   * known limitation; see plan 2026-04-17-studio-v2-cleanup.md T4.
    */
   private getCurrentUser(): string {
-    // TODO: 从认证系统获取当前用户
+    // TODO: wire to auth session — https://github.com/auraboot/auraboot/issues/XXX
+    // eslint-disable-next-line no-console
+    console.warn(
+      '[VersionManager] getCurrentUser() is not wired to auth — returning placeholder actor.',
+    );
     return 'current_user';
   }
 
@@ -644,25 +656,25 @@ export class VersionManagerImpl implements VersionManager {
   }
 
   /**
-   * 验证版本Schema
+   * @experimental Deep schema validation is TODO. Currently only checks that
+   *   a non-empty `id` exists. Do not rely on this for correctness.
+   *   See plan 2026-04-17-studio-v2-cleanup.md T4.
    */
   private async validateVersionSchema(schema: any): Promise<void> {
-    // TODO: 实现Schema验证逻辑
     if (!schema || !schema.id) {
       throw new Error('Invalid schema');
     }
+    // Deep validation intentionally not implemented — see plan 2026-04-17-studio-v2-cleanup.
   }
 
   /**
-   * 计算差异
+   * @experimental Deep diff not implemented. Always throws to prevent the UI
+   *   from silently displaying "no differences" when the diff is simply
+   *   unimplemented. UI callers MUST catch and render an 'unavailable' state.
+   *   See plan 2026-04-17-studio-v2-cleanup.md T4.
    */
-  private calculateDifferences(schemaA: any, schemaB: any): VersionDifference[] {
-    const differences: VersionDifference[] = [];
-
-    // TODO: 实现深度比较逻辑
-    // 这里简化实现，实际应该递归比较所有属性
-
-    return differences;
+  private calculateDifferences(_schemaA: any, _schemaB: any): VersionDifference[] {
+    throw new Error('VersionManager.calculateDifferences is not implemented');
   }
 
   /**
