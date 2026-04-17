@@ -411,6 +411,96 @@ export async function rejectTask(
 }
 
 /**
+ * List all pending tasks for a process instance.
+ *
+ * Wraps {@code GET /api/bpm/tasks/by-process/{processInstanceId}}. Useful for
+ * the detail-panel BPM operations section, which only has a
+ * {@link BpmInstanceForRecord} in hand and needs to resolve a concrete
+ * {@code taskId} before issuing approve/reject/withdraw/cc operations.
+ */
+export async function getTasksByProcessInstance(
+  processInstanceId: string,
+): Promise<TaskInstance[]> {
+  if (!processInstanceId || processInstanceId.trim().length === 0) {
+    throw new Error('getTasksByProcessInstance: processInstanceId is required');
+  }
+  const result = await get<Record<string, unknown>[]>(
+    `/api/bpm/tasks/by-process/${processInstanceId}`,
+  );
+  if (!isSuccess(result.code)) {
+    throw new Error(result.desc || 'Failed to list tasks for process');
+  }
+  return (result.data || []).map(mapTaskInstance);
+}
+
+/**
+ * Withdraw a process instance via a current task.
+ *
+ * Posts to {@code POST /api/bpm/tasks/{taskId}/withdraw}. Backend
+ * {@link com.auraboot.framework.bpm.controller.TaskController.WithdrawRequest}
+ * accepts a single optional {@code reason}.
+ *
+ * The caller must be the process initiator; the backend further constrains
+ * the operation by the process-level {@code WithdrawPolicy}
+ * (strict / loose / none).
+ */
+export async function withdrawTask(taskId: string, reason?: string): Promise<void> {
+  if (!taskId || taskId.trim().length === 0) {
+    throw new Error('withdrawTask: taskId is required');
+  }
+  const result = await post(`/api/bpm/tasks/${taskId}/withdraw`, { reason });
+  if (!isSuccess(result.code)) {
+    throw new Error(result.desc || 'Failed to withdraw process');
+  }
+}
+
+/**
+ * CC (carbon copy) a process instance via a current task.
+ *
+ * Posts to {@code POST /api/bpm/tasks/{taskId}/cc}. Backend
+ * {@link com.auraboot.framework.bpm.controller.TaskController.CcRequest} is a
+ * record of {@code (receiverUserIds: List<Long>, comment: String)}. Receiver
+ * ids are sent as numbers so JSON deserialization lines up with the Java type.
+ *
+ * The backend enforces the process-level {@code CcPolicy}
+ * (initiator / assignee / all); a policy violation surfaces as a non-success
+ * response code, which is rethrown here.
+ */
+export async function ccTask(
+  taskId: string,
+  receiverUserIds: string[],
+  comment: string,
+): Promise<void> {
+  if (!taskId || taskId.trim().length === 0) {
+    throw new Error('ccTask: taskId is required');
+  }
+  if (!Array.isArray(receiverUserIds) || receiverUserIds.length === 0) {
+    throw new Error('ccTask: receiverUserIds must be a non-empty array');
+  }
+  // Backend expects Long ids. We parse strictly: any non-numeric token is an
+  // error (caller should have validated upstream), so we avoid silently
+  // dropping values.
+  const numericIds = receiverUserIds.map((raw) => {
+    const trimmed = raw.trim();
+    if (trimmed.length === 0) {
+      throw new Error('ccTask: blank receiver id');
+    }
+    const n = Number(trimmed);
+    if (!Number.isFinite(n) || !Number.isInteger(n)) {
+      throw new Error(`ccTask: non-integer receiver id ${raw}`);
+    }
+    return n;
+  });
+  const result = await post(`/api/bpm/tasks/${taskId}/cc`, {
+    receiverUserIds: numericIds,
+    comment,
+  });
+  if (!isSuccess(result.code)) {
+    throw new Error(result.desc || 'Failed to CC process');
+  }
+}
+
+/**
  * Rollback a task to a target activity node
  */
 export async function rollbackTask(

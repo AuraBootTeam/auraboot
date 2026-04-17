@@ -30,6 +30,24 @@ vi.mock('~/plugins/core-bpm/components/panel/BpmDiagramSection', () => ({
   ),
 }));
 
+// BpmOperationsSection depends on useAuth + loads pending tasks via a second
+// backend call; its behaviour is covered by BpmOperationsSection.test.tsx. At
+// the panel level we only care that the slot is mounted with the resolved
+// instance and that the `onActionComplete` callback wire triggers a reload.
+vi.mock('~/plugins/core-bpm/components/panel/BpmOperationsSection', () => ({
+  BpmOperationsSection: ({
+    instance,
+  }: {
+    instance: { instanceId: string } | null;
+    onActionComplete?: () => void;
+  }) => (
+    <div
+      data-testid="bpm-operations-stub"
+      data-instance-id={instance?.instanceId ?? ''}
+    />
+  ),
+}));
+
 import { BpmPanelBlock } from '../BpmPanelBlock';
 
 const READY_INSTANCE = {
