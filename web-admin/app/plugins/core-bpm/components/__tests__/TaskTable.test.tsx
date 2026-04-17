@@ -13,7 +13,7 @@
 
 import React from 'react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 
 import { TaskTable } from '~/plugins/core-bpm/components/TaskTable';
 import type { TaskInstance } from '~/plugins/core-bpm/services/bpmWorkbenchService';
@@ -36,10 +36,12 @@ function task(overrides: Partial<TaskInstance> = {}): TaskInstance {
 }
 
 describe('TaskTable columns', () => {
-  // Project vitest config sets isolate=false; explicit cleanup prevents the
-  // previous render's DOM from leaking into the next test.
+  // Project vitest config sets isolate=false + singleThread=true: jsdom is
+  // shared across tests. Reset the body to prevent cross-test DOM leaks.
+  // (We avoid importing `cleanup` from @testing-library/react — not surfaced
+  // by the installed @types in this project.)
   afterEach(() => {
-    cleanup();
+    document.body.innerHTML = '';
   });
 
   const baseProps = {

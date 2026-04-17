@@ -12,7 +12,7 @@
 
 import React from 'react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, act, cleanup } from '@testing-library/react';
+import { render, screen, act } from '@testing-library/react';
 
 import { BPMNToolbar } from '~/plugins/core-designer/components/bpmn-designer/components/BPMNToolbar';
 import { useBPMNStore } from '~/plugins/core-designer/components/bpmn-designer/store/useBPMNStore';
@@ -43,10 +43,10 @@ describe('BPMNToolbar deploy button', () => {
     useBPMNStore.getState().reset();
   });
 
-  // Project vitest config sets isolate=false; explicit cleanup prevents the
-  // previous render's DOM from leaking into the next test.
+  // Project vitest config sets isolate=false + singleThread=true: jsdom is
+  // shared across tests. Reset the body to prevent cross-test DOM leaks.
   afterEach(() => {
-    cleanup();
+    document.body.innerHTML = '';
   });
 
   function renderToolbar() {
