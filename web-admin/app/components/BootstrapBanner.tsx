@@ -1,6 +1,6 @@
 import { Link } from 'react-router';
 import type { BootstrapStatus } from '~/services/bootstrapStatus';
-import { bootstrapT, describeMissingParts } from '~/services/bootstrapTexts';
+import { bootstrapT } from '~/services/bootstrapTexts';
 
 interface Props {
   status: BootstrapStatus;
@@ -18,10 +18,7 @@ export function BootstrapBanner({ status }: Props) {
     >
       <div>
         <span className="font-medium mr-2">{bootstrapT('bannerTitle')}</span>
-        <span>
-          {bootstrapT('bannerDetailPrefix')}
-          {describeMissingParts(status.missingParts)}
-        </span>
+        <span>{bootstrapT('bannerBody')}</span>
       </div>
       <Link
         to="/setup"
