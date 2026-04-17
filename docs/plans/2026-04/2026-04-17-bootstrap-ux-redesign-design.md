@@ -1,190 +1,191 @@
 # Bootstrap 未初始化态 UX 重设计
 
-- 日期：2026-04-17
+- 日期：2026-04-17（v1）/ 2026-04-17（v2 修订）
 - 范围：OSS 仓库（`auraboot/`）
-- 类型：design doc（实施 plan 另起）
+- 状态：v2 为现行版本；v1 已被 PoC 证伪
+
+---
+
+## 修订记录
+
+| 版本 | 日期 | 决策 |
+|------|------|------|
+| v1 | 2026-04-17 上午 | 三维 evaluator（admin_user / default_tenant / system_config）+ 结构化 missingParts |
+| **v2** | 2026-04-17 下午 | **退化为单一信号 `system_config.system.initialized`；删 evaluator 多维检查** |
+
+### v1 为什么错
+
+PoC 后发现两个根本问题：
+
+1. **`platform_admin` 不是通用信号**。它是 SaaS-Kernel 多租户场景下"系统租户管理员"的专属角色，OSS 单租户部署里业务侧用 `tenant_admin`。用 `platform_admin` 检查会**与脚本恢复路径冲突**：`oss-reset-and-init.sh` 的 recovery 分支跳过 step 8.5（创建 platform_admin），导致 evaluator 误报"admin 缺失"。
+2. **三维检查是在重复 `SystemConfigService.isInitialized()`**。`BootstrapEngineService` 在所有 step（含 admin/tenant/role 创建）完成后才写 `system.initialized=true`，**这一个标志位就是权威信号**。多查 admin/tenant 不增加确定性，反而引入耦合 + 假阳性。
+
+### v2 怎么改
+
+- evaluator 收敛到只调 `isInitialized()`
+- DTO 仍保留 `missingParts` 字段（前端兼容），但只可能 `[]` 或 `["system_config"]`
+- 删 `BootstrapStatusMapper` + 集成测试 + `BootstrapMissingPart.ADMIN_USER` / `DEFAULT_TENANT` 常量
+
+---
 
 ## 背景
 
-当前 `auraboot/web-admin/app/root.tsx:86-104` 的 SSR loader 会在 `bootstrap.initialized=false` 时**对任何路由静默 redirect 到 `/setup`**。这造成三个问题：
+`auraboot/web-admin/app/root.tsx` 的 SSR loader（旧）会在 `bootstrap.initialized=false` 时**对任何路由静默 redirect 到 `/setup`**。问题：
 
-1. **角色错位**：`/setup` 是首次部署初始化向导，应只对运维/首位部署者可见；当前对所有访问者（开发刷新、E2E、最终用户）都触发跳转。
-2. **无错误信息**：用户看不到原因 —— DB 被清？连错库？bootstrap 部分失败？只能靠经验猜。
-3. **违反"禁止自愈"红线**：当前行为把"数据缺失"翻译为"跳转向导"，掩盖真实原因，与项目硬约束冲突（`docs/standards/code-quality.md`）。
+1. **角色错位**：`/setup` 应只对运维/首位部署者可见；当前对所有访问者（开发刷新、E2E、最终用户）都触发跳转
+2. **无错误信息**：用户看不到原因 —— DB 被清？连错库？bootstrap 部分失败？
+3. **违反"禁止自愈"红线**：把"数据缺失"翻译为"跳转向导"，掩盖真实原因（`docs/standards/code-quality.md`）
 
-## 目标
+## 目标（v2）
 
-- 移除静默 redirect，改为**显式提示 + 用户主动进入**
-- 后端返回**结构化原因**（缺什么、为什么），前端展示具体信息
-- 已初始化后 `/setup` 路由本身**不可重复触发**
-- 开发环境继续依赖脚本层 bootstrap，不在后端做 dev-profile 自愈
+- 移除静默 redirect，改为**显式横幅提示 + 用户主动进入向导**
+- 已初始化后 `/setup` 路由显示"已完成"页，不重复触发向导
+- 不在后端做自愈（dev profile 自动 seed / 半提交补偿等）
+- **`oss-reset-and-init.sh` 同步去掉 recovery 分支**（见后文）
 
 ## 非目标
 
-- 不重写 `/setup` 向导本身（页面 UI 与现有 `SetupWizard.tsx` 保持兼容）
-- 不引入一次性 token / localhost 限制等访问控制（`已初始化后接口失效` 已足够防恶意）
-- 不改变 bootstrap 后端执行逻辑（`BootstrapEngineService` / 各 seeder 不动）
+- 不重写 `/setup` 向导本身
+- 不引入访问控制 token（已初始化后 `/api/bootstrap/setup` 自带幂等拒绝足够防恶意）
+- 不改 `BootstrapEngineService` / seeder 业务逻辑
 
-## 当前实现
+---
 
-### 后端
+## 关键概念：admin 用户的双重角色
 
-- `BootstrapController.getStatus()` 返回 `{ initialized, inProgress, mode }`（`auraboot/platform/.../bootstrap/controller/BootstrapController.java`）
-- `BootstrapStatusResponse` 仅含布尔值，无明细
-- `BootstrapController.setup()` 已做幂等检查（`isInitialized()` 时返回错误）
+`BootstrapEngineService.execute()` 完整路径下，admin 是**两个 tenant 的 member**：
 
-### 前端
+| Tenant | 名称 | id | admin 角色 | scope | 职责 |
+|--------|------|----|-----------|-------|-----|
+| **System Tenant** | "System" | `1`（`SystemTenantContextExecutor.SYSTEM_TENANT_ID`） | `platform_admin` | global | 跨租户系统配置、租户管理、平台菜单 |
+| **Business Tenant** | 用户 setup 时填的 companyName | bootstrap 新建 | `tenant_admin` | tenant | 租户内 user/role/data |
 
-- `root.tsx:86-104`：loader 内 fetch `/api/bootstrap/status`，未初始化即 `redirect('/setup')`
-- `sessionMiddlewareFactory.ts:13`：`/setup` 在 `PUBLIC_ROUTES` 白名单中
-- `routes.ts:15`：`/setup` 注册到 `SetupWizard.tsx`
-- `SetupWizard.tsx:73`：调用 `POST /api/bootstrap/setup`
+两个角色不冲突，对应不同维度。完整 bootstrap step 8.5 创建 `platform_admin` role + 分配；recovery 路径跳过这步 = **bug 状态**，不应被脚本掩盖。
 
-## 新设计
+后续如有跨平台/SaaS 模式需要细分检查，可重新引入 evaluator。OSS 单租户部署里两者一起判断没有增量价值。
 
-### 1. 后端 `BootstrapStatusResponse` 增强
+---
 
+## 设计
+
+### 1. 后端
+
+`BootstrapStatusResponse`（保留 v1 字段）：
 ```java
 public class BootstrapStatusResponse {
     private boolean initialized;
     private boolean inProgress;
     private String mode;
-    // 新增
-    private List<String> missingParts;   // ["admin_user", "default_tenant", "system_config"]
-    private String reason;               // human-readable, e.g. "No admin user in iam_user"
+    private List<String> missingParts;   // [] or ["system_config"]
+    private String reason;               // null or "Bootstrap not completed"
 }
 ```
 
-`SystemConfigService.isInitialized()` 当前只看一个标记位。需要拆分为：
-
-- `getMissingParts()` —— 逐项检查 admin 用户、默认租户、系统配置标记，返回缺失列表
-- `isInitialized()` 保持 `missingParts.isEmpty()` 的语义（向后兼容）
-
-`missingParts` 取值约定（常量化，避免魔术字符串）：
-- `admin_user` —— `iam_user` 表无任何 admin 角色用户
-- `default_tenant` —— `iam_tenant` 表无默认租户
-- `system_config` —— `system_config` 表 `bootstrap.completed` 标记缺失
-
-i18n key 由前端维护：`bootstrap.missing.admin_user` 等。
-
-### 2. 前端 SSR loader 改造（`root.tsx`）
-
-**移除 redirect**，改为注入 `bootstrapStatus` 到 `RootLoaderData`：
-
-```ts
-type BootstrapStatus = {
-  initialized: boolean;
-  inProgress: boolean;
-  missingParts: string[];
-  reason?: string;
-};
-
-// loader 返回
-return { ..., bootstrapStatus };
+`BootstrapController.getStatus()`：
+```java
+boolean initialized = systemConfigService.isInitialized();
+List<String> missingParts = initialized
+        ? List.of()
+        : List.of(BootstrapMissingPart.SYSTEM_CONFIG);
+String reason = initialized ? null : "Bootstrap not completed";
 ```
 
-逻辑：
-- 后端不可达 → `bootstrapStatus = null`（不展示横幅，让正常错误处理生效）
-- `initialized=true` → 不展示横幅
-- `initialized=false` → 通过 root layout 渲染**顶部固定横幅**
+直接调 `SystemConfigService.isInitialized()`，不经 evaluator。
 
-### 3. 全局横幅组件
+`BootstrapStartupLogger` 保留（启动时打印 WARN）。`BootstrapStatusEvaluator` / `BootstrapStatusMapper` / 集成测试 **删除**。
 
-- 位置：root layout 顶部，所有路由（含 `/setup`、`/login`）都可见，但 `/setup` 路由本身不展示（避免重复）
-- 样式：黄色（`bg-yellow-50 border-yellow-300`），不是红色
-- 内容：
-  - 标题：`系统未完成初始化`
-  - 详情：动态拼接 `missingParts` 的 i18n 文案，如「缺少：管理员账户、默认租户」
-  - CTA：「前往初始化」按钮 → `/setup`
-- 不可关闭（避免用户误关后忘记初始化）
+### 2. 前端
 
-### 4. 业务路由空状态
+- `bootstrapStatus.ts` —— 不变（fetch + types）
+- `bootstrapTexts.ts` —— 文案简化为单一态："System not initialized" / "Initialize now"，不再列具体缺失项
+- `BootstrapBanner.tsx` —— 不显示 missingParts 详情，文案变为通用提示
+- `BootstrapNotReady.tsx` / `SetupWizard.tsx` already-done —— 不变
+- `root.tsx` —— 不变
 
-未初始化时业务 API 必然 401/500。在 `ErrorBoundary` 加分支：
-- 若 `bootstrapStatus.initialized=false`，渲染**专门的"系统未就绪"空状态卡片**（而非常规 401/500 页），CTA 同样指向 `/setup`
-- 这样即使用户忽略横幅强行点菜单，也能拿到清晰提示
+### 3. 脚本（`oss-reset-and-init.sh`）
 
-### 5. `/setup` 已初始化态
+#### 现状（v1 时期，违反红线）
 
-- **前端**：`SetupWizard.tsx` loader 内检查 `bootstrapStatus.initialized`，若 `true` 则渲染"系统已初始化"页面（带返回首页 CTA），不渲染向导表单
-- **后端**：`POST /api/bootstrap/setup` 已有幂等检查，保持不动；可选增强错误码（如 `BOOTSTRAP_ALREADY_INITIALIZED`）方便前端区分
+step 4.5 三个 case：
+- A: 已 initialized → 跳过
+- B: **admin 已存在但 flag 没设 → `mark_initialized_flag()` 直接写 system_config**（自愈）
+- C: 什么都没 → 调 `/api/bootstrap/setup`
 
-### 6. 后端启动日志警告
+step 7.1 也是补偿：System Tenant 缺了就 INSERT id=1，绕过 BootstrapEngineService。
 
-`BootstrapEngineService` 或 `ApplicationRunner` 在启动时检查 `isInitialized()`，若未初始化则打印**显眼 WARN 日志**：
+这两处都在掩盖 bootstrap 流程的真实失败。
 
-```
-================================================
-  ⚠️  AuraBoot Bootstrap NOT INITIALIZED
-  Missing: [admin_user, default_tenant]
-  Run: scripts/reset-and-init.sh
-  Or:  visit http://localhost:5173/setup
-================================================
-```
+#### v2
 
-仅日志，**不自动 seed**（坚守"禁止自愈"红线）。
+| 模式 | 命令 | 行为 |
+|------|------|------|
+| **默认（导数据）** | `./scripts/oss-reset-and-init.sh` | reset DB → 启后端 → POST `/api/bootstrap/setup` → 启前端 → 导插件 → seed showcase |
+| **不导数据** | `./scripts/oss-reset-and-init.sh --no-bootstrap` | reset DB → 启后端（**未初始化态**）→ 启前端，停在这里 |
+
+改动：
+- **删** step 4.5 的 case B（`mark_initialized_flag` 函数 + 调用）
+- **删** step 7.1 的补偿 SQL（System Tenant 由 BootstrapEngineService 在 step 8.5 创建）
+- **加** `--no-bootstrap` 开关：跳过 step 4.5 / 6 / 7 / 7.1 / 7.5 / 8，只做 reset + 启服务
+- 默认路径必须从空 DB 走完整 `/api/bootstrap/setup`，不允许"恢复"
+
+不导数据时：
+- 浏览器访问 `/` → banner 显示
+- 用户点 banner CTA / 直接访问 `/setup` → 走真实向导
+- 完成后系统进入正常态
+- **整条链路成为端到端真测**，不再依赖 mock
+
+---
 
 ## 影响面
 
 | 文件 | 改动 |
 |------|------|
-| `auraboot/platform/.../bootstrap/dto/BootstrapStatusResponse.java` | 新增 `missingParts` / `reason` 字段 |
-| `auraboot/platform/.../saas/config/service/SystemConfigService.java` | 新增 `getMissingParts()`，`isInitialized()` 复用 |
-| `auraboot/platform/.../bootstrap/controller/BootstrapController.java` | `getStatus()` 装配新字段 |
-| `auraboot/platform/.../bootstrap/BootstrapEngineService.java` | 启动日志警告（可选放 ApplicationRunner） |
-| `auraboot/web-admin/app/root.tsx` | 移除 redirect，注入 bootstrapStatus |
-| `auraboot/web-admin/app/components/BootstrapBanner.tsx` | **新增**横幅组件 |
-| `auraboot/web-admin/app/routes/setup/SetupWizard.tsx` | 已初始化态渲染 |
-| `auraboot/web-admin/app/root.tsx` ErrorBoundary | 未就绪空状态分支 |
-| i18n 资源 | 新增 `bootstrap.banner.*` / `bootstrap.missing.*` keys |
+| `platform/.../bootstrap/dto/BootstrapStatusResponse.java` | 字段不变 |
+| `platform/.../bootstrap/controller/BootstrapController.java` | `getStatus()` 直接用 `systemConfigService` |
+| `platform/.../bootstrap/BootstrapStatusEvaluator.java` | **删** |
+| `platform/.../bootstrap/mapper/BootstrapStatusMapper.java` | **删** |
+| `platform/.../bootstrap/constant/BootstrapMissingPart.java` | 只留 `SYSTEM_CONFIG` |
+| `platform/.../bootstrap/BootstrapStartupLogger.java` | 适配（用 `isInitialized()`） |
+| `src/test/.../BootstrapStatusEvaluatorTest.java` | **删** |
+| `src/test/.../BootstrapStatusMapperIntegrationTest.java` | **删** |
+| `src/test/.../BootstrapControllerIntegrationTest.java` | 简化为 2 case（initialized true/false） |
+| `web-admin/app/services/bootstrapTexts.ts` | 简化 missing parts 标签为通用文案 |
+| `web-admin/app/components/BootstrapBanner.tsx` | 不渲染具体 missingParts |
+| `scripts/oss-reset-and-init.sh` | 删 recovery 分支 + 加 `--no-bootstrap` 开关 |
+
+---
 
 ## 测试策略
 
-### 后端集成测试
+### 后端
 
-- `BootstrapControllerIntegrationTest`
-  - 空库 → `getStatus` 返回 `initialized=false`、`missingParts=[admin_user, default_tenant, system_config]`
-  - 仅缺 admin → `missingParts=[admin_user]`
-  - 完整初始化 → `initialized=true`、`missingParts=[]`
-  - 已初始化后 `POST /setup` 返回错误
+- `BootstrapControllerIntegrationTest` —— 2 case：initialized=true → empty / =false → `["system_config"]`
+- 删除 evaluator 单测、mapper 集成测试
 
-### 前端 E2E（`auraboot/web-admin/tests/e2e/setup/`）
+### 前端 E2E
 
-复用已有 `setup-wizard.spec.ts` 文件，扩展场景：
+- 已有 active tests 不变（已初始化态 + banner-not-visible-on-init）
+- 用 `--no-bootstrap` 模式跑曾经 skip 的 4 个 banner 场景：现在可以**真测**
+- 把 `tests/e2e/setup/setup-wizard.spec.ts` 里相关 `test.skip` 改回 `test`
 
-1. **未初始化访问根路由 → 不再 redirect，看到横幅**（断言 banner DOM + 文案 + CTA href）
-2. **横幅 CTA 点击 → 跳转 /setup**
-3. **完成 setup → 横幅消失**
-4. **已初始化后访问 /setup → 显示"已初始化"页面，不显示向导表单**
-5. **未初始化访问业务路由 → 看到"系统未就绪"空状态卡，不是普通 401**
-6. **缺失项文案断言**：仅缺 admin 时横幅文案精确匹配 i18n
+---
 
-E2E 用 `auraboot/scripts/oss-test.sh`（OSS 测试脚本，见 memory `reference_oss_test_runner`）。
+## 与红线对齐
 
-## 风险与缓解
+- ✅ 禁止自愈：脚本删 mark_initialized_flag、删 step 7.1 补偿；后端 evaluator 删多维检查
+- ✅ 禁止魔术字符串：剩余 `system.initialized` 走 `SystemConfigKeys` 常量
+- ✅ i18n 规范：bootstrapTexts 4 语言保留
+- ✅ 测试即交付件：`--no-bootstrap` 让 banner 路径有真测覆盖
 
-| 风险 | 缓解 |
-|------|------|
-| 移除 redirect 后，某些 E2E 假设"未初始化必跳 /setup" | grep 全仓 `redirect.*setup` / `toHaveURL.*setup`，逐个改为断言横幅 |
-| `missingParts` 检查成本高（多次 DB query） | `getStatus` 加短 TTL 内存缓存（5s），避免高频刷新打 DB |
-| 横幅在 `/login` 页可能挤压布局 | 横幅渲染于 `<body>` 顶部 fixed，业务内容 `padding-top` 兼容 |
-| 国际化 fallback：未提供 i18n key 时显示 raw `missingParts` 值 | i18n 解析层已做 fallback，验收时检查无 key 泄漏 |
+---
 
-## 与既有红线的对齐
+## 后续工作
 
-- **禁止自愈/Ensure**：✅ 不做 dev-profile 自动 seed
-- **禁止魔术字符串**：✅ `missingParts` 值用常量类（如 `BootstrapMissingParts.ADMIN_USER`）
-- **i18n 规范**：✅ 所有横幅/空状态文案走 i18n key
-- **测试即交付件**：✅ 后端集成测试 + 前端 E2E 双覆盖
-- **UX 交互设计**：✅ 横幅 + 空状态 + CTA + 已初始化拒绝四态俱全
+实施按 task 分批：
+1. 后端简化（evaluator/mapper/常量删除 + Controller 直连 + 测试调整）
+2. 前端文案简化
+3. 脚本改造（`--no-bootstrap` + 删 recovery）
+4. E2E：unskip banner 场景，加 `--no-bootstrap` 模式跑测
+5. 文档同步（本 doc 已先行）
 
-## 后续 plan
-
-实施 plan 拆分为 6 个 task，参见 `2026-04-17-bootstrap-ux-redesign.md`（待写）：
-
-1. 后端 `BootstrapStatusResponse` 字段扩展 + `SystemConfigService.getMissingParts()` + 集成测试
-2. 后端启动日志警告
-3. 前端横幅组件 + i18n
-4. 前端 `root.tsx` loader 改造（移除 redirect）+ 业务路由空状态
-5. `SetupWizard.tsx` 已初始化态
-6. E2E 扩展 + 浏览器手动验收
+每批独立 commit。
