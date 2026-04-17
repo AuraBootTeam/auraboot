@@ -257,6 +257,30 @@ export const DESIGNER_I18N = {
     } as L,
   },
 
+  // ── Toolbar permissions ───────────────────────────────────────
+  permissions: {
+    missingUpdate: {
+      'zh-CN': '您没有编辑此页面的权限',
+      'en-US': 'You do not have permission to edit this page',
+    } as L,
+    missingPublish: {
+      'zh-CN': '您没有发布此页面的权限',
+      'en-US': 'You do not have permission to publish this page',
+    } as L,
+    missingDelete: {
+      'zh-CN': '您没有删除此页面的权限',
+      'en-US': 'You do not have permission to delete this page',
+    } as L,
+    missingImport: {
+      'zh-CN': '您没有导入页面的权限',
+      'en-US': 'You do not have permission to import pages',
+    } as L,
+    missingExport: {
+      'zh-CN': '您没有导出页面的权限',
+      'en-US': 'You do not have permission to export pages',
+    } as L,
+  },
+
   // ── Dashboard viewer ───────────────────────────────────────────
   viewer: {
     noData: {
