@@ -527,9 +527,12 @@ public class PageSchemaServiceImpl implements PageSchemaService {
             throw new ValidationException(ResponseCode.CommonValidationFailed, "Blocks format is invalid");
         }
 
-        // I18n compliance: title and description must not contain hardcoded non-ASCII text
-        PageSchemaDslI18nValidator.validatePageFields(
-                request.getTitle(), request.getDescription(), request.getPageKey());
+        // I18n compliance: scan page-level fields AND all blocks recursively
+        Map<String, Object> pageMap = new HashMap<>();
+        pageMap.put("title", request.getTitle());
+        pageMap.put("description", request.getDescription());
+        pageMap.put("blocks", request.getBlocks());
+        PageSchemaDslI18nValidator.validatePageSchema(pageMap, request.getPageKey());
     }
 
     /**
@@ -539,16 +542,19 @@ public class PageSchemaServiceImpl implements PageSchemaService {
         if (request == null) {
             throw new ValidationException(ResponseCode.CommonValidationFailed, "更新请求不能为空");
         }
-        
+
         if (request.getBlocks() != null && !request.getBlocks().isEmpty() &&
             !validateBlocks(request.getBlocks())) {
             throw new ValidationException(ResponseCode.CommonValidationFailed, "Blocks format is invalid");
         }
 
-        // I18n compliance: title and description must not contain hardcoded non-ASCII text
-        PageSchemaDslI18nValidator.validatePageFields(
-                request.getTitle(), request.getDescription(),
-                request.getPageKey() != null ? request.getPageKey() : "(update)");
+        // I18n compliance: scan page-level fields AND all blocks recursively
+        String pageKey = request.getPageKey() != null ? request.getPageKey() : "(update)";
+        Map<String, Object> pageMap = new HashMap<>();
+        pageMap.put("title", request.getTitle());
+        pageMap.put("description", request.getDescription());
+        pageMap.put("blocks", request.getBlocks());
+        PageSchemaDslI18nValidator.validatePageSchema(pageMap, pageKey);
     }
 
     /**

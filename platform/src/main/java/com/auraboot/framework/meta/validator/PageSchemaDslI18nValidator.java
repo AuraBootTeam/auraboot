@@ -49,7 +49,7 @@ public final class PageSchemaDslI18nValidator {
     );
 
     /** Sub-collections inside a block that may contain further text fields. */
-    private static final Set<String> BLOCK_SUB_LISTS = Set.of(
+    public static final Set<String> BLOCK_SUB_LISTS = Set.of(
             "columns", "fields", "actions", "tabs", "filters",
             "items", "children", "buttons"
     );
