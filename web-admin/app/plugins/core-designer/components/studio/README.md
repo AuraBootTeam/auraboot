@@ -74,7 +74,6 @@ app/studio
 | Hooks (drag/layout/runtime/forms) | ✅ 统一从 services 获取引擎，UI 不再直接依赖 legacy hook |
 | Workbench – Canvas/Palette/Toolbar/System | ⚙️ 主要组件已迁移，但部分 Workflow 功能仍需精炼 |
 | Workbench – Smart Components & Property Panel | ⚙️ Smart 组件/属性编辑器已合并到 `workbench/components/smart-components`，仍在补齐类型与交互 |
-| Workbench – DesignerWorkflow / Providers | 🚧 正在逐步替换剩余 legacy 逻辑（协作、预览、导入导出等） |
 | State/Event managers | ⚙️ 通过 services/managers 适配 legacy 单例，后续可替换为全新实现 |
 | SDK / Integration | ⚙️ `sdk/index.ts` 暴露 store/schema/layout/command 等管理器，未来可扩展 useSchemaRuntime 等 API |
 | Testing | 🚧 Vitest 覆盖 canvas/runtime/services，仍需扩充 workbench panels/工具栏等测试 |

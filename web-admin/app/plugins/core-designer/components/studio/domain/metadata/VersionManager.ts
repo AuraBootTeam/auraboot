@@ -631,6 +631,11 @@ export class VersionManagerImpl implements VersionManager {
    * @experimental Not wired to auth. Returns a placeholder actor string.
    *   Data created via this manager will have polluted createdBy/updatedBy —
    *   follow-up task: have public API accept `actor` param explicitly.
+   *
+   * NOTE: Until this is wired to auth, every version created via AutoSave /
+   * publish / rollback / saveDraft will have createdBy='system' (or
+   * whatever placeholder this returns). This is visible in VersionDetail
+   * UI and version listings — audit trails are effectively broken until F1.
    */
   private getCurrentUser(): string {
     if (!VersionManagerImpl._warnedGetCurrentUser) {
