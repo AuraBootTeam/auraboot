@@ -20,6 +20,7 @@ import { useEffect, useState } from 'react';
 import type { BlockConfig } from '~/framework/meta/schemas/types';
 import { useI18n } from '~/contexts/I18nContext';
 import { BpmStatusSection } from '~/plugins/core-bpm/components/panel/BpmStatusSection';
+import { BpmDiagramSection } from '~/plugins/core-bpm/components/panel/BpmDiagramSection';
 import {
   getInstanceForRecord,
   type BpmInstanceForRecord,
@@ -161,6 +162,13 @@ export function BpmPanelBlock({ block, record, recordId }: BpmPanelBlockProps) {
           return (
             <div key={section} data-testid="bpm-section-status">
               <BpmStatusSection instance={instance} t={t} />
+            </div>
+          );
+        }
+        if (section === 'diagram') {
+          return (
+            <div key={section} data-testid="bpm-section-diagram">
+              <BpmDiagramSection instance={instance} t={t} />
             </div>
           );
         }
