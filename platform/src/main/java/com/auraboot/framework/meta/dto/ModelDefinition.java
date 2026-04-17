@@ -4,6 +4,7 @@ import lombok.Builder;
 import lombok.Data;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 模型定义
@@ -110,4 +111,11 @@ public class ModelDefinition {
      * Evaluated in Stage 8 (PRE_INVARIANT) after InvariantEngine.
      */
     private List<CrossFieldRule> rules;
+
+    /**
+     * Raw extension map (flattened — nested {"extension":{...}} and flat keys are merged,
+     * with flat keys taking precedence). Used by virtual-model executors to read
+     * source-type-specific config (e.g. {@code endpointAdapter}).
+     */
+    private Map<String, Object> extension;
 }

@@ -757,6 +757,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
                 .updatedAt(DateUtil.toUtcLocalDateTime(model.getUpdatedAt()))
                 .softDelete(resolveSoftDelete(model))
                 .rules(loadCrossFieldRules(model))
+                .extension(flattenExtension(model))
                 .build();
     }
 
@@ -832,6 +833,22 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
             if (StringUtils.hasText(def.getModelCategory())) {
                 existing.setModelCategory(def.getModelCategory());
             }
+            // Merge caller-supplied extension keys (e.g. endpointAdapter) into
+            // the existing ExtensionBean's nested map, preserving displayName etc.
+            if (def.getExtension() != null && !def.getExtension().isEmpty()) {
+                ExtensionBean ext = existing.getExtension();
+                if (ext == null) {
+                    ext = new ExtensionBean();
+                    existing.setExtension(ext);
+                }
+                Map<String, Object> inner = ext.getExtension();
+                if (inner == null) {
+                    inner = new HashMap<>();
+                    ext.setExtension(inner);
+                }
+                inner.putAll(def.getExtension());
+                ext.validate();
+            }
             existing.setUpdatedAt(Instant.now());
             metaModelMapper.updateById(existing);
             return getDefinitionByCode(def.getCode());
@@ -852,6 +869,10 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
         }
         if (StringUtils.hasText(def.getModelType())) {
             extensionData.put("modelType", def.getModelType());
+        }
+        // Merge caller-supplied extension keys (e.g. endpointAdapter).
+        if (def.getExtension() != null && !def.getExtension().isEmpty()) {
+            extensionData.putAll(def.getExtension());
         }
         ExtensionBean extension = new ExtensionBean();
         extension.setExtension(extensionData);
@@ -922,6 +943,36 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
             return model.getTableName().trim();
         }
         return generateTableName(model.getCode());
+    }
+
+    /**
+     * Flatten Model.extension into a single map so executors can read config like
+     * {@code endpointAdapter} regardless of whether it sits in the nested
+     * {@code extension.extension} payload or at the flat top level.
+     * Flat keys override nested ones when both exist.
+     */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> flattenExtension(Model model) {
+        ExtensionBean ext = model.getExtension();
+        if (ext == null) {
+            return null;
+        }
+        Map<String, Object> result = new HashMap<>();
+        // Nested: ExtensionBean.extension field
+        Map<String, Object> nested = ext.getExtension();
+        if (nested != null) {
+            result.putAll(nested);
+        }
+        // Flat dynamic props (from @JsonAnySetter) take precedence over nested.
+        Map<String, Object> dynamic = ext.getDynamicProperties();
+        if (dynamic != null) {
+            for (Map.Entry<String, Object> e : dynamic.entrySet()) {
+                if (!"extension".equals(e.getKey())) {
+                    result.put(e.getKey(), e.getValue());
+                }
+            }
+        }
+        return result.isEmpty() ? null : result;
     }
 
     /**
