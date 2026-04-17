@@ -1,4 +1,6 @@
 import chalk from 'chalk';
+import { readFileSync, existsSync } from 'fs';
+import { resolve as resolvePath, isAbsolute, relative } from 'path';
 import { log } from '../utils/logger.js';
 import { loadPlugin, countResources } from '../utils/plugin-loader.js';
 import { validateStructural } from '../validation/structural.js';
@@ -193,7 +195,56 @@ function inferCategory(namespace: string): string {
   return mapping[namespace] || 'utility';
 }
 
+/**
+ * Inline DRL file content for rules that declare `ruleContentFile`.
+ *
+ * The backend `/api/plugins/import/execute-direct` endpoint consumes the
+ * manifest as-is and does NOT re-resolve file references — so we must read
+ * the DRL from disk and inline it into `ruleContent` before submission.
+ *
+ * Mirrors backend `PluginDirectoryLoader.inlineDrlContent`:
+ * - both `ruleContent` and `ruleContentFile` set → reject
+ * - path must stay within plugin directory (no `..` escape)
+ * - missing file → throw
+ */
+export function inlineRuleContents(rules: any[], pluginDir: string): any[] {
+  const pluginRoot = resolvePath(pluginDir);
+  return rules.map((rule) => {
+    const relPath: string | undefined = rule.ruleContentFile;
+    if (!relPath || !String(relPath).trim()) {
+      return rule;
+    }
+    const hasInline = typeof rule.ruleContent === 'string' && rule.ruleContent.trim().length > 0;
+    if (hasInline) {
+      throw new Error(
+        `Rule '${rule.ruleCode}' declares both ruleContent and ruleContentFile — pick one`
+      );
+    }
+    if (isAbsolute(relPath)) {
+      throw new Error(
+        `Rule '${rule.ruleCode}' ruleContentFile must be relative to plugin dir: ${relPath}`
+      );
+    }
+    const drlPath = resolvePath(pluginRoot, relPath);
+    const rel = relative(pluginRoot, drlPath);
+    if (rel.startsWith('..') || isAbsolute(rel)) {
+      throw new Error(
+        `Rule '${rule.ruleCode}' ruleContentFile escapes plugin directory: ${relPath}`
+      );
+    }
+    if (!existsSync(drlPath)) {
+      throw new Error(
+        `Rule '${rule.ruleCode}' ruleContentFile not found: ${relPath}`
+      );
+    }
+    const content = readFileSync(drlPath, 'utf8');
+    return { ...rule, ruleContent: content };
+  });
+}
+
 function buildExtendedManifest(plugin: ReturnType<typeof loadPlugin>): any {
+  const rawRules = plugin.resourceFiles.get('rules') || [];
+  const rules = inlineRuleContents(rawRules, plugin.dir);
   return {
     ...plugin.manifest,
     models: plugin.resourceFiles.get('models') || [],
@@ -211,7 +262,7 @@ function buildExtendedManifest(plugin: ReturnType<typeof loadPlugin>): any {
     bindingRules: plugin.resourceFiles.get('bindingRules') || [],
     dashboards: plugin.resourceFiles.get('dashboards') || [],
     processes: plugin.resourceFiles.get('processes') || [],
-    rules: plugin.resourceFiles.get('rules') || [],
+    rules,
     slaConfigs: plugin.resourceFiles.get('sla') || [],
   };
 }
