@@ -30,6 +30,13 @@ import java.util.Map;
  * NotificationCommandService (table {@code se_notification_instance},
  * notification_type={@code cc}). AuraBoot only writes a business-semantic
  * audit record ("I executed cc to N receivers") to {@code ab_bpm_audit_record}.
+ *
+ * <p><strong>Transactional semantics:</strong> the per-receiver loop and the
+ * audit write run inside a single Spring {@code @Transactional} boundary.
+ * SmartEngine's notification writes participate in the same transaction, so a
+ * failure mid-loop rolls back any notifications already written together with
+ * the audit record (all-or-nothing). Bad-input failures (null receiver entry,
+ * empty list) are rejected before any SmartEngine call.
  */
 @Slf4j
 @Service
@@ -53,6 +60,9 @@ public class CcService {
     public void cc(String taskId, List<Long> receiverUserIds, String comment) {
         if (receiverUserIds == null || receiverUserIds.isEmpty()) {
             throw new IllegalArgumentException("receiverUserIds must not be empty");
+        }
+        if (receiverUserIds.stream().anyMatch(java.util.Objects::isNull)) {
+            throw new IllegalArgumentException("receiverUserIds must not contain null entries");
         }
 
         String currentUserId = BpmSecurityUtil.getCurrentUserId();
