@@ -42,21 +42,6 @@ export interface ReassignRequest {
   assigneeUserIds: number[];
 }
 
-export async function getMyPendingTasks(pageNum = 1, pageSize = 20) {
-  return get<ApprovalTaskDTO[]>('/api/bpm/approval-tasks/my-pending', {
-    pageNum,
-    pageSize,
-  });
-}
-
-export async function getMyHistory(pageNum = 1, pageSize = 20, status?: string) {
-  return get<{ records: ApprovalTaskDTO[]; total: number }>('/api/bpm/approval-tasks/my-history', {
-    pageNum,
-    pageSize,
-    ...(status && status !== 'all' ? { status } : {}),
-  });
-}
-
 export async function getTaskDetail(taskPid: string) {
   return get<ApprovalTaskDTO>(`/api/bpm/approval-tasks/${taskPid}`);
 }
