@@ -102,17 +102,39 @@ This executes a 15-step pipeline:
 GET /api/bootstrap/status
 ```
 
-Response:
+Response (initialized):
 
 ```json
 {
   "code": "0",
   "data": {
     "initialized": true,
-    "setupAt": "2026-04-11T08:00:00Z"
+    "inProgress": false,
+    "mode": "single",
+    "missingParts": [],
+    "reason": null
   }
 }
 ```
+
+Response (not initialized):
+
+```json
+{
+  "code": "0",
+  "data": {
+    "initialized": false,
+    "inProgress": false,
+    "mode": null,
+    "missingParts": ["system_config"],
+    "reason": "Bootstrap not completed"
+  }
+}
+```
+
+When `initialized=false`, the web UI renders a top banner linking to `/setup`
+instead of silently redirecting. The authoritative signal is `system_config.system.initialized`,
+written by `BootstrapEngineService` after all bootstrap steps complete.
 
 ### Creating additional tenants (MULTI mode)
 
