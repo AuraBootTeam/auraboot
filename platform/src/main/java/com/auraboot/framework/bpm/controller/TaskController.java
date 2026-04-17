@@ -183,13 +183,14 @@ public class TaskController {
      */
     @PostMapping("/{taskId}/cc")
     @RequirePermission(MetaPermission.WORKFLOW_EXECUTE)
-    @Operation(summary = "CC process", description = "Send a CC notification for the process to specified users; subject to ccPolicy")
-    public ApiResponse<Long> ccTask(
+    @Operation(summary = "CC process",
+               description = "Send a CC notification for the process to specified users; subject to ccPolicy")
+    public ApiResponse<Void> ccTask(
             @PathVariable String taskId,
             @RequestBody CcRequest request) {
-        log.info("CC task: {} to {}", taskId, request.receiverUserIds());
-        var record = ccService.cc(taskId, request.receiverUserIds(), request.comment());
-        return ApiResponse.success(record.getId());
+        log.info("CC process: taskId={}, receivers={}", taskId, request.receiverUserIds());
+        ccService.cc(taskId, request.receiverUserIds(), request.comment());
+        return ApiResponse.success();
     }
 
     /**
