@@ -1,5 +1,6 @@
 package com.auraboot.framework.saas.bootstrap;
 
+import com.auraboot.framework.saas.config.service.SystemConfigService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
@@ -13,26 +14,24 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class BootstrapStartupLogger implements ApplicationRunner {
 
-    private final BootstrapStatusEvaluator evaluator;
+    private final SystemConfigService systemConfigService;
 
     @Override
     public void run(ApplicationArguments args) {
-        // Auxiliary observability — must never crash app boot if downstream returns
-        // unexpected state (e.g. evaluator mocked in tests returns null without stub).
-        BootstrapStatusEvaluator.Result result;
+        // Auxiliary observability — must never crash app boot if downstream fails.
+        boolean initialized;
         try {
-            result = evaluator.evaluate();
+            initialized = systemConfigService.isInitialized();
         } catch (Exception e) {
             log.warn("Bootstrap status check failed at startup: {}", e.getMessage());
             return;
         }
-        if (result == null || result.missingParts() == null || result.missingParts().isEmpty()) {
+        if (initialized) {
             return;
         }
         log.warn("================================================");
         log.warn("  AuraBoot Bootstrap NOT INITIALIZED");
-        log.warn("  Missing: {}", result.missingParts());
-        log.warn("  Run: scripts/reset-and-init.sh");
+        log.warn("  Run: scripts/oss-reset-and-init.sh");
         log.warn("  Or:  visit http://localhost:5173/setup");
         log.warn("================================================");
     }
