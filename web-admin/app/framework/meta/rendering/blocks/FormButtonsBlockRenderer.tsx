@@ -3,10 +3,13 @@
  * 用于渲染表单底部的操作按钮组
  */
 
-import React, { useMemo } from 'react';
+import React from 'react';
+import { useNavigate } from 'react-router';
 import type { BlockConfig, ButtonConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
+import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
+import { useAuth } from '~/contexts/AuthContext';
 
 export interface FormButtonsBlockRendererProps {
   block: BlockConfig;
@@ -25,15 +28,34 @@ export const FormButtonsBlockRenderer: React.FC<FormButtonsBlockRendererProps> =
   const locale = context.locale || 'zh-CN';
   const t = context.t || ((key: string) => key);
 
-  // 处理按钮点击事件
-  const handleButtonClick = (button: ButtonConfig) => {
-    if (!button.events?.onClick) return;
+  // 路由 / 鉴权上下文 — useActionHandler hook 要求
+  const navigate = useNavigate();
+  const { token } = useAuth();
+  const schema = runtime.getSchema();
+  const tableName = (schema as any).modelCode || schema.id || '';
+  const dataSourceManager = runtime.getDataSourceManager();
 
-    const handler = button.events.onClick.handler;
-    if (handler) {
-      // 执行 handler
-      runtime.executeHandler(handler, button.events.onClick.args || {});
+  const { handleAction } = useActionHandler({
+    runtime,
+    navigate,
+    tableName,
+    context: {
+      data: (context.form as Record<string, any>) || (context.data as Record<string, any>),
+    },
+    dataSourceManager,
+    locale,
+    t,
+    token: token || undefined,
+  });
+
+  // 处理按钮点击事件 - 委托给 useActionHandler
+  const handleButtonClick = (button: ButtonConfig) => {
+    // Only dispatch buttons that have at least one recognizable action source
+    // (preserves original behavior: buttons without events.onClick were no-ops)
+    if (!button.events?.onClick && !button.action && !button.commandCode && !button.navigateTo && !button.apiAction && !button.handler) {
+      return;
     }
+    handleAction(button, (context.form as Record<string, any>) || (context.data as Record<string, any>));
   };
 
   // 渲染单个按钮
