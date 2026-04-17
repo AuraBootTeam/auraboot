@@ -9,6 +9,8 @@ import com.auraboot.framework.meta.dto.*;
 import com.auraboot.framework.meta.dto.FieldMaskRule;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.mapper.MetaModelMapper;
+import com.auraboot.framework.meta.service.executor.ExecutorRegistry;
+import com.auraboot.framework.meta.service.executor.ModelDataExecutor;
 import com.auraboot.framework.meta.ddl.TableMetadataService;
 import com.auraboot.framework.meta.exception.MetaServiceException;
 import com.auraboot.framework.meta.util.JsonbFieldHelper;
@@ -66,6 +68,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     private final ApplicationContext applicationContext;
     private final PayloadTemporalNormalizer payloadTemporalNormalizer;
     private final FieldPermissionService fieldPermissionService;
+    private final ExecutorRegistry executorRegistry;
     private static final Set<String> SYSTEM_COLUMNS = SystemFieldConstants.QUERY_TRANSPARENT;
 
     /**
@@ -98,6 +101,14 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
         // 获取模型定义
         ModelDefinition model = getModelDefinition(modelCode);
+
+        // Phase 1 virtual-model dispatch: if the model has a non-physical sourceType
+        // AND an executor is registered for it, delegate. Otherwise fall through to
+        // the existing physical-table inline path (preserves full backward compatibility).
+        Optional<ModelDataExecutor> executorOpt = executorRegistry.resolve(model.getSourceType());
+        if (executorOpt.isPresent()) {
+            return executorOpt.get().list(modelCode, request);
+        }
 
         // VIEW models have no physical table — delegate to NamedQuery
         if ("view".equals(model.getModelType())) {
@@ -634,8 +645,20 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         }
         
         logOperation("getById", modelCode, recordId);
-        
+
         ModelDefinition model = getModelDefinition(modelCode);
+
+        // Phase 1 virtual-model dispatch: delegate to executor if non-physical sourceType
+        // has a registered executor; otherwise fall through to inline physical path.
+        Optional<ModelDataExecutor> executorOpt = executorRegistry.resolve(model.getSourceType());
+        if (executorOpt.isPresent()) {
+            Map<String, Object> record = executorOpt.get().get(modelCode, recordId);
+            if (record == null) {
+                throw new MetaServiceException("Record not found: " + recordId + " in model: " + modelCode);
+            }
+            return record;
+        }
+
         FieldDefinition primaryKey = metadataService.getPrimaryKeyField(modelCode);
         Long tenantId = getCurrentTenantId();
         
