@@ -11,11 +11,11 @@ const TEXTS = {
     'ja-JP': 'システムが初期化されていません',
     'ko-KR': '시스템이 초기화되지 않았습니다',
   },
-  bannerDetailPrefix: {
-    'zh-CN': '缺少：',
-    'en-US': 'Missing: ',
-    'ja-JP': '不足：',
-    'ko-KR': '누락: ',
+  bannerBody: {
+    'zh-CN': '请先完成初始化向导。',
+    'en-US': 'Complete the initialization wizard to continue.',
+    'ja-JP': '初期化ウィザードを完了してください。',
+    'ko-KR': '초기화 마법사를 완료하세요.',
   },
   bannerCta: {
     'zh-CN': '前往初始化',
@@ -61,34 +61,6 @@ const TEXTS = {
   },
 } as const;
 
-const MISSING_PART_LABELS: Record<string, Record<SupportedLocale, string>> = {
-  admin_user: {
-    'zh-CN': '管理员账户',
-    'en-US': 'Admin account',
-    'ja-JP': '管理者アカウント',
-    'ko-KR': '관리자 계정',
-  },
-  default_tenant: {
-    'zh-CN': '默认租户',
-    'en-US': 'Default tenant',
-    'ja-JP': 'デフォルトテナント',
-    'ko-KR': '기본 테넌트',
-  },
-  system_config: {
-    'zh-CN': '系统配置标记',
-    'en-US': 'System config flag',
-    'ja-JP': 'システム設定フラグ',
-    'ko-KR': '시스템 설정 플래그',
-  },
-};
-
-const PART_SEPARATOR: Record<SupportedLocale, string> = {
-  'zh-CN': '、',
-  'en-US': ', ',
-  'ja-JP': '、',
-  'ko-KR': ', ',
-};
-
 type TextKey = keyof typeof TEXTS;
 
 function detectLocale(): SupportedLocale {
@@ -103,10 +75,4 @@ function detectLocale(): SupportedLocale {
 export function bootstrapT(key: TextKey, locale?: SupportedLocale): string {
   const lang = locale ?? detectLocale();
   return TEXTS[key][lang];
-}
-
-export function describeMissingParts(parts: string[], locale?: SupportedLocale): string {
-  if (!parts.length) return '';
-  const lang = locale ?? detectLocale();
-  return parts.map((p) => MISSING_PART_LABELS[p]?.[lang] ?? p).join(PART_SEPARATOR[lang]);
 }
