@@ -3,8 +3,7 @@
 > BPM (Business Process Management) core plugin.
 
 Contributes:
-- `/bpm/task-center` — task management
-- `/bpm/approval-inbox` — approval inbox
+- `/bpm/task-center` — task management and approval inbox (unified entry point as of 2026-04-17)
 - `/bpm/process-status` — read-only BPMN viewer (deep link)
 - `/bpm/sla-monitor` — SLA dashboard
 
