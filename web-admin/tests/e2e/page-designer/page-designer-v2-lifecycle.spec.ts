@@ -63,7 +63,7 @@ test.describe('Page Designer V2 — Composite Page Lifecycle (DEPRECATED)', () =
         name: `${PREFIX}_page`,
         pageKey: `${PREFIX.toLowerCase()}_page`,
         title: 'Untitled',
-        kind: 'composite',
+        kind: 'list',
         blocks: [],
         semver: '0.1.0',
       },
@@ -78,7 +78,7 @@ test.describe('Page Designer V2 — Composite Page Lifecycle (DEPRECATED)', () =
     await page.goto(`/page-designer/${createdPagePid}`);
 
     // Canvas editor visible
-    await expect(page.getByTestId('canvas-editor')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId('designer-canvas')).toBeVisible({ timeout: 15_000 });
 
     // Empty state + quick-add buttons
     await expect(page.getByTestId('canvas-empty-state')).toBeVisible({ timeout: 5_000 });
@@ -106,7 +106,7 @@ test.describe('Page Designer V2 — Composite Page Lifecycle (DEPRECATED)', () =
   // -------------------------------------------------------------------------
   test('block CRUD + title edit in single session', async ({ page }) => {
     await page.goto(`/page-designer/${createdPagePid}`);
-    await expect(page.getByTestId('canvas-editor')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId('designer-canvas')).toBeVisible({ timeout: 15_000 });
 
     const blocks = page.getByTestId('canvas-body').locator(BLOCK_SEL);
 
@@ -160,7 +160,7 @@ test.describe('Page Designer V2 — Composite Page Lifecycle (DEPRECATED)', () =
   // -------------------------------------------------------------------------
   test('auto-save persists blocks after reload', async ({ page }) => {
     await page.goto(`/page-designer/${createdPagePid}`);
-    await expect(page.getByTestId('canvas-editor')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId('designer-canvas')).toBeVisible({ timeout: 15_000 });
 
     const blocks = page.getByTestId('canvas-body').locator(BLOCK_SEL);
 
@@ -178,7 +178,7 @@ test.describe('Page Designer V2 — Composite Page Lifecycle (DEPRECATED)', () =
 
     // Reload page
     await page.reload({ waitUntil: 'domcontentloaded' });
-    await expect(page.getByTestId('canvas-editor')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId('designer-canvas')).toBeVisible({ timeout: 15_000 });
 
     // Blocks should persist
     const blocksAfterReload = page.getByTestId('canvas-body').locator(BLOCK_SEL);
@@ -190,7 +190,7 @@ test.describe('Page Designer V2 — Composite Page Lifecycle (DEPRECATED)', () =
   // -------------------------------------------------------------------------
   test('publish page', async ({ page }) => {
     await page.goto(`/page-designer/${createdPagePid}`);
-    await expect(page.getByTestId('canvas-editor')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId('designer-canvas')).toBeVisible({ timeout: 15_000 });
 
     const publishPromise = page.waitForResponse(
       resp => resp.url().includes('/api/pages/') && resp.url().includes('/publish'),

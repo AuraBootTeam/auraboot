@@ -35,7 +35,7 @@ async function createBlankPage(page: Page): Promise<string> {
       name,
       pageKey,
       title: name,
-      kind: 'composite',
+      kind: 'list',
       blocks: [],
       metaInfo: { componentCount: 0 },
       semver: '0.1.0',
@@ -64,7 +64,7 @@ async function createPageWithBlocks(
       name: pageName,
       pageKey,
       title: pageName,
-      kind: 'composite',
+      kind: 'list',
       blocks: blocks.map((b, i) => ({
         id: b.id,
         blockType: b.blockType,
@@ -87,7 +87,7 @@ async function createPageWithBlocks(
 /** Open the designer for a given pid and wait for the canvas. */
 async function openDesigner(page: Page, pid: string): Promise<void> {
   await page.goto(`/page-designer/${pid}`, { waitUntil: 'domcontentloaded' });
-  await page.getByTestId('canvas-editor').waitFor({ state: 'visible', timeout: 15000 });
+  await page.getByTestId('designer-canvas').waitFor({ state: 'visible', timeout: 15000 });
 }
 
 /** Add a table block via palette click and select it. */
