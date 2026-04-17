@@ -12,8 +12,8 @@
  */
 
 import React from 'react';
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { render, screen, cleanup } from '@testing-library/react';
 
 import { TaskTable } from '~/plugins/core-bpm/components/TaskTable';
 import type { TaskInstance } from '~/plugins/core-bpm/services/bpmWorkbenchService';
@@ -36,6 +36,12 @@ function task(overrides: Partial<TaskInstance> = {}): TaskInstance {
 }
 
 describe('TaskTable columns', () => {
+  // Project vitest config sets isolate=false; explicit cleanup prevents the
+  // previous render's DOM from leaking into the next test.
+  afterEach(() => {
+    cleanup();
+  });
+
   const baseProps = {
     loading: false,
     selectedTasks: new Set<string>(),
