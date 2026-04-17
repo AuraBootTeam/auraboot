@@ -51,12 +51,13 @@ export interface BpmHistorySectionProps {
  * glyph (keeps the timeline dependency-free - no heroicons import); `color`
  * maps to a Tailwind background class used for the timeline rail dot.
  *
- * Known operations cover:
- *   - canonical AuraBoot BPM operations: process_start, task_approve,
- *     task_reject, task_withdraw, task_cc;
- *   - SmartEngine-native operations that may surface through the same audit
- *     channel: process_suspend, process_resume, process_terminate,
- *     task_complete, task_reassign.
+ * Known operations are the full set written by backend
+ * {@code BpmAuditOperation} enum:
+ *   - process-level: {@code process_start};
+ *   - task-level: {@code task_approve}, {@code task_reject},
+ *     {@code task_add_sign}, {@code task_transfer};
+ *   - instance-level (no {@code task_} prefix on the backend):
+ *     {@code withdraw}, {@code cc}.
  *
  * Any other value falls through to {@link UNKNOWN_OPERATION_STYLE}.
  */
@@ -71,62 +72,44 @@ const OPERATION_LABELS: Record<string, OperationDescriptor> = {
   process_start: {
     icon: '\u{1F680}',
     dotClass: 'bg-blue-500',
-    i18nKey: 'bpm.history.op.start',
+    i18nKey: 'bpm.history.op.process_start',
     fallback: '启动流程',
   },
   task_approve: {
     icon: '\u2705',
     dotClass: 'bg-green-500',
-    i18nKey: 'bpm.history.op.approve',
+    i18nKey: 'bpm.history.op.task_approve',
     fallback: '审批通过',
   },
   task_reject: {
     icon: '\u274C',
     dotClass: 'bg-red-500',
-    i18nKey: 'bpm.history.op.reject',
+    i18nKey: 'bpm.history.op.task_reject',
     fallback: '驳回',
   },
-  task_withdraw: {
+  task_add_sign: {
+    icon: '\u2795',
+    dotClass: 'bg-indigo-500',
+    i18nKey: 'bpm.history.op.task_add_sign',
+    fallback: '加签',
+  },
+  task_transfer: {
+    icon: '\u{1F504}',
+    dotClass: 'bg-gray-500',
+    i18nKey: 'bpm.history.op.task_transfer',
+    fallback: '转办',
+  },
+  withdraw: {
     icon: '\u21A9',
     dotClass: 'bg-gray-500',
     i18nKey: 'bpm.history.op.withdraw',
     fallback: '撤回',
   },
-  task_cc: {
+  cc: {
     icon: '\u{1F4E8}',
     dotClass: 'bg-blue-400',
     i18nKey: 'bpm.history.op.cc',
     fallback: '抄送',
-  },
-  process_suspend: {
-    icon: '\u23F8',
-    dotClass: 'bg-yellow-500',
-    i18nKey: 'bpm.history.op.suspend',
-    fallback: '挂起',
-  },
-  process_resume: {
-    icon: '\u25B6',
-    dotClass: 'bg-blue-500',
-    i18nKey: 'bpm.history.op.resume',
-    fallback: '恢复',
-  },
-  process_terminate: {
-    icon: '\u{1F6D1}',
-    dotClass: 'bg-red-600',
-    i18nKey: 'bpm.history.op.terminate',
-    fallback: '终止',
-  },
-  task_complete: {
-    icon: '\u2713',
-    dotClass: 'bg-green-500',
-    i18nKey: 'bpm.history.op.complete',
-    fallback: '完成任务',
-  },
-  task_reassign: {
-    icon: '\u{1F504}',
-    dotClass: 'bg-gray-500',
-    i18nKey: 'bpm.history.op.reassign',
-    fallback: '转办',
   },
 };
 
@@ -140,8 +123,10 @@ const UNKNOWN_OPERATION_STYLE = {
 const DETAIL_COMMENT_OPERATIONS = new Set([
   'task_approve',
   'task_reject',
-  'task_withdraw',
-  'task_cc',
+  'task_add_sign',
+  'task_transfer',
+  'withdraw',
+  'cc',
 ]);
 
 /**

@@ -21,8 +21,9 @@
  *
  *   Layer 2 — Identity-derived.
  *     - {@code canWithdraw}: instance is running AND currentUser is the
- *       process initiator, resolved from variables
- *       ({@code startUserId} / {@code initiatorUserId} / {@code applicantUserId}).
+ *       process initiator, resolved from variables (backend canonical key
+ *       {@code _startUserId} per {@code ApprovalChainExecutor}, with
+ *       {@code startUserId} as the SmartEngine-native fallback).
  *     - {@code canApprove} / {@code canReject}: instance is running AND
  *       currentUser id matches at least one current-node assignee.
  *     - {@code canCc}: same as approve/reject (assignees are always allowed to
@@ -47,8 +48,19 @@ import type { BpmInstanceForRecord } from './bpmWorkbenchService';
 /** Non-running instance statuses - Operations section disables every action. */
 const RUNNING_STATUS = 'running';
 
-/** Variable keys that may carry the process initiator's user id. */
-const INITIATOR_VARIABLE_KEYS = ['startUserId', 'initiatorUserId', 'applicantUserId'] as const;
+/**
+ * Variable keys that may carry the process initiator's user id.
+ *
+ * Ordered by backend preference — {@code _startUserId} is the canonical key
+ * written by {@code ApprovalChainExecutor} (see
+ * {@code platform/.../chain/ApprovalChainExecutor.java:90}) and consumed first
+ * by {@code AssigneeResolverService} (lines 123-125). {@code startUserId} is
+ * the legacy fallback written by {@code BpmIntegrationService} for SmartEngine-
+ * native starts. We intentionally do NOT probe {@code initiatorUserId} /
+ * {@code applicantUserId} — those are notification-payload keys on the event
+ * bus, never written to process variables, so probing them was dead code.
+ */
+const INITIATOR_VARIABLE_KEYS = ['_startUserId', 'startUserId'] as const;
 
 /** IAM permission code that unconditionally unlocks every BPM operation. */
 export const BPM_ADMIN_PERMISSION = 'bpm.admin';
