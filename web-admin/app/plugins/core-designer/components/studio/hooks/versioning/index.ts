@@ -11,7 +11,6 @@ import type {
   UpdateVersionRequest,
   PublishVersionRequest,
   RollbackVersionRequest,
-  VersionDiff,
   VersionEvent,
   VersionEventListener,
   VersionSync,
@@ -23,6 +22,7 @@ import {
   SyncStatus,
 } from '~/plugins/core-designer/components/studio/domain/metadata/types';
 import { getVersionManager } from '~/plugins/core-designer/components/studio/services/managers';
+import { useAuth } from '~/contexts/AuthContext';
 
 /**
  * 版本列表 Hook
@@ -148,13 +148,19 @@ export function useVersion(versionId: string | null) {
 }
 
 /**
- * 版本操作 Hook
+ * Version operations hook
  */
 export function useVersionOperations(pageId: string) {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const versionManager = getVersionManager();
+
+  const getActor = useCallback(
+    () => user?.email ?? user?.name ?? 'unknown',
+    [user],
+  );
 
   const createVersion = useCallback(
     async (request: CreateVersionRequest): Promise<Version> => {
@@ -162,7 +168,7 @@ export function useVersionOperations(pageId: string) {
         setLoading(true);
         setError(null);
 
-        const newVersion = await versionManager.createVersion(pageId, request);
+        const newVersion = await versionManager.createVersion(pageId, request, getActor());
         return newVersion;
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : '创建版本失败';
@@ -172,7 +178,7 @@ export function useVersionOperations(pageId: string) {
         setLoading(false);
       }
     },
-    [pageId, versionManager],
+    [pageId, versionManager, getActor],
   );
 
   const updateVersion = useCallback(
@@ -181,7 +187,7 @@ export function useVersionOperations(pageId: string) {
         setLoading(true);
         setError(null);
 
-        const updatedVersion = await versionManager.updateVersion(request);
+        const updatedVersion = await versionManager.updateVersion(request, getActor());
         return updatedVersion;
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : '更新版本失败';
@@ -191,7 +197,7 @@ export function useVersionOperations(pageId: string) {
         setLoading(false);
       }
     },
-    [versionManager],
+    [versionManager, getActor],
   );
 
   const deleteVersion = useCallback(
@@ -200,7 +206,7 @@ export function useVersionOperations(pageId: string) {
         setLoading(true);
         setError(null);
 
-        await versionManager.deleteVersion(pageId, versionId);
+        await versionManager.deleteVersion(pageId, versionId, getActor());
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : '删除版本失败';
         setError(errorMessage);
@@ -209,7 +215,7 @@ export function useVersionOperations(pageId: string) {
         setLoading(false);
       }
     },
-    [versionManager],
+    [versionManager, getActor],
   );
 
   const publishVersion = useCallback(
@@ -218,12 +224,11 @@ export function useVersionOperations(pageId: string) {
         setLoading(true);
         setError(null);
 
-        // Need versionId from request for publishVersion(pageId, versionId, request)
-        // Assuming request has versionId
         const publishedVersion = await versionManager.publishVersion(
           pageId,
           request.versionId,
           request,
+          getActor(),
         );
         return publishedVersion;
       } catch (err) {
@@ -234,7 +239,7 @@ export function useVersionOperations(pageId: string) {
         setLoading(false);
       }
     },
-    [versionManager],
+    [versionManager, getActor],
   );
 
   const unpublishVersion = useCallback(
@@ -243,7 +248,7 @@ export function useVersionOperations(pageId: string) {
         setLoading(true);
         setError(null);
 
-        const unpublishedVersion = await versionManager.unpublishVersion(versionId);
+        const unpublishedVersion = await versionManager.unpublishVersion(versionId, getActor());
         return unpublishedVersion;
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : '取消发布失败';
@@ -253,7 +258,7 @@ export function useVersionOperations(pageId: string) {
         setLoading(false);
       }
     },
-    [versionManager],
+    [versionManager, getActor],
   );
 
   const rollbackVersion = useCallback(
@@ -262,7 +267,7 @@ export function useVersionOperations(pageId: string) {
         setLoading(true);
         setError(null);
 
-        const rolledBackVersion = await versionManager.rollbackVersion(pageId, request);
+        const rolledBackVersion = await versionManager.rollbackVersion(pageId, request, getActor());
         return rolledBackVersion;
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : '回滚版本失败';
@@ -272,7 +277,7 @@ export function useVersionOperations(pageId: string) {
         setLoading(false);
       }
     },
-    [pageId, versionManager],
+    [pageId, versionManager, getActor],
   );
 
   const duplicateVersion = useCallback(
@@ -281,7 +286,7 @@ export function useVersionOperations(pageId: string) {
         setLoading(true);
         setError(null);
 
-        const duplicatedVersion = await versionManager.duplicateVersion(versionId, description);
+        const duplicatedVersion = await versionManager.duplicateVersion(versionId, getActor(), description);
         return duplicatedVersion;
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : '复制版本失败';
@@ -291,7 +296,7 @@ export function useVersionOperations(pageId: string) {
         setLoading(false);
       }
     },
-    [versionManager],
+    [versionManager, getActor],
   );
 
   const archiveVersion = useCallback(
@@ -300,7 +305,7 @@ export function useVersionOperations(pageId: string) {
         setLoading(true);
         setError(null);
 
-        const archivedVersion = await versionManager.archiveVersion(versionId);
+        const archivedVersion = await versionManager.archiveVersion(versionId, getActor());
         return archivedVersion;
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : '归档版本失败';
@@ -310,7 +315,7 @@ export function useVersionOperations(pageId: string) {
         setLoading(false);
       }
     },
-    [versionManager],
+    [versionManager, getActor],
   );
 
   const restoreVersion = useCallback(
@@ -319,7 +324,7 @@ export function useVersionOperations(pageId: string) {
         setLoading(true);
         setError(null);
 
-        const restoredVersion = await versionManager.restoreVersion(versionId);
+        const restoredVersion = await versionManager.restoreVersion(versionId, getActor());
         return restoredVersion;
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : '恢复版本失败';
@@ -329,7 +334,7 @@ export function useVersionOperations(pageId: string) {
         setLoading(false);
       }
     },
-    [versionManager],
+    [versionManager, getActor],
   );
 
   const clearError = useCallback(() => {
@@ -349,51 +354,6 @@ export function useVersionOperations(pageId: string) {
     duplicateVersion,
     archiveVersion,
     restoreVersion,
-  };
-}
-
-/**
- * 版本比较 Hook
- */
-export function useVersionComparison(pageId: string) {
-  const [diff, setDiff] = useState<VersionDiff | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const versionManager = getVersionManager();
-
-  const compareVersions = useCallback(
-    async (versionAId: string, versionBId: string) => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const versionDiff = await versionManager.compareVersions(pageId, versionAId, versionBId);
-        setDiff(versionDiff);
-        return versionDiff;
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : '比较版本失败';
-        setError(errorMessage);
-        setDiff(null);
-        throw new Error(errorMessage);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [versionManager],
-  );
-
-  const clearComparison = useCallback(() => {
-    setDiff(null);
-    setError(null);
-  }, []);
-
-  return {
-    diff,
-    loading,
-    error,
-    compareVersions,
-    clearComparison,
   };
 }
 
@@ -592,6 +552,7 @@ export function useVersionSync(versionId: string | null) {
  * 版本锁定 Hook
  */
 export function useVersionLock(versionId: string | null) {
+  const { user } = useAuth();
   const [locked, setLocked] = useState(false);
   const [lockInfo, setLockInfo] = useState<{ lockedBy: string; reason?: string } | null>(null);
 
@@ -600,16 +561,17 @@ export function useVersionLock(versionId: string | null) {
   const lockVersion = useCallback(
     async (reason?: string, expiresAt?: Date) => {
       if (versionId) {
+        const actor = user?.email ?? user?.name ?? 'unknown';
         try {
-          await versionManager.lockVersion(versionId, reason, expiresAt);
+          await versionManager.lockVersion(versionId, actor, reason, expiresAt);
           setLocked(true);
-          setLockInfo({ lockedBy: 'current_user', reason });
+          setLockInfo({ lockedBy: actor, reason });
         } catch (err) {
           console.error('Failed to lock version:', err);
         }
       }
     },
-    [versionId, versionManager],
+    [versionId, versionManager, user],
   );
 
   const unlockVersion = useCallback(async () => {

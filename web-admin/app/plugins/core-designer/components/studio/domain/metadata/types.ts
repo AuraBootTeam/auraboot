@@ -203,13 +203,13 @@ export interface VersionListResponse {
  */
 export interface VersionManager {
   /** 创建版本 */
-  createVersion(pageId: string, request: CreateVersionRequest): Promise<Version>;
+  createVersion(pageId: string, request: CreateVersionRequest, actor: string): Promise<Version>;
 
   /** 更新版本 */
-  updateVersion(request: UpdateVersionRequest): Promise<Version>;
+  updateVersion(request: UpdateVersionRequest, actor: string): Promise<Version>;
 
   /** 删除版本 */
-  deleteVersion(pageId: string, versionId: string): Promise<void>;
+  deleteVersion(pageId: string, versionId: string, actor: string): Promise<void>;
 
   /** 获取版本详情 */
   getVersion(versionId: string): Promise<Version>;
@@ -228,25 +228,26 @@ export interface VersionManager {
     pageId: string,
     versionId: string,
     request: PublishVersionRequest,
+    actor: string,
   ): Promise<Version>;
 
   /** 取消发布 */
-  unpublishVersion(versionId: string): Promise<Version>;
+  unpublishVersion(versionId: string, actor: string): Promise<Version>;
 
   /** 回滚版本 */
-  rollbackVersion(pageId: string, request: RollbackVersionRequest): Promise<Version>;
+  rollbackVersion(pageId: string, request: RollbackVersionRequest, actor: string): Promise<Version>;
 
   /** 比较版本 */
   compareVersions(pageId: string, versionAId: string, versionBId: string): Promise<VersionDiff>;
 
   /** 复制版本 */
-  duplicateVersion(versionId: string, description?: string): Promise<Version>;
+  duplicateVersion(versionId: string, actor: string, description?: string): Promise<Version>;
 
   /** 归档版本 */
-  archiveVersion(versionId: string): Promise<Version>;
+  archiveVersion(versionId: string, actor: string): Promise<Version>;
 
   /** 恢复版本 */
-  restoreVersion(versionId: string): Promise<Version>;
+  restoreVersion(versionId: string, actor: string): Promise<Version>;
 }
 
 /**
