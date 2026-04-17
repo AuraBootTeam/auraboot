@@ -1,11 +1,18 @@
 package com.auraboot.framework.bpm.extension;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.bpm.model.CcPolicy;
 import com.auraboot.framework.bpm.model.WithdrawPolicy;
 import com.auraboot.smart.framework.engine.SmartEngine;
+import com.auraboot.smart.framework.engine.constant.ExtensionElementsConstant;
+import com.auraboot.smart.framework.engine.model.assembly.ExtensionElementContainer;
+import com.auraboot.smart.framework.engine.model.assembly.ExtensionElements;
 import com.auraboot.smart.framework.engine.model.assembly.IdBasedElement;
 import com.auraboot.smart.framework.engine.model.assembly.ProcessDefinition;
 import com.auraboot.smart.framework.engine.service.query.RepositoryQueryService;
+import com.auraboot.smart.framework.engine.smart.PropertyCompositeKey;
+import com.auraboot.smart.framework.engine.smart.PropertyCompositeValue;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -18,14 +25,30 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+/**
+ * Unit tests for BpmExtensionAccessor.
+ *
+ * <p>SmartEngine stores <smart:properties> entries in:
+ *   element.getExtensionElements().getDecorationMap().get("Properties")
+ * as Map<PropertyCompositeKey, PropertyCompositeValue>.
+ * These tests verify that BpmExtensionAccessor reads from that path, not from
+ * IdBasedElement.getProperties() (which holds XML element attributes).
+ */
 @DisplayName("BpmExtensionAccessor")
 class BpmExtensionAccessorTest {
 
     private SmartEngine smartEngine;
     private RepositoryQueryService repo;
     private BpmExtensionAccessor accessor;
-    private ProcessDefinition processDef;
-    private IdBasedElement userTask;
+
+    /** ProcessDefinition mock that also implements ExtensionElementContainer. */
+    interface ProcessDefinitionWithExtension extends ProcessDefinition, ExtensionElementContainer {}
+
+    /** IdBasedElement mock that also implements ExtensionElementContainer (like UserTask). */
+    interface ActivityElementWithExtension extends IdBasedElement, ExtensionElementContainer {}
+
+    private ProcessDefinitionWithExtension processDef;
+    private ActivityElementWithExtension userTask;
 
     @BeforeEach
     void setUp() {
@@ -34,36 +57,79 @@ class BpmExtensionAccessorTest {
         when(smartEngine.getRepositoryQueryService()).thenReturn(repo);
         accessor = new BpmExtensionAccessor(smartEngine);
 
-        processDef = mock(ProcessDefinition.class);
+        processDef = mock(ProcessDefinitionWithExtension.class);
         when(processDef.getId()).thenReturn("leave_request");
+        // null tenantId matches any tenant in the findProcessDefinition filter
+        when(processDef.getTenantId()).thenReturn(null);
 
-        userTask = mock(IdBasedElement.class);
+        userTask = mock(ActivityElementWithExtension.class);
         Map<String, IdBasedElement> activityMap = new HashMap<>();
         activityMap.put("manager_approval", userTask);
         when(processDef.getIdBasedElementMap()).thenReturn(activityMap);
 
         when(repo.getAllCachedProcessDefinition()).thenReturn(List.of(processDef));
+
+        // MetaContext must be initialized so getCurrentTenantIdAsString() doesn't throw
+        MetaContext.setContext(1L, 1L, null, "test-user");
     }
 
+    @AfterEach
+    void tearDown() {
+        MetaContext.clear();
+    }
+
+    // ---- helpers --------------------------------------------------------
+
+    /**
+     * Build a mock ExtensionElements whose decorationMap["Properties"] contains
+     * a single PropertyCompositeKey(null, name) → PropertyCompositeValue(value) entry.
+     * NOTE: must call mock() before passing to when().thenReturn() to avoid
+     * Mockito's "unfinished stubbing" error.
+     */
+    private static ExtensionElements buildExtensionElements(String name, String value) {
+        ExtensionElements ext = mock(ExtensionElements.class);
+        Map<PropertyCompositeKey, PropertyCompositeValue> props = new HashMap<>();
+        props.put(new PropertyCompositeKey(null, name), new PropertyCompositeValue(value, Map.of()));
+        Map<String, Object> decorationMap = new HashMap<>();
+        decorationMap.put(ExtensionElementsConstant.PROPERTIES, props);
+        when(ext.getDecorationMap()).thenReturn(decorationMap);
+        return ext;
+    }
+
+    // ---- process-level tests --------------------------------------------
+
     @Test
-    @DisplayName("getWithdrawPolicy returns parsed value")
+    @DisplayName("getWithdrawPolicy returns parsed value from extensionElements")
     void getWithdrawPolicyParsed() {
-        when(processDef.getProperties()).thenReturn(Map.of("aura.withdrawPolicy", "loose"));
+        ExtensionElements ext = buildExtensionElements(BpmExtensionKeys.WITHDRAW_POLICY, "loose");
+        when(processDef.getExtensionElements()).thenReturn(ext);
         assertThat(accessor.getWithdrawPolicy("leave_request")).isEqualTo(WithdrawPolicy.LOOSE);
     }
 
     @Test
     @DisplayName("getWithdrawPolicy defaults to STRICT when missing")
     void getWithdrawPolicyDefault() {
-        when(processDef.getProperties()).thenReturn(Map.of());
+        when(processDef.getExtensionElements()).thenReturn(null);
         assertThat(accessor.getWithdrawPolicy("leave_request")).isEqualTo(WithdrawPolicy.STRICT);
     }
 
     @Test
+    @DisplayName("getWithdrawPolicy returns NONE when set")
+    void getWithdrawPolicyNone() {
+        ExtensionElements ext = buildExtensionElements(BpmExtensionKeys.WITHDRAW_POLICY, "none");
+        when(processDef.getExtensionElements()).thenReturn(ext);
+        assertThat(accessor.getWithdrawPolicy("leave_request")).isEqualTo(WithdrawPolicy.NONE);
+    }
+
+    // ---- activity-level tests -------------------------------------------
+
+    @Test
     @DisplayName("getCcPolicy uses activity override when present")
     void getCcPolicyActivityOverride() {
-        when(processDef.getProperties()).thenReturn(Map.of("aura.ccPolicy", "all"));
-        when(userTask.getProperties()).thenReturn(Map.of("aura.ccPolicyOverride", "initiator"));
+        ExtensionElements processExt = buildExtensionElements(BpmExtensionKeys.CC_POLICY, "all");
+        ExtensionElements taskExt = buildExtensionElements(BpmExtensionKeys.CC_POLICY_OVERRIDE, "initiator");
+        when(processDef.getExtensionElements()).thenReturn(processExt);
+        when(userTask.getExtensionElements()).thenReturn(taskExt);
         assertThat(accessor.getCcPolicy("leave_request", "manager_approval"))
                 .isEqualTo(CcPolicy.INITIATOR);
     }
@@ -71,8 +137,9 @@ class BpmExtensionAccessorTest {
     @Test
     @DisplayName("getCcPolicy falls back to process-level when no override")
     void getCcPolicyProcessLevel() {
-        when(processDef.getProperties()).thenReturn(Map.of("aura.ccPolicy", "assignee"));
-        when(userTask.getProperties()).thenReturn(Map.of());
+        ExtensionElements processExt = buildExtensionElements(BpmExtensionKeys.CC_POLICY, "assignee");
+        when(processDef.getExtensionElements()).thenReturn(processExt);
+        when(userTask.getExtensionElements()).thenReturn(null);
         assertThat(accessor.getCcPolicy("leave_request", "manager_approval"))
                 .isEqualTo(CcPolicy.ASSIGNEE);
     }
@@ -80,10 +147,12 @@ class BpmExtensionAccessorTest {
     @Test
     @DisplayName("getCcPolicy defaults to ALL when nothing set")
     void getCcPolicyDefault() {
-        when(processDef.getProperties()).thenReturn(Map.of());
-        when(userTask.getProperties()).thenReturn(Map.of());
+        when(processDef.getExtensionElements()).thenReturn(null);
+        when(userTask.getExtensionElements()).thenReturn(null);
         assertThat(accessor.getCcPolicy("leave_request", "manager_approval")).isEqualTo(CcPolicy.ALL);
     }
+
+    // ---- edge cases -----------------------------------------------------
 
     @Test
     @DisplayName("unknown processKey returns defaults")
