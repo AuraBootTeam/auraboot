@@ -50,6 +50,7 @@ import {
   ccTask,
   getTasksByProcessInstance,
   rejectTask,
+  terminateProcess,
   withdrawTask,
   type BpmInstanceForRecord,
   type TaskInstance,
@@ -61,6 +62,7 @@ import {
 } from '~/plugins/core-bpm/services/BpmPermissionService';
 import { WithdrawDialog, type WithdrawPolicy } from './WithdrawDialog';
 import { CcDialog } from './CcDialog';
+import { TerminateDialog } from './TerminateDialog';
 
 type Translator = (
   key: string,
@@ -81,7 +83,8 @@ type DialogState =
   | { type: 'approve' }
   | { type: 'reject' }
   | { type: 'withdraw' }
-  | { type: 'cc' };
+  | { type: 'cc' }
+  | { type: 'terminate' };
 
 /** Map blocked-reason codes to human-readable Chinese fallback copy. */
 const BLOCKED_REASON_COPY: Record<string, string> = {
@@ -89,6 +92,7 @@ const BLOCKED_REASON_COPY: Record<string, string> = {
   'user.anonymous': '请先登录',
   'user.notInitiator': '仅发起人可撤回',
   'user.notAssignee': '当前节点审批人非您',
+  'user.notBpmAdmin': '仅 BPM 管理员可终止',
   'task.none': '暂无待办任务',
 };
 
@@ -202,11 +206,21 @@ export function BpmOperationsSection({
       }
       return { disabled: false, reasonCode: undefined };
     };
+    // Terminate keys off the processInstanceId directly (no task lookup), so
+    // it is disabled/enabled purely on permission.
+    const terminateCanByPolicy = permission?.canTerminate ?? false;
+    const terminateReason = terminateCanByPolicy
+      ? undefined
+      : permission?.reasonsBlocked?.terminate;
     return {
       approve: derive('approve', permission?.canApprove ?? false, assigneeTaskId),
       reject: derive('reject', permission?.canReject ?? false, assigneeTaskId),
       withdraw: derive('withdraw', permission?.canWithdraw ?? false, firstPendingTaskId),
       cc: derive('cc', permission?.canCc ?? false, assigneeTaskId),
+      terminate: {
+        disabled: !terminateCanByPolicy,
+        reasonCode: terminateReason,
+      },
     };
   }, [permission, assigneeTaskId, firstPendingTaskId, tasksLoaded]);
 
@@ -277,6 +291,18 @@ export function BpmOperationsSection({
       onActionComplete?.();
     },
     [assigneeTaskId, onActionComplete, t],
+  );
+
+  const runTerminate = useCallback(
+    async (reason: string) => {
+      if (!instance) {
+        throw new Error(t('bpm.terminate.noInstance', undefined, '没有可终止的流程实例'));
+      }
+      await terminateProcess(instance.instanceId, reason);
+      setDialog({ type: 'none' });
+      onActionComplete?.();
+    },
+    [instance, onActionComplete, t],
   );
 
   // ---------- Render ----------
@@ -360,6 +386,15 @@ export function BpmOperationsSection({
           onClick={() => setDialog({ type: 'cc' })}
         >
           {t('bpm.operations.cc', undefined, '抄送')}
+        </Button>
+        <Button
+          data-testid="bpm-operations-terminate"
+          variant="destructive"
+          disabled={buttonState.terminate.disabled}
+          title={resolveBlockedTitle(t, buttonState.terminate.reasonCode)}
+          onClick={() => setDialog({ type: 'terminate' })}
+        >
+          {t('bpm.operations.terminate', undefined, '终止')}
         </Button>
       </div>
 
@@ -483,6 +518,15 @@ export function BpmOperationsSection({
         open={dialog.type === 'cc'}
         taskId={assigneeTaskId ?? ''}
         onConfirm={runCc}
+        onCancel={closeDialog}
+        t={t}
+      />
+
+      {/* Terminate dialog - bpm.admin only; required reason + confirm checkbox */}
+      <TerminateDialog
+        open={dialog.type === 'terminate'}
+        processInstanceId={instance.instanceId}
+        onConfirm={runTerminate}
         onCancel={closeDialog}
         t={t}
       />
