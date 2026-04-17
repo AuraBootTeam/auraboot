@@ -303,7 +303,7 @@ export function ConditionExpressionEditor({ condition, onChange }: ConditionExpr
   // ---------------------------------------------------------------------------
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" data-testid="condition-expression-editor">
       {/* Mode tabs */}
       <div className="flex rounded-md border border-gray-300">
         <button
@@ -314,6 +314,7 @@ export function ConditionExpressionEditor({ condition, onChange }: ConditionExpr
               ? 'bg-blue-50 text-blue-700'
               : 'bg-white text-gray-600 hover:bg-gray-50'
           } rounded-l-md`}
+          data-testid="condition-mode-simple"
         >
           {t('bpmn.condition.simpleMode')}
         </button>
@@ -325,6 +326,7 @@ export function ConditionExpressionEditor({ condition, onChange }: ConditionExpr
               ? 'bg-blue-50 text-blue-700'
               : 'bg-white text-gray-600 hover:bg-gray-50'
           } rounded-r-md border-l border-gray-300`}
+          data-testid="condition-mode-advanced"
         >
           {t('bpmn.condition.advancedMode')}
         </button>
@@ -477,6 +479,7 @@ export function ConditionExpressionEditor({ condition, onChange }: ConditionExpr
             className="w-full rounded-md border border-gray-300 px-2 py-2 font-mono text-xs leading-relaxed"
             rows={4}
             placeholder={t('bpmn.condition.advancedPlaceholder')}
+            data-testid="condition-advanced-content"
           />
 
           {/* Help text */}
