@@ -18,7 +18,7 @@ import java.util.List;
  * normalized into these whitelists at MetaModelService save time.
  */
 @Value
-@Builder
+@Builder(toBuilder = true)
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class ModelCapabilities {
 
