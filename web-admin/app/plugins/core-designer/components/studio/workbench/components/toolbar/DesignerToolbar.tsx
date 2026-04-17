@@ -16,6 +16,8 @@ import { SaveAsTemplateDialog } from '~/plugins/core-designer/components/studio/
 import { AiPageGenerateDialog } from '~/plugins/core-designer/components/studio/components/AiPageGenerateDialog';
 import type { MergeMode } from '~/plugins/core-designer/components/studio/components/ai-page-prompt';
 import type { PageSchema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
+import { usePermissions } from '~/contexts/AuthContext';
+import { DESIGNER_I18N } from '~/shared/designer/designerI18n';
 
 /**
  * DesignerToolbar props
@@ -73,6 +75,8 @@ const ToolbarButton: React.FC<{
   icon: React.ReactNode;
   label?: string;
   title: string;
+  /** Overrides title when button is disabled (used for permission denial messages) */
+  disabledTitle?: string;
   onClick?: () => void;
   disabled?: boolean;
   active?: boolean;
@@ -83,6 +87,7 @@ const ToolbarButton: React.FC<{
   icon,
   label,
   title,
+  disabledTitle,
   onClick,
   disabled = false,
   active = false,
@@ -100,11 +105,14 @@ const ToolbarButton: React.FC<{
     danger: 'text-red-600 hover:bg-red-50',
   }[variant];
 
+  const resolvedTitle = disabled && disabledTitle ? disabledTitle : title;
+
   return (
     <button
       onClick={onClick}
       disabled={disabled}
-      title={title}
+      title={resolvedTitle}
+      aria-label={resolvedTitle}
       data-testid={testId}
       className={` ${baseClass} flex items-center gap-1.5 rounded-md text-sm font-medium transition-colors ${variantClass} ${disabled ? 'cursor-not-allowed opacity-40' : ''} `}
     >
@@ -165,6 +173,17 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
   const [showDeviceMenu, setShowDeviceMenu] = useState(false);
   const [showSaveAsTemplate, setShowSaveAsTemplate] = useState(false);
   const [showAiGenerate, setShowAiGenerate] = useState(false);
+
+  // Permission pre-checks — disable action buttons for users lacking the required permission.
+  // This is a UX guard; the backend enforces the same rules via @PreAuthorize.
+  const { hasPermission } = usePermissions();
+  const canSave = hasPermission('page.page.update');
+  const canPublish = hasPermission('page.page.publish');
+  const canImport = hasPermission('page.page.import');
+  const canExport = hasPermission('page.page.export');
+
+  // Resolve locale for permission denied tooltips (default en-US)
+  const locale = (typeof document !== 'undefined' && document.documentElement.lang) || 'en-US';
 
   const statusInfo = pageMeta?.status ? PAGE_STATUS_INFO[pageMeta.status] : null;
 
@@ -487,8 +506,11 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
               </svg>
             }
             title="Import"
+            disabledTitle={DESIGNER_I18N.permissions.missingImport[locale] ?? DESIGNER_I18N.permissions.missingImport['en-US']}
             onClick={onImport}
+            disabled={!canImport}
             size="sm"
+            data-testid="toolbar-import"
           />
           <ToolbarButton
             icon={
@@ -502,8 +524,11 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
               </svg>
             }
             title="Export"
+            disabledTitle={DESIGNER_I18N.permissions.missingExport[locale] ?? DESIGNER_I18N.permissions.missingExport['en-US']}
             onClick={onExport}
+            disabled={!canExport}
             size="sm"
+            data-testid="toolbar-export"
           />
         </ToolbarGroup>
 
@@ -597,8 +622,9 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
           }
           label="Save"
           title="Save (Ctrl+S)"
+          disabledTitle={!canSave ? (DESIGNER_I18N.permissions.missingUpdate[locale] ?? DESIGNER_I18N.permissions.missingUpdate['en-US']) : undefined}
           onClick={onSave}
-          disabled={isSaving || !hasUnsavedChanges}
+          disabled={isSaving || !hasUnsavedChanges || !canSave}
           data-testid="toolbar-save"
         />
 
@@ -634,9 +660,10 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
           }
           label="Publish"
           title="Publish page"
+          disabledTitle={!canPublish ? (DESIGNER_I18N.permissions.missingPublish[locale] ?? DESIGNER_I18N.permissions.missingPublish['en-US']) : undefined}
           onClick={onPublish}
           variant="primary"
-          disabled={isPublishing}
+          disabled={isPublishing || !canPublish}
           data-testid="toolbar-publish"
         />
 
