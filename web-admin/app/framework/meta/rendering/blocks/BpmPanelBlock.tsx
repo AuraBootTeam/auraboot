@@ -18,6 +18,8 @@
 
 import { useEffect, useState } from 'react';
 import type { BlockConfig } from '~/framework/meta/schemas/types';
+import { useI18n } from '~/contexts/I18nContext';
+import { BpmStatusSection } from '~/plugins/core-bpm/components/panel/BpmStatusSection';
 import {
   getInstanceForRecord,
   type BpmInstanceForRecord,
@@ -62,6 +64,7 @@ function SectionPlaceholder({ section }: { section: BpmPanelSection }) {
 }
 
 export function BpmPanelBlock({ block, record, recordId }: BpmPanelBlockProps) {
+  const { t } = useI18n();
   const config = block.bpmPanel ?? {};
   const sections: BpmPanelSection[] =
     config.sections && config.sections.length > 0
@@ -153,9 +156,16 @@ export function BpmPanelBlock({ block, record, recordId }: BpmPanelBlockProps) {
       data-process-instance-id={instance.instanceId}
       className="space-y-3"
     >
-      {sections.map((section) => (
-        <SectionPlaceholder key={section} section={section} />
-      ))}
+      {sections.map((section) => {
+        if (section === 'status') {
+          return (
+            <div key={section} data-testid="bpm-section-status">
+              <BpmStatusSection instance={instance} t={t} />
+            </div>
+          );
+        }
+        return <SectionPlaceholder key={section} section={section} />;
+      })}
     </div>
   );
 }
