@@ -1,8 +1,10 @@
 package com.auraboot.framework.bpm.converter;
 
 import com.auraboot.framework.bpm.chain.BpmServiceTaskConstants;
+import com.auraboot.framework.bpm.extension.BpmExtensionKeys;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -12,6 +14,7 @@ import javax.xml.stream.XMLStreamWriter;
 import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -72,12 +75,13 @@ public class JsonToBpmnConverter {
             String processName = getTextOrDefault(root, "name", processKey);
             JsonNode nodesArray = root.path("nodes");
             JsonNode edgesArray = root.path("edges");
+            JsonNode processAura = root.path("aura");
 
             StringWriter stringWriter = new StringWriter();
             XMLOutputFactory xmlFactory = XMLOutputFactory.newInstance();
             XMLStreamWriter writer = xmlFactory.createXMLStreamWriter(stringWriter);
 
-            writeXmlDocument(writer, processKey, processName, nodesArray, edgesArray);
+            writeXmlDocument(writer, processKey, processName, nodesArray, edgesArray, processAura);
 
             writer.flush();
             writer.close();
@@ -115,7 +119,8 @@ public class JsonToBpmnConverter {
     // ==================== XML Generation ====================
 
     private void writeXmlDocument(XMLStreamWriter writer, String processKey, String processName,
-                                  JsonNode nodes, JsonNode edges) throws XMLStreamException {
+                                  JsonNode nodes, JsonNode edges, JsonNode processAura)
+            throws XMLStreamException {
 
         writer.writeStartDocument("UTF-8", "1.0");
         writer.writeCharacters("\n");
@@ -135,6 +140,11 @@ public class JsonToBpmnConverter {
         writer.writeAttribute("name", processName);
         writer.writeAttribute("isExecutable", "true");
         writer.writeCharacters("\n");
+
+        // Process-level <extensionElements><smart:properties>aura.*</smart:properties></extensionElements>
+        // compiled from designerJson.aura.{withdrawPolicy,ccPolicy}. Empty or absent aura block
+        // emits nothing so existing BPMN stays byte-identical for processes without policies.
+        writeProcessAuraExtensionElements(writer, processAura);
 
         // Validate exclusive gateway outgoing flows (each must have a condition or be marked default;
         // at most one default per gateway). Fail fast before writing invalid BPMN.
@@ -326,9 +336,14 @@ public class JsonToBpmnConverter {
         JsonNode multiInstance = config != null ? config.path("multiInstance") : null;
         boolean hasMultiInstance = multiInstance != null && !multiInstance.isMissingNode()
                 && multiInstance.path("enabled").asBoolean(false);
+        // Collect node-level aura extension properties (requiredPermissions, ccPolicyOverride).
+        Map<String, String> auraProps = collectUserTaskAuraProperties(config);
+        boolean hasAuraExtensions = !auraProps.isEmpty();
+        // If either child needs to appear we must use writeStartElement (not empty element).
+        boolean hasChildren = hasMultiInstance || hasAuraExtensions;
 
         writer.writeCharacters("\n    ");
-        if (hasMultiInstance) {
+        if (hasChildren) {
             writer.writeStartElement("userTask");
         } else {
             writer.writeEmptyElement("userTask");
@@ -341,14 +356,116 @@ public class JsonToBpmnConverter {
         // Handle assignee configuration
         writeUserTaskAssigneeAttributes(writer, config);
 
+        if (hasAuraExtensions) {
+            writeExtensionPropertiesElement(writer, auraProps);
+        }
+
         if (hasMultiInstance) {
             writeMultiInstanceLoopCharacteristics(writer, multiInstance);
+        }
 
+        if (hasChildren) {
             writer.writeCharacters("\n    ");
             writer.writeEndElement(); // userTask
         }
 
         writer.writeCharacters("\n");
+    }
+
+    /**
+     * Build the ordered map of node-level {@code aura.*} extension properties
+     * to emit inside the userTask's {@code <smart:properties>} block.
+     *
+     * <p>Current supported keys:
+     * <ul>
+     *   <li>{@link BpmExtensionKeys#REQUIRED_PERMISSIONS} — JSON array of permission codes</li>
+     *   <li>{@link BpmExtensionKeys#CC_POLICY_OVERRIDE} — per-node override of process ccPolicy</li>
+     * </ul>
+     */
+    private Map<String, String> collectUserTaskAuraProperties(JsonNode config) {
+        Map<String, String> result = new LinkedHashMap<>();
+        if (config == null || config.isMissingNode()) return result;
+        JsonNode aura = config.path("aura");
+        if (aura.isMissingNode() || !aura.isObject()) return result;
+
+        JsonNode requiredPermissions = aura.path("requiredPermissions");
+        if (requiredPermissions.isArray() && !requiredPermissions.isEmpty()) {
+            // Serialize as a JSON array string; BpmExtensionAccessor.getRequiredPermissions
+            // parses this back into List<String>.
+            try {
+                String serialized = objectMapper.writeValueAsString(requiredPermissions);
+                result.put(BpmExtensionKeys.REQUIRED_PERMISSIONS, serialized);
+            } catch (JsonProcessingException e) {
+                throw new BpmnConversionException(
+                        "Failed to serialize aura.requiredPermissions for userTask", e);
+            }
+        }
+
+        String ccOverride = getTextOrNull(aura, "ccPolicyOverride");
+        if (ccOverride != null) {
+            result.put(BpmExtensionKeys.CC_POLICY_OVERRIDE, ccOverride);
+        }
+        return result;
+    }
+
+    /**
+     * Emit the process-level {@code <extensionElements><smart:properties>...</smart:properties>
+     * </extensionElements>} block from {@code designerJson.aura.{withdrawPolicy,ccPolicy}}.
+     * No-op when the aura block is absent or empty.
+     */
+    private void writeProcessAuraExtensionElements(XMLStreamWriter writer, JsonNode processAura)
+            throws XMLStreamException {
+        if (processAura == null || processAura.isMissingNode() || !processAura.isObject()) return;
+        Map<String, String> props = new LinkedHashMap<>();
+        String withdrawPolicy = getTextOrNull(processAura, "withdrawPolicy");
+        if (withdrawPolicy != null) {
+            props.put(BpmExtensionKeys.WITHDRAW_POLICY, withdrawPolicy);
+        }
+        String ccPolicy = getTextOrNull(processAura, "ccPolicy");
+        if (ccPolicy != null) {
+            props.put(BpmExtensionKeys.CC_POLICY, ccPolicy);
+        }
+        if (props.isEmpty()) return;
+
+        writer.writeCharacters("    ");
+        writer.writeStartElement("extensionElements");
+        writeSmartProperties(writer, props, "      ");
+        writer.writeCharacters("\n    ");
+        writer.writeEndElement(); // extensionElements
+        writer.writeCharacters("\n");
+    }
+
+    /**
+     * Emit an activity-level {@code <extensionElements><smart:properties>...} block for
+     * the provided {@code aura.*} keyed properties. Indentation matches the surrounding
+     * userTask element so the resulting XML stays pretty-formatted for debugging.
+     */
+    private void writeExtensionPropertiesElement(XMLStreamWriter writer, Map<String, String> props)
+            throws XMLStreamException {
+        if (props.isEmpty()) return;
+        writer.writeCharacters("\n      ");
+        writer.writeStartElement("extensionElements");
+        writeSmartProperties(writer, props, "        ");
+        writer.writeCharacters("\n      ");
+        writer.writeEndElement(); // extensionElements
+    }
+
+    /**
+     * Emit a {@code <smart:properties>} element containing one
+     * {@code <smart:property name="..." value="..."/>} child per entry.
+     */
+    private void writeSmartProperties(XMLStreamWriter writer, Map<String, String> props,
+                                      String childIndent) throws XMLStreamException {
+        writer.writeCharacters("\n" + childIndent.substring(2));
+        writer.writeStartElement(SMART_NAMESPACE, "properties");
+        for (Map.Entry<String, String> entry : props.entrySet()) {
+            writer.writeCharacters("\n" + childIndent);
+            writer.writeEmptyElement(SMART_NAMESPACE, "property");
+            writer.writeAttribute("name", entry.getKey());
+            writer.writeAttribute("value", entry.getValue());
+        }
+        writer.writeCharacters("\n" + childIndent.substring(2));
+        writer.writeEndElement(); // smart:properties
     }
 
     /**

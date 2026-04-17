@@ -1141,4 +1141,111 @@ class JsonToBpmnConverterTest {
         assertTrue(xml.contains("startEvent"));
         assertTrue(xml.contains("endEvent"));
     }
+
+    // ==================== Aura policy extensions (Epic C) ====================
+
+    @Nested
+    @DisplayName("AuraBoot policy extensions via <smart:properties>")
+    class AuraPolicyExtensions {
+
+        @Test
+        @DisplayName("process-level aura.withdrawPolicy/ccPolicy emit <smart:properties> on <process>")
+        void processLevelAuraEmitsSmartProperties() {
+            String json = """
+                {
+                  "key": "p1",
+                  "name": "P1",
+                  "aura": {"withdrawPolicy": "strict", "ccPolicy": "initiator"},
+                  "nodes": [
+                    {"id":"s","type":"startEvent","position":{"x":0,"y":0},"data":{"type":"startEvent","label":"S"}},
+                    {"id":"e","type":"endEvent","position":{"x":1,"y":0},"data":{"type":"endEvent","label":"E"}}
+                  ],
+                  "edges": [
+                    {"id":"f1","source":"s","target":"e","data":{}}
+                  ]
+                }
+                """;
+            String xml = jsonToBpmn.convert(json);
+            // extensionElements block appears inside <process>
+            assertTrue(xml.contains("<extensionElements>"),
+                    "expected <extensionElements> when aura policies present:\n" + xml);
+            assertTrue(xml.contains("<smart:properties"), xml);
+            assertTrue(xml.contains("name=\"aura.withdrawPolicy\""));
+            assertTrue(xml.contains("value=\"strict\""));
+            assertTrue(xml.contains("name=\"aura.ccPolicy\""));
+            assertTrue(xml.contains("value=\"initiator\""));
+        }
+
+        @Test
+        @DisplayName("missing process-level aura block emits no <extensionElements>")
+        void missingAuraEmitsNothing() {
+            String json = """
+                {
+                  "key":"p0","name":"P0",
+                  "nodes":[
+                    {"id":"s","type":"startEvent","position":{"x":0,"y":0},"data":{"type":"startEvent","label":"S"}},
+                    {"id":"e","type":"endEvent","position":{"x":1,"y":0},"data":{"type":"endEvent","label":"E"}}
+                  ],
+                  "edges":[{"id":"f1","source":"s","target":"e","data":{}}]
+                }
+                """;
+            String xml = jsonToBpmn.convert(json);
+            assertFalse(xml.contains("<extensionElements>"),
+                    "did not expect <extensionElements> when aura absent:\n" + xml);
+            assertFalse(xml.contains("<smart:properties"), xml);
+        }
+
+        @Test
+        @DisplayName("userTask aura.requiredPermissions serialized as JSON array in <smart:properties>")
+        void userTaskRequiredPermissionsEmitted() {
+            String json = """
+                {
+                  "key":"p2","name":"P2",
+                  "nodes":[
+                    {"id":"s","type":"startEvent","position":{"x":0,"y":0},"data":{"type":"startEvent","label":"S"}},
+                    {"id":"t1","type":"userTask","position":{"x":1,"y":0},
+                     "data":{"type":"userTask","label":"Approve",
+                             "config":{"aura":{"requiredPermissions":["hr.leave.approve","hr.leave.view"]}}}},
+                    {"id":"e","type":"endEvent","position":{"x":2,"y":0},"data":{"type":"endEvent","label":"E"}}
+                  ],
+                  "edges":[
+                    {"id":"f1","source":"s","target":"t1","data":{}},
+                    {"id":"f2","source":"t1","target":"e","data":{}}
+                  ]
+                }
+                """;
+            String xml = jsonToBpmn.convert(json);
+            assertTrue(xml.contains("<smart:properties"), xml);
+            assertTrue(xml.contains("name=\"aura.requiredPermissions\""));
+            // Value is a JSON array string; XML attribute quoting escapes the inner quotes.
+            assertTrue(xml.contains("hr.leave.approve"));
+            assertTrue(xml.contains("hr.leave.view"));
+            // userTask must be a container (not empty element) when carrying children
+            assertTrue(xml.contains("</userTask>"), xml);
+        }
+
+        @Test
+        @DisplayName("userTask aura.ccPolicyOverride emits override key")
+        void userTaskCcPolicyOverrideEmitted() {
+            String json = """
+                {
+                  "key":"p3","name":"P3",
+                  "nodes":[
+                    {"id":"s","type":"startEvent","position":{"x":0,"y":0},"data":{"type":"startEvent","label":"S"}},
+                    {"id":"t1","type":"userTask","position":{"x":1,"y":0},
+                     "data":{"type":"userTask","label":"Approve",
+                             "config":{"aura":{"ccPolicyOverride":"assignee"}}}},
+                    {"id":"e","type":"endEvent","position":{"x":2,"y":0},"data":{"type":"endEvent","label":"E"}}
+                  ],
+                  "edges":[
+                    {"id":"f1","source":"s","target":"t1","data":{}},
+                    {"id":"f2","source":"t1","target":"e","data":{}}
+                  ]
+                }
+                """;
+            String xml = jsonToBpmn.convert(json);
+            assertTrue(xml.contains("name=\"aura.ccPolicyOverride\""), xml);
+            assertTrue(xml.contains("value=\"assignee\""));
+        }
+    }
 }
