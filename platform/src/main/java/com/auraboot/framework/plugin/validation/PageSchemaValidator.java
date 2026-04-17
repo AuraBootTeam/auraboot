@@ -128,8 +128,7 @@ public class PageSchemaValidator implements PluginValidator {
         }
 
         // Recurse into sub-lists (columns, fields, actions, tabs, filters, …)
-        for (String subList : Set.of("columns", "fields", "actions", "tabs",
-                "filters", "items", "children", "buttons")) {
+        for (String subList : PageSchemaDslI18nValidator.BLOCK_SUB_LISTS) {
             Object sub = blockMap.get(subList);
             if (sub instanceof List<?> items) {
                 for (int k = 0; k < items.size(); k++) {

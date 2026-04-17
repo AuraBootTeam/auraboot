@@ -24,6 +24,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -139,5 +140,41 @@ class PageSchemaI18nValidationControllerTest {
                         .content(body))
                 .andDo(print())
                 .andExpect(status().is2xxSuccessful());
+    }
+
+    // ── Update endpoint ───────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("I18N-U-01: PUT with blocks[0].label containing Chinese — service rejects with ValidationException (not swallowed)")
+    void update_chineseBlockLabel_serviceThrowsValidationException() throws Exception {
+        // Arrange: service simulates the i18n validation rejection when blocks contain Chinese text
+        var i18nException = new com.auraboot.framework.exception.ValidationException(
+                com.auraboot.framework.common.constant.ResponseCode.CommonValidationFailed,
+                "DSL i18n compliance violation: hardcoded non-ASCII text found in page schema. " +
+                "Use LocalizedText object or $i18n:key instead. Violations:\n" +
+                "  path=pages[test_i18n_page].blocks[0].label, value=\"工具栏\"");
+
+        when(pageSchemaService.update(anyString(), any())).thenThrow(i18nException);
+
+        // Build an update body with a block containing a Chinese label
+        Map<String, Object> block = new HashMap<>();
+        block.put("blockType", "toolbar");
+        block.put("label", "工具栏");
+
+        Map<String, Object> updateBody = new HashMap<>();
+        updateBody.put("title", "Contract List");
+        updateBody.put("blocks", List.of(block));
+
+        // In standaloneSetup the ValidationException propagates as NestedServletException.
+        assertThatThrownBy(() ->
+                mockMvc.perform(put("/api/pages/{pid}", "test-pid-001")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(updateBody)))
+                        .andDo(print()))
+                .hasRootCauseInstanceOf(com.auraboot.framework.exception.ValidationException.class)
+                .hasRootCauseMessage(
+                        "DSL i18n compliance violation: hardcoded non-ASCII text found in page schema. " +
+                        "Use LocalizedText object or $i18n:key instead. Violations:\n" +
+                        "  path=pages[test_i18n_page].blocks[0].label, value=\"工具栏\"");
     }
 }
