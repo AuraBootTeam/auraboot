@@ -32,7 +32,7 @@
 | 分层 | Studio 模块 | Meta 模块 | 说明 |
 | --- | --- | --- | --- |
 | **Domain** | `app/studio/domain/schema/**` | `app/meta/schemas/**` | 纯类型/转换器，不依赖 React。|
-| **Services** | `app/studio/services/**`（LayoutManager、SchemaRuntimeAdapter 等） | `app/meta/runtime/**`（SchemaRuntime、ActionRegistry、DataSourceManager 等） | 核心业务引擎，封装状态/数据流。 |
+| **Services** | `app/studio/services/**`（SchemaRuntimeAdapter 等） | `app/meta/runtime/**`（SchemaRuntime、ActionRegistry、DataSourceManager 等） | 核心业务引擎，封装状态/数据流。 |
 | **Hooks** | `app/studio/hooks/**` | `app/meta/hooks/**` | “React glue”，只包装 services。 |
 | **UI** | `app/studio/workbench/**` (Smart Components, Canvas, Panels) | `app/meta/rendering/**` (BlockRenderer, ComponentLoader) | UI 仅消费 hooks。|
 
