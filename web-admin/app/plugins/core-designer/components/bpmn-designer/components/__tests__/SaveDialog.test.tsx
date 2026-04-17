@@ -11,12 +11,18 @@
  */
 
 import React from 'react';
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 
 import { SaveDialog } from '~/plugins/core-designer/components/bpmn-designer/components/SaveDialog';
 
 describe('SaveDialog backdrop click', () => {
+  // Project vitest config sets isolate=false; explicit cleanup prevents the
+  // previous render's DOM from leaking into the next test.
+  afterEach(() => {
+    cleanup();
+  });
+
   const baseProps = {
     isOpen: true,
     initialData: { name: 'P', key: 'p' },

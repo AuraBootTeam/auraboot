@@ -11,8 +11,8 @@
  */
 
 import React from 'react';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, act } from '@testing-library/react';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { render, screen, act, cleanup } from '@testing-library/react';
 
 import { BPMNToolbar } from '~/plugins/core-designer/components/bpmn-designer/components/BPMNToolbar';
 import { useBPMNStore } from '~/plugins/core-designer/components/bpmn-designer/store/useBPMNStore';
@@ -41,6 +41,12 @@ function rfNode(id: string, type: BPMNNodeType): BPMNNode {
 describe('BPMNToolbar deploy button', () => {
   beforeEach(() => {
     useBPMNStore.getState().reset();
+  });
+
+  // Project vitest config sets isolate=false; explicit cleanup prevents the
+  // previous render's DOM from leaking into the next test.
+  afterEach(() => {
+    cleanup();
   });
 
   function renderToolbar() {
