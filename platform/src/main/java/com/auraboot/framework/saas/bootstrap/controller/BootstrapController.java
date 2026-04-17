@@ -2,6 +2,7 @@ package com.auraboot.framework.saas.bootstrap.controller;
 
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.saas.bootstrap.BootstrapEngineService;
+import com.auraboot.framework.saas.bootstrap.BootstrapStatusEvaluator;
 import com.auraboot.framework.saas.bootstrap.dto.BootstrapProgressResponse;
 import com.auraboot.framework.saas.bootstrap.dto.BootstrapRequest;
 import com.auraboot.framework.saas.bootstrap.dto.BootstrapStatusResponse;
@@ -25,17 +26,21 @@ import java.util.Map;
 public class BootstrapController {
 
     private final BootstrapEngineService bootstrapEngineService;
+    private final BootstrapStatusEvaluator statusEvaluator;
     private final SystemConfigService systemConfigService;
 
     @GetMapping("/status")
     public ApiResponse<BootstrapStatusResponse> getStatus() {
-        boolean initialized = systemConfigService.isInitialized();
+        BootstrapStatusEvaluator.Result eval = statusEvaluator.evaluate();
         BootstrapProgressResponse progress = bootstrapEngineService.getProgress();
-        boolean inProgress = "running".equals(progress.getStatus()) || "pending".equals(progress.getStatus());
+        boolean inProgress = "running".equals(progress.getStatus())
+                          || "pending".equals(progress.getStatus());
 
         return ApiResponse.success(BootstrapStatusResponse.builder()
-                .initialized(initialized)
+                .initialized(eval.missingParts().isEmpty())
                 .inProgress(inProgress)
+                .missingParts(eval.missingParts())
+                .reason(eval.reason())
                 .build());
     }
 
