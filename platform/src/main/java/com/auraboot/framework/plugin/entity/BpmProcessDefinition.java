@@ -111,25 +111,6 @@ public class BpmProcessDefinition {
     private Map<String, Object> extension;
 
     /**
-     * Withdraw policy: strict | loose | none. Default strict.
-     */
-    @TableField(value = "withdraw_policy")
-    private String withdrawPolicy;
-
-    /**
-     * CC policy: initiator | assignee | all. Default all.
-     */
-    @TableField(value = "cc_policy")
-    private String ccPolicy;
-
-    /**
-     * Required permissions override, keyed by operation name (withdraw/cc/...).
-     */
-    @TableField(value = "required_permissions",
-            typeHandler = com.auraboot.framework.plugin.typehandler.PluginSettingsTypeHandler.class)
-    private Map<String, Object> requiredPermissions;
-
-    /**
      * Hours before a pending approval task is considered overdue.
      * NULL means no timeout configured.
      */
