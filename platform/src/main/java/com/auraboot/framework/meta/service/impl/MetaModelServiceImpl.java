@@ -748,6 +748,9 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
                 .tableName(resolveTableName(model))
                 .modelType(model.getModelType())
                 .modelCategory(model.getEffectiveModelCategory())
+                .sourceType(model.getSourceType() != null ? model.getSourceType() : "physical")
+                .sourceRef(model.getSourceRef())
+                .capabilities(parseCapabilities(model.getCapabilities()))
                 .version(model.getVersion())
                 .status(model.getStatus() != null ? model.getStatus() : null)
                 .createdAt(DateUtil.toUtcLocalDateTime(model.getCreatedAt()))
@@ -755,6 +758,142 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
                 .softDelete(resolveSoftDelete(model))
                 .rules(loadCrossFieldRules(model))
                 .build();
+    }
+
+    /**
+     * Hydrate the capabilities JSONB string into a ModelCapabilities value object.
+     * Empty / null → ModelCapabilities.empty().
+     */
+    private ModelCapabilities parseCapabilities(String json) {
+        if (json == null || json.isBlank()) {
+            return ModelCapabilities.empty();
+        }
+        try {
+            return objectMapper.readValue(json, ModelCapabilities.class);
+        } catch (Exception e) {
+            log.warn("Failed to parse capabilities JSON, returning empty: {}", e.getMessage());
+            return ModelCapabilities.empty();
+        }
+    }
+
+    /**
+     * Normalize caller-supplied capabilities so that sortableFields / filterableFields
+     * reflect the field-level sortable/filterable flags on {@link ModelDefinition#getFields()}.
+     *
+     * Per design §3.3: 字段级 sortable/filterable 是编辑态 UI 输入，capabilities 白名单是运行时事实.
+     * Any caller-supplied whitelist is OVERRIDDEN here.
+     */
+    private ModelCapabilities normalizeCapabilities(ModelDefinition def) {
+        ModelCapabilities raw = def.getCapabilities() != null
+            ? def.getCapabilities() : ModelCapabilities.empty();
+
+        java.util.List<String> sortable = new java.util.ArrayList<>();
+        java.util.List<String> filterable = new java.util.ArrayList<>();
+        if (def.getFields() != null) {
+            for (FieldDefinition f : def.getFields()) {
+                if (Boolean.TRUE.equals(f.getSortable())) sortable.add(f.getCode());
+                if (Boolean.TRUE.equals(f.getFilterable())) filterable.add(f.getCode());
+            }
+        }
+
+        return ModelCapabilities.builder()
+            .list(raw.isList())
+            .detail(raw.isDetail())
+            .create(raw.isCreate())
+            .update(raw.isUpdate())
+            .delete(raw.isDelete())
+            .bulkDelete(raw.isBulkDelete())
+            .export(raw.isExport())
+            .sort(raw.isSort())
+            .filter(raw.isFilter())
+            .paginate(raw.isPaginate())
+            .sortableFields(sortable)       // override any caller-supplied value
+            .filterableFields(filterable)   // override any caller-supplied value
+            .detailKeyField(raw.getDetailKeyField())
+            .build();
+    }
+
+    @Override
+    @Transactional
+    public ModelDefinition saveDefinition(ModelDefinition def) {
+        if (def == null || !StringUtils.hasText(def.getCode())) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed, "ModelDefinition.code must not be blank");
+        }
+
+        // Normalize capabilities first so the persisted value reflects the runtime truth.
+        ModelCapabilities normalized = normalizeCapabilities(def);
+        def.setCapabilities(normalized);
+
+        String sourceType = StringUtils.hasText(def.getSourceType()) ? def.getSourceType() : "physical";
+        String capabilitiesJson;
+        try {
+            capabilitiesJson = objectMapper.writeValueAsString(normalized);
+        } catch (Exception e) {
+            throw new MetaServiceException("Failed to serialize capabilities for model " + def.getCode(), e);
+        }
+
+        Model existing = metaModelMapper.findCurrentByCode(def.getCode());
+        if (existing != null) {
+            existing.setSourceType(sourceType);
+            existing.setSourceRef(def.getSourceRef());
+            existing.setCapabilities(capabilitiesJson);
+            if (StringUtils.hasText(def.getTableName())) {
+                existing.setTableName(def.getTableName());
+            }
+            if (StringUtils.hasText(def.getModelCategory())) {
+                existing.setModelCategory(def.getModelCategory());
+            }
+            existing.setUpdatedAt(Instant.now());
+            metaModelMapper.updateById(existing);
+            return getDefinitionByCode(def.getCode());
+        }
+
+        Model model = new Model();
+        model.setPid(UniqueIdGenerator.generate());
+        model.setTenantId(getCurrentTenantId());
+        model.setCode(def.getCode());
+
+        // Build extension with displayName/description when supplied.
+        Map<String, Object> extensionData = new HashMap<>();
+        if (StringUtils.hasText(def.getDisplayName())) {
+            extensionData.put("displayName", def.getDisplayName());
+        }
+        if (StringUtils.hasText(def.getDescription())) {
+            extensionData.put("description", def.getDescription());
+        }
+        if (StringUtils.hasText(def.getModelType())) {
+            extensionData.put("modelType", def.getModelType());
+        }
+        ExtensionBean extension = new ExtensionBean();
+        extension.setExtension(extensionData);
+        extension.validate();
+        model.setExtension(extension);
+
+        model.setTableName(def.getTableName());
+        model.setModelCategory(def.getModelCategory());
+        model.setSourceType(sourceType);
+        model.setSourceRef(def.getSourceRef());
+        model.setCapabilities(capabilitiesJson);
+
+        model.setVersion(def.getVersion() != null ? def.getVersion() : 1);
+        model.setIsCurrent(true);
+        model.setStatus(def.getStatus() != null ? def.getStatus()
+            : com.auraboot.framework.meta.constant.Status.DRAFT.getCode());
+        model.setCreatedAt(Instant.now());
+        model.setUpdatedAt(Instant.now());
+        model.setDeletedFlag(false);
+
+        int inserted = metaModelMapper.insert(model);
+        if (inserted <= 0) {
+            throw new MetaServiceException("Failed to persist model definition: " + def.getCode());
+        }
+
+        return getDefinitionByCode(def.getCode());
+    }
+
+    @Override
+    public ModelDefinition getDefinitionByCode(String code) {
+        return getModelDefinitionFromDb(code).orElse(null);
     }
 
     /**
