@@ -266,7 +266,21 @@ export type ActionDef =
   | { type: 'navigate'; to: string; command?: string }
   | { type: 'builtin'; name: string }
   | { type: 'flow'; steps: FlowStep[] }
-  | { type: 'flow'; handler: string };
+  | { type: 'flow'; handler: string }
+  | {
+      type: 'bpm';
+      /** BPMN process definition key (matches <process id="..."> in the .bpmn file) */
+      processDefinitionKey: string;
+      /** Field name on the source record that provides the businessKey */
+      businessKeyField: string;
+      /**
+       * Variable name → expression mapping. Expression grammar:
+       * - "$.field" / "$.parent.child" — JSONPath-style record lookup (dot paths only)
+       * - Any non-"$"-prefixed value — treated as literal
+       * Bracket syntax ("$.list[0]") is rejected at runtime to match backend BpmActionExecutor.
+       */
+      variables?: Record<string, string>;
+    };
 
 // Button 配置
 export interface ButtonConfig {
