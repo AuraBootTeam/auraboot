@@ -361,6 +361,7 @@ public class ProcessEngineService {
         return new ProcessInstanceStatusDTO(
                 processInstanceId,
                 instance.getProcessDefinitionId(),
+                instance.getStartUserId(),
                 statusStr,
                 currentNodes,
                 completedNodes,

@@ -520,6 +520,18 @@ class BpmTaskOperationTest extends BaseIntegrationTest {
             assertEquals(instance.getInstanceId(), status.instanceId());
             assertNotNull(status.status(), "Status string should be present");
 
+            // Fix A: startUserId must be projected onto the DTO so the frontend
+            // BpmPermissionService Layer 2 (initiator → withdraw) can evaluate
+            // without depending on the caller having stuffed _startUserId into
+            // process variables. The value must mirror SmartEngine's
+            // ProcessInstance.startUserId verbatim (typically the
+            // engine-assigned starter id, e.g. "system" for engine-driven
+            // starts or the caller's user id for user-driven starts) rather
+            // than be re-derived from process variables.
+            assertNotNull(status.startUserId(), "DTO startUserId must be populated");
+            assertEquals(instance.getStartUserId(), status.startUserId(),
+                    "DTO startUserId must mirror ProcessInstance.startUserId");
+
             // Current nodes should include the active task
             if (status.currentNodes() != null && !status.currentNodes().isEmpty()) {
                 log.info("D2-17: Active nodes: {}", status.currentNodes().size());
