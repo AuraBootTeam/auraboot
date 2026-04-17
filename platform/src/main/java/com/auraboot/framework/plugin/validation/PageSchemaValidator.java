@@ -1,6 +1,7 @@
 package com.auraboot.framework.plugin.validation;
 
 import com.auraboot.framework.meta.constant.DslRegistry;
+import com.auraboot.framework.meta.validator.PageSchemaDslI18nValidator;
 import com.auraboot.framework.plugin.dto.imports.PageSchemaDTO;
 import com.auraboot.framework.plugin.dto.imports.PluginManifestExtended;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +23,7 @@ import static com.auraboot.framework.plugin.validation.PluginValidationMessage.w
  * - kind is a recognized value
  * - blocks list is present and non-empty
  * - Block types are recognized
+ * - I18n compliance: no hardcoded non-ASCII text in user-facing fields (S-PAGE-I18N)
  */
 @Slf4j
 @Component
@@ -77,8 +79,77 @@ public class PageSchemaValidator implements PluginValidator {
                     }
                 }
             }
+
+            // I18n compliance: scan page title and all block text fields
+            validateI18nCompliance(page, path, messages);
         }
 
         return messages;
+    }
+
+    /**
+     * Validate i18n compliance for user-facing text fields in the page and its blocks.
+     * Any hardcoded non-ASCII string (e.g. Chinese) in title/label/placeholder etc. is
+     * reported as an error with rule code S-PAGE-I18N.
+     *
+     * @param page     the page DTO to validate
+     * @param basePath JSON path prefix for error messages
+     * @param messages accumulator for validation messages
+     */
+    @SuppressWarnings("unchecked")
+    private void validateI18nCompliance(PageSchemaDTO page, String basePath,
+                                        List<PluginValidationMessage> messages) {
+        String pageKey = page.getPageKey();
+
+        // Check page-level title
+        collectI18nViolations(basePath + ".title", page.getTitle(), pageKey, messages);
+
+        // Check each block's text fields
+        List<Object> blocks = page.getBlocks();
+        if (blocks == null) return;
+
+        for (int j = 0; j < blocks.size(); j++) {
+            if (blocks.get(j) instanceof Map<?, ?> blockMap) {
+                String blockPath = basePath + ".blocks[" + j + "]";
+                scanBlockForI18n(blockPath, (Map<String, Object>) blockMap, pageKey, messages);
+            }
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private void scanBlockForI18n(String blockPath, Map<String, Object> blockMap,
+                                  String pageKey, List<PluginValidationMessage> messages) {
+        // Check all direct text fields on the block
+        for (String field : PageSchemaDslI18nValidator.BLOCK_TEXT_FIELDS) {
+            Object value = blockMap.get(field);
+            if (value != null) {
+                collectI18nViolations(blockPath + "." + field, value, pageKey, messages);
+            }
+        }
+
+        // Recurse into sub-lists (columns, fields, actions, tabs, filters, …)
+        for (String subList : PageSchemaDslI18nValidator.BLOCK_SUB_LISTS) {
+            Object sub = blockMap.get(subList);
+            if (sub instanceof List<?> items) {
+                for (int k = 0; k < items.size(); k++) {
+                    if (items.get(k) instanceof Map<?, ?> itemMap) {
+                        scanBlockForI18n(blockPath + "." + subList + "[" + k + "]",
+                                (Map<String, Object>) itemMap, pageKey, messages);
+                    }
+                }
+            }
+        }
+    }
+
+    private void collectI18nViolations(String path, Object value, String pageKey,
+                                       List<PluginValidationMessage> messages) {
+        List<PageSchemaDslI18nValidator.Violation> violations =
+                PageSchemaDslI18nValidator.collectViolations(path, value);
+        for (PageSchemaDslI18nValidator.Violation v : violations) {
+            messages.add(error("S-PAGE-I18N", category(), v.path(),
+                    "Page '" + pageKey + "': hardcoded non-ASCII text in DSL field '" +
+                            v.path() + "'. Value: \"" + v.value() + "\". " +
+                            "Use LocalizedText map or $i18n:key instead."));
+        }
     }
 }
