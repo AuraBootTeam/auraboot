@@ -210,5 +210,8 @@ function buildExtendedManifest(plugin: ReturnType<typeof loadPlugin>): any {
     savedViews: plugin.resourceFiles.get('saved-views') || [],
     bindingRules: plugin.resourceFiles.get('bindingRules') || [],
     dashboards: plugin.resourceFiles.get('dashboards') || [],
+    processes: plugin.resourceFiles.get('processes') || [],
+    rules: plugin.resourceFiles.get('rules') || [],
+    slaConfigs: plugin.resourceFiles.get('sla') || [],
   };
 }
