@@ -28,6 +28,8 @@ import { ApiService } from '~/shared/services/ApiService';
  * 版本管理器实现类
  */
 export class VersionManagerImpl implements VersionManager {
+  private static _warnedGetCurrentUser = false;
+
   private apiService: ApiService;
   private eventListeners: Map<VersionEventType, VersionEventListener[]> = new Map();
   private config: VersionConfig;
@@ -626,22 +628,16 @@ export class VersionManagerImpl implements VersionManager {
   }
 
   /**
-   * @experimental Not wired to auth yet. Returns a placeholder actor string.
-   * Callers (createVersion, publishVersion, lockVersion, etc.) use this for
-   * createdBy/lockedBy fields — the value is intentionally fake until the auth
-   * integration is implemented.
-   *
-   * NOTE: This method is intentionally NOT changed to throw because it is
-   * called on every normal AutoSave path (createVersion). Throwing here would
-   * break the editor's save loop. The silent-fake behavior is documented as a
-   * known limitation; see plan 2026-04-17-studio-v2-cleanup.md T4.
+   * @experimental Not wired to auth. Returns a placeholder actor string.
+   *   Data created via this manager will have polluted createdBy/updatedBy —
+   *   follow-up task: have public API accept `actor` param explicitly.
    */
   private getCurrentUser(): string {
-    // TODO: wire to auth session — https://github.com/auraboot/auraboot/issues/XXX
-    // eslint-disable-next-line no-console
-    console.warn(
-      '[VersionManager] getCurrentUser() is not wired to auth — returning placeholder actor.',
-    );
+    if (!VersionManagerImpl._warnedGetCurrentUser) {
+      VersionManagerImpl._warnedGetCurrentUser = true;
+      // eslint-disable-next-line no-console
+      console.warn('[VersionManager] getCurrentUser() is not wired to auth — returning placeholder actor. (warned once)');
+    }
     return 'current_user';
   }
 
@@ -674,7 +670,10 @@ export class VersionManagerImpl implements VersionManager {
    *   See plan 2026-04-17-studio-v2-cleanup.md T4.
    */
   private calculateDifferences(_schemaA: any, _schemaB: any): VersionDifference[] {
-    throw new Error('VersionManager.calculateDifferences is not implemented');
+    throw new Error(
+      'VersionManager.calculateDifferences is not implemented. ' +
+      'Callers must catch this error and render an unavailable/placeholder state.'
+    );
   }
 
   /**
