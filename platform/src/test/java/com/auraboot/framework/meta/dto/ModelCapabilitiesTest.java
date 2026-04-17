@@ -119,4 +119,44 @@ class ModelCapabilitiesTest {
             .build();
         assertThat(caps.resolveDetailKeyField("id")).isEqualTo("uuid");
     }
+
+    @Test
+    void sortableFields_is_defensively_copied_against_caller_mutation() {
+        java.util.List<String> mutable = new java.util.ArrayList<>(java.util.List.of("created_at"));
+        ModelCapabilities caps = ModelCapabilities.builder()
+            .sort(true)
+            .sortableFields(mutable)
+            .build();
+
+        mutable.add("injected");
+
+        assertThat(caps.canSortBy("created_at")).isTrue();
+        assertThat(caps.canSortBy("injected")).isFalse();
+    }
+
+    @Test
+    void sortableFields_getter_returns_unmodifiable_list() {
+        ModelCapabilities caps = ModelCapabilities.builder()
+            .sort(true)
+            .sortableFields(java.util.List.of("a", "b"))
+            .build();
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+            () -> caps.getSortableFields().add("x"))
+            .isInstanceOf(UnsupportedOperationException.class);
+    }
+
+    @Test
+    void filterableFields_is_defensively_copied_against_caller_mutation() {
+        java.util.List<String> mutable = new java.util.ArrayList<>(java.util.List.of("status"));
+        ModelCapabilities caps = ModelCapabilities.builder()
+            .filter(true)
+            .filterableFields(mutable)
+            .build();
+
+        mutable.add("injected");
+
+        assertThat(caps.canFilterBy("status")).isTrue();
+        assertThat(caps.canFilterBy("injected")).isFalse();
+    }
 }
