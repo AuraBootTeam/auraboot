@@ -97,6 +97,10 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
       // SSR cache: public routes without auth produce identical loader data
       // for the same pathname + locale combination. Cache for 30s to reduce
       // redundant i18n fetches and backend bootstrap-status checks.
+      // Known staleness window: bootstrapStatus is captured at cache time;
+      // after a successful POST /api/bootstrap/setup, the banner may persist on
+      // public routes (login, register) for up to 30s. Acceptable tradeoff —
+      // banner has no functional side effect, only visual.
       const cacheKey = ssrCacheKey(pathname, locale);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const cached = ssrLoaderCache.get(cacheKey) as any;
