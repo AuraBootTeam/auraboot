@@ -54,6 +54,7 @@ import { AuraBotProvider } from '~/plugins/core-aurabot/components-shell';
 import { QueryProvider } from '~/providers/QueryProvider';
 import { fetchBootstrapStatus, type BootstrapStatus } from '~/services/bootstrapStatus';
 import { BootstrapBanner } from '~/components/BootstrapBanner';
+import { BootstrapNotReady } from '~/components/BootstrapNotReady';
 
 import { sessionMiddleware } from '~/middleware/auth_filter';
 import { ssrLoaderCache, ssrCacheKey } from '~/utils/ssr-cache';
@@ -309,6 +310,11 @@ function rootT(key: RootErrorTextKey): string {
 }
 
 export function ErrorBoundary({ error }: ErrorBoundaryProps) {
+  const rootData = useRouteLoaderData('root') as RootLoaderData | undefined;
+  if (rootData?.bootstrapStatus && !rootData.bootstrapStatus.initialized) {
+    return <BootstrapNotReady />;
+  }
+
   let message = rootT('oops');
   let details = rootT('unexpected');
   let stack: string | undefined;
