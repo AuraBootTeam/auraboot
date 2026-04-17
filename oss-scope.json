@@ -78,7 +78,8 @@
     "tests/e2e/integration/**",
     "tests/e2e/cross-field-validation.spec.ts",
     "tests/e2e/cross-module/**",
-    "tests/e2e/workflow-demo/**"
+    "tests/e2e/workflow-demo/**",
+    "tests/e2e/setup/**"
   ],
 
   "test_excludes": [
