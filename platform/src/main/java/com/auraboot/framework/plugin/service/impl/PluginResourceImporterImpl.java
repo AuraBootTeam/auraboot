@@ -1196,6 +1196,15 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             extension.put("designerJson", dto.getDesignerJson());
         }
 
+        // Determine BPMN XML at import time so the DB row always carries a
+        // non-empty bpmn_content when we are (auto-)deploying. SmartEngine
+        // registration still happens in deployProcessToSmartEngine, but now we
+        // share the compiled XML with the persisted entity instead of leaving
+        // bpmn_content='' while status='deployed' (runtime then fails with
+        // bpm.rule.execution_failed or missing-definition errors).
+        Integer initialVersion = 1;
+        String initialBpmnContent = compileBpmnContent(dto, initialVersion);
+
         BpmProcessDefinition process = BpmProcessDefinition.builder()
                 .pid(pid)
                 .tenantId(tenantId)
@@ -1204,7 +1213,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                 .processName(dto.getEffectiveName())
                 .description(dto.getDescription())
                 .category(dto.getCategory())
-                .bpmnContent(dto.getBpmnContent() != null ? dto.getBpmnContent() : "")
+                .bpmnContent(initialBpmnContent)
                 .extension(extension.isEmpty() ? null : extension)
                 .formBindings(dto.getFormBindings() != null
                         ? objectMapper.convertValue(dto.getFormBindings(), new TypeReference<>() {})
@@ -1224,12 +1233,16 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             processDefinitionMapper.clearCurrentVersion(tenantId, dto.getKey());
             int nextVersion = processDefinitionMapper.getNextVersion(tenantId, dto.getKey());
             process.setVersion(nextVersion);
+            // Recompile BPMN with the new version attribute so the persisted
+            // XML and the SmartEngine deployment stay in lock-step.
+            String recompiled = compileBpmnContent(dto, nextVersion);
+            process.setBpmnContent(recompiled);
         }
 
         processDefinitionMapper.insert(process);
 
         if (Boolean.TRUE.equals(autoDeploy)) {
-            deployProcessToSmartEngine(dto, tenantId, process.getVersion());
+            deployProcessToSmartEngine(dto, tenantId, process.getVersion(), process.getBpmnContent());
         }
 
         return createResourceRecord(pluginPid, importId, tenantId, ResourceType.PROCESS,
@@ -1238,23 +1251,22 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     }
 
     /**
-     * Deploy the designerJson from a {@link ProcessDefinitionDTO} to SmartEngine
-     * as BPMN XML. Idempotent by (tenantId, processKey, version): if the
-     * process definition is already cached, skip. Failures are wrapped in
-     * {@link PluginException} so the import transaction rolls back cleanly.
+     * Compile a {@link ProcessDefinitionDTO}'s designerJson (or pass-through
+     * BPMN XML) into a version-stamped BPMN XML string. Returns empty string
+     * when neither designerJson nor bpmnContent is provided; callers that need
+     * non-empty content should validate upstream.
      */
     @SuppressWarnings("unchecked")
-    private void deployProcessToSmartEngine(ProcessDefinitionDTO dto, Long tenantId, Integer version) {
+    private String compileBpmnContent(ProcessDefinitionDTO dto, Integer version) {
+        if (dto.getBpmnContent() != null && !dto.getBpmnContent().isBlank()) {
+            return stampVersion(dto.getBpmnContent(), version);
+        }
         Map<String, Object> designerJson = dto.getDesignerJson() != null
                 ? objectMapper.convertValue(dto.getDesignerJson(), new TypeReference<Map<String, Object>>() {})
                 : null;
         if (designerJson == null || designerJson.isEmpty()) {
-            // Nothing to deploy; either BPMN XML is pre-supplied (not supported here)
-            // or the caller just wanted the DB row.
-            log.info("Process {} has no designerJson; skipping SmartEngine deploy", dto.getKey());
-            return;
+            return "";
         }
-
         // designerJson typically contains only {nodes, edges} — the process key/name live
         // on the DTO root. Propagate them so JsonToBpmnConverter emits <process id="<key>">
         // instead of the default "process_1", which would collide across imports.
@@ -1262,19 +1274,38 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         if (dto.getEffectiveName() != null) {
             designerJson.putIfAbsent("name", dto.getEffectiveName());
         }
-
-        // Always (re)deploy: SmartEngine cache is keyed by (id, version) and handles
-        // idempotent re-registration internally. Skipping based on key alone prevented
-        // dev-iteration updates from taking effect without a backend restart.
         try {
             String bpmnXml = jsonToBpmnConverter.convertFromMap(designerJson);
-            // Ensure BPMN has version attribute (SmartEngine requires it)
-            String versionStr = String.valueOf(version);
-            if (!bpmnXml.contains("version=\"")) {
-                bpmnXml = bpmnXml.replaceFirst(
-                        "(<process\\s+[^>]*)(>)",
-                        "$1 version=\"" + versionStr + ".0.0\"$2");
-            }
+            return stampVersion(bpmnXml, version);
+        } catch (Exception e) {
+            log.error("Failed to compile BPMN for {}: {}", dto.getKey(), e.getMessage(), e);
+            throw new PluginException("Failed to compile BPMN for " + dto.getKey() + ": " + e.getMessage(), e);
+        }
+    }
+
+    private String stampVersion(String bpmnXml, Integer version) {
+        if (bpmnXml.contains("version=\"")) {
+            return bpmnXml;
+        }
+        String versionStr = String.valueOf(version);
+        return bpmnXml.replaceFirst(
+                "(<process\\s+[^>]*)(>)",
+                "$1 version=\"" + versionStr + ".0.0\"$2");
+    }
+
+    /**
+     * Register a pre-compiled BPMN XML with SmartEngine. Idempotent by
+     * (tenantId, processKey, version): SmartEngine's deploy is safe to
+     * re-invoke. Failures are wrapped in {@link PluginException} so the
+     * import transaction rolls back cleanly.
+     */
+    private void deployProcessToSmartEngine(ProcessDefinitionDTO dto, Long tenantId,
+                                             Integer version, String bpmnXml) {
+        if (bpmnXml == null || bpmnXml.isBlank()) {
+            log.info("Process {} has no BPMN content; skipping SmartEngine deploy", dto.getKey());
+            return;
+        }
+        try {
             // Use tenant-aware deploy so the cache key includes tenantId.
             // Without tenantId the key is processKey:version; but ProcessEngineService.startProcess
             // passes TENANT_ID in variables, causing SmartEngine to look up by
