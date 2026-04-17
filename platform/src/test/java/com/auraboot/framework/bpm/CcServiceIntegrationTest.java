@@ -99,4 +99,16 @@ class CcServiceIntegrationTest extends BaseIntegrationTest {
         assertThatThrownBy(() -> ccService.cc(setup.taskId(), List.of(), "nobody"))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    @DisplayName("Receivers list with null entry rejected")
+    void nullReceiverEntryRejected() {
+        var setup = fixture.startProcess("cc-null-entry", CcPolicy.ALL);
+        var receivers = new java.util.ArrayList<Long>();
+        receivers.add(501L);
+        receivers.add(null);
+        assertThatThrownBy(() -> ccService.cc(setup.taskId(), receivers, "x"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("null");
+    }
 }
