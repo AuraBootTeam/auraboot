@@ -157,12 +157,18 @@ export class PageSchemaVersionManager {
     if (this.pendingChanges.size === 0) return;
 
     const changes = Array.from(this.pendingChanges.entries());
+    const actors = new Map(this.pendingActors);
     this.pendingChanges.clear();
+    this.pendingActors.clear();
 
     for (const [pageId, schema] of changes) {
       try {
         // Background timer has no user context — actor stored at markSchemaChanged call site
-        await this.saveDraft(pageId, schema, this.pendingActors.get(pageId) ?? 'system');
+        const actor = actors.get(pageId);
+        if (!actor) {
+          console.warn('[PageSchemaVersionManager] pendingActors miss for pageId=' + pageId + ', falling back to system');
+        }
+        await this.saveDraft(pageId, schema, actor ?? 'system');
       } catch (error) {
         console.error(`Auto-save failed for page ${pageId}:`, error);
         // 重新加入待保存队列
@@ -647,6 +653,7 @@ export class PageSchemaVersionManager {
 
     this.schemaCache.clear();
     this.pendingChanges.clear();
+    this.pendingActors.clear();
   }
 }
 
