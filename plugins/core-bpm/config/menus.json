@@ -47,20 +47,6 @@
     "visible": true
   },
   {
-    "code": "bpm_approval_inbox",
-    "parentCode": "bpm_management",
-    "name": "审批任务",
-    "name:zh-CN": "审批任务",
-    "name:en": "My Approvals",
-    "path": "/bpm/approval-inbox",
-    "component": null,
-    "icon": "audit",
-    "type": 1,
-    "permissionCode": "bpm_approval_inbox",
-    "orderNo": 23,
-    "visible": true
-  },
-  {
     "code": "bpm_monitor",
     "parentCode": "bpm_management",
     "name": "流程监控",

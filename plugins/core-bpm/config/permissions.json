@@ -20,16 +20,6 @@
     "resourceType": "menu"
   },
   {
-    "code": "bpm_approval_inbox",
-    "name": "审批任务",
-    "description": "查看和处理审批任务",
-    "type": "menu",
-    "module": "bpm",
-    "resource": "/bpm/approval-inbox",
-    "action": "view",
-    "resourceType": "menu"
-  },
-  {
     "code": "bpm_task_center",
     "name": "任务中心",
     "description": "查看和处理待办任务",

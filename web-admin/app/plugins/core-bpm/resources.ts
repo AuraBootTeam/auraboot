@@ -18,15 +18,6 @@ export const RESOURCES: PluginResource[] = [
     file: './plugins/core-bpm/pages/TaskCenter.tsx',
   },
   {
-    key: 'bpm.approval-inbox',
-    path: '/bpm/approval-inbox',
-    title: { en: 'Approval Inbox', zh: '审批中心' },
-    icon: 'check-circle',
-    menu: { order: 20, group: 'bpm' },
-    permission: 'bpm.task.act',
-    file: './plugins/core-bpm/pages/ApprovalInbox.tsx',
-  },
-  {
     key: 'bpm.process-status',
     path: '/bpm/process-status',
     title: { en: 'Process Status', zh: '流程状态' },
