@@ -232,6 +232,115 @@ describe('BpmHistorySection', () => {
     expect(screen.getByTestId('bpm-history-event-402')).toHaveTextContent('u-observer-2');
   });
 
+  it('parses activity_event details with eventType=activity_start and activityName', async () => {
+    listAuditEventsMock.mockResolvedValue([
+      buildEvent({
+        id: 501,
+        operation: 'activity_event',
+        createdAt: '2026-04-17T18:00:00Z',
+        details: {
+          eventType: 'activity_start',
+          activityId: 'task_hr_approve',
+          activityName: 'HR 审批',
+          activityType: 'userTask',
+        },
+      }),
+    ]);
+
+    render(<BpmHistorySection instance={buildInstance()} t={t} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('bpm-history-event-501')).toBeInTheDocument();
+    });
+
+    // Label prefers activityName over activityId.
+    expect(screen.getByTestId('bpm-history-event-501-label')).toHaveTextContent('进入节点 HR 审批');
+    // activityType surfaces as a subtitle chip.
+    expect(screen.getByTestId('bpm-history-event-501-activity-type')).toHaveTextContent('userTask');
+  });
+
+  it('parses activity_event details with eventType=activity_end and falls back to activityId when name missing', async () => {
+    listAuditEventsMock.mockResolvedValue([
+      buildEvent({
+        id: 502,
+        operation: 'activity_event',
+        createdAt: '2026-04-17T19:00:00Z',
+        details: {
+          eventType: 'activity_end',
+          activityId: 'task_hr_approve',
+          activityType: 'userTask',
+        },
+      }),
+    ]);
+
+    render(<BpmHistorySection instance={buildInstance()} t={t} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('bpm-history-event-502')).toBeInTheDocument();
+    });
+
+    // No activityName → label uses activityId verbatim.
+    expect(screen.getByTestId('bpm-history-event-502-label')).toHaveTextContent(
+      '完成节点 task_hr_approve',
+    );
+  });
+
+  it('falls back to generic activity_event label when details is null (legacy audit rows)', async () => {
+    listAuditEventsMock.mockResolvedValue([
+      buildEvent({
+        id: 503,
+        operation: 'activity_event',
+        createdAt: '2026-04-17T20:00:00Z',
+        details: null,
+      }),
+    ]);
+
+    render(<BpmHistorySection instance={buildInstance()} t={t} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('bpm-history-event-503')).toBeInTheDocument();
+    });
+
+    // No silent substitution to 进入/完成 — generic fallback label stays.
+    const label = screen.getByTestId('bpm-history-event-503-label');
+    expect(label).toHaveTextContent('活动事件');
+    expect(label).not.toHaveTextContent('进入节点');
+    expect(label).not.toHaveTextContent('完成节点');
+    // No activityType chip when details is absent.
+    expect(screen.queryByTestId('bpm-history-event-503-activity-type')).toBeNull();
+  });
+
+  it('falls back to generic activity_event label when eventType is unknown', async () => {
+    listAuditEventsMock.mockResolvedValue([
+      buildEvent({
+        id: 504,
+        operation: 'activity_event',
+        createdAt: '2026-04-17T21:00:00Z',
+        details: {
+          eventType: 'activity_pause', // not in ACTIVITY_EVENT_TYPES
+          activityId: 'task_hr_approve',
+          activityName: 'HR 审批',
+          activityType: 'userTask',
+        },
+      }),
+    ]);
+
+    render(<BpmHistorySection instance={buildInstance()} t={t} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('bpm-history-event-504')).toBeInTheDocument();
+    });
+
+    // Unknown eventType → keep generic fallback, do NOT silently translate
+    // to 进入/完成.
+    const label = screen.getByTestId('bpm-history-event-504-label');
+    expect(label).toHaveTextContent('活动事件');
+    expect(label).not.toHaveTextContent('进入节点');
+    expect(label).not.toHaveTextContent('完成节点');
+    // activityType chip still surfaces since details is present.
+    expect(screen.getByTestId('bpm-history-event-504-activity-type')).toHaveTextContent('userTask');
+  });
+
   it('surfaces the error state when listAuditEvents rejects', async () => {
     listAuditEventsMock.mockRejectedValue(new Error('audit service down'));
 
