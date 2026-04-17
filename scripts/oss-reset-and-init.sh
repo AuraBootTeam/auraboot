@@ -109,12 +109,13 @@ echo -e "${GREEN}   Database reset complete${NC}"
 echo -e "${YELLOW}Step 4: Starting backend service...${NC}"
 cd "$PLATFORM_DIR"
 
-# In --no-bootstrap mode, also disable AdminBootstrapRunner — otherwise it
-# auto-creates admin/tenant on empty DB at startup, defeating the flag.
-if [ "$NO_BOOTSTRAP" = "1" ]; then
-    export AURABOOT_BOOTSTRAP_ENABLED=false
-    echo "   AURABOOT_BOOTSTRAP_ENABLED=false (no auto-bootstrap on startup)"
-fi
+# Disable AdminBootstrapRunner so this script is the sole authority for
+# bootstrap. Otherwise it races the explicit /api/bootstrap/setup call below
+# (auto-creates admin → BootstrapEngineService then fails to recreate it).
+# AdminBootstrapRunner exists for Docker first-run convenience (no script);
+# here the script drives, so disable it in BOTH modes.
+export AURABOOT_BOOTSTRAP_ENABLED=false
+echo "   AURABOOT_BOOTSTRAP_ENABLED=false (script-driven bootstrap, no auto-runner)"
 
 # Start backend in persistent background process
 nohup ./gradlew bootRun > /tmp/aura-backend.log 2>&1 &
