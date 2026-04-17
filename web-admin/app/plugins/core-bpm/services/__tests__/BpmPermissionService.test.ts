@@ -54,7 +54,7 @@ const anonymousUser: CurrentUserForPermission = { id: null, permissions: [] };
 describe('BpmPermissionService.resolvePermissions', () => {
   it('allows withdraw when running instance initiator matches current user', () => {
     const i = instance({
-      variables: { startUserId: 'u-100' },
+      variables: { _startUserId: 'u-100' },
       currentNodes: [node({ nodeId: 'approver', assignee: 'u-200' })],
     });
     const result = resolvePermissions(i, { id: 'u-100', permissions: [] });
@@ -70,7 +70,7 @@ describe('BpmPermissionService.resolvePermissions', () => {
 
   it('allows approve / reject / cc when current user is an active assignee', () => {
     const i = instance({
-      variables: { startUserId: 'u-100' },
+      variables: { _startUserId: 'u-100' },
       currentNodes: [node({ nodeId: 'approver', assignee: 'u-200' })],
     });
     const result = resolvePermissions(i, { id: 'u-200', permissions: [] });
@@ -138,15 +138,38 @@ describe('BpmPermissionService.resolvePermissions', () => {
     expect(result.reasonsBlocked?.withdraw).toBe('user.anonymous');
   });
 
-  it('falls back to initiatorUserId / applicantUserId when startUserId is absent', () => {
-    const i1 = instance({ variables: { initiatorUserId: 'u-100' } });
-    expect(resolvePermissions(i1, { id: 'u-100', permissions: [] }).canWithdraw).toBe(
+  it('prefers backend canonical _startUserId over SmartEngine-native startUserId', () => {
+    // Both keys present but disagree — _startUserId wins because that is what
+    // ApprovalChainExecutor writes (and AssigneeResolverService reads first).
+    const i = instance({
+      variables: { _startUserId: 'u-100', startUserId: 'u-999' },
+    });
+    expect(resolvePermissions(i, { id: 'u-100', permissions: [] }).canWithdraw).toBe(
       true,
     );
+    expect(resolvePermissions(i, { id: 'u-999', permissions: [] }).canWithdraw).toBe(
+      false,
+    );
+  });
 
+  it('falls back to startUserId when _startUserId is absent (SmartEngine-native start)', () => {
+    const i = instance({ variables: { startUserId: 'u-100' } });
+    expect(resolvePermissions(i, { id: 'u-100', permissions: [] }).canWithdraw).toBe(
+      true,
+    );
+  });
+
+  it('does NOT read initiatorUserId / applicantUserId (those are notification payload keys, never process variables)', () => {
+    // Guards against the pre-fix behaviour that probed these keys. Backend
+    // never writes them to process variables — only to event-bus notification
+    // payloads — so trusting them would have been a dead branch.
+    const i1 = instance({ variables: { initiatorUserId: 'u-100' } });
+    expect(resolvePermissions(i1, { id: 'u-100', permissions: [] }).canWithdraw).toBe(
+      false,
+    );
     const i2 = instance({ variables: { applicantUserId: 'u-100' } });
     expect(resolvePermissions(i2, { id: 'u-100', permissions: [] }).canWithdraw).toBe(
-      true,
+      false,
     );
   });
 

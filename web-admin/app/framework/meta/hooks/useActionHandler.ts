@@ -467,11 +467,19 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
 
             if ('handler' in actionDef && actionDef.handler) {
               if (runtime) {
+                // Task 9a refactor regression fix: normalizeAction only lifts
+                // `handler` from the legacy `events.onClick.handler` shape but
+                // drops the sibling `args` map. Downstream `executeSchemaHandler`
+                // reads `button.events.onClick.args`, so we splice the original
+                // args back in (if any) to preserve pre-refactor behaviour.
+                const legacyArgs = normalizedButton.events?.onClick?.args;
                 await executeSchemaHandler({
                   runtime,
                   button: {
                     ...normalizedButton,
-                    events: { onClick: { handler: actionDef.handler } },
+                    events: {
+                      onClick: { handler: actionDef.handler, args: legacyArgs },
+                    },
                   },
                   record,
                   context,
