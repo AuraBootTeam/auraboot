@@ -4,6 +4,7 @@ import com.auraboot.smart.framework.engine.model.instance.ProcessInstance;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.bpm.dto.FormBindingConfig;
 import com.auraboot.framework.bpm.dto.ProcessStartRequest;
+import com.auraboot.framework.bpm.dto.TaskActionDef;
 import com.auraboot.framework.bpm.dto.TaskSubmitRequest;
 import com.auraboot.framework.bpm.enums.SaveStrategy;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
@@ -295,6 +296,91 @@ public class BpmFormService {
 
         // Return the first binding (primary form for the node)
         return bindings.get(0);
+    }
+
+    /**
+     * Load task actions for a specific node from the process definition's
+     * designerJson (stored in {@code extension.designerJson}).
+     *
+     * <p>Returns {@code null} when the process has no designerJson (pure BPMN
+     * path), or when the node either does not exist or has no
+     * {@code data.taskActions} array. This is NOT an error - plugin authors can
+     * omit taskActions for nodes that do not need gateway-variable forwarding.
+     *
+     * <p>Return type is {@code List<TaskActionDef>} (never a wrapped optional);
+     * callers check for {@code null} + empty list to decide whether to forward
+     * variables on the approve/reject API call.
+     *
+     * @param processKey process definition key (matches
+     *                   {@code ab_bpm_process_definition.process_key})
+     * @param nodeId     BPMN activity id of the user task
+     * @return declared task actions, or {@code null} when none apply
+     */
+    @SuppressWarnings("unchecked")
+    public List<TaskActionDef> getTaskActionsForNode(String processKey, String nodeId) {
+        if (processKey == null || nodeId == null) {
+            return null;
+        }
+        Long tenantId = MetaContext.getCurrentTenantId();
+        BpmProcessDefinition definition = processDefinitionMapper.selectOne(
+                new QueryWrapper<BpmProcessDefinition>()
+                        .eq("tenant_id", tenantId)
+                        .eq("process_key", processKey)
+                        .eq("is_current", true)
+                        .eq("deleted_flag", false)
+        );
+        if (definition == null || definition.getExtension() == null) {
+            return null;
+        }
+        Object designerObj = definition.getExtension().get("designerJson");
+        if (designerObj == null) {
+            return null;
+        }
+        // designerJson can be a Map (stored as JSON object) or a String (stored
+        // verbatim by some legacy call sites). Normalise to a Map.
+        Map<String, Object> designer;
+        if (designerObj instanceof Map<?, ?> m) {
+            designer = (Map<String, Object>) m;
+        } else if (designerObj instanceof String s && !s.isBlank()) {
+            try {
+                designer = objectMapper.readValue(s, new TypeReference<Map<String, Object>>() {});
+            } catch (Exception e) {
+                log.warn("Failed to parse designerJson string for process '{}'", processKey, e);
+                return null;
+            }
+        } else {
+            return null;
+        }
+        Object nodesObj = designer.get("nodes");
+        if (!(nodesObj instanceof List<?> nodes)) {
+            return null;
+        }
+        for (Object nodeObj : nodes) {
+            if (!(nodeObj instanceof Map<?, ?> nodeMap)) {
+                continue;
+            }
+            Object id = nodeMap.get("id");
+            if (!nodeId.equals(id)) {
+                continue;
+            }
+            Object data = nodeMap.get("data");
+            if (!(data instanceof Map<?, ?> dataMap)) {
+                return null;
+            }
+            Object actionsObj = dataMap.get("taskActions");
+            if (!(actionsObj instanceof List<?> actionsList) || actionsList.isEmpty()) {
+                return null;
+            }
+            try {
+                return objectMapper.convertValue(actionsList,
+                        new TypeReference<List<TaskActionDef>>() {});
+            } catch (Exception e) {
+                log.warn("Failed to parse taskActions for node '{}' in process '{}'",
+                        nodeId, processKey, e);
+                return null;
+            }
+        }
+        return null;
     }
 
     /**

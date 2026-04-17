@@ -79,7 +79,14 @@ public class BpmFormController {
         // 5. Resolve process name from definition
         String processName = resolveProcessName(processKey);
 
-        // 6. Build response
+        // 6. Resolve designer-authored taskActions for this node (may be null for
+        //    pure BPMN processes). Used by the UI to forward resultVariable/
+        //    resultValue as process variables on approve/reject submission so
+        //    exclusiveGateway MVEL conditions resolve (e.g. ${taskResult == 'approved'}).
+        List<com.auraboot.framework.bpm.dto.TaskActionDef> taskActions =
+                formService.getTaskActionsForNode(processKey, nodeId);
+
+        // 7. Build response
         TaskFormResponse response = TaskFormResponse.builder()
                 .taskId(taskId)
                 .taskName(task.getProcessDefinitionActivityId()) // activity ID as fallback name
@@ -89,6 +96,7 @@ public class BpmFormController {
                 .formBinding(formBinding)
                 .businessKey(businessKey)
                 .processVariables(processVariables)
+                .taskActions(taskActions)
                 .build();
 
         return ApiResponse.success(response);
