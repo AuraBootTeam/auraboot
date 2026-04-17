@@ -6,6 +6,8 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Save, Check, AlertCircle, Clock, Wifi, WifiOff } from 'lucide-react';
+import { useI18n } from '~/contexts/I18nContext';
+import { DESIGNER_I18N, resolveDesignerText } from '~/shared/designer';
 import { getVersionManager } from '~/plugins/core-designer/components/studio/services/managers';
 import type { CanvasSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 import { VersionType } from '~/plugins/core-designer/components/studio/domain/metadata/types';
@@ -30,37 +32,45 @@ export interface AutoSaveProps {
 /**
  * 保存状态指示器
  */
-const SaveStatusIndicator = ({ status, lastSaved }: { status: SaveStatus; lastSaved?: Date }) => {
+const SaveStatusIndicator = ({
+  status,
+  lastSaved,
+  locale,
+}: {
+  status: SaveStatus;
+  lastSaved?: Date;
+  locale: string;
+}) => {
   const getStatusConfig = () => {
     switch (status) {
       case 'saving':
         return {
           icon: <Save className="h-4 w-4 animate-pulse" />,
-          text: '保存中...',
+          text: resolveDesignerText(DESIGNER_I18N.autoSave.saving, locale),
           color: 'text-blue-500',
         };
       case 'saved':
         return {
           icon: <Check className="h-4 w-4" />,
-          text: '已保存',
+          text: resolveDesignerText(DESIGNER_I18N.autoSave.saved, locale),
           color: 'text-green-500',
         };
       case 'error':
         return {
           icon: <AlertCircle className="h-4 w-4" />,
-          text: '保存失败',
+          text: resolveDesignerText(DESIGNER_I18N.autoSave.error, locale),
           color: 'text-red-500',
         };
       case 'offline':
         return {
           icon: <WifiOff className="h-4 w-4" />,
-          text: '离线模式',
+          text: resolveDesignerText(DESIGNER_I18N.autoSave.offline, locale),
           color: 'text-gray-500',
         };
       default:
         return {
           icon: <Clock className="h-4 w-4" />,
-          text: '未保存',
+          text: resolveDesignerText(DESIGNER_I18N.autoSave.unsaved, locale),
           color: 'text-gray-500',
         };
     }
@@ -73,7 +83,7 @@ const SaveStatusIndicator = ({ status, lastSaved }: { status: SaveStatus; lastSa
       {icon}
       <span className="text-sm">{text}</span>
       {lastSaved && status === 'saved' && (
-        <span className="text-xs text-gray-400">{formatLastSaved(lastSaved)}</span>
+        <span className="text-xs text-gray-400">{formatLastSaved(lastSaved, locale)}</span>
       )}
     </div>
   );
@@ -82,19 +92,23 @@ const SaveStatusIndicator = ({ status, lastSaved }: { status: SaveStatus; lastSa
 /**
  * 格式化最后保存时间
  */
-function formatLastSaved(date: Date): string {
+function formatLastSaved(date: Date, locale: string): string {
   const now = new Date();
   const diff = now.getTime() - date.getTime();
 
   if (diff < 60000) {
     // 1分钟内
-    return '刚刚';
+    return resolveDesignerText(DESIGNER_I18N.autoSave.justNow, locale);
   } else if (diff < 3600000) {
     // 1小时内
-    return `${Math.floor(diff / 60000)}分钟前`;
+    return resolveDesignerText(DESIGNER_I18N.autoSave.minutesAgo, locale, {
+      n: Math.floor(diff / 60000),
+    });
   } else if (diff < 86400000) {
     // 24小时内
-    return `${Math.floor(diff / 3600000)}小时前`;
+    return resolveDesignerText(DESIGNER_I18N.autoSave.hoursAgo, locale, {
+      n: Math.floor(diff / 3600000),
+    });
   } else {
     return date.toLocaleDateString();
   }
@@ -111,6 +125,7 @@ export function AutoSave({
   debounceDelay = 2000, // 2秒
   className = '',
 }: AutoSaveProps) {
+  const { locale } = useI18n();
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const [lastSaved, setLastSaved] = useState<Date | undefined>();
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -141,7 +156,7 @@ export function AutoSave({
         await versionManager.createVersion(pageId, {
           schema,
           type: VersionType.SNAPSHOT,
-          description: '自动保存',
+          description: resolveDesignerText(DESIGNER_I18N.autoSave.versionDescription, locale),
         });
 
         setSaveStatus('saved');
@@ -257,7 +272,10 @@ export function AutoSave({
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
       if (hasUnsavedChanges) {
         event.preventDefault();
-        event.returnValue = '您有未保存的更改，确定要离开吗？';
+        event.returnValue = resolveDesignerText(
+          DESIGNER_I18N.autoSave.unsavedChangesWarning,
+          locale,
+        );
 
         // 尝试同步保存
         navigator.sendBeacon(
@@ -300,7 +318,7 @@ export function AutoSave({
       </div>
 
       {/* 保存状态指示器 */}
-      <SaveStatusIndicator status={saveStatus} lastSaved={lastSaved} />
+      <SaveStatusIndicator status={saveStatus} lastSaved={lastSaved} locale={locale} />
 
       {/* 手动保存按钮 */}
       <button
@@ -311,10 +329,14 @@ export function AutoSave({
             ? 'border-blue-500 bg-blue-500 text-white hover:bg-blue-600'
             : 'cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400'
         } `}
-        title={hasUnsavedChanges ? '立即保存' : '没有未保存的更改'}
+        title={
+          hasUnsavedChanges
+            ? resolveDesignerText(DESIGNER_I18N.autoSave.saveNow, locale)
+            : resolveDesignerText(DESIGNER_I18N.autoSave.noUnsavedChanges, locale)
+        }
       >
         <Save className="mr-1 inline h-4 w-4" />
-        保存
+        {resolveDesignerText(DESIGNER_I18N.studio.save, locale)}
       </button>
 
       {/* 错误重试按钮 */}
@@ -322,16 +344,16 @@ export function AutoSave({
         <button
           onClick={manualSave}
           className="rounded border border-red-500 bg-red-500 px-3 py-1.5 text-sm text-white transition-colors hover:bg-red-600"
-          title="重试保存"
+          title={resolveDesignerText(DESIGNER_I18N.autoSave.retryTooltip, locale)}
         >
-          重试
+          {resolveDesignerText(DESIGNER_I18N.autoSave.retry, locale)}
         </button>
       )}
 
       {/* 离线提示 */}
       {saveStatus === 'offline' && hasUnsavedChanges && (
         <div className="rounded border border-yellow-200 bg-yellow-100 px-3 py-1.5 text-sm text-yellow-800">
-          离线模式，将在网络恢复后自动保存
+          {resolveDesignerText(DESIGNER_I18N.autoSave.offlineHint, locale)}
         </div>
       )}
     </div>
@@ -350,6 +372,7 @@ export function useAutoSave(
     onSave?: (success: boolean) => void;
   } = {},
 ) {
+  const { locale } = useI18n();
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const [lastSaved, setLastSaved] = useState<Date | undefined>();
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -365,7 +388,7 @@ export function useAutoSave(
       await versionManager.createVersion(pageId, {
         schema,
         type: VersionType.SNAPSHOT,
-        description: '自动保存',
+        description: resolveDesignerText(DESIGNER_I18N.autoSave.versionDescription, locale),
       });
 
       setSaveStatus('saved');
