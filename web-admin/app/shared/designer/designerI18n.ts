@@ -193,6 +193,70 @@ export const DESIGNER_I18N = {
       'en-US': 'components',
     } as L,
   },
+  // ── AutoSave ──────────────────────────────────────────────────
+  autoSave: {
+    saving: {
+      'zh-CN': '保存中...',
+      'en-US': 'Saving...',
+    } as L,
+    saved: {
+      'zh-CN': '已保存',
+      'en-US': 'Saved',
+    } as L,
+    error: {
+      'zh-CN': '保存失败',
+      'en-US': 'Save failed',
+    } as L,
+    offline: {
+      'zh-CN': '离线模式',
+      'en-US': 'Offline',
+    } as L,
+    unsaved: {
+      'zh-CN': '未保存',
+      'en-US': 'Unsaved',
+    } as L,
+    justNow: {
+      'zh-CN': '刚刚',
+      'en-US': 'just now',
+    } as L,
+    minutesAgo: {
+      'zh-CN': '{n}分钟前',
+      'en-US': '{n}m ago',
+    } as L,
+    hoursAgo: {
+      'zh-CN': '{n}小时前',
+      'en-US': '{n}h ago',
+    } as L,
+    saveNow: {
+      'zh-CN': '立即保存',
+      'en-US': 'Save now',
+    } as L,
+    noUnsavedChanges: {
+      'zh-CN': '没有未保存的更改',
+      'en-US': 'No unsaved changes',
+    } as L,
+    retry: {
+      'zh-CN': '重试',
+      'en-US': 'Retry',
+    } as L,
+    retryTooltip: {
+      'zh-CN': '重试保存',
+      'en-US': 'Retry save',
+    } as L,
+    offlineHint: {
+      'zh-CN': '离线模式，将在网络恢复后自动保存',
+      'en-US': 'Offline — will auto-save when connection is restored',
+    } as L,
+    unsavedChangesWarning: {
+      'zh-CN': '您有未保存的更改，确定要离开吗？',
+      'en-US': 'You have unsaved changes. Are you sure you want to leave?',
+    } as L,
+    versionDescription: {
+      'zh-CN': '自动保存',
+      'en-US': 'Auto save',
+    } as L,
+  },
+
   // ── Dashboard viewer ───────────────────────────────────────────
   viewer: {
     noData: {
