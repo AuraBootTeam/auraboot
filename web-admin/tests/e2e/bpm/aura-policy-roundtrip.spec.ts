@@ -265,7 +265,9 @@ test.describe('BPM Designer aura.* policy round-trip (Epic C)', { tag: ['@bpm-re
     const permsInput = page.locator('[data-testid="usertask-required-permissions"]');
     await permsInput.waitFor({ state: 'visible', timeout: 5_000 });
     await permsInput.fill('hr.leave.approve, hr.leave.view');
-    await expect(permsInput).toHaveValue('hr.leave.approve, hr.leave.view');
+    // UserTaskEditor normalizes the comma-separated permission tokens (trims
+    // each entry) on input; assert the normalized value, not the raw one.
+    await expect(permsInput).toHaveValue('hr.leave.approve,hr.leave.view');
 
     // Clear selection so the Save button's isDirty check stabilises.
     await page.locator('.react-flow__pane').click({ position: { x: 50, y: 50 } });
