@@ -33,6 +33,7 @@ export interface RootLoaderData {
   initialTimezone?: string;
   edition: string;
   spaces: any[];
+  bootstrapStatus: BootstrapStatus | null;
 }
 
 import '~/app.css';
@@ -51,6 +52,8 @@ import { EntitlementProvider } from '~/contexts/EntitlementContext';
 import { DslRegistryProvider } from '~/contexts/DslRegistryContext';
 import { AuraBotProvider } from '~/plugins/core-aurabot/components-shell';
 import { QueryProvider } from '~/providers/QueryProvider';
+import { fetchBootstrapStatus, type BootstrapStatus } from '~/services/bootstrapStatus';
+import { BootstrapBanner } from '~/components/BootstrapBanner';
 
 import { sessionMiddleware } from '~/middleware/auth_filter';
 import { ssrLoaderCache, ssrCacheKey } from '~/utils/ssr-cache';
@@ -83,25 +86,8 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
   const initialTimezone = getTimezoneFromRequest(request);
   const { pathname } = new URL(request.url);
 
-  // Bootstrap check: redirect to /setup if system not initialized
-  if (!pathname.startsWith('/setup')) {
-    try {
-      const bootstrapUrl = process.env.BFF_INTERNAL_URL || 'http://127.0.0.1:6443';
-      const bootstrapRes = await fetch(`${bootstrapUrl}/api/bootstrap/status`);
-      if (bootstrapRes.ok) {
-        const bootstrapResult = await bootstrapRes.json();
-        if (
-          bootstrapResult.code === '0' &&
-          bootstrapResult.data &&
-          !bootstrapResult.data.initialized
-        ) {
-          return redirect('/setup');
-        }
-      }
-    } catch {
-      // Backend not available — don't redirect, continue normal flow
-    }
-  }
+  // Bootstrap status: never redirect; inject into loader data so the banner can render
+  const bootstrapStatus = await fetchBootstrapStatus();
 
   // Public marketing: skip user/menu fetch for anonymous visitors
   if (isPublicRoute(pathname)) {
@@ -129,6 +115,7 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
         initialTimezone: initialTimezone ?? undefined,
         edition,
         spaces: [],
+        bootstrapStatus,
       };
       ssrLoaderCache.set(cacheKey, result);
       return result;
@@ -186,7 +173,7 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
   }
 
   const edition = process.env.EDITION || 'enterprise';
-  return { user, permissions, preferences, menus, i18n: i18nData, locale, initialTimezone: initialTimezone ?? undefined, edition, spaces };
+  return { user, permissions, preferences, menus, i18n: i18nData, locale, initialTimezone: initialTimezone ?? undefined, edition, spaces, bootstrapStatus };
 }
 
 export function useRootLoaderData(): RootLoaderData | undefined {
@@ -252,7 +239,12 @@ export default function App() {
                   <ToastProvider>
                     <ConfirmDialogProvider>
                       <AuraBotProvider>
-                        <Outlet />
+                        {data.bootstrapStatus && !data.bootstrapStatus.initialized && (
+                          <BootstrapBanner status={data.bootstrapStatus} />
+                        )}
+                        <div className={data.bootstrapStatus && !data.bootstrapStatus.initialized ? 'pt-10' : ''}>
+                          <Outlet />
+                        </div>
                       </AuraBotProvider>
                     </ConfirmDialogProvider>
                   </ToastProvider>
