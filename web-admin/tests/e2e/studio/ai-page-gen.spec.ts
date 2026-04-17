@@ -34,7 +34,7 @@ async function createBlankCompositePage(page: Page): Promise<string> {
       name,
       pageKey,
       title: name,
-      kind: 'composite',
+      kind: 'list',
       blocks: [],
       metaInfo: { componentCount: 0 },
       semver: '0.1.0',

@@ -44,7 +44,7 @@ async function openDesigner(
   if (fallbackPagePid) {
     await page.goto(`/page-designer/${fallbackPagePid}`, { waitUntil: 'domcontentloaded' });
     const readySurface = page.locator(
-      '[data-testid="canvas-editor"], [data-testid="designer-canvas"], [data-testid^="canvas-block-"]',
+      '[data-testid="designer-canvas"], [data-testid="designer-canvas"], [data-testid^="canvas-block-"]',
     );
     const loaded2 = await readySurface.first().isVisible({ timeout: 8000 }).catch(() => false);
     if (loaded2) return true;
@@ -58,7 +58,7 @@ async function openDesigner(
         name: `E2E Deep ${Date.now()}`,
         pageKey,
         title: 'E2E Deep Test',
-        kind: 'composite',
+        kind: 'list',
         blocks: [
           { id: 'blk_tbl', blockType: 'table', config: {}, layout: { col: 0, colSpan: 12, rowSpan: 1, order: 0 } },
         ],
@@ -72,8 +72,8 @@ async function openDesigner(
       if (pid) {
         fallbackPagePid = pid;
         await page.goto(`/page-designer/${pid}`, { waitUntil: 'domcontentloaded' });
-        await page.getByTestId('canvas-editor').waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
-        return await page.getByTestId('canvas-editor').isVisible().catch(() => false);
+        await page.getByTestId('designer-canvas').waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+        return await page.getByTestId('designer-canvas').isVisible().catch(() => false);
       }
     }
   } catch { /* ignore */ }
@@ -187,7 +187,7 @@ test.describe('Page Designer Deep Operations', () => {
             name: `E2E Deep Operations ${Date.now()}`,
             pageKey,
             title: 'E2E Deep Operations Test Page',
-            kind: 'composite',
+            kind: 'list',
             blocks: [
               { id: 'blk_tbl', blockType: 'table', config: {}, layout: { col: 0, colSpan: 12, rowSpan: 1, order: 0 } },
               { id: 'blk_chart', blockType: 'chart', config: {}, layout: { col: 0, colSpan: 6, rowSpan: 1, order: 1 } },

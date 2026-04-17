@@ -34,7 +34,7 @@ test.beforeEach(async ({ page }) => {
       name: `${PREFIX}_deep`,
       pageKey: `${PREFIX.toLowerCase()}_deep`,
       title: 'Untitled',
-      kind: 'composite',
+      kind: 'list',
       blocks: [],
       semver: '0.1.0',
     },
@@ -52,7 +52,7 @@ test.afterEach(async ({ page }) => {
 /** Navigate to editor and wait for canvas */
 async function openEditor(page: Page) {
   await page.goto(`/page-designer/${pagePid}`);
-  await expect(page.getByTestId('canvas-editor')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId('designer-canvas')).toBeVisible({ timeout: 15_000 });
 }
 
 function configInput(page: Page, name: string) {
@@ -97,7 +97,7 @@ test.describe('Layout Structure', () => {
     await openEditor(page);
 
     // Main container
-    await expect(page.getByTestId('canvas-editor')).toBeVisible();
+    await expect(page.getByTestId('designer-canvas')).toBeVisible();
 
     // Left panel + tabs
     await expect(page.getByTestId('canvas-left-panel')).toBeVisible();

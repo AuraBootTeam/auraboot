@@ -37,7 +37,7 @@ async function createTestPage(
       name,
       pageKey,
       title: name,
-      kind: 'composite',
+      kind: 'list',
       blocks: [{ id: 'blk1', blockType: 'table', config: {} }],
       metaInfo: { componentCount: 1 },
       semver: '0.1.0',
@@ -115,7 +115,7 @@ test.describe('Page Templates', () => {
     await page.goto(`/page-designer/${pagePid}`, { waitUntil: 'domcontentloaded' });
 
     // Wait for the designer canvas to mount
-    await expect(page.getByTestId('canvas-editor')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId('designer-canvas')).toBeVisible({ timeout: 15000 });
 
     // The "Template" toolbar button should be visible because pageMeta is loaded
     const templateBtn = page.getByTestId('toolbar-save-as-template');
@@ -276,7 +276,7 @@ test.describe('Page Templates', () => {
 
     // Should navigate to the new page designer with the new pid
     await page.waitForURL(/\/page-designer\/[a-zA-Z0-9]+$/, { timeout: 10000 });
-    await expect(page.getByTestId('canvas-editor')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId('designer-canvas')).toBeVisible({ timeout: 15000 });
   });
 
   // -------------------------------------------------------------------------
@@ -383,7 +383,7 @@ test.describe('Page Templates', () => {
 
     // Navigates to the cloned page in designer
     await page.waitForURL(/\/page-designer\/[a-zA-Z0-9]+$/, { timeout: 10000 });
-    await expect(page.getByTestId('canvas-editor')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId('designer-canvas')).toBeVisible({ timeout: 15000 });
   });
 
   // -------------------------------------------------------------------------
@@ -391,7 +391,7 @@ test.describe('Page Templates', () => {
   // -------------------------------------------------------------------------
   test('T6 — save-as-template dialog disables save when name is empty', async ({ page }) => {
     await page.goto(`/page-designer/${pagePid}`, { waitUntil: 'domcontentloaded' });
-    await expect(page.getByTestId('canvas-editor')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId('designer-canvas')).toBeVisible({ timeout: 15000 });
 
     const templateBtn = page.getByTestId('toolbar-save-as-template');
     await expect(templateBtn).toBeVisible({ timeout: 10000 });
