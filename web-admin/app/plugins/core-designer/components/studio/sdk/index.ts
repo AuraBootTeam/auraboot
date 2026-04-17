@@ -1,6 +1,5 @@
 import { useCanvasEditorState, type CanvasEditorState } from '~/plugins/core-designer/components/studio/hooks/store/useCanvasEditorState';
 import { getSchemaManager, type SchemaManager } from '~/plugins/core-designer/components/studio/services/schema/SchemaManager';
-import { getLayoutManager, type LayoutManager } from '~/plugins/core-designer/components/studio/services/layout/LayoutManager';
 import {
   getPageStateManager,
   type IPageStateManager,
@@ -35,7 +34,6 @@ export interface DesignerSDK {
   useStore: typeof useCanvasEditorState;
   getStore: () => CanvasEditorState;
   schemaManager: SchemaManager;
-  layoutManager: LayoutManager;
   pageStateManager: IPageStateManager;
   commandManager: CommandManager;
   componentRegistry: ComponentRegistry;
@@ -58,7 +56,6 @@ export function getDesignerSDK(): DesignerSDK {
       useStore: useCanvasEditorState,
       getStore: () => useCanvasEditorState.getState(),
       schemaManager: getSchemaManager(),
-      layoutManager: getLayoutManager(),
       pageStateManager: getPageStateManager(),
       commandManager: getCommandManager(),
       componentRegistry,
