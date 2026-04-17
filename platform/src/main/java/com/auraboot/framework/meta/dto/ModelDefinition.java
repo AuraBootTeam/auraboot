@@ -54,6 +54,18 @@ public class ModelDefinition {
      * Business object category (DOCUMENT, MASTER, TRANSACTION, ACTIVITY, REFERENCE, ENTITY)
      */
     private String modelCategory;
+
+    /** Phase 1 values: physical | namedQuery | endpoint | sqlView */
+    private String sourceType;
+
+    /** For namedQuery: query code; for endpoint: connector endpoint code; for sqlView: view name. Required when sourceType != physical. */
+    private String sourceRef;
+
+    /** Primary key field code; required for all models (used as list rowKey and default detailKeyField). */
+    private String primaryKey;
+
+    /** Declared capabilities; the runtime truth for feature toggles and whitelist-based validation. */
+    private ModelCapabilities capabilities;
     
     /**
      * 版本号
