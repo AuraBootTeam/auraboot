@@ -4,6 +4,7 @@ import com.auraboot.framework.bpm.rule.DroolsEngineService;
 import com.auraboot.framework.rbac.mapper.UserRoleMapper;
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
 import com.auraboot.framework.tenant.service.TenantMemberService;
+import com.auraboot.smart.framework.engine.constant.RequestMapSpecialKeyConstant;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.expression.ExpressionParser;
@@ -120,7 +121,12 @@ public class AssigneeResolverService {
     }
 
     private List<String> resolveStarter(Map<String, Object> context) {
-        Object startUserId = context.get("_startUserId");
+        // Prefer SmartEngine canonical request-map key (injected by
+        // ProcessEngineService.startProcess); fall back to AuraBoot conventions.
+        Object startUserId = context.get(RequestMapSpecialKeyConstant.PROCESS_INSTANCE_START_USER_ID);
+        if (startUserId == null) {
+            startUserId = context.get("_startUserId");
+        }
         if (startUserId == null) {
             startUserId = context.get("startUserId");
         }
