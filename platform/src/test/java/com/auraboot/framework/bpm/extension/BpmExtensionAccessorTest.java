@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -59,8 +60,8 @@ class BpmExtensionAccessorTest {
 
         processDef = mock(ProcessDefinitionWithExtension.class);
         when(processDef.getId()).thenReturn("leave_request");
-        // null tenantId matches any tenant in the findProcessDefinition filter
-        when(processDef.getTenantId()).thenReturn(null);
+        // tenantId must match getCurrentTenantIdAsString() — MetaContext.setContext(1L, …) → "1"
+        when(processDef.getTenantId()).thenReturn("1");
 
         userTask = mock(ActivityElementWithExtension.class);
         Map<String, IdBasedElement> activityMap = new HashMap<>();
@@ -159,5 +160,16 @@ class BpmExtensionAccessorTest {
     void unknownProcessKey() {
         assertThat(accessor.getWithdrawPolicy("nonexistent")).isEqualTo(WithdrawPolicy.STRICT);
         assertThat(accessor.getCcPolicy("nonexistent", null)).isEqualTo(CcPolicy.ALL);
+    }
+
+    @Test
+    @DisplayName("findProcessDefinition throws when tenant context is missing")
+    void noTenantContextThrows() {
+        MetaContext.clear();
+        // MetaContext.get() throws IllegalStateException when uninitialized —
+        // findProcessDefinition must not swallow or bypass this.
+        assertThatThrownBy(() -> accessor.getWithdrawPolicy("leave_request"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("MetaContext not initialized");
     }
 }
