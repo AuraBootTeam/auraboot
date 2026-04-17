@@ -20,7 +20,7 @@
       "main": {
         "blocks": [{
           "id": "thr_attendance_table",
-          "blockType": "data-table",
+          "blockType": "table",
           "columns": [
             { "field": "thr_at_code", "width": 160, "sortable": true },
             { "field": "thr_at_employee_id", "width": 150 },

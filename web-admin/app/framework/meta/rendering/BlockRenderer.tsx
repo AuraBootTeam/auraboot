@@ -57,7 +57,6 @@ async function loadFallbackRenderers(): Promise<Map<string, React.ComponentType<
     ['table', table.TableBlockRenderer],
     ['filters', filters.FiltersBlockRenderer],
     ['toolbar', toolbar.ToolbarBlockRenderer],
-    ['action', toolbar.ToolbarBlockRenderer],
     ['description', description.DescriptionBlockRenderer],
     ['chart', chart.ChartBlockRenderer],
     ['tabs', tabs.TabsBlockRenderer],
@@ -95,6 +94,23 @@ export const BlockRenderer: React.FC<BlockRendererProps> = ({ block, runtime, ar
   if (!visible) return null;
 
   const blockType = block.blockType;
+
+  // Guard: reject renamed blockType aliases with a clear error so developers
+  // notice immediately instead of getting a silent fallback or mystery render.
+  // Renamed 2026-03-30 as part of page-type-unification (V2 flat format).
+  const DEPRECATED_BLOCK_TYPE_ALIASES: Record<string, string> = {
+    'data-table': 'table',
+    'filter-form': 'filters',
+    'list-tabs': 'tabs',
+    'toolbar-buttons': 'toolbar',
+    'action': 'custom',
+  };
+  if (blockType in DEPRECATED_BLOCK_TYPE_ALIASES) {
+    throw new Error(
+      `[BlockRenderer] blockType "${blockType}" was renamed to "${DEPRECATED_BLOCK_TYPE_ALIASES[blockType]}" since 2026-03-30. ` +
+        `Update your DSL JSON to use the new name.`,
+    );
+  }
 
   // Resolve renderer: profile-aware → fallback map
   const resolveRenderer = (): React.ComponentType<any> | null => {

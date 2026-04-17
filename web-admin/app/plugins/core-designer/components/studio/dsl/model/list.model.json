@@ -35,7 +35,7 @@
       "blocks": [
         {
           "id": "block_model_filters",
-          "blockType": "filter-form",
+          "blockType": "filters",
           "layout": { "colSpan": 12, "rowSpan": 1 },
           "model": "{{state.filters}}",
           "fields": [
@@ -138,7 +138,7 @@
       "blocks": [
         {
           "id": "block_model_table",
-          "blockType": "data-table",
+          "blockType": "table",
           "layout": { "colSpan": 12, "rowSpan": 1 },
           "table": {
             "rowKey": "pid",
