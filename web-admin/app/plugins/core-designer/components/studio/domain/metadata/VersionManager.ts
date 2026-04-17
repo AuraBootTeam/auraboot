@@ -1,5 +1,5 @@
 /**
- * 版本管理器实现
+ * Version manager implementation
  */
 
 import type {
@@ -25,11 +25,13 @@ import { VersionStatus, VersionType, VersionEventType } from '~/plugins/core-des
 import { ApiService } from '~/shared/services/ApiService';
 
 /**
- * 版本管理器实现类
+ * Version manager implementation class.
+ *
+ * All mutation methods that record authorship now require an explicit `actor`
+ * argument (the caller's email/username from auth context). The old
+ * `getCurrentUser()` silent-placeholder path has been removed — see GAP-221.
  */
 export class VersionManagerImpl implements VersionManager {
-  private static _warnedGetCurrentUser = false;
-
   private apiService: ApiService;
   private eventListeners: Map<VersionEventType, VersionEventListener[]> = new Map();
   private config: VersionConfig;
@@ -48,7 +50,7 @@ export class VersionManagerImpl implements VersionManager {
   }
 
   /**
-   * 初始化事件类型
+   * Initialize event type listener maps
    */
   private initializeEventTypes(): void {
     Object.values(VersionEventType).forEach((eventType) => {
@@ -57,17 +59,16 @@ export class VersionManagerImpl implements VersionManager {
   }
 
   /**
-   * 创建版本
+   * Create a new version.
+   *
+   * @param actor - caller identity (email or username) from auth context
    */
-  async createVersion(pageId: string, request: CreateVersionRequest): Promise<Version> {
+  async createVersion(pageId: string, request: CreateVersionRequest, actor: string): Promise<Version> {
     try {
-      // 验证请求
       this.validateCreateRequest(request);
 
-      // 生成版本号
       const version = await this.generateVersionNumber(pageId, request.type, request.baseVersionId);
 
-      // 创建版本对象
       const newVersion: Version = {
         id: this.generateVersionId(),
         version,
@@ -76,31 +77,28 @@ export class VersionManagerImpl implements VersionManager {
         schema: request.schema,
         createdAt: new Date(),
         updatedAt: new Date(),
-        createdBy: this.getCurrentUser(),
-        updatedBy: this.getCurrentUser(),
+        createdBy: actor,
+        updatedBy: actor,
         description: request.description,
         changelog: request.changelog,
         tags: request.tags || [],
         parentVersionId: request.baseVersionId,
       };
 
-      // 保存到存储
       if (this.storage) {
         await this.storage.saveVersion(newVersion);
       }
 
-      // 调用API
       const response = await this.apiService.post<Version>(`/pages/${pageId}/versions`, newVersion);
       const savedVersion = response.data;
 
-      // 触发事件
       await this.emitEvent({
         type: VersionEventType.VERSION_CREATED,
         pageId,
         versionId: savedVersion.id,
         version: savedVersion,
         timestamp: new Date(),
-        operator: this.getCurrentUser(),
+        operator: actor,
       });
 
       return savedVersion;
@@ -111,22 +109,20 @@ export class VersionManagerImpl implements VersionManager {
   }
 
   /**
-   * 更新版本
+   * Update a version.
+   *
+   * @param actor - caller identity from auth context
    */
-  async updateVersion(request: UpdateVersionRequest): Promise<Version> {
+  async updateVersion(request: UpdateVersionRequest, actor: string): Promise<Version> {
     try {
-      // 检查版本锁定
       await this.checkVersionLock(request.versionId);
 
-      // 获取现有版本
       const existingVersion = await this.getVersion(request.versionId);
 
-      // 检查版本状态
       if (existingVersion.status === VersionStatus.published) {
         throw new Error('Cannot update published version');
       }
 
-      // 更新版本对象
       const updatedVersion: Version = {
         ...existingVersion,
         schema: request.schema || existingVersion.schema,
@@ -134,29 +130,26 @@ export class VersionManagerImpl implements VersionManager {
         changelog: request.changelog || existingVersion.changelog,
         tags: request.tags || existingVersion.tags,
         updatedAt: new Date(),
-        updatedBy: this.getCurrentUser(),
+        updatedBy: actor,
       };
 
-      // 保存到存储
       if (this.storage) {
         await this.storage.saveVersion(updatedVersion);
       }
 
-      // 调用API
       const response = await this.apiService.put<Version>(
         `/versions/${request.versionId}`,
         updatedVersion,
       );
       const savedVersion = response.data;
 
-      // 触发事件
       await this.emitEvent({
         type: VersionEventType.VERSION_UPDATED,
         pageId: savedVersion.schema.id,
         versionId: savedVersion.id,
         version: savedVersion,
         timestamp: new Date(),
-        operator: this.getCurrentUser(),
+        operator: actor,
       });
 
       return savedVersion;
@@ -167,37 +160,33 @@ export class VersionManagerImpl implements VersionManager {
   }
 
   /**
-   * 删除版本
+   * Delete a version.
+   *
+   * @param actor - caller identity from auth context
    */
-  async deleteVersion(pageId: string, versionId: string): Promise<void> {
+  async deleteVersion(pageId: string, versionId: string, actor: string): Promise<void> {
     try {
-      // 检查版本锁定
       await this.checkVersionLock(versionId);
 
-      // 获取版本信息
       const version = await this.getVersion(versionId);
 
-      // 检查版本状态
       if (version.status === VersionStatus.published) {
         throw new Error('Cannot delete published version');
       }
 
-      // 从存储删除
       if (this.storage) {
         await this.storage.deleteVersion(versionId);
       }
 
-      // 调用API
       await this.apiService.delete(`/versions/${versionId}`);
 
-      // 触发事件
       await this.emitEvent({
         type: VersionEventType.VERSION_DELETED,
         pageId: version.schema.id,
         versionId: version.id,
         version,
         timestamp: new Date(),
-        operator: this.getCurrentUser(),
+        operator: actor,
       });
     } catch (error) {
       console.error('Failed to delete version:', error);
@@ -206,16 +195,14 @@ export class VersionManagerImpl implements VersionManager {
   }
 
   /**
-   * 获取版本详情
+   * Get version details
    */
   async getVersion(versionId: string): Promise<Version> {
     try {
-      // 先从存储获取
       if (this.storage && (await this.storage.versionExists(versionId))) {
         return await this.storage.loadVersion(versionId);
       }
 
-      // 从API获取
       const response = await this.apiService.get<Version>(`/versions/${versionId}`);
       return response.data;
     } catch (error) {
@@ -225,11 +212,10 @@ export class VersionManagerImpl implements VersionManager {
   }
 
   /**
-   * 获取版本列表
+   * Get version list
    */
   async getVersions(pageId: string, params?: VersionQueryParams): Promise<VersionListResponse> {
     try {
-      // 构建查询参数
       const queryParams = new URLSearchParams();
       if (params) {
         Object.entries(params).forEach(([key, value]) => {
@@ -239,7 +225,6 @@ export class VersionManagerImpl implements VersionManager {
         });
       }
 
-      // 调用API
       const response = await this.apiService.get<VersionListResponse>(`/pages/${pageId}/versions`, {
         params,
       });
@@ -251,7 +236,7 @@ export class VersionManagerImpl implements VersionManager {
   }
 
   /**
-   * 获取当前版本
+   * Get current version
    */
   async getCurrentVersion(pageId: string): Promise<Version> {
     try {
@@ -264,7 +249,7 @@ export class VersionManagerImpl implements VersionManager {
   }
 
   /**
-   * 获取已发布版本
+   * Get published version
    */
   async getPublishedVersion(pageId: string): Promise<Version> {
     try {
@@ -277,53 +262,42 @@ export class VersionManagerImpl implements VersionManager {
   }
 
   /**
-   * 发布版本
+   * Publish a version.
+   *
+   * @param actor - caller identity from auth context
    */
   async publishVersion(
     pageId: string,
     versionId: string,
     request: PublishVersionRequest,
+    actor: string,
   ): Promise<Version> {
     try {
-      // 检查版本锁定
       await this.checkVersionLock(request.versionId);
 
-      // 获取版本信息
       const version = await this.getVersion(versionId);
 
-      // 检查版本状态
       if (version.status === VersionStatus.published && !request.force) {
         throw new Error('Version is already published');
       }
 
-      // 验证版本Schema
       await this.validateVersionSchema(version.schema);
 
-      // 更新版本状态
-      const publishedVersion: Version = {
-        ...version,
-        status: VersionStatus.published,
-        publishedAt: new Date(),
-        publishedBy: this.getCurrentUser(),
-        updatedAt: new Date(),
-        updatedBy: this.getCurrentUser(),
-      };
-
-      // 调用API
+      // publishedBy / updatedBy are set server-side; the local object is not used
+      // for the final response — we just need the API call result.
       const response = await this.apiService.post<Version>(`/versions/${versionId}/publish`, {
         description: request.description,
         force: request.force,
       });
       const result = response.data;
 
-      // 触发事件
       await this.emitEvent({
         type: VersionEventType.VERSION_PUBLISHED,
         pageId: result.schema.id,
         versionId: result.id,
         version: result,
         timestamp: new Date(),
-        operator: this.getCurrentUser(),
+        operator: actor,
       });
 
       return result;
@@ -334,25 +308,24 @@ export class VersionManagerImpl implements VersionManager {
   }
 
   /**
-   * 取消发布
+   * Unpublish a version.
+   *
+   * @param actor - caller identity from auth context
    */
-  async unpublishVersion(versionId: string): Promise<Version> {
+  async unpublishVersion(versionId: string, actor: string): Promise<Version> {
     try {
-      // 检查版本锁定
       await this.checkVersionLock(versionId);
 
-      // 调用API
       const response = await this.apiService.post<Version>(`/versions/${versionId}/unpublish`);
       const result = response.data;
 
-      // 触发事件
       await this.emitEvent({
         type: VersionEventType.VERSION_UNPUBLISHED,
         pageId: result.schema.id,
         versionId: result.id,
         version: result,
         timestamp: new Date(),
-        operator: this.getCurrentUser(),
+        operator: actor,
       });
 
       return result;
@@ -363,14 +336,14 @@ export class VersionManagerImpl implements VersionManager {
   }
 
   /**
-   * 回滚版本
+   * Rollback to a previous version.
+   *
+   * @param actor - caller identity from auth context
    */
-  async rollbackVersion(pageId: string, request: RollbackVersionRequest): Promise<Version> {
+  async rollbackVersion(pageId: string, request: RollbackVersionRequest, actor: string): Promise<Version> {
     try {
-      // 获取目标版本
       const targetVersion = await this.getVersion(request.targetVersionId);
 
-      // 检查目标版本状态
       if (targetVersion.status !== VersionStatus.published) {
         throw new Error('Can only rollback to published version');
       }
@@ -378,15 +351,13 @@ export class VersionManagerImpl implements VersionManager {
       let result: Version;
 
       if (request.createNewVersion) {
-        // 创建新版本
         result = await this.createVersion(pageId, {
           schema: targetVersion.schema,
           type: VersionType.PATCH,
           description: request.description || `Rollback to version ${targetVersion.version}`,
           baseVersionId: request.targetVersionId,
-        });
+        }, actor);
       } else {
-        // 直接回滚
         const response = await this.apiService.post<Version>(`/pages/${pageId}/rollback`, {
           targetVersionId: request.targetVersionId,
           description: request.description,
@@ -394,14 +365,13 @@ export class VersionManagerImpl implements VersionManager {
         result = response.data;
       }
 
-      // 触发事件
       await this.emitEvent({
         type: VersionEventType.VERSION_ROLLED_BACK,
         pageId,
         versionId: result.id,
         version: result,
         timestamp: new Date(),
-        operator: this.getCurrentUser(),
+        operator: actor,
         data: { targetVersionId: request.targetVersionId },
       });
 
@@ -413,7 +383,10 @@ export class VersionManagerImpl implements VersionManager {
   }
 
   /**
-   * 比较版本
+   * Compare two versions (diff is not yet implemented).
+   *
+   * @experimental calculateDifferences always throws — callers must catch and
+   *   render an unavailable state. See plan 2026-04-17-studio-v2-cleanup.md T4.
    */
   async compareVersions(
     pageId: string,
@@ -421,16 +394,13 @@ export class VersionManagerImpl implements VersionManager {
     versionBId: string,
   ): Promise<VersionDiff> {
     try {
-      // 获取两个版本
       const [versionA, versionB] = await Promise.all([
         this.getVersion(versionAId),
         this.getVersion(versionBId),
       ]);
 
-      // 计算差异
       const differences = this.calculateDifferences(versionA.schema, versionB.schema);
 
-      // 统计差异
       const stats = {
         added: differences.filter((d) => d.type === 'added').length,
         modified: differences.filter((d) => d.type === 'modified').length,
@@ -450,20 +420,20 @@ export class VersionManagerImpl implements VersionManager {
   }
 
   /**
-   * 复制版本
+   * Duplicate a version.
+   *
+   * @param actor - caller identity from auth context
    */
-  async duplicateVersion(versionId: string, description?: string): Promise<Version> {
+  async duplicateVersion(versionId: string, actor: string, description?: string): Promise<Version> {
     try {
-      // 获取源版本
       const sourceVersion = await this.getVersion(versionId);
 
-      // 创建新版本
       return await this.createVersion(sourceVersion.schema.id, {
         schema: sourceVersion.schema,
         type: VersionType.MINOR,
         description: description || `Copy of version ${sourceVersion.version}`,
         baseVersionId: versionId,
-      });
+      }, actor);
     } catch (error) {
       console.error('Failed to duplicate version:', error);
       throw error;
@@ -471,9 +441,11 @@ export class VersionManagerImpl implements VersionManager {
   }
 
   /**
-   * 归档版本
+   * Archive a version.
+   *
+   * @param actor - caller identity from auth context
    */
-  async archiveVersion(versionId: string): Promise<Version> {
+  async archiveVersion(versionId: string, actor: string): Promise<Version> {
     try {
       const response = await this.apiService.post<Version>(`/versions/${versionId}/archive`);
       const result = response.data;
@@ -484,7 +456,7 @@ export class VersionManagerImpl implements VersionManager {
         versionId: result.id,
         version: result,
         timestamp: new Date(),
-        operator: this.getCurrentUser(),
+        operator: actor,
       });
 
       return result;
@@ -495,9 +467,11 @@ export class VersionManagerImpl implements VersionManager {
   }
 
   /**
-   * 恢复版本
+   * Restore an archived version.
+   *
+   * @param actor - caller identity from auth context
    */
-  async restoreVersion(versionId: string): Promise<Version> {
+  async restoreVersion(versionId: string, actor: string): Promise<Version> {
     try {
       const response = await this.apiService.post<Version>(`/versions/${versionId}/restore`);
       const result = response.data;
@@ -508,7 +482,7 @@ export class VersionManagerImpl implements VersionManager {
         versionId: result.id,
         version: result,
         timestamp: new Date(),
-        operator: this.getCurrentUser(),
+        operator: actor,
       });
 
       return result;
@@ -519,7 +493,7 @@ export class VersionManagerImpl implements VersionManager {
   }
 
   /**
-   * 添加事件监听器
+   * Add an event listener
    */
   addEventListener(listener: VersionEventListener): void {
     const listeners = this.eventListeners.get(listener.eventType) || [];
@@ -528,7 +502,7 @@ export class VersionManagerImpl implements VersionManager {
   }
 
   /**
-   * 移除事件监听器
+   * Remove an event listener
    */
   removeEventListener(listener: VersionEventListener): void {
     const listeners = this.eventListeners.get(listener.eventType) || [];
@@ -539,7 +513,7 @@ export class VersionManagerImpl implements VersionManager {
   }
 
   /**
-   * 触发事件
+   * Emit an event to all registered listeners
    */
   private async emitEvent(event: VersionEvent): Promise<void> {
     const listeners = this.eventListeners.get(event.type) || [];
@@ -554,7 +528,7 @@ export class VersionManagerImpl implements VersionManager {
   }
 
   /**
-   * 验证创建请求
+   * Validate create request
    */
   private validateCreateRequest(request: CreateVersionRequest): void {
     if (!request.schema) {
@@ -567,7 +541,7 @@ export class VersionManagerImpl implements VersionManager {
   }
 
   /**
-   * 生成版本号
+   * Generate next version number
    */
   private async generateVersionNumber(
     pageId: string,
@@ -581,7 +555,6 @@ export class VersionManagerImpl implements VersionManager {
         const base = await this.getVersion(baseVersionId);
         baseVersion = base.version;
       } else {
-        // 获取最新版本
         const versions = await this.getVersions(pageId, {
           sortBy: 'version',
           sortOrder: 'desc',
@@ -600,7 +573,7 @@ export class VersionManagerImpl implements VersionManager {
   }
 
   /**
-   * 递增版本号
+   * Increment a semver string according to version type
    */
   private incrementVersion(version: string, type: VersionType): string {
     const parts = version.split('.').map(Number);
@@ -621,33 +594,14 @@ export class VersionManagerImpl implements VersionManager {
   }
 
   /**
-   * 生成版本ID
+   * Generate a unique version ID
    */
   private generateVersionId(): string {
     return `version_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
   /**
-   * @experimental Not wired to auth. Returns a placeholder actor string.
-   *   Data created via this manager will have polluted createdBy/updatedBy —
-   *   follow-up task: have public API accept `actor` param explicitly.
-   *
-   * NOTE: Until this is wired to auth, every version created via AutoSave /
-   * publish / rollback / saveDraft will have createdBy='system' (or
-   * whatever placeholder this returns). This is visible in VersionDetail
-   * UI and version listings — audit trails are effectively broken until F1.
-   */
-  private getCurrentUser(): string {
-    if (!VersionManagerImpl._warnedGetCurrentUser) {
-      VersionManagerImpl._warnedGetCurrentUser = true;
-      // eslint-disable-next-line no-console
-      console.warn('[VersionManager] getCurrentUser() is not wired to auth — returning placeholder actor. (warned once)');
-    }
-    return 'current_user';
-  }
-
-  /**
-   * 检查版本锁定
+   * Check whether a version is locked
    */
   private async checkVersionLock(versionId: string): Promise<void> {
     const lock = this.locks.get(versionId);
@@ -682,12 +636,14 @@ export class VersionManagerImpl implements VersionManager {
   }
 
   /**
-   * 锁定版本
+   * Lock a version.
+   *
+   * @param actor - caller identity from auth context
    */
-  async lockVersion(versionId: string, reason?: string, expiresAt?: Date): Promise<void> {
+  async lockVersion(versionId: string, actor: string, reason?: string, expiresAt?: Date): Promise<void> {
     const lock: VersionLock = {
       versionId,
-      lockedBy: this.getCurrentUser(),
+      lockedBy: actor,
       lockedAt: new Date(),
       reason,
       expiresAt,
@@ -697,21 +653,21 @@ export class VersionManagerImpl implements VersionManager {
   }
 
   /**
-   * 解锁版本
+   * Unlock a version
    */
   async unlockVersion(versionId: string): Promise<void> {
     this.locks.delete(versionId);
   }
 
   /**
-   * 获取同步状态
+   * Get sync status for a version
    */
   getSyncStatus(versionId: string): VersionSync | undefined {
     return this.syncStatus.get(versionId);
   }
 
   /**
-   * 更新同步状态
+   * Update sync status for a version
    */
   updateSyncStatus(versionId: string, status: SyncStatus, error?: string): void {
     const sync: VersionSync = {
@@ -726,12 +682,12 @@ export class VersionManagerImpl implements VersionManager {
 }
 
 /**
- * 全局版本管理器实例
+ * Global version manager singleton
  */
 let globalVersionManager: VersionManagerImpl | null = null;
 
 /**
- * 获取版本管理器实例
+ * Get (or lazily create) the global version manager instance
  */
 export function getVersionManager(config?: VersionConfig): VersionManagerImpl {
   if (!globalVersionManager) {
@@ -741,7 +697,7 @@ export function getVersionManager(config?: VersionConfig): VersionManagerImpl {
 }
 
 /**
- * 设置版本管理器实例
+ * Replace the global version manager instance (for testing)
  */
 export function setVersionManager(manager: VersionManagerImpl): void {
   globalVersionManager = manager;

@@ -7,6 +7,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Save, Check, AlertCircle, Clock, Wifi, WifiOff } from 'lucide-react';
 import { useI18n } from '~/contexts/I18nContext';
+import { useAuth } from '~/contexts/AuthContext';
 import { DESIGNER_I18N, resolveDesignerText } from '~/shared/designer';
 import { getVersionManager } from '~/plugins/core-designer/components/studio/services/managers';
 import type { CanvasSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
@@ -126,6 +127,7 @@ export function AutoSave({
   className = '',
 }: AutoSaveProps) {
   const { locale } = useI18n();
+  const { user } = useAuth();
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const [lastSaved, setLastSaved] = useState<Date | undefined>();
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -152,12 +154,13 @@ export function AutoSave({
         isSavingRef.current = true;
         setSaveStatus('saving');
 
+        const actor = user?.email ?? user?.name ?? 'unknown';
         // 创建新的快照版本
         await versionManager.createVersion(pageId, {
           schema,
           type: VersionType.SNAPSHOT,
           description: resolveDesignerText(DESIGNER_I18N.autoSave.versionDescription, locale),
-        });
+        }, actor);
 
         setSaveStatus('saved');
         setLastSaved(new Date());
@@ -173,7 +176,7 @@ export function AutoSave({
         isSavingRef.current = false;
       }
     },
-    [pageId, schema, versionManager, isOnline, onSave],
+    [pageId, schema, versionManager, isOnline, onSave, user],
   );
 
   /**
@@ -373,6 +376,7 @@ export function useAutoSave(
   } = {},
 ) {
   const { locale } = useI18n();
+  const { user } = useAuth();
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const [lastSaved, setLastSaved] = useState<Date | undefined>();
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -385,11 +389,12 @@ export function useAutoSave(
     try {
       setSaveStatus('saving');
 
+      const actor = user?.email ?? user?.name ?? 'unknown';
       await versionManager.createVersion(pageId, {
         schema,
         type: VersionType.SNAPSHOT,
         description: resolveDesignerText(DESIGNER_I18N.autoSave.versionDescription, locale),
-      });
+      }, actor);
 
       setSaveStatus('saved');
       setLastSaved(new Date());
@@ -402,7 +407,7 @@ export function useAutoSave(
       setSaveStatus('error');
       options.onSave?.(false);
     }
-  }, [pageId, schema, versionManager, options]);
+  }, [pageId, schema, versionManager, options, user]);
 
   const debouncedSave = useCallback(() => {
     if (saveTimeoutRef.current) {
