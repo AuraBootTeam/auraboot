@@ -461,7 +461,7 @@ async function saveViaUI(page: Page, pid: string): Promise<number> {
 // ---------------------------------------------------------------------------
 // Test suite
 // ---------------------------------------------------------------------------
-test.describe('BPM Designer designerJson round-trip (Epic B4)', () => {
+test.describe('BPM Designer designerJson round-trip (Epic B4)', { tag: ['@bpm-regression'] }, () => {
   test.setTimeout(180_000);
 
   test.beforeAll(async ({ request }: { request: APIRequestContext }) => {

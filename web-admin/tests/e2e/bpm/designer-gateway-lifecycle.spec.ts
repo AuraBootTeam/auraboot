@@ -396,7 +396,7 @@ async function setUserTaskAssignee(page: Page, nodeId: string, expression: strin
 // ---------------------------------------------------------------------------
 // Test suite
 // ---------------------------------------------------------------------------
-test.describe('BPM Designer Gateway Full Lifecycle', () => {
+test.describe('BPM Designer Gateway Full Lifecycle', { tag: ['@bpm-regression'] }, () => {
   test.setTimeout(180_000);
 
   test.beforeAll(async ({ request }: { request: APIRequestContext }) => {
