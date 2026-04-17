@@ -51,14 +51,21 @@ const RUNNING_STATUS = 'running';
 /**
  * Variable keys that may carry the process initiator's user id.
  *
- * Ordered by backend preference — {@code _startUserId} is the canonical key
- * written by {@code ApprovalChainExecutor} (see
- * {@code platform/.../chain/ApprovalChainExecutor.java:90}) and consumed first
+ * Used as a *fallback* once Fix A (backend DTO {@code startUserId} projection)
+ * is in place — preferred lookup is {@code instance.startUserId} which mirrors
+ * SmartEngine's {@code ProcessInstance.startUserId} and is always populated.
+ *
+ * Variable-key fallback ordered by backend preference: {@code _startUserId} is
+ * the canonical key written by {@code ApprovalChainExecutor}
+ * ({@code platform/.../chain/ApprovalChainExecutor.java:90}) and consumed first
  * by {@code AssigneeResolverService} (lines 123-125). {@code startUserId} is
  * the legacy fallback written by {@code BpmIntegrationService} for SmartEngine-
  * native starts. We intentionally do NOT probe {@code initiatorUserId} /
  * {@code applicantUserId} — those are notification-payload keys on the event
  * bus, never written to process variables, so probing them was dead code.
+ *
+ * The variable-key fallback may be removed once every deployed backend emits
+ * the top-level {@code startUserId} field (Fix A rolled out everywhere).
  */
 const INITIATOR_VARIABLE_KEYS = ['_startUserId', 'startUserId'] as const;
 
@@ -98,13 +105,27 @@ export interface CurrentUserForPermission {
 }
 
 /**
- * Extract the process-initiator user id from the instance's process variables.
+ * Extract the process-initiator user id from the instance.
  *
- * We probe {@link INITIATOR_VARIABLE_KEYS} in order. The first key whose value
- * stringifies to a non-blank token wins. Any other representation (number,
- * boolean, null) is coerced via {@code String()} and then validated.
+ * Resolution order:
+ *   1. {@code instance.startUserId} — the canonical, top-level field emitted by
+ *      {@code ProcessInstanceStatusDTO} (Fix A). This mirrors SmartEngine
+ *      {@code ProcessInstance.startUserId} verbatim and is always populated for
+ *      newly-started instances regardless of how the caller passed variables.
+ *   2. {@code variables._startUserId} / {@code variables.startUserId} — legacy
+ *      fallback for backends that have not yet rolled out Fix A. Removable
+ *      once every deployment emits the top-level field.
+ *
+ * Any non-blank string representation wins; numbers/booleans are coerced via
+ * {@code String()} and then validated.
  */
 function resolveInitiatorId(instance: BpmInstanceForRecord): string | null {
+  // Layer 2 preferred: backend-projected top-level field.
+  if (instance.startUserId !== undefined && instance.startUserId !== null) {
+    const text = String(instance.startUserId).trim();
+    if (text.length > 0) return text;
+  }
+  // Backward-compatibility fallback: probe process variables.
   const variables = instance.variables;
   if (!variables) return null;
   for (const key of INITIATOR_VARIABLE_KEYS) {
