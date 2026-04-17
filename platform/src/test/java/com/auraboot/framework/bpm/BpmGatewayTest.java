@@ -63,8 +63,7 @@ class BpmGatewayTest extends BaseIntegrationTest {
                 <sequenceFlow id="flow_start_submit" sourceRef="start" targetRef="submit"/>
 
                 <userTask id="submit" name="Submit Request"
-                          smart:assigneeType="user"
-                          smart:assigneeId="testuser1"/>
+                          smart:assigneeType="starter"/>
                 <sequenceFlow id="flow_submit_gw" sourceRef="submit" targetRef="decision"/>
 
                 <exclusiveGateway id="decision" name="Approval Decision"/>
@@ -77,13 +76,11 @@ class BpmGatewayTest extends BaseIntegrationTest {
                 </sequenceFlow>
 
                 <userTask id="approved_task" name="Process Approved"
-                          smart:assigneeType="user"
-                          smart:assigneeId="testuser1"/>
+                          smart:assigneeType="starter"/>
                 <sequenceFlow id="flow_approved_end" sourceRef="approved_task" targetRef="end"/>
 
                 <userTask id="rejected_task" name="Process Rejected"
-                          smart:assigneeType="user"
-                          smart:assigneeId="testuser1"/>
+                          smart:assigneeType="starter"/>
                 <sequenceFlow id="flow_rejected_end" sourceRef="rejected_task" targetRef="end"/>
 
                 <endEvent id="end" name="End"/>
@@ -104,8 +101,7 @@ class BpmGatewayTest extends BaseIntegrationTest {
                 <startEvent id="start" name="Start"/>
                 <sequenceFlow id="flow1" sourceRef="start" targetRef="task1"/>
                 <userTask id="task1" name="Single Task"
-                          smart:assigneeType="user"
-                          smart:assigneeId="testuser1"/>
+                          smart:assigneeType="starter"/>
                 <sequenceFlow id="flow2" sourceRef="task1" targetRef="end"/>
                 <endEvent id="end" name="End"/>
               </process>
