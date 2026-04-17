@@ -70,6 +70,16 @@ public interface BpmProcessDefinitionMapper extends BaseMapper<BpmProcessDefinit
     int updateDeployment(@Param("pid") String pid, @Param("deploymentId") String deploymentId);
 
     /**
+     * Persist compiled BPMN XML. Called by ProcessDeploymentService#deploy when
+     * the BPMN is generated from designerJson at deploy-time; without this the
+     * /{pid}/bpmn endpoint would serve the stale empty bpmn_content column and
+     * runtime callers (aura.* smart:properties assertions, export/import,
+     * version history snapshots) would see no compiled XML.
+     */
+    @Update("UPDATE ab_bpm_process_definition SET bpmn_content = #{bpmnContent}, updated_at = NOW() WHERE pid = #{pid}")
+    int updateBpmnContent(@Param("pid") String pid, @Param("bpmnContent") String bpmnContent);
+
+    /**
      * Mark all versions as not current.
      */
     @Update("UPDATE ab_bpm_process_definition SET is_current = FALSE, updated_at = NOW() WHERE tenant_id = #{tenantId} AND process_key = #{processKey} AND is_current = TRUE")

@@ -348,6 +348,10 @@ public class ProcessDeploymentService {
             log.info("Converting designer JSON to BPMN XML: processKey={}", definition.getProcessKey());
             String bpmnXml = jsonToBpmnConverter.convert(designerJson);
             definition.setBpmnContent(bpmnXml);
+            // Persist the compiled XML so subsequent GET /{pid}/bpmn, exports,
+            // and version snapshots see the real content instead of the empty
+            // placeholder stored at create-time.
+            processDefinitionMapper.updateBpmnContent(pid, bpmnXml);
         }
 
         try {
