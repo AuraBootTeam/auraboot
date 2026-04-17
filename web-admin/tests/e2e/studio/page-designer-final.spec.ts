@@ -337,7 +337,6 @@ test.describe('Toolbar', () => {
 
     // Click undo to go back to the loaded state
     await undoBtn.click();
-    await page.waitForTimeout(300);
 
     // After undoing back to the loaded schema, the undo button must be disabled
     // (we are at the history floor — the loaded state, not the blank placeholder)
