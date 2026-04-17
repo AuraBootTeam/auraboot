@@ -179,6 +179,7 @@ export function FormBindingSection({
         type="button"
         onClick={() => setExpanded(!expanded)}
         className="flex w-full items-center justify-between px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+        data-testid="form-binding-toggle"
       >
         <span>{t('bpmn.prop.formBinding.title')} {hasFormRef ? '(1)' : ''}</span>
         <span className="text-gray-400">{expanded ? '▾' : '▸'}</span>
