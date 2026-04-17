@@ -300,14 +300,11 @@ test.describe('Toolbar', () => {
   // had blocks. After the fix, resetHistory() is called on load instead of pushState(),
   // so the undo floor is the real loaded schema — not the placeholder.
   //
-  // D8 is skipped: resetHistory's canUndo=false intent is defeated by child
-  // designer components that emit a normalize roundtrip via onChange after
-  // load. The normalized schema is semantically equivalent but not
-  // byte-identical, so handleSchemaChange.pushState still fires → canUndo
-  // becomes true on mount. The resetHistory API itself is verified in
-  // usePageSchemaHistory.test.ts (9/9 passing). Enable this test once the
-  // normalize roundtrip is eliminated (track as GAP-229-followup).
-  test.skip('D8: undo to bottom restores loaded blocks, not blank placeholder', async ({ page }) => {
+  // No normalize roundtrip exists in the current BlocksDesigner implementation:
+  // child components only call onSchemaChange on explicit user actions, not on mount.
+  // resetHistory() correctly seeds canUndo=false. Verified in usePageSchemaHistory.test.ts
+  // (9/9 passing) and confirmed by browser screenshot showing undo disabled on load.
+  test('D8: undo to bottom restores loaded blocks, not blank placeholder', async ({ page }) => {
     // Create a page pre-seeded with 2 blocks via API
     const name = uniqueId('d8-undo');
     const pageKey = `e2e_d8_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
@@ -334,17 +331,30 @@ test.describe('Toolbar', () => {
     await open(page, pid);
 
     // The toolbar undo button must start disabled (no edits yet)
+    // resetHistory() seeds history with the loaded schema as the floor,
+    // so canUndo=false immediately after load — no normalize roundtrip fires.
     const undoBtn = page.getByTestId('toolbar-undo');
     await expect(undoBtn).toBeDisabled({ timeout: 5000 });
 
-    // Add one block to build up undo history (one step above the loaded state)
-    await addBlock(page, 'table');
+    // Add one block to build up undo history (one step above the loaded state).
+    // BlocksDesigner uses designer-tab-blocks to show the block palette.
+    const blocksBefore = await page.locator('[data-testid="sortable-block"]').count();
+    await page.getByTestId('designer-tab-blocks').click();
+    await page.getByTestId('block-palette-item-table').click();
+    // Wait for the new block to appear in the canvas
+    await page.waitForFunction(
+      (expected) => document.querySelectorAll('[data-testid="sortable-block"]').length >= expected,
+      blocksBefore + 1,
+      { timeout: 3000 },
+    ).catch(() => {});
+    await page.waitForTimeout(300); // wait for React state / pushState to settle
 
     // After adding, undo becomes available
     await expect(undoBtn).not.toBeDisabled({ timeout: 3000 });
 
     // Click undo to go back to the loaded state
     await undoBtn.click();
+    await page.waitForTimeout(300); // wait for history state to settle
 
     // After undoing back to the loaded schema, the undo button must be disabled
     // (we are at the history floor — the loaded state, not the blank placeholder)
