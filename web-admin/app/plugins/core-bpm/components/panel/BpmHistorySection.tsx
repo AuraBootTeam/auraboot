@@ -111,6 +111,37 @@ const OPERATION_LABELS: Record<string, OperationDescriptor> = {
     i18nKey: 'bpm.history.op.cc',
     fallback: '抄送',
   },
+  // SmartEngine native audit event. `details.eventType` (activity_start /
+  // activity_end) further discriminates the specific lifecycle phase; see
+  // {@link resolveActivityEventPresentation}. The generic fallback label
+  // applies when details are missing or eventType is unknown.
+  activity_event: {
+    icon: '\u2699\uFE0F',
+    dotClass: 'bg-gray-400',
+    i18nKey: 'bpm.history.op.activity_event',
+    fallback: '活动事件',
+  },
+};
+
+/**
+ * Known `details.eventType` values for the SmartEngine-native
+ * {@code activity_event} audit operation. Any other eventType degrades to
+ * the generic {@code activity_event} label (no silent substitution).
+ */
+interface ActivityEventPresentation {
+  icon: string;
+  labelTemplate: (nodeDisplay: string) => string;
+}
+
+const ACTIVITY_EVENT_TYPES: Record<string, ActivityEventPresentation> = {
+  activity_start: {
+    icon: '\u25B6\uFE0F',
+    labelTemplate: (nodeDisplay) => `进入节点 ${nodeDisplay}`,
+  },
+  activity_end: {
+    icon: '\u23F9\uFE0F',
+    labelTemplate: (nodeDisplay) => `完成节点 ${nodeDisplay}`,
+  },
 };
 
 /** Neutral descriptor for any operation not in {@link OPERATION_LABELS}. */
@@ -257,11 +288,30 @@ export function BpmHistorySection({ instance, t }: BpmHistorySectionProps) {
         {sorted.map((event) => {
           const descriptor = OPERATION_LABELS[event.operation];
           const isKnown = descriptor !== undefined;
-          const label = isKnown
+          let label = isKnown
             ? t(descriptor.i18nKey, undefined, descriptor.fallback)
             : event.operation;
-          const icon = isKnown ? descriptor.icon : UNKNOWN_OPERATION_STYLE.icon;
+          let icon = isKnown ? descriptor.icon : UNKNOWN_OPERATION_STYLE.icon;
           const dotClass = isKnown ? descriptor.dotClass : UNKNOWN_OPERATION_STYLE.dotClass;
+
+          // SmartEngine native activity_event: parse details to render a
+          // human-readable "进入节点 X" / "完成节点 X" label. When details are
+          // missing or eventType is not one of the known values, the generic
+          // "活动事件" fallback from OPERATION_LABELS stays in place (no silent
+          // substitution to a made-up label).
+          let activityType: string | null = null;
+          if (event.operation === 'activity_event') {
+            const eventType = readStringField(event.details, 'eventType');
+            const activityName = readStringField(event.details, 'activityName');
+            const activityId = readStringField(event.details, 'activityId');
+            activityType = readStringField(event.details, 'activityType');
+            const presentation = eventType !== null ? ACTIVITY_EVENT_TYPES[eventType] : undefined;
+            if (presentation && (activityName || activityId)) {
+              const nodeDisplay = activityName ?? activityId ?? '';
+              label = presentation.labelTemplate(nodeDisplay);
+              icon = presentation.icon;
+            }
+          }
 
           const comment = readStringField(event.details, 'comment');
           const reason = readStringField(event.details, 'reason');
@@ -303,6 +353,14 @@ export function BpmHistorySection({ instance, t }: BpmHistorySectionProps) {
                     backend id so operators can still audit activity. */}
                 {event.userId && (
                   <span className="text-xs text-gray-500">{event.userId}</span>
+                )}
+                {activityType && (
+                  <span
+                    data-testid={`bpm-history-event-${event.id}-activity-type`}
+                    className="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-[10px] text-gray-500"
+                  >
+                    {activityType}
+                  </span>
                 )}
                 {event.createdAt && (
                   <span className="ml-auto text-xs text-gray-400">{event.createdAt}</span>
