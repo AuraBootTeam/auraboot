@@ -22,17 +22,7 @@ export async function fetchBootstrapStatus(): Promise<BootstrapStatus | null> {
       reason: json.data.reason,
     };
   } catch {
+    // Backend unreachable → return null so caller renders without banner.
     return null;
   }
-}
-
-export const MISSING_PART_LABELS: Record<string, string> = {
-  admin_user: 'Admin account',
-  default_tenant: 'Default tenant',
-  system_config: 'System config flag',
-};
-
-export function describeMissingParts(parts: string[]): string {
-  if (!parts.length) return '';
-  return parts.map((p) => MISSING_PART_LABELS[p] ?? p).join(', ');
 }

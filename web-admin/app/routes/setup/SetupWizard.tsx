@@ -3,6 +3,7 @@ import { useNavigate, Link, useLoaderData } from 'react-router';
 import type { LoaderFunctionArgs } from 'react-router';
 import { Button } from '~/ui/ui/button';
 import { fetchBootstrapStatus, type BootstrapStatus } from '~/services/bootstrapStatus';
+import { bootstrapT } from '~/services/bootstrapTexts';
 
 /**
  * Loader: fetch bootstrap status; UI branches between wizard and "already done" page.
@@ -37,10 +38,10 @@ export default function SetupWizard() {
   if (status?.initialized) {
     return (
       <div data-testid="bootstrap-already-done" className="max-w-md mx-auto mt-20 p-6 bg-white border border-gray-200 rounded shadow">
-        <h1 className="text-xl font-semibold mb-2 text-gray-900">System already initialized</h1>
-        <p className="text-gray-600 mb-4">No further action needed.</p>
+        <h1 className="text-xl font-semibold mb-2 text-gray-900">{bootstrapT('alreadyDoneTitle')}</h1>
+        <p className="text-gray-600 mb-4">{bootstrapT('alreadyDoneBody')}</p>
         <Link to="/" className="inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
-          Back to home
+          {bootstrapT('alreadyDoneCta')}
         </Link>
       </div>
     );

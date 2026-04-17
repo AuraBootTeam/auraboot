@@ -4,14 +4,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
-import org.springframework.context.annotation.Profile;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
 @Order(Integer.MAX_VALUE)
-@Profile("!integration-test")
 @RequiredArgsConstructor
 public class BootstrapStartupLogger implements ApplicationRunner {
 
@@ -19,8 +17,16 @@ public class BootstrapStartupLogger implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        BootstrapStatusEvaluator.Result result = evaluator.evaluate();
-        if (result.missingParts().isEmpty()) {
+        // Auxiliary observability — must never crash app boot if downstream returns
+        // unexpected state (e.g. evaluator mocked in tests returns null without stub).
+        BootstrapStatusEvaluator.Result result;
+        try {
+            result = evaluator.evaluate();
+        } catch (Exception e) {
+            log.warn("Bootstrap status check failed at startup: {}", e.getMessage());
+            return;
+        }
+        if (result == null || result.missingParts() == null || result.missingParts().isEmpty()) {
             return;
         }
         log.warn("================================================");

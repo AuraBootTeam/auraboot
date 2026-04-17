@@ -104,7 +104,13 @@ export interface UseActionHandlerOptions {
 
   // i18n
   locale: string;
-  t: (key: string) => string;
+  /**
+   * Translator. Accepts optional fallback string returned when the key is
+   * unresolved (matches `I18nContextType.t`). Callers that pass a
+   * single-argument `(key) => string` are forward-compatible — the extra
+   * parameter is simply ignored.
+   */
+  t: (key: string, params?: Record<string, any>, fallback?: string) => string;
 
   // 认证 token
   token?: string;
@@ -388,6 +394,71 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
             return;
           }
 
+          case 'bpm': {
+            if (confirmKey) {
+              const confirmed = await showConfirmDialog(confirmKey);
+              if (!confirmed) return;
+            }
+            const { processDefinitionKey, businessKeyField, variables: varMap } = actionDef;
+            const src: Record<string, any> = record || context.data || {};
+            const businessKeyRaw = src[businessKeyField];
+            if (
+              businessKeyRaw === undefined ||
+              businessKeyRaw === null ||
+              String(businessKeyRaw).trim() === ''
+            ) {
+              throw new Error(
+                `action.type=bpm: record missing or blank businessKeyField "${businessKeyField}"`,
+              );
+            }
+            const resolvedVars: Record<string, unknown> = {};
+            if (varMap) {
+              for (const [k, expr] of Object.entries(varMap)) {
+                if (typeof expr !== 'string') continue;
+                if (!expr.startsWith('$')) {
+                  resolvedVars[k] = expr; // literal
+                  continue;
+                }
+                if (expr.includes('[')) {
+                  throw new Error(
+                    `action.type=bpm: JSONPath bracket syntax not supported: "${expr}"`,
+                  );
+                }
+                const stripped = expr.startsWith('$.') ? expr.slice(2) : expr.slice(1);
+                if (stripped === '') continue;
+                let cursor: unknown = src;
+                let resolved = true;
+                for (const part of stripped.split('.')) {
+                  if (cursor && typeof cursor === 'object' && part in (cursor as object)) {
+                    cursor = (cursor as Record<string, unknown>)[part];
+                  } else {
+                    resolved = false;
+                    break;
+                  }
+                }
+                if (resolved) resolvedVars[k] = cursor;
+              }
+            }
+            const { startProcessFromAction } = await import(
+              '~/plugins/core-bpm/services/bpmWorkbenchService'
+            );
+            const result = await startProcessFromAction({
+              processDefinitionKey,
+              businessKey: String(businessKeyRaw),
+              variables: Object.keys(resolvedVars).length > 0 ? resolvedVars : undefined,
+            });
+            // i18n keys `bpm.action.start.success` / `bpm.action.start.deduped` are
+            // pending registration in the central i18n dictionary; t() accepts a
+            // fallback string that surfaces when the key is missing so the UX
+            // never shows the raw key.
+            const toastMessage = result.deduped
+              ? t('bpm.action.start.deduped', undefined, '该记录已有审批流程在运行')
+              : t('bpm.action.start.success', undefined, '审批流程已启动');
+            showToast?.(toastMessage, 'success');
+            if (context.loadData) await context.loadData();
+            return;
+          }
+
           case 'flow': {
             if (confirmKey) {
               const confirmed = await showConfirmDialog(confirmKey);
@@ -396,11 +467,19 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
 
             if ('handler' in actionDef && actionDef.handler) {
               if (runtime) {
+                // Task 9a refactor regression fix: normalizeAction only lifts
+                // `handler` from the legacy `events.onClick.handler` shape but
+                // drops the sibling `args` map. Downstream `executeSchemaHandler`
+                // reads `button.events.onClick.args`, so we splice the original
+                // args back in (if any) to preserve pre-refactor behaviour.
+                const legacyArgs = normalizedButton.events?.onClick?.args;
                 await executeSchemaHandler({
                   runtime,
                   button: {
                     ...normalizedButton,
-                    events: { onClick: { handler: actionDef.handler } },
+                    events: {
+                      onClick: { handler: actionDef.handler, args: legacyArgs },
+                    },
                   },
                   record,
                   context,

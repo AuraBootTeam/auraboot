@@ -246,6 +246,73 @@ export async function startProcess(request: StartProcessRequest): Promise<string
   return result.data;
 }
 
+// ==================== Action-driven Process Start ====================
+
+/**
+ * Request shape for DSL ActionDef(type=bpm) → POST /api/bpm/process-instances
+ *
+ * The backend `StartProcessRequest.processDefinitionId` field accepts the BPMN
+ * process definition key (i.e. <process id="..."> in the .bpmn file), so the
+ * frontend-facing contract uses `processDefinitionKey` for clarity and maps it
+ * onto the backend field name in the request body.
+ */
+export interface StartProcessFromActionRequest {
+  processDefinitionKey: string;
+  businessKey: string;
+  variables?: Record<string, unknown>;
+}
+
+/**
+ * Response from starting a process via ActionDef(type=bpm).
+ *
+ * `processInstanceId` is the freshly-started (or existing, if the backend
+ * decides to dedupe in the future) instance id. `deduped` is optional: when
+ * the backend reports that an existing running instance was reused for the
+ * (processKey, businessKey), UI can surface a distinct toast message.
+ * Current backend controller does not emit `deduped`; this field exists to
+ * allow forward-compatible handling once the controller supports it.
+ */
+export interface StartProcessFromActionResponse {
+  processInstanceId: string;
+  deduped?: boolean;
+}
+
+/**
+ * Start a BPM process instance from a DSL ActionDef(type=bpm).
+ *
+ * Posts to the canonical `/api/bpm/process-instances` endpoint. Does not
+ * perform multi-path response fallback: the backend returns ApiResponse<T>
+ * with `data.instanceId`; anything else is an error.
+ */
+export async function startProcessFromAction(
+  request: StartProcessFromActionRequest,
+): Promise<StartProcessFromActionResponse> {
+  const body = {
+    // Backend `StartProcessRequest.processDefinitionId` accepts the process key.
+    processDefinitionId: request.processDefinitionKey,
+    businessKey: request.businessKey,
+    variables: request.variables,
+  };
+  const result = await post<Record<string, unknown>>('/api/bpm/process-instances', body);
+  if (!isSuccess(result.code) || !result.data) {
+    throw new Error(
+      result.desc ||
+        `BPM start failed: empty response for processDefinitionKey=${request.processDefinitionKey}`,
+    );
+  }
+  const data = result.data;
+  const processInstanceId = data.instanceId as string | undefined;
+  if (!processInstanceId) {
+    throw new Error(
+      `BPM start failed: response missing instanceId for processDefinitionKey=${request.processDefinitionKey}`,
+    );
+  }
+  return {
+    processInstanceId,
+    deduped: typeof data.deduped === 'boolean' ? (data.deduped as boolean) : undefined,
+  };
+}
+
 /**
  * Batch process tasks
  */
@@ -344,6 +411,96 @@ export async function rejectTask(
 }
 
 /**
+ * List all pending tasks for a process instance.
+ *
+ * Wraps {@code GET /api/bpm/tasks/by-process/{processInstanceId}}. Useful for
+ * the detail-panel BPM operations section, which only has a
+ * {@link BpmInstanceForRecord} in hand and needs to resolve a concrete
+ * {@code taskId} before issuing approve/reject/withdraw/cc operations.
+ */
+export async function getTasksByProcessInstance(
+  processInstanceId: string,
+): Promise<TaskInstance[]> {
+  if (!processInstanceId || processInstanceId.trim().length === 0) {
+    throw new Error('getTasksByProcessInstance: processInstanceId is required');
+  }
+  const result = await get<Record<string, unknown>[]>(
+    `/api/bpm/tasks/by-process/${processInstanceId}`,
+  );
+  if (!isSuccess(result.code)) {
+    throw new Error(result.desc || 'Failed to list tasks for process');
+  }
+  return (result.data || []).map(mapTaskInstance);
+}
+
+/**
+ * Withdraw a process instance via a current task.
+ *
+ * Posts to {@code POST /api/bpm/tasks/{taskId}/withdraw}. Backend
+ * {@link com.auraboot.framework.bpm.controller.TaskController.WithdrawRequest}
+ * accepts a single optional {@code reason}.
+ *
+ * The caller must be the process initiator; the backend further constrains
+ * the operation by the process-level {@code WithdrawPolicy}
+ * (strict / loose / none).
+ */
+export async function withdrawTask(taskId: string, reason?: string): Promise<void> {
+  if (!taskId || taskId.trim().length === 0) {
+    throw new Error('withdrawTask: taskId is required');
+  }
+  const result = await post(`/api/bpm/tasks/${taskId}/withdraw`, { reason });
+  if (!isSuccess(result.code)) {
+    throw new Error(result.desc || 'Failed to withdraw process');
+  }
+}
+
+/**
+ * CC (carbon copy) a process instance via a current task.
+ *
+ * Posts to {@code POST /api/bpm/tasks/{taskId}/cc}. Backend
+ * {@link com.auraboot.framework.bpm.controller.TaskController.CcRequest} is a
+ * record of {@code (receiverUserIds: List<Long>, comment: String)}. Receiver
+ * ids are sent as numbers so JSON deserialization lines up with the Java type.
+ *
+ * The backend enforces the process-level {@code CcPolicy}
+ * (initiator / assignee / all); a policy violation surfaces as a non-success
+ * response code, which is rethrown here.
+ */
+export async function ccTask(
+  taskId: string,
+  receiverUserIds: string[],
+  comment: string,
+): Promise<void> {
+  if (!taskId || taskId.trim().length === 0) {
+    throw new Error('ccTask: taskId is required');
+  }
+  if (!Array.isArray(receiverUserIds) || receiverUserIds.length === 0) {
+    throw new Error('ccTask: receiverUserIds must be a non-empty array');
+  }
+  // Backend expects Long ids. We parse strictly: any non-numeric token is an
+  // error (caller should have validated upstream), so we avoid silently
+  // dropping values.
+  const numericIds = receiverUserIds.map((raw) => {
+    const trimmed = raw.trim();
+    if (trimmed.length === 0) {
+      throw new Error('ccTask: blank receiver id');
+    }
+    const n = Number(trimmed);
+    if (!Number.isFinite(n) || !Number.isInteger(n)) {
+      throw new Error(`ccTask: non-integer receiver id ${raw}`);
+    }
+    return n;
+  });
+  const result = await post(`/api/bpm/tasks/${taskId}/cc`, {
+    receiverUserIds: numericIds,
+    comment,
+  });
+  if (!isSuccess(result.code)) {
+    throw new Error(result.desc || 'Failed to CC process');
+  }
+}
+
+/**
  * Rollback a task to a target activity node
  */
 export async function rollbackTask(
@@ -406,6 +563,132 @@ export async function getMyStartedProcesses(): Promise<ProcessInstance[]> {
   const result = await get<ProcessInstance[]>('/api/bpm/tasks/started');
   if (!isSuccess(result.code) || !result.data) {
     throw new Error(result.desc || 'Failed to get started processes');
+  }
+  return result.data || [];
+}
+
+// ==================== Detail-page BPM panel APIs ====================
+//
+// The following helpers support the `bpm-panel` detail block (see
+// BpmPanelBlock.tsx). Each wraps a canonical backend endpoint:
+//
+//   - getInstanceForRecord:   GET /api/bpm/process-instances/by-business-key/status
+//     → backed by ProcessInstanceController#getProcessInstanceStatusByBusinessKey,
+//       returns ProcessInstanceStatusDTO (instanceId, processDefinitionId, status,
+//       currentNodes, completedNodes, variables).
+//
+//   - listAuditEvents:        GET /api/bpm/monitor/instances/{processInstanceId}/audit
+//     → backed by BpmMonitorController#getAuditTrail, returns List<BpmAuditRecordEntity>.
+//
+// Diagram rendering uses the existing `getProcessDefinitionByKey` helper
+// from `core-designer/services/bpmnService`; no separate BPMN-XML wrapper
+// lives here. The backend `GET /api/bpm/process-definitions/{pid}/bpmn`
+// endpoint is still available for plugins that want raw BPMN XML.
+//
+// These helpers do NOT perform multi-path response fallback. Any deviation from
+// the expected envelope surfaces as an error.
+
+/**
+ * Status of a single BPMN node in a process instance, as returned by backend
+ * `NodeStatusDTO`. Field names mirror backend record verbatim.
+ */
+export interface BpmNodeStatus {
+  nodeId: string;
+  type: string;
+  name: string | null;
+  status: string;
+  assignee: string | null;
+  completedAt: string | null;
+  completedBy: string | null;
+}
+
+/**
+ * Per-business-key process instance state, as returned by backend
+ * `ProcessInstanceStatusDTO`. Field names mirror backend record verbatim.
+ *
+ * The wrapper endpoint returns 4xx when no process instance exists for the
+ * given (businessKey, optional processKey) pair; `getInstanceForRecord`
+ * catches that case and resolves to `null` so callers can render an empty
+ * state instead of treating missing-instance as a bug.
+ */
+export interface BpmInstanceForRecord {
+  instanceId: string;
+  processDefinitionId: string;
+  status: string;
+  currentNodes: BpmNodeStatus[];
+  completedNodes: BpmNodeStatus[];
+  variables: Record<string, unknown>;
+}
+
+/**
+ * Audit event for a process instance, as returned by backend
+ * `BpmAuditRecordEntity`. Field names mirror backend entity verbatim so the
+ * frontend can render operation/timestamp/user details without further
+ * transformation.
+ */
+export interface BpmAuditEvent {
+  id: number;
+  pid: string;
+  userId: string | null;
+  operation: string;
+  processInstanceId: string | null;
+  taskId: string | null;
+  processDefinitionKey: string | null;
+  version: number | null;
+  details: Record<string, unknown> | null;
+  ipAddress: string | null;
+  result: string | null;
+  errorMessage: string | null;
+  createdAt: string | null;
+}
+
+/**
+ * Fetch the process instance status bound to `businessKey` (optionally
+ * filtered by `processKey`). Returns `null` when no instance exists.
+ *
+ * Uses ErrorCodes.SUCCESS to distinguish "no data" from a real failure:
+ * - code === SUCCESS + data present → instance
+ * - code === SUCCESS + data absent → null (shouldn't happen; backend returns 4xx)
+ * - code !== SUCCESS → error thrown for caller to surface
+ *
+ * The backend may respond with `BadParam` when the instance does not exist;
+ * the wrapper translates that into `null` so the UI can render an empty
+ * state. All other non-success codes propagate as errors.
+ */
+export async function getInstanceForRecord(
+  businessKey: string,
+  processKey?: string,
+): Promise<BpmInstanceForRecord | null> {
+  const params: Record<string, string> = { businessKey };
+  if (processKey) {
+    params.processKey = processKey;
+  }
+  const result = await get<BpmInstanceForRecord>(
+    '/api/bpm/process-instances/by-business-key/status',
+    { params },
+  );
+  if (isSuccess(result.code)) {
+    return result.data ?? null;
+  }
+  // Backend throws BadParam when instance is absent; translate to null instead
+  // of an error so the UI can render an empty state.
+  const desc = result.desc || '';
+  if (desc.includes('not found')) {
+    return null;
+  }
+  throw new Error(desc || 'Failed to get process instance for record');
+}
+
+/**
+ * Fetch audit events for a process instance. Ordered by backend insertion
+ * order (typically ascending createdAt). Empty array is a valid result.
+ */
+export async function listAuditEvents(processInstanceId: string): Promise<BpmAuditEvent[]> {
+  const result = await get<BpmAuditEvent[]>(
+    `/api/bpm/monitor/instances/${processInstanceId}/audit`,
+  );
+  if (!isSuccess(result.code)) {
+    throw new Error(result.desc || 'Failed to list audit events');
   }
   return result.data || [];
 }
