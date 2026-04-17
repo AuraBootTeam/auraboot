@@ -10,7 +10,7 @@ import { createDefaultSchema } from '~/plugins/core-designer/components/studio/w
 const designerSDK = getDesignerSDK();
 const { componentRegistry, pageStateManager: stateManager } = designerSDK;
 
-export interface CollaborationConfig {
+interface ControllerCollaborationConfig {
   enabled: boolean;
   websocketUrl?: string;
   userId: string;
@@ -23,7 +23,7 @@ export interface DesignerControllerOptions {
   initialSchema?: CanvasSchema;
   previewMode?: boolean;
   readonly?: boolean;
-  collaborationConfig?: CollaborationConfig;
+  collaborationConfig?: ControllerCollaborationConfig;
   onSchemaChange?: (schema: CanvasSchema) => void;
   onSave?: (schema: CanvasSchema) => Promise<void>;
   onPublish?: (schema: CanvasSchema) => Promise<void>;
