@@ -2,17 +2,20 @@
  * Designer Toolbar Permission Pre-check E2E Tests
  *
  * Verifies that the DesignerToolbar enforces permission-gating:
- * - Save button requires `page.page.update`
- * - Publish button requires `page.page.publish`
- * - Import button requires `page.page.import`
- * - Export button requires `page.page.export`
+ * - Save button requires `page.page.manage`
+ * - Publish button requires `page.page.manage`
+ * - Import button requires `page.page.manage`
+ * - Export button requires `page.page.manage`
+ *
+ * Backend PageSchemaController uses a single page.page.manage permission for all
+ * mutation endpoints. There are no fine-grained keys in the RBAC registry, so the
+ * frontend uses one unified permission check for all toolbar action buttons.
  *
  * Strategy:
- * 1. Admin user (all permissions) — positive test: buttons are present and not
- *    permission-disabled (may still be disabled for other reasons like no unsaved changes).
- * 2. Permission-stripped user — simulate by intercepting the React Router root loader
- *    data endpoint to remove `page.page.publish` from the permissionCodes array, then
- *    asserting the Publish button carries the `disabled` attribute.
+ * 1. Admin user (has page.page.manage) — positive test: buttons are not permission-disabled.
+ * 2. Permission-stripped user — intercept the React Router root loader data endpoint
+ *    to remove `page.page.manage` from permissionCodes, then assert the Publish and
+ *    Save buttons carry the `disabled` attribute.
  *
  * Dimensions: D1 (sidebar nav), D6 (toolbar renders), D9 (permission guard), D14 (RBAC)
  *
@@ -53,8 +56,8 @@ async function openDesigner(page: Page, pid: string): Promise<boolean> {
 test.describe('Designer toolbar permission pre-check', () => {
   test.setTimeout(60_000);
 
-  // ── D6, D14: Admin has all permissions — Publish button is NOT permission-disabled
-  test('admin user sees publish button enabled (has page.page.publish)', async ({ page }) => {
+  // ── D6, D14: Admin has page.page.manage — Publish button is NOT permission-disabled
+  test('admin user sees publish button enabled (has page.page.manage)', async ({ page }) => {
     const pid = await findSupportedPageId(page);
     if (!pid) {
       test.skip(true, 'No list/form/detail page found — run reset-and-init.sh first');
@@ -70,16 +73,14 @@ test.describe('Designer toolbar permission pre-check', () => {
     const publishBtn = page.locator('[data-testid="toolbar-publish"]');
     await expect(publishBtn).toBeVisible();
 
-    // Admin has page.page.publish → button is NOT disabled due to permissions.
-    // (It may still appear enabled/disabled depending on publish state, but it
-    // must not carry the aria-label that indicates permission denial.)
+    // Admin has page.page.manage → button is NOT disabled due to permissions.
     const ariaLabel = await publishBtn.getAttribute('aria-label');
     expect(ariaLabel).not.toContain('do not have permission');
-    expect(ariaLabel).not.toContain('没有发布');
+    expect(ariaLabel).not.toContain('没有管理');
   });
 
-  // ── D6, D14: Admin has all permissions — Save button is NOT permission-disabled
-  test('admin user sees save button accessible (has page.page.update)', async ({ page }) => {
+  // ── D6, D14: Admin has page.page.manage — Save button is NOT permission-disabled
+  test('admin user sees save button accessible (has page.page.manage)', async ({ page }) => {
     const pid = await findSupportedPageId(page);
     if (!pid) {
       test.skip(true, 'No list/form/detail page found — run reset-and-init.sh first');
@@ -95,22 +96,22 @@ test.describe('Designer toolbar permission pre-check', () => {
     const saveBtn = page.locator('[data-testid="toolbar-save"]');
     await expect(saveBtn).toBeVisible();
 
-    // Admin has page.page.update → save button title must NOT indicate permission denial
+    // Admin has page.page.manage → save button title must NOT indicate permission denial
     const ariaLabel = await saveBtn.getAttribute('aria-label');
     expect(ariaLabel).not.toContain('do not have permission');
-    expect(ariaLabel).not.toContain('没有编辑');
+    expect(ariaLabel).not.toContain('没有管理');
   });
 
-  // ── D9, D14: Simulated no-publish-permission user sees publish button disabled
+  // ── D9, D14: Simulated no-manage-permission user sees publish button disabled
   //
   // We intercept the React Router data fetch for the root route (the request that
-  // carries `?_data=root` or `?_data=routes/root`) and strip `page.page.publish`
-  // from the permissionCodes array.  The SPA then re-renders with the mocked auth
-  // data, causing the toolbar's `canPublish` flag to be false.
+  // carries ?_data=root or ?_data=routes/root) and strip `page.page.manage`
+  // from the permissionCodes array. The SPA then re-renders with the mocked auth
+  // data, causing canManage to be false and all action buttons to be disabled.
   //
   // If the data endpoint pattern does not match (e.g. React Router version change),
   // we fall back to verifying via page.evaluate() that the button carries disabled.
-  test('publish button is disabled when page.page.publish permission is absent', async ({
+  test('publish button is disabled when page.page.manage permission is absent', async ({
     page,
   }) => {
     const pid = await findSupportedPageId(page);
@@ -119,7 +120,7 @@ test.describe('Designer toolbar permission pre-check', () => {
       return;
     }
 
-    // Intercept root loader data to strip page.page.publish from permissionCodes.
+    // Intercept root loader data to strip page.page.manage from permissionCodes.
     // React Router v7 fetches route data via fetch requests with ?_data= param.
     let interceptedCount = 0;
     await page.route(/\?_data=(root|routes\/root|routes\/_root)/, async (route) => {
@@ -127,10 +128,10 @@ test.describe('Designer toolbar permission pre-check', () => {
       const text = await response.text();
       try {
         const json = JSON.parse(text);
-        // Strip page.page.publish from permissionCodes
+        // Strip page.page.manage from permissionCodes
         if (json?.permissions?.permissionCodes && Array.isArray(json.permissions.permissionCodes)) {
           json.permissions.permissionCodes = json.permissions.permissionCodes.filter(
-            (code: string) => code !== 'page.page.publish',
+            (code: string) => code !== 'page.page.manage',
           );
           interceptedCount++;
         }
@@ -160,9 +161,7 @@ test.describe('Designer toolbar permission pre-check', () => {
     if (interceptedCount === 0) {
       // The route data request did not match — this means SPA navigation did not
       // trigger a separate _data fetch (e.g. SSR served the page fully).
-      // Fall back: verify via DOM that button is present and check aria-label.
-      // We cannot assert disabled without actually stripping the permission in this case.
-      // Document the limitation and assert button visibility at minimum.
+      // Fall back: assert button visibility at minimum.
       console.log(
         'Permission simulation: _data intercept did not fire. ' +
           'Asserting toolbar publish button is visible (SSR rendered full page).',

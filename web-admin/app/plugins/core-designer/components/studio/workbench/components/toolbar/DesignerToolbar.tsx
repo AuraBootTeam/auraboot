@@ -17,6 +17,7 @@ import { AiPageGenerateDialog } from '~/plugins/core-designer/components/studio/
 import type { MergeMode } from '~/plugins/core-designer/components/studio/components/ai-page-prompt';
 import type { PageSchema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 import { usePermissions } from '~/contexts/AuthContext';
+import { useI18n } from '~/contexts/I18nContext';
 import { DESIGNER_I18N } from '~/shared/designer/designerI18n';
 
 /**
@@ -175,15 +176,18 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
   const [showAiGenerate, setShowAiGenerate] = useState(false);
 
   // Permission pre-checks — disable action buttons for users lacking the required permission.
-  // This is a UX guard; the backend enforces the same rules via @PreAuthorize.
+  // Backend PageSchemaController gates all mutations (save/publish/import/export) on
+  // a single page.page.manage permission.  We reflect the same single-permission check
+  // on the frontend so button states are truthful.
   const { hasPermission } = usePermissions();
-  const canSave = hasPermission('page.page.update');
-  const canPublish = hasPermission('page.page.publish');
-  const canImport = hasPermission('page.page.import');
-  const canExport = hasPermission('page.page.export');
+  const canManage = hasPermission('page.page.manage');
+  const canSave = canManage;
+  const canPublish = canManage;
+  const canImport = canManage;
+  const canExport = canManage;
 
-  // Resolve locale for permission denied tooltips (default en-US)
-  const locale = (typeof document !== 'undefined' && document.documentElement.lang) || 'en-US';
+  // Resolve locale for permission denied tooltips via the shared I18n context.
+  const { locale } = useI18n();
 
   const statusInfo = pageMeta?.status ? PAGE_STATUS_INFO[pageMeta.status] : null;
 
@@ -506,7 +510,7 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
               </svg>
             }
             title="Import"
-            disabledTitle={DESIGNER_I18N.permissions.missingImport[locale] ?? DESIGNER_I18N.permissions.missingImport['en-US']}
+            disabledTitle={DESIGNER_I18N.permissions.missingManage[locale] ?? DESIGNER_I18N.permissions.missingManage['en-US']}
             onClick={onImport}
             disabled={!canImport}
             size="sm"
@@ -524,7 +528,7 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
               </svg>
             }
             title="Export"
-            disabledTitle={DESIGNER_I18N.permissions.missingExport[locale] ?? DESIGNER_I18N.permissions.missingExport['en-US']}
+            disabledTitle={DESIGNER_I18N.permissions.missingManage[locale] ?? DESIGNER_I18N.permissions.missingManage['en-US']}
             onClick={onExport}
             disabled={!canExport}
             size="sm"
@@ -622,7 +626,7 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
           }
           label="Save"
           title="Save (Ctrl+S)"
-          disabledTitle={!canSave ? (DESIGNER_I18N.permissions.missingUpdate[locale] ?? DESIGNER_I18N.permissions.missingUpdate['en-US']) : undefined}
+          disabledTitle={!canSave ? (DESIGNER_I18N.permissions.missingManage[locale] ?? DESIGNER_I18N.permissions.missingManage['en-US']) : undefined}
           onClick={onSave}
           disabled={isSaving || !hasUnsavedChanges || !canSave}
           data-testid="toolbar-save"
@@ -660,7 +664,7 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
           }
           label="Publish"
           title="Publish page"
-          disabledTitle={!canPublish ? (DESIGNER_I18N.permissions.missingPublish[locale] ?? DESIGNER_I18N.permissions.missingPublish['en-US']) : undefined}
+          disabledTitle={!canPublish ? (DESIGNER_I18N.permissions.missingManage[locale] ?? DESIGNER_I18N.permissions.missingManage['en-US']) : undefined}
           onClick={onPublish}
           variant="primary"
           disabled={isPublishing || !canPublish}
