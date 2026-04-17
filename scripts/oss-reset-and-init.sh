@@ -109,6 +109,13 @@ echo -e "${GREEN}   Database reset complete${NC}"
 echo -e "${YELLOW}Step 4: Starting backend service...${NC}"
 cd "$PLATFORM_DIR"
 
+# In --no-bootstrap mode, also disable AdminBootstrapRunner — otherwise it
+# auto-creates admin/tenant on empty DB at startup, defeating the flag.
+if [ "$NO_BOOTSTRAP" = "1" ]; then
+    export AURABOOT_BOOTSTRAP_ENABLED=false
+    echo "   AURABOOT_BOOTSTRAP_ENABLED=false (no auto-bootstrap on startup)"
+fi
+
 # Start backend in persistent background process
 nohup ./gradlew bootRun > /tmp/aura-backend.log 2>&1 &
 BACKEND_PID=$!
