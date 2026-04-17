@@ -48,6 +48,17 @@ vi.mock('~/plugins/core-bpm/components/panel/BpmOperationsSection', () => ({
   ),
 }));
 
+// BpmHistorySection issues its own audit-trail fetch on mount, which would
+// break these unit tests by calling `listAuditEvents` against a partial
+// bpmWorkbenchService mock. Its behaviour is covered by
+// BpmHistorySection.test.tsx; at the panel level we only need to assert the
+// slot is mounted with the resolved instance.
+vi.mock('~/plugins/core-bpm/components/panel/BpmHistorySection', () => ({
+  BpmHistorySection: ({ instance }: { instance: { instanceId: string } | null }) => (
+    <div data-testid="bpm-history-stub" data-instance-id={instance?.instanceId ?? ''} />
+  ),
+}));
+
 import { BpmPanelBlock } from '../BpmPanelBlock';
 
 const READY_INSTANCE = {

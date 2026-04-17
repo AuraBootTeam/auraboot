@@ -22,6 +22,7 @@ import { useI18n } from '~/contexts/I18nContext';
 import { BpmStatusSection } from '~/plugins/core-bpm/components/panel/BpmStatusSection';
 import { BpmDiagramSection } from '~/plugins/core-bpm/components/panel/BpmDiagramSection';
 import { BpmOperationsSection } from '~/plugins/core-bpm/components/panel/BpmOperationsSection';
+import { BpmHistorySection } from '~/plugins/core-bpm/components/panel/BpmHistorySection';
 import {
   getInstanceForRecord,
   type BpmInstanceForRecord,
@@ -188,6 +189,13 @@ export function BpmPanelBlock({ block, record, recordId }: BpmPanelBlockProps) {
                 onActionComplete={handleReload}
                 t={t}
               />
+            </div>
+          );
+        }
+        if (section === 'history') {
+          return (
+            <div key={section} data-testid="bpm-section-history">
+              <BpmHistorySection instance={instance} t={t} />
             </div>
           );
         }
