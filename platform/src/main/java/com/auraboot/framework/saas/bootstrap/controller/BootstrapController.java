@@ -7,6 +7,7 @@ import com.auraboot.framework.saas.bootstrap.dto.BootstrapProgressResponse;
 import com.auraboot.framework.saas.bootstrap.dto.BootstrapRequest;
 import com.auraboot.framework.saas.bootstrap.dto.BootstrapStatusResponse;
 import com.auraboot.framework.saas.config.service.SystemConfigService;
+import com.auraboot.framework.saas.constant.BootstrapStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -33,8 +34,8 @@ public class BootstrapController {
     public ApiResponse<BootstrapStatusResponse> getStatus() {
         BootstrapStatusEvaluator.Result eval = statusEvaluator.evaluate();
         BootstrapProgressResponse progress = bootstrapEngineService.getProgress();
-        boolean inProgress = "running".equals(progress.getStatus())
-                          || "pending".equals(progress.getStatus());
+        boolean inProgress = BootstrapStatus.RUNNING.getCode().equals(progress.getStatus())
+                          || BootstrapStatus.PENDING.getCode().equals(progress.getStatus());
 
         return ApiResponse.success(BootstrapStatusResponse.builder()
                 .initialized(eval.missingParts().isEmpty())
@@ -44,10 +45,12 @@ public class BootstrapController {
                 .build());
     }
 
+    static final String ERR_ALREADY_INITIALIZED = "System is already initialized";
+
     @PostMapping("/setup")
     public ApiResponse<Object> setup(@RequestBody BootstrapRequest request) {
         if (systemConfigService.isInitialized()) {
-            return ApiResponse.error("System is already initialized");
+            return ApiResponse.error(ERR_ALREADY_INITIALIZED);
         }
         var result = bootstrapEngineService.execute(request);
         if (result.success()) {

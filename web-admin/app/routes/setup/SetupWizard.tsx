@@ -14,19 +14,6 @@ export async function loader(_args: LoaderFunctionArgs): Promise<{ status: Boots
 
 export default function SetupWizard() {
   const { status } = useLoaderData<typeof loader>();
-
-  if (status?.initialized) {
-    return (
-      <div data-testid="bootstrap-already-done" className="max-w-md mx-auto mt-20 p-6 bg-white border border-gray-200 rounded shadow">
-        <h1 className="text-xl font-semibold mb-2 text-gray-900">System already initialized</h1>
-        <p className="text-gray-600 mb-4">No further action needed.</p>
-        <Link to="/" className="inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
-          Back to home
-        </Link>
-      </div>
-    );
-  }
-
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     companyName: '',
@@ -46,6 +33,18 @@ export default function SetupWizard() {
   const [formError, setFormError] = useState('');
   const [setupError, setSetupError] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
+
+  if (status?.initialized) {
+    return (
+      <div data-testid="bootstrap-already-done" className="max-w-md mx-auto mt-20 p-6 bg-white border border-gray-200 rounded shadow">
+        <h1 className="text-xl font-semibold mb-2 text-gray-900">System already initialized</h1>
+        <p className="text-gray-600 mb-4">No further action needed.</p>
+        <Link to="/" className="inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+          Back to home
+        </Link>
+      </div>
+    );
+  }
 
   const handleChange = (field: string, value: string | boolean) => {
     setFormData((prev) => ({ ...prev, [field]: value }));

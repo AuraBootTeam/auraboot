@@ -1,8 +1,10 @@
 package com.auraboot.framework.saas.bootstrap;
 
+import com.auraboot.framework.rbac.constant.RoleConstants;
 import com.auraboot.framework.saas.bootstrap.constant.BootstrapMissingPart;
 import com.auraboot.framework.saas.bootstrap.mapper.BootstrapStatusMapper;
 import com.auraboot.framework.saas.config.service.SystemConfigService;
+import com.auraboot.framework.saas.executor.SystemTenantContextExecutor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -18,10 +20,10 @@ public class BootstrapStatusEvaluator {
 
     public Result evaluate() {
         List<String> missing = new ArrayList<>();
-        if (bootstrapStatusMapper.countPlatformAdminAssignments() == 0L) {
+        if (bootstrapStatusMapper.countPlatformAdminAssignments(RoleConstants.PLATFORM_ADMIN) == 0L) {
             missing.add(BootstrapMissingPart.ADMIN_USER);
         }
-        if (bootstrapStatusMapper.countSystemTenant() == 0L) {
+        if (bootstrapStatusMapper.countTenantById(SystemTenantContextExecutor.SYSTEM_TENANT_ID) == 0L) {
             missing.add(BootstrapMissingPart.DEFAULT_TENANT);
         }
         if (!systemConfigService.isInitialized()) {
