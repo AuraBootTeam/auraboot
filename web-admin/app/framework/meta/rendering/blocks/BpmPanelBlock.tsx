@@ -16,11 +16,12 @@
  * @since BPM closure spec 1 (Task 10)
  */
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { BlockConfig } from '~/framework/meta/schemas/types';
 import { useI18n } from '~/contexts/I18nContext';
 import { BpmStatusSection } from '~/plugins/core-bpm/components/panel/BpmStatusSection';
 import { BpmDiagramSection } from '~/plugins/core-bpm/components/panel/BpmDiagramSection';
+import { BpmOperationsSection } from '~/plugins/core-bpm/components/panel/BpmOperationsSection';
 import {
   getInstanceForRecord,
   type BpmInstanceForRecord,
@@ -85,6 +86,13 @@ export function BpmPanelBlock({ block, record, recordId }: BpmPanelBlockProps) {
   const [instance, setInstance] = useState<BpmInstanceForRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  // Monotonic counter bumped by `handleReload`. Operations section calls
+  // `onActionComplete` after a successful approve/reject/withdraw/cc so we
+  // refetch the instance state and surface the updated status/current-nodes.
+  const [reloadTick, setReloadTick] = useState(0);
+  const handleReload = useCallback(() => {
+    setReloadTick((t) => t + 1);
+  }, []);
 
   useEffect(() => {
     if (businessKey === undefined || businessKey === null || businessKey === '') {
@@ -112,7 +120,7 @@ export function BpmPanelBlock({ block, record, recordId }: BpmPanelBlockProps) {
     return () => {
       cancelled = true;
     };
-  }, [businessKey, config.processKey]);
+  }, [businessKey, config.processKey, reloadTick]);
 
   if (loading) {
     return (
@@ -169,6 +177,17 @@ export function BpmPanelBlock({ block, record, recordId }: BpmPanelBlockProps) {
           return (
             <div key={section} data-testid="bpm-section-diagram">
               <BpmDiagramSection instance={instance} t={t} />
+            </div>
+          );
+        }
+        if (section === 'operations') {
+          return (
+            <div key={section} data-testid="bpm-section-operations">
+              <BpmOperationsSection
+                instance={instance}
+                onActionComplete={handleReload}
+                t={t}
+              />
             </div>
           );
         }
