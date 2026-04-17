@@ -4,12 +4,15 @@ import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.meta.dto.FieldDefinition;
 import com.auraboot.framework.meta.dto.ModelCapabilities;
 import com.auraboot.framework.meta.dto.ModelDefinition;
+import com.auraboot.framework.meta.exception.MetaServiceException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * P1 Task 3: verify MetaModelService persists sourceType/sourceRef/capabilities and
@@ -19,6 +22,9 @@ class MetaModelServiceVirtualIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private MetaModelService metaModelService;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @Test
     void save_and_reload_namedQuery_virtual_model_preserves_source_type_and_ref() {
@@ -109,5 +115,25 @@ class MetaModelServiceVirtualIntegrationTest extends BaseIntegrationTest {
         ModelDefinition reloaded = metaModelService.getDefinitionByCode(code);
         assertThat(reloaded.getSourceType()).isEqualTo("physical");
         assertThat(reloaded.getCapabilities().isCreate()).isTrue();
+    }
+
+    @Test
+    void malformed_capabilities_json_fails_fast_on_reload() {
+        // Directly insert a row with invalid JSON via JDBC to simulate corruption.
+        long ts = System.currentTimeMillis();
+        String code = "p1_t3_malformed_" + ts;
+        jdbcTemplate.update(
+            "INSERT INTO ab_meta_model (pid, tenant_id, code, source_type, source_ref, version, " +
+            "status, is_current, capabilities) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb)",
+            "p1-t3-mal-" + ts,
+            testTenant.getId(), code, "namedQuery", "queries/x.sql", 1,
+            "draft", true,
+            // Valid JSON at the PG level (so JSONB accepts it) but structurally wrong
+            // for ModelCapabilities — sortableFields expects a List, not a String.
+            "{\"list\": true, \"sortableFields\": \"not-an-array\"}");
+
+        assertThatThrownBy(() -> metaModelService.getDefinitionByCode(code))
+            .isInstanceOf(MetaServiceException.class)
+            .hasMessageContaining("capabilities");
     }
 }

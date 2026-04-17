@@ -770,9 +770,9 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
         }
         try {
             return objectMapper.readValue(json, ModelCapabilities.class);
-        } catch (Exception e) {
-            log.warn("Failed to parse capabilities JSON, returning empty: {}", e.getMessage());
-            return ModelCapabilities.empty();
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new MetaServiceException(
+                "Failed to parse capabilities JSON for model; data corruption: " + e.getMessage(), e);
         }
     }
 
@@ -796,20 +796,9 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
             }
         }
 
-        return ModelCapabilities.builder()
-            .list(raw.isList())
-            .detail(raw.isDetail())
-            .create(raw.isCreate())
-            .update(raw.isUpdate())
-            .delete(raw.isDelete())
-            .bulkDelete(raw.isBulkDelete())
-            .export(raw.isExport())
-            .sort(raw.isSort())
-            .filter(raw.isFilter())
-            .paginate(raw.isPaginate())
+        return raw.toBuilder()
             .sortableFields(sortable)       // override any caller-supplied value
             .filterableFields(filterable)   // override any caller-supplied value
-            .detailKeyField(raw.getDetailKeyField())
             .build();
     }
 
@@ -828,7 +817,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
         String capabilitiesJson;
         try {
             capabilitiesJson = objectMapper.writeValueAsString(normalized);
-        } catch (Exception e) {
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
             throw new MetaServiceException("Failed to serialize capabilities for model " + def.getCode(), e);
         }
 
