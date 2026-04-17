@@ -55,6 +55,22 @@ export interface UserTaskConfig extends TaskBaseConfig {
   multiInstance?: MultiInstanceConfig; // 多实例配置
   formBindings?: FormBindingEntry[]; // Form bindings for this node
   hooks?: NodeHookEntry[]; // Pre/post execution hooks
+  /**
+   * AuraBoot-specific policies compiled into <smart:properties> at deploy time.
+   * Read at runtime by {@code BpmExtensionAccessor}.
+   */
+  aura?: UserTaskAuraConfig;
+}
+
+/**
+ * Per-userTask AuraBoot policy values compiled into <smart:properties>.
+ * Keys are namespaced with "aura." in BPMN XML (see BpmExtensionKeys).
+ */
+export interface UserTaskAuraConfig {
+  /** Permission codes required to claim/complete this task (AND semantics). */
+  requiredPermissions?: string[];
+  /** Optional per-node override of the process-level CcPolicy. */
+  ccPolicyOverride?: CcPolicy;
 }
 
 // 服务任务配置
@@ -206,10 +222,42 @@ export interface BPMNProcessDefinition {
   nodes: BPMNNode[];
   edges: BPMNEdge[];
   variables?: Record<string, any>; // 流程变量
+  /**
+   * AuraBoot-specific process policies compiled into <smart:properties> on the
+   * BPMN <process> element at deploy time. Read at runtime by
+   * {@code BpmExtensionAccessor}.
+   */
+  aura?: ProcessAuraConfig;
   createdAt?: string;
   updatedAt?: string;
   createdBy?: string;
   status?: 'draft' | 'published' | 'suspended'; // 状态
+}
+
+/**
+ * Withdraw policy codes supported by BpmExtensionAccessor.
+ * - strict: only the initiator can withdraw while the first task is still open.
+ * - loose:  the initiator can withdraw at any time before the process ends.
+ * - none:   withdraw is disabled entirely.
+ */
+export type WithdrawPolicy = 'strict' | 'loose' | 'none';
+
+/**
+ * Cc (carbon-copy) recipient policy codes.
+ * - initiator: only the process initiator receives cc notifications.
+ * - assignee:  only current task assignees receive cc notifications.
+ * - all:       both initiator and all assignees receive cc notifications.
+ */
+export type CcPolicy = 'initiator' | 'assignee' | 'all';
+
+/**
+ * Process-level AuraBoot policy values persisted under {@code process.aura.*}
+ * in designerJson and compiled to {@code <smart:properties>} on the BPMN
+ * {@code <process>} element at deploy time.
+ */
+export interface ProcessAuraConfig {
+  withdrawPolicy?: WithdrawPolicy;
+  ccPolicy?: CcPolicy;
 }
 
 // Node monitor status (used in monitor mode)

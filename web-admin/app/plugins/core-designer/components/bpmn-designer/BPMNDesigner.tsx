@@ -14,12 +14,30 @@ import { SaveDialog, type ProcessMetadata } from '~/plugins/core-designer/compon
 import { useVersioning, VersionHistoryPanel } from '~/shared/versioning';
 import { bpmnVersionService } from '~/shared/versioning/versionService';
 import { useBPMNStore } from '~/plugins/core-designer/components/bpmn-designer/store/useBPMNStore';
-import type { BPMNPaletteItem } from '~/plugins/core-designer/components/bpmn-designer/types';
+import type {
+  BPMNPaletteItem,
+  ProcessAuraConfig,
+  WithdrawPolicy,
+  CcPolicy,
+} from '~/plugins/core-designer/components/bpmn-designer/types';
 import {
   createProcessDefinition,
   updateProcessDefinition,
   getProcessDefinitionById,
 } from '~/plugins/core-designer/components/bpmn-designer/services/bpmnService';
+
+/**
+ * Return undefined when the aura block has no active fields so we don't persist
+ * empty objects into designerJson (keeps BPMN output byte-identical for
+ * processes without policies).
+ */
+function normalizeAura(aura: ProcessAuraConfig | undefined): ProcessAuraConfig | undefined {
+  if (!aura) return undefined;
+  const cleaned: ProcessAuraConfig = {};
+  if (aura.withdrawPolicy) cleaned.withdrawPolicy = aura.withdrawPolicy;
+  if (aura.ccPolicy) cleaned.ccPolicy = aura.ccPolicy;
+  return Object.keys(cleaned).length > 0 ? cleaned : undefined;
+}
 
 export function BPMNDesigner() {
   const [searchParams] = useSearchParams();
@@ -90,6 +108,11 @@ export function BPMNDesigner() {
     processDefinition?.description || '',
   );
   const [processCategory, setProcessCategory] = useState(processDefinition?.category || '');
+  // Process-level AuraBoot policies. undefined = inherit engine defaults
+  // (BpmExtensionAccessor returns STRICT/ALL when keys absent).
+  const [processAura, setProcessAura] = useState<ProcessAuraConfig | undefined>(
+    processDefinition?.aura,
+  );
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [isLoadingDefinition, setIsLoadingDefinition] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -125,6 +148,7 @@ export function BPMNDesigner() {
           setProcessKey(result.data.key || '');
           setProcessDescription(result.data.description || '');
           setProcessCategory(result.data.category || '');
+          setProcessAura(result.data.aura);
         } else {
           showErrorToast(t('bpmn.designer.load_failed'));
         }
@@ -171,6 +195,9 @@ export function BPMNDesigner() {
         ...metadata,
         nodes,
         edges,
+        // Persist process-level AuraBoot policies so JsonToBpmnConverter can
+        // compile them into <smart:properties> on the next deploy.
+        aura: processAura,
         status: 'draft' as const,
       };
 
@@ -221,6 +248,7 @@ export function BPMNDesigner() {
       ...processDefinition,
       nodes,
       edges,
+      aura: processAura,
       name: processName,
       key: processKey,
     };
@@ -335,6 +363,7 @@ export function BPMNDesigner() {
         if (json.key) setProcessKey(json.key);
         if (json.description) setProcessDescription(json.description);
         if (json.category) setProcessCategory(json.category);
+        if (json.aura && typeof json.aura === 'object') setProcessAura(json.aura);
 
         showSuccessToast(t('bpmn.designer.import_success'));
       } catch (error) {
@@ -503,6 +532,8 @@ export function BPMNDesigner() {
             description: processDescription,
             category: processCategory,
             isExisting: !!processDefinition?.id,
+            withdrawPolicy: processAura?.withdrawPolicy,
+            ccPolicy: processAura?.ccPolicy,
             onNameChange: (v) => {
               setProcessName(v);
               setDirty(true);
@@ -513,6 +544,14 @@ export function BPMNDesigner() {
             },
             onCategoryChange: (v) => {
               setProcessCategory(v);
+              setDirty(true);
+            },
+            onWithdrawPolicyChange: (v: WithdrawPolicy | undefined) => {
+              setProcessAura((prev) => normalizeAura({ ...prev, withdrawPolicy: v }));
+              setDirty(true);
+            },
+            onCcPolicyChange: (v: CcPolicy | undefined) => {
+              setProcessAura((prev) => normalizeAura({ ...prev, ccPolicy: v }));
               setDirty(true);
             },
           }}
