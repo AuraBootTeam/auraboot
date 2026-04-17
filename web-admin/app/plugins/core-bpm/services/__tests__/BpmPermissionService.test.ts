@@ -207,4 +207,49 @@ describe('BpmPermissionService.resolvePermissions', () => {
     expect(result.canWithdraw).toBe(false);
     expect(result.reasonsBlocked?.withdraw).toBe('user.notInitiator');
   });
+
+  // ---- Fix B: canTerminate cases ----
+
+  it('allows terminate when bpm.admin is held on a running instance', () => {
+    const i = instance({
+      currentNodes: [node({ assignee: 'u-200' })],
+    });
+    const result = resolvePermissions(i, {
+      id: 'u-admin',
+      permissions: [BPM_ADMIN_PERMISSION],
+    });
+    expect(result.canTerminate).toBe(true);
+    expect(result.reasonsBlocked).toBeUndefined();
+  });
+
+  it('blocks terminate for non-admin users on a running instance (even assignees)', () => {
+    const i = instance({
+      currentNodes: [node({ assignee: 'u-200' })],
+    });
+    const result = resolvePermissions(i, { id: 'u-200', permissions: [] });
+    expect(result.canTerminate).toBe(false);
+    expect(result.reasonsBlocked?.terminate).toBe('user.notBpmAdmin');
+  });
+
+  it('blocks terminate when the instance has ended, with instance.notRunning reason', () => {
+    const i = instance({ status: 'approved' });
+    const result = resolvePermissions(i, {
+      id: 'u-admin',
+      permissions: [BPM_ADMIN_PERMISSION],
+    });
+    expect(result.canTerminate).toBe(false);
+    expect(result.reasonsBlocked?.terminate).toBe('instance.notRunning');
+  });
+
+  it('blocks terminate for initiator without bpm.admin (OSS conservative; spec 4 reserved)', () => {
+    const i = instance({
+      startUserId: 'u-100',
+      currentNodes: [node({ assignee: 'u-200' })],
+    });
+    const result = resolvePermissions(i, { id: 'u-100', permissions: [] });
+    // Initiator can withdraw but CANNOT terminate in OSS scope.
+    expect(result.canWithdraw).toBe(true);
+    expect(result.canTerminate).toBe(false);
+    expect(result.reasonsBlocked?.terminate).toBe('user.notBpmAdmin');
+  });
 });

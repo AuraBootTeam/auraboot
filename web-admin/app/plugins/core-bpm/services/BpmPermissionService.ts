@@ -1,9 +1,9 @@
 /**
  * BpmPermissionService - Task 13 of the OSS BPM closure spec.
  *
- * Computes whether the current user may invoke each of the four BpmPanel
- * operations (approve / reject / withdraw / cc) against a given process
- * instance. The result drives the disabled state of the buttons in
+ * Computes whether the current user may invoke each of the five BpmPanel
+ * operations (approve / reject / withdraw / cc / terminate) against a given
+ * process instance. The result drives the disabled state of the buttons in
  * {@link BpmOperationsSection} so that the UI never surfaces an action that
  * will unambiguously fail at the backend.
  *
@@ -77,10 +77,16 @@ export type BpmPermissionReason =
   | 'instance.notRunning'
   | 'user.anonymous'
   | 'user.notInitiator'
-  | 'user.notAssignee';
+  | 'user.notAssignee'
+  | 'user.notBpmAdmin';
 
 /** Actions keyed by {@link BpmPermissionResult.reasonsBlocked}. */
-export type BpmPermissionAction = 'approve' | 'reject' | 'withdraw' | 'cc';
+export type BpmPermissionAction =
+  | 'approve'
+  | 'reject'
+  | 'withdraw'
+  | 'cc'
+  | 'terminate';
 
 /** Result of {@link resolvePermissions}. */
 export interface BpmPermissionResult {
@@ -88,6 +94,16 @@ export interface BpmPermissionResult {
   canReject: boolean;
   canWithdraw: boolean;
   canCc: boolean;
+  /**
+   * Whether the current user may terminate the running process instance.
+   *
+   * OSS policy (conservative): {@code bpm.admin} only. Initiator-driven
+   * self-terminate, supervisor-scope termination, and delegate-based overrides
+   * are reserved for closure spec 4 (supervision/override scope) and are NOT
+   * granted here. Non-running instances always evaluate to false because the
+   * backend {@code /terminate} endpoint rejects them.
+   */
+  canTerminate: boolean;
   /**
    * Per-action reason code explaining why the action is blocked. Only
    * populated for actions where {@code canXxx === false}. Keys are i18n key
@@ -183,11 +199,13 @@ export function resolvePermissions(
     reasonsBlocked.reject = 'instance.notRunning';
     reasonsBlocked.withdraw = 'instance.notRunning';
     reasonsBlocked.cc = 'instance.notRunning';
+    reasonsBlocked.terminate = 'instance.notRunning';
     return {
       canApprove: false,
       canReject: false,
       canWithdraw: false,
       canCc: false,
+      canTerminate: false,
       reasonsBlocked,
     };
   }
@@ -196,13 +214,15 @@ export function resolvePermissions(
   const anonymous = userId.length === 0;
   const hasBpmAdmin = currentUser.permissions.includes(BPM_ADMIN_PERMISSION);
 
-  // Layer 3 short-circuit: bpm.admin unlocks everything on a running instance.
+  // Layer 3 short-circuit: bpm.admin unlocks everything on a running instance
+  // (including terminate).
   if (hasBpmAdmin) {
     return {
       canApprove: true,
       canReject: true,
       canWithdraw: true,
       canCc: true,
+      canTerminate: true,
     };
   }
 
@@ -211,11 +231,13 @@ export function resolvePermissions(
     reasonsBlocked.reject = 'user.anonymous';
     reasonsBlocked.withdraw = 'user.anonymous';
     reasonsBlocked.cc = 'user.anonymous';
+    reasonsBlocked.terminate = 'user.anonymous';
     return {
       canApprove: false,
       canReject: false,
       canWithdraw: false,
       canCc: false,
+      canTerminate: false,
       reasonsBlocked,
     };
   }
@@ -229,17 +251,22 @@ export function resolvePermissions(
   const canReject = isAssignee;
   const canWithdraw = isInitiator;
   const canCc = isAssignee;
+  // OSS conservative: terminate requires bpm.admin. Initiator-self-terminate
+  // and supervisor-scope termination are closure spec 4 scope.
+  const canTerminate = false;
 
   if (!canApprove) reasonsBlocked.approve = 'user.notAssignee';
   if (!canReject) reasonsBlocked.reject = 'user.notAssignee';
   if (!canWithdraw) reasonsBlocked.withdraw = 'user.notInitiator';
   if (!canCc) reasonsBlocked.cc = 'user.notAssignee';
+  if (!canTerminate) reasonsBlocked.terminate = 'user.notBpmAdmin';
 
   const result: BpmPermissionResult = {
     canApprove,
     canReject,
     canWithdraw,
     canCc,
+    canTerminate,
   };
   if (Object.keys(reasonsBlocked).length > 0) {
     result.reasonsBlocked = reasonsBlocked;
