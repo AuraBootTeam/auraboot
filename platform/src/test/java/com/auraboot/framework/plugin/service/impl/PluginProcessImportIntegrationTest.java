@@ -207,6 +207,111 @@ class PluginProcessImportIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    @DisplayName("designerJson userTask.data.formPageKey → BpmProcessDefinition.formBindings is derived at import time")
+    void importDerivesFormBindingsFromDesignerFormPageKey() {
+        String key = "it_proc_formbind_" + System.nanoTime();
+        Long tenantId = getTestTenant().getId();
+
+        // Build a designerJson where the userTask carries data.formPageKey
+        // (designer form) but the DTO does NOT declare top-level formBindings.
+        Map<String, Object> designer = tinyDesignerJson();
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> nodes = (List<Map<String, Object>>) designer.get("nodes");
+        Map<String, Object> taskNode = nodes.stream()
+                .filter(n -> "task_1".equals(n.get("id")))
+                .findFirst()
+                .orElseThrow();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> taskData = (Map<String, Object>) taskNode.get("data");
+        taskData.put("formPageKey", "wd_leave_request_detail");
+
+        ProcessDefinitionDTO dto = ProcessDefinitionDTO.builder()
+                .key(key)
+                .name("FormBindings derivation test " + key)
+                .category("test")
+                .designerJson(designer)
+                .build();
+        // Explicit assertion: caller did NOT provide formBindings
+        assertThat(dto.getFormBindings()).isNull();
+
+        importer.importProcess(dto, PLUGIN_PID, IMPORT_ID, tenantId,
+                ImportRequest.ConflictStrategy.OVERWRITE, false);
+
+        BpmProcessDefinition row = processDefinitionMapper.selectOne(
+                new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<BpmProcessDefinition>()
+                        .eq("tenant_id", tenantId)
+                        .eq("process_key", key)
+                        .eq("is_current", true)
+                        .eq("deleted_flag", false));
+        assertThat(row).isNotNull();
+        assertThat(row.getFormBindings())
+                .as("form_bindings must contain an entry for the userTask carrying formPageKey")
+                .isNotNull()
+                .containsKey("task_1");
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> binding = (Map<String, Object>) row.getFormBindings().get("task_1");
+        assertThat(binding).isNotNull();
+        assertThat(binding.get("formType")).isEqualTo("PAGE");
+        assertThat(binding.get("formRef")).isEqualTo("wd_leave_request_detail");
+    }
+
+    @Test
+    @DisplayName("Explicit dto.formBindings wins over derivation from designerJson")
+    void explicitFormBindingsOverrideDerivation() {
+        String key = "it_proc_formbind_override_" + System.nanoTime();
+        Long tenantId = getTestTenant().getId();
+
+        Map<String, Object> designer = tinyDesignerJson();
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> nodes = (List<Map<String, Object>>) designer.get("nodes");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> taskData = (Map<String, Object>) nodes.stream()
+                .filter(n -> "task_1".equals(n.get("id")))
+                .findFirst()
+                .orElseThrow()
+                .get("data");
+        taskData.put("formPageKey", "page_from_designer");
+
+        Map<String, ProcessDefinitionDTO.FormBinding> explicit = new LinkedHashMap<>();
+        explicit.put("task_1", ProcessDefinitionDTO.FormBinding.builder()
+                .formType("PAGE")
+                .pagePid("page_from_dto")
+                .build());
+
+        ProcessDefinitionDTO dto = ProcessDefinitionDTO.builder()
+                .key(key)
+                .name("Override test " + key)
+                .category("test")
+                .designerJson(designer)
+                .formBindings(explicit)
+                .build();
+
+        importer.importProcess(dto, PLUGIN_PID, IMPORT_ID, tenantId,
+                ImportRequest.ConflictStrategy.OVERWRITE, false);
+
+        BpmProcessDefinition row = processDefinitionMapper.selectOne(
+                new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<BpmProcessDefinition>()
+                        .eq("tenant_id", tenantId)
+                        .eq("process_key", key)
+                        .eq("is_current", true)
+                        .eq("deleted_flag", false));
+        assertThat(row).isNotNull();
+        assertThat(row.getFormBindings())
+                .as("Explicit caller-supplied formBindings must not be overwritten by derivation")
+                .isNotNull()
+                .containsKey("task_1");
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> binding = (Map<String, Object>) row.getFormBindings().get("task_1");
+        // Explicit DTO FormBinding preserves its shape (pagePid), not the
+        // derived (formRef) shape.
+        assertThat(binding).containsKey("pagePid");
+        assertThat(binding.get("pagePid")).isEqualTo("page_from_dto");
+        assertThat(binding).doesNotContainKey("formRef");
+    }
+
+    @Test
     @DisplayName("Importer respects MetaContext tenantId (SKIP strategy returns SKIP record on existing key)")
     void skipStrategyReturnsSkipWhenExists() {
         // Ensure tenant context is set (BaseIntegrationTest already does this in @BeforeEach)
