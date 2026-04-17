@@ -1,27 +1,32 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, Link, useLoaderData } from 'react-router';
 import type { LoaderFunctionArgs } from 'react-router';
-import { redirect } from 'react-router';
 import { Button } from '~/ui/ui/button';
+import { fetchBootstrapStatus, type BootstrapStatus } from '~/services/bootstrapStatus';
 
 /**
- * Loader: redirect to / if system is already initialized.
+ * Loader: fetch bootstrap status; UI branches between wizard and "already done" page.
  */
-export async function loader({ request }: LoaderFunctionArgs) {
-  try {
-    const baseUrl = process.env.BFF_INTERNAL_URL || 'http://127.0.0.1:6443';
-    const res = await fetch(`${baseUrl}/api/bootstrap/status`);
-    const result = await res.json();
-    if (result.code === '0' && result.data?.initialized) {
-      return redirect('/login');
-    }
-  } catch {
-    // Backend not available — show setup page anyway
-  }
-  return null;
+export async function loader(_args: LoaderFunctionArgs): Promise<{ status: BootstrapStatus | null }> {
+  const status = await fetchBootstrapStatus();
+  return { status };
 }
 
 export default function SetupWizard() {
+  const { status } = useLoaderData<typeof loader>();
+
+  if (status?.initialized) {
+    return (
+      <div data-testid="bootstrap-already-done" className="max-w-md mx-auto mt-20 p-6 bg-white border border-gray-200 rounded shadow">
+        <h1 className="text-xl font-semibold mb-2 text-gray-900">System already initialized</h1>
+        <p className="text-gray-600 mb-4">No further action needed.</p>
+        <Link to="/" className="inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+          Back to home
+        </Link>
+      </div>
+    );
+  }
+
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     companyName: '',
