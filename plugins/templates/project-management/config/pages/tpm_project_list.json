@@ -2,13 +2,13 @@
   "pageKey": "tpm_project_list", "name:zh-CN": "项目列表", "name:en": "Projects", "pageType": "list", "modelCode": "tpm_project",
   "dslSchema": { "id": "list.tpm_project", "kind": "List", "areas": {
     "toolbar": { "blocks": [{ "id": "tpm_pj_toolbar", "blockType": "toolbar", "buttons": [{ "code": "create", "action": "create", "primary": true, "commandCode": "tpm:create_project", "navigateTo": "tpm_project_form", "permissionCode": "TPM.project.manage" }] }] },
-    "list-tabs": { "blocks": [{ "id": "tpm_pj_tabs", "blockType": "list-tabs", "tabs": [
+    "list-tabs": { "blocks": [{ "id": "tpm_pj_tabs", "blockType": "tabs", "tabs": [
       { "key": "all", "label": { "en": "All", "zh-CN": "全部" }, "filter": null },
       { "key": "planning", "label": { "en": "Planning", "zh-CN": "规划中" }, "filter": { "field": "tpm_pj_status", "value": "planning", "operator": "EQ" } },
       { "key": "active", "label": { "en": "Active", "zh-CN": "进行中" }, "filter": { "field": "tpm_pj_status", "value": "active", "operator": "EQ" } },
       { "key": "completed", "label": { "en": "Completed", "zh-CN": "已完成" }, "filter": { "field": "tpm_pj_status", "value": "completed", "operator": "EQ" } }
     ] }] },
-    "main": { "blocks": [{ "id": "tpm_pj_table", "blockType": "data-table", "columns": [
+    "main": { "blocks": [{ "id": "tpm_pj_table", "blockType": "table", "columns": [
       { "field": "tpm_pj_code", "width": 150, "sortable": true },
       { "field": "tpm_pj_name", "width": 220, "sortable": true },
       { "field": "tpm_pj_status", "width": 110, "renderType": "tag", "dictCode": "tpm_project_status" },

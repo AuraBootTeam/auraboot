@@ -20,7 +20,7 @@
       "list-tabs": {
         "blocks": [{
           "id": "gp_task_tabs",
-          "blockType": "list-tabs",
+          "blockType": "tabs",
           "tabs": [
             { "key": "all", "label": { "en": "All", "zh-CN": "全部" }, "filter": null },
             { "key": "new", "label": { "en": "New", "zh-CN": "新建" }, "filter": { "field": "gp_task_status", "value": "new", "operator": "EQ" } },
@@ -33,7 +33,7 @@
       "main": {
         "blocks": [{
           "id": "gp_task_table",
-          "blockType": "data-table",
+          "blockType": "table",
           "columns": [
             { "field": "gp_task_code", "width": 160, "sortable": true },
             { "field": "gp_task_title", "width": 250, "sortable": true },
