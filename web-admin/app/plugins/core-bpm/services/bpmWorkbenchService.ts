@@ -246,6 +246,73 @@ export async function startProcess(request: StartProcessRequest): Promise<string
   return result.data;
 }
 
+// ==================== Action-driven Process Start ====================
+
+/**
+ * Request shape for DSL ActionDef(type=bpm) → POST /api/bpm/process-instances
+ *
+ * The backend `StartProcessRequest.processDefinitionId` field accepts the BPMN
+ * process definition key (i.e. <process id="..."> in the .bpmn file), so the
+ * frontend-facing contract uses `processDefinitionKey` for clarity and maps it
+ * onto the backend field name in the request body.
+ */
+export interface StartProcessFromActionRequest {
+  processDefinitionKey: string;
+  businessKey: string;
+  variables?: Record<string, unknown>;
+}
+
+/**
+ * Response from starting a process via ActionDef(type=bpm).
+ *
+ * `processInstanceId` is the freshly-started (or existing, if the backend
+ * decides to dedupe in the future) instance id. `deduped` is optional: when
+ * the backend reports that an existing running instance was reused for the
+ * (processKey, businessKey), UI can surface a distinct toast message.
+ * Current backend controller does not emit `deduped`; this field exists to
+ * allow forward-compatible handling once the controller supports it.
+ */
+export interface StartProcessFromActionResponse {
+  processInstanceId: string;
+  deduped?: boolean;
+}
+
+/**
+ * Start a BPM process instance from a DSL ActionDef(type=bpm).
+ *
+ * Posts to the canonical `/api/bpm/process-instances` endpoint. Does not
+ * perform multi-path response fallback: the backend returns ApiResponse<T>
+ * with `data.instanceId`; anything else is an error.
+ */
+export async function startProcessFromAction(
+  request: StartProcessFromActionRequest,
+): Promise<StartProcessFromActionResponse> {
+  const body = {
+    // Backend `StartProcessRequest.processDefinitionId` accepts the process key.
+    processDefinitionId: request.processDefinitionKey,
+    businessKey: request.businessKey,
+    variables: request.variables,
+  };
+  const result = await post<Record<string, unknown>>('/api/bpm/process-instances', body);
+  if (!isSuccess(result.code) || !result.data) {
+    throw new Error(
+      result.desc ||
+        `BPM start failed: empty response for processDefinitionKey=${request.processDefinitionKey}`,
+    );
+  }
+  const data = result.data;
+  const processInstanceId = data.instanceId as string | undefined;
+  if (!processInstanceId) {
+    throw new Error(
+      `BPM start failed: response missing instanceId for processDefinitionKey=${request.processDefinitionKey}`,
+    );
+  }
+  return {
+    processInstanceId,
+    deduped: typeof data.deduped === 'boolean' ? (data.deduped as boolean) : undefined,
+  };
+}
+
 /**
  * Batch process tasks
  */
