@@ -210,25 +210,36 @@ test.describe('BPM Designer aura.* policy round-trip (Epic C)', { tag: ['@bpm-re
   // =========================================================================
   // C5.1 — UI drives aura.* policy fields, save serialises them into
   // designerJson, deploy compiles them into BPMN <smart:properties>
+  //
+  // Previous skip root-cause (2026-04-17): beforeAll seeds a 3-node graph
+  // into designerJson; the useEffect getProcessDefinitionById → setProcessDefinition
+  // hydrates state.nodes with those 3 nodes; the old test then called
+  // seedGraphIntoStore() which called addNode() three more times, producing
+  // 6 nodes with duplicate start/end ids. validate() then reported
+  // "start_event_single" error and handleSave early-returned before opening
+  // the SaveDialog — masquerading as a "SaveDialog PUT never fires" bug.
+  // Fix: rely on the API-hydrated graph (same pattern B1/B4 use) and drive
+  // only the property panel edits.
   // =========================================================================
-  // TODO(C5.1): SaveDialog opens but PUT-response await never fires after
-  // submit click in this seeded-process path. Other B1-B5 specs seed via API
-  // then skip the SaveDialog UI, so this is the only spec covering the
-  // designer UI save-flow end-to-end. Needs dedicated debugging session to
-  // trace BPMNDesigner.handleSaveWithMetadata → updateProcessDefinition PUT
-  // timing vs Playwright waitForResponse registration.
-  test.skip('C5.1: set policies in UI → save → deploy → compiled BPMN carries aura.*', async ({
+  test('C5.1: set policies in UI → save → deploy → compiled BPMN carries aura.*', async ({
     page,
-  }) => {
+  }, testInfo) => {
+    testInfo.annotations.push({
+      type: 'issue',
+      description:
+        'Depends on backend patch persisting compiled bpmn_content on deploy '
+          + '(BpmProcessDefinitionMapper.updateBpmnContent). If the running backend '
+          + 'predates that patch, the final <smart:properties> assertions fail with '
+          + 'empty bpmnContent even though the save PUT and deploy POST themselves '
+          + 'succeed. Re-run after ./gradlew bootRun restart.',
+    });
     // 1. D1 — sidebar nav first
     await navigateToProcessDefinitionList(page);
 
-    // 2. Enter designer for the draft
+    // 2. Enter designer for the draft — designerJson hydrated from beforeAll
+    //    produces the 3-node graph directly (setProcessDefinition loads nodes
+    //    from the persisted designerJson in the bpmnService.toFrontend mapper).
     await openDesigner(page, processPid);
-
-    // Seed the 3-node graph so the userTask property panel has something to
-    // target for requiredPermissions editing.
-    await seedGraphIntoStore(page, buildBaselineGraph());
 
     const rfNodes = page.locator('.react-flow__node');
     await expect(rfNodes).toHaveCount(3, { timeout: 10_000 });
@@ -285,19 +296,24 @@ test.describe('BPM Designer aura.* policy round-trip (Epic C)', { tag: ['@bpm-re
     await expect(saveBtn).toBeEnabled({ timeout: 5_000 });
     await saveBtn.click();
 
-    const saveDialogConfirm = page.locator('[data-testid="bpmn-save-dialog-submit"]');
-    await saveDialogConfirm.waitFor({ state: 'visible', timeout: 5_000 });
+    const dialog = page.locator('[data-testid="bpmn-save-dialog-panel"]');
+    await dialog.waitFor({ state: 'visible', timeout: 10_000 });
+    // Use the structural selector that B4 saveViaUI uses — robust against
+    // HMR/cached bundle variance on the data-testid attribute.
+    const saveDialogConfirm = dialog.locator('button[type="submit"]').first();
+    await expect(saveDialogConfirm).toBeEnabled({ timeout: 5_000 });
 
-    const putResponsePromise = page.waitForResponse(
-      (r) =>
-        r.url().includes(`/api/bpm/process-definitions/${processPid}`) &&
-        r.request().method() === 'PUT' &&
-        r.status() < 400,
-      { timeout: 15_000 },
-    );
-    await saveDialogConfirm.click();
-    const putResp = await putResponsePromise;
-    expect(putResp.status()).toBeLessThan(400);
+    const [putResp] = await Promise.all([
+      page.waitForResponse(
+        (r) =>
+          r.url().includes(`/api/bpm/process-definitions/${processPid}`) &&
+          r.request().method().toLowerCase() === 'put' &&
+          r.status() < 500,
+        { timeout: 15_000 },
+      ),
+      saveDialogConfirm.click(),
+    ]);
+    expect(putResp.status(), 'save PUT must succeed').toBeLessThan(400);
 
     // 6. D8 — persistence check via API: designerJson.aura.* is serialised
     const getResp = await page.request.get(`/api/bpm/process-definitions/${processPid}`);
