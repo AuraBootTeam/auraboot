@@ -4,6 +4,24 @@ import { render, screen } from '@testing-library/react';
 import { AutoSave } from '~/plugins/core-designer/components/studio/workbench/components/system/AutoSave';
 import { DESIGNER_I18N, resolveDesignerText } from '~/shared/designer';
 
+// Explicitly mock useI18n so locale='zh-CN' is a test contract,
+// not an implicit dependency on the createContext default value.
+vi.mock('~/contexts/I18nContext', async () => {
+  const actual = await vi.importActual<typeof import('~/contexts/I18nContext')>(
+    '~/contexts/I18nContext',
+  );
+  return {
+    ...actual,
+    useI18n: () => ({
+      locale: 'zh-CN',
+      t: (key: string, _params?: Record<string, any>, fallback?: string) => fallback ?? key,
+      setLocale: () => {},
+      loading: false,
+      isRTL: false,
+    }),
+  };
+});
+
 const mockVersionManager = {
   createVersion: vi.fn(),
 };
