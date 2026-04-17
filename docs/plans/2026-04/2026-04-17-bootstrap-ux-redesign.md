@@ -1016,3 +1016,67 @@ git commit -m "docs: update bootstrap flow after UX redesign"
 - [x] 浏览器手动验证 5 链路全部通过
 - [x] grep 无残留 `redirect.*setup` 假设
 - [x] 所有 commit 不含 Co-Authored-By
+
+---
+
+## v2 修订执行 backlog（2026-04-17 下午）
+
+PoC 后发现 v1 三维 evaluator 设计误报（见 design doc v2 修订记录）。以下为对齐 v2 的收敛工作，一次性交付。
+
+### v2-Task 1：后端简化
+
+**Files:**
+- Delete: `platform/.../bootstrap/BootstrapStatusEvaluator.java`
+- Delete: `platform/.../bootstrap/mapper/BootstrapStatusMapper.java`
+- Delete: `platform/src/test/.../BootstrapStatusEvaluatorTest.java`
+- Delete: `platform/src/test/.../BootstrapStatusMapperIntegrationTest.java`
+- Modify: `platform/.../bootstrap/constant/BootstrapMissingPart.java` — 只留 `SYSTEM_CONFIG`
+- Modify: `platform/.../bootstrap/controller/BootstrapController.java` — `getStatus()` 直接调 `systemConfigService.isInitialized()`，不经 evaluator
+- Modify: `platform/.../bootstrap/BootstrapStartupLogger.java` — 用 `isInitialized()`
+- Modify: `platform/src/test/.../BootstrapControllerIntegrationTest.java` — 2 case（initialized=true → `missingParts=[]` / =false → `["system_config"]`），不再 mock evaluator
+
+### v2-Task 2：前端文案简化
+
+**Files:**
+- Modify: `web-admin/app/services/bootstrapTexts.ts` — 删除 `MISSING_PART_LABELS` 的 3 项，只留单一态文案 "System not initialized / Initialize now"
+- Modify: `web-admin/app/components/BootstrapBanner.tsx` — 不再渲染 `describeMissingParts()`，只显示通用提示
+- Modify: `web-admin/app/services/bootstrapStatus.ts` — 字段保留不变
+
+### v2-Task 3：脚本改造
+
+**Files:**
+- Modify: `scripts/oss-reset-and-init.sh`
+
+改动：
+1. **删** `mark_initialized_flag()` 函数
+2. **删** step 4.5 的 case B（admin 已存在时补写 flag 分支）；保留 case A（已初始化跳过）+ case C（空库调 setup）
+3. **删** step 7.1 的 System Tenant 补偿 SQL（INSERT id=1 等）
+4. **加** `--no-bootstrap` 参数：跳过 step 4.5 / 6 / 7 / 7.1 / 7.5 / 8，只做 reset DB + 启后端 + 启前端
+5. 更新脚本头注释，职责降为"重置 + 可选导数据"
+
+### v2-Task 4：E2E 取消 skip
+
+**Files:**
+- Modify: `web-admin/tests/e2e/setup/setup-wizard.spec.ts`
+
+- 原先 4 个 `test.skip("requires empty database")` 改回 `test(...)`，通过运行前设置 `./scripts/oss-reset-and-init.sh --no-bootstrap` 确保前置条件
+- 加注释说明测试前置条件
+- 另外写一个 helper / 文档说明这组测试需要跑 `--no-bootstrap` 模式
+
+### v2-Task 5：系统参考文档同步
+
+**Files（待 grep 确定）:**
+- 可能涉及：`docs/system-reference/core/16-用户注册登录与租户流程.md`、`docs/system-reference/subsystems/53-SaaS多租户与Bootstrap架构.md`
+
+- grep 全仓 `redirect.*setup` / `BootstrapStatusEvaluator` 残留
+- 如有 bootstrap 流程图/说明提到 "未初始化跳转 /setup"，改为"显示横幅提示"
+
+### v2 验收
+
+- [ ] `BootstrapControllerIntegrationTest` 2 PASS（无 evaluator mock）
+- [ ] `compileJava` + `compileTestJava` 干净
+- [ ] `npx tsc --noEmit` 无新增错误
+- [ ] `./scripts/oss-reset-and-init.sh --no-bootstrap` 能正常跑完、banner 可见
+- [ ] `./scripts/oss-reset-and-init.sh` 默认路径能正常跑完，系统可用
+- [ ] 4 个 previously-skipped banner E2E 测试在 `--no-bootstrap` 环境下全部 PASS
+- [ ] 设计 doc v2 + plan v2 backlog 与代码一致
