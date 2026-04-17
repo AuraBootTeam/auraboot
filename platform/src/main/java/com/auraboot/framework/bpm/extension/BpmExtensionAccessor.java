@@ -11,9 +11,14 @@ import com.auraboot.smart.framework.engine.model.assembly.IdBasedElement;
 import com.auraboot.smart.framework.engine.model.assembly.ProcessDefinition;
 import com.auraboot.smart.framework.engine.smart.PropertyCompositeKey;
 import com.auraboot.smart.framework.engine.smart.PropertyCompositeValue;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -35,11 +40,15 @@ import java.util.Optional;
  * <p>All AuraBoot business config keys are namespaced with the "aura." prefix
  * (see {@link BpmExtensionKeys}).
  */
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class BpmExtensionAccessor {
 
     private final SmartEngine smartEngine;
+    private final ObjectMapper objectMapper;
+
+    private static final TypeReference<List<String>> STRING_LIST_TYPE = new TypeReference<>() {};
 
     /** Get raw process-level property from {@code <smart:properties>}, or empty when not set. */
     public Optional<String> getProcessProperty(String processKey, String key) {
@@ -82,6 +91,33 @@ public class BpmExtensionAccessor {
         return getProcessProperty(processKey, BpmExtensionKeys.CC_POLICY)
                 .map(CcPolicy::fromCode)
                 .orElse(CcPolicy.ALL);
+    }
+
+    /**
+     * Resolve the list of permission codes required to claim/complete a given userTask.
+     *
+     * <p>The value is stored in {@code <smart:properties>} as a JSON array string under
+     * {@link BpmExtensionKeys#REQUIRED_PERMISSIONS}. Missing value resolves to an empty
+     * list so callers can always iterate without null checks.
+     *
+     * <p>Malformed JSON does <strong>not</strong> silently fall back to the empty list —
+     * it throws {@link IllegalStateException} so deployment-time errors surface loudly
+     * rather than granting unintended access via a silent "no permissions required"
+     * downgrade (matches the no-silent-fallback policy).
+     */
+    public List<String> getRequiredPermissions(String processKey, String activityId) {
+        Optional<String> raw = getActivityProperty(
+                processKey, activityId, BpmExtensionKeys.REQUIRED_PERMISSIONS);
+        if (raw.isEmpty()) return Collections.emptyList();
+        String json = raw.get();
+        try {
+            List<String> parsed = objectMapper.readValue(json, STRING_LIST_TYPE);
+            return parsed == null ? Collections.emptyList() : parsed;
+        } catch (Exception e) {
+            throw new IllegalStateException(
+                    "Malformed aura.requiredPermissions JSON on activity '" + activityId
+                            + "' of process '" + processKey + "': " + json, e);
+        }
     }
 
     /**
