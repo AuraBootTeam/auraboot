@@ -3,11 +3,10 @@ package com.auraboot.framework.bpm.service;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.bpm.audit.BpmAuditOperation;
 import com.auraboot.framework.bpm.audit.BpmAuditService;
+import com.auraboot.framework.bpm.extension.BpmExtensionAccessor;
 import com.auraboot.framework.bpm.model.WithdrawPolicy;
 import com.auraboot.framework.bpm.util.BpmSecurityUtil;
 import com.auraboot.framework.exception.BusinessException;
-import com.auraboot.framework.plugin.entity.BpmProcessDefinition;
-import com.auraboot.framework.plugin.mapper.BpmProcessDefinitionMapper;
 import com.auraboot.smart.framework.engine.SmartEngine;
 import com.auraboot.smart.framework.engine.model.instance.ProcessInstance;
 import com.auraboot.smart.framework.engine.model.instance.TaskInstance;
@@ -19,12 +18,12 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Map;
 
 /**
- * Handles process-instance withdrawal according to the process-level WithdrawPolicy.
+ * Handles process-instance withdrawal according to the process-level WithdrawPolicy
+ * declared in BPMN <smart:properties> under aura.withdrawPolicy.
  *
  * <p>Semantics:
  * <ul>
- *   <li>{@code strict} — initiator only, before ANY approve. Rejected if any completed task
- *       in the instance was recorded with operation "task_approve" in the audit log.</li>
+ *   <li>{@code strict} — initiator only, before ANY approve.</li>
  *   <li>{@code loose}  — initiator only, anytime while the instance is still running.</li>
  *   <li>{@code none}   — disabled; always rejected.</li>
  * </ul>
@@ -35,15 +34,11 @@ import java.util.Map;
 public class WithdrawService {
 
     private final SmartEngine smartEngine;
-    private final BpmProcessDefinitionMapper processDefinitionMapper;
+    private final BpmExtensionAccessor extensionAccessor;
     private final BpmAuditService auditService;
 
     /**
      * Withdraw a running process instance identified by a current task.
-     *
-     * @param taskId the ID of any active task belonging to the target instance
-     * @param reason human-readable reason for withdrawal
-     * @throws BusinessException if the withdrawal is not allowed under the policy
      */
     @Transactional
     public void withdraw(String taskId, String reason) {
@@ -57,7 +52,6 @@ public class WithdrawService {
         }
         String processInstanceId = task.getProcessInstanceId();
 
-        // 2. Resolve process instance and definition
         ProcessInstance processInstance =
                 smartEngine.getProcessQueryService().findById(processInstanceId, tenantId);
         if (processInstance == null) {
@@ -65,32 +59,20 @@ public class WithdrawService {
         }
         String processKey = processInstance.getProcessDefinitionId();
 
-        BpmProcessDefinition def = processDefinitionMapper.findByProcessKey(
-                MetaContext.getCurrentTenantId(), processKey);
-        if (def == null) {
-            throw new BusinessException("Process definition not found: " + processKey);
-        }
-
-        // 3. Policy gate
-        WithdrawPolicy policy = WithdrawPolicy.fromCode(def.getWithdrawPolicy());
+        // 2. Policy gate (read from BPMN extension; defaults to STRICT when absent)
+        WithdrawPolicy policy = extensionAccessor.getWithdrawPolicy(processKey);
         if (policy == WithdrawPolicy.NONE) {
             throw new BusinessException("Withdraw is disabled for process: " + processKey);
         }
 
-        // 4. Initiator check — look up via ProcessInstance.startUserId, with audit-log fallback.
-        //    ProcessInstance.getStartUserId() is populated by SmartEngine from the
-        //    PROCESS_INSTANCE_START_USER_ID variable set at process start time.
-        //    The audit-log fallback covers migrated data and tests that record
-        //    PROCESS_START separately. Both paths are single-source lookups — not
-        //    the banned runtime fallback pattern (no multi-parser speculation).
+        // 3. Initiator check
         String initiatorId = processInstance.getStartUserId();
         if (initiatorId == null) {
             initiatorId = auditService.findByProcessInstance(processInstanceId)
                     .stream()
                     .filter(r -> BpmAuditOperation.PROCESS_START.matches(r.getOperation()))
                     .map(r -> r.getDetails() != null
-                            ? (String) r.getDetails().get("startUserId")
-                            : null)
+                            ? (String) r.getDetails().get("startUserId") : null)
                     .filter(uid -> uid != null && !uid.isBlank())
                     .findFirst()
                     .orElse(null);
@@ -99,8 +81,7 @@ public class WithdrawService {
             throw new BusinessException("Only the initiator can withdraw this process");
         }
 
-        // 5. STRICT policy: reject if any task was previously approved
-        //    Approved tasks are tracked via BpmAuditService (operation = "task_approve")
+        // 4. STRICT: reject if any task previously approved
         if (policy == WithdrawPolicy.STRICT) {
             boolean anyApproved = auditService.findByProcessInstance(processInstanceId)
                     .stream()
@@ -111,12 +92,10 @@ public class WithdrawService {
             }
         }
 
-        // 6. Terminate the process via SmartEngine abort
-        //    The adapter's terminateProcess() is a stub over an in-memory map that
-        //    is not populated by SmartEngine-started instances; call SmartEngine directly.
+        // 5. Abort via SmartEngine (terminate process)
         smartEngine.getProcessCommandService().abort(processInstanceId, "WITHDRAWN", tenantId);
 
-        // 7. Audit
+        // 6. Audit
         auditService.auditProcessOperation(
                 BpmAuditOperation.WITHDRAW.code(),
                 processInstanceId,
