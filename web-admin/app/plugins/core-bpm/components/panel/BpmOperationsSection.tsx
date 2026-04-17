@@ -71,12 +71,45 @@ import { TerminateDialog } from './TerminateDialog';
  * care about for routing. BpmFormController's TaskFormResponse has many more
  * fields; we only probe for the presence of {@code formBinding.formRef} to
  * decide whether to route the approve/reject click through BpmTaskDrawer
- * (DSL form) or the inline comment dialog.
+ * (DSL form) or the inline comment dialog, plus the node's declared
+ * taskActions so we can forward resultVariable/resultValue as process
+ * variables on the approve/reject API call.
  */
+interface TaskActionDefProbe {
+  key?: string;
+  type?: string;
+  resultVariable?: string;
+  resultValue?: string;
+  requireComment?: boolean;
+}
+
 interface TaskFormProbeResponse {
   formBinding?: {
     formRef?: string;
   };
+  taskActions?: TaskActionDefProbe[];
+}
+
+/**
+ * Extract the {@code {resultVariable: resultValue}} map for a given decision
+ * (approve/reject) from the node's taskActions. Returns {@code undefined} when
+ * no matching action exists or the action has no resultVariable — callers treat
+ * that as "send no extra variables" rather than silently fabricating one.
+ */
+function resolveActionVariables(
+  actions: TaskActionDefProbe[] | undefined,
+  decisionKey: 'approve' | 'reject',
+): Record<string, unknown> | undefined {
+  if (!Array.isArray(actions) || actions.length === 0) {
+    return undefined;
+  }
+  const match = actions.find(
+    (a) => a && a.type === 'complete' && a.key === decisionKey,
+  );
+  if (!match || !match.resultVariable) {
+    return undefined;
+  }
+  return { [match.resultVariable]: match.resultValue };
 }
 
 type Translator = (
@@ -145,6 +178,14 @@ export function BpmOperationsSection({
   // form probe to decide which path to take. Scoped to approve/reject only.
   const [probing, setProbing] = useState<'approve' | 'reject' | null>(null);
   const [probeError, setProbeError] = useState<string | null>(null);
+  // Cached taskActions from the most recent probe. When the user confirms the
+  // inline approve/reject dialog, we forward the matching action's
+  // resultVariable/resultValue as process variables so downstream
+  // exclusiveGateway conditions (e.g. MVEL ${taskResult == 'approved'})
+  // resolve. Null = probe has not run yet or returned no actions.
+  const [probedActions, setProbedActions] = useState<
+    TaskActionDefProbe[] | null
+  >(null);
 
   // Fetch pending tasks for the running instance. Non-running instances skip
   // this call entirely - none of the buttons render.
@@ -262,7 +303,15 @@ export function BpmOperationsSection({
     setSubmitting(true);
     setSubmitError(null);
     try {
-      await approveTask(assigneeTaskId, approveComment.trim() || undefined);
+      const variables = resolveActionVariables(
+        probedActions ?? undefined,
+        'approve',
+      );
+      await approveTask(
+        assigneeTaskId,
+        approveComment.trim() || undefined,
+        variables,
+      );
       setDialog({ type: 'none' });
       setApproveComment('');
       onActionComplete?.();
@@ -271,7 +320,7 @@ export function BpmOperationsSection({
     } finally {
       setSubmitting(false);
     }
-  }, [assigneeTaskId, approveComment, onActionComplete]);
+  }, [assigneeTaskId, approveComment, onActionComplete, probedActions]);
 
   const runReject = useCallback(async () => {
     if (!assigneeTaskId) return;
@@ -283,7 +332,11 @@ export function BpmOperationsSection({
     setSubmitting(true);
     setSubmitError(null);
     try {
-      await rejectTask(assigneeTaskId, reason);
+      const variables = resolveActionVariables(
+        probedActions ?? undefined,
+        'reject',
+      );
+      await rejectTask(assigneeTaskId, reason, variables);
       setDialog({ type: 'none' });
       setRejectComment('');
       onActionComplete?.();
@@ -292,7 +345,7 @@ export function BpmOperationsSection({
     } finally {
       setSubmitting(false);
     }
-  }, [assigneeTaskId, rejectComment, onActionComplete, t]);
+  }, [assigneeTaskId, rejectComment, onActionComplete, probedActions, t]);
 
   const runWithdraw = useCallback(
     async (reason?: string) => {
@@ -336,6 +389,15 @@ export function BpmOperationsSection({
         );
         const formRef = result.data?.formBinding?.formRef;
         const ok = result.code === ErrorCodes.SUCCESS;
+        // Cache taskActions so runApprove/runReject can forward
+        // resultVariable/resultValue as process variables. We cache even when
+        // routing through the drawer path — the drawer currently owns its own
+        // submit path via /api/bpm/forms/task/{id}/submit, but keeping the
+        // cache consistent avoids confusion when callers switch modes.
+        const actions = Array.isArray(result.data?.taskActions)
+          ? result.data!.taskActions!
+          : null;
+        setProbedActions(actions);
         if (ok && typeof formRef === 'string' && formRef.length > 0) {
           setDrawerState({ taskId: assigneeTaskId, decision });
         } else {

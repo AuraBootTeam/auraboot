@@ -295,8 +295,178 @@ describe('BpmOperationsSection', () => {
       fireEvent.click(screen.getByTestId('bpm-approve-confirm'));
     });
 
-    expect(approveTaskSpy).toHaveBeenCalledWith('task-7', undefined);
+    // Default probe returns no taskActions → approveTask called without
+    // variables (third arg is undefined).
+    expect(approveTaskSpy).toHaveBeenCalledWith('task-7', undefined, undefined);
     expect(onActionComplete).toHaveBeenCalledTimes(1);
+  });
+
+  it('forwards taskActions resultVariable/resultValue as variables on approve', async () => {
+    authStub.user = { pid: 'u-200' };
+    getTasksByProcessInstanceSpy.mockResolvedValue([
+      {
+        instanceId: 'pi-001',
+        taskId: 'task-7',
+        processInstanceId: 'pi-001',
+        processDefinitionKey: 'pd-alpha',
+        taskDefinitionKey: 'approver',
+        taskName: '审批',
+        assignee: 'u-200',
+        claimUserId: 'u-200',
+        createTime: '2026-04-17T00:00:00Z',
+        priority: 0,
+      },
+    ]);
+    // Probe returns taskActions with resultVariable=taskResult; approve → 'approved',
+    // reject → 'rejected'. No formBinding → inline dialog path.
+    formProbeGetSpy.mockResolvedValue({
+      code: '0',
+      desc: '',
+      data: {
+        formBinding: null,
+        taskActions: [
+          {
+            key: 'approve',
+            type: 'complete',
+            resultVariable: 'taskResult',
+            resultValue: 'approved',
+          },
+          {
+            key: 'reject',
+            type: 'complete',
+            resultVariable: 'taskResult',
+            resultValue: 'rejected',
+            requireComment: true,
+          },
+        ],
+      },
+    });
+
+    const onActionComplete = vi.fn();
+    await act(async () => {
+      render(
+        <BpmOperationsSection
+          instance={runningInstance()}
+          onActionComplete={onActionComplete}
+          t={t}
+        />,
+      );
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('bpm-operations-approve'));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('bpm-approve-confirm'));
+    });
+
+    expect(approveTaskSpy).toHaveBeenCalledWith('task-7', undefined, {
+      taskResult: 'approved',
+    });
+    expect(onActionComplete).toHaveBeenCalledTimes(1);
+  });
+
+  it('forwards taskActions resultVariable/resultValue as variables on reject', async () => {
+    authStub.user = { pid: 'u-200' };
+    getTasksByProcessInstanceSpy.mockResolvedValue([
+      {
+        instanceId: 'pi-001',
+        taskId: 'task-7',
+        processInstanceId: 'pi-001',
+        processDefinitionKey: 'pd-alpha',
+        taskDefinitionKey: 'approver',
+        taskName: '审批',
+        assignee: 'u-200',
+        claimUserId: 'u-200',
+        createTime: '2026-04-17T00:00:00Z',
+        priority: 0,
+      },
+    ]);
+    formProbeGetSpy.mockResolvedValue({
+      code: '0',
+      desc: '',
+      data: {
+        formBinding: null,
+        taskActions: [
+          {
+            key: 'approve',
+            type: 'complete',
+            resultVariable: 'taskResult',
+            resultValue: 'approved',
+          },
+          {
+            key: 'reject',
+            type: 'complete',
+            resultVariable: 'taskResult',
+            resultValue: 'rejected',
+            requireComment: true,
+          },
+        ],
+      },
+    });
+
+    const onActionComplete = vi.fn();
+    await act(async () => {
+      render(
+        <BpmOperationsSection
+          instance={runningInstance()}
+          onActionComplete={onActionComplete}
+          t={t}
+        />,
+      );
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('bpm-operations-reject'));
+    });
+    const rejectComment = screen.getByTestId('bpm-reject-comment');
+    fireEvent.change(rejectComment, { target: { value: 'too expensive' } });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('bpm-reject-confirm'));
+    });
+
+    expect(rejectTaskSpy).toHaveBeenCalledWith('task-7', 'too expensive', {
+      taskResult: 'rejected',
+    });
+    expect(onActionComplete).toHaveBeenCalledTimes(1);
+  });
+
+  it('omits variables arg when node has no taskActions (backward compatible)', async () => {
+    authStub.user = { pid: 'u-200' };
+    getTasksByProcessInstanceSpy.mockResolvedValue([
+      {
+        instanceId: 'pi-001',
+        taskId: 'task-7',
+        processInstanceId: 'pi-001',
+        processDefinitionKey: 'pd-alpha',
+        taskDefinitionKey: 'approver',
+        taskName: '审批',
+        assignee: 'u-200',
+        claimUserId: 'u-200',
+        createTime: '2026-04-17T00:00:00Z',
+        priority: 0,
+      },
+    ]);
+    // Probe returns taskActions: [] (explicit empty) — we must NOT silently
+    // fabricate a default taskResult='approved'. Per the red-line "no silent
+    // fallback", this path forwards undefined variables.
+    formProbeGetSpy.mockResolvedValue({
+      code: '0',
+      desc: '',
+      data: { formBinding: null, taskActions: [] },
+    });
+
+    await act(async () => {
+      render(<BpmOperationsSection instance={runningInstance()} t={t} />);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('bpm-operations-approve'));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('bpm-approve-confirm'));
+    });
+
+    expect(approveTaskSpy).toHaveBeenCalledWith('task-7', undefined, undefined);
   });
 
   it('enables withdraw only when current user is the initiator', async () => {
