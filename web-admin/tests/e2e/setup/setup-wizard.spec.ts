@@ -9,10 +9,10 @@
  *   D12 Form Validation    — empty submit, invalid email, short password, mismatch
  *   D14 Toast / Feedback   — error messages appear inline
  *
- * NOTE: Tests 1-5 (form interaction on uninitialized system) are skipped because
- * the test environment runs after reset-and-init.sh, meaning the system IS
- * initialized. The /setup loader redirects to /login when initialized.
- * Test 6 (redirect) is the primary positive test for this environment.
+ * NOTE: Tests requiring an uninitialized database are marked test.skip.
+ * After reset-and-init.sh the system IS initialized, so /setup renders an
+ * 'already initialized' page (no redirect). The post-init tests cover the
+ * already-done page, status API shape, and absence of the banner on root.
  *
  * @since 11.0.0
  */
@@ -20,38 +20,28 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Setup Wizard', () => {
-  // -------------------------------------------------------------------------
-  // Test 6: Already initialized system redirects to /login
-  // This is the main positive test — after reset-and-init.sh the system
-  // is initialized, so /setup should redirect.
-  // -------------------------------------------------------------------------
-  test('redirects away from /setup when system is already initialized', async ({ page }) => {
-    // Navigate to /setup — the loader checks /api/bootstrap/status
-    // and redirects away if initialized === true
+  test('shows already-initialized page when /setup accessed after init', async ({ page }) => {
     await page.goto('/setup', { waitUntil: 'domcontentloaded' });
 
-    // Wait for the redirect — should end up NOT on /setup
-    await page.waitForURL((url) => !url.pathname.includes('/setup'), { timeout: 15_000 });
+    // No redirect — page stays on /setup and renders the already-done card
+    await expect(page).toHaveURL(/\/setup/);
+    await expect(page.getByTestId('bootstrap-already-done')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('System already initialized')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Back to home' })).toBeVisible();
 
-    const url = page.url();
-    expect(
-      !url.includes('/setup'),
-      `Expected redirect away from /setup, but still at: ${url}`,
-    ).toBeTruthy();
-
-    // Verify setup wizard content is NOT visible
-    const setupHeading = page.locator('text=System Setup');
-    await expect(setupHeading).not.toBeVisible({ timeout: 3_000 });
+    // Wizard form must NOT render
+    await expect(page.getByText('Welcome to AuraBoot')).not.toBeVisible({ timeout: 1_000 });
   });
 
-  test('bootstrap status API returns initialized=true', async ({ page }) => {
-    // Verify the API that drives the redirect
+  test('bootstrap status API returns initialized=true with empty missingParts', async ({ page }) => {
     const res = await page.request.get('/api/bootstrap/status');
     expect(res.ok()).toBeTruthy();
 
     const body = await res.json();
     expect(body.code).toBe('0');
     expect(body.data.initialized).toBe(true);
+    expect(Array.isArray(body.data.missingParts)).toBe(true);
+    expect(body.data.missingParts.length).toBe(0);
   });
 
   test('setup API rejects when already initialized', async ({ page }) => {
@@ -171,5 +161,33 @@ test.describe('Setup Wizard', () => {
 
     // Should show "Password is required"
     await expect(page.getByText('Password is required')).toBeVisible({ timeout: 5_000 });
+  });
+
+  test('banner is NOT visible on root after initialization', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    // Banner should be absent because system is initialized
+    await expect(page.getByTestId('bootstrap-banner')).toBeHidden({ timeout: 3_000 });
+  });
+
+  // -------------------------------------------------------------------------
+  // Bootstrap UX — uninitialized scenarios
+  // Skipped because the test environment is initialized by reset-and-init.sh.
+  // Run manually after `./scripts/oss-reset-and-init.sh --skip-bootstrap` (or equivalent
+  // mechanism that leaves the DB empty).
+  // -------------------------------------------------------------------------
+
+  test.skip('shows banner instead of redirect on uninitialized root (requires empty database)', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await expect(page).toHaveURL('/');
+    const banner = page.getByTestId('bootstrap-banner');
+    await expect(banner).toBeVisible({ timeout: 10_000 });
+    await expect(banner).toContainText('System not initialized');
+    await expect(banner).toContainText('Admin account');
+  });
+
+  test.skip('banner CTA navigates to /setup (requires empty database)', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await page.getByTestId('bootstrap-banner-cta').click();
+    await expect(page).toHaveURL('/setup');
   });
 });
