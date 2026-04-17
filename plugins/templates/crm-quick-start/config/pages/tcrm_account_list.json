@@ -20,7 +20,7 @@
       "main": {
         "blocks": [{
           "id": "tcrm_account_table",
-          "blockType": "data-table",
+          "blockType": "table",
           "columns": [
             { "field": "tcrm_ac_code", "width": 160, "sortable": true },
             { "field": "tcrm_ac_name", "width": 200, "sortable": true },
