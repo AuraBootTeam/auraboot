@@ -20,7 +20,7 @@
       "main": {
         "blocks": [{
           "id": "gp_comment_table",
-          "blockType": "data-table",
+          "blockType": "table",
           "columns": [
             { "field": "gp_tc_task_id", "width": 200 },
             { "field": "gp_tc_content", "width": 400 },

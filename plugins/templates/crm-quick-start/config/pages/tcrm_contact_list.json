@@ -20,7 +20,7 @@
       "main": {
         "blocks": [{
           "id": "tcrm_contact_table",
-          "blockType": "data-table",
+          "blockType": "table",
           "columns": [
             { "field": "tcrm_ct_code", "width": 160, "sortable": true },
             { "field": "tcrm_ct_name", "width": 150, "sortable": true },

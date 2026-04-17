@@ -20,7 +20,7 @@
       "list-tabs": {
         "blocks": [{
           "id": "thr_leave_tabs",
-          "blockType": "list-tabs",
+          "blockType": "tabs",
           "tabs": [
             { "key": "all", "label": { "en": "All", "zh-CN": "全部" }, "filter": null },
             { "key": "pending", "label": { "en": "Pending", "zh-CN": "待审批" }, "filter": { "field": "thr_lv_status", "value": "pending", "operator": "EQ" } },
@@ -33,7 +33,7 @@
       "main": {
         "blocks": [{
           "id": "thr_leave_table",
-          "blockType": "data-table",
+          "blockType": "table",
           "columns": [
             { "field": "thr_lv_code", "width": 160, "sortable": true },
             { "field": "thr_lv_employee_id", "width": 150 },
