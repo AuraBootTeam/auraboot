@@ -12,6 +12,7 @@ import com.auraboot.smart.framework.engine.model.assembly.ProcessDefinition;
 import com.auraboot.smart.framework.engine.service.query.RepositoryQueryService;
 import com.auraboot.smart.framework.engine.smart.PropertyCompositeKey;
 import com.auraboot.smart.framework.engine.smart.PropertyCompositeValue;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -56,7 +57,7 @@ class BpmExtensionAccessorTest {
         smartEngine = mock(SmartEngine.class);
         repo = mock(RepositoryQueryService.class);
         when(smartEngine.getRepositoryQueryService()).thenReturn(repo);
-        accessor = new BpmExtensionAccessor(smartEngine);
+        accessor = new BpmExtensionAccessor(smartEngine, new ObjectMapper());
 
         processDef = mock(ProcessDefinitionWithExtension.class);
         when(processDef.getId()).thenReturn("leave_request");
@@ -154,6 +155,36 @@ class BpmExtensionAccessorTest {
     }
 
     // ---- edge cases -----------------------------------------------------
+
+    @Test
+    @DisplayName("getRequiredPermissions parses JSON array from <smart:properties>")
+    void getRequiredPermissionsParsed() {
+        ExtensionElements taskExt = buildExtensionElements(
+                BpmExtensionKeys.REQUIRED_PERMISSIONS, "[\"hr.leave.approve\",\"hr.leave.view\"]");
+        when(userTask.getExtensionElements()).thenReturn(taskExt);
+        assertThat(accessor.getRequiredPermissions("leave_request", "manager_approval"))
+                .containsExactly("hr.leave.approve", "hr.leave.view");
+    }
+
+    @Test
+    @DisplayName("getRequiredPermissions returns empty list when unset")
+    void getRequiredPermissionsEmpty() {
+        when(userTask.getExtensionElements()).thenReturn(null);
+        assertThat(accessor.getRequiredPermissions("leave_request", "manager_approval"))
+                .isEmpty();
+    }
+
+    @Test
+    @DisplayName("getRequiredPermissions throws on malformed JSON (no silent fallback)")
+    void getRequiredPermissionsMalformedJson() {
+        ExtensionElements taskExt = buildExtensionElements(
+                BpmExtensionKeys.REQUIRED_PERMISSIONS, "not-json");
+        when(userTask.getExtensionElements()).thenReturn(taskExt);
+        assertThatThrownBy(() ->
+                accessor.getRequiredPermissions("leave_request", "manager_approval"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Malformed aura.requiredPermissions");
+    }
 
     @Test
     @DisplayName("unknown processKey returns defaults")
