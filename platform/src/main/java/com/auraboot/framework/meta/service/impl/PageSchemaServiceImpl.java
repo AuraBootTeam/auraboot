@@ -3,6 +3,7 @@ package com.auraboot.framework.meta.service.impl;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.exception.ValidationException;
+import com.auraboot.framework.meta.validator.PageSchemaDslI18nValidator;
 import com.auraboot.framework.meta.constant.Status;
 import com.auraboot.framework.meta.converter.PageSchemaConverter;
 import com.auraboot.framework.meta.dto.*;
@@ -525,6 +526,13 @@ public class PageSchemaServiceImpl implements PageSchemaService {
         if (request.getBlocks() != null && !request.getBlocks().isEmpty() && !validateBlocks(request.getBlocks())) {
             throw new ValidationException(ResponseCode.CommonValidationFailed, "Blocks format is invalid");
         }
+
+        // I18n compliance: scan page-level fields AND all blocks recursively
+        Map<String, Object> pageMap = new HashMap<>();
+        pageMap.put("title", request.getTitle());
+        pageMap.put("description", request.getDescription());
+        pageMap.put("blocks", request.getBlocks());
+        PageSchemaDslI18nValidator.validatePageSchema(pageMap, request.getPageKey());
     }
 
     /**
@@ -534,11 +542,19 @@ public class PageSchemaServiceImpl implements PageSchemaService {
         if (request == null) {
             throw new ValidationException(ResponseCode.CommonValidationFailed, "更新请求不能为空");
         }
-        
+
         if (request.getBlocks() != null && !request.getBlocks().isEmpty() &&
             !validateBlocks(request.getBlocks())) {
             throw new ValidationException(ResponseCode.CommonValidationFailed, "Blocks format is invalid");
         }
+
+        // I18n compliance: scan page-level fields AND all blocks recursively
+        String pageKey = request.getPageKey() != null ? request.getPageKey() : "(update)";
+        Map<String, Object> pageMap = new HashMap<>();
+        pageMap.put("title", request.getTitle());
+        pageMap.put("description", request.getDescription());
+        pageMap.put("blocks", request.getBlocks());
+        PageSchemaDslI18nValidator.validatePageSchema(pageMap, pageKey);
     }
 
     /**
