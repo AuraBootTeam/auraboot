@@ -35,7 +35,6 @@ async function loadFallbackRenderers(): Promise<Map<string, React.ComponentType<
     description,
     chart,
     tabs,
-    approvalComments,
   ] = await Promise.all([
     import('~/framework/meta/rendering/blocks/FormBlockRenderer'),
     import('~/framework/meta/rendering/blocks/FormSectionBlockRenderer'),
@@ -47,7 +46,6 @@ async function loadFallbackRenderers(): Promise<Map<string, React.ComponentType<
     import('~/framework/meta/rendering/blocks/DescriptionBlockRenderer'),
     import('~/framework/meta/rendering/blocks/ChartBlockRenderer'),
     import('~/framework/meta/rendering/blocks/TabsBlockRenderer'),
-    import('~/framework/meta/rendering/blocks/ApprovalCommentsBlock'),
   ]);
   _fallbackRenderers = new Map([
     ['form', form.FormBlockRenderer],
@@ -60,7 +58,6 @@ async function loadFallbackRenderers(): Promise<Map<string, React.ComponentType<
     ['description', description.DescriptionBlockRenderer],
     ['chart', chart.ChartBlockRenderer],
     ['tabs', tabs.TabsBlockRenderer],
-    ['approval-comments', approvalComments.ApprovalCommentsBlock as any],
   ]);
   return _fallbackRenderers;
 }

@@ -39,7 +39,6 @@ import { SubTableViewer } from '~/framework/meta/rendering/blocks/SubTableViewer
 import { MonthlyGridViewer } from '~/framework/meta/rendering/blocks/MonthlyGridViewer';
 import { FieldHistoryViewer } from '~/framework/meta/rendering/blocks/FieldHistoryViewer';
 import { ActivityTimeline } from '~/framework/meta/rendering/blocks/ActivityTimeline';
-import { ApprovalCommentsBlock } from '~/framework/meta/rendering/blocks/ApprovalCommentsBlock';
 import { RecordComments } from '~/framework/meta/rendering/blocks/RecordComments';
 import { NbaSuggestionBar } from '~/framework/meta/rendering/blocks/NbaSuggestionBar';
 import { BpmPanelBlock } from '~/framework/meta/rendering/blocks/BpmPanelBlock';
@@ -767,21 +766,6 @@ function DetailBlockRenderer({
       <RecordComments
         modelCode={modelCode || ''}
         recordPid={String(pid)}
-        token={token}
-        locale={locale}
-        t={t}
-      />
-    );
-  }
-
-  if (block.blockType === 'approval-comments') {
-    const pid = recordData?.pid || recordId;
-    const approvalConfig = (block as any).approvalComments;
-    return (
-      <ApprovalCommentsBlock
-        modelCode={modelCode || ''}
-        recordPid={String(pid)}
-        config={approvalConfig}
         token={token}
         locale={locale}
         t={t}
