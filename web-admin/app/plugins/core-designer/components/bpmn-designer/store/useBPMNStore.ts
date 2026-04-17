@@ -9,6 +9,7 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { subscribeWithSelector } from 'zustand/middleware';
+import { current, isDraft } from 'immer';
 import {
   BPMNNodeType,
   type BPMNNode,
@@ -29,6 +30,48 @@ const BPMN_MAX_HISTORY = 50;
 interface BPMNSnapshot {
   nodes: BPMNNode[];
   edges: BPMNEdge[];
+}
+
+/**
+ * Strip React Flow internal fields that are not structured-cloneable.
+ *
+ * React Flow enriches nodes/edges at render time with fields such as
+ * `measured` (DOM measurement with internal refs), `selected`, `dragging`,
+ * and transient handles. When these reach `structuredClone` they throw
+ * `DataCloneError: ... could not be cloned`, breaking any state update
+ * that takes a history snapshot.
+ *
+ * This sanitizer keeps only the semantic fields the designer owns; it
+ * does NOT attempt a deep clone (the caller still runs structuredClone
+ * on the sanitized result).
+ */
+function sanitizeNodesForClone(nodes: readonly BPMNNode[]): BPMNNode[] {
+  return nodes.map((node) => {
+    const {
+      // React Flow internal / runtime fields we must drop
+      measured: _measured,
+      selected: _selected,
+      dragging: _dragging,
+      resizing: _resizing,
+      handleBounds: _handleBounds,
+      positionAbsolute: _positionAbsolute,
+      computed: _computed,
+      internals: _internals,
+      ...rest
+    } = node as BPMNNode & Record<string, unknown>;
+    return rest as BPMNNode;
+  });
+}
+
+function sanitizeEdgesForClone(edges: readonly BPMNEdge[]): BPMNEdge[] {
+  return edges.map((edge) => {
+    const {
+      selected: _selected,
+      interactionWidth: _interactionWidth,
+      ...rest
+    } = edge as BPMNEdge & Record<string, unknown>;
+    return rest as BPMNEdge;
+  });
 }
 
 interface BPMNStore {
@@ -152,18 +195,16 @@ export const useBPMNStore = create<BPMNStore>()(
         history: BPMNSnapshot[];
         historyIndex: number;
       }) {
-        let snapshot: BPMNSnapshot;
-        try {
-          snapshot = structuredClone({ nodes: draft.nodes, edges: draft.edges });
-        } catch {
-          // Fallback for environments where structuredClone fails on Proxy objects (e.g. Immer drafts)
-          try {
-            snapshot = JSON.parse(JSON.stringify({ nodes: draft.nodes, edges: draft.edges }));
-          } catch {
-            // Last resort: skip snapshot but don't block the state update
-            return;
-          }
-        }
+        // Extract plain (non-Proxy) arrays from the Immer draft before
+        // cloning. `current()` returns a plain copy of a draft; for values
+        // that are already plain (initial state) we can use them directly.
+        const plainNodes = isDraft(draft.nodes) ? (current(draft.nodes) as BPMNNode[]) : draft.nodes;
+        const plainEdges = isDraft(draft.edges) ? (current(draft.edges) as BPMNEdge[]) : draft.edges;
+        const sanitized = {
+          nodes: sanitizeNodesForClone(plainNodes),
+          edges: sanitizeEdgesForClone(plainEdges),
+        };
+        const snapshot: BPMNSnapshot = structuredClone(sanitized);
         draft.history = draft.history.slice(0, draft.historyIndex + 1);
         draft.history.push(snapshot);
         if (draft.history.length > BPMN_MAX_HISTORY) {
@@ -177,13 +218,21 @@ export const useBPMNStore = create<BPMNStore>()(
 
         setProcessDefinition: (definition) => {
           set((state) => {
-            state.processDefinition = definition;
-            state.nodes = definition.nodes || [];
-            state.edges = definition.edges || [];
+            // Sanitize incoming nodes/edges: they may come from either (a) an
+            // API response (plain JSON, safe) or (b) a save path that echoes
+            // back the current React Flow state (may carry non-cloneable
+            // internal fields like `measured`/`handleBounds`). Sanitizing
+            // once here keeps store state structured-cloneable for all
+            // downstream operations (history snapshots, undo/redo).
+            const cleanNodes = sanitizeNodesForClone(definition.nodes || []);
+            const cleanEdges = sanitizeEdgesForClone(definition.edges || []);
+            state.processDefinition = { ...definition, nodes: cleanNodes, edges: cleanEdges };
+            state.nodes = cleanNodes;
+            state.edges = cleanEdges;
             state.isDirty = false;
             const snapshot: BPMNSnapshot = structuredClone({
-              nodes: state.nodes,
-              edges: state.edges,
+              nodes: cleanNodes,
+              edges: cleanEdges,
             });
             state.history = [snapshot];
             state.historyIndex = 0;
