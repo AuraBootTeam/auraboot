@@ -243,6 +243,26 @@ public interface MetaModelService {
     MetaModelDTO create(MetaModelCreateRequest request);
 
     /**
+     * Upsert a model definition (Phase 1 virtual-model API).
+     *
+     * Persists {@code sourceType} / {@code sourceRef} / {@code primaryKey} and
+     * normalizes field-level {@code sortable}/{@code filterable} flags into
+     * {@code capabilities.sortableFields}/{@code filterableFields} whitelist
+     * (the whitelist is the runtime truth; any caller-supplied whitelist is
+     * overridden by this normalization).
+     *
+     * @param def model definition (must have non-blank code)
+     * @return persisted definition reloaded from DB
+     */
+    ModelDefinition saveDefinition(ModelDefinition def);
+
+    /**
+     * Lookup a model definition by code. Null-friendly wrapper around
+     * {@link #getModelDefinition(String)} for Phase 1 API ergonomics.
+     */
+    ModelDefinition getDefinitionByCode(String code);
+
+    /**
      * 根据PID查找模型
      * @param pid 模型PID
      * @return 模型DTO
