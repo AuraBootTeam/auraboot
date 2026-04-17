@@ -62,6 +62,29 @@ vi.mock('../CcDialog', () => ({
     ) : null,
 }));
 
+vi.mock('../TerminateDialog', () => ({
+  TerminateDialog: ({
+    open,
+    processInstanceId,
+    onConfirm,
+  }: {
+    open: boolean;
+    processInstanceId: string;
+    onConfirm: (reason: string) => Promise<void>;
+  }) =>
+    open ? (
+      <div data-testid="terminate-dialog-stub" data-instance-id={processInstanceId}>
+        <button
+          type="button"
+          data-testid="terminate-dialog-stub-confirm"
+          onClick={() => void onConfirm('reason-stub')}
+        >
+          confirm
+        </button>
+      </div>
+    ) : null,
+}));
+
 // --- Mock useAuth with a mutable handle so individual tests can flip the user.
 const authStub = {
   user: { pid: 'u-200' } as { pid?: string } | null,
@@ -79,6 +102,7 @@ const approveTaskSpy = vi.fn().mockResolvedValue(undefined);
 const rejectTaskSpy = vi.fn().mockResolvedValue(undefined);
 const withdrawTaskSpy = vi.fn().mockResolvedValue(undefined);
 const ccTaskSpy = vi.fn().mockResolvedValue(undefined);
+const terminateProcessSpy = vi.fn().mockResolvedValue(undefined);
 const getTasksByProcessInstanceSpy = vi.fn<() => Promise<any[]>>();
 
 vi.mock('~/plugins/core-bpm/services/bpmWorkbenchService', () => ({
@@ -89,6 +113,8 @@ vi.mock('~/plugins/core-bpm/services/bpmWorkbenchService', () => ({
   withdrawTask: (...args: unknown[]) =>
     withdrawTaskSpy(...(args as Parameters<typeof withdrawTaskSpy>)),
   ccTask: (...args: unknown[]) => ccTaskSpy(...(args as Parameters<typeof ccTaskSpy>)),
+  terminateProcess: (...args: unknown[]) =>
+    terminateProcessSpy(...(args as Parameters<typeof terminateProcessSpy>)),
   getTasksByProcessInstance: (...args: unknown[]) =>
     getTasksByProcessInstanceSpy(
       ...(args as Parameters<typeof getTasksByProcessInstanceSpy>),
@@ -288,5 +314,60 @@ describe('BpmOperationsSection', () => {
         'title',
       ),
     ).toContain('暂无待办任务');
+  });
+
+  // ---- Fix B: terminate button + dialog wiring ----
+
+  it('enables terminate for bpm.admin and wires terminateProcess on confirm', async () => {
+    authStub.user = { pid: 'u-admin' };
+    authStub.permissions = ['bpm.admin'];
+    getTasksByProcessInstanceSpy.mockResolvedValue([]);
+
+    const onActionComplete = vi.fn();
+    await act(async () => {
+      render(
+        <BpmOperationsSection
+          instance={runningInstance()}
+          onActionComplete={onActionComplete}
+          t={t}
+        />,
+      );
+    });
+
+    const terminateBtn = screen.getByTestId(
+      'bpm-operations-terminate',
+    ) as HTMLButtonElement;
+    expect(terminateBtn.disabled).toBe(false);
+
+    fireEvent.click(terminateBtn);
+    const stub = screen.getByTestId('terminate-dialog-stub');
+    expect(stub).toHaveAttribute('data-instance-id', 'pi-001');
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('terminate-dialog-stub-confirm'));
+    });
+
+    expect(terminateProcessSpy).toHaveBeenCalledWith('pi-001', 'reason-stub');
+    expect(onActionComplete).toHaveBeenCalled();
+  });
+
+  it('disables terminate for non-bpm.admin users and surfaces the reason tooltip', async () => {
+    authStub.user = { pid: 'u-200' };
+    authStub.permissions = [];
+    getTasksByProcessInstanceSpy.mockResolvedValue([]);
+
+    await act(async () => {
+      render(<BpmOperationsSection instance={runningInstance()} t={t} />);
+    });
+
+    const terminateBtn = screen.getByTestId(
+      'bpm-operations-terminate',
+    ) as HTMLButtonElement;
+    expect(terminateBtn.disabled).toBe(true);
+    expect(terminateBtn.getAttribute('title')).toContain('仅 BPM 管理员可终止');
+
+    fireEvent.click(terminateBtn);
+    expect(screen.queryByTestId('terminate-dialog-stub')).toBeNull();
+    expect(terminateProcessSpy).not.toHaveBeenCalled();
   });
 });
