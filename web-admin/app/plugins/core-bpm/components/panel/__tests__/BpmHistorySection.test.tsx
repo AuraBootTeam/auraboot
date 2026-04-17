@@ -181,6 +181,57 @@ describe('BpmHistorySection', () => {
     expect(label).not.toHaveTextContent('审批通过');
   });
 
+  it('renders labels for backend enum codes withdraw / cc / task_add_sign / task_transfer (no task_ prefix on the first two)', async () => {
+    // Pins the BpmAuditOperation enum shape: withdraw and cc are written
+    // WITHOUT the task_ prefix, while add-sign / transfer keep the prefix.
+    // Before the fix, this section used task_withdraw / task_cc keys and
+    // never matched runtime audit rows, degrading every withdraw/cc entry
+    // to the UNKNOWN_OPERATION_STYLE raw-string fallback.
+    listAuditEventsMock.mockResolvedValue([
+      buildEvent({
+        id: 401,
+        operation: 'withdraw',
+        createdAt: '2026-04-17T14:00:00Z',
+        details: { comment: 'mistaken submission' },
+      }),
+      buildEvent({
+        id: 402,
+        operation: 'cc',
+        createdAt: '2026-04-17T15:00:00Z',
+        details: { receiverUserIds: ['u-observer-1', 'u-observer-2'] },
+      }),
+      buildEvent({
+        id: 403,
+        operation: 'task_add_sign',
+        createdAt: '2026-04-17T16:00:00Z',
+      }),
+      buildEvent({
+        id: 404,
+        operation: 'task_transfer',
+        createdAt: '2026-04-17T17:00:00Z',
+      }),
+    ]);
+
+    render(<BpmHistorySection instance={buildInstance()} t={t} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('bpm-history-event-401')).toBeInTheDocument();
+    });
+
+    // All four surface their known labels (not raw strings).
+    expect(screen.getByTestId('bpm-history-event-401-label')).toHaveTextContent('撤回');
+    expect(screen.getByTestId('bpm-history-event-402-label')).toHaveTextContent('抄送');
+    expect(screen.getByTestId('bpm-history-event-403-label')).toHaveTextContent('加签');
+    expect(screen.getByTestId('bpm-history-event-404-label')).toHaveTextContent('转办');
+
+    // withdraw + comment surfaces structured detail (withdraw is now in
+    // DETAIL_COMMENT_OPERATIONS).
+    expect(screen.getByTestId('bpm-history-event-401')).toHaveTextContent('mistaken submission');
+    // cc + receiverUserIds surfaces the list inline.
+    expect(screen.getByTestId('bpm-history-event-402')).toHaveTextContent('u-observer-1');
+    expect(screen.getByTestId('bpm-history-event-402')).toHaveTextContent('u-observer-2');
+  });
+
   it('surfaces the error state when listAuditEvents rejects', async () => {
     listAuditEventsMock.mockRejectedValue(new Error('audit service down'));
 
