@@ -135,7 +135,7 @@ async function navigateToTaskCenter(page: Page): Promise<void> {
 // Test suite
 // ---------------------------------------------------------------------------
 
-test.describe('workflow-demo wd_leave_approval UI full lifecycle', () => {
+test.describe('workflow-demo wd_leave_approval UI full lifecycle', { tag: ['@bpm-regression'] }, () => {
   test.setTimeout(180_000);
 
   test.beforeAll(async ({ request }) => {

@@ -177,7 +177,7 @@ async function seedGraphIntoStore(
   }, graph);
 }
 
-test.describe('BPM Designer aura.* policy round-trip (Epic C)', () => {
+test.describe('BPM Designer aura.* policy round-trip (Epic C)', { tag: ['@bpm-regression'] }, () => {
   test.setTimeout(180_000);
 
   test.beforeAll(async ({ request }: { request: APIRequestContext }) => {

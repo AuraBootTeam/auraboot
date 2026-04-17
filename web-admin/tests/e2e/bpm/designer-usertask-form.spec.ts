@@ -204,7 +204,7 @@ async function selectNodeOpenEditor(page: Page, nodeId: string): Promise<void> {
 // ---------------------------------------------------------------------------
 // Test suite
 // ---------------------------------------------------------------------------
-test.describe('BPM Designer UserTask formPageKey Lifecycle', () => {
+test.describe('BPM Designer UserTask formPageKey Lifecycle', { tag: ['@bpm-regression'] }, () => {
   test.setTimeout(240_000);
 
   test.beforeAll(async ({ request }: { request: APIRequestContext }) => {

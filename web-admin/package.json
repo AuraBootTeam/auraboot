@@ -24,6 +24,7 @@
     "test:critical": "PW_PROFILE=critical playwright test",
     "test:ui": "PW_PROFILE=full PW_ROLE_PROJECTS=1 playwright test --ui",
     "test:fast": "PW_PROFILE=fast playwright test",
+    "test:bpm-regression": "NO_PROXY=localhost playwright test -c playwright.bpm-regression.config.ts",
     "test:debug": "PW_PROFILE=full PW_ROLE_PROJECTS=1 playwright test --debug",
     "test:report": "playwright show-report",
     "test:coverage:e2e": "E2E_COVERAGE=1 VITE_PORT=5174 PLAYWRIGHT_BASE_URL=http://localhost:5174 NO_PROXY=localhost npx playwright test tests/e2e/plugin/plugin-all-packages-smoke.spec.ts --project=chromium",
