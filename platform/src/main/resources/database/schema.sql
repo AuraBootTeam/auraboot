@@ -2525,15 +2525,9 @@ COMMENT ON COLUMN ab_bpm_process_definition.timeout_hours IS 'Hours before a pen
 COMMENT ON COLUMN ab_bpm_process_definition.timeout_action IS 'Action on timeout: ESCALATE, AUTO_APPROVE, AUTO_REJECT';
 COMMENT ON COLUMN ab_bpm_process_definition.escalate_to_user_id IS 'User to notify when timeout_action=ESCALATE';
 
--- Approval withdrawal and cc policies
-ALTER TABLE ab_bpm_process_definition
-    ADD COLUMN IF NOT EXISTS withdraw_policy VARCHAR(20) NOT NULL DEFAULT 'strict',
-    ADD COLUMN IF NOT EXISTS cc_policy VARCHAR(20) NOT NULL DEFAULT 'all',
-    ADD COLUMN IF NOT EXISTS required_permissions JSONB NOT NULL DEFAULT '{}'::jsonb;
-
-COMMENT ON COLUMN ab_bpm_process_definition.withdraw_policy IS 'Withdrawal policy: strict (initiator only, before any approve), loose (initiator only, anytime while running), none (disabled)';
-COMMENT ON COLUMN ab_bpm_process_definition.cc_policy IS 'CC policy: all (initiator + assignee can cc), initiator (initiator only), assignee (current task assignee only)';
-COMMENT ON COLUMN ab_bpm_process_definition.required_permissions IS 'Required permissions map {permission: boolean}';
+-- NOTE: withdraw_policy, cc_policy, required_permissions columns were removed.
+-- These policies are now declared exclusively in BPMN <smart:properties> extensions
+-- and resolved at runtime by BpmExtensionAccessor (aura.withdrawPolicy, aura.ccPolicy).
 
 -- =====================================================================
 -- Add plugin_pid column to existing tables for tracking plugin ownership
