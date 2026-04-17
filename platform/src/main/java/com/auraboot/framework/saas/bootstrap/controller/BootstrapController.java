@@ -2,7 +2,7 @@ package com.auraboot.framework.saas.bootstrap.controller;
 
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.saas.bootstrap.BootstrapEngineService;
-import com.auraboot.framework.saas.bootstrap.BootstrapStatusEvaluator;
+import com.auraboot.framework.saas.bootstrap.constant.BootstrapMissingPart;
 import com.auraboot.framework.saas.bootstrap.dto.BootstrapProgressResponse;
 import com.auraboot.framework.saas.bootstrap.dto.BootstrapRequest;
 import com.auraboot.framework.saas.bootstrap.dto.BootstrapStatusResponse;
@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -26,26 +27,26 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class BootstrapController {
 
+    static final String ERR_ALREADY_INITIALIZED = "System is already initialized";
+    static final String REASON_NOT_INITIALIZED = "Bootstrap not completed";
+
     private final BootstrapEngineService bootstrapEngineService;
-    private final BootstrapStatusEvaluator statusEvaluator;
     private final SystemConfigService systemConfigService;
 
     @GetMapping("/status")
     public ApiResponse<BootstrapStatusResponse> getStatus() {
-        BootstrapStatusEvaluator.Result eval = statusEvaluator.evaluate();
+        boolean initialized = systemConfigService.isInitialized();
         BootstrapProgressResponse progress = bootstrapEngineService.getProgress();
         boolean inProgress = BootstrapStatus.RUNNING.getCode().equals(progress.getStatus())
                           || BootstrapStatus.PENDING.getCode().equals(progress.getStatus());
 
         return ApiResponse.success(BootstrapStatusResponse.builder()
-                .initialized(eval.missingParts().isEmpty())
+                .initialized(initialized)
                 .inProgress(inProgress)
-                .missingParts(eval.missingParts())
-                .reason(eval.reason())
+                .missingParts(initialized ? List.of() : List.of(BootstrapMissingPart.SYSTEM_CONFIG))
+                .reason(initialized ? null : REASON_NOT_INITIALIZED)
                 .build());
     }
-
-    static final String ERR_ALREADY_INITIALIZED = "System is already initialized";
 
     @PostMapping("/setup")
     public ApiResponse<Object> setup(@RequestBody BootstrapRequest request) {
