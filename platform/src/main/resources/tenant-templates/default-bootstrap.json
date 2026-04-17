@@ -474,7 +474,6 @@
         "query_builder",
         "bpm_management",
         "bpm_task_center",
-        "bpm_approval_inbox",
         "bpm_monitor",
         "workflow.process.execute",
         "bpm.task.read",
