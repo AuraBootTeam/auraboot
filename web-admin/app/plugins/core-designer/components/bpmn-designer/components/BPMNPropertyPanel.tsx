@@ -17,6 +17,8 @@ import type {
   CallActivityConfig,
   StartEventConfig,
   EndEventConfig,
+  WithdrawPolicy,
+  CcPolicy,
 } from '~/plugins/core-designer/components/bpmn-designer/types';
 import {
   UserTaskEditor,
@@ -38,9 +40,17 @@ export interface ProcessMetadataProps {
   description: string;
   category: string;
   isExisting: boolean;
+  /**
+   * Process-level AuraBoot policies serialized into designerJson.aura.* and
+   * compiled to <smart:properties> on the BPMN <process> element at deploy time.
+   */
+  withdrawPolicy?: WithdrawPolicy;
+  ccPolicy?: CcPolicy;
   onNameChange: (value: string) => void;
   onDescriptionChange: (value: string) => void;
   onCategoryChange: (value: string) => void;
+  onWithdrawPolicyChange: (value: WithdrawPolicy | undefined) => void;
+  onCcPolicyChange: (value: CcPolicy | undefined) => void;
 }
 
 export function BPMNPropertyPanel({ processMetadata }: { processMetadata?: ProcessMetadataProps }) {

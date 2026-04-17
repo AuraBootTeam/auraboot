@@ -4,10 +4,17 @@
  */
 
 import { AssigneeType } from '~/plugins/core-designer/components/bpmn-designer/types';
-import type { UserTaskConfig, AssigneeConfig } from '~/plugins/core-designer/components/bpmn-designer/types';
+import type {
+  UserTaskConfig,
+  AssigneeConfig,
+  UserTaskAuraConfig,
+  CcPolicy,
+} from '~/plugins/core-designer/components/bpmn-designer/types';
 import { AssigneePicker } from './AssigneePicker';
 import { MultiInstanceSection, FormBindingSection, HookConfigSection } from './shared';
 import { useI18n } from '~/contexts/I18nContext';
+
+const CC_POLICY_OVERRIDE_OPTIONS: CcPolicy[] = ['initiator', 'assignee', 'all'];
 
 export function UserTaskEditor({
   config,
@@ -28,6 +35,28 @@ export function UserTaskEditor({
       assignee: { ...config?.assignee, [field]: value } as AssigneeConfig,
     } as UserTaskConfig);
   };
+
+  const handleAuraChange = <K extends keyof UserTaskAuraConfig>(
+    field: K,
+    value: UserTaskAuraConfig[K],
+  ) => {
+    const nextAura: UserTaskAuraConfig = { ...(config?.aura ?? {}), [field]: value };
+    // Strip out empty values so designerJson stays clean (and converter emits nothing).
+    const cleaned: UserTaskAuraConfig = {};
+    if (nextAura.requiredPermissions && nextAura.requiredPermissions.length > 0) {
+      cleaned.requiredPermissions = nextAura.requiredPermissions;
+    }
+    if (nextAura.ccPolicyOverride) {
+      cleaned.ccPolicyOverride = nextAura.ccPolicyOverride;
+    }
+    onChange({
+      ...config,
+      aura: Object.keys(cleaned).length > 0 ? cleaned : undefined,
+    } as UserTaskConfig);
+  };
+
+  const requiredPermissionsText = (config?.aura?.requiredPermissions ?? []).join(',');
+  const ccPolicyOverride = config?.aura?.ccPolicyOverride ?? '';
 
   const assigneeType = config?.assignee?.type || AssigneeType.USER;
 
@@ -187,6 +216,63 @@ export function UserTaskEditor({
         hooks={config?.hooks || []}
         onChange={(hooks) => handleChange('hooks', hooks)}
       />
+
+      {/* AuraBoot node policies — compiled into <smart:properties> at deploy time. */}
+      <div className="mb-4 rounded-md border border-gray-200 p-3">
+        <h3 className="mb-2 text-sm font-semibold text-gray-700">
+          {t('bpmn.prop.usertask.auraSectionTitle')}
+        </h3>
+
+        <div className="mb-3">
+          <label className="mb-1 block text-xs font-medium text-gray-600">
+            {t('bpmn.prop.usertask.requiredPermissions')}
+          </label>
+          <input
+            type="text"
+            value={requiredPermissionsText}
+            onChange={(e) => {
+              const codes = e.target.value
+                .split(',')
+                .map((s) => s.trim())
+                .filter((s) => s.length > 0);
+              handleAuraChange('requiredPermissions', codes.length > 0 ? codes : undefined);
+            }}
+            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+            placeholder={t('bpmn.prop.usertask.requiredPermissionsPlaceholder')}
+            data-testid="usertask-required-permissions"
+          />
+          <p className="mt-1 text-xs text-gray-400">
+            {t('bpmn.prop.usertask.requiredPermissionsHint')}
+          </p>
+        </div>
+
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-600">
+            {t('bpmn.prop.usertask.ccPolicyOverride')}
+          </label>
+          <select
+            value={ccPolicyOverride}
+            onChange={(e) =>
+              handleAuraChange(
+                'ccPolicyOverride',
+                e.target.value === '' ? undefined : (e.target.value as CcPolicy),
+              )
+            }
+            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+            data-testid="usertask-cc-policy-override"
+          >
+            <option value="">{t('bpmn.prop.usertask.ccPolicyInherit')}</option>
+            {CC_POLICY_OVERRIDE_OPTIONS.map((code) => (
+              <option key={code} value={code}>
+                {t(`bpmn.prop.process.ccPolicy.${code}`)}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-gray-400">
+            {t('bpmn.prop.usertask.ccPolicyOverrideHint')}
+          </p>
+        </div>
+      </div>
     </>
   );
 }
