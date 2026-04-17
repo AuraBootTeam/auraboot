@@ -88,17 +88,24 @@ public class BpmExtensionAccessor {
      * Find the deployed process definition for the given processKey under the current tenant.
      * Iterates all cached definitions; SmartEngine does not expose a direct key-only lookup
      * (the internal map key includes version and tenantId).
+     *
+     * <p>Requires a valid tenant context. Throws {@link IllegalStateException} if
+     * {@link MetaContext} has no tenant, per the project's no-silent-fallback policy.
+     * This prevents future non-request contexts (MQ consumers, scheduled tasks) from
+     * silently matching cross-tenant definitions.
      */
     private ProcessDefinition findProcessDefinition(String processKey) {
         if (processKey == null || processKey.isBlank()) return null;
         String tenantId = MetaContext.getCurrentTenantIdAsString();
+        if (tenantId == null) {
+            throw new IllegalStateException(
+                    "Tenant context required for process definition lookup: " + processKey);
+        }
         return smartEngine.getRepositoryQueryService()
                 .getAllCachedProcessDefinition()
                 .stream()
                 .filter(d -> processKey.equals(d.getId()))
-                .filter(d -> tenantId == null
-                        || d.getTenantId() == null
-                        || tenantId.equals(d.getTenantId()))
+                .filter(d -> tenantId.equals(d.getTenantId()))
                 .findFirst()
                 .orElse(null);
     }
@@ -125,13 +132,11 @@ public class BpmExtensionAccessor {
         if (!(propsObj instanceof Map)) return Optional.empty();
         Map<PropertyCompositeKey, PropertyCompositeValue> props =
                 (Map<PropertyCompositeKey, PropertyCompositeValue>) propsObj;
-        // PropertyCompositeKey uses Lombok @Data equals/hashCode on (type, name).
-        // BPMN <smart:property name="..." value="..."> produces type=null, name=key.
-        PropertyCompositeValue compositeValue = props.get(new PropertyCompositeKey(null, propertyName));
-        if (compositeValue == null) {
-            // Single-arg constructor also sets type=null; try for defensive completeness.
-            compositeValue = props.get(new PropertyCompositeKey(propertyName));
-        }
+        // SmartEngine's Properties.decorate() stores each <smart:property name="N" value="V"/>
+        // under PropertyCompositeKey(type=null, name=N). See
+        // com.auraboot.smart.framework.engine.smart.Properties#decorate.
+        PropertyCompositeValue compositeValue =
+                props.get(new PropertyCompositeKey(null, propertyName));
         if (compositeValue == null) return Optional.empty();
         String value = compositeValue.getValue();
         return (value == null || value.isBlank()) ? Optional.empty() : Optional.of(value);
