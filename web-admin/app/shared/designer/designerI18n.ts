@@ -257,6 +257,17 @@ export const DESIGNER_I18N = {
     } as L,
   },
 
+  // ── Toolbar permissions ───────────────────────────────────────
+  // Backend PageSchemaController uses a single page.page.manage permission for all
+  // mutation endpoints (save / publish / delete). Fine-grained keys don't exist in
+  // the RBAC registry, so we expose a single missingManage message for all actions.
+  permissions: {
+    missingManage: {
+      'zh-CN': '您没有管理此页面的权限',
+      'en-US': 'You do not have permission to manage this page',
+    } as L,
+  },
+
   // ── Dashboard viewer ───────────────────────────────────────────
   viewer: {
     noData: {
