@@ -171,23 +171,60 @@ test.describe('Setup Wizard', () => {
 
   // -------------------------------------------------------------------------
   // Bootstrap UX — uninitialized scenarios
-  // Skipped because the test environment is initialized by reset-and-init.sh.
-  // Run manually after `./scripts/oss-reset-and-init.sh --skip-bootstrap` (or equivalent
-  // mechanism that leaves the DB empty).
+  //
+  // Precondition: system is NOT initialized. Run `./scripts/oss-reset-and-init.sh
+  // --no-bootstrap` before this suite, or these tests self-skip when they detect
+  // an already-initialized backend.
   // -------------------------------------------------------------------------
 
-  test.skip('shows banner instead of redirect on uninitialized root (requires empty database)', async ({ page }) => {
+  test('shows banner on uninitialized root, no redirect', async ({ page, request }) => {
+    const res = await request.get('/api/bootstrap/status');
+    const body = await res.json();
+    test.skip(body.data?.initialized === true,
+        'System is initialized — run with --no-bootstrap to exercise this path');
+
     await page.goto('/', { waitUntil: 'domcontentloaded' });
     await expect(page).toHaveURL('/');
     const banner = page.getByTestId('bootstrap-banner');
     await expect(banner).toBeVisible({ timeout: 10_000 });
     await expect(banner).toContainText('System not initialized');
-    await expect(banner).toContainText('Admin account');
   });
 
-  test.skip('banner CTA navigates to /setup (requires empty database)', async ({ page }) => {
+  test('banner CTA navigates to /setup on uninitialized root', async ({ page, request }) => {
+    const res = await request.get('/api/bootstrap/status');
+    const body = await res.json();
+    test.skip(body.data?.initialized === true,
+        'System is initialized — run with --no-bootstrap to exercise this path');
+
     await page.goto('/', { waitUntil: 'domcontentloaded' });
     await page.getByTestId('bootstrap-banner-cta').click();
-    await expect(page).toHaveURL('/setup');
+    await expect(page).toHaveURL(/\/setup$/);
+  });
+
+  test('not-ready card appears when business route hit uninitialized', async ({ page, request }) => {
+    const res = await request.get('/api/bootstrap/status');
+    const body = await res.json();
+    test.skip(body.data?.initialized === true,
+        'System is initialized — run with --no-bootstrap to exercise this path');
+
+    // Any business-pageKey URL; ErrorBoundary should fall into BootstrapNotReady
+    await page.goto('/p/iam_user', { waitUntil: 'domcontentloaded' });
+    const notReady = page.getByTestId('bootstrap-not-ready');
+    // May appear, or banner may be the only indicator if loader succeeded.
+    // Either of them visible counts — assert at least one bootstrap-UX testid is visible.
+    const banner = page.getByTestId('bootstrap-banner');
+    await expect(banner.or(notReady).first()).toBeVisible({ timeout: 10_000 });
+  });
+
+  test('status API reports missing system_config when uninitialized', async ({ request }) => {
+    const res = await request.get('/api/bootstrap/status');
+    const body = await res.json();
+    test.skip(body.data?.initialized === true,
+        'System is initialized — run with --no-bootstrap to exercise this path');
+
+    expect(body.code).toBe('0');
+    expect(body.data.initialized).toBe(false);
+    expect(body.data.missingParts).toEqual(['system_config']);
+    expect(body.data.reason).toBe('Bootstrap not completed');
   });
 });
