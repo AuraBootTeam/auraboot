@@ -5,6 +5,8 @@
 > **Supersedes**: `2026-04-16-oss-bpm-closure-spec1-plan.md` (v1，部分已完成 commit 需回滚/重构)
 >
 > **Reference design**: `docs/superpowers/specs/2026-04-17-bpm-module-target-architecture-design.md`
+>
+> **⚠️ Task 9-16 已被前端 v2.1 取代**：本文件的 Task 9-16 基于错误的前端架构假设（`executionMode` 属性、直接 `/api/` fetch、ActionScheduler 注册），实际 OSS web-admin dispatcher 是 `useActionHandler.handleAction()`（`framework/meta/hooks/useActionHandler.ts:281`），按 `ActionDef.type` discriminated union 分派。**请按 [`2026-04-17-oss-bpm-closure-spec1-plan-v2-frontend.md`](./2026-04-17-oss-bpm-closure-spec1-plan-v2-frontend.md) 执行前端部分**。本文件的 Task 1-8（backend）仍然权威。
 
 **Goal:** 补齐 OSS BPM 审批语义闭环（撤回 / 抄送 / Action `executionMode=bpm` / `bpm-panel` block），同时按目标架构清理 `BpmEngine` 抽象层并把业务策略迁到 BPMN `<smart:properties>` extension。
 
