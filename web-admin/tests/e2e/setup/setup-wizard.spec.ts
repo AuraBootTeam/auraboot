@@ -20,7 +20,11 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Setup Wizard', () => {
-  test('shows already-initialized page when /setup accessed after init', async ({ page }) => {
+  test('shows already-initialized page when /setup accessed after init', async ({ page, request }) => {
+    const status = await (await request.get('/api/bootstrap/status')).json();
+    test.skip(status.data?.initialized !== true,
+        'System is uninitialized — run with default (no --no-bootstrap) to exercise this path');
+
     await page.goto('/setup', { waitUntil: 'domcontentloaded' });
 
     // No redirect — page stays on /setup and renders the already-done card
@@ -38,14 +42,22 @@ test.describe('Setup Wizard', () => {
     expect(res.ok()).toBeTruthy();
 
     const body = await res.json();
+    test.skip(body.data?.initialized !== true,
+        'System is uninitialized — run with default (no --no-bootstrap) to exercise this path');
+
     expect(body.code).toBe('0');
     expect(body.data.initialized).toBe(true);
     expect(Array.isArray(body.data.missingParts)).toBe(true);
     expect(body.data.missingParts.length).toBe(0);
   });
 
-  test('setup API rejects when already initialized', async ({ page }) => {
-    // POST to /setup should fail with error when system is already bootstrapped
+  test('setup API rejects when already initialized', async ({ page, request }) => {
+    // Guard: never POST /setup in uninitialized env — it would silently bootstrap
+    // the system and pollute subsequent tests.
+    const status = await (await request.get('/api/bootstrap/status')).json();
+    test.skip(status.data?.initialized !== true,
+        'System is uninitialized — calling /setup here would bootstrap; run with default mode');
+
     const res = await page.request.post('/api/bootstrap/setup', {
       data: {
         companyName: 'Test Company',
@@ -163,9 +175,12 @@ test.describe('Setup Wizard', () => {
     await expect(page.getByText('Password is required')).toBeVisible({ timeout: 5_000 });
   });
 
-  test('banner is NOT visible on root after initialization', async ({ page }) => {
+  test('banner is NOT visible on root after initialization', async ({ page, request }) => {
+    const status = await (await request.get('/api/bootstrap/status')).json();
+    test.skip(status.data?.initialized !== true,
+        'System is uninitialized — banner is expected to be visible in that mode');
+
     await page.goto('/', { waitUntil: 'domcontentloaded' });
-    // Banner should be absent because system is initialized
     await expect(page.getByTestId('bootstrap-banner')).toBeHidden({ timeout: 3_000 });
   });
 
@@ -177,14 +192,17 @@ test.describe('Setup Wizard', () => {
   // an already-initialized backend.
   // -------------------------------------------------------------------------
 
-  test('shows banner on uninitialized root, no redirect', async ({ page, request }) => {
+  test('shows banner (no silent redirect to /setup) on uninitialized', async ({ page, request }) => {
     const res = await request.get('/api/bootstrap/status');
     const body = await res.json();
     test.skip(body.data?.initialized === true,
         'System is initialized — run with --no-bootstrap to exercise this path');
 
     await page.goto('/', { waitUntil: 'domcontentloaded' });
-    await expect(page).toHaveURL('/');
+    // Unauthenticated + uninitialized → auth middleware redirects to /login;
+    // the banner renders on /login too because it lives in root layout.
+    // The important contract: no redirect to /setup (the old behavior).
+    await expect(page).not.toHaveURL(/\/setup/);
     const banner = page.getByTestId('bootstrap-banner');
     await expect(banner).toBeVisible({ timeout: 10_000 });
     await expect(banner).toContainText('System not initialized');
