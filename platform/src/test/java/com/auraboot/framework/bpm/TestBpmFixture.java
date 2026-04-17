@@ -3,7 +3,6 @@ package com.auraboot.framework.bpm;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.bpm.audit.BpmAuditOperation;
 import com.auraboot.framework.bpm.audit.BpmAuditService;
-import com.auraboot.framework.bpm.engine.BpmEngine;
 import com.auraboot.framework.bpm.entity.BpmAuditRecordEntity;
 import com.auraboot.framework.bpm.model.CcPolicy;
 import com.auraboot.framework.bpm.model.WithdrawPolicy;
@@ -64,7 +63,6 @@ public class TestBpmFixture {
     private final BpmProcessDefinitionMapper processDefinitionMapper;
     private final BpmAuditService auditService;
     private final SmartEngine smartEngine;
-    private final BpmEngine bpmEngine;
 
     /**
      * Process setup result.
@@ -106,13 +104,18 @@ public class TestBpmFixture {
 
     /**
      * Deploy a minimal BPMN process under the exact given processKey (no suffix appended).
-     * Used by BpmActionExecutor tests that need a deployed process without starting it.
+     * Uses ProcessDeploymentService — same path as production.
      *
      * @param processKey the exact process key to deploy (must be stable across duplicate checks)
      */
     public void deployProcess(String processKey) {
         String bpmn = String.format(MINIMAL_BPMN_TEMPLATE, processKey);
-        bpmEngine.deployProcess(processKey, bpmn);
+        ProcessDeploymentService.CreateProcessRequest req =
+                new ProcessDeploymentService.CreateProcessRequest(
+                        processKey, "Test Action " + processKey, "Fixture process",
+                        "test", bpmn, null, null, null);
+        BpmProcessDefinition def = deploymentService.create(req);
+        deploymentService.deploy(def.getPid());
         log.debug("TestBpmFixture.deployProcess: deployed key={}", processKey);
     }
 
