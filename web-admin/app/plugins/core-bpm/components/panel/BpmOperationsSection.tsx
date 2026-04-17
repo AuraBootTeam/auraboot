@@ -45,6 +45,7 @@ import {
   DialogTitle,
 } from '~/ui/ui/dialog';
 import { useAuth } from '~/contexts/AuthContext';
+import { get, ErrorCodes } from '~/shared/services/http-client';
 import {
   approveTask,
   ccTask,
@@ -60,9 +61,23 @@ import {
   type BpmPermissionAction,
   type BpmPermissionResult,
 } from '~/plugins/core-bpm/services/BpmPermissionService';
+import { BpmTaskDrawer } from '~/plugins/core-bpm/components/BpmTaskDrawer';
 import { WithdrawDialog, type WithdrawPolicy } from './WithdrawDialog';
 import { CcDialog } from './CcDialog';
 import { TerminateDialog } from './TerminateDialog';
+
+/**
+ * Minimal shape returned by {@code GET /api/bpm/forms/task/{taskId}} that we
+ * care about for routing. BpmFormController's TaskFormResponse has many more
+ * fields; we only probe for the presence of {@code formBinding.formRef} to
+ * decide whether to route the approve/reject click through BpmTaskDrawer
+ * (DSL form) or the inline comment dialog.
+ */
+interface TaskFormProbeResponse {
+  formBinding?: {
+    formRef?: string;
+  };
+}
 
 type Translator = (
   key: string,
@@ -120,6 +135,16 @@ export function BpmOperationsSection({
   const [rejectComment, setRejectComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  // Drawer state: when a task has formBinding.formRef, approve/reject routes
+  // through BpmTaskDrawer (DSL form + action). Null = drawer closed.
+  const [drawerState, setDrawerState] = useState<{
+    taskId: string;
+    decision: 'approve' | 'reject';
+  } | null>(null);
+  // Probing state: between button click and drawer/dialog open, we await the
+  // form probe to decide which path to take. Scoped to approve/reject only.
+  const [probing, setProbing] = useState<'approve' | 'reject' | null>(null);
+  const [probeError, setProbeError] = useState<string | null>(null);
 
   // Fetch pending tasks for the running instance. Non-running instances skip
   // this call entirely - none of the buttons render.
@@ -293,6 +318,51 @@ export function BpmOperationsSection({
     [assigneeTaskId, onActionComplete, t],
   );
 
+  /**
+   * Handle approve/reject button click. Probes the task for a DSL form
+   * binding: if {@code formBinding.formRef} is present, open
+   * {@link BpmTaskDrawer} pre-seeded with the chosen decision so the user
+   * can fill the bound form before submitting. Otherwise fall back to the
+   * inline comment dialog (unchanged behaviour).
+   */
+  const handleApproveOrRejectClick = useCallback(
+    async (decision: 'approve' | 'reject') => {
+      if (!assigneeTaskId) return;
+      setProbing(decision);
+      setProbeError(null);
+      try {
+        const result = await get<TaskFormProbeResponse>(
+          `/api/bpm/forms/task/${assigneeTaskId}`,
+        );
+        const formRef = result.data?.formBinding?.formRef;
+        const ok = result.code === ErrorCodes.SUCCESS;
+        if (ok && typeof formRef === 'string' && formRef.length > 0) {
+          setDrawerState({ taskId: assigneeTaskId, decision });
+        } else {
+          // No form binding → legacy inline comment dialog.
+          setDialog({ type: decision });
+        }
+      } catch (e) {
+        // Probe failure: surface the error and DO NOT silently fall back.
+        // (Silent fallback would mask real misconfigurations — see red-line
+        // "no silent fallback" in AGENTS.md.)
+        setProbeError(e instanceof Error ? e.message : String(e));
+      } finally {
+        setProbing(null);
+      }
+    },
+    [assigneeTaskId],
+  );
+
+  const closeDrawer = useCallback(() => {
+    setDrawerState(null);
+  }, []);
+
+  const handleDrawerComplete = useCallback(() => {
+    setDrawerState(null);
+    onActionComplete?.();
+  }, [onActionComplete]);
+
   const runTerminate = useCallback(
     async (reason: string) => {
       if (!instance) {
@@ -350,22 +420,35 @@ export function BpmOperationsSection({
         </p>
       )}
 
+      {probeError && (
+        <p
+          data-testid="bpm-operations-probe-error"
+          className="mt-2 text-xs text-red-600"
+        >
+          {t(
+            'bpm.operations.probeError',
+            { message: probeError },
+            `读取表单绑定失败：${probeError}`,
+          )}
+        </p>
+      )}
+
       <div className="mt-3 flex flex-wrap gap-2">
         <Button
           data-testid="bpm-operations-approve"
           variant="default"
-          disabled={buttonState.approve.disabled}
+          disabled={buttonState.approve.disabled || probing !== null}
           title={resolveBlockedTitle(t, buttonState.approve.reasonCode)}
-          onClick={() => setDialog({ type: 'approve' })}
+          onClick={() => void handleApproveOrRejectClick('approve')}
         >
           {t('bpm.operations.approve', undefined, '通过')}
         </Button>
         <Button
           data-testid="bpm-operations-reject"
           variant="destructive"
-          disabled={buttonState.reject.disabled}
+          disabled={buttonState.reject.disabled || probing !== null}
           title={resolveBlockedTitle(t, buttonState.reject.reasonCode)}
-          onClick={() => setDialog({ type: 'reject' })}
+          onClick={() => void handleApproveOrRejectClick('reject')}
         >
           {t('bpm.operations.reject', undefined, '驳回')}
         </Button>
@@ -530,6 +613,21 @@ export function BpmOperationsSection({
         onCancel={closeDialog}
         t={t}
       />
+
+      {/*
+       * Task-bound DSL form drawer. Only mounted when the approve/reject
+       * probe found a non-empty {@code formBinding.formRef}. The drawer
+       * handles its own fetch + form rendering; we only wire close/complete.
+       */}
+      {drawerState && (
+        <BpmTaskDrawer
+          taskId={drawerState.taskId}
+          open={true}
+          defaultDecision={drawerState.decision}
+          onClose={closeDrawer}
+          onComplete={handleDrawerComplete}
+        />
+      )}
     </div>
   );
 }

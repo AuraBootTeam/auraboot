@@ -97,6 +97,58 @@ vi.mock('~/contexts/AuthContext', () => ({
   }),
 }));
 
+// --- Mock BpmTaskDrawer so form-routed approve/reject renders a tiny stub.
+vi.mock('~/plugins/core-bpm/components/BpmTaskDrawer', () => ({
+  BpmTaskDrawer: ({
+    taskId,
+    defaultDecision,
+    onClose,
+    onComplete,
+  }: {
+    taskId: string;
+    open: boolean;
+    defaultDecision?: 'approve' | 'reject';
+    onClose: () => void;
+    onComplete: () => void;
+  }) => (
+    <div
+      data-testid="bpm-task-drawer-stub"
+      data-task-id={taskId}
+      data-decision={defaultDecision ?? ''}
+    >
+      <button
+        type="button"
+        data-testid="bpm-task-drawer-stub-close"
+        onClick={onClose}
+      >
+        close
+      </button>
+      <button
+        type="button"
+        data-testid="bpm-task-drawer-stub-complete"
+        onClick={onComplete}
+      >
+        complete
+      </button>
+    </div>
+  ),
+}));
+
+// --- Mock http-client.get for the form-binding probe. Default returns no
+//     formBinding so existing inline-dialog tests keep working; per-test
+//     overrides activate the drawer path.
+const formProbeGetSpy = vi.fn();
+vi.mock('~/shared/services/http-client', async () => {
+  const actual =
+    await vi.importActual<typeof import('~/shared/services/http-client')>(
+      '~/shared/services/http-client',
+    );
+  return {
+    ...actual,
+    get: (...args: unknown[]) => formProbeGetSpy(...args),
+  };
+});
+
 // --- Mock the workbench service endpoints.
 const approveTaskSpy = vi.fn().mockResolvedValue(undefined);
 const rejectTaskSpy = vi.fn().mockResolvedValue(undefined);
@@ -133,6 +185,13 @@ afterEach(() => {
 
 beforeEach(() => {
   getTasksByProcessInstanceSpy.mockResolvedValue([]);
+  // Default probe response: no formBinding → inline dialog path (existing
+  // tests rely on the inline dialog behaviour).
+  formProbeGetSpy.mockResolvedValue({
+    code: '0',
+    desc: '',
+    data: { formBinding: null },
+  });
 });
 
 const t = (_key: string, _params?: Record<string, unknown>, fallback?: string): string =>
@@ -225,8 +284,12 @@ describe('BpmOperationsSection', () => {
     expect(withdrawBtn.disabled).toBe(true);
     expect(withdrawBtn.getAttribute('title')).toContain('仅发起人可撤回');
 
-    // Click approve → open dialog → confirm.
-    fireEvent.click(approveBtn);
+    // Click approve → probe returns no formBinding → inline dialog opens →
+    // confirm. The probe is async, so we wrap the click in act() to flush
+    // the resolved promise before asserting the dialog is mounted.
+    await act(async () => {
+      fireEvent.click(approveBtn);
+    });
     expect(screen.getByTestId('bpm-approve-dialog')).toBeInTheDocument();
     await act(async () => {
       fireEvent.click(screen.getByTestId('bpm-approve-confirm'));
@@ -349,6 +412,109 @@ describe('BpmOperationsSection', () => {
 
     expect(terminateProcessSpy).toHaveBeenCalledWith('pi-001', 'reason-stub');
     expect(onActionComplete).toHaveBeenCalled();
+  });
+
+  // ---- Fix C: form-binding-aware approve/reject routing ----
+
+  async function renderAsAssigneeWithOneTask() {
+    authStub.user = { pid: 'u-200' };
+    getTasksByProcessInstanceSpy.mockResolvedValue([
+      {
+        instanceId: 'pi-001',
+        taskId: 'task-7',
+        processInstanceId: 'pi-001',
+        processDefinitionKey: 'pd-alpha',
+        taskDefinitionKey: 'approver',
+        taskName: '审批',
+        assignee: 'u-200',
+        claimUserId: 'u-200',
+        createTime: '2026-04-17T00:00:00Z',
+        priority: 0,
+      },
+    ]);
+    const onActionComplete = vi.fn();
+    await act(async () => {
+      render(
+        <BpmOperationsSection
+          instance={runningInstance()}
+          onActionComplete={onActionComplete}
+          t={t}
+        />,
+      );
+    });
+    return { onActionComplete };
+  }
+
+  it('routes approve through BpmTaskDrawer when the task has formBinding.formRef', async () => {
+    // Probe response carries a non-empty formRef → drawer path.
+    formProbeGetSpy.mockResolvedValue({
+      code: '0',
+      desc: '',
+      data: { formBinding: { formRef: 'wd_leave_request_detail' } },
+    });
+    const { onActionComplete } = await renderAsAssigneeWithOneTask();
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('bpm-operations-approve'));
+    });
+
+    // Inline dialog must NOT open; the drawer stub must.
+    expect(screen.queryByTestId('bpm-approve-dialog')).toBeNull();
+    const drawer = screen.getByTestId('bpm-task-drawer-stub');
+    expect(drawer).toHaveAttribute('data-task-id', 'task-7');
+    expect(drawer).toHaveAttribute('data-decision', 'approve');
+
+    // Probe called with the right URL.
+    expect(formProbeGetSpy).toHaveBeenCalledWith('/api/bpm/forms/task/task-7');
+
+    // Drawer onComplete unmounts it and fires onActionComplete.
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('bpm-task-drawer-stub-complete'));
+    });
+    expect(screen.queryByTestId('bpm-task-drawer-stub')).toBeNull();
+    expect(onActionComplete).toHaveBeenCalledTimes(1);
+  });
+
+  it('routes reject through BpmTaskDrawer pre-seeded with decision=reject when formBinding exists', async () => {
+    formProbeGetSpy.mockResolvedValue({
+      code: '0',
+      desc: '',
+      data: { formBinding: { formRef: 'wd_leave_request_detail' } },
+    });
+    await renderAsAssigneeWithOneTask();
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('bpm-operations-reject'));
+    });
+
+    expect(screen.queryByTestId('bpm-reject-dialog')).toBeNull();
+    const drawer = screen.getByTestId('bpm-task-drawer-stub');
+    expect(drawer).toHaveAttribute('data-decision', 'reject');
+  });
+
+  it('falls back to inline dialog when formBinding is an empty object (no formRef)', async () => {
+    // formBinding present but formRef missing → inline path, same behaviour
+    // as no formBinding at all (drawer has nothing to render).
+    formProbeGetSpy.mockResolvedValue({
+      code: '0',
+      desc: '',
+      data: { formBinding: {} },
+    });
+    await renderAsAssigneeWithOneTask();
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('bpm-operations-approve'));
+    });
+
+    expect(screen.queryByTestId('bpm-task-drawer-stub')).toBeNull();
+    expect(screen.getByTestId('bpm-approve-dialog')).toBeInTheDocument();
+
+    // Close the inline dialog before afterEach so the Radix portal's own
+    // cleanup doesn't race with our body.innerHTML reset (NotFoundError).
+    await act(async () => {
+      // approveTask resolves to undefined; confirming closes the dialog.
+      fireEvent.click(screen.getByTestId('bpm-approve-confirm'));
+    });
   });
 
   it('disables terminate for non-bpm.admin users and surfaces the reason tooltip', async () => {
