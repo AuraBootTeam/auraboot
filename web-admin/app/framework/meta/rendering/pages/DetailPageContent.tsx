@@ -42,6 +42,7 @@ import { ActivityTimeline } from '~/framework/meta/rendering/blocks/ActivityTime
 import { ApprovalCommentsBlock } from '~/framework/meta/rendering/blocks/ApprovalCommentsBlock';
 import { RecordComments } from '~/framework/meta/rendering/blocks/RecordComments';
 import { NbaSuggestionBar } from '~/framework/meta/rendering/blocks/NbaSuggestionBar';
+import { BpmPanelBlock } from '~/framework/meta/rendering/blocks/BpmPanelBlock';
 import type { BlockConfig, ButtonConfig, DetailTabConfig, FieldConfig } from '~/framework/meta/schemas/types';
 import { deriveTestId, buttonTestId } from '~/framework/meta/rendering/utils/deriveTestId';
 
@@ -800,6 +801,10 @@ function DetailBlockRenderer({
         t={t}
       />
     );
+  }
+
+  if (block.blockType === 'bpm-panel') {
+    return <BpmPanelBlock block={block as any} record={recordData} recordId={recordId} />;
   }
 
   if (block.blockType === 'monthly-grid' && block.monthlyGrid) {

@@ -476,3 +476,145 @@ export async function getMyStartedProcesses(): Promise<ProcessInstance[]> {
   }
   return result.data || [];
 }
+
+// ==================== Detail-page BPM panel APIs ====================
+//
+// The following helpers support the `bpm-panel` detail block (see
+// BpmPanelBlock.tsx). Each wraps a canonical backend endpoint:
+//
+//   - getInstanceForRecord:   GET /api/bpm/process-instances/by-business-key/status
+//     → backed by ProcessInstanceController#getProcessInstanceStatusByBusinessKey,
+//       returns ProcessInstanceStatusDTO (instanceId, processDefinitionId, status,
+//       currentNodes, completedNodes, variables).
+//
+//   - getDiagramForInstance:  GET /api/bpm/process-definitions/{pid}/bpmn
+//     → backed by ProcessDefinitionController#getBpmn, returns BPMN XML string.
+//       Note: the path parameter is the process definition PID (not the business
+//       process key). Status DTO.processDefinitionId carries that PID.
+//
+//   - listAuditEvents:        GET /api/bpm/monitor/instances/{processInstanceId}/audit
+//     → backed by BpmMonitorController#getAuditTrail, returns List<BpmAuditRecordEntity>.
+//
+// These helpers do NOT perform multi-path response fallback. Any deviation from
+// the expected envelope surfaces as an error.
+
+/**
+ * Status of a single BPMN node in a process instance, as returned by backend
+ * `NodeStatusDTO`. Field names mirror backend record verbatim.
+ */
+export interface BpmNodeStatus {
+  nodeId: string;
+  type: string;
+  name: string | null;
+  status: string;
+  assignee: string | null;
+  completedAt: string | null;
+  completedBy: string | null;
+}
+
+/**
+ * Per-business-key process instance state, as returned by backend
+ * `ProcessInstanceStatusDTO`. Field names mirror backend record verbatim.
+ *
+ * The wrapper endpoint returns 4xx when no process instance exists for the
+ * given (businessKey, optional processKey) pair; `getInstanceForRecord`
+ * catches that case and resolves to `null` so callers can render an empty
+ * state instead of treating missing-instance as a bug.
+ */
+export interface BpmInstanceForRecord {
+  instanceId: string;
+  processDefinitionId: string;
+  status: string;
+  currentNodes: BpmNodeStatus[];
+  completedNodes: BpmNodeStatus[];
+  variables: Record<string, unknown>;
+}
+
+/**
+ * Audit event for a process instance, as returned by backend
+ * `BpmAuditRecordEntity`. Field names mirror backend entity verbatim so the
+ * frontend can render operation/timestamp/user details without further
+ * transformation.
+ */
+export interface BpmAuditEvent {
+  id: number;
+  pid: string;
+  userId: string | null;
+  operation: string;
+  processInstanceId: string | null;
+  taskId: string | null;
+  processDefinitionKey: string | null;
+  version: number | null;
+  details: Record<string, unknown> | null;
+  ipAddress: string | null;
+  result: string | null;
+  errorMessage: string | null;
+  createdAt: string | null;
+}
+
+/**
+ * Fetch the process instance status bound to `businessKey` (optionally
+ * filtered by `processKey`). Returns `null` when no instance exists.
+ *
+ * Uses ErrorCodes.SUCCESS to distinguish "no data" from a real failure:
+ * - code === SUCCESS + data present → instance
+ * - code === SUCCESS + data absent → null (shouldn't happen; backend returns 4xx)
+ * - code !== SUCCESS → error thrown for caller to surface
+ *
+ * The backend may respond with `BadParam` when the instance does not exist;
+ * the wrapper translates that into `null` so the UI can render an empty
+ * state. All other non-success codes propagate as errors.
+ */
+export async function getInstanceForRecord(
+  businessKey: string,
+  processKey?: string,
+): Promise<BpmInstanceForRecord | null> {
+  const params: Record<string, string> = { businessKey };
+  if (processKey) {
+    params.processKey = processKey;
+  }
+  const result = await get<BpmInstanceForRecord>(
+    '/api/bpm/process-instances/by-business-key/status',
+    { params },
+  );
+  if (isSuccess(result.code)) {
+    return result.data ?? null;
+  }
+  // Backend throws BadParam when instance is absent; translate to null instead
+  // of an error so the UI can render an empty state.
+  const desc = result.desc || '';
+  if (desc.includes('not found')) {
+    return null;
+  }
+  throw new Error(desc || 'Failed to get process instance for record');
+}
+
+/**
+ * Fetch the BPMN XML for the process definition that owns the given instance.
+ *
+ * The plan-level phrasing "by instance" is implemented as a two-step call:
+ * the caller already holds `BpmInstanceForRecord.processDefinitionId` from
+ * `getInstanceForRecord`, so this helper accepts the PID directly and fetches
+ * the XML from the process-definitions endpoint.
+ */
+export async function getDiagramForInstance(processDefinitionPid: string): Promise<string> {
+  const result = await get<string>(`/api/bpm/process-definitions/${processDefinitionPid}/bpmn`);
+  if (!isSuccess(result.code) || !result.data) {
+    throw new Error(result.desc || 'Failed to get process BPMN diagram');
+  }
+  return result.data;
+}
+
+/**
+ * Fetch audit events for a process instance. Ordered by backend insertion
+ * order (typically ascending createdAt). Empty array is a valid result.
+ */
+export async function listAuditEvents(processInstanceId: string): Promise<BpmAuditEvent[]> {
+  const result = await get<BpmAuditEvent[]>(
+    `/api/bpm/monitor/instances/${processInstanceId}/audit`,
+  );
+  if (!isSuccess(result.code)) {
+    throw new Error(result.desc || 'Failed to list audit events');
+  }
+  return result.data || [];
+}
