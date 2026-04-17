@@ -75,4 +75,25 @@ public class ModelCapabilities {
         return detailKeyField != null && !detailKeyField.isBlank()
             ? detailKeyField : primaryKey;
     }
+
+    /**
+     * Custom builder that defensively copies whitelist inputs as immutable
+     * snapshots. {@code @Value} freezes the field reference but not list
+     * contents; without this copy, a caller retaining the original mutable
+     * list could mutate the whitelist post-construction and bypass the
+     * runtime-truth invariant.
+     */
+    public static class ModelCapabilitiesBuilder {
+        public ModelCapabilitiesBuilder sortableFields(List<String> fields) {
+            this.sortableFields$value = fields == null ? Collections.emptyList() : List.copyOf(fields);
+            this.sortableFields$set = true;
+            return this;
+        }
+
+        public ModelCapabilitiesBuilder filterableFields(List<String> fields) {
+            this.filterableFields$value = fields == null ? Collections.emptyList() : List.copyOf(fields);
+            this.filterableFields$set = true;
+            return this;
+        }
+    }
 }
