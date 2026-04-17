@@ -16,7 +16,7 @@ AuraBoot 的运行期与设计器都遵循同一套分层：
 
 2. **Services（无 UI 的业务引擎）**  
    - 位置：`app/studio/services/**`、`app/meta/runtime/**`。  
-   - 包含 SchemaRuntime、DataSourceManager、ActionRegistry、LayoutManager 等。  
+   - 包含 SchemaRuntime、DataSourceManager、ActionRegistry 等。  
    - 只依赖 Domain，不依赖 React。
 
 3. **Hooks（React Glue）**  
