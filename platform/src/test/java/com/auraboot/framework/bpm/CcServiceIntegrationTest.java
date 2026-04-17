@@ -1,14 +1,13 @@
 package com.auraboot.framework.bpm;
 
 import com.auraboot.framework.application.tenant.MetaContext;
-import com.auraboot.framework.bpm.entity.BpmCcRecord;
-import com.auraboot.framework.bpm.mapper.BpmCcRecordMapper;
 import com.auraboot.framework.bpm.model.CcPolicy;
 import com.auraboot.framework.bpm.service.CcService;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.integration.BaseIntegrationTest;
-import com.auraboot.framework.inbox.service.InboxService;
 import com.auraboot.smart.framework.engine.SmartEngine;
+import com.auraboot.smart.framework.engine.constant.NotificationConstant;
+import com.auraboot.smart.framework.engine.model.instance.NotificationInstance;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,60 +17,58 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@DisplayName("CcService")
+@DisplayName("CcService (SmartEngine notification backend)")
 class CcServiceIntegrationTest extends BaseIntegrationTest {
 
     @Autowired private CcService ccService;
-    @Autowired private BpmCcRecordMapper ccMapper;
-    @Autowired private InboxService inboxService;
     @Autowired private TestBpmFixture fixture;
     @Autowired private SmartEngine smartEngine;
 
     @Test
-    @DisplayName("Policy=all, initiator sends cc: records + notifies + audits")
-    void allPolicyAssigneeCc() {
-        // Policy=all allows both initiator and assignee. We verify using the initiator
-        // (who is the current user at process start) since the BPMN fixture uses a
-        // "system" assignee that is not a real numeric user in MetaContext.
+    @DisplayName("Policy=all, initiator sends cc: SmartEngine stores 2 notifications with type=cc")
+    void allPolicyInitiatorCc() {
         var setup = fixture.startProcess("cc-all-initiator", CcPolicy.ALL);
 
         ccService.cc(setup.taskId(), List.of(501L, 502L), "please be aware");
 
-        List<BpmCcRecord> records = ccMapper.findByProcessInstance(
-                MetaContext.getCurrentTenantId(), setup.instanceId());
-        assertThat(records).hasSize(1);
-        assertThat(records.get(0).getReceiverUserIds()).containsExactly(501L, 502L);
-        assertThat(records.get(0).getComment()).isEqualTo("please be aware");
+        List<NotificationInstance> r501 = smartEngine.createNotificationQuery()
+                .receiverUserId("501")
+                .notificationType(NotificationConstant.NotificationType.CC)
+                .listPage(0, 10);
+        List<NotificationInstance> r502 = smartEngine.createNotificationQuery()
+                .receiverUserId("502")
+                .notificationType(NotificationConstant.NotificationType.CC)
+                .listPage(0, 10);
 
-        var inbox501 = inboxService.listByUser(501L, MetaContext.getCurrentTenantId(),
-                "bpm_cc", "pending", 0, 10);
-        assertThat(inbox501.getRecords()).hasSize(1);
+        assertThat(r501).hasSize(1);
+        assertThat(r501.get(0).getProcessInstanceId()).isEqualTo(setup.instanceId());
+        assertThat(r501.get(0).getContent()).isEqualTo("please be aware");
+        assertThat(r501.get(0).getReadStatus()).isEqualTo(NotificationConstant.ReadStatus.UNREAD);
+        assertThat(r502).hasSize(1);
     }
 
     @Test
-    @DisplayName("Policy=all, assignee sends cc: accepted and recorded")
-    void allPolicyAssigneeBranchCc() {
+    @DisplayName("Policy=all, assignee sends cc: accepted")
+    void allPolicyAssigneeCc() {
         var setup = fixture.startProcess("cc-all-assignee-pos", CcPolicy.ALL);
 
-        // Claim the task as user 888 so task.getClaimUserId() == "888" in CcService
+        // Claim the task as user 888 so task.claimUserId == "888"
         smartEngine.getTaskCommandService().claim(
                 setup.taskId(), "888", MetaContext.getCurrentTenantIdAsString());
 
-        // Switch current user to the task assignee (888L)
+        // Switch current user to the task assignee
         fixture.switchCurrentUserTo(setup.assigneeId());
 
-        BpmCcRecord record = ccService.cc(setup.taskId(), List.of(777L), "assignee-sends-cc");
+        ccService.cc(setup.taskId(), List.of(777L), "assignee-sends-cc");
 
-        assertThat(record.getId()).isNotNull();
-        assertThat(record.getSenderId()).isEqualTo(setup.assigneeId()); // 888L
-        assertThat(record.getReceiverUserIds()).containsExactly(777L);
-
-        // Inbox notification pushed to receiver 777
-        var inboxItems = inboxService.listByUser(777L, MetaContext.getCurrentTenantId(),
-                "bpm_cc", "pending", 0, 10);
-        assertThat(inboxItems.getRecords()).hasSize(1);
-        // Title must use the i18n reference, not a hardcoded string
-        assertThat(inboxItems.getRecords().get(0).getTitle()).isEqualTo("$i18n:bpm.cc.inbox.title");
+        List<NotificationInstance> r777 = smartEngine.createNotificationQuery()
+                .receiverUserId("777")
+                .notificationType(NotificationConstant.NotificationType.CC)
+                .listPage(0, 10);
+        assertThat(r777).hasSize(1);
+        // Sender id is the assignee (888L)
+        assertThat(r777.get(0).getSenderUserId()).isEqualTo(String.valueOf(setup.assigneeId()));
+        assertThat(r777.get(0).getTitle()).isEqualTo("$i18n:bpm.cc.inbox.title");
     }
 
     @Test
@@ -96,7 +93,7 @@ class CcServiceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("Empty receivers rejected")
+    @DisplayName("Empty receivers rejected with IllegalArgumentException")
     void emptyReceiversRejected() {
         var setup = fixture.startProcess("cc-empty", CcPolicy.ALL);
         assertThatThrownBy(() -> ccService.cc(setup.taskId(), List.of(), "nobody"))
