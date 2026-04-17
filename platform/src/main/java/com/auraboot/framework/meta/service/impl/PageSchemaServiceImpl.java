@@ -3,6 +3,7 @@ package com.auraboot.framework.meta.service.impl;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.exception.ValidationException;
+import com.auraboot.framework.meta.validator.PageSchemaDslI18nValidator;
 import com.auraboot.framework.meta.constant.Status;
 import com.auraboot.framework.meta.converter.PageSchemaConverter;
 import com.auraboot.framework.meta.dto.*;
@@ -525,6 +526,10 @@ public class PageSchemaServiceImpl implements PageSchemaService {
         if (request.getBlocks() != null && !request.getBlocks().isEmpty() && !validateBlocks(request.getBlocks())) {
             throw new ValidationException(ResponseCode.CommonValidationFailed, "Blocks format is invalid");
         }
+
+        // I18n compliance: title and description must not contain hardcoded non-ASCII text
+        PageSchemaDslI18nValidator.validatePageFields(
+                request.getTitle(), request.getDescription(), request.getPageKey());
     }
 
     /**
@@ -539,6 +544,11 @@ public class PageSchemaServiceImpl implements PageSchemaService {
             !validateBlocks(request.getBlocks())) {
             throw new ValidationException(ResponseCode.CommonValidationFailed, "Blocks format is invalid");
         }
+
+        // I18n compliance: title and description must not contain hardcoded non-ASCII text
+        PageSchemaDslI18nValidator.validatePageFields(
+                request.getTitle(), request.getDescription(),
+                request.getPageKey() != null ? request.getPageKey() : "(update)");
     }
 
     /**
