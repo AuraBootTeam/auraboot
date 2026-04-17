@@ -86,7 +86,7 @@ export const reportDesignerService = {
 
     const payload = {
       pageKey,
-      kind: 'composite',
+      kind: 'list',
       profile: 'report',
       title: report.title,
       name: `${report.title} (${suffix})`,

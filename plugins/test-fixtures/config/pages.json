@@ -1280,7 +1280,7 @@
     "name:en": "Order Dashboard",
     "modelCode": "e2et_order",
     "description": "Order dashboard with data-table blocks grouped by status",
-    "kind": "composite",
+    "kind": "list",
     "schemaVersion": 2,
     "layout": {
       "type": "grid",
