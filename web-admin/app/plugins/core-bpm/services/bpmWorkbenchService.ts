@@ -614,6 +614,15 @@ export interface BpmNodeStatus {
 export interface BpmInstanceForRecord {
   instanceId: string;
   processDefinitionId: string;
+  /**
+   * ULID of the user who started the process instance, projected directly from
+   * SmartEngine {@code ProcessInstance.startUserId} by the backend
+   * {@code ProcessInstanceStatusDTO}. Optional only because older backends
+   * (pre-Fix A) did not emit it; new clients should rely on this field rather
+   * than {@code variables._startUserId} (which is only set when the start call
+   * happened to stuff it into the variables map).
+   */
+  startUserId?: string;
   status: string;
   currentNodes: BpmNodeStatus[];
   completedNodes: BpmNodeStatus[];

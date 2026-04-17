@@ -138,6 +138,34 @@ describe('BpmPermissionService.resolvePermissions', () => {
     expect(result.reasonsBlocked?.withdraw).toBe('user.anonymous');
   });
 
+  it('prefers top-level instance.startUserId over variables._startUserId (Fix A)', () => {
+    // Backend ProcessInstanceStatusDTO now projects startUserId at the top
+    // level (Fix A). When both the top-level field and the legacy variables
+    // entry disagree, the top-level field wins — it mirrors SmartEngine's
+    // canonical ProcessInstance.startUserId and is not subject to caller-
+    // controlled variable plumbing.
+    const i = instance({
+      startUserId: 'u-100',
+      variables: { _startUserId: 'u-999', startUserId: 'u-888' },
+    });
+    expect(resolvePermissions(i, { id: 'u-100', permissions: [] }).canWithdraw).toBe(
+      true,
+    );
+    expect(resolvePermissions(i, { id: 'u-999', permissions: [] }).canWithdraw).toBe(
+      false,
+    );
+  });
+
+  it('falls back to variables._startUserId when top-level startUserId is absent (legacy backend)', () => {
+    // Backwards compatibility window: backends that have not yet adopted Fix A
+    // still emit only the variables entry. Layer 2 must keep working.
+    const i = instance({ variables: { _startUserId: 'u-100' } });
+    expect(i.startUserId).toBeUndefined();
+    expect(resolvePermissions(i, { id: 'u-100', permissions: [] }).canWithdraw).toBe(
+      true,
+    );
+  });
+
   it('prefers backend canonical _startUserId over SmartEngine-native startUserId', () => {
     // Both keys present but disagree — _startUserId wins because that is what
     // ApprovalChainExecutor writes (and AssigneeResolverService reads first).
