@@ -507,28 +507,13 @@
                 "since": "1.0"
             },
             {
-                "code": "data-table",
-                "label": "Data table",
-                "since": "1.0"
-            },
-            {
                 "code": "filters",
                 "label": "Filter block",
                 "since": "1.0"
             },
             {
-                "code": "filter-form",
-                "label": "Filter form",
-                "since": "1.0"
-            },
-            {
                 "code": "toolbar",
                 "label": "Toolbar block",
-                "since": "1.0"
-            },
-            {
-                "code": "action",
-                "label": "Action block",
                 "since": "1.0"
             },
             {
@@ -544,11 +529,6 @@
             {
                 "code": "tabs",
                 "label": "Tab container",
-                "since": "1.0"
-            },
-            {
-                "code": "list-tabs",
-                "label": "List tabs",
                 "since": "1.0"
             },
             {
@@ -1462,24 +1442,9 @@
                 "description": "Form layout renderer"
             },
             {
-                "code": "filter-form",
-                "source": "platform",
-                "description": "Filter form renderer"
-            },
-            {
-                "code": "data-table",
-                "source": "platform",
-                "description": "Data table renderer"
-            },
-            {
                 "code": "form-buttons",
                 "source": "platform",
                 "description": "Form button bar renderer"
-            },
-            {
-                "code": "action",
-                "source": "platform",
-                "description": "Action button renderer"
             },
             {
                 "code": "chart",
