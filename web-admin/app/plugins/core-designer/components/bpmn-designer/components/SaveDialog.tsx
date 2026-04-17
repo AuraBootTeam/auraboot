@@ -142,10 +142,21 @@ export function SaveDialog({ isOpen, onClose, onSave, initialData, isNew }: Save
     return null;
   }
 
+  // Only close when the click target is the backdrop itself, not a descendant.
+  // stopPropagation on the inner panel already blocks bubbling, but this guard
+  // makes the intent explicit and survives future refactors that might
+  // accidentally drop the inner handler.
+  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
   return (
     <div
       className="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black"
-      onClick={onClose}
+      onClick={handleBackdropClick}
+      data-testid="bpmn-save-dialog-backdrop"
     >
       <div
         role="dialog"
@@ -153,6 +164,7 @@ export function SaveDialog({ isOpen, onClose, onSave, initialData, isNew }: Save
         aria-labelledby="bpmn-save-dialog-title"
         className="mx-4 w-full max-w-lg rounded-lg bg-white p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
+        data-testid="bpmn-save-dialog-panel"
       >
         <div className="mb-6 flex items-center justify-between">
           <h2 id="bpmn-save-dialog-title" className="text-xl font-semibold text-gray-900">保存流程定义</h2>
