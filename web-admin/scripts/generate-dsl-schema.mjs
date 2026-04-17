@@ -132,8 +132,8 @@ function addPageTypeDiscriminator(schema) {
       then: {
         properties: {
           areas: {
-            description: 'List pages should contain at least one data-table block',
-            'x-recommended-block-types': ['data-table', 'table', 'filters', 'toolbar', 'list-tabs'],
+            description: 'List pages should contain at least one table block',
+            'x-recommended-block-types': ['table', 'filters', 'toolbar', 'tabs'],
           },
         },
       },
@@ -166,7 +166,7 @@ function addPageTypeDiscriminator(schema) {
         properties: {
           areas: {
             description: 'Dashboard pages should contain chart and stat-card blocks',
-            'x-recommended-block-types': ['chart', 'stat-card', 'data-table', 'description'],
+            'x-recommended-block-types': ['chart', 'stat-card', 'table', 'description'],
           },
         },
       },

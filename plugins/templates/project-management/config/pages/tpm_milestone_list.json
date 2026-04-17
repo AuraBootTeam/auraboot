@@ -2,13 +2,13 @@
   "pageKey": "tpm_milestone_list", "name:zh-CN": "里程碑列表", "name:en": "Milestones", "pageType": "list", "modelCode": "tpm_milestone",
   "dslSchema": { "id": "list.tpm_milestone", "kind": "List", "areas": {
     "toolbar": { "blocks": [{ "id": "tpm_ms_toolbar", "blockType": "toolbar", "buttons": [{ "code": "create", "action": "create", "primary": true, "commandCode": "tpm:create_milestone", "navigateTo": "tpm_milestone_form", "permissionCode": "TPM.milestone.manage" }] }] },
-    "list-tabs": { "blocks": [{ "id": "tpm_ms_tabs", "blockType": "list-tabs", "tabs": [
+    "list-tabs": { "blocks": [{ "id": "tpm_ms_tabs", "blockType": "tabs", "tabs": [
       { "key": "all", "label": { "en": "All", "zh-CN": "全部" }, "filter": null },
       { "key": "pending", "label": { "en": "Pending", "zh-CN": "待达成" }, "filter": { "field": "tpm_ms_status", "value": "pending", "operator": "EQ" } },
       { "key": "reached", "label": { "en": "Reached", "zh-CN": "已达成" }, "filter": { "field": "tpm_ms_status", "value": "reached", "operator": "EQ" } },
       { "key": "missed", "label": { "en": "Missed", "zh-CN": "已错过" }, "filter": { "field": "tpm_ms_status", "value": "missed", "operator": "EQ" } }
     ] }] },
-    "main": { "blocks": [{ "id": "tpm_ms_table", "blockType": "data-table", "columns": [
+    "main": { "blocks": [{ "id": "tpm_ms_table", "blockType": "table", "columns": [
       { "field": "tpm_ms_code", "width": 140, "sortable": true }, { "field": "tpm_ms_name", "width": 220, "sortable": true },
       { "field": "tpm_ms_project_id", "width": 160 },
       { "field": "tpm_ms_status", "width": 110, "renderType": "tag", "dictCode": "tpm_milestone_status" },

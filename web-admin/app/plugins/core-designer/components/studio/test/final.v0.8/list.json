@@ -44,7 +44,7 @@
       "blocks": [
         {
           "id": "block_store_filters",
-          "blockType": "filter-form",
+          "blockType": "filters",
           "layout": {
             "colSpan": 12,
             "rowSpan": 1
@@ -167,7 +167,7 @@
       "blocks": [
         {
           "id": "block_store_table",
-          "blockType": "data-table",
+          "blockType": "table",
           "layout": {
             "colSpan": 12,
             "rowSpan": 1

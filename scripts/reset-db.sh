@@ -44,4 +44,27 @@ echo "Step 4: Initializing schema..."
 psql -d "$DB_NAME" -f "$SCHEMA_FILE"
 
 echo ""
+echo "Step 5: Migrating deprecated blockType aliases in ab_page_schema..."
+psql -d "$DB_NAME" -c "
+UPDATE ab_page_schema
+SET blocks = regexp_replace(
+  regexp_replace(
+    regexp_replace(
+      regexp_replace(
+        regexp_replace(
+          blocks::text,
+          '\"blockType\"\s*:\s*\"data-table\"', '\"blockType\": \"table\"', 'g'
+        ),
+        '\"blockType\"\s*:\s*\"filter-form\"', '\"blockType\": \"filters\"', 'g'
+      ),
+      '\"blockType\"\s*:\s*\"list-tabs\"', '\"blockType\": \"tabs\"', 'g'
+    ),
+    '\"blockType\"\s*:\s*\"toolbar-buttons\"', '\"blockType\": \"toolbar\"', 'g'
+  ),
+  '\"blockType\"\s*:\s*\"action\"', '\"blockType\": \"custom\"', 'g'
+)::jsonb
+WHERE blocks::text ~ '\"blockType\"\s*:\s*\"(data-table|filter-form|list-tabs|toolbar-buttons|action)\"';
+" && echo "  Migration complete (idempotent — 0 rows updated is fine if no stale data)." || echo "  Migration skipped (table may not exist yet, schema init will create it fresh)."
+
+echo ""
 echo "=== Database reset complete! ==="
