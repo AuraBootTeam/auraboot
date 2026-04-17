@@ -22,6 +22,7 @@ export const toolbarBlock: BlockDefinition = {
         { label: 'Builtin', value: 'builtin' },
         { label: 'Flow (Handler)', value: 'flow' },
         { label: 'Flow (Steps)', value: 'flow_steps' },
+        { label: 'BPM (Start Process)', value: 'bpm' },
       ],
     },
     {
@@ -72,6 +73,35 @@ export const toolbarBlock: BlockDefinition = {
       group: 'Action',
       description: 'Array of FlowStep objects: [{type, action, condition, ...}]',
       dependsOn: { field: 'action.type', value: 'flow_steps' },
+    },
+    // ── BPM action fields (type=bpm) ────────────────────────────
+    {
+      key: 'action.processDefinitionKey',
+      label: 'Process Definition',
+      type: 'process-select',
+      group: 'Action',
+      required: true,
+      description: 'BPMN process definition to start when button is clicked',
+      dependsOn: { field: 'action.type', value: 'bpm' },
+    },
+    {
+      key: 'action.businessKeyField',
+      label: 'Business Key Field',
+      type: 'field-select',
+      group: 'Action',
+      required: true,
+      placeholder: 'e.g. orderNo',
+      description: 'Record field whose value becomes the process businessKey',
+      dependsOn: { field: 'action.type', value: 'bpm' },
+    },
+    {
+      key: 'action.variables',
+      label: 'Variables (JSON)',
+      type: 'json',
+      group: 'Action',
+      description:
+        'Map of variable name to JSONPath ($.field.sub) or literal, e.g. {"amount": "$.totalAmount"}',
+      dependsOn: { field: 'action.type', value: 'bpm' },
     },
 
     // ── Appearance ──────────────────────────────────────────────

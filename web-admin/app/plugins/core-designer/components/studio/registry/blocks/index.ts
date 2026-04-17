@@ -1,5 +1,5 @@
 /**
- * Block definitions barrel — registers all 13 built-in block types.
+ * Block definitions barrel — registers all 14 built-in block types.
  *
  * Call registerAllBlocks() once at app bootstrap (e.g. in studio entry point)
  * before any canvas or palette component is rendered.
@@ -22,6 +22,7 @@ import { detailSectionBlock } from './detail-section';
 import { richTextBlock } from './rich-text';
 import { dividerBlock } from './divider';
 import { formButtonsBlock } from './form-buttons';
+import { bpmPanelBlock } from './bpm-panel';
 
 export function registerAllBlocks(): void {
   BlockRegistry.register(tableBlock);
@@ -37,6 +38,7 @@ export function registerAllBlocks(): void {
   BlockRegistry.register(richTextBlock);
   BlockRegistry.register(dividerBlock);
   BlockRegistry.register(formButtonsBlock);
+  BlockRegistry.register(bpmPanelBlock);
 }
 
 export {
@@ -53,4 +55,5 @@ export {
   richTextBlock,
   dividerBlock,
   formButtonsBlock,
+  bpmPanelBlock,
 };
