@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Agent Memory Service — CRUD operations for {@code ab_agent_memory}.
@@ -335,6 +336,132 @@ public class AgentMemoryService {
      * @param agentCode agent identifier
      * @return number of memories soft-deleted
      */
+    // =========================================================================
+    // 3D Memory Model — scope enforcement (2026-04-18 PR-13)
+    //
+    // scope ∈ {user, tenant, global}; scope_key identifies the boundary entity.
+    //   - user:   scope_key = user_id (stringified)
+    //   - tenant: scope_key = tenant_id or null (tenant_id column already enforces)
+    //   - global: scope_key = null (platform-wide, readable by everyone)
+    //
+    // Query visibility contract (memory-lifecycle.md §2.2):
+    //   caller sees memory iff
+    //     (scope='global')
+    //     OR (scope='tenant' AND tenant_id = currentTenantId)
+    //     OR (scope='user'   AND scope_key = currentUserId)
+    //
+    // The existing un-scoped APIs (listMemories / searchSemantic / …) remain
+    // available for internal consolidation/prompt-assembly paths; new callers
+    // (GroundingService, HITL UI) must use the *Scoped variants below.
+    // =========================================================================
+
+    /** Supported scope values — reject anything else at DB level via application check. */
+    public static final java.util.Set<String> VALID_SCOPES = java.util.Set.of("user", "tenant", "global");
+
+    private static void assertValidScope(String scope) {
+        if (!VALID_SCOPES.contains(scope)) {
+            throw new IllegalArgumentException(
+                    "Invalid memory scope '" + scope + "'; must be one of " + VALID_SCOPES);
+        }
+    }
+
+    /**
+     * Create a memory with an explicit scope tag.
+     * @param scope     "user" / "tenant" / "global"
+     * @param scopeKey  boundary entity id — user_id when scope=user, optional for tenant, null for global
+     */
+    public String createScopedMemory(Long tenantId, String agentCode,
+                                      String memoryType, String category,
+                                      String title, String content,
+                                      int importance, boolean shareable,
+                                      String scope, String scopeKey) {
+        assertValidScope(scope);
+        if ("user".equals(scope) && (scopeKey == null || scopeKey.isBlank())) {
+            throw new IllegalArgumentException("scope='user' requires non-blank scope_key (user_id)");
+        }
+        String pid = UniqueIdGenerator.generate();
+        jdbcTemplate.update(
+                "INSERT INTO ab_agent_memory "
+                + "(pid, tenant_id, memory_agent_id, memory_type, category, "
+                + " memory_title, memory_content, importance, shareable, "
+                + " scope, scope_key, created_at, updated_at, deleted_flag) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), FALSE)",
+                pid, tenantId, agentCode, memoryType, category,
+                title, content, importance, shareable, scope, scopeKey);
+        log.debug("Created scoped memory {} type={} scope={}/{}", pid, memoryType, scope, scopeKey);
+        return pid;
+    }
+
+    /**
+     * Keyword-search memories visible to the given (tenant, user) principal.
+     * Applies the scope visibility contract above.
+     */
+    public List<Map<String, Object>> searchScoped(Long tenantId, String userId,
+                                                   String agentCode, String query, int limit) {
+        Objects.requireNonNull(tenantId, "tenantId");
+        String pattern = "%" + (query == null ? "" : query) + "%";
+        // scope_key stored as VARCHAR — we pass stringified user id + tenant id.
+        String userKey = userId == null ? "" : userId;
+        return jdbcTemplate.queryForList(
+                "SELECT pid, memory_type, category, memory_title, memory_content, "
+                + "  importance, shareable, scope, scope_key, created_at "
+                + "FROM ab_agent_memory "
+                + "WHERE memory_agent_id = ? "
+                + "  AND (memory_content ILIKE ? OR memory_title ILIKE ?) "
+                + "  AND (deleted_flag IS NULL OR deleted_flag = FALSE) "
+                + "  AND ( "
+                + "    scope = 'global' "
+                + "    OR (scope = 'tenant' AND tenant_id = ?) "
+                + "    OR (scope = 'user'   AND scope_key = ?) "
+                + "  ) "
+                + "ORDER BY importance DESC, created_at DESC "
+                + "LIMIT ?",
+                agentCode, pattern, pattern, tenantId, userKey, limit);
+    }
+
+    /**
+     * Importance-ordered recall of memories visible to (tenant, user) — no keyword filter.
+     * Used by Active Memory pre-recall when grounding wants top-N user preferences.
+     */
+    public List<Map<String, Object>> loadScopedByImportance(Long tenantId, String userId,
+                                                             String agentCode, int limit) {
+        String userKey = userId == null ? "" : userId;
+        return jdbcTemplate.queryForList(
+                "SELECT pid, memory_type, category, memory_title, memory_content, "
+                + "  importance, shareable, scope, scope_key, created_at "
+                + "FROM ab_agent_memory "
+                + "WHERE memory_agent_id = ? "
+                + "  AND (deleted_flag IS NULL OR deleted_flag = FALSE) "
+                + "  AND ( "
+                + "    scope = 'global' "
+                + "    OR (scope = 'tenant' AND tenant_id = ?) "
+                + "    OR (scope = 'user'   AND scope_key = ?) "
+                + "  ) "
+                + "ORDER BY importance DESC, created_at DESC "
+                + "LIMIT ?",
+                agentCode, tenantId, userKey, limit);
+    }
+
+    /**
+     * GDPR-compliant forget-user: soft-delete every memory whose scope='user'
+     * and scope_key matches the given user_id. Returns affected row count.
+     * Does not touch tenant/global memories (those are legitimately about the
+     * tenant / platform, not the user).
+     */
+    public int forgetUser(String userId) {
+        if (userId == null || userId.isBlank()) {
+            throw new IllegalArgumentException("userId required for GDPR forget");
+        }
+        int updated = jdbcTemplate.update(
+                "UPDATE ab_agent_memory "
+                + "SET deleted_flag = TRUE, updated_at = NOW() "
+                + "WHERE scope = 'user' AND scope_key = ? "
+                + "  AND (deleted_flag IS NULL OR deleted_flag = FALSE)",
+                userId);
+        log.info("GDPR forget-user: soft-deleted {} memories for user_id={}", updated, userId);
+        return updated;
+    }
+
     public int deduplicateMemories(Long tenantId, String agentCode) {
         // Identify the id to KEEP for each duplicated title (highest importance, then smallest id)
         // and soft-delete all others.

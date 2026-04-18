@@ -4927,12 +4927,21 @@ CREATE TABLE IF NOT EXISTS ab_agent_memory (
   updated_by    BIGINT,
   deleted_flag  BOOLEAN DEFAULT FALSE,
   shareable     BOOLEAN DEFAULT FALSE,
-  embedding     vector(1536)
+  embedding     vector(1536),
+  -- 2026-04-18 PR-13: 3D memory model (memory-lifecycle.md §2) — access boundary.
+  -- scope ∈ {user, tenant, global}; scope_key = boundary entity id (user_id /
+  -- tenant_id / NULL for global). GDPR deletion: DELETE WHERE scope='user' AND
+  -- scope_key=? covers all memory about a specific user.
+  scope         VARCHAR(16) NOT NULL DEFAULT 'tenant',
+  scope_key     VARCHAR(100)
 );
+ALTER TABLE ab_agent_memory ADD COLUMN IF NOT EXISTS scope VARCHAR(16) NOT NULL DEFAULT 'tenant';
+ALTER TABLE ab_agent_memory ADD COLUMN IF NOT EXISTS scope_key VARCHAR(100);
 CREATE INDEX IF NOT EXISTS idx_agent_memory_tenant ON ab_agent_memory (tenant_id);
 CREATE INDEX IF NOT EXISTS idx_agent_memory_agent ON ab_agent_memory (memory_agent_id);
 CREATE INDEX IF NOT EXISTS idx_agent_memory_type ON ab_agent_memory (memory_type);
 CREATE INDEX IF NOT EXISTS idx_agent_memory_shareable ON ab_agent_memory (tenant_id, shareable) WHERE shareable = TRUE;
+CREATE INDEX IF NOT EXISTS idx_agent_memory_scope ON ab_agent_memory (scope, scope_key) WHERE (deleted_flag IS NULL OR deleted_flag = FALSE);
 -- HNSW index: better recall than IVFFlat, no pre-training needed
 CREATE INDEX IF NOT EXISTS idx_agent_memory_embedding ON ab_agent_memory USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
 COMMENT ON TABLE ab_agent_memory IS 'Agent long-term memory — facts, preferences, lessons, decisions';
@@ -6548,6 +6557,33 @@ ALTER TABLE ab_agent_approval
 ALTER TABLE ab_agent_action
     ADD COLUMN IF NOT EXISTS estimated_risk VARCHAR(5),     -- risk predicted at plan/grounding time
     ADD COLUMN IF NOT EXISTS risk_deviation BOOLEAN DEFAULT FALSE;  -- true if actual_risk > estimated_risk
+
+-- ACP Action Contract v1.1 — fidelity grading + audit-precision fields
+-- (specs/01-ActionContractSpec.md §1.3 v1.1 ALTER).
+-- fidelity: how faithfully we can reconstruct the action from what we stored.
+--   full     — DSL write with before_snapshot + after_snapshot + field_changes (exact diff)
+--   semantic — semantic change known (API call / MCP tool), snapshots may be absent
+--   blackbox — only metadata known (code sandbox / llm_native), body opaque
+-- command_signature: SHA-256 of (commandCode + canonical JSON args). Used for
+--   idempotency dedup + learning-loop pattern aggregation.
+-- skill_code: which Skill produced this Action (spec §1 "step_index ↔ skill_code"
+--   pair is how learning-loop groups Actions into patterns).
+-- reversal_action_pid: if this Action was undone by a later compensating Action,
+--   point back to it here. Enables reversible chains / rollback machinery.
+ALTER TABLE ab_agent_action
+    ADD COLUMN IF NOT EXISTS fidelity             VARCHAR(10),
+    ADD COLUMN IF NOT EXISTS skill_code           VARCHAR(128),
+    ADD COLUMN IF NOT EXISTS tool_ref             VARCHAR(200),
+    ADD COLUMN IF NOT EXISTS command_signature    VARCHAR(64),
+    ADD COLUMN IF NOT EXISTS exit_code            INTEGER,
+    ADD COLUMN IF NOT EXISTS stdout_hash          VARCHAR(64),
+    ADD COLUMN IF NOT EXISTS affected_entities    JSONB,
+    ADD COLUMN IF NOT EXISTS change_summary       TEXT,
+    ADD COLUMN IF NOT EXISTS artifact_refs        JSONB,
+    ADD COLUMN IF NOT EXISTS reversal_action_pid  VARCHAR(26);
+CREATE INDEX IF NOT EXISTS idx_action_fidelity ON ab_agent_action(fidelity) WHERE fidelity IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_action_skill_code ON ab_agent_action(skill_code) WHERE skill_code IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_action_command_signature ON ab_agent_action(tenant_id, command_signature) WHERE command_signature IS NOT NULL;
 
 -- ============================================================================
 -- ACP Capability Layer (Spec 00 §5.6)
