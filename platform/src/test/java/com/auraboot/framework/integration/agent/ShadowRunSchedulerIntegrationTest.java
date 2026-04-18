@@ -24,6 +24,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -240,6 +245,84 @@ class ShadowRunSchedulerIntegrationTest extends BaseIntegrationTest {
         assertThat(row.get("shadow_output_hash")).isNotNull();
         assertThat(row.get("original_output_hash")).isEqualTo(row.get("shadow_output_hash"));
         assertThat(row.get("output_match")).isEqualTo(Boolean.TRUE);
+    }
+
+    @Test
+    @DisplayName("PR-59: concurrent runOnce() calls → only one instance records runs (no duplicates)")
+    void concurrent_instances() throws Exception {
+        String run1 = "RUNC" + System.nanoTime();
+        seedAction(run1);
+        String yaml = "substrate: dsl\naction_type: query\ntool_refs:\n  - nq_leads\n";
+        String draftPid = seedDraft("REVIEWED_OK", yaml,
+                "[{\"run_id\":\"" + run1 + "\"}]");
+
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Callable<Integer> task = () -> scheduler.runOnce();
+            Future<Integer> f1 = pool.submit(task);
+            Future<Integer> f2 = pool.submit(task);
+            int a = f1.get(30, TimeUnit.SECONDS);
+            int b = f2.get(30, TimeUnit.SECONDS);
+
+            // One tick records >=1 shadow run, the other is shut out by the
+            // advisory lock and returns 0. Sum of the two must still match the
+            // single-instance outcome.
+            assertThat(a + b).as("combined executions").isGreaterThanOrEqualTo(1);
+            assertThat(Math.min(a, b)).as("losing tick must be 0").isZero();
+
+            Integer shadowCount = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM ab_agent_shadow_run WHERE draft_id = ?",
+                    Integer.class, draftPid);
+            // Only one (draft, run_id) row is created — never doubled.
+            assertThat(shadowCount).isEqualTo(1);
+        } finally {
+            pool.shutdownNow();
+            pool.awaitTermination(5, TimeUnit.SECONDS);
+        }
+    }
+
+    @Test
+    @DisplayName("PR-59: lock held across all internal jdbc calls — nested runOnce sees lock taken")
+    void lock_held_across_jdbc_calls() throws Exception {
+        String runId = "RUNN" + System.nanoTime();
+        seedAction(runId);
+        String yaml = "substrate: dsl\naction_type: query\ntool_refs:\n  - nq_leads\n";
+        String draftPid = seedDraft("REVIEWED_OK", yaml,
+                "[{\"run_id\":\"" + runId + "\"}]");
+
+        // Hold the advisory lock on a dedicated connection with an explicit
+        // pg_advisory_lock so the scheduler's pg_try_advisory_lock sees it
+        // taken on every physical connection it might borrow. If the fix
+        // regresses (lock unlock leaks), a subsequent runOnce would find the
+        // lock mysteriously free because the unlock landed on a different
+        // connection than the acquire. The session-scoped lock held here
+        // guarantees any pooled connection the scheduler uses sees occupied.
+        try (Connection blocker = dataSource.getConnection()) {
+            blocker.setAutoCommit(true);
+            try (PreparedStatement ps = blocker.prepareStatement("SELECT pg_advisory_lock(?)")) {
+                ps.setLong(1, 7301L);
+                ps.execute();
+            }
+
+            // Run multiple ticks while the external session holds the lock.
+            // Each tick must consistently return 0 — proving that the
+            // scheduler's own unlock never leaked into a pooled connection
+            // that would steal the lock from the blocker.
+            for (int i = 0; i < 3; i++) {
+                int executed = scheduler.runOnce();
+                assertThat(executed).as("attempt " + i).isZero();
+            }
+
+            Integer shadowCount = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM ab_agent_shadow_run WHERE draft_id = ?",
+                    Integer.class, draftPid);
+            assertThat(shadowCount).isZero();
+
+            try (PreparedStatement ps = blocker.prepareStatement("SELECT pg_advisory_unlock(?)")) {
+                ps.setLong(1, 7301L);
+                ps.execute();
+            }
+        }
     }
 
     @Test

@@ -1,11 +1,12 @@
 package com.auraboot.framework.agent.service;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.List;
 
@@ -28,7 +29,6 @@ import java.util.List;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class PromotionEvaluationRunner {
 
     /** Advisory-lock key; documented at class level. Distinct from ShadowRunScheduler (7301). */
@@ -36,6 +36,19 @@ public class PromotionEvaluationRunner {
 
     private final JdbcTemplate jdbcTemplate;
     private final PromotionEvaluator evaluator;
+    private final TransactionTemplate transactionTemplate;
+
+    public PromotionEvaluationRunner(JdbcTemplate jdbcTemplate,
+                                     PromotionEvaluator evaluator,
+                                     PlatformTransactionManager transactionManager) {
+        this.jdbcTemplate = jdbcTemplate;
+        this.evaluator = evaluator;
+        // Pin a single JDBC connection for lock/work/unlock. See ShadowRunScheduler
+        // for the full rationale — Postgres advisory locks are session-scoped,
+        // so without pinning the unlock may target a different pooled
+        // connection and leak the lock on the original one.
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
+    }
 
     @Value("${acp.learning.promotion.scheduler.enabled:false}")
     private boolean enabled;
@@ -54,17 +67,25 @@ public class PromotionEvaluationRunner {
 
     /** Returns the number of drafts evaluated in this pass. */
     public int runOnce() {
-        Boolean acquired = jdbcTemplate.queryForObject(
-                "SELECT pg_try_advisory_lock(?)", Boolean.class, LOCK_KEY);
-        if (!Boolean.TRUE.equals(acquired)) {
-            log.debug("PromotionEvaluationRunner: another instance holds advisory lock {}, skipping tick", LOCK_KEY);
-            return 0;
-        }
-        try {
-            return runOnceLocked();
-        } finally {
-            jdbcTemplate.queryForObject("SELECT pg_advisory_unlock(?)", Boolean.class, LOCK_KEY);
-        }
+        Integer result = transactionTemplate.execute(status -> {
+            Boolean acquired = jdbcTemplate.queryForObject(
+                    "SELECT pg_try_advisory_lock(?)", Boolean.class, LOCK_KEY);
+            if (!Boolean.TRUE.equals(acquired)) {
+                log.debug("PromotionEvaluationRunner: another instance holds advisory lock {}, skipping tick", LOCK_KEY);
+                return 0;
+            }
+            try {
+                return runOnceLocked();
+            } finally {
+                Boolean released = jdbcTemplate.queryForObject(
+                        "SELECT pg_advisory_unlock(?)", Boolean.class, LOCK_KEY);
+                if (!Boolean.TRUE.equals(released)) {
+                    log.warn("PromotionEvaluationRunner: pg_advisory_unlock({}) returned {} — possible connection mismatch",
+                            LOCK_KEY, released);
+                }
+            }
+        });
+        return result == null ? 0 : result;
     }
 
     private int runOnceLocked() {
