@@ -209,9 +209,13 @@ export const FieldPropertyEditor: React.FC<FieldPropertyEditorProps> = ({
     [fieldData, onChange],
   );
 
-  // Get component options based on data type
+  // Get component options based on data type.
+  // Backend / DSL stores dataType in lowercase (string/integer/...), but the
+  // FALLBACK map and registry-derived map are keyed by uppercase canonical
+  // names. Normalize to uppercase before lookup.
   const getComponentOptions = useCallback((): Array<{ label: string; value: string }> => {
-    return DATATYPE_COMPONENT_OPTIONS[dataType] || DATATYPE_COMPONENT_OPTIONS.STRING;
+    const key = String(dataType || 'string').toUpperCase();
+    return DATATYPE_COMPONENT_OPTIONS[key] || DATATYPE_COMPONENT_OPTIONS.STRING;
   }, [dataType]);
 
   // Render a single field using native HTML components
