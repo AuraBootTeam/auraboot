@@ -1,6 +1,7 @@
 package com.auraboot.framework.webhook.service.impl;
 
 import com.auraboot.framework.common.crypto.FieldEncryptionService;
+import com.auraboot.framework.common.util.PinnedHttpRequests;
 import com.auraboot.framework.common.util.SsrfValidator;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.webhook.entity.WebhookDeliveryLog;
@@ -14,14 +15,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.expression.MapAccessor;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.expression.spel.support.SimpleEvaluationContext;
-import org.springframework.http.*;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
@@ -42,10 +43,21 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 public class WebhookDispatcherImpl implements WebhookDispatcher {
 
+    private static final int DEFAULT_CONNECT_TIMEOUT_MS = 5_000;
+    private static final int DEFAULT_READ_TIMEOUT_MS = 10_000;
+
+    /**
+     * Shared JDK HTTP client for webhook delivery (P3-E DNS-rebinding
+     * hardening). JDK {@link HttpClient} is what {@link PinnedHttpRequests}
+     * targets for pinning the validated IP at connect time.
+     */
+    private static final HttpClient PINNED_HTTP_CLIENT = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofMillis(DEFAULT_CONNECT_TIMEOUT_MS))
+            .build();
+
     private final WebhookSubscriptionMapper subscriptionMapper;
     private final WebhookDeliveryLogMapper deliveryLogMapper;
     private final ObjectMapper objectMapper;
-    private final RestTemplate restTemplate;
     private final FieldEncryptionService fieldEncryptionService;
     private final ScheduledExecutorService retryScheduler = Executors.newSingleThreadScheduledExecutor(
             r -> { Thread t = new Thread(r, "webhook-retry"); t.setDaemon(true); return t; });
@@ -96,14 +108,30 @@ public class WebhookDispatcherImpl implements WebhookDispatcher {
             String body = objectMapper.writeValueAsString(payload);
             logEntry.setRequestBody(body);
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
+            // Validate URL + pin the resolved IP so the HTTP send cannot be
+            // re-resolved to a different address (P3-E #1 DNS rebinding TOCTOU).
+            SsrfValidator.ValidatedTarget target =
+                    SsrfValidator.validate(subscription.getTargetUrl());
+            if (target == null) {
+                throw new IllegalArgumentException(
+                        "webhook target could not be resolved: " + subscription.getTargetUrl());
+            }
+
+            int readTimeoutMs = subscription.getTimeoutMs() != null
+                    ? subscription.getTimeoutMs()
+                    : DEFAULT_READ_TIMEOUT_MS;
+
+            HttpRequest.Builder requestBuilder = PinnedHttpRequests.newPinnedRequestBuilder(target)
+                    .timeout(Duration.ofMillis(readTimeoutMs))
+                    .header("Content-Type", "application/json")
+                    .header("X-Webhook-Event", subscription.getEventType())
+                    .header("X-Webhook-Timestamp", String.valueOf(Instant.now().toEpochMilli()));
 
             // Add HMAC signature if secret is configured
             if (subscription.getSecret() != null && !subscription.getSecret().isBlank()) {
                 String decryptedSecret = fieldEncryptionService.decrypt(subscription.getSecret());
                 String signature = computeHmac(body, decryptedSecret);
-                headers.set("X-Webhook-Signature", signature);
+                requestBuilder.header("X-Webhook-Signature", signature);
             }
 
             // Add custom headers
@@ -111,40 +139,27 @@ public class WebhookDispatcherImpl implements WebhookDispatcher {
                 Map<String, String> customHeaders = objectMapper.readValue(
                         subscription.getHeaders(),
                         objectMapper.getTypeFactory().constructMapType(Map.class, String.class, String.class));
-                customHeaders.forEach(headers::set);
+                customHeaders.forEach(requestBuilder::header);
             }
 
-            headers.set("X-Webhook-Event", subscription.getEventType());
-            headers.set("X-Webhook-Timestamp", String.valueOf(Instant.now().toEpochMilli()));
+            requestBuilder.POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8));
 
-            // Validate URL to prevent SSRF attacks
-            SsrfValidator.validateUrl(subscription.getTargetUrl());
+            HttpResponse<String> response = PINNED_HTTP_CLIENT.send(
+                    requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
 
-            HttpEntity<String> request = new HttpEntity<>(body, headers);
-
-            // Use per-subscription timeout if configured, otherwise use global RestTemplate
-            RestTemplate client;
-            if (subscription.getTimeoutMs() != null) {
-                int timeout = subscription.getTimeoutMs();
-                SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-                factory.setConnectTimeout(Duration.ofMillis(Math.min(timeout, 5000)));
-                factory.setReadTimeout(Duration.ofMillis(timeout));
-                client = new RestTemplate(factory);
-            } else {
-                client = restTemplate;
+            int status = response.statusCode();
+            logEntry.setResponseStatus(status);
+            logEntry.setResponseBody(response.body());
+            if (status >= 400) {
+                // Preserve prior RestTemplate semantics: 4xx/5xx trigger retry.
+                throw new RuntimeException("Webhook returned error status " + status);
             }
-
-            ResponseEntity<String> response = client.exchange(
-                    subscription.getTargetUrl(), HttpMethod.POST, request, String.class);
-
-            logEntry.setResponseStatus(response.getStatusCode().value());
-            logEntry.setResponseBody(response.getBody());
             logEntry.setDeliveryStatus("success");
             logEntry.setDeliveredAt(Instant.now());
             deliveryLogMapper.insert(logEntry);
 
             log.debug("Webhook delivered: subscription={}, url={}, status={}",
-                    subscription.getPid(), subscription.getTargetUrl(), response.getStatusCode());
+                    subscription.getPid(), subscription.getTargetUrl(), status);
 
         } catch (IllegalArgumentException e) {
             // SSRF or invalid URL — do not retry
