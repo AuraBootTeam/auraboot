@@ -124,6 +124,17 @@ public class MemoryPromotionExpirer {
                 STATUS_DISCARDED, MemoryPromotionApplierImpl.STATUS_REJECTED);
         total += discarded;
 
+        // 3. PR-73: purge ab_agent_memory_access_log rows older than 90d.
+        //    Aligns with the implicit_co_sign lookback window — anything older
+        //    can no longer influence promotion decisions, so it is pure bloat.
+        int purged = jdbcTemplate.update(
+                "DELETE FROM ab_agent_memory_access_log "
+                        + "WHERE last_seen_at < NOW() - INTERVAL '90 days'");
+        if (purged > 0) {
+            log.info("MemoryPromotionExpirer: purged {} stale access-log rows", purged);
+            total += purged;
+        }
+
         return total;
     }
 }

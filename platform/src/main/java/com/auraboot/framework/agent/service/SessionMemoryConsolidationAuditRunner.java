@@ -62,10 +62,12 @@ public class SessionMemoryConsolidationAuditRunner {
                 "SELECT pid, memory_title, memory_content, importance, category "
                         + "FROM ab_agent_memory "
                         + "WHERE tenant_id = ? AND memory_agent_id = ? "
-                        + "  AND category = '" + AgentMemoryConsolidationService.CATEGORY_SESSION + "' "
+                        + "  AND category = ? "
                         + "  AND importance >= ? "
                         + "  AND (deleted_flag IS NULL OR deleted_flag = FALSE)",
-                tenantId, agentCode, importanceThreshold);
+                tenantId, agentCode,
+                AgentMemoryConsolidationService.CATEGORY_SESSION,
+                importanceThreshold);
         if (candidates.isEmpty()) {
             return 0;
         }
@@ -83,12 +85,18 @@ public class SessionMemoryConsolidationAuditRunner {
         }
         // Guard against empty IN list (already handled by early-return above).
         String inMarkers = String.join(",", java.util.Collections.nCopies(pids.size(), "?"));
+        Object[] flippedArgs = new Object[pids.size() + 1];
+        flippedArgs[0] = AgentMemoryConsolidationService.CATEGORY_USER;
+        int idx = 1;
+        for (String pid : pids) {
+            flippedArgs[idx++] = pid;
+        }
         List<Map<String, Object>> flipped = jdbcTemplate.queryForList(
                 "SELECT pid, memory_title, memory_content, importance "
                         + "FROM ab_agent_memory "
-                        + "WHERE category = '" + AgentMemoryConsolidationService.CATEGORY_USER + "' "
+                        + "WHERE category = ? "
                         + "  AND pid IN (" + inMarkers + ")",
-                pids.toArray());
+                flippedArgs);
 
         int inserted = 0;
         for (Map<String, Object> row : flipped) {
@@ -124,10 +132,15 @@ public class SessionMemoryConsolidationAuditRunner {
                                 int importance, int threshold) {
         String pid = UniqueIdGenerator.generate();
         String detailJson;
+        String sourcePidsJson;
         try {
             detailJson = objectMapper.writeValueAsString(Map.of(
                     "threshold_exceeded", threshold,
                     "source_memory_pid", sourceMemoryPid));
+            // PR-73: use Jackson to build the JSON array instead of raw string
+            // concatenation. Safe against future pids containing characters
+            // that would need JSON escaping.
+            sourcePidsJson = objectMapper.writeValueAsString(List.of(sourceMemoryPid));
         } catch (JsonProcessingException e) {
             // Explicit validation: the JSON build is over an in-memory Map we
             // just constructed — any serialisation failure is a programmer
@@ -147,7 +160,7 @@ public class SessionMemoryConsolidationAuditRunner {
                         + "?, ?, "
                         + "NOW(), NOW(), NOW(), NOW(), NOW(), NOW())",
                 pid, tenantId, SOURCE_SCOPE, sourceMemoryPid,
-                "[\"" + sourceMemoryPid + "\"]",
+                sourcePidsJson,
                 TARGET_SCOPE, "session_upgrade",
                 title, content, importance,
                 REASON_CODE, detailJson, 1.00d, null,
