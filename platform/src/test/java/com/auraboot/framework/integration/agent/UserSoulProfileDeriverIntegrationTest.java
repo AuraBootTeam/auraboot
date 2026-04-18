@@ -175,6 +175,28 @@ class UserSoulProfileDeriverIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    @DisplayName("deriver skips forgotten user (tombstone)")
+    void deriverSkipsForgottenUser() {
+        for (int i = 1; i <= 5; i++) {
+            seedMemory("m" + i, "profile", "t", "x", 8);
+        }
+        // Insert a tombstone row — status=ARCHIVED with edited_fields._forgotten=true.
+        jdbc.update("INSERT INTO ab_agent_user_soul_profile "
+                        + "(pid, tenant_id, user_id, version, status, profile, profile_hash, "
+                        + " edited_fields, hidden_at, created_at) "
+                        + "VALUES (?, ?, ?, 1, 'ARCHIVED', '{}'::jsonb, ?, "
+                        + " '{\"_forgotten\":true}'::jsonb, NOW(), NOW())",
+                tag + "tomb", tenantId, userId, "h:tomb");
+        DerivationResult r = deriver.deriveForUser(tenantId, userId);
+        assertThat(r.outcome()).isEqualTo(Outcome.SKIPPED_FORGOTTEN);
+        Long newDrafts = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM ab_agent_user_soul_profile "
+                        + "WHERE tenant_id = ? AND user_id = ? AND status = 'DRAFT'",
+                Long.class, tenantId, userId);
+        assertThat(newDrafts).isZero();
+    }
+
+    @Test
     @DisplayName("advisory lock 7306 prevents concurrent runScheduled")
     void advisoryLockSerialisesScheduled() throws InterruptedException {
         for (int i = 1; i <= 5; i++) {
