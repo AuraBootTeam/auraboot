@@ -2,6 +2,7 @@ package com.auraboot.framework.agent.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -51,10 +52,21 @@ public class ActiveMemoryService {
      * is null. Idempotent: if {@code content} already starts with
      * {@link #SHADOW_ANNOTATION_PREFIX}, it is not double-prefixed.
      *
-     * <p>Callers: {@link #snippet(Map)} (pre-recall path used by GroundingService)
-     * and {@code AgentRunService.loadMemorySection} (agent-run prompt assembly).
-     * Centralising here ensures both paths reach the LLM with the same marker
-     * contract (plan §8 / PR-72 C2).
+     * <p>Callers: {@link #snippet(Map)} (pre-recall path used by GroundingService),
+     * {@code AgentRunService.loadMemorySection} (agent-run prompt assembly), and
+     * {@code AgentPromptAssemblyService.loadMemoriesByCategory /
+     * loadSharedMemories} (deterministic prompt assembly entry point).
+     * Centralising here ensures every path reaches the LLM with the same
+     * marker contract (plan §8 / PR-72 C2 / PR-82 R5-C1).
+     *
+     * <p><b>Known limitation (PR-82 R5-N5):</b> the idempotency guard is an
+     * exact {@code startsWith(SHADOW_ANNOTATION_PREFIX)} check. If any upstream
+     * middleware normalises the literal prefix (e.g. full-width → half-width
+     * punctuation, NFC vs NFKC unicode folding) the guard can miss and the
+     * marker gets re-applied. In practice all our call sites pass raw DB
+     * content straight through, so this is a documented edge-case, not a
+     * behavioural bug — we intentionally trade theoretical robustness for a
+     * one-line O(len) check.
      */
     public static String applyShadowMarker(String content, boolean shadowMode) {
         if (!shadowMode || content == null) return content;
@@ -77,9 +89,19 @@ public class ActiveMemoryService {
      * safe to serialize into BIF.preContext JSONB and stringify into the system
      * prompt.
      *
-     * Exceptions are NOT swallowed here — {@code GroundingService} wraps the
-     * whole call so a storage error surfaces there (single catch point;
-     * "no silent fallback" red-line).
+     * Exceptions from READ operations are NOT swallowed here — {@code GroundingService}
+     * wraps the whole call so a storage error surfaces there (single catch
+     * point; "no silent fallback" red-line).
+     *
+     * <p><b>PR-82 R5-N3 — access-log write contract:</b> {@code preRecall} also
+     * calls {@link #logAccess} for each returned snippet (powers the
+     * {@code implicit_co_sign} Strategy B in MemoryPromotionExtractor). A
+     * {@link DataAccessException} thrown by the access-log INSERT is caught
+     * and logged at WARN only — an access-log miss at worst under-counts
+     * co-signers on that memory for that day, which is cosmetic, whereas
+     * breaking the user-facing chat path would be a production incident.
+     * All other exceptions (NPE, {@link IllegalArgumentException}, etc.)
+     * still propagate; the read contract is unchanged.
      *
      * @param tenantId     current tenant
      * @param userId       current user (stringified); can be null if the caller has
@@ -141,7 +163,18 @@ public class ActiveMemoryService {
         if (userId == null || userId.isBlank()) return;
         Object pidObj = row.get("pid");
         if (pidObj == null) return;
-        memoryService.recordMemoryAccess(String.valueOf(pidObj), userId);
+        String pid = String.valueOf(pidObj);
+        try {
+            memoryService.recordMemoryAccess(pid, userId);
+        } catch (DataAccessException e) {
+            // allowed-catch (PR-82 R5-N3): access-log write failure is
+            // cosmetic (at worst under-counts co-signers on this memory for
+            // today); it must NOT break the user-facing chat read path.
+            // Narrow catch — only DB-layer exceptions; NPE / validation
+            // errors in the row itself still propagate.
+            log.warn("access-log write failed for memory={} user={}: {}",
+                    pid, userId, e.getMessage());
+        }
     }
 
     /**
