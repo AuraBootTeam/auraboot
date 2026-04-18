@@ -7,6 +7,83 @@
     "refType": "command"
   },
   {
+    "key": "command.pgm.submit.label",
+    "source": "import",
+    "zh-CN": "提交",
+    "en-US": "Submit",
+    "refType": "command"
+  },
+  {
+    "key": "command.pgm.cancel.label",
+    "source": "import",
+    "zh-CN": "取消",
+    "en-US": "Cancel",
+    "refType": "command"
+  },
+  {
+    "key": "command.pgm.create.label",
+    "source": "import",
+    "zh-CN": "新建页面",
+    "en-US": "New Page",
+    "refType": "command"
+  },
+  {
+    "key": "command.pgm.edit.label",
+    "source": "import",
+    "zh-CN": "编辑",
+    "en-US": "Edit",
+    "refType": "command"
+  },
+  {
+    "key": "command.pgm.publish.label",
+    "source": "import",
+    "zh-CN": "发布",
+    "en-US": "Publish",
+    "refType": "command"
+  },
+  {
+    "key": "command.pgm.archive.label",
+    "source": "import",
+    "zh-CN": "归档",
+    "en-US": "Archive",
+    "refType": "command"
+  },
+  {
+    "key": "command.pgm.duplicate.label",
+    "source": "import",
+    "zh-CN": "复制",
+    "en-US": "Duplicate",
+    "refType": "command"
+  },
+  {
+    "key": "command.pgm.delete.label",
+    "source": "import",
+    "zh-CN": "删除",
+    "en-US": "Delete",
+    "refType": "command"
+  },
+  {
+    "key": "command.pgm.batchPublish.label",
+    "source": "import",
+    "zh-CN": "批量发布",
+    "en-US": "Batch Publish",
+    "refType": "command"
+  },
+  {
+    "key": "command.pgm.batchArchive.label",
+    "source": "import",
+    "zh-CN": "批量归档",
+    "en-US": "Batch Archive",
+    "refType": "command"
+  },
+  {
+    "key": "command.pgm.batchDelete.label",
+    "source": "import",
+    "zh-CN": "批量删除",
+    "en-US": "Batch Delete",
+    "refType": "command"
+  },
+  {
     "key": "command.pgm.create_page_schema.label",
     "source": "import",
     "zh-CN": "新建页面",

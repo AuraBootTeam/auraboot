@@ -1,0 +1,17 @@
+[
+  {
+    "code": "sc_showcase_summary",
+    "title:zh-CN": "Showcase 摘要",
+    "title:en": "Showcase Summary",
+    "description": "Sample published namedQuery used by virtual-model wizard E2E (Phase 1 P1.2). Lists basic showcase records.",
+    "status": "published",
+    "fromSql": "SELECT id, sc_name, sc_code, sc_status FROM mt_showcase_all_fields WHERE tenant_id = #{params.tenantId} ORDER BY id DESC LIMIT 100",
+    "outputFields": [
+      { "fieldCode": "id", "columnExpr": "id", "dataType": "string", "sortable": true },
+      { "fieldCode": "sc_name", "columnExpr": "sc_name", "dataType": "string", "sortable": true, "searchable": true },
+      { "fieldCode": "sc_code", "columnExpr": "sc_code", "dataType": "string", "sortable": true, "searchable": true },
+      { "fieldCode": "sc_status", "columnExpr": "sc_status", "dataType": "string", "sortable": false }
+    ],
+    "tags": ["showcase", "virtual-model-seed"]
+  }
+]
