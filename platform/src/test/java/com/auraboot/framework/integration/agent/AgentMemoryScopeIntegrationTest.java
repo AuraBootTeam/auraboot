@@ -167,7 +167,7 @@ class AgentMemoryScopeIntegrationTest extends BaseIntegrationTest {
         memoryService.createScopedMemory(tenantA, agent, "fact",       "agent", "T1",  "T1", 5, false, "tenant", null);
         memoryService.createScopedMemory(tenantA, agent, "fact",       "agent", "G1",  "G1", 5, false, "global", null);
 
-        int deleted = memoryService.forgetUser(userA);
+        int deleted = memoryService.forgetUser(tenantA, userA);
         assertThat(deleted).isEqualTo(2);
 
         // userA now sees only tenant + global (his user rows are gone)
@@ -182,12 +182,72 @@ class AgentMemoryScopeIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("forgetUser rejects blank user id")
+    @DisplayName("forgetUser is tenant-scoped — GDPR in tenant A does not erase tenant B")
+    void forget_user_is_tenant_scoped() {
+        String sharedUserId = "collision_" + System.nanoTime();
+        memoryService.createScopedMemory(tenantA, agent, "preference", "user",
+                "tenantA pref", "A-side", 7, false, "user", sharedUserId);
+        memoryService.createScopedMemory(tenantB, agent, "preference", "user",
+                "tenantB pref", "B-side", 7, false, "user", sharedUserId);
+
+        int deleted = memoryService.forgetUser(tenantA, sharedUserId);
+        assertThat(deleted).as("only tenantA's row should be deleted").isEqualTo(1);
+
+        // tenantB's row for the same user_id remains intact
+        Integer liveInB = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM ab_agent_memory WHERE tenant_id = ? AND scope_key = ? " +
+                        "AND (deleted_flag IS NULL OR deleted_flag = FALSE)",
+                Integer.class, tenantB, sharedUserId);
+        assertThat(liveInB).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("forgetUser rejects blank user id / null tenant id")
     void forget_user_requires_id() {
-        assertThatThrownBy(() -> memoryService.forgetUser(""))
+        assertThatThrownBy(() -> memoryService.forgetUser(tenantA, ""))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> memoryService.forgetUser(null))
+        assertThatThrownBy(() -> memoryService.forgetUser(tenantA, null))
                 .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> memoryService.forgetUser(null, userA))
+                .isInstanceOf(NullPointerException.class);
+    }
+
+    // -----------------------------------------------------------------------
+    // null-userId match hole (M1 fix)
+    // -----------------------------------------------------------------------
+
+    @Test
+    @DisplayName("null/blank userId does NOT match a dirty row whose scope_key='' (system caller)")
+    void null_user_does_not_match_blank_scope_key() {
+        // Simulate an upstream-bug row that slipped past createScopedMemory's
+        // validation and stored a literal blank scope_key at scope='user'.
+        jdbc.update("INSERT INTO ab_agent_memory " +
+                "(pid, tenant_id, memory_agent_id, memory_type, category, " +
+                " memory_title, memory_content, importance, shareable, " +
+                " scope, scope_key, created_at, updated_at, deleted_flag) " +
+                "VALUES (?, ?, ?, 'fact', 'agent', 'dirty', 'dirty row', 7, FALSE, " +
+                " 'user', '', NOW(), NOW(), FALSE)",
+                com.auraboot.framework.common.util.UniqueIdGenerator.generate(),
+                tenantA, agent);
+
+        // A real user-scoped row with a valid scope_key, for sanity.
+        memoryService.createScopedMemory(tenantA, agent, "fact", "user",
+                "valid", "valid user row", 7, false, "user", userA);
+
+        // System caller (null userId) — must see NEITHER dirty nor userA's row.
+        List<Map<String, Object>> sys = memoryService.loadScopedByImportance(tenantA, null, agent, 20);
+        assertThat(sys).extracting(r -> r.get("memory_title"))
+                .doesNotContain("dirty", "valid");
+
+        // Blank-string userId — same protection.
+        List<Map<String, Object>> blank = memoryService.loadScopedByImportance(tenantA, "", agent, 20);
+        assertThat(blank).extracting(r -> r.get("memory_title"))
+                .doesNotContain("dirty", "valid");
+
+        // The legitimate owner (userA) still sees his row (but still not dirty).
+        List<Map<String, Object>> owner = memoryService.loadScopedByImportance(tenantA, userA, agent, 20);
+        assertThat(owner).extracting(r -> r.get("memory_title")).contains("valid");
+        assertThat(owner).extracting(r -> r.get("memory_title")).doesNotContain("dirty");
     }
 
     // -----------------------------------------------------------------------

@@ -32,8 +32,8 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class ActiveMemoryService {
 
-    /** Agent code used to bucket AuraBot memories in ab_agent_memory. */
-    private static final String AURABOT_AGENT = "aurabot";
+    /** Default agent code when caller doesn't specify one (built-in chat path). */
+    public static final String DEFAULT_AGENT = "aurabot";
 
     /** Hard cap on snippets returned to Grounding — keep prompt size bounded. */
     private static final int MAX_SNIPPETS = 8;
@@ -44,53 +44,61 @@ public class ActiveMemoryService {
     private final AgentMemoryService memoryService;
 
     /**
-     * Pre-recall memories visible to (tenantId, userId). Non-null, possibly empty.
-     * Each snippet is a small map — pid / memory_type / memory_title / memory_content /
-     * importance / scope — safe to serialize into BIF.preContext JSONB and stringify
-     * into the system prompt.
+     * Pre-recall memories visible to (tenantId, userId) from {@code agentCode}'s
+     * memory bucket. Non-null, possibly empty. Each snippet is a small map —
+     * pid / memory_type / memory_title / memory_content / importance / scope —
+     * safe to serialize into BIF.preContext JSONB and stringify into the system
+     * prompt.
+     *
+     * Exceptions are NOT swallowed here — {@code GroundingService} wraps the
+     * whole call so a storage error surfaces there (single catch point;
+     * "no silent fallback" red-line).
      *
      * @param tenantId     current tenant
      * @param userId       current user (stringified); can be null if the caller has
      *                     no user context (rare — only cron / system runs)
+     * @param agentCode    agent bucket ({@link #DEFAULT_AGENT} when null)
      * @param userMessage  the natural-language input; drives keyword search
      */
-    public List<Map<String, Object>> preRecall(Long tenantId, String userId, String userMessage) {
+    public List<Map<String, Object>> preRecall(Long tenantId, String userId,
+                                                String agentCode, String userMessage) {
         if (tenantId == null) return List.of();
+        String agent = (agentCode == null || agentCode.isBlank()) ? DEFAULT_AGENT : agentCode;
 
         List<Map<String, Object>> snippets = new ArrayList<>();
         java.util.Set<String> seenPids = new java.util.HashSet<>();
 
-        try {
-            if (userMessage != null && !userMessage.isBlank()) {
-                for (Map<String, Object> row : memoryService.searchScoped(
-                        tenantId, userId, AURABOT_AGENT, userMessage.trim(), KEYWORD_LIMIT)) {
-                    if (seenPids.add(String.valueOf(row.get("pid")))) {
-                        snippets.add(snippet(row));
-                    }
+        if (userMessage != null && !userMessage.isBlank()) {
+            for (Map<String, Object> row : memoryService.searchScoped(
+                    tenantId, userId, agent, userMessage.trim(), KEYWORD_LIMIT)) {
+                if (seenPids.add(String.valueOf(row.get("pid")))) {
+                    snippets.add(snippet(row));
                 }
             }
-        } catch (Exception e) {
-            log.debug("keyword preRecall failed for tenant={}: {}", tenantId, e.getMessage());
         }
 
-        try {
-            if (snippets.size() < MAX_SNIPPETS) {
-                int remaining = MAX_SNIPPETS - snippets.size();
-                for (Map<String, Object> row : memoryService.loadScopedByImportance(
-                        tenantId, userId, AURABOT_AGENT, Math.max(IMPORTANCE_LIMIT, remaining))) {
-                    if (snippets.size() >= MAX_SNIPPETS) break;
-                    if (seenPids.add(String.valueOf(row.get("pid")))) {
-                        snippets.add(snippet(row));
-                    }
+        if (snippets.size() < MAX_SNIPPETS) {
+            // Intentionally fetch at least IMPORTANCE_LIMIT rows even when there's
+            // less room, so the importance pass always runs and we get fresh
+            // high-importance memories even if keyword search returned noise.
+            int fetch = Math.max(IMPORTANCE_LIMIT, MAX_SNIPPETS - snippets.size());
+            for (Map<String, Object> row : memoryService.loadScopedByImportance(
+                    tenantId, userId, agent, fetch)) {
+                if (snippets.size() >= MAX_SNIPPETS) break;
+                if (seenPids.add(String.valueOf(row.get("pid")))) {
+                    snippets.add(snippet(row));
                 }
             }
-        } catch (Exception e) {
-            log.debug("importance preRecall failed for tenant={}: {}", tenantId, e.getMessage());
         }
 
-        log.debug("Active Memory pre-recall: tenant={} user={} keyword='{}' → {} snippets",
-                tenantId, userId, userMessage, snippets.size());
+        log.debug("Active Memory pre-recall: tenant={} user={} agent={} keyword='{}' → {} snippets",
+                tenantId, userId, agent, userMessage, snippets.size());
         return snippets;
+    }
+
+    /** Backward-compat: call with default "aurabot" agent. */
+    public List<Map<String, Object>> preRecall(Long tenantId, String userId, String userMessage) {
+        return preRecall(tenantId, userId, DEFAULT_AGENT, userMessage);
     }
 
     /**
