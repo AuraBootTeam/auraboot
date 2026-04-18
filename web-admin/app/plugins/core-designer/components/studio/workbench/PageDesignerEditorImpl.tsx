@@ -172,6 +172,9 @@ export default function PageDesignerEditorImpl() {
   }, [dslHistory, toolbarActions]);
 
   // Settings -> schema sync handler
+  // NOTE: enableMultiView is persisted as a flat key on `extension` per the DSL
+  // contract (see dsl-schema.generated.json, plugins/test-fixtures/config/pages.json,
+  // and docs/use-cases/crm.md). Do NOT nest it under `render`.
   const handleSettingsChange = useCallback(
     (settings: AllSettings) => {
       if (!schema) return;
@@ -179,10 +182,7 @@ export default function PageDesignerEditorImpl() {
         ...schema,
         extension: {
           ...schema.extension,
-          render: {
-            ...schema.extension?.render,
-            enableMultiView: settings.page.enableMultiView,
-          },
+          enableMultiView: settings.page.enableMultiView,
         },
       };
       handleSchemaChange(updatedSchema);
@@ -377,7 +377,7 @@ export default function PageDesignerEditorImpl() {
         isOpen={toolbarState.showSettings}
         onClose={toolbarActions.toggleSettings}
         initialSettings={{
-          page: { enableMultiView: schema?.extension?.render?.enableMultiView === true },
+          page: { enableMultiView: schema?.extension?.enableMultiView === true },
         }}
         onSettingsChange={handleSettingsChange}
       />
