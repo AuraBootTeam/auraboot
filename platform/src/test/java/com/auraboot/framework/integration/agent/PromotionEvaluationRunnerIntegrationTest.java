@@ -11,6 +11,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.Commit;
+
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,6 +31,7 @@ class PromotionEvaluationRunnerIntegrationTest extends BaseIntegrationTest {
     @Autowired private PromotionEvaluationRunner runner;
     @Autowired private PromotionEvaluator evaluator;
     @Autowired private JdbcTemplate jdbc;
+    @Autowired private DataSource dataSource;
 
     private Long tenantId;
 
@@ -39,6 +44,7 @@ class PromotionEvaluationRunnerIntegrationTest extends BaseIntegrationTest {
     void cleanup() {
         jdbc.update("DELETE FROM ab_agent_shadow_run WHERE tenant_id = ?", tenantId);
         jdbc.update("DELETE FROM ab_agent_skill_draft WHERE tenant_id = ?", tenantId);
+        jdbc.execute("SELECT pg_advisory_unlock_all()");
     }
 
     private String seedDraft(String status) {
@@ -102,11 +108,8 @@ class PromotionEvaluationRunnerIntegrationTest extends BaseIntegrationTest {
     @DisplayName("C2: DRAFT_PENDING_REVIEW is never auto-promoted even with perfect shadow match")
     void draft_pending_review_never_promoted() {
         String pid = seedDraft("DRAFT_PENDING_REVIEW");
-        // 10 matching runs — would trivially pass the threshold if allowed.
         for (int i = 0; i < 10; i++) seedShadowRun(pid, true);
 
-        // Direct evaluator call (bypass runner's own status filter) to prove the
-        // evaluator's isPromotable() gate rejects DRAFT_PENDING_REVIEW.
         PromotionEvaluator.EvaluationResult r = evaluator.evaluate(pid);
         assertThat(r.getDecision()).isEqualTo(PromotionEvaluator.Decision.PROMOTE);
 
@@ -116,7 +119,6 @@ class PromotionEvaluationRunnerIntegrationTest extends BaseIntegrationTest {
                 .as("DRAFT_PENDING_REVIEW must require human review before promotion")
                 .isEqualTo("DRAFT_PENDING_REVIEW");
 
-        // shadow_metrics should still be persisted so the UI can show them.
         String metricsJson = jdbc.queryForObject(
                 "SELECT shadow_metrics::text FROM ab_agent_skill_draft WHERE pid = ?", String.class, pid);
         assertThat(metricsJson).contains("shadow_runs");
@@ -128,12 +130,6 @@ class PromotionEvaluationRunnerIntegrationTest extends BaseIntegrationTest {
         String pid = seedDraft("REVIEWED_OK");
         for (int i = 0; i < 6; i++) seedShadowRun(pid, true);
 
-        // Simulate a concurrent human-reject hitting the row after the evaluator
-        // has read status='REVIEWED_OK' but before it UPDATEs. Easiest deterministic
-        // path: flip status BEFORE calling evaluate — the evaluator's initial
-        // SELECT sees REVIEWED_REJECTED so decision stays PROMOTE from snapshot,
-        // but the narrow UPDATE (WHERE status IN ('REVIEWED_OK','SHADOW_RUNNING'))
-        // must match 0 rows and leave REVIEWED_REJECTED untouched.
         jdbc.update("UPDATE ab_agent_skill_draft SET status = 'REVIEWED_REJECTED' WHERE pid = ?", pid);
 
         evaluator.evaluate(pid);
@@ -143,6 +139,38 @@ class PromotionEvaluationRunnerIntegrationTest extends BaseIntegrationTest {
         assertThat(status)
                 .as("scheduler must not overwrite a concurrent human-reject")
                 .isEqualTo("REVIEWED_REJECTED");
+    }
+
+    @Test
+    @DisplayName("PR-54: advisory lock held by another session → runOnce returns 0 and evaluates nothing")
+    void advisory_lock_prevents_reentry() throws Exception {
+        String pid = seedDraft("REVIEWED_OK");
+        for (int i = 0; i < 6; i++) seedShadowRun(pid, true);
+
+        try (Connection blocker = dataSource.getConnection()) {
+            blocker.setAutoCommit(true);
+            try (PreparedStatement ps = blocker.prepareStatement("SELECT pg_advisory_lock(?)")) {
+                ps.setLong(1, 7302L);
+                ps.execute();
+            }
+
+            int evaluated = runner.runOnce();
+            assertThat(evaluated).isZero();
+
+            String status = jdbc.queryForObject(
+                    "SELECT status FROM ab_agent_skill_draft WHERE pid = ?", String.class, pid);
+            assertThat(status).isEqualTo("REVIEWED_OK");
+
+            try (PreparedStatement ps = blocker.prepareStatement("SELECT pg_advisory_unlock(?)")) {
+                ps.setLong(1, 7302L);
+                ps.execute();
+            }
+        }
+
+        runner.runOnce();
+        String statusAfter = jdbc.queryForObject(
+                "SELECT status FROM ab_agent_skill_draft WHERE pid = ?", String.class, pid);
+        assertThat(statusAfter).isEqualTo("PROMOTED_PENDING_HUMAN");
     }
 
     @Test
