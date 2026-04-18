@@ -12,6 +12,7 @@ import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { useSearchParams } from 'react-router';
 import type { PageContentProps } from '~/framework/meta/profiles/types';
 import { usePageRuntime } from '~/framework/meta/rendering/pages/hooks/usePageRuntime';
+import { BlockRenderer } from '~/framework/meta/rendering/BlockRenderer';
 import { buildApiEndpoint, getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
@@ -285,6 +286,26 @@ export function ListPageContent(props: PageContentProps) {
   const tableBlock = useMemo(() => {
     if (!schema?.blocks) return null;
     return schema.blocks.find((block: any) => block.blockType === 'table') || null;
+  }, [schema]);
+
+  // G7 dispatch — list pages hardcode table/filters/toolbar/tabs/form-buttons
+  // in the layout above, but any additional block types in the schema
+  // (chart / description / rich-text / divider / stat-card / etc.) were
+  // previously dropped silently. Collect them here and render via BlockRenderer
+  // at the end of the list page so they appear in the UI.
+  const LIST_SPECIALIZED_BLOCK_TYPES = new Set<string>([
+    'table',
+    'filters',
+    'toolbar',
+    'tabs',
+    'form-buttons',
+    'form-section',
+  ]);
+  const miscListBlocks = useMemo(() => {
+    if (!schema?.blocks) return [];
+    return schema.blocks.filter(
+      (b: any) => !LIST_SPECIALIZED_BLOCK_TYPES.has(b.blockType),
+    );
   }, [schema]);
 
   // Sync URL pagination params -> local state (supports refresh and browser back/forward).
@@ -2671,6 +2692,25 @@ export function ListPageContent(props: PageContentProps) {
                 onInlineSave={handleInlineSave}
                 dictDataCache={dictDataCache.current}
               />
+
+              {/* G7 — misc blocks (chart / description / rich-text / divider /
+                  stat-card / etc.) dispatched via BlockRenderer fallback
+                  registry. Unknown block types surface a visible placeholder. */}
+              {miscListBlocks.length > 0 && runtime && (
+                <div
+                  className="flex flex-col gap-4 p-4"
+                  data-testid="list-misc-blocks"
+                >
+                  {miscListBlocks.map((block: any, idx: number) => (
+                    <BlockRenderer
+                      key={block.id || `misc-list-${idx}`}
+                      block={block}
+                      runtime={runtime}
+                      areaId="list-misc"
+                    />
+                  ))}
+                </div>
+              )}
 
               {/* Pagination + Bulk Action Toolbar */}
               <ListPagination
