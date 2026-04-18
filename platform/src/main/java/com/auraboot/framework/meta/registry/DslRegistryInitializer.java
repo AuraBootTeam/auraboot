@@ -107,6 +107,32 @@ public class DslRegistryInitializer {
         reg.register(new RenderComponentRegistry.ComponentMeta("avatar", "platform", List.of("string"), "display"));
         reg.register(new RenderComponentRegistry.ComponentMeta("progress", "platform", List.of("decimal"), "display"));
         reg.register(new RenderComponentRegistry.ComponentMeta("rating", "platform", List.of("integer"), "display"));
+
+        // Phase W — 18 widgets surfaced via /api/dsl/registry so the designer
+        // can list them alongside core widgets. dataTypes inferred from each widget's
+        // intended field semantics; category aligns with client-side category buckets
+        // (`input` / `selection` / `display` / `advanced`). Three of these
+        // (`richtext` / `progress` / `rating`) were registered above with the
+        // core entries — re-registration is idempotent (last write wins) and
+        // keeps the catalog aligned with Phase W's declared dataTypes.
+        reg.register(new RenderComponentRegistry.ComponentMeta("multiselect", "platform", List.of("enum", "json"), "selection"));
+        reg.register(new RenderComponentRegistry.ComponentMeta("progress", "platform", List.of("decimal", "integer"), "display"));
+        reg.register(new RenderComponentRegistry.ComponentMeta("rating", "platform", List.of("integer", "decimal"), "input"));
+        reg.register(new RenderComponentRegistry.ComponentMeta("colorpicker", "platform", List.of("string"), "input"));
+        reg.register(new RenderComponentRegistry.ComponentMeta("moneyinput", "platform", List.of("decimal"), "input"));
+        reg.register(new RenderComponentRegistry.ComponentMeta("timepicker", "platform", List.of("time", "string"), "input"));
+        reg.register(new RenderComponentRegistry.ComponentMeta("daterange", "platform", List.of("date", "json"), "input"));
+        reg.register(new RenderComponentRegistry.ComponentMeta("timerangepicker", "platform", List.of("time", "json"), "input"));
+        reg.register(new RenderComponentRegistry.ComponentMeta("cascadeselect", "platform", List.of("string", "json"), "selection"));
+        reg.register(new RenderComponentRegistry.ComponentMeta("treeselect", "platform", List.of("string", "json"), "selection"));
+        reg.register(new RenderComponentRegistry.ComponentMeta("userselect", "platform", List.of("string", "reference"), "selection"));
+        reg.register(new RenderComponentRegistry.ComponentMeta("memberpicker", "platform", List.of("string", "reference"), "selection"));
+        reg.register(new RenderComponentRegistry.ComponentMeta("organizationselect", "platform", List.of("string", "reference"), "selection"));
+        reg.register(new RenderComponentRegistry.ComponentMeta("coordinatespicker", "platform", List.of("string", "json"), "advanced"));
+        reg.register(new RenderComponentRegistry.ComponentMeta("aifield", "platform", List.of("string", "text"), "advanced"));
+        reg.register(new RenderComponentRegistry.ComponentMeta("addressfield", "platform", List.of("string", "json"), "advanced"));
+        reg.register(new RenderComponentRegistry.ComponentMeta("richtext", "platform", List.of("text", "string"), "input"));
+        reg.register(new RenderComponentRegistry.ComponentMeta("fileattachment", "platform", List.of("file", "json"), "input"));
     }
 
     private void registerBuiltinBlockRenderers() {
