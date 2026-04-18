@@ -126,12 +126,23 @@ public class PromotionEvaluator {
         }
 
         if (decision == Decision.PROMOTE && isPromotable(currentStatus)) {
-            jdbcTemplate.update(
+            // N7 race fix: narrow the UPDATE to only flip status if it is still one
+            // of the promotable values. A concurrent human-reject from the UI
+            // (REVIEWED_REJECTED / ABANDONED) must not be overwritten by the
+            // scheduler. If 0 rows affected we log and keep the metrics update.
+            int flipped = jdbcTemplate.update(
                     "UPDATE ab_agent_skill_draft " +
                             "SET shadow_metrics = ?::jsonb, status = 'PROMOTED_PENDING_HUMAN', " +
                             "    shadow_started_at = COALESCE(shadow_started_at, NOW()) " +
-                            "WHERE pid = ?",
+                            "WHERE pid = ? AND status IN ('REVIEWED_OK', 'SHADOW_RUNNING')",
                     metricsJson, draftPid);
+            if (flipped == 0) {
+                log.info("Promotion skipped for draft {}: status changed concurrently (was {}), " +
+                        "persisting metrics only", draftPid, currentStatus);
+                jdbcTemplate.update(
+                        "UPDATE ab_agent_skill_draft SET shadow_metrics = ?::jsonb WHERE pid = ?",
+                        metricsJson, draftPid);
+            }
         } else {
             jdbcTemplate.update(
                     "UPDATE ab_agent_skill_draft SET shadow_metrics = ?::jsonb WHERE pid = ?",
@@ -139,9 +150,14 @@ public class PromotionEvaluator {
         }
     }
 
+    /**
+     * C2 fix: {@code DRAFT_PENDING_REVIEW} is intentionally NOT promotable —
+     * drafts in that state still need a human review before shadow runs can
+     * graduate them. Only {@code REVIEWED_OK} (human approved the contract)
+     * or {@code SHADOW_RUNNING} (already in the shadow pipeline) qualify.
+     */
     private boolean isPromotable(String currentStatus) {
-        return "DRAFT_PENDING_REVIEW".equals(currentStatus)
-                || "REVIEWED_OK".equals(currentStatus)
+        return "REVIEWED_OK".equals(currentStatus)
                 || "SHADOW_RUNNING".equals(currentStatus);
     }
 

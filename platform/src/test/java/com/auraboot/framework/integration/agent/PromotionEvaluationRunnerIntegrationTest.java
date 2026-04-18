@@ -1,6 +1,7 @@
 package com.auraboot.framework.integration.agent;
 
 import com.auraboot.framework.agent.service.PromotionEvaluationRunner;
+import com.auraboot.framework.agent.service.PromotionEvaluator;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import org.junit.jupiter.api.AfterEach;
@@ -24,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class PromotionEvaluationRunnerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired private PromotionEvaluationRunner runner;
+    @Autowired private PromotionEvaluator evaluator;
     @Autowired private JdbcTemplate jdbc;
 
     private Long tenantId;
@@ -94,6 +96,53 @@ class PromotionEvaluationRunnerIntegrationTest extends BaseIntegrationTest {
         String metricsJson = jdbc.queryForObject(
                 "SELECT shadow_metrics::text FROM ab_agent_skill_draft WHERE pid = ?", String.class, pid);
         assertThat(metricsJson).contains("shadow_runs");
+    }
+
+    @Test
+    @DisplayName("C2: DRAFT_PENDING_REVIEW is never auto-promoted even with perfect shadow match")
+    void draft_pending_review_never_promoted() {
+        String pid = seedDraft("DRAFT_PENDING_REVIEW");
+        // 10 matching runs — would trivially pass the threshold if allowed.
+        for (int i = 0; i < 10; i++) seedShadowRun(pid, true);
+
+        // Direct evaluator call (bypass runner's own status filter) to prove the
+        // evaluator's isPromotable() gate rejects DRAFT_PENDING_REVIEW.
+        PromotionEvaluator.EvaluationResult r = evaluator.evaluate(pid);
+        assertThat(r.getDecision()).isEqualTo(PromotionEvaluator.Decision.PROMOTE);
+
+        String status = jdbc.queryForObject(
+                "SELECT status FROM ab_agent_skill_draft WHERE pid = ?", String.class, pid);
+        assertThat(status)
+                .as("DRAFT_PENDING_REVIEW must require human review before promotion")
+                .isEqualTo("DRAFT_PENDING_REVIEW");
+
+        // shadow_metrics should still be persisted so the UI can show them.
+        String metricsJson = jdbc.queryForObject(
+                "SELECT shadow_metrics::text FROM ab_agent_skill_draft WHERE pid = ?", String.class, pid);
+        assertThat(metricsJson).contains("shadow_runs");
+    }
+
+    @Test
+    @DisplayName("N7 race: concurrent human-reject between SELECT and UPDATE is preserved")
+    void promotion_race_does_not_overwrite_human_reject() {
+        String pid = seedDraft("REVIEWED_OK");
+        for (int i = 0; i < 6; i++) seedShadowRun(pid, true);
+
+        // Simulate a concurrent human-reject hitting the row after the evaluator
+        // has read status='REVIEWED_OK' but before it UPDATEs. Easiest deterministic
+        // path: flip status BEFORE calling evaluate — the evaluator's initial
+        // SELECT sees REVIEWED_REJECTED so decision stays PROMOTE from snapshot,
+        // but the narrow UPDATE (WHERE status IN ('REVIEWED_OK','SHADOW_RUNNING'))
+        // must match 0 rows and leave REVIEWED_REJECTED untouched.
+        jdbc.update("UPDATE ab_agent_skill_draft SET status = 'REVIEWED_REJECTED' WHERE pid = ?", pid);
+
+        evaluator.evaluate(pid);
+
+        String status = jdbc.queryForObject(
+                "SELECT status FROM ab_agent_skill_draft WHERE pid = ?", String.class, pid);
+        assertThat(status)
+                .as("scheduler must not overwrite a concurrent human-reject")
+                .isEqualTo("REVIEWED_REJECTED");
     }
 
     @Test
