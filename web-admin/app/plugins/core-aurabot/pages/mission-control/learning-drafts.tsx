@@ -14,7 +14,7 @@
  * Full detail drill-down (shadow_run timeseries, pattern signature)
  * lands as an on-demand follow-up.
  */
-import { useState, useEffect, useCallback } from 'react';
+import { Fragment, useState, useEffect, useCallback } from 'react';
 import { get, post } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 
@@ -42,7 +42,17 @@ interface ShadowRunRow {
   original_cost_usd?: number;
   output_match?: boolean;
   fidelity_match?: boolean;
+  output_diff?: string | null;
   created_at: string;
+}
+
+interface PromotionResult {
+  decision: string;
+  shadow_runs: number;
+  output_match_rate: number;
+  fidelity_match_rate: number;
+  cost_delta?: number;
+  duration_delta_ms?: number;
 }
 
 interface DraftDetail extends DraftRow {
@@ -108,6 +118,8 @@ export default function LearningDraftsPage() {
   const [actionInFlight, setActionInFlight] = useState<string | null>(null);
   const [toast, setToast] = useState<{ kind: 'ok' | 'err'; msg: string } | null>(null);
   const [shadowRuns, setShadowRuns] = useState<ShadowRunRow[] | null>(null);
+  const [diffExpanded, setDiffExpanded] = useState<string | null>(null);
+  const [promotionResult, setPromotionResult] = useState<PromotionResult | null>(null);
 
   const fetchList = useCallback(async () => {
     setLoading(true);
@@ -152,11 +164,15 @@ export default function LearningDraftsPage() {
       setDetail(null);
       setShadowRuns(null);
       setComment('');
+      setDiffExpanded(null);
+      setPromotionResult(null);
       return;
     }
     setExpanded(pid);
     setDetail(null);
     setShadowRuns(null);
+    setDiffExpanded(null);
+    setPromotionResult(null);
     await Promise.all([loadDetail(pid), loadShadowRuns(pid)]);
   };
 
@@ -189,21 +205,17 @@ export default function LearningDraftsPage() {
     try {
       const r = await post(`/api/learning/drafts/${pid}/evaluate-promotion`, {});
       if (ResultHelper.isSuccess(r)) {
-        const d = r.data as {
-          decision: string;
-          shadow_runs: number;
-          output_match_rate: number;
-          fidelity_match_rate: number;
-        };
+        const d = r.data as PromotionResult;
         const labelMap: Record<string, string> = {
           PROMOTE: '已晋升至人工最终审核',
           BELOW_THRESHOLD: '未达到阈值',
           INSUFFICIENT_RUNS: '影子运行次数不足',
           NOT_FOUND: '草稿未找到',
         };
+        setPromotionResult(d);
         setToast({
           kind: d.decision === 'PROMOTE' ? 'ok' : 'err',
-          msg: `${labelMap[d.decision] ?? d.decision}（runs=${d.shadow_runs}, match=${Math.round((d.output_match_rate ?? 0) * 100)}%）`,
+          msg: labelMap[d.decision] ?? d.decision,
         });
         fetchList();
         loadDetail(pid);
@@ -345,6 +357,7 @@ export default function LearningDraftsPage() {
                             <table className="text-xs w-full" data-testid="shadow-runs-table">
                               <thead>
                                 <tr className="text-left text-gray-500 border-b border-gray-200">
+                                  <th className="px-1 py-1 w-4"></th>
                                   <th className="px-1 py-1">时间</th>
                                   <th className="px-1 py-1">状态</th>
                                   <th className="px-1 py-1">输出匹配</th>
@@ -363,12 +376,38 @@ export default function LearningDraftsPage() {
                                     r.shadow_cost_usd != null && r.original_cost_usd != null
                                       ? r.shadow_cost_usd - r.original_cost_usd
                                       : null;
+                                  const hasDiff =
+                                    r.output_match === false &&
+                                    typeof r.output_diff === 'string' &&
+                                    r.output_diff.trim().length > 0;
+                                  const isDiffOpen = diffExpanded === r.pid;
+                                  let prettyDiff: string | null = null;
+                                  if (hasDiff && isDiffOpen) {
+                                    try {
+                                      prettyDiff = JSON.stringify(JSON.parse(r.output_diff as string), null, 2);
+                                    } catch {
+                                      prettyDiff = r.output_diff as string;
+                                    }
+                                  }
                                   return (
+                                    <Fragment key={r.pid}>
                                     <tr
-                                      key={r.pid}
                                       className="border-b border-gray-100 align-top"
                                       data-testid={`shadow-run-${r.pid}`}
                                     >
+                                      <td className="px-1 py-1">
+                                        {hasDiff && (
+                                          <button
+                                            type="button"
+                                            onClick={() => setDiffExpanded(isDiffOpen ? null : r.pid)}
+                                            data-testid={`output-diff-toggle-${r.pid}`}
+                                            aria-label="toggle output diff"
+                                            className="text-gray-500 hover:text-gray-800 font-mono"
+                                          >
+                                            {isDiffOpen ? 'v' : '>'}
+                                          </button>
+                                        )}
+                                      </td>
                                       <td className="px-1 py-1 text-gray-500 whitespace-nowrap">
                                         {r.created_at?.slice(5, 16).replace('T', ' ')}
                                       </td>
@@ -410,11 +449,99 @@ export default function LearningDraftsPage() {
                                             : costDelta.toFixed(4)}
                                       </td>
                                     </tr>
+                                    {hasDiff && isDiffOpen && (
+                                      <tr
+                                        className="border-b border-gray-100 bg-gray-50"
+                                      >
+                                        <td></td>
+                                        <td colSpan={6} className="px-1 py-1">
+                                          <pre
+                                            className="text-xs bg-white border border-gray-200 rounded p-2 overflow-x-auto whitespace-pre-wrap"
+                                            data-testid={`output-diff-panel-${r.pid}`}
+                                          >
+                                            {prettyDiff}
+                                          </pre>
+                                        </td>
+                                      </tr>
+                                    )}
+                                    </Fragment>
                                   );
                                 })}
                               </tbody>
                             </table>
                           )}
+                        </div>
+                      )}
+
+                      {promotionResult && (
+                        <div
+                          className="grid grid-cols-4 gap-2"
+                          data-testid="promotion-cards"
+                        >
+                          <div className="border border-gray-200 rounded p-2 bg-white">
+                            <div className="text-xs text-gray-500">影子运行</div>
+                            <div className="text-lg font-bold" data-testid="promotion-shadow-runs">
+                              {promotionResult.shadow_runs}
+                            </div>
+                            <div className="text-xs text-gray-400">阈值 ≥5</div>
+                          </div>
+                          <div
+                            className={`border border-gray-200 rounded p-2 ${
+                              (promotionResult.output_match_rate ?? 0) >= 0.9
+                                ? 'bg-green-50'
+                                : 'bg-amber-50'
+                            }`}
+                          >
+                            <div className="text-xs text-gray-500">输出匹配</div>
+                            <div
+                              className={`text-lg font-bold ${
+                                (promotionResult.output_match_rate ?? 0) >= 0.9
+                                  ? 'text-green-700'
+                                  : 'text-amber-700'
+                              }`}
+                              data-testid="promotion-output-match"
+                            >
+                              {Math.round((promotionResult.output_match_rate ?? 0) * 100)}%
+                            </div>
+                            <div className="text-xs text-gray-400">阈值 ≥90%</div>
+                          </div>
+                          <div
+                            className={`border border-gray-200 rounded p-2 ${
+                              (promotionResult.fidelity_match_rate ?? 0) >= 0.9
+                                ? 'bg-green-50'
+                                : 'bg-amber-50'
+                            }`}
+                          >
+                            <div className="text-xs text-gray-500">Fidelity 匹配</div>
+                            <div
+                              className={`text-lg font-bold ${
+                                (promotionResult.fidelity_match_rate ?? 0) >= 0.9
+                                  ? 'text-green-700'
+                                  : 'text-amber-700'
+                              }`}
+                              data-testid="promotion-fidelity-match"
+                            >
+                              {Math.round((promotionResult.fidelity_match_rate ?? 0) * 100)}%
+                            </div>
+                            <div className="text-xs text-gray-400">阈值 ≥90%</div>
+                          </div>
+                          <div className="border border-gray-200 rounded p-2 bg-white">
+                            <div className="text-xs text-gray-500">决策</div>
+                            <span
+                              className={`inline-block mt-1 px-2 py-0.5 text-xs rounded font-medium ${
+                                promotionResult.decision === 'PROMOTE'
+                                  ? 'bg-green-100 text-green-800'
+                                  : promotionResult.decision === 'BELOW_THRESHOLD'
+                                    ? 'bg-amber-100 text-amber-800'
+                                    : promotionResult.decision === 'NOT_FOUND'
+                                      ? 'bg-red-100 text-red-800'
+                                      : 'bg-gray-100 text-gray-800'
+                              }`}
+                              data-testid="promotion-decision-chip"
+                            >
+                              {promotionResult.decision}
+                            </span>
+                          </div>
                         </div>
                       )}
 
