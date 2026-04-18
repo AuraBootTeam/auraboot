@@ -179,7 +179,7 @@ public class AgentPromptAssemblyService {
     private String loadMemoriesByCategory(Long tenantId, String agentCode,
                                            String category, int maxChars) {
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                "SELECT memory_title, memory_content, importance "
+                "SELECT memory_title, memory_content, importance, shadow_mode "
                 + "FROM ab_agent_memory "
                 + "WHERE tenant_id = ? AND memory_agent_id = ? AND category = ? "
                 + "AND (deleted_flag IS NULL OR deleted_flag = FALSE) "
@@ -200,6 +200,13 @@ public class AgentPromptAssemblyService {
             String content = str(row, "memory_content");
 
             if (content == null) continue;
+
+            // PR-82 R5-C1: apply shadow annotation so memories still inside the
+            // 7-day PROMOTED_SHADOW window reach the LLM with the uncertainty
+            // marker. Parity with ActiveMemoryService.snippet and
+            // AgentRunService.loadMemorySection (PR-72).
+            content = ActiveMemoryService.applyShadowMarker(
+                    content, Boolean.TRUE.equals(row.get("shadow_mode")));
 
             // Format a single memory entry
             String entry = (title != null)
@@ -239,7 +246,7 @@ public class AgentPromptAssemblyService {
      */
     public String loadSharedMemories(Long tenantId, int maxChars) {
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                "SELECT memory_agent_id, memory_title, memory_content, importance "
+                "SELECT memory_agent_id, memory_title, memory_content, importance, shadow_mode "
                 + "FROM ab_agent_memory "
                 + "WHERE tenant_id = ? AND shareable = TRUE "
                 + "AND category IN ('agent', 'user') "
@@ -262,6 +269,10 @@ public class AgentPromptAssemblyService {
             String content = str(row, "memory_content");
 
             if (content == null) continue;
+
+            // PR-82 R5-C1: apply shadow annotation to shared memories as well.
+            content = ActiveMemoryService.applyShadowMarker(
+                    content, Boolean.TRUE.equals(row.get("shadow_mode")));
 
             String entry = (title != null)
                     ? "- [" + agentId + "] " + title + ": " + content + "\n"
