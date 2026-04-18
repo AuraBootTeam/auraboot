@@ -6669,6 +6669,89 @@ CREATE INDEX IF NOT EXISTS idx_bif_skill       ON ab_agent_bif(dispatched_skill)
 CREATE INDEX IF NOT EXISTS idx_bif_run         ON ab_agent_bif(run_id);
 COMMENT ON TABLE ab_agent_bif IS 'ACP D1 Grounding: Business Intent Frame IR persistence — every LLM-turn grounding result';
 
+-- ============================================================================
+-- ACP Learning Loop (design/learning-loop.md) — three tables:
+--   ab_agent_learning_pattern  §3.3 — aggregated (command_signature, object) patterns
+--   ab_agent_skill_draft        §4.7 — generated skill contracts awaiting review
+--   ab_agent_shadow_run         §6.2 — shadow-mode comparison records
+-- The three have a straight lifecycle: pattern.OBSERVED → draft created
+-- → human review → shadow runs → promote to ab_agent_skill.
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS ab_agent_learning_pattern (
+    id                   BIGSERIAL PRIMARY KEY,
+    pid                  VARCHAR(26) UNIQUE NOT NULL,
+    tenant_id            BIGINT,
+    -- SHA-256 of the canonicalised (command_signature × target_model × action_type)
+    -- tuple — one row per unique semantic-level pattern. Per-tenant when the
+    -- pattern is tenant-specific, NULL tenant_id for platform-wide patterns.
+    pattern_hash         VARCHAR(64) UNIQUE,
+    pattern_signature    JSONB NOT NULL,
+    first_seen_at        TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    last_observed_at     TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    invocation_count     INTEGER DEFAULT 0,
+    success_rate         DECIMAL(3,2),
+    -- OBSERVED | DRAFT_GENERATED | REVIEWED | SHADOW | PROMOTED | REJECTED
+    status               VARCHAR(32) NOT NULL DEFAULT 'OBSERVED',
+    draft_skill_id       VARCHAR(26),             -- ab_agent_skill_draft.pid
+    promoted_to_skill_id VARCHAR(26),             -- ab_agent_skill.pid
+    updated_at           TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_learning_pattern_tenant_status ON ab_agent_learning_pattern (tenant_id, status);
+CREATE INDEX IF NOT EXISTS idx_learning_pattern_last_observed ON ab_agent_learning_pattern (last_observed_at DESC);
+COMMENT ON TABLE ab_agent_learning_pattern IS 'ACP Learning Loop §3 — aggregated Action patterns awaiting draft generation';
+
+CREATE TABLE IF NOT EXISTS ab_agent_skill_draft (
+    id                   BIGSERIAL PRIMARY KEY,
+    pid                  VARCHAR(26) UNIQUE NOT NULL,
+    tenant_id            BIGINT,
+    draft_skill_code     VARCHAR(128),
+    -- Full skill contract (substrate, inputs, outputs, tool_refs) rendered as YAML
+    -- so the reviewer sees exactly what will be promoted. hash for dedup.
+    contract_yaml        TEXT NOT NULL,
+    contract_hash        VARCHAR(64),
+    source_pattern_hash  VARCHAR(64) NOT NULL,    -- FK-ish to ab_agent_learning_pattern.pattern_hash
+    derived_from_runs    JSONB,                   -- [{"run_id":"..."}, ...]
+    -- DRAFT_PENDING_REVIEW | REVIEWED_OK | REVIEWED_REJECTED
+    --   | SHADOW_RUNNING | PROMOTED_PENDING_HUMAN | ACTIVE | DISCARDED
+    status               VARCHAR(32) NOT NULL DEFAULT 'DRAFT_PENDING_REVIEW',
+    reviewer_id          BIGINT,
+    review_comment       TEXT,
+    shadow_metrics       JSONB,                   -- { shadow_runs, output_match_rate, cost_delta, duration_delta, fidelity_match_rate }
+    promoted_to_skill_id VARCHAR(26),             -- ab_agent_skill.pid
+    created_at           TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    reviewed_at          TIMESTAMPTZ,
+    shadow_started_at    TIMESTAMPTZ,
+    promoted_at          TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_skill_draft_tenant_status ON ab_agent_skill_draft (tenant_id, status);
+CREATE INDEX IF NOT EXISTS idx_skill_draft_pattern_hash ON ab_agent_skill_draft (source_pattern_hash);
+COMMENT ON TABLE ab_agent_skill_draft IS 'ACP Learning Loop §4 — generated Skill contracts awaiting human review / shadow run';
+
+CREATE TABLE IF NOT EXISTS ab_agent_shadow_run (
+    id                   BIGSERIAL PRIMARY KEY,
+    pid                  VARCHAR(26) UNIQUE NOT NULL,
+    tenant_id            BIGINT NOT NULL,
+    draft_id             VARCHAR(26) NOT NULL,    -- ab_agent_skill_draft.pid
+    original_run_id      VARCHAR(26) NOT NULL,    -- ab_agent_run.pid
+    shadow_status        VARCHAR(16),             -- success | failed | timeout
+    shadow_duration_ms   BIGINT,
+    shadow_cost_usd      DECIMAL(10,4),
+    shadow_tokens        INTEGER,
+    shadow_output_hash   VARCHAR(64),
+    original_status      VARCHAR(16),
+    original_duration_ms BIGINT,
+    original_cost_usd    DECIMAL(10,4),
+    original_output_hash VARCHAR(64),
+    output_match         BOOLEAN,
+    output_diff          JSONB,
+    fidelity_match       BOOLEAN,
+    created_at           TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_shadow_run_draft_created ON ab_agent_shadow_run (draft_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_shadow_run_original ON ab_agent_shadow_run (original_run_id);
+COMMENT ON TABLE ab_agent_shadow_run IS 'ACP Learning Loop §6 — one row per shadow-mode execution comparing draft against production';
+
 -- Seed: platform built-in capabilities (tenant_id = -1)
 -- Skills are the built-in per-tenant generic codes (dsl.query / dsl.command)
 -- that AgentTemplateSeeder creates for every tenant; the router will return
