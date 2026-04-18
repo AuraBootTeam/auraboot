@@ -37,6 +37,9 @@ test.describe('Model CRUD Operations', () => {
     await page.goto(`/meta/models/new`);
     await page.waitForLoadState('domcontentloaded');
 
+    // Step 0: choose physical model type to reach the form
+    await page.getByTestId('model-type-physical').click();
+
     // Wait for form fields to be visible and interactive
     const codeInput = page.locator('input[placeholder*="user_order"]');
     await expect(codeInput).toBeVisible({ timeout: 10000 });
@@ -157,6 +160,9 @@ test.describe('Model CRUD Operations', () => {
     // Verify via UI - try to create duplicate
     await page.goto(`/meta/models/new`);
     await page.waitForLoadState('domcontentloaded');
+
+    // Step 0: choose physical model type to reach the form
+    await page.getByTestId('model-type-physical').click();
 
     await page.locator('input[placeholder*="user_order"]').fill(modelData.code);
     await page.locator('input[placeholder*="用户订单"]').fill('Duplicate Model');

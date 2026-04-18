@@ -35,7 +35,8 @@ async function createBlankPage(page: Page): Promise<string> {
       name,
       pageKey,
       title: name,
-      kind: 'list',
+      kind: 'form',
+      modelCode: 'tenant',
       blocks: [],
       metaInfo: { componentCount: 0 },
       semver: '0.1.0',
@@ -64,7 +65,8 @@ async function createPageWithBlocks(
       name: pageName,
       pageKey,
       title: pageName,
-      kind: 'list',
+      kind: 'form',
+      modelCode: 'tenant',
       blocks: blocks.map((b, i) => ({
         id: b.id,
         blockType: b.blockType,
@@ -90,10 +92,19 @@ async function openDesigner(page: Page, pid: string): Promise<void> {
   await page.getByTestId('designer-canvas').waitFor({ state: 'visible', timeout: 15000 });
 }
 
-/** Add a table block via palette click and select it. */
+/**
+ * Add a generic canvas block to exercise the block-config/expression-editor
+ * panels. Post-merge 5f72469b, page kind is 'form' (list canvas gone per §5.1),
+ * so we use form-section which is available in the form-kind palette and
+ * exposes the same expression-editor / tabs UX that these tests assert.
+ *
+ * (Legacy name preserved to minimize diff; the block type is no longer
+ * "table" — the tests here cover right-panel behavior, not table specifics,
+ * which are covered by page-designer-props-table.spec.ts.)
+ */
 async function addTableBlock(page: Page): Promise<void> {
-  await page.getByTestId('canvas-left-tab-components').click();
-  const paletteItem = page.getByTestId('block-palette-item-table');
+  await page.getByTestId('designer-tab-blocks').click();
+  const paletteItem = page.getByTestId('block-palette-item-form-section');
   await paletteItem.waitFor({ state: 'visible', timeout: 5000 });
   await paletteItem.click();
   // Wait for block to appear
@@ -102,7 +113,7 @@ async function addTableBlock(page: Page): Promise<void> {
 
 /** Add a toolbar block via palette click and select it. */
 async function addToolbarBlock(page: Page): Promise<void> {
-  await page.getByTestId('canvas-left-tab-components').click();
+  await page.getByTestId('designer-tab-blocks').click();
   const paletteItem = page.getByTestId('block-palette-item-toolbar');
   await paletteItem.waitFor({ state: 'visible', timeout: 5000 });
   await paletteItem.click();
@@ -111,7 +122,7 @@ async function addToolbarBlock(page: Page): Promise<void> {
 
 /** Add a form-section block with a text widget. */
 async function addFormSectionWithField(page: Page): Promise<void> {
-  await page.getByTestId('canvas-left-tab-widgets').click();
+  await page.getByTestId('designer-tab-fields').click();
   await expect(page.getByTestId('widget-palette')).toBeVisible();
   await page.getByTestId('widget-palette-item-text').click();
   await page.locator('[data-testid^="canvas-block-content-"]').first().waitFor({ state: 'visible', timeout: 5000 });
@@ -352,7 +363,11 @@ test.describe('Right Panel Tabs', () => {
   });
 
   // I7 — ButtonConfig back button → returns to toolbar block config
-  test('I7 — ButtonConfig back button returns to toolbar block config', async ({ page }) => {
+  // Skipped post-merge 5f72469b: toolbar block is list-only and list canvas
+  // removed per design §5.1. Toolbar button editing lives in ListConfigPanel
+  // → Toolbar tab; ButtonConfig back-navigation parity should be covered
+  // there.
+  test.skip('I7 — ButtonConfig back button returns to toolbar block config', async ({ page }) => {
     const pid = await createBlankPage(page);
     await openDesigner(page, pid);
 

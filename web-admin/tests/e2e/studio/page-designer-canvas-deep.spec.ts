@@ -57,7 +57,8 @@ async function createBlankPage(page: Page): Promise<string> {
       name,
       pageKey,
       title: name,
-      kind: 'list',
+      kind: 'form',
+      modelCode: 'tenant',
       blocks: [],
       metaInfo: { componentCount: 0 },
       semver: '0.1.0',
@@ -80,7 +81,7 @@ async function blockCount(page: Page): Promise<number> {
 
 /** Switch to Components tab and click the palette item to add a block */
 async function addBlock(page: Page, blockType: string): Promise<void> {
-  await page.getByTestId('canvas-left-tab-components').click();
+  await page.getByTestId('designer-tab-blocks').click();
   await page.getByTestId(`block-palette-item-${blockType}`).click();
   // Small stabilization wait — not a blanket timeout, just enough for React state flush
   await page.locator(BLK).nth(await blockCount(page) - 1).waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
@@ -305,7 +306,7 @@ test.describe('B3 — Block 删除', () => {
 
     // Add all 13 block types
     for (const blockType of ALL_BLOCK_TYPES) {
-      await page.getByTestId('canvas-left-tab-components').click();
+      await page.getByTestId('designer-tab-blocks').click();
       await page.getByTestId(`block-palette-item-${blockType}`).click();
     }
 
@@ -777,13 +778,13 @@ test.describe('G4-G8 — Block 预览内容', () => {
     await selectFirstBlock(page);
 
     // Switch to Widgets tab and add 3 widgets
-    await page.getByTestId('canvas-left-tab-widgets').click();
+    await page.getByTestId('designer-tab-fields').click();
     await page.getByTestId('widget-palette-item-text').click();
     await page.waitForTimeout(200);
-    await page.getByTestId('canvas-left-tab-widgets').click();
+    await page.getByTestId('designer-tab-fields').click();
     await page.getByTestId('widget-palette-item-number').click();
     await page.waitForTimeout(200);
-    await page.getByTestId('canvas-left-tab-widgets').click();
+    await page.getByTestId('designer-tab-fields').click();
     await page.getByTestId('widget-palette-item-date').click();
     await page.waitForTimeout(200);
 
@@ -882,7 +883,7 @@ test.describe('G9 — FieldConfigPanel 打开', () => {
     await selectFirstBlock(page);
 
     // Add a widget to create a field
-    await page.getByTestId('canvas-left-tab-widgets').click();
+    await page.getByTestId('designer-tab-fields').click();
     await page.getByTestId('widget-palette-item-text').click();
     await page.waitForTimeout(300);
 
@@ -986,7 +987,7 @@ test.describe('快速连续添加', () => {
     const pid = await createBlankPage(page);
     await open(page, pid);
 
-    await page.getByTestId('canvas-left-tab-components').click();
+    await page.getByTestId('designer-tab-blocks').click();
 
     // Click rapidly 5 times
     for (let i = 0; i < 5; i++) {

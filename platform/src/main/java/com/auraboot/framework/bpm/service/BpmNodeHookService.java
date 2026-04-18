@@ -29,6 +29,10 @@ import org.springframework.web.client.RestTemplate;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 @Slf4j
 @Service
@@ -36,6 +40,13 @@ public class BpmNodeHookService {
 
     private static final int HOOK_REST_CONNECT_TIMEOUT_MS = 5_000;
     private static final int HOOK_REST_READ_TIMEOUT_MS = 10_000;
+
+    /**
+     * Per-hook execution timeout (P3-E hardening). Bounds DoS surface for
+     * script (SpEL), drools, and rest_call executors. Configured higher than
+     * the REST read timeout so a slow but legal HTTP call still completes.
+     */
+    private static final long HOOK_EXECUTION_TIMEOUT_MS = 15_000L;
 
     /**
      * hookType vocabulary alias map (GAP-255).
@@ -211,15 +222,61 @@ public class BpmNodeHookService {
         String type = normalizeActionType(rawType);
 
         return switch (type == null ? "" : type) {
-            case "rest_call" -> executeRestCall(config, variables);
-            case "script" -> executeScript(config, variables);
-            case "drools_rule" -> executeDroolsRule(config, variables);
+            case "rest_call" -> runWithTimeout("rest_call", () -> executeRestCall(config, variables));
+            case "script" -> runWithTimeout("script", () -> executeScript(config, variables));
+            case "drools_rule" -> runWithTimeout("drools_rule", () -> executeDroolsRule(config, variables));
             case "command" -> executeCommand(config, variables);
             default -> {
                 log.warn("Unknown hook action type: raw={}, normalized={}", rawType, type);
                 yield true;
             }
         };
+    }
+
+    /**
+     * Bound the wall-clock execution time of a hook executor (P3-E hardening).
+     *
+     * <p>Runs {@code task} on a virtual thread and waits at most
+     * {@link #HOOK_EXECUTION_TIMEOUT_MS}. On timeout we return {@code false}
+     * (treated by callers as a hook failure) and surface a {@link BusinessException}
+     * up to the caller's fail-strategy handling so {@code block} can short-circuit
+     * the workflow. The runaway task continues on the virtual thread but is
+     * detached from the caller; SpEL/Drools have no kill switch so we cannot
+     * forcibly interrupt without {@code Thread.stop()}.
+     *
+     * <p>Command hooks are intentionally NOT wrapped: they reuse the platform's
+     * {@code CommandExecutor} pipeline which already runs inside the caller's
+     * transaction and has its own pipeline-level timeouts.
+     */
+    private boolean runWithTimeout(String label, java.util.concurrent.Callable<Boolean> task) {
+        CompletableFuture<Boolean> future = CompletableFuture.supplyAsync(() -> {
+            try {
+                return task.call();
+            } catch (RuntimeException re) {
+                throw re;
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }, runnable -> Thread.startVirtualThread(runnable));
+
+        try {
+            Boolean result = future.get(HOOK_EXECUTION_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+            return result != null && result;
+        } catch (TimeoutException te) {
+            future.cancel(true);
+            log.error("Hook executor '{}' exceeded timeout of {}ms", label, HOOK_EXECUTION_TIMEOUT_MS);
+            throw new BusinessException("Hook execution timeout (" + label + "): "
+                    + HOOK_EXECUTION_TIMEOUT_MS + "ms");
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            throw new BusinessException("Hook execution interrupted: " + label);
+        } catch (ExecutionException ee) {
+            Throwable cause = ee.getCause();
+            if (cause instanceof RuntimeException re) {
+                throw re;
+            }
+            throw new BusinessException("Hook execution failed (" + label + "): " + cause.getMessage());
+        }
     }
 
     @SuppressWarnings("unchecked")

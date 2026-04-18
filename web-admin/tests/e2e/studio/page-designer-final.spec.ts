@@ -45,7 +45,8 @@ async function createBlankPage(page: Page): Promise<string> {
       name,
       pageKey,
       title: name,
-      kind: 'list',
+      kind: 'form',
+      modelCode: 'tenant',
       blocks: [],
       metaInfo: { componentCount: 0 },
       semver: '0.1.0',
@@ -68,7 +69,7 @@ async function blockCount(page: Page): Promise<number> {
 
 async function addBlock(page: Page, type: string) {
   const countBefore = await blockCount(page);
-  await page.getByTestId('canvas-left-tab-components').click();
+  await page.getByTestId('designer-tab-blocks').click();
   await page.getByTestId(`block-palette-item-${type}`).click();
   // Wait for the block count to increase (React state update)
   await page.waitForFunction(
@@ -304,7 +305,12 @@ test.describe('Toolbar', () => {
   // child components only call onSchemaChange on explicit user actions, not on mount.
   // resetHistory() correctly seeds canUndo=false. Verified in usePageSchemaHistory.test.ts
   // (9/9 passing) and confirmed by browser screenshot showing undo disabled on load.
-  test('D8: undo to bottom restores loaded blocks, not blank placeholder', async ({ page }) => {
+  // D8 skipped post-merge 5f72469b: this test pre-seeds kind=list with
+  // table+filters blocks and relies on the list canvas (BlocksDesigner). Per
+  // design §5.1 kind=list now routes to ListConfigPanel and there is no
+  // canvas/undo UX. Undo-history parity should be added to ListConfigPanel
+  // tab-level edits.
+  test.skip('D8: undo to bottom restores loaded blocks, not blank placeholder', async ({ page }) => {
     // Create a page pre-seeded with 2 blocks via API
     const name = uniqueId('d8-undo');
     const pageKey = `e2e_d8_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
@@ -314,6 +320,7 @@ test.describe('Toolbar', () => {
         pageKey,
         title: name,
         kind: 'list',
+        modelCode: 'tenant',
         blocks: [
           { blockType: 'table', id: 'seed-table', fields: [] },
           { blockType: 'filters', id: 'seed-filters', conditions: [] },

@@ -23,4 +23,14 @@ public final class BpmExtensionKeys {
 
     /** Node-level: optional override of the process-level CcPolicy. */
     public static final String CC_POLICY_OVERRIDE = "aura.ccPolicyOverride";
+
+    /**
+     * Node-level: serialized JSON array of designer hook descriptors (GAP-254).
+     *
+     * <p>Each entry: {@code {hookType, actionType, executionOrder, failStrategy,
+     * async, enabled, hookConfig}}. Persisted into {@code ab_bpm_node_hook} at
+     * deploy time; this XML form survives export/import round-trips so audit and
+     * cross-environment migration retain designer state.
+     */
+    public static final String NODE_HOOKS = "aura.hooks";
 }

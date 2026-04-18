@@ -47,6 +47,17 @@
 import { test, expect, type Page, type Locator } from '@playwright/test';
 import { uniqueId } from '../helpers/index';
 
+// NOTE (2026-04-17): post-merge 5f72469b, kind=list routes to ListConfigPanel
+// (schema-driven tab panel), NOT BlocksDesigner canvas. The Table block is
+// list-only. Dragging it onto a canvas is no longer a supported UX — per
+// design §5.1, equivalent configuration lives in ListConfigPanel →
+// Columns / Filters / Toolbar / Behavior tabs.
+//
+// All describes in this file exercise the legacy "drag table to canvas,
+// configure via block property panel" flow. They are skipped (describe.skip)
+// as a reference for the properties that ListConfigPanel now owns. Parity
+// coverage should be added in tests/e2e/studio/list-config-panel-*.spec.ts.
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -67,6 +78,7 @@ async function createPage(page: Page): Promise<string> {
       pageKey,
       title: name,
       kind: 'list',
+      modelCode: 'tenant',
       blocks: [],
       metaInfo: { componentCount: 0 },
       semver: '0.1.0',
@@ -96,7 +108,7 @@ async function addAndSelectTable(page: Page): Promise<void> {
     if (await quickAdd.isVisible()) {
       await quickAdd.click();
     } else {
-      await page.getByTestId('canvas-left-tab-components').click();
+      await page.getByTestId('designer-tab-blocks').click();
       await page.getByTestId('block-palette-item-table').click();
     }
     return blockContent
@@ -213,7 +225,7 @@ async function getSwitchState(sw: Locator): Promise<SwitchState> {
 // C2.1 — Comprehensive single-test covering ALL table properties in sequence
 // ---------------------------------------------------------------------------
 
-test.describe('C2 — Table Block Properties (all 21)', () => {
+test.describe.skip('C2 — Table Block Properties (all 21)', () => {
   test(
     'C2.all: covers all table properties in sequence with 5-step verification',
     async ({ page }) => {
@@ -705,7 +717,7 @@ test.describe('C2 — Table Block Properties (all 21)', () => {
 // C2.dep1 — dependsOn chain: queryType → queryCode
 // ---------------------------------------------------------------------------
 
-test.describe('C2 dependsOn — queryType controls queryCode visibility', () => {
+test.describe.skip('C2 dependsOn — queryType controls queryCode visibility', () => {
   test('queryCode hidden when queryType=default, visible when queryType=namedQuery', async ({
     page,
   }) => {
@@ -749,7 +761,7 @@ test.describe('C2 dependsOn — queryType controls queryCode visibility', () => 
 // C2.dep2 — dependsOn chain: features.create.enabled → commandCode
 // ---------------------------------------------------------------------------
 
-test.describe('C2 dependsOn — create.enabled controls commandCode visibility', () => {
+test.describe.skip('C2 dependsOn — create.enabled controls commandCode visibility', () => {
   test('commandCode hidden by default, appears when create.enabled=true, disappears when false', async ({
     page,
   }) => {
@@ -798,7 +810,7 @@ test.describe('C2 dependsOn — create.enabled controls commandCode visibility',
 // C2.dep3 — dependsOn chain: rowActionsEnabled → rowActions JSON
 // ---------------------------------------------------------------------------
 
-test.describe('C2 dependsOn — rowActionsEnabled controls rowActions JSON editor', () => {
+test.describe.skip('C2 dependsOn — rowActionsEnabled controls rowActions JSON editor', () => {
   test('rowActions JSON hidden by default, appears when rowActionsEnabled=true', async ({
     page,
   }) => {
@@ -848,7 +860,7 @@ test.describe('C2 dependsOn — rowActionsEnabled controls rowActions JSON edito
 // C2.dep4 — dependsOn chain: summary.enabled → summary.fields JSON
 // ---------------------------------------------------------------------------
 
-test.describe('C2 dependsOn — summary.enabled controls summary.fields JSON editor', () => {
+test.describe.skip('C2 dependsOn — summary.enabled controls summary.fields JSON editor', () => {
   test('summary.fields JSON hidden by default, appears when summary.enabled=true', async ({
     page,
   }) => {
@@ -899,7 +911,7 @@ test.describe('C2 dependsOn — summary.enabled controls summary.fields JSON edi
 // C2.select — Select field option cycling tests
 // ---------------------------------------------------------------------------
 
-test.describe('C2 — Select field options', () => {
+test.describe.skip('C2 — Select field options', () => {
   test('queryType: all options available (Default list, Named Query)', async ({ page }) => {
     const pid = await createPage(page);
     await openDesigner(page, pid);
@@ -980,7 +992,7 @@ test.describe('C2 — Select field options', () => {
 // C2.switches — All boolean properties visible simultaneously
 // ---------------------------------------------------------------------------
 
-test.describe('C2 — All boolean switches visible simultaneously', () => {
+test.describe.skip('C2 — All boolean switches visible simultaneously', () => {
   test('all 7 boolean switches (excl. dependsOn) are visible in panel with correct defaults', async ({
     page,
   }) => {
@@ -1017,7 +1029,7 @@ test.describe('C2 — All boolean switches visible simultaneously', () => {
 // C2.panels — All config groups are present
 // ---------------------------------------------------------------------------
 
-test.describe('C2 — Config panel groups are rendered', () => {
+test.describe.skip('C2 — Config panel groups are rendered', () => {
   test('all expected config groups appear in the panel', async ({ page }) => {
     const pid = await createPage(page);
     await openDesigner(page, pid);

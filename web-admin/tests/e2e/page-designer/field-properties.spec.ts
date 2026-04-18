@@ -25,11 +25,14 @@ test.beforeAll(async ({ browser }) => {
       name,
       pageKey,
       title: name,
-      kind: 'list',
+      // kind=form keeps BlocksDesigner (designer-canvas). After DesignerRouter
+      // dispatch (merge 5f72469b), list kind routes to ListConfigPanel and the
+      // canvas/tab testids this suite asserts no longer exist.
+      kind: 'form',
+      modelCode: 'tenant',
       blocks: [
-        { blockType: 'filters', label: 'Filters', fields: [] },
-        { blockType: 'toolbar', label: 'Toolbar', actions: [] },
-        { blockType: 'table', label: 'Main Table', columns: [] },
+        { blockType: 'form-section', label: 'Main', fields: [] },
+        { blockType: 'form-buttons', label: 'Buttons', actions: [] },
       ],
       metaInfo: { componentCount: 1 },
       semver: '0.1.0',

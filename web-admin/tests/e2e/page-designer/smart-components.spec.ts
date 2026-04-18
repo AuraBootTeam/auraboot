@@ -25,11 +25,14 @@ test.beforeAll(async ({ browser }) => {
       name,
       pageKey,
       title: name,
-      kind: 'list',
+      // kind=form keeps BlocksDesigner, which exposes library-tab-blocks /
+      // library-tab-components. ListConfigPanel (post merge 5f72469b) has no
+      // BlockLibrary.
+      kind: 'form',
+      modelCode: 'tenant',
       blocks: [
-        { blockType: 'filters', label: 'Filters', fields: [] },
-        { blockType: 'toolbar', label: 'Toolbar', actions: [] },
-        { blockType: 'table', label: 'Main Table', columns: [] },
+        { blockType: 'form-section', label: 'Main', fields: [] },
+        { blockType: 'form-buttons', label: 'Buttons', actions: [] },
       ],
       metaInfo: { componentCount: 3 },
       semver: '0.1.0',
