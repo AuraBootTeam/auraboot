@@ -51,9 +51,10 @@ describe('SaveDialog backdrop click', () => {
     const onClose = vi.fn();
     render(<SaveDialog {...baseProps} onClose={onClose} onSave={vi.fn()} />);
 
-    const nameInput = screen.getByPlaceholderText('例如: 员工请假审批流程');
+    // i18n falls back to English when no provider is mounted in tests
+    const nameInput = screen.getByPlaceholderText('e.g. Employee leave approval process');
     fireEvent.click(nameInput);
-    const keyInput = screen.getByPlaceholderText('例如: leave_approval_process');
+    const keyInput = screen.getByPlaceholderText('e.g. leave_approval_process');
     fireEvent.click(keyInput);
     expect(onClose).not.toHaveBeenCalled();
   });
@@ -64,7 +65,7 @@ describe('SaveDialog backdrop click', () => {
     const onClose = vi.fn();
     render(<SaveDialog {...baseProps} onClose={onClose} onSave={vi.fn()} />);
 
-    fireEvent.click(screen.getByText('取消'));
+    fireEvent.click(screen.getByText('Cancel'));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
