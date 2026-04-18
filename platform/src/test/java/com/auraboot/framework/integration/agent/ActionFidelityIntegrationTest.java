@@ -77,7 +77,9 @@ class ActionFidelityIntegrationTest extends BaseIntegrationTest {
         Map<String, Object> row = jdbc.queryForMap(
                 "SELECT fidelity, tool_ref, command_signature, skill_code " +
                         "FROM ab_agent_action WHERE pid = ?", actionPid);
-        assertThat(row.get("fidelity")).isEqualTo(FidelityGrader.FIDELITY_FULL);
+        // Reads have no before/after diff to reconstruct — fidelity is semantic
+        // per skill-substrate-contract §10.1 (M4 fix).
+        assertThat(row.get("fidelity")).isEqualTo(FidelityGrader.FIDELITY_SEMANTIC);
         assertThat(row.get("tool_ref")).isEqualTo("nq:customer_list");
         assertThat(row.get("command_signature")).isNotNull();
         assertThat((String) row.get("command_signature")).hasSize(64);

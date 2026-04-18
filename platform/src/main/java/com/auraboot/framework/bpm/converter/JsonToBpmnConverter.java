@@ -13,6 +13,7 @@ import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamWriter;
 import java.io.StringWriter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -339,8 +340,14 @@ public class JsonToBpmnConverter {
         // Collect node-level aura extension properties (requiredPermissions, ccPolicyOverride).
         Map<String, String> auraProps = collectUserTaskAuraProperties(config);
         boolean hasAuraExtensions = !auraProps.isEmpty();
-        // If either child needs to appear we must use writeStartElement (not empty element).
-        boolean hasChildren = hasMultiInstance || hasAuraExtensions;
+        // Collect node-level hook descriptors (config.hooks[]) for GAP-254 compilation.
+        // Hooks are emitted as <smart:hook> children inside <extensionElements> alongside
+        // <smart:properties>, so the BPMN XML carries the full designer hook config and
+        // the deploy-time persistence path can recover it from XML or designerJson alike.
+        List<HookDescriptor> hooks = collectNodeHookDescriptors(config);
+        boolean hasHookExtensions = !hooks.isEmpty();
+        // If any child needs to appear we must use writeStartElement (not empty element).
+        boolean hasChildren = hasMultiInstance || hasAuraExtensions || hasHookExtensions;
 
         writer.writeCharacters("\n    ");
         if (hasChildren) {
@@ -356,8 +363,8 @@ public class JsonToBpmnConverter {
         // Handle assignee configuration
         writeUserTaskAssigneeAttributes(writer, config);
 
-        if (hasAuraExtensions) {
-            writeExtensionPropertiesElement(writer, auraProps);
+        if (hasAuraExtensions || hasHookExtensions) {
+            writeActivityExtensionElements(writer, auraProps, hooks);
         }
 
         if (hasMultiInstance) {
@@ -371,6 +378,135 @@ public class JsonToBpmnConverter {
 
         writer.writeCharacters("\n");
     }
+
+    /**
+     * Build the ordered list of node-level hook descriptors from {@code config.hooks[]}
+     * for GAP-254 compilation. Each entry is normalized into {@link HookDescriptor}
+     * with defaults applied so callers (XML emit + DB persist) see a uniform shape.
+     *
+     * <p>Designer JSON shape (from BPMN designer's HookConfigSection):
+     * <pre>{@code
+     *   config.hooks[] = [
+     *     { "hookType": "pre_execute" | "post_execute" | "pre_check" | "post_action",
+     *       "executionOrder": 0,
+     *       "hookConfig": { "actionType"|"type": "command|script|...", ... },
+     *       "failStrategy": "block" | "ignore" | "warn",
+     *       "async": false,
+     *       "enabled": true }
+     *   ]
+     * }</pre>
+     *
+     * <p>{@code hookConfig} is serialized to JSON and emitted as the inner text of the
+     * resulting {@code <smart:hookConfig>} element. Vocabulary normalization
+     * (pre_execute → pre_check, http_callback → rest_call) happens at the
+     * {@code BpmNodeHookService} write boundary; the converter preserves the raw
+     * designer values so the XML stays an exact mirror of the designer state.
+     */
+    List<HookDescriptor> collectNodeHookDescriptors(JsonNode config) {
+        if (config == null || config.isMissingNode()) return Collections.emptyList();
+        JsonNode hooks = config.path("hooks");
+        if (!hooks.isArray() || hooks.isEmpty()) return Collections.emptyList();
+        List<HookDescriptor> result = new ArrayList<>(hooks.size());
+        int autoOrder = 0;
+        for (JsonNode hook : hooks) {
+            if (!hook.isObject()) continue;
+            String hookType = getTextOrNull(hook, "hookType");
+            if (hookType == null) {
+                throw new BpmnConversionException(
+                        "Designer node hook missing required 'hookType' field: " + hook);
+            }
+            int order = hook.path("executionOrder").asInt(autoOrder);
+            String failStrategy = getTextOrDefault(hook, "failStrategy", "block");
+            boolean async = hook.path("async").asBoolean(false);
+            boolean enabled = !hook.has("enabled") || hook.path("enabled").asBoolean(true);
+            JsonNode hookConfig = hook.path("hookConfig");
+            String actionType = null;
+            String configJson = "{}";
+            if (hookConfig.isObject()) {
+                // actionType lives under hookConfig.actionType (UI vocab) or .type (backend
+                // vocab); surface whichever one is present so the XML attribute reflects
+                // the source-of-truth without forcing a normalize pass at this layer.
+                actionType = getTextOrNull(hookConfig, "actionType");
+                if (actionType == null) {
+                    actionType = getTextOrNull(hookConfig, "type");
+                }
+                try {
+                    configJson = objectMapper.writeValueAsString(hookConfig);
+                } catch (JsonProcessingException e) {
+                    throw new BpmnConversionException(
+                            "Failed to serialize node hook hookConfig for emission", e);
+                }
+            }
+            result.add(new HookDescriptor(
+                    hookType, actionType, order, failStrategy, async, enabled,
+                    configJson, hookConfig.isObject() ? hookConfig : null));
+            autoOrder++;
+        }
+        return result;
+    }
+
+    /**
+     * Static accessor used by {@code ProcessDeploymentService} to recover the same
+     * hook descriptor list at deploy time so it can be persisted into
+     * {@code ab_bpm_node_hook} alongside the deployed BPMN. Returns a flat list of
+     * (nodeId, descriptor) pairs scoped to userTask + serviceTask nodes (the only
+     * node types that surface a hook UI today).
+     */
+    public List<NodeHookEntry> extractHookEntries(JsonNode root) {
+        List<NodeHookEntry> entries = new ArrayList<>();
+        JsonNode nodes = root.path("nodes");
+        if (!nodes.isArray()) return entries;
+        for (JsonNode node : nodes) {
+            String nodeType = getNodeType(node);
+            // Only userTask carries hooks via UI today. ServiceTask family does not
+            // expose a hook editor, so we skip them deliberately rather than emit
+            // empty entries that downstream consumers would need to filter.
+            if (!"userTask".equals(nodeType)) continue;
+            String nodeId = node.path("id").asText();
+            if (nodeId == null || nodeId.isBlank()) continue;
+            JsonNode config = node.path("data").path("config");
+            for (HookDescriptor desc : collectNodeHookDescriptors(config)) {
+                entries.add(new NodeHookEntry(nodeId, desc));
+            }
+        }
+        return entries;
+    }
+
+    /**
+     * Convenience overload for callers holding a Map (avoids re-serializing).
+     */
+    public List<NodeHookEntry> extractHookEntries(Map<String, Object> processData) {
+        JsonNode tree = objectMapper.valueToTree(processData);
+        return extractHookEntries(tree);
+    }
+
+    /**
+     * Normalized shape of a single designer-level hook entry, ready to be emitted
+     * as XML or persisted to {@code ab_bpm_node_hook}.
+     *
+     * @param hookType         designer-vocab hookType (e.g. {@code pre_execute})
+     * @param actionType       designer-vocab actionType (e.g. {@code command}); nullable
+     * @param executionOrder   ordering within the same nodeId+hookType bucket
+     * @param failStrategy     {@code block | warn | ignore}
+     * @param async            whether the executor runs the hook on a virtual thread
+     * @param enabled          row-level disable flag
+     * @param hookConfigJson   serialized hookConfig (always a JSON object, never null)
+     * @param hookConfigNode   raw JsonNode form for callers that need structured access
+     */
+    public record HookDescriptor(
+            String hookType,
+            String actionType,
+            int executionOrder,
+            String failStrategy,
+            boolean async,
+            boolean enabled,
+            String hookConfigJson,
+            JsonNode hookConfigNode) {}
+
+    /**
+     * Pair of (nodeId, hook descriptor) used by deploy-time persistence.
+     */
+    public record NodeHookEntry(String nodeId, HookDescriptor descriptor) {}
 
     /**
      * Build the ordered map of node-level {@code aura.*} extension properties
@@ -436,18 +572,67 @@ public class JsonToBpmnConverter {
     }
 
     /**
-     * Emit an activity-level {@code <extensionElements><smart:properties>...} block for
-     * the provided {@code aura.*} keyed properties. Indentation matches the surrounding
-     * userTask element so the resulting XML stays pretty-formatted for debugging.
+     * Emit a single activity-level {@code <extensionElements>} block carrying the
+     * {@code <smart:properties>} entries for the surrounding userTask. Both
+     * aura.* keyed properties and the JSON-serialized hook list piggyback on the
+     * same {@code <smart:property>} mechanism so SmartEngine's BPMN parser
+     * (which only recognizes its own {@code Properties} extension) accepts the
+     * deployment without rejecting the file as "Parse process definition file
+     * failure!" — it stores anything under {@code Properties.decorationMap} and
+     * leaves interpretation to consumers.
+     *
+     * <p>Hook payload shape (one entry per hook descriptor):
+     * <pre>{@code
+     *   <smart:property name="aura.hooks"
+     *                   value='[{"hookType":"pre_execute","actionType":"command",...}, ...]'/>
+     * }</pre>
+     *
+     * <p>The serialized hook array survives import/export round-trips intact.
+     * The persistence path (deploy → ab_bpm_node_hook) consumes hooks directly
+     * from designerJson rather than re-parsing the XML, so this XML form is
+     * primarily for traceability + downstream consumers (export, audit).
      */
-    private void writeExtensionPropertiesElement(XMLStreamWriter writer, Map<String, String> props)
+    private void writeActivityExtensionElements(XMLStreamWriter writer,
+                                                Map<String, String> auraProps,
+                                                List<HookDescriptor> hooks)
             throws XMLStreamException {
-        if (props.isEmpty()) return;
+        // Compose merged property map: aura.* values + serialized hooks payload.
+        Map<String, String> merged = new LinkedHashMap<>(auraProps);
+        if (!hooks.isEmpty()) {
+            merged.put(BpmExtensionKeys.NODE_HOOKS, serializeHooksPayload(hooks));
+        }
+        if (merged.isEmpty()) return;
         writer.writeCharacters("\n      ");
         writer.writeStartElement("extensionElements");
-        writeSmartProperties(writer, props, "        ");
+        writeSmartProperties(writer, merged, "        ");
         writer.writeCharacters("\n      ");
         writer.writeEndElement(); // extensionElements
+    }
+
+    /**
+     * Serialize designer hook descriptors into the JSON array form stored under
+     * {@link BpmExtensionKeys#NODE_HOOKS}.
+     */
+    private String serializeHooksPayload(List<HookDescriptor> hooks) {
+        try {
+            List<Map<String, Object>> arr = new ArrayList<>(hooks.size());
+            for (HookDescriptor h : hooks) {
+                Map<String, Object> entry = new LinkedHashMap<>();
+                entry.put("hookType", h.hookType());
+                if (h.actionType() != null) entry.put("actionType", h.actionType());
+                entry.put("executionOrder", h.executionOrder());
+                entry.put("failStrategy", h.failStrategy());
+                entry.put("async", h.async());
+                entry.put("enabled", h.enabled());
+                entry.put("hookConfig", h.hookConfigNode() != null
+                        ? objectMapper.convertValue(h.hookConfigNode(), Map.class)
+                        : Map.of());
+                arr.add(entry);
+            }
+            return objectMapper.writeValueAsString(arr);
+        } catch (JsonProcessingException e) {
+            throw new BpmnConversionException("Failed to serialize node hooks payload", e);
+        }
     }
 
     /**

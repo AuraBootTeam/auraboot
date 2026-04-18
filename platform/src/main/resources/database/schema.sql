@@ -750,7 +750,7 @@ CREATE TABLE ab_page_schema (
 
     -- Page identification
     page_key VARCHAR(200) NOT NULL,
-    model_code VARCHAR(100),
+    model_code VARCHAR(100) NOT NULL,
 
     -- Basic info
     name VARCHAR(200) NOT NULL,
@@ -4927,14 +4927,15 @@ CREATE TABLE IF NOT EXISTS ab_agent_memory (
   updated_by    BIGINT,
   deleted_flag  BOOLEAN DEFAULT FALSE,
   shareable     BOOLEAN DEFAULT FALSE,
-  embedding     vector(1536),
-  -- 2026-04-18 PR-13: 3D memory model (memory-lifecycle.md §2) — access boundary.
-  -- scope ∈ {user, tenant, global}; scope_key = boundary entity id (user_id /
-  -- tenant_id / NULL for global). GDPR deletion: DELETE WHERE scope='user' AND
-  -- scope_key=? covers all memory about a specific user.
-  scope         VARCHAR(16) NOT NULL DEFAULT 'tenant',
-  scope_key     VARCHAR(100)
+  embedding     vector(1536)
 );
+
+-- 2026-04-18 PR-13: 3D memory model (memory-lifecycle.md §2) — access boundary.
+-- scope ∈ {user, tenant, global}; scope_key = boundary entity id (user_id /
+-- tenant_id / NULL for global). GDPR deletion: DELETE WHERE tenant_id=? AND
+-- scope='user' AND scope_key=? covers all memory about a specific user.
+-- ALTER-only declaration keeps fresh and existing DBs converging to the same
+-- shape without duplicating the definition in two places.
 ALTER TABLE ab_agent_memory ADD COLUMN IF NOT EXISTS scope VARCHAR(16) NOT NULL DEFAULT 'tenant';
 ALTER TABLE ab_agent_memory ADD COLUMN IF NOT EXISTS scope_key VARCHAR(100);
 CREATE INDEX IF NOT EXISTS idx_agent_memory_tenant ON ab_agent_memory (tenant_id);
@@ -6667,6 +6668,336 @@ CREATE INDEX IF NOT EXISTS idx_bif_intent_obj  ON ab_agent_bif(intent, primary_o
 CREATE INDEX IF NOT EXISTS idx_bif_skill       ON ab_agent_bif(dispatched_skill);
 CREATE INDEX IF NOT EXISTS idx_bif_run         ON ab_agent_bif(run_id);
 COMMENT ON TABLE ab_agent_bif IS 'ACP D1 Grounding: Business Intent Frame IR persistence — every LLM-turn grounding result';
+
+-- v1.1.2 extensions (ACP-Ideal §6.2.3 Hermes addendum) — profile + channel
+-- shape *which* agent this turn belongs to and *how* the user reached it.
+-- PatternExtractor mixes them into pattern_hash when present so patterns from
+-- different profiles / channels don't collapse.
+ALTER TABLE ab_agent_bif ADD COLUMN IF NOT EXISTS profile_id VARCHAR(26);
+ALTER TABLE ab_agent_bif ADD COLUMN IF NOT EXISTS channel    VARCHAR(32);
+CREATE INDEX IF NOT EXISTS idx_bif_profile ON ab_agent_bif(profile_id) WHERE profile_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_bif_channel ON ab_agent_bif(channel)    WHERE channel IS NOT NULL;
+
+-- ============================================================================
+-- ACP Learning Loop (design/learning-loop.md) — three tables:
+--   ab_agent_learning_pattern  §3.3 — aggregated (command_signature, object) patterns
+--   ab_agent_skill_draft        §4.7 — generated skill contracts awaiting review
+--   ab_agent_shadow_run         §6.2 — shadow-mode comparison records
+-- The three have a straight lifecycle: pattern.OBSERVED → draft created
+-- → human review → shadow runs → promote to ab_agent_skill.
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS ab_agent_learning_pattern (
+    id                   BIGSERIAL PRIMARY KEY,
+    pid                  VARCHAR(26) UNIQUE NOT NULL,
+    tenant_id            BIGINT,
+    -- SHA-256 of the canonicalised (command_signature × target_model × action_type)
+    -- tuple — one row per unique semantic-level pattern. Per-tenant when the
+    -- pattern is tenant-specific, NULL tenant_id for platform-wide patterns.
+    pattern_hash         VARCHAR(64) UNIQUE,
+    pattern_signature    JSONB NOT NULL,
+    first_seen_at        TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    last_observed_at     TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    invocation_count     INTEGER DEFAULT 0,
+    success_rate         DECIMAL(3,2),
+    -- OBSERVED | DRAFT_GENERATED | REVIEWED | SHADOW | PROMOTED | REJECTED
+    status               VARCHAR(32) NOT NULL DEFAULT 'OBSERVED',
+    draft_skill_id       VARCHAR(26),             -- ab_agent_skill_draft.pid
+    promoted_to_skill_id VARCHAR(26),             -- ab_agent_skill.pid
+    updated_at           TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_learning_pattern_tenant_status ON ab_agent_learning_pattern (tenant_id, status);
+CREATE INDEX IF NOT EXISTS idx_learning_pattern_last_observed ON ab_agent_learning_pattern (last_observed_at DESC);
+COMMENT ON TABLE ab_agent_learning_pattern IS 'ACP Learning Loop §3 — aggregated Action patterns awaiting draft generation';
+
+CREATE TABLE IF NOT EXISTS ab_agent_skill_draft (
+    id                   BIGSERIAL PRIMARY KEY,
+    pid                  VARCHAR(26) UNIQUE NOT NULL,
+    tenant_id            BIGINT,
+    draft_skill_code     VARCHAR(128),
+    -- Full skill contract (substrate, inputs, outputs, tool_refs) rendered as YAML
+    -- so the reviewer sees exactly what will be promoted. hash for dedup.
+    contract_yaml        TEXT NOT NULL,
+    contract_hash        VARCHAR(64),
+    source_pattern_hash  VARCHAR(64) NOT NULL,    -- FK-ish to ab_agent_learning_pattern.pattern_hash
+    derived_from_runs    JSONB,                   -- [{"run_id":"..."}, ...]
+    -- DRAFT_PENDING_REVIEW | REVIEWED_OK | REVIEWED_REJECTED
+    --   | SHADOW_RUNNING | PROMOTED_PENDING_HUMAN | ACTIVE | DISCARDED
+    status               VARCHAR(32) NOT NULL DEFAULT 'DRAFT_PENDING_REVIEW',
+    reviewer_id          BIGINT,
+    review_comment       TEXT,
+    shadow_metrics       JSONB,                   -- { shadow_runs, output_match_rate, cost_delta, duration_delta, fidelity_match_rate }
+    promoted_to_skill_id VARCHAR(26),             -- ab_agent_skill.pid
+    created_at           TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    reviewed_at          TIMESTAMPTZ,
+    shadow_started_at    TIMESTAMPTZ,
+    promoted_at          TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_skill_draft_tenant_status ON ab_agent_skill_draft (tenant_id, status);
+CREATE INDEX IF NOT EXISTS idx_skill_draft_pattern_hash ON ab_agent_skill_draft (source_pattern_hash);
+COMMENT ON TABLE ab_agent_skill_draft IS 'ACP Learning Loop §4 — generated Skill contracts awaiting human review / shadow run';
+
+CREATE TABLE IF NOT EXISTS ab_agent_shadow_run (
+    id                   BIGSERIAL PRIMARY KEY,
+    pid                  VARCHAR(26) UNIQUE NOT NULL,
+    tenant_id            BIGINT NOT NULL,
+    draft_id             VARCHAR(26) NOT NULL,    -- ab_agent_skill_draft.pid
+    original_run_id      VARCHAR(26) NOT NULL,    -- ab_agent_run.pid
+    shadow_status        VARCHAR(16),             -- success | failed | timeout
+    shadow_duration_ms   BIGINT,
+    shadow_cost_usd      DECIMAL(10,4),
+    shadow_tokens        INTEGER,
+    shadow_output_hash   VARCHAR(64),
+    original_status      VARCHAR(16),
+    original_duration_ms BIGINT,
+    original_cost_usd    DECIMAL(10,4),
+    original_output_hash VARCHAR(64),
+    output_match         BOOLEAN,
+    output_diff          JSONB,
+    fidelity_match       BOOLEAN,
+    created_at           TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_shadow_run_draft_created ON ab_agent_shadow_run (draft_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_shadow_run_original ON ab_agent_shadow_run (original_run_id);
+COMMENT ON TABLE ab_agent_shadow_run IS 'ACP Learning Loop §6 — one row per shadow-mode execution comparing draft against production';
+
+-- ============================================================================
+-- ACP Approval Notification Outbox (spec §3.5.4)
+-- Per-approval notification retry with exponential backoff — the generic
+-- ab_outbox is model-event focused (dsl Commands), this is domain-specific
+-- so we can evolve backoff / target / priority without destabilising the
+-- other table.
+-- Exponential backoff: attempt N sleeps for backoff_seconds[N] before next try.
+--   defaults: 60s, 300s, 1800s, 7200s, 43200s — caps at 5 attempts then 'failed'.
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS ab_agent_approval_notification_outbox (
+    id              BIGSERIAL PRIMARY KEY,
+    pid             VARCHAR(26) UNIQUE NOT NULL,
+    tenant_id       BIGINT NOT NULL,
+    approval_pid    VARCHAR(26) NOT NULL,              -- ab_agent_approval.pid
+    recipient_kind  VARCHAR(20) NOT NULL,              -- user | role | group
+    recipient_id    VARCHAR(200) NOT NULL,             -- stringified user_id / role_code / group_pid
+    channel         VARCHAR(20) NOT NULL DEFAULT 'inbox',  -- inbox | email | sms | webhook
+    payload         JSONB NOT NULL,
+    status          VARCHAR(20) NOT NULL DEFAULT 'pending',  -- pending | delivered | failed
+    retry_count     INTEGER NOT NULL DEFAULT 0,
+    last_error      TEXT,
+    next_retry_at   TIMESTAMPTZ,                       -- when pending, next attempt fires at/after this
+    delivered_at    TIMESTAMPTZ,
+    created_at      TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_apv_outbox_pending ON ab_agent_approval_notification_outbox (next_retry_at, status) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_apv_outbox_approval ON ab_agent_approval_notification_outbox (approval_pid);
+COMMENT ON TABLE ab_agent_approval_notification_outbox IS 'Approval notification delivery log with exponential-backoff retry (spec §3.5.4)';
+
+-- ============================================================================
+-- ACP Host Service Durables (ACP-Target-vs-Hermes §4.7)
+-- Two tables that make the agent runtime survive pod restarts:
+--   ab_agent_channel_session_state — channel session with lease/heartbeat
+--   ab_agent_schedule_delivery_outbox — scheduled-run notification retry
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS ab_agent_channel_session_state (
+    id               BIGSERIAL PRIMARY KEY,
+    pid              VARCHAR(26) UNIQUE NOT NULL,
+    tenant_id        BIGINT NOT NULL,
+    -- session_id is the channel-level identifier (e.g. SSE session id,
+    -- IM conversation id) — the thing a reconnecting client identifies.
+    session_id       VARCHAR(100) NOT NULL,
+    channel          VARCHAR(32) NOT NULL,            -- web | im | api | mobile
+    -- Pod holding the active lease. Empty/null = no active owner → up for grabs.
+    owner_pod_id     VARCHAR(100),
+    lease_expires_at TIMESTAMPTZ,                     -- another pod may claim after this
+    last_heartbeat_at TIMESTAMPTZ,
+    -- Free-form state the owner pod periodically saves so a new owner can
+    -- resume without full replay (e.g. last LLM message index, partial tool
+    -- output). Bounded by caller; we don't gate size here.
+    session_state    JSONB,
+    created_at       TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at       TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (tenant_id, session_id)
+);
+CREATE INDEX IF NOT EXISTS idx_chan_session_owner ON ab_agent_channel_session_state (owner_pod_id, lease_expires_at);
+CREATE INDEX IF NOT EXISTS idx_chan_session_expired ON ab_agent_channel_session_state (lease_expires_at) WHERE owner_pod_id IS NOT NULL;
+COMMENT ON TABLE ab_agent_channel_session_state IS 'Channel session state + lease for multi-pod crash-safe resume';
+
+CREATE TABLE IF NOT EXISTS ab_agent_schedule_delivery_outbox (
+    id              BIGSERIAL PRIMARY KEY,
+    pid             VARCHAR(26) UNIQUE NOT NULL,
+    tenant_id       BIGINT NOT NULL,
+    run_pid         VARCHAR(26) NOT NULL,             -- ab_agent_run.pid (scheduled run)
+    recipient_kind  VARCHAR(20) NOT NULL,             -- user | role | group
+    recipient_id    VARCHAR(200) NOT NULL,
+    channel         VARCHAR(20) NOT NULL DEFAULT 'inbox',
+    payload         JSONB NOT NULL,
+    status          VARCHAR(20) NOT NULL DEFAULT 'pending',
+    retry_count     INTEGER NOT NULL DEFAULT 0,
+    last_error      TEXT,
+    next_retry_at   TIMESTAMPTZ,
+    delivered_at    TIMESTAMPTZ,
+    created_at      TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_sched_delivery_pending ON ab_agent_schedule_delivery_outbox (next_retry_at, status) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_sched_delivery_run ON ab_agent_schedule_delivery_outbox (run_pid);
+COMMENT ON TABLE ab_agent_schedule_delivery_outbox IS 'Scheduled-run notification outbox with exponential-backoff retry';
+
+-- ============================================================================
+-- ACP Interrupt Log (ACP-Ideal §6.1.5)
+-- Every time a new user message arrives while a run is active, classifier
+-- decides (replace_intent | append_context | insert_subtask), we log the
+-- decision + act on it. Audit trail for UX quality + dispute resolution
+-- ("why was my previous request cancelled").
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS ab_agent_interrupt_log (
+    id                BIGSERIAL PRIMARY KEY,
+    pid               VARCHAR(26) UNIQUE NOT NULL,
+    tenant_id         BIGINT NOT NULL,
+    session_id        VARCHAR(100) NOT NULL,
+    active_run_id     VARCHAR(26),                     -- run active at interrupt time
+    new_message_excerpt VARCHAR(500),                  -- truncated for dashboard readability
+    sub_policy        VARCHAR(24) NOT NULL,            -- replace_intent | append_context | insert_subtask
+    classifier_tier   VARCHAR(16),                     -- keyword | llm
+    confidence        DECIMAL(3,2),
+    reason            VARCHAR(500),
+    action_taken      VARCHAR(32),                     -- cancelled_run | context_injected | subtask_enqueued | noop
+    created_at        TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_interrupt_log_session ON ab_agent_interrupt_log (session_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_interrupt_log_run ON ab_agent_interrupt_log (active_run_id);
+COMMENT ON TABLE ab_agent_interrupt_log IS 'Interrupt Protocol audit log — one row per user-interrupt classification decision';
+
+-- ============================================================================
+-- ACP Tool ACL (ACP-Ideal §5.5 — 5-dimensional authorisation matrix)
+-- Every tool invocation gated by rules matching these 5 axes:
+--   tenant_id | profile_id | channel | run_kind | tool_ref (glob)
+-- Rule effect ∈ {allow, deny}; higher priority wins; same-priority deny
+-- beats allow; no-match → DENY (fail-secure).
+--
+-- A NULL on any dimension means "any" match on that axis — so a rule
+-- with only tenant_id + tool_ref_pattern set applies to every profile /
+-- channel / run_kind. tool_ref_pattern supports a trailing * wildcard
+-- ('cmd_*', 'nq_crm_*').
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS ab_agent_tool_acl (
+    id                 BIGSERIAL PRIMARY KEY,
+    pid                VARCHAR(26) UNIQUE NOT NULL,
+    tenant_id          BIGINT NOT NULL,
+    -- dimensions — NULL = match any on that axis
+    profile_id         VARCHAR(26),
+    channel            VARCHAR(32),
+    run_kind           VARCHAR(20),                -- interactive | scheduled | shadow
+    tool_ref_pattern   VARCHAR(200) NOT NULL,      -- exact or trailing-* wildcard
+    effect             VARCHAR(8) NOT NULL CHECK (effect IN ('allow', 'deny')),
+    priority           INTEGER NOT NULL DEFAULT 100,
+    reason             VARCHAR(500),
+    active             BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at         TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at         TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_tool_acl_tenant_active ON ab_agent_tool_acl (tenant_id, active);
+CREATE INDEX IF NOT EXISTS idx_tool_acl_priority ON ab_agent_tool_acl (tenant_id, priority DESC, id) WHERE active = TRUE;
+COMMENT ON TABLE ab_agent_tool_acl IS 'ACP Tool ACL — 5-dim authorisation matrix; fail-secure default (no rule → deny)';
+
+-- ============================================================================
+-- ACP SkillPack Activation Filter (ACP-Ideal §3.3)
+-- A SkillPack is a named bundle of skill codes that gets activated for a
+-- (tenant, profile_id?, channel?, run_kind?) combination. Before the planner
+-- hands candidates to the LLM, we narrow the universe of allowed skills to
+-- (union of activated packs) + (individually-whitelisted skills). Without
+-- this, the LLM sees every skill in the tenant and occasionally picks
+-- expensive wrong turns.
+--
+-- Progressive rollout same as Tool ACL: a tenant with NO pack bindings gets
+-- pre-filter behaviour (all candidates pass through).
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS ab_agent_skill_pack (
+    id           BIGSERIAL PRIMARY KEY,
+    pid          VARCHAR(26) UNIQUE NOT NULL,
+    tenant_id    BIGINT NOT NULL,             -- -1 = platform built-in
+    pack_code    VARCHAR(100) NOT NULL,
+    pack_name    VARCHAR(200) NOT NULL,
+    description  TEXT,
+    skill_codes  JSONB NOT NULL,              -- ["crm.lead.update", "dsl.query", ...]
+    active       BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at   TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at   TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (tenant_id, pack_code)
+);
+CREATE INDEX IF NOT EXISTS idx_skill_pack_tenant ON ab_agent_skill_pack (tenant_id, active);
+COMMENT ON TABLE ab_agent_skill_pack IS 'Named bundle of skill codes for activation filtering';
+
+CREATE TABLE IF NOT EXISTS ab_agent_skill_pack_binding (
+    id            BIGSERIAL PRIMARY KEY,
+    pid           VARCHAR(26) UNIQUE NOT NULL,
+    tenant_id     BIGINT NOT NULL,
+    pack_pid      VARCHAR(26) NOT NULL,        -- ab_agent_skill_pack.pid
+    -- dimensions — NULL = match any on that axis
+    profile_id    VARCHAR(26),
+    channel       VARCHAR(32),
+    run_kind      VARCHAR(20),
+    priority      INTEGER NOT NULL DEFAULT 100,
+    active        BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at    TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at    TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_pack_binding_tenant ON ab_agent_skill_pack_binding (tenant_id, active);
+CREATE INDEX IF NOT EXISTS idx_pack_binding_pack ON ab_agent_skill_pack_binding (pack_pid);
+COMMENT ON TABLE ab_agent_skill_pack_binding IS 'Which skill pack(s) activate for a (profile × channel × run_kind) tuple';
+
+-- ============================================================================
+-- ACP Dry-Run Support Registry (learning-loop.md §6.0.2)
+-- Shadow Mode needs to replay a candidate Skill without producing side
+-- effects. Per ACP spec, different substrates support dry-run differently:
+--   FULL       — executor can run safely with no side effect (e.g.
+--                dsl_query NamedQuery; mcp tool with annotations.readOnly=true)
+--   SIMULATED  — executor runs validation + before-snapshot phases, skips
+--                commit (e.g. dsl_command with dry_run_supported=true)
+--   NONE       — can't be shadowed (e.g. third-party webhook with no dry
+--                endpoint); Shadow Mode skips; promotion goes straight to
+--                reinforced human gate
+--
+-- Pattern matches are exact OR trailing '*' prefix; tenant_id=-1 = platform
+-- default. A tenant can override by inserting a row that overrides the
+-- default (lookup picks the most specific match, tenant beats platform).
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS ab_agent_dry_run_support (
+    id                BIGSERIAL PRIMARY KEY,
+    pid               VARCHAR(26) UNIQUE NOT NULL,
+    tenant_id         BIGINT NOT NULL,                 -- -1 = platform default
+    tool_ref_pattern  VARCHAR(200) NOT NULL,
+    support_level     VARCHAR(16) NOT NULL CHECK (support_level IN ('FULL', 'SIMULATED', 'NONE')),
+    hint              VARCHAR(500),
+    created_at        TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at        TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (tenant_id, tool_ref_pattern)
+);
+CREATE INDEX IF NOT EXISTS idx_dry_run_support_tenant ON ab_agent_dry_run_support (tenant_id);
+COMMENT ON TABLE ab_agent_dry_run_support IS 'Registry of which tool_refs support Shadow Mode dry-run (spec §6.0.2)';
+
+-- Platform defaults: dsl_query and nq_* are read-only → FULL.
+-- dsl_command / cmd_* → NONE (requires CommandPipeline dry-run work,
+-- separate PR). api_call / mcp / code → NONE until per-tool annotation
+-- flows in.
+INSERT INTO ab_agent_dry_run_support (pid, tenant_id, tool_ref_pattern, support_level, hint) VALUES
+('DRS_DSL_QUERY_ANY',  -1, 'nq_*',       'FULL', 'Named queries are side-effect free; FULL dry-run is just running the query'),
+('DRS_DSL_QUERY_NQ',   -1, 'dsl.query',  'FULL', 'Built-in dsl.query skill is always read-only'),
+('DRS_DSL_CMD_BLOCK',  -1, 'cmd_*',      'SIMULATED', 'CommandPipeline runs under a rollback-only transaction (PR-40)'),
+('DRS_DSL_COMMAND',    -1, 'dsl.command','SIMULATED', 'CommandPipeline runs under a rollback-only transaction (PR-40)'),
+('DRS_CODE_BLOCK',     -1, 'code.*',     'NONE', 'Code substrate without sandbox dry-run capability is unsafe'),
+('DRS_API_BLOCK',      -1, 'api_*',      'NONE', 'API calls lack dry_run_safe annotations by default')
+ON CONFLICT DO NOTHING;
+
+-- PR-40 migration: upgrade platform defaults from NONE → SIMULATED now that
+-- CommandPipeline supports rollback-only dry-run. Safe to re-run.
+UPDATE ab_agent_dry_run_support
+SET support_level = 'SIMULATED',
+    hint = 'CommandPipeline runs under a rollback-only transaction (PR-40)',
+    updated_at = CURRENT_TIMESTAMP
+WHERE tenant_id = -1
+  AND tool_ref_pattern IN ('cmd_*', 'dsl.command')
+  AND support_level = 'NONE';
 
 -- Seed: platform built-in capabilities (tenant_id = -1)
 -- Skills are the built-in per-tenant generic codes (dsl.query / dsl.command)

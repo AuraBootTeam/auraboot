@@ -89,10 +89,12 @@ test.describe('Page Designer loads existing pages', () => {
     }
     await page.waitForLoadState('domcontentloaded').catch(() => {});
 
-    // D6: The designer canvas must be visible — confirms editor loaded the saved schema
+    // D6: The designer surface must be visible — confirms editor loaded the saved schema.
+    // Post merge 5f72469b: DesignerRouter dispatches list → list-config-panel,
+    // detail → detail-config-panel, form → designer-canvas. Accept any.
     const canvas = page
       .locator(
-        '[data-testid="designer-canvas"], [data-designer-canvas], .designer-canvas, [data-testid="areas-designer"]',
+        '[data-testid="designer-canvas"], [data-designer-canvas], .designer-canvas, [data-testid="areas-designer"], [data-testid="list-config-panel"], [data-testid="detail-config-panel"]',
       )
       .first();
     await expect(canvas).toBeVisible({ timeout: 10000 });

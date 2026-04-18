@@ -148,6 +148,17 @@ public class CommandExecutorImpl implements CommandExecutor {
                 result = guardedPipeline.get();
             }
 
+            // Shadow Mode dry-run (learning-loop.md §6): the pipeline ran to
+            // completion producing a realistic result object, but every DB
+            // write it made must be undone. Force rollback at the JTA layer.
+            if (request.isDryRun()) {
+                org.springframework.transaction.interceptor.TransactionAspectSupport
+                        .currentTransactionStatus().setRollbackOnly();
+                log.info("Command {} executed in dry-run mode — transaction marked for rollback",
+                        commandCode);
+                result.setPhaseReached("completed_dry_run");
+            }
+
             // Record success metrics
             if (metricsSample != null && commandMetrics != null) {
                 commandMetrics.recordCommandExecution(metricsSample, commandCode, result.getCommandCode(), true);

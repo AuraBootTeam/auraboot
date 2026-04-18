@@ -784,3 +784,298 @@ admin:
       genderMale: 男
       genderFemale: 女
       positionNone: -- 无职位 --
+
+# BPMN Designer
+bpmn:
+  status:
+    draft: 草稿
+    published: 已发布
+    suspended: 已暂停
+  designer:
+    title: BPMN 流程设计器
+    process_name: 流程名称
+    process_key: 流程标识
+    save: 保存
+    saving: 保存中...
+    validate: 验证
+    import: 导入
+    export: 导出
+    deploy: 部署
+    deploying: 部署中...
+    monitor: 监控
+    exit_monitor: 退出监控
+    monitor_mode: 监控模式
+    version_history: 版本历史
+    new_process: 新建流程
+    clear: 清空
+    save_first: 请先保存流程
+    save_success: 保存成功
+    save_failed: 保存失败
+    deploy_success: 部署成功
+    deploy_failed: 部署失败
+    import_success: 导入成功
+    import_failed: 导入失败
+    import_json_only: 仅支持 JSON 格式
+    file_read_error: 文件读取失败
+    load_failed: 加载失败
+    query_status: 查询状态
+    instance_id_placeholder: 输入流程实例 ID
+  save:
+    title: 保存流程定义
+    closeAria: 关闭对话框
+    cancel: 取消
+    confirm: 确定
+    saving: 保存中...
+    field:
+      name: 流程名称
+      namePlaceholder: '例如：员工请假审批流程'
+      key: 流程标识
+      keyPlaceholder: '例如：leave_approval_process'
+      version: 版本号（数字）
+      versionAuto: （自动递增）
+      versionName: 语义化版本号
+      versionNamePlaceholder: '例如：1.0.0'
+      versionNameHint: '格式：x.y.z（如 1.0.0 或 2.1.3）'
+      description: 描述
+      descriptionPlaceholder: 流程的详细描述...
+      category: 分类
+      categoryPlaceholder: '例如：人事管理'
+    error:
+      nameRequired: 流程名称不能为空
+      nameTooLong: 流程名称不能超过 100 个字符
+      keyRequired: 流程标识不能为空
+      keyPattern: 流程标识只能包含字母、数字、下划线和连字符
+      versionFormat: '版本号格式不正确，应为 x.y.z 格式（如 1.0.0）'
+      descriptionTooLong: 描述不能超过 500 个字符
+      categoryTooLong: 分类不能超过 50 个字符
+  palette:
+    title: 组件库
+    categoryEvent: 事件
+    categoryTask: 任务
+    categoryGateway: 网关
+    startEvent: 开始事件
+    startEventDesc: 流程的开始节点
+    endEvent: 结束事件
+    endEventDesc: 流程的结束节点
+    userTask: 用户任务
+    userTaskDesc: 需要人工处理的任务
+    serviceTask: 服务任务
+    serviceTaskDesc: 自动执行的服务任务
+    receiveTask: 接收任务
+    receiveTaskDesc: 等待接收消息的任务
+    exclusiveGateway: 排他网关
+    exclusiveGatewayDesc: 条件分支，只能选择一条路径
+    parallelGateway: 并行网关
+    parallelGatewayDesc: 并行分支，所有路径同时执行
+    inclusiveGateway: 包容网关
+    inclusiveGatewayDesc: 条件分支，满足条件的路径都执行
+    callActivity: 子流程
+    callActivityDesc: 调用另一个流程定义
+  common:
+    delete: 删除
+    description: 描述
+    loading: 加载中...
+    noResults: 暂无结果
+    remove: 移除
+    search: 搜索
+  prop:
+    nodeLabel: 节点名称
+    nodeProperties: 节点属性
+    edgeProperties: 连线属性
+    processProperties: 流程属性
+    selectNodeOrEdge: 请选择节点或连线
+    confirmDeleteNode: 确认删除该节点？
+    confirmDeleteEdge: 确认删除该连线？
+    deleteNodeTitle: 删除节点
+    deleteEdgeTitle: 删除连线
+    common:
+      unsupportedHint: 该节点类型暂不支持配置
+    multiInstance:
+      title: 多实例配置
+      enable: 启用多实例
+      executionMode: 执行模式
+      sequential: 串行
+      parallel: 并行
+      loopCardinality: 循环次数
+      loopCardinalityPlaceholder: 例如 ${count}
+      collection: 集合表达式
+      elementVariable: 元素变量名
+      completionCondition: 完成条件
+    edge:
+      label: 标签
+      defaultFlow: 默认流向
+      defaultFlowHint: 当其他条件都不满足时走此分支
+    formBinding:
+      title: 表单绑定
+      formPage: 表单页面
+      saveStrategy: 保存策略
+      saveBusinessOnly: 仅保存业务数据
+      saveDualWrite: 业务数据 + 流程变量
+      saveVariableOnly: 仅保存流程变量
+      versionStrategy: 版本策略
+      versionLatest: 始终使用最新版本
+      versionFixed: 锁定指定版本
+      versionPlaceholder: 留空使用最新
+      variableMapping: 变量映射
+      fieldPermissions: 字段权限
+    assignee:
+      typeUser: 用户
+      typeRole: 角色
+      typeTeam: 部门
+      addPlaceholder: 添加候选人
+    startevent:
+      formKey: 启动表单
+      formKeyPlaceholder: 例如 leaveRequestForm
+      initiator: 发起人变量
+    endevent:
+      terminateAll: 终止所有流程实例
+    receivetask:
+      messageRef: 消息引用
+      messageType: 消息类型
+    servicetask:
+      serviceType: 服务类型
+      typeHttp: HTTP 调用
+      typeJava: Java 类
+      typeScript: 脚本
+      typeCommand: Aura 命令
+      serviceUrl: 服务地址
+      className: 类名
+      scriptType: 脚本类型
+      scriptContent: 脚本内容
+      commandCode: 命令编码
+      commandCodeHint: 选择已注册的 Aura Command
+      async: 异步执行
+    usertask:
+      auraSectionTitle: Aura 扩展配置
+      assigneeType: 处理人类型
+      assignUser: 指定用户
+      assignRole: 指定角色
+      assignDept: 指定部门
+      assignExpression: 表达式
+      assignStarter: 流程发起人
+      starterHint: 自动取流程发起人
+      expressionLabel: 表达式
+      expressionHint: '示例：${initiator} 或 ${variables.managerId}'
+      searchUser: 搜索用户
+      searchRole: 搜索角色
+      searchDept: 搜索部门
+      approvalMode: 审批模式
+      modeSingle: 单人审批
+      modeMulti: 会签
+      modeSequential: 依次审批
+      dueDate: 截止时间
+      dueDatePlaceholder: 例如 2026-04-30T18:00:00
+      dueDateHint: 支持 ISO8601 或表达式
+      priority: 优先级
+      skipable: 允许跳过
+      requiredPermissions: 所需权限
+      requiredPermissionsPlaceholder: 例如 leave.approve
+      requiredPermissionsHint: 多个权限以逗号分隔
+      ccPolicyInherit: 沿用流程级抄送策略
+      ccPolicyOverride: 覆盖抄送策略
+      ccPolicyOverrideHint: 仅对此节点生效
+    process:
+      auraSectionTitle: Aura 扩展配置
+      name: 名称
+      namePlaceholder: 流程名称
+      key: 标识
+      keyReadonlyHint: 流程标识保存后不可修改
+      category: 分类
+      categoryPlaceholder: '例如：人事管理'
+      descPlaceholder: 流程描述
+      ccPolicy: 抄送策略
+      ccPolicyHint: 抄送给指定人员
+      withdrawPolicy: 撤回策略
+      withdrawPolicyHint: 控制是否允许撤回
+      policyDefault: 默认
+  gateway:
+    defaultFlow: 默认流向
+    defaultFlowHint: 当其他条件都不满足时走此分支
+    defaultFlowTag: 默认
+    noDefaultFlow: 未设置默认流向
+    outgoingConditions: 出口条件
+    noConditionSet: 尚未设置条件
+    completionCondition: 完成条件
+    exclusiveDescPlaceholder: 排他网关说明
+    inclusiveDescPlaceholder: 包容网关说明
+    parallelDescPlaceholder: 并行网关说明
+    parallelInfo: 并行网关无需配置条件
+  callactivity:
+    calledProcess: 被调用流程
+    calledProcessVersion: 流程版本
+    versionLatest: 始终使用最新
+    versionFixed: 锁定指定版本
+    versionPlaceholder: 留空使用最新
+    selectProcess: 选择流程
+    searchProcess: 搜索流程
+    noDeployedProcess: 暂无已部署的流程
+    variableMapping: 变量映射
+    inputMapping: 输入映射
+    outputMapping: 输出映射
+    parentVariable: 父流程变量
+    childVariable: 子流程变量
+    addMapping: 新增映射
+  condition:
+    type: 条件类型
+    typeExpression: 表达式
+    typeScript: 脚本
+    language: 语言
+    simpleMode: 简单模式
+    advancedMode: 高级模式
+    advancedPlaceholder: 例如 ${amount > 1000}
+    fieldPlaceholder: 字段名
+    valuePlaceholder: 取值
+    addRule: 新增规则
+    removeRule: 移除规则
+    preview: 预览
+    parseWarning: 表达式解析失败
+    helpText: 支持 SpEL/JS 表达式
+    op:
+      contains: 包含
+      isEmpty: 为空
+      isNotEmpty: 非空
+  hook:
+    title: 钩子配置
+    addHook: 新增钩子
+    hookNumber: 钩子 #{index}
+    hookType: 触发时机
+    typePreExecute: 执行前
+    typePostExecute: 执行后
+    typePreComplete: 完成前
+    typePostComplete: 完成后
+    actionType: 动作类型
+    actionScript: 脚本
+    actionHttpCallback: HTTP 回调
+    actionCommand: 执行命令
+    scriptLanguage: 脚本语言
+    scriptContent: 脚本内容
+    httpUrl: HTTP 地址
+    httpMethod: HTTP 方法
+    httpHeaders: 请求头
+    commandCode: 命令编码
+    commandParams: 命令参数
+    failStrategy: 失败策略
+    failBlock: 阻断
+    failIgnore: 忽略
+    failRetry: 重试
+    enabled: 启用
+    async: 异步
+    executionOrder: 执行顺序
+  validate:
+    passed: 流程校验通过
+    failed: 流程校验失败
+    result: 校验结果
+    errors_title: 错误列表
+    start_event_required: 缺少开始事件
+    start_event_single: 仅允许一个开始事件
+    end_event_required: 缺少结束事件
+    start_no_incoming: 开始事件不能有入边
+    start_no_outgoing: 开始事件需要至少一条出边
+    end_no_incoming: 结束事件需要至少一条入边
+    end_no_outgoing: 结束事件不能有出边
+    task_no_incoming: '任务 "{name}" 缺少入边'
+    task_no_outgoing: '任务 "{name}" 缺少出边'
+    gateway_no_incoming: '网关 "{name}" 缺少入边'
+    exclusive_gateway_min_outgoing: 排他网关至少需要两条出边
+    exclusive_gateway_edge_missing_condition: '排他网关 "{name}" 的出边缺少条件'
+    exclusive_gateway_multiple_defaults: '排他网关 "{name}" 配置了多个默认流向'

@@ -5,15 +5,14 @@
  * config → save → deploy → runtime execution of pre-check / post-action hooks
  * when the process instance activity starts / ends.
  *
- * Runtime coverage (HOOK-2 / HOOK-3) is pinned via test.fixme against two
- * diagnosed platform gaps (see the comment blocks under each .fixme test):
+ * Runtime coverage (HOOK-2 / HOOK-3) was previously pinned via test.fixme
+ * against two diagnosed platform gaps that have since been closed:
  *
- *   GAP-A (hook compilation): JsonToBpmnConverter does NOT compile node
- *     hooks from designerJson into the deployed BPMN XML (no <smart:hooks>
- *     / extensionElements for hooks). Grep for "hook" in
- *     platform/src/main/java/com/auraboot/framework/bpm/converter/
- *     JsonToBpmnConverter.java returns 0 hits — node hooks live in their own
- *     table (ab_bpm_node_hook) rather than being embedded in the BPMN.
+ *   GAP-254 (CLOSED): JsonToBpmnConverter now compiles designerJson
+ *     config.hooks[] into BPMN as <smart:property name="aura.hooks" .../>
+ *     AND ProcessDeploymentService persists the same descriptor list into
+ *     ab_bpm_node_hook on deploy, so BpmNodeHookService.getHooks finds them
+ *     at ACTIVITY_START / ACTIVITY_END.
  *
  *   GAP-B (hookType contract mismatch): The frontend NodeHookEntry
  *     hookType value set is
@@ -672,7 +671,7 @@ test.describe(
     // to end. Once GAP-254 (and the upstream GAP-A at deploy time) land, the
     // .fixme markers can be removed without further hook-service changes.
     // =======================================================================
-    test.fixme(
+    test(
       'HOOK-2: start instance → pre-check hook fires, writes preHookFired variable',
       async ({ request }) => {
         expect(processPid, 'processPid must be set from HOOK-1').toBeTruthy();
@@ -727,7 +726,7 @@ test.describe(
     // next queryInstanceStatus call — today that call sees the pre-activity
     // snapshot because the hook mutation is never persisted.
     // =======================================================================
-    test.fixme(
+    test(
       'HOOK-3: complete task → post-action hook fires, writes postHookFired variable',
       async ({ request }) => {
         expect(
