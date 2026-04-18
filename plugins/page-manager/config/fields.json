@@ -35,9 +35,10 @@
   },
   {
     "code": "model_code",
-    "displayName:zh-CN": "绑定模型",
-    "displayName:en": "Bound Model",
+    "displayName:zh-CN": "主 Model",
+    "displayName:en": "Primary Model",
     "dataType": "text",
+    "constraints": { "required": true, "maxLength": 200 },
     "feature": { "searchable": true }
   },
   {
