@@ -26,6 +26,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataAccessException;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -662,7 +663,7 @@ public class AgentRunService {
             }
 
             StringBuilder sqlBuilder = new StringBuilder();
-            sqlBuilder.append("SELECT pid, memory_title, memory_content, memory_type, category ");
+            sqlBuilder.append("SELECT pid, memory_title, memory_content, memory_type, category, shadow_mode ");
             sqlBuilder.append("FROM ab_agent_memory ");
             sqlBuilder.append("WHERE tenant_id = #{params.tenantId} ");
             sqlBuilder.append("AND (memory_agent_id = #{params.agentCode} OR memory_agent_id IS NULL) ");
@@ -707,6 +708,15 @@ public class AgentRunService {
                 String title = mem.get("memory_title") != null ? String.valueOf(mem.get("memory_title")) : "";
                 String content = mem.get("memory_content") != null ? String.valueOf(mem.get("memory_content")) : "";
 
+                // PR-72 C2: route through the shared helper so agent-run prompt
+                // assembly applies the same shadow-mode annotation that the
+                // interactive chat path uses. Without this, shadow memories
+                // look fully-endorsed to the LLM during cron agent runs.
+                Object shadowObj = mem.get("shadow_mode");
+                boolean isShadow = shadowObj instanceof Boolean shadowBool ? shadowBool
+                        : Boolean.parseBoolean(String.valueOf(shadowObj));
+                content = ActiveMemoryService.applyShadowMarker(content, isShadow);
+
                 StringBuilder entry = new StringBuilder();
                 entry.append("\n### [").append(memType).append("]");
                 if (!category.isBlank()) {
@@ -730,8 +740,12 @@ public class AgentRunService {
             }
 
             return sb.toString();
-        } catch (Exception e) {
-            log.warn("Failed to load agent memories: {}", e.getMessage());
+        } catch (DataAccessException e) {
+            // allowed-catch: prompt-assembly must not crash on memory-read failure;
+            // see PR-72 C4. Log at ERROR with full stack so the failure is visible
+            // in ops dashboards even though the agent run continues without memory.
+            log.error("Failed to load agent memories for tenant={} agent={}: {}",
+                    tenantId, agentCode, e.getMessage(), e);
             return null;
         }
     }

@@ -45,6 +45,23 @@ public class ActiveMemoryService {
     public static final String SHADOW_ANNOTATION_PREFIX =
             "[SHADOW / 近期团队记忆 · 观察中] ";
 
+    /**
+     * Apply the shadow-mode annotation to a memory-content string. Returns
+     * the input unchanged when {@code shadowMode=false} or when {@code content}
+     * is null. Idempotent: if {@code content} already starts with
+     * {@link #SHADOW_ANNOTATION_PREFIX}, it is not double-prefixed.
+     *
+     * <p>Callers: {@link #snippet(Map)} (pre-recall path used by GroundingService)
+     * and {@code AgentRunService.loadMemorySection} (agent-run prompt assembly).
+     * Centralising here ensures both paths reach the LLM with the same marker
+     * contract (plan §8 / PR-72 C2).
+     */
+    public static String applyShadowMarker(String content, boolean shadowMode) {
+        if (!shadowMode || content == null) return content;
+        if (content.startsWith(SHADOW_ANNOTATION_PREFIX)) return content;
+        return SHADOW_ANNOTATION_PREFIX + content;
+    }
+
     /** Hard cap on snippets returned to Grounding — keep prompt size bounded. */
     private static final int MAX_SNIPPETS = 8;
     /** Keyword hits weighted more heavily than importance recall. */
@@ -83,6 +100,7 @@ public class ActiveMemoryService {
                     tenantId, userId, agent, userMessage.trim(), KEYWORD_LIMIT)) {
                 if (seenPids.add(String.valueOf(row.get("pid")))) {
                     snippets.add(snippet(row));
+                    logAccess(row, userId);
                 }
             }
         }
@@ -97,6 +115,7 @@ public class ActiveMemoryService {
                 if (snippets.size() >= MAX_SNIPPETS) break;
                 if (seenPids.add(String.valueOf(row.get("pid")))) {
                     snippets.add(snippet(row));
+                    logAccess(row, userId);
                 }
             }
         }
@@ -109,6 +128,20 @@ public class ActiveMemoryService {
     /** Backward-compat: call with default "aurabot" agent. */
     public List<Map<String, Object>> preRecall(Long tenantId, String userId, String userMessage) {
         return preRecall(tenantId, userId, DEFAULT_AGENT, userMessage);
+    }
+
+    /**
+     * PR-72 C3: write one access-log row per (memory, user, day) whenever a
+     * memory is materialised into a chat pre-recall payload. Powers the
+     * {@code implicit_co_sign} strategy in {@link MemoryPromotionExtractor}
+     * which counts distinct users over 90 days. No-op when userId is null
+     * (system / cron caller — recordMemoryAccess itself guards this too).
+     */
+    private void logAccess(Map<String, Object> row, String userId) {
+        if (userId == null || userId.isBlank()) return;
+        Object pidObj = row.get("pid");
+        if (pidObj == null) return;
+        memoryService.recordMemoryAccess(String.valueOf(pidObj), userId);
     }
 
     /**
@@ -132,9 +165,7 @@ public class ActiveMemoryService {
         // "这条不对" retract button keyed on the marker.
         Object shadow = row.get("shadow_mode");
         boolean isShadow = shadow instanceof Boolean b ? b : Boolean.parseBoolean(String.valueOf(shadow));
-        if (isShadow && contentStr != null) {
-            contentStr = SHADOW_ANNOTATION_PREFIX + contentStr;
-        }
+        contentStr = applyShadowMarker(contentStr, isShadow);
         m.put("content", contentStr);
         m.put("importance", row.get("importance"));
         m.put("scope", row.get("scope"));
