@@ -569,23 +569,36 @@ public class TenantBootstrapServiceImpl implements TenantBootstrapService {
 
         int totalAssigned = 0;
 
+        // Internal system model permissions (e.g. model.sys_user.read) must only
+        // reach a narrow set of roles — the VIEWER template would otherwise pick
+        // them up through its "all read actions" filter and leak the user
+        // directory. See SystemPermissionInitializer#INTERNAL_SYSTEM_MODELS.
+        Set<String> internalSystemCodes =
+            com.auraboot.framework.permission.service.SystemPermissionInitializer.internalSystemModelActionCodes();
+        Set<String> internalSystemRoleWhitelist =
+            com.auraboot.framework.permission.service.SystemPermissionInitializer.internalSystemModelRoleWhitelist();
+
         for (Map.Entry<String, Role> entry : roleMap.entrySet()) {
             Role role = entry.getValue();
-            RolePermissionTemplate template = RolePermissionTemplate.findByRoleCode(entry.getKey());
+            String roleCode = entry.getKey();
+            RolePermissionTemplate template = RolePermissionTemplate.findByRoleCode(roleCode);
             if (template == null) {
-                log.debug("No template for role: {}", entry.getKey());
+                log.debug("No template for role: {}", roleCode);
                 continue;
             }
 
+            boolean internalAllowed = internalSystemRoleWhitelist.contains(roleCode);
+
             List<Long> filteredIds = systemPermissions.stream()
                 .filter(template::shouldAssign)
+                .filter(p -> internalAllowed || !internalSystemCodes.contains(p.getCode()))
                 .map(com.auraboot.framework.permission.entity.Permission::getId)
                 .toList();
 
             if (!filteredIds.isEmpty()) {
                 rolePermissionService.assignPermissionsToRole(role.getId(), filteredIds);
                 totalAssigned += filteredIds.size();
-                log.info("{}角色Permission分配完成: count={}", entry.getKey(), filteredIds.size());
+                log.info("{}角色Permission分配完成: count={}", roleCode, filteredIds.size());
             }
         }
 
