@@ -5,6 +5,7 @@ import com.auraboot.framework.meta.dto.PageSchemaCreateRequest;
 import com.auraboot.framework.meta.dto.PageSchemaDTO;
 import com.auraboot.framework.meta.service.CommandHandler;
 import com.auraboot.framework.meta.service.CommandHandlerContext;
+import com.auraboot.framework.meta.service.DryRunSafe;
 import com.auraboot.framework.meta.service.PageSchemaService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,6 +37,9 @@ import java.util.Map;
 @Slf4j
 @Component("pageSchemaCommandHandler")
 @RequiredArgsConstructor
+@DryRunSafe  // All writes (JDBC updates + pageSchemaService.create) happen
+             // through the pooled DataSource, so they roll back cleanly under
+             // dry-run. No external HTTP/MQ/email/storage side effects.
 public class PageSchemaCommandHandler implements CommandHandler {
 
     private final PageSchemaService pageSchemaService;
