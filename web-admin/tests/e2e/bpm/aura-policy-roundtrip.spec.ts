@@ -404,20 +404,31 @@ test.describe('BPM Designer aura.* policy round-trip (Epic C)', { tag: ['@bpm-re
     });
     expect(status.currentNodes.map((n) => n.nodeId)).toContain('approve');
 
-    // 3. Resolve the taskId for the current user.
+    // 3. Resolve the taskId for the current user via the canonical todo
+    //    endpoint (/api/bpm/tasks/my collides with the path-variable route
+    //    /tasks/{id:Long} and returns 500). Filter the todo list to this
+    //    instance's approve task.
     const tasksResp = await request.get(
-      `/api/bpm/tasks/my?processInstanceId=${encodeURIComponent(status.instanceId)}`,
+      `/api/bpm/tasks/todo?pageNum=1&pageSize=100`,
       { headers: { Authorization: `Bearer ${adminToken}` } },
     );
-    expect(tasksResp.ok(), `list my tasks must succeed: ${tasksResp.status()}`).toBe(true);
+    expect(tasksResp.ok(), `list todo tasks must succeed: ${tasksResp.status()}`).toBe(true);
     const tasksBody = await tasksResp.json();
-    const tasks =
-      (tasksBody?.data?.records as Array<Record<string, unknown>> | undefined) ??
-      (tasksBody?.data as Array<Record<string, unknown>> | undefined) ??
-      [];
-    const approveTask = tasks.find((t) => t.activityId === 'approve' || t.nodeId === 'approve');
+    const tasksRaw = tasksBody?.data;
+    const tasks = (Array.isArray(tasksRaw) ? tasksRaw : tasksRaw?.records ?? []) as Array<
+      Record<string, unknown>
+    >;
+    const approveTask = tasks.find(
+      (t) =>
+        String(t.processInstanceId ?? '') === status.instanceId &&
+        (t.processDefinitionActivityId === 'approve' ||
+          t.activityId === 'approve' ||
+          t.nodeId === 'approve'),
+    );
     expect(approveTask, 'approve task must be present for initiator').toBeTruthy();
-    const taskId = String(approveTask?.id ?? approveTask?.taskId ?? '');
+    const taskId = String(
+      approveTask?.instanceId ?? approveTask?.id ?? approveTask?.taskId ?? '',
+    );
     expect(taskId).toBeTruthy();
 
     // 4. Withdraw via the initiator path — WithdrawService reads the
