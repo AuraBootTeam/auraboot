@@ -261,7 +261,7 @@ export async function saveProcess(page: Page): Promise<{ processDefinitionId: st
   expect(response.ok()).toBe(true);
 
   const body = await response.json();
-  const pid: string = body?.data?.id ?? body?.data?.pid ?? body?.id;
+  const pid: string = body?.data?.pid;
   if (!pid) {
     throw new Error(`saveProcess: could not extract process definition ID from response: ${JSON.stringify(body)}`);
   }
@@ -305,10 +305,12 @@ export async function deployProcess(
   expect(response.ok()).toBe(true);
 
   const body = await response.json();
-  // The deploy endpoint returns the updated ProcessDefinitionDTO.
-  // Use the pid/id as the deployment identifier since there is no separate deploymentId.
-  const deploymentId: string =
-    body?.data?.deploymentId ?? body?.data?.id ?? body?.data?.pid ?? pdId;
+  // The deploy endpoint returns the updated ProcessDefinitionDTO which includes
+  // deploymentId set to "{processKey}:{version}" by ProcessDeploymentService.deploy().
+  const deploymentId: string = body?.data?.deploymentId;
+  if (!deploymentId) {
+    throw new Error(`deployProcess: could not extract deploymentId from response: ${JSON.stringify(body)}`);
+  }
 
   return { deploymentId };
 }
