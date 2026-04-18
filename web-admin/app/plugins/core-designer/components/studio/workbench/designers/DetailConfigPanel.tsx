@@ -4,6 +4,11 @@ import { useModelCapabilities } from '~/shared/hooks/useModelCapabilities';
 import { blocksToDetailVm, detailVmToBlocks, type DetailViewModel } from './detail-config/mapper';
 import { SectionsTab } from './detail-config/SectionsTab';
 import { ActionsTab } from './detail-config/ActionsTab';
+import {
+  validateDetailVm,
+  hasBlockingErrors,
+  type ValidationError,
+} from './validation/capabilityValidator';
 
 export interface DetailConfigPanelProps {
   schema: PageSchema;
@@ -74,6 +79,39 @@ export const DetailConfigPanel: React.FC<DetailConfigPanelProps> = ({
       )}
 
       <main className="flex-1 overflow-auto bg-white p-6">
+        {(() => {
+          const errors: ValidationError[] = validateDetailVm(vm, capabilities);
+          if (errors.length === 0) return null;
+          return (
+            <div
+              className={`mb-4 rounded border p-3 text-sm ${
+                hasBlockingErrors(errors)
+                  ? 'border-red-200 bg-red-50'
+                  : 'border-amber-200 bg-amber-50'
+              }`}
+              data-testid="validation-banner"
+            >
+              <div className="mb-1 font-medium">
+                {hasBlockingErrors(errors)
+                  ? 'Configuration conflicts'
+                  : 'Warnings'}
+              </div>
+              <ul className="space-y-1">
+                {errors.map((e, i) => (
+                  <li
+                    key={i}
+                    className={
+                      e.severity === 'error' ? 'text-red-700' : 'text-amber-700'
+                    }
+                    data-testid={`validation-${e.severity}`}
+                  >
+                    [{e.tab}] {e.message}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          );
+        })()}
         {tab === 'sections' && (
           <SectionsTab vm={vm} setVm={setVm} fields={fields} readonly={readonly} />
         )}
