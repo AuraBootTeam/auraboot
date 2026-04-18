@@ -72,10 +72,18 @@ public class DslCommandShadowInvoker implements ShadowToolInvoker {
         // output_match_rate by returning a "successful" Map to the caller.
         CommandExecuteResult r = commandExecutor.execute(commandCode, req);
 
+        // N-R3-1: explicit success flag avoids the fragile heuristic in
+        // OutputSignatureProjector.extractCommandSuccess. A dry-run is only
+        // truly successful when CommandExecutorImpl reaches the terminal
+        // phase "completed_dry_run"; partial phases (e.g. "validation") still
+        // return a non-null phase_reached but indicate a short-circuit.
+        boolean success = r != null && "completed_dry_run".equals(r.getPhaseReached());
+
         Map<String, Object> out = new HashMap<>();
         out.put("command_code", commandCode);
         out.put("phase_reached", r == null ? null : r.getPhaseReached());
         out.put("data", r == null ? Map.of() : (r.getData() == null ? Map.of() : r.getData()));
+        out.put("success", success);
         return out;
     }
 

@@ -3,12 +3,10 @@ package com.auraboot.framework.agent.util;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeSet;
 
 /**
  * Output-signature projector for Shadow Mode match comparisons (PR-60).
@@ -211,22 +209,9 @@ public final class OutputSignatureProjector {
         return 0L;
     }
 
-    /** Collect primary keys ({@code id}/{@code pid}/{@code _id}) from rows, deduped and sorted ascending. */
-    @SuppressWarnings("unused")
-    private static List<Object> extractPrimaryKeysSorted(Map<String, Object> shadowResult) {
-        if (shadowResult == null) return List.of();
-        Object rows = shadowResult.get("rows");
-        if (!(rows instanceof List<?> list)) return List.of();
-        TreeSet<String> keys = new TreeSet<>();
-        for (Object r : list) {
-            if (!(r instanceof Map<?, ?> row)) continue;
-            Object k = row.get("id");
-            if (k == null) k = row.get("pid");
-            if (k == null) k = row.get("_id");
-            if (k != null) keys.add(String.valueOf(k));
-        }
-        return new ArrayList<>(keys);
-    }
+    // TODO(record_ids): tighten query projection once ActionRecorder
+    // persists row IDs — see ActionRecorder#recordReadAction. Until then,
+    // the query projection can only compare record_count symmetrically.
 
     private static String extractCommandRecordId(Map<String, Object> shadowResult) {
         if (shadowResult == null) return null;
@@ -243,7 +228,15 @@ public final class OutputSignatureProjector {
 
     private static boolean extractCommandSuccess(Map<String, Object> shadowResult) {
         if (shadowResult == null) return false;
-        // Invoker succeeded if phase_reached is non-null AND no explicit error field.
+        // N-R3-1: primary signal is the explicit "success" key written by
+        // DslCommandShadowInvoker. The fallback heuristic is retained for
+        // back-compat with hand-constructed maps (tests, future invokers
+        // that haven't migrated yet), but it is imprecise: a partial phase
+        // like "validation" with no exception would otherwise count as
+        // success even though CommandExecutorImpl never reached the
+        // "completed_dry_run" terminal phase.
+        Object explicit = shadowResult.get("success");
+        if (explicit instanceof Boolean b) return b;
         if (shadowResult.containsKey("error")) return false;
         Object phase = shadowResult.get("phase_reached");
         return phase != null;
