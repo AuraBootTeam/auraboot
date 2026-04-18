@@ -338,10 +338,48 @@ export type StandardAction =
   | 'cancel';
 
 /**
- * Button configuration
+ * Localized text map (e.g. { "zh-CN": "提交", "en": "Submit" }).
+ */
+export type DslLocalizedText = string | Record<string, string>;
+
+/**
+ * Full-object action descriptor (runtime contract).
+ *
+ * Examples:
+ *   { type: 'command', command: 'sc:update_showcase' }
+ *   { type: 'navigate', url: '/p/foo' }
+ *   { type: 'submit' } / { type: 'cancel' }
+ */
+export interface DslActionDescriptor {
+  type: 'command' | 'navigate' | 'submit' | 'cancel' | 'close' | string;
+  command?: string;
+  url?: string;
+  params?: Record<string, unknown>;
+  [k: string]: unknown;
+}
+
+/**
+ * Button configuration.
+ *
+ * Two shapes are supported by the runtime:
+ *   1. Shorthand — `{ action: 'submit', type: 'primary' }`
+ *      where `action` is a StandardAction code and `type` is the AntD button style.
+ *   2. Full object — `{ code: 'submit', primary: true, label: {...}, action: { type, command } }`
+ *      where `code` identifies the button semantically, `primary` is a boolean style flag,
+ *      `label` is localized text, and `action` is a DslActionDescriptor.
+ *
+ * Fields are intentionally permissive so a button can start as shorthand and be
+ * "promoted" into full form without losing data.
  */
 export interface DslButton {
-  action: StandardAction | string;
+  /** Shorthand action code; optional when using full-object form with `code`. */
+  action?: StandardAction | string | DslActionDescriptor;
+  /** Full-object semantic code (mirrors `action` when used as shorthand). */
+  code?: string;
+  /** Full-object style flag: boolean primary highlight. */
+  primary?: boolean;
+  /** Full-object localized label. */
+  label?: DslLocalizedText;
   visible?: string; // SpEL expression
   disabled?: string; // SpEL expression
   type?: 'primary' | 'default' | 'dashed' | 'text' | 'link';
