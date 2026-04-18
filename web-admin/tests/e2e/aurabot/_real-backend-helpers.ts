@@ -273,3 +273,204 @@ export function cleanupMissionControlMenus(ids: SeededMenus): void {
         AND id IN (${list});`,
   );
 }
+
+// ---------------------------------------------------------------------------
+// Memory Promotion seeding (PR-69 Phase 5)
+// ---------------------------------------------------------------------------
+
+export interface SeededPromotion {
+  pid: string;
+  /** Optional source memory pid — created when the seed populates one. */
+  sourceMemoryPid?: string;
+  /** Optional promoted memory pid — set when status = PROMOTED_SHADOW. */
+  promotedMemoryPid?: string;
+}
+
+const PROMO_PREFIX = 'E2EMP';
+const MEM_PREFIX = 'E2EMM';
+
+/**
+ * Insert a DRAFT_PENDING_REVIEW promotion row with sensible defaults.
+ *
+ * Ensures the row satisfies chk_memory_promotion_scope (source=user,
+ * target=tenant for reason_code ∈ cross_user_agreement / implicit_co_sign /
+ * importance_spike; source=session, target=user for session_upgrade).
+ */
+export function seedMemoryPromotion(
+  status: string,
+  confidence: number = 0.85,
+  reasonCode: string = 'cross_user_agreement',
+): string {
+  const pid = randomPid(PROMO_PREFIX);
+  const { source, target } =
+    reasonCode === 'session_upgrade'
+      ? { source: 'session', target: 'user' }
+      : { source: 'user', target: 'tenant' };
+  const sql = `
+    INSERT INTO ab_agent_memory_promotion
+      (pid, tenant_id, source_scope, target_scope, category,
+       proposed_title, proposed_content, proposed_importance,
+       reason_code, reason_detail, confidence_score, similarity_score,
+       status, created_at)
+    VALUES
+      ('${pid}', ${ADMIN_TENANT_ID}, '${source}', '${target}', 'operations',
+       'E2E test promotion ${pid}',
+       $$This is a test memory proposal for E2E validation ${pid}.$$, 7,
+       '${reasonCode}',
+       '{"agreement_count":3,"user_ids":[1,2,3]}'::jsonb,
+       ${confidence}, 0.87,
+       '${status}', NOW());
+  `;
+  psql(sql);
+  return pid;
+}
+
+/**
+ * Seed a PROMOTED_SHADOW row with a real back-linked ab_agent_memory
+ * tenant-scope row so the retract path has something to soft-delete.
+ */
+export function seedMemoryPromotionWithPromotedMemory(): SeededPromotion {
+  const promotionPid = randomPid(PROMO_PREFIX);
+  const memoryPid = randomPid(MEM_PREFIX);
+  const now = 'NOW()';
+  const shadowEnds = `NOW() + INTERVAL '7 days'`;
+
+  // 1) Insert the ab_agent_memory row first (FK target)
+  psql(`
+    INSERT INTO ab_agent_memory
+      (pid, tenant_id, memory_agent_id, memory_type, category,
+       memory_title, memory_content, importance, shareable,
+       scope, scope_key, shadow_mode, promoted_from_pid,
+       created_at, updated_at)
+    VALUES
+      ('${memoryPid}', ${ADMIN_TENANT_ID}, 'default', 'tenant_shared', 'operations',
+       'Shadow memory ${memoryPid}',
+       $$Shadow-mode memory content for retract test ${memoryPid}$$,
+       7, TRUE,
+       'tenant', NULL, TRUE, '${promotionPid}',
+       ${now}, ${now});
+  `);
+
+  // 2) Insert the promotion row linking back to it
+  psql(`
+    INSERT INTO ab_agent_memory_promotion
+      (pid, tenant_id, source_scope, target_scope, category,
+       proposed_title, proposed_content, proposed_importance,
+       reason_code, reason_detail, confidence_score, similarity_score,
+       status, promoted_memory_pid, shadow_started_at, shadow_ends_at,
+       reviewed_at, created_at)
+    VALUES
+      ('${promotionPid}', ${ADMIN_TENANT_ID}, 'user', 'tenant', 'operations',
+       'Shadow memory ${memoryPid}',
+       $$Shadow-mode memory content for retract test ${memoryPid}$$, 7,
+       'cross_user_agreement',
+       '{"agreement_count":3,"user_ids":[1,2,3]}'::jsonb,
+       0.88, 0.90,
+       'PROMOTED_SHADOW', '${memoryPid}',
+       ${now}, ${shadowEnds},
+       ${now}, ${now});
+  `);
+
+  return { pid: promotionPid, promotedMemoryPid: memoryPid };
+}
+
+/** Return the current promotion.status straight from the DB. */
+export function dbPromotionStatus(pid: string): string {
+  return psql(
+    `SELECT status FROM ab_agent_memory_promotion WHERE pid = '${pid}';`,
+  );
+}
+
+export interface PromotionRow {
+  status: string;
+  rejectReason: string | null;
+  reviewComment: string | null;
+  promotedMemoryPid: string | null;
+}
+
+export function dbPromotionRow(pid: string): PromotionRow {
+  const raw = psql(
+    `SELECT status || '|' || COALESCE(reject_reason, '') || '|' ||
+            COALESCE(review_comment, '') || '|' ||
+            COALESCE(promoted_memory_pid, '')
+     FROM ab_agent_memory_promotion WHERE pid = '${pid}';`,
+  );
+  const [status, rejectReason, reviewComment, promotedMemoryPid] = raw.split('|');
+  return {
+    status,
+    rejectReason: rejectReason || null,
+    reviewComment: reviewComment || null,
+    promotedMemoryPid: promotedMemoryPid || null,
+  };
+}
+
+/** Whether ab_agent_memory row is soft-deleted (deleted_flag = TRUE). */
+export function dbMemoryIsDeleted(memoryPid: string): boolean {
+  const raw = psql(
+    `SELECT deleted_flag FROM ab_agent_memory WHERE pid = '${memoryPid}';`,
+  );
+  return raw === 't';
+}
+
+/** Delete seeded promotions + their back-linked memories by pid prefix. */
+export function cleanupPromotions(pidPrefix: string): void {
+  // Memories FIRST (promotion.promoted_memory_pid has no FK, but
+  // ab_agent_memory.promoted_from_pid → promotion.pid is informational only).
+  psql(
+    `DELETE FROM ab_agent_memory
+       WHERE tenant_id = ${ADMIN_TENANT_ID} AND pid LIKE '${pidPrefix}%';`,
+  );
+  psql(
+    `DELETE FROM ab_agent_memory_promotion
+       WHERE tenant_id = ${ADMIN_TENANT_ID} AND pid LIKE '${pidPrefix}%';`,
+  );
+  // Also clean any memory rows linked to our seeded promotions (via
+  // promoted_memory_pid) that used a different prefix (MEM_PREFIX).
+  psql(
+    `DELETE FROM ab_agent_memory
+       WHERE tenant_id = ${ADMIN_TENANT_ID} AND pid LIKE '${MEM_PREFIX}%';`,
+  );
+}
+
+/** Prefix used by seedMemoryPromotion* — exported for cleanupPromotions callers. */
+export const MEMORY_PROMOTION_PID_PREFIX = PROMO_PREFIX;
+
+// ---------------------------------------------------------------------------
+// Memory Promotion menu seeding
+// ---------------------------------------------------------------------------
+
+export interface SeededPromotionMenu {
+  menuId: string;
+  ownedIds: string[];
+}
+
+/**
+ * Idempotent: insert "记忆提案" leaf under "AI 中心" at /aurabot/memory-promotions.
+ * Mirrors seedMissionControlMenus for the Phase 4 / Phase 5 page.
+ */
+export function seedMemoryPromotionsMenu(): SeededPromotionMenu {
+  const rand = () => Math.random().toString(36).slice(2, 8).toUpperCase();
+  const pid = `E2EM_MP_${rand()}${rand()}`.slice(0, 26);
+  const r = upsertMenu({
+    pid,
+    code: 'aurabot.memory-promotions',
+    name: '记忆提案',
+    path: '/aurabot/memory-promotions',
+    order: 37,
+  });
+  return {
+    menuId: r.id,
+    ownedIds: r.didInsert ? [r.id] : [],
+  };
+}
+
+export function cleanupMemoryPromotionsMenu(menu: SeededPromotionMenu): void {
+  if (menu.ownedIds.length === 0) return;
+  const list = menu.ownedIds.join(',');
+  psql(
+    `DELETE FROM ab_menu
+      WHERE tenant_id = ${ADMIN_TENANT_ID}
+        AND path = '/aurabot/memory-promotions'
+        AND id IN (${list});`,
+  );
+}
