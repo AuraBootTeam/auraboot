@@ -130,10 +130,27 @@ public class CommandExecutorImpl implements CommandExecutor {
                 .startTime(startTime)
                 .build();
 
+        // Shadow Mode dry-run (learning-loop.md §6, PR-56): mark rollback
+        // BEFORE any phase runs so that even if a phase tries to commit
+        // something intra-transactionally, the flag is already set. Any
+        // AFTER_COMMIT TransactionSynchronization registered downstream
+        // (webhook dispatch, audit trail listener, api-call) will also be
+        // short-circuited by the Spring tx manager once rollback-only is
+        // set, removing the remaining side-effect leakage vectors.
+        if (request.isDryRun()) {
+            org.springframework.transaction.interceptor.TransactionAspectSupport
+                    .currentTransactionStatus().setRollbackOnly();
+            log.info("Dry-run mode: transaction marked for rollback at pipeline entry (command={})",
+                    commandCode);
+        }
+
         try {
             // Pre-guard phases: Load, SchemaValidate, Idempotency, Entitlement
             CommandExecuteResult shortCircuit = commandPipeline.executePreGuardPhases(ctx);
             if (shortCircuit != null) {
+                if (request.isDryRun()) {
+                    shortCircuit.setPhaseReached("completed_dry_run");
+                }
                 return shortCircuit;
             }
 
@@ -148,14 +165,7 @@ public class CommandExecutorImpl implements CommandExecutor {
                 result = guardedPipeline.get();
             }
 
-            // Shadow Mode dry-run (learning-loop.md §6): the pipeline ran to
-            // completion producing a realistic result object, but every DB
-            // write it made must be undone. Force rollback at the JTA layer.
             if (request.isDryRun()) {
-                org.springframework.transaction.interceptor.TransactionAspectSupport
-                        .currentTransactionStatus().setRollbackOnly();
-                log.info("Command {} executed in dry-run mode — transaction marked for rollback",
-                        commandCode);
                 result.setPhaseReached("completed_dry_run");
             }
 
@@ -176,13 +186,21 @@ public class CommandExecutorImpl implements CommandExecutor {
                 commandMetrics.recordCommandExecution(metricsSample, "unknown", "unknown", false);
             }
 
-            // Audit log for failure
-            Map<String, Long> phaseTimings = ctx.getPhaseTimings();
-            if (ctx.getCurrentPhase() != null) {
-                phaseTimings.put(ctx.getCurrentPhase(), System.currentTimeMillis() - ctx.getCurrentPhaseStart());
+            // Audit log for failure — skipped under dry-run (PR-56 C4) so
+            // operators do not see synthetic dry-run failures mixed with
+            // real ones in ab_command_audit_log. The exception itself
+            // still propagates to GlobalExceptionHandler unchanged.
+            if (request.isDryRun()) {
+                log.info("Dry-run: audit log skipped for failed command {} at phase {}",
+                        commandCode, phaseReached);
+            } else {
+                Map<String, Long> phaseTimings = ctx.getPhaseTimings();
+                if (ctx.getCurrentPhase() != null) {
+                    phaseTimings.put(ctx.getCurrentPhase(), System.currentTimeMillis() - ctx.getCurrentPhaseStart());
+                }
+                effectExecutor.saveAuditLog(tenantId, commandCode, null, userId,
+                        request.getPayload(), null, false, e.getMessage(), executionTimeMs, phaseReached, phaseTimings);
             }
-            effectExecutor.saveAuditLog(tenantId, commandCode, null, userId,
-                    request.getPayload(), null, false, e.getMessage(), executionTimeMs, phaseReached, phaseTimings);
 
             if (e instanceof BusinessException || e instanceof ValidationException) {
                 throw e;
