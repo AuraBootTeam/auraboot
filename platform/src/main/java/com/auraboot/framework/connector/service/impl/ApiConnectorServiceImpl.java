@@ -2,6 +2,7 @@ package com.auraboot.framework.connector.service.impl;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.crypto.FieldEncryptionService;
+import com.auraboot.framework.common.util.PinnedHttpRequests;
 import com.auraboot.framework.common.util.SsrfValidator;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.connector.dto.ApiConnectorCreateRequest;
@@ -14,11 +15,14 @@ import com.auraboot.framework.connector.service.ApiConnectorService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.RestTemplate;
 
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.*;
 
 /**
@@ -31,10 +35,21 @@ import java.util.*;
 @RequiredArgsConstructor
 public class ApiConnectorServiceImpl implements ApiConnectorService {
 
+    private static final int CONNECT_TIMEOUT_MS = 5_000;
+    private static final int DEFAULT_READ_TIMEOUT_MS = 30_000;
+
+    /**
+     * Shared pinned-IP HTTP client (P3-E DNS-rebinding hardening). JDK
+     * {@link HttpClient} is what {@link PinnedHttpRequests} targets for
+     * pinning the validated IP at connect time.
+     */
+    private static final HttpClient PINNED_HTTP_CLIENT = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofMillis(CONNECT_TIMEOUT_MS))
+            .build();
+
     private final ApiConnectorMapper connectorMapper;
     private final ApiConnectorEndpointMapper endpointMapper;
     private final ObjectMapper objectMapper;
-    private final RestTemplate restTemplate;
     private final FieldEncryptionService fieldEncryptionService;
 
     @Override
@@ -127,25 +142,59 @@ public class ApiConnectorServiceImpl implements ApiConnectorService {
 
         String url = connector.getBaseUrl() + endpoint.getPath();
 
-        // Validate URL to prevent SSRF attacks
-        SsrfValidator.validateUrl(url);
-
-        HttpMethod method = HttpMethod.valueOf(endpoint.getMethod());
-
-        HttpHeaders headers = buildHeaders(connector);
-        HttpEntity<Map<String, Object>> request;
-
-        if (method == HttpMethod.GET || method == HttpMethod.DELETE) {
-            request = new HttpEntity<>(headers);
-        } else {
-            request = new HttpEntity<>(params, headers);
+        // Validate URL + pin the resolved IP so the HTTP send cannot be
+        // re-resolved (P3-E #1 DNS rebinding TOCTOU).
+        SsrfValidator.ValidatedTarget target = SsrfValidator.validate(url);
+        if (target == null) {
+            throw new BusinessException("API connector target could not be resolved: " + url);
         }
 
+        String method = endpoint.getMethod() == null ? "GET" : endpoint.getMethod().toUpperCase();
+        int readTimeoutMs = connector.getTimeoutMs() != null
+                ? connector.getTimeoutMs() : DEFAULT_READ_TIMEOUT_MS;
+
+        HttpRequest.Builder builder = PinnedHttpRequests.newPinnedRequestBuilder(target)
+                .timeout(Duration.ofMillis(readTimeoutMs));
+        applyHeaders(builder, connector);
+
+        String bodyJson = null;
+        boolean bodyMethod = !"GET".equals(method) && !"DELETE".equals(method) && !"HEAD".equals(method);
+        if (bodyMethod && params != null) {
+            try {
+                bodyJson = objectMapper.writeValueAsString(params);
+            } catch (Exception e) {
+                throw new BusinessException("Failed to serialize request body: " + e.getMessage(), e);
+            }
+        }
+
+        HttpRequest.BodyPublisher publisher = bodyJson != null
+                ? HttpRequest.BodyPublishers.ofString(bodyJson, StandardCharsets.UTF_8)
+                : HttpRequest.BodyPublishers.noBody();
+        builder.method(method, publisher);
+
         try {
-            ResponseEntity<Map> response = restTemplate.exchange(url, method, request, Map.class);
+            HttpResponse<String> response = PINNED_HTTP_CLIENT.send(
+                    builder.build(), HttpResponse.BodyHandlers.ofString());
+            int status = response.statusCode();
             log.debug("API call: connector={}, endpoint={}, status={}",
-                    connectorPid, endpointCode, response.getStatusCode());
-            return response.getBody() != null ? response.getBody() : Map.of();
+                    connectorPid, endpointCode, status);
+            if (status >= 400) {
+                throw new BusinessException(
+                        "API call failed with status " + status + ": " + response.body());
+            }
+            String body = response.body();
+            if (body == null || body.isBlank()) {
+                return Map.of();
+            }
+            try {
+                return objectMapper.readValue(body, Map.class);
+            } catch (Exception parseError) {
+                log.warn("API response not JSON: connector={}, endpoint={}",
+                        connectorPid, endpointCode);
+                return Map.of("raw", body);
+            }
+        } catch (BusinessException be) {
+            throw be;
         } catch (Exception e) {
             log.error("API call failed: connector={}, endpoint={}, error={}",
                     connectorPid, endpointCode, e.getMessage());
@@ -162,14 +211,22 @@ public class ApiConnectorServiceImpl implements ApiConnectorService {
         }
 
         try {
-            // Validate URL to prevent SSRF attacks
-            SsrfValidator.validateUrl(connector.getBaseUrl());
+            // Validate URL + pin the resolved IP (P3-E #1).
+            SsrfValidator.ValidatedTarget target = SsrfValidator.validate(connector.getBaseUrl());
+            if (target == null) {
+                log.warn("Connection test: target could not be resolved: {}", connector.getBaseUrl());
+                return false;
+            }
 
-            HttpHeaders headers = buildHeaders(connector);
-            HttpEntity<Void> request = new HttpEntity<>(headers);
-            ResponseEntity<String> response = restTemplate.exchange(
-                    connector.getBaseUrl(), HttpMethod.HEAD, request, String.class);
-            return response.getStatusCode().is2xxSuccessful();
+            HttpRequest.Builder builder = PinnedHttpRequests.newPinnedRequestBuilder(target)
+                    .timeout(Duration.ofMillis(DEFAULT_READ_TIMEOUT_MS))
+                    .method("HEAD", HttpRequest.BodyPublishers.noBody());
+            applyHeaders(builder, connector);
+
+            HttpResponse<Void> response = PINNED_HTTP_CLIENT.send(
+                    builder.build(), HttpResponse.BodyHandlers.discarding());
+            int status = response.statusCode();
+            return status >= 200 && status < 300;
         } catch (IllegalArgumentException e) {
             log.warn("SSRF blocked: connection test for connector {} rejected: {}", connectorPid, e.getMessage());
             return false;
@@ -180,9 +237,8 @@ public class ApiConnectorServiceImpl implements ApiConnectorService {
     }
 
     @SuppressWarnings("unchecked")
-    private HttpHeaders buildHeaders(ApiConnector connector) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
+    private void applyHeaders(HttpRequest.Builder builder, ApiConnector connector) {
+        builder.header("Content-Type", "application/json");
 
         // Apply default headers
         if (connector.getDefaultHeaders() != null) {
@@ -190,18 +246,17 @@ public class ApiConnectorServiceImpl implements ApiConnectorService {
                 Map<String, String> defaultHeaders = objectMapper.readValue(
                         connector.getDefaultHeaders(),
                         objectMapper.getTypeFactory().constructMapType(Map.class, String.class, String.class));
-                defaultHeaders.forEach(headers::set);
+                defaultHeaders.forEach(builder::header);
             } catch (Exception e) {
                 log.warn("Failed to parse default headers for connector {}", connector.getPid());
             }
         }
 
         // Apply authentication
-        applyAuth(headers, connector);
-        return headers;
+        applyAuth(builder, connector);
     }
 
-    private void applyAuth(HttpHeaders headers, ApiConnector connector) {
+    private void applyAuth(HttpRequest.Builder builder, ApiConnector connector) {
         String authType = connector.getAuthType();
         if (authType == null || "none".equals(authType)) return;
 
@@ -215,15 +270,18 @@ public class ApiConnectorServiceImpl implements ApiConnectorService {
             switch (authType) {
                 case "api_key":
                     String keyHeader = authConfig.getOrDefault("headerName", "X-API-Key");
-                    headers.set(keyHeader, authConfig.getOrDefault("apiKey", ""));
+                    builder.header(keyHeader, authConfig.getOrDefault("apiKey", ""));
                     break;
                 case "bearer":
-                    headers.setBearerAuth(authConfig.getOrDefault("token", ""));
+                    builder.header("Authorization",
+                            "Bearer " + authConfig.getOrDefault("token", ""));
                     break;
                 case "basic":
-                    headers.setBasicAuth(
-                            authConfig.getOrDefault("username", ""),
-                            authConfig.getOrDefault("password", ""));
+                    String creds = authConfig.getOrDefault("username", "") + ":"
+                            + authConfig.getOrDefault("password", "");
+                    String encoded = Base64.getEncoder().encodeToString(
+                            creds.getBytes(StandardCharsets.UTF_8));
+                    builder.header("Authorization", "Basic " + encoded);
                     break;
             }
         } catch (Exception e) {
