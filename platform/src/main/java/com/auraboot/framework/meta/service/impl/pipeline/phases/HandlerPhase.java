@@ -109,8 +109,11 @@ public class HandlerPhase implements CommandPhase {
         // 2. Execute plugin command handlers from ExtensionRegistry
         executePluginCommandHandler(command.getCode(), command.getModelCode(), payload, tenantId, request, fieldMapResults, handlerResults);
 
-        // 3. Declarative BPM trigger
-        executeBpmTrigger(execConfig, command, payload, request, handlerResults);
+        // 3. Declarative BPM trigger — skipped under dry-run since BPM
+        // process state lives outside the command's transaction envelope.
+        if (!request.isDryRun()) {
+            executeBpmTrigger(execConfig, command, payload, request, handlerResults);
+        }
 
         return handlerResults;
     }
