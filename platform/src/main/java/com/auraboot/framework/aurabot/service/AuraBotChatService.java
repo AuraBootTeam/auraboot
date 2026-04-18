@@ -85,6 +85,15 @@ public class AuraBotChatService {
     @Autowired(required = false)
     private ChatRunPersistencePort chatRunPersistencePort;
 
+    /**
+     * Optional User Soul Profile reader (plan §5.5 / PR-77 Phase 3). When a profile
+     * exists for the current user, a compact "About this user" block is prepended
+     * to the chat system prompt. Made optional so tests that don't wire the bean
+     * and legacy contexts continue to compose prompts unchanged.
+     */
+    @Autowired(required = false)
+    private com.auraboot.framework.agent.service.UserSoulProfileReader userSoulProfileReader;
+
     @Value("${aurabot.max-tool-rounds:20}")
     private int maxToolRounds;
 
@@ -318,6 +327,18 @@ public class AuraBotChatService {
             systemPrompt = systemPrompt + buildBifContextHint(bif);
             if (qualityIssue != null) {
                 systemPrompt = systemPrompt + buildQualityIssueHint(qualityIssue);
+            }
+        }
+        // PR-77 Phase 3: prepend User Soul Profile grounding section (plan §5.5) so
+        // the LLM sees the derived "about this user" block before any other context.
+        // Empty when no ACTIVE profile or when the caller is system/cron (null userId).
+        if (userSoulProfileReader != null) {
+            Long userIdForSoul = MetaContext.getCurrentUserId();
+            String userIdStr = userIdForSoul == null ? null : userIdForSoul.toString();
+            java.util.Optional<com.auraboot.framework.agent.service.UserSoulProfileReader.ProfileSection> soul =
+                    userSoulProfileReader.loadForGrounding(tenantId, userIdStr);
+            if (soul.isPresent()) {
+                systemPrompt = soul.get().renderedPromptText() + "\n\n" + systemPrompt;
             }
         }
         aiTraceService.endSpan(promptSpan, Map.of("char_count", systemPrompt.length()), "success");
