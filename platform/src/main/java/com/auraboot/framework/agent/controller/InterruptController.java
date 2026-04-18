@@ -59,6 +59,33 @@ public class InterruptController {
         return ApiResponse.ok(out);
     }
 
+    /**
+     * Tenant-wide interrupt audit log for Mission Control. Optional
+     * sub_policy filter (replace_intent | append_context | insert_subtask).
+     */
+    @GetMapping("/interrupts")
+    public ApiResponse<List<Map<String, Object>>> listTenantInterrupts(
+            @RequestParam(required = false) String subPolicy,
+            @RequestParam(defaultValue = "100") int limit) {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        int capped = Math.min(Math.max(1, limit), 500);
+
+        StringBuilder sql = new StringBuilder(
+                "SELECT pid, session_id, active_run_id, new_message_excerpt, sub_policy, " +
+                        "       classifier_tier, confidence, reason, action_taken, created_at " +
+                        "FROM ab_agent_interrupt_log WHERE tenant_id = ? ");
+        List<Object> params = new java.util.ArrayList<>();
+        params.add(tenantId);
+        if (subPolicy != null && !subPolicy.isBlank()) {
+            sql.append("AND sub_policy = ? ");
+            params.add(subPolicy);
+        }
+        sql.append("ORDER BY created_at DESC LIMIT ?");
+        params.add(capped);
+
+        return ApiResponse.ok(jdbcTemplate.queryForList(sql.toString(), params.toArray()));
+    }
+
     @GetMapping("/{sessionId}/interrupt-log")
     public ApiResponse<List<Map<String, Object>>> listInterrupts(@PathVariable String sessionId,
                                                                   @RequestParam(defaultValue = "50") int limit) {
