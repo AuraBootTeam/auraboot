@@ -74,6 +74,22 @@ if [[ -n "$SUITE_LABEL" ]]; then
 fi
 echo ""
 
+# Preflight: many specs depend on the internal test-fixtures plugin (e2et_*
+# models / commands). It is not imported by default. Detect missing fixtures
+# and warn loudly so the operator can rerun reset-and-init with
+# IMPORT_TEST_FIXTURES=true (or AURA_ENV=test) before the suite drops dozens
+# of unrelated red regressions on the floor.
+FIXTURE_PROBE=$(curl -sS -o /dev/null -w "%{http_code}" \
+  "http://localhost:6443/api/meta/commands?modelCode=e2et_order" 2>/dev/null || echo "000")
+if [[ "$FIXTURE_PROBE" != "200" ]]; then
+  echo "WARNING: test-fixtures plugin not detected (probe HTTP $FIXTURE_PROBE)."
+  echo "         Many saved-view / list-ux / platform specs will fail with"
+  echo "         'Command not found: e2et:create_order'."
+  echo "         Fix:  IMPORT_TEST_FIXTURES=true ./scripts/oss-reset-and-init.sh"
+  echo "         Or import directly via /api/plugins/import/import-directory-sync."
+  echo ""
+fi
+
 LOG="/tmp/pw-oss-$(date +%Y%m%d-%H%M%S).log"
 echo "Log: $LOG"
 echo ""
