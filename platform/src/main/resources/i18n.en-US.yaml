@@ -764,3 +764,298 @@ admin:
       genderMale: Male
       genderFemale: Female
       positionNone: -- No Position --
+
+# BPMN Designer
+bpmn:
+  status:
+    draft: Draft
+    published: Published
+    suspended: Suspended
+  designer:
+    title: BPMN Process Designer
+    process_name: Process name
+    process_key: Process key
+    save: Save
+    saving: Saving...
+    validate: Validate
+    import: Import
+    export: Export
+    deploy: Deploy
+    deploying: Deploying...
+    monitor: Monitor
+    exit_monitor: Exit monitor
+    monitor_mode: Monitor mode
+    version_history: Version history
+    new_process: New process
+    clear: Clear
+    save_first: Please save the process first
+    save_success: Saved
+    save_failed: Save failed
+    deploy_success: Deployed
+    deploy_failed: Deploy failed
+    import_success: Import succeeded
+    import_failed: Import failed
+    import_json_only: Only JSON files are supported
+    file_read_error: Failed to read file
+    load_failed: Load failed
+    query_status: Query status
+    instance_id_placeholder: Enter process instance ID
+  save:
+    title: Save process definition
+    closeAria: Close dialog
+    cancel: Cancel
+    confirm: Save
+    saving: Saving...
+    field:
+      name: Process name
+      namePlaceholder: 'e.g. Employee leave approval process'
+      key: Process key
+      keyPlaceholder: 'e.g. leave_approval_process'
+      version: Version (numeric)
+      versionAuto: (auto-incremented)
+      versionName: Semantic version
+      versionNamePlaceholder: 'e.g. 1.0.0'
+      versionNameHint: 'Format: x.y.z (e.g. 1.0.0 or 2.1.3)'
+      description: Description
+      descriptionPlaceholder: Detailed description of the process...
+      category: Category
+      categoryPlaceholder: 'e.g. HR Management'
+    error:
+      nameRequired: Process name is required
+      nameTooLong: Process name must be at most 100 characters
+      keyRequired: Process key is required
+      keyPattern: Process key may only contain letters, digits, underscores and hyphens
+      versionFormat: 'Version must follow x.y.z format (e.g. 1.0.0)'
+      descriptionTooLong: Description must be at most 500 characters
+      categoryTooLong: Category must be at most 50 characters
+  palette:
+    title: Components
+    categoryEvent: Events
+    categoryTask: Tasks
+    categoryGateway: Gateways
+    startEvent: Start Event
+    startEventDesc: Start node of the process
+    endEvent: End Event
+    endEventDesc: End node of the process
+    userTask: User Task
+    userTaskDesc: Task that requires human action
+    serviceTask: Service Task
+    serviceTaskDesc: Automated service task
+    receiveTask: Receive Task
+    receiveTaskDesc: Task that waits for an incoming message
+    exclusiveGateway: Exclusive Gateway
+    exclusiveGatewayDesc: Conditional branch — only one path is taken
+    parallelGateway: Parallel Gateway
+    parallelGatewayDesc: Parallel branch — all paths run concurrently
+    inclusiveGateway: Inclusive Gateway
+    inclusiveGatewayDesc: Conditional branch — every matching path runs
+    callActivity: Call Activity
+    callActivityDesc: Invoke another process definition
+  common:
+    delete: Delete
+    description: Description
+    loading: Loading...
+    noResults: No results
+    remove: Remove
+    search: Search
+  prop:
+    nodeLabel: Node label
+    nodeProperties: Node properties
+    edgeProperties: Edge properties
+    processProperties: Process properties
+    selectNodeOrEdge: Select a node or edge
+    confirmDeleteNode: Delete this node?
+    confirmDeleteEdge: Delete this edge?
+    deleteNodeTitle: Delete node
+    deleteEdgeTitle: Delete edge
+    common:
+      unsupportedHint: This node type does not yet support configuration
+    multiInstance:
+      title: Multi-instance
+      enable: Enable multi-instance
+      executionMode: Execution mode
+      sequential: Sequential
+      parallel: Parallel
+      loopCardinality: Loop cardinality
+      loopCardinalityPlaceholder: e.g. ${count}
+      collection: Collection expression
+      elementVariable: Element variable
+      completionCondition: Completion condition
+    edge:
+      label: Label
+      defaultFlow: Default flow
+      defaultFlowHint: Used when no other condition matches
+    formBinding:
+      title: Form binding
+      formPage: Form page
+      saveStrategy: Save strategy
+      saveBusinessOnly: Business data only
+      saveDualWrite: Business data + process variables
+      saveVariableOnly: Process variables only
+      versionStrategy: Version strategy
+      versionLatest: Always use latest
+      versionFixed: Pin to a version
+      versionPlaceholder: Leave empty for latest
+      variableMapping: Variable mapping
+      fieldPermissions: Field permissions
+    assignee:
+      typeUser: User
+      typeRole: Role
+      typeTeam: Department
+      addPlaceholder: Add candidate
+    startevent:
+      formKey: Start form
+      formKeyPlaceholder: e.g. leaveRequestForm
+      initiator: Initiator variable
+    endevent:
+      terminateAll: Terminate all instances
+    receivetask:
+      messageRef: Message reference
+      messageType: Message type
+    servicetask:
+      serviceType: Service type
+      typeHttp: HTTP call
+      typeJava: Java class
+      typeScript: Script
+      typeCommand: Aura command
+      serviceUrl: Service URL
+      className: Class name
+      scriptType: Script type
+      scriptContent: Script content
+      commandCode: Command code
+      commandCodeHint: Pick a registered Aura command
+      async: Asynchronous
+    usertask:
+      auraSectionTitle: Aura extension
+      assigneeType: Assignee type
+      assignUser: User
+      assignRole: Role
+      assignDept: Department
+      assignExpression: Expression
+      assignStarter: Process initiator
+      starterHint: Automatically use the process initiator
+      expressionLabel: Expression
+      expressionHint: 'e.g. ${initiator} or ${variables.managerId}'
+      searchUser: Search user
+      searchRole: Search role
+      searchDept: Search department
+      approvalMode: Approval mode
+      modeSingle: Single approver
+      modeMulti: Multi-approver (parallel)
+      modeSequential: Sequential
+      dueDate: Due date
+      dueDatePlaceholder: e.g. 2026-04-30T18:00:00
+      dueDateHint: Supports ISO8601 or expressions
+      priority: Priority
+      skipable: Skippable
+      requiredPermissions: Required permissions
+      requiredPermissionsPlaceholder: e.g. leave.approve
+      requiredPermissionsHint: Comma-separated permission codes
+      ccPolicyInherit: Inherit process-level CC policy
+      ccPolicyOverride: Override CC policy
+      ccPolicyOverrideHint: Applies only to this node
+    process:
+      auraSectionTitle: Aura extension
+      name: Name
+      namePlaceholder: Process name
+      key: Key
+      keyReadonlyHint: Process key cannot be changed after save
+      category: Category
+      categoryPlaceholder: 'e.g. HR Management'
+      descPlaceholder: Process description
+      ccPolicy: CC policy
+      ccPolicyHint: Carbon-copy designated recipients
+      withdrawPolicy: Withdraw policy
+      withdrawPolicyHint: Controls whether withdraw is allowed
+      policyDefault: Default
+  gateway:
+    defaultFlow: Default flow
+    defaultFlowHint: Used when no other condition matches
+    defaultFlowTag: Default
+    noDefaultFlow: No default flow set
+    outgoingConditions: Outgoing conditions
+    noConditionSet: No condition set
+    completionCondition: Completion condition
+    exclusiveDescPlaceholder: Exclusive gateway description
+    inclusiveDescPlaceholder: Inclusive gateway description
+    parallelDescPlaceholder: Parallel gateway description
+    parallelInfo: Parallel gateways do not require conditions
+  callactivity:
+    calledProcess: Called process
+    calledProcessVersion: Process version
+    versionLatest: Always use latest
+    versionFixed: Pin to a version
+    versionPlaceholder: Leave empty for latest
+    selectProcess: Select process
+    searchProcess: Search process
+    noDeployedProcess: No deployed process available
+    variableMapping: Variable mapping
+    inputMapping: Input mapping
+    outputMapping: Output mapping
+    parentVariable: Parent variable
+    childVariable: Child variable
+    addMapping: Add mapping
+  condition:
+    type: Condition type
+    typeExpression: Expression
+    typeScript: Script
+    language: Language
+    simpleMode: Simple mode
+    advancedMode: Advanced mode
+    advancedPlaceholder: e.g. ${amount > 1000}
+    fieldPlaceholder: Field
+    valuePlaceholder: Value
+    addRule: Add rule
+    removeRule: Remove rule
+    preview: Preview
+    parseWarning: Failed to parse expression
+    helpText: Supports SpEL / JS expressions
+    op:
+      contains: contains
+      isEmpty: is empty
+      isNotEmpty: is not empty
+  hook:
+    title: Hooks
+    addHook: Add hook
+    hookNumber: Hook #{index}
+    hookType: Trigger
+    typePreExecute: Pre-execute
+    typePostExecute: Post-execute
+    typePreComplete: Pre-complete
+    typePostComplete: Post-complete
+    actionType: Action type
+    actionScript: Script
+    actionHttpCallback: HTTP callback
+    actionCommand: Command
+    scriptLanguage: Script language
+    scriptContent: Script content
+    httpUrl: HTTP URL
+    httpMethod: HTTP method
+    httpHeaders: HTTP headers
+    commandCode: Command code
+    commandParams: Command parameters
+    failStrategy: Failure strategy
+    failBlock: Block
+    failIgnore: Ignore
+    failRetry: Retry
+    enabled: Enabled
+    async: Async
+    executionOrder: Execution order
+  validate:
+    passed: Process validation passed
+    failed: Process validation failed
+    result: Validation result
+    errors_title: Errors
+    start_event_required: Start event is required
+    start_event_single: Only one start event is allowed
+    end_event_required: End event is required
+    start_no_incoming: Start event must not have incoming edges
+    start_no_outgoing: Start event must have at least one outgoing edge
+    end_no_incoming: End event must have at least one incoming edge
+    end_no_outgoing: End event must not have outgoing edges
+    task_no_incoming: 'Task "{name}" has no incoming edge'
+    task_no_outgoing: 'Task "{name}" has no outgoing edge'
+    gateway_no_incoming: 'Gateway "{name}" has no incoming edge'
+    exclusive_gateway_min_outgoing: Exclusive gateway requires at least two outgoing edges
+    exclusive_gateway_edge_missing_condition: 'Exclusive gateway "{name}" has an outgoing edge without a condition'
+    exclusive_gateway_multiple_defaults: 'Exclusive gateway "{name}" has multiple default flows'
