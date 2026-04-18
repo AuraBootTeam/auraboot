@@ -1,12 +1,17 @@
 package com.auraboot.framework.agent.service;
 
+import com.auraboot.framework.agent.dto.LlmChatRequest;
+import com.auraboot.framework.agent.dto.LlmChatResponse;
 import com.auraboot.framework.agent.metrics.MemoryPromotionMetrics;
+import com.auraboot.framework.agent.provider.LlmProvider;
+import com.auraboot.framework.agent.provider.LlmProviderFactory;
 import com.auraboot.framework.agent.util.ConfidenceScorer;
 import com.auraboot.framework.agent.util.EmbeddingSimilarity;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -66,6 +71,10 @@ public class MemoryPromotionExtractor {
     private final MemoryPromotionMetrics metrics;
     private final ObjectMapper objectMapper;
     private final TransactionTemplate transactionTemplate;
+
+    /** Optional — some test profiles skip the LLM provider wiring. */
+    @Autowired(required = false)
+    private LlmProviderFactory llmProviderFactory;
 
     public MemoryPromotionExtractor(JdbcTemplate jdbcTemplate,
                                     MemoryEmbeddingService memoryEmbeddingService,
@@ -279,9 +288,11 @@ public class MemoryPromotionExtractor {
             if (anyNonTerminal(List.of(r.pid))) continue;
 
             double confidence = ConfidenceScorer.forImplicitCoSign(coSigners);
+            List<String> coSignerIds = loadCoSignerUserIds(r);
             Map<String, Object> detail = new LinkedHashMap<>();
             detail.put("author_user_id", r.scopeKey);
             detail.put("co_signer_count", coSigners);
+            detail.put("co_signer_user_ids", coSignerIds);
 
             insertProposal(tenantId, "user", r.pid, List.of(r.pid), "tenant",
                     r.category == null ? "general" : r.category,
@@ -294,13 +305,39 @@ public class MemoryPromotionExtractor {
     }
 
     /**
-     * Count co-signers for a memory. Phase 1 returns 0 — requires per-user
-     * access log. Package-private for test override (see integration test
-     * spy pattern).
+     * Count distinct co-signers of a memory over the last 90 days (PR-66
+     * Phase 2). A co-signer is any user whose id appears in
+     * {@code ab_agent_memory_access_log} for the memory and is <b>not</b>
+     * the author. Access rows older than 90 days are excluded so the signal
+     * reflects current relevance.
      */
+    /** List the distinct co-signer user ids (excluding the author) in the last 90d. */
+    protected List<String> loadCoSignerUserIds(MemoryRow row) {
+        if (row == null || row.pid == null) return List.of();
+        String authorUserId = row.scopeKey;
+        return jdbcTemplate.queryForList(
+                "SELECT DISTINCT user_id "
+                        + "FROM ab_agent_memory_access_log "
+                        + "WHERE memory_pid = ? "
+                        + "  AND (? IS NULL OR user_id <> ?) "
+                        + "  AND last_seen_at >= NOW() - INTERVAL '90 days' "
+                        + "ORDER BY user_id",
+                String.class, row.pid, authorUserId, authorUserId);
+    }
+
     protected int countCoSigners(MemoryRow row) {
-        // TODO(phase-2): implement against a future memory_access_log table.
-        return 0;
+        if (row == null || row.pid == null) return 0;
+        // scope_key is the author user id; exclude it so self-access does
+        // not count as a co-sign.
+        String authorUserId = row.scopeKey;
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(DISTINCT user_id) "
+                        + "FROM ab_agent_memory_access_log "
+                        + "WHERE memory_pid = ? "
+                        + "  AND (? IS NULL OR user_id <> ?) "
+                        + "  AND last_seen_at >= NOW() - INTERVAL '90 days'",
+                Integer.class, row.pid, authorUserId, authorUserId);
+        return count == null ? 0 : count;
     }
 
     // ------------------------------------------------------------------
@@ -386,7 +423,7 @@ public class MemoryPromotionExtractor {
         String pid = UniqueIdGenerator.generate();
         String detailJson = toJson(detail);
         String sourcePidsJson = toJson(sourceMemoryPids);
-        String aiRationale = rationaleEnabled ? generateRationale(reasonCode, title, content, detail) : null;
+        String aiRationale = rationaleEnabled ? generateRationale(tenantId, reasonCode, title, content, detail) : null;
 
         jdbcTemplate.update(
                 "INSERT INTO ab_agent_memory_promotion ("
@@ -406,18 +443,72 @@ public class MemoryPromotionExtractor {
     }
 
     /**
-     * Best-effort LLM-generated rationale. Returns null on failure; source
-     * memories remain the primary evidence.
+     * Best-effort LLM-generated rationale. Returns null on any failure; the
+     * source memories remain the primary evidence and no rationale is
+     * stored in that case.
      *
-     * TODO(phase-2): wire to {@code LlmProviderFactory.getProvider(...).chat(...)}
-     * with a short prompt. Left as a hook in Phase 1 so the column is
-     * present and the extractor does not block on LLM availability.
+     * <p><b>Graceful-null rationale (plan §6.1):</b> this is the single place
+     * in the promotion pipeline where we intentionally swallow exceptions
+     * and return null. The LLM provider can be unreachable, rate-limited,
+     * or misconfigured per-tenant — none of those should block the
+     * extractor from emitting a proposal with full evidence. Unlike e.g.
+     * API response parsing (which has a strict contract), the rationale
+     * is a cosmetic reviewer hint; the design explicitly allows a null
+     * value.
      */
-    protected String generateRationale(String reasonCode,
+    protected String generateRationale(Long tenantId,
+                                       String reasonCode,
                                        String title,
                                        String content,
                                        Map<String, Object> detail) {
-        return null;
+        if (!rationaleEnabled) return null;
+        if (llmProviderFactory == null) return null;
+        try {
+            LlmProviderFactory.ProviderConfig cfg = llmProviderFactory.resolveConfig(tenantId, null);
+            if (cfg == null || cfg.getApiKey() == null || cfg.getApiKey().isBlank()) {
+                return null;
+            }
+            LlmProvider provider = llmProviderFactory.getProvider(cfg.getProviderCode());
+            if (provider == null) return null;
+
+            String systemPrompt =
+                    "You are a team knowledge-curation advisor. Based on the memory below,"
+                            + " produce exactly one short sentence (≤60 characters) explaining"
+                            + " why this is worth promoting to team-shared knowledge."
+                            + " Respond in Chinese if the source is Chinese, otherwise English."
+                            + " Output only the sentence, no preamble.";
+            String userText = "Memory:\n"
+                    + (title == null ? "" : ("Title: " + title + "\n"))
+                    + "Content: " + (content == null ? "" : content) + "\n"
+                    + "Reason code: " + reasonCode;
+
+            LlmChatRequest req = LlmChatRequest.builder()
+                    .providerCode(cfg.getProviderCode())
+                    .model(cfg.getDefaultModel())
+                    .systemPrompt(systemPrompt)
+                    .messages(List.of(LlmChatRequest.Message.builder()
+                            .role("user").content(userText).build()))
+                    .maxTokens(120)
+                    .build();
+
+            LlmChatResponse resp = provider.chat(req, cfg.getApiKey(), cfg.getBaseUrl());
+            if (resp == null || resp.getContent() == null || resp.getContent().isEmpty()) {
+                return null;
+            }
+            for (LlmChatResponse.ContentBlock block : resp.getContent()) {
+                if ("text".equals(block.getType()) && block.getText() != null) {
+                    String out = block.getText().trim();
+                    if (!out.isEmpty()) {
+                        return out.length() > 240 ? out.substring(0, 240) : out;
+                    }
+                }
+            }
+            return null;
+        } catch (Exception e) {
+            // Graceful-null by design — see method javadoc.
+            log.debug("generateRationale: LLM unavailable or failed ({}); storing null", e.getMessage());
+            return null;
+        }
     }
 
     private String toJson(Object value) {
