@@ -444,6 +444,11 @@ export function FormPageContent(props: PageContentProps) {
         mode,
         ...formData,
       },
+      // Expose current form values as `record` so DSL visibleWhen expressions
+      // like `record.sc_status === 'active'` work uniformly on form + detail.
+      // Detail page already provides `record`; form must match so the same
+      // DSL works across both kinds.
+      record: formData,
       locale,
       t: (key: string) => t(key),
       fetchResult,
