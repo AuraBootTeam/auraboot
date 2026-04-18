@@ -1,5 +1,6 @@
 package com.auraboot.framework.integration.agent;
 
+import com.auraboot.framework.agent.provider.LlmProviderFactory;
 import com.auraboot.framework.agent.service.PatternExtractor;
 import com.auraboot.framework.agent.service.SkillDraftGenerator;
 import com.auraboot.framework.agent.service.SkillDraftNamer;
@@ -10,12 +11,16 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.Commit;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 /**
  * PR-25: SkillDraftNamer behaviour.
@@ -32,6 +37,7 @@ class SkillDraftNamerIntegrationTest extends BaseIntegrationTest {
     @Autowired private SkillDraftGenerator generator;
     @Autowired private SkillDraftNamer namer;
     @Autowired private JdbcTemplate jdbc;
+    @SpyBean  private LlmProviderFactory providerFactory;
 
     private Long tenantId;
 
@@ -86,6 +92,49 @@ class SkillDraftNamerIntegrationTest extends BaseIntegrationTest {
         // > 60 chars
         String longCode = "crm." + "x".repeat(60);
         assertThat(namer.isValidCode(longCode)).isFalse();
+    }
+
+    @Test
+    @DisplayName("N11: isValidCode rejects consecutive dots (a..b)")
+    void regex_rejects_consecutive_dots() {
+        assertThat(namer.isValidCode("a..b")).isFalse();
+        assertThat(namer.isValidCode("crm..lead")).isFalse();
+    }
+
+    @Test
+    @DisplayName("N11: isValidCode rejects trailing dot (a.b.)")
+    void regex_rejects_trailing_dot() {
+        assertThat(namer.isValidCode("a.b.")).isFalse();
+        assertThat(namer.isValidCode("crm.lead.")).isFalse();
+    }
+
+    @Test
+    @DisplayName("N11: isValidCode accepts typical auto.* code + nested snake_case")
+    void regex_accepts_typical_auto_code() {
+        assertThat(namer.isValidCode("auto.crm_lead_update.abc123")).isTrue();
+        assertThat(namer.isValidCode("a.b_c.d")).isTrue();
+    }
+
+    @Test
+    @DisplayName("N11: tenant isolation — renameDraft(tenantB, pid-owned-by-A) returns false and never calls LLM")
+    void tenant_isolation_rename_refuses_other_tenant() {
+        // Seed a draft owned by tenantId (tenant A).
+        String draftPid = seedDraftWithAutoName();
+        long otherTenant = tenantId + 1;
+
+        // Calling with a foreign tenant must return false without invoking the
+        // LLM provider factory (short-circuit at loadDraft).
+        boolean renamed = namer.renameDraft(otherTenant, draftPid);
+        assertThat(renamed).isFalse();
+
+        verify(providerFactory, never()).resolveConfig(any(), any());
+        verify(providerFactory, never()).getProvider(any());
+
+        // The draft's draft_skill_code stays untouched.
+        String codeAfter = jdbc.queryForObject(
+                "SELECT draft_skill_code FROM ab_agent_skill_draft WHERE pid = ?",
+                String.class, draftPid);
+        assertThat(codeAfter).startsWith("auto.");
     }
 
     @Test

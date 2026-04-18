@@ -54,9 +54,11 @@ public class SkillDraftNamer {
      * — caller can ignore the boolean; the draft stays usable either way.
      */
     public boolean renameDraft(Long tenantId, String draftPid) {
-        Map<String, Object> draft = loadDraft(draftPid);
+        // N11 fix: load draft scoped to tenant. If the draft does not belong to
+        // this tenant (or does not exist), bail out BEFORE calling the LLM.
+        Map<String, Object> draft = loadDraft(tenantId, draftPid);
         if (draft == null) {
-            log.debug("renameDraft: no draft found for pid={}", draftPid);
+            log.debug("renameDraft: no draft found for tenant={} pid={}", tenantId, draftPid);
             return false;
         }
         // Build the signature payload for the LLM from the related pattern.
@@ -81,8 +83,8 @@ public class SkillDraftNamer {
         int updated = jdbcTemplate.update(
                 "UPDATE ab_agent_skill_draft " +
                         "SET draft_skill_code = ?, review_comment = ? " +
-                        "WHERE pid = ? AND status = 'DRAFT_PENDING_REVIEW'",
-                proposal.code, proposal.description, draftPid);
+                        "WHERE pid = ? AND tenant_id = ? AND status = 'DRAFT_PENDING_REVIEW'",
+                proposal.code, proposal.description, draftPid, tenantId);
         if (updated == 1) {
             log.info("SkillDraftNamer: draft {} renamed: auto.* → {}", draftPid, proposal.code);
             return true;
@@ -176,16 +178,24 @@ public class SkillDraftNamer {
         return t.trim();
     }
 
-    /** Allowed: prefix + "." + snake_case, total ≤ 60 chars. */
+    /**
+     * Allowed: domain prefix + "." + snake_case segments, total ≤ 60 chars.
+     * Tightened (N11): disallow consecutive dots ({@code a..b}) and trailing
+     * dots ({@code a.b.}). Each segment after the first must start with a
+     * lowercase letter.
+     */
     public boolean isValidCode(String code) {
         if (code == null || code.isBlank() || code.length() > 60) return false;
-        return code.matches("^[a-z][a-z0-9]*\\.[a-z][a-z0-9_.]{1,58}$");
+        // Reject consecutive dots and trailing dot up front.
+        if (code.contains("..") || code.endsWith(".")) return false;
+        return code.matches("^[a-z][a-z0-9]*(\\.[a-z][a-z0-9_]*)+$");
     }
 
-    private Map<String, Object> loadDraft(String draftPid) {
+    private Map<String, Object> loadDraft(Long tenantId, String draftPid) {
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(
                 "SELECT pid, tenant_id, draft_skill_code, contract_yaml, source_pattern_hash, status " +
-                        "FROM ab_agent_skill_draft WHERE pid = ?", draftPid);
+                        "FROM ab_agent_skill_draft WHERE pid = ? AND tenant_id = ?",
+                draftPid, tenantId);
         return rows.isEmpty() ? null : rows.get(0);
     }
 
