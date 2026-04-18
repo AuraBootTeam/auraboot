@@ -52,6 +52,8 @@ public class BifRecorder {
             row.put("intent", bif.getIntent());
             row.put("object", bif.getObject());
             row.put("primary_object", bif.getPrimaryObject() != null ? bif.getPrimaryObject() : bif.getObject());
+            row.put("profile_id", bif.getProfileId());
+            row.put("channel", bif.getChannel());
             row.put("actionability", bif.getActionability());
             row.put("risk_level", bif.getRiskLevel());
             row.put("match_type", bif.getMatchType());
