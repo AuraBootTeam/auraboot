@@ -51,12 +51,19 @@ export default defineConfig({
       allow: ['..'],
     },
     watch: {
+      // NOTE: do NOT use bare `**/plugins/**` — that pattern also matches
+      // `app/plugins/**` (the entire frontend plugin tree) and silently
+      // disables HMR for every frontend plugin file (manifesting as "edits
+      // never take effect until dev server restart"). Restrict the backend
+      // plugins ignore to absolute / repo-relative paths.
       ignored: [
         '**/platform/**',
         '**/ios/**',
         '**/android/**',
         '**/docs/**',
-        '**/plugins/**',
+        '/plugins/**',
+        '../plugins/**',
+        '../../plugins/**',
         '**/scripts/**',
         '**/.gradle/**',
         '**/.git/**',
