@@ -1373,4 +1373,124 @@ class JsonToBpmnConverterTest {
             assertFalse(xml.contains("hookType="), xml);
         }
     }
+
+    // ==================== CallActivity (GAP-250) ====================
+    // SmartEngine's CallActivityParser only reads `calledElement` and
+    // `calledElementVersion` attributes; the XML parser facade throws on any
+    // unknown child element (EngineException "No parser found for QName").
+    // These tests lock in the fix: emit a self-closing <callActivity/> with
+    // only the attributes SmartEngine actually parses — NEVER emit
+    // <extensionElements> or <smart:in>/<smart:out>, even when the UI config
+    // carries inputMappings / outputMappings. See writeCallActivity javadoc.
+
+    @Nested
+    @DisplayName("CallActivity — GAP-250 SmartEngine parser compatibility")
+    class CallActivityCompat {
+
+        @Test
+        @DisplayName("emits calledElement + smart:calledElementVersion attributes only")
+        void emitsCalledElementAttributes() {
+            String json = """
+                {
+                  "key":"parent_proc","name":"Parent",
+                  "nodes":[
+                    {"id":"s","type":"startEvent","position":{"x":0,"y":0},"data":{"type":"startEvent","label":""}},
+                    {"id":"invoke","type":"callActivity","position":{"x":1,"y":0},"data":{"type":"callActivity","label":"Invoke","config":{
+                      "calledProcessKey":"child_proc","calledProcessVersion":"1.0.0"
+                    }}},
+                    {"id":"e","type":"endEvent","position":{"x":2,"y":0},"data":{"type":"endEvent","label":""}}
+                  ],
+                  "edges":[
+                    {"id":"f1","source":"s","target":"invoke","data":{}},
+                    {"id":"f2","source":"invoke","target":"e","data":{}}
+                  ]
+                }
+                """;
+            String xml = jsonToBpmn.convert(json);
+            assertTrue(xml.contains("<callActivity "), "callActivity element missing: " + xml);
+            assertTrue(xml.contains("id=\"invoke\""), xml);
+            assertTrue(xml.contains("calledElement=\"child_proc\""), xml);
+            assertTrue(xml.contains("calledElementVersion=\"1.0.0\""), xml);
+        }
+
+        @Test
+        @DisplayName("never emits <extensionElements> or <smart:in>/<smart:out> (SmartEngine parser contract)")
+        void neverEmitsMappingExtensionElements() {
+            // The UI allows users to author inputMappings / outputMappings in
+            // the CallActivity property panel. Those values MUST stay in
+            // designerJson config only — they must NOT leak into the BPMN XML,
+            // because SmartEngine's XML parser rejects unknown child elements
+            // under <callActivity> with "Parse process definition file failure!".
+            String json = """
+                {
+                  "key":"parent_proc","name":"Parent",
+                  "nodes":[
+                    {"id":"s","type":"startEvent","position":{"x":0,"y":0},"data":{"type":"startEvent","label":""}},
+                    {"id":"invoke","type":"callActivity","position":{"x":1,"y":0},"data":{"type":"callActivity","label":"Invoke","config":{
+                      "calledProcessKey":"child_proc",
+                      "calledProcessVersion":"latest",
+                      "inputMappings":{"parentInput":"childInput"},
+                      "outputMappings":{"childOutput":"parentOutput"}
+                    }}},
+                    {"id":"e","type":"endEvent","position":{"x":2,"y":0},"data":{"type":"endEvent","label":""}}
+                  ],
+                  "edges":[
+                    {"id":"f1","source":"s","target":"invoke","data":{}},
+                    {"id":"f2","source":"invoke","target":"e","data":{}}
+                  ]
+                }
+                """;
+            String xml = jsonToBpmn.convert(json);
+
+            // callActivity element is still emitted with attributes
+            assertTrue(xml.contains("calledElement=\"child_proc\""), xml);
+            assertTrue(xml.contains("calledElementVersion=\"latest\""), xml);
+
+            // But NO mapping elements — SmartEngine has no parser for these.
+            // Extract the <callActivity ...> ... </callActivity> segment (or
+            // self-closing form) and assert cleanly inside it.
+            assertFalse(xml.contains("<smart:in "),
+                    "GAP-250: <smart:in> breaks SmartEngine deploy: " + xml);
+            assertFalse(xml.contains("<smart:out "),
+                    "GAP-250: <smart:out> breaks SmartEngine deploy: " + xml);
+
+            // extensionElements may appear in other contexts (process-level hooks
+            // etc.), but must not be emitted inside callActivity. Easiest
+            // invariant: the substring between <callActivity and its end must
+            // contain neither "extensionElements" nor the mapping tags.
+            int caStart = xml.indexOf("<callActivity");
+            int caEnd = xml.indexOf("</callActivity>", caStart);
+            String caBlock = caEnd > 0 ? xml.substring(caStart, caEnd) : xml.substring(caStart);
+            assertFalse(caBlock.contains("extensionElements"),
+                    "GAP-250: no extensionElements inside callActivity: " + caBlock);
+        }
+
+        @Test
+        @DisplayName("callActivity without config still serializes (id only)")
+        void callActivityWithoutConfig() {
+            // Edge case: designer creates a blank callActivity node before
+            // the user picks a target process. Converter should still produce
+            // well-formed XML (deploy will of course fail until calledElement
+            // is set, but the converter itself must not throw).
+            String json = """
+                {
+                  "key":"parent_proc","name":"Parent",
+                  "nodes":[
+                    {"id":"s","type":"startEvent","position":{"x":0,"y":0},"data":{"type":"startEvent","label":""}},
+                    {"id":"invoke","type":"callActivity","position":{"x":1,"y":0},"data":{"type":"callActivity","label":"Invoke"}},
+                    {"id":"e","type":"endEvent","position":{"x":2,"y":0},"data":{"type":"endEvent","label":""}}
+                  ],
+                  "edges":[
+                    {"id":"f1","source":"s","target":"invoke","data":{}},
+                    {"id":"f2","source":"invoke","target":"e","data":{}}
+                  ]
+                }
+                """;
+            String xml = jsonToBpmn.convert(json);
+            assertTrue(xml.contains("<callActivity "), xml);
+            assertTrue(xml.contains("id=\"invoke\""), xml);
+            assertFalse(xml.contains("<smart:in"), xml);
+            assertFalse(xml.contains("<smart:out"), xml);
+        }
+    }
 }
