@@ -77,9 +77,21 @@ export const ToolbarPreview: React.FC<ToolbarPreviewProps> = ({ block }) => {
  * Single button preview
  */
 const ButtonPreview: React.FC<{ button: DslButton }> = ({ button }) => {
-  const action = button.action as StandardAction;
-  const label = ACTION_LABELS[action] || button.action;
-  const isPrimary = button.type === 'primary' || action === 'submit' || action === 'create';
+  const semanticCode =
+    button.code ?? (typeof button.action === 'string' ? button.action : '');
+  const action = semanticCode as StandardAction;
+  const labelFromObject =
+    typeof button.label === 'object' && button.label !== null
+      ? button.label['zh-CN'] ?? button.label['en'] ?? button.label['en-US']
+      : typeof button.label === 'string'
+        ? button.label
+        : undefined;
+  const label = labelFromObject || ACTION_LABELS[action] || semanticCode;
+  const isPrimary =
+    button.primary === true ||
+    button.type === 'primary' ||
+    action === 'submit' ||
+    action === 'create';
   const isDanger = button.danger || action === 'delete' || action === 'batchDelete';
 
   return (
