@@ -44,9 +44,12 @@ export interface PageSchemaExtension {
     detailEndpoint?: string;
     method?: 'GET' | 'POST';
   };
-  render?: {
-    enableMultiView?: boolean;
-  };
+  /**
+   * Multi-view tabs for list pages (Table/Kanban/Calendar/Gallery).
+   * Flat key on extension per DSL contract (see dsl-schema.generated.json,
+   * plugins/test-fixtures/config/pages.json, docs/use-cases/crm.md).
+   */
+  enableMultiView?: boolean;
   afterSubmitRedirect?: string;
   plugin?: Record<string, unknown>;
 }
