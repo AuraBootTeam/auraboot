@@ -8,7 +8,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ConcurrentModificationException;
 import java.util.Map;
 import java.util.Set;
 
@@ -20,8 +19,10 @@ import java.util.Set;
  * {@code ab_agent_memory_promotion} rows. Every state transition uses the
  * {@code WHERE pid=? AND status=?} guard pattern (mirrors
  * {@code PromotionEvaluator} post-PR-53) and throws
- * {@link ConcurrentModificationException} when the guarded UPDATE affects
- * zero rows.
+ * {@link IllegalStateException} when the guarded UPDATE affects
+ * zero rows (status race) and {@link IllegalArgumentException} when the pid
+ * is unknown or input is invalid. Exception types align with
+ * {@code MemoryPromotionController} catch blocks (→ 409 / 404).
  *
  * <p>Status transitions handled here:
  * <ul>
@@ -62,7 +63,7 @@ public class MemoryPromotionApplierImpl implements MemoryPromotionApplier {
         Map<String, Object> row = loadPromotionRow(promotionPid);
         String currentStatus = (String) row.get("status");
         if (!STATUS_DRAFT.equals(currentStatus)) {
-            throw new ConcurrentModificationException(
+            throw new IllegalStateException(
                     "Promotion " + promotionPid + " is not in " + STATUS_DRAFT
                             + " (was: " + currentStatus + ")");
         }
@@ -97,7 +98,7 @@ public class MemoryPromotionApplierImpl implements MemoryPromotionApplier {
                         + "WHERE pid = ? AND status = ?",
                 STATUS_SHADOW, reviewerId, comment, newMemoryPid, promotionPid, STATUS_DRAFT);
         if (updated != 1) {
-            throw new ConcurrentModificationException(
+            throw new IllegalStateException(
                     "Promotion " + promotionPid + " status changed concurrently during approve");
         }
 
@@ -127,7 +128,7 @@ public class MemoryPromotionApplierImpl implements MemoryPromotionApplier {
                         + "WHERE pid = ? AND status = ?",
                 STATUS_REJECTED, reviewerId, rejectReason, comment, promotionPid, STATUS_DRAFT);
         if (updated != 1) {
-            throw new ConcurrentModificationException(
+            throw new IllegalStateException(
                     "Promotion " + promotionPid + " is not in " + STATUS_DRAFT
                             + " or changed concurrently");
         }
@@ -144,7 +145,7 @@ public class MemoryPromotionApplierImpl implements MemoryPromotionApplier {
         Map<String, Object> row = loadPromotionRow(promotionPid);
         String currentStatus = (String) row.get("status");
         if (!STATUS_SHADOW.equals(currentStatus)) {
-            throw new ConcurrentModificationException(
+            throw new IllegalStateException(
                     "Promotion " + promotionPid + " is not in " + STATUS_SHADOW
                             + " (was: " + currentStatus + "); retraction only valid "
                             + "during the shadow window");
@@ -168,7 +169,7 @@ public class MemoryPromotionApplierImpl implements MemoryPromotionApplier {
                         + "WHERE pid = ? AND status = ?",
                 STATUS_RETRACTED, reason, reviewerId, promotionPid, STATUS_SHADOW);
         if (updated != 1) {
-            throw new ConcurrentModificationException(
+            throw new IllegalStateException(
                     "Promotion " + promotionPid + " status changed concurrently during retract");
         }
 
@@ -189,7 +190,7 @@ public class MemoryPromotionApplierImpl implements MemoryPromotionApplier {
                             + "FROM ab_agent_memory_promotion WHERE pid = ?",
                     promotionPid);
         } catch (EmptyResultDataAccessException e) {
-            throw new ConcurrentModificationException("Promotion " + promotionPid + " not found");
+            throw new IllegalArgumentException("Promotion " + promotionPid + " not found");
         }
     }
 }

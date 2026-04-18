@@ -13,7 +13,6 @@ import org.springframework.test.annotation.Commit;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ConcurrentModificationException;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -178,13 +177,13 @@ class MemoryPromotionApplierIntegrationTest extends BaseIntegrationTest {
         jdbc.update("UPDATE ab_agent_memory_promotion SET status='ACTIVE' WHERE pid=?", pid);
 
         assertThatThrownBy(() -> applier.retract(pid, 99L, "changed mind"))
-                .isInstanceOf(ConcurrentModificationException.class);
+                .isInstanceOf(IllegalStateException.class);
     }
 
     // ---------------------- concurrency ----------------------
 
     @Test
-    @DisplayName("concurrent approve: only one wins, the other throws ConcurrentModificationException")
+    @DisplayName("concurrent approve: only one wins, the other throws IllegalStateException")
     void concurrent_approve_race() throws Exception {
         String pid = seedDraft();
         CompletableFuture<Throwable> a = CompletableFuture.supplyAsync(() -> {
@@ -206,9 +205,9 @@ class MemoryPromotionApplierIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("unknown pid throws ConcurrentModificationException (cross-tenant / not-found probe)")
+    @DisplayName("unknown pid throws IllegalArgumentException (cross-tenant / not-found probe)")
     void unknown_pid_throws() {
         assertThatThrownBy(() -> applier.approve(UniqueIdGenerator.generate(), 1L, null))
-                .isInstanceOf(ConcurrentModificationException.class);
+                .isInstanceOf(IllegalArgumentException.class);
     }
 }
