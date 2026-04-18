@@ -480,14 +480,15 @@ test.describe('Phase 6 — showcase_all_fields runtime rendering', () => {
     });
 
     // Tabs: detail page declares 3 tabs (overview / selectors_people / rich_content).
-    const tabBar = page.locator('[role="tablist"], .tabs, [data-testid*="tab"]').first();
-    const tabBarVisible = await tabBar
+    // Match accessible role="tab" elements directly (the runtime renders a
+    // <nav role="tablist"> with <button role="tab"> children, not .tab-item).
+    const tabItems = page.getByRole('tab');
+    const tabBarVisible = await tabItems
+      .first()
       .isVisible({ timeout: 8_000 })
       .catch(() => false);
     if (tabBarVisible) {
       // Confirm at least 2 tab items render (overview + one more).
-      const tabItems = page
-        .locator('[role="tab"], button[role="tab"], .tab-item');
       const tabCount = await tabItems.count();
       expect(tabCount, 'detail page should render ≥2 tabs').toBeGreaterThanOrEqual(2);
 
