@@ -66,9 +66,16 @@ export function InclusiveGatewayEditor({
       </div>
 
       {/*
-        Completion condition is UI-only: JsonToBpmnConverter does not emit a
-        completionCondition element on inclusiveGateway, so SmartEngine falls
-        back to its default join semantics. Disabled until runtime support lands.
+        GAP-252: Completion condition on inclusiveGateway is unsupported end-to-end:
+        - Runtime: SmartEngine InclusiveGatewayParser only reads id/name/properties
+          (see core/.../bpmn/assembly/gateway/parser/InclusiveGatewayParser.java)
+          and InclusiveGatewayBehavior applies default BPMN 2.0 N-of-N join semantics.
+          No `CompletionCondition` model exists outside MultiInstanceLoopCharacteristics.
+        - Converter: JsonToBpmnConverter.writeInclusiveGateway does not emit
+          <completionCondition>; silently dropped even if UI were enabled.
+        - GAP-253 fixed the ClassCast in the join path but did NOT add threshold logic.
+        Disabled with concrete reason; re-enable requires SmartEngine parser + behavior
+        changes, not just a UI flip.
       */}
       <div className="mb-4">
         <label className="mb-1 block text-sm font-medium text-gray-700">{t('bpmn.gateway.completionCondition')}</label>
@@ -81,7 +88,10 @@ export function InclusiveGatewayEditor({
           rows={2}
           placeholder="${nrOfCompletedInstances >= 1}"
         />
-        <p className="mt-1 text-xs text-amber-600">{t('bpmn.prop.common.unsupportedHint')}</p>
+        <p className="mt-1 text-xs text-amber-600">
+          {t('bpmn.prop.inclusivegateway.completionConditionUnsupported') ||
+            'Unsupported: SmartEngine InclusiveGatewayParser does not read <completionCondition>; default BPMN join semantics apply. Needs runtime support (parser + behavior), not just UI enable.'}
+        </p>
       </div>
     </>
   );
