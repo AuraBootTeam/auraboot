@@ -16,6 +16,10 @@ import {
   FieldPermissionSection,
   type FieldPermissionValue,
 } from './FieldPermissionSection';
+import { WidgetRegistry } from '~/plugins/core-designer/components/studio/registry/widget-registry';
+import { PropertyFieldRenderer } from '~/shared/designer/PropertyFieldRenderer';
+import type { PropertySchema } from '~/shared/designer/types';
+import type { FieldAdapter } from '~/ui/field-adapter';
 
 /**
  * Static fallback for data type → component options mapping.
@@ -141,7 +145,7 @@ export const FieldPropertyEditor: React.FC<FieldPropertyEditorProps> = ({
   const fieldData = useMemo(() => parseFieldShorthand(fieldRef), [fieldRef]);
 
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
-    new Set(['basic', 'validation']),
+    new Set(['basic', 'validation', 'widget-specific']),
   );
 
   // Toggle section expansion
@@ -433,6 +437,19 @@ export const FieldPropertyEditor: React.FC<FieldPropertyEditorProps> = ({
       <div className="flex-1 overflow-auto p-3">
         {(fieldPropertyConfig.sections as SectionConfig[]).map(renderSection)}
 
+        {/* Widget-specific properties — schema-driven panel rendered from
+            WidgetRegistry[component].schema. Writes into field.props.* namespace. */}
+        <WidgetSpecificPanel
+          component={fieldData.component}
+          props={(fieldData as DslFieldOverride).props ?? {}}
+          onPropsChange={(next) =>
+            onChange({ props: Object.keys(next).length > 0 ? next : undefined } as Partial<DslFieldOverride>)
+          }
+          readonly={readonly}
+          expanded={expandedSections.has('widget-specific')}
+          onToggle={() => toggleSection('widget-specific')}
+        />
+
         {/* Field-level role permissions (custom section — not schema-driven because it
             requires async role loading + checkbox UI not expressible as a PropertySchema widget) */}
         <FieldPermissionSection
@@ -441,6 +458,107 @@ export const FieldPropertyEditor: React.FC<FieldPropertyEditorProps> = ({
           disabled={readonly}
         />
       </div>
+    </div>
+  );
+};
+
+// ──────────────────────────────────────────────────────────────────────────────
+// WidgetSpecificPanel — schema-driven config panel for widget-specific props.
+//
+// Reads WidgetRegistry[component].schema (PropertySchema[]) and renders each
+// entry via the unified PropertyFieldRenderer. Values live inside the field's
+// `props.*` namespace (NOT top-level field properties).
+//
+// dependsOn is evaluated against the current `props` object so conditional
+// fields (e.g. dictCode visible when optionsSource === 'dict') work out of the box.
+// ──────────────────────────────────────────────────────────────────────────────
+
+interface WidgetSpecificPanelProps {
+  component: string | undefined;
+  props: Record<string, unknown>;
+  onPropsChange: (next: Record<string, unknown>) => void;
+  readonly?: boolean;
+  expanded: boolean;
+  onToggle: () => void;
+}
+
+const WidgetSpecificPanel: React.FC<WidgetSpecificPanelProps> = ({
+  component,
+  props,
+  onPropsChange,
+  readonly,
+  expanded,
+  onToggle,
+}) => {
+  const schema: PropertySchema<string>[] = useMemo(() => {
+    if (!component) return [];
+    return WidgetRegistry.getSchema(component);
+  }, [component]);
+
+  if (!component || schema.length === 0) {
+    return null;
+  }
+
+  const widgetName = WidgetRegistry.getName(component);
+
+  // Build a per-schema FieldAdapter that read/writes into props[key].
+  const makeAdapter = (s: PropertySchema<string>): FieldAdapter<unknown> => ({
+    value: props[s.key] ?? s.defaultValue,
+    setValue: (v: unknown) => {
+      const next = { ...props };
+      if (v === undefined || v === null || v === '') {
+        delete next[s.key];
+      } else {
+        next[s.key] = v;
+      }
+      onPropsChange(next);
+    },
+    disabled: readonly,
+  });
+
+  // Evaluate dependsOn against current props bag.
+  const isVisible = (s: PropertySchema<string>): boolean => {
+    if (!s.dependsOn) return true;
+    const current = props[s.dependsOn.field];
+    if (s.dependsOn.value === undefined) {
+      return current !== undefined && current !== null && current !== '';
+    }
+    return current === s.dependsOn.value;
+  };
+
+  const visibleSchemas = schema.filter(isVisible);
+
+  return (
+    <div className="mb-3" data-testid="widget-specific-panel" data-component={component}>
+      <button
+        className="flex w-full items-center justify-between rounded-t border border-gray-200 bg-gray-50 p-2 transition-colors hover:bg-gray-100"
+        onClick={onToggle}
+      >
+        <span className="text-sm font-medium text-gray-700">
+          {widgetName} Properties
+        </span>
+        <svg
+          className={`h-4 w-4 transform text-gray-400 transition-transform ${
+            expanded ? 'rotate-180' : ''
+          }`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {expanded && (
+        <div className="rounded-b border border-t-0 border-gray-200 bg-white p-3">
+          <div className="grid grid-cols-1 gap-3">
+            {visibleSchemas.map((s) => (
+              <div key={s.key} data-testid={`widget-prop-${s.key}`}>
+                <PropertyFieldRenderer schema={s} adapter={makeAdapter(s)} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
