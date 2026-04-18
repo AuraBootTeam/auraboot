@@ -10,6 +10,11 @@ import org.springframework.stereotype.Component;
 import java.util.HashMap;
 import java.util.Map;
 
+// N12: do not catch CommandExecutor exceptions here. ShadowExecutor already
+// wraps this invocation in try/catch and records shadowStatus="failed" on
+// failure — swallowing here inflated output_match_rate because the caller
+// saw a "successful" Map return and counted it as a match.
+
 /**
  * Shadow invoker for DSL write commands (tool_ref = {@code dsl.command}
  * or {@code cmd_*}). PR-40 enables this: {@link CommandExecutor} now
@@ -61,14 +66,11 @@ public class DslCommandShadowInvoker implements ShadowToolInvoker {
             if (targetRecordId instanceof String s) req.setTargetRecordId(s);
         }
 
-        CommandExecuteResult r;
-        try {
-            r = commandExecutor.execute(commandCode, req);
-        } catch (Exception e) {
-            log.warn("DslCommandShadowInvoker: dry-run {} failed: {}", commandCode, e.getMessage());
-            return Map.of("command_code", commandCode, "status", "failed",
-                    "error", e.getMessage() == null ? "" : e.getMessage());
-        }
+        // Exception from CommandExecutor propagates to the caller (ShadowExecutor),
+        // which marks shadow_status="failed" in its own try/catch (see
+        // ShadowExecutor.java ~line 103). Silent-swallow here would inflate
+        // output_match_rate by returning a "successful" Map to the caller.
+        CommandExecuteResult r = commandExecutor.execute(commandCode, req);
 
         Map<String, Object> out = new HashMap<>();
         out.put("command_code", commandCode);

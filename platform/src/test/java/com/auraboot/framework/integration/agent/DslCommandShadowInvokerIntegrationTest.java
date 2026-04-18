@@ -16,6 +16,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -86,13 +87,18 @@ class DslCommandShadowInvokerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("executor exception is caught and reported as status=failed")
-    void exception_wrapped() {
+    @DisplayName("N12: executor exception propagates to caller (no silent-swallow)")
+    void executor_exception_propagates() {
         when(commandExecutor.execute(eq("bad_cmd"), any()))
                 .thenThrow(new RuntimeException("validation blew up"));
-        Map<String, Object> out = invoker.invokeShadow(10L, "cmd_bad_cmd", null);
-        assertThat(out.get("status")).isEqualTo("failed");
-        assertThat(out.get("error")).asString().contains("validation blew up");
+
+        // Previously this invoker caught the exception and returned a Map with
+        // status=failed — ShadowExecutor then recorded shadowStatus="success"
+        // because no exception bubbled up, inflating output_match_rate.
+        // The caller's own try/catch (ShadowExecutor) now handles failure.
+        assertThatThrownBy(() -> invoker.invokeShadow(10L, "cmd_bad_cmd", null))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("validation blew up");
     }
 
     // =========================================================================
