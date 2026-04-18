@@ -123,4 +123,36 @@ public final class CommandStage {
             default -> "UNKNOWN(" + stage + ")";
         };
     }
+
+    /**
+     * Returns a description for the given stage number.
+     */
+    public static String descriptionOf(int stage) {
+        return switch (stage) {
+            case LOAD -> "Load command definition from database";
+            case SCHEMA_VALIDATE -> "Basic payload schema validation";
+            case IDEMPOTENCY_CHECK -> "Check for duplicate request replay";
+            case ENTITLEMENT_CHECK -> "Verify plugin/feature entitlements";
+            case SOD_CHECK -> "Separation of Duties enforcement";
+            case STATE_CHECK -> "Validate state transitions";
+            case ASSERT -> "Preconditions, assertions, and field validation";
+            case PRE_INVARIANT -> "Pre-execution invariant evaluation";
+            case CROSS_FIELD_VALIDATION -> "Cross-field dependency rule evaluation";
+            case AUTO_SET -> "Inject auto-generated values (codes, timestamps)";
+            case FIELD_MAP -> "Map payload to database columns and persist";
+            case COMPUTED_FIELDS -> "Calculate SpEL formula fields";
+            case CHANGE_TRACKING -> "Record field-level changes for audit trail";
+            case HANDLER -> "Execute custom command handlers";
+            case SIDE_EFFECT -> "Create/update related records";
+            case ROLL_UP -> "Recalculate parent summary fields";
+            case POST_ACTION -> "Post-processing (child records, etc.)";
+            case EFFECT -> "Write events to outbox/store, record audit";
+            case POST_INVARIANT -> "Post-execution invariant evaluation";
+            case DOMAIN_EVENT -> "Publish domain events for in-process listeners";
+            case API_CALL -> "Execute external API calls";
+            case WEBHOOK -> "Dispatch webhooks to external systems";
+            case GOVERNANCE_SNAPSHOT -> "Governance snapshot capture";
+            default -> "";
+        };
+    }
 }

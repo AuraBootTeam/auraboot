@@ -11,8 +11,10 @@ import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.dto.UserProvisionRequest;
 import com.auraboot.framework.user.dto.UserProvisionResponse;
+import com.auraboot.framework.user.dto.UserSearchDTO;
 import com.auraboot.framework.user.mapper.UserMapper;
 import com.auraboot.framework.user.service.UserProvisioningService;
+import com.auraboot.framework.user.service.UserService;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -24,6 +26,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.security.SecureRandom;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 
 @Slf4j
@@ -37,6 +40,7 @@ public class AdminUserController {
     private final PasswordEncoder passwordEncoder;
     private final PasswordManagementService passwordManagementService;
     private final UserProvisioningService userProvisioningService;
+    private final UserService userService;
 
     private static final String CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%";
     private static final SecureRandom RANDOM = new SecureRandom();
@@ -58,6 +62,31 @@ public class AdminUserController {
         }
         UserProvisionResponse response = userProvisioningService.provision(request, tenantId, currentUserId);
         return ApiResponse.success(response);
+    }
+
+    /**
+     * Tenant-scoped user search for picker UIs (MemberPicker, reference-field dropdown,
+     * approval assignee selection, etc.).
+     *
+     * <p>Authenticated endpoint — authentication is enforced by the default Spring Security
+     * filter chain; any tenant member may call it because picker selection is a UX need, not
+     * an admin action. The query is strictly scoped to the caller's current tenant via
+     * ab_tenant_member (status=active), so callers can never see users outside their tenant.</p>
+     *
+     * <p>Replaces the previously-removed public {@code /api/users/search} endpoint, which was
+     * deleted during the 2026-04 security review because it lacked authentication.</p>
+     */
+    @GetMapping("/search")
+    @Operation(summary = "Search users in the current tenant by keyword (for picker UIs)")
+    public ApiResponse<List<UserSearchDTO>> search(
+            @RequestParam(required = false, defaultValue = "") String keyword,
+            @RequestParam(required = false, defaultValue = "20") int size) {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        if (tenantId == null) {
+            throw new RootUnCheckedException(ResponseCode.BadParam, "No tenant context — caller must be in a tenant");
+        }
+        List<UserSearchDTO> results = userService.searchInTenant(tenantId, keyword, size);
+        return ApiResponse.success(results);
     }
 
     @PostMapping("/{userPid}/reset-password")
