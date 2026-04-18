@@ -41,7 +41,7 @@ import {
   listAuditEvents,
   undeployProcess,
   hasProcessStart,
-} from './_helpers/bpm-lifecycle';
+} from '../../e2e/bpm/_helpers/bpm-lifecycle';
 
 // ---------------------------------------------------------------------------
 // Serial — PG-1/2/3 share one deployed definition + one instance, IG-1/2 share
