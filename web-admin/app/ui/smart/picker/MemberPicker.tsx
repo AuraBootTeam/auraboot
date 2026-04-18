@@ -181,11 +181,12 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
   // Read-only display
   if (readOnly) {
     return (
-      <div className={cn('flex flex-wrap gap-1.5', className)}>
+      <div data-testid="member-picker-readonly" className={cn('flex flex-wrap gap-1.5', className)}>
         {selectedMembers.length > 0 ? (
           selectedMembers.map((m) => (
             <span
               key={m.id}
+              data-testid={`member-picker-selected-${m.id}`}
               className="inline-flex items-center gap-1.5 rounded-full bg-gray-50 py-0.5 pr-2.5 pl-1 text-sm text-gray-700"
             >
               <span
@@ -207,9 +208,10 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
   }
 
   return (
-    <div ref={dropdownRef} className={cn('relative', className)}>
+    <div ref={dropdownRef} data-testid="member-picker" className={cn('relative', className)}>
       {/* Selected members display + Add button */}
       <div
+        data-testid="member-picker-trigger"
         className={cn(
           'min-h-[38px] rounded-lg border px-2 py-1.5 transition-all',
           disabled
@@ -224,6 +226,7 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
           {selectedMembers.map((m) => (
             <span
               key={m.id}
+              data-testid={`member-picker-selected-${m.id}`}
               className="inline-flex items-center gap-1 rounded-full bg-gray-100 py-0.5 pr-1 pl-0.5 text-sm text-gray-800 transition-colors hover:bg-gray-200"
             >
               <span
@@ -238,6 +241,7 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
               {!disabled && (
                 <button
                   type="button"
+                  data-testid={`member-picker-remove-${m.id}`}
                   onClick={(e) => handleRemove(m.id, e)}
                   className="flex h-4 w-4 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-300 hover:text-gray-600"
                 >
@@ -251,6 +255,7 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
           {!disabled && (
             <button
               type="button"
+              data-testid="member-picker-add"
               onClick={() => setOpen(!open)}
               className={cn(
                 'inline-flex items-center gap-1 rounded-full border border-dashed px-2 py-0.5 text-xs transition-colors',
@@ -268,7 +273,10 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
 
       {/* Search popup dropdown */}
       {open && !disabled && (
-        <div className="absolute top-full right-0 left-0 z-50 mt-1.5 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg">
+        <div
+          data-testid="member-picker-popup"
+          className="absolute top-full right-0 left-0 z-50 mt-1.5 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg"
+        >
           {/* Search input */}
           <div className="border-b border-gray-100 p-2">
             <div className="relative">
@@ -276,6 +284,7 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
               <input
                 ref={searchRef}
                 type="text"
+                data-testid="member-picker-search-input"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search members..."
@@ -303,6 +312,7 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
                   <button
                     key={opt.id}
                     type="button"
+                    data-testid={`member-picker-option-${opt.id}`}
                     onClick={() => handleSelect(opt)}
                     className={cn(
                       'mx-1 flex w-[calc(100%-8px)] items-center gap-2.5 rounded-md px-2 py-2 text-left transition-colors',
