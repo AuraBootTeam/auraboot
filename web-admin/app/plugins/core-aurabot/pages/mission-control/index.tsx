@@ -520,6 +520,18 @@ function DashboardView({
           desc={l('审核 user→tenant 记忆晋升提案', 'Review user→tenant memory promotion proposals')}
           onClick={() => navigate('/aurabot/memory-promotions')}
         />
+        <QuickLink
+          icon="🪞"
+          title={l('我的画像', 'My Profile')}
+          desc={l('查看、编辑、固定或遗忘 Soul Profile', 'View, edit, pin, or forget your soul profile')}
+          onClick={() => navigate('/aurabot/my-profile')}
+        />
+        <QuickLink
+          icon="👥"
+          title={l('Soul Profiles 管理', 'Soul Profiles (Admin)')}
+          desc={l('租户 Soul Profile 元数据监控', 'Tenant soul profile metadata monitoring')}
+          onClick={() => navigate('/aurabot/soul-profiles')}
+        />
       </div>
 
       {/* Quick Links to Config Pages */}
