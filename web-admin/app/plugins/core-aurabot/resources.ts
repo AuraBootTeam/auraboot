@@ -55,4 +55,10 @@ export const RESOURCES: PluginResource[] = [
     menu: { order: 35, group: 'aurabot' }, permission: 'aurabot.run.read',
     file: './plugins/core-aurabot/pages/mission-control/learning-drafts.tsx',
   },
+  {
+    key: 'aurabot.interrupts', path: '/aurabot/interrupts',
+    title: { en: 'Interrupts', zh: '中断审计' }, icon: 'alert-circle',
+    menu: { order: 36, group: 'aurabot' }, permission: 'aurabot.run.read',
+    file: './plugins/core-aurabot/pages/mission-control/interrupts.tsx',
+  },
 ]
