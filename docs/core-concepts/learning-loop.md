@@ -198,3 +198,23 @@ If a plugin's command handler cannot honour dry-run safely, either leave
 register its command code as `NONE` in `ab_agent_dry_run_support` for the
 affected tenants; `DryRunSupportRegistry` will then classify the tool_ref
 as ineligible and skip shadow replay entirely.
+
+#### Phase-level audit (PR-62 R2-N2)
+
+Beyond the HANDLER / DOMAIN_EVENT / afterCommit gates above, PR-62 audited
+every remaining entry call in `CompletionPhase` and `PostExecutionPhase`:
+
+- `CompletionPhase.effectExecutor.executeEffectPhase` — writes only to
+  `ab_outbox` and the event store through MyBatis mappers that inherit the
+  caller's transaction. **Kept active** under dry-run to exercise the
+  rollback envelope (the whole point of shadow replay). An `INFO` log
+  `"Dry-run: effect phase ran under rollback envelope"` documents the fact.
+  If any future refactor introduces a write that escapes the outer
+  transaction (`REQUIRES_NEW`, `@Async`, Kafka / WebSocket / HTTP
+  emission), the call MUST be wrapped in `if (!dryRun)` — the comment at
+  the call site flags this requirement.
+- `PostExecutionPhase` — gated at the phase entry under `if (dryRun)
+  return;`. Covers side-effect rules, roll-up recalculation, governance
+  snapshot, and postActions (including BPM `start_process` which triggers
+  SmartEngine task listeners that are easy to refactor into non-JDBC
+  emissions). The gate is defensive rather than currently required.
