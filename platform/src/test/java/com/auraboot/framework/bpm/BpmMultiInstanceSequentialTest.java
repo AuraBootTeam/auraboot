@@ -131,14 +131,16 @@ class BpmMultiInstanceSequentialTest extends BaseIntegrationTest {
     // =====================================================================
     @Test
     @Disabled("""
-            SURFACES REAL GAP (SEQ-MI-GAP-1): sequential MI runtime does not iterate
-            across collection elements. Observed behavior: SmartEngine spawns exactly
-            one task (correct initial step), but completing it ends the MI activity
-            instead of spawning the next iteration. Root cause likely lives in
-            DefaultMultiInstanceCounter / UserTaskBehavior — the completionCondition
-            fires because per-iteration nrOfInstances is computed as 1 rather than
-            |collection|. Fix ticket: SEQ-MI-GAP-1 (runtime sequential MI iteration).
-            Re-enable once the runtime cycles through the collection.""")
+            BLOCKED-UPSTREAM (GAP-263 / SEQ-MI-GAP-1): SmartEngine fork engine deficit.
+            Diagnosed root cause (UserTaskBehavior.handleMultiInstance:177-294):
+            totalInstanceCount = totalExecutionInstanceList.size() reflects already-
+            created EI rows, not the collection cardinality. After task #1 completes
+            the variable nrOfInstances=1 and nrOfCompletedInstances=1, so the BPMN-
+            standard completionCondition (nrOfCompletedInstances == nrOfInstances)
+            evaluates true and the activity exits before compensateExecutionAndTask
+            (line 238) can spawn iteration #2. Fix MUST land in the SmartEngine fork
+            — bind nrOfInstances to the cached collection cardinality at enter()
+            time (per BPMN 2.0 §13.2). See docs/backlog/technical.md GAP-263.""")
     @DisplayName("SEQ-01: sequential MI with 3 approvers advances one-by-one to completion")
     void sequentialMiAdvancesOneByOne() {
         ProcessInstance instance = deployAndStart("three", List.of("u1", "u2", "u3"));
@@ -216,12 +218,15 @@ class BpmMultiInstanceSequentialTest extends BaseIntegrationTest {
     // =====================================================================
     @Test
     @Disabled("""
-            SURFACES REAL GAP (SEQ-MI-GAP-2): empty collection does not skip the MI
-            activity — IdAndGroupTaskAssigneeDispatcher's defensive fallback returns
-            the current user when the resolved miCollection is []-empty, which
-            materializes one userTask against the wrong assignee. Sequential MI over
-            an empty list must short-circuit to zero iterations and follow the
-            outgoing sequenceFlow, per BPMN 2.0 §13.2. Fix ticket: SEQ-MI-GAP-2.""")
+            BLOCKED-UPSTREAM (GAP-263 / SEQ-MI-GAP-2): SmartEngine fork engine deficit.
+            Platform-side IdAndGroupTaskAssigneeDispatcher fallback fixed in this
+            branch — empty miCollection now returns []-empty candidate list (no
+            silent starter fallback). However SmartEngine UserTaskBehavior.enter
+            (lines 70-108) still creates an empty ActivityInstance with no TIs and
+            never calls execute() / setNeedPause(false), so the MI activity hangs.
+            Fix MUST land in SmartEngine fork — when MI candidate list is empty,
+            short-circuit ACTIVITY_END and advance through the outgoing sequenceFlow
+            per BPMN 2.0 §13.2. See docs/backlog/technical.md GAP-263.""")
     @DisplayName("SEQ-03: empty collection → MI activity is skipped, instance completes")
     void sequentialMiEmptyCollection() {
         ProcessInstance instance = deployAndStart("empty", List.of());
