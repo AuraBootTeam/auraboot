@@ -82,4 +82,35 @@ public interface UserMapper extends BaseMapper<User> {
             @Param("excludeUserId") Long excludeUserId,
             @Param("keyword") String keyword,
             @Param("limit") int limit);
+
+    /**
+     * Single-user lookup with the same tenant-scoped projection as
+     * {@link #searchUsersByTenant}, used by picker resolve-name flows.
+     * Returns null when the user does not exist or is not a member of the tenant.
+     */
+    @Select("""
+            SELECT u.pid AS pid,
+                   COALESCE(u.nick_name, u.user_name, u.email) AS display_name,
+                   u.email AS email,
+                   u.img_id AS avatar_url,
+                   d.org_dept_name AS department_name
+            FROM ab_user u
+            INNER JOIN ab_tenant_member tm
+                    ON tm.user_id = u.id
+                   AND tm.tenant_id = #{tenantId}
+                   AND tm.status = 'active'
+                   AND tm.deleted_flag = FALSE
+            LEFT JOIN mt_org_employee e
+                   ON e.org_emp_user_id = CAST(u.id AS VARCHAR)
+                  AND e.tenant_id = #{tenantId}
+            LEFT JOIN mt_org_department d
+                   ON d.id = CAST(e.org_emp_dept_id AS BIGINT)
+                  AND d.tenant_id = #{tenantId}
+            WHERE u.deleted_flag = FALSE
+              AND u.pid = #{pid}
+            LIMIT 1
+            """)
+    Map<String, Object> findUserInTenantByPid(
+            @Param("tenantId") Long tenantId,
+            @Param("pid") String pid);
 }
