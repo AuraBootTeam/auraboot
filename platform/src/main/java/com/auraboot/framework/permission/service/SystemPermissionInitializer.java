@@ -167,6 +167,44 @@ public class SystemPermissionInitializer {
     }
 
     // ========================================================================
+    // Internal system models (accessed via /api/dynamic/{code} but not registered
+    // as user-facing MetaModels)
+    // ========================================================================
+
+    /**
+     * Internal system model codes that are reachable through DynamicController
+     * (e.g. {@code /api/dynamic/sys_user/list}) but are NOT registered as
+     * user-facing {@code ab_meta_model} entries. Without explicit permissions,
+     * the DynamicController's {@code @RequirePermission("model.{pageKey}.read")}
+     * blocks every access — including the admin-facing MemberPicker/SmartSelect
+     * that resolves user references.
+     *
+     * <p>Each entry here produces {@code model.{code}.{action}} permission codes
+     * during tenant bootstrap. Privilege is intentionally narrow: only
+     * TENANT_ADMIN and DEVELOPER receive these (see
+     * {@link #INTERNAL_SYSTEM_MODEL_ROLE_WHITELIST}); VIEWER is excluded so we
+     * do not accidentally leak user listings via the "viewer gets all read
+     * actions" template rule.
+     */
+    private record InternalSystemModel(String code, String displayName, String[] actions) {}
+
+    private static final List<InternalSystemModel> INTERNAL_SYSTEM_MODELS = List.of(
+        // sys_user is referenced via refModelCode in plugin fields (applicant,
+        // assignee, owner, ...). The SmartSelect/MemberPicker widget calls
+        // GET /api/dynamic/sys_user/list to populate dropdowns. Only read is
+        // needed — mutations still go through the dedicated user/member APIs.
+        new InternalSystemModel("sys_user", "System User", ACTIONS_READ_ONLY)
+    );
+
+    /**
+     * Role codes that receive internal system model permissions during bootstrap.
+     * Deliberately excludes VIEWER to avoid leaking user directory data through
+     * the {@link RolePermissionTemplate#VIEWER} read-all-leaves filter.
+     */
+    private static final Set<String> INTERNAL_SYSTEM_MODEL_ROLE_WHITELIST =
+        Set.of("tenant_admin", "developer");
+
+    // ========================================================================
     // Public API
     // ========================================================================
 
@@ -230,10 +268,62 @@ public class SystemPermissionInitializer {
             }
         }
 
+        // Internal system model permissions (model.sys_user.read, …) — parented
+        // under the existing "platform" module so the tree remains navigable.
+        Long platformModuleId = resolveExistingId("module", "platform", null);
+        for (InternalSystemModel m : INTERNAL_SYSTEM_MODELS) {
+            // Level 2: model.{code} resource node
+            Permission resourceNode = createOrSkipPermission(
+                tenantId, "model", m.code(), null,
+                m.displayName(),
+                "Internal system model: " + m.displayName(),
+                LEVEL_RESOURCE, platformModuleId,
+                allPermissions, counts
+            );
+            Long resourceId = resourceNode != null
+                ? resourceNode.getId()
+                : resolveExistingId("model", m.code(), null);
+
+            // Level 3: action nodes
+            for (String action : m.actions()) {
+                createOrSkipPermission(
+                    tenantId, "model", m.code(), action,
+                    m.displayName() + " " + capitalize(action),
+                    getActionDescription(m.displayName(), action),
+                    LEVEL_ACTION, resourceId,
+                    allPermissions, counts
+                );
+            }
+        }
+
         log.info("System permission initialization complete: tenantId={}, created={}, skipped={}, total={}",
             tenantId, counts[0], counts[1], allPermissions.size());
 
         return allPermissions;
+    }
+
+    /**
+     * Expose the set of internal system model permission codes (level=3 action
+     * nodes) for use by the bootstrap role-assignment step, which must grant
+     * them narrowly to admin/developer only (not viewer).
+     *
+     * @return set of codes like {@code model.sys_user.read}
+     */
+    public static Set<String> internalSystemModelActionCodes() {
+        Set<String> codes = new LinkedHashSet<>();
+        for (InternalSystemModel m : INTERNAL_SYSTEM_MODELS) {
+            for (String action : m.actions()) {
+                codes.add("model." + m.code() + "." + action);
+            }
+        }
+        return codes;
+    }
+
+    /**
+     * Role codes authorized to receive internal system model permissions.
+     */
+    public static Set<String> internalSystemModelRoleWhitelist() {
+        return INTERNAL_SYSTEM_MODEL_ROLE_WHITELIST;
     }
 
     // ========================================================================
