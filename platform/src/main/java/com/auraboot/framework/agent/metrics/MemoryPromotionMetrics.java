@@ -27,6 +27,7 @@ public class MemoryPromotionMetrics {
     public static final String PROPOSAL_TOTAL = "auraboot_memory_promotion_proposal_total";
     public static final String DECISION_TOTAL = "auraboot_memory_promotion_decision_total";
     public static final String SHADOW_RETRACTION_TOTAL = "auraboot_memory_promotion_shadow_retraction_total";
+    public static final String EMBEDDING_DIM_MISMATCH_TOTAL = "auraboot_memory_embedding_dim_mismatch_total";
 
     public static final String REASON_CROSS_USER_AGREEMENT = "cross_user_agreement";
     public static final String REASON_IMPLICIT_CO_SIGN = "implicit_co_sign";
@@ -62,6 +63,22 @@ public class MemoryPromotionMetrics {
                 .tag("tenant", tenantId == null ? "unknown" : tenantId.toString())
                 .tag("decision", decision == null ? "unknown" : decision)
                 .tag("reason", rejectReason == null ? "none" : rejectReason)
+                .register(registry)
+                .increment();
+    }
+
+    /**
+     * Record an embedding dimension mismatch or null/empty vector returned
+     * by the embedding provider (PR-74 / N5). Tagged with tenant + provider
+     * + observed dim so ops can diagnose a misconfigured model without
+     * reading logs.
+     */
+    public void recordEmbeddingDimMismatch(Long tenantId, String provider, int actualDim) {
+        Counter.builder(EMBEDDING_DIM_MISMATCH_TOTAL)
+                .description("Embedding vectors rejected due to null/empty/dim-mismatch")
+                .tag("tenant", tenantId == null ? "unknown" : tenantId.toString())
+                .tag("provider", provider == null ? "unknown" : provider)
+                .tag("actual_dim", Integer.toString(actualDim))
                 .register(registry)
                 .increment();
     }
