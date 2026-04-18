@@ -67,6 +67,30 @@ public interface CommandHandlerExtension extends ExtensionPoint {
         return 0;
     }
 
+    /**
+     * Declare whether this handler is safe to execute under
+     * {@code CommandExecuteRequest.dryRun=true}.
+     *
+     * <p>The CommandPipeline transaction rollback only undoes writes made
+     * through the pooled JDBC {@code DataSource}. External side effects —
+     * outbound HTTP, email, MQ publishes, object-storage uploads, Redis,
+     * external DBs, file writes — escape the rollback envelope and will
+     * fire for real even when dry-run is requested.
+     *
+     * <p>Return {@code true} only when the handler either has no such
+     * external side effects, or inspects {@link CommandContext#dryRun()}
+     * internally and short-circuits every external call.
+     *
+     * <p>When this method returns {@code false} (default), HandlerPhase
+     * skips the handler entirely under dry-run and logs the skip at INFO.
+     *
+     * @return true if the handler honours dry-run semantics
+     * @since PR-56
+     */
+    default boolean supportsDryRun() {
+        return false;
+    }
+
     /** Well-known key for DataAccessor in the settings map. */
     String DATA_ACCESSOR_KEY = "__dataAccessor";
 
