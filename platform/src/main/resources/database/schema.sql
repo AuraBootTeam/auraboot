@@ -6900,6 +6900,52 @@ CREATE INDEX IF NOT EXISTS idx_tool_acl_tenant_active ON ab_agent_tool_acl (tena
 CREATE INDEX IF NOT EXISTS idx_tool_acl_priority ON ab_agent_tool_acl (tenant_id, priority DESC, id) WHERE active = TRUE;
 COMMENT ON TABLE ab_agent_tool_acl IS 'ACP Tool ACL — 5-dim authorisation matrix; fail-secure default (no rule → deny)';
 
+-- ============================================================================
+-- ACP SkillPack Activation Filter (ACP-Ideal §3.3)
+-- A SkillPack is a named bundle of skill codes that gets activated for a
+-- (tenant, profile_id?, channel?, run_kind?) combination. Before the planner
+-- hands candidates to the LLM, we narrow the universe of allowed skills to
+-- (union of activated packs) + (individually-whitelisted skills). Without
+-- this, the LLM sees every skill in the tenant and occasionally picks
+-- expensive wrong turns.
+--
+-- Progressive rollout same as Tool ACL: a tenant with NO pack bindings gets
+-- pre-filter behaviour (all candidates pass through).
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS ab_agent_skill_pack (
+    id           BIGSERIAL PRIMARY KEY,
+    pid          VARCHAR(26) UNIQUE NOT NULL,
+    tenant_id    BIGINT NOT NULL,             -- -1 = platform built-in
+    pack_code    VARCHAR(100) NOT NULL,
+    pack_name    VARCHAR(200) NOT NULL,
+    description  TEXT,
+    skill_codes  JSONB NOT NULL,              -- ["crm.lead.update", "dsl.query", ...]
+    active       BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at   TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at   TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (tenant_id, pack_code)
+);
+CREATE INDEX IF NOT EXISTS idx_skill_pack_tenant ON ab_agent_skill_pack (tenant_id, active);
+COMMENT ON TABLE ab_agent_skill_pack IS 'Named bundle of skill codes for activation filtering';
+
+CREATE TABLE IF NOT EXISTS ab_agent_skill_pack_binding (
+    id            BIGSERIAL PRIMARY KEY,
+    pid           VARCHAR(26) UNIQUE NOT NULL,
+    tenant_id     BIGINT NOT NULL,
+    pack_pid      VARCHAR(26) NOT NULL,        -- ab_agent_skill_pack.pid
+    -- dimensions — NULL = match any on that axis
+    profile_id    VARCHAR(26),
+    channel       VARCHAR(32),
+    run_kind      VARCHAR(20),
+    priority      INTEGER NOT NULL DEFAULT 100,
+    active        BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at    TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at    TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_pack_binding_tenant ON ab_agent_skill_pack_binding (tenant_id, active);
+CREATE INDEX IF NOT EXISTS idx_pack_binding_pack ON ab_agent_skill_pack_binding (pack_pid);
+COMMENT ON TABLE ab_agent_skill_pack_binding IS 'Which skill pack(s) activate for a (profile × channel × run_kind) tuple';
+
 -- Seed: platform built-in capabilities (tenant_id = -1)
 -- Skills are the built-in per-tenant generic codes (dsl.query / dsl.command)
 -- that AgentTemplateSeeder creates for every tenant; the router will return
