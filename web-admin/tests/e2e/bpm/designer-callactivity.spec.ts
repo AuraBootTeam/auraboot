@@ -7,18 +7,30 @@
  *
  * Originally this spec also drove the full runtime lifecycle (deploy → start
  * parent → child spawns with input mapping → complete child → output mapping
- * propagates back). Those tests are authored but currently skipped because
- * SmartEngine's BPMN parser rejects the XML emitted by
- * JsonToBpmnConverter.writeCallActivity when input/output mappings are
- * present:
+ * propagates back). CA-2/CA-3 remain skipped due to a SmartEngine runtime
+ * limitation (NOT a converter bug — GAP-250 fixed the XML emission).
  *
+ * GAP-250 status: The BPMN parser error
  *    Parse process definition file failure!
+ * has been fixed. Root cause: JsonToBpmnConverter.writeCallActivity used to
+ * emit <extensionElements><smart:in source target/></...>, but SmartEngine's
+ * DefaultXmlParserFacade throws EngineException on any element it has no
+ * parser for. CallActivityParser only reads the `calledElement` /
+ * `calledElementVersion` attributes (see SmartEngine fork
+ * core/.../callactivity/parser/CallActivityParser.java). The converter now
+ * emits a self-closing <callActivity calledElement=... smart:calledElementVersion=.../>
+ * mirroring the canonical fixture
+ *   extension/storage/storage-mysql/src/test/resources/parent-callactivity-process.bpmn20.xml.
  *
- * The converter emits <extensionElements><smart:in source target/></...>
- * (SMART_NAMESPACE = http://smartengine.org/schema/process), which the
- * downstream parser does not accept. Deploys WITHOUT mappings succeed
- * (verified via curl). See CA-2 / CA-3 TODO and CA-1 step 9 note for the
- * tracking contract. When the backend is fixed, remove .skip() from both.
+ * CA-2 / CA-3 unresolved: SmartEngine's CallActivityBehavior explicitly
+ * isolates parent/child request maps ("隔离父子流程的request和response" —
+ * only tenantId is forwarded). Variable mapping between parent and child is
+ * not a BPMN-level feature in SmartEngine; it must be implemented via an
+ * ExecutionListener / AuraVariablePersister extension at the platform
+ * level. Until that platform work lands, the inputMappings / outputMappings
+ * values stay in designerJson config only (UI contract covered by CA-1)
+ * and do NOT cause runtime variable propagation. Unskip CA-2/CA-3 once the
+ * platform listener is implemented.
  *
  * Dimensions covered (per docs/standards/testing-e2e-web.md):
  *   D1  — Sidebar menu navigation (not page.goto direct)
@@ -493,21 +505,11 @@ test.describe(
       await page.locator('.react-flow__pane').click({ position: { x: 50, y: 50 } });
 
       // 9. Deploy via toolbar (real UI click).
-      //    NOTE: Deploy currently fails with SmartEngine "Parse process
-      //    definition file failure!" when the CallActivity carries
-      //    input/output mappings. The generator emits
-      //    <extensionElements><smart:in source.. target..></extensionElements>
-      //    (see JsonToBpmnConverter.writeCallActivity ~line 710) which the
-      //    SmartEngine BPMN parser does not accept. Without mappings deploy
-      //    works fine (verified via curl). Tracked as a backend bug — the
-      //    parser contract for CallActivity extension elements needs either
-      //    a different namespace / wrapper or SmartEngine needs to accept
-      //    the smart:in/smart:out pair.
-      //
-      //    To keep CA-1 green on the UI contract (the subject of this spec)
-      //    while the backend is fixed, we only assert the deploy response is
-      //    received — not that it succeeds. CA-2 / CA-3 (which require a
-      //    working runtime) are marked .skip() with the same TODO.
+      //    GAP-250 fix: converter no longer emits <smart:in>/<smart:out> into
+      //    the BPMN XML (SmartEngine's parser had no parser for those
+      //    elements and threw "Parse process definition file failure!").
+      //    Deploy now succeeds — variable propagation is a separate
+      //    platform-level concern (see CA-2 / CA-3 notes).
       const deployBtn = page.locator('[data-testid="bpmn-btn-deploy"]');
       await expect(deployBtn).toBeVisible({ timeout: 5_000 });
       await expect(deployBtn).toBeEnabled({ timeout: 10_000 });
@@ -518,19 +520,25 @@ test.describe(
       );
       await deployBtn.click();
       const deployResp = await deployResponsePromise;
-      // Accept either 2xx (once backend is fixed) or 4xx/5xx (current known
-      // failure). The UI-contract assertions above are the real coverage.
-      expect(deployResp.status()).toBeGreaterThan(0);
+      expect(
+        deployResp.ok(),
+        `GAP-250 regression guard: deploy must succeed, got ${deployResp.status()} ${await deployResp
+          .text()
+          .catch(() => '')}`,
+      ).toBe(true);
     });
 
     // =======================================================================
     // CA-2: start parent with parentInput=<unique>; assert child instance
     // spawns and receives the mapped childInput variable.
     //
-    // TODO: un-skip once SmartEngine accepts the BPMN emitted by
-    // JsonToBpmnConverter.writeCallActivity for CallActivity with
-    // input/output mappings. Currently deploy fails with
-    // "Parse process definition file failure!" — see CA-1 step 9 note.
+    // TODO: un-skip once the platform implements variable mapping at the
+    // ExecutionListener / AuraVariablePersister layer. GAP-250 fixed deploy
+    // (converter no longer emits <smart:in>/<smart:out>), but SmartEngine's
+    // CallActivityBehavior explicitly isolates parent/child request maps
+    // ("隔离父子流程的request和response" — only tenantId is forwarded), so
+    // the inputMappings / outputMappings from designerJson config do not
+    // reach the child at runtime today.
     // Contract to verify when unskipped:
     //   - starting parent with parentInput=INPUT_VALUE spawns a child
     //     instance running CHILD_KEY
@@ -604,8 +612,8 @@ test.describe(
     // CA-3: complete child task with output; verify output mapping writes
     // parentOutput back onto the parent instance.
     //
-    // TODO: un-skip together with CA-2 once SmartEngine accepts the BPMN
-    // emitted for CallActivity with mappings. Contract to verify:
+    // TODO: un-skip together with CA-2 once the platform implements
+    // variable mapping propagation (see CA-2 note). Contract to verify:
     //   - completing child_review with variables.childOutput=OUTPUT_VALUE
     //     transitions parent to completed state
     //   - parent.variables.parentOutput == OUTPUT_VALUE (output mapping worked)
