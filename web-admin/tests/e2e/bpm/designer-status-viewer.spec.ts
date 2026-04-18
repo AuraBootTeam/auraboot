@@ -114,16 +114,17 @@ async function clickTaskCenterTab(page: Page, tabLabel: RegExp): Promise<void> {
 }
 
 /**
- * From "我发起的" tab, find the row matching `businessKey` (or PROCESS_KEY)
- * and open its action menu → "查看详情". Some environments open a drawer
- * instead of navigating; in that case we navigate via menu by clicking the
- * sidebar Process Status route which is hidden but reachable through the
- * same handler — fallback to direct URL is allowed only for STATV-2/3 after
- * the entry-point navigation has been verified at least once in STATV-1.
+ * From "我发起的" tab, find the row for the given instanceId and open its
+ * action menu → "查看详情". The backend currently returns processDefinitionId
+ * only for started processes (businessKey/processDefinitionKey/title are not
+ * populated in the workbench payload), so the only stable identifier rendered
+ * in the row is `instanceId` — we match on that. Some environments open a
+ * drawer instead of navigating; in that case we fall back to the same in-app
+ * router URL.
  */
 async function openStatusViewerFromList(
   page: Page,
-  rowMatcher: string,
+  _rowMatcher: string,
   instanceId: string,
 ): Promise<void> {
   await navigateToTaskCenter(page);
@@ -133,9 +134,9 @@ async function openStatusViewerFromList(
   const table = page.locator('table').first();
   await expect(table).toBeVisible({ timeout: 10_000 });
 
-  // Locate the row by businessKey OR processKey (the table renders both)
-  const row = page.locator('tbody tr').filter({ hasText: rowMatcher }).first();
-  await expect(row, `Row matching "${rowMatcher}" must be visible in 我发起的 tab`).toBeVisible({
+  // Locate the row by instanceId (rendered under the process title column).
+  const row = page.locator('tbody tr').filter({ hasText: instanceId }).first();
+  await expect(row, `Row for instanceId "${instanceId}" must be visible in 我发起的 tab`).toBeVisible({
     timeout: 10_000,
   });
 
