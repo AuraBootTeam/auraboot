@@ -1,5 +1,6 @@
 package com.auraboot.framework.agent.controller;
 
+import com.auraboot.framework.agent.service.PromotionEvaluator;
 import com.auraboot.framework.agent.service.SkillDraftNamer;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
@@ -31,6 +32,7 @@ public class LearningLoopController {
 
     private final JdbcTemplate jdbcTemplate;
     private final SkillDraftNamer namer;
+    private final PromotionEvaluator promotionEvaluator;
 
     // =========================================================================
     // List
@@ -202,6 +204,35 @@ public class LearningLoopController {
                     String.class, pid, tenantId);
             result.put("new_code", newCode);
         }
+        return ApiResponse.ok(result);
+    }
+
+    // =========================================================================
+    // Promotion evaluation (Phase 5)
+    // =========================================================================
+
+    /**
+     * Evaluate a draft against its accumulated shadow_run metrics. Writes the
+     * shadow_metrics JSON back to the draft row and, if thresholds are met,
+     * flips status to PROMOTED_PENDING_HUMAN. Returns the computed metrics
+     * plus the decision so Mission Control can show them inline.
+     */
+    @PostMapping("/drafts/{pid}/evaluate-promotion")
+    public ApiResponse<Map<String, Object>> evaluatePromotion(@PathVariable String pid) {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        List<Map<String, Object>> owns = jdbcTemplate.queryForList(
+                "SELECT 1 FROM ab_agent_skill_draft WHERE pid = ? AND tenant_id = ?", pid, tenantId);
+        if (owns.isEmpty()) return ApiResponse.error(404, "draft not found");
+
+        PromotionEvaluator.EvaluationResult r = promotionEvaluator.evaluate(pid);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("pid", r.getDraftPid());
+        result.put("decision", r.getDecision().name());
+        result.put("shadow_runs", r.getShadowRuns());
+        result.put("output_match_rate", r.getOutputMatchRate());
+        result.put("fidelity_match_rate", r.getFidelityMatchRate());
+        result.put("cost_delta", r.getCostDelta());
+        result.put("duration_delta_ms", r.getDurationDeltaMs());
         return ApiResponse.ok(result);
     }
 }
