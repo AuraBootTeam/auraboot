@@ -6843,6 +6843,31 @@ CREATE INDEX IF NOT EXISTS idx_sched_delivery_pending ON ab_agent_schedule_deliv
 CREATE INDEX IF NOT EXISTS idx_sched_delivery_run ON ab_agent_schedule_delivery_outbox (run_pid);
 COMMENT ON TABLE ab_agent_schedule_delivery_outbox IS 'Scheduled-run notification outbox with exponential-backoff retry';
 
+-- ============================================================================
+-- ACP Interrupt Log (ACP-Ideal §6.1.5)
+-- Every time a new user message arrives while a run is active, classifier
+-- decides (replace_intent | append_context | insert_subtask), we log the
+-- decision + act on it. Audit trail for UX quality + dispute resolution
+-- ("why was my previous request cancelled").
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS ab_agent_interrupt_log (
+    id                BIGSERIAL PRIMARY KEY,
+    pid               VARCHAR(26) UNIQUE NOT NULL,
+    tenant_id         BIGINT NOT NULL,
+    session_id        VARCHAR(100) NOT NULL,
+    active_run_id     VARCHAR(26),                     -- run active at interrupt time
+    new_message_excerpt VARCHAR(500),                  -- truncated for dashboard readability
+    sub_policy        VARCHAR(24) NOT NULL,            -- replace_intent | append_context | insert_subtask
+    classifier_tier   VARCHAR(16),                     -- keyword | llm
+    confidence        DECIMAL(3,2),
+    reason            VARCHAR(500),
+    action_taken      VARCHAR(32),                     -- cancelled_run | context_injected | subtask_enqueued | noop
+    created_at        TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_interrupt_log_session ON ab_agent_interrupt_log (session_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_interrupt_log_run ON ab_agent_interrupt_log (active_run_id);
+COMMENT ON TABLE ab_agent_interrupt_log IS 'Interrupt Protocol audit log — one row per user-interrupt classification decision';
+
 -- Seed: platform built-in capabilities (tenant_id = -1)
 -- Skills are the built-in per-tenant generic codes (dsl.query / dsl.command)
 -- that AgentTemplateSeeder creates for every tenant; the router will return
