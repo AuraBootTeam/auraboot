@@ -132,18 +132,26 @@ export async function assertDesignerJson(
   }
 
   // Edge assertion
+  // designerJson edges follow React Flow convention: fields are "source" and "target".
+  // Condition lives in edge.data.condition.content (BPMNEdgeData.condition: ConditionExpression).
   const edges = (dj.edges ?? []) as Array<Record<string, unknown>>;
 
   for (const spec of expected.edgeSpecs) {
     const match = edges.find((e) => {
-      const source = (e.source ?? e.from) as string;
-      const target = (e.target ?? e.to) as string;
+      const source = e.source as string | undefined;
+      const target = e.target as string | undefined;
+      if (source === undefined || target === undefined) {
+        throw new Error(
+          `assertDesignerJson: edge object is missing "source" or "target" field. ` +
+            `Edge keys: [${Object.keys(e).join(', ')}]`,
+        );
+      }
       return source === spec.from && target === spec.to;
     });
 
     if (!match) {
       const edgeSummary = edges
-        .map((e) => `${e.source ?? e.from}→${e.target ?? e.to}`)
+        .map((e) => `${e.source as string}→${e.target as string}`)
         .join(', ');
       throw new Error(
         `assertDesignerJson: expected edge ${spec.from}→${spec.to} not found. ` +
@@ -152,9 +160,17 @@ export async function assertDesignerJson(
     }
 
     if (spec.condition !== undefined) {
-      // Condition may live in data.condition or directly on the edge object
-      const edgeData = (match.data ?? match) as Record<string, unknown>;
-      const actual = (edgeData.condition ?? edgeData.conditionExpression ?? '') as string;
+      // Condition is stored in edge.data.condition.content (BPMNEdgeData → ConditionExpression).
+      const edgeData = match.data as Record<string, unknown> | undefined;
+      const conditionObj = edgeData?.condition as Record<string, unknown> | undefined;
+      const actual = conditionObj?.content as string | undefined;
+      if (actual === undefined) {
+        throw new Error(
+          `assertDesignerJson: edge ${spec.from}→${spec.to} has no condition. ` +
+            `Expected condition containing "${spec.condition}". ` +
+            `edge.data keys: [${Object.keys(edgeData ?? {}).join(', ')}]`,
+        );
+      }
       if (!actual.includes(spec.condition)) {
         throw new Error(
           `assertDesignerJson: edge ${spec.from}→${spec.to} condition does not contain ` +
@@ -437,10 +453,11 @@ export async function startInstanceAndAdvance(
     );
   }
 
-  const finalStatus = (finalData.status ?? finalData.state) as string | undefined;
+  // ProcessInstance.getStatus() serialises to JSON key "status" (InstanceStatus enum).
+  const finalStatus = finalData.status as string | undefined;
   if (!finalStatus) {
     throw new Error(
-      `startInstanceAndAdvance: final instance response missing "status" or "state" field. ` +
+      `startInstanceAndAdvance: final instance response missing "status" field. ` +
         `data fields: ${Object.keys(finalData).join(', ')}`,
     );
   }
