@@ -7662,3 +7662,96 @@ CREATE TABLE IF NOT EXISTS ab_user_note (
 );
 CREATE INDEX IF NOT EXISTS idx_user_note_user ON ab_user_note(user_id, tenant_id);
 COMMENT ON TABLE ab_user_note IS 'Personal quick notes per user on the workbench';
+
+-- ====================================================================
+-- PR-65 Memory Promotion (Phase 1) — schema additions
+-- Design: docs/plans/2026-04/2026-04-18-memory-promotion-design.md §4
+-- Reuses existing ab_agent_memory.embedding vector(1536) column for
+-- cross-user similarity; no separate content_embedding column needed.
+-- ====================================================================
+
+-- Companion fields on ab_agent_memory for shadow period + provenance.
+ALTER TABLE ab_agent_memory ADD COLUMN IF NOT EXISTS shadow_mode BOOLEAN DEFAULT FALSE;
+ALTER TABLE ab_agent_memory ADD COLUMN IF NOT EXISTS promoted_from_pid VARCHAR(26);
+CREATE INDEX IF NOT EXISTS idx_memory_promoted_from ON ab_agent_memory (promoted_from_pid)
+    WHERE promoted_from_pid IS NOT NULL;
+
+-- Promotion proposal / audit ledger.
+CREATE TABLE IF NOT EXISTS ab_agent_memory_promotion (
+    id                    BIGSERIAL PRIMARY KEY,
+    pid                   VARCHAR(26) UNIQUE NOT NULL,
+    tenant_id             BIGINT NOT NULL,
+
+    -- Source
+    source_scope          VARCHAR(16) NOT NULL,
+    source_memory_pid     VARCHAR(26),
+    source_memory_pids    JSONB,
+    target_scope          VARCHAR(16) NOT NULL,
+
+    -- Proposal content
+    category              VARCHAR(32) NOT NULL,
+    proposed_title        VARCHAR(200),
+    proposed_content      TEXT NOT NULL,
+    proposed_importance   INTEGER DEFAULT 5,
+
+    -- Signal strength
+    reason_code           VARCHAR(32),
+    reason_detail         JSONB,
+    confidence_score      NUMERIC(3,2),
+    similarity_score      NUMERIC(3,2),
+    ai_rationale          TEXT,
+
+    -- Review workflow
+    status                VARCHAR(32) NOT NULL DEFAULT 'DRAFT_PENDING_REVIEW',
+    reviewer_id           BIGINT,
+    review_comment        TEXT,
+    reject_reason         VARCHAR(32),
+
+    -- Shadow period (post-promotion observation)
+    promoted_memory_pid   VARCHAR(26),
+    shadow_started_at     TIMESTAMPTZ,
+    shadow_ends_at        TIMESTAMPTZ,
+    activated_at          TIMESTAMPTZ,
+
+    -- Audit
+    created_at            TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    reviewed_at           TIMESTAMPTZ,
+    updated_at            TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT chk_memory_promotion_status CHECK (status IN (
+        'DRAFT_PENDING_REVIEW',
+        'REVIEWED_REJECTED',
+        'PROMOTED_SHADOW',
+        'ACTIVE',
+        'RETRACTED',
+        'DISCARDED',
+        'EXPIRED'
+    )),
+    CONSTRAINT chk_memory_promotion_scope CHECK (
+        (source_scope = 'session' AND target_scope = 'user') OR
+        (source_scope = 'user' AND target_scope = 'tenant')
+    ),
+    CONSTRAINT chk_memory_promotion_reject_reason CHECK (
+        reject_reason IS NULL OR reject_reason IN (
+            'too_specific', 'contains_pii', 'outdated', 'wrong', 'duplicate', 'other'
+        )
+    ),
+    CONSTRAINT fk_memory_promotion_source FOREIGN KEY (source_memory_pid)
+        REFERENCES ab_agent_memory (pid) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_memory_promotion_tenant_status
+    ON ab_agent_memory_promotion (tenant_id, status);
+CREATE INDEX IF NOT EXISTS idx_memory_promotion_pending_confidence
+    ON ab_agent_memory_promotion (tenant_id, confidence_score DESC)
+    WHERE status = 'DRAFT_PENDING_REVIEW';
+CREATE INDEX IF NOT EXISTS idx_memory_promotion_shadow_ends
+    ON ab_agent_memory_promotion (shadow_ends_at)
+    WHERE status = 'PROMOTED_SHADOW';
+CREATE INDEX IF NOT EXISTS idx_memory_promotion_created
+    ON ab_agent_memory_promotion (created_at DESC);
+
+COMMENT ON TABLE ab_agent_memory_promotion IS
+    'Memory promotion proposals and audit rows (PR-65). '
+    'Status lattice: DRAFT_PENDING_REVIEW → PROMOTED_SHADOW → ACTIVE, '
+    'with REVIEWED_REJECTED / RETRACTED / DISCARDED / EXPIRED as terminal states.';
