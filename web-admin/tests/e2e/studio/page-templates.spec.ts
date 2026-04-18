@@ -38,6 +38,7 @@ async function createTestPage(
       pageKey,
       title: name,
       kind: 'list',
+      modelCode: 'tenant',
       blocks: [{ id: 'blk1', blockType: 'table', config: {} }],
       metaInfo: { componentCount: 1 },
       semver: '0.1.0',

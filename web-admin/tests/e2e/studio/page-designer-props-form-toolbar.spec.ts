@@ -66,7 +66,8 @@ async function createPage(page: Page, prefix: string): Promise<string> {
       name,
       pageKey,
       title: name,
-      kind: 'list',
+      kind: 'form',
+      modelCode: 'tenant',
       blocks: [],
       metaInfo: { componentCount: 0 },
       semver: '0.1.0',
@@ -150,7 +151,7 @@ test.describe('C4 — Form-section Block — Deep Property Tests', () => {
    * Returns the config panel locator.
    */
   async function addAndSelectFormSection(page: Page): Promise<Locator> {
-    await page.getByTestId('canvas-left-tab-components').click();
+    await page.getByTestId('designer-tab-blocks').click();
     const paletteItem = page.getByTestId('block-palette-item-form-section');
     await paletteItem.waitFor({ state: 'visible', timeout: 5000 });
     await paletteItem.click();
@@ -421,7 +422,10 @@ test.describe('C4 — Form-section Block — Deep Property Tests', () => {
 // C5 — Toolbar / ActionDef Block Deep Property Tests
 // ===========================================================================
 
-test.describe('C5 — Toolbar Block — Deep ActionDef Tests', () => {
+// C5 Toolbar: toolbar is list-only per BlockLibrary.availableIn; list canvas
+// removed per design §5.1 → no toolbar drag-to-canvas flow post-merge.
+// Equivalent UX: ListConfigPanel → Toolbar tab. Kept skipped as schema reference.
+test.describe.skip('C5 — Toolbar Block — Deep ActionDef Tests', () => {
   /**
    * Add a toolbar block and select it.
    * Returns the config panel locator.
@@ -429,7 +433,7 @@ test.describe('C5 — Toolbar Block — Deep ActionDef Tests', () => {
   async function addAndSelectToolbar(page: Page): Promise<Locator> {
     // Palette items are both dnd-kit useDraggable and native HTML5 draggable.
     // The drag-init race can swallow a click, so retry once before failing.
-    await page.getByTestId('canvas-left-tab-components').click();
+    await page.getByTestId('designer-tab-blocks').click();
     const paletteItem = page.getByTestId('block-palette-item-toolbar');
     await paletteItem.waitFor({ state: 'visible', timeout: 5000 });
 

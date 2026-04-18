@@ -67,7 +67,8 @@ async function createPage(page: Page, prefix: string): Promise<string> {
       name,
       pageKey,
       title: name,
-      kind: 'list',
+      kind: 'form',
+      modelCode: 'tenant',
       blocks: [],
       metaInfo: { componentCount: 0 },
       semver: '0.1.0',
@@ -90,7 +91,7 @@ async function openDesigner(page: Page, pid: string): Promise<void> {
 
 /** Add a block via the Components palette. */
 async function addBlock(page: Page, blockType: string): Promise<void> {
-  await page.getByTestId('canvas-left-tab-components').click();
+  await page.getByTestId('designer-tab-blocks').click();
   const paletteItem = page.getByTestId(`block-palette-item-${blockType}`);
   await paletteItem.waitFor({ state: 'visible', timeout: 5000 });
   await paletteItem.click();
@@ -167,7 +168,11 @@ async function getRadixSelectValue(container: Locator, label: string): Promise<s
 // C6. Sub-table Block (10 properties)
 // ===========================================================================
 
-test.describe('C6 Sub-table — relationMode 3 branches + tabLabel + maxRows + visibleWhen', () => {
+// C6 Sub-table: no palette item in BlockLibrary (not among the 10 hardcoded
+// types). Post-merge 5f72469b, list canvas removed per design §5.1. Sub-table
+// configuration is reachable via ListConfigPanel → Columns tab (sub-table
+// column rendering mode) or dashboard composite widgets.
+test.describe.skip('C6 Sub-table — relationMode 3 branches + tabLabel + maxRows + visibleWhen', () => {
   test('C6.1 relationMode default FK; switching reveals/hides branch-specific fields', async ({ page }) => {
     const pid = await createPage(page, 'subtbl');
     await openDesigner(page, pid);
@@ -370,7 +375,8 @@ test.describe('C6 Sub-table — relationMode 3 branches + tabLabel + maxRows + v
 // C7. Tabs Block (5 properties)
 // ===========================================================================
 
-test.describe('C7 Tabs — defaultActiveTab + tabPosition + tabs JSON + visibleWhen + className', () => {
+// C7 Tabs: no palette item (not in BlockLibrary's 10 types). Removed per §5.1.
+test.describe.skip('C7 Tabs — defaultActiveTab + tabPosition + tabs JSON + visibleWhen + className', () => {
   test('C7.1 tabPosition default Top; change to Left; deselect; reselect — persists', async ({ page }) => {
     const pid = await createPage(page, 'tabs-pos');
     await openDesigner(page, pid);
@@ -550,7 +556,8 @@ test.describe('C8 Stat-card — queryCode + visibleWhen + layout.colSpan default
 // C9. Monthly-grid Block (12 properties)
 // ===========================================================================
 
-test.describe('C9 Monthly-grid — 12 properties: Data Source + Resolve Via + Metrics + expressions', () => {
+// C9 Monthly-grid: no palette item (not in BlockLibrary). Removed per §5.1.
+test.describe.skip('C9 Monthly-grid — 12 properties: Data Source + Resolve Via + Metrics + expressions', () => {
   test('C9.1 Data Source text fields — parentField + parentDisplayField + parentSortField + childParentField + monthField persist', async ({ page }) => {
     const pid = await createPage(page, 'mgrid-ds');
     await openDesigner(page, pid);
@@ -662,7 +669,9 @@ test.describe('C9 Monthly-grid — 12 properties: Data Source + Resolve Via + Me
 // C10. Filters Block (3 properties)
 // ===========================================================================
 
-test.describe('C10 Filters — modelCode model-select + colCount select default=4 + visibleWhen', () => {
+// C10 Filters: list-only per BlockLibrary.availableIn; list canvas removed
+// per design §5.1. Equivalent UX: ListConfigPanel → Filters tab.
+test.describe.skip('C10 Filters — modelCode model-select + colCount select default=4 + visibleWhen', () => {
   test('C10.1 colCount default is 4; change to 2; deselect; reselect — persists', async ({ page }) => {
     const pid = await createPage(page, 'filters-cols');
     await openDesigner(page, pid);
@@ -815,7 +824,9 @@ test.describe('C11 Detail-section — modelCode model-select + colCount select d
 // C12. Rich-text Block (2 properties)
 // ===========================================================================
 
-test.describe('C12 Rich-text — content textarea + visibleWhen', () => {
+// C12 Rich-text: no palette item in BlockLibrary (not among the 10 types).
+// Design §5.1: rich content blocks belong to dashboard composite widgets.
+test.describe.skip('C12 Rich-text — content textarea + visibleWhen', () => {
   test('C12.1 content — fill text, deselect, reselect — persists', async ({ page }) => {
     const pid = await createPage(page, 'richtext-content');
     await openDesigner(page, pid);
@@ -873,7 +884,8 @@ test.describe('C12 Rich-text — content textarea + visibleWhen', () => {
 // C13. Divider Block (1 property: visibleWhen only)
 // ===========================================================================
 
-test.describe('C13 Divider — visibleWhen only (minimal block)', () => {
+// C13 Divider: no palette item in BlockLibrary. Removed per §5.1.
+test.describe.skip('C13 Divider — visibleWhen only (minimal block)', () => {
   test('C13.1 config panel renders with only visibleWhen property', async ({ page }) => {
     const pid = await createPage(page, 'divider-only');
     await openDesigner(page, pid);

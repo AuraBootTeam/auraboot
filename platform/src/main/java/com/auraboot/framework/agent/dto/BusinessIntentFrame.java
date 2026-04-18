@@ -53,4 +53,11 @@ public class BusinessIntentFrame {
     // from ab_agent_memory before emitting the BIF — gives downstream LLM access
     // to user preferences / prior decisions without extra round-trips.
     private List<Map<String, Object>> preContext;
+
+    // v1.1.2 profile + channel (ACP-Ideal §6.2.3 Hermes addendum). Shape which
+    // agent this turn belongs to and how the user reached it — both feed into
+    // PatternExtractor's pattern_hash so the same command across profiles /
+    // channels stays distinct.
+    private String profileId;
+    private String channel;
 }

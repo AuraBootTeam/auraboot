@@ -58,9 +58,14 @@ async function openDesigner(
         name: `E2E Deep ${Date.now()}`,
         pageKey,
         title: 'E2E Deep Test',
-        kind: 'list',
+        // kind=form keeps BlocksDesigner (designer-canvas testid). After
+        // DesignerRouter dispatch (merge 5f72469b), list/detail route to
+        // ConfigPanel instead of the canvas, so generic block-op tests must
+        // target form kind.
+        kind: 'form',
+        modelCode: 'tenant',
         blocks: [
-          { id: 'blk_tbl', blockType: 'table', config: {}, layout: { col: 0, colSpan: 12, rowSpan: 1, order: 0 } },
+          { id: 'blk_sec', blockType: 'form-section', config: {}, layout: { col: 0, colSpan: 12, rowSpan: 1, order: 0 } },
         ],
         metaInfo: { componentCount: 1 },
         semver: '0.1.0',
@@ -169,13 +174,15 @@ test.describe('Page Designer Deep Operations', () => {
     });
     const p = await context.newPage();
     try {
-      // Try to find an existing page first
-      const resp = await p.request.get('/api/pages?pageSize=5');
+      // Try to find an existing form-kind page first (form kind keeps
+      // BlocksDesigner / designer-canvas active post DesignerRouter dispatch).
+      const resp = await p.request.get('/api/pages?pageSize=20');
       if (resp.ok()) {
         const data = await resp.json();
         const pages = data.data?.records || data.data || [];
-        if (pages.length > 0) {
-          fallbackPagePid = pages[0].pid || pages[0].id || null;
+        const formPage = pages.find((x: { kind?: string }) => x.kind === 'form');
+        if (formPage) {
+          fallbackPagePid = formPage.pid || formPage.id || null;
         }
       }
 
@@ -187,10 +194,13 @@ test.describe('Page Designer Deep Operations', () => {
             name: `E2E Deep Operations ${Date.now()}`,
             pageKey,
             title: 'E2E Deep Operations Test Page',
-            kind: 'list',
+            // See inline fixture comment below — must use form kind to keep
+            // BlocksDesigner (designer-canvas) active.
+            kind: 'form',
+            modelCode: 'tenant',
             blocks: [
-              { id: 'blk_tbl', blockType: 'table', config: {}, layout: { col: 0, colSpan: 12, rowSpan: 1, order: 0 } },
-              { id: 'blk_chart', blockType: 'chart', config: {}, layout: { col: 0, colSpan: 6, rowSpan: 1, order: 1 } },
+              { id: 'blk_sec', blockType: 'form-section', config: {}, layout: { col: 0, colSpan: 12, rowSpan: 1, order: 0 } },
+              { id: 'blk_stat', blockType: 'stat-card', config: {}, layout: { col: 0, colSpan: 6, rowSpan: 1, order: 1 } },
             ],
             metaInfo: { componentCount: 2 },
             semver: '0.1.0',

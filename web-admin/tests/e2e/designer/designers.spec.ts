@@ -56,6 +56,7 @@ test.describe('Page Designer (F4-a)', () => {
         pageKey,
         title: 'F4A Test',
         kind: 'list',
+        modelCode: 'tenant',
         blocks: [
           { blockType: 'filters', label: 'Filters', fields: [] },
           { blockType: 'toolbar', label: 'Toolbar', actions: [] },

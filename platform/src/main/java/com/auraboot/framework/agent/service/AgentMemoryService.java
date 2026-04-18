@@ -395,14 +395,17 @@ public class AgentMemoryService {
     /**
      * Keyword-search memories visible to the given (tenant, user) principal.
      * Applies the scope visibility contract above.
+     *
+     * When {@code userId} is null/blank (system/cron caller) the scope='user'
+     * disjunct is suppressed entirely — a dirty row whose scope_key happens
+     * to be the empty string must NOT match a system caller.
      */
     public List<Map<String, Object>> searchScoped(Long tenantId, String userId,
                                                    String agentCode, String query, int limit) {
         Objects.requireNonNull(tenantId, "tenantId");
         String pattern = "%" + (query == null ? "" : query) + "%";
-        // scope_key stored as VARCHAR — we pass stringified user id + tenant id.
-        String userKey = userId == null ? "" : userId;
-        return jdbcTemplate.queryForList(
+        boolean hasUser = userId != null && !userId.isBlank();
+        String sql =
                 "SELECT pid, memory_type, category, memory_title, memory_content, "
                 + "  importance, shareable, scope, scope_key, created_at "
                 + "FROM ab_agent_memory "
@@ -412,21 +415,25 @@ public class AgentMemoryService {
                 + "  AND ( "
                 + "    scope = 'global' "
                 + "    OR (scope = 'tenant' AND tenant_id = ?) "
-                + "    OR (scope = 'user'   AND scope_key = ?) "
+                + (hasUser ? "    OR (scope = 'user'   AND scope_key = ?) " : "")
                 + "  ) "
                 + "ORDER BY importance DESC, created_at DESC "
-                + "LIMIT ?",
-                agentCode, pattern, pattern, tenantId, userKey, limit);
+                + "LIMIT ?";
+        return hasUser
+                ? jdbcTemplate.queryForList(sql, agentCode, pattern, pattern, tenantId, userId, limit)
+                : jdbcTemplate.queryForList(sql, agentCode, pattern, pattern, tenantId, limit);
     }
 
     /**
      * Importance-ordered recall of memories visible to (tenant, user) — no keyword filter.
      * Used by Active Memory pre-recall when grounding wants top-N user preferences.
+     * Same null-userId handling as {@link #searchScoped}.
      */
     public List<Map<String, Object>> loadScopedByImportance(Long tenantId, String userId,
                                                              String agentCode, int limit) {
-        String userKey = userId == null ? "" : userId;
-        return jdbcTemplate.queryForList(
+        Objects.requireNonNull(tenantId, "tenantId");
+        boolean hasUser = userId != null && !userId.isBlank();
+        String sql =
                 "SELECT pid, memory_type, category, memory_title, memory_content, "
                 + "  importance, shareable, scope, scope_key, created_at "
                 + "FROM ab_agent_memory "
@@ -435,60 +442,76 @@ public class AgentMemoryService {
                 + "  AND ( "
                 + "    scope = 'global' "
                 + "    OR (scope = 'tenant' AND tenant_id = ?) "
-                + "    OR (scope = 'user'   AND scope_key = ?) "
+                + (hasUser ? "    OR (scope = 'user'   AND scope_key = ?) " : "")
                 + "  ) "
                 + "ORDER BY importance DESC, created_at DESC "
-                + "LIMIT ?",
-                agentCode, tenantId, userKey, limit);
+                + "LIMIT ?";
+        return hasUser
+                ? jdbcTemplate.queryForList(sql, agentCode, tenantId, userId, limit)
+                : jdbcTemplate.queryForList(sql, agentCode, tenantId, limit);
     }
 
     /**
-     * GDPR-compliant forget-user: soft-delete every memory whose scope='user'
-     * and scope_key matches the given user_id. Returns affected row count.
-     * Does not touch tenant/global memories (those are legitimately about the
-     * tenant / platform, not the user).
+     * GDPR-compliant forget-user: soft-delete every memory whose scope='user',
+     * scope_key matches the given user_id, AND tenant_id matches the requesting
+     * tenant. The tenant filter prevents a GDPR request in tenant A from
+     * erasing tenant B's memories when user_id values collide across tenants
+     * (scope_key is only unique within a tenant; a future user→member_id
+     * migration will make this collision more likely).
+     *
+     * Does not touch tenant/global memories — those are legitimately about
+     * the tenant / platform, not the individual user.
      */
-    public int forgetUser(String userId) {
+    public int forgetUser(Long tenantId, String userId) {
+        Objects.requireNonNull(tenantId, "tenantId required for GDPR forget");
         if (userId == null || userId.isBlank()) {
             throw new IllegalArgumentException("userId required for GDPR forget");
         }
         int updated = jdbcTemplate.update(
                 "UPDATE ab_agent_memory "
                 + "SET deleted_flag = TRUE, updated_at = NOW() "
-                + "WHERE scope = 'user' AND scope_key = ? "
+                + "WHERE tenant_id = ? AND scope = 'user' AND scope_key = ? "
                 + "  AND (deleted_flag IS NULL OR deleted_flag = FALSE)",
-                userId);
-        log.info("GDPR forget-user: soft-deleted {} memories for user_id={}", updated, userId);
+                tenantId, userId);
+        log.info("GDPR forget-user: tenant={} user_id={} → soft-deleted {} memories",
+                tenantId, userId, updated);
         return updated;
     }
 
     public int deduplicateMemories(Long tenantId, String agentCode) {
-        // Identify the id to KEEP for each duplicated title (highest importance, then smallest id)
-        // and soft-delete all others.
+        // Identify the id to KEEP for each duplicated (title, scope, scope_key)
+        // tuple (highest importance, then smallest id) and soft-delete all others.
+        //
+        // Scope-aware dedup (2026-04-18 fix): grouping by memory_title ALONE
+        // would merge a user-scoped private memory with a tenant-scoped public
+        // memory that happens to share a title, soft-deleting the lower-
+        // importance one — effectively leaking or destroying data across scope
+        // boundaries. The (title, scope, scope_key) triple keeps each scope's
+        // dedup pool isolated.
         int deleted = jdbcTemplate.update(
                 "UPDATE ab_agent_memory SET deleted_flag = TRUE, updated_at = NOW() "
                 + "WHERE tenant_id = ? AND memory_agent_id = ? "
                 + "AND (deleted_flag IS NULL OR deleted_flag = FALSE) "
                 + "AND memory_title IS NOT NULL "
                 + "AND id NOT IN ( "
-                + "  SELECT DISTINCT ON (memory_title) id "
+                + "  SELECT DISTINCT ON (memory_title, scope, COALESCE(scope_key, '')) id "
                 + "  FROM ab_agent_memory "
                 + "  WHERE tenant_id = ? AND memory_agent_id = ? "
                 + "  AND memory_title IS NOT NULL "
                 + "  AND (deleted_flag IS NULL OR deleted_flag = FALSE) "
-                + "  ORDER BY memory_title, importance DESC, id ASC "
+                + "  ORDER BY memory_title, scope, COALESCE(scope_key, ''), importance DESC, id ASC "
                 + ") "
-                + "AND memory_title IN ( "
-                + "  SELECT memory_title FROM ab_agent_memory "
+                + "AND (memory_title, scope, COALESCE(scope_key, '')) IN ( "
+                + "  SELECT memory_title, scope, COALESCE(scope_key, '') FROM ab_agent_memory "
                 + "  WHERE tenant_id = ? AND memory_agent_id = ? "
                 + "  AND memory_title IS NOT NULL "
                 + "  AND (deleted_flag IS NULL OR deleted_flag = FALSE) "
-                + "  GROUP BY memory_title HAVING COUNT(*) > 1 "
+                + "  GROUP BY memory_title, scope, COALESCE(scope_key, '') HAVING COUNT(*) > 1 "
                 + ")",
                 tenantId, agentCode, tenantId, agentCode, tenantId, agentCode);
 
         if (deleted > 0) {
-            log.info("Deduplicated {} memories for agent {} in tenant {}", deleted, agentCode, tenantId);
+            log.info("Deduplicated {} memories for agent {} in tenant {} (scope-aware)", deleted, agentCode, tenantId);
         }
         return deleted;
     }
