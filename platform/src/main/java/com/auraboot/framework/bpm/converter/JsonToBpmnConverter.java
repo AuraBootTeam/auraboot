@@ -363,6 +363,27 @@ public class JsonToBpmnConverter {
         // Handle assignee configuration
         writeUserTaskAssigneeAttributes(writer, config);
 
+        // GAP-249: propagate multi-instance config as userTask-level attributes so
+        // they become part of AbstractActivity.properties after parsing. SmartEngine's
+        // MultiInstanceLoopCharacteristics model does NOT retain the collection
+        // expression or element variable, so the TaskAssigneeDispatcher has no way to
+        // drive N-instance expansion unless we stash these here. The child
+        // <multiInstanceLoopCharacteristics> element below still carries isSequential
+        // and completionCondition — that's what UserTaskBehavior.handleMultiInstance
+        // consumes. These two surfaces are complementary, not redundant.
+        if (hasMultiInstance) {
+            String miCollection = getTextOrNull(multiInstance, "collection");
+            if (miCollection != null) {
+                writer.writeAttribute(SMART_NAMESPACE, "miCollection", miCollection);
+            }
+            String miElementVariable = getTextOrNull(multiInstance, "elementVariable");
+            if (miElementVariable != null) {
+                writer.writeAttribute(SMART_NAMESPACE, "miElementVariable", miElementVariable);
+            }
+            boolean miSequential = multiInstance.path("sequential").asBoolean(false);
+            writer.writeAttribute(SMART_NAMESPACE, "miSequential", String.valueOf(miSequential));
+        }
+
         if (hasAuraExtensions || hasHookExtensions) {
             writeActivityExtensionElements(writer, auraProps, hooks);
         }

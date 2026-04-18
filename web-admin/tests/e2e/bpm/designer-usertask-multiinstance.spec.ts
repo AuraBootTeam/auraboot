@@ -6,13 +6,16 @@
  * correct attributes.
  *
  * Runtime coverage (start instance → N parallel tasks → per-task completion →
- * instance reaches end) is pinned via test.fixme against a diagnosed platform
- * gap: SmartEngine runtime currently does NOT expand multi-instance
- * activities — only 1 TaskInstance is created regardless of collection size.
- * See the MI-2 comment block for the diagnosis (status API evidence, code
- * location, root cause). When the platform ships multi-instance execution,
- * remove the .fixme markers on MI-2/3/4 and they will exercise the full
- * runtime contract unchanged.
+ * instance reaches end) is enabled after GAP-249 wiring:
+ *   - DefaultMultiInstanceCounter registered on ProcessEngineConfiguration
+ *   - JsonToBpmnConverter emits smart:miCollection / smart:miElementVariable
+ *     attributes on the userTask so the parser surfaces them in
+ *     activity.properties
+ *   - IdAndGroupTaskAssigneeDispatcher reads miCollection, resolves the
+ *     referenced process variable to a List, and emits one candidate per
+ *     element → SmartEngine's UserTaskBehavior.enter produces N parallel
+ *     EI/TI rows (1:1).
+ * Backend integration coverage: BpmMultiInstanceTest GAP249-01/02/03.
  *
  * Dimensions covered (per docs/standards/testing-e2e-web.md):
  *   D1  — Sidebar menu navigation (not page.goto direct)
@@ -460,38 +463,12 @@ test.describe(
     // =======================================================================
     // MI-2: start instance with 3-element collection → spawns 3 parallel tasks
     //
-    // DIAGNOSED CAPABILITY GAP (2026-04-17):
-    //   BPMN XML deployment is correct and carries
-    //   <multiInstanceLoopCharacteristics isSequential="false"
-    //     smart:collection="${approverList}"
-    //     smart:elementVariable="currentApprover">...</>
-    //   but SmartEngine runtime does NOT expand multi-instance activities at
-    //   start time. Only one TaskInstance is created regardless of
-    //   collection size, and queryInstanceStatus reports exactly one active
-    //   approve_each node.
-    //
-    //   Runtime evidence (confirmed via manual API probe):
-    //     GET /api/bpm/process-instances/.../status → currentNodes.length==1
-    //     GET /api/bpm/tasks/todo            → one task per instance
-    //
-    //   Root cause — grep for "multiInstance|LoopCharacter" in
-    //   platform/src/main/java returns only converter code
-    //   (JsonToBpmnConverter / BpmnToJsonConverter); there is no SmartEngine
-    //   activity-handler path that reads the collection and spawns N
-    //   executions. Consistent with the broader platform note that the
-    //   SmartEngineBpmAdapter is a stub for parts of the BPMN spec
-    //   (project_bpm_adapter_stub memory).
-    //
-    //   Fix requires platform work (SmartEngine multi-instance handler +
-    //   ProcessInstanceStatusDTO currentNodes aggregation). Tracked out of
-    //   band; this spec pins the runtime contract via test.fixme so the
-    //   acceptance becomes "gap closed" rather than "test silently skipped".
-    //
-    // MI-1 above still provides real coverage for: UI testids, designer
-    // round-trip of config.multiInstance, Deploy toolbar, BPMN persistence
-    // with correct attributes.
+    // Runtime behaviour is provided by the GAP-249 wiring described in the
+    // module-level comment. The dispatcher resolves ${approverList} from
+    // process variables to a List<String> and emits one candidate per
+    // element; SmartEngine creates one EI/TI per candidate.
     // =======================================================================
-    test.fixme('MI-2: start instance with collection of 3 → 3 parallel tasks spawn', async ({
+    test('MI-2: start instance with collection of 3 → 3 parallel tasks spawn', async ({
       page,
       request,
     }) => {
@@ -568,7 +545,7 @@ test.describe(
     // MI-3: complete one task → remaining count drops to N-1 (parallel guarantee)
     // Blocked by same runtime gap as MI-2 — SmartEngine spawns 1 task only.
     // =======================================================================
-    test.fixme('MI-3: complete one task → 2 remain active (parallel guarantee)', async ({
+    test('MI-3: complete one task → 2 remain active (parallel guarantee)', async ({
       request,
     }) => {
       expect(startedInstance, 'startedInstance must be set from MI-2').toBeTruthy();
@@ -616,7 +593,7 @@ test.describe(
     // MI-4: complete remaining tasks → instance reaches end
     // Blocked by same runtime gap as MI-2.
     // =======================================================================
-    test.fixme('MI-4: complete all remaining tasks → instance reaches end', async ({ request }) => {
+    test('MI-4: complete all remaining tasks → instance reaches end', async ({ request }) => {
       expect(startedInstance, 'startedInstance must be set from MI-2').toBeTruthy();
       const instanceId = startedInstance!.instanceId;
 
