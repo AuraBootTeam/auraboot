@@ -1248,4 +1248,129 @@ class JsonToBpmnConverterTest {
             assertTrue(xml.contains("value=\"assignee\""));
         }
     }
+
+    // ==================== GAP-254: Node Hook Compilation ====================
+
+    @Nested
+    @DisplayName("Node hook compilation (GAP-254)")
+    class NodeHookCompilation {
+
+        private static final String HOOK_USER_TASK_JSON = """
+                {
+                  "key": "wf_hook_compile",
+                  "name": "Hook Compile",
+                  "nodes": [
+                    {"id":"start","type":"startEvent","position":{"x":80,"y":200},
+                      "data":{"type":"startEvent","label":"Start"}},
+                    {"id":"approve","type":"userTask","position":{"x":280,"y":200},
+                      "data":{"type":"userTask","label":"Approve","config":{
+                        "assigneeType":"user","assigneeIds":["admin"],
+                        "hooks":[
+                          {"hookType":"pre_execute","executionOrder":0,
+                           "hookConfig":{"actionType":"command","commandCode":"wd:notify","params":"{}"},
+                           "failStrategy":"block","async":false,"enabled":true},
+                          {"hookType":"post_execute","executionOrder":1,
+                           "hookConfig":{"actionType":"script","script":"#vars[\\"x\\"]=1"},
+                           "failStrategy":"ignore","async":true,"enabled":true}
+                        ]
+                      }}},
+                    {"id":"end","type":"endEvent","position":{"x":520,"y":200},
+                      "data":{"type":"endEvent","label":"End"}}
+                  ],
+                  "edges":[
+                    {"id":"e1","source":"start","target":"approve","data":{}},
+                    {"id":"e2","source":"approve","target":"end","data":{}}
+                  ]
+                }
+                """;
+
+        @Test
+        @DisplayName("emits aura.hooks smart:property holding serialized hook list")
+        void emitsSmartHookPerEntry() {
+            String xml = jsonToBpmn.convert(HOOK_USER_TASK_JSON);
+            // Wrapper element appears once on the userTask
+            assertTrue(xml.contains("<extensionElements>"), xml);
+            // Hooks land under name="aura.hooks" (single property carrying JSON array)
+            assertTrue(xml.contains("name=\"aura.hooks\""), xml);
+            // The hookType / actionType / failStrategy values appear inside the
+            // serialized JSON value of the property — exact XML escaping makes
+            // attribute matching brittle, so we assert key fragments instead.
+            assertTrue(xml.contains("pre_execute"), xml);
+            assertTrue(xml.contains("post_execute"), xml);
+            assertTrue(xml.contains("command"), xml);
+            assertTrue(xml.contains("script"), xml);
+            assertTrue(xml.contains("commandCode"), xml);
+            assertTrue(xml.contains("wd:notify"), xml);
+        }
+
+        @Test
+        @DisplayName("missing hookType throws BpmnConversionException with diagnostic")
+        void missingHookTypeFails() {
+            String json = """
+                    {
+                      "key":"k","name":"k",
+                      "nodes":[
+                        {"id":"s","type":"startEvent","position":{"x":0,"y":0},"data":{"type":"startEvent","label":""}},
+                        {"id":"t1","type":"userTask","position":{"x":1,"y":1},"data":{"type":"userTask","label":"t1","config":{
+                          "hooks":[{"hookConfig":{"actionType":"command"}}]
+                        }}},
+                        {"id":"e","type":"endEvent","position":{"x":2,"y":2},"data":{"type":"endEvent","label":""}}
+                      ],
+                      "edges":[
+                        {"id":"f1","source":"s","target":"t1","data":{}},
+                        {"id":"f2","source":"t1","target":"e","data":{}}
+                      ]
+                    }
+                    """;
+            BpmnConversionException ex = assertThrows(BpmnConversionException.class,
+                    () -> jsonToBpmn.convert(json));
+            assertTrue(ex.getMessage().contains("hookType"), ex.getMessage());
+        }
+
+        @Test
+        @DisplayName("extractHookEntries returns one entry per (nodeId, hook) pair")
+        void extractHookEntriesReturnsFlatList() throws Exception {
+            JsonNode root = objectMapper.readTree(HOOK_USER_TASK_JSON);
+            var entries = jsonToBpmn.extractHookEntries(root);
+            assertEquals(2, entries.size(), "two hooks must surface");
+            assertEquals("approve", entries.get(0).nodeId());
+            assertEquals("approve", entries.get(1).nodeId());
+            assertEquals("pre_execute", entries.get(0).descriptor().hookType());
+            assertEquals("command", entries.get(0).descriptor().actionType());
+            assertEquals(0, entries.get(0).descriptor().executionOrder());
+            assertEquals("block", entries.get(0).descriptor().failStrategy());
+            assertEquals(false, entries.get(0).descriptor().async());
+            assertEquals("post_execute", entries.get(1).descriptor().hookType());
+            assertEquals("script", entries.get(1).descriptor().actionType());
+            assertEquals(true, entries.get(1).descriptor().async());
+            // hookConfigJson is real JSON object text — assert key presence rather
+            // than full string equality to avoid coupling to map iteration order.
+            assertTrue(entries.get(0).descriptor().hookConfigJson().contains("commandCode"));
+            assertTrue(entries.get(1).descriptor().hookConfigJson().contains("script"));
+        }
+
+        @Test
+        @DisplayName("nodes without hooks emit no <smart:hook> elements")
+        void noHooksEmitsNothing() {
+            String json = """
+                    {
+                      "key":"k","name":"k",
+                      "nodes":[
+                        {"id":"s","type":"startEvent","position":{"x":0,"y":0},"data":{"type":"startEvent","label":""}},
+                        {"id":"t1","type":"userTask","position":{"x":1,"y":1},"data":{"type":"userTask","label":"t1","config":{
+                          "assigneeType":"user","assigneeIds":["admin"]
+                        }}},
+                        {"id":"e","type":"endEvent","position":{"x":2,"y":2},"data":{"type":"endEvent","label":""}}
+                      ],
+                      "edges":[
+                        {"id":"f1","source":"s","target":"t1","data":{}},
+                        {"id":"f2","source":"t1","target":"e","data":{}}
+                      ]
+                    }
+                    """;
+            String xml = jsonToBpmn.convert(json);
+            assertFalse(xml.contains("<smart:hook"), "no hook element when designer hooks empty: " + xml);
+            assertFalse(xml.contains("hookType="), xml);
+        }
+    }
 }

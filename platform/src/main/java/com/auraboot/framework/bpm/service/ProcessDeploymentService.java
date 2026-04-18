@@ -4,6 +4,8 @@ import com.auraboot.smart.framework.engine.SmartEngine;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.bpm.audit.BpmAuditService;
 import com.auraboot.framework.bpm.converter.JsonToBpmnConverter;
+import com.auraboot.framework.bpm.entity.BpmNodeHook;
+import com.auraboot.framework.bpm.mapper.BpmNodeHookMapper;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.plugin.entity.BpmProcessDefinition;
 import com.auraboot.framework.plugin.mapper.BpmProcessDefinitionMapper;
@@ -35,6 +37,8 @@ public class ProcessDeploymentService {
     private final BpmProcessDefinitionMapper processDefinitionMapper;
     private final BpmAuditService bpmAuditService;
     private final JsonToBpmnConverter jsonToBpmnConverter;
+    private final BpmNodeHookService bpmNodeHookService;
+    private final BpmNodeHookMapper bpmNodeHookMapper;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
     private static final String EXTENSION_KEY_DESIGNER_JSON = "designerJson";
 
@@ -337,10 +341,29 @@ public class ProcessDeploymentService {
             return definition;
         }
 
+        // Always parse designerJson when present so we can both (a) compile to BPMN if
+        // bpmnContent is missing and (b) extract node hooks for ab_bpm_node_hook
+        // persistence regardless of whether the BPMN was pre-supplied (GAP-254).
+        com.fasterxml.jackson.databind.JsonNode designerRoot = null;
+        String designerJson = getDesignerJson(definition);
+        if (StringUtils.hasText(designerJson)) {
+            try {
+                com.fasterxml.jackson.databind.node.ObjectNode root =
+                        (com.fasterxml.jackson.databind.node.ObjectNode) objectMapper.readTree(designerJson);
+                root.put("key", definition.getProcessKey());
+                if (!root.has("name") && definition.getProcessName() != null) {
+                    root.put("name", definition.getProcessName());
+                }
+                designerRoot = root;
+            } catch (Exception e) {
+                throw new IllegalStateException(
+                        "Failed to parse designerJson on deploy: " + e.getMessage(), e);
+            }
+        }
+
         // Auto-convert designer JSON to BPMN XML if bpmnContent is empty
         if (!StringUtils.hasText(definition.getBpmnContent())) {
-            String designerJson = getDesignerJson(definition);
-            if (!StringUtils.hasText(designerJson)) {
+            if (designerRoot == null) {
                 throw new IllegalStateException(
                         "Cannot deploy process '" + definition.getProcessKey()
                                 + "': neither bpmnContent nor designerJson is available");
@@ -351,25 +374,20 @@ public class ProcessDeploymentService {
             // <process id="<processKey>"> instead of the default "process_1",
             // which would collide across multiple UI-created processes and
             // break startProcess(processKey) lookup downstream.
-            String bpmnXml;
-            try {
-                com.fasterxml.jackson.databind.node.ObjectNode root =
-                        (com.fasterxml.jackson.databind.node.ObjectNode) objectMapper.readTree(designerJson);
-                root.put("key", definition.getProcessKey());
-                if (!root.has("name") && definition.getProcessName() != null) {
-                    root.put("name", definition.getProcessName());
-                }
-                bpmnXml = jsonToBpmnConverter.convertFromJsonNode(root);
-            } catch (Exception e) {
-                throw new IllegalStateException(
-                        "Failed to inject processKey into designerJson before BPMN conversion: "
-                                + e.getMessage(), e);
-            }
+            String bpmnXml = jsonToBpmnConverter.convertFromJsonNode(designerRoot);
             definition.setBpmnContent(bpmnXml);
             // Persist the compiled XML so subsequent GET /{pid}/bpmn, exports,
             // and version snapshots see the real content instead of the empty
             // placeholder stored at create-time.
             processDefinitionMapper.updateBpmnContent(pid, bpmnXml);
+        }
+
+        // GAP-254: compile designerJson node hooks into ab_bpm_node_hook so the
+        // runtime BpmNodeHookService.getHooks(processKey,nodeId,hookType) finds
+        // them on ACTIVITY_START / ACTIVITY_END. We delete-and-reinsert per
+        // (processKey, nodeId) tuple so re-deploys stay idempotent.
+        if (designerRoot != null) {
+            persistDesignerHooks(definition.getProcessKey(), designerRoot);
         }
 
         try {
@@ -583,6 +601,54 @@ public class ProcessDeploymentService {
 
     private String getCurrentUserId() {
         return com.auraboot.framework.bpm.util.BpmSecurityUtil.getCurrentUserId();
+    }
+
+    /**
+     * GAP-254: persist designer-side node hooks into {@code ab_bpm_node_hook} so the
+     * runtime {@link BpmNodeHookService} can fetch them on ACTIVITY_START /
+     * ACTIVITY_END. Re-deploy is idempotent — we hard-delete prior hooks scoped to
+     * this {@code (tenantId, processKey)} tuple before reinserting from the latest
+     * designerJson, so designer-side hook removals propagate cleanly.
+     */
+    private void persistDesignerHooks(String processKey,
+                                      com.fasterxml.jackson.databind.JsonNode designerRoot) {
+        List<JsonToBpmnConverter.NodeHookEntry> entries =
+                jsonToBpmnConverter.extractHookEntries(designerRoot);
+        // Always wipe prior hooks for this process key first; an empty designerJson
+        // hooks list legitimately means "remove all node hooks for this process".
+        Long tenantId = MetaContext.getCurrentTenantId();
+        var deleteWrapper = new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<BpmNodeHook>()
+                .eq("tenant_id", tenantId)
+                .eq("process_key", processKey);
+        bpmNodeHookMapper.delete(deleteWrapper);
+
+        if (entries.isEmpty()) {
+            log.debug("No designer node hooks to persist for processKey={}", processKey);
+            return;
+        }
+
+        for (JsonToBpmnConverter.NodeHookEntry entry : entries) {
+            JsonToBpmnConverter.HookDescriptor d = entry.descriptor();
+            BpmNodeHook hook = new BpmNodeHook();
+            hook.setProcessKey(processKey);
+            hook.setNodeId(entry.nodeId());
+            hook.setHookType(d.hookType()); // BpmNodeHookService.createHook normalizes
+            hook.setExecutionOrder(d.executionOrder());
+            hook.setHookConfig(toMap(d.hookConfigNode()));
+            hook.setFailStrategy(d.failStrategy());
+            hook.setAsync(d.async());
+            hook.setEnabled(d.enabled());
+            bpmNodeHookService.createHook(hook);
+        }
+        log.info("Persisted {} designer node hook(s) for processKey={}", entries.size(), processKey);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> toMap(com.fasterxml.jackson.databind.JsonNode node) {
+        if (node == null || node.isNull() || node.isMissingNode() || !node.isObject()) {
+            return Map.of();
+        }
+        return objectMapper.convertValue(node, Map.class);
     }
 
     /**
