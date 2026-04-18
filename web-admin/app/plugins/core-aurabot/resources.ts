@@ -61,4 +61,10 @@ export const RESOURCES: PluginResource[] = [
     menu: { order: 36, group: 'aurabot' }, permission: 'aurabot.run.read',
     file: './plugins/core-aurabot/pages/mission-control/interrupts.tsx',
   },
+  {
+    key: 'aurabot.memory-promotions', path: '/aurabot/memory-promotions',
+    title: { en: 'Memory Promotions', zh: '记忆晋升' }, icon: 'arrow-up-right-circle',
+    menu: { order: 37, group: 'aurabot' }, permission: 'aurabot.run.read',
+    file: './plugins/core-aurabot/pages/mission-control/memory-promotions.tsx',
+  },
 ]
