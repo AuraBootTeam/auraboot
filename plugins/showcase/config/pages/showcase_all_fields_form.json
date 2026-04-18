@@ -166,6 +166,10 @@
         {
           "field": "sc_department",
           "colSpan": 4
+        },
+        {
+          "field": "sc_owner_user",
+          "colSpan": 6
         }
       ]
     },
@@ -227,6 +231,10 @@
         },
         {
           "field": "sc_attachment",
+          "colSpan": 12
+        },
+        {
+          "field": "sc_attachment_file",
           "colSpan": 12
         },
         {
