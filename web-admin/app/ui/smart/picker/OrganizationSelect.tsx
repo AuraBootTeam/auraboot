@@ -262,6 +262,7 @@ export const OrganizationSelect: React.FC<OrganizationSelectProps> = ({
     return nodes.map((node) => (
       <div key={node.id}>
         <div
+          data-testid={`organization-select-option-${node.id}`}
           className={`flex cursor-pointer items-center p-2 hover:bg-gray-50 ${isSelected(node.id) ? 'bg-blue-50 text-blue-900' : 'text-gray-900'} ${!isSelectable(node) ? 'opacity-60' : ''} `}
           style={{ paddingLeft: `${node.level * 20 + 8}px` }}
           onClick={() => isSelectable(node) && handleOrganizationSelect(node)}
@@ -303,8 +304,9 @@ export const OrganizationSelect: React.FC<OrganizationSelectProps> = ({
       error={meta.showError ? st(meta.meta.error) : undefined}
       className={`relative space-y-2 ${className}`}
     >
-      <div className="relative">
+      <div className="relative" data-testid={`organization-select-${name}`}>
         <div
+          data-testid={`organization-select-trigger-${name}`}
           className={`w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm ${disabledValue ? 'cursor-not-allowed bg-gray-50' : 'cursor-pointer bg-white hover:border-gray-400'} ${selectedOrganizations.length > 0 ? 'text-gray-900' : 'text-gray-500'} focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none`}
           onClick={() => !disabledValue && setIsOpen(!isOpen)}
         >
@@ -352,6 +354,7 @@ export const OrganizationSelect: React.FC<OrganizationSelectProps> = ({
                 <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform text-gray-400" />
                 <input
                   type="text"
+                  data-testid={`organization-select-search-input-${name}`}
                   placeholder={st('搜索组织...')}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -377,6 +380,7 @@ export const OrganizationSelect: React.FC<OrganizationSelectProps> = ({
                       filteredOrganizations.map((org) => (
                         <div
                           key={org.id}
+                          data-testid={`organization-select-option-${org.id}`}
                           className={`cursor-pointer border-b border-gray-100 p-3 last:border-b-0 hover:bg-gray-50 ${isSelected(org.id) ? 'bg-blue-50 text-blue-900' : 'text-gray-900'} ${!isSelectable(org) ? 'opacity-60' : ''} `}
                           onClick={() => isSelectable(org) && handleOrganizationSelect(org)}
                         >
