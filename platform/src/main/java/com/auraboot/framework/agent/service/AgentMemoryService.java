@@ -289,6 +289,32 @@ public class AgentMemoryService {
                 tenantId, agentCode);
     }
 
+    /**
+     * Record that a specific user read a specific memory (PR-66 Phase 2).
+     *
+     * <p>Upserts one row per {@code (memory_pid, user_id, current_date)} into
+     * {@code ab_agent_memory_access_log}. Callers invoke this from the
+     * grounding / memory-load path after they materialise a memory into the
+     * prompt. Feeds {@code MemoryPromotionExtractor} — which counts distinct
+     * users per memory over the last 90 days to detect implicit co-sign
+     * candidates for tenant-scope promotion.
+     *
+     * <p>No-op when {@code userId} is null/blank (system / cron caller) —
+     * we cannot attribute access to a real user in that case.
+     */
+    public void recordMemoryAccess(String memoryPid, String userId) {
+        if (memoryPid == null || memoryPid.isBlank()) return;
+        if (userId == null || userId.isBlank()) return;
+        jdbcTemplate.update(
+                "INSERT INTO ab_agent_memory_access_log "
+                + "  (memory_pid, user_id, access_day, access_count, first_seen_at, last_seen_at) "
+                + "VALUES (?, ?, CURRENT_DATE, 1, NOW(), NOW()) "
+                + "ON CONFLICT ON CONSTRAINT uq_memory_access_log DO UPDATE SET "
+                + "  access_count = ab_agent_memory_access_log.access_count + 1, "
+                + "  last_seen_at = NOW()",
+                memoryPid, userId);
+    }
+
     // =========================================================================
     // Semantic / keyword search (fallback without vector)
     // =========================================================================
