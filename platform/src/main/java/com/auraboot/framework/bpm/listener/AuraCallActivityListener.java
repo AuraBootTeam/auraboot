@@ -338,82 +338,126 @@ public class AuraCallActivityListener implements Listener {
      * in-memory — we read the output variable directly from there. We also
      * walk the parent context chain to locate the calling CallActivity and
      * read its {@code aura.callMappings} payload.
+     *
+     * <p><b>Nesting (GAP-264):</b> SmartEngine fires PROCESS_END events in
+     * <i>outer-first</i> order during a synchronous nested-signal unwind
+     * (top-level parent → middle child → leaf grandchild), which is the
+     * REVERSE of the logical "leaf finishes first" intuition. The empirical
+     * order observed in {@code BpmCallActivityNestedTest.CA-NEST-GAP-1} was:
+     *
+     * <pre>
+     *   PROCESS_END(parent)      ← fires first; child has no childOutput yet
+     *   PROCESS_END(child)       ← grandchild→child output applied here
+     *   PROCESS_END(grandchild)  ← fires last; carries gc task-complete request
+     * </pre>
+     *
+     * If each PROCESS_END only handled its own one-hop mapping, the chain
+     * would never compose — by the time {@code child} writes {@code childOutput}
+     * to itself, the parent's PROCESS_END handler has already run and missed
+     * it. Therefore each invocation must <b>eagerly walk the full ancestor
+     * chain</b>: write to the immediate caller, then re-read that caller's
+     * vars and project up through the next caller's outputMappings, until
+     * we hit a top-level (non-callActivity) process or a level with no
+     * mappings. This is safe because per-level writes are persisted via
+     * {@link #persistProcessVariable} (auto-committed by
+     * {@code VariableCommandService.insert}) and immediately readable.
      */
     private void handleProcessEnd(ExecutionContext childContext) {
         ProcessInstance childInstance = childContext.getProcessInstance();
         if (childInstance == null) return;
 
-        // Identify whether this is a callActivity child: SmartEngine stores
-        // the parent pointer directly on the child process instance whenever
-        // it was spawned via CallActivityBehavior.startChildProcessInstance.
-        // We deliberately do NOT rely on {@code childContext.getParent()} —
-        // that reference is present during the initial synchronous child
-        // start but becomes null once the child pauses at a wait state and
-        // resumes via a fresh {@code executionCommandService.signal} call
-        // (PreparePhase rebuilds the context without the parent chain).
-        String parentInstanceId = childInstance.getParentInstanceId();
-        if (parentInstanceId == null || parentInstanceId.isBlank()) {
-            return; // Top-level process end — nothing to propagate.
-        }
-
         String tenantId = childContext.getTenantId();
 
-        // Locate the parent's ProcessDefinition so we can read the
-        // aura.callMappings payload off the callActivity element. We need
-        // the activityId of the invoking callActivity; SmartEngine stores
-        // that pointer on the child as {@code parentExecutionInstanceId},
-        // which maps via {@code se_execution_instance} to the activity id.
-        String parentExecutionInstanceId = childInstance.getParentExecutionInstanceId();
-        CallActivity callActivity = resolveCallingCallActivity(parentInstanceId, parentExecutionInstanceId, tenantId);
-        if (callActivity == null) {
-            log.debug("handleProcessEnd: no invoking callActivity resolved for child={}",
-                    childInstance.getInstanceId());
-            return;
-        }
-
-        Map<String, Map<String, String>> mappings = readCallMappings(callActivity);
-        if (mappings == null) return;
-        Map<String, String> outputs = mappings.get("outputs");
-        if (outputs == null || outputs.isEmpty()) return;
-
-        // Child's end-state variables: union of persisted DB rows (process +
-        // execution scopes) PLUS the live request map, which still holds the
-        // task-completion payload not yet flushed by CommonServiceHelper
-        // (see DefaultExecutionCommandService.signal: createExecution is
-        // called AFTER pvmProcessInstance.signal returns, i.e. AFTER this
-        // listener fires, so childOutput lives only in request at this point).
-        Map<String, Object> childVarMap = new LinkedHashMap<>();
-        childVarMap.putAll(collectAllChildVariables(childInstance.getInstanceId(), tenantId));
+        // Seed-level vars: persisted DB rows for the just-ended process,
+        // plus the live request map (carries task-completion variables not
+        // yet flushed by CommonServiceHelper — see class-level Javadoc).
+        Map<String, Object> currentVars = new LinkedHashMap<>();
+        currentVars.putAll(collectAllChildVariables(childInstance.getInstanceId(), tenantId));
         if (childContext.getRequest() != null) {
-            childVarMap.putAll(childContext.getRequest());
+            currentVars.putAll(childContext.getRequest());
         }
 
-        int copied = 0;
-        for (Map.Entry<String, String> mapping : outputs.entrySet()) {
-            String childVar = mapping.getKey();
-            String parentVar = mapping.getValue();
-            if (childVar == null || parentVar == null
-                    || childVar.isBlank() || parentVar.isBlank()) {
-                continue;
-            }
-            if (!childVarMap.containsKey(childVar)) continue;
-            Object value = childVarMap.get(childVar);
-            if (value != null) {
-                // Persist directly to parent's process-scope variable table.
-                // The parent's in-memory request map is not accessible here
-                // (fresh signal-prepared context for the resumed parent hasn't
-                // been built yet), so DB is the authoritative channel. The
-                // parent's execution flow reads variables via
-                // ProcessEngineService#getProcessInstanceStatus which unions
-                // both scopes, so the write is immediately visible.
-                persistProcessVariable(parentInstanceId, tenantId, parentVar, value);
-            }
-            copied++;
-        }
+        propagateOutputsUpChain(childInstance, currentVars, tenantId);
+    }
 
-        log.debug("CallActivity output mapping: parent={} child={} copied={} of {}",
-                parentInstanceId, childInstance.getInstanceId(),
-                copied, outputs.size());
+    /**
+     * Walk the call-activity ancestor chain from {@code currentInstance}
+     * upward, applying each level's outputMappings. {@code currentVars}
+     * holds the just-ended process's effective variable map (DB ∪ request).
+     *
+     * <p>For each hop we (1) resolve the calling CallActivity element on
+     * the parent's ProcessDefinition, (2) project current vars through
+     * outputMappings into parent-scope writes, (3) merge those writes into
+     * a fresh {@code currentVars} (parent's persisted vars + new writes)
+     * and recurse to the next ancestor.
+     *
+     * <p>Bounded by the natural callActivity depth — engine-level guards
+     * (CallActivityBehavior recursion limit) prevent unbounded chains, but
+     * we add a defensive cap to surface pathological cycles in logs.
+     */
+    private void propagateOutputsUpChain(ProcessInstance currentInstance,
+                                         Map<String, Object> currentVars,
+                                         String tenantId) {
+        final int MAX_DEPTH = 16;
+        ProcessInstance current = currentInstance;
+        for (int depth = 0; depth < MAX_DEPTH; depth++) {
+            String parentInstanceId = current.getParentInstanceId();
+            if (parentInstanceId == null || parentInstanceId.isBlank()) {
+                return; // Reached a top-level process — nothing more to propagate.
+            }
+            String parentExecutionInstanceId = current.getParentExecutionInstanceId();
+            CallActivity callActivity = resolveCallingCallActivity(
+                    parentInstanceId, parentExecutionInstanceId, tenantId);
+            if (callActivity == null) {
+                log.debug("propagateOutputsUpChain: no invoking callActivity for child={} (depth={})",
+                        current.getInstanceId(), depth);
+                return;
+            }
+            Map<String, Map<String, String>> mappings = readCallMappings(callActivity);
+            if (mappings == null) return;
+            Map<String, String> outputs = mappings.get("outputs");
+
+            int copied = 0;
+            // Buffer writes so they're visible at the next hop's currentVars
+            // without an extra DB read per key.
+            Map<String, Object> writtenToParent = new LinkedHashMap<>();
+            if (outputs != null && !outputs.isEmpty()) {
+                for (Map.Entry<String, String> mapping : outputs.entrySet()) {
+                    String fromVar = mapping.getKey();
+                    String toVar = mapping.getValue();
+                    if (fromVar == null || toVar == null
+                            || fromVar.isBlank() || toVar.isBlank()) {
+                        continue;
+                    }
+                    if (!currentVars.containsKey(fromVar)) continue;
+                    Object value = currentVars.get(fromVar);
+                    if (value == null) continue;
+                    persistProcessVariable(parentInstanceId, tenantId, toVar, value);
+                    writtenToParent.put(toVar, value);
+                    copied++;
+                }
+            }
+
+            log.debug("CallActivity output mapping: parent={} child={} depth={} copied={} of {}",
+                    parentInstanceId, current.getInstanceId(), depth,
+                    copied, outputs == null ? 0 : outputs.size());
+
+            // Walk up: the parent becomes the new "current". Refresh its
+            // var view from DB (now including the writes we just made) so
+            // the next hop's outputMappings can pull them through.
+            ProcessInstance parent = smartEngine.getProcessQueryService()
+                    .findById(parentInstanceId, tenantId);
+            if (parent == null) return;
+            Map<String, Object> nextVars = new LinkedHashMap<>(
+                    collectAllChildVariables(parentInstanceId, tenantId));
+            // Overlay our just-written values to guarantee visibility even
+            // if the persist hadn't yet flushed to the read query above.
+            nextVars.putAll(writtenToParent);
+            current = parent;
+            currentVars = nextVars;
+        }
+        log.warn("propagateOutputsUpChain: exceeded MAX_DEPTH={} (cycle?) starting from child={}",
+                MAX_DEPTH, currentInstance.getInstanceId());
     }
 
     /**
