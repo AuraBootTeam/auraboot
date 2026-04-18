@@ -604,6 +604,33 @@ public class JsonToBpmnConverter {
                 // COMMAND service type: bridge to AuraBoot Command engine via CommandServiceTaskDelegate.
                 // The delegate reads command configuration from process variables at runtime.
                 writer.writeAttribute(SMART_NAMESPACE, "class", "commandServiceTaskDelegate");
+            } else if ("http".equals(serviceType)) {
+                // HTTP service type: bridge to HttpServiceTaskDelegate which
+                // performs the outbound call at runtime. Required: serviceUrl.
+                String serviceUrl = getTextOrNull(config, "serviceUrl");
+                if (serviceUrl == null || serviceUrl.isBlank()) {
+                    throw new BpmnConversionException("serviceTask '" + id
+                            + "' with serviceType=http missing 'serviceUrl' in config");
+                }
+                writer.writeAttribute(SMART_NAMESPACE, "class",
+                        BpmServiceTaskConstants.BEAN_HTTP_DELEGATE);
+                writer.writeAttribute(SMART_NAMESPACE,
+                        BpmServiceTaskConstants.ATTR_SERVICE_URL, serviceUrl);
+                String httpMethod = getTextOrNull(config, "method");
+                if (httpMethod != null && !httpMethod.isBlank()) {
+                    writer.writeAttribute(SMART_NAMESPACE,
+                            BpmServiceTaskConstants.ATTR_METHOD, httpMethod);
+                }
+                String responseVar = getTextOrNull(config, "responseVar");
+                if (responseVar != null && !responseVar.isBlank()) {
+                    writer.writeAttribute(SMART_NAMESPACE,
+                            BpmServiceTaskConstants.ATTR_RESPONSE_VAR, responseVar);
+                }
+                String timeoutMs = getTextOrNull(config, "timeoutMs");
+                if (timeoutMs != null && !timeoutMs.isBlank()) {
+                    writer.writeAttribute(SMART_NAMESPACE,
+                            BpmServiceTaskConstants.ATTR_TIMEOUT_MS, timeoutMs);
+                }
             } else if (className != null) {
                 // Explicit className: emit smart:class directly
                 writer.writeAttribute(SMART_NAMESPACE, "class", className);
