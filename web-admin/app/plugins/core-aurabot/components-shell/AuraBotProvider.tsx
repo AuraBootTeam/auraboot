@@ -437,22 +437,29 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
       const summaries = items.map(toSessionSummary);
       setSessions(summaries);
       if (!state.currentConversationId && summaries.length > 0 && state.messages.length === 0) {
+        // Only auto-restore when we have an explicit remembered conversation id
+        // that still exists on the server. Avoid arbitrarily resuming a random
+        // historical conversation (breaks welcome-state UX and E2E tests that
+        // expect a fresh panel after each reset).
         const preferredConversationId =
           typeof window !== 'undefined'
             ? Number(window.localStorage.getItem(LAST_CONVERSATION_KEY) || '')
             : NaN;
-        const target =
-          summaries.find((item) => item.conversationId === preferredConversationId) || summaries[0];
-        const messages = await auraBotApi.getConversationMessages(target.conversationId);
-        dispatch({
-          type: 'hydrate_session',
-          payload: {
-            sessionId: generateSessionId(),
-            conversationId: target.conversationId,
-            messages: messages.map(toSimpleMessage),
-            selectedAgentCode: target.selectedAgentCode,
-          },
-        });
+        const target = Number.isFinite(preferredConversationId)
+          ? summaries.find((item) => item.conversationId === preferredConversationId)
+          : undefined;
+        if (target) {
+          const messages = await auraBotApi.getConversationMessages(target.conversationId);
+          dispatch({
+            type: 'hydrate_session',
+            payload: {
+              sessionId: generateSessionId(),
+              conversationId: target.conversationId,
+              messages: messages.map(toSimpleMessage),
+              selectedAgentCode: target.selectedAgentCode,
+            },
+          });
+        }
       }
     } catch {
       // Conversation history unavailable — keep in-memory state only
