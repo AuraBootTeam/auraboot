@@ -299,7 +299,12 @@ bootJar {
 }
 
 bootRun {
-    jvmArgs = ['-Xms2g', '-Xmx8g','-XX:+UseG1GC', '-Duser.timezone=UTC']
+    // -Djdk.httpclient.allowRestrictedHeaders=host unlocks the Host header for
+    // java.net.http.HttpClient so PinnedHttpRequests can pin the IP at connect
+    // time (P3-E #1 DNS rebinding TOCTOU mitigation). The property is read at
+    // JDK HttpClient class init, so it MUST be set via JVM arg, not at runtime.
+    jvmArgs = ['-Xms2g', '-Xmx8g','-XX:+UseG1GC', '-Duser.timezone=UTC',
+               '-Djdk.httpclient.allowRestrictedHeaders=host']
 }
 
 tasks.withType(Test).configureEach {
@@ -307,6 +312,8 @@ tasks.withType(Test).configureEach {
         includeSystemOutLog = false
         includeSystemErrLog = false
     }
+    // See bootRun comment above — needed in tests too.
+    jvmArgs '-Djdk.httpclient.allowRestrictedHeaders=host'
 }
 
 // 配置测试任务使用JUnit Platform

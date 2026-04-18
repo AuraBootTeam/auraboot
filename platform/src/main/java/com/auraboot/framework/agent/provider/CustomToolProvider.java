@@ -1,6 +1,7 @@
 package com.auraboot.framework.agent.provider;
 
 import com.auraboot.framework.agent.tool.SendCustomerReplyToolHandler;
+import com.auraboot.framework.common.util.PinnedHttpRequests;
 import com.auraboot.framework.common.util.SsrfValidator;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -8,7 +9,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -136,14 +136,18 @@ public class CustomToolProvider implements ToolProvider {
             url = parts[1].trim();
         }
 
-        // SSRF protection: validate URL before making server-side request
-        SsrfValidator.validateUrl(url);
+        // SSRF protection: validate + pin resolved IP to defeat DNS rebinding
+        // (P3-E #1). Using the validated target below ensures the HTTP client
+        // connects to the exact IP that passed the block-list check.
+        SsrfValidator.ValidatedTarget target = SsrfValidator.validate(url);
+        if (target == null) {
+            throw new IllegalArgumentException("api_call URL could not be resolved: " + url);
+        }
 
         HttpClient httpClient = HttpClient.newHttpClient();
         String bodyJson = objectMapper.writeValueAsString(params != null ? params : Map.of());
 
-        HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
-                .uri(URI.create(url))
+        HttpRequest.Builder requestBuilder = PinnedHttpRequests.newPinnedRequestBuilder(target)
                 .header("Content-Type", "application/json")
                 .timeout(Duration.ofSeconds(30));
 
