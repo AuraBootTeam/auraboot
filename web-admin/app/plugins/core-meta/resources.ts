@@ -4,6 +4,7 @@ export const RESOURCES: PluginResource[] = [
   // Models
   { key: 'meta.models', path: '/meta/models', title: { en: 'Models', zh: '模型' }, icon: 'database', menu: { order: 10, group: 'meta' }, permission: 'meta.model.read', file: './plugins/core-meta/pages/meta/models/index.tsx' },
   { key: 'meta.models.new', path: '/meta/models/new', title: { en: 'New Model', zh: '新建模型' }, menu: false, parentKey: 'meta.models', permission: 'meta.model.edit', file: './plugins/core-meta/pages/meta/models/new.tsx' },
+  { key: 'meta.models.new.virtual', path: '/meta/models/new/virtual', title: { en: 'New Virtual Model', zh: '新建虚拟模型' }, menu: false, parentKey: 'meta.models', permission: 'meta.model.edit', file: './plugins/core-meta/pages/meta/models/new/virtual.tsx' },
   { key: 'meta.models.detail', path: '/meta/models/:pid', title: { en: 'Model', zh: '模型详情' }, menu: false, parentKey: 'meta.models', permission: 'meta.model.read', file: './plugins/core-meta/pages/meta/models/$pid.tsx' },
   { key: 'meta.models.edit', path: '/meta/models/:pid/edit', title: { en: 'Edit Model', zh: '编辑模型' }, menu: false, parentKey: 'meta.models', permission: 'meta.model.edit', file: './plugins/core-meta/pages/meta/models/$pid.edit.tsx' },
   // Fields
