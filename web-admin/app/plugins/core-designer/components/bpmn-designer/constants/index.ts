@@ -1,10 +1,14 @@
 /**
- * BPMN设计器常量定义
+ * BPMN designer constant definitions.
+ *
+ * NOTE: Palette label/description and DEFAULT_NODE_CONFIGS.name fields below
+ * are English fallbacks only. Runtime labels are resolved through i18n in
+ * BPMNPalette via PALETTE_ITEM_I18N. Do not hardcode localized text here.
  */
 
 import { BPMNNodeType, type BPMNPaletteItem } from '~/plugins/core-designer/components/bpmn-designer/types';
 
-// BPMN节点样式配置
+// BPMN node style configuration
 export const BPMN_NODE_STYLES = {
   [BPMNNodeType.START_EVENT]: {
     width: 36,
@@ -80,87 +84,87 @@ export const BPMN_NODE_STYLES = {
   },
 };
 
-// 组件库配置
+// Palette items (label/description are English fallbacks; UI resolves via i18n)
 export const BPMN_PALETTE_ITEMS: BPMNPaletteItem[] = [
   {
     type: BPMNNodeType.START_EVENT,
-    label: '开始事件', // i18n: bpmn.palette.startEvent
+    label: 'Start Event',
     icon: '▶',
     category: 'event',
-    description: '流程的开始节点', // i18n: bpmn.palette.startEventDesc
+    description: 'Start node of the process',
   },
   {
     type: BPMNNodeType.END_EVENT,
-    label: '结束事件', // i18n: bpmn.palette.endEvent
+    label: 'End Event',
     icon: '⬛',
     category: 'event',
-    description: '流程的结束节点', // i18n: bpmn.palette.endEventDesc
+    description: 'End node of the process',
   },
   {
     type: BPMNNodeType.USER_TASK,
-    label: '用户任务', // i18n: bpmn.palette.userTask
+    label: 'User Task',
     icon: '👤',
     category: 'task',
-    description: '需要人工处理的任务', // i18n: bpmn.palette.userTaskDesc
+    description: 'Task that requires human action',
   },
   {
     type: BPMNNodeType.SERVICE_TASK,
-    label: '服务任务', // i18n: bpmn.palette.serviceTask
+    label: 'Service Task',
     icon: '⚙',
     category: 'task',
-    description: '自动执行的服务任务', // i18n: bpmn.palette.serviceTaskDesc
+    description: 'Automated service task',
   },
   {
     type: BPMNNodeType.RECEIVE_TASK,
-    label: '接收任务', // i18n: bpmn.palette.receiveTask
+    label: 'Receive Task',
     icon: '📨',
     category: 'task',
-    description: '等待接收消息的任务', // i18n: bpmn.palette.receiveTaskDesc
+    description: 'Task that waits for an incoming message',
   },
   {
     type: BPMNNodeType.EXCLUSIVE_GATEWAY,
-    label: '排他网关', // i18n: bpmn.palette.exclusiveGateway
+    label: 'Exclusive Gateway',
     icon: '◆',
     category: 'gateway',
-    description: '条件分支，只能选择一条路径', // i18n: bpmn.palette.exclusiveGatewayDesc
+    description: 'Conditional branch — only one path is taken',
   },
   {
     type: BPMNNodeType.PARALLEL_GATEWAY,
-    label: '并行网关', // i18n: bpmn.palette.parallelGateway
+    label: 'Parallel Gateway',
     icon: '＋',
     category: 'gateway',
-    description: '并行分支，所有路径同时执行', // i18n: bpmn.palette.parallelGatewayDesc
+    description: 'Parallel branch — all paths run concurrently',
   },
   {
     type: BPMNNodeType.INCLUSIVE_GATEWAY,
-    label: '包容网关', // i18n: bpmn.palette.inclusiveGateway
+    label: 'Inclusive Gateway',
     icon: '○',
     category: 'gateway',
-    description: '条件分支，满足条件的路径都执行', // i18n: bpmn.palette.inclusiveGatewayDesc
+    description: 'Conditional branch — every matching path runs',
   },
   {
     type: BPMNNodeType.CALL_ACTIVITY,
-    label: '子流程', // i18n: bpmn.palette.callActivity
+    label: 'Call Activity',
     icon: '⧉',
     category: 'task' as const,
-    description: '调用另一个流程定义', // i18n: bpmn.palette.callActivityDesc
+    description: 'Invoke another process definition',
   },
 ];
 
-// 默认节点配置
+// Default node configs (name field is English fallback; canvas overrides with i18n label)
 export const DEFAULT_NODE_CONFIGS = {
   [BPMNNodeType.START_EVENT]: {
-    name: '开始',
+    name: 'Start',
     description: '',
     initiator: 'initiator',
   },
   [BPMNNodeType.END_EVENT]: {
-    name: '结束',
+    name: 'End',
     description: '',
     terminateAll: false,
   },
   [BPMNNodeType.USER_TASK]: {
-    name: '用户任务',
+    name: 'User Task',
     description: '',
     assignee: {
       type: 'user' as const,
@@ -171,37 +175,37 @@ export const DEFAULT_NODE_CONFIGS = {
     skipable: false,
   },
   [BPMNNodeType.SERVICE_TASK]: {
-    name: '服务任务',
+    name: 'Service Task',
     description: '',
     serviceType: 'http' as const,
     async: false,
     priority: 50,
   },
   [BPMNNodeType.RECEIVE_TASK]: {
-    name: '接收任务',
+    name: 'Receive Task',
     description: '',
     priority: 50,
   },
   [BPMNNodeType.EXCLUSIVE_GATEWAY]: {
-    name: '排他网关',
+    name: 'Exclusive Gateway',
     description: '',
   },
   [BPMNNodeType.PARALLEL_GATEWAY]: {
-    name: '并行网关',
+    name: 'Parallel Gateway',
     description: '',
   },
   [BPMNNodeType.INCLUSIVE_GATEWAY]: {
-    name: '包容网关',
+    name: 'Inclusive Gateway',
     description: '',
   },
   [BPMNNodeType.CALL_ACTIVITY]: {
-    name: '子流程',
+    name: 'Call Activity',
     description: '',
     calledProcessKey: '',
   },
 };
 
-// 连线样式
+// Edge styles
 export const EDGE_STYLES = {
   default: {
     stroke: '#94a3b8',
@@ -218,14 +222,14 @@ export const EDGE_STYLES = {
   },
 };
 
-// 网格配置
+// Grid configuration
 export const GRID_CONFIG = {
   size: 20,
   color: '#e2e8f0',
   style: 'dots' as const,
 };
 
-// 画布配置
+// Canvas configuration
 export const CANVAS_CONFIG = {
   minZoom: 0.5,
   maxZoom: 2,
