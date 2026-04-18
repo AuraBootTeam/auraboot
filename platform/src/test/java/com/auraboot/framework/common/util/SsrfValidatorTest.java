@@ -164,4 +164,67 @@ class SsrfValidatorTest {
         assertThatNoException().isThrownBy(
                 () -> SsrfValidator.validateUrl("https://this-host-does-not-exist-aura.invalid/test"));
     }
+
+    // =========================================================
+    // IPv6 loopback / IPv4-mapped IPv6 (P3-E hardening)
+    // =========================================================
+
+    @Test
+    void validate_ipv6LoopbackBracketed_throwsIllegalArgument() {
+        assertThatThrownBy(() -> SsrfValidator.validateUrl("http://[::1]/api"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("loopback");
+    }
+
+    @Test
+    void validate_ipv4MappedIpv6Loopback_throwsIllegalArgument() {
+        // ::ffff:127.0.0.1 — JDK's Inet6Address.isLoopbackAddress() may return
+        // false without the IPv4-mapped unwrap. The validator must reject.
+        assertThatThrownBy(() -> SsrfValidator.validateUrl("http://[::ffff:127.0.0.1]/api"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("loopback");
+    }
+
+    @Test
+    void validate_ipv4MappedIpv6Private_throwsIllegalArgument() {
+        // ::ffff:10.0.0.1 — mapped RFC1918 private address.
+        assertThatThrownBy(() -> SsrfValidator.validateUrl("http://[::ffff:10.0.0.1]/api"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("private");
+    }
+
+    // =========================================================
+    // Multi-A-record paranoid check (P3-E hardening)
+    // =========================================================
+
+    @Test
+    void validate_multiARecord_anyPrivate_throwsIllegalArgument() throws Exception {
+        // Simulate "attacker DNS returns [203.0.113.1, 127.0.0.1]" via a direct
+        // call to the per-address rejection path. SsrfValidator.validate()
+        // iterates every address returned by getAllByName() and rejects if ANY
+        // is private — this test asserts the contract (each address is checked
+        // in isolation through the same rejection predicate).
+        java.lang.reflect.Method m = SsrfValidator.class.getDeclaredMethod(
+                "rejectIfPrivate", java.net.InetAddress.class);
+        m.setAccessible(true);
+
+        java.net.InetAddress publicIp = java.net.InetAddress.getByAddress(
+                "mixed.example", new byte[]{(byte) 203, 0, 113, 1});
+        java.net.InetAddress loopback = java.net.InetAddress.getByAddress(
+                "mixed.example", new byte[]{127, 0, 0, 1});
+
+        // Public address passes.
+        assertThatNoException().isThrownBy(() -> m.invoke(null, publicIp));
+
+        // Loopback in the same answer set is rejected.
+        assertThatThrownBy(() -> {
+            try {
+                m.invoke(null, loopback);
+            } catch (java.lang.reflect.InvocationTargetException ite) {
+                throw ite.getCause();
+            }
+        })
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("loopback");
+    }
 }
