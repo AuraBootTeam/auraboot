@@ -495,14 +495,18 @@ test.describe(
     // in this environment"), but until now no runtime test has pinned
     // down the exact failure signature (complete-task → ClassCastException).
     // =======================================================================
-    test.fixme('IG-2: inclusive join waits for every activated branch to complete', async ({ request }) => {
-      // Evidence recorded at spec authoring time (see commit message):
+    test('IG-2: inclusive join waits for every activated branch to complete', async ({ request }) => {
+      // GAP-253 fixed: AuraVariablePersister.deserialize now special-cases
+      // the engine-internal $triggerActivityIds$ key and returns List<String>
+      // so InclusiveGatewayHelper#findTriggerActivityIdsFromDB no longer
+      // throws ClassCastException when the join evaluates. Original failure:
       //   POST /api/bpm/tasks/{taskId}/complete →
       //     500 {"exception":"ClassCastException","detail":"class
       //     java.lang.String cannot be cast to class java.util.List"}
-      // Reproduction: deploy buildInclusiveBpmn + start with
-      //   amount=200 & priority='vip' → both task_high and task_premium
-      //   activate (IG-1 green) → complete either task → 500.
+      test.skip(
+        !inclusiveRuntimeWorks,
+        `inclusive gateway runtime not supported in this environment — ${inclusiveProbeEvidence}.`,
+      );
       expect(igInstanceBothId).toBeTruthy();
 
       const todosBefore = await listTodoForInstance(request, adminToken, igInstanceBothId);

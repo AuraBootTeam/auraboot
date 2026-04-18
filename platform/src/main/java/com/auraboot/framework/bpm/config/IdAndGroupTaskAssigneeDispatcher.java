@@ -43,6 +43,29 @@ public class IdAndGroupTaskAssigneeDispatcher implements TaskAssigneeDispatcher 
         String assigneeId = properties.getOrDefault("assigneeId", "");
         String assigneeExpression = properties.getOrDefault("assignee", ""); // expression-based
 
+        // GAP-249: multi-instance expansion. When the userTask carries
+        // smart:miCollection (emitted by JsonToBpmnConverter when
+        // config.multiInstance.enabled=true), resolve the collection from the
+        // process request context and emit one candidate per element. SmartEngine's
+        // UserTaskBehavior.enter iterates the returned list 1:1 into EI/TI rows, so
+        // this is the hook that makes parallel "会签" actually spawn N parallel
+        // tasks. Each element is bound to the element variable (default:
+        // currentApprover) when it is itself a user id / assignee reference.
+        String miCollectionExpr = properties.getOrDefault("miCollection", "");
+        if (!miCollectionExpr.isBlank()) {
+            List<String> miAssignees = resolveMultiInstanceAssignees(miCollectionExpr, request);
+            if (!miAssignees.isEmpty()) {
+                for (int i = 0; i < miAssignees.size(); i++) {
+                    addCandidate(candidates, miAssignees.get(i), AssigneeTypeConstant.USER, i + 1);
+                }
+                log.debug("Multi-instance expansion for activity {}: {} instances",
+                        activity.getId(), candidates.size());
+                return candidates;
+            }
+            log.warn("Multi-instance collection '{}' resolved to empty list for activity {}; falling through",
+                    miCollectionExpr, activity.getId());
+        }
+
         if (!assigneeType.isBlank()) {
             try {
                 // Map BPMN assignee type to AssigneeResolverService rule type
@@ -131,6 +154,57 @@ public class IdAndGroupTaskAssigneeDispatcher implements TaskAssigneeDispatcher 
         if (request == null) return null;
         Object userId = request.get(RequestMapSpecialKeyConstant.PROCESS_INSTANCE_START_USER_ID);
         return userId != null ? userId.toString() : null;
+    }
+
+    /**
+     * Resolve a multi-instance collection expression to a list of assignee ids.
+     *
+     * <p>Accepts two forms:
+     * <ul>
+     *   <li>{@code ${varName}} — direct lookup of a process variable whose value is a
+     *       {@code Collection} (List, Set, array) or comma-separated String.
+     *   <li>bare variable name like {@code approverList} — same lookup without
+     *       the template wrapper.
+     * </ul>
+     *
+     * <p>We deliberately avoid SpEL here: the test contract and BPMN standard use
+     * {@code ${expr}} placeholders, and the collection value is already the full
+     * list — there is no reason to evaluate it as an expression. If richer
+     * expressions are needed later, wire {@code ExpressionUtil} through the
+     * {@code processEngineConfiguration}.
+     */
+    @SuppressWarnings("unchecked")
+    private List<String> resolveMultiInstanceAssignees(String expr, Map<String, Object> context) {
+        if (expr == null || expr.isBlank()) return List.of();
+        String varName = expr.trim();
+        if (varName.startsWith("${") && varName.endsWith("}")) {
+            varName = varName.substring(2, varName.length() - 1).trim();
+        }
+        Object value = context != null ? context.get(varName) : null;
+        if (value == null) {
+            return List.of();
+        }
+        if (value instanceof java.util.Collection<?> coll) {
+            return coll.stream()
+                    .filter(java.util.Objects::nonNull)
+                    .map(Object::toString)
+                    .filter(s -> !s.isBlank())
+                    .toList();
+        }
+        if (value.getClass().isArray()) {
+            Object[] arr = (Object[]) value;
+            return java.util.Arrays.stream(arr)
+                    .filter(java.util.Objects::nonNull)
+                    .map(Object::toString)
+                    .filter(s -> !s.isBlank())
+                    .toList();
+        }
+        String str = value.toString();
+        if (str.isBlank()) return List.of();
+        return java.util.Arrays.stream(str.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .toList();
     }
 
     private void addCandidate(List<TaskAssigneeCandidateInstance> list,
