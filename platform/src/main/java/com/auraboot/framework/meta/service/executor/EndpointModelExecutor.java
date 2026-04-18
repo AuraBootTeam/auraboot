@@ -1,5 +1,7 @@
 package com.auraboot.framework.meta.service.executor;
 
+import com.auraboot.framework.common.util.PinnedHttpRequests;
+import com.auraboot.framework.common.util.SsrfValidator;
 import com.auraboot.framework.meta.dto.DynamicQueryRequest;
 import com.auraboot.framework.meta.dto.ModelDefinition;
 import com.auraboot.framework.meta.dto.PaginationResult;
@@ -12,11 +14,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.HttpClientErrorException;
-import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.InetAddress;
@@ -24,7 +22,11 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -51,9 +53,20 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class EndpointModelExecutor implements ModelDataExecutor {
 
+    private static final int CONNECT_TIMEOUT_SECONDS = 5;
+    private static final int READ_TIMEOUT_SECONDS = 30;
+
+    /**
+     * Shared pinned-IP HTTP client (P3-E DNS-rebinding hardening). JDK
+     * {@link HttpClient} is what {@link PinnedHttpRequests} targets for
+     * pinning the validated IP at connect time.
+     */
+    private static final HttpClient PINNED_HTTP_CLIENT = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(CONNECT_TIMEOUT_SECONDS))
+            .build();
+
     private final MetaModelService metaModelService;
     private final ObjectMapper objectMapper;
-    private final RestTemplate restTemplate;
 
     @Override
     public String sourceType() {
@@ -72,18 +85,12 @@ public class EndpointModelExecutor implements ModelDataExecutor {
         validateEndpointUrl(list.getEndpoint());
 
         URI uri = buildListUri(list, request);
-        HttpMethod method = HttpMethod.valueOf(list.getMethod() == null ? "GET" : list.getMethod().toUpperCase());
+        String method = list.getMethod() == null ? "GET" : list.getMethod().toUpperCase();
         log.debug("EndpointModelExecutor.list {} {}", method, uri);
 
-        ResponseEntity<String> resp;
-        try {
-            resp = restTemplate.exchange(uri, method, null, String.class);
-        } catch (HttpClientErrorException e) {
-            throw new MetaServiceException(
-                "endpoint list call failed (" + e.getStatusCode() + ") for model " + modelCode, e);
-        }
+        String responseBody = sendPinned(modelCode, method, uri, "list");
 
-        JsonNode root = readJson(resp.getBody(), modelCode);
+        JsonNode root = readJson(responseBody, modelCode);
         JsonNode items = root.at(toJsonPtr(list.getResponseItemsPath()));
         if (!items.isArray()) {
             throw new MetaServiceException(
@@ -128,7 +135,7 @@ public class EndpointModelExecutor implements ModelDataExecutor {
         }
         validateEndpointUrl(url);
 
-        HttpMethod method = HttpMethod.valueOf(detail.getMethod() == null ? "GET" : detail.getMethod().toUpperCase());
+        String method = detail.getMethod() == null ? "GET" : detail.getMethod().toUpperCase();
         URI uri;
         try {
             uri = new URI(url);
@@ -137,17 +144,14 @@ public class EndpointModelExecutor implements ModelDataExecutor {
         }
         log.debug("EndpointModelExecutor.get {} {}", method, uri);
 
-        ResponseEntity<String> resp;
+        String responseBody;
         try {
-            resp = restTemplate.exchange(uri, method, null, String.class);
-        } catch (HttpClientErrorException.NotFound nf) {
+            responseBody = sendPinned(modelCode, method, uri, "detail");
+        } catch (EndpointNotFoundException nf) {
             return null;
-        } catch (HttpClientErrorException e) {
-            throw new MetaServiceException(
-                "endpoint detail call failed (" + e.getStatusCode() + ") for model " + modelCode, e);
         }
 
-        JsonNode root = readJson(resp.getBody(), modelCode);
+        JsonNode root = readJson(responseBody, modelCode);
         JsonNode item = root.at(toJsonPtr(detail.getResponseItemPath()));
         if (item.isMissingNode() || item.isNull()) {
             return null;
@@ -156,6 +160,51 @@ public class EndpointModelExecutor implements ModelDataExecutor {
     }
 
     // --- helpers ---------------------------------------------------------
+
+    /** Internal signal that a detail call returned 404 (maps to null return). */
+    private static final class EndpointNotFoundException extends RuntimeException {
+        EndpointNotFoundException() { super(); }
+    }
+
+    /**
+     * Pinned-IP HTTP send. Replaces the previous {@code RestTemplate.exchange}
+     * call so the connect-time IP cannot diverge from the IP that passed
+     * {@link #validateEndpointUrl(String)} / {@link SsrfValidator}
+     * (P3-E #1 DNS rebinding TOCTOU).
+     *
+     * @param channel diagnostic hint (e.g. "list" / "detail")
+     * @throws EndpointNotFoundException when the remote returns 404 on a
+     *                                   detail channel so the caller can
+     *                                   convert to {@code null}
+     */
+    private String sendPinned(String modelCode, String method, URI uri, String channel) {
+        SsrfValidator.ValidatedTarget target = SsrfValidator.validate(uri.toString());
+        if (target == null) {
+            throw new MetaServiceException(
+                "endpoint " + channel + " target could not be resolved for model " + modelCode);
+        }
+        HttpRequest.Builder builder = PinnedHttpRequests.newPinnedRequestBuilder(target)
+                .timeout(Duration.ofSeconds(READ_TIMEOUT_SECONDS))
+                .method(method, HttpRequest.BodyPublishers.noBody());
+        try {
+            HttpResponse<String> response = PINNED_HTTP_CLIENT.send(
+                    builder.build(), HttpResponse.BodyHandlers.ofString());
+            int status = response.statusCode();
+            if ("detail".equals(channel) && status == 404) {
+                throw new EndpointNotFoundException();
+            }
+            if (status >= 400) {
+                throw new MetaServiceException(
+                    "endpoint " + channel + " call failed (" + status + ") for model " + modelCode);
+            }
+            return response.body();
+        } catch (EndpointNotFoundException | MetaServiceException rethrow) {
+            throw rethrow;
+        } catch (Exception e) {
+            throw new MetaServiceException(
+                "endpoint " + channel + " call failed for model " + modelCode + ": " + e.getMessage(), e);
+        }
+    }
 
     private ModelDefinition requireVirtualModel(String modelCode) {
         ModelDefinition def = metaModelService.getDefinitionByCode(modelCode);
