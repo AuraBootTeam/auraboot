@@ -6761,6 +6761,36 @@ CREATE INDEX IF NOT EXISTS idx_shadow_run_draft_created ON ab_agent_shadow_run (
 CREATE INDEX IF NOT EXISTS idx_shadow_run_original ON ab_agent_shadow_run (original_run_id);
 COMMENT ON TABLE ab_agent_shadow_run IS 'ACP Learning Loop §6 — one row per shadow-mode execution comparing draft against production';
 
+-- ============================================================================
+-- ACP Approval Notification Outbox (spec §3.5.4)
+-- Per-approval notification retry with exponential backoff — the generic
+-- ab_outbox is model-event focused (dsl Commands), this is domain-specific
+-- so we can evolve backoff / target / priority without destabilising the
+-- other table.
+-- Exponential backoff: attempt N sleeps for backoff_seconds[N] before next try.
+--   defaults: 60s, 300s, 1800s, 7200s, 43200s — caps at 5 attempts then 'failed'.
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS ab_agent_approval_notification_outbox (
+    id              BIGSERIAL PRIMARY KEY,
+    pid             VARCHAR(26) UNIQUE NOT NULL,
+    tenant_id       BIGINT NOT NULL,
+    approval_pid    VARCHAR(26) NOT NULL,              -- ab_agent_approval.pid
+    recipient_kind  VARCHAR(20) NOT NULL,              -- user | role | group
+    recipient_id    VARCHAR(200) NOT NULL,             -- stringified user_id / role_code / group_pid
+    channel         VARCHAR(20) NOT NULL DEFAULT 'inbox',  -- inbox | email | sms | webhook
+    payload         JSONB NOT NULL,
+    status          VARCHAR(20) NOT NULL DEFAULT 'pending',  -- pending | delivered | failed
+    retry_count     INTEGER NOT NULL DEFAULT 0,
+    last_error      TEXT,
+    next_retry_at   TIMESTAMPTZ,                       -- when pending, next attempt fires at/after this
+    delivered_at    TIMESTAMPTZ,
+    created_at      TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_apv_outbox_pending ON ab_agent_approval_notification_outbox (next_retry_at, status) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_apv_outbox_approval ON ab_agent_approval_notification_outbox (approval_pid);
+COMMENT ON TABLE ab_agent_approval_notification_outbox IS 'Approval notification delivery log with exponential-backoff retry (spec §3.5.4)';
+
 -- Seed: platform built-in capabilities (tenant_id = -1)
 -- Skills are the built-in per-tenant generic codes (dsl.query / dsl.command)
 -- that AgentTemplateSeeder creates for every tenant; the router will return
