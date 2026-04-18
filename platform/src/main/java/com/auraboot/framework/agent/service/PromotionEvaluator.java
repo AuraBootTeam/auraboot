@@ -1,10 +1,12 @@
 package com.auraboot.framework.agent.service;
 
+import com.auraboot.framework.agent.metrics.LearningLoopMetrics;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Builder;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -34,6 +36,9 @@ public class PromotionEvaluator {
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
 
+    @Autowired(required = false)
+    private LearningLoopMetrics metrics;
+
     @Value("${acp.learning.promotion.min-shadow-runs:5}")
     private int minShadowRuns;
 
@@ -50,8 +55,14 @@ public class PromotionEvaluator {
     public EvaluationResult evaluate(String draftPid) {
         List<Map<String, Object>> draftRows = jdbcTemplate.queryForList(
                 "SELECT status FROM ab_agent_skill_draft WHERE pid = ?", draftPid);
-        if (draftRows.isEmpty()) return EvaluationResult.builder().draftPid(draftPid).decision(Decision.NOT_FOUND).build();
+        if (draftRows.isEmpty()) {
+            if (metrics != null) metrics.recordPromotionDecision(null, Decision.NOT_FOUND.name());
+            return EvaluationResult.builder().draftPid(draftPid).decision(Decision.NOT_FOUND).build();
+        }
         String currentStatus = (String) draftRows.get(0).get("status");
+        Long tenantId = jdbcTemplate.queryForObject(
+                "SELECT tenant_id FROM ab_agent_skill_draft WHERE pid = ?",
+                Long.class, draftPid);
 
         Map<String, Object> stats = jdbcTemplate.queryForMap(
                 "SELECT " +
@@ -72,12 +83,12 @@ public class PromotionEvaluator {
         double costDelta = ((Number) stats.get("cost_delta")).doubleValue();
         double durationDelta = ((Number) stats.get("duration_delta_ms")).doubleValue();
 
-        Map<String, Object> metrics = new LinkedHashMap<>();
-        metrics.put("shadow_runs", n);
-        metrics.put("output_match_rate", round(outMatch));
-        metrics.put("fidelity_match_rate", round(fidMatch));
-        metrics.put("cost_delta", round(costDelta));
-        metrics.put("duration_delta_ms", round(durationDelta));
+        Map<String, Object> metricsJson = new LinkedHashMap<>();
+        metricsJson.put("shadow_runs", n);
+        metricsJson.put("output_match_rate", round(outMatch));
+        metricsJson.put("fidelity_match_rate", round(fidMatch));
+        metricsJson.put("cost_delta", round(costDelta));
+        metricsJson.put("duration_delta_ms", round(durationDelta));
 
         Decision decision;
         if (n < minShadowRuns) {
@@ -88,7 +99,8 @@ public class PromotionEvaluator {
             decision = Decision.PROMOTE;
         }
 
-        persistMetrics(draftPid, metrics, decision, currentStatus);
+        persistMetrics(draftPid, metricsJson, decision, currentStatus);
+        if (metrics != null) metrics.recordPromotionDecision(tenantId, decision.name());
 
         log.info("Promotion eval: draft={} runs={} out_match={} fid_match={} decision={}",
                 draftPid, n, outMatch, fidMatch, decision);
