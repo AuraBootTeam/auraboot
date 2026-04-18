@@ -150,7 +150,7 @@ function buildHooksBpmnXml(processKey: string, processName: string): string {
 <definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:smart="http://auraboot.com/smart" targetNamespace="http://auraboot.com/bpm" id="def_${processKey}">
   <process id="${processKey}" name="${processName}" isExecutable="true">
     <startEvent id="start"/>
-    <userTask id="${NODE_ID}" name="Approve Task" smart:assigneeType="user" smart:assigneeId="admin"/>
+    <userTask id="${NODE_ID}" name="Approve Task" smart:assigneeType="starter"/>
     <endEvent id="end"/>
     <sequenceFlow id="e_start_approve" sourceRef="start" targetRef="${NODE_ID}"/>
     <sequenceFlow id="e_approve_end" sourceRef="${NODE_ID}" targetRef="end"/>
@@ -181,8 +181,8 @@ function buildHooksDesignerJson() {
           type: 'userTask',
           label: 'Approve Task',
           config: {
-            assigneeType: 'user',
-            assigneeIds: ['admin'],
+            assigneeType: 'starter',
+            assigneeIds: [],
             hooks: [
               {
                 hookType: 'pre_execute',
@@ -343,7 +343,9 @@ async function listHooksForProcess(
   );
   expect(resp.ok(), `list hooks must respond ok: ${resp.status()}`).toBe(true);
   const body = await resp.json();
-  const rows = (body?.data ?? []) as Array<Record<string, unknown>>;
+  // BpmNodeHookController.list returns ResponseEntity<List<BpmNodeHook>> — the
+  // body is the raw array, not wrapped in ApiResponse.data.
+  const rows = (Array.isArray(body) ? body : body?.data ?? []) as Array<Record<string, unknown>>;
   return rows.map((r) => ({
     pid: String(r.pid ?? ''),
     nodeId: String(r.nodeId ?? ''),
@@ -373,11 +375,16 @@ async function listInstanceTodoTasks(
         (t.processInstance as string) ??
         '';
       const nodeKey =
+        (t.processDefinitionActivityId as string) ??
         (t.taskDefinitionKey as string) ??
         (t.activityId as string) ??
         (t.nodeKey as string) ??
         '';
-      const id = (t.id as string) ?? (t.taskId as string) ?? '';
+      const id =
+        (t.instanceId as string) ??
+        (t.id as string) ??
+        (t.taskId as string) ??
+        '';
       return { id, nodeKey, processInstanceId: pid };
     })
     .filter((t) => t.processInstanceId === instanceId);
@@ -511,8 +518,33 @@ test.describe(
       await removeBtn.click();
       await expect(page.locator('[data-testid="hook-entry-2"]')).toHaveCount(0);
 
-      // Deselect to stabilize isDirty before Deploy
+      // Deselect to stabilize isDirty before Save/Deploy
       await page.locator('.react-flow__pane').click({ position: { x: 50, y: 50 } });
+
+      // 8b. Save first — the hook add/remove/fill mutations above set
+      //     isDirty=true, and the Deploy button is gated on !isDirty. Clicking
+      //     the toolbar Save button persists the designerJson/BPMN round-trip
+      //     (which is exactly what GAP-254's converter path needs exercised)
+      //     and clears isDirty so Deploy becomes enabled. This also adds
+      //     genuine save-path coverage the other BPM specs skip.
+      const saveBtn = page.locator('[data-testid="bpmn-toolbar-btn-save"]');
+      await expect(saveBtn).toBeVisible({ timeout: 5_000 });
+      await expect(saveBtn).toBeEnabled({ timeout: 5_000 });
+      await saveBtn.click();
+      // Save opens the metadata dialog (BPMNDesigner.handleSave → setShowSaveDialog)
+      const saveDialogSubmit = page.locator('[data-testid="bpmn-save-dialog-submit"]');
+      await expect(saveDialogSubmit).toBeVisible({ timeout: 5_000 });
+      const saveResponsePromise = page.waitForResponse(
+        (r) =>
+          r.url().includes(`/api/bpm/process-definitions/${processPid}`) &&
+          r.request().method() === 'PUT' &&
+          r.status() < 400,
+        { timeout: 15_000 },
+      );
+      await saveDialogSubmit.click();
+      await saveResponsePromise;
+      // Dialog closes after successful save; isDirty flips to false
+      await expect(saveDialogSubmit).toHaveCount(0, { timeout: 5_000 });
 
       // 9. Deploy via toolbar button (real UI click) — D14
       const deployBtn = page.locator('[data-testid="bpmn-btn-deploy"]');
@@ -561,15 +593,30 @@ test.describe(
       expect(bpmnContent).toContain(`<userTask id="${NODE_ID}"`);
       expect(bpmnContent).toContain('Approve Task');
 
-      // 12. Register the two hooks via POST /api/bpm/node-hooks — this is
-      //     the half of the contract that works today. GAP-B (hookType
-      //     vocabulary mismatch) means we must translate the UI values
-      //     (pre_execute / post_execute) into the backend values
-      //     (pre_check / post_action) for the executor to see them.
-      //     Once the platform closes GAP-A and the converter persists
-      //     hooks from designerJson to ab_bpm_node_hook on deploy, these
-      //     two explicit calls become redundant — until then they provide
-      //     the storage rows HOOK-2/3 need to assert against.
+      // 12a. GAP-254 closed GAP-A: ProcessDeploymentService.deploy now parses
+      //      designerJson config.hooks[] and persists them into ab_bpm_node_hook
+      //      (with UI vocab pre_execute/post_execute normalized to backend
+      //      vocab pre_check/post_action via BpmNodeHookService.normalizeHookType).
+      //      The UI seeds actionType=command hooks to exercise the Designer
+      //      CommandActionConfig surface; those rows are verified below.
+      const deployPersistedHooks = await listHooksForProcess(request, adminToken, PROCESS_KEY);
+      const deployPreRow = deployPersistedHooks.find(
+        (h) => h.hookType === 'pre_check' && h.hookConfig?.actionType === 'command',
+      );
+      const deployPostRow = deployPersistedHooks.find(
+        (h) => h.hookType === 'post_action' && h.hookConfig?.actionType === 'command',
+      );
+      expect(deployPreRow, 'pre_check command hook must be persisted by deploy').toBeTruthy();
+      expect(deployPostRow, 'post_action command hook must be persisted by deploy').toBeTruthy();
+      expect(deployPreRow?.nodeId).toBe(NODE_ID);
+      expect(deployPostRow?.nodeId).toBe(NODE_ID);
+
+      // 12b. HOOK-2/3 assert observable runtime variable writes
+      //      (preHookFired/postHookFired). Those require script-type hooks
+      //      that exercise BpmNodeHookService.executeScript + the SpEL
+      //      write-through landed under GAP-257. We register them as
+      //      additional rows alongside the deploy-persisted command hooks,
+      //      so both execute on ACTIVITY_START/ACTIVITY_END.
       const preHookPid = await registerHookViaApi(request, adminToken, {
         processKey: PROCESS_KEY,
         nodeId: NODE_ID,
@@ -578,7 +625,7 @@ test.describe(
           type: 'script',
           script: '#vars["preHookFired"] = true',
         },
-        executionOrder: 0,
+        executionOrder: 10,
         failStrategy: 'ignore',
         async: false,
         enabled: true,
@@ -591,26 +638,13 @@ test.describe(
           type: 'script',
           script: '#vars["postHookFired"] = true',
         },
-        executionOrder: 0,
+        executionOrder: 10,
         failStrategy: 'ignore',
         async: false,
         enabled: true,
       });
       expect(preHookPid).toBeTruthy();
       expect(postHookPid).toBeTruthy();
-
-      // 13. List hooks via the dedicated endpoint — must see both rows with
-      //     the expected hook_type and nodeId values. This proves the row
-      //     landed with the right tenant + process_key + node_id tuple.
-      const hooks = await listHooksForProcess(request, adminToken, PROCESS_KEY);
-      const preRow = hooks.find((h) => h.hookType === 'pre_check');
-      const postRow = hooks.find((h) => h.hookType === 'post_action');
-      expect(preRow, 'pre_check hook row must be listed').toBeTruthy();
-      expect(postRow, 'post_action hook row must be listed').toBeTruthy();
-      expect(preRow?.nodeId).toBe(NODE_ID);
-      expect(postRow?.nodeId).toBe(NODE_ID);
-      expect(preRow?.hookConfig?.type).toBe('script');
-      expect(postRow?.hookConfig?.type).toBe('script');
     });
 
     // =======================================================================
@@ -746,19 +780,31 @@ test.describe(
 
         // Final status must carry postHookFired=true, and the instance
         // should have ended (currentNodes empty, completedNodes includes
-        // approve_task).
-        const final = await queryInstanceStatus(request, adminToken, {
-          processKey: PROCESS_KEY,
-          businessKey: BK,
-        });
-        expect(final.currentNodes.length).toBe(0);
-        expect(final.completedNodes.map((n) => n.nodeId)).toContain(NODE_ID);
-        expect(
-          final.variables.postHookFired,
-          'post-action hook must write postHookFired=true to execution variables',
-        ).toBe(true);
+        // approve_task). Post-action hook commits its SpEL variable write
+        // alongside SmartEngine's own activity-end variable snapshot, so
+        // poll briefly for the variable to become visible via the status
+        // DTO (async variable persistence can race the read).
+        let final: Awaited<ReturnType<typeof queryInstanceStatus>> | null = null;
+        await expect
+          .poll(
+            async () => {
+              final = await queryInstanceStatus(request, adminToken, {
+                processKey: PROCESS_KEY,
+                businessKey: BK,
+              });
+              return final.variables.postHookFired === true;
+            },
+            {
+              timeout: 5_000,
+              intervals: [200, 500, 1000],
+              message: 'post-action hook must write postHookFired=true to execution variables',
+            },
+          )
+          .toBe(true);
+        expect(final!.currentNodes.length).toBe(0);
+        expect(final!.completedNodes.map((n) => n.nodeId)).toContain(NODE_ID);
         expect(['completed', 'ended', 'finished']).toContain(
-          final.status.toLowerCase(),
+          final!.status.toLowerCase(),
         );
 
         // Audit trail — activity_end row must exist for approve_task
