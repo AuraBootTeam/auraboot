@@ -62,7 +62,7 @@
 
 import { test, expect, type APIRequestContext } from '@playwright/test';
 import { Client as PgClient } from 'pg';
-import { uniqueId } from '../helpers/index';
+import { uniqueId } from '../../e2e/helpers/index';
 
 // ── Tenant A = default admin tenant ─────────────────────────────────
 const ADMIN_EMAIL = 'admin@example.com';
