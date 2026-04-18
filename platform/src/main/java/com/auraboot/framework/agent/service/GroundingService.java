@@ -32,6 +32,9 @@ public class GroundingService {
     private final SemanticValidator semanticValidator;
     private final SemanticTermResolver semanticTermResolver;
     private final CapabilityRouter capabilityRouter;
+    /** Optional — present when Active Memory is deployed (memory-lifecycle.md §4). */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private ActiveMemoryService activeMemoryService;
 
     /**
      * Ground a user message into a BusinessIntentFrame.
@@ -113,6 +116,17 @@ public class GroundingService {
                 + " (confidence=" + String.format("%.2f", objectResult.getConfidence()) + ")");
         explanation.put("riskReason", riskLevel + ": " + intentResult.getIntent() + " operation");
 
+        // 8.5. Active Memory pre-recall (memory-lifecycle.md §4) — best-effort.
+        List<Map<String, Object>> preContext = List.of();
+        if (activeMemoryService != null) {
+            try {
+                String userId = context != null ? context.getUserId() : null;
+                preContext = activeMemoryService.preRecall(tenantId, userId, userMessage);
+            } catch (Exception e) {
+                log.debug("Active Memory pre-recall failed, continuing without preContext: {}", e.getMessage());
+            }
+        }
+
         // 9. Build BIF
         BusinessIntentFrame bif = BusinessIntentFrame.builder()
                 .intent(intentResult.getIntent())
@@ -130,12 +144,13 @@ public class GroundingService {
                         "pageModel", context.getPageModel() != null ? context.getPageModel() : "",
                         "recordId", context.getRecordId() != null ? context.getRecordId() : ""
                 ) : Map.of())
+                .preContext(preContext)
                 .build();
 
         long durationMs = System.currentTimeMillis() - startMs;
-        log.info("D1 Grounding: intent={}, object={}, confidence={}, skills={}, duration={}ms",
+        log.info("D1 Grounding: intent={}, object={}, confidence={}, skills={}, preContext={}, duration={}ms",
                 bif.getIntent(), bif.getObject(), String.format("%.2f", confidence.getOverall()),
-                candidateSkills.size(), durationMs);
+                candidateSkills.size(), preContext.size(), durationMs);
 
         return bif;
     }
@@ -197,10 +212,13 @@ public class GroundingService {
     @Data
     @Builder
     @AllArgsConstructor
+    @lombok.NoArgsConstructor
     public static class GroundingContext {
         private String pageModel;
         private String recordId;
         private String conversationId;
         private String sessionId;
+        /** User id (stringified) — required for Active Memory user-scoped recall. */
+        private String userId;
     }
 }

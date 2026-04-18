@@ -278,11 +278,13 @@ public class AuraBotChatService {
         if (groundingService != null) {
             SpanContext groundingSpan = aiTraceService.startSpan(trace, null, "span", "d1_grounding", null);
             try {
+                Long userIdForGrounding = MetaContext.getCurrentUserId();
                 var gctx = com.auraboot.framework.agent.service.GroundingService.GroundingContext.builder()
                         .pageModel(modelCode)
                         .recordId(recordPid)
                         .conversationId(request.getSessionId())
                         .sessionId(request.getSessionId())
+                        .userId(userIdForGrounding == null ? null : userIdForGrounding.toString())
                         .build();
                 bif = groundingService.ground(tenantId, request.getMessage(), gctx);
                 tools = applyCandidateSkillsMode(tools, bif);
@@ -1420,6 +1422,24 @@ public class AuraBotChatService {
         }
         if (bif.getConfidence() != null) {
             sb.append("- confidence: overall=").append(String.format("%.2f", bif.getConfidence().getOverall())).append('\n');
+        }
+        if (bif.getPreContext() != null && !bif.getPreContext().isEmpty()) {
+            sb.append("\n## Relevant memory (Active Memory pre-recall)\n");
+            int shown = 0;
+            for (java.util.Map<String, Object> snippet : bif.getPreContext()) {
+                if (shown++ >= 5) break;  // keep prompt small
+                Object title = snippet.get("title");
+                Object content = snippet.get("content");
+                Object scope = snippet.get("scope");
+                sb.append("- [")
+                        .append(scope == null ? "" : scope)
+                        .append("] ")
+                        .append(title == null ? "(no title)" : title);
+                if (content != null) {
+                    sb.append(": ").append(content);
+                }
+                sb.append('\n');
+            }
         }
         return sb.toString();
     }
