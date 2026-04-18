@@ -153,27 +153,48 @@ automation loop and ship the operator-facing Mission Control surface.
 
 Shadow Mode runs DSL write drafts via `CommandExecutor.execute` with
 `CommandExecuteRequest.dryRun=true`. `CommandExecutorImpl` marks the outer
-transaction `setRollbackOnly()` so JdbcTemplate / JPA writes issued inside
-the pipeline are reverted when the pipeline returns. Side effects that
-escape the JDBC connection — outbound HTTP, emails, message-queue
+transaction `setRollbackOnly()` **at pipeline entry** (PR-56 N13) so
+JdbcTemplate / JPA writes issued inside the pipeline are reverted even if
+an intermediate phase attempts an intra-transactional commit. Side effects
+that escape the JDBC connection — outbound HTTP, emails, message-queue
 publishes, S3 uploads, Redis writes, external-DB writes — are NOT covered
 by this rollback.
 
-To close that gap, the HANDLER phase now propagates the flag to every
-handler it invokes (PR-50):
+To close that gap, the HANDLER phase **skips handlers that do not opt in**
+to dry-run semantics (PR-56 C3), replacing the earlier honour-system
+warning:
 
-- Spring-bean `CommandHandler`: `ctx.isDryRun()` is set via
-  `CommandHandlerContext.dryRun`.
-- Plugin `CommandHandlerExtension`: `ctx.dryRun()` is set on
-  `CommandHandlerExtension.CommandContext` via the builder.
+- Spring-bean `CommandHandler`: the handler class MUST be annotated with
+  `@com.auraboot.framework.meta.service.DryRunSafe` for `HandlerPhase` to
+  invoke it under dry-run. Otherwise the phase logs `INFO` `"Dry-run:
+  skipping handler X (class not marked @DryRunSafe)"` and continues
+  gracefully. When invoked, the handler still receives the flag via
+  `CommandHandlerContext.isDryRun()` so it can branch internally.
+- Plugin `CommandHandlerExtension`: override the SPI method
+  `default boolean supportsDryRun() { return false; }` to return `true`
+  when the handler is safe to execute under dry-run. Otherwise
+  `HandlerPhase` skips it with an `INFO` log. When invoked, the flag is
+  exposed via `CommandHandlerContext.dryRun()`.
 
-Handlers that produce external effects MUST inspect this flag and
-early-return (or switch to a side-effect-free branch) when it is true.
-`HandlerPhase` emits a single `WARN` log at dry-run entry listing the
-number of handlers that will execute, so operators can cross-reference
-handler implementations against the registry.
+A handler qualifies for the marker / `supportsDryRun()=true` when it
+either has no side effects outside the JDBC connection managed by the
+enclosing transaction, or inspects the flag internally and short-circuits
+every external call.
 
-If a plugin's command handler cannot honour dry-run safely, register its
-command code as `NONE` in `ab_agent_dry_run_support` for the affected
-tenants; `DryRunSupportRegistry` will then classify the tool_ref as
-ineligible and skip shadow replay entirely.
+`CompletionPhase` additionally skips (PR-56 C4) under dry-run:
+
+- `DomainEventPublisher.publishCommandCompleted` synchronous publication
+  (prevents any non-transactional `@EventListener` from firing).
+- `afterCommit` registration for `api_call` / `webhook` rules.
+- `afterCommit` registration for `effectExecutor.saveAuditLog` — no
+  synthetic `ab_command_audit_log` rows from dry-run runs.
+
+And `CommandExecutorImpl`'s failure-path `saveAuditLog` call is skipped
+under dry-run, so a deliberately thrown error in shadow replay does not
+produce a phantom audit row.
+
+If a plugin's command handler cannot honour dry-run safely, either leave
+`supportsDryRun()` at its default `false` (HandlerPhase will skip it) or
+register its command code as `NONE` in `ab_agent_dry_run_support` for the
+affected tenants; `DryRunSupportRegistry` will then classify the tool_ref
+as ineligible and skip shadow replay entirely.
