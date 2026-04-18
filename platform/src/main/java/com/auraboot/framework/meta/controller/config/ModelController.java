@@ -9,6 +9,7 @@ import com.auraboot.framework.meta.dto.DDLPreviewResult;
 import com.auraboot.framework.meta.dto.MetaModelCreateRequest;
 import com.auraboot.framework.meta.dto.MetaModelDTO;
 import com.auraboot.framework.meta.dto.MetaModelUpdateRequest;
+import com.auraboot.framework.meta.dto.ModelDefinition;
 import com.auraboot.framework.meta.dto.PageSchemaDTO;
 import com.auraboot.framework.meta.dto.SchemaOperationResult;
 import com.auraboot.framework.meta.dto.SchemaSyncOptions;
@@ -78,7 +79,41 @@ public class ModelController {
         
         // 创建模型
         MetaModelDTO result = metaModelService.create(request);
-        
+
+        // Virtual-model wizard payload carries sourceType/sourceRef/primaryKey/
+        // capabilities/fields/extension that are not persisted by the legacy
+        // create() path. Route them through saveDefinition() so the model row
+        // actually stores the declared source, capabilities, and primaryKey.
+        boolean hasVirtualPayload =
+                (request.getSourceType() != null && !request.getSourceType().isBlank()
+                        && !"physical".equalsIgnoreCase(request.getSourceType()))
+                || request.getSourceRef() != null
+                || request.getPrimaryKey() != null
+                || request.getCapabilities() != null
+                || (request.getFields() != null && !request.getFields().isEmpty());
+        if (hasVirtualPayload) {
+            ModelDefinition def = ModelDefinition.builder()
+                    .code(result.getCode())
+                    .displayName(request.getDisplayName())
+                    .description(request.getDescription())
+                    .modelType(request.getModelType())
+                    .modelCategory(request.getModelCategory())
+                    .tableName(request.getTableName())
+                    .sourceType(request.getSourceType())
+                    .sourceRef(request.getSourceRef())
+                    .primaryKey(request.getPrimaryKey())
+                    .capabilities(request.getCapabilities())
+                    .fields(request.getFields())
+                    .extension(request.getExtension())
+                    .build();
+            metaModelService.saveDefinition(def);
+            // Reload to pick up persisted source/capabilities/primaryKey.
+            MetaModelDTO reloaded = metaModelService.findByPid(result.getPid());
+            if (reloaded != null) {
+                result = reloaded;
+            }
+        }
+
         log.info("模型创建成功: pid={}, code={}", result.getPid(), result.getCode());
         return ApiResponse.success("模型创建成功", result);
     }
