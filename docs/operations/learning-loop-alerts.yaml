@@ -1,0 +1,32 @@
+groups:
+  - name: auraboot.learning_loop
+    rules:
+      - alert: ShadowSchedulerStalled
+        expr: absent_over_time(auraboot_shadow_run_outcome_total[30m])
+        for: 15m
+        labels:
+          severity: warning
+          component: acp-learning-loop
+        annotations:
+          summary: "Shadow scheduler stalled"
+          description: "No shadow runs recorded in 30 min — check acp.learning.shadow.scheduler.enabled"
+
+      - alert: HighNotFoundRate
+        expr: (sum(rate(auraboot_promotion_decision_total{decision="NOT_FOUND"}[1h])) / sum(rate(auraboot_promotion_decision_total[1h]))) > 0.05
+        for: 30m
+        labels:
+          severity: warning
+          component: acp-learning-loop
+        annotations:
+          summary: "High NOT_FOUND rate in promotion evaluator"
+          description: "Promotion evaluator seeing >5% NOT_FOUND decisions — stale draft PIDs in use"
+
+      - alert: PromotionStalled
+        expr: sum(increase(auraboot_promotion_decision_total{decision="PROMOTE"}[7d])) == 0 and sum(increase(auraboot_promotion_decision_total{decision="INSUFFICIENT_RUNS"}[7d])) > 10
+        for: 1h
+        labels:
+          severity: info
+          component: acp-learning-loop
+        annotations:
+          summary: "Promotion evaluator not promoting drafts"
+          description: "PromotionEvaluator ran but never promoted in 7d despite 10+ evaluations — threshold too strict or shadow runs not converging"

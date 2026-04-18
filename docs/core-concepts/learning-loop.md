@@ -148,3 +148,32 @@ Base path: `/api/learning` unless noted. All are tenant-scoped via
 
 PR-25..29 set up the HITL + classifier skeleton; PR-32..44 close the
 automation loop and ship the operator-facing Mission Control surface.
+
+### Plugin handler dry-run contract
+
+Shadow Mode runs DSL write drafts via `CommandExecutor.execute` with
+`CommandExecuteRequest.dryRun=true`. `CommandExecutorImpl` marks the outer
+transaction `setRollbackOnly()` so JdbcTemplate / JPA writes issued inside
+the pipeline are reverted when the pipeline returns. Side effects that
+escape the JDBC connection — outbound HTTP, emails, message-queue
+publishes, S3 uploads, Redis writes, external-DB writes — are NOT covered
+by this rollback.
+
+To close that gap, the HANDLER phase now propagates the flag to every
+handler it invokes (PR-50):
+
+- Spring-bean `CommandHandler`: `ctx.isDryRun()` is set via
+  `CommandHandlerContext.dryRun`.
+- Plugin `CommandHandlerExtension`: `ctx.dryRun()` is set on
+  `CommandHandlerExtension.CommandContext` via the builder.
+
+Handlers that produce external effects MUST inspect this flag and
+early-return (or switch to a side-effect-free branch) when it is true.
+`HandlerPhase` emits a single `WARN` log at dry-run entry listing the
+number of handlers that will execute, so operators can cross-reference
+handler implementations against the registry.
+
+If a plugin's command handler cannot honour dry-run safely, register its
+command code as `NONE` in `ab_agent_dry_run_support` for the affected
+tenants; `DryRunSupportRegistry` will then classify the tool_ref as
+ineligible and skip shadow replay entirely.
