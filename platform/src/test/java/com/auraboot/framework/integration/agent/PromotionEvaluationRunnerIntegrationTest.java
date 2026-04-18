@@ -18,6 +18,12 @@ import java.sql.PreparedStatement;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -171,6 +177,33 @@ class PromotionEvaluationRunnerIntegrationTest extends BaseIntegrationTest {
         String statusAfter = jdbc.queryForObject(
                 "SELECT status FROM ab_agent_skill_draft WHERE pid = ?", String.class, pid);
         assertThat(statusAfter).isEqualTo("PROMOTED_PENDING_HUMAN");
+    }
+
+    @Test
+    @DisplayName("PR-59: concurrent runOnce() calls → lock serializes, draft promoted at most once")
+    void concurrent_instances() throws Exception {
+        String pid = seedDraft("REVIEWED_OK");
+        for (int i = 0; i < 6; i++) seedShadowRun(pid, true);
+
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Callable<Integer> task = () -> runner.runOnce();
+            Future<Integer> f1 = pool.submit(task);
+            Future<Integer> f2 = pool.submit(task);
+            int a = f1.get(30, TimeUnit.SECONDS);
+            int b = f2.get(30, TimeUnit.SECONDS);
+
+            // Only one tick actually acquires the lock; the loser returns 0.
+            assertThat(a + b).isGreaterThanOrEqualTo(1);
+            assertThat(Math.min(a, b)).as("losing tick must be 0").isZero();
+
+            String status = jdbc.queryForObject(
+                    "SELECT status FROM ab_agent_skill_draft WHERE pid = ?", String.class, pid);
+            assertThat(status).isEqualTo("PROMOTED_PENDING_HUMAN");
+        } finally {
+            pool.shutdownNow();
+            pool.awaitTermination(5, TimeUnit.SECONDS);
+        }
     }
 
     @Test
