@@ -30,3 +30,45 @@ groups:
         annotations:
           summary: "Promotion evaluator not promoting drafts"
           description: "PromotionEvaluator ran but never promoted in 7d despite 10+ evaluations — threshold too strict or shadow runs not converging"
+
+  - name: auraboot.memory_promotion
+    rules:
+      - alert: MemoryReviewerStalled
+        expr: (max(auraboot_memory_promotion_reviewer_backlog_seconds) > 604800) and (max(auraboot_memory_promotion_pending_count) > 50)
+        for: 4h
+        labels:
+          severity: warning
+          component: acp-memory-promotion
+        annotations:
+          summary: "Memory promotion reviewer backlog stalled"
+          description: "Oldest pending memory promotion > 7d AND queue depth > 50 — reviewer attention needed"
+
+      - alert: MemoryHighRejectionRate
+        expr: (sum(rate(auraboot_memory_promotion_decision_total{decision="REJECT"}[30d])) / sum(rate(auraboot_memory_promotion_decision_total{decision=~"APPROVE|REJECT"}[30d]))) > 0.6
+        for: 1d
+        labels:
+          severity: info
+          component: acp-memory-promotion
+        annotations:
+          summary: "High memory promotion rejection rate"
+          description: "Reject rate > 60% over 30d — extractor may need tuning (raise min-similarity / min-users-per-tenant)"
+
+      - alert: MemoryShadowRetractionSpike
+        expr: sum by (tenant) (increase(auraboot_memory_promotion_shadow_retraction_total[7d])) > 3
+        for: 1h
+        labels:
+          severity: warning
+          component: acp-memory-promotion
+        annotations:
+          summary: "Shadow retraction spike on tenant {{ $labels.tenant }}"
+          description: "Tenant has retracted >3 shadow promotions in 7d — proposal quality is degraded"
+
+      - alert: MemoryExtractorIdle
+        expr: increase(auraboot_memory_promotion_proposal_total[14d]) == 0
+        for: 1d
+        labels:
+          severity: info
+          component: acp-memory-promotion
+        annotations:
+          summary: "Memory promotion extractor idle"
+          description: "No memory promotion proposals generated in 14d — extractor may be disabled (acp.memory.promotion.scheduler.enabled) or tenant may lack signal"
