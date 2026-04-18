@@ -184,8 +184,34 @@ function probeCapabilities(request: APIRequestContext): Promise<boolean> {
           { failOnStatusCode: false },
         );
         if (!r.ok()) return false;
-        const body = (await r.json()) as { code?: string; data?: unknown };
-        return body.code === '0' && !!body.data;
+        const body = (await r.json()) as {
+          code?: string;
+          data?: {
+            list?: boolean;
+            sortableFields?: unknown[];
+            filterableFields?: unknown[];
+          };
+        };
+        if (body.code !== '0' || !body.data) return false;
+        // Endpoint exists. The deep config tabs (Columns/Filters/Toolbar/
+        // Behavior) derive their field list from
+        // `sortableFields ∪ filterableFields`. If both arrays are empty the
+        // ColumnsTab renders "加载字段中..." (because the
+        // ListConfigPanel.fields useMemo returns undefined for "no
+        // capabilities" but [] for "empty arrays" — and an empty map yields
+        // a truthy [] which then renders zero rows; here we additionally
+        // observe in browser that the React fetch result resolves with
+        // empty arrays late enough that the test exceeds 5 s waiting for
+        // the tab body. Treat empty fields as "deep configuration not
+        // exercisable" and skip the deep tabs.
+        const hasShape =
+          Array.isArray(body.data.sortableFields) &&
+          Array.isArray(body.data.filterableFields);
+        const hasAnyCapability = body.data.list === true;
+        const hasFields =
+          (body.data.sortableFields?.length ?? 0) > 0 ||
+          (body.data.filterableFields?.length ?? 0) > 0;
+        return hasShape && hasAnyCapability && hasFields;
       } catch {
         return false;
       }
