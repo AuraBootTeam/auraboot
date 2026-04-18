@@ -1,7 +1,8 @@
 package com.auraboot.framework.agent.service;
 
 import com.auraboot.framework.agent.metrics.LearningLoopMetrics;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.auraboot.framework.agent.util.CanonicalJsonHasher;
+import com.auraboot.framework.agent.util.ContractYamlParser;
 import lombok.Builder;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -10,10 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
-import java.security.MessageDigest;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 
@@ -36,7 +34,6 @@ import java.util.Map;
 public class ShadowExecutor {
 
     private final JdbcTemplate jdbcTemplate;
-    private final ObjectMapper objectMapper;
     private final ShadowEligibilityChecker eligibilityChecker;
     private final ShadowRunner shadowRunner;
     private final List<ShadowToolInvoker> invokers;
@@ -85,7 +82,7 @@ public class ShadowExecutor {
                     .outcome("skipped_ineligible").eligibility(eligibility).build();
         }
 
-        List<String> toolRefs = parseToolRefs(yaml);
+        List<String> toolRefs = ContractYamlParser.parseToolRefs(yaml);
         long startMs = System.currentTimeMillis();
         List<Map<String, Object>> results = new ArrayList<>();
         String shadowStatus = "success";
@@ -109,8 +106,10 @@ public class ShadowExecutor {
         }
         long elapsed = System.currentTimeMillis() - startMs;
 
-        String shadowHash = hashCanonical(results);
-        Boolean outputMatch = req.originalOutputHash != null && req.originalOutputHash.equals(shadowHash);
+        String shadowHash = CanonicalJsonHasher.sha256Canonical(results);
+        Boolean outputMatch = req.originalOutputHash != null
+                && shadowHash != null
+                && req.originalOutputHash.equals(shadowHash);
 
         ShadowRunner.ShadowOutcome outcome = ShadowRunner.ShadowOutcome.builder()
                 .tenantId(tenantId)
@@ -139,28 +138,4 @@ public class ShadowExecutor {
         return null;
     }
 
-    private String hashCanonical(Object payload) {
-        try {
-            String json = objectMapper.writeValueAsString(payload);
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
-            return HexFormat.of().formatHex(md.digest(json.getBytes()));
-        } catch (Exception e) {
-            log.debug("hashCanonical failed: {}", e.getMessage());
-            return "";
-        }
-    }
-
-    private List<String> parseToolRefs(String yaml) {
-        if (yaml == null) return Collections.emptyList();
-        List<String> out = new ArrayList<>();
-        boolean inBlock = false;
-        for (String line : yaml.split("\n")) {
-            if (line.startsWith("tool_refs:")) { inBlock = true; continue; }
-            if (!inBlock) continue;
-            if (!line.isEmpty() && !Character.isWhitespace(line.charAt(0))) break;
-            String t = line.trim();
-            if (t.startsWith("- ")) out.add(t.substring(2).trim());
-        }
-        return out;
-    }
 }

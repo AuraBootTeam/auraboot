@@ -179,6 +179,32 @@ class ShadowExecutorIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    @DisplayName("PR-54: canonical hash is stable across repeated executions with same draft + args")
+    void canonical_hash_stable() {
+        jdbc.update("INSERT INTO ab_agent_dry_run_support " +
+                        "(pid, tenant_id, tool_ref_pattern, support_level, created_at, updated_at) " +
+                        "VALUES (?, ?, 'mcp_*', 'FULL', NOW(), NOW())",
+                UniqueIdGenerator.generate(), tenantId);
+        String pid = seedDraft("substrate: dsl\naction_type: query\ntool_refs:\n  - mcp_stable_tool\n");
+
+        ShadowExecutor.ExecutionResult r1 = executor.execute(ShadowExecutor.ExecutionRequest.builder()
+                .draftPid(pid).originalRunId("origA").originalOutputHash("h")
+                .originalDurationMs(1L).originalStatus("success").build());
+        ShadowExecutor.ExecutionResult r2 = executor.execute(ShadowExecutor.ExecutionRequest.builder()
+                .draftPid(pid).originalRunId("origB").originalOutputHash("h")
+                .originalDurationMs(1L).originalStatus("success").build());
+
+        String hash1 = jdbc.queryForObject(
+                "SELECT shadow_output_hash FROM ab_agent_shadow_run WHERE pid = ?",
+                String.class, r1.getShadowRunPid());
+        String hash2 = jdbc.queryForObject(
+                "SELECT shadow_output_hash FROM ab_agent_shadow_run WHERE pid = ?",
+                String.class, r2.getShadowRunPid());
+        assertThat(hash1).isNotNull().hasSize(64);
+        assertThat(hash1).isEqualTo(hash2);
+    }
+
+    @Test
     @DisplayName("executor reports skipped_not_found for unknown draft")
     void executor_not_found() {
         ShadowExecutor.ExecutionResult r = executor.execute(ShadowExecutor.ExecutionRequest.builder()
