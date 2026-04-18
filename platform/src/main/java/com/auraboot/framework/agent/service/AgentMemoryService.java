@@ -433,7 +433,7 @@ public class AgentMemoryService {
         boolean hasUser = userId != null && !userId.isBlank();
         String sql =
                 "SELECT pid, memory_type, category, memory_title, memory_content, "
-                + "  importance, shareable, scope, scope_key, created_at "
+                + "  importance, shareable, scope, scope_key, shadow_mode, created_at "
                 + "FROM ab_agent_memory "
                 + "WHERE memory_agent_id = ? "
                 + "  AND (memory_content ILIKE ? OR memory_title ILIKE ?) "
@@ -461,7 +461,7 @@ public class AgentMemoryService {
         boolean hasUser = userId != null && !userId.isBlank();
         String sql =
                 "SELECT pid, memory_type, category, memory_title, memory_content, "
-                + "  importance, shareable, scope, scope_key, created_at "
+                + "  importance, shareable, scope, scope_key, shadow_mode, created_at "
                 + "FROM ab_agent_memory "
                 + "WHERE memory_agent_id = ? "
                 + "  AND (deleted_flag IS NULL OR deleted_flag = FALSE) "
