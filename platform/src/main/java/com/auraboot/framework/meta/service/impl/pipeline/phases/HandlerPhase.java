@@ -10,6 +10,7 @@ import com.auraboot.framework.meta.entity.CommandDefinition;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.service.CommandHandler;
 import com.auraboot.framework.meta.service.CommandHandlerContext;
+import com.auraboot.framework.meta.service.DryRunSafe;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.impl.CommandExecutorUtils;
@@ -74,29 +75,14 @@ public class HandlerPhase implements CommandPhase {
                                                      CommandExecuteRequest request,
                                                      Map<String, Object> execConfig) {
         Map<String, Object> handlerResults = new HashMap<>();
+        boolean dryRun = request.isDryRun();
 
-        // Warn once when a dry-run enters handlers — ops signal that handlers
-        // must self-check ctx.isDryRun() to skip external side effects. The
-        // CommandPipeline transaction rolls back DB writes only; HTTP / email
-        // / MQ / file effects escape the rollback envelope (PR-50).
-        if (request.isDryRun()) {
-            int springHandlerCount = 0;
-            for (BindingRule rule : handlerRules) {
-                if (StringUtils.hasText(rule.getHandlerClass())) {
-                    springHandlerCount++;
-                }
-            }
-            boolean hasPluginHandler = extensionRegistry != null
-                    && extensionRegistry.getCommandHandler(command.getCode()).isPresent();
-            int totalHandlerCount = springHandlerCount + (hasPluginHandler ? 1 : 0);
-            if (totalHandlerCount > 0) {
-                log.warn("Dry-run: command {} has {} handler(s); handlers must self-check "
-                        + "ctx.isDryRun() to avoid side effects outside the DB rollback envelope",
-                        command.getCode(), totalHandlerCount);
-            }
-        }
-
-        // 1. Execute Spring Bean handlers from binding rules
+        // 1. Execute Spring Bean handlers from binding rules.
+        //    Under dry-run (PR-56) we SKIP every handler whose implementation
+        //    class is NOT annotated with @DryRunSafe. The CommandPipeline
+        //    transaction rollback only undoes JDBC writes; external side
+        //    effects (HTTP / email / MQ / S3 / Redis / files) escape the
+        //    envelope, so honour-system logging is not enough.
         for (BindingRule rule : handlerRules) {
             if (!StringUtils.hasText(rule.getHandlerClass())) {
                 continue;
@@ -104,6 +90,11 @@ public class HandlerPhase implements CommandPhase {
 
             try {
                 CommandHandler handler = applicationContext.getBean(rule.getHandlerClass(), CommandHandler.class);
+                if (dryRun && !handler.getClass().isAnnotationPresent(DryRunSafe.class)) {
+                    log.info("Dry-run: skipping handler {} (class not marked @DryRunSafe)",
+                            handler.getClass().getName());
+                    continue;
+                }
                 CommandHandlerContext context = CommandHandlerContext.builder()
                         .commandCode(command.getCode())
                         .modelCode(command.getModelCode())
@@ -234,6 +225,16 @@ public class HandlerPhase implements CommandPhase {
         }
 
         CommandHandlerExtension handler = pluginHandler.get();
+
+        // PR-56: gate plugin handlers on the supportsDryRun() SPI method.
+        // Plugins that do not explicitly opt in are skipped under dry-run
+        // because external side effects escape the JDBC rollback envelope.
+        if (request.isDryRun() && !handler.supportsDryRun()) {
+            log.info("Dry-run: skipping plugin handler {} for command {} (supportsDryRun()=false)",
+                    handler.getClass().getName(), commandCode);
+            return;
+        }
+
         log.info("Executing plugin command handler for: {} (handler: {})", commandCode, handler.getClass().getName());
 
         try {
