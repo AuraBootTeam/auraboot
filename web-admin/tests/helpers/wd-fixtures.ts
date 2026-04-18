@@ -63,14 +63,10 @@ export async function loginAs(
 
 /**
  * Attempt login as wd_manager@example.com and wd_hr@example.com.
- * If either login fails (auth error), create the user via admin API (POST /api/admin/users)
- * with role code wd_manager / wd_hr respectively, then login again.
- *
- * CONCERN: workflow-demo default-bootstrap.json does NOT seed wd_manager or wd_hr
- * users — only a rolePermissionBinding for tenant_admin is declared. Tests relying
- * on ensureRoleUsers will auto-create the users on first run, but the created users
- * are not cleaned up between runs. This is safe for idempotent test environments
- * that reset via reset-and-init.sh before each run.
+ * If either login fails (first run after reset), create the user via admin API
+ * (POST /api/admin/users) with role code wd_manager / wd_hr respectively,
+ * then login again. The helper is idempotent: subsequent calls find the user
+ * already present and skip creation.
  */
 export async function ensureRoleUsers(
   api: APIRequestContext,
@@ -291,26 +287,23 @@ export async function submitLeaveRequest(
 
   // Fill leave type (wd_req_type) — select/combobox
   const typeField = page.locator('[data-field="wd_req_type"]').first();
-  if (await typeField.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await typeField.click();
-    await page.getByRole('option', { name: input.type }).first().click();
-  }
+  await expect(typeField).toBeVisible({ timeout: 5000 });
+  await typeField.click();
+  await page.getByRole('option', { name: input.type }).first().click();
 
   // Fill days (wd_req_days)
   const daysField = page
     .locator('[data-field="wd_req_days"] input, input[name="wd_req_days"]')
     .first();
-  if (await daysField.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await daysField.fill(String(input.days));
-  }
+  await expect(daysField).toBeVisible({ timeout: 5000 });
+  await daysField.fill(String(input.days));
 
   // Fill reason (wd_req_reason)
   const reasonField = page
     .locator('[data-field="wd_req_reason"] textarea, textarea[name="wd_req_reason"]')
     .first();
-  if (await reasonField.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await reasonField.fill(input.reason);
-  }
+  await expect(reasonField).toBeVisible({ timeout: 5000 });
+  await reasonField.fill(input.reason);
 
   // Intercept the create command response to extract recordId
   const submitRespPromise = page.waitForResponse(
@@ -328,16 +321,19 @@ export async function submitLeaveRequest(
   const submitResp = await submitRespPromise;
   const submitBody = await submitResp.json();
 
-  // The command execute response data.id or data.pid holds the created record id
-  const recordId: unknown = submitBody?.data?.id ?? submitBody?.data?.pid ?? submitBody?.data;
-  if (typeof recordId !== 'string' && typeof recordId !== 'number') {
+  // CommandExecuteResult.data is the merged fieldMapResults from the pipeline,
+  // which always includes the created record's `pid` field.
+  // Contract: POST /api/meta/commands/execute/:code → { data: { pid: string, ... } }
+  // Source: CommandPipeline.java#executeGuardedPhases — resultData = fieldMapResults ∪ handlerResults
+  const recordId: unknown = submitBody?.data?.pid;
+  if (typeof recordId !== 'string' || recordId.trim() === '') {
     throw new Error(
-      `submitLeaveRequest: could not extract recordId from submit response. ` +
-        `Full response: ${JSON.stringify(submitBody)}`,
+      `submitLeaveRequest: expected response.data.pid (string) but got: ` +
+        `${JSON.stringify(submitBody?.data)}. Full response: ${JSON.stringify(submitBody)}`,
     );
   }
 
-  return { recordId: String(recordId) };
+  return { recordId };
 }
 
 // ---------------------------------------------------------------------------
@@ -380,7 +376,7 @@ export async function processTask(
     .filter({ hasText: taskKey })
     .first();
 
-  await expect(businessKeyCell).toBeVisible({ timeout: 10000 });
+  await expect(businessKeyCell).toBeVisible({ timeout: 5000 });
 
   // Click the task name button in the same row to open the detail drawer
   const taskRow = businessKeyCell.locator('xpath=ancestor::tr').first();
