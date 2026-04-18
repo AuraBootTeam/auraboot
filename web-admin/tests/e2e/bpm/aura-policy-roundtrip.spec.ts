@@ -303,16 +303,23 @@ test.describe('BPM Designer aura.* policy round-trip (Epic C)', { tag: ['@bpm-re
     const saveDialogConfirm = dialog.locator('button[type="submit"]').first();
     await expect(saveDialogConfirm).toBeEnabled({ timeout: 5_000 });
 
-    const [putResp] = await Promise.all([
-      page.waitForResponse(
-        (r) =>
-          r.url().includes(`/api/bpm/process-definitions/${processPid}`) &&
-          r.request().method().toLowerCase() === 'put' &&
-          r.status() < 500,
-        { timeout: 15_000 },
-      ),
-      saveDialogConfirm.click(),
-    ]);
+    // Register the PUT listener BEFORE triggering the click. Promise.all
+    // couples the click's auto-retry window (button-enable, overlay
+    // interception, HMR re-render) with the 15s response timeout — so a
+    // cold-HMR frame that delays the form submit by a few seconds eats
+    // into the response budget and can produce a spurious timeout on the
+    // first run after a frontend restart. Splitting them lets the click
+    // resolve on its own schedule, and the response timer only begins
+    // counting actual network latency after the PUT has been fired.
+    const putPromise = page.waitForResponse(
+      (r) =>
+        r.url().includes(`/api/bpm/process-definitions/${processPid}`) &&
+        r.request().method().toLowerCase() === 'put' &&
+        r.status() < 500,
+      { timeout: 15_000 },
+    );
+    await saveDialogConfirm.click();
+    const putResp = await putPromise;
     expect(putResp.status(), 'save PUT must succeed').toBeLessThan(400);
 
     // 6. D8 — persistence check via API: designerJson.aura.* is serialised

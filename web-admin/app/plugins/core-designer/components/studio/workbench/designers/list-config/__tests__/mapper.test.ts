@@ -82,4 +82,130 @@ describe('list mapper', () => {
       'table_generated',
     ]);
   });
+
+  // ---------------------------------------------------------------------------
+  // Preservation of rich toolbar button fields across VM round-trip.
+  // Regression for bug where viewModelToBlocks emitted `{preset: 'create'}` and
+  // dropped action/variant from real plugin pages (e.g. bpm_process_management).
+  // ---------------------------------------------------------------------------
+
+  it('preserves preset button action/variant across blocks → VM → blocks roundtrip', () => {
+    const originalButton = {
+      code: 'create',
+      label: 'create',
+      variant: 'primary',
+      action: { type: 'navigate', to: '/bpmn-designer' },
+    };
+    const originalBlocks: DslBlock[] = [
+      {
+        id: 'toolbar',
+        blockType: 'toolbar',
+        buttons: [originalButton],
+      } as unknown as DslBlock,
+      { id: 'table', blockType: 'table' },
+    ];
+
+    const vm = blocksToViewModel(originalBlocks);
+    expect(vm.toolbar.presets).toEqual(['create']);
+    expect(vm.toolbar.presetRaw?.create).toEqual(originalButton);
+
+    const roundTripped = viewModelToBlocks(vm);
+    const toolbar = roundTripped.find((b) => b.blockType === 'toolbar')!;
+    expect((toolbar.buttons as unknown as unknown[])[0]).toEqual(originalButton);
+  });
+
+  it('preserves unknown custom button fields across roundtrip', () => {
+    const originalButton = {
+      code: 'refresh',
+      label: 'Refresh',
+      command: 'refresh:table',
+      variant: 'default',
+      action: { type: 'command', command: 'refresh:table' },
+      confirm: 'Are you sure?',
+    };
+    const originalBlocks: DslBlock[] = [
+      {
+        id: 'toolbar',
+        blockType: 'toolbar',
+        buttons: [originalButton],
+      } as unknown as DslBlock,
+      { id: 'table', blockType: 'table' },
+    ];
+
+    const vm = blocksToViewModel(originalBlocks);
+    expect(vm.toolbar.presets).toEqual([]);
+    expect(vm.toolbar.customButtons).toHaveLength(1);
+    expect(vm.toolbar.customButtons[0].label).toBe('Refresh');
+    expect(vm.toolbar.customButtons[0].command).toBe('refresh:table');
+    expect(vm.toolbar.customButtons[0].raw).toEqual(originalButton);
+
+    const roundTripped = viewModelToBlocks(vm);
+    const toolbar = roundTripped.find((b) => b.blockType === 'toolbar')!;
+    expect((toolbar.buttons as unknown as unknown[])[0]).toEqual(originalButton);
+  });
+
+  it('propagates label/command edits while preserving unknown custom button fields', () => {
+    const originalBlocks: DslBlock[] = [
+      {
+        id: 'toolbar',
+        blockType: 'toolbar',
+        buttons: [
+          {
+            code: 'refresh',
+            label: 'Refresh',
+            command: 'refresh:table',
+            variant: 'default',
+            action: { type: 'command', command: 'refresh:table' },
+          },
+        ],
+      } as unknown as DslBlock,
+      { id: 'table', blockType: 'table' },
+    ];
+
+    const vm = blocksToViewModel(originalBlocks);
+    // Simulate the user editing label via ToolbarTab.
+    vm.toolbar.customButtons[0].label = 'Reload';
+
+    const roundTripped = viewModelToBlocks(vm);
+    const btn = (roundTripped.find((b) => b.blockType === 'toolbar')!
+      .buttons as unknown as Array<Record<string, unknown>>)[0];
+    expect(btn.label).toBe('Reload');
+    expect(btn.code).toBe('refresh');
+    expect(btn.variant).toBe('default');
+    expect(btn.action).toEqual({ type: 'command', command: 'refresh:table' });
+  });
+
+  it('detects preset by code field when `preset` key is absent', () => {
+    const blocks: DslBlock[] = [
+      {
+        id: 'toolbar',
+        blockType: 'toolbar',
+        buttons: [{ code: 'create' }, { code: 'export' }],
+      } as unknown as DslBlock,
+      { id: 'table', blockType: 'table' },
+    ];
+    const vm = blocksToViewModel(blocks);
+    expect(vm.toolbar.presets).toEqual(['create', 'export']);
+    // Trivial `{code: presetKey}` should not populate presetRaw, so VM stays
+    // identical to a VM created from scratch.
+    expect(vm.toolbar.presetRaw).toBeUndefined();
+  });
+
+  it('multiple occurrences of same preset are deduplicated', () => {
+    const blocks: DslBlock[] = [
+      {
+        id: 'toolbar',
+        blockType: 'toolbar',
+        buttons: [
+          { code: 'create', variant: 'primary' },
+          { code: 'create', variant: 'default' },
+        ],
+      } as unknown as DslBlock,
+      { id: 'table', blockType: 'table' },
+    ];
+    const vm = blocksToViewModel(blocks);
+    expect(vm.toolbar.presets).toEqual(['create']);
+    // First occurrence wins.
+    expect(vm.toolbar.presetRaw?.create?.variant).toBe('primary');
+  });
 });

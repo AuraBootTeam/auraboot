@@ -21,6 +21,9 @@ public final class BpmServiceTaskConstants {
     /** Spring bean name used as {@code smart:class} for the Notification delegate. */
     public static final String BEAN_NOTIFICATION_DELEGATE = "notificationServiceTaskDelegate";
 
+    /** Spring bean name used as {@code smart:class} for the HTTP delegate. */
+    public static final String BEAN_HTTP_DELEGATE = "httpServiceTaskDelegate";
+
     // ==================== smart:* extension attributes ====================
 
     public static final String ATTR_RULE_CODE = "ruleCode";
@@ -28,6 +31,12 @@ public final class BpmServiceTaskConstants {
     public static final String ATTR_EVENT_CODE = "eventCode";
     public static final String ATTR_RECIPIENT_FROM = "recipientFrom";
     public static final String ATTR_TEMPLATE_PARAMS_VARS = "templateParamsVars";
+
+    // HTTP serviceTask attributes
+    public static final String ATTR_SERVICE_URL = "serviceUrl";
+    public static final String ATTR_METHOD = "method";
+    public static final String ATTR_RESPONSE_VAR = "responseVar";
+    public static final String ATTR_TIMEOUT_MS = "timeoutMs";
 
     private BpmServiceTaskConstants() {
         // no instances
