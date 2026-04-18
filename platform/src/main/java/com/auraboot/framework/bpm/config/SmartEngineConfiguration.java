@@ -55,6 +55,13 @@ public class SmartEngineConfiguration implements ApplicationContextAware {
         configuration.getOptionContainer().put(ConfigurationOption.TRANSFER_ENABLED_OPTION);
         configuration.setVariablePersister(new AuraVariablePersister());
 
+        // GAP-249: wire MultiInstanceCounter SPI so that userTasks with
+        // multiInstanceLoopCharacteristics can evaluate their completionCondition
+        // at task-complete time. Without this, UserTaskBehavior.handleMultiInstance
+        // throws ValidationException("MultiInstanceCounter can NOT be null ...").
+        configuration.setMultiInstanceCounter(new DefaultMultiInstanceCounter());
+        log.info("MultiInstanceCounter configured: DefaultMultiInstanceCounter");
+
         if (taskAssigneeDispatcher != null) {
             configuration.setTaskAssigneeDispatcher(taskAssigneeDispatcher);
             log.info("TaskAssigneeDispatcher configured: {}", taskAssigneeDispatcher.getClass().getSimpleName());
