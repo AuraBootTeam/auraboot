@@ -3,12 +3,13 @@ package com.auraboot.framework.agent.service;
 import com.auraboot.framework.agent.util.CanonicalJsonHasher;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.List;
 import java.util.Map;
@@ -44,7 +45,6 @@ import java.util.Map;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class ShadowRunScheduler {
 
     /** Advisory-lock key; documented at class level. Distinct from PromotionEvaluationRunner (7302). */
@@ -53,6 +53,22 @@ public class ShadowRunScheduler {
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
     private final ShadowExecutor shadowExecutor;
+    private final TransactionTemplate transactionTemplate;
+
+    public ShadowRunScheduler(JdbcTemplate jdbcTemplate,
+                              ObjectMapper objectMapper,
+                              ShadowExecutor shadowExecutor,
+                              PlatformTransactionManager transactionManager) {
+        this.jdbcTemplate = jdbcTemplate;
+        this.objectMapper = objectMapper;
+        this.shadowExecutor = shadowExecutor;
+        // Pin a single JDBC connection for the entire lock/work/unlock window.
+        // Postgres advisory locks are session-scoped, so the unlock MUST run on
+        // the same physical connection that acquired the lock; otherwise
+        // pg_advisory_unlock returns false silently and the lock leaks on the
+        // original connection.
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
+    }
 
     @Value("${acp.learning.shadow.scheduler.enabled:false}")
     private boolean enabled;
@@ -74,17 +90,32 @@ public class ShadowRunScheduler {
 
     /** @return number of shadow runs recorded across all drafts this pass. */
     public int runOnce() {
-        Boolean acquired = jdbcTemplate.queryForObject(
-                "SELECT pg_try_advisory_lock(?)", Boolean.class, LOCK_KEY);
-        if (!Boolean.TRUE.equals(acquired)) {
-            log.debug("ShadowRunScheduler: another instance holds advisory lock {}, skipping tick", LOCK_KEY);
-            return 0;
-        }
-        try {
-            return runOnceLocked();
-        } finally {
-            jdbcTemplate.queryForObject("SELECT pg_advisory_unlock(?)", Boolean.class, LOCK_KEY);
-        }
+        // Wrap lock/work/unlock in a transaction so Spring pins a single JDBC
+        // connection for the entire scope. Nested jdbcTemplate.* calls inside
+        // this TX reuse the same pinned connection automatically, which keeps
+        // Postgres session-scoped advisory locks coherent. Without this
+        // pinning, each jdbcTemplate.* call could borrow a different pooled
+        // connection — the unlock would land on the wrong session and return
+        // false silently, leaking the lock on the original connection.
+        Integer result = transactionTemplate.execute(status -> {
+            Boolean acquired = jdbcTemplate.queryForObject(
+                    "SELECT pg_try_advisory_lock(?)", Boolean.class, LOCK_KEY);
+            if (!Boolean.TRUE.equals(acquired)) {
+                log.debug("ShadowRunScheduler: another instance holds advisory lock {}, skipping tick", LOCK_KEY);
+                return 0;
+            }
+            try {
+                return runOnceLocked();
+            } finally {
+                Boolean released = jdbcTemplate.queryForObject(
+                        "SELECT pg_advisory_unlock(?)", Boolean.class, LOCK_KEY);
+                if (!Boolean.TRUE.equals(released)) {
+                    log.warn("ShadowRunScheduler: pg_advisory_unlock({}) returned {} — possible connection mismatch",
+                            LOCK_KEY, released);
+                }
+            }
+        });
+        return result == null ? 0 : result;
     }
 
     private int runOnceLocked() {
