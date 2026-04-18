@@ -170,6 +170,8 @@ class ShadowAndPromotionIntegrationTest extends BaseIntegrationTest {
     @DisplayName("PROMOTE — draft with ≥5 runs all matching flips to PROMOTED_PENDING_HUMAN")
     void promote_when_thresholds_met() {
         String draftPid = seedDraft("sig_pro_" + tenantId, "crm_lead", "query", "semantic", 5);
+        // PR-53 C2: only REVIEWED_OK / SHADOW_RUNNING are promotable — simulate prior human review.
+        jdbc.update("UPDATE ab_agent_skill_draft SET status = 'REVIEWED_OK' WHERE pid = ?", draftPid);
         seedShadowRuns(draftPid, 5, 5);
 
         PromotionEvaluator.EvaluationResult r = promoter.evaluate(draftPid);
