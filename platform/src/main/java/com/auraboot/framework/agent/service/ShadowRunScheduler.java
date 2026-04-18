@@ -1,5 +1,6 @@
 package com.auraboot.framework.agent.service;
 
+import com.auraboot.framework.agent.util.CanonicalJsonHasher;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -28,11 +29,26 @@ import java.util.Map;
  * {@code SHADOW_RUNNING}.
  *
  * Disabled by default; the enterprise operator opts in per-environment.
+ *
+ * <p><b>Historical note:</b> before PR-54 the original output hash was computed
+ * as Postgres {@code md5(after_snapshot::text)} while the shadow hash was a
+ * JVM SHA-256 over a Jackson dump of a list of {@code HashMap}s — the two
+ * hashes could never match, so {@code output_match} was always {@code false}
+ * and no draft ever auto-promoted. Rows written before PR-54 carry stale
+ * md5-based hashes and should be purged on upgrade
+ * ({@code DELETE FROM ab_agent_shadow_run WHERE created_at &lt; &lt;pr54-deploy&gt;}).
+ *
+ * <p><b>Multi-node safety:</b> uses a Postgres advisory lock (key {@value #LOCK_KEY})
+ * to ensure only one scheduler instance runs a tick at a time. See also
+ * {@link PromotionEvaluationRunner} (key 7302).
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class ShadowRunScheduler {
+
+    /** Advisory-lock key; documented at class level. Distinct from PromotionEvaluationRunner (7302). */
+    private static final long LOCK_KEY = 7301L;
 
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
@@ -58,6 +74,20 @@ public class ShadowRunScheduler {
 
     /** @return number of shadow runs recorded across all drafts this pass. */
     public int runOnce() {
+        Boolean acquired = jdbcTemplate.queryForObject(
+                "SELECT pg_try_advisory_lock(?)", Boolean.class, LOCK_KEY);
+        if (!Boolean.TRUE.equals(acquired)) {
+            log.debug("ShadowRunScheduler: another instance holds advisory lock {}, skipping tick", LOCK_KEY);
+            return 0;
+        }
+        try {
+            return runOnceLocked();
+        } finally {
+            jdbcTemplate.queryForObject("SELECT pg_advisory_unlock(?)", Boolean.class, LOCK_KEY);
+        }
+    }
+
+    private int runOnceLocked() {
         List<Map<String, Object>> drafts = jdbcTemplate.queryForList(
                 "SELECT pid, derived_from_runs::text AS derived_json, status " +
                         "FROM ab_agent_skill_draft " +
@@ -82,10 +112,12 @@ public class ShadowRunScheduler {
                 Map<String, Object> origin = loadOriginalRun(runId);
                 if (origin == null) continue;
 
+                String originalSnapshotJson = (String) origin.get("after_snapshot_json");
+                String originalOutputHash = CanonicalJsonHasher.sha256CanonicalJsonString(originalSnapshotJson);
                 ShadowExecutor.ExecutionRequest req = ShadowExecutor.ExecutionRequest.builder()
                         .draftPid(draftPid)
                         .originalRunId(runId)
-                        .originalOutputHash((String) origin.get("output_hash"))
+                        .originalOutputHash(originalOutputHash)
                         .originalDurationMs(origin.get("duration_ms") == null ? null :
                                 ((Number) origin.get("duration_ms")).longValue())
                         .originalStatus((String) origin.get("status"))
@@ -141,7 +173,7 @@ public class ShadowRunScheduler {
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(
                 "SELECT action_status AS status, " +
                         "  EXTRACT(EPOCH FROM (updated_at - executed_at)) * 1000 AS duration_ms, " +
-                        "  md5(COALESCE(after_snapshot::text, '')) AS output_hash " +
+                        "  after_snapshot::text AS after_snapshot_json " +
                         "FROM ab_agent_action WHERE run_id = ? LIMIT 1",
                 runId);
         return rows.isEmpty() ? null : rows.get(0);
