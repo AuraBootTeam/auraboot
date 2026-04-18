@@ -59,12 +59,14 @@ class ShadowExecutorIntegrationTest extends BaseIntegrationTest {
     // =========================================================================
 
     @Test
-    @DisplayName("platform defaults — nq_* and dsl.query are FULL, cmd_* and dsl.command are NONE")
+    @DisplayName("platform defaults — nq_*/dsl.query=FULL, cmd_*/dsl.command=SIMULATED (post PR-40), code/api=NONE")
     void platform_defaults_loaded() {
         assertThat(registry.lookup(tenantId, "nq_crm_leads")).isEqualTo(DryRunSupportRegistry.SupportLevel.FULL);
         assertThat(registry.lookup(tenantId, "dsl.query")).isEqualTo(DryRunSupportRegistry.SupportLevel.FULL);
-        assertThat(registry.lookup(tenantId, "cmd_create_lead")).isEqualTo(DryRunSupportRegistry.SupportLevel.NONE);
-        assertThat(registry.lookup(tenantId, "dsl.command")).isEqualTo(DryRunSupportRegistry.SupportLevel.NONE);
+        assertThat(registry.lookup(tenantId, "cmd_create_lead")).isEqualTo(DryRunSupportRegistry.SupportLevel.SIMULATED);
+        assertThat(registry.lookup(tenantId, "dsl.command")).isEqualTo(DryRunSupportRegistry.SupportLevel.SIMULATED);
+        assertThat(registry.lookup(tenantId, "code.run")).isEqualTo(DryRunSupportRegistry.SupportLevel.NONE);
+        assertThat(registry.lookup(tenantId, "api_stripe_charge")).isEqualTo(DryRunSupportRegistry.SupportLevel.NONE);
     }
 
     @Test
@@ -76,12 +78,12 @@ class ShadowExecutorIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("tenant override beats platform default")
     void tenant_override_wins() {
-        // Platform default for cmd_* is NONE; tenant opts in to SIMULATED.
+        // Platform default for code.* is NONE; tenant forces FULL for a specific bucket.
         jdbc.update("INSERT INTO ab_agent_dry_run_support " +
                         "(pid, tenant_id, tool_ref_pattern, support_level, created_at, updated_at) " +
-                        "VALUES (?, ?, 'cmd_*', 'SIMULATED', NOW(), NOW())",
+                        "VALUES (?, ?, 'code.*', 'FULL', NOW(), NOW())",
                 UniqueIdGenerator.generate(), tenantId);
-        assertThat(registry.lookup(tenantId, "cmd_create_lead")).isEqualTo(DryRunSupportRegistry.SupportLevel.SIMULATED);
+        assertThat(registry.lookup(tenantId, "code.sandbox_eval")).isEqualTo(DryRunSupportRegistry.SupportLevel.FULL);
     }
 
     // =========================================================================
@@ -121,7 +123,8 @@ class ShadowExecutorIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("write draft with any NONE tool_ref → INELIGIBLE_NO_DRY_RUN_SUPPORT")
     void write_any_none_ineligible() {
-        String yaml = "substrate: dsl\naction_type: update\ntool_refs:\n  - cmd_create_lead\n";
+        // api_* is NONE by platform default — an API call tool can never be shadowed.
+        String yaml = "substrate: api\naction_type: update\ntool_refs:\n  - api_stripe_charge\n";
         assertThat(checker.classify(tenantId, yaml))
                 .isEqualTo(ShadowEligibilityChecker.Eligibility.INELIGIBLE_NO_DRY_RUN_SUPPORT);
     }
@@ -141,7 +144,7 @@ class ShadowExecutorIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("executor skips ineligible write draft without recording a shadow run")
     void executor_skips_ineligible() {
-        String pid = seedDraft("substrate: dsl\naction_type: update\ntool_refs:\n  - cmd_create_lead\n");
+        String pid = seedDraft("substrate: api\naction_type: update\ntool_refs:\n  - api_stripe_charge\n");
         ShadowExecutor.ExecutionResult r = executor.execute(ShadowExecutor.ExecutionRequest.builder()
                 .draftPid(pid).originalRunId("orig1").originalOutputHash("h0")
                 .originalDurationMs(100L).originalStatus("success").build());

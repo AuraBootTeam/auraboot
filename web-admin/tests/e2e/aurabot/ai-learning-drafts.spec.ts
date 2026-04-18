@@ -74,6 +74,7 @@ async function interceptLearningApi(page: Page, opts: {
   detail?: unknown;
   reviewResponder?: (body: Record<string, unknown>) => unknown;
   renameResponder?: () => unknown;
+  shadowRuns?: unknown[];
 }) {
   // Default handlers
   const listData = opts.list ?? [makeDraft()];
@@ -105,6 +106,13 @@ async function interceptLearningApi(page: Page, opts: {
         });
     await route.fulfill({
       status: 200, contentType: 'application/json', body: JSON.stringify(payload),
+    });
+  });
+
+  await page.route(/\/api\/learning\/drafts\/[^/]+\/shadow-runs(\?.*)?$/, async (route: Route) => {
+    await route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify(envelope(opts.shadowRuns ?? [])),
     });
   });
 
@@ -260,5 +268,65 @@ test.describe('Mission Control — SkillDraft review (PR-31)', () => {
 
     const reviewedOkRequests = requestedUrls.filter((u) => u.includes('status=REVIEWED_OK'));
     expect(reviewedOkRequests.length).toBeGreaterThanOrEqual(1);
+  });
+
+  test('LD-07: shadow-runs empty state renders when no shadow runs exist (PR-43)', async ({ page }) => {
+    await interceptLearningApi(page, { shadowRuns: [] });
+    await openPage(page);
+
+    await page.locator('[data-testid="draft-DRAFTPID1234567890ABCD"] button').first().click();
+
+    const section = page.locator('[data-testid="shadow-runs-section"]');
+    await expect(section).toBeVisible();
+    await expect(section).toContainText('暂无影子运行');
+  });
+
+  test('LD-08: shadow-runs table renders duration/cost deltas (PR-43)', async ({ page }) => {
+    await interceptLearningApi(page, {
+      shadowRuns: [
+        {
+          pid: 'SR1234567890ABCDEF1234',
+          original_run_id: 'ORIG111',
+          shadow_status: 'success',
+          shadow_duration_ms: 120,
+          original_duration_ms: 180,
+          shadow_cost_usd: 0.0012,
+          original_cost_usd: 0.0015,
+          output_match: true,
+          fidelity_match: true,
+          created_at: '2026-04-18T12:00:00Z',
+        },
+        {
+          pid: 'SR9876543210ZYXWVU0987',
+          original_run_id: 'ORIG222',
+          shadow_status: 'success',
+          shadow_duration_ms: 220,
+          original_duration_ms: 150,
+          shadow_cost_usd: 0.003,
+          original_cost_usd: 0.001,
+          output_match: false,
+          fidelity_match: true,
+          created_at: '2026-04-18T12:05:00Z',
+        },
+      ],
+    });
+    await openPage(page);
+
+    await page.locator('[data-testid="draft-DRAFTPID1234567890ABCD"] button').first().click();
+
+    const table = page.locator('[data-testid="shadow-runs-table"]');
+    await expect(table).toBeVisible();
+
+    // Row 1: faster & cheaper → negative deltas, green
+    const row1 = page.locator('[data-testid="shadow-run-SR1234567890ABCDEF1234"]');
+    await expect(row1).toContainText('-60');       // 120 - 180
+    await expect(row1).toContainText('-0.0003');    // 0.0012 - 0.0015
+    await expect(row1).toContainText('✓');
+
+    // Row 2: slower & more expensive → positive deltas, cross
+    const row2 = page.locator('[data-testid="shadow-run-SR9876543210ZYXWVU0987"]');
+    await expect(row2).toContainText('+70');        // 220 - 150
+    await expect(row2).toContainText('+0.0020');    // 0.003 - 0.001
+    await expect(row2).toContainText('✗');
   });
 });
