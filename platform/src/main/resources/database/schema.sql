@@ -4884,6 +4884,8 @@ CREATE TABLE IF NOT EXISTS ab_agent_approval (
   approved_at      TIMESTAMPTZ,
   rejection_reason TEXT,
   policy_id        VARCHAR(26),
+  plan_hash        VARCHAR(64),          -- P0: 审批时冻结 plan 的 SHA-256；防止审批后 plan 被修改
+  plan_snapshot    TEXT,                 -- P0: 冻结的 plan JSON（审计 / HITL 展示用）
   expires_at       TIMESTAMPTZ,
   auto_action      VARCHAR(20),
   idempotency_key  VARCHAR(200),
@@ -4892,6 +4894,11 @@ CREATE TABLE IF NOT EXISTS ab_agent_approval (
   created_by       BIGINT,
   updated_by       BIGINT
 );
+-- ACP P0 fix: additive columns for plan integrity freezing.
+-- Idempotent ALTER so both fresh init (after CREATE TABLE above) and upgrade paths apply.
+ALTER TABLE ab_agent_approval ADD COLUMN IF NOT EXISTS plan_hash VARCHAR(64);
+ALTER TABLE ab_agent_approval ADD COLUMN IF NOT EXISTS plan_snapshot TEXT;
+
 CREATE INDEX IF NOT EXISTS idx_agent_approval_tenant ON ab_agent_approval (tenant_id);
 CREATE INDEX IF NOT EXISTS idx_agent_approval_status ON ab_agent_approval (tenant_id, approval_status);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_approval_idempotency ON ab_agent_approval(idempotency_key) WHERE idempotency_key IS NOT NULL;
@@ -6569,10 +6576,74 @@ CREATE INDEX IF NOT EXISTS idx_capability_tenant_status ON ab_agent_capability(t
     WHERE (deleted_flag = FALSE OR deleted_flag IS NULL);
 COMMENT ON TABLE ab_agent_capability IS 'ACP Capability Layer: routes BIF intent+object to domain capabilities, then capabilities to skills';
 
+-- ============================================================================
+-- ACP D1 Grounding: ab_agent_bif (Business Intent Frame persistence)
+-- DDL source: docs/agent/ACP-Ideal-Agent-Design.md §6.2.3
+-- Aligned with specs/03-BusinessIntentFrameSpec.md §1 BIF JSON Schema
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS ab_agent_bif (
+    id                     BIGSERIAL PRIMARY KEY,
+    pid                    VARCHAR(26) UNIQUE NOT NULL,
+    tenant_id              BIGINT NOT NULL,
+
+    -- execution context (run_id may be null when BIF computed pre-run)
+    run_id                 VARCHAR(26),
+    step_index             INTEGER,
+    conversation_id        VARCHAR(26),
+
+    nl_input               TEXT NOT NULL,
+
+    -- core semantics (aligned with specs/03 §1 BIF JSON Schema)
+    intent                 VARCHAR(32) NOT NULL,
+    object                 VARCHAR(128),
+    objects                JSONB,
+    primary_object         VARCHAR(128),
+    object_relations       JSONB,
+
+    scope                  JSONB,
+    filters                JSONB,
+    semantic_constraints   JSONB,
+    context                JSONB,
+
+    actionability          VARCHAR(16),
+    risk_level             VARCHAR(8) NOT NULL,
+
+    confidence             JSONB NOT NULL,
+    match_type             VARCHAR(16),
+
+    candidate_skills       JSONB,
+    candidate_skills_mode  VARCHAR(16)
+        CHECK (candidate_skills_mode IN ('hint', 'bounded', 'fixed')),
+    dispatched_skill       VARCHAR(128),
+    explanation            JSONB,
+
+    -- v1.1 extensions
+    pre_context            JSONB,
+    metrics                JSONB,
+
+    schema_version         SMALLINT NOT NULL DEFAULT 1,
+
+    created_at             TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_bif_tenant_time ON ab_agent_bif(tenant_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_bif_intent_obj  ON ab_agent_bif(intent, primary_object);
+CREATE INDEX IF NOT EXISTS idx_bif_skill       ON ab_agent_bif(dispatched_skill);
+CREATE INDEX IF NOT EXISTS idx_bif_run         ON ab_agent_bif(run_id);
+COMMENT ON TABLE ab_agent_bif IS 'ACP D1 Grounding: Business Intent Frame IR persistence — every LLM-turn grounding result';
+
 -- Seed: platform built-in capabilities (tenant_id = -1)
+-- Skills are the built-in per-tenant generic codes (dsl.query / dsl.command)
+-- that AgentTemplateSeeder creates for every tenant; the router will return
+-- these for domain-matched BIFs, letting GroundingService skip its hard-coded
+-- intent→skill fallback (see GroundingService.resolveCandidateSkills).
 INSERT INTO ab_agent_capability (pid, tenant_id, capability_code, capability_name, domain, intent_patterns, object_patterns, skills, selection_strategy) VALUES
-('CAP_CRM_QUERY',  -1, 'crm.query',  'CRM Query',      'crm', '["query", "analyze", "summarize", "report"]', '["crm_*"]', '[]', 'auto_first'),
-('CAP_CRM_MANAGE', -1, 'crm.manage', 'CRM Management', 'crm', '["create", "update", "delete", "transition", "assign"]', '["crm_*"]', '[]', 'auto_first')
+('CAP_CRM_QUERY',     -1, 'crm.query',     'CRM Query',          'crm',     '["query", "analyze", "summarize", "report", "explain", "compare", "recommend"]', '["crm_*"]', '["dsl.query"]',   'auto_first'),
+('CAP_CRM_MANAGE',    -1, 'crm.manage',    'CRM Management',     'crm',     '["create", "update", "delete", "transition", "assign", "notify"]',                '["crm_*"]', '["dsl.command"]', 'auto_first'),
+('CAP_PM_QUERY',      -1, 'pm.query',      'Project Query',      'pm',      '["query", "analyze", "summarize", "report", "explain"]',                          '["pm_*"]',  '["dsl.query"]',   'auto_first'),
+('CAP_PM_MANAGE',     -1, 'pm.manage',     'Project Management', 'pm',      '["create", "update", "delete", "transition", "assign"]',                          '["pm_*"]',  '["dsl.command"]', 'auto_first'),
+('CAP_GENERIC_QUERY', -1, 'generic.query', 'Generic Query',      'generic', '["query", "analyze", "summarize", "report", "explain"]',                          '["*"]',     '["dsl.query"]',   'auto_first'),
+('CAP_GENERIC_EXEC',  -1, 'generic.exec',  'Generic Execute',    'generic', '["create", "update", "delete", "transition", "assign", "notify", "export"]',       '["*"]',     '["dsl.command"]', 'auto_first')
 ON CONFLICT DO NOTHING;
 
 -- ============================================================================

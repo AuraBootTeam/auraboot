@@ -58,15 +58,18 @@ public class CapabilityRouter {
      * Find Capabilities matching the given intent and object patterns.
      */
     private List<Map<String, Object>> findCapabilities(Long tenantId, String intent, String objectCode) {
+        // tenant_id -1 = platform built-in; tenant-specific overrides platform via DESC order.
+        // Use selectByQueryWithoutTenant so the TenantLineInterceptor doesn't silently AND-in
+        // `tenant_id = <current>` and wipe out the platform (-1) rows we're trying to fetch.
         String sql = "SELECT capability_code, capability_name, domain, intent_patterns, object_patterns, " +
                 "skills, selection_strategy " +
                 "FROM ab_agent_capability " +
                 "WHERE (tenant_id = #{params.tenantId} OR tenant_id = -1) " +
                 "AND capability_status = 'active' AND (deleted_flag = FALSE OR deleted_flag IS NULL) " +
-                "ORDER BY tenant_id DESC";  // tenant-specific overrides platform
+                "ORDER BY tenant_id DESC";
 
         try {
-            List<Map<String, Object>> allCaps = dynamicDataMapper.selectByQuery(sql,
+            List<Map<String, Object>> allCaps = dynamicDataMapper.selectByQueryWithoutTenant(sql,
                     Map.of("tenantId", tenantId));
 
             // Filter by intent and object pattern matching

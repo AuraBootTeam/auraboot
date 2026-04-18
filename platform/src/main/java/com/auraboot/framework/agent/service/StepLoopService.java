@@ -88,6 +88,10 @@ public class StepLoopService {
         String lastTextResponse = "";
         List<Map<String, Object>> toolCallLog = new ArrayList<>();
 
+        // Classic agent loop = single logical step (index 0).
+        // Actions produced during this loop belong to execution_plan[0].
+        StepContext.setStepIndex(0);
+        try {
         for (int loop = 0; loop < maxLoops; loop++) {
             // Timeout check
             checkTimeout(runPid, LocalDateTime.now());
@@ -173,6 +177,9 @@ public class StepLoopService {
                 messages.add(LlmChatRequest.Message.builder().role("user").content(toolResults).build());
             }
         }
+        } finally {
+            StepContext.clear();
+        }
 
         updateRunToolCalls(runPid, toolCallLog);
 
@@ -230,8 +237,18 @@ public class StepLoopService {
         }
 
         for (int i = startStep; i < plan.size(); i++) {
+            // Bind the current step index so ActionRecorder stamps every Action
+            // produced during this step with the matching execution_plan[i] index.
+            StepContext.setStepIndex(i);
             AgentPlanStep step = plan.get(i);
             step.setStatus(AgentPlanStep.StepStatus.RUNNING);
+            step.setStartedAt(LocalDateTime.now());
+            if (step.getSkillCode() == null && step.getToolCode() != null) {
+                step.setSkillCode(step.getToolCode());
+            }
+            if (step.getInput() == null && step.getToolInput() != null) {
+                step.setInput(step.getToolInput());
+            }
             long stepStart = System.currentTimeMillis();
 
             // Check approval gate for this step
@@ -322,7 +339,12 @@ public class StepLoopService {
 
                 step.setStatus(AgentPlanStep.StepStatus.COMPLETED);
                 step.setResult(truncate(lastTextResponse, 200));
+                step.setFinishedAt(LocalDateTime.now());
                 step.setDurationMs(System.currentTimeMillis() - stepStart);
+                Map<String, Object> outSummary = new java.util.LinkedHashMap<>();
+                outSummary.put("status", "success");
+                outSummary.put("text", truncate(lastTextResponse, 200));
+                step.setOutput(outSummary);
 
                 // Cost guard
                 if (totalCost > costLimit) {
@@ -337,7 +359,12 @@ public class StepLoopService {
             } catch (Exception e) {
                 step.setStatus(AgentPlanStep.StepStatus.FAILED);
                 step.setError(e.getMessage());
+                step.setFinishedAt(LocalDateTime.now());
                 step.setDurationMs(System.currentTimeMillis() - stepStart);
+                Map<String, Object> failSummary = new java.util.LinkedHashMap<>();
+                failSummary.put("status", "failed");
+                failSummary.put("error", truncate(e.getMessage(), 200));
+                step.setOutput(failSummary);
 
                 // Attempt adaptive re-planning
                 boolean replanned = attemptReplan(plan, i, e.getMessage(), provider, config, model, systemPrompt, tools, messages);
@@ -349,6 +376,7 @@ public class StepLoopService {
                 persistPlan(runPid, plan, i + 1);
             }
         }
+        StepContext.clear();
 
         updateRunToolCalls(runPid, toolCallLog);
 
