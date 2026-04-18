@@ -139,6 +139,39 @@ class OutputSignatureProjectorTest {
                 .isEqualTo(OutputSignatureProjector.computeMatchHash(projOrig));
     }
 
+    @Test
+    @DisplayName("N-R3-1: explicit success=false wins over heuristic (non-terminal phase)")
+    void command_success_from_explicit_key_wins_over_heuristic() {
+        // phase_reached is non-null (heuristic would say success=true), but
+        // the explicit success=false key marks this as a partial failure.
+        Map<String, Object> shadow = new LinkedHashMap<>();
+        shadow.put("command_code", "cmd_x");
+        shadow.put("phase_reached", "validation");
+        shadow.put("success", false);
+        shadow.put("data", Map.of("recordId", "LEAD-42"));
+
+        Map<String, Object> projExplicit = OutputSignatureProjector.projectShadow("cmd_x", shadow);
+        assertThat(projExplicit.get("success")).isEqualTo(false);
+
+        // Without the explicit key, the heuristic falls back to "phase_reached non-null".
+        Map<String, Object> legacy = new LinkedHashMap<>();
+        legacy.put("command_code", "cmd_x");
+        legacy.put("phase_reached", "validation");
+        legacy.put("data", Map.of("recordId", "LEAD-42"));
+        Map<String, Object> projLegacy = OutputSignatureProjector.projectShadow("cmd_x", legacy);
+        assertThat(projLegacy.get("success")).isEqualTo(true);
+    }
+
+    @Test
+    @DisplayName("N-R3-1: command_success defaults to false when no explicit key and no phase_reached")
+    void command_success_defaults_false_when_no_explicit_key_and_no_phase_reached() {
+        Map<String, Object> shadow = new LinkedHashMap<>();
+        shadow.put("command_code", "cmd_x");
+        shadow.put("data", Map.of());
+        Map<String, Object> proj = OutputSignatureProjector.projectShadow("cmd_x", shadow);
+        assertThat(proj.get("success")).isEqualTo(false);
+    }
+
     // ========================================================================
     // Unknown tool_ref fallback
     // ========================================================================
