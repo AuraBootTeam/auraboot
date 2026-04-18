@@ -27,6 +27,7 @@ public class ActionRecorder {
 
     private final DynamicDataMapper dynamicDataMapper;
     private final ObjectMapper objectMapper;
+    private final FidelityGrader fidelityGrader;
 
     /**
      * Record an Action for a dsl_command execution.
@@ -90,6 +91,24 @@ public class ActionRecorder {
             row.put("executed_at", LocalDateTime.now());
             row.put("created_at", LocalDateTime.now());
 
+            // v1.1 Action Contract (specs/01 §1.3)
+            String toolType = toolDef != null ? toolDef.getToolType() : "dsl_command";
+            row.put("fidelity", fidelityGrader.grade(toolType));
+            if (toolDef != null) {
+                row.put("tool_ref", toolDef.getName());
+            }
+            com.auraboot.framework.agent.dto.BusinessIntentFrame bif = BifContext.getCurrentBif();
+            if (bif != null && bif.getCandidateSkills() != null && !bif.getCandidateSkills().isEmpty()) {
+                row.put("skill_code", bif.getCandidateSkills().get(0));
+            }
+            String signature = fidelityGrader.commandSignature(commandCode, input);
+            if (signature != null) {
+                row.put("command_signature", signature);
+            }
+            if (fieldChanges != null && !fieldChanges.isEmpty()) {
+                row.put("change_summary", buildChangeSummary(fieldChanges));
+            }
+
             // JSONB fields
             if (beforeData != null) {
                 row.put("before_snapshot", objectMapper.writeValueAsString(filterSnapshotFields(beforeData)));
@@ -102,7 +121,8 @@ public class ActionRecorder {
             }
 
             // 6. INSERT with JSONB awareness
-            Set<String> jsonbColumns = Set.of("before_snapshot", "after_snapshot", "field_changes", "target_record_ids");
+            Set<String> jsonbColumns = Set.of("before_snapshot", "after_snapshot", "field_changes",
+                    "target_record_ids", "affected_entities", "artifact_refs");
             dynamicDataMapper.insertWithJsonb("ab_agent_action", row, jsonbColumns);
 
             log.info("Action recorded: pid={}, code={}.{}, model={}, status={}",
@@ -154,6 +174,20 @@ public class ActionRecorder {
             row.put("actor_type", "agent");
             row.put("executed_at", LocalDateTime.now());
             row.put("created_at", LocalDateTime.now());
+
+            // v1.1 Action Contract (specs/01 §1.3) — reads are always full-fidelity (SQL).
+            row.put("fidelity", FidelityGrader.FIDELITY_FULL);
+            if (toolDef != null) {
+                row.put("tool_ref", toolDef.getName());
+            }
+            com.auraboot.framework.agent.dto.BusinessIntentFrame bif = BifContext.getCurrentBif();
+            if (bif != null && bif.getCandidateSkills() != null && !bif.getCandidateSkills().isEmpty()) {
+                row.put("skill_code", bif.getCandidateSkills().get(0));
+            }
+            String signature = fidelityGrader.commandSignature(queryCode, input);
+            if (signature != null) {
+                row.put("command_signature", signature);
+            }
 
             dynamicDataMapper.insert("ab_agent_action", row);
             log.info("Read action recorded: pid={}, model={}, count={}", actionPid, modelCode, resultCount);
@@ -277,6 +311,34 @@ public class ActionRecorder {
             }
         }
         return queryCode;
+    }
+
+    /**
+     * One-line human-readable summary of what changed, for audit reports.
+     * Example: "3 fields changed: status (draft → active), owner, budget"
+     */
+    private String buildChangeSummary(List<FieldChange> changes) {
+        if (changes == null || changes.isEmpty()) return null;
+        StringBuilder sb = new StringBuilder();
+        sb.append(changes.size()).append(changes.size() == 1 ? " field changed: " : " fields changed: ");
+        int limit = Math.min(3, changes.size());
+        for (int i = 0; i < limit; i++) {
+            if (i > 0) sb.append(", ");
+            FieldChange c = changes.get(i);
+            sb.append(c.getFieldCode());
+            if (c.getOldValue() != null || c.getNewValue() != null) {
+                sb.append(" (").append(truncate(c.getOldValue()))
+                        .append(" → ").append(truncate(c.getNewValue())).append(")");
+            }
+        }
+        if (changes.size() > limit) sb.append(", …");
+        return sb.toString();
+    }
+
+    private String truncate(Object v) {
+        if (v == null) return "null";
+        String s = v.toString();
+        return s.length() > 40 ? s.substring(0, 40) + "…" : s;
     }
 
     private List<FieldChange> computeFieldChanges(Map<String, Object> before, Map<String, Object> after) {
