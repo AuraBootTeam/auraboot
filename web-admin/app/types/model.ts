@@ -69,6 +69,14 @@ export interface MetaModelDTO {
   releaseId?: number;
   releasePid?: string;
   fieldCount?: number;
+  /** Virtual model source type: 'physical' | 'namedQuery' | 'endpoint' | 'sqlView' */
+  sourceType?: string;
+  /** Virtual model detection health status */
+  health?: {
+    status?: 'ok' | 'field_drift' | 'detection_failed' | 'unknown';
+    lastDetectedAt?: string;
+    lastDetectionError?: string;
+  };
 }
 
 /**
