@@ -9,6 +9,7 @@
 
 import React, { useCallback, useMemo } from 'react';
 import type { PageSchema, DslBlock, PageLayout } from '~/plugins/core-designer/components/studio/domain/dsl/types';
+import { resolveLocalizedText } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 
 /**
  * Device preset configurations
@@ -288,7 +289,7 @@ const BlockPreview: React.FC<{ block: DslBlock; showGrid: boolean }> = ({ block,
       return (
         <div className={`${borderClass} rounded-lg p-3`}>
           {block.title && (
-            <div className="mb-2 text-sm font-medium text-gray-700">{block.title}</div>
+            <div className="mb-2 text-sm font-medium text-gray-700">{resolveLocalizedText(block.title)}</div>
           )}
           <div className="grid grid-cols-2 gap-3">
             {(block.fields || []).slice(0, 8).map((field, i) => {
@@ -349,7 +350,7 @@ const BlockPreview: React.FC<{ block: DslBlock; showGrid: boolean }> = ({ block,
               </svg>
             </div>
             <div>
-              <div className="text-sm text-gray-700">{block.title || block.blockType}</div>
+              <div className="text-sm text-gray-700">{resolveLocalizedText(block.title) || block.blockType}</div>
               <div className="text-xs text-gray-400">{block.blockType}</div>
             </div>
           </div>

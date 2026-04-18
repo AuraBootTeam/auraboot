@@ -75,6 +75,27 @@ export interface PageSchema {
 // =============================================================================
 
 /**
+ * Resolve a LocalizedText value to a plain string for rendering.
+ * Accepts plain strings, `$i18n:...` keys (returned as-is), and
+ * `{ "zh-CN": "...", "en-US": "..." }` objects (prefers zh-CN, then en-US,
+ * then any first string value). Returns '' for null/undefined.
+ */
+export function resolveLocalizedText(
+  v: string | { [locale: string]: string } | undefined | null,
+): string {
+  if (v === null || v === undefined) return '';
+  if (typeof v === 'string') return v;
+  if (typeof v === 'object') {
+    if (typeof v['zh-CN'] === 'string') return v['zh-CN'];
+    if (typeof v['en-US'] === 'string') return v['en-US'];
+    for (const k of Object.keys(v)) {
+      if (typeof v[k] === 'string') return v[k];
+    }
+  }
+  return '';
+}
+
+/**
  * Block types supported in a page
  */
 export type BlockType =
@@ -103,7 +124,9 @@ export interface DslBlock {
   visible?: string; // SpEL expression
 
   // Content - varies by blockType
-  title?: string;
+  // `title` may be a plain string, an `$i18n:key` string, or a LocalizedText
+  // object `{ "zh-CN": "...", "en-US": "..." }`. See LocalizedTextInput.
+  title?: string | { [locale: string]: string };
   fields?: DslFieldRef[]; // filters, form-section
   columns?: DslColumnRef[]; // table
   buttons?: DslButton[]; // toolbar, form-buttons
@@ -146,7 +169,9 @@ export interface DslFieldOverride {
   disabled?: string; // SpEL expression
   required?: boolean;
   component?: string;
-  placeholder?: string;
+  /** Label override — may be string, `$i18n:key`, or LocalizedText object. */
+  label?: string | { [locale: string]: string };
+  placeholder?: string | { [locale: string]: string };
   advanced?: boolean; // for filters, show in advanced section
   props?: Record<string, unknown>;
 }
@@ -325,6 +350,8 @@ export interface DslButton {
   mode?: 'drawer' | 'modal' | 'page'; // for create/edit
   confirm?: boolean | string; // confirmation message
   id?: string; // for row actions
+  /** Display label — overrides the standard-action default. Accepts LocalizedText. */
+  label?: string | { [locale: string]: string };
 }
 
 // =============================================================================

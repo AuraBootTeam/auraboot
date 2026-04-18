@@ -7,6 +7,7 @@
 
 import React, { useState } from 'react';
 import type { DslBlock } from '~/plugins/core-designer/components/studio/domain/dsl/types';
+import { LocalizedTextInput, type LocalizedTextValue } from '~/shared/designer';
 
 export interface BlockSettingsEditorProps {
   block: DslBlock;
@@ -132,17 +133,15 @@ const BasicProperties: React.FC<PropertyEditorProps> = ({ block, onChange, reado
 
   return (
     <div className="space-y-4">
-      {/* Title */}
+      {/* Title — accepts LocalizedText (zh-CN + en-US) */}
       {showTitle && (
         <PropertyField label="标题" testId="block-title">
-          <input
-            type="text"
-            value={block.title || ''}
-            onChange={(e) => onChange({ title: e.target.value || undefined })}
+          <LocalizedTextInput
+            value={block.title as LocalizedTextValue}
+            onChange={(next) => onChange({ title: (next ?? undefined) as DslBlock['title'] })}
             disabled={readonly}
-            className="property-input"
             placeholder="输入标题"
-            data-testid="block-title-input"
+            testId="block-title-input"
           />
         </PropertyField>
       )}
