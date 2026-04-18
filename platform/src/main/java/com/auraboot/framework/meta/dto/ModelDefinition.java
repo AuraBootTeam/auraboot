@@ -4,6 +4,7 @@ import lombok.Builder;
 import lombok.Data;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 模型定义
@@ -54,6 +55,18 @@ public class ModelDefinition {
      * Business object category (DOCUMENT, MASTER, TRANSACTION, ACTIVITY, REFERENCE, ENTITY)
      */
     private String modelCategory;
+
+    /** Phase 1 values: physical | namedQuery | endpoint | sqlView */
+    private String sourceType;
+
+    /** For namedQuery: query code; for endpoint: connector endpoint code; for sqlView: view name. Required when sourceType != physical. */
+    private String sourceRef;
+
+    /** Primary key field code; required for all models (used as list rowKey and default detailKeyField). */
+    private String primaryKey;
+
+    /** Declared capabilities; the runtime truth for feature toggles and whitelist-based validation. */
+    private ModelCapabilities capabilities;
     
     /**
      * 版本号
@@ -98,4 +111,11 @@ public class ModelDefinition {
      * Evaluated in Stage 8 (PRE_INVARIANT) after InvariantEngine.
      */
     private List<CrossFieldRule> rules;
+
+    /**
+     * Raw extension map (flattened — nested {"extension":{...}} and flat keys are merged,
+     * with flat keys taking precedence). Used by virtual-model executors to read
+     * source-type-specific config (e.g. {@code endpointAdapter}).
+     */
+    private Map<String, Object> extension;
 }

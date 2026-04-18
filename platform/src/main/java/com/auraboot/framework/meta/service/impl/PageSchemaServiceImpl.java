@@ -9,8 +9,10 @@ import com.auraboot.framework.meta.converter.PageSchemaConverter;
 import com.auraboot.framework.meta.dto.*;
 import com.auraboot.framework.meta.entity.PageSchema;
 import com.auraboot.framework.meta.event.SchemaPublishedEvent;
+import com.auraboot.framework.meta.dto.ModelDefinition;
 import com.auraboot.framework.meta.mapper.PageSchemaMapper;
 import com.auraboot.framework.meta.schema.SystemTabRegistry;
+import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.PageSchemaService;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -43,6 +45,11 @@ public class PageSchemaServiceImpl implements PageSchemaService {
     private final com.auraboot.framework.permission.service.AutoPermissionAssignmentService autoPermissionAssignmentService;
     private final com.auraboot.framework.meta.mapper.MetaModelMapper metaModelMapper;
     private final ApplicationEventPublisher eventPublisher;
+    private final MetaModelService metaModelService;
+    private final PageSchemaDefaultBlockGenerator defaultBlockGenerator;
+
+    /** Extension key used to snapshot the bound {modelCode}@{version} at page-save time. */
+    private static final String EXT_BOUND_MODEL_VERSION = "boundModelVersion";
 
     // ==================== CRUD 基础方法 ====================
 
@@ -54,12 +61,24 @@ public class PageSchemaServiceImpl implements PageSchemaService {
         validateCreateRequest(request);
         validatePageKeyUnique(request.getPageKey(), null);
         validateNameUnique(request.getName(), null);
+
+        // Auto-populate default blocks when caller supplied none but the page has
+        // a bound modelCode (quick-generate flow). Deterministic per §12.8.
+        if ((request.getBlocks() == null || request.getBlocks().isEmpty())
+            && StringUtils.hasText(request.getModelCode())) {
+            List<Map<String, Object>> defaults = defaultBlockGenerator.generate(
+                request.getKind(), request.getModelCode());
+            if (!defaults.isEmpty()) {
+                request.setBlocks(new ArrayList<>(defaults));
+            }
+        }
         
         // 转换实体并设置默认值
         PageSchema pageSchema = pageSchemaConverter.toEntity(request);
         pageSchema.setPid(UniqueIdGenerator.generate());
         pageSchema.setStatus(Status.DRAFT.getCode());
         pageSchema.setExtension(new com.auraboot.framework.meta.entity.payload.ExtensionBean());
+        recordBoundModelVersion(pageSchema);
         pageSchema.setVersion(1);
         pageSchema.setIsCurrent(true);
         pageSchema.setCreatedAt(Instant.now());
@@ -121,6 +140,7 @@ public class PageSchemaServiceImpl implements PageSchemaService {
 
         // 更新实体
         pageSchemaConverter.updateEntity(existingSchema, request);
+        recordBoundModelVersion(existingSchema);
         existingSchema.setUpdatedAt(Instant.now());
         // Increment row_version for optimistic lock
         existingSchema.setRowVersion((existingSchema.getRowVersion() != null ? existingSchema.getRowVersion() : 1) + 1);
@@ -482,6 +502,53 @@ public class PageSchemaServiceImpl implements PageSchemaService {
         }
 
         return dto;
+    }
+
+    /**
+     * Snapshot the bound model's {code}@{version} into extension.boundModelVersion.
+     *
+     * <p>Per P1 design §3.3 principle 7, when a page schema is persisted with a
+     * non-blank {@code modelCode}, we record the bound model's current version so
+     * that drift-detection (P2) can compare at design-time and warn the editor.
+     *
+     * <p>Behavior:
+     * <ul>
+     *   <li>No modelCode → skip (do not touch extension).</li>
+     *   <li>Model not found → skip; do not record. Downstream design-time
+     *       validation is expected to surface the unknown modelCode.</li>
+     *   <li>Model has no version → skip (defensive; capabilities require version).</li>
+     *   <li>Otherwise → write {@code {modelCode}@{version}} into the nested
+     *       extension map of {@link com.auraboot.framework.meta.entity.payload.ExtensionBean}.</li>
+     * </ul>
+     */
+    private void recordBoundModelVersion(PageSchema pageSchema) {
+        String modelCode = pageSchema.getModelCode();
+        if (!StringUtils.hasText(modelCode)) {
+            return;
+        }
+        ModelDefinition def;
+        try {
+            def = metaModelService.getDefinitionByCode(modelCode);
+        } catch (Exception e) {
+            // Unknown model or lookup failure: do not block page save; drift is a design-time concern.
+            log.debug("boundModelVersion lookup skipped for modelCode={}: {}", modelCode, e.getMessage());
+            return;
+        }
+        if (def == null || def.getVersion() == null) {
+            return;
+        }
+
+        com.auraboot.framework.meta.entity.payload.ExtensionBean bean = pageSchema.getExtension();
+        if (bean == null) {
+            bean = new com.auraboot.framework.meta.entity.payload.ExtensionBean();
+            pageSchema.setExtension(bean);
+        }
+        Map<String, Object> ext = bean.getExtension();
+        if (ext == null) {
+            ext = new HashMap<>();
+            bean.setExtension(ext);
+        }
+        ext.put(EXT_BOUND_MODEL_VERSION, def.getCode() + "@" + def.getVersion());
     }
 
     /**

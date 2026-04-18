@@ -35,6 +35,8 @@ import { mergeRules as crossFieldMergeRules } from '~/framework/meta/validation/
 import { evaluateCondition as crossFieldEvalCondition } from '~/framework/meta/validation/conditionEvaluator';
 import { evaluateAssert as crossFieldEvalAssert } from '~/framework/meta/validation/assertEvaluator';
 import { deriveTestId, buttonTestId } from '~/framework/meta/rendering/utils/deriveTestId';
+import { useModelCapabilities } from '~/shared/hooks/useModelCapabilities';
+import { checkKindCompatibility } from '~/shared/utils/kindCapability';
 
 /**
  * Map field dataType to Smart component name.
@@ -293,17 +295,55 @@ export function FormPageContent(props: PageContentProps) {
   const recordId = props.recordId;
   const isEditMode = !!recordId;
 
+  // Flat field-name set from schema (form-section blocks).
+  // Used for generic URL aliasing (e.g. ?modelCode=xxx → model_code) and for
+  // deciding whether kind × capability validation applies to this form.
+  const schemaFieldNames = useMemo(() => {
+    const names = new Set<string>();
+    const blocks = (schema as any)?.blocks ?? [];
+    for (const b of blocks) {
+      if (b?.blockType === 'form-section' && Array.isArray(b.fields)) {
+        for (const f of b.fields) {
+          if (f?.field) names.add(String(f.field));
+        }
+      }
+    }
+    return names;
+  }, [schema]);
+
   // URL-based default values for create mode (e.g. ?dv.crm_qt_opportunity_id=01xxx)
+  // Also supports a short form aliasing commonly-used query params to DB columns
+  // when the form has a matching field:
+  //   ?modelCode=xxx  → model_code (when form has `model_code` field)
   const urlDefaultValues = useMemo(() => {
-    if (isEditMode) return {};
+    if (isEditMode) return {} as Record<string, string>;
     const defaults: Record<string, string> = {};
     for (const [key, value] of searchParams.entries()) {
       if (key.startsWith('dv.') && value) {
         defaults[key.substring(3)] = value;
       }
     }
+    const modelCodeParam = searchParams.get('modelCode');
+    if (modelCodeParam && schemaFieldNames.has('model_code') && !defaults.model_code) {
+      defaults.model_code = modelCodeParam;
+    }
     return defaults;
-  }, [isEditMode, searchParams]);
+  }, [isEditMode, searchParams, schemaFieldNames]);
+
+  // Track whether modelCode was seeded from URL so we can show a hint.
+  const urlSeededModelCode = useMemo(() => {
+    if (isEditMode) return null;
+    const mc = searchParams.get('modelCode');
+    return mc && schemaFieldNames.has('model_code') ? mc : null;
+  }, [isEditMode, searchParams, schemaFieldNames]);
+
+  // Forms that edit both a model_code and a kind field (e.g. page_schema_form)
+  // must validate that the selected kind is compatible with the model's
+  // capabilities before submit. Fetch capabilities lazily when both fields
+  // are present and the user has chosen a model code.
+  const hasModelCodeAndKindFields =
+    schemaFieldNames.has('model_code') && schemaFieldNames.has('kind');
+
 
   // Determine mode string for expression context
   const mode = isEditMode ? 'edit' : 'create';
@@ -330,6 +370,13 @@ export function FormPageContent(props: PageContentProps) {
   // Get user info and permissions from context
   const { user } = useUser();
   const { permissions } = usePermissions();
+
+  // Kind × capability validation: fetch selected model's capabilities when the
+  // form has both `model_code` and `kind` fields. No-op for other forms.
+  const activeModelCodeForCaps = hasModelCodeAndKindFields
+    ? (typeof formData.model_code === 'string' ? formData.model_code : undefined)
+    : undefined;
+  const { data: kindCapabilities } = useModelCapabilities(activeModelCodeForCaps);
 
   // Create complete ExpressionContext for field rendering
   const pageContext = useMemo(() => {
@@ -572,6 +619,26 @@ export function FormPageContent(props: PageContentProps) {
       }
     }
 
+    // Kind × ModelCapabilities validation (P2B-T2).
+    // When this form binds both `model_code` and `kind`, block submit if the
+    // selected kind is not supported by the selected model's capabilities.
+    if (hasModelCodeAndKindFields) {
+      const selectedKind =
+        typeof submissionData.kind === 'string' ? submissionData.kind : undefined;
+      const selectedModelCode =
+        typeof submissionData.model_code === 'string' ? submissionData.model_code : undefined;
+      if (selectedKind && selectedModelCode && kindCapabilities) {
+        const compat = checkKindCompatibility(selectedKind, kindCapabilities);
+        if (!compat.compatible) {
+          errors.push(
+            compat.reason
+              ? `Kind "${selectedKind}" is not supported by model "${selectedModelCode}": ${compat.reason}`
+              : `Kind "${selectedKind}" is not supported by model "${selectedModelCode}"`,
+          );
+        }
+      }
+    }
+
     // Cross-field validation rules (from model-level rules + command overrides)
     if (schema?.rules && schema.rules.length > 0) {
       const finalRules = crossFieldMergeRules(schema.rules, schema.ruleOverrides ?? []);
@@ -592,7 +659,17 @@ export function FormPageContent(props: PageContentProps) {
     }
 
     return errors;
-  }, [schema, pageContext, modelFields, t, formData, initialFormData, recordId]);
+  }, [
+    schema,
+    pageContext,
+    modelFields,
+    t,
+    formData,
+    initialFormData,
+    recordId,
+    hasModelCodeAndKindFields,
+    kindCapabilities,
+  ]);
 
   // In new mode, override form button commandCodes with the create command
   // so that save_draft/submit use CREATE instead of UPDATE
@@ -1083,6 +1160,22 @@ export function FormPageContent(props: PageContentProps) {
           {error && (
             <div className="mx-6 mt-4 rounded-md border border-red-200 bg-red-50 p-4">
               <p className="text-red-600">{error}</p>
+            </div>
+          )}
+
+          {/* URL-prefill hint: shown when modelCode was seeded from ?modelCode=xxx */}
+          {urlSeededModelCode && !isEditMode && (
+            <div
+              className="mx-6 mt-4 rounded-md border border-blue-200 bg-blue-50 p-3"
+              data-testid="form-modelcode-prefill-hint"
+            >
+              <p className="text-sm text-blue-700">
+                {(t('pageSchemaForm.modelCodePrefillHint') ||
+                  `Creating from model "{modelCode}"`).replace(
+                  '{modelCode}',
+                  urlSeededModelCode,
+                )}
+              </p>
             </div>
           )}
 

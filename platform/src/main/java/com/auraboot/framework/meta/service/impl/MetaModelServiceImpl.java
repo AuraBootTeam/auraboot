@@ -739,6 +739,8 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
      * 将MetaModel实体转换为ModelDefinition DTO
      */
     private ModelDefinition convertToModelDefinition(Model model) {
+        Map<String, Object> flatExt = flattenExtension(model);
+        String primaryKey = flatExt != null ? (String) flatExt.get("primaryKey") : null;
         return ModelDefinition.builder()
                 .id(model.getId())
                 .code(model.getCode())
@@ -748,13 +750,171 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
                 .tableName(resolveTableName(model))
                 .modelType(model.getModelType())
                 .modelCategory(model.getEffectiveModelCategory())
+                .sourceType(model.getSourceType() != null ? model.getSourceType() : "physical")
+                .sourceRef(model.getSourceRef())
+                .capabilities(parseCapabilities(model.getCapabilities()))
+                .primaryKey(primaryKey)
                 .version(model.getVersion())
                 .status(model.getStatus() != null ? model.getStatus() : null)
                 .createdAt(DateUtil.toUtcLocalDateTime(model.getCreatedAt()))
                 .updatedAt(DateUtil.toUtcLocalDateTime(model.getUpdatedAt()))
                 .softDelete(resolveSoftDelete(model))
                 .rules(loadCrossFieldRules(model))
+                .extension(flatExt)
                 .build();
+    }
+
+    /**
+     * Hydrate the capabilities JSONB string into a ModelCapabilities value object.
+     * Empty / null → ModelCapabilities.empty().
+     */
+    private ModelCapabilities parseCapabilities(String json) {
+        if (json == null || json.isBlank()) {
+            return ModelCapabilities.empty();
+        }
+        try {
+            return objectMapper.readValue(json, ModelCapabilities.class);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new MetaServiceException(
+                "Failed to parse capabilities JSON for model; data corruption: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Normalize caller-supplied capabilities so that sortableFields / filterableFields
+     * reflect the field-level sortable/filterable flags on {@link ModelDefinition#getFields()}.
+     *
+     * Per design §3.3: 字段级 sortable/filterable 是编辑态 UI 输入，capabilities 白名单是运行时事实.
+     * Any caller-supplied whitelist is OVERRIDDEN here.
+     */
+    private ModelCapabilities normalizeCapabilities(ModelDefinition def) {
+        ModelCapabilities raw = def.getCapabilities() != null
+            ? def.getCapabilities() : ModelCapabilities.empty();
+
+        java.util.List<String> sortable = new java.util.ArrayList<>();
+        java.util.List<String> filterable = new java.util.ArrayList<>();
+        if (def.getFields() != null) {
+            for (FieldDefinition f : def.getFields()) {
+                if (Boolean.TRUE.equals(f.getSortable())) sortable.add(f.getCode());
+                if (Boolean.TRUE.equals(f.getFilterable())) filterable.add(f.getCode());
+            }
+        }
+
+        return raw.toBuilder()
+            .sortableFields(sortable)       // override any caller-supplied value
+            .filterableFields(filterable)   // override any caller-supplied value
+            .build();
+    }
+
+    @Override
+    @Transactional
+    public ModelDefinition saveDefinition(ModelDefinition def) {
+        if (def == null || !StringUtils.hasText(def.getCode())) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed, "ModelDefinition.code must not be blank");
+        }
+
+        // Normalize capabilities first so the persisted value reflects the runtime truth.
+        ModelCapabilities normalized = normalizeCapabilities(def);
+        def.setCapabilities(normalized);
+
+        String sourceType = StringUtils.hasText(def.getSourceType()) ? def.getSourceType() : "physical";
+        String capabilitiesJson;
+        try {
+            capabilitiesJson = objectMapper.writeValueAsString(normalized);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new MetaServiceException("Failed to serialize capabilities for model " + def.getCode(), e);
+        }
+
+        Model existing = metaModelMapper.findCurrentByCode(def.getCode());
+        if (existing != null) {
+            existing.setSourceType(sourceType);
+            existing.setSourceRef(def.getSourceRef());
+            existing.setCapabilities(capabilitiesJson);
+            if (StringUtils.hasText(def.getTableName())) {
+                existing.setTableName(def.getTableName());
+            }
+            if (StringUtils.hasText(def.getModelCategory())) {
+                existing.setModelCategory(def.getModelCategory());
+            }
+            // Merge caller-supplied extension keys (e.g. endpointAdapter) into
+            // the existing ExtensionBean's nested map, preserving displayName etc.
+            ExtensionBean ext = existing.getExtension();
+            if (ext == null) {
+                ext = new ExtensionBean();
+                existing.setExtension(ext);
+            }
+            Map<String, Object> inner = ext.getExtension();
+            if (inner == null) {
+                inner = new HashMap<>();
+                ext.setExtension(inner);
+            }
+            if (def.getExtension() != null && !def.getExtension().isEmpty()) {
+                inner.putAll(def.getExtension());
+            }
+            // Persist ModelDefinition.primaryKey into extension so it survives reloads.
+            if (StringUtils.hasText(def.getPrimaryKey())) {
+                inner.put("primaryKey", def.getPrimaryKey());
+            }
+            ext.validate();
+            existing.setUpdatedAt(Instant.now());
+            metaModelMapper.updateById(existing);
+            return getDefinitionByCode(def.getCode());
+        }
+
+        Model model = new Model();
+        model.setPid(UniqueIdGenerator.generate());
+        model.setTenantId(getCurrentTenantId());
+        model.setCode(def.getCode());
+
+        // Build extension with displayName/description when supplied.
+        Map<String, Object> extensionData = new HashMap<>();
+        if (StringUtils.hasText(def.getDisplayName())) {
+            extensionData.put("displayName", def.getDisplayName());
+        }
+        if (StringUtils.hasText(def.getDescription())) {
+            extensionData.put("description", def.getDescription());
+        }
+        if (StringUtils.hasText(def.getModelType())) {
+            extensionData.put("modelType", def.getModelType());
+        }
+        // Merge caller-supplied extension keys (e.g. endpointAdapter).
+        if (def.getExtension() != null && !def.getExtension().isEmpty()) {
+            extensionData.putAll(def.getExtension());
+        }
+        // Persist ModelDefinition.primaryKey into extension so it survives reloads.
+        if (StringUtils.hasText(def.getPrimaryKey())) {
+            extensionData.put("primaryKey", def.getPrimaryKey());
+        }
+        ExtensionBean extension = new ExtensionBean();
+        extension.setExtension(extensionData);
+        extension.validate();
+        model.setExtension(extension);
+
+        model.setTableName(def.getTableName());
+        model.setModelCategory(def.getModelCategory());
+        model.setSourceType(sourceType);
+        model.setSourceRef(def.getSourceRef());
+        model.setCapabilities(capabilitiesJson);
+
+        model.setVersion(def.getVersion() != null ? def.getVersion() : 1);
+        model.setIsCurrent(true);
+        model.setStatus(def.getStatus() != null ? def.getStatus()
+            : com.auraboot.framework.meta.constant.Status.DRAFT.getCode());
+        model.setCreatedAt(Instant.now());
+        model.setUpdatedAt(Instant.now());
+        model.setDeletedFlag(false);
+
+        int inserted = metaModelMapper.insert(model);
+        if (inserted <= 0) {
+            throw new MetaServiceException("Failed to persist model definition: " + def.getCode());
+        }
+
+        return getDefinitionByCode(def.getCode());
+    }
+
+    @Override
+    public ModelDefinition getDefinitionByCode(String code) {
+        return getModelDefinitionFromDb(code).orElse(null);
     }
 
     /**
@@ -794,6 +954,36 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
             return model.getTableName().trim();
         }
         return generateTableName(model.getCode());
+    }
+
+    /**
+     * Flatten Model.extension into a single map so executors can read config like
+     * {@code endpointAdapter} regardless of whether it sits in the nested
+     * {@code extension.extension} payload or at the flat top level.
+     * Flat keys override nested ones when both exist.
+     */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> flattenExtension(Model model) {
+        ExtensionBean ext = model.getExtension();
+        if (ext == null) {
+            return null;
+        }
+        Map<String, Object> result = new HashMap<>();
+        // Nested: ExtensionBean.extension field
+        Map<String, Object> nested = ext.getExtension();
+        if (nested != null) {
+            result.putAll(nested);
+        }
+        // Flat dynamic props (from @JsonAnySetter) take precedence over nested.
+        Map<String, Object> dynamic = ext.getDynamicProperties();
+        if (dynamic != null) {
+            for (Map.Entry<String, Object> e : dynamic.entrySet()) {
+                if (!"extension".equals(e.getKey())) {
+                    result.put(e.getKey(), e.getValue());
+                }
+            }
+        }
+        return result.isEmpty() ? null : result;
     }
 
     /**

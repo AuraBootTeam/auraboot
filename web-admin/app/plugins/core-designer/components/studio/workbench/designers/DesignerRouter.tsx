@@ -2,7 +2,9 @@
  * Designer Router
  *
  * Routes to the appropriate designer based on page kind.
- * - list / form / detail -> BlocksDesigner (V2 flat schema.blocks)
+ * - list   -> ListConfigPanel (P2B stub, structured config in P3)
+ * - detail -> DetailConfigPanel (P2B stub, structured config in P3)
+ * - form   -> BlocksDesigner (V2 flat schema.blocks, unchanged)
  *
  * PageKind is narrowed to 'list' | 'form' | 'detail' (Task 3.1).
  * The default case is an exhaustive never-check that will surface at compile
@@ -13,6 +15,8 @@
 import React from 'react';
 import type { PageSchema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 import { BlocksDesigner } from './BlocksDesigner';
+import { ListConfigPanel } from './ListConfigPanel';
+import { DetailConfigPanel } from './DetailConfigPanel';
 
 export interface DesignerRouterProps {
   /**
@@ -71,8 +75,30 @@ export function DesignerRouter({
 }: DesignerRouterProps) {
   switch (schema.kind) {
     case 'list':
-    case 'form':
+      return (
+        <ListConfigPanel
+          schema={schema}
+          onSchemaChange={onSchemaChange}
+          onSave={onSave}
+          modelCode={modelCode || schema.modelCode}
+          readonly={readonly}
+          previewMode={previewMode}
+        />
+      );
+
     case 'detail':
+      return (
+        <DetailConfigPanel
+          schema={schema}
+          onSchemaChange={onSchemaChange}
+          onSave={onSave}
+          modelCode={modelCode || schema.modelCode}
+          readonly={readonly}
+          previewMode={previewMode}
+        />
+      );
+
+    case 'form':
       return (
         <BlocksDesigner
           schema={schema}
