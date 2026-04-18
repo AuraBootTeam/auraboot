@@ -86,6 +86,7 @@ public class UserSoulProfileDeriver {
         DRAFTED(UserSoulProfileMetrics.OUTCOME_DRAFTED),
         SKIPPED_NO_CHANGE(UserSoulProfileMetrics.OUTCOME_SKIPPED_NO_CHANGE),
         SKIPPED_TOO_LITTLE_SIGNAL(UserSoulProfileMetrics.OUTCOME_SKIPPED_TOO_LITTLE_SIGNAL),
+        SKIPPED_FORGOTTEN(UserSoulProfileMetrics.OUTCOME_SKIPPED_FORGOTTEN),
         FAILED(UserSoulProfileMetrics.OUTCOME_FAILED);
         public final String tag;
         Outcome(String tag) { this.tag = tag; }
@@ -156,6 +157,14 @@ public class UserSoulProfileDeriver {
             throw new IllegalArgumentException("tenantId + userId required");
         }
 
+        // 0. Honour GDPR tombstone. If the user has forget'd, do not re-derive.
+        //    The tombstone is an ARCHIVED row with edited_fields._forgotten = true
+        //    (see UserSoulProfileEditor.forgetProfile).
+        if (isForgotten(tenantId, userId)) {
+            metrics.recordDerivation(tenantId, Outcome.SKIPPED_FORGOTTEN.tag);
+            return new DerivationResult(Outcome.SKIPPED_FORGOTTEN, null, null);
+        }
+
         // 1. Inputs.
         List<Map<String, Object>> memories =
                 agentMemoryService.loadScopedByImportance(tenantId, userId, "default", 50);
@@ -187,6 +196,20 @@ public class UserSoulProfileDeriver {
     }
 
     // ---- Helpers ----------------------------------------------------
+
+    /**
+     * Tombstone check — a forget'd user has an ARCHIVED row whose
+     * {@code edited_fields._forgotten = true}. Inline SQL to avoid a
+     * circular dependency on {@code UserSoulProfileEditor}.
+     */
+    private boolean isForgotten(Long tenantId, String userId) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ab_agent_user_soul_profile "
+                        + "WHERE tenant_id = ? AND user_id = ? AND status = 'ARCHIVED' "
+                        + "  AND (edited_fields ->> '_forgotten') = 'true'",
+                Integer.class, tenantId, userId);
+        return count != null && count > 0;
+    }
 
     private List<Map<String, Object>> loadRecentActions(Long tenantId, String userId, int days) {
         // Action actor_id stores the user that triggered the action. actor_type
