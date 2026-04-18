@@ -154,7 +154,7 @@ test.describe('Mission Control — SkillDraft review (PR-31)', () => {
     await expect(row).toBeVisible();
     await expect(row.locator('[data-testid="draft-code"]'))
       .toHaveText('auto.crm_lead_update.abc123');
-    await expect(row.locator('text=待审核')).toBeVisible();
+    await expect(row.getByText(/待审核|Pending review/)).toBeVisible();
   });
 
   test('LD-02: expanding a row loads detail and shows contract_yaml', async ({ page }) => {
@@ -191,7 +191,7 @@ test.describe('Mission Control — SkillDraft review (PR-31)', () => {
     await page.locator('[data-testid="review-comment"]').fill('looks good');
     await page.locator('[data-testid="approve-btn"]').click();
 
-    await expect(page.locator('[data-testid="toast"]')).toContainText('批准成功');
+    await expect(page.locator('[data-testid="toast"]')).toContainText(/批准成功|Approval succeeded/);
     expect(capturedBodies).toHaveLength(1);
     expect(capturedBodies[0]).toEqual({ decision: 'approve', comment: 'looks good' });
   });
@@ -213,7 +213,7 @@ test.describe('Mission Control — SkillDraft review (PR-31)', () => {
     await page.locator('[data-testid="draft-DRAFTPID1234567890ABCD"] button').first().click();
     await page.locator('[data-testid="reject-btn"]').click();
 
-    await expect(page.locator('[data-testid="toast"]')).toContainText('驳回成功');
+    await expect(page.locator('[data-testid="toast"]')).toContainText(/驳回成功|Rejection succeeded/);
     expect(capturedBodies[0]).toHaveProperty('decision', 'reject');
   });
 
@@ -280,7 +280,7 @@ test.describe('Mission Control — SkillDraft review (PR-31)', () => {
 
     const section = page.locator('[data-testid="shadow-runs-section"]');
     await expect(section).toBeVisible();
-    await expect(section).toContainText('暂无影子运行');
+    await expect(section).toContainText(/暂无影子运行|No shadow runs yet/);
   });
 
   test('LD-08: shadow-runs table renders duration/cost deltas (PR-43)', async ({ page }) => {
