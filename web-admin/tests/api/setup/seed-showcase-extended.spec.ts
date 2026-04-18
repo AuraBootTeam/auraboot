@@ -556,21 +556,21 @@ test.describe.serial('Showcase Seed — Extended', () => {
     const transitionMap: Record<string, string[]> = {
       discovery: [],
       qualification: ['crm:qualify_opportunity'],
-      proposal: ['crm:qualify_opportunity', 'crm:advance_opp_to_proposal'],
+      proposal: ['crm:qualify_opportunity', 'crm:propose_opportunity'],
       negotiation: [
         'crm:qualify_opportunity',
-        'crm:advance_opp_to_proposal',
-        'crm:advance_opp_to_negotiation',
+        'crm:propose_opportunity',
+        'crm:negotiate_opportunity',
       ],
       closed_won: [
         'crm:qualify_opportunity',
-        'crm:advance_opp_to_proposal',
-        'crm:advance_opp_to_negotiation',
+        'crm:propose_opportunity',
+        'crm:negotiate_opportunity',
         'crm:win_opportunity',
       ],
       closed_lost: [
         'crm:qualify_opportunity',
-        'crm:advance_opp_to_proposal',
+        'crm:propose_opportunity',
         'crm:lose_opportunity',
       ],
     };
@@ -585,7 +585,7 @@ test.describe.serial('Showcase Seed — Extended', () => {
         crm_opp_name: oppNames[i],
         crm_opp_account_id: acc.pid,
         crm_opp_expected_amount: amount,
-        crm_opp_expected_close_date: dateTimeAt(closeMonth, randInt(1, 28)),
+        crm_opp_expected_close_date: dateAt(closeMonth, randInt(1, 28)),
       });
 
       for (const transition of transitionMap[stage] || []) {
@@ -782,21 +782,19 @@ test.describe.serial('Showcase Seed — Extended', () => {
   // ═════════════════════════════════════════════════════════════════════════
 
   test('Phase 14: CRM — C-tier Small Opportunities (15)', async ({ page }) => {
-    const cAccountNames = Object.keys(ext.accounts).filter(
-      (name) =>
-        ![
-          '哈尔滨',
-          '兰州',
-          '贵阳',
-          '昆明',
-          '南宁',
-          '呼和浩特',
-          '西宁',
-          '拉萨',
-          '海口',
-          '乌鲁木齐',
-        ].some((city) => name.includes(city)),
-    );
+    // Look up C-tier accounts from DB (so the phase is rerunnable when ext.accounts cache is empty).
+    const listResp = await page.request.get('/api/dynamic/crm_account/list?pageSize=200');
+    const listBody = await listResp.json();
+    const dbAccounts: Array<{ pid: string; crm_acc_name: string; crm_acc_rating: string }> =
+      listBody?.data?.records || [];
+    const cTierAccounts = dbAccounts.filter((a) => a.crm_acc_rating === 'C');
+    if (cTierAccounts.length < 5) {
+      console.warn('  Not enough C-tier accounts, skipping C-tier opportunities');
+      return;
+    }
+    const cAccountNames = cTierAccounts.map((a) => a.crm_acc_name);
+    const accountIdByName: Record<string, string> = {};
+    for (const a of cTierAccounts) accountIdByName[a.crm_acc_name] = a.pid;
 
     const oppTemplates = [
       { name: '小批量打样', amountMin: 10000, amountMax: 50000 },
@@ -827,11 +825,11 @@ test.describe.serial('Showcase Seed — Extended', () => {
     const transitionMap: Record<string, string[]> = {
       discovery: [],
       qualification: ['crm:qualify_opportunity'],
-      proposal: ['crm:qualify_opportunity', 'crm:advance_opp_to_proposal'],
+      proposal: ['crm:qualify_opportunity', 'crm:propose_opportunity'],
       closed_won: [
         'crm:qualify_opportunity',
-        'crm:advance_opp_to_proposal',
-        'crm:advance_opp_to_negotiation',
+        'crm:propose_opportunity',
+        'crm:negotiate_opportunity',
         'crm:win_opportunity',
       ],
       closed_lost: ['crm:qualify_opportunity', 'crm:lose_opportunity'],
@@ -839,7 +837,7 @@ test.describe.serial('Showcase Seed — Extended', () => {
 
     for (let i = 0; i < 15 && i < cAccountNames.length; i++) {
       const accName = cAccountNames[i];
-      const accId = ext.accounts[accName];
+      const accId = accountIdByName[accName];
       const template = oppTemplates[i % oppTemplates.length];
       const stage = stages[i];
       const amount = randInt(template.amountMin, template.amountMax);
@@ -848,7 +846,7 @@ test.describe.serial('Showcase Seed — Extended', () => {
         crm_opp_name: `${accName.slice(0, 4)}-${template.name}`,
         crm_opp_account_id: accId,
         crm_opp_expected_amount: amount,
-        crm_opp_expected_close_date: dateTimeAt(randInt(8, 18), randInt(1, 28)),
+        crm_opp_expected_close_date: dateAt(randInt(8, 18), randInt(1, 28)),
       });
 
       for (const transition of transitionMap[stage] || []) {
