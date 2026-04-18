@@ -17,6 +17,7 @@ import { FieldPropertyEditor } from './editors/FieldPropertyEditor';
 import { DataSourceEditor } from './editors/DataSourceEditor';
 import { TabFilterEditor } from './editors/TabFilterEditor';
 import { viewModelService } from '~/plugins/core-designer/components/studio/services/viewmodel/ViewModelService';
+import { get } from '~/shared/services/http-client';
 
 /**
  * Selected field info structure
@@ -86,12 +87,28 @@ export const BlockPropertyPanel: React.FC<BlockPropertyPanelProps> = ({
         : selectedFieldInfo.fieldRef.field;
 
     let cancelled = false;
+    // Try ViewModel resolved-fields first (works for VIEW models).
+    // For physical models, /api/meta/view-models/{code}/resolved-fields returns []
+    // so fall back to /api/meta/models/code/{code}/fields which returns the
+    // physical column metadata with `fieldType` (mapped to dataType).
     viewModelService
       .getResolvedFields(modelCode)
       .then((fields) => {
         if (cancelled) return;
         const match = fields.find((f) => f.code === fieldCode);
-        setFieldDataType(match?.dataType || 'string');
+        if (match?.dataType) {
+          setFieldDataType(match.dataType);
+          return;
+        }
+        // Fallback: physical model lookup
+        return get<Array<{ code: string; fieldType?: string; dataType?: string }>>(
+          `/api/meta/models/code/${modelCode}/fields`,
+        ).then((res) => {
+          if (cancelled) return;
+          const list = Array.isArray(res?.data) ? res.data : [];
+          const phys = list.find((f) => f.code === fieldCode);
+          setFieldDataType(phys?.dataType || phys?.fieldType || 'string');
+        });
       })
       .catch(() => {
         if (!cancelled) setFieldDataType('string');

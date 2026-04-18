@@ -161,6 +161,36 @@ function resolveActionType(action: unknown): string {
   return '';
 }
 
+/**
+ * Resolve the redirect target after a successful form submit.
+ *
+ * Honors `schema.extension.afterSubmitRedirect` when set. Supports placeholder
+ * substitution from the response data (e.g. `{pid}` is replaced with the new
+ * record's pid). Falls back to the list page (`/p/{tableName}`) when no
+ * override is configured.
+ */
+function resolveAfterSubmitRedirect(
+  schema: any,
+  tableName: string,
+  responseData: any,
+  recordId: string | null | undefined,
+): string {
+  const template = (schema?.extension as any)?.afterSubmitRedirect;
+  if (typeof template !== 'string' || !template) {
+    return `/p/${tableName}`;
+  }
+  // Build placeholder bag: response payload fields + the original recordId.
+  const bag: Record<string, any> = {
+    ...(responseData && typeof responseData === 'object' ? responseData : {}),
+  };
+  if (recordId && bag.pid == null) bag.pid = recordId;
+  if (recordId && bag.id == null) bag.id = recordId;
+  return template.replace(/\{(\w+)\}/g, (_match, key: string) => {
+    const value = bag[key];
+    return value != null ? String(value) : '';
+  });
+}
+
 function inferEditCommandCode(commandCode: string | null, isEditMode: boolean): string | null {
   if (!isEditMode || !commandCode) return commandCode;
   if (commandCode.includes(':create_')) {
@@ -816,7 +846,7 @@ export function FormPageContent(props: PageContentProps) {
                 contextError || result.desc || result.message || 'Command execution failed',
               );
             }
-            navigate(`/p/${tableName}`);
+            navigate(resolveAfterSubmitRedirect(schema, tableName, result.data, recordId));
           })
           .catch((err) => {
             const errorMessage = err instanceof Error ? err.message : 'Failed to execute command';
@@ -888,7 +918,7 @@ export function FormPageContent(props: PageContentProps) {
             );
           }
           showSuccessToast(t('common.saveSuccess') || 'Saved successfully');
-          navigate(`/p/${targetModelCode}`);
+          navigate(resolveAfterSubmitRedirect(schema, targetModelCode, result.data, recordId));
         });
       }
 
