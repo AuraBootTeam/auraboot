@@ -58,6 +58,17 @@
             "assigneeType": "role",
             "assigneeValue": "wd_manager",
             "formPageKey": "wd_leave_request_detail",
+            "formBinding": {
+              "formRef": "wd_leave_request_detail",
+              "formType": "PAGE",
+              "fieldPermissions": {
+                "days": "readonly",
+                "type": "readonly",
+                "reason": "readonly",
+                "approver_comment": "editable"
+              },
+              "saveStrategy": "business_only"
+            },
             "slaKey": "wd_manager_approve_sla",
             "taskActions": [
               {
@@ -93,6 +104,17 @@
             "assigneeType": "role",
             "assigneeValue": "wd_hr",
             "formPageKey": "wd_leave_request_detail",
+            "formBinding": {
+              "formRef": "wd_leave_request_detail",
+              "formType": "PAGE",
+              "fieldPermissions": {
+                "days": "readonly",
+                "type": "readonly",
+                "reason": "readonly",
+                "approver_comment": "editable"
+              },
+              "saveStrategy": "business_only"
+            },
             "slaKey": "wd_hr_approve_sla",
             "taskActions": [
               {
