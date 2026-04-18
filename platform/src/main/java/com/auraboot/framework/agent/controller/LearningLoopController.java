@@ -245,6 +245,39 @@ public class LearningLoopController {
     }
 
     // =========================================================================
+    // Shadow Run inspector (Phase 6)
+    // =========================================================================
+
+    /**
+     * List shadow runs for a given draft, newest first. Mission Control uses
+     * this to drill into why promotion evaluation stalled (low match rate,
+     * failures, etc). Tenant-scoped.
+     */
+    @GetMapping("/drafts/{pid}/shadow-runs")
+    public ApiResponse<List<Map<String, Object>>> shadowRuns(
+            @PathVariable String pid,
+            @RequestParam(defaultValue = "50") int limit) {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        int capped = Math.min(Math.max(1, limit), 200);
+
+        // Confirm draft belongs to tenant before exposing shadow rows.
+        List<Map<String, Object>> owns = jdbcTemplate.queryForList(
+                "SELECT 1 FROM ab_agent_skill_draft WHERE pid = ? AND tenant_id = ?", pid, tenantId);
+        if (owns.isEmpty()) return ApiResponse.error(404, "draft not found");
+
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT pid, original_run_id, shadow_status, " +
+                        "       shadow_duration_ms, shadow_cost_usd, shadow_tokens, shadow_output_hash, " +
+                        "       original_status, original_duration_ms, original_cost_usd, original_output_hash, " +
+                        "       output_match, fidelity_match, created_at " +
+                        "FROM ab_agent_shadow_run " +
+                        "WHERE tenant_id = ? AND draft_id = ? " +
+                        "ORDER BY created_at DESC LIMIT ?",
+                tenantId, pid, capped);
+        return ApiResponse.ok(rows);
+    }
+
+    // =========================================================================
     // Promotion evaluation (Phase 5)
     // =========================================================================
 
