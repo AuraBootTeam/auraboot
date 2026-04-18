@@ -101,6 +101,39 @@ class DslCommandShadowInvokerIntegrationTest extends BaseIntegrationTest {
                 .hasMessageContaining("validation blew up");
     }
 
+    @Test
+    @DisplayName("N-R3-1: explicit success=true when CommandExecuteResult reaches completed_dry_run")
+    void success_key_true_on_dry_run_completion() {
+        when(commandExecutor.execute(eq("ok_cmd"), any())).thenReturn(
+                CommandExecuteResult.builder()
+                        .commandCode("ok_cmd")
+                        .phaseReached("completed_dry_run")
+                        .data(Map.of("recordId", "LEAD-1"))
+                        .build());
+
+        Map<String, Object> out = invoker.invokeShadow(10L, "cmd_ok_cmd",
+                Map.of("payload", Map.of("name", "Alice")));
+
+        assertThat(out).containsEntry("success", true);
+    }
+
+    @Test
+    @DisplayName("N-R3-1: explicit success=false when phase_reached is not completed_dry_run")
+    void success_key_false_on_non_dryrun_phase() {
+        when(commandExecutor.execute(eq("partial_cmd"), any())).thenReturn(
+                CommandExecuteResult.builder()
+                        .commandCode("partial_cmd")
+                        .phaseReached("validation")
+                        .data(Map.of())
+                        .build());
+
+        Map<String, Object> out = invoker.invokeShadow(10L, "cmd_partial_cmd",
+                Map.of("payload", Map.of("name", "Alice")));
+
+        assertThat(out).containsEntry("success", false);
+        assertThat(out).containsEntry("phase_reached", "validation");
+    }
+
     // =========================================================================
     // Platform defaults upgraded to SIMULATED
     // =========================================================================
