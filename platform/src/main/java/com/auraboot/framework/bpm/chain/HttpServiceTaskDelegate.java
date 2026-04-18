@@ -1,5 +1,7 @@
 package com.auraboot.framework.bpm.chain;
 
+import com.auraboot.framework.common.util.PinnedHttpRequests;
+import com.auraboot.framework.common.util.SsrfValidator;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.smart.framework.engine.context.ExecutionContext;
 import com.auraboot.smart.framework.engine.delegation.JavaDelegation;
@@ -7,15 +9,13 @@ import com.auraboot.smart.framework.engine.model.assembly.IdBasedElement;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.ResourceAccessException;
-import org.springframework.web.client.RestClientResponseException;
-import org.springframework.web.client.RestTemplate;
 
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.net.http.HttpTimeoutException;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -58,11 +58,20 @@ public class HttpServiceTaskDelegate implements JavaDelegation {
 
     private static final Pattern VAR_PATTERN = Pattern.compile("\\$\\{([^}]+)\\}");
 
-    private final RestTemplate restTemplate;
+    private static final int CONNECT_TIMEOUT_MS = 3_000;
+
+    /**
+     * Shared pinned-IP HTTP client (P3-E DNS-rebinding hardening). JDK
+     * {@link HttpClient} is what {@link PinnedHttpRequests} targets for
+     * pinning the validated IP at connect time.
+     */
+    private static final HttpClient PINNED_HTTP_CLIENT = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofMillis(CONNECT_TIMEOUT_MS))
+            .build();
+
     private final ObjectMapper objectMapper;
 
-    public HttpServiceTaskDelegate(RestTemplate restTemplate, ObjectMapper objectMapper) {
-        this.restTemplate = restTemplate;
+    public HttpServiceTaskDelegate(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
     }
 
@@ -82,26 +91,41 @@ public class HttpServiceTaskDelegate implements JavaDelegation {
         }
         String url = substituteVariables(rawUrl, processVars);
 
-        HttpMethod method = parseMethod(properties.get(BpmServiceTaskConstants.ATTR_METHOD));
+        String method = parseMethod(properties.get(BpmServiceTaskConstants.ATTR_METHOD));
         int timeoutMs = parseTimeoutMs(properties.get(BpmServiceTaskConstants.ATTR_TIMEOUT_MS));
         String responseVar = properties.get(BpmServiceTaskConstants.ATTR_RESPONSE_VAR);
 
-        HttpHeaders headers = new HttpHeaders();
-        HttpEntity<Object> entity = new HttpEntity<>(null, headers);
-
         long startedAt = System.currentTimeMillis();
         try {
-            // Request-scoped timeout override. The auto-configured RestTemplate
-            // uses SimpleClientHttpRequestFactory; we honor the BPMN-level
-            // timeout by wrapping the exchange and relying on the shared
-            // factory's read timeout as an upper bound. For per-call override
-            // we recreate the factory only when the node demands a tighter cap.
-            ResponseEntity<String> response = executeWithTimeout(url, method, entity, timeoutMs);
-            int status = response.getStatusCodeValue();
-            String body = response.getBody();
+            // Validate URL + pin the resolved IP (P3-E #1 DNS rebinding TOCTOU).
+            // Wrapping inside the try block ensures IllegalArgumentException
+            // from SSRF guard maps to the standard ERR_HTTP_CALL_FAILED.
+            SsrfValidator.ValidatedTarget target = SsrfValidator.validate(url);
+            if (target == null) {
+                log.error("HTTP serviceTask target could not be resolved: {} {}", method, url);
+                throw new BusinessException(ERR_HTTP_CALL_FAILED);
+            }
+
+            HttpRequest request = PinnedHttpRequests.newPinnedRequestBuilder(target)
+                    .timeout(Duration.ofMillis(timeoutMs))
+                    .method(method, HttpRequest.BodyPublishers.noBody())
+                    .build();
+
+            log.debug("HTTP serviceTask scheduled: {} {} (timeoutMs={})", method, url, timeoutMs);
+
+            HttpResponse<String> response = PINNED_HTTP_CLIENT.send(
+                    request, HttpResponse.BodyHandlers.ofString());
+            int status = response.statusCode();
+            String body = response.body();
 
             log.info("HTTP serviceTask: {} {} -> {} ({} ms)",
                     method, url, status, System.currentTimeMillis() - startedAt);
+
+            if (status >= 400) {
+                log.error("HTTP serviceTask non-2xx: {} {} -> {} (body={})",
+                        method, url, status, body);
+                throw new BusinessException(ERR_HTTP_CALL_FAILED);
+            }
 
             if (responseVar != null && !responseVar.isBlank()) {
                 Map<String, Object> payload = new LinkedHashMap<>();
@@ -109,37 +133,25 @@ public class HttpServiceTaskDelegate implements JavaDelegation {
                 payload.put("body", body);
                 processVars.put(responseVar, payload);
             }
-        } catch (RestClientResponseException httpError) {
-            // Non-2xx response from the remote.
-            log.error("HTTP serviceTask non-2xx: {} {} -> {} (body={})",
-                    method, url, httpError.getRawStatusCode(),
-                    httpError.getResponseBodyAsString(), httpError);
-            throw new BusinessException(ERR_HTTP_CALL_FAILED);
-        } catch (ResourceAccessException networkError) {
-            // Connection refused, DNS failure, read timeout.
-            log.error("HTTP serviceTask network failure: {} {} - {}",
-                    method, url, networkError.getMessage(), networkError);
-            throw new BusinessException(ERR_HTTP_CALL_FAILED);
         } catch (BusinessException be) {
             throw be;
+        } catch (IllegalArgumentException ssrfError) {
+            // SSRF guard rejected the URL before any socket connect. Normalize
+            // to the standard HTTP-failure code so process instances observe
+            // identical semantics for "network rejected" and "security rejected".
+            log.warn("HTTP serviceTask SSRF reject: {} {} - {}",
+                    method, url, ssrfError.getMessage());
+            throw new BusinessException(ERR_HTTP_CALL_FAILED);
+        } catch (HttpTimeoutException timeoutError) {
+            log.error("HTTP serviceTask timeout: {} {} - {}",
+                    method, url, timeoutError.getMessage(), timeoutError);
+            throw new BusinessException(ERR_HTTP_CALL_FAILED);
         } catch (Exception e) {
-            log.error("HTTP serviceTask unexpected failure: {} {} - {}",
+            // Connection refused, DNS failure, I/O, interrupted — map to standard failure.
+            log.error("HTTP serviceTask failure: {} {} - {}",
                     method, url, e.getMessage(), e);
             throw new BusinessException(ERR_HTTP_CALL_FAILED);
         }
-    }
-
-    private ResponseEntity<String> executeWithTimeout(String url,
-                                                      HttpMethod method,
-                                                      HttpEntity<Object> entity,
-                                                      int timeoutMs) {
-        // For now, use the shared RestTemplate. The shared factory carries a
-        // pooled timeout configured in HttpClientAutoConfiguration; BPMN-level
-        // timeoutMs acts as an upper bound on expected duration documented in
-        // logs. A future change can thread a per-call factory through here if
-        // plugins need tighter caps than the platform default.
-        log.debug("HTTP serviceTask scheduled: {} {} (timeoutMs={})", method, url, timeoutMs);
-        return restTemplate.exchange(url, method, entity, String.class);
     }
 
     /**
@@ -168,14 +180,22 @@ public class HttpServiceTaskDelegate implements JavaDelegation {
         return sb.toString();
     }
 
-    private HttpMethod parseMethod(String raw) {
+    private String parseMethod(String raw) {
         if (raw == null || raw.isBlank()) {
-            return HttpMethod.GET;
+            return "GET";
         }
-        try {
-            return HttpMethod.valueOf(raw.trim().toUpperCase());
-        } catch (IllegalArgumentException iae) {
-            throw new BusinessException(ERR_HTTP_METHOD_INVALID);
+        String normalized = raw.trim().toUpperCase();
+        switch (normalized) {
+            case "GET":
+            case "POST":
+            case "PUT":
+            case "DELETE":
+            case "HEAD":
+            case "OPTIONS":
+            case "PATCH":
+                return normalized;
+            default:
+                throw new BusinessException(ERR_HTTP_METHOD_INVALID);
         }
     }
 
