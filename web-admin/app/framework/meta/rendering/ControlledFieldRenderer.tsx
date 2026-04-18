@@ -119,12 +119,77 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
     }
   }
 
+  // GAP-258: UI output adapters for pickers whose native shape does not match
+  // backend field types. Backend is the source of truth (dataType:string), so we
+  // narrow array outputs at the edge.
+  // - cascadeselect: component emits string[] of all levels; backend wants the
+  //   most specific leaf as a single string. We forward the last non-empty value.
+  // - memberpicker (multiple): component emits string[]; backend rejects arrays
+  //   for string fields, so we serialize as a JSON string ('["id1","id2"]').
+  const componentLower = String(field.component || '').toLowerCase();
+  const isMemberPickerMultiple =
+    componentLower === 'memberpicker' && Boolean(field.props?.multiple);
+
+  const adaptedValue = useMemo(() => {
+    if (componentLower === 'cascadeselect') {
+      // Re-inflate stored leaf string into a single-element path so the picker
+      // can display the selected leaf value. Parent-level labels won't repopulate
+      // from just the leaf, but the leaf trigger will reflect the persisted value.
+      if (typeof value === 'string' && value !== '') return [value];
+      if (Array.isArray(value)) return value;
+      return undefined;
+    }
+    if (isMemberPickerMultiple) {
+      if (typeof value === 'string' && value.startsWith('[')) {
+        try {
+          const parsed = JSON.parse(value);
+          if (Array.isArray(parsed)) return parsed;
+        } catch {
+          // CATCH: non-transactional JSON parse guard; fall through to raw value
+        }
+      }
+      return value;
+    }
+    return value;
+  }, [componentLower, isMemberPickerMultiple, value]);
+
+  const adaptedOnChange = useMemo(() => {
+    if (componentLower === 'cascadeselect') {
+      return (next: unknown) => {
+        if (Array.isArray(next)) {
+          // Find the last non-empty entry (= the deepest selected level).
+          let leaf: string | undefined;
+          for (let i = next.length - 1; i >= 0; i--) {
+            const candidate = next[i];
+            if (typeof candidate === 'string' && candidate !== '') {
+              leaf = candidate;
+              break;
+            }
+          }
+          onChange(leaf ?? '');
+          return;
+        }
+        onChange(next);
+      };
+    }
+    if (isMemberPickerMultiple) {
+      return (next: unknown) => {
+        if (Array.isArray(next)) {
+          onChange(next.length > 0 ? JSON.stringify(next) : '');
+          return;
+        }
+        onChange(next);
+      };
+    }
+    return onChange;
+  }, [componentLower, isMemberPickerMultiple, onChange]);
+
   const componentProps: Record<string, any> = {
     name: field.field,
     // label is rendered by ControlledFieldRenderer wrapper, not passed to component
     // to ensure consistent vertical label-above-input layout across all components
-    value,
-    onChange,
+    value: adaptedValue,
+    onChange: adaptedOnChange,
     disabled: isDisabled,
     readOnly: isReadOnly,
     required: isRequired,
