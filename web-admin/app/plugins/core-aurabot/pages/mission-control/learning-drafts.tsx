@@ -159,6 +159,37 @@ export default function LearningDraftsPage() {
     }
   };
 
+  const evaluatePromotion = async (pid: string) => {
+    setActionInFlight(pid);
+    try {
+      const r = await post(`/api/learning/drafts/${pid}/evaluate-promotion`, {});
+      if (ResultHelper.isSuccess(r)) {
+        const d = r.data as {
+          decision: string;
+          shadow_runs: number;
+          output_match_rate: number;
+          fidelity_match_rate: number;
+        };
+        const labelMap: Record<string, string> = {
+          PROMOTE: '已晋升至人工最终审核',
+          BELOW_THRESHOLD: '未达到阈值',
+          INSUFFICIENT_RUNS: '影子运行次数不足',
+          NOT_FOUND: '草稿未找到',
+        };
+        setToast({
+          kind: d.decision === 'PROMOTE' ? 'ok' : 'err',
+          msg: `${labelMap[d.decision] ?? d.decision}（runs=${d.shadow_runs}, match=${Math.round((d.output_match_rate ?? 0) * 100)}%）`,
+        });
+        fetchList();
+        loadDetail(pid);
+      } else {
+        setToast({ kind: 'err', msg: (r as any)?.message ?? '评估失败' });
+      }
+    } finally {
+      setActionInFlight(null);
+    }
+  };
+
   const autoRename = async (pid: string) => {
     setActionInFlight(pid);
     try {
@@ -344,6 +375,16 @@ export default function LearningDraftsPage() {
                               className="px-3 py-1 text-sm rounded border border-gray-300 hover:bg-gray-50 disabled:opacity-50"
                             >
                               让 LLM 命名
+                            </button>
+                          )}
+                          {(d.status === 'REVIEWED_OK' || d.status === 'SHADOW_RUNNING') && (
+                            <button
+                              onClick={() => evaluatePromotion(d.pid)}
+                              disabled={actionInFlight === d.pid}
+                              data-testid="evaluate-promotion-btn"
+                              className="px-3 py-1 text-sm rounded border border-blue-300 text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+                            >
+                              评估晋升
                             </button>
                           )}
                         </div>
