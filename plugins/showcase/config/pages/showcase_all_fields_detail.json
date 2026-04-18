@@ -220,6 +220,10 @@
                 {
                   "field": "sc_department",
                   "readOnly": true
+                },
+                {
+                  "field": "sc_owner_user",
+                  "readOnly": true
                 }
               ]
             },
@@ -270,6 +274,10 @@
                 },
                 {
                   "field": "sc_attachment",
+                  "readOnly": true
+                },
+                {
+                  "field": "sc_attachment_file",
                   "readOnly": true
                 },
                 {
