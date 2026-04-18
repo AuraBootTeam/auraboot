@@ -6868,6 +6868,38 @@ CREATE INDEX IF NOT EXISTS idx_interrupt_log_session ON ab_agent_interrupt_log (
 CREATE INDEX IF NOT EXISTS idx_interrupt_log_run ON ab_agent_interrupt_log (active_run_id);
 COMMENT ON TABLE ab_agent_interrupt_log IS 'Interrupt Protocol audit log — one row per user-interrupt classification decision';
 
+-- ============================================================================
+-- ACP Tool ACL (ACP-Ideal §5.5 — 5-dimensional authorisation matrix)
+-- Every tool invocation gated by rules matching these 5 axes:
+--   tenant_id | profile_id | channel | run_kind | tool_ref (glob)
+-- Rule effect ∈ {allow, deny}; higher priority wins; same-priority deny
+-- beats allow; no-match → DENY (fail-secure).
+--
+-- A NULL on any dimension means "any" match on that axis — so a rule
+-- with only tenant_id + tool_ref_pattern set applies to every profile /
+-- channel / run_kind. tool_ref_pattern supports a trailing * wildcard
+-- ('cmd_*', 'nq_crm_*').
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS ab_agent_tool_acl (
+    id                 BIGSERIAL PRIMARY KEY,
+    pid                VARCHAR(26) UNIQUE NOT NULL,
+    tenant_id          BIGINT NOT NULL,
+    -- dimensions — NULL = match any on that axis
+    profile_id         VARCHAR(26),
+    channel            VARCHAR(32),
+    run_kind           VARCHAR(20),                -- interactive | scheduled | shadow
+    tool_ref_pattern   VARCHAR(200) NOT NULL,      -- exact or trailing-* wildcard
+    effect             VARCHAR(8) NOT NULL CHECK (effect IN ('allow', 'deny')),
+    priority           INTEGER NOT NULL DEFAULT 100,
+    reason             VARCHAR(500),
+    active             BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at         TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at         TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_tool_acl_tenant_active ON ab_agent_tool_acl (tenant_id, active);
+CREATE INDEX IF NOT EXISTS idx_tool_acl_priority ON ab_agent_tool_acl (tenant_id, priority DESC, id) WHERE active = TRUE;
+COMMENT ON TABLE ab_agent_tool_acl IS 'ACP Tool ACL — 5-dim authorisation matrix; fail-secure default (no rule → deny)';
+
 -- Seed: platform built-in capabilities (tenant_id = -1)
 -- Skills are the built-in per-tenant generic codes (dsl.query / dsl.command)
 -- that AgentTemplateSeeder creates for every tenant; the router will return

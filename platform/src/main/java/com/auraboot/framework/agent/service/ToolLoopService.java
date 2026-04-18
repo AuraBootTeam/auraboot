@@ -43,6 +43,7 @@ public class ToolLoopService implements ToolExecutionPort {
 
     private final ActionRecorder actionRecorder;
     private final AgentApprovalGateService approvalGate;
+    private final ToolAclChecker toolAclChecker;
     private final AiTraceService aiTraceService;
     private final DynamicDataMapper dynamicDataMapper;
     private final CommandExecutor commandExecutor;
@@ -74,6 +75,23 @@ public class ToolLoopService implements ToolExecutionPort {
             }
             return "Error: Unknown tool '" + toolName + "'. Available tools: " +
                     tools.stream().map(AgentToolDefinition::getName).limit(10).collect(Collectors.joining(", "));
+        }
+
+        // ACP §5.5 — Tool ACL 5-dim pre-check. Runs BEFORE approval gate
+        // because ACL is about "may this tuple invoke this tool at all"; if
+        // ACL denies, there's nothing for a human to approve. Fail-secure:
+        // no rule match → deny. BIF's profile_id/channel flow in naturally;
+        // run_kind defaults to 'interactive' for the tool-loop path.
+        com.auraboot.framework.agent.dto.BusinessIntentFrame bifForAcl = BifContext.getCurrentBif();
+        String profileId = bifForAcl != null ? bifForAcl.getProfileId() : null;
+        String channel   = bifForAcl != null ? bifForAcl.getChannel()   : null;
+        String runKind   = "interactive";
+        ToolAclChecker.Decision acl = toolAclChecker.check(tenantId, profileId, channel, runKind, toolName);
+        if (!acl.isAllowed()) {
+            String reason = acl.getReason() == null ? "denied_by_tool_acl" : acl.getReason();
+            log.info("Tool ACL deny: tenant={} profile={} channel={} run_kind={} tool={} → {}",
+                    tenantId, profileId, channel, runKind, toolName, reason);
+            return "Error: Tool '" + toolName + "' is not permitted for this agent profile / channel (ACL: " + reason + ")";
         }
 
         // BIF-risk-aware approval: force approval when current-turn BIF says risk ≥ L3
