@@ -21,7 +21,7 @@ import {
   rectSortingStrategy,
 } from '@dnd-kit/sortable';
 import type { DslBlock, DslFieldRef } from '~/plugins/core-designer/components/studio/domain/dsl/types';
-import { parseFieldShorthand } from '~/plugins/core-designer/components/studio/domain/dsl/types';
+import { parseFieldShorthand, resolveLocalizedText } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 import { SortableFilterField } from './SortableFilterField';
 
 export interface FilterFormPreviewProps {
@@ -108,7 +108,7 @@ export const FilterFormPreview: React.FC<FilterFormPreviewProps> = ({
                       key={fieldId}
                       id={fieldId}
                       fieldName={field.field || `字段${index + 1}`}
-                      placeholder={field.placeholder}
+                      placeholder={resolveLocalizedText(field.placeholder) || undefined}
                       isAdvanced={field.advanced}
                       isSelected={selectedFieldIndex === index}
                       disabled={readonly}
