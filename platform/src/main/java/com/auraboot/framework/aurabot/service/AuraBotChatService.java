@@ -200,10 +200,12 @@ public class AuraBotChatService {
     // =========================================================================
 
     private void doStreamChat(Long tenantId, ChatRequest request, SseEmitter emitter) {
+        com.auraboot.framework.agent.service.ChatSseContext.setEmitter(emitter);
         try {
             doStreamChatInner(tenantId, request, emitter);
         } finally {
             com.auraboot.framework.agent.service.BifContext.clear();
+            com.auraboot.framework.agent.service.ChatSseContext.clear();
         }
     }
 
