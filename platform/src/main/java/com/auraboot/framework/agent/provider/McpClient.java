@@ -1,5 +1,6 @@
 package com.auraboot.framework.agent.provider;
 
+import com.auraboot.framework.common.util.PinnedHttpRequests;
 import com.auraboot.framework.common.util.SsrfValidator;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -7,7 +8,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -108,14 +108,16 @@ public class McpClient {
 
     private JsonNode sendRequest(String serverUrl, Map<String, Object> requestBody) {
         try {
-            // SSRF protection: validate URL before making server-side request
-            SsrfValidator.validateUrl(serverUrl);
+            // SSRF protection with IP pinning (P3-E #1 DNS rebinding TOCTOU).
+            SsrfValidator.ValidatedTarget target = SsrfValidator.validate(serverUrl);
+            if (target == null) {
+                throw new McpClientException("MCP server URL could not be resolved: " + serverUrl);
+            }
 
             String body = objectMapper.writeValueAsString(requestBody);
             log.debug("MCP request to {}: {}", serverUrl, body);
 
-            HttpRequest httpRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(serverUrl))
+            HttpRequest httpRequest = PinnedHttpRequests.newPinnedRequestBuilder(target)
                     .header("Content-Type", "application/json")
                     .timeout(TIMEOUT)
                     .POST(HttpRequest.BodyPublishers.ofString(body))
