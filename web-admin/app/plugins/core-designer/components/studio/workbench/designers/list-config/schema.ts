@@ -120,7 +120,7 @@ export function buildBehaviorSchemas(
       type: 'select',
       group: '排序',
       options: [
-        { label: '(不设)', value: '' },
+        { label: '(不设)', value: '__none__' },
         ...sortableFields.map((f) => ({ label: f, value: f })),
       ],
     },
@@ -129,7 +129,10 @@ export function buildBehaviorSchemas(
       label: '排序方向',
       type: 'select',
       group: '排序',
-      dependsOn: { field: 'defaultSortField' },
+      // Show only when a real sort field is selected (not the '__none__' sentinel).
+      // anyOf lists actual field values — '__none__' is excluded, so this row
+      // hides automatically when no sort field is chosen.
+      dependsOn: { field: 'defaultSortField', anyOf: sortableFields },
       options: [
         { label: '降序', value: 'desc' },
         { label: '升序', value: 'asc' },
