@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { get } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
+import { useI18n } from '~/contexts/I18nContext';
 
 interface InterruptRow {
   pid: string;
@@ -26,11 +27,16 @@ interface InterruptRow {
   created_at: string;
 }
 
-const POLICY_LABEL: Record<string, string> = {
-  replace_intent: '替换意图',
-  append_context: '追加上下文',
-  insert_subtask: '插入子任务',
+const POLICY_LABEL: Record<string, [string, string]> = {
+  replace_intent: ['替换意图', 'Replace intent'],
+  append_context: ['追加上下文', 'Append context'],
+  insert_subtask: ['插入子任务', 'Insert subtask'],
 };
+
+function policyText(policy: string, l: (zh: string, en: string) => string): string {
+  const pair = POLICY_LABEL[policy];
+  return pair ? l(pair[0], pair[1]) : policy;
+}
 
 const POLICY_OPTIONS = ['replace_intent', 'append_context', 'insert_subtask'];
 
@@ -48,6 +54,11 @@ function policyColor(policy: string): string {
 }
 
 export default function InterruptsPage() {
+  const { locale } = useI18n();
+  const l = useCallback(
+    (zh: string, en: string) => (locale === 'zh-CN' ? zh : en),
+    [locale],
+  );
   const [rows, setRows] = useState<InterruptRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [policyFilter, setPolicyFilter] = useState('');
@@ -72,19 +83,19 @@ export default function InterruptsPage() {
   return (
     <div className="p-6 max-w-6xl mx-auto" data-testid="interrupts-page">
       <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">中断审计</h1>
+        <h1 className="text-2xl font-semibold">{l('中断审计', 'Interrupt Audit')}</h1>
         <div className="flex items-center gap-3">
-          <label className="text-sm text-gray-600">策略</label>
+          <label className="text-sm text-gray-600">{l('策略', 'Policy')}</label>
           <select
             data-testid="policy-filter"
             value={policyFilter}
             onChange={(e) => setPolicyFilter(e.target.value)}
             className="border border-gray-300 rounded px-2 py-1 text-sm"
           >
-            <option value="">全部</option>
+            <option value="">{l('全部', 'All')}</option>
             {POLICY_OPTIONS.map((p) => (
               <option key={p} value={p}>
-                {POLICY_LABEL[p] ?? p}
+                {policyText(p, l)}
               </option>
             ))}
           </select>
@@ -92,19 +103,24 @@ export default function InterruptsPage() {
             onClick={fetchRows}
             className="text-sm px-3 py-1 rounded border border-gray-300 hover:bg-gray-50"
           >
-            刷新
+            {l('刷新', 'Refresh')}
           </button>
         </div>
       </div>
 
-      {loading && <div className="text-sm text-gray-500">加载中...</div>}
+      {loading && (
+        <div className="text-sm text-gray-500">{l('加载中...', 'Loading...')}</div>
+      )}
 
       {!loading && rows.length === 0 && (
         <div
           className="text-sm text-gray-500 border border-dashed border-gray-300 rounded p-6 text-center"
           data-testid="empty-state"
         >
-          暂无中断记录 — 会话侧收到新消息时，分类器会在此留下记录。
+          {l(
+            '暂无中断记录 — 会话侧收到新消息时，分类器会在此留下记录。',
+            'No interrupt records yet — the classifier logs here when a new message arrives in a session.',
+          )}
         </div>
       )}
 
@@ -115,13 +131,13 @@ export default function InterruptsPage() {
         >
           <thead>
             <tr className="border-b border-gray-200 text-left text-gray-600">
-              <th className="py-2 pr-3">时间</th>
-              <th className="py-2 pr-3">会话</th>
-              <th className="py-2 pr-3">策略</th>
-              <th className="py-2 pr-3">消息摘要</th>
-              <th className="py-2 pr-3">分类器</th>
-              <th className="py-2 pr-3">置信度</th>
-              <th className="py-2 pr-3">动作</th>
+              <th className="py-2 pr-3">{l('时间', 'Time')}</th>
+              <th className="py-2 pr-3">{l('会话', 'Session')}</th>
+              <th className="py-2 pr-3">{l('策略', 'Policy')}</th>
+              <th className="py-2 pr-3">{l('消息摘要', 'Message excerpt')}</th>
+              <th className="py-2 pr-3">{l('分类器', 'Classifier')}</th>
+              <th className="py-2 pr-3">{l('置信度', 'Confidence')}</th>
+              <th className="py-2 pr-3">{l('动作', 'Action')}</th>
             </tr>
           </thead>
           <tbody>
@@ -142,7 +158,7 @@ export default function InterruptsPage() {
                     className={`inline-block px-2 py-0.5 text-xs rounded ${policyColor(r.sub_policy)}`}
                     data-testid="policy-badge"
                   >
-                    {POLICY_LABEL[r.sub_policy] ?? r.sub_policy}
+                    {policyText(r.sub_policy, l)}
                   </span>
                 </td>
                 <td className="py-2 pr-3 max-w-xs truncate" title={r.new_message_excerpt}>
