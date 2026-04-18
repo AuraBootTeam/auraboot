@@ -17,6 +17,7 @@
 import { Fragment, useState, useEffect, useCallback } from 'react';
 import { get, post } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
+import { useI18n } from '~/contexts/I18nContext';
 
 interface DraftRow {
   pid: string;
@@ -73,15 +74,20 @@ interface DraftDetail extends DraftRow {
   }>;
 }
 
-const STATUS_LABEL: Record<string, string> = {
-  DRAFT_PENDING_REVIEW: '待审核',
-  REVIEWED_OK: '审核通过',
-  REVIEWED_REJECTED: '已驳回',
-  SHADOW_RUNNING: '影子运行中',
-  PROMOTED_PENDING_HUMAN: '待最终批准',
-  ACTIVE: '已启用',
-  DISCARDED: '已丢弃',
+const STATUS_LABEL: Record<string, [string, string]> = {
+  DRAFT_PENDING_REVIEW: ['待审核', 'Pending review'],
+  REVIEWED_OK: ['审核通过', 'Approved'],
+  REVIEWED_REJECTED: ['已驳回', 'Rejected'],
+  SHADOW_RUNNING: ['影子运行中', 'Shadow running'],
+  PROMOTED_PENDING_HUMAN: ['待最终批准', 'Pending final approval'],
+  ACTIVE: ['已启用', 'Active'],
+  DISCARDED: ['已丢弃', 'Discarded'],
 };
+
+function statusText(status: string, l: (zh: string, en: string) => string): string {
+  const pair = STATUS_LABEL[status];
+  return pair ? l(pair[0], pair[1]) : status;
+}
 
 const STATUS_OPTIONS = [
   'DRAFT_PENDING_REVIEW',
@@ -109,6 +115,11 @@ function statusColor(status: string): string {
 }
 
 export default function LearningDraftsPage() {
+  const { locale } = useI18n();
+  const l = useCallback(
+    (zh: string, en: string) => (locale === 'zh-CN' ? zh : en),
+    [locale],
+  );
   const [drafts, setDrafts] = useState<DraftRow[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>('DRAFT_PENDING_REVIEW');
   const [loading, setLoading] = useState(false);
@@ -129,12 +140,12 @@ export default function LearningDraftsPage() {
       if (ResultHelper.isSuccess(r)) {
         setDrafts((r.data as DraftRow[]) ?? []);
       } else {
-        setToast({ kind: 'err', msg: (r as any)?.message ?? '加载失败' });
+        setToast({ kind: 'err', msg: (r as any)?.message ?? l('加载失败', 'Failed to load') });
       }
     } finally {
       setLoading(false);
     }
-  }, [statusFilter]);
+  }, [statusFilter, l]);
 
   useEffect(() => {
     fetchList();
@@ -184,16 +195,23 @@ export default function LearningDraftsPage() {
         comment: comment.trim() || undefined,
       });
       if (ResultHelper.isSuccess(r)) {
+        const okMsg =
+          decision === 'approve'
+            ? l('批准成功', 'Approval succeeded')
+            : l('驳回成功', 'Rejection succeeded');
         setToast({
           kind: 'ok',
-          msg: `${decision === 'approve' ? '批准' : '驳回'}成功 → ${(r.data as any)?.status}`,
+          msg: `${okMsg} → ${(r.data as any)?.status}`,
         });
         setComment('');
         setExpanded(null);
         setDetail(null);
         fetchList();
       } else {
-        setToast({ kind: 'err', msg: (r as any)?.message ?? '操作失败' });
+        setToast({
+          kind: 'err',
+          msg: (r as any)?.message ?? l('操作失败', 'Operation failed'),
+        });
       }
     } finally {
       setActionInFlight(null);
@@ -206,21 +224,25 @@ export default function LearningDraftsPage() {
       const r = await post(`/api/learning/drafts/${pid}/evaluate-promotion`, {});
       if (ResultHelper.isSuccess(r)) {
         const d = r.data as PromotionResult;
-        const labelMap: Record<string, string> = {
-          PROMOTE: '已晋升至人工最终审核',
-          BELOW_THRESHOLD: '未达到阈值',
-          INSUFFICIENT_RUNS: '影子运行次数不足',
-          NOT_FOUND: '草稿未找到',
+        const labelMap: Record<string, [string, string]> = {
+          PROMOTE: ['已晋升至人工最终审核', 'Promoted to final human review'],
+          BELOW_THRESHOLD: ['未达到阈值', 'Below threshold'],
+          INSUFFICIENT_RUNS: ['影子运行次数不足', 'Insufficient shadow runs'],
+          NOT_FOUND: ['草稿未找到', 'Draft not found'],
         };
         setPromotionResult(d);
+        const pair = labelMap[d.decision];
         setToast({
           kind: d.decision === 'PROMOTE' ? 'ok' : 'err',
-          msg: labelMap[d.decision] ?? d.decision,
+          msg: pair ? l(pair[0], pair[1]) : d.decision,
         });
         fetchList();
         loadDetail(pid);
       } else {
-        setToast({ kind: 'err', msg: (r as any)?.message ?? '评估失败' });
+        setToast({
+          kind: 'err',
+          msg: (r as any)?.message ?? l('评估失败', 'Evaluation failed'),
+        });
       }
     } finally {
       setActionInFlight(null);
@@ -234,11 +256,20 @@ export default function LearningDraftsPage() {
       if (ResultHelper.isSuccess(r)) {
         const d = r.data as { renamed: boolean; new_code?: string };
         if (d.renamed) {
-          setToast({ kind: 'ok', msg: `已重命名 → ${d.new_code}` });
+          setToast({
+            kind: 'ok',
+            msg: `${l('已重命名', 'Renamed')} → ${d.new_code}`,
+          });
           fetchList();
           loadDetail(pid);
         } else {
-          setToast({ kind: 'err', msg: '重命名未生效(LLM 未配置或提议不合规)' });
+          setToast({
+            kind: 'err',
+            msg: l(
+              '重命名未生效(LLM 未配置或提议不合规)',
+              'Rename did not take effect (LLM not configured or proposal invalid)',
+            ),
+          });
         }
       }
     } finally {
@@ -249,19 +280,19 @@ export default function LearningDraftsPage() {
   return (
     <div className="p-6 max-w-6xl mx-auto" data-testid="learning-drafts-page">
       <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Skill 草稿审核</h1>
+        <h1 className="text-2xl font-semibold">{l('Skill 草稿审核', 'Skill Draft Review')}</h1>
         <div className="flex items-center gap-3">
-          <label className="text-sm text-gray-600">状态</label>
+          <label className="text-sm text-gray-600">{l('状态', 'Status')}</label>
           <select
             data-testid="status-filter"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
             className="border border-gray-300 rounded px-2 py-1 text-sm"
           >
-            <option value="">全部</option>
+            <option value="">{l('全部', 'All')}</option>
             {STATUS_OPTIONS.map((s) => (
               <option key={s} value={s}>
-                {STATUS_LABEL[s] ?? s}
+                {statusText(s, l)}
               </option>
             ))}
           </select>
@@ -269,7 +300,7 @@ export default function LearningDraftsPage() {
             onClick={fetchList}
             className="text-sm px-3 py-1 rounded border border-gray-300 hover:bg-gray-50"
           >
-            刷新
+            {l('刷新', 'Refresh')}
           </button>
         </div>
       </div>
@@ -286,10 +317,10 @@ export default function LearningDraftsPage() {
         </div>
       )}
 
-      {loading && <div className="text-sm text-gray-500">加载中…</div>}
+      {loading && <div className="text-sm text-gray-500">{l('加载中…', 'Loading…')}</div>}
       {!loading && drafts.length === 0 && (
         <div className="text-sm text-gray-500 border border-dashed rounded p-6 text-center">
-          当前筛选下暂无草稿。
+          {l('当前筛选下暂无草稿。', 'No drafts match the current filter.')}
         </div>
       )}
 
@@ -313,7 +344,7 @@ export default function LearningDraftsPage() {
                   <span
                     className={`inline-block text-xs px-2 py-0.5 rounded ${statusColor(d.status)}`}
                   >
-                    {STATUS_LABEL[d.status] ?? d.status}
+                    {statusText(d.status, l)}
                   </span>
                   <span className="font-mono text-sm truncate" data-testid="draft-code">
                     {d.draft_skill_code}
@@ -324,13 +355,19 @@ export default function LearningDraftsPage() {
 
               {isExpanded && (
                 <div className="border-t border-gray-200 p-4 space-y-3" data-testid="draft-detail">
-                  {!detail && <div className="text-sm text-gray-500">加载详情…</div>}
+                  {!detail && (
+                    <div className="text-sm text-gray-500">
+                      {l('加载详情…', 'Loading detail…')}
+                    </div>
+                  )}
                   {detail && (
                     <>
                       {detail.source_pattern && (
                         <div className="text-xs text-gray-600">
-                          来源模式:调用 {detail.source_pattern.invocation_count} 次,成功率{' '}
-                          {(detail.source_pattern.success_rate * 100).toFixed(0)}%
+                          {l(
+                            `来源模式:调用 ${detail.source_pattern.invocation_count} 次,成功率 ${(detail.source_pattern.success_rate * 100).toFixed(0)}%`,
+                            `Source pattern: ${detail.source_pattern.invocation_count} invocations, ${(detail.source_pattern.success_rate * 100).toFixed(0)}% success rate`,
+                          )}
                         </div>
                       )}
 
@@ -347,23 +384,30 @@ export default function LearningDraftsPage() {
                       {shadowRuns !== null && (
                         <div data-testid="shadow-runs-section">
                           <div className="text-xs font-medium text-gray-700 mb-1">
-                            影子运行历史({shadowRuns.length})
+                            {l('影子运行历史', 'Shadow run history')}({shadowRuns.length})
                           </div>
                           {shadowRuns.length === 0 ? (
                             <div className="text-xs text-gray-500 italic">
-                              暂无影子运行 — ShadowRunScheduler 尚未为此草稿重放原始调用
+                              {l(
+                                '暂无影子运行 — ShadowRunScheduler 尚未为此草稿重放原始调用',
+                                'No shadow runs yet — ShadowRunScheduler has not replayed original invocations for this draft',
+                              )}
                             </div>
                           ) : (
                             <table className="text-xs w-full" data-testid="shadow-runs-table">
                               <thead>
                                 <tr className="text-left text-gray-500 border-b border-gray-200">
                                   <th className="px-1 py-1 w-4"></th>
-                                  <th className="px-1 py-1">时间</th>
-                                  <th className="px-1 py-1">状态</th>
-                                  <th className="px-1 py-1">输出匹配</th>
+                                  <th className="px-1 py-1">{l('时间', 'Time')}</th>
+                                  <th className="px-1 py-1">{l('状态', 'Status')}</th>
+                                  <th className="px-1 py-1">{l('输出匹配', 'Output match')}</th>
                                   <th className="px-1 py-1">Fidelity</th>
-                                  <th className="px-1 py-1 text-right">耗时差 ms</th>
-                                  <th className="px-1 py-1 text-right">成本差 $</th>
+                                  <th className="px-1 py-1 text-right">
+                                    {l('耗时差 ms', 'Duration Δ ms')}
+                                  </th>
+                                  <th className="px-1 py-1 text-right">
+                                    {l('成本差 $', 'Cost Δ $')}
+                                  </th>
                                 </tr>
                               </thead>
                               <tbody>
@@ -479,11 +523,15 @@ export default function LearningDraftsPage() {
                           data-testid="promotion-cards"
                         >
                           <div className="border border-gray-200 rounded p-2 bg-white">
-                            <div className="text-xs text-gray-500">影子运行</div>
+                            <div className="text-xs text-gray-500">
+                              {l('影子运行', 'Shadow runs')}
+                            </div>
                             <div className="text-lg font-bold" data-testid="promotion-shadow-runs">
                               {promotionResult.shadow_runs}
                             </div>
-                            <div className="text-xs text-gray-400">阈值 ≥5</div>
+                            <div className="text-xs text-gray-400">
+                              {l('阈值', 'Threshold')} ≥5
+                            </div>
                           </div>
                           <div
                             className={`border border-gray-200 rounded p-2 ${
@@ -492,7 +540,9 @@ export default function LearningDraftsPage() {
                                 : 'bg-amber-50'
                             }`}
                           >
-                            <div className="text-xs text-gray-500">输出匹配</div>
+                            <div className="text-xs text-gray-500">
+                              {l('输出匹配', 'Output match')}
+                            </div>
                             <div
                               className={`text-lg font-bold ${
                                 (promotionResult.output_match_rate ?? 0) >= 0.9
@@ -503,7 +553,9 @@ export default function LearningDraftsPage() {
                             >
                               {Math.round((promotionResult.output_match_rate ?? 0) * 100)}%
                             </div>
-                            <div className="text-xs text-gray-400">阈值 ≥90%</div>
+                            <div className="text-xs text-gray-400">
+                              {l('阈值', 'Threshold')} ≥90%
+                            </div>
                           </div>
                           <div
                             className={`border border-gray-200 rounded p-2 ${
@@ -512,7 +564,9 @@ export default function LearningDraftsPage() {
                                 : 'bg-amber-50'
                             }`}
                           >
-                            <div className="text-xs text-gray-500">Fidelity 匹配</div>
+                            <div className="text-xs text-gray-500">
+                              {l('Fidelity 匹配', 'Fidelity match')}
+                            </div>
                             <div
                               className={`text-lg font-bold ${
                                 (promotionResult.fidelity_match_rate ?? 0) >= 0.9
@@ -523,10 +577,12 @@ export default function LearningDraftsPage() {
                             >
                               {Math.round((promotionResult.fidelity_match_rate ?? 0) * 100)}%
                             </div>
-                            <div className="text-xs text-gray-400">阈值 ≥90%</div>
+                            <div className="text-xs text-gray-400">
+                              {l('阈值', 'Threshold')} ≥90%
+                            </div>
                           </div>
                           <div className="border border-gray-200 rounded p-2 bg-white">
-                            <div className="text-xs text-gray-500">决策</div>
+                            <div className="text-xs text-gray-500">{l('决策', 'Decision')}</div>
                             <span
                               className={`inline-block mt-1 px-2 py-0.5 text-xs rounded font-medium ${
                                 promotionResult.decision === 'PROMOTE'
@@ -547,7 +603,7 @@ export default function LearningDraftsPage() {
 
                       <div className="pt-2 border-t border-gray-100 space-y-2">
                         <textarea
-                          placeholder="审核意见(可选)"
+                          placeholder={l('审核意见(可选)', 'Review comment (optional)')}
                           value={comment}
                           onChange={(e) => setComment(e.target.value)}
                           className="w-full border border-gray-300 rounded text-sm p-2 resize-none"
@@ -562,7 +618,7 @@ export default function LearningDraftsPage() {
                               data-testid="approve-btn"
                               className="px-3 py-1 text-sm rounded bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
                             >
-                              批准
+                              {l('批准', 'Approve')}
                             </button>
                           )}
                           {canReject && (
@@ -572,7 +628,7 @@ export default function LearningDraftsPage() {
                               data-testid="reject-btn"
                               className="px-3 py-1 text-sm rounded bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
                             >
-                              驳回
+                              {l('驳回', 'Reject')}
                             </button>
                           )}
                           {d.draft_skill_code?.startsWith('auto.') && (
@@ -582,7 +638,7 @@ export default function LearningDraftsPage() {
                               data-testid="rename-btn"
                               className="px-3 py-1 text-sm rounded border border-gray-300 hover:bg-gray-50 disabled:opacity-50"
                             >
-                              让 LLM 命名
+                              {l('让 LLM 命名', 'Let LLM rename')}
                             </button>
                           )}
                           {(d.status === 'REVIEWED_OK' || d.status === 'SHADOW_RUNNING') && (
@@ -592,7 +648,7 @@ export default function LearningDraftsPage() {
                               data-testid="evaluate-promotion-btn"
                               className="px-3 py-1 text-sm rounded border border-blue-300 text-blue-700 hover:bg-blue-50 disabled:opacity-50"
                             >
-                              评估晋升
+                              {l('评估晋升', 'Evaluate promotion')}
                             </button>
                           )}
                         </div>
