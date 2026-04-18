@@ -6602,9 +6602,17 @@ CREATE INDEX IF NOT EXISTS idx_bif_run         ON ab_agent_bif(run_id);
 COMMENT ON TABLE ab_agent_bif IS 'ACP D1 Grounding: Business Intent Frame IR persistence — every LLM-turn grounding result';
 
 -- Seed: platform built-in capabilities (tenant_id = -1)
+-- Skills are the built-in per-tenant generic codes (dsl.query / dsl.command)
+-- that AgentTemplateSeeder creates for every tenant; the router will return
+-- these for domain-matched BIFs, letting GroundingService skip its hard-coded
+-- intent→skill fallback (see GroundingService.resolveCandidateSkills).
 INSERT INTO ab_agent_capability (pid, tenant_id, capability_code, capability_name, domain, intent_patterns, object_patterns, skills, selection_strategy) VALUES
-('CAP_CRM_QUERY',  -1, 'crm.query',  'CRM Query',      'crm', '["query", "analyze", "summarize", "report"]', '["crm_*"]', '[]', 'auto_first'),
-('CAP_CRM_MANAGE', -1, 'crm.manage', 'CRM Management', 'crm', '["create", "update", "delete", "transition", "assign"]', '["crm_*"]', '[]', 'auto_first')
+('CAP_CRM_QUERY',     -1, 'crm.query',     'CRM Query',          'crm',     '["query", "analyze", "summarize", "report", "explain", "compare", "recommend"]', '["crm_*"]', '["dsl.query"]',   'auto_first'),
+('CAP_CRM_MANAGE',    -1, 'crm.manage',    'CRM Management',     'crm',     '["create", "update", "delete", "transition", "assign", "notify"]',                '["crm_*"]', '["dsl.command"]', 'auto_first'),
+('CAP_PM_QUERY',      -1, 'pm.query',      'Project Query',      'pm',      '["query", "analyze", "summarize", "report", "explain"]',                          '["pm_*"]',  '["dsl.query"]',   'auto_first'),
+('CAP_PM_MANAGE',     -1, 'pm.manage',     'Project Management', 'pm',      '["create", "update", "delete", "transition", "assign"]',                          '["pm_*"]',  '["dsl.command"]', 'auto_first'),
+('CAP_GENERIC_QUERY', -1, 'generic.query', 'Generic Query',      'generic', '["query", "analyze", "summarize", "report", "explain"]',                          '["*"]',     '["dsl.query"]',   'auto_first'),
+('CAP_GENERIC_EXEC',  -1, 'generic.exec',  'Generic Execute',    'generic', '["create", "update", "delete", "transition", "assign", "notify", "export"]',       '["*"]',     '["dsl.command"]', 'auto_first')
 ON CONFLICT DO NOTHING;
 
 -- ============================================================================
