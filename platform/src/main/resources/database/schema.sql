@@ -6222,6 +6222,62 @@ CREATE INDEX IF NOT EXISTS idx_ab_agent_user_profile_tenant ON ab_agent_user_pro
 COMMENT ON TABLE ab_agent_user_profile IS 'Per-user AI agent memory profile: communication style, role context, preferences, decision patterns';
 
 -- ============================================================
+-- User Soul Profile (PR-75 Phase 1 schema, PR-77 Phase 3 reader)
+-- Per-user derived LLM-rendered profile. One ACTIVE row per (tenant,user).
+-- Older versions remain as SUPERSEDED for audit. See
+-- docs/plans/2026-04/2026-04-19-user-soul-profile-design.md
+-- ============================================================
+CREATE TABLE IF NOT EXISTS ab_agent_user_soul_profile (
+    id                    BIGSERIAL PRIMARY KEY,
+    pid                   VARCHAR(26) UNIQUE NOT NULL,
+    tenant_id             BIGINT NOT NULL,
+    user_id               VARCHAR(64) NOT NULL,
+
+    version               INTEGER NOT NULL DEFAULT 1,
+    status                VARCHAR(16) NOT NULL DEFAULT 'DRAFT',
+
+    profile               JSONB NOT NULL,
+    profile_hash          VARCHAR(64) NOT NULL,
+    language_preference   VARCHAR(8),
+
+    source_memory_pids    JSONB,
+    source_action_count   INTEGER DEFAULT 0,
+    source_window_days    INTEGER DEFAULT 90,
+    derivation_model      VARCHAR(64),
+    derivation_confidence NUMERIC(3,2),
+
+    edited_fields         JSONB,
+    hidden_at             TIMESTAMPTZ,
+
+    created_at            TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    activated_at          TIMESTAMPTZ,
+    superseded_at         TIMESTAMPTZ,
+    stale_flagged_at      TIMESTAMPTZ,
+
+    CONSTRAINT chk_user_soul_profile_status CHECK (status IN (
+        'DRAFT', 'ACTIVE', 'SUPERSEDED', 'ARCHIVED'
+    )),
+    CONSTRAINT chk_user_soul_profile_confidence CHECK (
+        derivation_confidence IS NULL OR
+        (derivation_confidence >= 0 AND derivation_confidence <= 1)
+    )
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_user_soul_profile_active
+    ON ab_agent_user_soul_profile (tenant_id, user_id)
+    WHERE status = 'ACTIVE';
+
+CREATE INDEX IF NOT EXISTS idx_user_soul_profile_tenant_user
+    ON ab_agent_user_soul_profile (tenant_id, user_id, status);
+
+CREATE INDEX IF NOT EXISTS idx_user_soul_profile_stale
+    ON ab_agent_user_soul_profile (stale_flagged_at)
+    WHERE stale_flagged_at IS NOT NULL AND status = 'ACTIVE';
+
+COMMENT ON TABLE ab_agent_user_soul_profile IS
+    'User Soul Profile — derived per-user personalisation profile for grounding LLM prompts (see 2026-04-19 design doc).';
+
+-- ============================================================
 -- CRM Multi-Channel Ingestion (GAP-035) + CRM Ecosystem Integration (GAP-036)
 -- ============================================================
 
@@ -7812,73 +7868,4 @@ ALTER TABLE ab_agent_memory_access_log
     ADD CONSTRAINT fk_memory_access_log_memory
     FOREIGN KEY (memory_pid) REFERENCES ab_agent_memory(pid)
     ON DELETE CASCADE;
-
--- =====================================================================
--- User Soul Profile (PR-75, plan §4)
---
--- Per-user derived profile: preferences, communication style, expertise,
--- boundaries. Distinct from ab_agent_definition.soul_profile (which
--- describes the agent's persona). One ACTIVE row per (tenant, user);
--- older versions stay for audit.
--- =====================================================================
-CREATE TABLE IF NOT EXISTS ab_agent_user_soul_profile (
-    id                    BIGSERIAL PRIMARY KEY,
-    pid                   VARCHAR(26) UNIQUE NOT NULL,
-    tenant_id             BIGINT NOT NULL,
-    user_id               VARCHAR(64) NOT NULL,
-
-    -- Versioning: one ACTIVE row per (tenant, user); older versions stay for audit
-    version               INTEGER NOT NULL DEFAULT 1,
-    status                VARCHAR(16) NOT NULL DEFAULT 'DRAFT',
-
-    -- Derived profile (rendered JSONB, see plan §4 schema)
-    profile               JSONB NOT NULL,
-    profile_hash          VARCHAR(64) NOT NULL,
-    language_preference   VARCHAR(8),
-
-    -- Derivation audit
-    source_memory_pids    JSONB,
-    source_action_count   INTEGER DEFAULT 0,
-    source_window_days    INTEGER DEFAULT 90,
-    derivation_model      VARCHAR(64),
-    derivation_confidence NUMERIC(3,2),
-
-    -- User control
-    edited_fields         JSONB,
-    hidden_at             TIMESTAMPTZ,
-
-    -- Staleness + lifecycle
-    created_at            TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    activated_at          TIMESTAMPTZ,
-    superseded_at         TIMESTAMPTZ,
-    stale_flagged_at      TIMESTAMPTZ,
-
-    CONSTRAINT chk_user_soul_profile_status CHECK (status IN (
-        'DRAFT', 'ACTIVE', 'SUPERSEDED', 'ARCHIVED'
-    )),
-    CONSTRAINT chk_user_soul_profile_confidence CHECK (
-        derivation_confidence IS NULL OR
-        (derivation_confidence >= 0 AND derivation_confidence <= 1)
-    )
-);
-
--- At most one ACTIVE row per (tenant, user).
-CREATE UNIQUE INDEX IF NOT EXISTS uq_user_soul_profile_active
-    ON ab_agent_user_soul_profile (tenant_id, user_id)
-    WHERE status = 'ACTIVE';
-
-CREATE INDEX IF NOT EXISTS idx_user_soul_profile_tenant_user
-    ON ab_agent_user_soul_profile (tenant_id, user_id, status);
-
-CREATE INDEX IF NOT EXISTS idx_user_soul_profile_stale
-    ON ab_agent_user_soul_profile (stale_flagged_at)
-    WHERE stale_flagged_at IS NOT NULL AND status = 'ACTIVE';
-
-CREATE INDEX IF NOT EXISTS idx_user_soul_profile_created
-    ON ab_agent_user_soul_profile (tenant_id, created_at DESC);
-
-COMMENT ON TABLE ab_agent_user_soul_profile IS
-    'Per-user derived Soul Profile (PR-75). Citable, user-controllable '
-    'projection over scoped memories and action history. Not to be '
-    'confused with ab_agent_definition.soul_profile (agent persona).';
 
