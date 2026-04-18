@@ -46,7 +46,7 @@ async function createPage(page: Page): Promise<string> {
       name,
       pageKey,
       title: name,
-      kind: 'list',
+      kind: 'form',
       modelCode: 'tenant',
       blocks: [],
       metaInfo: { componentCount: 0 },
@@ -74,7 +74,7 @@ async function blockCount(page: Page): Promise<number> {
 /** Click a block-palette item to add a block, wait for DOM update. */
 async function addBlockFromPalette(page: Page, type: string): Promise<void> {
   // Ensure we're on the Components tab
-  await page.getByTestId('canvas-left-tab-components').click();
+  await page.getByTestId('designer-tab-blocks').click();
   await page.getByTestId('block-palette').waitFor({ state: 'visible' });
   await page.getByTestId(`block-palette-item-${type}`).click();
   // Small wait for React state to settle
@@ -90,7 +90,7 @@ async function dragWidgetTo(
   target: ReturnType<Page['locator']>,
   primeTarget?: ReturnType<Page['locator']>,
 ): Promise<void> {
-  await page.getByTestId('canvas-left-tab-widgets').click();
+  await page.getByTestId('designer-tab-fields').click();
   const source = page.getByTestId(`widget-palette-item-${widgetType}`);
   await expect(source).toBeVisible();
 
@@ -546,7 +546,7 @@ test.describe('A3 — Widgets Tab', () => {
     await openDesigner(page, pid);
 
     // Switch to Widgets tab
-    await page.getByTestId('canvas-left-tab-widgets').click();
+    await page.getByTestId('designer-tab-fields').click();
     await expect(page.getByTestId('widget-palette')).toBeVisible();
 
     // All 11 widget types from WIDGET_DEFS
@@ -570,7 +570,7 @@ test.describe('A3 — Widgets Tab', () => {
     const pid = await createPage(page);
     await openDesigner(page, pid);
 
-    await page.getByTestId('canvas-left-tab-widgets').click();
+    await page.getByTestId('designer-tab-fields').click();
     await expect(page.getByTestId('widget-palette')).toBeVisible();
 
     await page.getByTestId('widget-palette-search').fill('date');
@@ -603,7 +603,7 @@ test.describe('A3 — Widgets Tab', () => {
     await expect(page.locator(BLK).first()).toHaveClass(/selected/);
 
     // Switch to Widgets tab
-    await page.getByTestId('canvas-left-tab-widgets').click();
+    await page.getByTestId('designer-tab-fields').click();
     await expect(page.getByTestId('widget-palette')).toBeVisible();
 
     // Click Text Input widget
@@ -624,7 +624,7 @@ test.describe('A3 — Widgets Tab', () => {
     await openDesigner(page, pid);
 
     // Switch to Widgets tab (no block selected)
-    await page.getByTestId('canvas-left-tab-widgets').click();
+    await page.getByTestId('designer-tab-fields').click();
     await expect(page.getByTestId('widget-palette')).toBeVisible();
 
     expect(await blockCount(page)).toBe(0);
@@ -655,7 +655,7 @@ test.describe('A3 — Widgets Tab', () => {
 
     await blockCards.nth(1).click();
 
-    await page.getByTestId('canvas-left-tab-widgets').click();
+    await page.getByTestId('designer-tab-fields').click();
     await page.getByTestId('widget-palette-item-number').click();
 
     await expect(blockCards).toHaveCount(3);
@@ -672,7 +672,7 @@ test.describe('A3 — Widgets Tab', () => {
     await openDesigner(page, pid);
 
     // Switch to Widgets tab, add first widget (creates form-section)
-    await page.getByTestId('canvas-left-tab-widgets').click();
+    await page.getByTestId('designer-tab-fields').click();
     await page.getByTestId('widget-palette-item-text').click();
     await page.locator('[data-testid^="canvas-block-content-"]').first().waitFor({ state: 'visible' });
 
@@ -681,12 +681,12 @@ test.describe('A3 — Widgets Tab', () => {
     await expect(page.locator(BLK).first()).toHaveClass(/selected/);
 
     // Re-open widgets tab and add 2nd widget
-    await page.getByTestId('canvas-left-tab-widgets').click();
+    await page.getByTestId('designer-tab-fields').click();
     await page.getByTestId('widget-palette-item-number').click();
 
     // Re-select form-section and add 3rd widget
     await page.locator(BLK).first().click();
-    await page.getByTestId('canvas-left-tab-widgets').click();
+    await page.getByTestId('designer-tab-fields').click();
     await page.getByTestId('widget-palette-item-date').click();
 
     // Still 1 block total
@@ -705,9 +705,9 @@ test.describe('A3 — Widgets Tab', () => {
     await addBlockFromPalette(page, 'form-section');
     await page.locator(BLK).first().click();
 
-    await page.getByTestId('canvas-left-tab-widgets').click();
+    await page.getByTestId('designer-tab-fields').click();
     await page.getByTestId('widget-palette-item-number').click();
-    await page.getByTestId('canvas-left-tab-widgets').click();
+    await page.getByTestId('designer-tab-fields').click();
     await page.getByTestId('widget-palette-item-date').click();
 
     const firstBlock = page.locator('[data-testid^="canvas-block-content-"]').first();
@@ -729,11 +729,11 @@ test.describe('A3 — Widgets Tab', () => {
     await addBlockFromPalette(page, 'form-section');
     await page.locator(BLK).first().click();
 
-    await page.getByTestId('canvas-left-tab-widgets').click();
+    await page.getByTestId('designer-tab-fields').click();
     await page.getByTestId('widget-palette-item-text').click();
-    await page.getByTestId('canvas-left-tab-widgets').click();
+    await page.getByTestId('designer-tab-fields').click();
     await page.getByTestId('widget-palette-item-number').click();
-    await page.getByTestId('canvas-left-tab-widgets').click();
+    await page.getByTestId('designer-tab-fields').click();
     await page.getByTestId('widget-palette-item-date').click();
 
     const firstBlock = page.locator('[data-testid^="canvas-block-content-"]').first();
@@ -760,7 +760,7 @@ test.describe('A3 — Widgets Tab', () => {
     await addBlockFromPalette(page, 'table');
     await expect(page.locator('[data-testid^="canvas-block-content-"]')).toHaveCount(1);
 
-    await page.getByTestId('canvas-left-tab-widgets').click();
+    await page.getByTestId('designer-tab-fields').click();
     const source = page.getByTestId('widget-palette-item-text');
     await expect(source).toBeVisible();
 
@@ -788,7 +788,7 @@ test.describe('A3 — Widgets Tab', () => {
 
     expect(await blockCount(page)).toBe(0);
 
-    await page.getByTestId('canvas-left-tab-widgets').click();
+    await page.getByTestId('designer-tab-fields').click();
     const source = page.getByTestId('widget-palette-item-text');
     await expect(source).toBeVisible();
 
@@ -820,13 +820,13 @@ test.describe('A3 — Widgets Tab', () => {
     await addBlockFromPalette(page, 'form-section');
     await page.locator(BLK).first().click();
 
-    await page.getByTestId('canvas-left-tab-widgets').click();
+    await page.getByTestId('designer-tab-fields').click();
     await page.getByTestId('widget-palette-item-text').click();
-    await page.getByTestId('canvas-left-tab-widgets').click();
+    await page.getByTestId('designer-tab-fields').click();
     await page.getByTestId('widget-palette-item-number').click();
-    await page.getByTestId('canvas-left-tab-widgets').click();
+    await page.getByTestId('designer-tab-fields').click();
     await page.getByTestId('widget-palette-item-date').click();
-    await page.getByTestId('canvas-left-tab-widgets').click();
+    await page.getByTestId('designer-tab-fields').click();
     await page.getByTestId('widget-palette-item-textarea').click();
 
     const firstBlock = page.locator('[data-testid^="canvas-block-content-"]').first();
@@ -858,7 +858,7 @@ test.describe('A3 — Widgets Tab', () => {
       await openDesigner(page, pid);
 
       // Switch to Widgets tab
-      await page.getByTestId('canvas-left-tab-widgets').click();
+      await page.getByTestId('designer-tab-fields').click();
       await expect(page.getByTestId('widget-palette')).toBeVisible();
 
       // Verify the palette item has the correct label text (use .text-xs.font-medium to target name, not description)
@@ -903,7 +903,7 @@ test.describe('A4 — Outline Tab', () => {
     expect(await blockCount(page)).toBe(3);
 
     // Switch to Outline tab
-    await page.getByTestId('canvas-left-tab-outline').click();
+    await page.getByTestId('designer-tab-outline').click();
     await expect(page.getByTestId('outline-panel')).toBeVisible();
 
     // Outline must list exactly 3 items
@@ -926,7 +926,7 @@ test.describe('A4 — Outline Tab', () => {
     await page.waitForFunction(() => document.querySelectorAll('[data-testid^="canvas-block-content-"]').length >= 2, { timeout: 5000 });
 
     // Switch to Outline tab
-    await page.getByTestId('canvas-left-tab-outline').click();
+    await page.getByTestId('designer-tab-outline').click();
     await expect(page.getByTestId('outline-panel')).toBeVisible();
 
     const outlineItems = page.locator('[data-testid^="outline-item-"]');
@@ -958,7 +958,7 @@ test.describe('A4 — Outline Tab', () => {
     await page.waitForFunction(() => document.querySelectorAll('[data-testid^="canvas-block-content-"]').length >= 3, { timeout: 5000 });
 
     // Switch to Outline and verify 3 items
-    await page.getByTestId('canvas-left-tab-outline').click();
+    await page.getByTestId('designer-tab-outline').click();
     let outlineItems = page.locator('[data-testid^="outline-item-"]');
     await expect(outlineItems).toHaveCount(3);
 
@@ -993,7 +993,7 @@ test.describe('A4 — Outline Tab', () => {
     await page.waitForFunction(() => document.querySelectorAll('[data-testid^="canvas-block-content-"]').length >= 2, { timeout: 5000 });
 
     // Switch to Outline
-    await page.getByTestId('canvas-left-tab-outline').click();
+    await page.getByTestId('designer-tab-outline').click();
     await expect(page.getByTestId('outline-panel')).toBeVisible();
 
     const outlineItems = page.locator('[data-testid^="outline-item-"]');
@@ -1053,7 +1053,7 @@ test.describe('H — Left Panel Details', () => {
     const pid = await createPage(page);
     await openDesigner(page, pid);
 
-    await page.getByTestId('canvas-left-tab-widgets').click();
+    await page.getByTestId('designer-tab-fields').click();
     await expect(page.getByTestId('widget-palette')).toBeVisible();
 
     await page.getByTestId('widget-palette-search').fill('date');
@@ -1080,7 +1080,7 @@ test.describe('H — Left Panel Details', () => {
     await openDesigner(page, pid);
 
     // Switch to Outline with empty canvas
-    await page.getByTestId('canvas-left-tab-outline').click();
+    await page.getByTestId('designer-tab-outline').click();
     await expect(page.getByTestId('outline-panel')).toBeVisible();
 
     // Must show "No blocks yet" empty state
@@ -1108,7 +1108,7 @@ test.describe('H — Left Panel Details', () => {
     await page.waitForFunction(() => document.querySelectorAll('[data-testid^="canvas-block-content-"]').length >= 3, { timeout: 5000 });
 
     // Switch to Outline
-    await page.getByTestId('canvas-left-tab-outline').click();
+    await page.getByTestId('designer-tab-outline').click();
     await expect(page.getByTestId('outline-panel')).toBeVisible();
 
     const outlineItems = page.locator('[data-testid^="outline-item-"]');
@@ -1171,21 +1171,21 @@ test.describe('H — Left Panel Details', () => {
     await expect(page.getByTestId('outline-panel')).not.toBeVisible();
 
     // Click Widgets tab
-    await page.getByTestId('canvas-left-tab-widgets').click();
+    await page.getByTestId('designer-tab-fields').click();
     await expect(page.getByTestId('widget-palette')).toBeVisible();
     await expect(page.getByTestId('field-palette')).not.toBeVisible();
     await expect(page.getByTestId('block-palette')).not.toBeVisible();
     await expect(page.getByTestId('outline-panel')).not.toBeVisible();
 
     // Click Outline tab
-    await page.getByTestId('canvas-left-tab-outline').click();
+    await page.getByTestId('designer-tab-outline').click();
     await expect(page.getByTestId('outline-panel')).toBeVisible();
     await expect(page.getByTestId('widget-palette')).not.toBeVisible();
     await expect(page.getByTestId('field-palette')).not.toBeVisible();
     await expect(page.getByTestId('block-palette')).not.toBeVisible();
 
     // Back to Components
-    await page.getByTestId('canvas-left-tab-components').click();
+    await page.getByTestId('designer-tab-blocks').click();
     await expect(page.getByTestId('block-palette')).toBeVisible();
     await expect(page.getByTestId('outline-panel')).not.toBeVisible();
   });
