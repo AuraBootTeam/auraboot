@@ -35,6 +35,43 @@ public class LearningLoopController {
     private final PromotionEvaluator promotionEvaluator;
 
     // =========================================================================
+    // Stats — counts by status for Mission Control dashboards
+    // =========================================================================
+
+    /**
+     * Aggregate draft counts by status for the current tenant.
+     * Returns every known status key (including zero counts) so the
+     * dashboard renders a stable shape.
+     */
+    @GetMapping("/drafts/stats")
+    public ApiResponse<Map<String, Object>> stats() {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT status, COUNT(*) AS n FROM ab_agent_skill_draft " +
+                        "WHERE tenant_id = ? GROUP BY status",
+                tenantId);
+
+        Map<String, Long> byStatus = new LinkedHashMap<>();
+        for (String s : List.of(
+                "DRAFT_PENDING_REVIEW", "REVIEWED_OK", "SHADOW_RUNNING",
+                "PROMOTED_PENDING_HUMAN", "ACTIVE",
+                "REVIEWED_REJECTED", "DISCARDED")) {
+            byStatus.put(s, 0L);
+        }
+        long total = 0;
+        for (Map<String, Object> r : rows) {
+            String status = (String) r.get("status");
+            long n = ((Number) r.get("n")).longValue();
+            byStatus.put(status, n);
+            total += n;
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("total", total);
+        out.put("by_status", byStatus);
+        return ApiResponse.ok(out);
+    }
+
+    // =========================================================================
     // List
     // =========================================================================
 
