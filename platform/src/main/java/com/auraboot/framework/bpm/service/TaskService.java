@@ -2,6 +2,7 @@ package com.auraboot.framework.bpm.service;
 
 import com.auraboot.smart.framework.engine.SmartEngine;
 import com.auraboot.smart.framework.engine.constant.RequestMapSpecialKeyConstant;
+import com.auraboot.smart.framework.engine.model.instance.ProcessInstance;
 import com.auraboot.smart.framework.engine.model.instance.TaskAssigneeCandidateInstance;
 import com.auraboot.smart.framework.engine.model.instance.TaskInstance;
 import com.auraboot.smart.framework.engine.service.param.query.PendingTaskQueryParam;
@@ -35,6 +36,12 @@ public class TaskService {
 
     private final SmartEngine smartEngine;
     private final BpmAuditService bpmAuditService;
+    private final BpmTaskActionsResolver taskActionsResolver;
+
+    /** Key for the approve action in designerJson taskActions declarations. */
+    private static final String ACTION_KEY_APPROVE = "approve";
+    /** Key for the reject action in designerJson taskActions declarations. */
+    private static final String ACTION_KEY_REJECT = "reject";
 
     /**
      * 查询用户待办任务
@@ -213,6 +220,13 @@ public class TaskService {
         vars.put("_comment", comment != null ? comment : "");
         vars.put(RequestMapSpecialKeyConstant.TENANT_ID, tenantId);
 
+        // Bug #8 Part 2: inject taskActions resultVariable/resultValue fallback
+        // from designerJson so downstream exclusiveGateway MVEL conditions
+        // (e.g. ${taskResult == 'approved'}) resolve even when the caller did
+        // not explicitly pass a variables map. Caller-supplied values win
+        // (merge is putIfAbsent inside the resolver).
+        injectTaskActionsFallback(task, ACTION_KEY_APPROVE, vars);
+
         // SmartEngine does not reload persisted variables into the signal context
         // when resuming after a userTask. Merge them so downstream serviceTasks
         // (e.g. DroolsServiceTaskDelegate, NotificationServiceTaskDelegate) can
@@ -250,6 +264,11 @@ public class TaskService {
         vars.put("_action", "reject");
         vars.put("_comment", comment != null ? comment : "");
         vars.put(RequestMapSpecialKeyConstant.TENANT_ID, tenantId);
+
+        // Bug #8 Part 2: mirror approveTask — inject rejection's declared
+        // resultVariable/resultValue from designerJson taskActions so gateway
+        // conditions can route regardless of which client triggered the reject.
+        injectTaskActionsFallback(task, ACTION_KEY_REJECT, vars);
 
         mergePersistedVariables(task.getProcessInstanceId(), tenantId, vars);
 
@@ -423,6 +442,39 @@ public class TaskService {
 
     private String getCurrentUserId() {
         return com.auraboot.framework.bpm.util.BpmSecurityUtil.getCurrentUserId();
+    }
+
+    /**
+     * Inject the fallback {@code resultVariable → resultValue} pair declared
+     * by the matching {@code taskActions[key=actionKey, type=complete]} entry
+     * in the process definition's designerJson.
+     *
+     * <p>No-op when the task row has no activity/process linkage yet (should
+     * not happen for a validated task) or when the node has no taskActions
+     * (legitimate — plugin authors omit taskActions for pure BPMN processes).
+     *
+     * <p>Caller-provided values in {@code vars} are preserved (Bug #8 Part 1
+     * frontend forwarding still wins when present).
+     */
+    private void injectTaskActionsFallback(TaskInstance task, String actionKey,
+                                           Map<String, Object> vars) {
+        String nodeId = task.getProcessDefinitionActivityId();
+        String processInstanceId = task.getProcessInstanceId();
+        if (nodeId == null || processInstanceId == null) {
+            return;
+        }
+        String tenantId = MetaContext.getCurrentTenantIdAsString();
+        ProcessInstance pi = smartEngine.getProcessQueryService()
+                .findById(processInstanceId, tenantId);
+        if (pi == null) {
+            // Tenant/data mismatch — the canCompleteTask check above should
+            // have caught this. Throw rather than silently swallow.
+            throw new IllegalStateException(
+                    "Process instance not found for task during action resolution: "
+                            + task.getInstanceId());
+        }
+        String processKey = pi.getProcessDefinitionId();
+        taskActionsResolver.mergeActionResultVariable(processKey, nodeId, actionKey, vars);
     }
 
     /**
