@@ -59,6 +59,13 @@ public class AgentRunService {
     private final GroundingService groundingService;
     private final AgentSkillService skillService;
 
+    /**
+     * User Soul Profile grounding reader (plan §5.5 / PR-77).
+     * Optional so existing tests + legacy contexts without the bean don't break.
+     */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private UserSoulProfileReader userSoulProfileReader;
+
     private static final int MAX_HALLUCINATION_COUNT = 3;
     private static final int DEFAULT_TIMEOUT_SECONDS = 300;
 
@@ -686,11 +693,28 @@ public class AgentRunService {
             // Track memory access for decay system
             memoryService.trackAccess(tenantId, agentCode);
 
+            // PR-77 Phase 3: prepend User Soul Profile section (plan §5.5) BEFORE
+            // the agent-memory block when an ACTIVE profile exists for the current
+            // user. System/cron runs without a user id still get the memory section
+            // unchanged (Reader returns Optional.empty when userId is null).
+            String profilePreamble = "";
+            if (userSoulProfileReader != null) {
+                Long currentUserIdForProfile = MetaContext.getCurrentUserId();
+                String userIdForProfile = currentUserIdForProfile == null
+                        ? null : currentUserIdForProfile.toString();
+                Optional<UserSoulProfileReader.ProfileSection> section =
+                        userSoulProfileReader.loadForGrounding(tenantId, userIdForProfile);
+                if (section.isPresent()) {
+                    profilePreamble = section.get().renderedPromptText() + "\n\n";
+                }
+            }
+
             if (memories == null || memories.isEmpty()) {
-                return null;
+                return profilePreamble.isEmpty() ? null : profilePreamble;
             }
 
             StringBuilder sb = new StringBuilder();
+            sb.append(profilePreamble);
             sb.append("## Agent Memory\n");
             sb.append("The following are your accumulated memories and lessons. Use them to inform your work:\n");
 
