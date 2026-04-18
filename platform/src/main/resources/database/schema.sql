@@ -7755,3 +7755,28 @@ COMMENT ON TABLE ab_agent_memory_promotion IS
     'Memory promotion proposals and audit rows (PR-65). '
     'Status lattice: DRAFT_PENDING_REVIEW → PROMOTED_SHADOW → ACTIVE, '
     'with REVIEWED_REJECTED / RETRACTED / DISCARDED / EXPIRED as terminal states.';
+
+-- ====================================================================
+-- PR-66 Memory Promotion (Phase 2) — per-user memory access log
+-- Powers implicit_co_sign detection by tracking which users read which
+-- memories. One row per (memory, user, calendar day) — upsert-based so
+-- the cardinality scales linearly with reads, not exponentially.
+-- Retention: 90 days (aligns with implicit_co_sign lookback window).
+-- ====================================================================
+CREATE TABLE IF NOT EXISTS ab_agent_memory_access_log (
+    id            BIGSERIAL PRIMARY KEY,
+    memory_pid    VARCHAR(26)  NOT NULL,
+    user_id       VARCHAR(64)  NOT NULL,
+    access_day    DATE         NOT NULL DEFAULT CURRENT_DATE,
+    access_count  INTEGER      NOT NULL DEFAULT 1,
+    first_seen_at TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_seen_at  TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_memory_access_log UNIQUE (memory_pid, user_id, access_day)
+);
+CREATE INDEX IF NOT EXISTS idx_memory_access_log_pid_time
+    ON ab_agent_memory_access_log (memory_pid, last_seen_at DESC);
+CREATE INDEX IF NOT EXISTS idx_memory_access_log_user
+    ON ab_agent_memory_access_log (user_id, last_seen_at DESC);
+COMMENT ON TABLE ab_agent_memory_access_log IS
+    'Per-user memory access log (PR-66 Phase 2). '
+    'Feeds implicit_co_sign detection in MemoryPromotionExtractor.';
