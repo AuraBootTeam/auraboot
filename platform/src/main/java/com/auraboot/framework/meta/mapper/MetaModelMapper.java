@@ -281,12 +281,14 @@ public interface MetaModelMapper extends BaseMapper<Model> {
 
     /**
      * Update model fields for plugin import (extension, plugin_pid, table_name, model_category).
+     * table_name is only overwritten when the plugin explicitly provides one; a null value
+     * preserves the existing column so that dynamic-table models (mt_*) are not cleared.
      */
     @Update("""
         UPDATE ab_meta_model SET
             extension = #{extension}::jsonb,
             plugin_pid = #{pluginPid},
-            table_name = #{tableName},
+            table_name = COALESCE(#{tableName}, table_name),
             model_category = #{modelCategory},
             updated_at = NOW()
         WHERE tenant_id = #{tenantId} AND code = #{code} AND deleted_flag = FALSE

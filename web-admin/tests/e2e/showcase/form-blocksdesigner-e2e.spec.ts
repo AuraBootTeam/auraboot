@@ -521,7 +521,10 @@ test.describe('Phase 4 — Form BlocksDesigner E2E (widget config chain)', () =>
   test('P4.2: configure widget for 6 fields and persist component into ui_schema', async ({
     page,
   }) => {
-    test.skip(true, 'BACKLOG B15: form designer route crashes with "Cannot read properties of undefined (reading \'map\')" before designer-properties-panel mounts. Page-level error boundary intercepts. Needs root-cause fix in form designer schema/field initialization.');
+    // B15 fixed: buildComponentOptionsFromRegistry now normalises dataType keys to uppercase,
+    // preventing getComponentOptions() from returning undefined when the server registry
+    // ships lowercase keys (e.g. "string" instead of "STRING"). The SmartSelect `options.map()`
+    // no longer crashes, so designer-properties-panel mounts correctly for form kind pages.
     const pageKey = uniquePageKey();
     const pid = await apiCreateFormPage(page, pageKey);
     createdPagePids.push(pid);
