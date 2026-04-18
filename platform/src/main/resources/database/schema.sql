@@ -6791,6 +6791,58 @@ CREATE INDEX IF NOT EXISTS idx_apv_outbox_pending ON ab_agent_approval_notificat
 CREATE INDEX IF NOT EXISTS idx_apv_outbox_approval ON ab_agent_approval_notification_outbox (approval_pid);
 COMMENT ON TABLE ab_agent_approval_notification_outbox IS 'Approval notification delivery log with exponential-backoff retry (spec §3.5.4)';
 
+-- ============================================================================
+-- ACP Host Service Durables (ACP-Target-vs-Hermes §4.7)
+-- Two tables that make the agent runtime survive pod restarts:
+--   ab_agent_channel_session_state — channel session with lease/heartbeat
+--   ab_agent_schedule_delivery_outbox — scheduled-run notification retry
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS ab_agent_channel_session_state (
+    id               BIGSERIAL PRIMARY KEY,
+    pid              VARCHAR(26) UNIQUE NOT NULL,
+    tenant_id        BIGINT NOT NULL,
+    -- session_id is the channel-level identifier (e.g. SSE session id,
+    -- IM conversation id) — the thing a reconnecting client identifies.
+    session_id       VARCHAR(100) NOT NULL,
+    channel          VARCHAR(32) NOT NULL,            -- web | im | api | mobile
+    -- Pod holding the active lease. Empty/null = no active owner → up for grabs.
+    owner_pod_id     VARCHAR(100),
+    lease_expires_at TIMESTAMPTZ,                     -- another pod may claim after this
+    last_heartbeat_at TIMESTAMPTZ,
+    -- Free-form state the owner pod periodically saves so a new owner can
+    -- resume without full replay (e.g. last LLM message index, partial tool
+    -- output). Bounded by caller; we don't gate size here.
+    session_state    JSONB,
+    created_at       TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at       TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (tenant_id, session_id)
+);
+CREATE INDEX IF NOT EXISTS idx_chan_session_owner ON ab_agent_channel_session_state (owner_pod_id, lease_expires_at);
+CREATE INDEX IF NOT EXISTS idx_chan_session_expired ON ab_agent_channel_session_state (lease_expires_at) WHERE owner_pod_id IS NOT NULL;
+COMMENT ON TABLE ab_agent_channel_session_state IS 'Channel session state + lease for multi-pod crash-safe resume';
+
+CREATE TABLE IF NOT EXISTS ab_agent_schedule_delivery_outbox (
+    id              BIGSERIAL PRIMARY KEY,
+    pid             VARCHAR(26) UNIQUE NOT NULL,
+    tenant_id       BIGINT NOT NULL,
+    run_pid         VARCHAR(26) NOT NULL,             -- ab_agent_run.pid (scheduled run)
+    recipient_kind  VARCHAR(20) NOT NULL,             -- user | role | group
+    recipient_id    VARCHAR(200) NOT NULL,
+    channel         VARCHAR(20) NOT NULL DEFAULT 'inbox',
+    payload         JSONB NOT NULL,
+    status          VARCHAR(20) NOT NULL DEFAULT 'pending',
+    retry_count     INTEGER NOT NULL DEFAULT 0,
+    last_error      TEXT,
+    next_retry_at   TIMESTAMPTZ,
+    delivered_at    TIMESTAMPTZ,
+    created_at      TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_sched_delivery_pending ON ab_agent_schedule_delivery_outbox (next_retry_at, status) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_sched_delivery_run ON ab_agent_schedule_delivery_outbox (run_pid);
+COMMENT ON TABLE ab_agent_schedule_delivery_outbox IS 'Scheduled-run notification outbox with exponential-backoff retry';
+
 -- Seed: platform built-in capabilities (tenant_id = -1)
 -- Skills are the built-in per-tenant generic codes (dsl.query / dsl.command)
 -- that AgentTemplateSeeder creates for every tenant; the router will return
