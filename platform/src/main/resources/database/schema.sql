@@ -6946,6 +6946,49 @@ CREATE INDEX IF NOT EXISTS idx_pack_binding_tenant ON ab_agent_skill_pack_bindin
 CREATE INDEX IF NOT EXISTS idx_pack_binding_pack ON ab_agent_skill_pack_binding (pack_pid);
 COMMENT ON TABLE ab_agent_skill_pack_binding IS 'Which skill pack(s) activate for a (profile × channel × run_kind) tuple';
 
+-- ============================================================================
+-- ACP Dry-Run Support Registry (learning-loop.md §6.0.2)
+-- Shadow Mode needs to replay a candidate Skill without producing side
+-- effects. Per ACP spec, different substrates support dry-run differently:
+--   FULL       — executor can run safely with no side effect (e.g.
+--                dsl_query NamedQuery; mcp tool with annotations.readOnly=true)
+--   SIMULATED  — executor runs validation + before-snapshot phases, skips
+--                commit (e.g. dsl_command with dry_run_supported=true)
+--   NONE       — can't be shadowed (e.g. third-party webhook with no dry
+--                endpoint); Shadow Mode skips; promotion goes straight to
+--                reinforced human gate
+--
+-- Pattern matches are exact OR trailing '*' prefix; tenant_id=-1 = platform
+-- default. A tenant can override by inserting a row that overrides the
+-- default (lookup picks the most specific match, tenant beats platform).
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS ab_agent_dry_run_support (
+    id                BIGSERIAL PRIMARY KEY,
+    pid               VARCHAR(26) UNIQUE NOT NULL,
+    tenant_id         BIGINT NOT NULL,                 -- -1 = platform default
+    tool_ref_pattern  VARCHAR(200) NOT NULL,
+    support_level     VARCHAR(16) NOT NULL CHECK (support_level IN ('FULL', 'SIMULATED', 'NONE')),
+    hint              VARCHAR(500),
+    created_at        TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at        TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (tenant_id, tool_ref_pattern)
+);
+CREATE INDEX IF NOT EXISTS idx_dry_run_support_tenant ON ab_agent_dry_run_support (tenant_id);
+COMMENT ON TABLE ab_agent_dry_run_support IS 'Registry of which tool_refs support Shadow Mode dry-run (spec §6.0.2)';
+
+-- Platform defaults: dsl_query and nq_* are read-only → FULL.
+-- dsl_command / cmd_* → NONE (requires CommandPipeline dry-run work,
+-- separate PR). api_call / mcp / code → NONE until per-tool annotation
+-- flows in.
+INSERT INTO ab_agent_dry_run_support (pid, tenant_id, tool_ref_pattern, support_level, hint) VALUES
+('DRS_DSL_QUERY_ANY',  -1, 'nq_*',       'FULL', 'Named queries are side-effect free; FULL dry-run is just running the query'),
+('DRS_DSL_QUERY_NQ',   -1, 'dsl.query',  'FULL', 'Built-in dsl.query skill is always read-only'),
+('DRS_DSL_CMD_BLOCK',  -1, 'cmd_*',      'NONE', 'DSL write commands need CommandPipeline dry-run (not yet wired)'),
+('DRS_DSL_COMMAND',    -1, 'dsl.command','NONE', 'Built-in dsl.command skill is always side-effectful'),
+('DRS_CODE_BLOCK',     -1, 'code.*',     'NONE', 'Code substrate without sandbox dry-run capability is unsafe'),
+('DRS_API_BLOCK',      -1, 'api_*',      'NONE', 'API calls lack dry_run_safe annotations by default')
+ON CONFLICT DO NOTHING;
+
 -- Seed: platform built-in capabilities (tenant_id = -1)
 -- Skills are the built-in per-tenant generic codes (dsl.query / dsl.command)
 -- that AgentTemplateSeeder creates for every tenant; the router will return
