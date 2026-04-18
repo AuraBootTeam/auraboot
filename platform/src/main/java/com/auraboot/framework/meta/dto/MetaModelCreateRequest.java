@@ -4,6 +4,7 @@ import lombok.Data;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -54,6 +55,36 @@ public class MetaModelCreateRequest {
      * Table name for the model (optional, auto-generated if not specified).
      */
     private String tableName;
+
+    /**
+     * Source type for virtual model: physical | namedQuery | endpoint | sqlView.
+     * Defaults to "physical" when omitted.
+     */
+    private String sourceType;
+
+    /**
+     * Source reference: for namedQuery the query code; for endpoint the connector
+     * endpoint code; for sqlView the view name. Required when sourceType != physical.
+     */
+    private String sourceRef;
+
+    /**
+     * Primary key field code. Used as list rowKey and default detailKeyField.
+     */
+    private String primaryKey;
+
+    /**
+     * Declared capabilities (read/write/sort/filter/paginate/export + whitelists).
+     * Runtime truth for feature toggles and whitelist-based validation.
+     */
+    private ModelCapabilities capabilities;
+
+    /**
+     * Field definitions supplied by the virtual-model wizard. Each entry
+     * carries at minimum code/dataType/sortable/filterable and is normalized
+     * into capabilities.sortableFields/filterableFields at save time.
+     */
+    private List<FieldDefinition> fields;
 
     /**
      * 扩展属性
