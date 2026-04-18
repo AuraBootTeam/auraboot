@@ -173,7 +173,7 @@ public class PageSchemaDefaultBlockGenerator {
             Map<String, Object> main = new LinkedHashMap<>();
             main.put("id", "section_main");
             main.put("blockType", "detail-section");
-            main.put("title", "基本信息");
+            main.put("title", Map.of("zh-CN", "基本信息", "en-US", "Basic Info"));
             main.put("columns", 2);
             main.put("fields", mainFields);
             blocks.add(main);
@@ -183,7 +183,7 @@ public class PageSchemaDefaultBlockGenerator {
             Map<String, Object> audit = new LinkedHashMap<>();
             audit.put("id", "section_audit");
             audit.put("blockType", "detail-section");
-            audit.put("title", "系统信息");
+            audit.put("title", Map.of("zh-CN", "系统信息", "en-US", "System Info"));
             audit.put("columns", 2);
             audit.put("fields", auditFields);
             audit.put("collapsible", true);
@@ -213,7 +213,7 @@ public class PageSchemaDefaultBlockGenerator {
         Map<String, Object> section = new LinkedHashMap<>();
         section.put("id", "form_section_main");
         section.put("blockType", "form-section");
-        section.put("title", "基本信息");
+        section.put("title", Map.of("zh-CN", "基本信息", "en-US", "Basic Info"));
         section.put("columns", 2);
         section.put("fields", writableFields);
         blocks.add(section);
