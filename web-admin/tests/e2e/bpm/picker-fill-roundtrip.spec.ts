@@ -12,14 +12,12 @@
  *   - MemberPicker       (sc_team_members, open/search/select only — see below)
  *   - CascadeSelect      (sc_cascade_category, interaction only — see below)
  *
- * ⚠️ Known product contract gaps (tracked separately, NOT masked here):
- *   - CascadeSelect emits `string[]` (all chosen levels), but the
- *     `sc_cascade_category` backend field is `dataType:string`. A single-string
- *     adapter is missing. This spec clicks through all 3 levels to exercise the
- *     picker UI but does NOT include the field in the submitted payload.
- *   - MemberPicker in `multiple:true` mode emits `string[]`. Backend command
- *     rejects with "must be a string". This spec exercises open + search + click
- *     but does not include the field in the submitted payload.
+ * GAP-258 (fixed 2026-04-17): ControlledFieldRenderer now adapts picker output
+ * to backend field shape at the edge:
+ *   - cascadeselect emits the deepest (leaf) value as a single string.
+ *   - memberpicker with multiple:true serializes its string[] as a JSON string
+ *     (e.g. '["pid-abc","pid-def"]'); callers parse back with JSON.parse.
+ * Both fields are asserted end-to-end in PIK-1.
  *
  * Coverage dimensions (per docs/standards/testing-e2e-web.md):
  *   D1  Sidebar navigation (no shortcut via page.goto to /new)
@@ -278,19 +276,18 @@ test.describe('All-picker UI fill round-trip', { tag: ['@bpm-regression', '@pick
     await fillDate(page, 'sc_start_date', START_DATE);
     await fillDate(page, 'sc_end_date', END_DATE);
 
-    // [D4/D5] CascadeSelect — drive UI through all 3 levels even though the
-    // value is NOT included in sc:create_showcase inputFields (component emits
-    // string[], backend expects string). Verifies the trigger→options→leaf
-    // flow is clickable for every level so we would catch a regression like
-    // "levels don't re-enable after parent select".
+    // [D4/D5] CascadeSelect — drive UI through all 3 levels. Post-GAP-258 the
+    // renderer narrows onChange output to the deepest leaf (single string),
+    // which matches sc_cascade_category dataType:string.
     await pickCascade(page, CASCADE_L0, CASCADE_L1, CASCADE_L2);
 
     // [D4/D5] TreeSelect — single-mode string. Persisted.
     await pickTreeSelect(page, TREE_VALUE);
 
     // [D4/D5] MemberPicker — exercises open + search + option click path.
-    // Field is multiple:true, so onChange emits string[] and backend command
-    // currently rejects it. Not in submitted payload.
+    // Field is multiple:true; post-GAP-258 the renderer serializes the string[]
+    // as a JSON string so sc_team_members (dataType:string, maxLength:2000) stores
+    // '["pid-..."]'. Asserted below via JSON.parse.
     await pickMember(page, memberId);
     await expect(
       page.locator(`[data-testid="member-picker-selected-${memberId}"]`).first(),
@@ -327,6 +324,22 @@ test.describe('All-picker UI fill round-trip', { tag: ['@bpm-regression', '@pick
     expect(String(record.sc_end_date), 'DatePicker sc_end_date persisted').toContain(END_DATE);
     expect(String(record.sc_tree_node), 'TreeSelect persisted as leaf value').toBe(TREE_VALUE);
     expect(String(record.sc_department), 'OrganizationSelect persisted as org id').toBe(ORG_TECH);
+
+    // GAP-258: CascadeSelect now persists the deepest leaf value (single string).
+    expect(
+      String(record.sc_cascade_category),
+      'CascadeSelect persisted as deepest leaf (single string)',
+    ).toBe(CASCADE_L2);
+
+    // GAP-258: MemberPicker(multiple) persists as JSON-serialized string[].
+    expect(
+      record.sc_team_members,
+      'MemberPicker persisted as JSON string (dataType:string)',
+    ).toBeTruthy();
+    expect(
+      JSON.parse(String(record.sc_team_members)),
+      'MemberPicker JSON parses to the picked ids',
+    ).toEqual([memberId]);
   });
 
   test('PIK-2 — Reopen edit form: pickers show initial values, edit, persist', async ({ page, request }) => {
