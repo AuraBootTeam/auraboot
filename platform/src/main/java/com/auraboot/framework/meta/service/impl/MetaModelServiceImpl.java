@@ -788,8 +788,15 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
      * Any caller-supplied whitelist is OVERRIDDEN here.
      */
     private ModelCapabilities normalizeCapabilities(ModelDefinition def) {
-        ModelCapabilities raw = def.getCapabilities() != null
-            ? def.getCapabilities() : ModelCapabilities.empty();
+        ModelCapabilities raw;
+        if (def.getCapabilities() != null) {
+            raw = def.getCapabilities();
+        } else {
+            String st = def.getSourceType();
+            raw = (st == null || "physical".equals(st))
+                ? ModelCapabilities.fullPhysical()
+                : ModelCapabilities.empty();
+        }
 
         java.util.List<String> sortable = new java.util.ArrayList<>();
         java.util.List<String> filterable = new java.util.ArrayList<>();
