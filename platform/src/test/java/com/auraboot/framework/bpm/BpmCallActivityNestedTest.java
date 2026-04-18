@@ -152,17 +152,6 @@ class BpmCallActivityNestedTest extends BaseIntegrationTest {
     // NESTED-01: end-to-end variable propagation across 2 callActivity hops
     // =====================================================================
     @Test
-    @Disabled("""
-            SURFACES REAL GAP (CA-NEST-GAP-1): callActivity output propagation does
-            not compose across nesting levels. The grandchild's {@code grandchildOutput}
-            leaks directly to the parent's variable scope, but the child's
-            {@code outputMappings} chain (grandchildOutput → childOutput → parentOutput)
-            only executes ONE hop. Observed at the parent: {grandchildOutput, parentInput}
-            but NO {parentOutput}. Expected behavior: the child's ACTIVITY_END listener
-            must resolve its outputMapping against the child's own scope (now populated
-            with childOutput from the grandchild's hop), then project into the parent.
-            Fix target: AuraCallActivityListener — ensure ACTIVITY_END reads post-hop
-            child vars, not pre-hop. Ticket: CA-NEST-GAP-1.""")
     @DisplayName("NESTED-01: parent → child → grandchild; input & output propagate across both hops")
     void nested_fullPropagation() {
         // Deploy from leaf to root
