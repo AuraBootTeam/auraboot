@@ -125,7 +125,7 @@ export function AuraBotPanel() {
             className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-sm font-semibold text-gray-800 transition-colors hover:bg-white/60 dark:text-gray-200 dark:hover:bg-gray-700/50"
             data-testid="agent-selector-trigger"
           >
-            {currentAgent.agent_name || currentAgent.agent_code}
+            <span>{currentAgent.agent_name || currentAgent.agent_code}</span>
             {agents.length > 1 && <ChevronUpDownIcon className="h-3.5 w-3.5 text-gray-400" />}
           </button>
 
