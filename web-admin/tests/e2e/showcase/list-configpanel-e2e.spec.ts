@@ -289,7 +289,6 @@ test.describe('Phase 3 — List ConfigPanel E2E (4 tabs)', () => {
     // mismatch between Playwright storageState and same-origin browser fetch.
     // Tested credentials:'include' — no effect. Needs deeper diagnosis (network
     // panel + actual response inspection in real browser).
-    test.skip(true, 'BACKLOG B14: SPA fetch of capabilities never resolves in browser context');
     const capabilitiesAvailable = await probeCapabilities(request);
     test.skip(
       !capabilitiesAvailable,
@@ -366,7 +365,6 @@ test.describe('Phase 3 — List ConfigPanel E2E (4 tabs)', () => {
     page,
     request,
   }) => {
-    test.skip(true, 'BACKLOG B14: SPA fetch of capabilities never resolves in browser context (see P3.1)');
     const capabilitiesAvailable = await probeCapabilities(request);
     test.skip(
       !capabilitiesAvailable,
@@ -433,7 +431,6 @@ test.describe('Phase 3 — List ConfigPanel E2E (4 tabs)', () => {
     page,
     request,
   }) => {
-    test.skip(true, 'BACKLOG B14: SPA fetch of capabilities never resolves in browser context (see P3.1)');
     const capabilitiesAvailable = await probeCapabilities(request);
     test.skip(
       !capabilitiesAvailable,
@@ -495,7 +492,6 @@ test.describe('Phase 3 — List ConfigPanel E2E (4 tabs)', () => {
     page,
     request,
   }) => {
-    test.skip(true, 'BACKLOG B14: SPA fetch of capabilities never resolves in browser context (see P3.1)');
     const capabilitiesAvailable = await probeCapabilities(request);
     test.skip(
       !capabilitiesAvailable,
