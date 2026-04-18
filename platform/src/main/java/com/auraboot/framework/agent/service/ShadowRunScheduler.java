@@ -155,7 +155,7 @@ public class ShadowRunScheduler {
                 if (projectionToolRef != null) {
                     // PR-60: project to canonical signature so original/shadow
                     // shapes align. See OutputSignatureProjector javadoc.
-                    String actionStatus = (String) origin.get("status");
+                    String actionStatus = (String) origin.get("action_status");
                     String targetRecordId = (String) origin.get("target_record_id");
                     Integer affectedCount = origin.get("affected_count") == null ? null
                             : ((Number) origin.get("affected_count")).intValue();
@@ -171,7 +171,7 @@ public class ShadowRunScheduler {
                         .originalOutputHash(originalOutputHash)
                         .originalDurationMs(origin.get("duration_ms") == null ? null :
                                 ((Number) origin.get("duration_ms")).longValue())
-                        .originalStatus((String) origin.get("status"))
+                        .originalStatus((String) origin.get("action_status"))
                         .args(Map.of())      // invocation args not reconstructed in this PR
                         .build();
                 try {
@@ -221,9 +221,17 @@ public class ShadowRunScheduler {
     }
 
     private Map<String, Object> loadOriginalRun(String runId) {
+        // N-R3-3: expose the real column name "action_status" rather than
+        // aliasing it to "status" — the alias created a second name for the
+        // same value and divergent read sites. Call sites updated to use
+        // origin.get("action_status").
+        //
+        // N-R3-4: COALESCE(updated_at, executed_at) so duration_ms collapses
+        // to 0 instead of SQL NULL when a row has not been updated yet.
+        // Downstream code unboxes this as a primitive long.
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                "SELECT action_status AS status, " +
-                        "  EXTRACT(EPOCH FROM (updated_at - executed_at)) * 1000 AS duration_ms, " +
+                "SELECT action_status, " +
+                        "  EXTRACT(EPOCH FROM (COALESCE(updated_at, executed_at) - executed_at)) * 1000 AS duration_ms, " +
                         "  after_snapshot::text AS after_snapshot_json, " +
                         "  target_record_id, " +
                         "  affected_count " +
