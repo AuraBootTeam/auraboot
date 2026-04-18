@@ -1,11 +1,15 @@
 package com.auraboot.framework.bpm.config;
 
+import com.auraboot.smart.framework.engine.bpmn.behavior.gateway.helper.InclusiveGatewayHelper;
 import com.auraboot.smart.framework.engine.configuration.VariablePersister;
 import com.auraboot.smart.framework.engine.constant.RequestMapSpecialKeyConstant;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.lang.reflect.Field;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -73,6 +77,23 @@ public class AuraVariablePersister implements VariablePersister {
     public Object deserialize(String key, String type, String value) {
         if (value == null) {
             return null;
+        }
+        // InclusiveGateway special case: the trigger-activity-ids variable is
+        // written with fieldType=String.class but the payload is a serialized
+        // List<String> (see
+        // com.auraboot.smart.framework.engine.bpmn.behavior.gateway.helper
+        //   .InclusiveGatewayHelper#persistMatchedTransitionsEagerly and
+        //   #findTriggerActivityIdsFromDB which casts the result to
+        //   List<String>). If we honored the declared String type we'd return
+        //   the raw JSON array literal and the cast in the helper would blow
+        //   up with ClassCastException at inclusive join time. Matches
+        //   SmartEngine's reference CustomVariablePersister.
+        if (key != null && key.contains(InclusiveGatewayHelper.TRIGGER_ACTIVITY_IDS)) {
+            try {
+                return MAPPER.readValue(value, new TypeReference<List<String>>() {});
+            } catch (Exception e) {
+                return Collections.emptyList();
+            }
         }
         // Restore original types so Drools MVEL constraints like
         // ((Number) this["days"]).doubleValue() work across segments.
