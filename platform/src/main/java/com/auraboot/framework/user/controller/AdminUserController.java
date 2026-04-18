@@ -89,6 +89,26 @@ public class AdminUserController {
         return ApiResponse.success(results);
     }
 
+    /**
+     * Lookup a single user by PID for picker resolve-name flows.
+     * Returns the same safe projection as /search; password and other sensitive
+     * fields are never included. Tenant-scoped: 404 if the user is not in the
+     * caller's tenant.
+     */
+    @GetMapping("/{userPid}")
+    @Operation(summary = "Get a single user by PID (picker resolve-name)")
+    public ApiResponse<UserSearchDTO> getOne(@PathVariable String userPid) {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        if (tenantId == null) {
+            throw new RootUnCheckedException(ResponseCode.BadParam, "No tenant context");
+        }
+        UserSearchDTO dto = userService.findInTenantByPid(tenantId, userPid);
+        if (dto == null) {
+            throw new RootUnCheckedException(ResponseCode.NOT_FOUND, "User not found in current tenant: " + userPid);
+        }
+        return ApiResponse.success(dto);
+    }
+
     @PostMapping("/{userPid}/reset-password")
     @Operation(summary = "Admin reset user password")
     public ApiResponse<Map<String, String>> resetPassword(@PathVariable String userPid) {

@@ -59,6 +59,25 @@ public class UserServiceImpl implements UserService {
                 .toList();
     }
 
+    @Override
+    public UserSearchDTO findInTenantByPid(Long tenantId, String pid) {
+        Objects.requireNonNull(tenantId, "tenantId is required");
+        if (pid == null || pid.isBlank()) {
+            return null;
+        }
+        Map<String, Object> row = userMapper.findUserInTenantByPid(tenantId, pid);
+        if (row == null) {
+            return null;
+        }
+        return UserSearchDTO.builder()
+                .pid(stringValue(row.get("pid")))
+                .displayName(stringValue(row.get("display_name")))
+                .email(stringValue(row.get("email")))
+                .avatarUrl(stringValue(row.get("avatar_url")))
+                .departmentName(stringValue(row.get("department_name")))
+                .build();
+    }
+
     private static String stringValue(Object v) {
         return v == null ? null : v.toString();
     }

@@ -56,4 +56,11 @@ public interface UserService {
      * @param size     hard upper bound on returned rows (clamped to [1, 200])
      */
     List<UserSearchDTO> searchInTenant(Long tenantId, String keyword, int size);
+
+    /**
+     * Look up a single user by PID, restricted to the given tenant. Returns the
+     * same safe projection as {@link #searchInTenant} (password etc never included).
+     * Returns null when the user does not exist or is not a member of the tenant.
+     */
+    UserSearchDTO findInTenantByPid(Long tenantId, String pid);
 }
