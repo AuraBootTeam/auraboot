@@ -521,9 +521,13 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         Map<String, Object> feature = dto.getFeature() != null ? new LinkedHashMap<>(dto.getFeature()) : new LinkedHashMap<>();
         if (dto.getConstraints() == null) return feature.isEmpty() ? null : feature;
 
-        if (dto.getConstraints().getRequired() != null) {
-            feature.put("required", dto.getConstraints().getRequired());
-        }
+        // GAP-259 regression guard: field-level `constraints.required` MUST NOT propagate to
+        // the global FieldFeatureBean. Required-ness is a per-binding concept (one field can be
+        // required in model_A but optional in model_B). Writing it to feature.required causes
+        // cross-plugin cross-model pollution — any plugin re-importing the same field code
+        // silently flips NOT NULL semantics on every model bound to it (downstream DDL in
+        // SchemaManagementServiceImpl reads field.isRequired() to emit NOT NULL columns).
+        // Use ModelFieldBindingDTO.required for per-binding required-ness instead.
         if (dto.getConstraints().getUnique() != null) {
             feature.put("unique", dto.getConstraints().getUnique());
         }
