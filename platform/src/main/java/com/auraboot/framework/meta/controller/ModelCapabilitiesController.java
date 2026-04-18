@@ -68,9 +68,17 @@ public class ModelCapabilitiesController {
             throw new RootUnCheckedException(ResponseCode.NOT_FOUND, "Model not found: " + code);
         }
 
-        ModelCapabilities caps = def.getCapabilities() != null
-                ? def.getCapabilities()
-                : ModelCapabilities.empty();
+        ModelCapabilities caps = def.getCapabilities();
+        boolean isEmpty = caps == null
+                || (!caps.isList() && !caps.isDetail() && !caps.isCreate() && !caps.isUpdate()
+                    && !caps.isDelete() && !caps.isBulkDelete() && !caps.isExport()
+                    && !caps.isSort() && !caps.isFilter() && !caps.isPaginate());
+        if (isEmpty) {
+            String st = def.getSourceType();
+            caps = (st == null || "physical".equals(st))
+                    ? ModelCapabilities.fullPhysical()
+                    : ModelCapabilities.empty();
+        }
 
         return ApiResponse.ok(caps);
     }
