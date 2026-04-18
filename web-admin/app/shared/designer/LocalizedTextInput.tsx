@@ -152,9 +152,15 @@ export const LocalizedTextInput: React.FC<LocalizedTextInputProps> = ({
 
   return (
     <div className={className}>
-      {label && (
+      {/* Toggle row — always renders (label optional) so wrapping in
+          <PropertyField label="..."> still surfaces the "+ 多语言" button. */}
+      {(label || !i18nMode) && (
         <div className="mb-1 flex items-center justify-between">
-          <label className="block text-xs font-medium text-gray-600">{label}</label>
+          {label ? (
+            <label className="block text-xs font-medium text-gray-600">{label}</label>
+          ) : (
+            <span />
+          )}
           {!i18nMode && (
             <button
               type="button"
