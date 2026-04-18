@@ -11,6 +11,7 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import type { KeyboardEvent } from 'react';
 import { useAuraBot } from '../components-shell/AuraBotProvider';
 import type { SimpleMessage } from '../components-shell/AuraBotProvider';
+import { useI18n } from '~/contexts/I18nContext';
 import { ToolResultCard } from './ToolResultCard';
 import { ChatBiResultCard } from './ChatBiResultCard';
 import { ConfirmCard } from './ConfirmCard';
@@ -491,6 +492,7 @@ function SelectedKbChips() {
 
 export function AuraBotChat() {
   const { state, sendMessage, setInputValue, confirmTool, cancelTool } = useAuraBot();
+  const { t } = useI18n();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -613,7 +615,7 @@ export function AuraBotChat() {
                   ? 'bg-blue-600 text-white hover:bg-blue-700'
                   : 'cursor-not-allowed bg-gray-200 text-gray-400'
               } `}
-              title="Send (Cmd+Enter)"
+              title={t('aurabot.chat.send', undefined, '发送 (Cmd+Enter)')}
             >
               <SendIcon className="h-5 w-5" />
             </button>
