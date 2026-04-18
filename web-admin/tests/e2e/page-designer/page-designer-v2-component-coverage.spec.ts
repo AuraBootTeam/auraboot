@@ -35,6 +35,7 @@ test.beforeEach(async ({ page }) => {
       pageKey: `${PREFIX.toLowerCase()}_deep`,
       title: 'Untitled',
       kind: 'list',
+      modelCode: 'tenant',
       blocks: [],
       semver: '0.1.0',
     },

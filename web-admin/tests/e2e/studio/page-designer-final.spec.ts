@@ -46,6 +46,7 @@ async function createBlankPage(page: Page): Promise<string> {
       pageKey,
       title: name,
       kind: 'list',
+      modelCode: 'tenant',
       blocks: [],
       metaInfo: { componentCount: 0 },
       semver: '0.1.0',
@@ -314,6 +315,7 @@ test.describe('Toolbar', () => {
         pageKey,
         title: name,
         kind: 'list',
+        modelCode: 'tenant',
         blocks: [
           { blockType: 'table', id: 'seed-table', fields: [] },
           { blockType: 'filters', id: 'seed-filters', conditions: [] },
