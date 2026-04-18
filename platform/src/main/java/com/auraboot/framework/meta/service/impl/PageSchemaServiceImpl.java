@@ -46,6 +46,7 @@ public class PageSchemaServiceImpl implements PageSchemaService {
     private final com.auraboot.framework.meta.mapper.MetaModelMapper metaModelMapper;
     private final ApplicationEventPublisher eventPublisher;
     private final MetaModelService metaModelService;
+    private final PageSchemaDefaultBlockGenerator defaultBlockGenerator;
 
     /** Extension key used to snapshot the bound {modelCode}@{version} at page-save time. */
     private static final String EXT_BOUND_MODEL_VERSION = "boundModelVersion";
@@ -60,6 +61,17 @@ public class PageSchemaServiceImpl implements PageSchemaService {
         validateCreateRequest(request);
         validatePageKeyUnique(request.getPageKey(), null);
         validateNameUnique(request.getName(), null);
+
+        // Auto-populate default blocks when caller supplied none but the page has
+        // a bound modelCode (quick-generate flow). Deterministic per §12.8.
+        if ((request.getBlocks() == null || request.getBlocks().isEmpty())
+            && StringUtils.hasText(request.getModelCode())) {
+            List<Map<String, Object>> defaults = defaultBlockGenerator.generate(
+                request.getKind(), request.getModelCode());
+            if (!defaults.isEmpty()) {
+                request.setBlocks(new ArrayList<>(defaults));
+            }
+        }
         
         // 转换实体并设置默认值
         PageSchema pageSchema = pageSchemaConverter.toEntity(request);
