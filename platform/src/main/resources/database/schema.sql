@@ -6713,7 +6713,7 @@ COMMENT ON TABLE ab_agent_learning_pattern IS 'ACP Learning Loop §3 — aggrega
 CREATE TABLE IF NOT EXISTS ab_agent_skill_draft (
     id                   BIGSERIAL PRIMARY KEY,
     pid                  VARCHAR(26) UNIQUE NOT NULL,
-    tenant_id            BIGINT,
+    tenant_id            BIGINT NOT NULL,
     draft_skill_code     VARCHAR(128),
     -- Full skill contract (substrate, inputs, outputs, tool_refs) rendered as YAML
     -- so the reviewer sees exactly what will be promoted. hash for dedup.
@@ -6737,12 +6737,29 @@ CREATE INDEX IF NOT EXISTS idx_skill_draft_tenant_status ON ab_agent_skill_draft
 CREATE INDEX IF NOT EXISTS idx_skill_draft_pattern_hash ON ab_agent_skill_draft (source_pattern_hash);
 COMMENT ON TABLE ab_agent_skill_draft IS 'ACP Learning Loop §4 — generated Skill contracts awaiting human review / shadow run';
 
+-- PR-55: schema integrity tightening (N8 status enum + N9 tenant_id NOT NULL)
+-- Dev stage: purge orphan rows then lock down the column. No prod data to preserve.
+DELETE FROM ab_agent_skill_draft WHERE tenant_id IS NULL;
+ALTER TABLE ab_agent_skill_draft ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE ab_agent_skill_draft DROP CONSTRAINT IF EXISTS chk_skill_draft_status;
+ALTER TABLE ab_agent_skill_draft
+    ADD CONSTRAINT chk_skill_draft_status CHECK (status IN (
+        'DRAFT_PENDING_REVIEW',
+        'REVIEWED_OK',
+        'REVIEWED_REJECTED',
+        'SHADOW_RUNNING',
+        'PROMOTED_PENDING_HUMAN',
+        'ACTIVE',
+        'DISCARDED'
+    ));
+-- end PR-55 (skill_draft)
+
 CREATE TABLE IF NOT EXISTS ab_agent_shadow_run (
     id                   BIGSERIAL PRIMARY KEY,
     pid                  VARCHAR(26) UNIQUE NOT NULL,
     tenant_id            BIGINT NOT NULL,
     draft_id             VARCHAR(26) NOT NULL,    -- ab_agent_skill_draft.pid
-    original_run_id      VARCHAR(26) NOT NULL,    -- ab_agent_run.pid
+    original_run_id      VARCHAR(26) NOT NULL,    -- logical FK to ab_agent_action.run_id (no DB FK — see PR-55 comment below)
     shadow_status        VARCHAR(16),             -- success | failed | timeout
     shadow_duration_ms   BIGINT,
     shadow_cost_usd      DECIMAL(10,4),
@@ -6760,6 +6777,40 @@ CREATE TABLE IF NOT EXISTS ab_agent_shadow_run (
 CREATE INDEX IF NOT EXISTS idx_shadow_run_draft_created ON ab_agent_shadow_run (draft_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_shadow_run_original ON ab_agent_shadow_run (original_run_id);
 COMMENT ON TABLE ab_agent_shadow_run IS 'ACP Learning Loop §6 — one row per shadow-mode execution comparing draft against production';
+
+-- PR-55: schema integrity tightening (N8 status enum + N10 FK + Notable #6 unique)
+-- shadow_status enum — allowed values mirror ShadowExecutor.java (success|skipped|failed)
+-- plus 'timeout' reserved for future watchdog path (ShadowRunner.java:80 comment).
+ALTER TABLE ab_agent_shadow_run DROP CONSTRAINT IF EXISTS chk_shadow_run_status;
+ALTER TABLE ab_agent_shadow_run
+    ADD CONSTRAINT chk_shadow_run_status CHECK (shadow_status IS NULL OR shadow_status IN (
+        'success',
+        'failed',
+        'timeout',
+        'skipped'
+    ));
+-- FK to ab_agent_skill_draft — cascade delete so purged drafts don't leave orphans.
+ALTER TABLE ab_agent_shadow_run DROP CONSTRAINT IF EXISTS fk_shadow_run_draft;
+ALTER TABLE ab_agent_shadow_run
+    ADD CONSTRAINT fk_shadow_run_draft
+    FOREIGN KEY (draft_id) REFERENCES ab_agent_skill_draft(pid)
+    ON DELETE CASCADE;
+-- FK to ab_agent_run intentionally skipped: shadow_run.original_run_id values
+-- come from ab_agent_action.run_id (plain VARCHAR, no PK/uniqueness guarantee)
+-- rather than ab_agent_run.pid. Scheduler seeds actions without a matching
+-- ab_agent_run row, so adding FK → ab_agent_run(pid) would break real ingestion.
+-- Treated as logical foreign key enforced at application layer.
+-- Notable #6: refuse multi-node scheduler race double-insert. Purge dupes first.
+DELETE FROM ab_agent_shadow_run a
+USING ab_agent_shadow_run b
+WHERE a.id > b.id
+  AND a.draft_id = b.draft_id
+  AND a.original_run_id = b.original_run_id;
+ALTER TABLE ab_agent_shadow_run DROP CONSTRAINT IF EXISTS uq_shadow_run_draft_original;
+ALTER TABLE ab_agent_shadow_run
+    ADD CONSTRAINT uq_shadow_run_draft_original
+    UNIQUE (draft_id, original_run_id);
+-- end PR-55 (shadow_run)
 
 -- ============================================================================
 -- ACP Approval Notification Outbox (spec §3.5.4)
