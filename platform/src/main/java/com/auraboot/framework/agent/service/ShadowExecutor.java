@@ -1,10 +1,12 @@
 package com.auraboot.framework.agent.service;
 
+import com.auraboot.framework.agent.metrics.LearningLoopMetrics;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Builder;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -39,6 +41,9 @@ public class ShadowExecutor {
     private final ShadowRunner shadowRunner;
     private final List<ShadowToolInvoker> invokers;
 
+    @Autowired(required = false)
+    private LearningLoopMetrics metrics;
+
     @Data
     @Builder
     public static class ExecutionRequest {
@@ -63,6 +68,7 @@ public class ShadowExecutor {
                 "SELECT tenant_id, contract_yaml FROM ab_agent_skill_draft WHERE pid = ?", req.draftPid);
         if (rows.isEmpty()) {
             log.warn("ShadowExecutor: draft {} not found", req.draftPid);
+            if (metrics != null) metrics.recordShadowRunOutcome(null, "skipped_not_found");
             return ExecutionResult.builder()
                     .outcome("skipped_not_found")
                     .eligibility(ShadowEligibilityChecker.Eligibility.NOT_FOUND).build();
@@ -74,6 +80,7 @@ public class ShadowExecutor {
         if (eligibility == ShadowEligibilityChecker.Eligibility.INELIGIBLE_NO_DRY_RUN_SUPPORT
                 || eligibility == ShadowEligibilityChecker.Eligibility.INELIGIBLE_CODE_SIDE_EFFECT_UNKNOWN) {
             log.info("ShadowExecutor: draft {} ineligible ({}), skipping shadow", req.draftPid, eligibility);
+            if (metrics != null) metrics.recordShadowRunOutcome(tenantId, "skipped_ineligible");
             return ExecutionResult.builder()
                     .outcome("skipped_ineligible").eligibility(eligibility).build();
         }
@@ -119,6 +126,7 @@ public class ShadowExecutor {
                 .fidelityMatch(Boolean.TRUE)
                 .build();
         String pid = shadowRunner.recordRun(outcome);
+        if (metrics != null) metrics.recordShadowRunOutcome(tenantId, "executed");
 
         return ExecutionResult.builder()
                 .shadowRunPid(pid).outcome("executed").eligibility(eligibility).build();
