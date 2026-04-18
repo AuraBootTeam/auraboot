@@ -29,14 +29,22 @@ export function ReceiveTaskEditor({
         />
       </div>
 
+      {/*
+        messageRef / messageType are UI-only placeholders: JsonToBpmnConverter does
+        not emit a <bpmn:message> element, so SmartEngine has no trigger to advance
+        the ReceiveTask. Fields are disabled until runtime support lands.
+      */}
       <div className="mb-4">
         <label className="mb-1 block text-sm font-medium text-gray-700">{t('bpmn.prop.receivetask.messageRef')}</label>
         <input
           type="text"
           value={config?.messageRef || ''}
-          onChange={(e) => handleChange('messageRef', e.target.value)}
-          className="w-full rounded-md border border-gray-300 px-3 py-2"
+          disabled
+          readOnly
+          data-testid="receivetask-messageRef"
+          className="w-full rounded-md border border-gray-300 bg-gray-100 px-3 py-2 text-gray-500"
         />
+        <p className="mt-1 text-xs text-amber-600">{t('bpmn.prop.common.unsupportedHint')}</p>
       </div>
 
       <div className="mb-4">
@@ -44,9 +52,12 @@ export function ReceiveTaskEditor({
         <input
           type="text"
           value={config?.messageType || ''}
-          onChange={(e) => handleChange('messageType', e.target.value)}
-          className="w-full rounded-md border border-gray-300 px-3 py-2"
+          disabled
+          readOnly
+          data-testid="receivetask-messageType"
+          className="w-full rounded-md border border-gray-300 bg-gray-100 px-3 py-2 text-gray-500"
         />
+        <p className="mt-1 text-xs text-amber-600">{t('bpmn.prop.common.unsupportedHint')}</p>
       </div>
     </>
   );

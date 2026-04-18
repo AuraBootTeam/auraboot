@@ -22,7 +22,8 @@
     "constraints": { "required": true },
     "extension": {
       "refModelCode": "sys_user",
-      "refDisplayField": "username"
+      "refDisplayField": "username",
+      "renderComponent": "memberpicker"
     }
   },
   {

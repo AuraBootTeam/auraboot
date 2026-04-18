@@ -387,7 +387,12 @@ test.describe(
       });
       expect(meResp.ok(), `/api/auth/me: ${meResp.status()}`).toBe(true);
       const meBody = await meResp.json();
-      adminUserId = String(meBody?.data?.user?.id ?? '');
+      // Use the ULID `user.pid` (sys_user primary identifier) rather than
+      // the snowflake memberId — MemberPicker's /api/admin/users/search
+      // returns rows keyed by sys_user.pid, and the wd_req_applicant
+      // reference field stores that same pid. Mixing the two ID systems
+      // would leave the MemberPicker option testid lookup empty.
+      adminUserId = String(meBody?.data?.user?.pid ?? meBody?.data?.user?.id ?? '');
       expect(adminUserId, '/me must return a user pid').toBeTruthy();
     });
 
@@ -563,64 +568,129 @@ test.describe(
     });
 
     // =======================================================================
-    // G2: UI-driven list→submit path starts wd_leave_approval instance.
+    // G2: UI-driven create→submit path starts wd_leave_approval instance.
     //
-    // Pragmatic scope note:
-    //   The wd_leave_request form renders a SmartSelect for wd_req_applicant
-    //   that loads its options through GET /api/dynamic/sys_user/list. On a
-    //   fresh environment the admin tenant_admin role has `*` in
-    //   rolePermissionBindings (see tenant-templates/default-bootstrap.json)
-    //   but the secure-query pipeline still enforces `model.sys_user.read`
-    //   which is NOT in the hierarchical permission list (sys_user is an
-    //   internal system model, not a user-created model, so the
-    //   AutoPermissionAssignmentService hierarchy doesn't cover it). Result:
-    //   the applicant dropdown returns 403 and renders zero options — no UI
-    //   path can fill a required reference field. This is a platform-level
-    //   permission gap orthogonal to the BPM chain under test and is being
-    //   tracked separately; forcing a pure-UI fill here would block on
-    //   unrelated permission work.
+    // Pure-UI path: sidebar nav → 我的申请 list → 新建请假 toolbar button →
+    // wd_leave_request_form → MemberPicker (applicant) + SmartSelect (type) +
+    // DatePicker (start/end) + SmartNumber (days) + SmartTextArea (reason) →
+    // Save → list refresh → row action menu → 执行 → confirm dialog.
     //
-    //   We therefore narrow G2's UI scope to the BPM-specific surface: the
-    //   draft record is seeded through the same Command pipeline the form
-    //   would call (wd:create_leave_request), then every subsequent
-    //   interaction — list navigation, row lookup, action-menu open, the
-    //   submit confirmation dialog — runs through real UI. The core G2
-    //   invariant ("a UI Submit click starts the wd_leave_approval process")
-    //   stays verified.
-    //
-    //   The fully pure-UI variant reactivates automatically once
-    //   `model.sys_user.read` is granted to tenant_admin.
+    // Applicant field: wd_req_applicant carries extension.renderComponent =
+    // "memberpicker" (fields.json). MemberPicker hits /api/admin/users/search
+    // which is tenant-scoped and callable by any tenant member — it does NOT
+    // require model.sys_user.read so the earlier SmartSelect 403 is bypassed
+    // entirely.
     // =======================================================================
     test('G2: UI Submit action starts wd_leave_approval process instance', async ({
       page,
       request,
     }) => {
-      // 0. Seed a draft via the create command (narrow scope — see note above).
-      //    Every non-setup step stays pure UI.
-      const createResp = await request.post(
-        '/api/meta/commands/execute/wd:create_leave_request',
-        {
-          headers: { Authorization: `Bearer ${adminToken}` },
-          data: {
-            payload: {
-              wd_req_applicant: adminUserId,
-              wd_req_type: 'annual',
-              wd_req_start_date: LEAVE_START_DATE,
-              wd_req_end_date: LEAVE_END_DATE,
-              wd_req_days: 2,
-              wd_req_reason: LEAVE_REASON,
-            },
-            operationType: 'create',
-          },
-        },
-      );
-      expect(createResp.ok(), `draft create seed: ${createResp.status()}`).toBe(true);
-      const createBody = await createResp.json();
-      expect(String(createBody?.code)).toBe('0');
-      const seedData = createBody?.data?.data ?? {};
-      leaveRequestPid = String(seedData?.recordId ?? seedData?.pid ?? seedData?.id ?? '');
-      expect(leaveRequestPid, 'create must return a recordId').toBeTruthy();
+      // 1. Sidebar navigation → "我的申请" list page (D1)
+      await navigateToLeaveRequestList(page);
 
+      // 2. Click list toolbar "create" button → routes to /p/wd_leave_request/new
+      const createToolbarBtn = page
+        .locator('[data-testid="toolbar-btn-create"]')
+        .first();
+      await expect(createToolbarBtn, 'create button must be visible on list').toBeVisible({
+        timeout: 10_000,
+      });
+      await createToolbarBtn.click();
+      await page.waitForURL(/\/p\/wd_leave_request\/new/, { timeout: 10_000 });
+
+      // 3. Wait for form container to mount (D8 form load)
+      await expect(
+        page.locator('[data-testid="dynamic-form"]').first(),
+        'form container must render after nav to /new',
+      ).toBeVisible({ timeout: 10_000 });
+
+      // 4. Applicant via MemberPicker: click add → search admin email → pick
+      const memberPickerTrigger = page
+        .locator('[data-testid="member-picker-trigger"]')
+        .first();
+      await expect(
+        memberPickerTrigger,
+        'MemberPicker trigger must render for wd_req_applicant',
+      ).toBeVisible({ timeout: 10_000 });
+      const memberAddBtn = memberPickerTrigger
+        .locator('[data-testid="member-picker-add"]')
+        .first();
+      await memberAddBtn.click();
+      const searchInput = page.locator('[data-testid="member-picker-search-input"]').first();
+      await expect(searchInput).toBeVisible({ timeout: 5_000 });
+      await searchInput.fill('admin');
+      // Wait for the admin option to appear (users/search is debounced via state,
+      // we poll for the expected option by id).
+      const adminOption = page
+        .locator(`[data-testid="member-picker-option-${adminUserId}"]`)
+        .first();
+      await expect(
+        adminOption,
+        `admin option member-picker-option-${adminUserId} must appear`,
+      ).toBeVisible({ timeout: 10_000 });
+      await adminOption.click();
+      // After selection the chip should appear and picker popup closes.
+      await expect(
+        memberPickerTrigger.locator(`[data-testid="member-picker-selected-${adminUserId}"]`),
+        'selected admin chip must render',
+      ).toBeVisible({ timeout: 5_000 });
+
+      // 5. Type: SmartSelect enum → annual
+      await pickSmartSelect(page, 'wd_req_type', /年假|Annual/i);
+
+      // 6. Dates
+      await fillDatePicker(page, 'wd_req_start_date', LEAVE_START_DATE);
+      await fillDatePicker(page, 'wd_req_end_date', LEAVE_END_DATE);
+
+      // 7. Days: SmartNumber input — testid resolved via field-{name} wrapper
+      const daysInput = page
+        .locator('[data-testid="form-field-wd_req_days"] input')
+        .first();
+      await expect(daysInput, 'days input must be visible').toBeVisible({ timeout: 5_000 });
+      await daysInput.fill('2');
+
+      // 8. Reason (textarea) — optional on bindings but we fill for assertion fidelity.
+      const reasonTextarea = page
+        .locator('[data-testid="form-field-wd_req_reason"] textarea')
+        .first();
+      if (await reasonTextarea.isVisible({ timeout: 3_000 }).catch(() => false)) {
+        await reasonTextarea.fill(LEAVE_REASON);
+      }
+
+      // 9. Submit — the form-buttons "submit" button posts wd:create_leave_request
+      //    (FormPageContent derives operationType=create in new mode regardless of
+      //    the command suffix; the command dispatcher routes by operationType).
+      const createCmdPromise = page.waitForResponse(
+        (r) =>
+          r.url().includes('/api/meta/commands/execute/wd') &&
+          (r.url().includes('create_leave_request') ||
+            r.url().includes('update_leave_request')) &&
+          r.request().method() === 'POST',
+        { timeout: 20_000 },
+      );
+      // form-buttons render with testid `form-btn-{code}` (FormPageContent L1375).
+      const submitBtn = page.locator('[data-testid="form-btn-submit"]').first();
+      await expect(
+        submitBtn,
+        'form-buttons submit button must be reachable',
+      ).toBeVisible({ timeout: 5_000 });
+      await submitBtn.click();
+
+      const createResp2 = await createCmdPromise;
+      expect(
+        createResp2.status(),
+        `form create POST HTTP=${createResp2.status()}`,
+      ).toBeLessThan(400);
+      const createBody2 = await createResp2.json();
+      expect(String(createBody2?.code)).toBe('0');
+      const seedData = createBody2?.data?.data ?? createBody2?.data ?? {};
+      leaveRequestPid = String(seedData?.recordId ?? seedData?.pid ?? seedData?.id ?? '');
+      expect(leaveRequestPid, 'form submit must return a recordId').toBeTruthy();
+
+      // 10. After save, FormPageContent navigates back to list (/p/wd_leave_request).
+      await page.waitForURL(/\/p\/wd_leave_request(?:$|\?|\/$)/, { timeout: 15_000 });
+
+      // Fetch the generated code for row lookup.
       const detailResp = await request.get(
         `/api/dynamic/wd_leave_request_detail/${leaveRequestPid}`,
         { headers: { Authorization: `Bearer ${adminToken}` } },
@@ -629,10 +699,10 @@ test.describe(
       leaveRequestCode = String((await detailResp.json())?.data?.wd_req_code ?? '');
       expect(leaveRequestCode).toMatch(/^WDLR-/);
 
-      // 1. Sidebar navigation → "我的申请" list page
-      await navigateToLeaveRequestList(page);
+      // 11. Wait for list table to re-render after the form-save redirect.
+      await expect(page.locator('table').first()).toBeVisible({ timeout: 10_000 });
 
-      // 2. Find our draft row by its generated code
+      // 12. Find our freshly-created row by its generated code (D7)
       const row = page
         .locator('table tbody tr')
         .filter({ hasText: leaveRequestCode })
@@ -644,7 +714,7 @@ test.describe(
       // Pre-submit state visible in UI (D7 baseline)
       await expect(row, 'row status should read draft pre-submit').toContainText(/draft|草稿/i);
 
-      // 3. Open the row "..." action menu → click "执行" (submit state_transition)
+      // 13. Open the row "..." action menu → click "执行" (submit state_transition)
       const moreBtn = row.locator('[data-testid="row-action-more"]').first();
       await expect(moreBtn).toBeVisible({ timeout: 5_000 });
       await moreBtn.click();
@@ -815,16 +885,56 @@ test.describe(
         'DSL form skeleton must clear once schema loads',
       ).toHaveCount(0, { timeout: 15_000 });
 
-      // At least one of the leave-request fields must be visible inside the
-      // form. We accept any of the canonical wd_leave_request fields by code
-      // wd_leave_request_detail is a detail-style page (toolbar + tabs blocks),
-      // not a form page — so we don't insist on input fields named wd_req_*.
-      // Instead assert the rendered tab pane carries non-trivial content
-      // (text length > some threshold), proving the DSL page actually loaded
-      // through the FormTab rendering pipeline rather than rendering an
-      // empty error state.
-      await expect(formContent, 'FormTab content must render non-empty page output')
-        .not.toBeEmpty({ timeout: 10_000 });
+      // Real field-level assertions: wd_leave_request_detail renders read-only
+      // field wrappers (DetailPageContent) with data-testid="field-{code}".
+      // The useSchemaLoader "__disabled__" short-circuit (see hook fix in the
+      // same commit) guarantees the error state clears between the initial
+      // hasForm=false render and the formBinding.formRef arrival, so we can
+      // assert real field content without racing the form fetch.
+      await expect(
+        formContent,
+        'FormTab must not render DSL load error for the bound detail page',
+      ).not.toContainText('加载失败', { timeout: 15_000 });
+
+      // Wait for the DetailPageContent lazy chunk + record fetch to finish.
+      // When the Suspense boundary is still showing detail-page-skeleton the
+      // actual page hasn't mounted yet; we explicitly poll until it clears.
+      await expect(
+        formContent.locator('[data-testid="detail-page-skeleton"]'),
+        'detail-page-skeleton Suspense fallback must resolve into the real page',
+      ).toHaveCount(0, { timeout: 20_000 });
+
+      await expect(
+        formContent.locator('[data-testid^="form-field-wd_req_"]').first(),
+        'at least one wd_req_* field wrapper must render in the detail view',
+      ).toBeVisible({ timeout: 15_000 });
+
+      // wd_req_days: DetailPageContent renders readOnly numeric fields as
+      // text — assert the span/text contains the submitted value (2).
+      const daysField = formContent
+        .locator('[data-testid="form-field-wd_req_days"]')
+        .first();
+      await expect(
+        daysField,
+        'days field wrapper must render in FormTab DSL output',
+      ).toBeVisible({ timeout: 5_000 });
+      await expect(
+        daysField,
+        'days field must display the value G2 submitted (days=2)',
+      ).toContainText(/\b2\b/);
+
+      // wd_req_status: bound to the "submitted" state that G2 transitioned to.
+      const statusField = formContent
+        .locator('[data-testid="form-field-wd_req_status"]')
+        .first();
+      await expect(
+        statusField,
+        'status field must render with the post-submit value',
+      ).toBeVisible({ timeout: 5_000 });
+      await expect(
+        statusField,
+        'status field must read submitted after G2 state_transition',
+      ).toContainText(/submitted|已提交/i);
 
       // Belt-and-braces: cross-check the API itself still surfaces the
       // formBinding (catches form_bindings column regressions independently
