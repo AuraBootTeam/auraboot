@@ -28,7 +28,7 @@ class BpmnConverterRoundTripTest {
     @BeforeEach
     void setUp() {
         objectMapper = new ObjectMapper();
-        jsonToBpmn = new JsonToBpmnConverter(objectMapper);
+        jsonToBpmn = new JsonToBpmnConverter(objectMapper, null);
         bpmnToJson = new BpmnToJsonConverter(objectMapper);
     }
 
