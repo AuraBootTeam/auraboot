@@ -2,35 +2,29 @@
  * BPM Designer CallActivity Full Lifecycle — Wave 2 CA
  *
  * Validates the UI path for configuring a CallActivity node (child process
- * picker + input/output variable mapping table) and that the designerJson
- * persisted by the save dialog faithfully reflects every UI-set field.
- *
- * Originally this spec also drove the full runtime lifecycle (deploy → start
- * parent → child spawns with input mapping → complete child → output mapping
- * propagates back). CA-2/CA-3 remain skipped due to a SmartEngine runtime
- * limitation (NOT a converter bug — GAP-250 fixed the XML emission).
+ * picker + input/output variable mapping table) AND the full runtime
+ * lifecycle: deploy → start parent → child spawns with input mapping →
+ * complete child → output mapping propagates back.
  *
  * GAP-250 status: The BPMN parser error
  *    Parse process definition file failure!
- * has been fixed. Root cause: JsonToBpmnConverter.writeCallActivity used to
- * emit <extensionElements><smart:in source target/></...>, but SmartEngine's
+ * is fixed. Root cause: JsonToBpmnConverter.writeCallActivity used to emit
+ * <extensionElements><smart:in source target/></...>, but SmartEngine's
  * DefaultXmlParserFacade throws EngineException on any element it has no
  * parser for. CallActivityParser only reads the `calledElement` /
- * `calledElementVersion` attributes (see SmartEngine fork
- * core/.../callactivity/parser/CallActivityParser.java). The converter now
- * emits a self-closing <callActivity calledElement=... smart:calledElementVersion=.../>
- * mirroring the canonical fixture
- *   extension/storage/storage-mysql/src/test/resources/parent-callactivity-process.bpmn20.xml.
+ * `calledElementVersion` attributes. The converter now emits
+ * <callActivity> with the registered generic <smart:properties> extension
+ * carrying an {@code aura.callMappings} JSON payload — this is parser-
+ * accepted and survives deploy.
  *
- * CA-2 / CA-3 unresolved: SmartEngine's CallActivityBehavior explicitly
- * isolates parent/child request maps ("隔离父子流程的request和response" —
- * only tenantId is forwarded). Variable mapping between parent and child is
- * not a BPMN-level feature in SmartEngine; it must be implemented via an
- * ExecutionListener / AuraVariablePersister extension at the platform
- * level. Until that platform work lands, the inputMappings / outputMappings
- * values stay in designerJson config only (UI contract covered by CA-1)
- * and do NOT cause runtime variable propagation. Unskip CA-2/CA-3 once the
- * platform listener is implemented.
+ * CA-2 / CA-3 status (post-listener): AuraCallActivityListener bridges
+ * SmartEngine's parent/child request-map isolation at two lifecycle points:
+ *   - child PROCESS_START: copies parent request vars → child request per
+ *     aura.callMappings.inputs; persists as child process-scope vars.
+ *   - child PROCESS_END: reads child vars (DB + live signal payload) and
+ *     persists output mappings as parent process-scope vars.
+ * See AuraCallActivityListener javadoc for the why-not-ACTIVITY_END timing
+ * analysis (CreateExecution flushes vars AFTER signal returns).
  *
  * Dimensions covered (per docs/standards/testing-e2e-web.md):
  *   D1  — Sidebar menu navigation (not page.goto direct)
@@ -532,20 +526,22 @@ test.describe(
     // CA-2: start parent with parentInput=<unique>; assert child instance
     // spawns and receives the mapped childInput variable.
     //
-    // TODO: un-skip once the platform implements variable mapping at the
-    // ExecutionListener / AuraVariablePersister layer. GAP-250 fixed deploy
-    // (converter no longer emits <smart:in>/<smart:out>), but SmartEngine's
-    // CallActivityBehavior explicitly isolates parent/child request maps
-    // ("隔离父子流程的request和response" — only tenantId is forwarded), so
-    // the inputMappings / outputMappings from designerJson config do not
-    // reach the child at runtime today.
-    // Contract to verify when unskipped:
+    // Unskipped after platform landed AuraCallActivityListener (GAP-250
+    // follow-up). The listener consumes the aura.callMappings smart:property
+    // that JsonToBpmnConverter now writes under <callActivity>, and bridges
+    // SmartEngine's parent/child request-map isolation:
+    //   - at child PROCESS_START: copy parent request vars → child request
+    //     + persist as process-scope variable rows
+    //   - at child PROCESS_END: read child's variables (DB + in-memory
+    //     signal request) and persist output mappings as process-scope rows
+    //     on the parent.
+    // Contract verified here:
     //   - starting parent with parentInput=INPUT_VALUE spawns a child
     //     instance running CHILD_KEY
     //   - child.variables.childInput == INPUT_VALUE (input mapping worked)
     //   - parent.currentNodes contains 'invoke_child' (wait state)
     // =======================================================================
-    test.skip('CA-2: start parent → child spawns + input mapping propagates', async ({ request }) => {
+    test('CA-2: start parent → child spawns + input mapping propagates', async ({ request }) => {
       expect(parentPid, 'parentPid must be set from CA-1').toBeTruthy();
 
       const started = await startProcessInstance(request, adminToken, {
@@ -612,14 +608,14 @@ test.describe(
     // CA-3: complete child task with output; verify output mapping writes
     // parentOutput back onto the parent instance.
     //
-    // TODO: un-skip together with CA-2 once the platform implements
-    // variable mapping propagation (see CA-2 note). Contract to verify:
+    // Unskipped together with CA-2 (see that test's note for the listener
+    // details). Contract verified:
     //   - completing child_review with variables.childOutput=OUTPUT_VALUE
     //     transitions parent to completed state
     //   - parent.variables.parentOutput == OUTPUT_VALUE (output mapping worked)
     //   - parent.completedNodes contains 'invoke_child'
     // =======================================================================
-    test.skip('CA-3: complete child task → output mapping propagates back to parent', async ({
+    test('CA-3: complete child task → output mapping propagates back to parent', async ({
       request,
     }) => {
       expect(childInstanceId, 'childInstanceId must be set from CA-2').toBeTruthy();
