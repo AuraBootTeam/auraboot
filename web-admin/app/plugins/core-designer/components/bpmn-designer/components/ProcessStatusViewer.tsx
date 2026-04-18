@@ -297,14 +297,16 @@ export function ProcessStatusViewer({
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const normalized = status.toUpperCase();
+  const normalized = (status ?? '').toLowerCase();
   const config: Record<string, { label: string; bg: string; text: string }> = {
     running: { label: 'Running', bg: 'bg-blue-100', text: 'text-blue-700' },
     completed: { label: 'Completed', bg: 'bg-green-100', text: 'text-green-700' },
     suspended: { label: 'Suspended', bg: 'bg-yellow-100', text: 'text-yellow-700' },
-    TERMINATED: { label: 'Terminated', bg: 'bg-red-100', text: 'text-red-700' },
+    terminated: { label: 'Terminated', bg: 'bg-red-100', text: 'text-red-700' },
+    aborted: { label: 'Terminated', bg: 'bg-red-100', text: 'text-red-700' },
+    cancelled: { label: 'Cancelled', bg: 'bg-red-100', text: 'text-red-700' },
     active: { label: 'Active', bg: 'bg-blue-100', text: 'text-blue-700' },
-    IDLE: { label: 'Not Reached', bg: 'bg-gray-100', text: 'text-gray-500' },
+    idle: { label: 'Not Reached', bg: 'bg-gray-100', text: 'text-gray-500' },
   };
   const c = config[normalized] ?? { label: status, bg: 'bg-gray-100', text: 'text-gray-700' };
 
