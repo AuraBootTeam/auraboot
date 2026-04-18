@@ -286,5 +286,13 @@
     "required": false,
     "visible": true,
     "editable": true
+  },
+  {
+    "modelCode": "showcase_all_fields",
+    "fieldCode": "sc_advanced_settings",
+    "sequence": 37,
+    "required": false,
+    "visible": true,
+    "editable": true
   }
 ]
