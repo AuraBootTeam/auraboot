@@ -59,16 +59,7 @@ function buildCannedStream(contract: Record<string, unknown>): string {
  * pass through so the UI state transitions work normally.
  */
 async function interceptChatStream(page: Page, contract: Record<string, unknown>) {
-  page.on('console', (msg) => {
-    const text = msg.text();
-    if (text.includes('result_contract') || text.includes('onResultContract') || msg.type() === 'error') {
-      // eslint-disable-next-line no-console
-      console.log('[E2E browser ' + msg.type() + '] ' + text);
-    }
-  });
   await page.route('**/api/ai/aurabot/chat/stream', async (route: Route) => {
-    // eslint-disable-next-line no-console
-    console.log('[E2E] intercepted chat/stream, body len=' + buildCannedStream(contract).length);
     await route.fulfill({
       status: 200,
       contentType: 'text/event-stream; charset=utf-8',
@@ -109,7 +100,9 @@ test.describe('AuraBot — ResultContract rendering', () => {
     await input.fill('show me the top customers');
     await input.press('Enter');
 
-    const rc = panel.locator('[data-testid="result-contract"]');
+    // Locate RC at page scope — the panel is a portal so the chat message may
+    // not be a DOM descendant of [data-testid="aurabot-panel"].
+    const rc = page.locator('[data-testid="result-contract"]');
     await expect(rc).toBeVisible({ timeout: 10000 });
 
     // Status + skill header
@@ -120,8 +113,8 @@ test.describe('AuraBot — ResultContract rendering', () => {
     // Table body
     const table = rc.locator('[data-testid="rc-table"]');
     await expect(table).toBeVisible();
-    await expect(table.locator('text=Acme')).toBeVisible();
-    await expect(table.locator('text=Globex')).toBeVisible();
+    await expect(table.getByRole('cell', { name: 'Acme', exact: true })).toBeVisible();
+    await expect(table.getByRole('cell', { name: 'Globex', exact: true })).toBeVisible();
     await expect(table.locator('th', { hasText: /^pid$/ })).toBeVisible();
     await expect(table.locator('th', { hasText: /^name$/ })).toBeVisible();
   });
@@ -145,7 +138,7 @@ test.describe('AuraBot — ResultContract rendering', () => {
     await input.fill('create a lead for TestCo');
     await input.press('Enter');
 
-    const rc = panel.locator('[data-testid="result-contract"]');
+    const rc = page.locator('[data-testid="result-contract"]');
     await expect(rc).toBeVisible({ timeout: 10000 });
 
     const card = rc.locator('[data-testid="rc-card"]');
@@ -173,7 +166,7 @@ test.describe('AuraBot — ResultContract rendering', () => {
     await input.fill('query a nonexistent thing');
     await input.press('Enter');
 
-    const rc = panel.locator('[data-testid="result-contract"]');
+    const rc = page.locator('[data-testid="result-contract"]');
     await expect(rc).toBeVisible({ timeout: 10000 });
 
     const statusBadge = rc.locator('text=failed').first();

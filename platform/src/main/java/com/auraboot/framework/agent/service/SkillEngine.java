@@ -609,11 +609,15 @@ public class SkillEngine {
     }
 
     /**
-     * Resolve a $ref path like "steps[0].data.pid" or "input.recordPid".
+     * Resolve a $ref path. Supported namespaces (spec §4.2 step_input_mappings):
+     * - input.path       → original SkillInput.parameters
+     * - steps[N].path    → Nth previous step output (0-based)
+     * - prev.path        → last step output (shorthand for steps[i-1])
+     * - bif.path         → current-turn BusinessIntentFrame (via BifContext)
      */
     @SuppressWarnings("unchecked")
-    private Object resolveRefPath(String refPath, Map<String, Object> originalInput,
-                                  List<Map<String, Object>> previousOutputs) {
+    Object resolveRefPath(String refPath, Map<String, Object> originalInput,
+                          List<Map<String, Object>> previousOutputs) {
         try {
             if (refPath.startsWith("input.")) {
                 String fieldPath = refPath.substring(6);
@@ -633,11 +637,42 @@ public class SkillEngine {
                 return navigatePath(stepOutput, remaining);
             }
 
+            if (refPath.equals("prev") || refPath.startsWith("prev.")) {
+                if (previousOutputs.isEmpty()) return null;
+                Map<String, Object> last = previousOutputs.get(previousOutputs.size() - 1);
+                if (refPath.equals("prev")) return last;
+                return navigatePath(last, refPath.substring(5));
+            }
+
+            if (refPath.equals("bif") || refPath.startsWith("bif.")) {
+                com.auraboot.framework.agent.dto.BusinessIntentFrame bif = BifContext.getCurrentBif();
+                if (bif == null) return null;
+                Map<String, Object> bifMap = bifToMap(bif);
+                if (refPath.equals("bif")) return bifMap;
+                return navigatePath(bifMap, refPath.substring(4));
+            }
+
             return null;
         } catch (Exception e) {
             log.debug("Failed to resolve $ref path '{}': {}", refPath, e.getMessage());
             return null;
         }
+    }
+
+    /** Flatten BIF to a map so navigatePath can traverse it via dot-notation. */
+    private Map<String, Object> bifToMap(com.auraboot.framework.agent.dto.BusinessIntentFrame bif) {
+        Map<String, Object> m = new HashMap<>();
+        m.put("intent", bif.getIntent());
+        m.put("object", bif.getObject());
+        m.put("primaryObject", bif.getPrimaryObject());
+        m.put("riskLevel", bif.getRiskLevel());
+        m.put("actionability", bif.getActionability());
+        m.put("candidateSkills", bif.getCandidateSkills());
+        m.put("candidateSkillsMode", bif.getCandidateSkillsMode());
+        m.put("filters", bif.getFilters());
+        m.put("scope", bif.getScope());
+        m.put("context", bif.getContext());
+        return m;
     }
 
     /**

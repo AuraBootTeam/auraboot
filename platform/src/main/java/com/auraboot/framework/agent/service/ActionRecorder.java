@@ -64,6 +64,10 @@ public class ActionRecorder {
             row.put("pid", actionPid);
             row.put("tenant_id", tenantId);
             row.put("run_id", runPid);
+            Integer stepIndex = StepContext.getStepIndex();
+            if (stepIndex != null) {
+                row.put("step_index", stepIndex);
+            }
             row.put("action_code", meta.modelCode + "." + meta.executionType);
             row.put("action_type", actionType);
             row.put("transaction_scope", transactionScope);
@@ -129,6 +133,10 @@ public class ActionRecorder {
             row.put("pid", actionPid);
             row.put("tenant_id", tenantId);
             row.put("run_id", runPid);
+            Integer stepIndex = StepContext.getStepIndex();
+            if (stepIndex != null) {
+                row.put("step_index", stepIndex);
+            }
             row.put("action_code", modelCode + ".query");
             row.put("action_type", "read");
             row.put("transaction_scope", "read_only");
