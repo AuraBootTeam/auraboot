@@ -305,14 +305,18 @@ public class AgentMemoryService {
     public void recordMemoryAccess(String memoryPid, String userId) {
         if (memoryPid == null || memoryPid.isBlank()) return;
         if (userId == null || userId.isBlank()) return;
+        // PR-73: derive tenant_id from the memory row via a SELECT-based INSERT.
+        // When memory_pid does not exist (already hard-deleted), the SELECT
+        // returns zero rows and the INSERT is a no-op — safe by design.
         jdbcTemplate.update(
                 "INSERT INTO ab_agent_memory_access_log "
-                + "  (memory_pid, user_id, access_day, access_count, first_seen_at, last_seen_at) "
-                + "VALUES (?, ?, CURRENT_DATE, 1, NOW(), NOW()) "
+                + "  (memory_pid, tenant_id, user_id, access_day, access_count, first_seen_at, last_seen_at) "
+                + "SELECT ?, m.tenant_id, ?, CURRENT_DATE, 1, NOW(), NOW() "
+                + "FROM ab_agent_memory m WHERE m.pid = ? "
                 + "ON CONFLICT ON CONSTRAINT uq_memory_access_log DO UPDATE SET "
                 + "  access_count = ab_agent_memory_access_log.access_count + 1, "
                 + "  last_seen_at = NOW()",
-                memoryPid, userId);
+                memoryPid, userId, memoryPid);
     }
 
     // =========================================================================
