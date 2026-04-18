@@ -435,19 +435,72 @@ async function configureFormButtons(page: Page, buttons: any[]): Promise<void> {
     await addSelect.selectOption(code).catch(() => null);
   }
 
-  // Try to promote submit → primary (reference uses primary:true).
-  const submit = buttons.find((b) => (b.code ?? b.action) === 'submit');
-  if (submit?.primary) {
-    const submitHeader = panel.locator('div.cursor-pointer:has-text("提交")').first();
-    if (await submitHeader.isVisible({ timeout: 2_000 }).catch(() => false)) {
-      await submitHeader.click();
-      const typeSelect = panel
-        .locator('label:has-text("按钮类型") >> xpath=following-sibling::select[1]')
-        .first();
-      if (await typeSelect.isVisible({ timeout: 2_000 }).catch(() => false)) {
-        await typeSelect.selectOption('primary').catch(() => null);
+  // Configure each button through the full-object editor so the saved blocks
+  // match the reference shape ({code, primary, label, action:{type,command}}).
+  for (const b of buttons) {
+    const code = b.code ?? b.action;
+    if (!code) continue;
+
+    // Find the button item by test-id and expand it.
+    const buttonItem = panel.getByTestId(`button-item-${code}`).first();
+    if (!(await buttonItem.isVisible({ timeout: 2_000 }).catch(() => false))) continue;
+    const header = buttonItem.getByTestId(`button-header-${code}`).first();
+    await header.click();
+
+    // Flip into full-object mode.
+    const toggle = buttonItem.getByTestId('button-full-object-toggle').first();
+    await expect(toggle).toBeVisible({ timeout: 3_000 });
+    const checked = await toggle.isChecked().catch(() => false);
+    if (!checked) await toggle.click();
+
+    // code input (matches reference).
+    const codeInput = buttonItem.getByTestId('button-code-input').first();
+    await expect(codeInput).toBeVisible({ timeout: 2_000 });
+    await codeInput.fill(code);
+
+    // primary checkbox.
+    if (b.primary) {
+      const primaryCb = buttonItem.getByTestId('button-primary-checkbox').first();
+      const pChecked = await primaryCb.isChecked().catch(() => false);
+      if (!pChecked) await primaryCb.click();
+    }
+
+    // label (zh-CN + en).
+    const labelZh =
+      typeof b.label === 'object' && b.label !== null
+        ? b.label['zh-CN'] ?? ''
+        : typeof b.label === 'string'
+          ? b.label
+          : '';
+    const labelEn =
+      typeof b.label === 'object' && b.label !== null
+        ? b.label['en'] ?? b.label['en-US'] ?? ''
+        : '';
+    if (labelZh) {
+      await buttonItem.getByTestId('button-label-zh-input').fill(labelZh);
+    }
+    if (labelEn) {
+      await buttonItem.getByTestId('button-label-en-input').fill(labelEn);
+    }
+
+    // action descriptor (type + command / url).
+    const actionObj =
+      b.action && typeof b.action === 'object' ? (b.action as Record<string, unknown>) : null;
+    if (actionObj?.type) {
+      await buttonItem
+        .getByTestId('button-action-type-select')
+        .selectOption(String(actionObj.type));
+      if (actionObj.type === 'command' && actionObj.command) {
+        await buttonItem
+          .getByTestId('button-action-command-input')
+          .fill(String(actionObj.command));
+      } else if (actionObj.type === 'navigate' && actionObj.url) {
+        await buttonItem.getByTestId('button-action-url-input').fill(String(actionObj.url));
       }
     }
+
+    // Collapse so the next one starts clean.
+    await header.click().catch(() => null);
   }
 }
 

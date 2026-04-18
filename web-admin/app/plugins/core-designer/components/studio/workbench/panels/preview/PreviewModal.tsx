@@ -313,8 +313,23 @@ const BlockPreview: React.FC<{ block: DslBlock; showGrid: boolean }> = ({ block,
         <div className={`${borderClass} rounded-lg p-3`}>
           <div className="flex gap-2">
             {(block.buttons || block.actions || []).slice(0, 4).map((btn, i) => {
-              const label = typeof btn === 'string' ? btn : btn.action;
-              const isPrimary = i === 0 || (typeof btn !== 'string' && btn.type === 'primary');
+              let label: string;
+              let isPrimary: boolean;
+              if (typeof btn === 'string') {
+                label = btn;
+                isPrimary = i === 0;
+              } else {
+                const labelFromObject =
+                  typeof btn.label === 'object' && btn.label !== null
+                    ? btn.label['zh-CN'] ?? btn.label['en'] ?? btn.label['en-US']
+                    : typeof btn.label === 'string'
+                      ? btn.label
+                      : undefined;
+                const codeStr =
+                  btn.code ?? (typeof btn.action === 'string' ? btn.action : '') ?? '';
+                label = labelFromObject ?? codeStr;
+                isPrimary = i === 0 || btn.primary === true || btn.type === 'primary';
+              }
               return (
                 <div
                   key={i}
