@@ -35,6 +35,7 @@ public class ProcessDeploymentService {
     private final BpmProcessDefinitionMapper processDefinitionMapper;
     private final BpmAuditService bpmAuditService;
     private final JsonToBpmnConverter jsonToBpmnConverter;
+    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
     private static final String EXTENSION_KEY_DESIGNER_JSON = "designerJson";
 
     // ==================== Query Operations ====================
@@ -346,7 +347,24 @@ public class ProcessDeploymentService {
             }
 
             log.info("Converting designer JSON to BPMN XML: processKey={}", definition.getProcessKey());
-            String bpmnXml = jsonToBpmnConverter.convert(designerJson);
+            // Inject canonical processKey/name so JsonToBpmnConverter emits
+            // <process id="<processKey>"> instead of the default "process_1",
+            // which would collide across multiple UI-created processes and
+            // break startProcess(processKey) lookup downstream.
+            String bpmnXml;
+            try {
+                com.fasterxml.jackson.databind.node.ObjectNode root =
+                        (com.fasterxml.jackson.databind.node.ObjectNode) objectMapper.readTree(designerJson);
+                root.put("key", definition.getProcessKey());
+                if (!root.has("name") && definition.getProcessName() != null) {
+                    root.put("name", definition.getProcessName());
+                }
+                bpmnXml = jsonToBpmnConverter.convertFromJsonNode(root);
+            } catch (Exception e) {
+                throw new IllegalStateException(
+                        "Failed to inject processKey into designerJson before BPMN conversion: "
+                                + e.getMessage(), e);
+            }
             definition.setBpmnContent(bpmnXml);
             // Persist the compiled XML so subsequent GET /{pid}/bpmn, exports,
             // and version snapshots see the real content instead of the empty
