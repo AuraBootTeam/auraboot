@@ -33,4 +33,27 @@ public final class BpmExtensionKeys {
      * cross-environment migration retain designer state.
      */
     public static final String NODE_HOOKS = "aura.hooks";
+
+    /**
+     * Node-level (callActivity): serialized JSON object carrying parent↔child
+     * variable mapping configuration.
+     *
+     * <p>Shape:
+     * <pre>{@code
+     *   {
+     *     "inputs":  {"parentVar":"childVar", ...},   // propagate parent → child at child PROCESS_START
+     *     "outputs": {"childVar":"parentVar", ...}    // propagate child → parent at callActivity ACTIVITY_END
+     *   }
+     * }</pre>
+     *
+     * <p>SmartEngine's {@code CallActivityBehavior} intentionally isolates the
+     * parent/child request maps (only {@code tenantId} is forwarded). This
+     * key carries the UI-configured mapping into the deployed BPMN, where
+     * {@code AuraCallActivityListener} consumes it at runtime to bridge the
+     * isolation. Direct {@code <smart:in>/<smart:out>} child elements of
+     * {@code <callActivity>} are NOT supported by SmartEngine's BPMN parser
+     * (see GAP-250); we piggyback on the generic {@code <smart:properties>}
+     * extension mechanism used by other aura.* keys instead.
+     */
+    public static final String CALL_MAPPINGS = "aura.callMappings";
 }
