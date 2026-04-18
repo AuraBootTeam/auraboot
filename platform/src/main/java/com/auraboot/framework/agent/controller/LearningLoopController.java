@@ -269,7 +269,7 @@ public class LearningLoopController {
                 "SELECT pid, original_run_id, shadow_status, " +
                         "       shadow_duration_ms, shadow_cost_usd, shadow_tokens, shadow_output_hash, " +
                         "       original_status, original_duration_ms, original_cost_usd, original_output_hash, " +
-                        "       output_match, fidelity_match, created_at " +
+                        "       output_match, fidelity_match, output_diff::text AS output_diff, created_at " +
                         "FROM ab_agent_shadow_run " +
                         "WHERE tenant_id = ? AND draft_id = ? " +
                         "ORDER BY created_at DESC LIMIT ?",
