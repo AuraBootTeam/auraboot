@@ -6,7 +6,12 @@
  */
 
 import React, { useState, useCallback, useMemo } from 'react';
-import type { DslButton, StandardAction } from '~/plugins/core-designer/components/studio/domain/dsl/types';
+import type {
+  DslActionDescriptor,
+  DslButton,
+  DslLocalizedText,
+  StandardAction,
+} from '~/plugins/core-designer/components/studio/domain/dsl/types';
 import { useCommandActions } from '~/plugins/core-designer/components/studio/hooks/actions/useCommandActions';
 import { ActionPhaseEditor } from '~/plugins/core-designer/components/studio/workbench/panels/actions/ActionPhaseEditor';
 import { CommandSelector } from '~/plugins/core-designer/components/studio/workbench/panels/actions/CommandSelector';
@@ -74,8 +79,11 @@ export const ActionsEditor: React.FC<ActionsEditorProps> = ({
   const handleAddButton = useCallback(
     (action: StandardAction | string) => {
       if (readonly) return;
-      // Check if already exists
-      const exists = allButtons.some((b) => b.action === action);
+      // Check if already exists (compare by semantic code or shorthand action string)
+      const exists = allButtons.some((b) => {
+        const sc = b.code ?? (typeof b.action === 'string' ? b.action : undefined);
+        return sc === action;
+      });
       if (exists) return;
 
       const newButton: DslButton = { action };
@@ -132,8 +140,12 @@ export const ActionsEditor: React.FC<ActionsEditorProps> = ({
     [buttons, actions, onChange, readonly],
   );
 
-  // Get unused standard actions
-  const usedActions = new Set(allButtons.map((b) => b.action));
+  // Get unused standard actions (compare by semantic code, supporting full-object form)
+  const usedActions = new Set(
+    allButtons
+      .map((b) => b.code ?? (typeof b.action === 'string' ? b.action : undefined))
+      .filter((x): x is string => !!x),
+  );
   const unusedActions = STANDARD_ACTIONS.filter((a) => !usedActions.has(a.action));
 
   return (
@@ -176,7 +188,7 @@ export const ActionsEditor: React.FC<ActionsEditorProps> = ({
         <div className="space-y-2">
           {allButtons.map((button, index) => (
             <ButtonItem
-              key={`${button.action}-${index}`}
+              key={`${button.code ?? (typeof button.action === 'string' ? button.action : 'btn')}-${index}`}
               button={button}
               index={index}
               isExpanded={expandedButton === index}
@@ -263,24 +275,45 @@ const ButtonItem: React.FC<ButtonItemProps> = ({
   commandActions,
   modelCode,
 }) => {
-  const actionDef = STANDARD_ACTIONS.find((a) => a.action === button.action);
-  const label = actionDef?.label || button.action;
+  const semanticCode =
+    button.code ?? (typeof button.action === 'string' ? button.action : undefined) ?? '';
+  const actionDef = STANDARD_ACTIONS.find((a) => a.action === semanticCode);
+  const labelText =
+    (typeof button.label === 'string'
+      ? button.label
+      : button.label && typeof button.label === 'object'
+        ? button.label['zh-CN'] ?? button.label['en'] ?? button.label['en-US']
+        : undefined) ||
+    actionDef?.label ||
+    semanticCode ||
+    'action';
   const icon = actionDef?.icon || '⚡';
 
   // For advanced mode, find or create action config
-  const actionConfig = commandActions?.actions.find((a) => a.commandCode === button.action);
+  const actionConfig = commandActions?.actions.find((a) => a.commandCode === semanticCode);
 
   return (
-    <div className="overflow-hidden rounded-md border border-gray-200">
+    <div
+      className="overflow-hidden rounded-md border border-gray-200"
+      data-testid={`button-item-${semanticCode || index}`}
+    >
       {/* Button header */}
       <div
         className="flex cursor-pointer items-center gap-2 bg-gray-50 px-3 py-2 hover:bg-gray-100"
+        data-testid={`button-header-${semanticCode || index}`}
         onClick={onToggle}
       >
         <span className="text-base">{icon}</span>
-        <span className="flex-1 text-sm font-medium text-gray-700">{label}</span>
+        <span className="flex-1 text-sm font-medium text-gray-700">{labelText}</span>
 
-        {/* Type badge */}
+        {/* Primary badge (full-object boolean) */}
+        {button.primary && (
+          <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10px] text-blue-600">
+            primary
+          </span>
+        )}
+
+        {/* Type badge (shorthand AntD style) */}
         {button.type && (
           <span
             className={`rounded px-1.5 py-0.5 text-[10px] ${
@@ -350,8 +383,65 @@ const ButtonBasicSettings: React.FC<ButtonBasicSettingsProps> = ({
   onUpdate,
   readonly,
 }) => {
+  // A button is considered "full object" when any full-object field is set.
+  const isFullObject =
+    button.code !== undefined ||
+    button.primary !== undefined ||
+    button.label !== undefined ||
+    (typeof button.action === 'object' && button.action !== null);
+  const [fullObject, setFullObject] = useState<boolean>(isFullObject);
+
   return (
     <>
+      {/* Full-object mode toggle */}
+      <div className="flex items-center justify-between">
+        <label className="text-xs text-gray-500">高级对象编辑</label>
+        <input
+          type="checkbox"
+          data-testid="button-full-object-toggle"
+          checked={fullObject}
+          onChange={(e) => {
+            const next = e.target.checked;
+            setFullObject(next);
+            if (!next) {
+              // Collapse: drop full-object fields, keep shorthand action code if present.
+              const fallbackAction =
+                typeof button.action === 'string'
+                  ? button.action
+                  : (button.code ?? 'custom');
+              onUpdate({
+                code: undefined,
+                primary: undefined,
+                label: undefined,
+                action: fallbackAction,
+              } as Partial<DslButton>);
+            } else {
+              // Promote: seed code from shorthand action, default action descriptor.
+              const currentCode =
+                button.code ??
+                (typeof button.action === 'string' ? button.action : undefined) ??
+                'custom';
+              const existingActionObj =
+                typeof button.action === 'object' && button.action !== null
+                  ? (button.action as DslActionDescriptor)
+                  : undefined;
+              onUpdate({
+                code: currentCode,
+                primary: button.primary,
+                label: button.label,
+                action: existingActionObj,
+              } as Partial<DslButton>);
+            }
+          }}
+          disabled={readonly}
+          className="rounded border-gray-300"
+        />
+      </div>
+
+      {fullObject && (
+        <FullObjectEditor button={button} onUpdate={onUpdate} readonly={readonly} />
+      )}
+
       {/* Button type */}
       <div>
         <label className="mb-1 block text-xs text-gray-500">按钮类型</label>
@@ -412,7 +502,8 @@ const ButtonBasicSettings: React.FC<ButtonBasicSettingsProps> = ({
       </div>
 
       {/* Mode (for create/edit) */}
-      {(button.action === 'create' || button.action === 'edit') && (
+      {((button.code ?? (typeof button.action === 'string' ? button.action : '')) === 'create' ||
+        (button.code ?? (typeof button.action === 'string' ? button.action : '')) === 'edit') && (
         <div>
           <label className="mb-1 block text-xs text-gray-500">打开方式</label>
           <select
@@ -477,6 +568,170 @@ const ConfirmEditor: React.FC<ConfirmEditorProps> = ({ confirm, onChange, readon
           className="w-full rounded border border-gray-200 px-2 py-1 text-xs focus:ring-1 focus:ring-blue-300 focus:outline-none"
           disabled={readonly}
         />
+      )}
+    </div>
+  );
+};
+
+/**
+ * Full-object editor — produces `{ code, primary, label, action: { type, command } }`
+ * matching the runtime contract in `plugins/.../showcase_all_fields_form.json`.
+ */
+interface FullObjectEditorProps {
+  button: DslButton;
+  onUpdate: (updates: Partial<DslButton>) => void;
+  readonly?: boolean;
+}
+
+const FullObjectEditor: React.FC<FullObjectEditorProps> = ({ button, onUpdate, readonly }) => {
+  const actionObj: DslActionDescriptor =
+    typeof button.action === 'object' && button.action !== null
+      ? (button.action as DslActionDescriptor)
+      : ({ type: 'command' } as DslActionDescriptor);
+
+  const labelZh =
+    typeof button.label === 'object' && button.label !== null
+      ? button.label['zh-CN'] ?? ''
+      : typeof button.label === 'string'
+        ? button.label
+        : '';
+  const labelEn =
+    typeof button.label === 'object' && button.label !== null
+      ? button.label['en'] ?? button.label['en-US'] ?? ''
+      : '';
+
+  const updateLabel = (zh: string, en: string): DslLocalizedText | undefined => {
+    if (!zh && !en) return undefined;
+    const out: Record<string, string> = {};
+    if (zh) out['zh-CN'] = zh;
+    if (en) out['en'] = en;
+    return out;
+  };
+
+  return (
+    <div
+      className="space-y-3 rounded-md border border-blue-100 bg-blue-50/30 p-3"
+      data-testid="button-full-object-panel"
+    >
+      {/* code */}
+      <div>
+        <label className="mb-1 block text-xs text-gray-500">code</label>
+        <input
+          type="text"
+          data-testid="button-code-input"
+          value={button.code ?? ''}
+          onChange={(e) => onUpdate({ code: e.target.value || undefined })}
+          disabled={readonly}
+          className="w-full rounded border border-gray-200 px-2 py-1.5 font-mono text-xs"
+          placeholder="submit"
+        />
+      </div>
+
+      {/* primary boolean */}
+      <div className="flex items-center justify-between">
+        <label className="text-xs text-gray-500">primary</label>
+        <input
+          type="checkbox"
+          data-testid="button-primary-checkbox"
+          checked={!!button.primary}
+          onChange={(e) => onUpdate({ primary: e.target.checked ? true : undefined })}
+          disabled={readonly}
+          className="rounded border-gray-300"
+        />
+      </div>
+
+      {/* label (zh-CN + en) */}
+      <div>
+        <label className="mb-1 block text-xs text-gray-500">label · zh-CN</label>
+        <input
+          type="text"
+          data-testid="button-label-zh-input"
+          value={labelZh}
+          onChange={(e) => onUpdate({ label: updateLabel(e.target.value, labelEn) })}
+          disabled={readonly}
+          className="w-full rounded border border-gray-200 px-2 py-1.5 text-xs"
+          placeholder="提交"
+        />
+      </div>
+      <div>
+        <label className="mb-1 block text-xs text-gray-500">label · en</label>
+        <input
+          type="text"
+          data-testid="button-label-en-input"
+          value={labelEn}
+          onChange={(e) => onUpdate({ label: updateLabel(labelZh, e.target.value) })}
+          disabled={readonly}
+          className="w-full rounded border border-gray-200 px-2 py-1.5 text-xs"
+          placeholder="Submit"
+        />
+      </div>
+
+      {/* action.type */}
+      <div>
+        <label className="mb-1 block text-xs text-gray-500">action.type</label>
+        <select
+          data-testid="button-action-type-select"
+          value={actionObj.type ?? ''}
+          onChange={(e) => {
+            const nextType = e.target.value || 'command';
+            const next: DslActionDescriptor = { ...actionObj, type: nextType };
+            // Trim type-specific fields that no longer apply.
+            if (nextType !== 'command') delete next.command;
+            if (nextType !== 'navigate') delete next.url;
+            onUpdate({ action: next });
+          }}
+          disabled={readonly}
+          className="w-full rounded border border-gray-200 px-2 py-1.5 text-xs"
+        >
+          <option value="command">command</option>
+          <option value="navigate">navigate</option>
+          <option value="submit">submit</option>
+          <option value="cancel">cancel</option>
+          <option value="close">close</option>
+        </select>
+      </div>
+
+      {/* action params: dynamic per type */}
+      {actionObj.type === 'command' && (
+        <div>
+          <label className="mb-1 block text-xs text-gray-500">action.command</label>
+          <input
+            type="text"
+            data-testid="button-action-command-input"
+            value={actionObj.command ?? ''}
+            onChange={(e) => {
+              const next: DslActionDescriptor = {
+                ...actionObj,
+                command: e.target.value || undefined,
+              };
+              onUpdate({ action: next });
+            }}
+            disabled={readonly}
+            className="w-full rounded border border-gray-200 px-2 py-1.5 font-mono text-xs"
+            placeholder="sc:update_showcase"
+          />
+        </div>
+      )}
+
+      {actionObj.type === 'navigate' && (
+        <div>
+          <label className="mb-1 block text-xs text-gray-500">action.url</label>
+          <input
+            type="text"
+            data-testid="button-action-url-input"
+            value={actionObj.url ?? ''}
+            onChange={(e) => {
+              const next: DslActionDescriptor = {
+                ...actionObj,
+                url: e.target.value || undefined,
+              };
+              onUpdate({ action: next });
+            }}
+            disabled={readonly}
+            className="w-full rounded border border-gray-200 px-2 py-1.5 font-mono text-xs"
+            placeholder="/p/foo"
+          />
+        </div>
       )}
     </div>
   );
