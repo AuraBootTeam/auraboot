@@ -48,6 +48,7 @@ export function MultiInstanceSection({
                 checked={config?.enabled || false}
                 onChange={(e) => handleChange('enabled', e.target.checked)}
                 className="mr-2"
+                data-testid="multiinstance-enabled"
               />
               <span className="text-sm font-medium text-gray-700">{t('bpmn.prop.multiInstance.enable')}</span>
             </label>
@@ -65,6 +66,7 @@ export function MultiInstanceSection({
                       checked={config?.sequential === true}
                       onChange={() => handleChange('sequential', true)}
                       className="mr-1"
+                      data-testid="multiinstance-sequential"
                     />
                     <span className="text-sm text-gray-700">{t('bpmn.prop.multiInstance.sequential')}</span>
                   </label>
@@ -89,6 +91,7 @@ export function MultiInstanceSection({
                   onChange={(e) => handleChange('collection', e.target.value)}
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                   placeholder="${assigneeList}"
+                  data-testid="multiinstance-collection"
                 />
               </div>
 
@@ -100,6 +103,7 @@ export function MultiInstanceSection({
                   onChange={(e) => handleChange('elementVariable', e.target.value)}
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                   placeholder="assignee"
+                  data-testid="multiinstance-element-variable"
                 />
               </div>
 
@@ -111,6 +115,7 @@ export function MultiInstanceSection({
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                   rows={2}
                   placeholder="${nrOfCompletedInstances/nrOfInstances >= 0.5}"
+                  data-testid="multiinstance-completion-condition"
                 />
               </div>
 
@@ -128,6 +133,7 @@ export function MultiInstanceSection({
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                   min="1"
                   placeholder={t('bpmn.prop.multiInstance.loopCardinalityPlaceholder')}
+                  data-testid="multiinstance-cardinality"
                 />
               </div>
             </>
@@ -340,6 +346,7 @@ function HttpCallbackConfig({
           type="text"
           value={(config.url as string) || ''}
           onChange={(e) => onChange({ ...config, url: e.target.value })}
+          data-testid="hook-http-url"
           className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
           placeholder="https://example.com/webhook"
         />
@@ -421,6 +428,7 @@ function CommandActionConfig({
           type="text"
           value={(config.commandCode as string) || ''}
           onChange={(e) => onChange({ ...config, commandCode: e.target.value })}
+          data-testid="hook-command-code"
           className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
           placeholder="namespace:command_code"
         />
@@ -488,15 +496,16 @@ export function HookConfigSection({
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
+        data-testid="hook-section-toggle"
         className="flex w-full items-center justify-between px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
       >
         <span>{t('bpmn.hook.title')} ({hooks.length})</span>
         <span className="text-gray-400">{expanded ? '▾' : '▸'}</span>
       </button>
       {expanded && (
-        <div className="px-3 pb-3">
+        <div className="px-3 pb-3" data-testid="hook-section-body">
           {hooks.map((hook, index) => (
-            <div key={index} className="mb-3 rounded border border-gray-100 bg-gray-50 p-2">
+            <div key={index} className="mb-3 rounded border border-gray-100 bg-gray-50 p-2" data-testid={`hook-entry-${index}`}>
               <div className="mb-2 flex items-center justify-between">
                 <span className="text-xs font-medium text-gray-500">{t('bpmn.hook.hookNumber')} #{index + 1}</span>
                 <button
@@ -512,6 +521,7 @@ export function HookConfigSection({
                 <select
                   value={hook.hookType}
                   onChange={(e) => updateHook(index, 'hookType', e.target.value)}
+                  data-testid={`hook-type-${index}`}
                   className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
                 >
                   <option value="pre_execute">{t('bpmn.hook.typePreExecute')}</option>
@@ -527,6 +537,7 @@ export function HookConfigSection({
                   onChange={(e) =>
                     updateHookConfig(index, { actionType: e.target.value })
                   }
+                  data-testid={`hook-action-type-${index}`}
                   className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
                 >
                   <option value="http_callback">{t('bpmn.hook.actionHttpCallback')}</option>
@@ -604,6 +615,7 @@ export function HookConfigSection({
           <button
             type="button"
             onClick={addHook}
+            data-testid="hook-add-btn"
             className="w-full rounded border border-dashed border-blue-300 py-1 text-sm text-blue-600 hover:bg-blue-50 hover:text-blue-800"
           >
             {t('bpmn.hook.addHook')}

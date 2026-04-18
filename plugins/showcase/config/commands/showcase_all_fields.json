@@ -23,7 +23,9 @@
       "sc_phone",
       "sc_richtext_content",
       "sc_attachment",
-      "sc_remark"
+      "sc_remark",
+      "sc_tree_node",
+      "sc_department"
     ],
     "autoSetFields": {
       "sc_code": {
@@ -84,7 +86,9 @@
       "sc_phone",
       "sc_richtext_content",
       "sc_attachment",
-      "sc_remark"
+      "sc_remark",
+      "sc_tree_node",
+      "sc_department"
     ],
     "validation": {
       "rules": [
