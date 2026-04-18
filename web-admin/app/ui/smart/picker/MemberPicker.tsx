@@ -124,7 +124,7 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
         const members: MemberOption[] = [];
         for (const id of selectedIds) {
           try {
-            const res = await fetch(`/api/users/${id}`);
+            const res = await fetch(`/api/admin/users/${id}`);
             if (res.ok) {
               const result = await res.json();
               if (ResultHelper.isSuccess(result) && result.data) {
