@@ -35,6 +35,16 @@ public class ActiveMemoryService {
     /** Default agent code when caller doesn't specify one (built-in chat path). */
     public static final String DEFAULT_AGENT = "aurabot";
 
+    /**
+     * Prefix annotation prepended to {@code memory_content} when the source
+     * memory row has {@code shadow_mode=TRUE} (plan §8). Bilingual marker so
+     * downstream LLM (AuraBot) understands uncertainty and prefixes its reply
+     * with "根据团队近期记忆（尚在观察期）：...". Keep the literal in sync
+     * with the E2E / backend tests — callers may assert on this string.
+     */
+    public static final String SHADOW_ANNOTATION_PREFIX =
+            "[SHADOW / 近期团队记忆 · 观察中] ";
+
     /** Hard cap on snippets returned to Grounding — keep prompt size bounded. */
     private static final int MAX_SNIPPETS = 8;
     /** Keyword hits weighted more heavily than importance recall. */
@@ -112,13 +122,23 @@ public class ActiveMemoryService {
         m.put("type", row.get("memory_type"));
         m.put("title", row.get("memory_title"));
         Object content = row.get("memory_content");
-        if (content instanceof String s && s.length() > 400) {
-            m.put("content", s.substring(0, 400) + "…");
-        } else {
-            m.put("content", content);
+        String contentStr = content == null ? null : content.toString();
+        if (contentStr != null && contentStr.length() > 400) {
+            contentStr = contentStr.substring(0, 400) + "…";
         }
+        // Shadow-mode annotation (plan §8): tenant memories still in the
+        // 7-day observation window are prefixed so AuraBot can preface its
+        // reply with uncertainty language and frontend can render a
+        // "这条不对" retract button keyed on the marker.
+        Object shadow = row.get("shadow_mode");
+        boolean isShadow = shadow instanceof Boolean b ? b : Boolean.parseBoolean(String.valueOf(shadow));
+        if (isShadow && contentStr != null) {
+            contentStr = SHADOW_ANNOTATION_PREFIX + contentStr;
+        }
+        m.put("content", contentStr);
         m.put("importance", row.get("importance"));
         m.put("scope", row.get("scope"));
+        m.put("shadow_mode", isShadow);
         return m;
     }
 }
