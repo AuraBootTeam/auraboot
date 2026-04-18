@@ -457,28 +457,106 @@ test.describe('D — Detail-kind block coverage (bpm-panel / activity / comments
   // closest analog but is not routed by DetailBlockRenderer's hardcoded
   // switch. Coverage belongs in designer/report-designer E2E.
   // ---------------------------------------------------------------------------
-  test('D.rich-text: skip — not dispatched by DetailBlockRenderer', async () => {
-    test.skip(
-      true,
-      'rich-text is not wired into DetailBlockRenderer or the BlockRenderer ' +
-        'fallback map used by detail pages. The closest runtime analog is the ' +
-        '`description` block (DescriptionBlockRenderer), but detail pages use ' +
-        'a hardcoded switch over form-section/sub-table/activity-timeline/' +
-        'record-comments/field-history/bpm-panel/monthly-grid. rich-text ' +
-        'coverage belongs in designer canvas or report-designer E2E.',
+  // ---------------------------------------------------------------------------
+  // D.rich-text — renders via BlockRenderer fallback dispatch (G7).
+  // DetailBlockRenderer now routes unknown blockTypes through BlockRenderer,
+  // which has RichTextBlockRenderer registered in its fallback map.
+  // ---------------------------------------------------------------------------
+  test('D.rich-text: renders via BlockRenderer fallback in a detail-page tab', async ({
+    page,
+    request,
+  }) => {
+    const seed = await seedRecord(request);
+    createdPids.push(seed.pid);
+
+    detailSnapshot = await snapshotDetailPage(request, DETAIL_PAGE_KEY);
+    const keep = detailSnapshot.blocks.filter(
+      (b: any) => b?.blockType !== 'tabs' && b?.blockType !== 'toolbar',
     );
+    const nextBlocks = [
+      ...keep,
+      {
+        id: 'd_identity',
+        blockType: 'detail-section',
+        title: 'D Detail Identity',
+        columns: 2,
+        fields: [{ field: 'sc_name' }, { field: 'sc_code' }],
+      },
+      buildTabsBlock(
+        [
+          {
+            id: 'd_rich_text',
+            blockType: 'rich-text',
+            content: '<p data-testid="rich-text-content">Hello from rich-text block</p>',
+          },
+        ],
+        'd_rich_text_tab',
+      ),
+    ];
+    await replacePageBlocks(request, detailSnapshot, nextBlocks);
+
+    await gotoShowcaseListViaMenu(page);
+    await openDetailViaListRow(page, seed.pid);
+
+    const tabButton = page.locator('button', { hasText: 'D Runtime Tab' }).first();
+    await expect(tabButton).toBeVisible({ timeout: 10_000 });
+    await tabButton.click();
+
+    const richTextBlock = page.locator('[data-testid="rich-text-block"]').first();
+    await expect(richTextBlock, 'rich-text block container should render').toBeVisible({
+      timeout: 10_000,
+    });
+    await expect(
+      page.locator('[data-testid="rich-text-content"]'),
+      'rich-text sanitized HTML should render',
+    ).toBeVisible({ timeout: 5_000 });
   });
 
   // ---------------------------------------------------------------------------
-  // D.divider — NOT supported at runtime on detail pages.
+  // D.divider — renders via BlockRenderer fallback dispatch (G7).
   // ---------------------------------------------------------------------------
-  test('D.divider: skip — no runtime renderer', async () => {
-    test.skip(
-      true,
-      'divider has no runtime renderer in DetailBlockRenderer, ' +
-        'BlockRenderer fallback map, or any profile. It is a designer-only ' +
-        'concept. Coverage belongs in designer canvas E2E.',
+  test('D.divider: renders via BlockRenderer fallback in a detail-page tab', async ({
+    page,
+    request,
+  }) => {
+    const seed = await seedRecord(request);
+    createdPids.push(seed.pid);
+
+    detailSnapshot = await snapshotDetailPage(request, DETAIL_PAGE_KEY);
+    const keep = detailSnapshot.blocks.filter(
+      (b: any) => b?.blockType !== 'tabs' && b?.blockType !== 'toolbar',
     );
+    const nextBlocks = [
+      ...keep,
+      {
+        id: 'd_identity',
+        blockType: 'detail-section',
+        title: 'D Detail Identity',
+        columns: 2,
+        fields: [{ field: 'sc_name' }, { field: 'sc_code' }],
+      },
+      buildTabsBlock(
+        [
+          {
+            id: 'd_divider',
+            blockType: 'divider',
+            title: 'Section separator',
+          },
+        ],
+        'd_divider_tab',
+      ),
+    ];
+    await replacePageBlocks(request, detailSnapshot, nextBlocks);
+
+    await gotoShowcaseListViaMenu(page);
+    await openDetailViaListRow(page, seed.pid);
+
+    const tabButton = page.locator('button', { hasText: 'D Runtime Tab' }).first();
+    await expect(tabButton).toBeVisible({ timeout: 10_000 });
+    await tabButton.click();
+
+    const dividerBlock = page.locator('[data-testid="divider-block"]').first();
+    await expect(dividerBlock, 'divider block should render').toBeVisible({ timeout: 10_000 });
   });
 
   // ---------------------------------------------------------------------------

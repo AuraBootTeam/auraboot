@@ -42,6 +42,8 @@ import { ActivityTimeline } from '~/framework/meta/rendering/blocks/ActivityTime
 import { RecordComments } from '~/framework/meta/rendering/blocks/RecordComments';
 import { NbaSuggestionBar } from '~/framework/meta/rendering/blocks/NbaSuggestionBar';
 import { BpmPanelBlock } from '~/framework/meta/rendering/blocks/BpmPanelBlock';
+import { BlockRenderer } from '~/framework/meta/rendering/BlockRenderer';
+import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import type { BlockConfig, ButtonConfig, DetailTabConfig, FieldConfig } from '~/framework/meta/schemas/types';
 import { deriveTestId, buttonTestId } from '~/framework/meta/rendering/utils/deriveTestId';
 import { evaluateVisibleWhen as evaluateVisibleWhenExpression } from './utils/visibleWhen';
@@ -338,6 +340,31 @@ export function DetailPageContent(props: PageContentProps) {
     [allBlocks],
   );
 
+  // G7 dispatch — blocks not handled by the hardcoded switch above still need
+  // to render. Collect anything that is NOT a known detail-page block type and
+  // delegate to BlockRenderer (unified block dispatcher). This lets chart,
+  // description, rich-text, divider, stat-card etc. render on detail pages
+  // without every detail page having to opt in explicitly.
+  const DETAIL_SPECIALIZED_BLOCK_TYPES = new Set<string>([
+    'toolbar',
+    'tabs',
+    'form-section',
+    'detail-section',
+    'sub-table',
+    'monthly-grid',
+    'activity-timeline',
+    'record-comments',
+    'field-history',
+    'bpm-panel',
+  ]);
+  const directMiscBlocks = useMemo(
+    () =>
+      allBlocks.filter(
+        (b: BlockConfig) => !DETAIL_SPECIALIZED_BLOCK_TYPES.has(b.blockType as string),
+      ),
+    [allBlocks],
+  );
+
   // System tabs are injected by backend into dsl_schema. Filter out system tabs when no recordId (new record).
   const allTabs = (tabsBlock?.tabs || []) as DetailTabConfig[];
   const tabs = recordId ? allTabs : allTabs.filter((t) => !t.system);
@@ -504,6 +531,7 @@ export function DetailPageContent(props: PageContentProps) {
                     onDataChange={reloadRecord}
                     getDictItems={getDictItems}
                     enrichField={enrichField}
+                    runtime={runtime as SchemaRuntime}
                   />
                 ))}
               </div>
@@ -528,6 +556,7 @@ export function DetailPageContent(props: PageContentProps) {
                 onDataChange={reloadRecord}
                 getDictItems={getDictItems}
                 enrichField={enrichField}
+                    runtime={runtime as SchemaRuntime}
               />
             ))}
             {directSubTableBlocks.map((block: BlockConfig, blockIndex: number) => (
@@ -544,6 +573,7 @@ export function DetailPageContent(props: PageContentProps) {
                 onDataChange={reloadRecord}
                 getDictItems={getDictItems}
                 enrichField={enrichField}
+                    runtime={runtime as SchemaRuntime}
               />
             ))}
             {directMonthlyGridBlocks.map((block: BlockConfig, blockIndex: number) => (
@@ -560,13 +590,30 @@ export function DetailPageContent(props: PageContentProps) {
                 onDataChange={reloadRecord}
                 getDictItems={getDictItems}
                 enrichField={enrichField}
+                    runtime={runtime as SchemaRuntime}
               />
             ))}
+
+            {/* G7 — unified fallback dispatch for blocks not handled by the
+                hardcoded detail switch (chart / description / rich-text /
+                divider / stat-card / etc.). Renders via BlockRenderer using
+                the fallback renderer registry. Unknown blockTypes surface as
+                a visible placeholder + console.warn (not silently dropped). */}
+            {runtime &&
+              directMiscBlocks.map((block: BlockConfig, blockIndex: number) => (
+                <BlockRenderer
+                  key={block.id || `misc-${blockIndex}`}
+                  block={block}
+                  runtime={runtime}
+                  areaId="detail-direct"
+                />
+              ))}
 
             {/* Fallback: no structured blocks found, show all fields */}
             {effectiveDirectFormBlocks.length === 0 &&
               directSubTableBlocks.length === 0 &&
               directMonthlyGridBlocks.length === 0 &&
+              directMiscBlocks.length === 0 &&
               tabs.length === 0 && (
                 <FallbackDetailView schema={schema} recordData={recordData} locale={locale} t={t} />
               )}
@@ -626,6 +673,7 @@ function DetailBlockRenderer({
   onDataChange,
   getDictItems,
   enrichField,
+  runtime,
 }: {
   block: BlockConfig;
   recordData: RecordData;
@@ -640,6 +688,7 @@ function DetailBlockRenderer({
     code: string,
   ) => Array<{ value: string; label: string; extension?: Record<string, any> }>;
   enrichField?: (field: FieldConfig) => FieldConfig;
+  runtime?: SchemaRuntime;
 }) {
   const resolveModelFieldLabel = useCallback(
     (fieldCode: string): string => {
@@ -805,8 +854,31 @@ function DetailBlockRenderer({
     );
   }
 
-  // Unknown block type - render nothing
-  return null;
+  // G7 — unified fallback dispatch. Unknown block types fall through to the
+  // BlockRenderer registry (chart / description / rich-text / divider /
+  // stat-card / form / filters / etc.). Renders an "Unknown block type"
+  // placeholder if no renderer is registered — NEVER silently null.
+  if (runtime) {
+    return (
+      <BlockRenderer block={block} runtime={runtime} areaId="detail-tab" />
+    );
+  }
+
+  // No runtime available — log and surface the miss so it's diagnosable.
+  // eslint-disable-next-line no-console
+  console.warn(
+    `[DetailBlockRenderer] No runtime context; cannot dispatch blockType="${block.blockType}"`,
+  );
+  return (
+    <div
+      className="rounded border border-yellow-300 bg-yellow-50 p-4"
+      data-testid="detail-block-unknown"
+    >
+      <p className="text-yellow-800">
+        Unknown block type on detail page: <code>{String(block.blockType)}</code>
+      </p>
+    </div>
+  );
 }
 
 /**
