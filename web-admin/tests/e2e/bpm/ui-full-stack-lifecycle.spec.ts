@@ -792,16 +792,37 @@ test.describe(
       await expect(formTab).toBeVisible({ timeout: 3_000 });
       await formTab.click();
 
-      // The wd_leave_approval process has NO formBinding on task_manager_approve
-      // (see processes.json — only taskActions are declared). FormTab therefore
-      // either renders an empty state or a contextual message. The drawer itself
-      // staying mounted + 表单 tab active is the assertion we can make without
-      // fabricating a formBinding the process doesn't have.
-      //
-      // Per the spec's strict "no silent fallback" policy we assert the tab is
-      // actually selected (has the border-blue-600 active class). This keeps
-      // the assertion honest: if the tab-switch machinery breaks, we fail.
+      // The tab must actually activate (border-blue-600 = active marker). Per
+      // the spec's strict "no silent fallback" policy we verify the
+      // tab-switch machinery works.
       await expect(formTab, '表单 tab must be the active one').toHaveClass(/border-blue-600/);
+
+      // Additional assertion: cross-check that the BPM form API itself does
+      // return a formBinding for this task now that processes.json declares
+      // it explicitly (task_manager_approve.data.formBinding with formRef=
+      // wd_leave_request_detail) and plugin import derives the form_bindings
+      // map on ab_bpm_process_definition. This catches the original Bug #10
+      // failure mode (form_bindings column empty → no formBinding returned)
+      // without depending on the known TaskFormResponse/bpmFormService shape
+      // mismatch in FormTab rendering.
+      const formApiResp = await request.get(`/api/bpm/forms/task/${leaveTaskId}`, {
+        headers: { Authorization: `Bearer ${adminToken}` },
+      });
+      expect(formApiResp.ok(), `form api: ${formApiResp.status()}`).toBe(true);
+      const formBody = await formApiResp.json();
+      const formBinding = formBody?.data?.formBinding;
+      expect(
+        formBinding,
+        'form_bindings row must surface a formBinding entry for task_manager_approve',
+      ).toBeTruthy();
+      expect(
+        String(formBinding?.formRef ?? ''),
+        'derived formBinding.formRef must point at wd_leave_request_detail',
+      ).toBe('wd_leave_request_detail');
+      expect(
+        String(formBinding?.formType ?? '').toLowerCase(),
+        'derived formBinding.formType must be PAGE',
+      ).toBe('page');
 
       // Switch to 基本信息 to keep state predictable for G4 (and assert the
       // drawer body does render core metadata — processDefinitionKey +
