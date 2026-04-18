@@ -516,4 +516,120 @@ test.describe('AuraBot Panel', () => {
     // Either way, the endpoint is wired up and responds (not 404).
     expect(resp.status()).not.toBe(404);
   });
+
+  // -------------------------------------------------------------------------
+  // GAP-260 / GAP-262 lock-in regression tests
+  //   These assertions guard three distinct fixes surfaced by the
+  //   aurabot/ai-panel.spec.ts suite:
+  //     - AuraBotProvider.refreshConversations() no longer auto-resumes a past
+  //       conversation when no rememberedConversationId is present.
+  //     - AuraBotPanel wraps agent name in an explicit <span>.
+  //     - AuraBotChat send button title is i18n'd (zh: "发送").
+  //     - DefaultLayout eager-imports the panel chunk (no React.lazy race).
+  //   Each test asserts exactly one invariant so a regression pinpoints the
+  //   offending fix without shadowing from neighboring assertions.
+  // -------------------------------------------------------------------------
+
+  test('AIP-WELCOME: panel opens to welcome state when no conversation is remembered', async ({
+    page,
+  }) => {
+    // Clear any leaked remembered conversation id from previous tests / storageState.
+    await gotoAppAndWaitForHeader(page);
+    await page.evaluate(() => {
+      try {
+        window.localStorage.removeItem('aurabot.currentConversationId');
+        // Also clear any namespaced keys defensively
+        for (const k of Object.keys(window.localStorage)) {
+          if (/aurabot.*conversation/i.test(k)) window.localStorage.removeItem(k);
+        }
+      } catch {
+        // ignore
+      }
+    });
+
+    const panel = await openPanel(page);
+
+    // GAP-260 #1: welcome h3 must be visible. If AuraBotProvider auto-resumes
+    // an old conversation, the welcome banner would be hidden by chat bubbles.
+    const welcomeHeading = panel.locator('h3').filter({ hasText: /^AuraBot$/ });
+    await expect(
+      welcomeHeading,
+      'Welcome <h3>AuraBot</h3> must render when no rememberedConversationId is present',
+    ).toBeVisible({ timeout: 5000 });
+  });
+
+  test('AIP-AGENT-SPAN: agent name renders inside an explicit <span> element', async ({
+    page,
+  }) => {
+    await gotoAppAndWaitForHeader(page);
+    const panel = await openPanel(page);
+
+    // GAP-260 #2: the agent selector button must contain a <span> whose text
+    // is the agent name (default "AuraBot"). Bare text nodes would fail the
+    // span-scoped locator used by screen readers and suite assertions.
+    const agentSpan = panel.locator('span').filter({ hasText: /^AuraBot$/ }).first();
+    await expect(
+      agentSpan,
+      'Agent name "AuraBot" must be wrapped in a <span> element, not a bare text node',
+    ).toBeVisible({ timeout: 5000 });
+
+    // Verify the tagName via DOM — Playwright's .locator('span') only matches
+    // elements, but we assert explicitly for resilience against template shifts.
+    const tagName = await agentSpan.evaluate((el) => el.tagName.toLowerCase());
+    expect(tagName).toBe('span');
+  });
+
+  test('AIP-SEND-I18N: send button title is localized under zh-CN locale', async ({
+    page,
+  }) => {
+    // Set zh-CN as the preferred language before app boots
+    await page.addInitScript(() => {
+      try {
+        window.localStorage.setItem('i18nextLng', 'zh-CN');
+        window.localStorage.setItem('locale', 'zh-CN');
+      } catch {
+        // ignore
+      }
+    });
+
+    await gotoAppAndWaitForHeader(page);
+    const panel = await openPanel(page);
+
+    // GAP-260 #3: the send button title must contain "发送" under zh locale.
+    // A hardcoded "Send (Cmd+Enter)" would fail this lock-in.
+    const sendBtn = panel.locator('button[title*="发送"]').first();
+    await expect(
+      sendBtn,
+      'Send button title must contain "发送" under zh-CN locale (i18n key aurabot.chat.send)',
+    ).toBeVisible({ timeout: 5000 });
+  });
+
+  test('AIP-EAGER-LOAD: panel mounts within 1.5s of layout render (no lazy-chunk race)', async ({
+    page,
+  }) => {
+    // GAP-262: DefaultLayout eager-imports AuraBotPanel. After layout renders,
+    // the panel DOM should appear very quickly after clicking toggle — no
+    // React.lazy chunk resolution delay. We click once and wait with a tight
+    // budget. If the lazy race returns, polling will time out at 1500ms.
+    await gotoAppAndWaitForHeader(page);
+
+    const toggle = page.locator('[data-testid="ai-panel-toggle"]');
+    await expect(toggle).toBeVisible({ timeout: 5000 });
+    await expect(toggle).toBeEnabled({ timeout: 5000 });
+
+    const clickTs = Date.now();
+    await toggle.click();
+
+    await page.waitForFunction(
+      () => !!document.querySelector('[data-testid="aurabot-panel"]'),
+      undefined,
+      { polling: 50, timeout: 1500 },
+    );
+
+    const elapsed = Date.now() - clickTs;
+    expect(
+      elapsed,
+      `panel should mount in <1500ms after toggle click (eager import); took ${elapsed}ms`,
+    ).toBeLessThan(1500);
+  });
 });
