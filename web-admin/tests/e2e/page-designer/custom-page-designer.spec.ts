@@ -32,7 +32,7 @@ async function openDesigner(page: Page): Promise<string | null> {
   await page.goto(`/page-designer/${pageId}`, { waitUntil: 'domcontentloaded' });
   await expect(
     page.locator(
-      '[data-testid="designer-canvas"], [data-testid="sortable-block"], [data-testid^="canvas-block-"]',
+      '[data-testid="designer-canvas"], [data-testid="sortable-block"], [data-testid^="canvas-block-"], [data-testid="list-config-panel"], [data-testid="detail-config-panel"]',
     ).first(),
   ).toBeVisible({ timeout: 15000 });
 
@@ -52,7 +52,7 @@ test.describe('CUSTOM/API Page Designer', () => {
     await expect(page).toHaveURL(new RegExp(`/page-designer/${pageId}$`));
     await expect(
       page.locator(
-        '[data-testid="designer-canvas"], [data-testid="sortable-block"], [data-testid^="canvas-block-"]',
+        '[data-testid="designer-canvas"], [data-testid="sortable-block"], [data-testid^="canvas-block-"], [data-testid="list-config-panel"], [data-testid="detail-config-panel"]',
       ).first(),
     ).toBeVisible();
   });
@@ -67,7 +67,7 @@ test.describe('CUSTOM/API Page Designer', () => {
     await page.reload({ waitUntil: 'domcontentloaded' });
     await expect(
       page.locator(
-        '[data-testid="designer-canvas"], [data-testid="sortable-block"], [data-testid^="canvas-block-"]',
+        '[data-testid="designer-canvas"], [data-testid="sortable-block"], [data-testid^="canvas-block-"], [data-testid="list-config-panel"], [data-testid="detail-config-panel"]',
       ).first(),
     ).toBeVisible({ timeout: 15000 });
     await expect(page).toHaveURL(new RegExp(`/page-designer/${pageId}$`));
