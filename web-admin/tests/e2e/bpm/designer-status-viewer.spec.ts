@@ -20,7 +20,8 @@
  * Coverage IDs:
  *   STATV-1  start instance → open viewer from list → assert active node + diagram
  *   STATV-2  complete first task → reopen viewer → assert progress moved (completedNodes)
- *   STATV-3  terminate instance → reopen viewer → assert terminal state visualization
+ *   STATV-3  terminate instance → reopen viewer → assert terminal badge (false-green hardened)
+ *   STATV-4  suspend instance → reopen viewer → assert Suspended badge
  *
  * @bpm-regression
  * @since P3-C
@@ -39,6 +40,7 @@ const PROCESS_KEY = `statv_${UID}`.toLowerCase();
 const PROCESS_NAME = `Status Viewer Test ${UID}`;
 const BUSINESS_KEY = `E2E-STATV-${UID}`;
 const BUSINESS_KEY_TERMINATE = `E2E-STATV-TERM-${UID}`;
+const BUSINESS_KEY_SUSPEND = `E2E-STATV-SUSP-${UID}`;
 
 // ---------------------------------------------------------------------------
 // BPMN fixture: start → userTask1 → userTask2 → end (two user tasks so we can
@@ -180,6 +182,7 @@ test.describe('BPM Process Status Viewer @bpm-regression', () => {
   let processPid: string;
   let instanceId: string;
   let terminateInstanceId: string;
+  let suspendInstanceId: string;
   let firstTaskId: string;
   let envSkipReason: string | null = null;
 
@@ -264,6 +267,19 @@ test.describe('BPM Process Status Viewer @bpm-regression', () => {
       if (startResp2.ok()) {
         const inst2 = await startResp2.json();
         terminateInstanceId = inst2.data?.instanceId || inst2.data?.processInstanceId;
+      }
+
+      // 6. Start instance #3 (will be suspended in STATV-4)
+      const startResp3 = await page.request.post('/api/bpm/process-instances', {
+        data: {
+          processDefinitionId: PROCESS_KEY,
+          businessKey: BUSINESS_KEY_SUSPEND,
+          variables: { initiator: 'e2e-test' },
+        },
+      });
+      if (startResp3.ok()) {
+        const inst3 = await startResp3.json();
+        suspendInstanceId = inst3.data?.instanceId || inst3.data?.processInstanceId;
       }
     } finally {
       await ctx.close();
@@ -399,9 +415,29 @@ test.describe('BPM Process Status Viewer @bpm-regression', () => {
       .first();
     await expect(completedNode).toBeVisible({ timeout: 5_000 });
     await completedNode.click();
-    await expect(page.locator('text=Node Detail').first()).toBeVisible({ timeout: 5_000 });
-    // The node detail "Status" row should reflect completed (StatusBadge renders Completed)
-    await expect(page.getByText(/Completed|completed/i).first()).toBeVisible({ timeout: 5_000 });
+
+    // STATV-2 false-green fix: scope Status assertion to the Node Detail panel,
+    // NOT a table column header like "Completed At". The panel is a <div> with
+    // a header h3 "Node Detail" — scope all assertions to that card.
+    const detailPanel = page
+      .locator('div')
+      .filter({ has: page.locator('h3', { hasText: 'Node Detail' }) })
+      .first();
+    await expect(detailPanel).toBeVisible({ timeout: 5_000 });
+
+    // Assert exact nodeId rendered in the Node ID DetailRow (not a loose text match)
+    await expect(detailPanel.getByText('userTask1', { exact: true })).toBeVisible({ timeout: 3_000 });
+
+    // The Status DetailRow renders a StatusBadge <span> with the literal label "Completed".
+    // Filter to exact match so we do not accept the "Completed At" / "Completed By" row labels.
+    const statusBadge = detailPanel
+      .locator('span')
+      .filter({ hasText: /^Completed$/ })
+      .first();
+    await expect(
+      statusBadge,
+      'userTask1 detail Status badge should render the exact label "Completed"',
+    ).toBeVisible({ timeout: 5_000 });
   });
 
   // =========================================================================
@@ -421,15 +457,22 @@ test.describe('BPM Process Status Viewer @bpm-regression', () => {
       expect(r.ok(), `terminate API must succeed (got ${r.status()})`).toBe(true);
     }).toPass({ timeout: 10_000 });
 
-    // Confirm via API that backend marks the instance as terminated/aborted/completed
+    // STATV-3 false-green fix: a terminate action MUST produce a terminate-class
+    // backend status. Accepting "completed" here previously let a silent no-op
+    // pass as green. Backend must report exactly terminated/aborted/cancelled.
     const statusResp = await page.request.get(
-      `/api/bpm/process-instances/${terminateInstanceId}`,
+      `/api/bpm/process-instances/${terminateInstanceId}/status`,
     );
-    expect(statusResp.ok()).toBe(true);
+    expect(statusResp.ok(), 'status API should return 200').toBe(true);
     const apiStatus = String((await statusResp.json()).data?.status ?? '').toLowerCase();
-    expect(apiStatus, `backend status must reflect terminal state, got "${apiStatus}"`).toMatch(
-      /terminated|aborted|completed|cancelled|canceled/i,
-    );
+    expect(
+      apiStatus,
+      `terminate action must set status to terminated/aborted/cancelled, got "${apiStatus}"`,
+    ).toMatch(/^(terminated|aborted|cancelled|canceled)$/);
+    expect(
+      apiStatus,
+      'terminate action must NOT leave status as "completed" (false-green guard)',
+    ).not.toBe('completed');
 
     // Reopen viewer for the terminated instance
     await openStatusViewerFromList(page, BUSINESS_KEY_TERMINATE, terminateInstanceId);
@@ -437,18 +480,31 @@ test.describe('BPM Process Status Viewer @bpm-regression', () => {
     // Header still shows the instance id
     await expect(page.getByText(terminateInstanceId)).toBeVisible({ timeout: 10_000 });
 
-    // The header StatusBadge must render a non-running label (Terminated /
-    // Completed / Cancelled). The viewer normalizes via StatusBadge — assert
-    // that NONE of the active-state labels are shown for the header pill,
-    // and at least one terminal label is shown somewhere on the page.
-    const terminalText = await page
-      .getByText(/Terminated|Completed|Cancelled|Canceled|已终止|已完成|已取消/i)
-      .first()
-      .isVisible({ timeout: 8_000 })
-      .catch(() => false);
-    expect(terminalText, 'viewer must visualize terminal state (Terminated/Completed/Cancelled)').toBe(
-      true,
-    );
+    // Scope the StatusBadge assertion to the viewer header bar, NOT arbitrary
+    // page text. The header badge label for terminated/aborted is "Terminated"
+    // per StatusBadge config in ProcessStatusViewer.tsx (aborted → Terminated).
+    const headerBar = page
+      .locator('div')
+      .filter({ has: page.locator('h2', { hasText: /Process Status/i }) })
+      .first();
+    await expect(headerBar).toBeVisible({ timeout: 5_000 });
+    const headerBadge = headerBar
+      .locator('span')
+      .filter({ hasText: /^(Terminated|Cancelled)$/ })
+      .first();
+    await expect(
+      headerBadge,
+      'viewer header StatusBadge must render Terminated/Cancelled (NOT Completed) for a terminated instance',
+    ).toBeVisible({ timeout: 8_000 });
+
+    // Guard: the header badge must not be the "Completed" badge
+    const headerCompletedBadge = headerBar
+      .locator('span')
+      .filter({ hasText: /^Completed$/ });
+    expect(
+      await headerCompletedBadge.count(),
+      'header should not display the Completed badge for a terminated instance',
+    ).toBe(0);
 
     // No currentNodes → no node should be rendered with the "active" highlight
     // (we assert via API contract: currentNodes is empty for a terminated instance)
@@ -468,6 +524,82 @@ test.describe('BPM Process Status Viewer @bpm-regression', () => {
     // should be available for terminated instances for audit purposes)
     const canvas = page.locator('.react-flow').first();
     await expect(canvas, 'BPMN canvas must render even for terminated instances').toBeVisible({
+      timeout: 10_000,
+    });
+  });
+
+  // =========================================================================
+  // STATV-4 — Suspend instance, reopen viewer, assert Suspended badge
+  //   Lock-in regression for suspended-state visualization. Complements
+  //   STATV-3: terminal != suspended; the viewer must render a distinct
+  //   yellow "Suspended" badge, not re-use "Terminated" or "Completed".
+  // =========================================================================
+  test('STATV-4 @bpm-regression — suspended instance → viewer shows Suspended badge', async ({
+    page,
+  }) => {
+    test.skip(
+      !suspendInstanceId,
+      'instance #3 (for suspend) not created — likely a permission gap in the test env',
+    );
+
+    // Suspend via API
+    const suspendResp = await page.request.post(
+      `/api/bpm/process-instances/${suspendInstanceId}/suspend`,
+      { data: { reason: `STATV-4 ${UID}` } },
+    );
+    test.skip(
+      !suspendResp.ok(),
+      `suspend API unavailable in this env (status=${suspendResp.status()})`,
+    );
+
+    // Backend must report status exactly "suspended" (NOT terminated/completed)
+    await expect
+      .poll(
+        async () => {
+          const r = await page.request.get(
+            `/api/bpm/process-instances/${suspendInstanceId}/status`,
+          );
+          if (!r.ok()) return null;
+          return String((await r.json()).data?.status ?? '').toLowerCase();
+        },
+        { timeout: 10_000, message: 'backend should report suspended status' },
+      )
+      .toBe('suspended');
+
+    // Reopen viewer for the suspended instance
+    await openStatusViewerFromList(page, BUSINESS_KEY_SUSPEND, suspendInstanceId);
+
+    // Header still shows the instance id
+    await expect(page.getByText(suspendInstanceId)).toBeVisible({ timeout: 10_000 });
+
+    // Header StatusBadge must render "Suspended" (yellow) — scoped to header bar
+    const headerBar = page
+      .locator('div')
+      .filter({ has: page.locator('h2', { hasText: /Process Status/i }) })
+      .first();
+    await expect(headerBar).toBeVisible({ timeout: 5_000 });
+    const suspendedBadge = headerBar
+      .locator('span')
+      .filter({ hasText: /^Suspended$/ })
+      .first();
+    await expect(
+      suspendedBadge,
+      'viewer header must render "Suspended" badge for a suspended instance',
+    ).toBeVisible({ timeout: 8_000 });
+
+    // Guard: must not mis-render as Terminated or Completed
+    const wrongBadges = await headerBar
+      .locator('span')
+      .filter({ hasText: /^(Terminated|Completed|Cancelled)$/ })
+      .count();
+    expect(
+      wrongBadges,
+      'suspended instance header must not display Terminated/Completed/Cancelled',
+    ).toBe(0);
+
+    // Canvas still renders for audit
+    const canvas = page.locator('.react-flow').first();
+    await expect(canvas, 'BPMN canvas must render for suspended instances').toBeVisible({
       timeout: 10_000,
     });
   });
