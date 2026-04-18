@@ -129,7 +129,8 @@ class ShadowRunSchedulerIntegrationTest extends BaseIntegrationTest {
     void ineligible_write_no_runs() {
         String run1 = "RUNW" + System.nanoTime();
         seedAction(run1);
-        String yaml = "substrate: dsl\naction_type: update\ntool_refs:\n  - cmd_update_lead\n";
+        // api_* is NONE by platform default; draft is ineligible.
+        String yaml = "substrate: api\naction_type: update\ntool_refs:\n  - api_stripe_charge\n";
         String draftPid = seedDraft("REVIEWED_OK", yaml,
                 "[{\"run_id\":\"" + run1 + "\"}]");
 
