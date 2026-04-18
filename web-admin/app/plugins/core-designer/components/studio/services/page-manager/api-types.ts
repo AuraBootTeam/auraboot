@@ -30,6 +30,7 @@ export interface PageSchemaDTO {
   title: string | Record<string, string>;
   description?: string;
   kind: ApiPageType;
+  modelCode?: string;
   blocks?: any[];
   layout?: Record<string, unknown>;
   profile?: string;
