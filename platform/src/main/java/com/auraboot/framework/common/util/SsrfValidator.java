@@ -2,6 +2,7 @@ package com.auraboot.framework.common.util;
 
 import lombok.extern.slf4j.Slf4j;
 
+import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.URI;
 import java.net.UnknownHostException;
@@ -130,8 +131,16 @@ public final class SsrfValidator {
         }
 
         try {
-            InetAddress addr = InetAddress.getByName(host);
-            rejectIfPrivate(addr);
+            // Paranoid multi-A-record check (P3-E hardening): if DNS returns
+            // multiple addresses, ANY private/loopback/link-local address causes
+            // rejection. Otherwise an attacker who controls DNS can answer with
+            // [public-A, 127.0.0.1]; the OS may pick either at connect time.
+            InetAddress[] all = InetAddress.getAllByName(host);
+            for (InetAddress a : all) {
+                rejectIfPrivate(a);
+            }
+            // Pin the first resolved address for downstream connect-time use.
+            InetAddress addr = all[0];
             return new ValidatedTarget(uri, host, addr, port, lowerScheme);
         } catch (UnknownHostException e) {
             // DNS resolution failure is NOT an SSRF concern — the host simply
@@ -157,6 +166,23 @@ public final class SsrfValidator {
     }
 
     private static void rejectIfPrivate(InetAddress addr) {
+        // IPv4-mapped IPv6 (::ffff:x.y.z.w) bypass: on many JDKs, the mapped
+        // address reports isLoopbackAddress()/isSiteLocalAddress() as FALSE
+        // because the check only inspects the IPv6 high bits. Unwrap to the
+        // embedded IPv4 and re-run the block-list against that.
+        if (addr instanceof Inet6Address v6) {
+            byte[] raw = v6.getAddress();
+            if (isIpv4Mapped(raw)) {
+                try {
+                    byte[] v4Raw = new byte[] {raw[12], raw[13], raw[14], raw[15]};
+                    InetAddress v4 = InetAddress.getByAddress(v4Raw);
+                    rejectIfPrivate(v4);
+                } catch (UnknownHostException unreachable) {
+                    // getByAddress with a 4-byte array never throws.
+                    throw new IllegalStateException(unreachable);
+                }
+            }
+        }
         if (addr.isLoopbackAddress()) {
             throw new IllegalArgumentException("URL resolves to loopback address");
         }
@@ -169,5 +195,18 @@ public final class SsrfValidator {
         if (addr.isAnyLocalAddress()) {
             throw new IllegalArgumentException("URL resolves to wildcard address");
         }
+    }
+
+    /** Returns true for the ::ffff:0:0/96 prefix (IPv4-mapped IPv6). */
+    private static boolean isIpv4Mapped(byte[] raw) {
+        if (raw.length != 16) {
+            return false;
+        }
+        for (int i = 0; i < 10; i++) {
+            if (raw[i] != 0) {
+                return false;
+            }
+        }
+        return (raw[10] & 0xff) == 0xff && (raw[11] & 0xff) == 0xff;
     }
 }

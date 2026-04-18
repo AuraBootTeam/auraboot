@@ -5,13 +5,17 @@ import com.auraboot.framework.bpm.rule.DroolsEngineService;
 import com.auraboot.framework.bpm.service.BpmNodeHookService;
 import com.auraboot.framework.bpm.service.BpmNodeHookService.HookExecutionResult;
 import com.auraboot.framework.integration.BaseIntegrationTest;
+import com.auraboot.framework.meta.dto.CommandExecuteRequest;
+import com.auraboot.framework.meta.service.CommandExecutor;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
+import org.mockito.ArgumentMatchers;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.lang.reflect.Method;
 import java.util.Map;
@@ -43,6 +47,16 @@ class BpmNodeHookSecurityTest extends BaseIntegrationTest {
 
     @Autowired
     private DroolsEngineService droolsEngineService;
+
+    /**
+     * Mock the real {@link CommandExecutor} so HOOK-SEC-06 can stub a
+     * slow-running command without inserting a fake {@code @Component} into
+     * the full application context — this keeps the dispatch path
+     * (executeHook → runWithTimeout → executeCommand → commandExecutor.execute)
+     * exercised end-to-end while letting the test bound the callable's runtime.
+     */
+    @MockitoBean
+    private CommandExecutor commandExecutor;
 
     private BpmNodeHook buildHook(String processKey, String nodeId, String hookType,
                                   Map<String, Object> config, String failStrategy) {
@@ -233,32 +247,89 @@ class BpmNodeHookSecurityTest extends BaseIntegrationTest {
 
     @Test
     @Order(6)
-    @DisplayName("HOOK-SEC-06: command hook is bounded by runWithTimeout (no unbounded CommandExecutor)")
-    void hookSec06_commandTimeout() throws Exception {
-        // A sleeping callable stands in for a long-running Command — the
-        // dispatch in executeHook() now routes command through runWithTimeout,
-        // so any unbounded CommandExecutor.execute(...) is forced to respect
-        // HOOK_EXECUTION_TIMEOUT_MS. We assert the wrapper path here directly.
-        Callable<Boolean> sleepingCommand = () -> {
-            // Emulate CommandExecutor.execute blocking on a downstream DB / HTTP
-            // call that doesn't honour interrupts.
+    @DisplayName("HOOK-SEC-06: command hook dispatched via executeHook is bounded by runWithTimeout (end-to-end)")
+    void hookSec06_commandTimeoutEndToEnd() throws Exception {
+        // Stub the real CommandExecutor bean so CommandExecutor.execute() blocks
+        // for 60s — mimicking an unbounded downstream JDBC/HTTP call that does
+        // NOT honour interrupts. The test asserts the full dispatch path
+        //   executePreChecks → executeHook → runWithTimeout("command", …)
+        //     → executeCommand → commandExecutor.execute(...)
+        // trips the HOOK_EXECUTION_TIMEOUT_MS wrapper within ~20s (15s soft +
+        // 5s grace) and surfaces as a BLOCK fail-strategy result. A future
+        // refactor that removes the runWithTimeout wrapper at the command
+        // dispatch site would flip this test red, unlike the prior reflection-
+        // based HOOK-SEC-05 which only proved the helper's own correctness.
+        org.mockito.Mockito.doAnswer(inv -> {
             long end = System.currentTimeMillis() + 60_000L;
             while (System.currentTimeMillis() < end) {
-                // busy-wait without interrupt check
+                // busy-wait without interrupt check — emulates an
+                // uncooperative downstream executor.
             }
-            return true;
-        };
+            return null;
+        }).when(commandExecutor).execute(
+                ArgumentMatchers.eq("slowTestCommand"),
+                ArgumentMatchers.any(CommandExecuteRequest.class));
+
+        String processKey = "sec-cmd-timeout-" + System.nanoTime();
+        hookService.createHook(buildHook(
+                processKey, "n", "pre_check",
+                Map.of(
+                        "type", "command",
+                        "commandCode", "slowTestCommand",
+                        "payload", Map.of("x", 1)
+                ),
+                "block"
+        ));
 
         long start = System.currentTimeMillis();
-        BusinessException ex = assertThrows(BusinessException.class,
-                () -> invokeRunWithTimeout("command", sleepingCommand));
+        HookExecutionResult result = hookService.executePreChecks(processKey, "n", Map.of());
         long elapsed = System.currentTimeMillis() - start;
 
-        assertTrue(ex.getMessage().contains("timeout")
-                        && ex.getMessage().contains("command"),
-                "Expected command-timeout message, got: " + ex.getMessage());
-        assertTrue(elapsed < 30_000L, "elapsed=" + elapsed);
+        assertFalse(result.passed(),
+                "Command hook exceeding HOOK_EXECUTION_TIMEOUT_MS must be blocked; got: " + result.message());
+        assertNotNull(result.message());
+        assertTrue(result.message().contains("Pre-check error")
+                        && result.message().toLowerCase().contains("timeout"),
+                "BLOCK strategy must surface a timeout error, got: " + result.message());
+        // 15s soft + up to 5s hard-kill grace; generous upper bound for CI jitter.
+        assertTrue(elapsed < 30_000L,
+                "Command dispatch must trip wrapper well before 60s callable budget; elapsed=" + elapsed);
+        assertTrue(elapsed >= 15_000L,
+                "Must not trip before the configured 15s timeout; elapsed=" + elapsed);
 
-        log.info("HOOK-SEC-06 PASSED: command hook bounded by runWithTimeout, elapsed={}ms", elapsed);
+        log.info("HOOK-SEC-06 PASSED: command dispatch bounded via executeHook, elapsed={}ms", elapsed);
+    }
+
+    @Test
+    @Order(7)
+    @DisplayName("HOOK-SEC-07: IPv6 loopback [::1] and IPv4-mapped IPv6 ::ffff:127.0.0.1 are rejected as SSRF")
+    void hookSec07_ipv6LoopbackAndMappedRejected() {
+        // [::1] — canonical IPv6 loopback; must be rejected.
+        String pk1 = "sec-ssrf-v6loop-" + System.nanoTime();
+        hookService.createHook(buildHook(
+                pk1, "n", "pre_check",
+                Map.of("type", "rest_call",
+                        "url", "http://[::1]/admin",
+                        "method", "get"),
+                "block"
+        ));
+        HookExecutionResult v6 = hookService.executePreChecks(pk1, "n", Map.of());
+        assertFalse(v6.passed(), "IPv6 loopback [::1] must be rejected");
+
+        // ::ffff:127.0.0.1 — IPv4-mapped IPv6 loopback; pre-hardening some JDKs
+        // reported isLoopbackAddress()=false on the Inet6Address, letting this
+        // slip through. Ensure SsrfValidator unwraps and rejects.
+        String pk2 = "sec-ssrf-v4mapped-" + System.nanoTime();
+        hookService.createHook(buildHook(
+                pk2, "n", "pre_check",
+                Map.of("type", "rest_call",
+                        "url", "http://[::ffff:127.0.0.1]/admin",
+                        "method", "get"),
+                "block"
+        ));
+        HookExecutionResult mapped = hookService.executePreChecks(pk2, "n", Map.of());
+        assertFalse(mapped.passed(), "IPv4-mapped IPv6 loopback must be rejected");
+
+        log.info("HOOK-SEC-07 PASSED: IPv6 loopback + IPv4-mapped loopback both rejected");
     }
 }
