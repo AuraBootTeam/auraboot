@@ -1,5 +1,9 @@
-import React from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { PageSchema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
+import { useModelCapabilities } from '~/shared/hooks/useModelCapabilities';
+import { blocksToDetailVm, detailVmToBlocks, type DetailViewModel } from './detail-config/mapper';
+import { SectionsTab } from './detail-config/SectionsTab';
+import { ActionsTab } from './detail-config/ActionsTab';
 
 export interface DetailConfigPanelProps {
   schema: PageSchema;
@@ -10,37 +14,73 @@ export interface DetailConfigPanelProps {
   previewMode?: boolean;
 }
 
-/**
- * Structured config panel for kind=detail pages.
- * P2B stub — full implementation in P3 (Layout / Sections / Tabs / Related).
- */
-export const DetailConfigPanel: React.FC<DetailConfigPanelProps> = ({ schema, modelCode }) => {
+type Tab = 'sections' | 'actions';
+
+const TABS: Array<{ id: Tab; label: string; icon: string }> = [
+  { id: 'sections', label: 'Sections', icon: '📄' },
+  { id: 'actions', label: 'Actions', icon: '⚡' },
+];
+
+export const DetailConfigPanel: React.FC<DetailConfigPanelProps> = ({
+  schema, onSchemaChange, modelCode, readonly, previewMode,
+}) => {
+  const effectiveModelCode = modelCode ?? schema.modelCode;
+  const { data: capabilities } = useModelCapabilities(effectiveModelCode);
+
+  const fields = useMemo(() => {
+    if (!capabilities) return undefined;
+    const set = new Set<string>([
+      ...capabilities.sortableFields,
+      ...capabilities.filterableFields,
+    ]);
+    return Array.from(set).map((code) => ({ code, displayName: code, dataType: 'unknown' }));
+  }, [capabilities]);
+
+  const [tab, setTab] = useState<Tab>('sections');
+  const [vm, setVm] = useState<DetailViewModel>(() => blocksToDetailVm(schema.blocks ?? []));
+  const lastPushedRef = useRef<string>('');
+
+  useEffect(() => {
+    const nextBlocks = detailVmToBlocks(vm);
+    const nextSerialized = JSON.stringify(nextBlocks);
+    const currentSerialized = JSON.stringify(schema.blocks ?? []);
+    if (nextSerialized !== currentSerialized && nextSerialized !== lastPushedRef.current) {
+      lastPushedRef.current = nextSerialized;
+      onSchemaChange({ ...schema, blocks: nextBlocks });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vm]);
+
   return (
-    <div
-      className="flex h-full flex-1 items-center justify-center bg-gray-50"
-      data-testid="detail-config-panel-stub"
-    >
-      <div className="max-w-md text-center p-8">
-        <div className="text-5xl mb-4">📄</div>
-        <h2 className="text-lg font-medium text-gray-800 mb-2">Detail Config Panel</h2>
-        <p className="text-sm text-gray-500 mb-4">
-          此页面 kind=detail 将由结构化配置面板（Layout / Sections / Tabs / Related）驱动。
-        </p>
-        <p className="text-xs text-gray-400">P3 阶段将完整实现，目前为占位组件。</p>
-        <div className="mt-6 rounded bg-white border border-gray-200 p-3 text-xs text-left font-mono">
-          <div>
-            schema.kind: <span className="text-blue-600">{schema.kind}</span>
-          </div>
-          <div>
-            schema.modelCode:{' '}
-            <span className="text-blue-600">{schema.modelCode ?? modelCode ?? '(未设置)'}</span>
-          </div>
-          <div>
-            blocks.length:{' '}
-            <span className="text-blue-600">{(schema.blocks ?? []).length}</span>
-          </div>
-        </div>
-      </div>
+    <div className="flex h-full" data-testid="detail-config-panel">
+      {!previewMode && (
+        <aside className="w-52 shrink-0 border-r bg-gray-50">
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`flex w-full items-center gap-2 border-l-2 px-4 py-3 text-sm transition-colors ${
+                tab === t.id
+                  ? 'border-blue-500 bg-white font-medium text-blue-700'
+                  : 'border-transparent text-gray-600 hover:bg-gray-100'
+              }`}
+              data-testid={`detail-tab-${t.id}`}
+            >
+              <span>{t.icon}</span>
+              <span>{t.label}</span>
+            </button>
+          ))}
+        </aside>
+      )}
+
+      <main className="flex-1 overflow-auto bg-white p-6">
+        {tab === 'sections' && (
+          <SectionsTab vm={vm} setVm={setVm} fields={fields} readonly={readonly} />
+        )}
+        {tab === 'actions' && (
+          <ActionsTab vm={vm} setVm={setVm} capabilities={capabilities} readonly={readonly} />
+        )}
+      </main>
     </div>
   );
 };
