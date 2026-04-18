@@ -156,17 +156,21 @@ test.describe('Phase 6 — showcase_all_fields runtime rendering', () => {
   }) => {
     test.setTimeout(60_000);
 
-    // Seed two records so the list always has data and pagination has signal.
+    // Seed two records with deterministic, asserted values.
+    const seedAName = `E2E A ${Date.now()}`;
+    const seedBName = `E2E B ${Date.now()}`;
     const pidA = await seedRecord(request, {
       sc_priority: 'high',
       sc_quantity: 1,
-      sc_name: `E2E A ${Date.now()}`,
+      sc_price: 12.5,
+      sc_name: seedAName,
     });
     createdPids.push(pidA);
     const pidB = await seedRecord(request, {
       sc_priority: 'low',
       sc_quantity: 999,
-      sc_name: `E2E B ${Date.now()}`,
+      sc_price: 88.88,
+      sc_name: seedBName,
     });
     createdPids.push(pidB);
 
@@ -178,6 +182,23 @@ test.describe('Phase 6 — showcase_all_fields runtime rendering', () => {
     await expect(rows.first()).toBeVisible({ timeout: 10_000 });
     const initialCount = await rows.count();
     expect(initialCount, 'list should render at least one row').toBeGreaterThan(0);
+
+    // D14: data-value assertion — the seeded sc_name MUST be visible somewhere
+    // in the rendered list table body (not just "any row exists").
+    const seedARow = page.locator(`[data-testid="dynamic-list"] tbody tr`, {
+      hasText: seedAName,
+    });
+    await expect(seedARow.first(), `seed A row "${seedAName}" should be rendered`).toBeVisible({
+      timeout: 5_000,
+    });
+    const seedBRow = page.locator(`[data-testid="dynamic-list"] tbody tr`, {
+      hasText: seedBName,
+    });
+    await expect(seedBRow.first(), `seed B row "${seedBName}" should be rendered`).toBeVisible({
+      timeout: 5_000,
+    });
+    // Quantity / price column values for seed B (most distinctive).
+    await expect(seedBRow.first()).toContainText('999');
 
     // Step 3: sort by clicking the sc_quantity column header. Capture the
     // first-page response and verify sortField is sent.
@@ -350,6 +371,13 @@ test.describe('Phase 6 — showcase_all_fields runtime rendering', () => {
     await priceInput.click();
     await priceInput.fill('123.45');
 
+    // D14: data-value assertion — verify the inputs actually retained the
+    // values we typed (catches controlled-component bugs that silently drop
+    // input).
+    await expect(nameInput).toHaveValue(submitName, { timeout: 3_000 });
+    await expect(quantityInput).toHaveValue('42', { timeout: 3_000 });
+    await expect(priceInput).toHaveValue('123.45', { timeout: 3_000 });
+
     if (hasPrioritySelect) {
       await prioritySelect.selectOption({ label: /高|High/i }).catch(async () => {
         // Fallback: select by index.
@@ -383,13 +411,46 @@ test.describe('Phase 6 — showcase_all_fields runtime rendering', () => {
     expect(body?.code, `submit response code: ${JSON.stringify(body)}`).toBe('0');
     expect(newPid, 'submit should return recordId').toBeTruthy();
 
-    // Assert success toast OR redirect away from /new.
+    // D14: success feedback — assert either a success toast (preferred) OR a
+    // redirect away from /new. At least one MUST hold; "static success" is
+    // forbidden by the UX standard.
     const stillOnForm = FORM_NEW_URL_RE.test(page.url());
     if (stillOnForm) {
       const toast = page
         .locator('text=/成功|Success|已创建|created/i')
         .first();
-      await expect(toast).toBeVisible({ timeout: 5_000 });
+      await expect(
+        toast,
+        'submit must show a success toast when staying on /new (no silent success)',
+      ).toBeVisible({ timeout: 5_000 });
+    } else {
+      // Redirected away — assert we landed on the detail or list (positive
+      // navigation, not just "not /new").
+      await expect(page).toHaveURL(
+        new RegExp(`/p/${MODEL_CODE}(?:/|$|\\?)`),
+        { timeout: 3_000 },
+      );
+    }
+
+    // D14: round-trip assertion — confirm the new record exists in the DB
+    // with EXACTLY the values we filled (catches command-pipeline silent
+    // value drops). This is API setup-style verification, not a UX path.
+    if (newPid) {
+      const verify = await page.request.get(
+        `/api/dynamic/${MODEL_CODE}/list?pageNum=1&pageSize=1&filters=${encodeURIComponent(
+          JSON.stringify([{ fieldName: 'pid', operator: 'EQ', value: newPid }]),
+        )}`,
+      );
+      const verifyBody = await verify.json();
+      const created = verifyBody?.data?.records?.[0] ?? {};
+      expect(created.sc_name, 'persisted sc_name should match input').toBe(submitName);
+      expect(Number(created.sc_quantity), 'persisted sc_quantity should match input').toBe(42);
+      // Decimal precision can vary by backend (string vs number); compare
+      // numerically.
+      expect(Number(created.sc_price), 'persisted sc_price should match input').toBeCloseTo(
+        123.45,
+        2,
+      );
     }
 
     // dependsOn / visibleWhen — none configured on showcase_all_fields fields.
@@ -410,16 +471,30 @@ test.describe('Phase 6 — showcase_all_fields runtime rendering', () => {
   }) => {
     test.setTimeout(75_000);
 
-    // Seed a record we can identify in the list.
+    // Seed a record with deterministic values we can assert on the detail page.
     const ts = Date.now();
     const uniqueName = `E2E Detail ${ts}`;
+    const seedDescription = `Phase 6 detail seed row ${ts}`;
+    const seedQuantity = 7;
+    const seedPrice = 555.55;
     const pid = await seedRecord(request, {
       sc_name: uniqueName,
-      sc_description: 'Phase 6 detail seed row',
-      sc_quantity: 7,
-      sc_price: 555.55,
+      sc_description: seedDescription,
+      sc_quantity: seedQuantity,
+      sc_price: seedPrice,
     });
     createdPids.push(pid);
+
+    // Look up the seeded record's auto-generated sc_code so we can assert it
+    // appears on the detail view.
+    const lookup = await request.get(
+      `/api/dynamic/${MODEL_CODE}/list?pageNum=1&pageSize=1&filters=${encodeURIComponent(
+        JSON.stringify([{ fieldName: 'pid', operator: 'EQ', value: pid }]),
+      )}`,
+    );
+    const lookupBody = await lookup.json();
+    const seedRow = lookupBody?.data?.records?.[0] ?? {};
+    const seedCode: string = seedRow.sc_code ?? '';
 
     await navigateToShowcaseListViaMenu(page);
 
@@ -528,16 +603,47 @@ test.describe('Phase 6 — showcase_all_fields runtime rendering', () => {
       'detail overview tab should expose ≥1 form-section',
     ).toBeGreaterThan(0);
 
-    // Field-value assertion: our unique sc_name should appear somewhere in the
-    // detail body (in either an input value, a span, or a read-only cell).
-    const nameAppears = await page
-      .locator(`text=${uniqueName}`)
-      .first()
-      .isVisible({ timeout: 5_000 })
-      .catch(() => false);
-    expect(nameAppears, `seeded sc_name "${uniqueName}" should be visible on detail page`).toBe(
-      true,
-    );
+    // D14: data-value assertions — every seeded field MUST be visible on the
+    // detail page (no "any element with sc_name appears" — we want each value
+    // to render).
+    const detailBody = page.locator('main, [role="main"], body').first();
+
+    await expect(
+      page.locator(`text=${uniqueName}`).first(),
+      `seeded sc_name "${uniqueName}" should be visible on detail page`,
+    ).toBeVisible({ timeout: 5_000 });
+
+    if (seedCode) {
+      await expect(
+        page.locator(`text=${seedCode}`).first(),
+        `seeded sc_code "${seedCode}" should be visible on detail page`,
+      ).toBeVisible({ timeout: 5_000 });
+    } else {
+      test.info().annotations.push({
+        type: 'gap',
+        description: 'seed lookup returned no sc_code — cannot assert auto-generated code value',
+      });
+    }
+
+    await expect(
+      page.locator(`text=${seedDescription}`).first(),
+      `seeded sc_description should be visible on detail page`,
+    ).toBeVisible({ timeout: 5_000 });
+
+    // sc_quantity / sc_price may be formatted (toLocaleString → "555.55" or
+    // "555,555" etc). Check for a substring tolerant of locale formatting.
+    const quantityRegex = new RegExp(`\\b${seedQuantity}\\b`);
+    await expect(
+      detailBody.locator(`text=${quantityRegex}`).first(),
+      `seeded sc_quantity ${seedQuantity} should be visible on detail page`,
+    ).toBeVisible({ timeout: 5_000 });
+
+    // Price: accept "555.55", "555,55", or "555.5" (locale variance).
+    const priceRegex = /555[.,]?55/;
+    await expect(
+      detailBody.locator(`text=${priceRegex}`).first(),
+      `seeded sc_price ${seedPrice} should be visible on detail page`,
+    ).toBeVisible({ timeout: 5_000 });
 
     // Action buttons: detail toolbar block declares preset edit/delete via
     // standard CRUD. Click count not strictly required — assert visibility.
