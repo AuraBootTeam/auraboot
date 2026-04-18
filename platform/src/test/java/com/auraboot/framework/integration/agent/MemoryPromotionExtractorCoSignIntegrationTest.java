@@ -65,11 +65,12 @@ class MemoryPromotionExtractorCoSignIntegrationTest extends BaseIntegrationTest 
     }
 
     private void seedAccess(String memoryPid, String userId, String ageInterval) {
+        // PR-73: tenant_id now NOT NULL on ab_agent_memory_access_log.
         jdbc.update("INSERT INTO ab_agent_memory_access_log "
-                        + "  (memory_pid, user_id, access_day, access_count, first_seen_at, last_seen_at) "
-                        + "VALUES (?, ?, (NOW() " + ageInterval + ")::date, 1, NOW() " + ageInterval
+                        + "  (memory_pid, tenant_id, user_id, access_day, access_count, first_seen_at, last_seen_at) "
+                        + "VALUES (?, ?, ?, (NOW() " + ageInterval + ")::date, 1, NOW() " + ageInterval
                         + ", NOW() " + ageInterval + ")",
-                memoryPid, userId);
+                memoryPid, tenantId, userId);
     }
 
     @Test
