@@ -155,9 +155,13 @@ class ShadowExecutorIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("executor records a shadow run for eligible read-only draft (with no invokers → status=skipped)")
+    @DisplayName("executor records a shadow run for eligible read-only draft; tool_ref with no invoker → status=skipped")
     void executor_runs_eligible_draft() {
-        String pid = seedDraft("substrate: dsl\naction_type: query\ntool_refs:\n  - nq_leads\n");
+        jdbc.update("INSERT INTO ab_agent_dry_run_support " +
+                        "(pid, tenant_id, tool_ref_pattern, support_level, created_at, updated_at) " +
+                        "VALUES (?, ?, 'mcp_*', 'FULL', NOW(), NOW())",
+                UniqueIdGenerator.generate(), tenantId);
+        String pid = seedDraft("substrate: dsl\naction_type: query\ntool_refs:\n  - mcp_unknown_tool\n");
         ShadowExecutor.ExecutionResult r = executor.execute(ShadowExecutor.ExecutionRequest.builder()
                 .draftPid(pid).originalRunId("orig2").originalOutputHash("hX")
                 .originalDurationMs(200L).originalStatus("success").build());
