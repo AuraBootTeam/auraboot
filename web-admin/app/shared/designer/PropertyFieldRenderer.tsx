@@ -75,10 +75,35 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
         />
       );
 
-    case 'number':
+    case 'number': {
+      // BaseInput stores `e.target.value` (always a string) in the adapter.
+      // For `type: 'number'` schemas the persisted DSL must carry a real
+      // number, otherwise downstream consumers (column.width, table.props
+      // .pageSize, etc.) silently coerce types or fail Number comparisons.
+      // Wrap the adapter so reads expose strings (for the input's `value`
+      // prop) while writes coerce back to number | undefined.
+      const baseAdapter = adapter as unknown as {
+        value: unknown;
+        setValue: (v: unknown) => void;
+      } & Record<string, unknown>;
+      const numericAdapter = {
+        ...baseAdapter,
+        value:
+          baseAdapter.value === undefined || baseAdapter.value === null
+            ? ''
+            : String(baseAdapter.value),
+        setValue: (v: unknown) => {
+          if (v === '' || v === null || v === undefined) {
+            baseAdapter.setValue(undefined);
+            return;
+          }
+          const n = typeof v === 'number' ? v : Number(v);
+          baseAdapter.setValue(Number.isNaN(n) ? undefined : n);
+        },
+      };
       return (
         <BaseInput
-          adapter={adapter as any}
+          adapter={numericAdapter as any}
           name={schema.key}
           label={label}
           placeholder={placeholder}
@@ -86,6 +111,7 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
           type="number"
         />
       );
+    }
 
     case 'textarea':
       return (
