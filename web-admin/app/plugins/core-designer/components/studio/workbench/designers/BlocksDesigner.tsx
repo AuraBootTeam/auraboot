@@ -37,6 +37,7 @@ import type {
 import {
   parseFieldShorthand,
   serializeFieldOverride,
+  resolveLocalizedText,
 } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 import { BlockLibrary } from './areas/BlockLibrary';
 import { BlockPropertyPanel } from './areas/BlockPropertyPanel';
@@ -476,7 +477,7 @@ export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
                                 : 'text-gray-600 hover:bg-gray-50'
                             }`}
                           >
-                            {block.title || block.blockType}
+                            {resolveLocalizedText(block.title) || block.blockType}
                           </button>
                         </li>
                       ))}
@@ -613,7 +614,7 @@ export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
                 <circle cx="15" cy="19" r="1.5" />
               </svg>
               <span className="truncate text-sm font-medium text-gray-700">
-                {draggedBlock.title || draggedBlock.blockType}
+                {resolveLocalizedText(draggedBlock.title) || draggedBlock.blockType}
               </span>
             </div>
             <div className="mt-1 truncate text-xs text-gray-400">{draggedBlock.blockType}</div>

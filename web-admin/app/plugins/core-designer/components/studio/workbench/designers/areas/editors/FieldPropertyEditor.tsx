@@ -12,6 +12,7 @@ import type { DslFieldOverride, BlockType } from '~/plugins/core-designer/compon
 import { parseFieldShorthand } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 import { useDslRegistry } from '~/contexts/DslRegistryContext';
 import fieldPropertyConfig from '../configs/field-property-panel.json';
+import { LocalizedTextInput, type LocalizedTextValue } from '~/shared/designer';
 import {
   FieldPermissionSection,
   type FieldPermissionValue,
@@ -307,6 +308,19 @@ export const FieldPropertyEditor: React.FC<FieldPropertyEditorProps> = ({
                 ))}
               </select>
             </div>
+          );
+          break;
+
+        case 'LocalizedTextInput':
+          component = (
+            <LocalizedTextInput
+              value={fieldValue as LocalizedTextValue}
+              onChange={(next) => handleFieldChange(fieldConfig.field, next ?? undefined)}
+              label={fieldConfig.props.label}
+              placeholder={fieldConfig.props.placeholder}
+              disabled={isDisabled}
+              testId={`field-${fieldConfig.field}`}
+            />
           );
           break;
 

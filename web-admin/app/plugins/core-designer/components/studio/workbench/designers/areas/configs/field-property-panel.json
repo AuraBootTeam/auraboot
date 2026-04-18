@@ -18,7 +18,7 @@
         },
         {
           "field": "label",
-          "component": "SmartInput",
+          "component": "LocalizedTextInput",
           "props": { "label": "标签", "placeholder": "覆盖字段标签", "size": "small" }
         },
         {
