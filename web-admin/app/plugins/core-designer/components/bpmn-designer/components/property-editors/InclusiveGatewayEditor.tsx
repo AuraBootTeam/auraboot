@@ -65,19 +65,23 @@ export function InclusiveGatewayEditor({
         </p>
       </div>
 
-      {/* Completion condition */}
+      {/*
+        Completion condition is UI-only: JsonToBpmnConverter does not emit a
+        completionCondition element on inclusiveGateway, so SmartEngine falls
+        back to its default join semantics. Disabled until runtime support lands.
+      */}
       <div className="mb-4">
         <label className="mb-1 block text-sm font-medium text-gray-700">{t('bpmn.gateway.completionCondition')}</label>
         <textarea
           value={config?.completionCondition || ''}
-          onChange={(e) => handleChange('completionCondition', e.target.value)}
-          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+          disabled
+          readOnly
+          data-testid="inclusivegateway-completionCondition"
+          className="w-full rounded-md border border-gray-300 bg-gray-100 px-3 py-2 text-sm text-gray-500"
           rows={2}
           placeholder="${nrOfCompletedInstances >= 1}"
         />
-        <p className="mt-1 text-xs text-gray-500">
-          {t('bpmn.gateway.completionConditionHint')}
-        </p>
+        <p className="mt-1 text-xs text-amber-600">{t('bpmn.prop.common.unsupportedHint')}</p>
       </div>
     </>
   );

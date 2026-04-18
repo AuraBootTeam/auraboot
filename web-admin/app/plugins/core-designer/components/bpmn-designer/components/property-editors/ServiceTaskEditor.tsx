@@ -37,6 +37,7 @@ export function ServiceTaskEditor({
           value={config?.serviceType || 'http'}
           onChange={(e) => handleChange('serviceType', e.target.value)}
           className="w-full rounded-md border border-gray-300 px-3 py-2"
+          data-testid="servicetask-service-type"
         >
           <option value="http">{t('bpmn.prop.servicetask.typeHttp')}</option>
           <option value="java">{t('bpmn.prop.servicetask.typeJava')}</option>
@@ -53,6 +54,7 @@ export function ServiceTaskEditor({
             onChange={(e) => handleChange('serviceUrl', e.target.value)}
             className="w-full rounded-md border border-gray-300 px-3 py-2"
             placeholder="https://api.example.com/service"
+            data-testid="servicetask-service-url"
           />
         </div>
       )}
@@ -66,6 +68,7 @@ export function ServiceTaskEditor({
             onChange={(e) => handleChange('className', e.target.value)}
             className="w-full rounded-md border border-gray-300 px-3 py-2"
             placeholder="com.example.MyService"
+            data-testid="servicetask-class-name"
           />
         </div>
       )}
@@ -74,12 +77,17 @@ export function ServiceTaskEditor({
         <>
           <div className="mb-4">
             <label className="mb-1 block text-sm font-medium text-gray-700">{t('bpmn.prop.servicetask.scriptType')}</label>
+            {/*
+              Only Groovy is supported by the SmartEngine script runtime.
+              Selecting JavaScript would deploy a process that fails at runtime,
+              so the option is removed from the dropdown.
+            */}
             <select
-              value={config?.scriptType || 'javascript'}
+              value={config?.scriptType || 'groovy'}
               onChange={(e) => handleChange('scriptType', e.target.value)}
               className="w-full rounded-md border border-gray-300 px-3 py-2"
+              data-testid="servicetask-script-type"
             >
-              <option value="javascript">JavaScript</option>
               <option value="groovy">Groovy</option>
             </select>
           </div>
@@ -90,6 +98,7 @@ export function ServiceTaskEditor({
               onChange={(e) => handleChange('scriptContent', e.target.value)}
               className="w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-sm"
               rows={6}
+              data-testid="servicetask-script-content"
             />
           </div>
         </>
@@ -102,6 +111,7 @@ export function ServiceTaskEditor({
             checked={config?.async || false}
             onChange={(e) => handleChange('async', e.target.checked)}
             className="mr-2"
+            data-testid="servicetask-async"
           />
           <span className="text-sm font-medium text-gray-700">{t('bpmn.prop.servicetask.async')}</span>
         </label>
