@@ -4853,6 +4853,8 @@ CREATE TABLE IF NOT EXISTS ab_agent_approval (
   approved_at      TIMESTAMPTZ,
   rejection_reason TEXT,
   policy_id        VARCHAR(26),
+  plan_hash        VARCHAR(64),          -- P0: 审批时冻结 plan 的 SHA-256；防止审批后 plan 被修改
+  plan_snapshot    TEXT,                 -- P0: 冻结的 plan JSON（审计 / HITL 展示用）
   expires_at       TIMESTAMPTZ,
   auto_action      VARCHAR(20),
   idempotency_key  VARCHAR(200),
@@ -4861,6 +4863,11 @@ CREATE TABLE IF NOT EXISTS ab_agent_approval (
   created_by       BIGINT,
   updated_by       BIGINT
 );
+-- ACP P0 fix: additive columns for plan integrity freezing.
+-- Idempotent ALTER so both fresh init (after CREATE TABLE above) and upgrade paths apply.
+ALTER TABLE ab_agent_approval ADD COLUMN IF NOT EXISTS plan_hash VARCHAR(64);
+ALTER TABLE ab_agent_approval ADD COLUMN IF NOT EXISTS plan_snapshot TEXT;
+
 CREATE INDEX IF NOT EXISTS idx_agent_approval_tenant ON ab_agent_approval (tenant_id);
 CREATE INDEX IF NOT EXISTS idx_agent_approval_status ON ab_agent_approval (tenant_id, approval_status);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_approval_idempotency ON ab_agent_approval(idempotency_key) WHERE idempotency_key IS NOT NULL;
