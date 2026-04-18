@@ -38,7 +38,7 @@
     "displayName:zh-CN": "主 Model",
     "displayName:en": "Primary Model",
     "dataType": "text",
-    "constraints": { "required": true, "maxLength": 200 },
+    "constraints": { "maxLength": 200 },
     "feature": { "searchable": true }
   },
   {
