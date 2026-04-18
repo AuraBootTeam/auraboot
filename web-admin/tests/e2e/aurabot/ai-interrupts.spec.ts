@@ -71,7 +71,7 @@ test.describe('Mission Control — Interrupt audit (PR-38)', () => {
 
     const row = page.locator('[data-testid="interrupt-INTERRUPTPID1234567890AB"]');
     await expect(row).toBeVisible();
-    await expect(row.locator('[data-testid="policy-badge"]')).toContainText('替换意图');
+    await expect(row.locator('[data-testid="policy-badge"]')).toContainText(/替换意图|Replace intent/);
     await expect(row).toContainText('算了,改成看上周数据');
     await expect(row).toContainText('92%');
   });
@@ -115,12 +115,12 @@ test.describe('Mission Control — Interrupt audit (PR-38)', () => {
 
     await expect(
       page.locator('[data-testid="interrupt-IX1234567890123456789012"] [data-testid="policy-badge"]'),
-    ).toContainText('替换意图');
+    ).toContainText(/替换意图|Replace intent/);
     await expect(
       page.locator('[data-testid="interrupt-IY1234567890123456789012"] [data-testid="policy-badge"]'),
-    ).toContainText('追加上下文');
+    ).toContainText(/追加上下文|Append context/);
     await expect(
       page.locator('[data-testid="interrupt-IZ1234567890123456789012"] [data-testid="policy-badge"]'),
-    ).toContainText('插入子任务');
+    ).toContainText(/插入子任务|Insert subtask/);
   });
 });
