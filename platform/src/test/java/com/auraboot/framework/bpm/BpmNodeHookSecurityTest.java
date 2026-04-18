@@ -13,7 +13,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.lang.reflect.Method;
 import java.util.Map;
+import java.util.concurrent.Callable;
+
+import com.auraboot.framework.exception.BusinessException;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -172,5 +176,89 @@ class BpmNodeHookSecurityTest extends BaseIntegrationTest {
                 "Errors must call out ProcessBuilder block, got: " + errors2);
 
         log.info("HOOK-SEC-03 PASSED: Drools refused Runtime + ProcessBuilder DRL imports");
+    }
+
+    /**
+     * Reflectively invokes the private {@code runWithTimeout(String, Callable)}
+     * to unit-test the hard-kill mechanism without depending on SpEL / Drools
+     * being able to spin (SpEL's T(...) is blocked, so we can't trigger
+     * {@code Thread.sleep} from inside a script).
+     */
+    private boolean invokeRunWithTimeout(String label, Callable<Boolean> task) throws Exception {
+        Method m = BpmNodeHookService.class.getDeclaredMethod(
+                "runWithTimeout", String.class, Callable.class);
+        m.setAccessible(true);
+        try {
+            return (Boolean) m.invoke(hookService, label, task);
+        } catch (java.lang.reflect.InvocationTargetException ite) {
+            if (ite.getCause() instanceof RuntimeException re) throw re;
+            throw ite;
+        }
+    }
+
+    @Test
+    @Order(5)
+    @DisplayName("HOOK-SEC-05: uncooperative infinite loop is hard-killed within (timeout + grace)")
+    void hookSec05_hardKillRunawayLoop() throws Exception {
+        // This Callable deliberately ignores Thread.interrupted() to emulate
+        // what SpEL expression evaluation or Drools fireAllRules would do if a
+        // user-supplied script spins forever. runWithTimeout must still
+        // terminate it via Thread.stop() within roughly 15s + 5s grace.
+        Callable<Boolean> runaway = () -> {
+            long end = System.currentTimeMillis() + 60_000L; // 60s budget
+            // Busy loop that explicitly does NOT honour interrupts — mirrors
+            // SpEL AST evaluation / Drools RETE which don't poll the flag.
+            while (System.currentTimeMillis() < end) {
+                // no-op; don't check Thread.interrupted()
+            }
+            return true;
+        };
+
+        long start = System.currentTimeMillis();
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> invokeRunWithTimeout("script", runaway));
+        long elapsed = System.currentTimeMillis() - start;
+
+        assertTrue(ex.getMessage().contains("timeout"),
+                "Expected timeout message, got: " + ex.getMessage());
+        // 15s soft + up to 5s hard-kill grace; allow generous upper bound for
+        // CI jitter. Must be strictly less than the 60s runaway budget.
+        assertTrue(elapsed < 30_000L,
+                "Runaway must be killed well before its own 60s budget; elapsed=" + elapsed);
+        assertTrue(elapsed >= 15_000L,
+                "Must not trip before the configured 15s timeout; elapsed=" + elapsed);
+
+        log.info("HOOK-SEC-05 PASSED: runaway loop hard-killed in {}ms", elapsed);
+    }
+
+    @Test
+    @Order(6)
+    @DisplayName("HOOK-SEC-06: command hook is bounded by runWithTimeout (no unbounded CommandExecutor)")
+    void hookSec06_commandTimeout() throws Exception {
+        // A sleeping callable stands in for a long-running Command — the
+        // dispatch in executeHook() now routes command through runWithTimeout,
+        // so any unbounded CommandExecutor.execute(...) is forced to respect
+        // HOOK_EXECUTION_TIMEOUT_MS. We assert the wrapper path here directly.
+        Callable<Boolean> sleepingCommand = () -> {
+            // Emulate CommandExecutor.execute blocking on a downstream DB / HTTP
+            // call that doesn't honour interrupts.
+            long end = System.currentTimeMillis() + 60_000L;
+            while (System.currentTimeMillis() < end) {
+                // busy-wait without interrupt check
+            }
+            return true;
+        };
+
+        long start = System.currentTimeMillis();
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> invokeRunWithTimeout("command", sleepingCommand));
+        long elapsed = System.currentTimeMillis() - start;
+
+        assertTrue(ex.getMessage().contains("timeout")
+                        && ex.getMessage().contains("command"),
+                "Expected command-timeout message, got: " + ex.getMessage());
+        assertTrue(elapsed < 30_000L, "elapsed=" + elapsed);
+
+        log.info("HOOK-SEC-06 PASSED: command hook bounded by runWithTimeout, elapsed={}ms", elapsed);
     }
 }
