@@ -9,7 +9,7 @@
 import React, { useState, useCallback } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import type { DslFieldRef, DslFieldOverride } from '~/plugins/core-designer/components/studio/domain/dsl/types';
-import { parseFieldShorthand } from '~/plugins/core-designer/components/studio/domain/dsl/types';
+import { parseFieldShorthand, resolveLocalizedText } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 
 export interface FieldsEditorProps {
   fields: DslFieldRef[];
@@ -291,7 +291,7 @@ const FieldItem: React.FC<FieldItemProps> = ({
             <label className="mb-1 block text-xs text-gray-500">占位文本</label>
             <input
               type="text"
-              value={field.placeholder || ''}
+              value={resolveLocalizedText(field.placeholder) || ''}
               onChange={(e) => onUpdate({ placeholder: e.target.value || undefined })}
               disabled={readonly}
               className="w-full rounded border border-gray-200 px-2 py-1.5 text-sm"

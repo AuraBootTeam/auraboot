@@ -7,6 +7,7 @@
 
 import React, { useState, useCallback, useMemo } from 'react';
 import type { DslButton, StandardAction } from '~/plugins/core-designer/components/studio/domain/dsl/types';
+import { LocalizedTextInput, type LocalizedTextValue } from '~/shared/designer';
 import { useCommandActions } from '~/plugins/core-designer/components/studio/hooks/actions/useCommandActions';
 import { ActionPhaseEditor } from '~/plugins/core-designer/components/studio/workbench/panels/actions/ActionPhaseEditor';
 import { CommandSelector } from '~/plugins/core-designer/components/studio/workbench/panels/actions/CommandSelector';
@@ -352,6 +353,18 @@ const ButtonBasicSettings: React.FC<ButtonBasicSettingsProps> = ({
 }) => {
   return (
     <>
+      {/* Label override (supports LocalizedText) */}
+      <div>
+        <LocalizedTextInput
+          value={button.label as LocalizedTextValue}
+          onChange={(next) => onUpdate({ label: (next ?? undefined) as DslButton['label'] })}
+          label="按钮文案"
+          placeholder="覆盖默认文案"
+          disabled={readonly}
+          testId={`button-label-${button.action}`}
+        />
+      </div>
+
       {/* Button type */}
       <div>
         <label className="mb-1 block text-xs text-gray-500">按钮类型</label>

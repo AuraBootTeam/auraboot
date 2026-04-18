@@ -11,6 +11,9 @@ export { DesignerRegistry, createRegistry } from './types';
 export { PropertyFieldRenderer } from './PropertyFieldRenderer';
 export type { PropertyFieldRendererProps } from './PropertyFieldRenderer';
 
+export { LocalizedTextInput } from './LocalizedTextInput';
+export type { LocalizedTextInputProps, LocalizedTextValue } from './LocalizedTextInput';
+
 export { DesignerToolbar } from './DesignerToolbar';
 export type { DesignerToolbarProps } from './DesignerToolbar';
 
