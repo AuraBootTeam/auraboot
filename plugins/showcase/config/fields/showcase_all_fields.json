@@ -298,5 +298,31 @@
     "dataType": "string",
     "constraints": { "maxLength": 500 },
     "extension": { "renderComponent": "addressfield" }
+  },
+  {
+    "code": "sc_owner_user",
+    "displayName:zh-CN": "负责人",
+    "displayName:en": "Owner",
+    "dataType": "reference",
+    "description": "Reference to e2et_customer demonstrating reference data type.",
+    "refTarget": {
+      "targetModel": "e2et_customer",
+      "targetField": "e2et_cust_name"
+    },
+    "extension": {
+      "placeholder:zh-CN": "请选择负责人",
+      "placeholder:en": "Select owner"
+    }
+  },
+  {
+    "code": "sc_attachment_file",
+    "displayName:zh-CN": "附件文件",
+    "displayName:en": "Attachment File",
+    "dataType": "file",
+    "description": "Native file dataType showcasing upload widget.",
+    "extension": {
+      "multiple": true,
+      "maxCount": 5
+    }
   }
 ]
