@@ -15,6 +15,7 @@ import com.auraboot.framework.plugin.mapper.BpmProcessDefinitionMapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -38,6 +39,7 @@ public class ProcessEngineService {
     private final BpmAuditService bpmAuditService;
     private final SlaRecordService slaRecordService;
     private final BpmProcessDefinitionMapper processDefinitionMapper;
+    private final JdbcTemplate jdbcTemplate;
 
     /**
      * 启动流程实例
@@ -345,7 +347,14 @@ public class ProcessEngineService {
             }
         }
 
-        // 8. Collect process variables
+        // 8. Collect process variables.
+        //    SmartEngine's VariableQueryService.findProcessInstanceVariableList
+        //    only returns process-scope variables (execution_instance_id=0).
+        //    Hooks that fire during ACTIVITY_END (post-action) write via
+        //    the execution context's request map, which SmartEngine persists
+        //    at execution scope (execution_instance_id = activity's execution).
+        //    To surface those variables (e.g. postHookFired set by a script
+        //    hook on a userTask), we merge execution-scope variables as well.
         Map<String, Object> variables = new LinkedHashMap<>();
         List<VariableInstance> variableInstances = smartEngine.getVariableQueryService()
                 .findProcessInstanceVariableList(processInstanceId, tenantId);
@@ -354,6 +363,7 @@ public class ProcessEngineService {
                 variables.put(vi.getFieldKey(), vi.getFieldValue());
             }
         }
+        mergeExecutionScopeVariables(processInstanceId, tenantId, variables);
 
         log.debug("Process instance status: instanceId={}, status={}, currentNodes={}, completedNodes={}",
                 processInstanceId, statusStr, currentNodes.size(), completedNodes.size());
@@ -497,5 +507,86 @@ public class ProcessEngineService {
         } catch (Exception e) {
             log.warn("Failed to save form bindings snapshot for process: {}", processDefinitionId, e);
         }
+    }
+
+    /**
+     * Merge execution-scope SmartEngine variables into the caller map.
+     *
+     * <p>{@code VariableQueryService.findProcessInstanceVariableList} only
+     * returns variables stored with {@code execution_instance_id = 0} (the
+     * process-scope bucket). Node-hook scripts fired from
+     * {@code ProcessEventListener} during {@code ACTIVITY_END} write through
+     * to the execution context's request map, which SmartEngine persists at
+     * the activity's execution scope. The status DTO must surface those so
+     * callers (runtime monitoring, post-action hook assertions) see the
+     * complete variable set. Caller-supplied keys (process-scope) take
+     * precedence — execution-scope vars only fill gaps.
+     */
+    private void mergeExecutionScopeVariables(String processInstanceId, String tenantId,
+                                              Map<String, Object> into) {
+        if (processInstanceId == null || into == null) {
+            return;
+        }
+        try {
+            StringBuilder sql = new StringBuilder(
+                    "SELECT field_key, field_type, field_string_value, field_long_value, field_double_value "
+                            + "FROM se_variable_instance "
+                            + "WHERE process_instance_id = ? "
+                            + "AND COALESCE(execution_instance_id, 0) <> 0");
+            List<Object> params = new ArrayList<>();
+            params.add(Long.parseLong(processInstanceId));
+            if (tenantId != null) {
+                sql.append(" AND tenant_id = ?");
+                params.add(tenantId);
+            }
+            List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql.toString(), params.toArray());
+            for (Map<String, Object> row : rows) {
+                String key = (String) row.get("field_key");
+                if (key == null || into.containsKey(key)) {
+                    continue;
+                }
+                String type = (String) row.get("field_type");
+                Object value = coerceVariableValue(type,
+                        row.get("field_string_value"),
+                        row.get("field_long_value"),
+                        row.get("field_double_value"));
+                if (value != null) {
+                    into.put(key, value);
+                }
+            }
+        } catch (NumberFormatException e) {
+            // processInstanceId is not a numeric id — nothing to merge.
+        } catch (Exception e) {
+            log.debug("Failed to merge execution-scope variables for PI={}: {}",
+                    processInstanceId, e.getMessage());
+        }
+    }
+
+    /**
+     * Coerce a raw {@code se_variable_instance} row into its declared Java
+     * type. Mirrors {@code AuraVariablePersister.deserialize} for the
+     * subset we see from execution-scope variable writes — Boolean, Number,
+     * and fallthrough String.
+     */
+    private Object coerceVariableValue(String type, Object stringValue, Object longValue, Object doubleValue) {
+        String s = stringValue != null ? stringValue.toString() : null;
+        if (type == null) {
+            if (longValue != null) return longValue;
+            if (doubleValue != null) return doubleValue;
+            return s;
+        }
+        return switch (type) {
+            case "java.lang.Boolean", "boolean", "Boolean" ->
+                    s != null ? Boolean.valueOf(s) : null;
+            case "java.lang.Long", "long", "Long" ->
+                    longValue != null ? longValue : (s != null ? Long.valueOf(s) : null);
+            case "java.lang.Integer", "int", "Integer" ->
+                    longValue != null ? ((Number) longValue).intValue() : (s != null ? Integer.valueOf(s) : null);
+            case "java.lang.Double", "double", "Double" ->
+                    doubleValue != null ? doubleValue : (s != null ? Double.valueOf(s) : null);
+            case "java.lang.Float", "float", "Float" ->
+                    doubleValue != null ? ((Number) doubleValue).floatValue() : (s != null ? Float.valueOf(s) : null);
+            default -> s;
+        };
     }
 }
