@@ -514,6 +514,12 @@ function DashboardView({
           desc={l('查看分类器产出的中断记录', 'Inspect interrupt classifier output')}
           onClick={() => navigate('/aurabot/interrupts')}
         />
+        <QuickLink
+          icon="⬆️"
+          title={l('记忆晋升', 'Memory Promotions')}
+          desc={l('审核 user→tenant 记忆晋升提案', 'Review user→tenant memory promotion proposals')}
+          onClick={() => navigate('/aurabot/memory-promotions')}
+        />
       </div>
 
       {/* Quick Links to Config Pages */}
