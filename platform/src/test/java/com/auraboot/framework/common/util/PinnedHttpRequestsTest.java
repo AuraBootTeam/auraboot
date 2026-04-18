@@ -1,12 +1,17 @@
 package com.auraboot.framework.common.util;
 
 import com.auraboot.framework.common.util.SsrfValidator.ValidatedTarget;
+import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.URI;
+import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -148,6 +153,51 @@ class PinnedHttpRequestsTest {
         assertThatThrownBy(() -> PinnedHttpRequests.newPinnedRequestBuilder(null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("must not be null");
+    }
+
+    @Test
+    @DisplayName("HOOK-SEC-04h: 302 redirect chain to loopback — Location header must be re-validated and rejected")
+    void redirectLocation_toLoopback_isRejectedByValidate() throws Exception {
+        // Spin up a small local HTTP server on a random port that returns a
+        // 302 pointing at http://127.0.0.1:6443/. A hardened pinned client
+        // must: (a) NOT auto-follow the redirect (HttpClient default is NEVER),
+        // and (b) when an explicit follow is attempted, the Location target
+        // must be passed through SsrfValidator.validate(...) which will reject
+        // the loopback target.
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/redirect", exchange -> {
+            exchange.getResponseHeaders().add("Location", "http://127.0.0.1/admin");
+            exchange.sendResponseHeaders(302, -1);
+            exchange.close();
+        });
+        server.start();
+        try {
+            int port = server.getAddress().getPort();
+            URI redirectUri = URI.create("http://127.0.0.1:" + port + "/redirect");
+
+            // Step 1: initial request with redirect following DISABLED — we
+            // expect status 302 and a Location header that points at loopback.
+            HttpClient noFollow = HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofSeconds(2))
+                    .followRedirects(HttpClient.Redirect.NEVER)
+                    .build();
+            HttpResponse<String> initial = noFollow.send(
+                    HttpRequest.newBuilder(redirectUri).GET().build(),
+                    HttpResponse.BodyHandlers.ofString());
+            assertThat(initial.statusCode()).isEqualTo(302);
+            String location = initial.headers().firstValue("Location").orElseThrow();
+            assertThat(location).isEqualTo("http://127.0.0.1/admin");
+
+            // Step 2: the attacker-supplied redirect target must be rejected
+            // when revalidated. This is the contract any future redirect-
+            // following wrapper MUST honour — we do not let a 302 smuggle a
+            // loopback URL past the initial SSRF check.
+            assertThatThrownBy(() -> SsrfValidator.validate(location))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("loopback");
+        } finally {
+            server.stop(0);
+        }
     }
 
     @Test
