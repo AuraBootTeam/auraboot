@@ -35,6 +35,9 @@ async function loadFallbackRenderers(): Promise<Map<string, React.ComponentType<
     description,
     chart,
     tabs,
+    richText,
+    divider,
+    statCard,
   ] = await Promise.all([
     import('~/framework/meta/rendering/blocks/FormBlockRenderer'),
     import('~/framework/meta/rendering/blocks/FormSectionBlockRenderer'),
@@ -46,6 +49,9 @@ async function loadFallbackRenderers(): Promise<Map<string, React.ComponentType<
     import('~/framework/meta/rendering/blocks/DescriptionBlockRenderer'),
     import('~/framework/meta/rendering/blocks/ChartBlockRenderer'),
     import('~/framework/meta/rendering/blocks/TabsBlockRenderer'),
+    import('~/framework/meta/rendering/blocks/RichTextBlockRenderer'),
+    import('~/framework/meta/rendering/blocks/DividerBlockRenderer'),
+    import('~/framework/meta/rendering/blocks/StatCardBlockRenderer'),
   ]);
   _fallbackRenderers = new Map([
     ['form', form.FormBlockRenderer],
@@ -58,6 +64,9 @@ async function loadFallbackRenderers(): Promise<Map<string, React.ComponentType<
     ['description', description.DescriptionBlockRenderer],
     ['chart', chart.ChartBlockRenderer],
     ['tabs', tabs.TabsBlockRenderer],
+    ['rich-text', richText.RichTextBlockRenderer],
+    ['divider', divider.DividerBlockRenderer],
+    ['stat-card', statCard.StatCardBlockRenderer],
   ]);
   return _fallbackRenderers;
 }
@@ -70,6 +79,12 @@ function getFallbackRenderers(): Map<string, React.ComponentType<any>> {
   }
   return _fallbackRenderers;
 }
+
+// Kick off fallback renderer module loading at import time so list/detail
+// pages that depend on the fallback dispatch path have renderers ready on the
+// first render pass (not the second). This is a no-op when the registry is
+// already populated.
+void loadFallbackRenderers();
 
 export interface BlockRendererProps {
   block: BlockConfig;

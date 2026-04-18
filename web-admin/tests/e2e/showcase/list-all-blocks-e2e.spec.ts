@@ -238,15 +238,38 @@ test.describe('D — List-kind block coverage (filters standalone)', () => {
   // report-designer block. Persisting {blockType:'stat-card'} on a list page
   // would render nothing — silently ignored.
   // ---------------------------------------------------------------------------
-  test('D.stat-card: skip — not dispatched by ListPageContent at runtime', async () => {
-    test.skip(
-      true,
-      'stat-card is not wired into ListPageContent or BlockRenderer fallback. ' +
-        'It exists only in the designer palette (core-designer BlockLibrary) ' +
-        'and as a report-designer block. Persisting stat-card on a list page ' +
-        'would render nothing. Coverage for stat-card belongs in dashboard/' +
-        'report-designer E2E, not list-page E2E.',
-    );
+  test('D.stat-card: renders via BlockRenderer fallback on a list page (G7)', async ({
+    page,
+    request,
+  }) => {
+    listSnapshot = await snapshotListPage(request, LIST_PAGE_KEY);
+    const otherBlocks = listSnapshot.blocks;
+    const newBlocks = [
+      ...otherBlocks,
+      {
+        id: 'd_stat_card',
+        blockType: 'stat-card',
+        title: 'Showcase stat',
+        statCard: {
+          value: 42,
+          unit: 'records',
+          trend: '+12%',
+          trendDirection: 'up',
+        },
+      },
+    ];
+    await replacePageBlocks(request, listSnapshot, newBlocks);
+
+    await gotoShowcaseListViaMenu(page);
+
+    const statCard = page.locator('[data-testid="stat-card-block"]').first();
+    await expect(statCard, 'stat-card block should render on list page').toBeVisible({
+      timeout: 10_000,
+    });
+    const value = page.locator('[data-testid="stat-card-value"]').first();
+    await expect(value).toHaveText('42');
+    const trend = page.locator('[data-testid="stat-card-trend"]').first();
+    await expect(trend).toHaveText('+12%');
   });
 
   // ---------------------------------------------------------------------------
@@ -258,15 +281,39 @@ test.describe('D — List-kind block coverage (filters standalone)', () => {
   // /tabs), never through BlockRenderer. So chart blocks on a list page are
   // silently ignored at runtime.
   // ---------------------------------------------------------------------------
-  test('D.chart: skip — not dispatched by ListPageContent at runtime', async () => {
-    test.skip(
-      true,
-      'chart block is not dispatched by ListPageContent (which uses a ' +
-        'hardcoded switch on table/filters/toolbar/tabs). ChartBlockRenderer ' +
-        'is registered as a BlockRenderer fallback, but list pages do not ' +
-        'route through BlockRenderer. Chart block coverage belongs in ' +
-        'dashboard E2E (core-dashboard widget + DashboardChartBlock).',
-    );
+  test('D.chart: renders via BlockRenderer fallback on a list page (G7)', async ({
+    page,
+    request,
+  }) => {
+    listSnapshot = await snapshotListPage(request, LIST_PAGE_KEY);
+    const otherBlocks = listSnapshot.blocks;
+    const newBlocks = [
+      ...otherBlocks,
+      {
+        id: 'd_chart',
+        blockType: 'chart',
+        chartType: 'bar',
+        title: 'Showcase chart',
+        chartConfig: {
+          xField: 'month',
+          yField: 'amount',
+        },
+      },
+    ];
+    await replacePageBlocks(request, listSnapshot, newBlocks);
+
+    await gotoShowcaseListViaMenu(page);
+
+    // The block renderer wraps each block in a `block-<blockType>` class. The
+    // chart component itself renders inside; without a data source the
+    // underlying chart library still mounts a container. Assert the block
+    // wrapper is present, which proves BlockRenderer routed the chart type.
+    const miscArea = page.locator('[data-testid="list-misc-blocks"]').first();
+    await expect(miscArea, 'list-misc-blocks area should render').toBeVisible({ timeout: 10_000 });
+    const chartWrapper = miscArea.locator('.block-chart').first();
+    await expect(chartWrapper, 'chart block wrapper should be dispatched').toBeVisible({
+      timeout: 10_000,
+    });
   });
 
   // ---------------------------------------------------------------------------
