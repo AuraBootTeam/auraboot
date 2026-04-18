@@ -91,6 +91,11 @@
         {
           "field": "sc_is_active",
           "colSpan": 6
+        },
+        {
+          "field": "sc_advanced_settings",
+          "colSpan": 12,
+          "visibleWhen": "record.sc_status === 'active'"
         }
       ]
     },

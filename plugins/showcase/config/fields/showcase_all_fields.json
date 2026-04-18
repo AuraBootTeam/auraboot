@@ -324,5 +324,16 @@
       "multiple": true,
       "maxCount": 5
     }
+  },
+  {
+    "code": "sc_advanced_settings",
+    "displayName:zh-CN": "高级设置",
+    "displayName:en": "Advanced Settings",
+    "dataType": "text",
+    "description": "Conditional field demonstrating visibleWhen — only shown when sc_status === 'active'.",
+    "extension": {
+      "placeholder:zh-CN": "仅在状态为活跃时显示",
+      "placeholder:en": "Only visible when status is active"
+    }
   }
 ]
