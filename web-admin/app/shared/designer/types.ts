@@ -31,7 +31,8 @@ export type PropertyType =
   | 'dashboard-select'
   | 'process-select'
   | 'automation-select'
-  | 'command-select';
+  | 'command-select'
+  | 'localizedText';
 
 /**
  * Property schema definition for designer configuration panels.

@@ -9,7 +9,7 @@ import React from 'react';
 import { SortableContext, rectSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { DslBlock, DslFieldRef } from '~/plugins/core-designer/components/studio/domain/dsl/types';
-import { parseFieldShorthand } from '~/plugins/core-designer/components/studio/domain/dsl/types';
+import { parseFieldShorthand, resolveLocalizedText } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 
 export interface FormSectionPreviewProps {
   block: DslBlock;
@@ -27,7 +27,7 @@ export const FormSectionPreview: React.FC<FormSectionPreviewProps> = ({
   readonly,
 }) => {
   const fields = block.fields || [];
-  const title = block.title;
+  const title = resolveLocalizedText(block.title);
   const collapsible = block.collapsible;
   const isDetailSection = block.blockType === 'detail-section';
   const columnsCount = (block.props as any)?.columns || 2;
@@ -90,7 +90,7 @@ export const FormSectionPreview: React.FC<FormSectionPreviewProps> = ({
                     key={fieldId}
                     id={fieldId}
                     fieldName={field.field || `字段${index + 1}`}
-                    placeholder={field.placeholder}
+                    placeholder={resolveLocalizedText(field.placeholder) || undefined}
                     required={field.required}
                     isDetailSection={isDetailSection}
                     isSelected={selectedFieldIndex === index}

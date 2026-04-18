@@ -7,6 +7,7 @@
 
 import React from 'react';
 import type { DslBlock, DslFieldRef } from '~/plugins/core-designer/components/studio/domain/dsl/types';
+import { resolveLocalizedText } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 import { FilterFormPreview } from './FilterFormPreview';
 import { DataTablePreview } from './DataTablePreview';
 import { FormSectionPreview } from './FormSectionPreview';
@@ -210,7 +211,7 @@ const SelectionInfoPreview: React.FC<{ block: DslBlock }> = ({ block }) => {
 const StatCardPreview: React.FC<{ block: DslBlock }> = ({ block }) => {
   return (
     <div className="bg-gradient-to-br from-blue-50 to-white p-4">
-      <div className="mb-1 text-xs text-gray-500">{block.title || '统计指标'}</div>
+      <div className="mb-1 text-xs text-gray-500">{resolveLocalizedText(block.title) || '统计指标'}</div>
       <div className="text-2xl font-semibold text-gray-900">--</div>
       <div className="mt-1 text-xs text-green-600">+0%</div>
     </div>
@@ -223,7 +224,7 @@ const StatCardPreview: React.FC<{ block: DslBlock }> = ({ block }) => {
 const ChartCardPreview: React.FC<{ block: DslBlock }> = ({ block }) => {
   return (
     <div className="p-4">
-      <div className="mb-3 text-sm font-medium text-gray-900">{block.title || '图表'}</div>
+      <div className="mb-3 text-sm font-medium text-gray-900">{resolveLocalizedText(block.title) || '图表'}</div>
       <div className="flex h-24 items-center justify-center rounded bg-gray-100">
         <svg
           className="h-8 w-8 text-gray-300"

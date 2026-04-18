@@ -26,6 +26,7 @@ import {
 import { ExpressionEditor } from './expression';
 import { DependentFieldSelect } from './DependentFieldSelect';
 import { DependentMultiSelect } from './DependentMultiSelect';
+import { LocalizedTextInput, type LocalizedTextValue } from './LocalizedTextInput';
 import type { FieldAdapter } from '~/ui/field-adapter';
 import type { PropertySchema, PropertyType } from './types';
 
@@ -259,6 +260,17 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
           placeholder={placeholder || 'Select automation...'}
           helpText={helpText}
           fetchOptions={fetchAutomationOptions}
+        />
+      );
+
+    case 'localizedText':
+      return (
+        <LocalizedTextInput
+          value={adapter.value as LocalizedTextValue}
+          onChange={(next) => adapter.setValue(next as unknown)}
+          label={label}
+          placeholder={placeholder}
+          testId={schema.key}
         />
       );
 
