@@ -152,15 +152,48 @@ function deepDiff(expected: unknown, actual: unknown, currentPath = ''): Diff[] 
  * Normalize a field ref: reference has objects like {field,colSpan,readOnly,visibleWhen}.
  * Saved blocks may store string shorthand "code" or "code|widget" — decode to object.
  */
+/**
+ * Field DSL key aliases. The hand-authored reference uses runtime-public camelCase
+ * names (`colSpan`, `readOnly`, `visibleWhen`) while the designer's DslFieldOverride
+ * type emits internal canonical names (`span`, `readonly`, `visible`). Both shapes
+ * are accepted by the runtime renderer, but for byte-equality we normalise the
+ * reference side to the designer's canonical form before deep-diffing.
+ */
+const FIELD_KEY_ALIASES: Record<string, string> = {
+  colSpan: 'span',
+  readOnly: 'readonly',
+  visibleWhen: 'visible',
+};
+
 function normalizeFieldRef(f: any): any {
   if (typeof f === 'string') {
     return { field: f.split('|')[0] };
   }
-  return f;
+  if (f == null || typeof f !== 'object') return f;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(f)) {
+    const canonical = FIELD_KEY_ALIASES[k] ?? k;
+    out[canonical] = v;
+  }
+  return out;
+}
+
+/**
+ * Block-level keys that the designer always emits but the hand-authored reference
+ * may omit. We treat empty/default values as equivalent to undefined so they
+ * don't pollute the diff.
+ */
+function stripEmptyBlockKeys(b: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...b };
+  // `actions: []` is a designer artefact for form-buttons (no quick-actions used).
+  if (Array.isArray(out.actions) && (out.actions as unknown[]).length === 0) {
+    delete out.actions;
+  }
+  return out;
 }
 
 function normalizeBlockForCompare(b: any): any {
-  const copy: any = {};
+  const copy: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(b)) {
     if (IGNORED_KEYS.has(k)) continue;
     if (k === 'fields' && Array.isArray(v)) {
@@ -169,7 +202,7 @@ function normalizeBlockForCompare(b: any): any {
       copy[k] = v;
     }
   }
-  return copy;
+  return stripEmptyBlockKeys(copy);
 }
 
 // ---------------------------------------------------------------------------
@@ -286,7 +319,27 @@ async function addBlockViaPalette(page: Page, blockType: string): Promise<void> 
   await page.getByTestId('designer-tab-blocks').click();
   const item = page.getByTestId(`block-palette-item-${blockType}`);
   await expect(item).toBeVisible({ timeout: 5_000 });
+
+  // Snapshot pre-count + wait for canvas to gain one more block of this type.
+  // BlocksDesigner.addBlock generates `block_${Date.now()}`; firing palette
+  // clicks within the same millisecond produces colliding IDs which cause
+  // React key collisions and visible re-ordering bugs (the "selected" block
+  // floats to the end of the canvas while DOM nth() indexing references the
+  // wrong sibling). Polling on count ensures one new block landed; advancing
+  // past the current ms tick guarantees the next add gets a distinct id.
+  const sel = `[data-block-type="${blockType}"]`;
+  const before = await page.locator(sel).count();
   await item.click();
+  await expect
+    .poll(async () => page.locator(sel).count(), { timeout: 5_000 })
+    .toBe(before + 1);
+  // Force the JS clock past the Date.now() boundary so the next addBlock
+  // produces a distinct `block_${Date.now()}` id (collision-prone otherwise).
+  await page.waitForFunction(
+    (mark) => Date.now() > (mark as number),
+    Date.now(),
+    { timeout: 100 },
+  );
 }
 
 /**
@@ -296,31 +349,61 @@ async function addBlockViaPalette(page: Page, blockType: string): Promise<void> 
  * `sectionIndex` is the 0-based index among reference sections (0 .. 8).
  */
 async function selectSectionViaOutline(page: Page, sectionIndex: number): Promise<void> {
-  await page.getByTestId('designer-tab-outline').click();
-  const outlineButtons = page.locator('button:has-text("Section Title")');
-  await expect(outlineButtons.first()).toBeVisible({ timeout: 5_000 });
-  await outlineButtons.nth(sectionIndex).click();
+  // Click the form-section directly on the canvas by positional index. The
+  // canvas reflects insertion order, and `[data-block-type="form-section"]`
+  // is a stable hook independent of (mutable) title text. Index 0 is the
+  // API-seeded Placeholder section, so reference section N is canvas N+1.
+  const block = page.locator('[data-block-type="form-section"]').nth(sectionIndex + 1);
+  await expect(block).toBeVisible({ timeout: 5_000 });
+  await block.click();
 }
 
 /**
- * Set the block title through the BlockPropertyPanel. The reference uses
- * LocalizedText objects {"zh-CN": "...", "en-US": "..."}. The designer's
- * title editor likely exposes a single string input (and perhaps a locale
- * switcher). We fill whichever locale inputs it surfaces — if only a single
- * raw string, we use the zh-CN value.
+ * Set the block title through the BlockPropertyPanel via the G2
+ * LocalizedTextInput component. Reference titles are LocalizedText objects
+ * ({"zh-CN": "...", "en-US": "..."}); we expand the multi-locale toggle then
+ * fill both locale inputs so the saved DSL emits the same object shape.
+ *
+ * Test-ids exposed by BlockSettingsEditor → LocalizedTextInput:
+ *   - block-title-input-toggle  (expand/collapse "+ 多语言")
+ *   - block-title-input-zh      (zh-CN input, always rendered)
+ *   - block-title-input-en      (en-US input, only after expand)
  */
 async function setSectionTitle(page: Page, title: any): Promise<void> {
   const panel = page.getByTestId('designer-properties-panel');
 
-  // Try label="标题" or placeholder containing "标题"
-  const titleInput = panel
-    .locator('label:has-text("标题") >> xpath=following-sibling::input[1], input[placeholder*="标题"]')
-    .first();
+  const zhValue =
+    typeof title === 'string' ? title : title?.['zh-CN'] ?? title?.['en-US'] ?? '';
+  const enValue = typeof title === 'object' && title !== null ? title['en-US'] ?? title['en'] ?? '' : '';
 
-  const zhValue = typeof title === 'string' ? title : title?.['zh-CN'] ?? '';
-  if (await titleInput.isVisible({ timeout: 1_500 }).catch(() => false)) {
-    await titleInput.click();
-    await titleInput.fill(zhValue);
+  const zhInput = panel.getByTestId('block-title-input-zh').first();
+  await expect(zhInput).toBeVisible({ timeout: 5_000 });
+  await zhInput.click();
+  await zhInput.fill(zhValue);
+
+  if (enValue) {
+    // Expand to expose the en-US locale input. The toggle is only rendered when
+    // LocalizedTextInput receives a `label` prop; BlockSettingsEditor currently
+    // does NOT pass one (PropertyField wraps the label externally), so the toggle
+    // is absent for section titles. Field labels (FieldPropertyEditor) DO receive
+    // the prop, so the same helper pattern works there.
+    const toggle = panel.getByTestId('block-title-input-toggle').first();
+    const toggleVisible = await toggle.isVisible({ timeout: 1_000 }).catch(() => false);
+    if (toggleVisible) {
+      const text = (await toggle.textContent().catch(() => '')) ?? '';
+      if (text.includes('多语言')) {
+        await toggle.click();
+      }
+      const enInput = panel.getByTestId('block-title-input-en').first();
+      if (await enInput.isVisible({ timeout: 2_000 }).catch(() => false)) {
+        await enInput.click();
+        await enInput.fill(enValue);
+      }
+    }
+    // If toggle is unavailable, the saved title will be the zh-CN string form
+    // and the diff oracle will surface a string-vs-object mismatch — that is
+    // the documented BlockSettingsEditor integration gap (G2 component is fine,
+    // its host doesn't pass `label` so the toggle never renders).
   }
 }
 
