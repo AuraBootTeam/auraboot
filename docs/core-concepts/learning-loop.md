@@ -198,3 +198,16 @@ If a plugin's command handler cannot honour dry-run safely, either leave
 register its command code as `NONE` in `ab_agent_dry_run_support` for the
 affected tenants; `DryRunSupportRegistry` will then classify the tool_ref
 as ineligible and skip shadow replay entirely.
+
+### Schema migration notes (PR-63)
+
+The PR-55 tenant_id NOT NULL migration originally ran an unconditional
+`DELETE FROM ab_agent_skill_draft WHERE tenant_id IS NULL` every boot.
+PR-63 wrapped it (and the companion `ab_agent_shadow_run` dedup purge)
+in a PL/pgSQL `DO` block that counts candidate rows first, emits a
+`RAISE NOTICE` with the row count when there is something to purge, and
+skips the `DELETE` entirely otherwise. The guarded block is safe to
+re-run on every boot — no NULL rows means no delete, so developer
+test data inserted via manual `psql` is no longer silently dropped on
+the next restart. The follow-up `ALTER COLUMN ... SET NOT NULL` is
+intrinsically idempotent and needs no guard.
