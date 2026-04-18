@@ -4927,12 +4927,21 @@ CREATE TABLE IF NOT EXISTS ab_agent_memory (
   updated_by    BIGINT,
   deleted_flag  BOOLEAN DEFAULT FALSE,
   shareable     BOOLEAN DEFAULT FALSE,
-  embedding     vector(1536)
+  embedding     vector(1536),
+  -- 2026-04-18 PR-13: 3D memory model (memory-lifecycle.md §2) — access boundary.
+  -- scope ∈ {user, tenant, global}; scope_key = boundary entity id (user_id /
+  -- tenant_id / NULL for global). GDPR deletion: DELETE WHERE scope='user' AND
+  -- scope_key=? covers all memory about a specific user.
+  scope         VARCHAR(16) NOT NULL DEFAULT 'tenant',
+  scope_key     VARCHAR(100)
 );
+ALTER TABLE ab_agent_memory ADD COLUMN IF NOT EXISTS scope VARCHAR(16) NOT NULL DEFAULT 'tenant';
+ALTER TABLE ab_agent_memory ADD COLUMN IF NOT EXISTS scope_key VARCHAR(100);
 CREATE INDEX IF NOT EXISTS idx_agent_memory_tenant ON ab_agent_memory (tenant_id);
 CREATE INDEX IF NOT EXISTS idx_agent_memory_agent ON ab_agent_memory (memory_agent_id);
 CREATE INDEX IF NOT EXISTS idx_agent_memory_type ON ab_agent_memory (memory_type);
 CREATE INDEX IF NOT EXISTS idx_agent_memory_shareable ON ab_agent_memory (tenant_id, shareable) WHERE shareable = TRUE;
+CREATE INDEX IF NOT EXISTS idx_agent_memory_scope ON ab_agent_memory (scope, scope_key) WHERE (deleted_flag IS NULL OR deleted_flag = FALSE);
 -- HNSW index: better recall than IVFFlat, no pre-training needed
 CREATE INDEX IF NOT EXISTS idx_agent_memory_embedding ON ab_agent_memory USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
 COMMENT ON TABLE ab_agent_memory IS 'Agent long-term memory — facts, preferences, lessons, decisions';
