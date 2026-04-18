@@ -67,4 +67,16 @@ export const RESOURCES: PluginResource[] = [
     menu: { order: 37, group: 'aurabot' }, permission: 'aurabot.run.read',
     file: './plugins/core-aurabot/pages/mission-control/memory-promotions.tsx',
   },
+  {
+    key: 'aurabot.my-profile', path: '/aurabot/my-profile',
+    title: { en: 'My Profile', zh: '我的画像' }, icon: 'user-circle',
+    menu: { order: 38, group: 'aurabot' }, permission: 'aurabot.run.read',
+    file: './plugins/core-aurabot/pages/mission-control/my-profile.tsx',
+  },
+  {
+    key: 'aurabot.soul-profiles-admin', path: '/aurabot/soul-profiles',
+    title: { en: 'Soul Profiles (Admin)', zh: 'Soul Profiles 管理' }, icon: 'users',
+    menu: { order: 39, group: 'aurabot' }, permission: 'aurabot.dashboard.read',
+    file: './plugins/core-aurabot/pages/mission-control/soul-profiles-admin.tsx',
+  },
 ]
