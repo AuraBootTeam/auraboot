@@ -249,25 +249,27 @@ test.describe('Mission Control — SkillDraft review (PR-31)', () => {
 
   test('LD-06: status filter dropdown changes the list query', async ({ page }) => {
     const requestedUrls: string[] = [];
-    await page.route(/\/api\/learning\/drafts\?.*/, async (route: Route) => {
+    // Single unified handler: captures every /drafts list request and
+    // returns [] so the UI stays in the empty state between filter changes.
+    await page.route(/\/api\/learning\/drafts(\?|$)/, async (route: Route) => {
       requestedUrls.push(route.request().url());
       await route.fulfill({
-        status: 200, contentType: 'application/json',
+        status: 200,
+        contentType: 'application/json',
         body: JSON.stringify(envelope([])),
       });
     });
-    await interceptLearningApi(page, { list: [] });  // plus catch-all
-    await openPage(page);
+    await page.goto('/aurabot/learning-drafts');
+    await expect(page.locator('[data-testid="learning-drafts-page"]')).toBeVisible({ timeout: 10000 });
+    // Wait until the initial fetch captures — ensures React has hydrated
+    // and the route handler is live before we interact with the select.
+    await expect.poll(() => requestedUrls.length, { timeout: 10000 }).toBeGreaterThanOrEqual(1);
 
     await page.locator('[data-testid="status-filter"]').selectOption('REVIEWED_OK');
-    // wait for the re-fetch
-    await page.waitForFunction(
-      () => document.querySelectorAll('[data-testid^="draft-"]').length === 0,
-      { timeout: 5000 },
-    ).catch(() => null);
-
-    const reviewedOkRequests = requestedUrls.filter((u) => u.includes('status=REVIEWED_OK'));
-    expect(reviewedOkRequests.length).toBeGreaterThanOrEqual(1);
+    await expect.poll(
+      () => requestedUrls.filter((u) => u.includes('status=REVIEWED_OK')).length,
+      { timeout: 10000 },
+    ).toBeGreaterThanOrEqual(1);
   });
 
   test('LD-07: shadow-runs empty state renders when no shadow runs exist (PR-43)', async ({ page }) => {
