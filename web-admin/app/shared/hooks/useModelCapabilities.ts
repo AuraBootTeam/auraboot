@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { get } from '~/shared/services/http-client';
 
 export interface ModelCapabilities {
   list: boolean;
@@ -38,14 +39,13 @@ export function useModelCapabilities(code: string | undefined): UseModelCapabili
     let cancelled = false;
     setLoading(true);
     setError(undefined);
-    fetch(`/api/meta/models/${encodeURIComponent(code)}/capabilities`)
-      .then((r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json();
-      })
-      .then((body) => {
+    get<ModelCapabilities>(`/api/meta/models/${encodeURIComponent(code)}/capabilities`)
+      .then((result) => {
         if (cancelled) return;
-        setData(body?.data as ModelCapabilities);
+        if (result.code !== '0') {
+          throw new Error(`HTTP ${result.code}: ${result.desc}`);
+        }
+        setData(result.data ?? undefined);
       })
       .catch((e: Error) => {
         if (cancelled) return;
