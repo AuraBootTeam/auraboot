@@ -434,6 +434,10 @@ CREATE TABLE IF NOT EXISTS ab_meta_model (
     model_category       VARCHAR(50),               -- DOCUMENT, MASTER, TRANSACTION, ACTIVITY, REFERENCE, ENTITY
     data_sensitivity     VARCHAR(20) DEFAULT 'internal', -- PUBLIC, INTERNAL, CONFIDENTIAL, RESTRICTED
     lifecycle_description TEXT,                      -- e.g. "NEW → QUALIFIED → CONVERTED"
+    source_type          VARCHAR(20) NOT NULL DEFAULT 'physical'
+                          CHECK (source_type IN ('physical','namedQuery','endpoint','sqlView')),
+    source_ref           TEXT,
+    capabilities         JSONB NOT NULL DEFAULT '{}'::jsonb,
     version INT NOT NULL,
     semver TEXT,
     is_current BOOLEAN NOT NULL DEFAULT FALSE,
@@ -942,6 +946,33 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_meta_model_status') THEN
         ALTER TABLE ab_meta_model ADD CONSTRAINT chk_meta_model_status CHECK (status IN ('draft', 'published', 'archived'));
     END IF;
+END $$;
+
+-- Phase 1 virtual model storage contract:
+-- physical models must have table_name; virtual models must have source_ref.
+-- Soft variant: legacy physical rows that lack a table_name are tolerated when
+-- their extension.modelType signals virtual semantics (view/aggregate/virtual).
+-- This lets existing fixtures survive while still rejecting genuinely malformed
+-- rows (physical + no table_name + no extension hint) and virtual rows without
+-- a sourceRef. New rows written by MetaModelServiceImpl always set source_type
+-- correctly, so the invariant stays enforced in the forward direction.
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_model_source') THEN
+        ALTER TABLE ab_meta_model DROP CONSTRAINT chk_model_source;
+    END IF;
+    ALTER TABLE ab_meta_model
+        ADD CONSTRAINT chk_model_source CHECK (
+            (source_type = 'physical' AND (
+                table_name IS NOT NULL
+                -- legacy: modelType may sit at extension.modelType (flat) or
+                -- extension.extension.modelType (nested) when the row predates
+                -- the first-class table_name column.
+                OR COALESCE(extension->>'modelType', '') <> ''
+                OR COALESCE(extension->'extension'->>'modelType', '') <> ''
+            ))
+            OR (source_type <> 'physical' AND source_ref IS NOT NULL)
+        );
 END $$;
 
 

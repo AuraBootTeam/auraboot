@@ -80,7 +80,8 @@ public class ExtensionBean {
             "tableName", "modelCode", "pageType", "schemaType",
             "uiSchema", "querySchema", "tags", "metadata",
             "enableNba", "skipTableCreation", "dataScope",
-            "titleField", "subtitleField");
+            "titleField", "subtitleField",
+            "endpointAdapter");
 
     /**
      * Validate extension content: key count limit and value size limit.

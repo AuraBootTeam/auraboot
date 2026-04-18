@@ -76,6 +76,12 @@ public class FieldDefinition {
      */
     @Builder.Default
     private Boolean displayField = false;
+
+    /** UI editor input: checked in model fields tab. Normalized into capabilities.sortableFields at save time. */
+    private Boolean sortable;
+
+    /** UI editor input: checked in model fields tab. Normalized into capabilities.filterableFields at save time. */
+    private Boolean filterable;
     
     /**
      * 默认值

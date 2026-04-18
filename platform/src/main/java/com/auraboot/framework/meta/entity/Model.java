@@ -50,6 +50,29 @@ public class Model extends AbstractMultiVersionEntity {
     private String modelCategory;
 
     /**
+     * Model source type: physical | namedQuery | endpoint | sqlView (Phase 1).
+     * Defaults to "physical" at DB level.
+     */
+    @TableField("source_type")
+    private String sourceType;
+
+    /**
+     * Source reference: for namedQuery → query code, for endpoint → connector endpoint code,
+     * for sqlView → view name. Required when sourceType != physical (enforced by chk_model_source).
+     */
+    @TableField("source_ref")
+    private String sourceRef;
+
+    /**
+     * Declared capabilities JSONB payload (list/detail/create/update/delete/sort/filter/...
+     * + sortableFields/filterableFields whitelist). Stored as raw JSON string; service layer
+     * parses via ObjectMapper into {@link com.auraboot.framework.meta.dto.ModelCapabilities}.
+     */
+    @TableField(value = "capabilities",
+        typeHandler = com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler.class)
+    private String capabilities;
+
+    /**
      * 获取显示名称（从extension中提取）
      * Supports both nested {"extension":{"displayName":"..."}} and flat {"displayName":"..."} formats
      * @return 显示名称

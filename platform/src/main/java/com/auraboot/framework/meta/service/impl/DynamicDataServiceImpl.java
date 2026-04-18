@@ -9,6 +9,8 @@ import com.auraboot.framework.meta.dto.*;
 import com.auraboot.framework.meta.dto.FieldMaskRule;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.mapper.MetaModelMapper;
+import com.auraboot.framework.meta.service.executor.ExecutorRegistry;
+import com.auraboot.framework.meta.service.executor.ModelDataExecutor;
 import com.auraboot.framework.meta.ddl.TableMetadataService;
 import com.auraboot.framework.meta.exception.MetaServiceException;
 import com.auraboot.framework.meta.util.JsonbFieldHelper;
@@ -66,6 +68,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     private final ApplicationContext applicationContext;
     private final PayloadTemporalNormalizer payloadTemporalNormalizer;
     private final FieldPermissionService fieldPermissionService;
+    private final ExecutorRegistry executorRegistry;
     private static final Set<String> SYSTEM_COLUMNS = SystemFieldConstants.QUERY_TRANSPARENT;
 
     /**
@@ -98,6 +101,14 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
         // 获取模型定义
         ModelDefinition model = getModelDefinition(modelCode);
+
+        // Phase 1 virtual-model dispatch: if the model has a non-physical sourceType
+        // AND an executor is registered for it, delegate. Otherwise fall through to
+        // the existing physical-table inline path (preserves full backward compatibility).
+        Optional<ModelDataExecutor> executorOpt = executorRegistry.resolve(model.getSourceType());
+        if (executorOpt.isPresent()) {
+            return executorOpt.get().list(modelCode, request);
+        }
 
         // VIEW models have no physical table — delegate to NamedQuery
         if ("view".equals(model.getModelType())) {
@@ -634,8 +645,20 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         }
         
         logOperation("getById", modelCode, recordId);
-        
+
         ModelDefinition model = getModelDefinition(modelCode);
+
+        // Phase 1 virtual-model dispatch: delegate to executor if non-physical sourceType
+        // has a registered executor; otherwise fall through to inline physical path.
+        Optional<ModelDataExecutor> executorOpt = executorRegistry.resolve(model.getSourceType());
+        if (executorOpt.isPresent()) {
+            Map<String, Object> record = executorOpt.get().get(modelCode, recordId);
+            if (record == null) {
+                throw new MetaServiceException("Record not found: " + recordId + " in model: " + modelCode);
+            }
+            return record;
+        }
+
         FieldDefinition primaryKey = metadataService.getPrimaryKeyField(modelCode);
         Long tenantId = getCurrentTenantId();
         
@@ -708,10 +731,11 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Transactional
     public Map<String, Object> create(String modelCode, Map<String, Object> data) {
         validateModelCode(modelCode);
+        assertWritable(modelCode);
         if (data == null || data.isEmpty()) {
             throw new MetaServiceException("Data cannot be null or empty");
         }
-        
+
         logOperation("create", modelCode, data.keySet());
         
         ModelDefinition model = getModelDefinition(modelCode);
@@ -947,6 +971,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Transactional
     public Map<String, Object> update(String modelCode, String recordId, Map<String, Object> data) {
         validateModelCode(modelCode);
+        assertWritable(modelCode);
         if (recordId == null || recordId.trim().isEmpty()) {
             throw new MetaServiceException("Record ID cannot be null or empty");
         }
@@ -1072,6 +1097,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Transactional
     public void delete(String modelCode, String recordId) {
         validateModelCode(modelCode);
+        assertWritable(modelCode);
         if (recordId == null || recordId.trim().isEmpty()) {
             throw new MetaServiceException("Record ID cannot be null or empty");
         }
@@ -1125,6 +1151,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     public DynamicBatchResponse batchCreate(String modelCode, List<Map<String, Object>> dataList) {
         validateModelCode(modelCode);
+        assertWritable(modelCode);
         if (dataList == null || dataList.isEmpty()) {
             throw new MetaServiceException("Data list cannot be null or empty");
         }
@@ -1185,10 +1212,11 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Transactional
     public DynamicBatchResponse batchUpdate(String modelCode, List<Map<String, Object>> dataList) {
         validateModelCode(modelCode);
+        assertWritable(modelCode);
         if (dataList == null || dataList.isEmpty()) {
             throw new MetaServiceException("Data list cannot be null or empty");
         }
-        
+
         logOperation("batchUpdate", modelCode, dataList.size());
         
         ModelDefinition model = getModelDefinition(modelCode);
@@ -1229,10 +1257,11 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Transactional
     public void batchDelete(String modelCode, List<String> recordIds) {
         validateModelCode(modelCode);
+        assertWritable(modelCode);
         if (recordIds == null || recordIds.isEmpty()) {
             throw new MetaServiceException("Record IDs cannot be null or empty");
         }
-        
+
         logOperation("batchDelete", modelCode, recordIds.size());
         
         ModelDefinition model = getModelDefinition(modelCode);
@@ -1921,6 +1950,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Transactional
     public ImportResult importData(String modelCode, DataImportRequest importRequest) {
         validateModelCode(modelCode);
+        assertWritable(modelCode);
         logOperation("importData", modelCode, importRequest);
 
         Instant startTime = Instant.now();
@@ -2083,6 +2113,31 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     private ModelDefinition getModelDefinition(String modelCode) {
         return metadataService.getModelDefinition(modelCode)
                 .orElseThrow(() -> new MetaServiceException("Model not found: " + modelCode));
+    }
+
+    /**
+     * Phase 1 guard: reject write operations against virtual models.
+     *
+     * <p>Virtual models (sourceType != "physical", i.e. namedQuery/endpoint/sqlView)
+     * are read-only in phase 1 per design §6.4. Phase 2 will introduce a Virtual
+     * Writable Model abstraction with command binding + field mapping.
+     *
+     * <p>Null-safe: if the model definition is not yet registered (first create
+     * with auto table provisioning) or sourceType is null, treats as physical
+     * and allows the write — the downstream code paths will still validate
+     * existence.
+     */
+    private void assertWritable(String modelCode) {
+        ModelDefinition def = metadataService.getDefinitionByCode(modelCode);
+        if (def == null) {
+            return;
+        }
+        String sourceType = def.getSourceType();
+        if (sourceType != null && !"physical".equals(sourceType)) {
+            throw new MetaServiceException(
+                "virtual model is read-only in phase 1: " + modelCode
+                + " (sourceType=" + sourceType + ")");
+        }
     }
 
     private Map<String, Object> toColumnData(ModelDefinition model, Map<String, Object> data) {
@@ -2448,6 +2503,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Transactional
     public JointSubTableSaveResponse saveWithRelations(String modelCode, JointSubTableSaveRequest request) {
         validateModelCode(modelCode);
+        assertWritable(modelCode);
         if (request == null || request.getMasterData() == null) {
             throw new MetaServiceException("Request and master data cannot be null");
         }
