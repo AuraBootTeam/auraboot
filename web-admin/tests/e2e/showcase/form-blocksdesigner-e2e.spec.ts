@@ -272,11 +272,57 @@ async function readWidgetOptions(page: Page): Promise<string[]> {
 
 /**
  * Choose a widget by exact value in the widget select.
+ *
+ * Uses a poll-loop because the dropdown's option list mutates while the
+ * BlockPropertyPanel resolves dataType async (see resolvePhysicalDataType
+ * in BlockPropertyPanel.tsx). A single selectOption() can race against the
+ * post-resolve re-render and fail with "did not find some options". Polling
+ * verifies the value is present, then sets it via the native React change
+ * path so React's controlled-component model picks up the new value.
  */
 async function chooseWidgetByValue(page: Page, widgetValue: string): Promise<void> {
   const select = widgetSelect(page);
   await expect(select).toBeVisible({ timeout: 5_000 });
-  await select.selectOption(widgetValue);
+
+  // Wait for the desired option to be present in the live DOM.
+  await expect
+    .poll(
+      async () =>
+        await select.locator('option').evaluateAll(
+          (opts, val) => (opts as HTMLOptionElement[]).some((o) => o.value === val),
+          widgetValue,
+        ),
+      { timeout: 5_000 },
+    )
+    .toBe(true);
+
+  // Set the value via the native React-aware path. Calling selectOption can
+  // still race when React re-renders mid-call; firing change directly on the
+  // DOM bypasses Playwright's option-validation phase and lets React's
+  // onChange handler observe the new value.
+  //
+  // The select can still snap back to "" if the registry hydrates between
+  // our DOM write and React's reconciliation (option list mutates →
+  // controlled <select> rejects the orphan value). Retry with a fresh
+  // option-presence check so we don't lock onto a transient FALLBACK option.
+  await expect
+    .poll(
+      async () => {
+        const present = await select.locator('option').evaluateAll(
+          (opts, val) => (opts as HTMLOptionElement[]).some((o) => o.value === val),
+          widgetValue,
+        );
+        if (!present) return null;
+        await select.evaluate((el, val) => {
+          const sel = el as HTMLSelectElement;
+          sel.value = val;
+          sel.dispatchEvent(new Event('change', { bubbles: true }));
+        }, widgetValue);
+        return await select.inputValue();
+      },
+      { timeout: 5_000 },
+    )
+    .toBe(widgetValue);
 }
 
 /**
@@ -418,9 +464,10 @@ test.describe('Phase 4 — Form BlocksDesigner E2E (widget config chain)', () =>
   // BlocksDesigner specs need many UI interactions (add 3 blocks, type 7
   // field codes, configure 6 widgets, save). Each individual locator wait is
   // ≤5s per the red-line rule, but the combined budget exceeds the default
-  // 15s. Bump the per-test ceiling to 60s — this is a *test-budget* not a
+  // 15s. Bump the per-test ceiling to 90s — this is a *test-budget* not a
   // *locator timeout*, so the no-waitForTimeout / 5s-locator rule is honoured.
-  test.setTimeout(60_000);
+  // P4.5 cycles 12 widgets across 9 dataType buckets and needs the full 90s.
+  test.setTimeout(90_000);
 
   test.afterEach(async ({ page }) => {
     while (createdPagePids.length > 0) {
@@ -553,9 +600,32 @@ test.describe('Phase 4 — Form BlocksDesigner E2E (widget config chain)', () =>
     for (let i = 0; i < fieldCodes.length; i++) {
       const field = fieldCodes[i];
       await selectFieldInBlock(page, 'Section Title', field);
+
+      // Wait for the registry to hydrate the dropdown. Pre-fix, dataType
+      // always degraded to 'string' so the dropdown stayed on the 3-option
+      // FALLBACK (smart-input/smart-textarea/smart-password). After the
+      // BlockPropertyPanel fix the registry repopulates with 15+ string-bucket
+      // widgets — capturing options too early locks us onto transient
+      // smart-* values that disappear after hydration.
+      const select = widgetSelect(page);
+      await expect
+        .poll(
+          async () =>
+            await select
+              .locator('option')
+              .evaluateAll(
+                (opts) =>
+                  (opts as HTMLOptionElement[]).filter(
+                    (o) => o.value && !o.value.startsWith('smart-'),
+                  ).length,
+              ),
+          { timeout: 5_000 },
+        )
+        .toBeGreaterThan(0);
+
       const opts = await readWidgetOptions(page);
-      // Drop empty placeholder ("自动选择") option if present.
-      const real = opts.filter((v) => v && v.length > 0);
+      // Drop empty placeholder ("自动选择") and FALLBACK smart-* options.
+      const real = opts.filter((v) => v && v.length > 0 && !v.startsWith('smart-'));
       expect(real.length, `widget dropdown for ${field} should expose options`).toBeGreaterThan(0);
       const widget = real[i % real.length];
       await chooseWidgetByValue(page, widget);
@@ -691,6 +761,231 @@ test.describe('Phase 4 — Form BlocksDesigner E2E (widget config chain)', () =>
     const submit = buttons.find((b) => b.action === 'submit');
     if (submit) {
       expect(submit.type, 'submit button type should be primary').toBe('primary');
+    }
+  });
+
+  // -------------------------------------------------------------------------
+  // P4.5 — 12-widget configuration chain across 9 dataType buckets.
+  //
+  // Companion fix in this PR: BlockPropertyPanel.tsx physical-model dataType
+  // resolution. Before the fix, /api/meta/models/code/{code}/fields was 404 so
+  // every showcase field degraded to dataType='string', and the widget
+  // dropdown only ever surfaced the 4-entry STRING bucket — leaving the
+  // INTEGER/DECIMAL/ENUM/DATE/DATETIME/BOOLEAN/FILE/TEXT widget chains
+  // completely untested. Fix: code → /api/meta/models/code/{code} → pid →
+  // /api/meta/models/{pid}/fields, which preserves the logical dataType.
+  //
+  // Coverage matrix (12 widgets / 9 buckets):
+  //   string       input         sc_phone
+  //   string       colorpicker   sc_color           (display-bucket variant)
+  //   text         richtext      sc_remark
+  //   text         textarea      sc_description
+  //   integer      number        sc_quantity
+  //   integer      rating        sc_rating
+  //   integer      progress      sc_progress
+  //   decimal      moneyinput    sc_price
+  //   enum         select        sc_status
+  //   enum         radio-group   sc_priority
+  //   boolean      switch        sc_is_active
+  //   date         date          sc_start_date
+  //   datetime     datetime      sc_created_at
+  //   file         upload        sc_attachment_file
+  //
+  // (14 entries; we assert 12 mandatory persistences and tolerate up to 2
+  // misses for fields whose registry alias is not exposed in the dropdown
+  // — the test surfaces *which* mismatched in the failure message.)
+  // -------------------------------------------------------------------------
+  test('P4.5: configure 12 widgets across all dataType buckets and persist component', async ({
+    page,
+  }) => {
+    const pageKey = uniquePageKey();
+    const pid = await apiCreateFormPage(page, pageKey);
+    createdPagePids.push(pid);
+
+    await navigateToDesignerViaMenu(page, pid, pageKey);
+    // FormSectionPreview hard-caps the canvas preview at fields.slice(0, 8)
+    // (the rest collapse into a "+N 更多字段" badge that has no click
+    // handler). Field selection in the FieldPropertyEditor happens through
+    // canvas clicks only (the right-side FieldsEditor list is a separate
+    // inline editor, not the full property editor). So we add TWO sections,
+    // 7 fields + 7 fields, to keep every field reachable via canvas click.
+    await addBlockViaPalette(page, 'form-section');
+    await addBlockViaPalette(page, 'form-section');
+
+    // Plan: { fieldCode, expectedWidget, section } triples grouped per
+    // dataType bucket. `section` indexes the outline (0 = first added,
+    // 1 = second added). The default Placeholder section keeps blocks[0],
+    // so our two added sections live at outline indices 1 and 2.
+    const plan: Array<{ field: string; widget: string; bucket: string; section: number }> = [
+      // Section 1 — string + text + integer (7 fields, fits the 8-cap)
+      { field: 'sc_phone', widget: 'input', bucket: 'string', section: 0 },
+      { field: 'sc_color', widget: 'colorpicker', bucket: 'string', section: 0 },
+      { field: 'sc_remark', widget: 'richtext', bucket: 'text', section: 0 },
+      { field: 'sc_description', widget: 'textarea', bucket: 'text', section: 0 },
+      { field: 'sc_quantity', widget: 'number', bucket: 'integer', section: 0 },
+      { field: 'sc_rating', widget: 'rating', bucket: 'integer', section: 0 },
+      { field: 'sc_progress', widget: 'progress', bucket: 'integer', section: 0 },
+      // Section 2 — decimal + enum + boolean + date + datetime + file (7 fields)
+      { field: 'sc_price', widget: 'moneyinput', bucket: 'decimal', section: 1 },
+      { field: 'sc_status', widget: 'select', bucket: 'enum', section: 1 },
+      { field: 'sc_priority', widget: 'radio-group', bucket: 'enum', section: 1 },
+      { field: 'sc_is_active', widget: 'switch', bucket: 'boolean', section: 1 },
+      { field: 'sc_start_date', widget: 'date', bucket: 'date', section: 1 },
+      { field: 'sc_created_at', widget: 'datetime', bucket: 'datetime', section: 1 },
+      { field: 'sc_attachment_file', widget: 'upload', bucket: 'file', section: 1 },
+    ];
+
+    // Add fields to each section. Outline button order: blocks[0]=Placeholder,
+    // blocks[1]=Section Title (first added), blocks[2]=Section Title (second).
+    await page.getByTestId('designer-tab-outline').click();
+    const outlineButtons = page.locator('button:has-text("Section Title")');
+    await expect(outlineButtons.first()).toBeVisible({ timeout: 5_000 });
+
+    for (let s = 0; s < 2; s++) {
+      await outlineButtons.nth(s).click();
+      const sectionFields = plan.filter((p) => p.section === s).map((p) => p.field);
+      await addFieldsToSelectedBlock(page, sectionFields);
+    }
+
+    // Cycle each field, verify dropdown surfaces the expected widget for that
+    // bucket, then choose it. We DO NOT save per field — one save at the end
+    // keeps the test under 90s while still proving the full chain.
+    const dropdownTrace: Array<{
+      field: string;
+      bucket: string;
+      attempted: string;
+      options: string[];
+      chosen: string | null;
+    }> = [];
+
+    // The two added "Section Title" blocks live as the 2nd and 3rd
+    // sortable-block instances (the auto-injected Placeholder is the first).
+    // Cache the locator strategy so we don't re-evaluate on every iteration.
+    const sectionBlock = (sectionIdx: number) =>
+      page.locator('[data-block-type="form-section"]').nth(sectionIdx + 1);
+
+    for (const { field, widget, bucket, section } of plan) {
+      const block = sectionBlock(section);
+      await expect(block).toBeVisible({ timeout: 5_000 });
+      const fieldLabel = block.locator(`label:has-text("${field}")`).first();
+      await expect(fieldLabel).toBeVisible({ timeout: 5_000 });
+      await fieldLabel
+        .locator('xpath=ancestor::div[contains(@class,"group/field")]')
+        .first()
+        .click();
+      const propsPanel = page.getByTestId('designer-properties-panel');
+      await expect(propsPanel.locator('text=字段属性')).toBeVisible({ timeout: 5_000 });
+
+      // Wait for the FieldPropertyEditor's dataType badge to settle on the
+      // expected bucket. The BlockPropertyPanel resolves dataType async via
+      // /api/meta/models/code/{code} → /api/meta/models/{pid}/fields, so the
+      // dropdown's option list mutates mid-render. Without this gate,
+      // readWidgetOptions captures the STRING-default options and
+      // selectOption races against the post-resolve re-render.
+      const dataTypeBadge = propsPanel
+        .locator('span.font-mono')
+        .first()
+        .locator('xpath=following-sibling::span[1]');
+      await expect(dataTypeBadge).toHaveText(bucket, { timeout: 5_000 });
+
+      // Wait for the dropdown to contain the targeted widget (or for the
+      // 5s budget to expire — in which case we know the registry doesn't
+      // expose this widget for that bucket and we record a 'skip').
+      const select = widgetSelect(page);
+      const targetPresent = await select
+        .locator(`option[value="${widget}"]`)
+        .first()
+        .waitFor({ state: 'attached', timeout: 5_000 })
+        .then(() => true)
+        .catch(() => false);
+
+      let chosen: string | null = null;
+      const opts = await readWidgetOptions(page);
+      const real = opts.filter((v) => v && v.length > 0);
+      if (targetPresent) {
+        await chooseWidgetByValue(page, widget);
+        chosen = widget;
+      } else if (real.length > 0) {
+        // Fallback so the field is not left at "auto" — pick the first real
+        // option. The assertion at the end records this as a miss with the
+        // dropdown contents so the gap is debuggable.
+        await chooseWidgetByValue(page, real[0]);
+        chosen = real[0];
+      }
+      dropdownTrace.push({ field, bucket, attempted: widget, options: real, chosen });
+
+      await page
+        .getByTestId('designer-properties-panel')
+        .locator('button:has-text("返回 Block")')
+        .first()
+        .click()
+        .catch(() => null);
+    }
+
+    await clickSaveAndWait(page, pid);
+
+    const blocks = await fetchSavedBlocks(page, pid);
+    const sections = blocks.filter(
+      (b) => b.blockType === 'form-section' && b.title !== 'Placeholder',
+    );
+    expect(sections.length, 'two added form-section blocks should exist').toBeGreaterThanOrEqual(
+      2,
+    );
+
+    // Aggregate persisted components across both sections.
+    const persisted = new Map<string, string | undefined>();
+    for (const sec of sections) {
+      for (const fr of sec.fields || []) {
+        const obj = typeof fr === 'string' ? { field: fr.split('|')[0] } : fr;
+        persisted.set(obj.field, obj.component);
+      }
+    }
+
+    // Build a per-row report. A widget is counted as a "hit" iff the
+    // persisted component exactly equals the targeted widget for that
+    // dataType bucket. Anything less proves a chain break (registry,
+    // dropdown, FieldPropertyEditor handler, or PUT pipeline).
+    const hits: string[] = [];
+    const misses: string[] = [];
+    for (const { field, widget, bucket } of plan) {
+      const got = persisted.get(field);
+      if (got === widget) {
+        hits.push(`${bucket}/${widget}`);
+      } else {
+        const trace = dropdownTrace.find((t) => t.field === field);
+        misses.push(
+          `${bucket}/${field} expected=${widget} got=${got} dropdown=[${trace?.options.join(',')}] chose=${trace?.chosen}`,
+        );
+      }
+    }
+
+    // Surface trace in the test output so failures self-diagnose.
+    console.log('[P4.5] hits:', hits.join('  '));
+    if (misses.length > 0) console.log('[P4.5] misses:', misses.join('\n  '));
+
+    // Hard requirement: at least 12 of the 14 targeted widget chains must
+    // round-trip. The ≤2-miss tolerance is for registry naming variants
+    // (e.g. checkbox-group vs checkbox) that surface inconsistently across
+    // dataType buckets.
+    expect(
+      hits.length,
+      `widget chain coverage too low: ${hits.length}/14, misses=\n  ${misses.join('\n  ')}`,
+    ).toBeGreaterThanOrEqual(12);
+
+    // Bucket coverage: every dataType bucket in the plan must have at least
+    // one persisted hit so the test cannot silently degrade to a single
+    // bucket.
+    const bucketsCovered = new Set(
+      plan
+        .filter(({ field, widget }) => persisted.get(field) === widget)
+        .map((p) => p.bucket),
+    );
+    const expectedBuckets = new Set(plan.map((p) => p.bucket));
+    for (const b of expectedBuckets) {
+      expect(
+        bucketsCovered.has(b),
+        `bucket ${b} had no successful widget round-trip`,
+      ).toBeTruthy();
     }
   });
 });

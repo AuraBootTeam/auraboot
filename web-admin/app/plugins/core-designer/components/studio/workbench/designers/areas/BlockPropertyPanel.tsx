@@ -88,9 +88,41 @@ export const BlockPropertyPanel: React.FC<BlockPropertyPanelProps> = ({
 
     let cancelled = false;
     // Try ViewModel resolved-fields first (works for VIEW models).
-    // For physical models, /api/meta/view-models/{code}/resolved-fields returns []
-    // so fall back to /api/meta/models/code/{code}/fields which returns the
-    // physical column metadata with `fieldType` (mapped to dataType).
+    // For physical models, /api/meta/view-models/{code}/resolved-fields returns
+    // a 4xx Business error ("Model is not a VIEW type") which throws in the
+    // shared `get` wrapper. The previous catch-arm fallback hit
+    // /api/meta/models/code/{code}/fields which does NOT exist (404), so
+    // dataType permanently degraded to 'string' and the widget dropdown only
+    // ever exposed the STRING bucket — masking entire dataType buckets
+    // (integer/decimal/enum/date/datetime/boolean/file/text) in the
+    // FieldPropertyEditor.
+    //
+    // The correct physical-model chain:
+    //   1) /api/meta/models/code/{code}        → MetaModelDTO with pid
+    //   2) /api/meta/models/{pid}/fields       → fields[] with logical dataType
+    //
+    // This must run on BOTH then() (view-model returned but field absent) and
+    // catch() (physical model that 4xx'd the view-model probe).
+    const resolvePhysicalDataType = async (): Promise<void> => {
+      try {
+        const modelRes = await get<{ pid?: string }>(
+          `/api/meta/models/code/${modelCode}`,
+        );
+        if (cancelled) return;
+        const modelPid = modelRes?.data?.pid;
+        if (!modelPid) return;
+        const res = await get<Array<{ code: string; dataType?: string }>>(
+          `/api/meta/models/${modelPid}/fields`,
+        );
+        if (cancelled) return;
+        const list = Array.isArray(res?.data) ? res.data : [];
+        const phys = list.find((f) => f.code === fieldCode);
+        if (phys?.dataType) setFieldDataType(phys.dataType);
+      } catch {
+        // Physical lookup also failed — keep the 'string' default.
+      }
+    };
+
     viewModelService
       .getResolvedFields(modelCode)
       .then((fields) => {
@@ -100,18 +132,14 @@ export const BlockPropertyPanel: React.FC<BlockPropertyPanelProps> = ({
           setFieldDataType(match.dataType);
           return;
         }
-        // Fallback: physical model lookup
-        return get<Array<{ code: string; fieldType?: string; dataType?: string }>>(
-          `/api/meta/models/code/${modelCode}/fields`,
-        ).then((res) => {
-          if (cancelled) return;
-          const list = Array.isArray(res?.data) ? res.data : [];
-          const phys = list.find((f) => f.code === fieldCode);
-          setFieldDataType(phys?.dataType || phys?.fieldType || 'string');
-        });
+        return resolvePhysicalDataType();
       })
       .catch(() => {
-        if (!cancelled) setFieldDataType('string');
+        if (cancelled) return;
+        // view-model probe rejected (typically physical model 4xx) — try the
+        // physical-model chain instead of silently falling back to 'string'.
+        setFieldDataType('string');
+        void resolvePhysicalDataType();
       });
     return () => {
       cancelled = true;
