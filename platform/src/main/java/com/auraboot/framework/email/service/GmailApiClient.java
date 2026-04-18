@@ -1,9 +1,12 @@
 package com.auraboot.framework.email.service;
 
 import com.auraboot.framework.common.crypto.FieldEncryptionService;
+import com.auraboot.framework.common.util.PinnedHttpRequests;
+import com.auraboot.framework.common.util.SsrfValidator;
 import com.auraboot.framework.email.config.GmailApiConfig;
 import com.auraboot.framework.email.mapper.EmailAccountMapper;
 import com.auraboot.framework.email.model.EmailAccount;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeTokenRequest;
 import com.google.api.client.googleapis.auth.oauth2.GoogleTokenResponse;
 import com.google.api.client.http.javanet.NetHttpTransport;
@@ -17,19 +20,20 @@ import com.google.auth.oauth2.GoogleCredentials;
 import com.google.auth.oauth2.UserCredentials;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
-import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -69,10 +73,21 @@ public class GmailApiClient {
             GmailScopes.GMAIL_MODIFY
     );
 
+    /**
+     * Shared pinned-IP HTTP client (P3-E DNS-rebinding hardening). All outbound
+     * calls to Google OAuth endpoints go through {@link PinnedHttpRequests}
+     * so the connect-time IP cannot be re-resolved to an attacker-controlled
+     * address between SSRF validation and socket connect.
+     */
+    private static final HttpClient PINNED_HTTP_CLIENT = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(10))
+            .build();
+
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
     private final GmailApiConfig gmailApiConfig;
     private final FieldEncryptionService fieldEncryptionService;
     private final EmailAccountMapper emailAccountMapper;
-    private final RestTemplate restTemplate = new RestTemplate();
 
     // ──────────────────────────────────────────────────────────────────────────
     // Public API
@@ -200,16 +215,28 @@ public class GmailApiClient {
         }
 
         try {
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+            SsrfValidator.ValidatedTarget target = SsrfValidator.validate(GOOGLE_REVOKE_URL);
+            if (target == null) {
+                log.warn("revokeToken: target could not be resolved: {}", GOOGLE_REVOKE_URL);
+                return;
+            }
+            Map<String, String> form = new LinkedHashMap<>();
+            form.put("token", refreshToken);
 
-            MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
-            body.add("token", refreshToken);
+            HttpRequest request = PinnedHttpRequests.newPinnedRequestBuilder(target)
+                    .timeout(Duration.ofSeconds(30))
+                    .header("Content-Type", "application/x-www-form-urlencoded")
+                    .POST(HttpRequest.BodyPublishers.ofString(
+                            encodeForm(form), StandardCharsets.UTF_8))
+                    .build();
 
-            restTemplate.postForObject(
-                    GOOGLE_REVOKE_URL,
-                    new HttpEntity<>(body, headers),
-                    Void.class);
+            HttpResponse<String> response = PINNED_HTTP_CLIENT.send(
+                    request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() >= 400) {
+                log.warn("Token revocation non-2xx (best-effort): status={}, body={}",
+                        response.statusCode(), response.body());
+                return;
+            }
 
             log.info("Token revoked at Google successfully");
         } catch (Exception e) {
@@ -235,19 +262,38 @@ public class GmailApiClient {
      */
     @SuppressWarnings("unchecked")
     private String refreshAccessToken(EmailAccount account, String plainRefreshToken) throws IOException {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+        SsrfValidator.ValidatedTarget target = SsrfValidator.validate(GOOGLE_TOKEN_URL);
+        if (target == null) {
+            throw new IOException("Google token endpoint could not be resolved: " + GOOGLE_TOKEN_URL);
+        }
 
-        MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
-        body.add("client_id",     gmailApiConfig.getClientId());
-        body.add("client_secret", gmailApiConfig.getClientSecret());
-        body.add("refresh_token", plainRefreshToken);
-        body.add("grant_type",    "refresh_token");
+        Map<String, String> form = new LinkedHashMap<>();
+        form.put("client_id",     gmailApiConfig.getClientId());
+        form.put("client_secret", gmailApiConfig.getClientSecret());
+        form.put("refresh_token", plainRefreshToken);
+        form.put("grant_type",    "refresh_token");
 
-        Map<String, Object> response = restTemplate.postForObject(
-                GOOGLE_TOKEN_URL,
-                new HttpEntity<>(body, headers),
-                Map.class);
+        HttpRequest request = PinnedHttpRequests.newPinnedRequestBuilder(target)
+                .timeout(Duration.ofSeconds(30))
+                .header("Content-Type", "application/x-www-form-urlencoded")
+                .POST(HttpRequest.BodyPublishers.ofString(
+                        encodeForm(form), StandardCharsets.UTF_8))
+                .build();
+
+        Map<String, Object> response;
+        try {
+            HttpResponse<String> httpResponse = PINNED_HTTP_CLIENT.send(
+                    request, HttpResponse.BodyHandlers.ofString());
+            if (httpResponse.statusCode() >= 400) {
+                throw new IOException("Google token refresh failed: status="
+                        + httpResponse.statusCode() + ", body=" + httpResponse.body());
+            }
+            response = OBJECT_MAPPER.readValue(httpResponse.body(), Map.class);
+        } catch (IOException ioe) {
+            throw ioe;
+        } catch (Exception e) {
+            throw new IOException("Google token refresh call failed: " + e.getMessage(), e);
+        }
 
         if (response == null) {
             throw new IOException("Empty response from Google token refresh endpoint");
@@ -267,5 +313,23 @@ public class GmailApiClient {
 
         log.info("Access token refreshed for account {}, expires at {}", account.getId(), newExpiry);
         return newAccessToken;
+    }
+
+    /**
+     * URL-encode a form as {@code k1=v1&k2=v2}. Mirrors Spring's
+     * {@code application/x-www-form-urlencoded} serialization but avoids the
+     * RestTemplate dependency entirely.
+     */
+    private static String encodeForm(Map<String, String> form) {
+        StringBuilder sb = new StringBuilder();
+        for (Map.Entry<String, String> entry : form.entrySet()) {
+            if (sb.length() > 0) sb.append('&');
+            sb.append(URLEncoder.encode(entry.getKey(), StandardCharsets.UTF_8))
+                    .append('=')
+                    .append(URLEncoder.encode(
+                            entry.getValue() == null ? "" : entry.getValue(),
+                            StandardCharsets.UTF_8));
+        }
+        return sb.toString();
     }
 }
