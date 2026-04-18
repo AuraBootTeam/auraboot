@@ -1,14 +1,15 @@
-import React, { useEffect, useState, Suspense } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router';
 import Header from '~/routes/Header';
 import LeftSidebar from '~/routes/LeftSidebar';
 import PageContent from '~/routes/PageContent';
 import { useAuraBot } from '~/plugins/core-aurabot/components-shell/AuraBotProvider';
 import { recordVisit } from '~/plugins/core-dashboard/widgets/workbench/useRecentVisits';
-
-const AuraBotPanel = React.lazy(() =>
-  import('~/plugins/core-aurabot/components-shell/AuraBotPanel').then((m) => ({ default: m.AuraBotPanel })),
-);
+// Eagerly import AuraBotPanel (non-lazy) — the panel is small, always needed
+// for logged-in users, and lazy loading caused a race in dev mode where the
+// chunk had not finished transpiling when the user clicked the toggle,
+// leaving the panel invisible after the first click. See GAP-262.
+import { AuraBotPanel } from '~/plugins/core-aurabot/components-shell/AuraBotPanel';
 
 export default function DefaultLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -43,11 +44,7 @@ export default function DefaultLayout() {
           <PageContent />
         </div>
 
-        {aiPanelOpen && (
-          <Suspense fallback={<div className="w-96 animate-pulse bg-gray-100 dark:bg-gray-800" />}>
-            <AuraBotPanel />
-          </Suspense>
-        )}
+        {aiPanelOpen && <AuraBotPanel />}
       </div>
 
       {/* Feedback floating button — temporarily hidden */}
