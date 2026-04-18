@@ -1,11 +1,11 @@
 package com.auraboot.framework.agent.service;
 
+import com.auraboot.framework.agent.util.ContractYamlParser;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -45,14 +45,14 @@ public class ShadowEligibilityChecker {
     /** Exposed for testing callers that already have the YAML. */
     public Eligibility classify(Long tenantId, String yaml) {
         if (yaml == null) return Eligibility.INELIGIBLE_NO_DRY_RUN_SUPPORT;
-        String substrate = parseLine(yaml, "substrate:");
-        String actionType = parseLine(yaml, "action_type:");
+        String substrate = ContractYamlParser.parseScalar(yaml, "substrate");
+        String actionType = ContractYamlParser.parseScalar(yaml, "action_type");
 
         if (isReadAction(actionType)) return Eligibility.ELIGIBLE_DIRECT;
         if ("prompt".equals(substrate)) return Eligibility.ELIGIBLE_DIRECT;
         if ("code".equals(substrate)) return Eligibility.INELIGIBLE_CODE_SIDE_EFFECT_UNKNOWN;
 
-        List<String> toolRefs = parseToolRefs(yaml);
+        List<String> toolRefs = ContractYamlParser.parseToolRefs(yaml);
         if (toolRefs.isEmpty()) {
             // Write substrate with no tool_refs declared — can't verify safety.
             return Eligibility.INELIGIBLE_NO_DRY_RUN_SUPPORT;
@@ -79,29 +79,4 @@ public class ShadowEligibilityChecker {
         };
     }
 
-    private String parseLine(String yaml, String prefix) {
-        for (String line : yaml.split("\n")) {
-            String t = line.trim();
-            if (t.startsWith(prefix)) {
-                return t.substring(prefix.length()).trim();
-            }
-        }
-        return null;
-    }
-
-    private List<String> parseToolRefs(String yaml) {
-        List<String> out = new ArrayList<>();
-        boolean inBlock = false;
-        for (String line : yaml.split("\n")) {
-            if (line.startsWith("tool_refs:")) { inBlock = true; continue; }
-            if (!inBlock) continue;
-            // End of block when we hit a non-indented non-blank line
-            if (!line.isEmpty() && !Character.isWhitespace(line.charAt(0))) break;
-            String t = line.trim();
-            if (t.startsWith("- ")) {
-                out.add(t.substring(2).trim());
-            }
-        }
-        return out;
-    }
 }

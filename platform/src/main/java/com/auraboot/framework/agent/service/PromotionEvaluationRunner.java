@@ -21,11 +21,18 @@ import java.util.List;
  * This runner only batches the work — it doesn't duplicate evaluation
  * logic. Disabled by default; flip {@code acp.learning.promotion.scheduler.enabled}
  * to true once Shadow Mode is generating steady traffic.
+ *
+ * <p><b>Multi-node safety:</b> guarded by Postgres advisory lock
+ * {@value #LOCK_KEY}. Distinct from {@link ShadowRunScheduler} (7301) so
+ * the two schedulers never contend.
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class PromotionEvaluationRunner {
+
+    /** Advisory-lock key; documented at class level. Distinct from ShadowRunScheduler (7301). */
+    private static final long LOCK_KEY = 7302L;
 
     private final JdbcTemplate jdbcTemplate;
     private final PromotionEvaluator evaluator;
@@ -47,6 +54,20 @@ public class PromotionEvaluationRunner {
 
     /** Returns the number of drafts evaluated in this pass. */
     public int runOnce() {
+        Boolean acquired = jdbcTemplate.queryForObject(
+                "SELECT pg_try_advisory_lock(?)", Boolean.class, LOCK_KEY);
+        if (!Boolean.TRUE.equals(acquired)) {
+            log.debug("PromotionEvaluationRunner: another instance holds advisory lock {}, skipping tick", LOCK_KEY);
+            return 0;
+        }
+        try {
+            return runOnceLocked();
+        } finally {
+            jdbcTemplate.queryForObject("SELECT pg_advisory_unlock(?)", Boolean.class, LOCK_KEY);
+        }
+    }
+
+    private int runOnceLocked() {
         List<String> draftPids = jdbcTemplate.queryForList(
                 "SELECT pid FROM ab_agent_skill_draft " +
                         "WHERE status IN ('REVIEWED_OK', 'SHADOW_RUNNING') " +
