@@ -352,6 +352,7 @@ export const TreeSelect = forwardRef<HTMLDivElement, TreeSelectProps>(
       return (
         <div key={node.key}>
           <div
+            data-testid={`tree-select-option-${node.value}`}
             className={clsx(
               'flex cursor-pointer items-center px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-600',
               isSelected && canSelect && 'bg-blue-50 dark:bg-blue-900',
@@ -436,8 +437,13 @@ export const TreeSelect = forwardRef<HTMLDivElement, TreeSelectProps>(
     const filteredTreeData = filterTreeData(treeData, searchValue);
 
     const selectElement = (
-      <div className={clsx('relative', inline ? 'flex-1' : 'w-full')} ref={dropdownRef}>
+      <div
+        className={clsx('relative', inline ? 'flex-1' : 'w-full')}
+        ref={dropdownRef}
+        data-testid={`tree-select-${name}`}
+      >
         <div
+          data-testid="tree-select-trigger"
           className={clsx(
             baseStyles,
             sizeStyles[size],
@@ -456,6 +462,7 @@ export const TreeSelect = forwardRef<HTMLDivElement, TreeSelectProps>(
             {clearable && hasValue && !readOnly && (
               <button
                 type="button"
+                data-testid="tree-select-clear"
                 onClick={(e) => {
                   e.stopPropagation();
                   handleClear();
@@ -490,12 +497,16 @@ export const TreeSelect = forwardRef<HTMLDivElement, TreeSelectProps>(
         </div>
 
         {isOpen && (
-          <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-300 bg-white shadow-lg dark:border-gray-600 dark:bg-gray-700">
+          <div
+            data-testid="tree-select-popup"
+            className="absolute z-10 mt-1 w-full rounded-lg border border-gray-300 bg-white shadow-lg dark:border-gray-600 dark:bg-gray-700"
+          >
             {searchable && (
               <div className="border-b border-gray-200 p-2 dark:border-gray-600">
                 <input
                   ref={searchInputRef}
                   type="text"
+                  data-testid="tree-select-search-input"
                   placeholder={st('搜索...')}
                   value={searchValue}
                   onChange={(e) => handleSearch(e.target.value)}

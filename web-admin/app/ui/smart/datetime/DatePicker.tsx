@@ -160,6 +160,7 @@ export const DatePicker = forwardRef<HTMLInputElement, DatePickerProps>(
             {showToday && (
               <FieldActionButton
                 type="button"
+                data-testid="date-picker-today"
                 onClick={handleTodayClick}
                 disabled={disabledValue}
                 size="md"
@@ -169,7 +170,12 @@ export const DatePicker = forwardRef<HTMLInputElement, DatePickerProps>(
               </FieldActionButton>
             )}
             {clearable && field.value && !disabledValue && (
-              <FieldActionButton type="button" onClick={handleClearClick} iconOnly>
+              <FieldActionButton
+                type="button"
+                data-testid="date-picker-clear"
+                onClick={handleClearClick}
+                iconOnly
+              >
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
                     strokeLinecap="round"
@@ -188,6 +194,7 @@ export const DatePicker = forwardRef<HTMLInputElement, DatePickerProps>(
           type={dateType}
           id={name}
           name={name}
+          data-testid={`date-picker-input-${name}`}
           value={field.value || ''}
           placeholder={placeholderText}
           disabled={disabledValue}
