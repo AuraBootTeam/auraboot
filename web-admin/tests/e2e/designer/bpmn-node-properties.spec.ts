@@ -978,39 +978,23 @@ test.describe('BPMN Node Properties — Full Coverage', () => {
   });
 
   // =========================================================================
-  // RT-01: ReceiveTask — edit messageRef + messageType + verify
+  // RT-01: ReceiveTask — messageRef + messageType are surfaced disabled
+  //   GAP-252: SmartEngine has no <bpmn:message> parser/correlation. The fields
+  //   remain rendered (for future support) but disabled + readOnly with a
+  //   concrete hint. Asserting the disabled contract prevents silent re-enable.
   // =========================================================================
-  test('RT-01: ReceiveTask — edit messageRef + messageType + verify persistence', async ({ page }) => {
+  test('RT-01: ReceiveTask — messageRef + messageType disabled with unsupported hint', async ({ page }) => {
     await gotoDesigner(page);
     await selectNodeByLabel(page, /WaitMsg/);
 
     const propPanel = page.locator('.w-80.border-l').first();
-    const allTextInputs = propPanel.locator('input[type="text"]');
-    const inputCount = await allTextInputs.count();
-    expect(inputCount, 'ReceiveTask should have at least 3 text inputs').toBeGreaterThanOrEqual(3);
+    const msgRef = propPanel.locator('[data-testid="receivetask-messageRef"]');
+    const msgType = propPanel.locator('[data-testid="receivetask-messageType"]');
 
-    // MessageRef = 2nd input (index 1), MessageType = 3rd input (index 2)
-    const msgRefValue = `msg_ref_${UID}`;
-    const msgTypeValue = `payment_received`;
-
-    await reactFillNthInput(page, 1, msgRefValue);
-    await reactFillNthInput(page, 2, msgTypeValue);
-
-    // Verify edits took effect
-    expect(await getNthInputValue(page, 1)).toBe(msgRefValue);
-    expect(await getNthInputValue(page, 2)).toBe(msgTypeValue);
-
-    await saveProcess(page);
-
-    // Verify persistence via API
-    await verifyPersistedValue(page, 'rt1',
-      (data) => data.data?.config?.messageRef === msgRefValue,
-      `MessageRef should persist as ${msgRefValue}`,
-    );
-    await verifyPersistedValue(page, 'rt1',
-      (data) => data.data?.config?.messageType === msgTypeValue,
-      `MessageType should persist as ${msgTypeValue}`,
-    );
+    await expect(msgRef).toBeVisible();
+    await expect(msgRef).toBeDisabled();
+    await expect(msgType).toBeVisible();
+    await expect(msgType).toBeDisabled();
   });
 
   // =========================================================================
@@ -1358,39 +1342,20 @@ test.describe('BPMN Node Properties — Full Coverage', () => {
     }
   });
 
-  // IG-03: InclusiveGateway — completion condition textarea visible (enterprise)
-  test('IG-03: InclusiveGateway — completion condition field', async ({ page }) => {
+  // IG-03: InclusiveGateway — completion condition surfaced disabled
+  //   GAP-252: SmartEngine InclusiveGatewayParser does not read <completionCondition>
+  //   and InclusiveGatewayBehavior has no threshold logic (GAP-253 fixed only the
+  //   ClassCast on the join path). Field remains rendered but disabled with a
+  //   concrete hint; enabling requires SmartEngine runtime support.
+  test('IG-03: InclusiveGateway — completion condition disabled with unsupported hint', async ({ page }) => {
     await gotoDesigner(page);
     await selectNodeByLabel(page, /IncGateway/);
 
     const propPanel = page.locator('.w-80.border-l').first();
-    const textareas = propPanel.locator('textarea');
-    const textareaCount = await textareas.count();
+    const completion = propPanel.locator('[data-testid="inclusivegateway-completionCondition"]');
 
-    // Description textarea is always at index 0
-    // Enterprise may have a second textarea for completion condition
-    if (textareaCount >= 2) {
-      const conditionTextarea = textareas.nth(1);
-      await conditionTextarea.scrollIntoViewIfNeeded();
-      await expect(conditionTextarea).toBeVisible({ timeout: 3_000 });
-
-      const testCondition = `\${nrOfCompletedInstances >= 1}`;
-      await reactFillNthTextarea(page, 1, testCondition);
-
-      const afterEdit = await getNthTextareaValue(page, 1);
-      expect(afterEdit).toBe(testCondition);
-
-      await saveProcess(page);
-
-      // Verify persistence via API
-      await verifyPersistedValue(page, 'igw1',
-        (data) => data.data?.config?.completionCondition === testCondition,
-        `Completion condition should persist as ${testCondition}`,
-      );
-    } else {
-      // Core version: only description textarea, completion condition not available
-      expect(textareaCount, 'InclusiveGateway should have at least description textarea').toBeGreaterThanOrEqual(1);
-    }
+    await expect(completion).toBeVisible();
+    await expect(completion).toBeDisabled();
   });
 
   // =========================================================================
