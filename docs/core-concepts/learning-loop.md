@@ -218,3 +218,16 @@ every remaining entry call in `CompletionPhase` and `PostExecutionPhase`:
   snapshot, and postActions (including BPM `start_process` which triggers
   SmartEngine task listeners that are easy to refactor into non-JDBC
   emissions). The gate is defensive rather than currently required.
+
+### Schema migration notes (PR-63)
+
+The PR-55 tenant_id NOT NULL migration originally ran an unconditional
+`DELETE FROM ab_agent_skill_draft WHERE tenant_id IS NULL` every boot.
+PR-63 wrapped it (and the companion `ab_agent_shadow_run` dedup purge)
+in a PL/pgSQL `DO` block that counts candidate rows first, emits a
+`RAISE NOTICE` with the row count when there is something to purge, and
+skips the `DELETE` entirely otherwise. The guarded block is safe to
+re-run on every boot — no NULL rows means no delete, so developer
+test data inserted via manual `psql` is no longer silently dropped on
+the next restart. The follow-up `ALTER COLUMN ... SET NOT NULL` is
+intrinsically idempotent and needs no guard.
