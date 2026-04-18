@@ -65,6 +65,7 @@ public class BifRecorder {
             putJson(row, "candidate_skills", bif.getCandidateSkills());
             putJson(row, "explanation", bif.getExplanation());
             putJson(row, "confidence", toConfidenceMap(bif.getConfidence()));
+            putJson(row, "pre_context", bif.getPreContext());
 
             row.put("schema_version", 1);
             row.put("created_at", LocalDateTime.now());

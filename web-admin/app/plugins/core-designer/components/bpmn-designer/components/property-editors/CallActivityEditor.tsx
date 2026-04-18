@@ -19,12 +19,14 @@ function VariableMappingTable({
   onChange,
   sourcePlaceholder,
   targetPlaceholder,
+  testIdPrefix,
 }: {
   label: string;
   mappings: Record<string, string>;
   onChange: (mappings: Record<string, string>) => void;
   sourcePlaceholder: string;
   targetPlaceholder: string;
+  testIdPrefix: string;
 }) {
   const { t } = useI18n();
   const rows: VariableMappingRow[] = Object.entries(mappings).map(([source, target]) => ({
@@ -63,7 +65,7 @@ function VariableMappingTable({
       {rows.length > 0 && (
         <div className="space-y-1">
           {rows.map((row, index) => (
-            <div key={index} className="flex items-center gap-1">
+            <div key={index} className="flex items-center gap-1" data-testid={`${testIdPrefix}-row-${index}`}>
               <input
                 type="text"
                 value={row.source}
@@ -94,6 +96,7 @@ function VariableMappingTable({
         type="button"
         onClick={addRow}
         className="mt-1 text-xs text-blue-600 hover:text-blue-800"
+        data-testid={`${testIdPrefix}-add`}
       >
         {t('bpmn.callactivity.addMapping')}
       </button>
@@ -136,7 +139,7 @@ export function CallActivityEditor({
         />
       </div>
 
-      <div className="mb-4">
+      <div className="mb-4" data-testid="callactivity-process-key">
         <label className="mb-1 block text-sm font-medium text-gray-700">{t('bpmn.callactivity.calledProcess')}</label>
         <ProcessPicker
           value={config?.calledProcessKey || ''}
@@ -151,6 +154,7 @@ export function CallActivityEditor({
           value={config?.calledProcessVersion || 'latest'}
           onChange={(e) => handleChange('calledProcessVersion', e.target.value)}
           className="w-full rounded-md border border-gray-300 px-3 py-2"
+          data-testid="callactivity-version-mode"
         >
           <option value="latest">{t('bpmn.callactivity.versionLatest')}</option>
           <option value="fixed">{t('bpmn.callactivity.versionFixed')}</option>
@@ -184,6 +188,7 @@ export function CallActivityEditor({
               onChange={(inputMappings) => handleChange('inputMappings', inputMappings)}
               sourcePlaceholder={t('bpmn.callactivity.parentVariable')}
               targetPlaceholder={t('bpmn.callactivity.childVariable')}
+              testIdPrefix="callactivity-input"
             />
             <VariableMappingTable
               label={t('bpmn.callactivity.outputMapping')}
@@ -191,6 +196,7 @@ export function CallActivityEditor({
               onChange={(outputMappings) => handleChange('outputMappings', outputMappings)}
               sourcePlaceholder={t('bpmn.callactivity.childVariable')}
               targetPlaceholder={t('bpmn.callactivity.parentVariable')}
+              testIdPrefix="callactivity-output"
             />
           </div>
         )}

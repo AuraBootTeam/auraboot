@@ -405,6 +405,7 @@
 
   { "key": "bpmn.prop.receivetask.messageRef", "zh-CN": "消息引用", "en-US": "Message Reference", "source": "import", "refType": "ui" },
   { "key": "bpmn.prop.receivetask.messageType", "zh-CN": "消息类型", "en-US": "Message Type", "source": "import", "refType": "ui" },
+  { "key": "bpmn.prop.common.unsupportedHint", "zh-CN": "运行时暂未支持，配置将被忽略", "en-US": "Not yet supported at runtime; configuration will be ignored", "source": "import", "refType": "ui" },
 
   { "key": "bpmn.prop.startevent.initiator", "zh-CN": "发起人变量名", "en-US": "Initiator Variable", "source": "import", "refType": "ui" },
   { "key": "bpmn.prop.startevent.formKey", "zh-CN": "启动表单", "en-US": "Start Form", "source": "import", "refType": "ui" },

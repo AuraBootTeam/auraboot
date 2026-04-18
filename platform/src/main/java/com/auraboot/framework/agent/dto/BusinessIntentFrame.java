@@ -48,4 +48,9 @@ public class BusinessIntentFrame {
 
     // explanation (for HITL trust)
     private Map<String, String> explanation;
+
+    // v1.1 Active Memory pre-recall (memory-lifecycle.md §4). Snippets retrieved
+    // from ab_agent_memory before emitting the BIF — gives downstream LLM access
+    // to user preferences / prior decisions without extra round-trips.
+    private List<Map<String, Object>> preContext;
 }
