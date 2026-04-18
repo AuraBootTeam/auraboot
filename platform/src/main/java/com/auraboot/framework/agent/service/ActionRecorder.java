@@ -175,8 +175,9 @@ public class ActionRecorder {
             row.put("executed_at", LocalDateTime.now());
             row.put("created_at", LocalDateTime.now());
 
-            // v1.1 Action Contract (specs/01 §1.3) — reads are always full-fidelity (SQL).
-            row.put("fidelity", FidelityGrader.FIDELITY_FULL);
+            // v1.1 Action Contract (specs/01 §1.3) — reads grade as semantic:
+            // no side effect → no before/after diff to reconstruct.
+            row.put("fidelity", fidelityGrader.grade(toolDef != null ? toolDef.getToolType() : "dsl_query"));
             if (toolDef != null) {
                 row.put("tool_ref", toolDef.getName());
             }

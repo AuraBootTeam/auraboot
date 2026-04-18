@@ -121,7 +121,8 @@ public class GroundingService {
         if (activeMemoryService != null) {
             try {
                 String userId = context != null ? context.getUserId() : null;
-                preContext = activeMemoryService.preRecall(tenantId, userId, userMessage);
+                String agentCode = context != null ? context.getAgentCode() : null;
+                preContext = activeMemoryService.preRecall(tenantId, userId, agentCode, userMessage);
             } catch (Exception e) {
                 log.debug("Active Memory pre-recall failed, continuing without preContext: {}", e.getMessage());
             }
@@ -220,5 +221,12 @@ public class GroundingService {
         private String sessionId;
         /** User id (stringified) — required for Active Memory user-scoped recall. */
         private String userId;
+        /**
+         * Agent code that owns memories in {@code ab_agent_memory}. Defaults to
+         * "aurabot" when null so the built-in chat path keeps working. ACP
+         * chat routes MUST set this to their own agent_code or they will
+         * inadvertently read aurabot's memories.
+         */
+        private String agentCode;
     }
 }

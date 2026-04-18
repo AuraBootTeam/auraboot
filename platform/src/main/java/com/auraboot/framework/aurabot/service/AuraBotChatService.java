@@ -285,6 +285,7 @@ public class AuraBotChatService {
                         .conversationId(request.getSessionId())
                         .sessionId(request.getSessionId())
                         .userId(userIdForGrounding == null ? null : userIdForGrounding.toString())
+                        .agentCode(com.auraboot.framework.agent.service.ActiveMemoryService.DEFAULT_AGENT)
                         .build();
                 bif = groundingService.ground(tenantId, request.getMessage(), gctx);
                 tools = applyCandidateSkillsMode(tools, bif);

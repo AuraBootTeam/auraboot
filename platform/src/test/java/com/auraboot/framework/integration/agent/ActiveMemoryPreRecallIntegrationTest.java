@@ -157,9 +157,20 @@ class ActiveMemoryPreRecallIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("grounding tolerates null userId (cron/system caller) — no crash, no preContext")
+    @DisplayName("grounding tolerates null userId — sees tenant row but NOT dirty scope_key='' rows")
     void grounding_tolerates_null_user() {
         memory.createScopedMemory(tenantId, agent, "fact", "agent", "t1", "tenant t1", 7, false, "tenant", null);
+
+        // Dirty row: an upstream-bug insert with scope='user' and scope_key='' MUST NOT
+        // match a null/system caller (regression pin for M1).
+        jdbc.update("INSERT INTO ab_agent_memory " +
+                "(pid, tenant_id, memory_agent_id, memory_type, category, " +
+                " memory_title, memory_content, importance, shareable, " +
+                " scope, scope_key, created_at, updated_at, deleted_flag) " +
+                "VALUES (?, ?, ?, 'fact', 'agent', 'dirty', 'dirty null-user', 9, FALSE, " +
+                " 'user', '', NOW(), NOW(), FALSE)",
+                com.auraboot.framework.common.util.UniqueIdGenerator.generate(),
+                tenantId, agent);
 
         GroundingService.GroundingContext ctx = GroundingService.GroundingContext.builder()
                 .pageModel("crm_lead")
@@ -168,7 +179,29 @@ class ActiveMemoryPreRecallIntegrationTest extends BaseIntegrationTest {
 
         BusinessIntentFrame bif = groundingService.ground(tenantId, "query leads", ctx);
         assertThat(bif).isNotNull();
-        // Tenant-scoped row should still show up because tenant filter matches regardless of userId.
+        // Tenant-scoped row visible.
         assertThat(bif.getPreContext()).extracting(s -> s.get("title")).contains("t1");
+        // Dirty empty-scope_key row is NOT visible.
+        assertThat(bif.getPreContext()).extracting(s -> s.get("title")).doesNotContain("dirty");
+    }
+
+    @Test
+    @DisplayName("preRecall with explicit agentCode reads that agent's bucket (not default aurabot)")
+    void preRecall_honors_explicit_agent_code() {
+        String customAgent = "crm_ops_" + System.nanoTime();
+        memory.createScopedMemory(tenantId, customAgent, "fact", "agent",
+                "custom-only", "only crm_ops knows this", 8, false, "tenant", null);
+        // aurabot bucket is separate — no row.
+
+        List<Map<String, Object>> aurabotSnippets =
+                activeMemory.preRecall(tenantId, userId, "aurabot", "custom");
+        List<Map<String, Object>> customSnippets =
+                activeMemory.preRecall(tenantId, userId, customAgent, "custom");
+
+        assertThat(aurabotSnippets).extracting(s -> s.get("title")).doesNotContain("custom-only");
+        assertThat(customSnippets).extracting(s -> s.get("title")).contains("custom-only");
+
+        // cleanup this custom agent's rows (not caught by the shared "aurabot" cleanup)
+        jdbc.update("DELETE FROM ab_agent_memory WHERE memory_agent_id = ?", customAgent);
     }
 }
