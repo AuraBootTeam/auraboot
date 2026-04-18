@@ -48,7 +48,21 @@ public class AgentApprovalGateService {
     public String checkAndRequestApproval(Long tenantId, String runId, String taskId,
                                            String toolCode, String toolDescription,
                                            Map<String, Object> requestData, boolean toolRequiresApproval) {
-        if (!toolRequiresApproval && !matchesAnyPolicy(tenantId, toolCode, requestData)) {
+        // P0 fix: findMatchingPolicy 统一替代原 matchesAnyPolicy + resolveTimeoutFromPolicy；
+        // 一次 SQL 既做 match 判定又拿 policy_id，避免 approval 创建后 policy_id=null 导致 fail-open。
+        PolicyMatch matched = findMatchingPolicy(tenantId, toolCode, requestData);
+        if (!toolRequiresApproval && matched == null) {
+            return null;
+        }
+        if (toolRequiresApproval && matched == null) {
+            // Fail-secure：tool 要求审批但 tenant 未配置匹配的 policy → 拒绝创建 approval。
+            // 这会让调用方（CommandPipeline / SkillEngine）把 run 标失败，强制 tenant 补齐 policy。
+            // 理由：policy_id=null 的 approval 谁能批？之前的 fail-open 允许任意 tenant 用户批是严重漏洞。
+            log.error("Tool requires approval but no matching approval policy configured. " +
+                            "Refusing to create approval (fail-secure). tenant={}, tool={}, run={}. " +
+                            "Action: tenant admin must configure an ab_approval_policy with a tool_call " +
+                            "trigger_rule matching this tool.",
+                    tenantId, toolCode, runId);
             return null;
         }
 
@@ -66,12 +80,14 @@ public class AgentApprovalGateService {
             return existingPid;
         }
 
-        // Resolve timeout configuration from the matching policy (or use defaults)
-        PolicyTimeout policyTimeout = resolveTimeoutFromPolicy(tenantId, toolCode, requestData);
-
         try {
             String approvalPid = UniqueIdGenerator.generate();
             LocalDateTime now = LocalDateTime.now();
+            // P0 fix: plan_hash 从 canonical(request_data) 计算；审批通过后执行前必须 re-validate，
+            // 防止 approval 创建后有人篡改 request_data 字段。
+            String requestDataJson = objectMapper.writeValueAsString(requestData);
+            String planHash = sha256Hex(canonicalizeJson(requestDataJson));
+
             Map<String, Object> approval = new HashMap<>();
             approval.put("pid", approvalPid);
             approval.put("tenant_id", tenantId);
@@ -80,19 +96,23 @@ public class AgentApprovalGateService {
             approval.put("approval_type", "tool_call");
             approval.put("approval_title", "Agent requests approval: " + toolDescription);
             approval.put("approval_description", "Tool: " + toolCode);
-            approval.put("request_data", objectMapper.writeValueAsString(requestData));
+            approval.put("request_data", requestDataJson);
             approval.put("approval_status", "pending");
             approval.put("approval_subject_type", "action");
             approval.put("revalidate_policy", "none");
-            approval.put("expires_at", now.plusHours(policyTimeout.timeoutHours));
-            approval.put("auto_action", policyTimeout.autoAction);
+            approval.put("expires_at", now.plusHours(matched.timeoutHours()));
+            approval.put("auto_action", matched.autoAction());
             approval.put("idempotency_key", idempotencyKey);
+            approval.put("policy_id", matched.policyId());      // P0 fix: 必须写，否则 isAuthorizedApprover 无法判定
+            approval.put("plan_hash", planHash);                // P0 fix: 冻结 plan
+            approval.put("plan_snapshot", requestDataJson);     // HITL 展示用
             approval.put("created_at", now);
             approval.put("updated_at", now);
 
             dynamicDataMapper.insert("ab_agent_approval", approval);
-            log.info("Approval requested: pid={}, tool={}, key={}, expires_at=+{}h, auto_action={}",
-                    approvalPid, toolCode, idempotencyKey, policyTimeout.timeoutHours, policyTimeout.autoAction);
+            log.info("Approval requested: pid={}, tool={}, key={}, policy={}, plan_hash={}, expires_at=+{}h",
+                    approvalPid, toolCode, idempotencyKey, matched.policyId(),
+                    planHash.substring(0, 12), matched.timeoutHours());
             return approvalPid;
         } catch (Exception e) {
             log.error("Failed to create approval request: {}", e.getMessage(), e);
@@ -100,16 +120,21 @@ public class AgentApprovalGateService {
         }
     }
 
-    /** Immutable holder for resolved policy timeout configuration. */
-    private record PolicyTimeout(int timeoutHours, String autoAction) {}
+    /** Immutable holder for a matched policy — used for both timeout and policy_id linkage. */
+    private record PolicyMatch(String policyId, int timeoutHours, String autoAction) {}
 
     /**
-     * Resolve timeout_hours and timeout_action from the first matching active policy.
-     * Falls back to 24 hours / REJECT when no policy matches or fields are null.
+     * Find the first matching active approval policy for (tenant, toolCode, requestData).
+     * Returns {@code null} when no policy matches. Caller decides fail-secure behavior
+     * (e.g., refuse to create approval if tool requires approval but no policy matches).
+     * <p>
+     * P0 fix: returns the policy_id along with timeout so the approval row is correctly
+     * linked. Previously {@code resolveTimeoutFromPolicy} dropped policy_id, causing
+     * {@code isAuthorizedApprover} to see {@code policy_id=null} and fall open.
      */
-    private PolicyTimeout resolveTimeoutFromPolicy(Long tenantId, String toolCode,
-                                                    Map<String, Object> requestData) {
-        String sql = "SELECT trigger_rules, timeout_hours, timeout_action " +
+    private PolicyMatch findMatchingPolicy(Long tenantId, String toolCode,
+                                            Map<String, Object> requestData) {
+        String sql = "SELECT pid, trigger_rules, timeout_hours, timeout_action " +
                 "FROM ab_approval_policy WHERE tenant_id = #{params.tenantId} " +
                 "AND policy_status = 'active' AND deleted_flag = FALSE";
         List<Map<String, Object>> policies = dynamicDataMapper.selectByQuery(sql, Map.of("tenantId", tenantId));
@@ -131,7 +156,7 @@ public class AgentApprovalGateService {
                         }
                     } else if ("cost_threshold".equals(type)) {
                         double threshold = ((Number) rule.getOrDefault("threshold", 0)).doubleValue();
-                        double estimatedCost = requestData.containsKey("estimated_cost")
+                        double estimatedCost = requestData != null && requestData.containsKey("estimated_cost")
                                 ? ((Number) requestData.get("estimated_cost")).doubleValue() : 0;
                         if (estimatedCost > threshold) {
                             matched = true;
@@ -144,15 +169,47 @@ public class AgentApprovalGateService {
                             ? ((Number) policy.get("timeout_hours")).intValue() : 24;
                     String autoAction = policy.get("timeout_action") != null
                             ? (String) policy.get("timeout_action") : "reject";
-                    return new PolicyTimeout(timeoutHours, autoAction);
+                    return new PolicyMatch(
+                            (String) policy.get("pid"),
+                            timeoutHours,
+                            autoAction);
                 }
             } catch (Exception e) {
-                log.warn("Failed to parse trigger rules while resolving timeout: {}", e.getMessage());
+                log.warn("Failed to parse trigger rules while resolving policy: {}", e.getMessage());
             }
         }
+        return null;
+    }
 
-        // No matching policy — apply conservative defaults
-        return new PolicyTimeout(24, "reject");
+    /** SHA-256 hex digest of input string (UTF-8). Used for plan_hash. */
+    private static String sha256Hex(String s) {
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] digest = md.digest(s.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder(digest.length * 2);
+            for (byte b : digest) sb.append(String.format("%02x", b));
+            return sb.toString();
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 unavailable", e);
+        }
+    }
+
+    /**
+     * Canonicalize a JSON string so logically equal payloads produce the same hash.
+     * Parses → sorts object keys recursively → re-serializes.
+     */
+    private String canonicalizeJson(String json) {
+        if (json == null || json.isBlank()) return "";
+        try {
+            Object tree = objectMapper.readValue(json, Object.class);
+            return objectMapper.writerWithDefaultPrettyPrinter()
+                    .with(com.fasterxml.jackson.databind.SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)
+                    .writeValueAsString(tree);
+        } catch (Exception e) {
+            // If we can't parse, fall back to raw string. Better than crashing; plan_hash
+            // will still be stable for byte-identical payloads.
+            return json;
+        }
     }
 
     public boolean isApproved(String approvalPid) {
@@ -197,9 +254,12 @@ public class AgentApprovalGateService {
         }
 
         String policyId = (String) approvalRows.get(0).get("policy_id");
+        // P0 fix: 三处 fail-open 全部改 fail-secure。policy_id=null / 缺失 / rules 空
+        // 一律 deny；tenant 必须显式配置可批审人白名单。
         if (policyId == null || policyId.isBlank()) {
-            // No policy linked — any authenticated tenant user may act
-            return true;
+            log.error("Approval {} has no policy_id. Rejecting all approve attempts (fail-secure). " +
+                    "Action: tenant admin must link this approval to an ab_approval_policy.", approvalPid);
+            return false;
         }
 
         // Load the policy's approver_rules
@@ -208,22 +268,26 @@ public class AgentApprovalGateService {
         List<Map<String, Object>> policyRows = dynamicDataMapper.selectByQuery(
                 policySql, Map.of("policyId", policyId, "tenantId", tenantId));
         if (policyRows.isEmpty() || policyRows.get(0) == null) {
-            // Policy not found — fall through and allow (policy was deleted after approval creation)
-            log.warn("Approval {} references missing policy {}; allowing any authenticated user", approvalPid, policyId);
-            return true;
+            log.error("Approval {} references missing/deleted policy {}. Rejecting (fail-secure). " +
+                    "Action: restore policy or reject this approval manually.",
+                    approvalPid, policyId);
+            return false;
         }
 
         String approverRulesJson = (String) policyRows.get(0).get("approver_rules");
         if (approverRulesJson == null || approverRulesJson.isBlank()) {
-            // Policy exists but has no approver rules — allow any
-            return true;
+            log.error("Policy {} has no approver_rules configured. Rejecting (fail-secure). " +
+                    "Action: tenant admin must define approver_rules JSONB on this policy.",
+                    policyId);
+            return false;
         }
 
         try {
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> rules = objectMapper.readValue(approverRulesJson, List.class);
             if (rules == null || rules.isEmpty()) {
-                return true;
+                log.error("Policy {} approver_rules is empty array. Rejecting (fail-secure).", policyId);
+                return false;
             }
             return evaluateApproverRules(tenantId, userId, rules);
         } catch (Exception e) {
@@ -231,6 +295,37 @@ public class AgentApprovalGateService {
             // Fail-secure: if we cannot parse the rules, deny access
             return false;
         }
+    }
+
+    /**
+     * Validate that the stored request_data still matches the plan_hash captured at
+     * approval creation time. Guards against post-approval tampering of the row.
+     *
+     * @return {@code true} if hash matches or no hash was recorded (legacy approvals);
+     *         {@code false} if tampering is detected.
+     */
+    public boolean validatePlanIntegrity(Map<String, Object> approval) {
+        if (approval == null) return false;
+        String storedHash = (String) approval.get("plan_hash");
+        if (storedHash == null || storedHash.isBlank()) {
+            // Legacy approval created before the plan_hash column existed.
+            // Log at WARN so ops can identify and remediate.
+            log.warn("Approval {} has no plan_hash (pre-v2 legacy row). Integrity check skipped.",
+                    approval.get("pid"));
+            return true;
+        }
+        String requestDataJson = (String) approval.get("request_data");
+        String recomputed = sha256Hex(canonicalizeJson(requestDataJson));
+        if (!storedHash.equals(recomputed)) {
+            log.error("Plan integrity check FAILED: approval={} stored_hash={} recomputed={}. " +
+                    "Someone modified request_data after approval creation. " +
+                    "Rejecting approve() call.",
+                    approval.get("pid"),
+                    storedHash.substring(0, Math.min(12, storedHash.length())),
+                    recomputed.substring(0, Math.min(12, recomputed.length())));
+            return false;
+        }
+        return true;
     }
 
     /**
@@ -316,6 +411,21 @@ public class AgentApprovalGateService {
         Map<String, Object> approval = loadPendingApproval(tenantId, approvalPid);
         if (approval == null) {
             return null;
+        }
+
+        // P0 fix: 审批前校验 plan_hash；若 request_data 被篡改则拒绝
+        if (!validatePlanIntegrity(approval)) {
+            // Mark approval as rejected due to integrity violation
+            LocalDateTime rejectNow = LocalDateTime.now();
+            dynamicDataMapper.update("ab_agent_approval",
+                    Map.of("approval_status", "rejected",
+                            "approver_id", approverId,
+                            "approved_at", rejectNow,
+                            "rejection_reason", "plan_integrity_violation",
+                            "updated_at", rejectNow),
+                    Map.of("pid", approvalPid));
+            throw new IllegalStateException(
+                    "Approval " + approvalPid + " rejected: plan_hash mismatch (request_data modified after creation)");
         }
 
         LocalDateTime now = LocalDateTime.now();
@@ -523,11 +633,30 @@ public class AgentApprovalGateService {
         log.info("Run {} marked as FAILED: {}", runPid, errorMessage);
     }
 
+    /**
+     * Lightweight predicate: does any active policy match the (tool, requestData) pair?
+     * Thin wrapper over {@link #findMatchingPolicy} to keep the boolean fast-path readable.
+     */
     private boolean matchesAnyPolicy(Long tenantId, String toolCode, Map<String, Object> requestData) {
-        String sql = "SELECT pid, trigger_rules FROM ab_approval_policy WHERE tenant_id = #{params.tenantId} " +
-                "AND policy_status = 'active' AND deleted_flag = FALSE";
-        List<Map<String, Object>> policies = dynamicDataMapper.selectByQuery(sql, Map.of("tenantId", tenantId));
+        return findMatchingPolicy(tenantId, toolCode, requestData) != null;
+    }
 
+    /**
+     * Check whether an agent has any matching approval policy configured at the agent level.
+     * Used by the scheduled-run gate to refuse scheduling agents that bypass approval
+     * but are subject to policy-level gates.
+     * <p>
+     * P0 fix: scheduled runs previously only checked {@code t.requires_approval = TRUE}
+     * at the tool level. Policies keyed on agent_code / cost_threshold / model patterns
+     * were silently bypassed. This method covers that gap.
+     */
+    public boolean agentHasMatchingPolicy(Long tenantId, String agentCode) {
+        if (tenantId == null || agentCode == null || agentCode.isBlank()) return false;
+        String sql = "SELECT trigger_rules FROM ab_approval_policy " +
+                "WHERE tenant_id = #{params.tenantId} " +
+                "AND policy_status = 'active' AND deleted_flag = FALSE";
+        List<Map<String, Object>> policies = dynamicDataMapper.selectByQuery(
+                sql, Map.of("tenantId", tenantId));
         for (Map<String, Object> policy : policies) {
             if (policy == null) continue;
             String triggerRulesJson = (String) policy.get("trigger_rules");
@@ -536,22 +665,16 @@ public class AgentApprovalGateService {
                 List<Map<String, Object>> rules = objectMapper.readValue(triggerRulesJson, RULE_LIST_TYPE);
                 for (Map<String, Object> rule : rules) {
                     String type = (String) rule.get("type");
-                    if ("tool_call".equals(type)) {
+                    if ("agent_code".equals(type)) {
                         String pattern = (String) rule.get("pattern");
-                        if (pattern != null && toolCode.matches(pattern.replace("*", ".*"))) {
-                            return true;
-                        }
-                    } else if ("cost_threshold".equals(type)) {
-                        double threshold = ((Number) rule.getOrDefault("threshold", 0)).doubleValue();
-                        double estimatedCost = requestData.containsKey("estimated_cost")
-                                ? ((Number) requestData.get("estimated_cost")).doubleValue() : 0;
-                        if (estimatedCost > threshold) {
+                        if (pattern != null && agentCode.matches(pattern.replace("*", ".*"))) {
                             return true;
                         }
                     }
                 }
             } catch (Exception e) {
-                log.warn("Failed to parse trigger rules: {}", e.getMessage());
+                log.warn("Failed to parse trigger rules while checking agent-level policy: {}",
+                        e.getMessage());
             }
         }
         return false;

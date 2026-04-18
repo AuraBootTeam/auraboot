@@ -48,6 +48,7 @@ public class AgentScheduleService {
     private final TaskScheduler taskScheduler;
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
+    private final AgentApprovalGateService approvalGateService;
 
     private final Map<String, ScheduledFuture<?>> scheduledFutures = new ConcurrentHashMap<>();
 
@@ -152,10 +153,15 @@ public class AgentScheduleService {
 
             String agentCode = (String) task.get("assignee_id");
             if (agentCode != null && !agentCode.isBlank()) {
-                if (agentHasApprovalRequiredTools(tenantId, agentCode)) {
-                    log.warn("Scheduled run for agent '{}' skipped: agent has tools requiring approval. " +
-                            "Use manual dispatch instead. schedule_pid={}", agentCode, schedulePid);
-                    // Clean up the task we created since we won't be running it
+                // P0 fix: 同时检查 tool-level requires_approval 和 agent-level approval policy。
+                // 原实现仅检查 t.requires_approval=TRUE，绕过所有 policy-level gate（agent_code
+                // 模式 / cost_threshold 等）。这是 schedule 旁路审批的主根因。
+                boolean toolGated  = agentHasApprovalRequiredTools(tenantId, agentCode);
+                boolean policyGated = approvalGateService.agentHasMatchingPolicy(tenantId, agentCode);
+                if (toolGated || policyGated) {
+                    log.warn("Scheduled run for agent '{}' skipped: blocked by approval gate " +
+                            "(tool_level={}, policy_level={}). Use manual dispatch instead. schedule_pid={}",
+                            agentCode, toolGated, policyGated, schedulePid);
                     dynamicDataMapper.update("ab_agent_task",
                             Map.of("task_status", "cancelled", "updated_at", LocalDateTime.now()),
                             Map.of("pid", taskPid));

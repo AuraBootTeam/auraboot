@@ -49,6 +49,7 @@ public class ToolLoopService implements ToolExecutionPort {
     private final NamedQueryService namedQueryService;
     private final ObjectMapper objectMapper;
     private final ToolProviderRegistry toolProviderRegistry;
+    private final ResultContractEmitter resultContractEmitter;
 
     /**
      * Execute a tool call within an agent run.
@@ -75,7 +76,19 @@ public class ToolLoopService implements ToolExecutionPort {
                     tools.stream().map(AgentToolDefinition::getName).limit(10).collect(Collectors.joining(", "));
         }
 
-        if (toolDef.isRequiresApproval()) {
+        // BIF-risk-aware approval: force approval when current-turn BIF says risk ≥ L3
+        // AND this is a write tool (cmd_*), regardless of per-tool flag. Closes the
+        // D1 Grounding → Approval Gate loop (spec §5.1 RiskEvaluator quality gate).
+        boolean requiresApproval = toolDef.isRequiresApproval();
+        if (!requiresApproval) {
+            com.auraboot.framework.agent.dto.BusinessIntentFrame bif = BifContext.getCurrentBif();
+            if (bif != null && isHighRisk(bif.getRiskLevel()) && isWriteTool(toolName, toolDef)) {
+                requiresApproval = true;
+                log.info("BIF risk={} escalates tool {} to approval-required (was false)",
+                        bif.getRiskLevel(), toolName);
+            }
+        }
+        if (requiresApproval) {
             String approvalPid = approvalGate.checkAndRequestApproval(
                     tenantId, runPid, taskPid, toolName, toolDef.getDescription(), input, true);
             if (approvalPid != null) {
@@ -117,6 +130,15 @@ public class ToolLoopService implements ToolExecutionPort {
             boolean success = !result.startsWith("Error");
             updateToolStats(tenantId, toolName, success, latencyMs, success ? null : result);
 
+            // Emit ResultContract for structured frontend rendering (PR-11). No-op if
+            // ChatSseContext has no emitter (non-chat callers: tests, ad-hoc skill runs).
+            if ("dsl_query".equals(toolDef.getToolType())) {
+                resultContractEmitter.emitQueryResult(toolName, toolDef, result, latencyMs, success);
+            } else if ("dsl_command".equals(toolDef.getToolType())) {
+                resultContractEmitter.emitCommandResult(toolName, toolDef, result, latencyMs, success,
+                        success ? null : result);
+            }
+
             try { aiTraceService.endSpan(spanCtx, result, success ? "success" : "error"); }
             catch (Exception traceEx) { log.debug("Failed to end span for tool {}: {}", toolName, traceEx.getMessage()); }
 
@@ -125,6 +147,15 @@ public class ToolLoopService implements ToolExecutionPort {
             long latencyMs = System.currentTimeMillis() - startMs;
             updateToolStats(tenantId, toolName, false, latencyMs, e.getMessage());
             log.error("Tool execution failed: tool={}, error={}", toolName, e.getMessage());
+
+            if (toolDef != null) {
+                String type = toolDef.getToolType();
+                if ("dsl_query".equals(type)) {
+                    resultContractEmitter.emitQueryResult(toolName, toolDef, "Error: " + e.getMessage(), latencyMs, false);
+                } else if ("dsl_command".equals(type)) {
+                    resultContractEmitter.emitCommandResult(toolName, toolDef, null, latencyMs, false, e.getMessage());
+                }
+            }
 
             try { aiTraceService.endSpan(spanCtx, e.getMessage(), "error"); }
             catch (Exception traceEx) { log.debug("Failed to end span for tool {}: {}", toolName, traceEx.getMessage()); }
@@ -260,6 +291,24 @@ public class ToolLoopService implements ToolExecutionPort {
     }
 
     // ========== Helpers ==========
+
+    /** Risk levels L3 and L4 trigger mandatory Approval Gate routing. */
+    private boolean isHighRisk(String riskLevel) {
+        return "L3".equals(riskLevel) || "L4".equals(riskLevel);
+    }
+
+    /**
+     * A write tool either declares a non-query tool_type or follows the cmd_*
+     * naming convention. dsl_query / read tools are never escalated.
+     */
+    private boolean isWriteTool(String toolName, com.auraboot.framework.agent.dto.AgentToolDefinition toolDef) {
+        if (toolDef != null) {
+            String type = toolDef.getToolType();
+            if ("dsl_query".equals(type) || "llm_native".equals(type)) return false;
+            if ("dsl_command".equals(type) || "api_call".equals(type)) return true;
+        }
+        return toolName != null && toolName.startsWith("cmd_");
+    }
 
     private String resolveModelCodeForCommand(Long tenantId, String commandCode) {
         try {

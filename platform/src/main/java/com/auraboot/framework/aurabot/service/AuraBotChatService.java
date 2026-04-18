@@ -73,6 +73,14 @@ public class AuraBotChatService {
     @Autowired(required = false)
     private com.auraboot.framework.agent.port.AgentChatPort agentChatPort;
 
+    /** Optional D1 Grounding service (computes BIF per turn). */
+    @Autowired(required = false)
+    private com.auraboot.framework.agent.service.GroundingService groundingService;
+
+    /** Optional BIF persistence. */
+    @Autowired(required = false)
+    private com.auraboot.framework.agent.service.BifRecorder bifRecorder;
+
     /** Optional chat run persistence from the shared AI runtime. */
     @Autowired(required = false)
     private ChatRunPersistencePort chatRunPersistencePort;
@@ -192,6 +200,16 @@ public class AuraBotChatService {
     // =========================================================================
 
     private void doStreamChat(Long tenantId, ChatRequest request, SseEmitter emitter) {
+        com.auraboot.framework.agent.service.ChatSseContext.setEmitter(emitter);
+        try {
+            doStreamChatInner(tenantId, request, emitter);
+        } finally {
+            com.auraboot.framework.agent.service.BifContext.clear();
+            com.auraboot.framework.agent.service.ChatSseContext.clear();
+        }
+    }
+
+    private void doStreamChatInner(Long tenantId, ChatRequest request, SseEmitter emitter) {
         // 0. Route to ACP Agent if agentCode is set and not the default "aurabot"
         String agentCode = request.getAgentCode();
         if (agentCode != null && !agentCode.isBlank() && !"aurabot".equals(agentCode)) {
@@ -254,9 +272,51 @@ public class AuraBotChatService {
         List<LlmChatRequest.Tool> tools = resolved.tools();
         aiTraceService.endSpan(resolveSpan, Map.of("tool_count", tools.size()), "success");
 
+        // --- D1 Grounding: compile user message → BIF, constrain tools, persist ---
+        com.auraboot.framework.agent.dto.BusinessIntentFrame bif = null;
+        String qualityIssue = null;
+        if (groundingService != null) {
+            SpanContext groundingSpan = aiTraceService.startSpan(trace, null, "span", "d1_grounding", null);
+            try {
+                var gctx = com.auraboot.framework.agent.service.GroundingService.GroundingContext.builder()
+                        .pageModel(modelCode)
+                        .recordId(recordPid)
+                        .conversationId(request.getSessionId())
+                        .sessionId(request.getSessionId())
+                        .build();
+                bif = groundingService.ground(tenantId, request.getMessage(), gctx);
+                tools = applyCandidateSkillsMode(tools, bif);
+                com.auraboot.framework.agent.service.BifContext.setCurrentBif(bif);
+                if (bifRecorder != null) {
+                    bifRecorder.record(tenantId, request.getMessage(), bif, null, request.getSessionId());
+                }
+                // Spec §5.1 quality gate: record degradation but continue — the LLM
+                // can still produce a useful answer; the hint we inject below nudges
+                // it to ask for clarification when grounding is uncertain.
+                qualityIssue = groundingService.checkQualityGate(bif);
+                aiTraceService.endSpan(groundingSpan, Map.of(
+                        "intent", bif.getIntent() != null ? bif.getIntent() : "",
+                        "object", bif.getObject() != null ? bif.getObject() : "",
+                        "mode", bif.getCandidateSkillsMode() != null ? bif.getCandidateSkillsMode() : "",
+                        "risk", bif.getRiskLevel() != null ? bif.getRiskLevel() : "",
+                        "quality_issue", qualityIssue != null ? qualityIssue : "ok",
+                        "tool_count_after", tools.size()), "success");
+            } catch (Exception e) {
+                log.warn("D1 Grounding failed, falling back to TF-IDF tool selection: {}", e.getMessage());
+                aiTraceService.endSpan(groundingSpan, Map.of("error", e.getMessage()), "error");
+                bif = null;
+            }
+        }
+
         // --- Trace: render prompt span ---
         SpanContext promptSpan = aiTraceService.startSpan(trace, null, "span", "render_prompt", null);
         String systemPrompt = buildSystemPrompt(tenantId, request, resolved);
+        if (bif != null) {
+            systemPrompt = systemPrompt + buildBifContextHint(bif);
+            if (qualityIssue != null) {
+                systemPrompt = systemPrompt + buildQualityIssueHint(qualityIssue);
+            }
+        }
         aiTraceService.endSpan(promptSpan, Map.of("char_count", systemPrompt.length()), "success");
 
         // 5. Route: tool loop (sync) vs text-only streaming
@@ -1315,6 +1375,66 @@ public class AuraBotChatService {
         } catch (Exception e) {
             log.warn("Failed to send SSE event {}: {}", eventName, e.getMessage());
         }
+    }
+
+    /**
+     * Constrain the tool list based on the BIF's candidateSkillsMode.
+     * - fixed + read_only intent: drop all write (cmd_*) tools
+     * - bounded: keep all (LLM may choose); approval gate enforces at execution
+     * - hint (default): no filtering
+     * Spec: 03-BusinessIntentFrameSpec §1 candidateSkillsMode.
+     */
+    private List<LlmChatRequest.Tool> applyCandidateSkillsMode(
+            List<LlmChatRequest.Tool> tools,
+            com.auraboot.framework.agent.dto.BusinessIntentFrame bif) {
+        if (tools == null || tools.isEmpty() || bif == null) return tools;
+        String mode = bif.getCandidateSkillsMode();
+        String actionability = bif.getActionability();
+        if (!"fixed".equals(mode) || !"read_only".equals(actionability)) {
+            return tools;
+        }
+        List<LlmChatRequest.Tool> filtered = new ArrayList<>();
+        for (LlmChatRequest.Tool t : tools) {
+            String name = t.getName() != null ? t.getName() : "";
+            if (!name.startsWith("cmd_")) {
+                filtered.add(t);
+            }
+        }
+        log.debug("D1 mode=fixed read_only: filtered tools {} → {}", tools.size(), filtered.size());
+        return filtered;
+    }
+
+    /**
+     * Render a compact BIF context hint appended to the system prompt so the LLM
+     * knows what the user most likely wants and which candidate skills are in scope.
+     */
+    private String buildBifContextHint(com.auraboot.framework.agent.dto.BusinessIntentFrame bif) {
+        StringBuilder sb = new StringBuilder("\n\n## Intent Analysis (D1)\n");
+        sb.append("- intent: ").append(nullSafe(bif.getIntent())).append('\n');
+        sb.append("- object: ").append(nullSafe(bif.getObject())).append('\n');
+        sb.append("- risk: ").append(nullSafe(bif.getRiskLevel()))
+                .append(" (").append(nullSafe(bif.getActionability())).append(")\n");
+        if (bif.getCandidateSkills() != null && !bif.getCandidateSkills().isEmpty()) {
+            sb.append("- candidate skills (").append(nullSafe(bif.getCandidateSkillsMode())).append("): ")
+                    .append(String.join(", ", bif.getCandidateSkills())).append('\n');
+        }
+        if (bif.getConfidence() != null) {
+            sb.append("- confidence: overall=").append(String.format("%.2f", bif.getConfidence().getOverall())).append('\n');
+        }
+        return sb.toString();
+    }
+
+    private static String nullSafe(String s) {
+        return s == null ? "" : s;
+    }
+
+    /**
+     * Surface a degraded-grounding signal to the LLM so it can choose to ask for
+     * clarification instead of running tools with a shaky intent. Spec §5.1.
+     */
+    private String buildQualityIssueHint(String issue) {
+        return "\n- quality_gate: " + issue +
+                " — grounding is uncertain; if the user's request is ambiguous, ask a clarifying question before using any write tool.\n";
     }
 
     /**
