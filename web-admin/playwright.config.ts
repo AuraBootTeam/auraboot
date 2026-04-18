@@ -54,7 +54,11 @@ export default defineConfig({
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: 0,
-  workers: Number(process.env.PW_WORKERS || 10),
+  // Default 4: designer-heavy specs crush the dev server HMR under 10+
+  // concurrent workers (observed Request context disposed / Execution
+  // context destroyed / Target page has been closed). Override with
+  // PW_WORKERS env var when running lighter specs.
+  workers: Number(process.env.PW_WORKERS || 4),
   timeout: process.env.E2E_COVERAGE === '1' ? 60000 : 15000,
 
   // Reporter configuration
