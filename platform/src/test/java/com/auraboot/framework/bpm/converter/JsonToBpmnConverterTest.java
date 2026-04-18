@@ -28,7 +28,7 @@ class JsonToBpmnConverterTest {
     @BeforeEach
     void setUp() {
         objectMapper = new ObjectMapper();
-        jsonToBpmn = new JsonToBpmnConverter(objectMapper);
+        jsonToBpmn = new JsonToBpmnConverter(objectMapper, null);
         bpmnToJson = new BpmnToJsonConverter(objectMapper);
     }
 
@@ -1414,13 +1414,22 @@ class JsonToBpmnConverterTest {
         }
 
         @Test
-        @DisplayName("never emits <extensionElements> or <smart:in>/<smart:out> (SmartEngine parser contract)")
+        @DisplayName("never emits raw <smart:in>/<smart:out> (SmartEngine parser contract) — mappings live in aura.callMappings smart:property")
         void neverEmitsMappingExtensionElements() {
             // The UI allows users to author inputMappings / outputMappings in
-            // the CallActivity property panel. Those values MUST stay in
-            // designerJson config only — they must NOT leak into the BPMN XML,
-            // because SmartEngine's XML parser rejects unknown child elements
-            // under <callActivity> with "Parse process definition file failure!".
+            // the CallActivity property panel. Those values must be carried
+            // through to the deployed BPMN so AuraCallActivityListener can
+            // bridge SmartEngine's parent/child request-map isolation at
+            // runtime. Prior GAP-250 iterations emitted <smart:in>/<smart:out>
+            // directly under <callActivity>, which SmartEngine's BPMN parser
+            // rejected with "Parse process definition file failure!" because
+            // those QNames have no registered parser.
+            //
+            // The current contract piggybacks on the generic <smart:properties>
+            // extension (which IS a registered parser, shared with aura.hooks /
+            // aura.formKey) — the mappings ride as a JSON payload under
+            // <smart:property name="aura.callMappings" .../>. No raw
+            // <smart:in>/<smart:out> are ever emitted.
             String json = """
                 {
                   "key":"parent_proc","name":"Parent",
@@ -1442,27 +1451,47 @@ class JsonToBpmnConverterTest {
                 """;
             String xml = jsonToBpmn.convert(json);
 
-            // callActivity element is still emitted with attributes
+            // callActivity element is still emitted with attributes.
+            // Version "latest" is resolved to the concrete max-deployed
+            // version at convert-time when a SmartEngine bean is available;
+            // in this unit test the converter is constructed with
+            // {@code smartEngine = null}, so the literal "latest" is
+            // stripped rather than emitted (SmartEngine's parser would
+            // accept the string but the runtime container has no alias
+            // lookup — see resolveLatestVersion javadoc). The net is: the
+            // "latest" literal must never appear in the deployed BPMN.
             assertTrue(xml.contains("calledElement=\"child_proc\""), xml);
-            assertTrue(xml.contains("calledElementVersion=\"latest\""), xml);
+            assertFalse(xml.contains("calledElementVersion=\"latest\""),
+                    "literal 'latest' must not leak into deployed BPMN: " + xml);
 
-            // But NO mapping elements — SmartEngine has no parser for these.
-            // Extract the <callActivity ...> ... </callActivity> segment (or
-            // self-closing form) and assert cleanly inside it.
+            // Raw <smart:in>/<smart:out> are still forbidden — SmartEngine has
+            // no parser for them. This invariant is the original GAP-250 fix.
             assertFalse(xml.contains("<smart:in "),
                     "GAP-250: <smart:in> breaks SmartEngine deploy: " + xml);
             assertFalse(xml.contains("<smart:out "),
                     "GAP-250: <smart:out> breaks SmartEngine deploy: " + xml);
 
-            // extensionElements may appear in other contexts (process-level hooks
-            // etc.), but must not be emitted inside callActivity. Easiest
-            // invariant: the substring between <callActivity and its end must
-            // contain neither "extensionElements" nor the mapping tags.
+            // Extract the <callActivity ...> ... </callActivity> segment to
+            // scope further assertions to this one element.
             int caStart = xml.indexOf("<callActivity");
             int caEnd = xml.indexOf("</callActivity>", caStart);
             String caBlock = caEnd > 0 ? xml.substring(caStart, caEnd) : xml.substring(caStart);
-            assertFalse(caBlock.contains("extensionElements"),
-                    "GAP-250: no extensionElements inside callActivity: " + caBlock);
+
+            // The mappings payload IS emitted — nested under the generic
+            // <smart:properties> extension (registered parser) rather than as
+            // free-standing <smart:in>/<smart:out> children.
+            assertTrue(caBlock.contains("extensionElements"),
+                    "mappings must ride as <extensionElements><smart:properties>: " + caBlock);
+            assertTrue(caBlock.contains("aura.callMappings"),
+                    "aura.callMappings smart:property missing: " + caBlock);
+            assertTrue(caBlock.contains("parentInput"),
+                    "inputMappings payload must include parentInput: " + caBlock);
+            assertTrue(caBlock.contains("childInput"),
+                    "inputMappings payload must include childInput: " + caBlock);
+            assertTrue(caBlock.contains("childOutput"),
+                    "outputMappings payload must include childOutput: " + caBlock);
+            assertTrue(caBlock.contains("parentOutput"),
+                    "outputMappings payload must include parentOutput: " + caBlock);
         }
 
         @Test
