@@ -25,11 +25,19 @@ import org.springframework.stereotype.Component;
 public class MemoryPromotionMetrics {
 
     public static final String PROPOSAL_TOTAL = "auraboot_memory_promotion_proposal_total";
+    public static final String DECISION_TOTAL = "auraboot_memory_promotion_decision_total";
+    public static final String SHADOW_RETRACTION_TOTAL = "auraboot_memory_promotion_shadow_retraction_total";
 
     public static final String REASON_CROSS_USER_AGREEMENT = "cross_user_agreement";
     public static final String REASON_IMPLICIT_CO_SIGN = "implicit_co_sign";
     public static final String REASON_IMPORTANCE_SPIKE = "importance_spike";
     public static final String REASON_SESSION_UPGRADE = "session_upgrade";
+
+    public static final String DECISION_APPROVE = "APPROVE";
+    public static final String DECISION_REJECT = "REJECT";
+    public static final String DECISION_RETRACT = "RETRACT";
+    public static final String DECISION_ACTIVATE = "ACTIVATE";
+    public static final String DECISION_EXPIRE = "EXPIRE";
 
     private final MeterRegistry registry;
 
@@ -38,6 +46,30 @@ public class MemoryPromotionMetrics {
                 .description("Memory promotion proposals emitted by the extractor")
                 .tag("tenant", tenantId == null ? "unknown" : tenantId.toString())
                 .tag("reason_code", reasonCode == null ? "unknown" : reasonCode)
+                .register(registry)
+                .increment();
+    }
+
+    /**
+     * Record a review/activation/expire decision. {@code rejectReason} applies
+     * only when {@code decision == REJECT} — it is recorded as the "reason"
+     * tag to enable per-reason breakdowns. Pass null for non-reject decisions
+     * and "unknown" will be used.
+     */
+    public void recordDecision(Long tenantId, String decision, String rejectReason) {
+        Counter.builder(DECISION_TOTAL)
+                .description("Memory promotion review / lifecycle decisions")
+                .tag("tenant", tenantId == null ? "unknown" : tenantId.toString())
+                .tag("decision", decision == null ? "unknown" : decision)
+                .tag("reason", rejectReason == null ? "none" : rejectReason)
+                .register(registry)
+                .increment();
+    }
+
+    public void recordShadowRetraction(Long tenantId) {
+        Counter.builder(SHADOW_RETRACTION_TOTAL)
+                .description("Memory promotions retracted during the 7-day shadow window")
+                .tag("tenant", tenantId == null ? "unknown" : tenantId.toString())
                 .register(registry)
                 .increment();
     }

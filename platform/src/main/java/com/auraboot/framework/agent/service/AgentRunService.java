@@ -662,7 +662,7 @@ public class AgentRunService {
             }
 
             StringBuilder sqlBuilder = new StringBuilder();
-            sqlBuilder.append("SELECT memory_title, memory_content, memory_type, category ");
+            sqlBuilder.append("SELECT pid, memory_title, memory_content, memory_type, category ");
             sqlBuilder.append("FROM ab_agent_memory ");
             sqlBuilder.append("WHERE tenant_id = #{params.tenantId} ");
             sqlBuilder.append("AND (memory_agent_id = #{params.agentCode} OR memory_agent_id IS NULL) ");
@@ -693,8 +693,15 @@ public class AgentRunService {
             sb.append("## Agent Memory\n");
             sb.append("The following are your accumulated memories and lessons. Use them to inform your work:\n");
 
+            // PR-66: capture the current user id (may be null for system/cron
+            // calls) so each materialised memory can be logged per-user for
+            // the implicit_co_sign extractor.
+            Long currentUserId = MetaContext.getCurrentUserId();
+            String userIdStr = currentUserId == null ? null : currentUserId.toString();
+
             int totalLen = sb.length();
             for (Map<String, Object> mem : memories) {
+                String pid = mem.get("pid") != null ? String.valueOf(mem.get("pid")) : null;
                 String memType = mem.get("memory_type") != null ? String.valueOf(mem.get("memory_type")) : "note";
                 String category = mem.get("category") != null ? String.valueOf(mem.get("category")) : "";
                 String title = mem.get("memory_title") != null ? String.valueOf(mem.get("memory_title")) : "";
@@ -715,6 +722,11 @@ public class AgentRunService {
                 }
                 sb.append(entry);
                 totalLen += entry.length();
+
+                // PR-66: per-user access log (upsert per day); no-op if userId null.
+                if (pid != null && userIdStr != null) {
+                    memoryService.recordMemoryAccess(pid, userIdStr);
+                }
             }
 
             return sb.toString();
