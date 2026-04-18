@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.Commit;
 
@@ -36,19 +37,49 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Import(ShadowRunSchedulerIntegrationTest.FixedInvokerTestConfig.class)
 class ShadowRunSchedulerIntegrationTest extends BaseIntegrationTest {
 
-    /** Deterministic stub invoker for {@code mcp_fixed} — exercises the canonical-hash match path. */
+    /**
+     * Deterministic stub invokers:
+     * <ul>
+     *   <li>{@code nq_test}: query invoker returning total=3 — exercises the
+     *       query projection path added in PR-60.</li>
+     *   <li>{@code nq_mismatch}: query invoker returning total=2 — used to
+     *       prove {@code output_match=false} when record counts differ.</li>
+     * </ul>
+     */
     @TestConfiguration
     static class FixedInvokerTestConfig {
+        // @Order(0) places stubs ahead of the real NamedQueryShadowInvoker
+        // in the ShadowExecutor's injected List<ShadowToolInvoker>.
         @Bean
-        ShadowToolInvoker mcpFixedInvoker() {
+        @Order(0)
+        ShadowToolInvoker nqTestInvoker() {
             return new ShadowToolInvoker() {
-                @Override public boolean supports(String toolRef) { return "mcp_fixed".equals(toolRef); }
+                @Override public boolean supports(String toolRef) { return "nq_test".equals(toolRef); }
                 @Override public Map<String, Object> invokeShadow(Long tenantId, String toolRef, Map<String, Object> args) {
-                    // Intentionally build with reversed key order — the canonical hasher
-                    // must normalize this so the test below can pre-compute the match hash.
+                    // Intentionally reversed key order + a rows list with shuffled IDs —
+                    // the projector must reduce this to just record_count so it matches
+                    // the original side's affected_count (no rows persisted for reads).
                     Map<String, Object> out = new LinkedHashMap<>();
+                    out.put("rows", List.of(
+                            Map.of("id", 3),
+                            Map.of("id", 1),
+                            Map.of("id", 2)));
                     out.put("total", 3L);
-                    out.put("query_code", "stub");
+                    out.put("query_code", "test");
+                    return out;
+                }
+            };
+        }
+
+        @Bean
+        @Order(0)
+        ShadowToolInvoker nqMismatchInvoker() {
+            return new ShadowToolInvoker() {
+                @Override public boolean supports(String toolRef) { return "nq_mismatch".equals(toolRef); }
+                @Override public Map<String, Object> invokeShadow(Long tenantId, String toolRef, Map<String, Object> args) {
+                    Map<String, Object> out = new LinkedHashMap<>();
+                    out.put("total", 2L);
+                    out.put("rows", List.of(Map.of("id", 1), Map.of("id", 2)));
                     return out;
                 }
             };
@@ -96,13 +127,18 @@ class ShadowRunSchedulerIntegrationTest extends BaseIntegrationTest {
                 UniqueIdGenerator.generate(), tenantId, runId);
     }
 
-    private void seedActionWithSnapshot(String runId, String snapshotJson) {
+    /**
+     * Seed a read action the way {@link com.auraboot.framework.agent.service.ActionRecorder#recordReadAction}
+     * actually does — with {@code affected_count} but no {@code after_snapshot}. This is the
+     * real-world shape the PR-60 projector has to match against.
+     */
+    private void seedReadAction(String runId, int affectedCount) {
         jdbc.update("INSERT INTO ab_agent_action " +
                         "(pid, tenant_id, run_id, action_code, action_type, target_model, " +
-                        " action_status, after_snapshot, executed_at, updated_at) " +
+                        " action_status, affected_count, executed_at, updated_at) " +
                         "VALUES (?, ?, ?, 'crm.lead.list', 'query', 'crm_lead', " +
-                        " 'success', ?::jsonb, NOW() - INTERVAL '100 milliseconds', NOW())",
-                UniqueIdGenerator.generate(), tenantId, runId, snapshotJson);
+                        " 'success', ?, NOW() - INTERVAL '100 milliseconds', NOW())",
+                UniqueIdGenerator.generate(), tenantId, runId, affectedCount);
     }
 
     @Test
@@ -207,25 +243,14 @@ class ShadowRunSchedulerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("PR-54: output_match=true when original after_snapshot canonical-hash equals shadow result hash")
-    void hash_match_when_original_equals_shadow() {
-        // dry-run registry: let mcp_fixed pass eligibility as FULL
-        jdbc.update("INSERT INTO ab_agent_dry_run_support " +
-                        "(pid, tenant_id, tool_ref_pattern, support_level, created_at, updated_at) " +
-                        "VALUES (?, ?, 'mcp_*', 'FULL', NOW(), NOW())",
-                UniqueIdGenerator.generate(), tenantId);
-
-        // Our FixedInvokerTestConfig returns {query_code:"stub", total:3}.
-        // ShadowExecutor wraps each tool_ref result as {tool_ref, result}; the
-        // complete payload that gets hashed is a list of one such map. We seed
-        // the original after_snapshot to the same JSON — any key ordering works
-        // because the hasher is canonical.
-        String snapshot = "[{\"tool_ref\":\"mcp_fixed\",\"result\":{\"total\":3,\"query_code\":\"stub\"}}]";
-
+    @DisplayName("PR-60: output_match=true when shadow and original share the query projection (same record_count)")
+    void output_match_true_when_shadow_and_original_share_projection() {
+        // Shadow side returns total=3. Original recorded affected_count=3.
+        // Projections are {type:query, tool_ref:nq_test, record_count:3} on both sides.
         String runId = "RUNM" + System.nanoTime();
-        seedActionWithSnapshot(runId, snapshot);
+        seedReadAction(runId, 3);
 
-        String yaml = "substrate: dsl\naction_type: query\ntool_refs:\n  - mcp_fixed\n";
+        String yaml = "substrate: dsl\naction_type: query\ntool_refs:\n  - nq_test\n";
         String draftPid = seedDraft("REVIEWED_OK", yaml,
                 "[{\"run_id\":\"" + runId + "\"}]");
 
@@ -240,6 +265,29 @@ class ShadowRunSchedulerIntegrationTest extends BaseIntegrationTest {
         assertThat(row.get("shadow_output_hash")).isNotNull();
         assertThat(row.get("original_output_hash")).isEqualTo(row.get("shadow_output_hash"));
         assertThat(row.get("output_match")).isEqualTo(Boolean.TRUE);
+    }
+
+    @Test
+    @DisplayName("PR-60: output_match=false when shadow and original record counts differ")
+    void output_match_false_when_record_counts_differ() {
+        // Shadow invoker nq_mismatch returns total=2; original recorded 3.
+        String runId = "RUNMM" + System.nanoTime();
+        seedReadAction(runId, 3);
+
+        String yaml = "substrate: dsl\naction_type: query\ntool_refs:\n  - nq_mismatch\n";
+        String draftPid = seedDraft("REVIEWED_OK", yaml,
+                "[{\"run_id\":\"" + runId + "\"}]");
+
+        int executed = scheduler.runOnce();
+        assertThat(executed).isGreaterThanOrEqualTo(1);
+
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT output_match, shadow_output_hash, original_output_hash " +
+                        "FROM ab_agent_shadow_run WHERE draft_id = ?", draftPid);
+        assertThat(rows).hasSize(1);
+        Map<String, Object> row = rows.get(0);
+        assertThat(row.get("output_match")).isEqualTo(Boolean.FALSE);
+        assertThat(row.get("shadow_output_hash")).isNotEqualTo(row.get("original_output_hash"));
     }
 
     @Test

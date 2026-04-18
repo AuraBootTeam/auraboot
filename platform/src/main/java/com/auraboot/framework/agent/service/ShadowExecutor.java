@@ -3,6 +3,7 @@ package com.auraboot.framework.agent.service;
 import com.auraboot.framework.agent.metrics.LearningLoopMetrics;
 import com.auraboot.framework.agent.util.CanonicalJsonHasher;
 import com.auraboot.framework.agent.util.ContractYamlParser;
+import com.auraboot.framework.agent.util.OutputSignatureProjector;
 import lombok.Builder;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -85,6 +86,10 @@ public class ShadowExecutor {
         List<String> toolRefs = ContractYamlParser.parseToolRefs(yaml);
         long startMs = System.currentTimeMillis();
         List<Map<String, Object>> results = new ArrayList<>();
+        // Track raw per-tool invoker returns (un-wrapped) so the single-tool
+        // projector can see the shape the invoker actually produced rather
+        // than the {tool_ref,result} executor wrapper.
+        List<Map<String, Object>> rawResults = new ArrayList<>();
         String shadowStatus = "success";
         for (String toolRef : toolRefs) {
             ShadowToolInvoker invoker = findInvoker(toolRef);
@@ -93,20 +98,35 @@ public class ShadowExecutor {
                         toolRef, req.draftPid);
                 shadowStatus = "skipped";
                 results.add(Map.of("tool_ref", toolRef, "status", "no_invoker"));
+                rawResults.add(null);
                 continue;
             }
             try {
                 Map<String, Object> r = invoker.invokeShadow(tenantId, toolRef, req.args);
                 results.add(Map.of("tool_ref", toolRef, "result", r == null ? Map.of() : r));
+                rawResults.add(r == null ? Map.of() : r);
             } catch (Exception e) {
                 log.warn("ShadowExecutor: invoker failed for tool_ref={}: {}", toolRef, e.getMessage());
                 shadowStatus = "failed";
                 results.add(Map.of("tool_ref", toolRef, "error", e.getMessage() == null ? "" : e.getMessage()));
+                rawResults.add(null);
             }
         }
         long elapsed = System.currentTimeMillis() - startMs;
 
-        String shadowHash = CanonicalJsonHasher.sha256Canonical(results);
+        // PR-60: single-tool drafts use the projector so original/shadow
+        // shapes align. Multi-tool drafts keep the pre-PR-60 full-hash
+        // behaviour — the projector can only speak about one tool at a
+        // time, and multi-tool drafts have no meaningful "same outcome"
+        // definition without tool-level semantics.
+        String shadowHash;
+        if (toolRefs.size() == 1 && rawResults.get(0) != null) {
+            Map<String, Object> projection = OutputSignatureProjector
+                    .projectShadow(toolRefs.get(0), rawResults.get(0));
+            shadowHash = OutputSignatureProjector.computeMatchHash(projection);
+        } else {
+            shadowHash = CanonicalJsonHasher.sha256Canonical(results);
+        }
         Boolean outputMatch = req.originalOutputHash != null
                 && shadowHash != null
                 && req.originalOutputHash.equals(shadowHash);
