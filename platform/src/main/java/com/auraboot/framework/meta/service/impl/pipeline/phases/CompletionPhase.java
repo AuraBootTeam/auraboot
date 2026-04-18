@@ -44,8 +44,23 @@ public class CompletionPhase implements CommandPhase {
     public void execute(CommandPipelineContext ctx) {
         boolean dryRun = ctx.getRequest() != null && ctx.getRequest().isDryRun();
 
-        // EFFECT phase
+        // EFFECT phase (PR-62 R2-N2): effectExecutor.executeEffectPhase writes
+        // to ab_outbox and the event store via MyBatis mappers — both inherit
+        // the caller's transaction (no REQUIRES_NEW, no @Async, no external
+        // messaging). Under dry-run the outer transaction is already marked
+        // rollback-only (CommandExecutorImpl:140) so these writes are
+        // discarded by Postgres at rollback time. We intentionally LEAVE the
+        // call active so the dry-run exercises the exact rollback envelope
+        // that production relies on. If a future refactor introduces any
+        // write that escapes the outer transaction (Kafka publish, WebSocket
+        // emit, HTTP call, REQUIRES_NEW, @Async), this call MUST be gated
+        // behind `if (!dryRun)` — see learning-loop.md "Plugin handler
+        // dry-run contract".
         var effectRules = ctx.getRulesByType().getOrDefault("effect", Collections.emptyList());
+        if (dryRun) {
+            log.info("Dry-run: effect phase ran under rollback envelope for command {} ({} effect rules)",
+                    ctx.getCommand().getCode(), effectRules.size());
+        }
         effectExecutor.executeEffectPhase(effectRules, ctx.getCommand(), ctx.getPayload(),
                 ctx.getFieldMapResults(), ctx.getTenantId(), ctx.getUserId(),
                 ctx.getRequest(), ctx.getTargetState());
