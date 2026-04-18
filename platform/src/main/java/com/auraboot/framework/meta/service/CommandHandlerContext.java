@@ -24,4 +24,14 @@ public class CommandHandlerContext {
     private Long userId;
     private Map<String, Object> fieldMapResults;
     private String ruleConfig;
+
+    /**
+     * When true, the enclosing CommandPipeline transaction will roll back
+     * (set via {@code TransactionAspectSupport.setRollbackOnly()} in
+     * {@code CommandExecutorImpl}). Handlers MUST early-return or switch to
+     * a side-effect-free branch when {@code dryRun=true} — the rollback
+     * only covers DB writes inside the same transaction. External effects
+     * (HTTP, email, MQ, file system, caches) escape the rollback envelope.
+     */
+    private boolean dryRun;
 }

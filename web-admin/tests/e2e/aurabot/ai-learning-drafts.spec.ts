@@ -331,4 +331,111 @@ test.describe('Mission Control — SkillDraft review (PR-31)', () => {
     await expect(row2).toContainText('+0.0020');    // 0.003 - 0.001
     await expect(row2).toContainText('✗');
   });
+
+  test('LD-09: output_diff toggle is hidden when output_match=true (PR-52)', async ({ page }) => {
+    await interceptLearningApi(page, {
+      shadowRuns: [
+        {
+          pid: 'SRMATCHOK0000000000001',
+          original_run_id: 'ORIG333',
+          shadow_status: 'success',
+          shadow_duration_ms: 100,
+          original_duration_ms: 120,
+          shadow_cost_usd: 0.001,
+          original_cost_usd: 0.001,
+          output_match: true,
+          fidelity_match: true,
+          output_diff: null,
+          created_at: '2026-04-18T12:10:00Z',
+        },
+      ],
+    });
+    await openPage(page);
+
+    await page.locator('[data-testid="draft-DRAFTPID1234567890ABCD"] button').first().click();
+    await expect(page.locator('[data-testid="shadow-runs-table"]')).toBeVisible();
+    await expect(
+      page.locator('[data-testid="output-diff-toggle-SRMATCHOK0000000000001"]'),
+    ).toHaveCount(0);
+    await expect(
+      page.locator('[data-testid="output-diff-panel-SRMATCHOK0000000000001"]'),
+    ).toHaveCount(0);
+  });
+
+  test('LD-10: output_diff panel expands and shows JSON when output_match=false (PR-52)', async ({ page }) => {
+    await interceptLearningApi(page, {
+      shadowRuns: [
+        {
+          pid: 'SRDIFFMISMATCH00000001',
+          original_run_id: 'ORIG444',
+          shadow_status: 'success',
+          shadow_duration_ms: 200,
+          original_duration_ms: 150,
+          shadow_cost_usd: 0.002,
+          original_cost_usd: 0.001,
+          output_match: false,
+          fidelity_match: true,
+          output_diff: JSON.stringify({
+            expected_row_count: 3,
+            actual_row_count: 2,
+            missing_ids: ['id-7'],
+          }),
+          created_at: '2026-04-18T12:15:00Z',
+        },
+      ],
+    });
+    await openPage(page);
+
+    await page.locator('[data-testid="draft-DRAFTPID1234567890ABCD"] button').first().click();
+    const toggle = page.locator('[data-testid="output-diff-toggle-SRDIFFMISMATCH00000001"]');
+    await expect(toggle).toBeVisible();
+
+    // Panel hidden before toggle
+    await expect(
+      page.locator('[data-testid="output-diff-panel-SRDIFFMISMATCH00000001"]'),
+    ).toHaveCount(0);
+
+    await toggle.click();
+    const panel = page.locator('[data-testid="output-diff-panel-SRDIFFMISMATCH00000001"]');
+    await expect(panel).toBeVisible();
+    await expect(panel).toContainText('expected_row_count');
+    await expect(panel).toContainText('missing_ids');
+  });
+
+  test('LD-11: promotion metrics cards render with decision chip (PR-52)', async ({ page }) => {
+    await interceptLearningApi(page, {
+      list: [makeDraft({ status: 'REVIEWED_OK' })],
+      detail: makeDetail({ status: 'REVIEWED_OK' }),
+    });
+    await page.route(/\/api\/learning\/drafts\/[^/]+\/evaluate-promotion$/, async (route: Route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(
+          envelope({
+            pid: 'DRAFTPID1234567890ABCD',
+            decision: 'PROMOTE',
+            shadow_runs: 8,
+            output_match_rate: 0.95,
+            fidelity_match_rate: 0.98,
+            cost_delta: -0.001,
+            duration_delta_ms: -40,
+          }),
+        ),
+      });
+    });
+    await openPage(page);
+
+    await page.locator('[data-testid="draft-DRAFTPID1234567890ABCD"] button').first().click();
+    await page.locator('[data-testid="evaluate-promotion-btn"]').click();
+
+    const cards = page.locator('[data-testid="promotion-cards"]');
+    await expect(cards).toBeVisible();
+    await expect(page.locator('[data-testid="promotion-shadow-runs"]')).toHaveText('8');
+    await expect(page.locator('[data-testid="promotion-output-match"]')).toHaveText('95%');
+    await expect(page.locator('[data-testid="promotion-fidelity-match"]')).toHaveText('98%');
+    const chip = page.locator('[data-testid="promotion-decision-chip"]');
+    await expect(chip).toHaveText('PROMOTE');
+    await expect(chip).toHaveClass(/bg-green-100/);
+  });
 });
