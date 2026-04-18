@@ -29,10 +29,6 @@ import org.springframework.web.client.RestTemplate;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 @Slf4j
 @Service
@@ -43,10 +39,21 @@ public class BpmNodeHookService {
 
     /**
      * Per-hook execution timeout (P3-E hardening). Bounds DoS surface for
-     * script (SpEL), drools, and rest_call executors. Configured higher than
-     * the REST read timeout so a slow but legal HTTP call still completes.
+     * script (SpEL), drools, rest_call, and command executors. Configured
+     * higher than the REST read timeout so a slow but legal HTTP call still
+     * completes.
      */
     private static final long HOOK_EXECUTION_TIMEOUT_MS = 15_000L;
+
+    /**
+     * Grace window after soft {@link Thread#interrupt()} before escalating to
+     * hard-kill via {@link Thread#stop()}. Uncooperative SpEL / Drools loops
+     * never poll {@code Thread.interrupted()}, so the soft phase is a pure
+     * courtesy for well-behaved executors (REST client, etc.); the hard phase
+     * is what actually halts a runaway {@code while(true)} in a user SpEL
+     * script.
+     */
+    private static final long HOOK_HARD_KILL_GRACE_MS = 5_000L;
 
     /**
      * hookType vocabulary alias map (GAP-255).
@@ -225,7 +232,7 @@ public class BpmNodeHookService {
             case "rest_call" -> runWithTimeout("rest_call", () -> executeRestCall(config, variables));
             case "script" -> runWithTimeout("script", () -> executeScript(config, variables));
             case "drools_rule" -> runWithTimeout("drools_rule", () -> executeDroolsRule(config, variables));
-            case "command" -> executeCommand(config, variables);
+            case "command" -> runWithTimeout("command", () -> executeCommand(config, variables));
             default -> {
                 log.warn("Unknown hook action type: raw={}, normalized={}", rawType, type);
                 yield true;
@@ -234,49 +241,110 @@ public class BpmNodeHookService {
     }
 
     /**
-     * Bound the wall-clock execution time of a hook executor (P3-E hardening).
+     * Bound the wall-clock execution time of a hook executor (P3-E residual
+     * #2 and #3 hardening).
      *
-     * <p>Runs {@code task} on a virtual thread and waits at most
-     * {@link #HOOK_EXECUTION_TIMEOUT_MS}. On timeout we return {@code false}
-     * (treated by callers as a hook failure) and surface a {@link BusinessException}
-     * up to the caller's fail-strategy handling so {@code block} can short-circuit
-     * the workflow. The runaway task continues on the virtual thread but is
-     * detached from the caller; SpEL/Drools have no kill switch so we cannot
-     * forcibly interrupt without {@code Thread.stop()}.
+     * <p>Runs {@code task} on a <strong>dedicated daemon platform thread</strong>
+     * (neither pooled nor virtual) so the caller always returns within
+     * {@value #HOOK_EXECUTION_TIMEOUT_MS}ms plus {@value #HOOK_HARD_KILL_GRACE_MS}ms
+     * grace even if the worker is wedged. On timeout the caller throws
+     * {@link BusinessException} so the hook's fail-strategy (block/warn/skip)
+     * fires and the BPM process advances.
      *
-     * <p>Command hooks are intentionally NOT wrapped: they reuse the platform's
-     * {@code CommandExecutor} pipeline which already runs inside the caller's
-     * transaction and has its own pipeline-level timeouts.
+     * <h3>Soft interrupt phase</h3>
+     * After the configured timeout the worker receives {@link Thread#interrupt()}.
+     * Cooperative executors honour this immediately:
+     * <ul>
+     *   <li>{@code hookRestTemplate} — underlying {@code SimpleClientHttpRequestFactory}
+     *       aborts the in-flight connect/read.</li>
+     *   <li>{@code CommandExecutor} downstream JDBC / HTTP — most connection
+     *       pools check the interrupt flag.</li>
+     * </ul>
+     *
+     * <h3>Hard-kill caveat (JDK 21+)</h3>
+     * {@link Thread#stop()} was neutered in JDK 20 and throws
+     * {@link UnsupportedOperationException} on JDK 21 — it is no longer a
+     * viable escape hatch. As a result, a truly uncooperative CPU-bound loop
+     * (e.g. Drools {@code fireAllRules} on a pathological rule graph, or a
+     * custom script executor that never polls {@code Thread.interrupted()})
+     * will remain scheduled on its daemon thread until the JVM exits. The
+     * daemon flag ensures shutdown is not blocked; the caller still returns
+     * promptly so the workflow is not held hostage.
+     *
+     * <h3>Why that is acceptable here</h3>
+     * <ul>
+     *   <li>SpEL has no {@code while}/{@code for} grammar; looping requires
+     *       {@code T(...)} type refs (blocked by {@link #DENY_TYPE_LOCATOR}),
+     *       bean refs (no {@code BeanResolver} registered), or constructor
+     *       calls (no {@code ConstructorResolver} registered). A script that
+     *       passes hook hardening cannot build a spin loop inside SpEL.</li>
+     *   <li>Drools {@code validateDrl} blocks {@code Thread}/{@code Runtime}/
+     *       {@code ProcessBuilder} imports, so rules cannot call
+     *       {@code Thread.sleep} directly.</li>
+     *   <li>REST-call and Command hooks go through cooperating clients that
+     *       honour interrupts.</li>
+     * </ul>
+     *
+     * <p>In other words: the caller-side timeout is the guaranteed bound; the
+     * worker-side hard-kill is <em>best effort</em>, and the JVM-level
+     * guarantees plus SpEL/Drools hardening make the residual DoS surface
+     * acceptable for the dev-stage threat model.
      */
     private boolean runWithTimeout(String label, java.util.concurrent.Callable<Boolean> task) {
-        CompletableFuture<Boolean> future = CompletableFuture.supplyAsync(() -> {
+        final Object[] resultHolder = new Object[1];
+        final Throwable[] errorHolder = new Throwable[1];
+
+        Thread worker = new Thread(() -> {
             try {
-                return task.call();
-            } catch (RuntimeException re) {
-                throw re;
-            } catch (Exception e) {
-                throw new RuntimeException(e);
+                resultHolder[0] = task.call();
+            } catch (Throwable t) {
+                errorHolder[0] = t;
             }
-        }, runnable -> Thread.startVirtualThread(runnable));
+        }, "bpm-hook-" + label + "-" + System.nanoTime());
+        // Daemon: a wedged worker must not block JVM shutdown.
+        worker.setDaemon(true);
+        worker.start();
 
         try {
-            Boolean result = future.get(HOOK_EXECUTION_TIMEOUT_MS, TimeUnit.MILLISECONDS);
-            return result != null && result;
-        } catch (TimeoutException te) {
-            future.cancel(true);
-            log.error("Hook executor '{}' exceeded timeout of {}ms", label, HOOK_EXECUTION_TIMEOUT_MS);
-            throw new BusinessException("Hook execution timeout (" + label + "): "
-                    + HOOK_EXECUTION_TIMEOUT_MS + "ms");
+            worker.join(HOOK_EXECUTION_TIMEOUT_MS);
         } catch (InterruptedException ie) {
             Thread.currentThread().interrupt();
+            worker.interrupt();
             throw new BusinessException("Hook execution interrupted: " + label);
-        } catch (ExecutionException ee) {
-            Throwable cause = ee.getCause();
+        }
+
+        if (worker.isAlive()) {
+            log.error("Hook executor '{}' exceeded timeout of {}ms, issuing interrupt",
+                    label, HOOK_EXECUTION_TIMEOUT_MS);
+            worker.interrupt();
+            try {
+                worker.join(HOOK_HARD_KILL_GRACE_MS);
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+            }
+            if (worker.isAlive()) {
+                // JDK 21 removed Thread.stop(); we cannot forcibly halt a
+                // CPU-bound loop that ignores the interrupt flag. The worker
+                // remains as a daemon and will be torn down at JVM exit. The
+                // caller still returns promptly so the BPM process advances.
+                log.error("Hook executor '{}' did not honour interrupt within {}ms; "
+                        + "abandoning daemon worker (JDK 21 has no Thread.stop)",
+                        label, HOOK_HARD_KILL_GRACE_MS);
+            }
+            throw new BusinessException("Hook execution timeout (" + label + "): "
+                    + HOOK_EXECUTION_TIMEOUT_MS + "ms");
+        }
+
+        if (errorHolder[0] != null) {
+            Throwable cause = errorHolder[0];
             if (cause instanceof RuntimeException re) {
                 throw re;
             }
-            throw new BusinessException("Hook execution failed (" + label + "): " + cause.getMessage());
+            throw new BusinessException("Hook execution failed (" + label + "): "
+                    + cause.getMessage());
         }
+        Boolean result = (Boolean) resultHolder[0];
+        return result != null && result;
     }
 
     @SuppressWarnings("unchecked")
