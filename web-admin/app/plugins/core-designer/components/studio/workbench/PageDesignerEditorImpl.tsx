@@ -28,6 +28,33 @@ import type { PageSchema } from '~/plugins/core-designer/components/studio/domai
 import { DEVICE_PRESETS } from '~/plugins/core-designer/components/studio/workbench/canvas/devices/presets';
 
 /**
+ * Pure helpers for the Settings ↔ Schema ↔ Settings bridge.
+ *
+ * The contract (GAP-261): `enableMultiView` lives as a FLAT key on
+ * `schema.extension` — never nested under `render` or any other sub-object.
+ * These helpers are the single write / read path; the component's
+ * `handleSettingsChange` and `initialSettings` delegate here so drift is
+ * locked in by the unit test
+ * `__tests__/PageDesignerEditorImpl.test.tsx`.
+ */
+export function applySettingsToSchema(
+  schema: PageSchema,
+  settings: { page: { enableMultiView: boolean } },
+): PageSchema {
+  return {
+    ...schema,
+    extension: {
+      ...schema.extension,
+      enableMultiView: settings.page.enableMultiView,
+    },
+  };
+}
+
+export function readEnableMultiView(schema: PageSchema | null | undefined): boolean {
+  return schema?.extension?.enableMultiView === true;
+}
+
+/**
  * Page Designer Editor — full implementation with toolbar, canvas, and panels.
  */
 export default function PageDesignerEditorImpl() {
@@ -178,14 +205,7 @@ export default function PageDesignerEditorImpl() {
   const handleSettingsChange = useCallback(
     (settings: AllSettings) => {
       if (!schema) return;
-      const updatedSchema: PageSchema = {
-        ...schema,
-        extension: {
-          ...schema.extension,
-          enableMultiView: settings.page.enableMultiView,
-        },
-      };
-      handleSchemaChange(updatedSchema);
+      handleSchemaChange(applySettingsToSchema(schema, settings));
     },
     [schema, handleSchemaChange],
   );
@@ -377,7 +397,7 @@ export default function PageDesignerEditorImpl() {
         isOpen={toolbarState.showSettings}
         onClose={toolbarActions.toggleSettings}
         initialSettings={{
-          page: { enableMultiView: schema?.extension?.enableMultiView === true },
+          page: { enableMultiView: readEnableMultiView(schema) },
         }}
         onSettingsChange={handleSettingsChange}
       />
