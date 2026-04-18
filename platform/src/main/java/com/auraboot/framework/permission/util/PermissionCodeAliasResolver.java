@@ -33,6 +33,11 @@ public final class PermissionCodeAliasResolver {
         PRIMARY_TO_ALIAS.put("system.bpm_config.update", "bpm.config.manage");
         PRIMARY_TO_ALIAS.put("system.bpm_task.read", "bpm.task.read");
         PRIMARY_TO_ALIAS.put("system.bpm_task.update", "bpm.task.manage");
+        PRIMARY_TO_ALIAS.put("system.bpm_hook.update", "bpm.hook.manage");
+        PRIMARY_TO_ALIAS.put("system.bpm_rule.update", "bpm.rule.manage");
+        PRIMARY_TO_ALIAS.put("system.bpm_sla.update", "bpm.sla.manage");
+        PRIMARY_TO_ALIAS.put("system.bpm_signature.update", "bpm.signature.manage");
+        PRIMARY_TO_ALIAS.put("system.bpm_definition.update", "bpm.definition.manage");
         PRIMARY_TO_ALIAS.put("system.cloud_config.update", "cloud_config_manage");
         PRIMARY_TO_ALIAS.put("system.webhook.update", "sys.webhook.manage");
         PRIMARY_TO_ALIAS.put("system.print.generate", "print_generate");
