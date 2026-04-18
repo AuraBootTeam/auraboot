@@ -44,6 +44,7 @@ public class BpmFormService {
     private final TaskService taskService;
     private final ProcessEngineService processEngineService;
     private final BpmProcessDefinitionMapper processDefinitionMapper;
+    private final BpmTaskActionsResolver taskActionsResolver;
 
     /**
      * Get form configuration for a task.
@@ -316,71 +317,8 @@ public class BpmFormService {
      * @param nodeId     BPMN activity id of the user task
      * @return declared task actions, or {@code null} when none apply
      */
-    @SuppressWarnings("unchecked")
     public List<TaskActionDef> getTaskActionsForNode(String processKey, String nodeId) {
-        if (processKey == null || nodeId == null) {
-            return null;
-        }
-        Long tenantId = MetaContext.getCurrentTenantId();
-        BpmProcessDefinition definition = processDefinitionMapper.selectOne(
-                new QueryWrapper<BpmProcessDefinition>()
-                        .eq("tenant_id", tenantId)
-                        .eq("process_key", processKey)
-                        .eq("is_current", true)
-                        .eq("deleted_flag", false)
-        );
-        if (definition == null || definition.getExtension() == null) {
-            return null;
-        }
-        Object designerObj = definition.getExtension().get("designerJson");
-        if (designerObj == null) {
-            return null;
-        }
-        // designerJson can be a Map (stored as JSON object) or a String (stored
-        // verbatim by some legacy call sites). Normalise to a Map.
-        Map<String, Object> designer;
-        if (designerObj instanceof Map<?, ?> m) {
-            designer = (Map<String, Object>) m;
-        } else if (designerObj instanceof String s && !s.isBlank()) {
-            try {
-                designer = objectMapper.readValue(s, new TypeReference<Map<String, Object>>() {});
-            } catch (Exception e) {
-                log.warn("Failed to parse designerJson string for process '{}'", processKey, e);
-                return null;
-            }
-        } else {
-            return null;
-        }
-        Object nodesObj = designer.get("nodes");
-        if (!(nodesObj instanceof List<?> nodes)) {
-            return null;
-        }
-        for (Object nodeObj : nodes) {
-            if (!(nodeObj instanceof Map<?, ?> nodeMap)) {
-                continue;
-            }
-            Object id = nodeMap.get("id");
-            if (!nodeId.equals(id)) {
-                continue;
-            }
-            Object data = nodeMap.get("data");
-            if (!(data instanceof Map<?, ?> dataMap)) {
-                return null;
-            }
-            Object actionsObj = dataMap.get("taskActions");
-            if (!(actionsObj instanceof List<?> actionsList) || actionsList.isEmpty()) {
-                return null;
-            }
-            try {
-                return objectMapper.convertValue(actionsList,
-                        new TypeReference<List<TaskActionDef>>() {});
-            } catch (Exception e) {
-                log.warn("Failed to parse taskActions for node '{}' in process '{}'",
-                        nodeId, processKey, e);
-                return null;
-            }
-        }
-        return null;
+        return taskActionsResolver.getTaskActionsForNode(processKey, nodeId);
     }
 
     /**
