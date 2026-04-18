@@ -31,6 +31,9 @@ const PRESET_COLORS = [
 ];
 
 export function ColorPickerField({
+  name,
+  label,
+  required = false,
   value = '',
   defaultValue = '#3b82f6',
   disabled = false,
@@ -58,18 +61,34 @@ export function ColorPickerField({
 
   if (readOnly) {
     return (
-      <div className="flex items-center gap-2">
-        <div
-          className="h-6 w-6 rounded border border-gray-300"
-          style={{ backgroundColor: currentColor }}
-        />
-        <span className="text-sm text-gray-700">{currentColor}</span>
+      <div>
+        {label && (
+          <label className="mb-1 block text-sm font-medium text-gray-700">
+            {label}
+            {required && <span className="ml-0.5 text-red-500">*</span>}
+          </label>
+        )}
+        <div className="flex items-center gap-2">
+          <div
+            className="h-6 w-6 rounded border border-gray-300"
+            style={{ backgroundColor: currentColor }}
+          />
+          <span className="text-sm text-gray-700">{currentColor}</span>
+        </div>
       </div>
     );
   }
 
   return (
-    <div ref={containerRef} className="relative inline-block">
+    <div>
+      {label && (
+        <label className="mb-1 block text-sm font-medium text-gray-700">
+          {label}
+          {required && <span className="ml-0.5 text-red-500">*</span>}
+        </label>
+      )}
+      {name && <input type="hidden" name={name} value={currentColor} />}
+      <div ref={containerRef} className="relative inline-block">
       <button
         type="button"
         disabled={disabled}
@@ -110,6 +129,7 @@ export function ColorPickerField({
           />
         </div>
       )}
+      </div>
     </div>
   );
 }
