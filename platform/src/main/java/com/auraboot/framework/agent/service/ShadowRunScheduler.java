@@ -1,6 +1,8 @@
 package com.auraboot.framework.agent.service;
 
 import com.auraboot.framework.agent.util.CanonicalJsonHasher;
+import com.auraboot.framework.agent.util.ContractYamlParser;
+import com.auraboot.framework.agent.util.OutputSignatureProjector;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -89,7 +91,7 @@ public class ShadowRunScheduler {
 
     private int runOnceLocked() {
         List<Map<String, Object>> drafts = jdbcTemplate.queryForList(
-                "SELECT pid, derived_from_runs::text AS derived_json, status " +
+                "SELECT pid, derived_from_runs::text AS derived_json, status, contract_yaml " +
                         "FROM ab_agent_skill_draft " +
                         "WHERE status IN ('REVIEWED_OK', 'SHADOW_RUNNING') " +
                         "ORDER BY reviewed_at ASC NULLS LAST, created_at ASC " +
@@ -101,6 +103,11 @@ public class ShadowRunScheduler {
             String draftPid = (String) d.get("pid");
             String currentStatus = (String) d.get("status");
             String derivedJson = (String) d.get("derived_json");
+            String contractYaml = (String) d.get("contract_yaml");
+            List<String> draftToolRefs = ContractYamlParser.parseToolRefs(contractYaml);
+            // PR-60: projection only applies to single-tool drafts. Multi-tool
+            // falls back to full canonical hash of after_snapshot (pre-PR-60).
+            String projectionToolRef = draftToolRefs.size() == 1 ? draftToolRefs.get(0) : null;
             List<String> runIds = parseRunIds(derivedJson);
             if (runIds.isEmpty()) continue;
 
@@ -113,7 +120,20 @@ public class ShadowRunScheduler {
                 if (origin == null) continue;
 
                 String originalSnapshotJson = (String) origin.get("after_snapshot_json");
-                String originalOutputHash = CanonicalJsonHasher.sha256CanonicalJsonString(originalSnapshotJson);
+                String originalOutputHash;
+                if (projectionToolRef != null) {
+                    // PR-60: project to canonical signature so original/shadow
+                    // shapes align. See OutputSignatureProjector javadoc.
+                    String actionStatus = (String) origin.get("status");
+                    String targetRecordId = (String) origin.get("target_record_id");
+                    Integer affectedCount = origin.get("affected_count") == null ? null
+                            : ((Number) origin.get("affected_count")).intValue();
+                    Map<String, Object> projection = OutputSignatureProjector.projectOriginal(
+                            projectionToolRef, actionStatus, targetRecordId, affectedCount, originalSnapshotJson);
+                    originalOutputHash = OutputSignatureProjector.computeMatchHash(projection);
+                } else {
+                    originalOutputHash = CanonicalJsonHasher.sha256CanonicalJsonString(originalSnapshotJson);
+                }
                 ShadowExecutor.ExecutionRequest req = ShadowExecutor.ExecutionRequest.builder()
                         .draftPid(draftPid)
                         .originalRunId(runId)
@@ -173,7 +193,9 @@ public class ShadowRunScheduler {
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(
                 "SELECT action_status AS status, " +
                         "  EXTRACT(EPOCH FROM (updated_at - executed_at)) * 1000 AS duration_ms, " +
-                        "  after_snapshot::text AS after_snapshot_json " +
+                        "  after_snapshot::text AS after_snapshot_json, " +
+                        "  target_record_id, " +
+                        "  affected_count " +
                         "FROM ab_agent_action WHERE run_id = ? LIMIT 1",
                 runId);
         return rows.isEmpty() ? null : rows.get(0);
