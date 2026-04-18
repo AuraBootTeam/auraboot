@@ -151,8 +151,8 @@ class LearningLoopSchemaIntegrationTest extends BaseIntegrationTest {
     void skill_draft_requires_source() {
         String draftPid = pid("d_no_src");
         assertThatThrownBy(() -> jdbc.update(
-                "INSERT INTO ab_agent_skill_draft (pid, contract_yaml) VALUES (?, ?)",
-                draftPid, "yaml"))
+                "INSERT INTO ab_agent_skill_draft (pid, tenant_id, contract_yaml) VALUES (?, ?, ?)",
+                draftPid, 1L, "yaml"))
                 .hasMessageContaining("source_pattern_hash");
     }
 
@@ -162,9 +162,9 @@ class LearningLoopSchemaIntegrationTest extends BaseIntegrationTest {
         String draftPid = pid("d_runs");
         String runsJson = "[{\"run_id\":\"01RUN1\"},{\"run_id\":\"01RUN2\"},{\"run_id\":\"01RUN3\"}]";
         jdbc.update("INSERT INTO ab_agent_skill_draft " +
-                        "(pid, contract_yaml, source_pattern_hash, derived_from_runs) " +
-                        "VALUES (?, ?, ?, ?::jsonb)",
-                draftPid, "yaml", "hash_1", runsJson);
+                        "(pid, tenant_id, contract_yaml, source_pattern_hash, derived_from_runs) " +
+                        "VALUES (?, ?, ?, ?, ?::jsonb)",
+                draftPid, 1L, "yaml", "hash_1", runsJson);
 
         String stored = jdbc.queryForObject(
                 "SELECT derived_from_runs::text FROM ab_agent_skill_draft WHERE pid = ?",
@@ -188,8 +188,8 @@ class LearningLoopSchemaIntegrationTest extends BaseIntegrationTest {
     @DisplayName("shadow_run output_diff JSONB round-trips")
     void shadow_run_output_diff() {
         String draftPid = pid("d_for_shadow");
-        jdbc.update("INSERT INTO ab_agent_skill_draft (pid, contract_yaml, source_pattern_hash) VALUES (?, ?, ?)",
-                draftPid, "y", "h");
+        jdbc.update("INSERT INTO ab_agent_skill_draft (pid, tenant_id, contract_yaml, source_pattern_hash) VALUES (?, ?, ?, ?)",
+                draftPid, 1L, "y", "h");
 
         String shadowPid = pid("sr_diff");
         String diffJson = "{\"missing_fields\":[\"owner_id\"],\"mismatch_count\":2}";
@@ -210,8 +210,8 @@ class LearningLoopSchemaIntegrationTest extends BaseIntegrationTest {
     @DisplayName("shadow_run idx_shadow_run_draft_created orders by created_at DESC for the draft")
     void shadow_run_draft_order() {
         String draftPid = pid("d_order");
-        jdbc.update("INSERT INTO ab_agent_skill_draft (pid, contract_yaml, source_pattern_hash) VALUES (?, ?, ?)",
-                draftPid, "y", "h");
+        jdbc.update("INSERT INTO ab_agent_skill_draft (pid, tenant_id, contract_yaml, source_pattern_hash) VALUES (?, ?, ?, ?)",
+                draftPid, 1L, "y", "h");
 
         for (int i = 0; i < 3; i++) {
             String srPid = pid("sr_order_" + i);
@@ -243,9 +243,9 @@ class LearningLoopSchemaIntegrationTest extends BaseIntegrationTest {
 
         String draftPid = pid("d_lc");
         jdbc.update("INSERT INTO ab_agent_skill_draft " +
-                        "(pid, contract_yaml, source_pattern_hash, status) " +
-                        "VALUES (?, ?, ?, 'SHADOW_RUNNING')",
-                draftPid, "yaml", patternHash);
+                        "(pid, tenant_id, contract_yaml, source_pattern_hash, status) " +
+                        "VALUES (?, ?, ?, ?, 'SHADOW_RUNNING')",
+                draftPid, 1L, "yaml", patternHash);
         jdbc.update("UPDATE ab_agent_learning_pattern SET draft_skill_id = ?, status = 'SHADOW' WHERE pid = ?",
                 draftPid, patternPid);
 
