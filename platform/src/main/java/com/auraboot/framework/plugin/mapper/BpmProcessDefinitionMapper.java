@@ -1,6 +1,7 @@
 package com.auraboot.framework.plugin.mapper;
 
 import com.auraboot.framework.plugin.entity.BpmProcessDefinition;
+import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -38,6 +39,18 @@ public interface BpmProcessDefinitionMapper extends BaseMapper<BpmProcessDefinit
      */
     @Select("SELECT * FROM ab_bpm_process_definition WHERE tenant_id = #{tenantId} AND status = 'deployed' AND deleted_flag = false ORDER BY process_name")
     List<BpmProcessDefinition> findDeployed(@Param("tenantId") Long tenantId);
+
+    /**
+     * Find all deployed processes across every tenant.
+     *
+     * <p>Used exclusively by the startup re-deployer to re-register previously
+     * deployed BPMN definitions into SmartEngine's in-memory repository after a
+     * backend restart. The tenant interceptor must be bypassed here because
+     * this runs before any request context is established.
+     */
+    @InterceptorIgnore(tenantLine = "true")
+    @Select("SELECT * FROM ab_bpm_process_definition WHERE status = 'deployed' AND deleted_flag = false ORDER BY tenant_id, process_name")
+    List<BpmProcessDefinition> findAllDeployedAcrossTenants();
 
     /**
      * Find by plugin PID.
