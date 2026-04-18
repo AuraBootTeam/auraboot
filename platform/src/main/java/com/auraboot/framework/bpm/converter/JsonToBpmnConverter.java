@@ -14,7 +14,6 @@ import javax.xml.stream.XMLStreamWriter;
 import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -912,46 +911,32 @@ public class JsonToBpmnConverter {
                 writer.writeAttribute(SMART_NAMESPACE, "calledElementVersion", calledProcessVersion);
             }
 
-            // Write input/output mappings as extension elements
-            JsonNode inputMappings = config.path("inputMappings");
-            JsonNode outputMappings = config.path("outputMappings");
-            boolean hasExtensions = (inputMappings.isObject() && inputMappings.size() > 0)
-                    || (outputMappings.isObject() && outputMappings.size() > 0);
-
-            if (hasExtensions) {
-                writer.writeCharacters("\n      ");
-                writer.writeStartElement("extensionElements");
-
-                if (inputMappings.isObject()) {
-                    Iterator<Map.Entry<String, JsonNode>> fields = inputMappings.fields();
-                    while (fields.hasNext()) {
-                        Map.Entry<String, JsonNode> entry = fields.next();
-                        writer.writeCharacters("\n        ");
-                        writer.writeEmptyElement(SMART_NAMESPACE, "in");
-                        writer.writeAttribute("source", entry.getKey());
-                        writer.writeAttribute("target", entry.getValue().asText());
-                    }
-                }
-
-                if (outputMappings.isObject()) {
-                    Iterator<Map.Entry<String, JsonNode>> fields = outputMappings.fields();
-                    while (fields.hasNext()) {
-                        Map.Entry<String, JsonNode> entry = fields.next();
-                        writer.writeCharacters("\n        ");
-                        writer.writeEmptyElement(SMART_NAMESPACE, "out");
-                        writer.writeAttribute("source", entry.getKey());
-                        writer.writeAttribute("target", entry.getValue().asText());
-                    }
-                }
-
-                writer.writeCharacters("\n      ");
-                writer.writeEndElement(); // extensionElements
-            }
+            // NOTE: inputMappings / outputMappings are intentionally NOT serialized
+            // into BPMN XML. SmartEngine's CallActivityParser
+            // (com.auraboot.smart.framework.engine.bpmn.assembly.callactivity.parser.CallActivityParser)
+            // only reads the `calledElement` and `calledElementVersion` attributes
+            // and ignores any child elements. The XML parser facade
+            // (DefaultXmlParserFacade#parseElement) throws
+            // `EngineException("No parser found for QName: ...")` for any unknown
+            // element it encounters, which caused the prior
+            // `<extensionElements><smart:in/><smart:out/></extensionElements>`
+            // emission to fail deploy with "Parse process definition file failure!".
+            //
+            // Variable propagation between parent and child processes is not
+            // supported by SmartEngine's CallActivityBehavior at the engine level
+            // (see the `隔离父子流程的request和response` comment in
+            // CallActivityBehavior#startChildProcessInstance — only tenantId is
+            // forwarded). The UI-level inputMappings / outputMappings stay in
+            // designerJson config for future platform-level implementation via
+            // ExecutionListener / AuraVariablePersister; they are NOT a
+            // BPMN-level contract. See GAP-250 and the CA-2/CA-3 skip notes in
+            // web-admin/tests/e2e/bpm/designer-callactivity.spec.ts.
         }
 
-        writer.writeCharacters("\n    ");
-        writer.writeEndElement(); // callActivity
+        // Self-closing <callActivity .../> — matches the canonical SmartEngine
+        // test fixture shape (storage-mysql/src/test/resources/parent-callactivity-process.bpmn20.xml).
         writer.writeCharacters("\n");
+        writer.writeEndElement(); // callActivity
     }
 
     /**
