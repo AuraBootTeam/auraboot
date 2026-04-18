@@ -32,6 +32,19 @@ interface DraftRow {
   shadow_metrics_json?: string;
 }
 
+interface ShadowRunRow {
+  pid: string;
+  original_run_id: string;
+  shadow_status: string;
+  shadow_duration_ms?: number;
+  shadow_cost_usd?: number;
+  original_duration_ms?: number;
+  original_cost_usd?: number;
+  output_match?: boolean;
+  fidelity_match?: boolean;
+  created_at: string;
+}
+
 interface DraftDetail extends DraftRow {
   contract_yaml: string;
   derived_from_runs_json?: string;
@@ -94,6 +107,7 @@ export default function LearningDraftsPage() {
   const [comment, setComment] = useState('');
   const [actionInFlight, setActionInFlight] = useState<string | null>(null);
   const [toast, setToast] = useState<{ kind: 'ok' | 'err'; msg: string } | null>(null);
+  const [shadowRuns, setShadowRuns] = useState<ShadowRunRow[] | null>(null);
 
   const fetchList = useCallback(async () => {
     setLoading(true);
@@ -123,16 +137,27 @@ export default function LearningDraftsPage() {
     }
   };
 
+  const loadShadowRuns = async (pid: string) => {
+    const r = await get(`/api/learning/drafts/${pid}/shadow-runs`);
+    if (ResultHelper.isSuccess(r)) {
+      setShadowRuns((r.data as ShadowRunRow[]) ?? []);
+    } else {
+      setShadowRuns([]);
+    }
+  };
+
   const toggleRow = async (pid: string) => {
     if (expanded === pid) {
       setExpanded(null);
       setDetail(null);
+      setShadowRuns(null);
       setComment('');
       return;
     }
     setExpanded(pid);
     setDetail(null);
-    await loadDetail(pid);
+    setShadowRuns(null);
+    await Promise.all([loadDetail(pid), loadShadowRuns(pid)]);
   };
 
   const review = async (pid: string, decision: 'approve' | 'reject') => {
@@ -307,33 +332,89 @@ export default function LearningDraftsPage() {
                         </pre>
                       </div>
 
-                      {detail.recent_shadow_runs && detail.recent_shadow_runs.length > 0 && (
-                        <div>
+                      {shadowRuns !== null && (
+                        <div data-testid="shadow-runs-section">
                           <div className="text-xs font-medium text-gray-700 mb-1">
-                            近期影子运行({detail.recent_shadow_runs.length})
+                            影子运行历史({shadowRuns.length})
                           </div>
-                          <table className="text-xs w-full">
-                            <thead>
-                              <tr className="text-left text-gray-500">
-                                <th className="px-1 py-0.5">状态</th>
-                                <th className="px-1 py-0.5">输出一致</th>
-                                <th className="px-1 py-0.5">Fidelity 一致</th>
-                                <th className="px-1 py-0.5">影子耗时</th>
-                                <th className="px-1 py-0.5">原始耗时</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {detail.recent_shadow_runs.slice(0, 10).map((r) => (
-                                <tr key={r.pid} className="border-t border-gray-100">
-                                  <td className="px-1 py-0.5">{r.shadow_status}</td>
-                                  <td className="px-1 py-0.5">{r.output_match ? '✓' : '✗'}</td>
-                                  <td className="px-1 py-0.5">{r.fidelity_match ? '✓' : '✗'}</td>
-                                  <td className="px-1 py-0.5">{r.shadow_duration_ms ?? '-'}ms</td>
-                                  <td className="px-1 py-0.5">{r.original_duration_ms ?? '-'}ms</td>
+                          {shadowRuns.length === 0 ? (
+                            <div className="text-xs text-gray-500 italic">
+                              暂无影子运行 — ShadowRunScheduler 尚未为此草稿重放原始调用
+                            </div>
+                          ) : (
+                            <table className="text-xs w-full" data-testid="shadow-runs-table">
+                              <thead>
+                                <tr className="text-left text-gray-500 border-b border-gray-200">
+                                  <th className="px-1 py-1">时间</th>
+                                  <th className="px-1 py-1">状态</th>
+                                  <th className="px-1 py-1">输出匹配</th>
+                                  <th className="px-1 py-1">Fidelity</th>
+                                  <th className="px-1 py-1 text-right">耗时差 ms</th>
+                                  <th className="px-1 py-1 text-right">成本差 $</th>
                                 </tr>
-                              ))}
-                            </tbody>
-                          </table>
+                              </thead>
+                              <tbody>
+                                {shadowRuns.slice(0, 20).map((r) => {
+                                  const durDelta =
+                                    r.shadow_duration_ms != null && r.original_duration_ms != null
+                                      ? r.shadow_duration_ms - r.original_duration_ms
+                                      : null;
+                                  const costDelta =
+                                    r.shadow_cost_usd != null && r.original_cost_usd != null
+                                      ? r.shadow_cost_usd - r.original_cost_usd
+                                      : null;
+                                  return (
+                                    <tr
+                                      key={r.pid}
+                                      className="border-b border-gray-100 align-top"
+                                      data-testid={`shadow-run-${r.pid}`}
+                                    >
+                                      <td className="px-1 py-1 text-gray-500 whitespace-nowrap">
+                                        {r.created_at?.slice(5, 16).replace('T', ' ')}
+                                      </td>
+                                      <td className="px-1 py-1">{r.shadow_status}</td>
+                                      <td
+                                        className={`px-1 py-1 ${r.output_match ? 'text-green-700' : 'text-red-700'}`}
+                                      >
+                                        {r.output_match ? '✓' : '✗'}
+                                      </td>
+                                      <td
+                                        className={`px-1 py-1 ${r.fidelity_match ? 'text-green-700' : 'text-amber-700'}`}
+                                      >
+                                        {r.fidelity_match ? '✓' : '✗'}
+                                      </td>
+                                      <td
+                                        className={`px-1 py-1 text-right tabular-nums ${
+                                          durDelta == null
+                                            ? 'text-gray-400'
+                                            : durDelta > 0
+                                              ? 'text-amber-700'
+                                              : 'text-green-700'
+                                        }`}
+                                      >
+                                        {durDelta == null ? '-' : (durDelta > 0 ? `+${durDelta}` : durDelta)}
+                                      </td>
+                                      <td
+                                        className={`px-1 py-1 text-right tabular-nums ${
+                                          costDelta == null
+                                            ? 'text-gray-400'
+                                            : costDelta > 0
+                                              ? 'text-amber-700'
+                                              : 'text-green-700'
+                                        }`}
+                                      >
+                                        {costDelta == null
+                                          ? '-'
+                                          : costDelta > 0
+                                            ? `+${costDelta.toFixed(4)}`
+                                            : costDelta.toFixed(4)}
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          )}
                         </div>
                       )}
 
