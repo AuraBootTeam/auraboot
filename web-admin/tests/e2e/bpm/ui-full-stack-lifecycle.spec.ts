@@ -788,23 +788,56 @@ test.describe(
       await expect(infoTab).toBeVisible({ timeout: 3_000 });
 
       // Switch to 表单 tab → FormTab lazy-loads form data via bpmFormService
+      // and renders the bound DSL form (post-fix: shape was previously broken
+      // and always rendered the empty fallback even with a valid formBinding).
       const formTab = drawerRoot.locator('button:has-text("表单")').first();
       await expect(formTab).toBeVisible({ timeout: 3_000 });
       await formTab.click();
-
-      // The tab must actually activate (border-blue-600 = active marker). Per
-      // the spec's strict "no silent fallback" policy we verify the
-      // tab-switch machinery works.
       await expect(formTab, '表单 tab must be the active one').toHaveClass(/border-blue-600/);
 
-      // Additional assertion: cross-check that the BPM form API itself does
-      // return a formBinding for this task now that processes.json declares
-      // it explicitly (task_manager_approve.data.formBinding with formRef=
-      // wd_leave_request_detail) and plugin import derives the form_bindings
-      // map on ab_bpm_process_definition. This catches the original Bug #10
-      // failure mode (form_bindings column empty → no formBinding returned)
-      // without depending on the known TaskFormResponse/bpmFormService shape
-      // mismatch in FormTab rendering.
+      // Real DSL render assertion (no silent fallback): the empty state must
+      // NOT show, and the form-tab content container must mount with at least
+      // one input/select wired to a wd_leave_request_detail field.
+      await expect(
+        drawerRoot.locator('[data-testid="form-tab-empty"]'),
+        'the "未绑定表单" fallback must not render when formBinding is non-null',
+      ).toHaveCount(0);
+      const formContent = drawerRoot.locator('[data-testid="form-tab-content"]').first();
+      await expect(formContent, 'FormTab content container must mount').toBeVisible({
+        timeout: 10_000,
+      });
+
+      // Wait for the DSL renderer to finish loading the schema (it shows a
+      // skeleton/spinner with data-testid="dsl-form-renderer-loading" while
+      // fetching). After loading, the actual page content takes its place.
+      await expect(
+        drawerRoot.locator('[data-testid="dsl-form-renderer-loading"]'),
+        'DSL form skeleton must clear once schema loads',
+      ).toHaveCount(0, { timeout: 15_000 });
+
+      // At least one of the leave-request fields must be visible inside the
+      // form. We accept any of the canonical wd_leave_request fields by code
+      // since the renderer uses field code as the input name attribute.
+      const leaveFieldCodes = [
+        'wd_req_days',
+        'wd_req_type',
+        'wd_req_reason',
+        'wd_req_start_date',
+        'wd_req_end_date',
+      ];
+      const fieldLocator = formContent.locator(
+        leaveFieldCodes
+          .map((code) => `[name="${code}"], [data-field-code="${code}"]`)
+          .join(', '),
+      );
+      await expect(
+        fieldLocator.first(),
+        `at least one wd_leave_request field (${leaveFieldCodes.join('/')}) must render in FormTab`,
+      ).toBeVisible({ timeout: 10_000 });
+
+      // Belt-and-braces: cross-check the API itself still surfaces the
+      // formBinding (catches form_bindings column regressions independently
+      // of UI rendering).
       const formApiResp = await request.get(`/api/bpm/forms/task/${leaveTaskId}`, {
         headers: { Authorization: `Bearer ${adminToken}` },
       });
