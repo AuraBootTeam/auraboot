@@ -130,15 +130,19 @@ class CallApiExecutorTest {
     // =========================================================
 
     @Test
-    void execute_unreachableExternalHost_failsWithBusinessException() {
-        // DNS fails → SsrfValidator allows it → HTTP client fails → BusinessException
+    void execute_unreachableExternalHost_failsFast() {
+        // P3-E #1 pinning: unresolvable hosts now fail fast because we require
+        // a pinned IP at validation time (SsrfValidator.validate() returns null
+        // on UnknownHostException, and the executor cannot pin without it).
+        // This is strictly safer than letting the HTTP client re-resolve later.
         AutomationAction action = buildAction(Map.of(
                 "url", "https://this-host-definitely-does-not-exist-aura.invalid/api",
                 "timeoutSeconds", 1
         ));
 
         assertThatThrownBy(() -> executor.execute(action, Map.of()))
-                .isInstanceOf(BusinessException.class);
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("could not be resolved");
     }
 
     // =========================================================

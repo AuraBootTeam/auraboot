@@ -4,6 +4,7 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.bpm.entity.BpmNodeHook;
 import com.auraboot.framework.bpm.mapper.BpmNodeHookMapper;
 import com.auraboot.framework.bpm.rule.DroolsEngineService;
+import com.auraboot.framework.common.util.PinnedHttpRequests;
 import com.auraboot.framework.common.util.SsrfValidator;
 import com.auraboot.framework.common.util.UlidGenerator;
 import com.auraboot.framework.exception.BusinessException;
@@ -20,12 +21,15 @@ import org.springframework.expression.spel.SpelMessage;
 import org.springframework.expression.spel.SpelParserConfiguration;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.expression.spel.support.StandardEvaluationContext;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestTemplate;
 
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -83,7 +87,6 @@ public class BpmNodeHookService {
     private final DroolsEngineService droolsEngineService;
     private final CommandExecutor commandExecutor;
     private final RestTemplate restTemplate;
-    private final RestTemplate hookRestTemplate;
     /**
      * SpEL parser configured without compiler optimisation and without auto-grow,
      * to keep script evaluation deterministic and bounded (GAP-257).
@@ -110,11 +113,9 @@ public class BpmNodeHookService {
         this.droolsEngineService = droolsEngineService;
         this.commandExecutor = commandExecutor;
         this.restTemplate = restTemplate;
-        // Dedicated RestTemplate with timeouts for hook REST calls (NH-2)
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(HOOK_REST_CONNECT_TIMEOUT_MS);
-        factory.setReadTimeout(HOOK_REST_READ_TIMEOUT_MS);
-        this.hookRestTemplate = new RestTemplate(factory);
+        // Hook REST calls are now executed via Java HttpClient with IP pinning
+        // (see PINNED_HOOK_CLIENT + executeRestCall). The previous hookRestTemplate
+        // could not pin DNS and was replaced for P3-E #1 (DNS rebinding TOCTOU).
     }
 
     /**
@@ -279,21 +280,47 @@ public class BpmNodeHookService {
         }
     }
 
-    @SuppressWarnings("unchecked")
+    /**
+     * Dedicated Java HttpClient for rest_call hooks (P3-E DNS-rebinding hardening,
+     * 2026-04-18). Replaces the previous {@code hookRestTemplate} because JDK
+     * {@link HttpClient} is what {@link PinnedHttpRequests} targets for pinning.
+     */
+    private static final HttpClient PINNED_HOOK_CLIENT = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofMillis(HOOK_REST_CONNECT_TIMEOUT_MS))
+            .build();
+
     private boolean executeRestCall(Map<String, Object> config, Map<String, Object> variables) {
         String url = (String) config.get("url");
         String method = (String) config.getOrDefault("method", "post");
 
-        // Validate URL to prevent SSRF attacks
-        SsrfValidator.validateUrl(url);
+        // Validate URL + capture resolved IP to pin at connect time (P3-E #1).
+        // If validate() throws, SSRF was detected and we never touch the socket.
+        SsrfValidator.ValidatedTarget target = SsrfValidator.validate(url);
+        if (target == null) {
+            log.warn("REST hook URL could not be resolved: {}", url);
+            return false;
+        }
 
         try {
+            HttpRequest.Builder builder = PinnedHttpRequests.newPinnedRequestBuilder(target)
+                    .timeout(Duration.ofMillis(HOOK_REST_READ_TIMEOUT_MS));
+
             if ("get".equalsIgnoreCase(method)) {
-                hookRestTemplate.getForEntity(url, Map.class);
+                builder.GET();
             } else {
-                hookRestTemplate.postForEntity(url, variables, Map.class);
+                String body = com.auraboot.framework.common.util.JsonUtil.toJson(variables);
+                builder.header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(body));
             }
-            return true;
+
+            HttpResponse<String> response = PINNED_HOOK_CLIENT.send(
+                    builder.build(), HttpResponse.BodyHandlers.ofString());
+            int status = response.statusCode();
+            if (status >= 200 && status < 300) {
+                return true;
+            }
+            log.warn("REST hook returned non-2xx: url={}, status={}", url, status);
+            return false;
         } catch (Exception e) {
             log.error("REST hook call failed: url={}", url, e);
             return false;
