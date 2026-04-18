@@ -14,6 +14,7 @@ import { SaveDialog, type ProcessMetadata } from '~/plugins/core-designer/compon
 import { useVersioning, VersionHistoryPanel } from '~/shared/versioning';
 import { bpmnVersionService } from '~/shared/versioning/versionService';
 import { useBPMNStore } from '~/plugins/core-designer/components/bpmn-designer/store/useBPMNStore';
+import { installDesignerTestHooks } from '~/plugins/core-designer/components/bpmn-designer/testHooks';
 import type {
   BPMNPaletteItem,
   ProcessAuraConfig,
@@ -122,10 +123,48 @@ export function BPMNDesigner() {
   // process structure without depending on fragile react-flow drag/drop simulation.
   useEffect(() => {
     (window as any).__bpmnDesignerStore = useBPMNStore;
+
+    // Install the higher-level __bpmDesigner test hook (DEV only).
+    // An adapter bridges the real store API to DesignerStoreLike.
+    const storeAdapter = {
+      addNode: (node: { id: string; type: string; position: { x: number; y: number }; data: Record<string, unknown> }) => {
+        useBPMNStore.getState().addNode({
+          id: node.id,
+          type: node.type,
+          position: node.position,
+          data: { type: node.type as any, label: String(node.data.label ?? node.id), config: (node.data.config ?? {}) as any, ...node.data },
+        } as any);
+        return node.id;
+      },
+      addEdge: (edge: { id?: string; source: string; target: string; data?: Record<string, unknown> }) => {
+        const id = edge.id ?? `edge-${edge.source}-${edge.target}`;
+        useBPMNStore.getState().addEdge({
+          id,
+          source: edge.source,
+          target: edge.target,
+          type: 'smoothstep',
+          animated: false,
+          label: String(edge.data?.label ?? ''),
+          style: { stroke: '#94a3b8', strokeWidth: 2 },
+          data: { label: String(edge.data?.label ?? ''), ...(edge.data ?? {}) },
+        } as any);
+        return id;
+      },
+      setNodeData: (id: string, patch: Record<string, unknown>) => {
+        useBPMNStore.getState().updateNode(id, patch as any);
+      },
+      getSnapshot: () => {
+        const state = useBPMNStore.getState();
+        return { nodes: state.nodes, edges: state.edges };
+      },
+    };
+    installDesignerTestHooks(storeAdapter, import.meta.env.DEV);
+
     return () => {
       if ((window as any).__bpmnDesignerStore === useBPMNStore) {
         delete (window as any).__bpmnDesignerStore;
       }
+      (window as any).__bpmDesigner = undefined;
     };
   }, []);
 
