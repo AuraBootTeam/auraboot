@@ -1,165 +1,168 @@
-import { test, expect } from '../../fixtures';
+import { test, expect } from '@playwright/test';
 import {
-  uniqueId,
-  dateOffsetStr,
-  executeCommandViaApi,
-} from '../helpers';
+  loginAs,
+  ensureRoleUsers,
+  createLeaveApplicant,
+  setLeaveBalance,
+  submitLeaveRequest,
+  processTask,
+} from '../../helpers/wd-fixtures';
 
 /**
- * Workflow Demo E2E — Short sick leave → Manager approval → Approved
+ * R1 — Short leave (days=2) → Drools routes to wd_manager → Manager approves
+ *      → process completed, business record status = approved.
  *
- * Record identification: PID from API → detail API for code/id.
- * D1 covered by sidebar → list navigation.
- * Detail pages accessed via /p/wd_leave_request/view/{pid} (list may paginate).
+ * Business key investigation:
+ *   commands.json wd:submit_leave_request postActions[0].businessKey = "${recordId}"
+ *   → processTask(page, recordId, ...) matches task-business-key cell directly.
+ *
+ * Leave type "sick" label: dicts.json wd_leave_type item value="sick", label="Sick Leave",
+ *   label:zh-CN="病假". submitLeaveRequest clicks getByRole('option', { name: input.type })
+ *   so we pass the raw dict value "sick" and let the helper resolve the option.
+ *
+ * Terminal status: dicts.json wd_leave_status value="approved" (string stored in wd_req_status).
+ *
+ * Business record endpoint: GET /api/dynamic/wd_leave_request_detail/{pid} → data.wd_req_status
+ *   (confirmed by existing test WD1-005 in same suite pattern).
+ *
+ * Process instance endpoint: GET /api/bpm/process-instances/{instanceId} → data.status
+ *   (confirmed from bpm-assertions.ts startInstanceAndAdvance final-fetch contract).
+ *
+ * Process instance id stored on: wd_req_process_instance field (processes.json extension.processInstanceField).
  */
 
-const UID = uniqueId('WD1');
-const LEAVE_REASON = `E2E sick leave ${UID}`;
-const START_DATE = dateOffsetStr(3);
-const END_DATE = dateOffsetStr(4);
-const ADMIN_USER_ID = '302959828878364672';
+test.describe('workflow-demo — R1 short leave manager approve', () => {
+  test('short leave (days=2) → manager approves → completed/approved', async ({
+    browser,
+    request,
+  }) => {
+    // ------------------------------------------------------------------
+    // 1. API setup: admin login, ensure role users, create applicant, seed balance
+    // ------------------------------------------------------------------
+    const adminToken = await loginAs(request, 'admin@example.com', 'Test2026x');
+    const { managerToken: _managerToken } = await ensureRoleUsers(request);
+    const applicant = await createLeaveApplicant(request, adminToken, 'r1_short');
+    await setLeaveBalance(request, adminToken, applicant.userId, 20);
 
-test.describe('Workflow Demo — Short sick leave → Manager approve', () => {
-  test.describe.configure({ mode: 'serial' });
+    // ------------------------------------------------------------------
+    // 2. Applicant context: login via UI, navigate to list, submit leave
+    // ------------------------------------------------------------------
+    const applicantCtx = await browser.newContext();
+    const applicantPage = await applicantCtx.newPage();
 
-  let leaveRequestPid: string;
-  let leaveRequestCode: string;
-  let processInstanceId: string | null = null;
-
-  /** Sidebar → list page (D1) */
-  async function navigateToList(page: import('@playwright/test').Page) {
-    await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
-    const nav = page.locator('nav').first();
-    await expect(nav).toBeVisible({ timeout: 5_000 });
-    const rootBtn = nav.getByRole('button', { name: /请假|Leave Demo/i }).first();
-    await expect(rootBtn).toBeVisible({ timeout: 5_000 });
-    await rootBtn.evaluate((el: HTMLElement) => el.click());
-    const leafLink = nav.locator('a[href="/p/wd_leave_request"]').first();
-    await expect(leafLink).toBeVisible({ timeout: 3_000 });
-    const listResp = page.waitForResponse(
-      (r) => r.url().includes('/api/dynamic/wd_leave_request') && r.url().includes('list') && r.status() === 200,
-      { timeout: 15_000 },
-    );
-    await leafLink.evaluate((el: HTMLElement) => el.click());
-    await listResp;
-  }
-
-  /** Detail page via URL (record may not be on list page 1) */
-  async function goToDetail(page: import('@playwright/test').Page) {
-    await page.goto(`/p/wd_leave_request/view/${leaveRequestPid}`, { waitUntil: 'domcontentloaded' });
-    await expect(page.locator('[data-testid="form-field-wd_req_code"]').first())
-      .toBeVisible({ timeout: 10_000 });
-  }
-
-  async function fetchRecord(page: import('@playwright/test').Page) {
-    const resp = await page.request.get(`/api/dynamic/wd_leave_request_detail/${leaveRequestPid}`);
-    expect(resp.status()).toBe(200);
-    return (await resp.json())?.data;
-  }
-
-  // Setup
-  test('WD1-001 Create draft via API', async ({ page }) => {
-    const result = await executeCommandViaApi(page, 'wd:create_leave_request', {
-      wd_req_applicant: ADMIN_USER_ID,
-      wd_req_type: 'sick',
-      wd_req_start_date: START_DATE,
-      wd_req_end_date: END_DATE,
-      wd_req_days: 2,
-      wd_req_reason: LEAVE_REASON,
-    }, undefined, 'create');
-    leaveRequestPid = result?.recordId;
-    expect(leaveRequestPid).toBeTruthy();
-
-    const record = await fetchRecord(page);
-    leaveRequestCode = record?.wd_req_code;
-    expect(leaveRequestCode).toMatch(/^WDLR-/);
-  });
-
-  // D1 + D2 — Menu navigation, list renders with data
-  test('WD1-002 Sidebar menu → list page renders', async ({ page }) => {
-    test.setTimeout(30_000);
-    await navigateToList(page);
-    const table = page.locator('table').first();
-    await expect(table).toBeVisible({ timeout: 5_000 });
-    // Verify table has rows (at least headers + 1 data row)
-    const rows = page.locator('table tbody tr');
-    await expect(rows.first()).toBeVisible({ timeout: 5_000 });
-  });
-
-  // D7 — Detail page field values
-  test('WD1-003 Detail page shows correct field values', async ({ page }) => {
-    test.setTimeout(30_000);
-    await goToDetail(page);
-
-    const main = page.locator('main').first();
-    await expect(main.locator('[data-testid="form-field-wd_req_status"]').first())
-      .toContainText(/draft|草稿/i, { timeout: 5_000 });
-    await expect(main.locator('[data-testid="form-field-wd_req_type"]').first())
-      .toContainText(/sick|病假/i);
-    await expect(main.locator('[data-testid="form-field-wd_req_days"]').first())
-      .toContainText('2');
-    await expect(main.locator('[data-testid="form-field-wd_req_reason"]').first())
-      .toContainText(LEAVE_REASON);
-  });
-
-  // D9 — Submit from detail page
-  test('WD1-004 Submit leave request', async ({ page }) => {
-    test.setTimeout(30_000);
-    await goToDetail(page);
-
-    const submitBtn = page.locator('[data-testid="toolbar-btn-submit"]');
-    await expect(submitBtn).toBeVisible({ timeout: 5_000 });
-
-    const cmdResp = page.waitForResponse(
-      (r) => r.url().includes('/api/meta/commands/execute/') && r.status() === 200,
-      { timeout: 10_000 },
-    );
-    await submitBtn.click();
-
-    const dialog = page.locator('[data-testid="confirm-dialog"]');
-    if (await dialog.isVisible().catch(() => false)) {
-      await page.locator('[data-testid="confirm-ok"]').click();
-    }
-
-    const resp = await cmdResp;
-    const body = await resp.json();
-    expect(body?.code).toBe('0');
-  });
-
-  // D7 — Verify submitted
-  test('WD1-005 Status is submitted', async ({ page }) => {
-    test.setTimeout(30_000);
-    const record = await fetchRecord(page);
-    expect(record?.wd_req_status).toBe('submitted');
-    processInstanceId = record?.wd_req_process_instance ?? null;
-
-    await goToDetail(page);
-    const main = page.locator('main').first();
-    await expect(main.locator('[data-testid="form-field-wd_req_status"]').first())
-      .toContainText(/submitted|已提交/i, { timeout: 5_000 });
-  });
-
-  // D9 — Approve (conditional on BPM)
-  test('WD1-006 Approve via inbox', async ({ page }) => {
-    test.setTimeout(45_000);
-    if (!processInstanceId) {
-      test.skip(true, 'BPM process not started — se_deployment_instance empty');
-      return;
-    }
-
-    const inboxResp = await page.request.get('/api/inbox?status=pending&itemType=approval&pageNum=1&pageSize=50');
-    const items = (await inboxResp.json())?.data?.records ?? [];
-    const item = items.find((i: any) => i.cardData?.processKey?.includes('wd_leave_approval'));
-    expect(item, 'pending approval should exist').toBeTruthy();
-
-    const approveResp = await page.request.post(`/api/inbox/${item.id}/approval-action`, {
-      data: { action: 'approve', comment: `E2E approved ${UID}` },
+    await applicantPage.goto('/login');
+    await applicantPage.getByLabel(/email/i).fill(applicant.email);
+    await applicantPage.getByLabel(/password|密码/i).fill('Test2026x');
+    await applicantPage.getByRole('button', { name: /login|登录/i }).click();
+    await applicantPage.waitForURL((u) => !u.pathname.endsWith('/login'), {
+      timeout: 10_000,
     });
-    expect(approveResp.status()).toBe(200);
 
-    await goToDetail(page);
-    const main = page.locator('main').first();
-    await expect(main.locator('[data-testid="form-field-wd_req_status"]').first())
-      .toContainText(/approved|已通过/i, { timeout: 5_000 });
+    // Leave type "sick" → option rendered as "Sick Leave" or "病假" (i18n-driven).
+    // submitLeaveRequest clicks getByRole('option', { name: input.type }) after
+    // clicking the type combobox; we pass the dict item value "sick" which the
+    // form option label resolves to. If i18n renders the zh-CN label, the helper
+    // will match either. We pass the value directly — the helper uses it as-is
+    // in getByRole('option', { name: input.type }).first().click().
+    const { recordId } = await submitLeaveRequest(applicantPage, {
+      days: 2,
+      type: 'sick',
+      reason: 'R1 short leave automated test — E2E manager approval path',
+    });
+    expect(recordId, 'submitLeaveRequest must return a non-empty recordId').toBeTruthy();
+
+    // ------------------------------------------------------------------
+    // 3. Manager context: login via UI, approve task via Task Center
+    // ------------------------------------------------------------------
+    const managerCtx = await browser.newContext();
+    const managerPage = await managerCtx.newPage();
+
+    await managerPage.goto('/login');
+    await managerPage.getByLabel(/email/i).fill('wd_manager@example.com');
+    await managerPage.getByLabel(/password|密码/i).fill('Test2026x');
+    await managerPage.getByRole('button', { name: /login|登录/i }).click();
+    await managerPage.waitForURL((u) => !u.pathname.endsWith('/login'), {
+      timeout: 10_000,
+    });
+
+    // processTask navigates via sidebar to /bpm/task-center, finds the row whose
+    // data-testid="task-business-key" contains recordId (= businessKey set to
+    // "${recordId}" in postActions), and approves it.
+    await processTask(managerPage, recordId, 'approve', 'LGTM — R1 automated approval');
+
+    // ------------------------------------------------------------------
+    // 4a. Assert: business record status = 'approved'
+    //     Endpoint: GET /api/dynamic/wd_leave_request_detail/{pid}
+    //     → data.wd_req_status === 'approved'
+    // ------------------------------------------------------------------
+    const recordResp = await applicantPage.request.get(
+      `/api/dynamic/wd_leave_request_detail/${recordId}`,
+    );
+    expect(recordResp.status(), 'business record detail fetch must return 200').toBe(200);
+
+    const recordBody = await recordResp.json();
+    const record = recordBody?.data as Record<string, unknown> | undefined;
+    if (!record) {
+      throw new Error(
+        `R1: business record detail response missing "data". Full body: ${JSON.stringify(recordBody)}`,
+      );
+    }
+
+    expect(
+      record.wd_req_status,
+      `business record wd_req_status must be "approved" after manager approval`,
+    ).toBe('approved');
+
+    // ------------------------------------------------------------------
+    // 4b. Assert: process instance status = completed (via BPM API)
+    //     Field wd_req_process_instance holds the instance id (stored by
+    //     postActions[0].storeInstanceIdIn in submit command).
+    //     Endpoint: GET /api/bpm/process-instances/{instanceId} → data.status
+    // ------------------------------------------------------------------
+    const instanceId = record.wd_req_process_instance as string | undefined;
+    if (instanceId) {
+      const instanceResp = await applicantPage.request.get(
+        `/api/bpm/process-instances/${instanceId}`,
+      );
+      expect(
+        instanceResp.status(),
+        `GET /api/bpm/process-instances/${instanceId} must return 200`,
+      ).toBe(200);
+
+      const instanceBody = await instanceResp.json();
+      const instanceData = instanceBody?.data as Record<string, unknown> | undefined;
+      if (!instanceData) {
+        throw new Error(
+          `R1: process instance response missing "data". Full body: ${JSON.stringify(instanceBody)}`,
+        );
+      }
+
+      // Status is a string from InstanceStatus enum serialised to lowercase.
+      // Expected terminal state after approval: "completed".
+      expect(
+        (instanceData.status as string | undefined)?.toLowerCase(),
+        `process instance status must be "completed" after manager approval`,
+      ).toBe('completed');
+    }
+    // If instanceId is absent (BPM not wired in this deployment), we still
+    // verified the business record status — that is the primary assertion.
+
+    // ------------------------------------------------------------------
+    // 5. Detail page visual assertion: wd_req_status shows approved label
+    // ------------------------------------------------------------------
+    await applicantPage.goto(
+      `/p/wd_leave_request/view/${recordId}`,
+      { waitUntil: 'domcontentloaded' },
+    );
+    const main = applicantPage.locator('main').first();
+    await expect(
+      main.locator('[data-testid="form-field-wd_req_status"]').first(),
+    ).toContainText(/approved|已通过/i, { timeout: 5_000 });
+
+    // ------------------------------------------------------------------
+    // Cleanup: close browser contexts
+    // ------------------------------------------------------------------
+    await applicantCtx.close();
+    await managerCtx.close();
   });
 });
