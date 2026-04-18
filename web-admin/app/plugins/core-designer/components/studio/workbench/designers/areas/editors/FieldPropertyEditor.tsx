@@ -66,6 +66,12 @@ const DATATYPE_COMPONENT_OPTIONS_FALLBACK: Record<
 /**
  * Build DATATYPE_COMPONENT_OPTIONS from the DSL registry's renderComponents.
  * Groups components by their compatible dataTypes.
+ *
+ * Keys are normalised to UPPERCASE so they match the FALLBACK map convention
+ * and the `.toUpperCase()` lookup in `getComponentOptions`. Without this
+ * normalisation, a server registry that ships lowercase dataType strings
+ * (e.g. "string") produces a map keyed `{"string": [...]}` while the lookup
+ * uses `"STRING"`, yielding `undefined` → `options.map(...)` crash (B15).
  */
 function buildComponentOptionsFromRegistry(
   renderComponents: Array<{ code: string; dataTypes?: string[]; category?: string }>,
@@ -76,8 +82,9 @@ function buildComponentOptionsFromRegistry(
     const option = { label: rc.code, value: rc.code };
     if (rc.dataTypes && rc.dataTypes.length > 0) {
       for (const dt of rc.dataTypes) {
-        if (!map[dt]) map[dt] = [];
-        map[dt].push(option);
+        const key = String(dt).toUpperCase(); // normalise to uppercase
+        if (!map[key]) map[key] = [];
+        map[key].push(option);
       }
     }
   }
@@ -210,13 +217,14 @@ export const FieldPropertyEditor: React.FC<FieldPropertyEditorProps> = ({
   );
 
   // Get component options based on data type.
-  // Backend / DSL stores dataType in lowercase (string/integer/...), but the
-  // FALLBACK map and registry-derived map are keyed by uppercase canonical
-  // names. Normalize to uppercase before lookup.
+  // Both DATATYPE_COMPONENT_OPTIONS_FALLBACK and registry-derived maps are keyed
+  // by uppercase canonical names (buildComponentOptionsFromRegistry normalises).
+  // The final `|| []` guard ensures we never return undefined even if the registry
+  // ships an entirely unknown dataType with no fallback entry.
   const getComponentOptions = useCallback((): Array<{ label: string; value: string }> => {
     const key = String(dataType || 'string').toUpperCase();
-    return DATATYPE_COMPONENT_OPTIONS[key] || DATATYPE_COMPONENT_OPTIONS.STRING;
-  }, [dataType]);
+    return DATATYPE_COMPONENT_OPTIONS[key] || DATATYPE_COMPONENT_OPTIONS['STRING'] || [];
+  }, [dataType, DATATYPE_COMPONENT_OPTIONS]);
 
   // Render a single field using native HTML components
   const renderField = useCallback(
@@ -231,9 +239,11 @@ export const FieldPropertyEditor: React.FC<FieldPropertyEditorProps> = ({
       const isDisabled = readonly || fieldConfig.props?.disabled;
 
       // Get options for select
-      let options = fieldConfig.props?.options || [];
+      let options: Array<{ label: string; value: string }> = fieldConfig.props?.options || [];
       if (fieldConfig.optionsKey === 'componentOptions') {
-        options = getComponentOptions();
+        // getComponentOptions() is guaranteed non-undefined via FALLBACK map, but
+        // guard with `?? []` as defence-in-depth against unexpected registry shapes.
+        options = getComponentOptions() ?? [];
       }
 
       // Render based on component type
