@@ -18,6 +18,7 @@ import type {
   IntentResult,
   OperationStep,
 } from '../types';
+import type { ResultContract } from '../types/ResultContract';
 
 // ============================================================================
 // Configuration
@@ -94,6 +95,8 @@ export interface ChatStreamOptions {
   onError: (error: string, traceId?: string) => void;
   onToolStart?: (toolId: string, toolName: string, input: Record<string, any>) => void;
   onToolResult?: (toolId: string, result: Record<string, any>, success: boolean) => void;
+  /** Structured Skill/tool output from the backend (spec: ResultContract). */
+  onResultContract?: (contract: ResultContract) => void;
   onConfirmRequired?: (
     toolId: string,
     toolName: string,
@@ -617,6 +620,9 @@ async function processSSEStream(
                 break;
               case 'tool_result':
                 callbacks.onToolResult?.(data.toolId, data.result || {}, data.success !== false);
+                break;
+              case 'result_contract':
+                callbacks.onResultContract?.(data as ResultContract);
                 break;
               case 'confirm_required':
                 callbacks.onConfirmRequired?.(
