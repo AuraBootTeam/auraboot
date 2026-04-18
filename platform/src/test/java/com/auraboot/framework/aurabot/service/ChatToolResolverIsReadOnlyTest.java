@@ -16,7 +16,7 @@ class ChatToolResolverIsReadOnlyTest {
     @BeforeEach
     void setUp() {
         // Construct with null SPI ports — only isReadOnly() is tested
-        resolver = new ChatToolResolver(null, null);
+        resolver = new ChatToolResolver(null, null, null);
     }
 
     @Test
