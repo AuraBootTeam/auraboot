@@ -35,10 +35,7 @@
  */
 
 import { test, expect, type Page, type APIRequestContext } from '../../fixtures';
-import {
-  loginAsAdmin,
-  undeployProcess,
-} from './_helpers/bpm-lifecycle';
+import { loginAs } from '../../helpers/wd-fixtures';
 import {
   assertDesignerJson,
   assertBpmnXml,
@@ -256,7 +253,7 @@ test.describe('BPM designer — gateway conditions', { tag: ['@bpm-regression'] 
   test.setTimeout(240_000);
 
   test.beforeAll(async ({ request }: { request: APIRequestContext }) => {
-    adminToken = await loginAsAdmin(request);
+    adminToken = await loginAs(request, 'admin@example.com', 'Test2026x');
   });
 
   // ==========================================================================
@@ -447,10 +444,6 @@ test.describe('BPM designer — gateway conditions', { tag: ['@bpm-regression'] 
       'else branch: instance must complete',
     ).toBe('completed');
 
-    // -------------------------------------------------------------------------
-    // Cleanup (best-effort — no afterAll hook per red line)
-    // -------------------------------------------------------------------------
-    await undeployProcess(request, adminToken, pid);
   });
 
   // ==========================================================================
@@ -633,9 +626,6 @@ test.describe('BPM designer — gateway conditions', { tag: ['@bpm-regression'] 
       'parallel gateway lifecycle must complete after both tasks done',
     ).toBe('completed');
 
-    // Cleanup (best-effort — running instance from the manual start above
-    // will be left at task nodes; env reset handles cleanup)
-    await undeployProcess(request, adminToken, pid);
   });
 
   // ==========================================================================
@@ -888,7 +878,5 @@ test.describe('BPM designer — gateway conditions', { tag: ['@bpm-regression'] 
       'L3b: inclusive gateway must complete after single matching branch completes',
     ).toBe('completed');
 
-    // Cleanup (best-effort — running instances may remain from L3a/L3b manual starts)
-    await undeployProcess(request, adminToken, pid);
   });
 });
