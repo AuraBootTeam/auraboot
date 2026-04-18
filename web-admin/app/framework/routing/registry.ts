@@ -53,6 +53,10 @@ export class RouteRegistryImpl implements RouteRegistry {
 
   register(resource: NavigationResource): void {
     if (this.resources.has(resource.key)) {
+      const previous = this.resources.get(resource.key)
+      if (previous && previous.path !== resource.path) {
+        this.pathIndex.delete(previous.path)
+      }
       // Allow re-registration in HMR scenarios but warn.
       // eslint-disable-next-line no-console
       console.warn(`[RouteRegistry] re-registering key=${resource.key} (HMR?)`)

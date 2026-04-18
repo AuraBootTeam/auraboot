@@ -24,6 +24,24 @@ export interface RuntimeFieldRendererProps {
 }
 
 /**
+ * Platform-provided reference models that are NOT stored in ab_meta_model and therefore cannot
+ * be resolved via the generic /api/dynamic/{code}/list route. Each entry maps a system model
+ * code to the picker endpoint that returns its options.
+ *
+ * Add new entries here (e.g. sys_role, sys_dept) when new platform pickers come online.
+ */
+const SYSTEM_MODEL_ENDPOINTS: Record<
+  string,
+  { endpoint: string; valueField: string; labelField: string }
+> = {
+  sys_user: {
+    endpoint: '/api/admin/users/search',
+    valueField: 'pid',
+    labelField: 'displayName',
+  },
+};
+
+/**
  * Runtime 模式字段渲染器
  *
  * 特点:
@@ -145,19 +163,36 @@ export const RuntimeFieldRenderer: React.FC<RuntimeFieldRendererProps> = ({ fiel
       (field as any).referenceModelCode;
     const labelField = refTarget?.targetField;
     if (targetModelCode) {
-      const referenceDataSource: DataSourceConfig = {
-        type: 'api',
-        endpoint: `/api/dynamic/${targetModelCode}/list`,
-        method: 'get',
-        params: { page: 1, pageSize: 200 },
-        adaptor: 'optionList',
-        valueField: 'pid',
-        autoFetch: true,
-      };
-      if (labelField) {
-        referenceDataSource.labelField = labelField;
+      // System-model dispatch: sys_user / sys_role / sys_dept live in platform tables,
+      // not in ab_meta_model, so they are not reachable via /api/dynamic/{code}/list.
+      // Each one exposes a dedicated picker endpoint.
+      const systemModel = SYSTEM_MODEL_ENDPOINTS[targetModelCode];
+      if (systemModel) {
+        componentProps.dataSource = {
+          type: 'api',
+          endpoint: systemModel.endpoint,
+          method: 'get',
+          params: { size: 200 },
+          adaptor: 'optionList',
+          valueField: systemModel.valueField,
+          labelField: labelField || systemModel.labelField,
+          autoFetch: true,
+        } satisfies DataSourceConfig;
+      } else {
+        const referenceDataSource: DataSourceConfig = {
+          type: 'api',
+          endpoint: `/api/dynamic/${targetModelCode}/list`,
+          method: 'get',
+          params: { page: 1, pageSize: 200 },
+          adaptor: 'optionList',
+          valueField: 'pid',
+          autoFetch: true,
+        };
+        if (labelField) {
+          referenceDataSource.labelField = labelField;
+        }
+        componentProps.dataSource = referenceDataSource;
       }
-      componentProps.dataSource = referenceDataSource;
     }
   } else if (field.dataSource) {
     // 如果有 dataSource 配置，传递给组件

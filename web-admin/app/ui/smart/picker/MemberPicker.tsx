@@ -82,8 +82,11 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
   const searchUsers = useCallback(async (keyword: string) => {
     setLoading(true);
     try {
+      // NOTE: the unauthenticated /api/users/search endpoint was removed during the 2026-04
+      // security review. The tenant-scoped replacement lives under /api/admin/users/search —
+      // it is callable by any tenant member and only returns users within the caller's tenant.
       const response = await fetch(
-        `/api/users/search?keyword=${encodeURIComponent(keyword)}&size=20`,
+        `/api/admin/users/search?keyword=${encodeURIComponent(keyword)}&size=20`,
       );
       if (response.ok) {
         const result = await response.json();

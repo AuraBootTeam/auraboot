@@ -15,6 +15,7 @@ import { ToolResultCard } from './ToolResultCard';
 import { ChatBiResultCard } from './ChatBiResultCard';
 import { ConfirmCard } from './ConfirmCard';
 import { ModelSuggestionCard } from './ModelSuggestionCard';
+import { ResultContractView } from './ResultContractView';
 
 // ============================================================================
 // Icons
@@ -128,6 +129,18 @@ function MessageBubble({ message, onConfirm, onCancel, isLoading }: MessageBubbl
         <div className="flex items-center gap-2 rounded-2xl rounded-bl-md bg-gray-50 px-4 py-2.5 dark:bg-gray-700/50">
           <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
           <span className="text-sm text-gray-600 dark:text-gray-300">{message.content}</span>
+        </div>
+      </div>
+    );
+  }
+
+  // ResultContract — structured Skill/tool output (PR-11). Renders via the
+  // renderHint-dispatching ResultContractView; see spec §3.4.
+  if (message.type === 'result_contract' && message.resultContract) {
+    return (
+      <div className="mb-3 flex justify-start">
+        <div className="max-w-[88%] rounded-2xl rounded-bl-md bg-white px-3 py-2 shadow-sm dark:bg-gray-700">
+          <ResultContractView contract={message.resultContract} />
         </div>
       </div>
     );
