@@ -2,6 +2,7 @@ package com.auraboot.framework.automation.executor.impl;
 
 import com.auraboot.framework.automation.entity.AutomationAction;
 import com.auraboot.framework.automation.executor.ActionExecutor;
+import com.auraboot.framework.common.util.PinnedHttpRequests;
 import com.auraboot.framework.common.util.SsrfValidator;
 import com.auraboot.framework.exception.BusinessException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -9,7 +10,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -57,14 +57,17 @@ public class CallApiExecutor implements ActionExecutor {
         // Process variable substitution in URL
         url = processTemplate(url, context);
 
-        // Validate URL to prevent SSRF attacks
-        SsrfValidator.validateUrl(url);
+        // Validate URL + capture resolved IP so the HTTP call uses the same IP
+        // that passed the block-list check (P3-E #1 DNS rebinding TOCTOU).
+        SsrfValidator.ValidatedTarget target = SsrfValidator.validate(url);
+        if (target == null) {
+            throw new IllegalArgumentException("CALL_API target could not be resolved: " + url);
+        }
 
         log.info("Calling API: method={}, url={}", method, url);
 
         try {
-            HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
+            HttpRequest.Builder requestBuilder = PinnedHttpRequests.newPinnedRequestBuilder(target)
                     .timeout(Duration.ofSeconds(timeoutSeconds));
 
             // Set headers
