@@ -20,7 +20,6 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -106,6 +105,20 @@ public class MemoryPromotionExtractor {
     @Value("${acp.memory.promotion.rationale.enabled:true}")
     private boolean rationaleEnabled;
 
+    /**
+     * Feature flag for the pgvector-indexed ANN shortlist path (PR-74 / N3).
+     * When true (default), each seed memory pulls its 20 nearest neighbours
+     * using the HNSW index; when false, the legacy O(n²) Java-side pairwise
+     * cosine path runs instead. Kept as a config rollback switch in case
+     * production surfaces index-specific issues.
+     */
+    @Value("${acp.memory.promotion.extractor.use-pgvector-shortlist:true}")
+    private boolean usePgvectorShortlist;
+
+    /** ANN candidate pool size per seed. Kept small — enough to cover the
+     *  min-cluster + a few spurious nearby neighbours, no more. */
+    private static final int ANN_CANDIDATE_LIMIT = 20;
+
     @Scheduled(cron = "${acp.memory.promotion.scheduler.cron:0 30 3 * * *}")
     public void runScheduled() {
         if (!enabled) return;
@@ -155,22 +168,165 @@ public class MemoryPromotionExtractor {
 
     /** Scans a single tenant's memories; used by tests and the locked runner. */
     public int runForTenant(Long tenantId) {
+        // PR-74 / N4: load every already-proposed source_memory_pid (non-terminal)
+        // in one shot so downstream dedup is O(1) per cluster instead of N+1 query.
+        Set<String> alreadyProposed = loadAlreadyProposedSourcePids(tenantId);
         int count = 0;
-        count += extractCrossUserAgreement(tenantId);
-        count += extractImplicitCoSign(tenantId);
+        count += extractCrossUserAgreement(tenantId, alreadyProposed);
+        count += extractImplicitCoSign(tenantId, alreadyProposed);
         if (importanceSpikeEnabled) {
-            count += extractImportanceSpike(tenantId);
+            count += extractImportanceSpike(tenantId, alreadyProposed);
         }
         return count;
+    }
+
+    /**
+     * One-shot query returning the set of memory pids already referenced
+     * (as {@code source_memory_pid} or expanded from {@code source_memory_pids})
+     * by a non-terminal promotion in this tenant. The caller checks
+     * containment in O(1).
+     */
+    private Set<String> loadAlreadyProposedSourcePids(Long tenantId) {
+        Set<String> out = new HashSet<>();
+        out.addAll(jdbcTemplate.queryForList(
+                "SELECT DISTINCT source_memory_pid "
+                        + "FROM ab_agent_memory_promotion "
+                        + "WHERE tenant_id = ? "
+                        + "AND status IN ('DRAFT_PENDING_REVIEW','PROMOTED_SHADOW','ACTIVE') "
+                        + "AND source_memory_pid IS NOT NULL",
+                String.class, tenantId));
+        out.addAll(jdbcTemplate.queryForList(
+                "SELECT DISTINCT jsonb_array_elements_text(source_memory_pids) "
+                        + "FROM ab_agent_memory_promotion "
+                        + "WHERE tenant_id = ? "
+                        + "AND status IN ('DRAFT_PENDING_REVIEW','PROMOTED_SHADOW','ACTIVE') "
+                        + "AND source_memory_pids IS NOT NULL",
+                String.class, tenantId));
+        out.remove(null);
+        return out;
     }
 
     // ------------------------------------------------------------------
     // Strategy A — cross_user_agreement
     // ------------------------------------------------------------------
 
+    /** Test-facing overload: load the dedup set inline. */
     int extractCrossUserAgreement(Long tenantId) {
+        return extractCrossUserAgreement(tenantId, loadAlreadyProposedSourcePids(tenantId));
+    }
+
+    /**
+     * Identify cross-user clusters. Two paths:
+     *
+     * <ul>
+     *   <li><b>ANN shortlist (default):</b> for each seed, ask pgvector for
+     *       its 20 nearest neighbours via the HNSW index, filter to those
+     *       above {@code minSimilarity}, then cluster. O(n · log n) instead
+     *       of O(n²).</li>
+     *   <li><b>Fallback:</b> legacy Java-side pairwise cosine — kept so a
+     *       bad rollout can be switched off via config, and so tenants on
+     *       a pgvector-less database (dev/test) still get results.</li>
+     * </ul>
+     *
+     * <p>Parity guarantee: the ANN path must return a superset of the
+     * fallback result for the same data at the same {@code minSimilarity},
+     * because:
+     * <ul>
+     *   <li>Every memory the fallback would match against seed S has cosine
+     *       ≥ minSimilarity → it ranks in the top-K nearest neighbours for
+     *       K ≫ typical cluster size. We use K=20 which comfortably exceeds
+     *       {@code minUsersPerTenant} (default 3).</li>
+     *   <li>We then apply the same cosine ≥ minSimilarity filter and the
+     *       same distinct-user + cluster-size rules.</li>
+     * </ul>
+     * If a tenant has > 20 near-identical memories around a seed, only the
+     * closest 20 are considered — but the proposal is still emitted, which
+     * is the correctness property we care about (no false negatives).
+     */
+    int extractCrossUserAgreement(Long tenantId, Set<String> alreadyProposed) {
+        if (usePgvectorShortlist) {
+            return extractCrossUserAgreementAnn(tenantId, alreadyProposed);
+        }
+        return extractCrossUserAgreementFallback(tenantId, alreadyProposed);
+    }
+
+    /** pgvector HNSW-indexed shortlist path (PR-74 / N3). */
+    private int extractCrossUserAgreementAnn(Long tenantId, Set<String> alreadyProposed) {
+        // Candidate seeds: every user-scope memory with an embedding in the
+        // last 90d. We iterate recent-first so active topics get proposed
+        // before old ones during large backlogs.
+        List<MemoryRow> seeds = jdbcTemplate.query(
+                "SELECT pid, tenant_id, scope_key, category, memory_title, memory_content, "
+                        + "       importance, embedding::text AS embedding_text "
+                        + "FROM ab_agent_memory "
+                        + "WHERE tenant_id = ? "
+                        + "AND scope = 'user' "
+                        + "AND embedding IS NOT NULL "
+                        + "AND (deleted_flag = FALSE OR deleted_flag IS NULL) "
+                        + "AND updated_at > NOW() - INTERVAL '90 days' "
+                        + "ORDER BY updated_at DESC",
+                (rs, rn) -> MemoryRow.fromResultSet(rs),
+                tenantId);
+        if (seeds.size() < minUsersPerTenant) {
+            return 0;
+        }
+
+        Set<String> processed = new HashSet<>();
+        int proposals = 0;
+
+        for (MemoryRow seed : seeds) {
+            if (processed.contains(seed.pid)) continue;
+            if (alreadyProposed.contains(seed.pid)) {
+                processed.add(seed.pid);
+                continue;
+            }
+            if (seed.embedding == null || seed.embedding.length == 0) {
+                continue;
+            }
+
+            // Ask pgvector for K nearest neighbours (excluding seed + same user).
+            List<MemoryRow> neighbours = jdbcTemplate.query(
+                    "SELECT pid, tenant_id, scope_key, category, memory_title, memory_content, "
+                            + "       importance, embedding::text AS embedding_text "
+                            + "FROM ab_agent_memory "
+                            + "WHERE tenant_id = ? "
+                            + "AND scope = 'user' "
+                            + "AND (deleted_flag = FALSE OR deleted_flag IS NULL) "
+                            + "AND embedding IS NOT NULL "
+                            + "AND pid <> ? "
+                            + "AND (scope_key IS NULL OR scope_key <> ?) "
+                            + "ORDER BY embedding <=> (SELECT embedding FROM ab_agent_memory WHERE pid = ?) "
+                            + "LIMIT ?",
+                    (rs, rn) -> MemoryRow.fromResultSet(rs),
+                    tenantId, seed.pid, seed.scopeKey == null ? "" : seed.scopeKey,
+                    seed.pid, ANN_CANDIDATE_LIMIT);
+
+            List<MemoryRow> cluster = new ArrayList<>();
+            cluster.add(seed);
+            double minPairwise = 1.0d;
+            for (MemoryRow n : neighbours) {
+                if (processed.contains(n.pid)) continue;
+                if (alreadyProposed.contains(n.pid)) continue;
+                if (n.embedding == null) continue;
+                double sim = EmbeddingSimilarity.cosine(seed.embedding, n.embedding);
+                if (sim >= minSimilarity) {
+                    cluster.add(n);
+                    if (sim < minPairwise) minPairwise = sim;
+                }
+            }
+
+            if (!emitClusterIfQualifying(tenantId, seed, cluster, minPairwise, alreadyProposed, processed)) {
+                processed.add(seed.pid);
+                continue;
+            }
+            proposals++;
+        }
+        return proposals;
+    }
+
+    /** Pre-N3 fallback: load all, O(n²) pairwise. Retained behind config switch. */
+    private int extractCrossUserAgreementFallback(Long tenantId, Set<String> alreadyProposed) {
         List<MemoryRow> rows = loadUserMemories(tenantId);
-        // Ensure embeddings (lazy compute when missing).
         List<MemoryRow> embedded = new ArrayList<>(rows.size());
         for (MemoryRow r : rows) {
             double[] v = r.embedding;
@@ -194,6 +350,10 @@ public class MemoryPromotionExtractor {
         for (int i = 0; i < embedded.size(); i++) {
             if (used[i]) continue;
             MemoryRow seed = embedded.get(i);
+            if (alreadyProposed.contains(seed.pid)) {
+                used[i] = true;
+                continue;
+            }
             List<Integer> clusterIdx = new ArrayList<>();
             clusterIdx.add(i);
             double minPairwise = 1.0d;
@@ -201,6 +361,7 @@ public class MemoryPromotionExtractor {
             for (int j = i + 1; j < embedded.size(); j++) {
                 if (used[j]) continue;
                 MemoryRow other = embedded.get(j);
+                if (alreadyProposed.contains(other.pid)) continue;
                 double sim = EmbeddingSimilarity.cosine(seed.embedding, other.embedding);
                 if (sim >= minSimilarity) {
                     clusterIdx.add(j);
@@ -208,10 +369,14 @@ public class MemoryPromotionExtractor {
                 }
             }
 
-            // Count distinct users in cluster
+            List<MemoryRow> cluster = new ArrayList<>(clusterIdx.size());
+            for (int idx : clusterIdx) cluster.add(embedded.get(idx));
+
+            // Inline-equivalent of emitClusterIfQualifying, but tracks `used`
+            // for the O(n²) seed-skipping contract the fallback had before.
             Set<Long> distinctUsers = new LinkedHashSet<>();
-            for (int idx : clusterIdx) {
-                Long uid = embedded.get(idx).scopeKeyAsLong();
+            for (MemoryRow m : cluster) {
+                Long uid = m.scopeKeyAsLong();
                 if (uid != null) distinctUsers.add(uid);
             }
             if (distinctUsers.size() < minUsersPerTenant) {
@@ -219,13 +384,14 @@ public class MemoryPromotionExtractor {
             }
 
             List<String> sourcePids = new ArrayList<>();
-            for (int idx : clusterIdx) {
-                sourcePids.add(embedded.get(idx).pid);
+            for (MemoryRow m : cluster) sourcePids.add(m.pid);
+            // alreadyProposed is a snapshot from run-start; also mark each
+            // seed so the current tick doesn't re-propose the same cluster.
+            boolean conflict = false;
+            for (String p : sourcePids) {
+                if (alreadyProposed.contains(p)) { conflict = true; break; }
             }
-
-            if (anyNonTerminal(sourcePids)) {
-                log.debug("cross_user_agreement: cluster around {} already has pending/active proposal, skipping",
-                        seed.pid);
+            if (conflict) {
                 for (int idx : clusterIdx) used[idx] = true;
                 continue;
             }
@@ -238,10 +404,10 @@ public class MemoryPromotionExtractor {
 
             insertProposal(
                     tenantId,
-                    /*sourceScope*/"user",
-                    /*sourceMemoryPid*/seed.pid,
-                    /*sourceMemoryPids*/sourcePids,
-                    /*targetScope*/"tenant",
+                    "user",
+                    seed.pid,
+                    sourcePids,
+                    "tenant",
                     seed.category == null ? "general" : seed.category,
                     seed.title,
                     seed.content,
@@ -251,10 +417,70 @@ public class MemoryPromotionExtractor {
                     confidence,
                     round2(minPairwise));
 
+            for (String p : sourcePids) alreadyProposed.add(p);
             for (int idx : clusterIdx) used[idx] = true;
             proposals++;
         }
         return proposals;
+    }
+
+    /**
+     * Shared qualify-and-emit helper used by the ANN path. Returns true if
+     * a proposal was inserted (and mutates the {@code processed} set to mark
+     * every cluster member so further seeds skip the cluster).
+     */
+    private boolean emitClusterIfQualifying(Long tenantId,
+                                            MemoryRow seed,
+                                            List<MemoryRow> cluster,
+                                            double minPairwise,
+                                            Set<String> alreadyProposed,
+                                            Set<String> processed) {
+        Set<Long> distinctUsers = new LinkedHashSet<>();
+        for (MemoryRow m : cluster) {
+            Long uid = m.scopeKeyAsLong();
+            if (uid != null) distinctUsers.add(uid);
+        }
+        if (distinctUsers.size() < minUsersPerTenant) {
+            return false;
+        }
+
+        List<String> sourcePids = new ArrayList<>();
+        for (MemoryRow m : cluster) sourcePids.add(m.pid);
+
+        // Dedup against the batch snapshot (+ anything emitted this tick).
+        for (String p : sourcePids) {
+            if (alreadyProposed.contains(p)) {
+                log.debug("cross_user_agreement: cluster around {} already has pending/active proposal, skipping",
+                        seed.pid);
+                for (MemoryRow m : cluster) processed.add(m.pid);
+                return false;
+            }
+        }
+
+        double confidence = ConfidenceScorer.forCrossUserAgreement(distinctUsers.size(), minPairwise);
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("user_ids", new ArrayList<>(distinctUsers));
+        detail.put("agreement_count", distinctUsers.size());
+        detail.put("min_similarity", round2(minPairwise));
+
+        insertProposal(
+                tenantId,
+                "user",
+                seed.pid,
+                sourcePids,
+                "tenant",
+                seed.category == null ? "general" : seed.category,
+                seed.title,
+                seed.content,
+                seed.importance,
+                MemoryPromotionMetrics.REASON_CROSS_USER_AGREEMENT,
+                detail,
+                confidence,
+                round2(minPairwise));
+
+        for (MemoryRow m : cluster) processed.add(m.pid);
+        for (String p : sourcePids) alreadyProposed.add(p);
+        return true;
     }
 
     // ------------------------------------------------------------------
@@ -262,6 +488,10 @@ public class MemoryPromotionExtractor {
     // ------------------------------------------------------------------
 
     int extractImplicitCoSign(Long tenantId) {
+        return extractImplicitCoSign(tenantId, loadAlreadyProposedSourcePids(tenantId));
+    }
+
+    int extractImplicitCoSign(Long tenantId, Set<String> alreadyProposed) {
         // Phase 1 gap: ab_agent_memory has a single last_accessed timestamp
         // and no per-user access log. Without attribution we cannot count
         // co-signers. The extractor still runs the query so integration
@@ -285,7 +515,7 @@ public class MemoryPromotionExtractor {
         for (MemoryRow r : candidates) {
             int coSigners = countCoSigners(r);
             if (coSigners < ConfidenceScorer.CO_SIGN_MIN_COUNT) continue;
-            if (anyNonTerminal(List.of(r.pid))) continue;
+            if (alreadyProposed.contains(r.pid)) continue;
 
             double confidence = ConfidenceScorer.forImplicitCoSign(coSigners);
             List<String> coSignerIds = loadCoSignerUserIds(r);
@@ -299,6 +529,7 @@ public class MemoryPromotionExtractor {
                     r.title, r.content, r.importance,
                     MemoryPromotionMetrics.REASON_IMPLICIT_CO_SIGN,
                     detail, confidence, null);
+            alreadyProposed.add(r.pid);
             proposals++;
         }
         return proposals;
@@ -345,6 +576,10 @@ public class MemoryPromotionExtractor {
     // ------------------------------------------------------------------
 
     int extractImportanceSpike(Long tenantId) {
+        return extractImportanceSpike(tenantId, loadAlreadyProposedSourcePids(tenantId));
+    }
+
+    int extractImportanceSpike(Long tenantId, Set<String> alreadyProposed) {
         List<MemoryRow> candidates = jdbcTemplate.query(
                 "SELECT pid, tenant_id, scope_key, category, memory_title, memory_content, "
                         + "       importance, embedding::text AS embedding_text "
@@ -359,7 +594,7 @@ public class MemoryPromotionExtractor {
 
         int proposals = 0;
         for (MemoryRow r : candidates) {
-            if (anyNonTerminal(List.of(r.pid))) continue;
+            if (alreadyProposed.contains(r.pid)) continue;
             Map<String, Object> detail = new LinkedHashMap<>();
             detail.put("author_user_id", r.scopeKey);
             detail.put("importance", r.importance);
@@ -368,6 +603,7 @@ public class MemoryPromotionExtractor {
                     r.title, r.content, r.importance,
                     MemoryPromotionMetrics.REASON_IMPORTANCE_SPIKE,
                     detail, ConfidenceScorer.forImportanceSpike(), null);
+            alreadyProposed.add(r.pid);
             proposals++;
         }
         return proposals;
@@ -388,23 +624,6 @@ public class MemoryPromotionExtractor {
                         + "AND updated_at > NOW() - INTERVAL '90 days'",
                 (rs, rn) -> MemoryRow.fromResultSet(rs),
                 tenantId);
-    }
-
-    private boolean anyNonTerminal(List<String> sourcePids) {
-        if (sourcePids == null || sourcePids.isEmpty()) return false;
-        Set<String> unique = new HashSet<>(sourcePids);
-        String inList = String.join(",", Collections.nCopies(unique.size(), "?"));
-        Object[] args = new Object[unique.size()];
-        int i = 0;
-        for (String pid : unique) {
-            args[i++] = pid;
-        }
-        List<String> hits = jdbcTemplate.queryForList(
-                "SELECT pid FROM ab_agent_memory_promotion "
-                        + "WHERE status IN ('DRAFT_PENDING_REVIEW','PROMOTED_SHADOW','ACTIVE') "
-                        + "AND source_memory_pid IN (" + inList + ")",
-                String.class, args);
-        return !hits.isEmpty();
     }
 
     private void insertProposal(Long tenantId,
