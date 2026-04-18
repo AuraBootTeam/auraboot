@@ -52,3 +52,62 @@ acp.memory.promotion.rationale.enabled=true
   column exists and wiring is stubbed for a Phase-2 LLM call.
 - **Applier / Activator / Expirer**: Phase 2 (PR-66).
 - **REST + UI**: Phase 3 / 4.
+
+---
+
+## Mission Control UI (Phase 4, PR-68)
+
+Reviewer workflow surface at `/aurabot/memory-promotions`.
+
+### Tabs
+
+1. **Pending Review** (default) — `GET /api/memory/promotions?status=DRAFT_PENDING_REVIEW&sort=confidence_desc`
+   - Per-row card: confidence bar, category badge, proposed title + content,
+     AI rationale, expandable evidence (source user_ids), batch checkbox,
+     approve / reject / provenance buttons.
+   - Always-visible PII warning banner above the approve action.
+2. **Shadow Observation** — `?status=PROMOTED_SHADOW`
+   - Shows "N hours remaining" countdown vs `shadow_ends_at`.
+   - Retract button → modal requiring a free-form reason → `POST /retract`.
+3. **Audit History** — `ACTIVE` + `REVIEWED_REJECTED` + `RETRACTED` (three parallel
+   requests merged + sorted by `created_at desc`). Read-only table with
+   provenance drill-down.
+
+### Keyboard shortcuts (Pending tab)
+
+| Key | Action |
+|-----|--------|
+| `j` | Select next proposal |
+| `k` | Select previous proposal |
+| `a` | Approve currently selected |
+| `r` | Open reject modal |
+| `s` | Skip (advance selection without mutation) |
+| `e` | Toggle evidence expansion |
+
+Shortcuts are suppressed while focus is inside an `input` / `textarea` / `select`
+or while any modal (reject / batch / provenance) is open.
+
+### Batch approve drawer
+
+- Enabled when ≥ 1 row is checked.
+- Forwarded to `POST /api/memory/promotions/batch-approve` which filters out
+  entries with `confidence < 0.80` — the drawer surfaces the floor inline.
+- PII warning repeats inside the drawer so bulk approvers cannot miss it.
+
+### Provenance modal
+
+- `GET /api/memory/promotions/{pid}/provenance` renders a timeline:
+  source memories → promotion step → promoted tenant memory (if any).
+- Author attribution is pulled from `ab_user` when the user row still exists.
+
+### Grounding integration (`[SHADOW / 近期团队记忆 · 观察中]`)
+
+`AgentMemoryService.searchScoped` / `loadScopedByImportance` return
+`shadow_mode` alongside other columns. `ActiveMemoryService.snippet()`
+prefixes the content with the bilingual marker when `shadow_mode=TRUE`
+so AuraBot's prompt context conveys the observation-window uncertainty
+and can preface its reply with "根据团队近期记忆（尚在观察期）：...".
+
+Integration test: `ActiveMemoryShadowAnnotationIntegrationTest` pins three
+shapes — shadow tenant memory annotated; active tenant memory verbatim;
+importance-only path also annotated.
