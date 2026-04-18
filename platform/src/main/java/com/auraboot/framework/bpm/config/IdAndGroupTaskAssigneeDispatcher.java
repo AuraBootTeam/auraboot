@@ -53,17 +53,28 @@ public class IdAndGroupTaskAssigneeDispatcher implements TaskAssigneeDispatcher 
         // currentApprover) when it is itself a user id / assignee reference.
         String miCollectionExpr = properties.getOrDefault("miCollection", "");
         if (!miCollectionExpr.isBlank()) {
+            // GAP-263: when miCollection is explicitly declared, this userTask is a
+            // multi-instance activity. The candidate list defines the iteration set,
+            // so an empty collection MUST return an empty candidate list — NOT fall
+            // through to assigneeType / starter fallback (which would silently
+            // materialize a task against the wrong user). Per BPMN 2.0 §13.2 an
+            // empty MI activity should be skipped entirely; the SmartEngine fork
+            // currently does NOT honor this (see BLOCKED-UPSTREAM note on GAP-263),
+            // but that's no excuse to mask the empty case here.
             List<String> miAssignees = resolveMultiInstanceAssignees(miCollectionExpr, request);
-            if (!miAssignees.isEmpty()) {
-                for (int i = 0; i < miAssignees.size(); i++) {
-                    addCandidate(candidates, miAssignees.get(i), AssigneeTypeConstant.USER, i + 1);
-                }
+            for (int i = 0; i < miAssignees.size(); i++) {
+                addCandidate(candidates, miAssignees.get(i), AssigneeTypeConstant.USER, i + 1);
+            }
+            if (candidates.isEmpty()) {
+                log.warn("Multi-instance collection '{}' resolved to empty list for activity {}; "
+                        + "returning empty candidate list. SmartEngine fork must short-circuit "
+                        + "the MI activity (GAP-263 SEQ-MI-GAP-2).",
+                        miCollectionExpr, activity.getId());
+            } else {
                 log.debug("Multi-instance expansion for activity {}: {} instances",
                         activity.getId(), candidates.size());
-                return candidates;
             }
-            log.warn("Multi-instance collection '{}' resolved to empty list for activity {}; falling through",
-                    miCollectionExpr, activity.getId());
+            return candidates;
         }
 
         if (!assigneeType.isBlank()) {
