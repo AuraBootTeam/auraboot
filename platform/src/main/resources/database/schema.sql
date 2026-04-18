@@ -6983,11 +6983,21 @@ COMMENT ON TABLE ab_agent_dry_run_support IS 'Registry of which tool_refs suppor
 INSERT INTO ab_agent_dry_run_support (pid, tenant_id, tool_ref_pattern, support_level, hint) VALUES
 ('DRS_DSL_QUERY_ANY',  -1, 'nq_*',       'FULL', 'Named queries are side-effect free; FULL dry-run is just running the query'),
 ('DRS_DSL_QUERY_NQ',   -1, 'dsl.query',  'FULL', 'Built-in dsl.query skill is always read-only'),
-('DRS_DSL_CMD_BLOCK',  -1, 'cmd_*',      'NONE', 'DSL write commands need CommandPipeline dry-run (not yet wired)'),
-('DRS_DSL_COMMAND',    -1, 'dsl.command','NONE', 'Built-in dsl.command skill is always side-effectful'),
+('DRS_DSL_CMD_BLOCK',  -1, 'cmd_*',      'SIMULATED', 'CommandPipeline runs under a rollback-only transaction (PR-40)'),
+('DRS_DSL_COMMAND',    -1, 'dsl.command','SIMULATED', 'CommandPipeline runs under a rollback-only transaction (PR-40)'),
 ('DRS_CODE_BLOCK',     -1, 'code.*',     'NONE', 'Code substrate without sandbox dry-run capability is unsafe'),
 ('DRS_API_BLOCK',      -1, 'api_*',      'NONE', 'API calls lack dry_run_safe annotations by default')
 ON CONFLICT DO NOTHING;
+
+-- PR-40 migration: upgrade platform defaults from NONE → SIMULATED now that
+-- CommandPipeline supports rollback-only dry-run. Safe to re-run.
+UPDATE ab_agent_dry_run_support
+SET support_level = 'SIMULATED',
+    hint = 'CommandPipeline runs under a rollback-only transaction (PR-40)',
+    updated_at = CURRENT_TIMESTAMP
+WHERE tenant_id = -1
+  AND tool_ref_pattern IN ('cmd_*', 'dsl.command')
+  AND support_level = 'NONE';
 
 -- Seed: platform built-in capabilities (tenant_id = -1)
 -- Skills are the built-in per-tenant generic codes (dsl.query / dsl.command)
