@@ -7766,6 +7766,7 @@ COMMENT ON TABLE ab_agent_memory_promotion IS
 CREATE TABLE IF NOT EXISTS ab_agent_memory_access_log (
     id            BIGSERIAL PRIMARY KEY,
     memory_pid    VARCHAR(26)  NOT NULL,
+    tenant_id     BIGINT       NOT NULL,
     user_id       VARCHAR(64)  NOT NULL,
     access_day    DATE         NOT NULL DEFAULT CURRENT_DATE,
     access_count  INTEGER      NOT NULL DEFAULT 1,
@@ -7777,6 +7778,37 @@ CREATE INDEX IF NOT EXISTS idx_memory_access_log_pid_time
     ON ab_agent_memory_access_log (memory_pid, last_seen_at DESC);
 CREATE INDEX IF NOT EXISTS idx_memory_access_log_user
     ON ab_agent_memory_access_log (user_id, last_seen_at DESC);
+CREATE INDEX IF NOT EXISTS idx_memory_access_log_tenant
+    ON ab_agent_memory_access_log (tenant_id);
 COMMENT ON TABLE ab_agent_memory_access_log IS
     'Per-user memory access log (PR-66 Phase 2). '
     'Feeds implicit_co_sign detection in MemoryPromotionExtractor.';
+
+-- PR-73: access log tightening — backfill tenant_id and add FK to ab_agent_memory.
+-- Idempotent: no-op on fresh installs (tenant_id already NOT NULL from CREATE above),
+-- performs backfill + constraint tightening on pre-PR-73 databases.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'ab_agent_memory_access_log' AND column_name = 'tenant_id'
+  ) THEN
+    ALTER TABLE ab_agent_memory_access_log ADD COLUMN tenant_id BIGINT;
+    UPDATE ab_agent_memory_access_log al
+       SET tenant_id = m.tenant_id
+      FROM ab_agent_memory m
+     WHERE al.memory_pid = m.pid AND al.tenant_id IS NULL;
+    DELETE FROM ab_agent_memory_access_log WHERE tenant_id IS NULL;
+    ALTER TABLE ab_agent_memory_access_log ALTER COLUMN tenant_id SET NOT NULL;
+    CREATE INDEX IF NOT EXISTS idx_memory_access_log_tenant
+        ON ab_agent_memory_access_log (tenant_id);
+  END IF;
+END
+$$;
+
+ALTER TABLE ab_agent_memory_access_log
+    DROP CONSTRAINT IF EXISTS fk_memory_access_log_memory;
+ALTER TABLE ab_agent_memory_access_log
+    ADD CONSTRAINT fk_memory_access_log_memory
+    FOREIGN KEY (memory_pid) REFERENCES ab_agent_memory(pid)
+    ON DELETE CASCADE;
