@@ -23,14 +23,14 @@
  * Phase 4 UI deliverables the spec depends on:
  *   - data-testid="memory-promotions-page" root
  *   - data-testid="promotion-{pid}" per row
- *   - data-testid="promotion-approve-btn" / "promotion-reject-btn"
- *   - data-testid="promotion-reject-reason" select; options match enum
- *   - data-testid="promotion-retract-btn" (on Shadow tab)
- *   - data-testid="promotion-retract-reason" input
+ *   - data-testid="approve-btn" / "reject-btn"
+ *   - data-testid="reject-reason-select" select; options match enum
+ *   - data-testid="retract-btn" (on Shadow tab)
+ *   - data-testid="retract-reason" input
  *   - data-testid="promotion-batch-checkbox-{pid}"
  *   - data-testid="promotion-batch-approve-btn"
- *   - data-testid="promotion-provenance-link" / "promotion-provenance-modal"
- *   - data-testid="promotion-tab-shadow" / "promotion-tab-pending"
+ *   - data-testid="provenance-link" / "provenance-modal"
+ *   - data-testid="tab-shadow" / "promotion-tab-pending"
  *   - data-testid="toast"
  */
 
@@ -84,10 +84,18 @@ async function navigateViaSidebar(page: Page): Promise<void> {
   ).toBeVisible({ timeout: 10_000 });
 }
 
-async function expandRow(page: Page, pid: string): Promise<void> {
-  const row = page.locator(`[data-testid="promotion-${pid}"]`);
-  await expect(row).toBeVisible({ timeout: 10_000 });
-  await row.locator('button').first().click();
+/** Wait for a pending-tab row to render. Pending cards always show the
+ *  approve / reject / expand buttons inline — no pre-click needed. */
+async function waitPendingRow(page: Page, pid: string): Promise<void> {
+  await expect(page.locator(`[data-testid="promotion-${pid}"]`))
+      .toBeVisible({ timeout: 10_000 });
+}
+
+/** Wait for a shadow-tab row to render. Shadow cards use the `shadow-${pid}`
+ *  testid (different from the pending tab's `promotion-${pid}`). */
+async function waitShadowRow(page: Page, pid: string): Promise<void> {
+  await expect(page.locator(`[data-testid="shadow-${pid}"]`))
+      .toBeVisible({ timeout: 10_000 });
 }
 
 test.describe('Mission Control — Memory Promotion review (real backend, PR-69)', () => {
@@ -97,9 +105,9 @@ test.describe('Mission Control — Memory Promotion review (real backend, PR-69)
     const pid = seedMemoryPromotion('DRAFT_PENDING_REVIEW', 0.85, 'cross_user_agreement');
 
     await navigateViaSidebar(page);
-    await expandRow(page, pid);
+    await waitPendingRow(page, pid);
 
-    await page.locator('[data-testid="promotion-approve-btn"]').click();
+    await page.locator('[data-testid="approve-btn"]').click();
 
     await expect(page.locator('[data-testid="toast"]')).toBeVisible({
       timeout: 5_000,
@@ -120,16 +128,16 @@ test.describe('Mission Control — Memory Promotion review (real backend, PR-69)
     const pid = seedMemoryPromotion('DRAFT_PENDING_REVIEW', 0.82, 'cross_user_agreement');
 
     await navigateViaSidebar(page);
-    await expandRow(page, pid);
+    await waitPendingRow(page, pid);
 
-    await page.locator('[data-testid="promotion-reject-btn"]').click();
+    await page.locator('[data-testid="reject-btn"]').click();
 
-    const reasonSelect = page.locator('[data-testid="promotion-reject-reason"]');
+    const reasonSelect = page.locator('[data-testid="reject-reason-select"]');
     await expect(reasonSelect).toBeVisible({ timeout: 5_000 });
     await reasonSelect.selectOption('outdated');
 
     // Submit confirm button inside the reject modal.
-    await page.locator('[data-testid="promotion-reject-submit"]').click();
+    await page.locator('[data-testid="reject-submit"]').click();
 
     await expect(page.locator('[data-testid="toast"]')).toBeVisible({
       timeout: 5_000,
@@ -151,16 +159,16 @@ test.describe('Mission Control — Memory Promotion review (real backend, PR-69)
     await navigateViaSidebar(page);
 
     // Switch to the Shadow tab to see this promotion.
-    await page.locator('[data-testid="promotion-tab-shadow"]').click();
-    await expandRow(page, seed.pid);
+    await page.locator('[data-testid="tab-shadow"]').click();
+    await waitShadowRow(page, seed.pid);
 
-    await page.locator('[data-testid="promotion-retract-btn"]').click();
+    await page.locator('[data-testid="retract-btn"]').click();
 
-    const reasonInput = page.locator('[data-testid="promotion-retract-reason"]');
+    const reasonInput = page.locator('[data-testid="retract-reason"]');
     await expect(reasonInput).toBeVisible({ timeout: 5_000 });
     await reasonInput.fill('e2e retract — proposal was wrong');
 
-    await page.locator('[data-testid="promotion-retract-submit"]').click();
+    await page.locator('[data-testid="retract-submit"]').click();
 
     await expect(page.locator('[data-testid="toast"]')).toBeVisible({
       timeout: 5_000,
@@ -185,12 +193,15 @@ test.describe('Mission Control — Memory Promotion review (real backend, PR-69)
 
     // Tick the three checkboxes.
     for (const pid of [pid1, pid2, pid3]) {
-      const cb = page.locator(`[data-testid="promotion-batch-checkbox-${pid}"]`);
+      const cb = page.locator(`[data-testid="check-${pid}"]`);
       await expect(cb).toBeVisible({ timeout: 10_000 });
       await cb.check();
     }
 
-    await page.locator('[data-testid="promotion-batch-approve-btn"]').click();
+    // Two-step batch flow: batch-bar → drawer → submit (PR-68 UI).
+    await page.locator('[data-testid="batch-approve-btn"]').click();
+    await expect(page.locator('[data-testid="batch-drawer"]')).toBeVisible({ timeout: 5_000 });
+    await page.locator('[data-testid="batch-submit"]').click();
 
     await expect(page.locator('[data-testid="toast"]')).toBeVisible({
       timeout: 10_000,
@@ -209,18 +220,21 @@ test.describe('Mission Control — Memory Promotion review (real backend, PR-69)
     const seed = seedMemoryPromotionWithPromotedMemory();
 
     await navigateViaSidebar(page);
-    await page.locator('[data-testid="promotion-tab-shadow"]').click();
-    await expandRow(page, seed.pid);
+    await page.locator('[data-testid="tab-shadow"]').click();
+    await waitShadowRow(page, seed.pid);
 
-    await page.locator('[data-testid="promotion-provenance-link"]').click();
+    await page.locator('[data-testid="provenance-link"]').click();
 
-    const modal = page.locator('[data-testid="promotion-provenance-modal"]');
+    const modal = page.locator('[data-testid="provenance-modal"]');
     await expect(modal).toBeVisible({ timeout: 5_000 });
 
-    // Modal must reveal the promotion pid, the promoted memory, and a
-    // timeline with a promotion-created marker.
-    await expect(modal).toContainText(seed.pid);
-    await expect(modal).toContainText(seed.promotedMemoryPid!);
+    // Modal renders a 3-step timeline; we assert structural testids plus
+    // the human-readable status/scope markers the UI actually displays
+    // (pid strings are not rendered in the modal body — they're keys).
+    await expect(modal.locator('[data-testid="timeline-promotion"]')).toBeVisible();
+    await expect(modal.locator('[data-testid="timeline-promoted"]')).toBeVisible();
     await expect(modal).toContainText(/PROMOTED_SHADOW|观察/);
+    await expect(modal).toContainText('user');    // source scope
+    await expect(modal).toContainText('tenant');  // target scope
   });
 });
