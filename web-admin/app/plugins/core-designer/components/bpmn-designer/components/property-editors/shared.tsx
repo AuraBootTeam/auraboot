@@ -48,6 +48,7 @@ export function MultiInstanceSection({
                 checked={config?.enabled || false}
                 onChange={(e) => handleChange('enabled', e.target.checked)}
                 className="mr-2"
+                data-testid="multiinstance-enabled"
               />
               <span className="text-sm font-medium text-gray-700">{t('bpmn.prop.multiInstance.enable')}</span>
             </label>
@@ -65,6 +66,7 @@ export function MultiInstanceSection({
                       checked={config?.sequential === true}
                       onChange={() => handleChange('sequential', true)}
                       className="mr-1"
+                      data-testid="multiinstance-sequential"
                     />
                     <span className="text-sm text-gray-700">{t('bpmn.prop.multiInstance.sequential')}</span>
                   </label>
@@ -89,6 +91,7 @@ export function MultiInstanceSection({
                   onChange={(e) => handleChange('collection', e.target.value)}
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                   placeholder="${assigneeList}"
+                  data-testid="multiinstance-collection"
                 />
               </div>
 
@@ -100,6 +103,7 @@ export function MultiInstanceSection({
                   onChange={(e) => handleChange('elementVariable', e.target.value)}
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                   placeholder="assignee"
+                  data-testid="multiinstance-element-variable"
                 />
               </div>
 
@@ -111,6 +115,7 @@ export function MultiInstanceSection({
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                   rows={2}
                   placeholder="${nrOfCompletedInstances/nrOfInstances >= 0.5}"
+                  data-testid="multiinstance-completion-condition"
                 />
               </div>
 
@@ -128,6 +133,7 @@ export function MultiInstanceSection({
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                   min="1"
                   placeholder={t('bpmn.prop.multiInstance.loopCardinalityPlaceholder')}
+                  data-testid="multiinstance-cardinality"
                 />
               </div>
             </>
