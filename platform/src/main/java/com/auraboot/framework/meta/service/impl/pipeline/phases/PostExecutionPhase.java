@@ -52,6 +52,25 @@ public class PostExecutionPhase implements CommandPhase {
 
     @Override
     public void execute(CommandPipelineContext ctx) {
+        boolean dryRun = ctx.getRequest() != null && ctx.getRequest().isDryRun();
+
+        // PR-62 R2-N2: PostExecutionPhase runs arbitrary side effects
+        // declared by `execConfig` (side-effect rules create/update other
+        // model records), roll-up summaries, governance snapshots, and
+        // postActions (including `start_process` which kicks off a BPM
+        // process instance via SmartEngine). While every path today joins
+        // the outer transaction through @Transactional(REQUIRED), BPM
+        // process start may trigger async task listeners and downstream
+        // state persistence that are easy to refactor into non-JDBC
+        // emissions. We gate the entire phase under dry-run to make the
+        // intent explicit and future-proof — see learning-loop.md
+        // "Plugin handler dry-run contract".
+        if (dryRun) {
+            log.info("Dry-run: skipped PostExecutionPhase (side effects / roll-up / governance / postActions) for command {}",
+                    ctx.getCommand() != null ? ctx.getCommand().getCode() : "<unknown>");
+            return;
+        }
+
         // Side effects
         sideEffectExecutor.executeSideEffectPhase(ctx.getExecConfig(), ctx.getPayload(),
                 ctx.getTenantId(), ctx.getUserId(), ctx.getCommand(), ctx.getRequest(), ctx.getFieldMapResults());
