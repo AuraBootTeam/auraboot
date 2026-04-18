@@ -117,6 +117,29 @@ class MetaModelServiceVirtualIntegrationTest extends BaseIntegrationTest {
         assertThat(reloaded.getCapabilities().isCreate()).isTrue();
     }
 
+    /**
+     * P1 Followup Issue A: ModelDefinition.primaryKey must round-trip through
+     * the extension JSONB column so callers don't need the capabilities.detailKeyField
+     * workaround (T7/T9/T12).
+     */
+    @Test
+    void save_and_reload_preserves_primaryKey() {
+        String code = "p1_t13_pk_" + System.currentTimeMillis();
+        ModelDefinition def = ModelDefinition.builder()
+            .code(code)
+            .displayName("PrimaryKey Roundtrip")
+            .sourceType("namedQuery")
+            .sourceRef("queries/pk_roundtrip.sql")
+            .primaryKey("order_id")
+            .capabilities(ModelCapabilities.virtualReadOnly())
+            .build();
+
+        metaModelService.saveDefinition(def);
+        ModelDefinition reloaded = metaModelService.getDefinitionByCode(code);
+        assertThat(reloaded).isNotNull();
+        assertThat(reloaded.getPrimaryKey()).isEqualTo("order_id");
+    }
+
     @Test
     void malformed_capabilities_json_fails_fast_on_reload() {
         // Directly insert a row with invalid JSON via JDBC to simulate corruption.

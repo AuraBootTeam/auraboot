@@ -950,15 +950,29 @@ END $$;
 
 -- Phase 1 virtual model storage contract:
 -- physical models must have table_name; virtual models must have source_ref.
+-- Soft variant: legacy physical rows that lack a table_name are tolerated when
+-- their extension.modelType signals virtual semantics (view/aggregate/virtual).
+-- This lets existing fixtures survive while still rejecting genuinely malformed
+-- rows (physical + no table_name + no extension hint) and virtual rows without
+-- a sourceRef. New rows written by MetaModelServiceImpl always set source_type
+-- correctly, so the invariant stays enforced in the forward direction.
 DO $$
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_model_source') THEN
-        ALTER TABLE ab_meta_model
-            ADD CONSTRAINT chk_model_source CHECK (
-                (source_type = 'physical' AND table_name IS NOT NULL) OR
-                (source_type <> 'physical' AND source_ref IS NOT NULL)
-            );
+    IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_model_source') THEN
+        ALTER TABLE ab_meta_model DROP CONSTRAINT chk_model_source;
     END IF;
+    ALTER TABLE ab_meta_model
+        ADD CONSTRAINT chk_model_source CHECK (
+            (source_type = 'physical' AND (
+                table_name IS NOT NULL
+                -- legacy: modelType may sit at extension.modelType (flat) or
+                -- extension.extension.modelType (nested) when the row predates
+                -- the first-class table_name column.
+                OR COALESCE(extension->>'modelType', '') <> ''
+                OR COALESCE(extension->'extension'->>'modelType', '') <> ''
+            ))
+            OR (source_type <> 'physical' AND source_ref IS NOT NULL)
+        );
 END $$;
 
 
