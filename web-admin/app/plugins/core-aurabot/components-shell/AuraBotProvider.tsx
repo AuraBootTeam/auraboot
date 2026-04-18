@@ -36,6 +36,7 @@ interface SimpleMessage {
     | 'error'
     | 'tool_loading'
     | 'tool_result'
+    | 'result_contract'
     | 'confirm_card'
     | 'tool_executed'
     | 'tool_cancelled';
@@ -46,6 +47,7 @@ interface SimpleMessage {
   toolName?: string;
   toolInput?: Record<string, any>;
   toolResult?: Record<string, any>;
+  resultContract?: import('../types/ResultContract').ResultContract;
   traceId?: string;
 }
 
@@ -711,6 +713,19 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
               if (data?.action === 'form_fill' && data?.fields && formFillHandlerRef.current) {
                 formFillHandlerRef.current(data.fields);
               }
+            },
+            onResultContract: (contract) => {
+              dispatch({
+                type: 'add_tool_message',
+                payload: {
+                  id: `rc-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                  type: 'result_contract',
+                  sender: 'bot',
+                  timestamp: Date.now(),
+                  content: contract.textSummary ?? '',
+                  resultContract: contract,
+                },
+              });
             },
             onConfirmRequired: (
               toolId: string,
