@@ -49,4 +49,10 @@ export const RESOURCES: PluginResource[] = [
     menu: false, parentKey: 'aurabot.knowledge', permission: 'aurabot.knowledge.read',
     file: './plugins/core-aurabot/pages/aurabot/knowledge.$kbPid.tsx',
   },
+  {
+    key: 'aurabot.learning-drafts', path: '/aurabot/learning-drafts',
+    title: { en: 'Skill Drafts', zh: '技能草稿' }, icon: 'lightbulb',
+    menu: { order: 35, group: 'aurabot' }, permission: 'aurabot.run.read',
+    file: './plugins/core-aurabot/pages/mission-control/learning-drafts.tsx',
+  },
 ]
