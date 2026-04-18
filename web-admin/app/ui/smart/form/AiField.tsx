@@ -31,6 +31,12 @@ export interface AiFieldConfig {
 }
 
 export interface AiFieldProps {
+  /** Form field name for hidden input submission */
+  name?: string;
+  /** Field label */
+  label?: string;
+  /** Whether the field is required */
+  required?: boolean;
   /** Current field value */
   value?: string;
   /** Callback when value changes */
@@ -63,6 +69,9 @@ const OPERATION_LABELS: Record<AiOperation, { label: string; icon: string }> = {
  * AiField - AI-enhanced text field with generation capabilities
  */
 export const AiField: React.FC<AiFieldProps> = ({
+  name,
+  label,
+  required = false,
   value = '',
   onChange,
   aiConfig,
@@ -142,14 +151,31 @@ export const AiField: React.FC<AiFieldProps> = ({
 
   if (readOnly) {
     return (
-      <div className={cn('text-sm text-gray-700', className)}>
-        {value || <span className="text-gray-400">-</span>}
+      <div className={className}>
+        {label && (
+          <label className="mb-1 block text-sm font-medium text-gray-700">
+            {label}
+            {required && <span className="ml-0.5 text-red-500">*</span>}
+          </label>
+        )}
+        {name && <input type="hidden" name={name} value={value} />}
+        <div className="text-sm text-gray-700">
+          {value || <span className="text-gray-400">-</span>}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className={cn('relative', className)}>
+    <div className={className}>
+      {label && (
+        <label className="mb-1 block text-sm font-medium text-gray-700">
+          {label}
+          {required && <span className="ml-0.5 text-red-500">*</span>}
+        </label>
+      )}
+      {name && <input type="hidden" name={name} value={value} />}
+      <div className="relative">
       {/* Text area */}
       <textarea
         value={value}
@@ -262,6 +288,7 @@ export const AiField: React.FC<AiFieldProps> = ({
             {error}
           </span>
         )}
+      </div>
       </div>
     </div>
   );
