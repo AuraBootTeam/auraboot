@@ -16,10 +16,19 @@ const GREP = /@bpm-regression/;
 
 export default defineConfig({
   ...ossConfig,
-  projects: (ossConfig.projects ?? []).map((project) => {
-    if (project.name === 'auth') {
-      return project;
-    }
-    return { ...project, grep: GREP };
-  }),
+  // Filter out chromium-deep — its sole purpose (per playwright.config.ts) is to
+  // isolate resource-intensive *-deep.spec.ts files with workers:1. The OSS
+  // config wrapper overrides every project's testMatch with the OSS scope,
+  // which inadvertently pulls all bpm specs into chromium-deep too, causing
+  // each test to run twice and surfacing flakiness from second-pass UI state.
+  // Our @bpm-regression specs aren't named *-deep.spec.ts and don't need the
+  // resource-isolation treatment, so chromium alone is sufficient.
+  projects: (ossConfig.projects ?? [])
+    .filter((project) => project.name !== 'chromium-deep')
+    .map((project) => {
+      if (project.name === 'auth') {
+        return project;
+      }
+      return { ...project, grep: GREP };
+    }),
 });
