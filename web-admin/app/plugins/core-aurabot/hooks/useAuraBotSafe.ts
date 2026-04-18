@@ -1,24 +1,17 @@
-// OSS slot stub — enterprise AuraBot integration lives in ent-aurabot-pro plugin.
-// In OSS builds, AuraBot form-fill/registration calls are no-ops.
+/**
+ * Safe version of useAuraBot that returns null when outside AuraBotProvider.
+ * Use in components (e.g. DslFormRenderer) that may render with or without
+ * AuraBot context.
+ *
+ * Previously this was an OSS "slot stub" returning a NOOP handle while the
+ * real implementation lived in the enterprise ent-aurabot-pro overlay. Per
+ * the 2026-04-15 OSS expansion rule (AI 全栈全部开源), the real hook now
+ * lives here.
+ */
+import { useContext } from 'react';
+import { AuraBotCtx } from '~/plugins/core-aurabot/components-shell/AuraBotProvider';
+import type { AuraBotContextValue } from '~/plugins/core-aurabot/components-shell/AuraBotProvider';
 
-export type FormFillHandler = (_fields: Record<string, unknown>) => void | Promise<void>;
-
-export interface AuraBotSafeHandle {
-  readonly isAvailable: boolean;
-  registerFormFillHandler(_handler: FormFillHandler): void;
-  unregisterFormFillHandler(): void;
-  ask(_prompt: string): Promise<null>;
-  summarize(_text: string): Promise<null>;
-}
-
-const NOOP_HANDLE: AuraBotSafeHandle = {
-  isAvailable: false,
-  registerFormFillHandler: () => {},
-  unregisterFormFillHandler: () => {},
-  ask: async () => null,
-  summarize: async () => null,
-};
-
-export function useAuraBotSafe(): AuraBotSafeHandle {
-  return NOOP_HANDLE;
+export function useAuraBotSafe(): AuraBotContextValue | null {
+  return useContext(AuraBotCtx);
 }

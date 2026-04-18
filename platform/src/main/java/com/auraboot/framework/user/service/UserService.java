@@ -1,6 +1,7 @@
 package com.auraboot.framework.user.service;
 
 import com.auraboot.framework.user.dao.entity.User;
+import com.auraboot.framework.user.dto.UserSearchDTO;
 import com.auraboot.framework.user.exception.UserException;
 
 import java.util.Collection;
@@ -44,4 +45,15 @@ public interface UserService {
      * Batch find users by IDs.
      */
     List<User> findByUserIds(Collection<Long> userIds);
+
+    /**
+     * Search active human users within the given tenant by a case-insensitive keyword match
+     * against display name / user name / email. Returns a safe, picker-oriented projection —
+     * password and other sensitive fields are never included.
+     *
+     * @param tenantId required; scopes the search via ab_tenant_member
+     * @param keyword  raw keyword (may be null/blank for "any"); wildcarded server-side
+     * @param size     hard upper bound on returned rows (clamped to [1, 200])
+     */
+    List<UserSearchDTO> searchInTenant(Long tenantId, String keyword, int size);
 }

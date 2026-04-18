@@ -7,10 +7,13 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.event.user.UserRegisteredEvent;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.user.dao.entity.User;
+import com.auraboot.framework.user.dto.UserSearchDTO;
 import com.auraboot.framework.user.mapper.UserMapper;
 import com.auraboot.framework.user.exception.UserException;
 import com.auraboot.framework.user.service.UserService;
@@ -35,6 +38,30 @@ public class UserServiceImpl implements UserService {
     private final UserMapper userMapper;
     private final PasswordManagementService passwordManagementService;
     private final PasswordPolicyService passwordPolicyService;
+
+    @Override
+    public List<UserSearchDTO> searchInTenant(Long tenantId, String keyword, int size) {
+        Objects.requireNonNull(tenantId, "tenantId is required for user search");
+        int clamped = Math.max(1, Math.min(size, 200));
+        String normalized = keyword == null ? "" : keyword.trim();
+        String likePattern = "%" + normalized.toLowerCase() + "%";
+        // Picker search does not exclude any user — users should be able to pick themselves
+        // (e.g. "assign task to me"). The controller layer may pass an explicit exclude if needed.
+        List<Map<String, Object>> rows = userMapper.searchUsersByTenant(tenantId, null, likePattern, clamped);
+        return rows.stream()
+                .map(row -> UserSearchDTO.builder()
+                        .pid(stringValue(row.get("pid")))
+                        .displayName(stringValue(row.get("display_name")))
+                        .email(stringValue(row.get("email")))
+                        .avatarUrl(stringValue(row.get("avatar_url")))
+                        .departmentName(stringValue(row.get("department_name")))
+                        .build())
+                .toList();
+    }
+
+    private static String stringValue(Object v) {
+        return v == null ? null : v.toString();
+    }
 
     @Override
     public List<User> findByUserIds(Collection<Long> userIds) {

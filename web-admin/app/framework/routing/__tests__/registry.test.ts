@@ -112,4 +112,16 @@ describe('RouteRegistryImpl', () => {
     const reg = new RouteRegistryImpl()
     expect(reg.buildBreadcrumb('/nope')).toEqual([])
   })
+
+  it('updates reverse path index when re-registering an existing key', () => {
+    const reg = new RouteRegistryImpl()
+    reg.register(r({ key: 'sys.users', path: '/system/users', title: 'Users' }))
+    reg.register(r({ key: 'sys.users', path: '/system/people', title: 'Users' }))
+
+    expect(reg.findByPath('/system/users')).toBeUndefined()
+    expect(reg.findByPath('/system/people')?.key).toBe('sys.users')
+    expect(() =>
+      reg.register(r({ key: 'sys.legacy-users', path: '/system/users', title: 'Legacy Users' })),
+    ).not.toThrow()
+  })
 })

@@ -62,6 +62,7 @@ import { ListTable } from './list/ListTable';
 import { encodeSorts, decodeSorts } from './list/useListUrlState';
 import { savedViewService } from '~/shared/services/savedViewService';
 import { useDebouncedValue, useDebouncedCallback } from '~/hooks/useDebouncedValue';
+import { evaluateVisibleWhen as evaluateVisibleWhenExpression } from './utils/visibleWhen';
 
 // Dict data item type
 interface DictItem {
@@ -943,17 +944,11 @@ export function ListPageContent(props: PageContentProps) {
   // Evaluate visibleWhen expression against a row record
   const evaluateVisibleWhen = useCallback(
     (visibleWhen: string | undefined, record?: Record<string, any>): boolean => {
-      if (!visibleWhen) return true;
-      try {
-        // Support expressions like "row.field === 'value'" or "['v1','v2'].includes(row.field)"
-        const row = record || {};
-        const form = record || {};
-        // eslint-disable-next-line no-new-func
-        const fn = new Function('row', 'form', 'record', `return (${visibleWhen})`);
-        return !!fn(row, form, record);
-      } catch {
-        return true; // Show button if expression evaluation fails
-      }
+      return evaluateVisibleWhenExpression(visibleWhen, {
+        record: record || {},
+        row: record || {},
+        form: record || {},
+      });
     },
     [],
   );

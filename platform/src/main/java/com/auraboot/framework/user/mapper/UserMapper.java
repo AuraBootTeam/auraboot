@@ -48,9 +48,10 @@ public interface UserMapper extends BaseMapper<User> {
      * Excludes the requesting user and non-human accounts.
      */
     @Select("""
-            SELECT u.id,
+            SELECT u.id AS id,
+                   u.pid AS pid,
                    COALESCE(u.nick_name, u.user_name, u.email) AS display_name,
-                   u.email,
+                   u.email AS email,
                    u.img_id AS avatar_url,
                    d.org_dept_name AS department_name
             FROM ab_user u
@@ -67,13 +68,13 @@ public interface UserMapper extends BaseMapper<User> {
                   AND d.tenant_id = #{tenantId}
             WHERE u.deleted_flag = FALSE
               AND (u.user_type IS NULL OR u.user_type = 'human')
-              AND u.id != #{excludeUserId}
+              AND u.id != COALESCE(#{excludeUserId,jdbcType=BIGINT}, -1)
               AND (
-                  LOWER(u.nick_name) LIKE LOWER(#{keyword})
-                  OR LOWER(u.email) LIKE LOWER(#{keyword})
-                  OR LOWER(u.user_name) LIKE LOWER(#{keyword})
+                  LOWER(COALESCE(u.nick_name, '')) LIKE LOWER(#{keyword})
+                  OR LOWER(COALESCE(u.email, '')) LIKE LOWER(#{keyword})
+                  OR LOWER(COALESCE(u.user_name, '')) LIKE LOWER(#{keyword})
               )
-            ORDER BY u.nick_name ASC
+            ORDER BY u.nick_name ASC NULLS LAST
             LIMIT #{limit}
             """)
     List<Map<String, Object>> searchUsersByTenant(

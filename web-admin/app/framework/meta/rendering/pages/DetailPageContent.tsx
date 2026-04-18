@@ -44,6 +44,7 @@ import { NbaSuggestionBar } from '~/framework/meta/rendering/blocks/NbaSuggestio
 import { BpmPanelBlock } from '~/framework/meta/rendering/blocks/BpmPanelBlock';
 import type { BlockConfig, ButtonConfig, DetailTabConfig, FieldConfig } from '~/framework/meta/schemas/types';
 import { deriveTestId, buttonTestId } from '~/framework/meta/rendering/utils/deriveTestId';
+import { evaluateVisibleWhen as evaluateVisibleWhenExpression } from './utils/visibleWhen';
 
 interface RecordData {
   [key: string]: any;
@@ -258,17 +259,11 @@ export function DetailPageContent(props: PageContentProps) {
   // Evaluate visibleWhen expression against the record
   const evaluateVisibleWhen = useCallback(
     (visibleWhen: string | undefined): boolean => {
-      if (!visibleWhen) return true;
-      try {
-        const record = recordData || {};
-        const row = record;
-        const form = record;
-        // eslint-disable-next-line no-new-func
-        const fn = new Function('record', 'row', 'form', `return (${visibleWhen})`);
-        return !!fn(record, row, form);
-      } catch {
-        return true;
-      }
+      return evaluateVisibleWhenExpression(visibleWhen, {
+        record: recordData || {},
+        row: recordData || {},
+        form: recordData || {},
+      });
     },
     [recordData],
   );
