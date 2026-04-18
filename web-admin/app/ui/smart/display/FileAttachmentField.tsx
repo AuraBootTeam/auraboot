@@ -4,6 +4,7 @@
  */
 import React, { useRef, useState, useCallback } from 'react';
 import { uploadFile } from '~/shared/services/fileupload/uploadService';
+import { useToastContext } from '~/contexts/ToastContext';
 
 interface FileItem {
   name: string;
@@ -55,13 +56,18 @@ export function FileAttachmentField({
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const files = parseValue(value);
+  const { showErrorToast } = useToastContext();
 
   const handleUpload = useCallback(
     async (fileList: FileList) => {
       const newFiles: FileItem[] = [];
       setUploading(true);
       for (const file of Array.from(fileList)) {
-        if (file.size > maxSize * 1024 * 1024) continue;
+        if (file.size > maxSize * 1024 * 1024) {
+          console.warn(`[FileAttachmentField] File "${file.name}" exceeds ${maxSize}MB limit, skipped.`);
+          showErrorToast(`${file.name} 超出 ${maxSize}MB 限制`);
+          continue;
+        }
         try {
           const res = await uploadFile(file);
           const json = await res.json();
