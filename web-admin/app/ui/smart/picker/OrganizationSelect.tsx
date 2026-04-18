@@ -5,6 +5,10 @@ import { useSmartFieldMeta } from '~/plugins/core-designer/components/studio/hoo
 import { useSmartText } from '~/utils/i18n';
 import { FieldBase } from '~/ui/ui/field-base';
 import { FieldActionButton } from '~/ui/ui/field-action-button';
+import {
+  organizationService,
+  type DepartmentTreeNode,
+} from '~/shared/services/organizationService';
 
 interface OrganizationNode {
   id: string;
@@ -64,90 +68,42 @@ export const OrganizationSelect: React.FC<OrganizationSelectProps> = ({
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
 
-  // Mock organization data
-  const mockOrganizations: OrganizationNode[] = [
-    {
-      id: 'org-1',
-      name: 'AuraBoot科技有限公司',
-      code: 'auraboot',
-      type: 'company',
-      level: 0,
-      children: [
-        {
-          id: 'org-2',
-          name: '技术部',
-          code: 'tech',
-          type: 'department',
-          parentId: 'org-1',
-          level: 1,
-          children: [
-            {
-              id: 'org-3',
-              name: '前端开发团队',
-              code: 'frontend',
-              type: 'team',
-              parentId: 'org-2',
-              level: 2,
-            },
-            {
-              id: 'org-4',
-              name: '后端开发团队',
-              code: 'backend',
-              type: 'team',
-              parentId: 'org-2',
-              level: 2,
-            },
-          ],
-        },
-        {
-          id: 'org-5',
-          name: '产品部',
-          code: 'product',
-          type: 'department',
-          parentId: 'org-1',
-          level: 1,
-          children: [
-            {
-              id: 'org-6',
-              name: '产品设计团队',
-              code: 'design',
-              type: 'team',
-              parentId: 'org-5',
-              level: 2,
-            },
-          ],
-        },
-        {
-          id: 'org-7',
-          name: '运营部',
-          code: 'operation',
-          type: 'department',
-          parentId: 'org-1',
-          level: 1,
-          children: [
-            {
-              id: 'org-8',
-              name: '市场推广团队',
-              code: 'marketing',
-              type: 'team',
-              parentId: 'org-7',
-              level: 2,
-            },
-          ],
-        },
-      ],
-    },
-  ];
+  // Map DepartmentTreeNode (API) → OrganizationNode (UI)
+  const mapDeptTreeToOrgNodes = (
+    nodes: DepartmentTreeNode[],
+    parentId: string | null,
+    level: number,
+  ): OrganizationNode[] => {
+    return nodes.map((node) => {
+      const type: OrganizationNode['type'] =
+        level === 0 ? 'company' : level === 1 ? 'department' : 'team';
+      return {
+        id: node.pid,
+        name: node.name,
+        type,
+        parentId: parentId ?? undefined,
+        level,
+        children:
+          node.children && node.children.length > 0
+            ? mapDeptTreeToOrgNodes(node.children, node.pid, level + 1)
+            : undefined,
+      };
+    });
+  };
 
   useEffect(() => {
-    // Mock API call to fetch organizations
     setLoading(true);
-    setTimeout(() => {
-      setOrganizations(mockOrganizations);
-      // Auto expand root nodes
-      setExpandedNodes(new Set(['org-1']));
-      setLoading(false);
-    }, 300);
+    organizationService
+      .getDepartmentTree()
+      .then((result) => {
+        if (result.data) {
+          const nodes = mapDeptTreeToOrgNodes(result.data, null, 0);
+          setOrganizations(nodes);
+          setExpandedNodes(new Set(result.data.map((n) => n.pid)));
+        }
+      })
+      .catch((err) => console.error('Failed to load departments:', err))
+      .finally(() => setLoading(false));
   }, []);
 
   const flattenOrganizations = (orgs: OrganizationNode[]): OrganizationNode[] => {
@@ -168,10 +124,8 @@ export const OrganizationSelect: React.FC<OrganizationSelectProps> = ({
     const allOrgs = flattenOrganizations(organizations);
     if (!searchQuery) return organizations;
 
-    const filtered = allOrgs.filter(
-      (org) =>
-        org.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        org.code?.toLowerCase().includes(searchQuery.toLowerCase()),
+    const filtered = allOrgs.filter((org) =>
+      org.name.toLowerCase().includes(searchQuery.toLowerCase()),
     );
 
     // If searching, return flat list

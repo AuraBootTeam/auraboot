@@ -20,6 +20,12 @@ export interface MemberOption {
 }
 
 export interface MemberPickerProps {
+  /** Form field name for hidden input submission */
+  name?: string;
+  /** Field label */
+  label?: string;
+  /** Whether the field is required */
+  required?: boolean;
   /** Current value (single ID or array of IDs) */
   value?: string | string[];
   /** Callback when selection changes */
@@ -40,6 +46,9 @@ export interface MemberPickerProps {
  * MemberPicker - User/member selection field with avatar chips
  */
 export const MemberPicker: React.FC<MemberPickerProps> = ({
+  name,
+  label,
+  required = false,
   value,
   onChange,
   multiple = false,
@@ -181,9 +190,22 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
     [selectedIds, multiple, onChange],
   );
 
+  // Compute hidden input value: JSON array for multiple, plain string for single
+  const hiddenValue = multiple
+    ? JSON.stringify(selectedIds)
+    : selectedIds[0] ?? '';
+
   // Read-only display
   if (readOnly) {
     return (
+      <div>
+        {label && (
+          <label className="mb-1 block text-sm font-medium text-gray-700">
+            {label}
+            {required && <span className="ml-0.5 text-red-500">*</span>}
+          </label>
+        )}
+        {name && <input type="hidden" name={name} value={hiddenValue} />}
       <div data-testid="member-picker-readonly" className={cn('flex flex-wrap gap-1.5', className)}>
         {selectedMembers.length > 0 ? (
           selectedMembers.map((m) => (
@@ -207,11 +229,20 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
           <span className="text-sm text-gray-400">-</span>
         )}
       </div>
+      </div>
     );
   }
 
   return (
-    <div ref={dropdownRef} data-testid="member-picker" className={cn('relative', className)}>
+    <div>
+      {label && (
+        <label className="mb-1 block text-sm font-medium text-gray-700">
+          {label}
+          {required && <span className="ml-0.5 text-red-500">*</span>}
+        </label>
+      )}
+      {name && <input type="hidden" name={name} value={hiddenValue} />}
+      <div ref={dropdownRef} data-testid="member-picker" className={cn('relative', className)}>
       {/* Selected members display + Add button */}
       <div
         data-testid="member-picker-trigger"
@@ -369,6 +400,7 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };
