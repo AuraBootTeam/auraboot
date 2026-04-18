@@ -3,6 +3,8 @@ package com.auraboot.framework.integration.agent;
 import com.auraboot.framework.agent.service.DryRunSupportRegistry;
 import com.auraboot.framework.agent.service.ShadowEligibilityChecker;
 import com.auraboot.framework.agent.service.ShadowExecutor;
+import com.auraboot.framework.agent.service.ShadowToolInvoker;
+import com.auraboot.framework.agent.util.OutputSignatureProjector;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import org.junit.jupiter.api.AfterEach;
@@ -10,20 +12,56 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.Commit;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+import java.util.Map;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * PR-32: Shadow Mode — Dry-Run Support Registry + ShadowExecutor.
+ * PR-60: output-signature projection.
  */
 @Commit
 @Transactional(propagation = Propagation.NEVER)
 @DisplayName("Shadow Mode Executor + DryRunSupportRegistry (PR-32)")
+@Import(ShadowExecutorIntegrationTest.QueryInvokerTestConfig.class)
 class ShadowExecutorIntegrationTest extends BaseIntegrationTest {
+
+    /** PR-60: stub invoker for nq_leads that returns a shuffled rows list.
+     *  {@code @Order(0)} places it ahead of the real {@link com.auraboot.framework.agent.service.NamedQueryShadowInvoker}
+     *  in the {@code List<ShadowToolInvoker>} injected into {@link ShadowExecutor},
+     *  so our stub claims the {@code nq_leads_projection} tool_ref before the
+     *  real invoker tries to look it up in {@code ab_named_query}. */
+    @TestConfiguration
+    static class QueryInvokerTestConfig {
+        @Bean
+        @Order(0)
+        ShadowToolInvoker nqLeadsProjectionInvoker() {
+            return new ShadowToolInvoker() {
+                @Override public boolean supports(String toolRef) { return "nq_leads_projection".equals(toolRef); }
+                @Override public Map<String, Object> invokeShadow(Long tenantId, String toolRef, Map<String, Object> args) {
+                    return Map.of(
+                            "query_code", "leads_projection",
+                            "total", 5L,
+                            "rows", List.of(
+                                    Map.of("id", 3),
+                                    Map.of("id", 1),
+                                    Map.of("id", 2),
+                                    Map.of("id", 5),
+                                    Map.of("id", 4)));
+                }
+            };
+        }
+    }
 
     @Autowired private DryRunSupportRegistry registry;
     @Autowired private ShadowEligibilityChecker checker;
@@ -202,6 +240,28 @@ class ShadowExecutorIntegrationTest extends BaseIntegrationTest {
                 String.class, r2.getShadowRunPid());
         assertThat(hash1).isNotNull().hasSize(64);
         assertThat(hash1).isEqualTo(hash2);
+    }
+
+    @Test
+    @DisplayName("PR-60: shadow_output_hash uses projection for single-tool query draft")
+    void shadow_hash_uses_projection_for_query_tool() {
+        String pid = seedDraft("substrate: dsl\naction_type: query\ntool_refs:\n  - nq_leads_projection\n");
+        ShadowExecutor.ExecutionResult r = executor.execute(ShadowExecutor.ExecutionRequest.builder()
+                .draftPid(pid).originalRunId("origQ").originalOutputHash("ignored")
+                .originalDurationMs(1L).originalStatus("success").build());
+        assertThat(r.getOutcome()).isEqualTo("executed");
+
+        String shadowHash = jdbc.queryForObject(
+                "SELECT shadow_output_hash FROM ab_agent_shadow_run WHERE pid = ?",
+                String.class, r.getShadowRunPid());
+
+        // Expected projection: {type:query, tool_ref:nq_leads_projection, record_count:5}
+        Map<String, Object> expected = OutputSignatureProjector.projectShadow(
+                "nq_leads_projection",
+                Map.of("total", 5L, "query_code", "leads_projection",
+                        "rows", List.of(Map.of("id", 1))));
+        String expectedHash = OutputSignatureProjector.computeMatchHash(expected);
+        assertThat(shadowHash).isEqualTo(expectedHash);
     }
 
     @Test
