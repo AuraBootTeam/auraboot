@@ -84,7 +84,8 @@ public interface CommandHandlerExtension extends ExtensionPoint {
             String modelCode,
             String recordId,
             Map<String, Object> payload,
-            Map<String, Object> settings
+            Map<String, Object> settings,
+            boolean dryRun
     ) {
         /**
          * Get the DataAccessor from the settings map.
@@ -117,6 +118,7 @@ public interface CommandHandlerExtension extends ExtensionPoint {
             private String recordId;
             private Map<String, Object> payload;
             private Map<String, Object> settings;
+            private boolean dryRun;
 
             public Builder tenantId(Long tenantId) {
                 this.tenantId = tenantId;
@@ -158,8 +160,19 @@ public interface CommandHandlerExtension extends ExtensionPoint {
                 return this;
             }
 
+            /**
+             * When true, the enclosing CommandPipeline transaction will roll
+             * back DB writes. Plugin handlers MUST early-return or switch to
+             * a side-effect-free branch — external effects (HTTP / email /
+             * MQ / file / cache) escape the rollback boundary.
+             */
+            public Builder dryRun(boolean dryRun) {
+                this.dryRun = dryRun;
+                return this;
+            }
+
             public CommandContext build() {
-                return new CommandContext(tenantId, pluginId, namespace, commandType, modelCode, recordId, payload, settings);
+                return new CommandContext(tenantId, pluginId, namespace, commandType, modelCode, recordId, payload, settings, dryRun);
             }
         }
     }
