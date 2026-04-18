@@ -12,7 +12,7 @@
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { useNavigate, useParams, useLoaderData, useLocation } from 'react-router';
+import { useNavigate, useParams, useLoaderData, useLocation, Link } from 'react-router';
 import type { LoaderFunctionArgs } from 'react-router';
 import { modelService } from '~/shared/services/modelService';
 import { confirmDialog } from '~/utils/confirmDialog';
@@ -23,7 +23,34 @@ import { RuntimeVerification } from '~/ui/meta/RuntimeVerification';
 import { FieldListManager } from '~/ui/meta/FieldListManager';
 import { FieldConfigDialog, type FieldBindingConfig } from '~/ui/meta/FieldConfigDialog';
 import { DictConfigDialog } from '~/ui/meta/DictConfigDialog';
+import { SourceTypeBadge } from '~/shared/components/SourceTypeBadge';
 import type { MetaModelDTO, ModelFieldBinding, Permission, ModelVersion } from '~/types/model';
+
+/**
+ * Check whether the given model is a virtual model (non-physical sourceType).
+ */
+function isVirtualModel(model: { sourceType?: string }): boolean {
+  return !!model.sourceType && model.sourceType !== 'physical';
+}
+
+/**
+ * Human-readable label for a capability flag key.
+ */
+function capabilityLabel(key: string): string {
+  const LABELS: Record<string, string> = {
+    list: '可列表',
+    detail: '可详情',
+    sort: '可排序',
+    filter: '可过滤',
+    create: '可新建',
+    update: '可更新',
+    delete: '可删除',
+    export: '可导出',
+    search: '可搜索',
+    paginate: '可分页',
+  };
+  return LABELS[key] ?? key;
+}
 
 /**
  * Tab类型定义
@@ -110,6 +137,80 @@ export default function ModelDetailPage() {
 
   // 字典配置对话框状态
   const [dictConfigField, setDictConfigField] = useState<ModelFieldBinding | null>(null);
+
+  // 虚拟 Model 运行时检查状态
+  const [sampleData, setSampleData] = useState<unknown>(null);
+  const [connectivityStatus, setConnectivityStatus] = useState<
+    { ok: boolean; message?: string } | null
+  >(null);
+
+  /**
+   * 虚拟 Model: 重新检测 schema
+   */
+  const triggerRedetection = useCallback(
+    async (modelPid: string) => {
+      try {
+        const res = await fetch(`/api/meta/virtual-models/${modelPid}/redetect`, {
+          method: 'POST',
+          credentials: 'include',
+        });
+        if (res.status === 404 || res.status === 405) {
+          showErrorToast('暂未支持自动重新检测,P1 backend 未实现该 endpoint');
+          return;
+        }
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+        showSuccessToast('重新检测已触发');
+      } catch (err) {
+        console.error('Redetect failed:', err);
+        showErrorToast('暂未支持自动重新检测,P1 backend 未实现该 endpoint');
+      }
+    },
+    [showSuccessToast, showErrorToast],
+  );
+
+  /**
+   * 虚拟 Model: 连通性检查
+   */
+  const checkConnectivity = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/dynamic/${model.code}/list?pageNum=1&pageSize=1`, {
+        credentials: 'include',
+      });
+      if (res.ok) {
+        setConnectivityStatus({ ok: true });
+        showSuccessToast('数据源连通正常');
+      } else {
+        setConnectivityStatus({ ok: false, message: `HTTP ${res.status}` });
+        showErrorToast(`连通性检查失败: HTTP ${res.status}`);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setConnectivityStatus({ ok: false, message: msg });
+      showErrorToast(`连通性检查失败: ${msg}`);
+    }
+  }, [model.code, showSuccessToast, showErrorToast]);
+
+  /**
+   * 虚拟 Model: 加载样本数据
+   */
+  const loadSample = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/dynamic/${model.code}/list?pageNum=1&pageSize=3`, {
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+      const json = await res.json();
+      setSampleData(json);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      showErrorToast(`加载样本失败: ${msg}`);
+      setSampleData({ error: msg });
+    }
+  }, [model.code, showErrorToast]);
 
   /**
    * Sync activeTab with URL hash changes (browser back/forward)
@@ -588,6 +689,45 @@ export default function ModelDetailPage() {
           {/* 基本信息Tab */}
           {activeTab === 'basic' && (
             <div className="space-y-6">
+              {isVirtualModel(model) && (
+                <div
+                  className="rounded-lg border border-blue-200 bg-blue-50 p-4"
+                  data-testid="virtual-model-strip"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="mb-2 flex items-center gap-3">
+                        <SourceTypeBadge sourceType={model.sourceType} />
+                        <span className="text-sm font-medium text-gray-700">
+                          {(model as unknown as { sourceRef?: string }).sourceRef ?? '-'}
+                        </span>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {Object.entries(
+                          (model as unknown as { capabilities?: Record<string, unknown> })
+                            .capabilities ?? {},
+                        )
+                          .filter(([, v]) => typeof v === 'boolean' && v === true)
+                          .map(([k]) => (
+                            <span
+                              key={k}
+                              className="rounded border border-blue-200 bg-white px-2 py-0.5 text-xs text-blue-700"
+                            >
+                              {capabilityLabel(k)}
+                            </span>
+                          ))}
+                      </div>
+                    </div>
+                    <button
+                      className="shrink-0 rounded border border-blue-300 bg-white px-3 py-1.5 text-xs text-blue-700 hover:bg-blue-100"
+                      onClick={() => triggerRedetection(model.pid)}
+                      data-testid="redetect-btn"
+                    >
+                      🔄 重新检测
+                    </button>
+                  </div>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-6">
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700">模型编码</label>
@@ -709,16 +849,27 @@ export default function ModelDetailPage() {
 
           {/* 字段Tab */}
           {activeTab === 'fields' && (
-            <FieldListManager
-              fields={fields}
-              modelPid={pid!}
-              modelCode={model.code}
-              onFieldsReorder={handleFieldsReorder}
-              onFieldConfigure={handleFieldConfigure}
-              onFieldUnbind={handleFieldUnbind}
-              onFieldBound={handleFieldBound}
-              onDictConfig={handleDictConfig}
-            />
+            <div>
+              {isVirtualModel(model) && (
+                <div
+                  className="mb-3 rounded bg-amber-50 p-3 text-xs text-amber-800"
+                  data-testid="virtual-fields-notice"
+                >
+                  🔒 虚拟 Model 的字段名 / 类型只读(来自 detection 快照)。仅允许改 label / sortable
+                  / filterable。
+                </div>
+              )}
+              <FieldListManager
+                fields={fields}
+                modelPid={pid!}
+                modelCode={model.code}
+                onFieldsReorder={handleFieldsReorder}
+                onFieldConfigure={handleFieldConfigure}
+                onFieldUnbind={handleFieldUnbind}
+                onFieldBound={handleFieldBound}
+                onDictConfig={handleDictConfig}
+              />
+            </div>
           )}
 
           {/* 权限点Tab */}
@@ -826,6 +977,15 @@ export default function ModelDetailPage() {
           {/* 关联页面Tab */}
           {activeTab === 'pages' && (
             <div>
+              <div className="mb-4 flex justify-end">
+                <Link
+                  to={`/p/page_schema/new?modelCode=${encodeURIComponent(model.code)}`}
+                  className="inline-flex items-center gap-1 rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+                  data-testid="create-page-for-model-btn"
+                >
+                  + 为此 Model 新建页面
+                </Link>
+              </div>
               {pages.length === 0 ? (
                 <div className="py-12 text-center">
                   <p className="text-gray-500">暂无关联页面</p>
@@ -842,7 +1002,17 @@ export default function ModelDetailPage() {
                     <div key={page.id} className="rounded-lg border border-gray-200 p-4">
                       <div className="flex items-start justify-between">
                         <div>
-                          <h3 className="text-sm font-medium text-gray-900">{page.name}</h3>
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-sm font-medium text-gray-900">{page.name}</h3>
+                            {page.kind && (
+                              <span
+                                className="inline-flex rounded bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700"
+                                data-testid="page-kind-badge"
+                              >
+                                {page.kind}
+                              </span>
+                            )}
+                          </div>
                           <p className="mt-1 text-sm text-gray-500">{page.description}</p>
                           <p className="mt-1 text-xs text-gray-400">
                             类型: {page.type} · 路由: {page.route}
@@ -859,11 +1029,64 @@ export default function ModelDetailPage() {
 
           {/* 运行时验证Tab */}
           {activeTab === 'runtime' && (
-            <RuntimeVerification
-              model={model}
-              fields={fields}
-              onRefresh={() => window.location.reload()}
-            />
+            <div>
+              {isVirtualModel(model) && (
+                <div
+                  className="mb-4 rounded border p-4"
+                  data-testid="virtual-runtime-check"
+                >
+                  <h3 className="mb-3 text-sm font-medium">虚拟 Model 运行时检查</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span>
+                        数据源连通性
+                        {connectivityStatus && (
+                          <span
+                            className={`ml-2 text-xs ${
+                              connectivityStatus.ok ? 'text-green-600' : 'text-red-600'
+                            }`}
+                          >
+                            {connectivityStatus.ok
+                              ? '✅ 正常'
+                              : `❌ ${connectivityStatus.message ?? '失败'}`}
+                          </span>
+                        )}
+                      </span>
+                      <button
+                        onClick={checkConnectivity}
+                        className="rounded border px-2 py-1 text-xs"
+                        data-testid="check-connectivity-btn"
+                      >
+                        检查
+                      </button>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>样本数据预览</span>
+                      <button
+                        onClick={loadSample}
+                        className="rounded border px-2 py-1 text-xs"
+                        data-testid="load-sample-btn"
+                      >
+                        加载 3 条样本
+                      </button>
+                    </div>
+                  </div>
+                  {sampleData !== null && (
+                    <pre
+                      className="mt-3 max-h-60 overflow-auto rounded bg-gray-50 p-3 text-xs"
+                      data-testid="virtual-sample-data"
+                    >
+                      {JSON.stringify(sampleData, null, 2)}
+                    </pre>
+                  )}
+                </div>
+              )}
+              <RuntimeVerification
+                model={model}
+                fields={fields}
+                onRefresh={() => window.location.reload()}
+              />
+            </div>
           )}
         </div>
       </div>

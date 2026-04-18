@@ -4,10 +4,13 @@ import com.auraboot.framework.meta.entity.Field;
 import com.auraboot.framework.meta.entity.ModelFieldBinding;
 import com.auraboot.framework.meta.entity.NamedQueryField;
 import com.auraboot.framework.meta.entity.payload.ComputedFieldOverride;
+import com.auraboot.framework.meta.entity.payload.FieldFeatureBean;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Data;
 
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Unified resolved field DTO representing the merged result
@@ -34,6 +37,15 @@ public class ResolvedFieldDTO {
     private Boolean editable;
     private String aliasCode;
     private Integer fieldOrder;
+
+    /** Editor UI input: whether this field can be used for sorting in lists. */
+    private Boolean sortable;
+
+    /** Editor UI input: whether this field can be used as a filter criterion. */
+    private Boolean filterable;
+
+    /** Editor UI input: whether this field accepts writes (used for form kind). */
+    private Boolean writable;
 
     // ==================== Computed Field ====================
 
@@ -76,14 +88,26 @@ public class ResolvedFieldDTO {
         }
 
         // Extract from field feature
-        if (field.getFeature() != null) {
-            if (field.getFeature().getComputeExpression() != null) {
-                dto.setComputeExpression(field.getFeature().getComputeExpression());
+        FieldFeatureBean feature = field.getFeature();
+        if (feature != null) {
+            if (feature.getComputeExpression() != null) {
+                dto.setComputeExpression(feature.getComputeExpression());
             }
-            if (field.getFeature().getVirtualType() != null) {
-                dto.setVirtual(!"materialized".equalsIgnoreCase(field.getFeature().getVirtualType()));
+            if (feature.getVirtualType() != null) {
+                dto.setVirtual(!"materialized".equalsIgnoreCase(feature.getVirtualType()));
             }
         }
+
+        // Populate editor flags: prefer explicit feature values, fall back to heuristic defaults.
+        // sortable/filterable default true for simple scalar types (string/number/date), false for json/text/blob.
+        dto.setSortable(feature != null && feature.getSortable() != null
+                ? feature.getSortable()
+                : defaultQueryableForType(field.getDataType()));
+        dto.setFilterable(feature != null && feature.getFilterable() != null
+                ? feature.getFilterable()
+                : defaultQueryableForType(field.getDataType()));
+        // writable = not readonly and not virtual (computed fields are not user-writable).
+        dto.setWritable(computeWritable(feature));
 
         // Apply binding overrides (Layer 2)
         if (binding != null) {
@@ -108,6 +132,13 @@ public class ResolvedFieldDTO {
         dto.setSourceType("named_query_field");
         dto.setVisible(true);
         dto.setEditable(false); // Named query fields are read-only by default
+        // Populate editor flags: trust NamedQueryField.sortable; NamedQueryField has no filterable column,
+        // so filterable defaults by dataType (queryable-by-type whitelist). writable=false (query-sourced).
+        dto.setSortable(nqField.getSortable() != null
+                ? nqField.getSortable()
+                : defaultQueryableForType(nqField.getDataType()));
+        dto.setFilterable(defaultQueryableForType(nqField.getDataType()));
+        dto.setWritable(false);
         return dto;
     }
 
@@ -131,6 +162,10 @@ public class ResolvedFieldDTO {
             }
         }
 
+        // Virtual-only computed fields: default to queryable by type, never writable.
+        dto.setSortable(defaultQueryableForType(dto.getDataType()));
+        dto.setFilterable(defaultQueryableForType(dto.getDataType()));
+        dto.setWritable(false);
         return dto;
     }
 
@@ -161,5 +196,41 @@ public class ResolvedFieldDTO {
         if (override.getUiHint() != null) {
             this.uiHint = override.getUiHint();
         }
+    }
+
+    // ==================== Flag Defaulting Helpers ====================
+
+    private static final Set<String> QUERYABLE_SCALAR_TYPES = Set.of(
+            "string", "enum", "dict",
+            "integer", "int", "long", "bigint",
+            "decimal", "numeric", "float", "double",
+            "boolean", "bool",
+            "date", "datetime", "timestamp", "time"
+    );
+
+    /**
+     * Default queryable flag (used for both sortable and filterable) when the source
+     * doesn't explicitly specify one. Sortable and filterable share the same scalar-type
+     * whitelist today; keeping a single helper makes the shared-default intent explicit
+     * and prevents silent divergence if the two flags are ever mis-wired.
+     * <p>
+     * Simple scalars (string/number/boolean/date/enum/dict) → true;
+     * JSON/text/blob/reference/unknown → false.
+     */
+    private static Boolean defaultQueryableForType(String dataType) {
+        if (dataType == null) return Boolean.FALSE;
+        return QUERYABLE_SCALAR_TYPES.contains(dataType.toLowerCase(Locale.ROOT));
+    }
+
+    /**
+     * writable = !readonly && !virtual (computed/transient fields are not user-writable).
+     */
+    private static Boolean computeWritable(FieldFeatureBean feature) {
+        if (feature == null) return Boolean.TRUE;
+        boolean readonly = Boolean.TRUE.equals(feature.getReadonly());
+        String virtualType = feature.getVirtualType();
+        boolean virtual = virtualType != null && !virtualType.isEmpty()
+                && !"materialized".equalsIgnoreCase(virtualType);
+        return !readonly && !virtual;
     }
 }

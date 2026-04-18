@@ -26,6 +26,42 @@ import { ErrorAlert } from '~/ui/ErrorAlert';
 import { Pagination } from '~/ui/Pagination';
 import { ManagedBadge } from '~/ui/common/ManagedBadge';
 import { useBatchResourceOwners } from '~/hooks/useResourceOwner';
+import { SourceTypeBadge } from '~/shared/components/SourceTypeBadge';
+
+type HealthStatus = 'ok' | 'field_drift' | 'detection_failed' | 'unknown';
+
+interface HealthBadgeProps {
+  status: HealthStatus;
+  lastDetectedAt?: string;
+}
+
+const HEALTH_CONFIG: Record<HealthStatus, { icon: string; color: string; label: string }> = {
+  ok: { icon: '🟢', color: 'text-green-600', label: '正常' },
+  field_drift: { icon: '🟡', color: 'text-amber-600', label: '字段漂移' },
+  detection_failed: { icon: '🔴', color: 'text-red-600', label: '检测失败' },
+  unknown: { icon: '⚪', color: 'text-gray-400', label: '未检测' },
+};
+
+function HealthBadge({ status, lastDetectedAt }: HealthBadgeProps) {
+  const c = HEALTH_CONFIG[status] ?? HEALTH_CONFIG.unknown;
+  const title = lastDetectedAt
+    ? `最近检测: ${new Date(lastDetectedAt).toLocaleString('zh-CN')}`
+    : '从未检测';
+  return (
+    <span
+      title={title}
+      className={`inline-flex items-center gap-1 ${c.color}`}
+      data-testid="model-health-badge"
+    >
+      <span>{c.icon}</span>
+      <span className="text-xs">{c.label}</span>
+    </span>
+  );
+}
+
+function isVirtualModel(model: { sourceType?: string }): boolean {
+  return !!model.sourceType && model.sourceType !== 'physical';
+}
 
 /**
  * Loader函数 - 加载初始数据
@@ -114,6 +150,9 @@ export default function ModelListPage() {
     status: initialParams.status || '',
   });
 
+  // 来源类型过滤（客户端过滤；后端暂不支持 sourceType 过滤参数）
+  const [sourceTypeFilter, setSourceTypeFilter] = useState<'all' | 'physical' | 'virtual'>('all');
+
   // 分页状态
   const [pagination, setPagination] = useState({
     current: initialParams.page || 1,
@@ -177,6 +216,7 @@ export default function ModelListPage() {
       modelType: '',
       status: '',
     });
+    setSourceTypeFilter('all');
     setPagination((prev) => ({ ...prev, current: 1 }));
   }, []);
 
@@ -356,10 +396,21 @@ export default function ModelListPage() {
     },
     [data],
   );
+  // NOTE: the select-all checkbox still targets the full (server-page) data set so
+  // client-side sourceType filter does not desync selection semantics.
 
   // Batch query resource ownership for managed badges
   const resourceRefs = useMemo(() => data.map((m) => ({ type: 'model', code: m.code })), [data]);
   const { owners } = useBatchResourceOwners(resourceRefs);
+
+  // 客户端按 sourceType 过滤 (后端暂不支持 sourceType 过滤参数)
+  const visibleData = useMemo(() => {
+    if (sourceTypeFilter === 'all') return data;
+    if (sourceTypeFilter === 'physical') {
+      return data.filter((m) => !m.sourceType || m.sourceType === 'physical');
+    }
+    return data.filter((m) => isVirtualModel(m));
+  }, [data, sourceTypeFilter]);
 
   // 渲染加载状态
   if (loading && data.length === 0) {
@@ -385,6 +436,29 @@ export default function ModelListPage() {
 
       {/* 过滤器区域 */}
       <div className="mb-4 rounded-lg bg-white p-4 shadow">
+        {/* 来源类型顶层分段（全部/物理/虚拟） */}
+        <div className="mb-4 flex items-center gap-2" data-testid="sourcetype-filter-group">
+          <span className="text-sm font-medium text-gray-700">来源:</span>
+          {(['all', 'physical', 'virtual'] as const).map((key) => {
+            const label = key === 'all' ? '全部' : key === 'physical' ? '物理' : '虚拟';
+            const active = sourceTypeFilter === key;
+            return (
+              <button
+                key={key}
+                type="button"
+                data-testid={`sourcetype-filter-${key}`}
+                onClick={() => setSourceTypeFilter(key)}
+                className={`rounded-md border px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none ${
+                  active
+                    ? 'border-blue-600 bg-blue-600 text-white'
+                    : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
         <div className="grid grid-cols-12 gap-4">
           {/* 关键词搜索 */}
           <div className="col-span-4">
@@ -504,6 +578,12 @@ export default function ModelListPage() {
                 显示名称
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
+                来源
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
+                健康
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
                 模型类型
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
@@ -524,14 +604,14 @@ export default function ModelListPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200 bg-white">
-            {data.length === 0 ? (
+            {visibleData.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-6 py-12 text-center text-gray-500">
+                <td colSpan={11} className="px-6 py-12 text-center text-gray-500">
                   暂无数据
                 </td>
               </tr>
             ) : (
-              data.map((model) => {
+              visibleData.map((model) => {
                 const owner = owners[`model:${model.code}`];
                 return (
                   <tr key={model.pid} className="hover:bg-gray-50">
@@ -556,6 +636,25 @@ export default function ModelListPage() {
                     </td>
                     <td className="px-6 py-4 text-sm whitespace-nowrap text-gray-900">
                       {model.displayName}
+                    </td>
+                    <td
+                      className="px-6 py-4 text-sm whitespace-nowrap"
+                      data-testid={`model-source-cell-${model.code}`}
+                    >
+                      <SourceTypeBadge sourceType={model.sourceType} />
+                    </td>
+                    <td
+                      className="px-6 py-4 text-sm whitespace-nowrap"
+                      data-testid={`model-health-cell-${model.code}`}
+                    >
+                      {isVirtualModel(model) ? (
+                        <HealthBadge
+                          status={(model.health?.status as HealthStatus) ?? 'unknown'}
+                          lastDetectedAt={model.health?.lastDetectedAt}
+                        />
+                      ) : (
+                        <span className="text-gray-300">—</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-sm whitespace-nowrap text-gray-500">
                       {model.modelType === 'entity'
