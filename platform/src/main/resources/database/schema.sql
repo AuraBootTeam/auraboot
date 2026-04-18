@@ -6669,6 +6669,15 @@ CREATE INDEX IF NOT EXISTS idx_bif_skill       ON ab_agent_bif(dispatched_skill)
 CREATE INDEX IF NOT EXISTS idx_bif_run         ON ab_agent_bif(run_id);
 COMMENT ON TABLE ab_agent_bif IS 'ACP D1 Grounding: Business Intent Frame IR persistence — every LLM-turn grounding result';
 
+-- v1.1.2 extensions (ACP-Ideal §6.2.3 Hermes addendum) — profile + channel
+-- shape *which* agent this turn belongs to and *how* the user reached it.
+-- PatternExtractor mixes them into pattern_hash when present so patterns from
+-- different profiles / channels don't collapse.
+ALTER TABLE ab_agent_bif ADD COLUMN IF NOT EXISTS profile_id VARCHAR(26);
+ALTER TABLE ab_agent_bif ADD COLUMN IF NOT EXISTS channel    VARCHAR(32);
+CREATE INDEX IF NOT EXISTS idx_bif_profile ON ab_agent_bif(profile_id) WHERE profile_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_bif_channel ON ab_agent_bif(channel)    WHERE channel IS NOT NULL;
+
 -- ============================================================================
 -- ACP Learning Loop (design/learning-loop.md) — three tables:
 --   ab_agent_learning_pattern  §3.3 — aggregated (command_signature, object) patterns
