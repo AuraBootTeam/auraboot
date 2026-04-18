@@ -59,11 +59,16 @@ function buildCannedStream(contract: Record<string, unknown>): string {
  * pass through so the UI state transitions work normally.
  */
 async function interceptChatStream(page: Page, contract: Record<string, unknown>) {
-  let hitCount = 0;
+  page.on('console', (msg) => {
+    const text = msg.text();
+    if (text.includes('result_contract') || text.includes('onResultContract') || msg.type() === 'error') {
+      // eslint-disable-next-line no-console
+      console.log('[E2E browser ' + msg.type() + '] ' + text);
+    }
+  });
   await page.route('**/api/ai/aurabot/chat/stream', async (route: Route) => {
-    hitCount += 1;
     // eslint-disable-next-line no-console
-    console.log('[E2E] intercepted chat/stream, hit #' + hitCount);
+    console.log('[E2E] intercepted chat/stream, body len=' + buildCannedStream(contract).length);
     await route.fulfill({
       status: 200,
       contentType: 'text/event-stream; charset=utf-8',
@@ -73,13 +78,6 @@ async function interceptChatStream(page: Page, contract: Record<string, unknown>
       },
       body: buildCannedStream(contract),
     });
-  });
-  // Log any 4xx/5xx response that isn't our canned stream so we can see real failures.
-  page.on('response', (res) => {
-    if (res.url().includes('/api/ai/aurabot') && res.status() >= 400) {
-      // eslint-disable-next-line no-console
-      console.log('[E2E] aurabot API failure', res.status(), res.url());
-    }
   });
 }
 
