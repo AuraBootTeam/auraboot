@@ -58,6 +58,7 @@ async function createBlankPage(page: Page): Promise<string> {
       pageKey,
       title: name,
       kind: 'list',
+      modelCode: 'tenant',
       blocks: [],
       metaInfo: { componentCount: 0 },
       semver: '0.1.0',

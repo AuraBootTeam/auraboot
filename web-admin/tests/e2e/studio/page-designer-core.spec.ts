@@ -18,7 +18,7 @@ async function createBlankPage(page: Page): Promise<string> {
   const name = uniqueId('core');
   const pageKey = `e2e_core_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
   const resp = await page.request.post('/api/pages', {
-    data: { name, pageKey, title: name, kind: 'list', blocks: [], metaInfo: { componentCount: 0 }, semver: '0.1.0' },
+    data: { name, pageKey, title: name, kind: 'list', modelCode: 'tenant', blocks: [], metaInfo: { componentCount: 0 }, semver: '0.1.0' },
   });
   expect(resp.ok(), `createBlankPage failed: ${resp.status()}`).toBeTruthy();
   const body = await resp.json();
@@ -30,7 +30,7 @@ async function createPageWithBlock(page: Page, blockType: string): Promise<strin
   const pageKey = `e2e_core_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
   const resp = await page.request.post('/api/pages', {
     data: {
-      name, pageKey, title: name, kind: 'list',
+      name, pageKey, title: name, kind: 'list', modelCode: 'tenant',
       blocks: [{ id: 'blk_pre', blockType, config: {}, layout: { col: 0, colSpan: 12, rowSpan: 1, order: 0 } }],
       metaInfo: { componentCount: 1 }, semver: '0.1.0',
     },

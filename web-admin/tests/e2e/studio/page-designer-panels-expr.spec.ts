@@ -36,6 +36,7 @@ async function createBlankPage(page: Page): Promise<string> {
       pageKey,
       title: name,
       kind: 'list',
+      modelCode: 'tenant',
       blocks: [],
       metaInfo: { componentCount: 0 },
       semver: '0.1.0',
@@ -65,6 +66,7 @@ async function createPageWithBlocks(
       pageKey,
       title: pageName,
       kind: 'list',
+      modelCode: 'tenant',
       blocks: blocks.map((b, i) => ({
         id: b.id,
         blockType: b.blockType,
