@@ -37,7 +37,7 @@ export function toPageSchema(dto: PageSchemaDTO): PageSchema {
     kind: dto.kind as PageSchema['kind'],
     id: dto.pid,
     pageKey: dto.pageKey,
-    modelCode: dto.extension?.viewModelCode as string | undefined,
+    modelCode: (dto.modelCode ?? dto.extension?.viewModelCode) as string | undefined,
     title: dto.title,
     layout: (dto.layout as PageSchema['layout']) ?? { type: 'stack' },
     blocks: dto.blocks as PageSchema['blocks'],
