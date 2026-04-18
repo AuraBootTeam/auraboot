@@ -270,5 +270,21 @@
     "required": false,
     "visible": true,
     "editable": true
+  },
+  {
+    "modelCode": "showcase_all_fields",
+    "fieldCode": "sc_owner_user",
+    "sequence": 35,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "showcase_all_fields",
+    "fieldCode": "sc_attachment_file",
+    "sequence": 36,
+    "required": false,
+    "visible": true,
+    "editable": true
   }
 ]

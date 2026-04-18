@@ -117,6 +117,12 @@ public class TaskService {
         // 完成任务 - 使用SmartEngine的实际API
         Map<String, Object> vars = variables != null ? new HashMap<>(variables) : new HashMap<>();
         vars.put(RequestMapSpecialKeyConstant.TENANT_ID, tenantId);
+        // GAP-249: default task instance tag to "agree" so MultiInstanceCounter
+        // (DefaultMultiInstanceCounter) can tally completed instances against the
+        // completionCondition. Callers can override by passing an explicit tag
+        // in variables (e.g. reject flows pass "disagree").
+        vars.putIfAbsent(RequestMapSpecialKeyConstant.TASK_INSTANCE_TAG,
+                com.auraboot.smart.framework.engine.constant.AdHocConstant.AGREE);
         smartEngine.getTaskCommandService().complete(taskId, vars);
 
         // 记录审计日志  fixme comment
