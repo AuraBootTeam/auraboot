@@ -3,6 +3,7 @@ package com.auraboot.framework.aurabot.service;
 import com.auraboot.framework.agent.dto.LlmChatRequest;
 import com.auraboot.framework.agent.port.GroundingPort;
 import com.auraboot.framework.agent.port.ToolDiscoveryPort;
+import com.auraboot.framework.agent.service.SkillPackActivator;
 import com.auraboot.framework.application.tenant.MetaContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,14 +38,17 @@ public class ChatToolResolver {
     // SPI ports from the shared AI runtime
     private final GroundingPort groundingPort;
     private final ToolDiscoveryPort toolDiscoveryPort;
+    private final SkillPackActivator skillPackActivator;
 
     @Autowired
     public ChatToolResolver(
             @Autowired(required = false) GroundingPort groundingPort,
-            @Autowired(required = false) ToolDiscoveryPort toolDiscoveryPort
+            @Autowired(required = false) ToolDiscoveryPort toolDiscoveryPort,
+            @Autowired(required = false) SkillPackActivator skillPackActivator
     ) {
         this.groundingPort = groundingPort;
         this.toolDiscoveryPort = toolDiscoveryPort;
+        this.skillPackActivator = skillPackActivator;
     }
 
     /**
@@ -92,8 +96,24 @@ public class ChatToolResolver {
                     grounding.intent(), grounding.object(),
                     String.format("%.2f", grounding.confidence()), grounding.candidateSkills());
 
+            // ACP §3.3 Tier-1 — apply SkillPack Activation Filter to narrow the
+            // candidate skill set the planner will see. Tenants with no pack
+            // bindings pass through unchanged (progressive rollout).
+            List<String> candidates = grounding.candidateSkills();
+            if (skillPackActivator != null && candidates != null && !candidates.isEmpty()) {
+                SkillPackActivator.ActivationResult activation =
+                        skillPackActivator.filter(tenantId, null, null, null, candidates);
+                if ("filter_applied".equals(activation.getReason()) && activation.getRemovedCount() > 0) {
+                    log.info("SkillPack filter: {} → {} skills (dropped {})",
+                            candidates.size(),
+                            activation.getActivatedCandidates().size(),
+                            activation.getRemovedCount());
+                }
+                candidates = activation.getActivatedCandidates();
+            }
+
             var toolDefs = toolDiscoveryPort.discoverTools(
-                    tenantId, grounding.candidateSkills(),
+                    tenantId, candidates,
                     grounding.object(), grounding.intent(), MAX_TOOLS);
 
             List<LlmChatRequest.Tool> llmTools = new ArrayList<>(toolDefs.stream()
