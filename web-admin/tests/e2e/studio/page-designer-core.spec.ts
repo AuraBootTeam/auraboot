@@ -18,7 +18,7 @@ async function createBlankPage(page: Page): Promise<string> {
   const name = uniqueId('core');
   const pageKey = `e2e_core_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
   const resp = await page.request.post('/api/pages', {
-    data: { name, pageKey, title: name, kind: 'list', modelCode: 'tenant', blocks: [], metaInfo: { componentCount: 0 }, semver: '0.1.0' },
+    data: { name, pageKey, title: name, kind: 'form', modelCode: 'tenant', blocks: [], metaInfo: { componentCount: 0 }, semver: '0.1.0' },
   });
   expect(resp.ok(), `createBlankPage failed: ${resp.status()}`).toBeTruthy();
   const body = await resp.json();
@@ -30,7 +30,7 @@ async function createPageWithBlock(page: Page, blockType: string): Promise<strin
   const pageKey = `e2e_core_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
   const resp = await page.request.post('/api/pages', {
     data: {
-      name, pageKey, title: name, kind: 'list', modelCode: 'tenant',
+      name, pageKey, title: name, kind: 'form', modelCode: 'tenant',
       blocks: [{ id: 'blk_pre', blockType, config: {}, layout: { col: 0, colSpan: 12, rowSpan: 1, order: 0 } }],
       metaInfo: { componentCount: 1 }, semver: '0.1.0',
     },
@@ -89,7 +89,9 @@ async function selectFirstBlock(page: Page) {
 // ---------------------------------------------------------------------------
 
 test.describe('添加 Block', () => {
-  test('点击 Table → canvas 从 0 变 1', async ({ page }) => {
+  // table is list-only; list canvas removed per design §5.1 (kind=list → ListConfigPanel).
+  // Equivalent UX: ListConfigPanel Columns/Filters/Toolbar/Behavior tabs.
+  test.skip('点击 Table → canvas 从 0 变 1 — list canvas removed per design §5.1', async ({ page }) => {
     const pid = await createBlankPage(page);
     await open(page, pid);
 

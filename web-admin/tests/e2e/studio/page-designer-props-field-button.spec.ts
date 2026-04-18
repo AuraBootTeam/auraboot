@@ -72,7 +72,7 @@ async function createPage(page: Page, prefix: string): Promise<string> {
       name,
       pageKey,
       title: name,
-      kind: 'list',
+      kind: 'form',
       modelCode: 'tenant',
       blocks: [],
       metaInfo: { componentCount: 0 },
@@ -194,7 +194,7 @@ test.describe('C15 — FieldConfig — Deep Property Tests', () => {
    */
   async function addFormSectionAndOpenFieldConfig(page: Page): Promise<Locator> {
     // Switch to Widgets tab and add a text widget
-    await page.getByTestId('canvas-left-tab-widgets').click();
+    await page.getByTestId('designer-tab-fields').click();
     await expect(page.getByTestId('widget-palette')).toBeVisible();
     await page.getByTestId('widget-palette-item-text').click();
 
@@ -508,7 +508,10 @@ test.describe('C15 — FieldConfig — Deep Property Tests', () => {
 // C16 — ButtonConfig Deep Property Tests (toolbar button-level editing)
 // ===========================================================================
 
-test.describe('C16 — ButtonConfig — Deep Property Tests', () => {
+// C16 ButtonConfig: depends on toolbar block (list-only) and list canvas.
+// Post-merge 5f72469b, list canvas removed per design §5.1. Equivalent UX
+// for configuring toolbar button actions lives in ListConfigPanel → Toolbar tab.
+test.describe.skip('C16 — ButtonConfig — Deep Property Tests', () => {
   /**
    * Open the designer for a page that has a toolbar with a pre-configured button.
    * Select the toolbar block, then click the button chip to open ButtonConfigPanel.

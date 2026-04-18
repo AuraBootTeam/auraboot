@@ -40,6 +40,14 @@
 import { test, expect, type Page, type Locator } from '@playwright/test';
 import { uniqueId } from '../helpers/index';
 
+// NOTE (2026-04-17): post-merge 5f72469b, the chart block has no palette item
+// in BlockLibrary.tsx (only chart-card is exposed), and kind=list routes to
+// ListConfigPanel instead of the canvas designer. The canvas-based "drag
+// chart, configure via block property panel" flow these tests rely on no
+// longer exists — per design §5.1. All C3.* describes are skipped; property
+// parity for charts should be covered by dashboard-designer tests and the
+// new chart-card block schema tests.
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -79,7 +87,7 @@ async function openDesigner(page: Page, pid: string): Promise<void> {
 /** Add a chart block via the Components palette and select it. */
 async function addAndSelectChart(page: Page): Promise<void> {
   // Switch to Components tab (may already be there)
-  await page.getByTestId('canvas-left-tab-components').click();
+  await page.getByTestId('designer-tab-blocks').click();
   const paletteItem = page.getByTestId('block-palette-item-chart');
   await paletteItem.waitFor({ state: 'visible', timeout: 5000 });
   await paletteItem.click();
@@ -95,7 +103,7 @@ async function addAndSelectChart(page: Page): Promise<void> {
 
 /** Add a second block (table) and click it, then reselect chart. */
 async function addTableBlock(page: Page): Promise<void> {
-  await page.getByTestId('canvas-left-tab-components').click();
+  await page.getByTestId('designer-tab-blocks').click();
   const paletteItem = page.getByTestId('block-palette-item-table');
   await paletteItem.waitFor({ state: 'visible', timeout: 5000 });
   await paletteItem.click();
@@ -149,7 +157,7 @@ const BLOCK_WRAPPER_SEL =
 // C3.1 / C3.2–C3.8  dataSourceMode — 3-branch dependsOn chain
 // ---------------------------------------------------------------------------
 
-test.describe('C3.1 dataSourceMode — 3 branches and field visibility', () => {
+test.describe.skip('C3.1 dataSourceMode — 3 branches and field visibility', () => {
   test('default is "Model Aggregate"; switching reveals/hides branch-specific fields', async ({ page }) => {
     const pid = await createPage(page);
     await openDesigner(page, pid);
@@ -227,7 +235,7 @@ test.describe('C3.1 dataSourceMode — 3 branches and field visibility', () => {
 // C3.3  metricField (text) — 5-step pattern
 // ---------------------------------------------------------------------------
 
-test.describe('C3.3 metricField — text input in Model Aggregate mode', () => {
+test.describe.skip('C3.3 metricField — text input in Model Aggregate mode', () => {
   test('fill metric field, deselect, reselect — value persists', async ({ page }) => {
     const pid = await createPage(page);
     await openDesigner(page, pid);
@@ -271,7 +279,7 @@ test.describe('C3.3 metricField — text input in Model Aggregate mode', () => {
 // C3.4  aggregation (select: SUM/COUNT/AVG/MIN/MAX) — 5-step + options check
 // ---------------------------------------------------------------------------
 
-test.describe('C3.4 aggregation — all 5 options, default SUM, change to AVG', () => {
+test.describe.skip('C3.4 aggregation — all 5 options, default SUM, change to AVG', () => {
   test.fixme('default SUM; verify 5 options; change to AVG; deselect; reselect → AVG', async ({ page }) => {
     const pid = await createPage(page);
     await openDesigner(page, pid);
@@ -321,7 +329,7 @@ test.describe('C3.4 aggregation — all 5 options, default SUM, change to AVG', 
 // C3.5  groupDimension (text) — 5-step pattern
 // ---------------------------------------------------------------------------
 
-test.describe('C3.5 groupDimension — text input in Model Aggregate mode', () => {
+test.describe.skip('C3.5 groupDimension — text input in Model Aggregate mode', () => {
   test.fixme('fill group dimension, deselect, reselect — value persists', async ({ page }) => {
     const pid = await createPage(page);
     await openDesigner(page, pid);
@@ -362,7 +370,7 @@ test.describe('C3.5 groupDimension — text input in Model Aggregate mode', () =
 // C3.6  dataSource.queryCode (text) — Named Query mode — 5-step pattern
 // ---------------------------------------------------------------------------
 
-test.describe('C3.6 dataSource.queryCode — Named Query mode', () => {
+test.describe.skip('C3.6 dataSource.queryCode — Named Query mode', () => {
   test('switch to Named Query; fill queryCode; deselect; reselect → value persists', async ({ page }) => {
     const pid = await createPage(page);
     await openDesigner(page, pid);
@@ -409,7 +417,7 @@ test.describe('C3.6 dataSource.queryCode — Named Query mode', () => {
 // C3.7  dataSource.endpoint (text) — Custom API mode — 5-step pattern
 // ---------------------------------------------------------------------------
 
-test.describe('C3.7 dataSource.endpoint — Custom API mode', () => {
+test.describe.skip('C3.7 dataSource.endpoint — Custom API mode', () => {
   test('switch to Custom API; fill endpoint; deselect; reselect → persists', async ({ page }) => {
     const pid = await createPage(page);
     await openDesigner(page, pid);
@@ -451,7 +459,7 @@ test.describe('C3.7 dataSource.endpoint — Custom API mode', () => {
 // C3.8  dataSource.params (json textarea) — Custom API mode — 5-step pattern
 // ---------------------------------------------------------------------------
 
-test.describe('C3.8 dataSource.params — Custom API mode JSON textarea', () => {
+test.describe.skip('C3.8 dataSource.params — Custom API mode JSON textarea', () => {
   test('switch to Custom API; fill params; deselect; reselect → persists', async ({ page }) => {
     const pid = await createPage(page);
     await openDesigner(page, pid);
@@ -497,7 +505,7 @@ test.describe('C3.8 dataSource.params — Custom API mode JSON textarea', () => 
 // C3.9  chartType — 20 options, default Bar, change to Pie, persist
 // ---------------------------------------------------------------------------
 
-test.describe('C3.9 chartType — 20 options verification and persistence', () => {
+test.describe.skip('C3.9 chartType — 20 options verification and persistence', () => {
   test('default is Bar; verify exactly 20 options; change to Pie; deselect; reselect → Pie', async ({ page }) => {
     const pid = await createPage(page);
     await openDesigner(page, pid);
@@ -573,7 +581,7 @@ test.describe('C3.9 chartType — 20 options verification and persistence', () =
 // C3.10  chartTitle (text) — 5-step pattern
 // ---------------------------------------------------------------------------
 
-test.describe('C3.10 chartTitle — text input with persistence', () => {
+test.describe.skip('C3.10 chartTitle — text input with persistence', () => {
   test('default empty; fill "Revenue Chart"; deselect; reselect → persists', async ({ page }) => {
     const pid = await createPage(page);
     await openDesigner(page, pid);
@@ -611,7 +619,7 @@ test.describe('C3.10 chartTitle — text input with persistence', () => {
 // C3.11  height (number) — default 300, change to 400, persist
 // ---------------------------------------------------------------------------
 
-test.describe('C3.11 height — number input, default 300', () => {
+test.describe.skip('C3.11 height — number input, default 300', () => {
   test('default 300; change to 400; deselect; reselect → 400', async ({ page }) => {
     const pid = await createPage(page);
     await openDesigner(page, pid);
@@ -648,7 +656,7 @@ test.describe('C3.11 height — number input, default 300', () => {
 // C3.12  showLegend (switch) — default OFF, toggle ON, persist
 // ---------------------------------------------------------------------------
 
-test.describe('C3.12 showLegend — switch default OFF, toggle to ON', () => {
+test.describe.skip('C3.12 showLegend — switch default OFF, toggle to ON', () => {
   test('default unchecked; toggle ON; deselect; reselect → checked', async ({ page }) => {
     const pid = await createPage(page);
     await openDesigner(page, pid);
@@ -684,7 +692,7 @@ test.describe('C3.12 showLegend — switch default OFF, toggle to ON', () => {
 // C3.13  showValues (switch) — default OFF, toggle ON, persist
 // ---------------------------------------------------------------------------
 
-test.describe('C3.13 showValues — switch default OFF, toggle to ON', () => {
+test.describe.skip('C3.13 showValues — switch default OFF, toggle to ON', () => {
   test('default unchecked; toggle ON; deselect; reselect → checked', async ({ page }) => {
     const pid = await createPage(page);
     await openDesigner(page, pid);
@@ -720,7 +728,7 @@ test.describe('C3.13 showValues — switch default OFF, toggle to ON', () => {
 // C3.14  visibleWhen — expression editor in Conditions group
 // ---------------------------------------------------------------------------
 
-test.describe('C3.14 visibleWhen — expression editor in Conditions group', () => {
+test.describe.skip('C3.14 visibleWhen — expression editor in Conditions group', () => {
   test('Conditions group header visible; expression editor renders', async ({ page }) => {
     const pid = await createPage(page);
     await openDesigner(page, pid);
@@ -743,7 +751,7 @@ test.describe('C3.14 visibleWhen — expression editor in Conditions group', () 
 // C3.+  layout.colSpan — chart default is 6 (not 12 like table)
 // ---------------------------------------------------------------------------
 
-test.describe('C3.+ layout.colSpan — chart default 6', () => {
+test.describe.skip('C3.+ layout.colSpan — chart default 6', () => {
   test.fixme('chart block shows "6col" badge by default', async ({ page }) => {
     const pid = await createPage(page);
     await openDesigner(page, pid);
@@ -789,7 +797,7 @@ test.describe('C3.+ layout.colSpan — chart default 6', () => {
 // C3 Integration — All 4 group headers visible
 // ---------------------------------------------------------------------------
 
-test.describe('C3 integration — all property groups render', () => {
+test.describe.skip('C3 integration — all property groups render', () => {
   test('Data Source, Chart Type, Style, and Conditions groups all visible', async ({ page }) => {
     const pid = await createPage(page);
     await openDesigner(page, pid);
