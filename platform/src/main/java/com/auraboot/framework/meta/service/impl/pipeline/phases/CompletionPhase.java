@@ -42,19 +42,38 @@ public class CompletionPhase implements CommandPhase {
 
     @Override
     public void execute(CommandPipelineContext ctx) {
+        boolean dryRun = ctx.getRequest() != null && ctx.getRequest().isDryRun();
+
         // EFFECT phase
         var effectRules = ctx.getRulesByType().getOrDefault("effect", Collections.emptyList());
         effectExecutor.executeEffectPhase(effectRules, ctx.getCommand(), ctx.getPayload(),
                 ctx.getFieldMapResults(), ctx.getTenantId(), ctx.getUserId(),
                 ctx.getRequest(), ctx.getTargetState());
 
-        // DOMAIN_EVENT phase
-        publishDomainEvent(ctx);
+        // DOMAIN_EVENT phase — skipped under dry-run (PR-56 C4). The event
+        // bus fan-out triggers AFTER_COMMIT listeners (AuditTrailEventListener
+        // writes to ab_audit_trail via its own REQUIRES_NEW transaction);
+        // setRollbackOnly already suppresses AFTER_COMMIT, but we avoid
+        // even publishing the event to keep any @EventListener that runs
+        // IN_COMMIT / immediately (non-transactional) from firing.
+        if (!dryRun) {
+            publishDomainEvent(ctx);
+        } else {
+            log.info("Dry-run: skipped domain event publication for command {}", ctx.getCommand().getCode());
+        }
 
-        // API_CALL and WEBHOOK — schedule for after-commit
+        // API_CALL and WEBHOOK — schedule for after-commit.
+        // Under dry-run we don't even register the afterCommit callback:
+        // the tx is rollback-only so it would never fire anyway, but
+        // declining registration makes the intent explicit.
         List<BindingRule> apiCallRules = ctx.getRulesByType().getOrDefault("api_call", Collections.emptyList());
         List<BindingRule> webhookRules = ctx.getRulesByType().getOrDefault("webhook", Collections.emptyList());
-        if (!apiCallRules.isEmpty() || !webhookRules.isEmpty()) {
+        if (dryRun) {
+            if (!apiCallRules.isEmpty() || !webhookRules.isEmpty()) {
+                log.info("Dry-run: skipped api_call/webhook registration (api={}, webhook={}) for command {}",
+                        apiCallRules.size(), webhookRules.size(), ctx.getCommand().getCode());
+            }
+        } else if (!apiCallRules.isEmpty() || !webhookRules.isEmpty()) {
             final var payload = new HashMap<>(ctx.getPayload());
             final var handlerResults = new HashMap<>(ctx.getHandlerResults());
             final var command = ctx.getCommand();
@@ -104,15 +123,24 @@ public class CompletionPhase implements CommandPhase {
         final var userId = ctx.getUserId();
         final var phase = ctx.getCurrentPhase();
 
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                effectExecutor.saveAuditLog(tenantId, commandCode, commandPid, userId,
-                        auditPayload, auditResult, true, null, execTimeMs, phase, auditTimings);
-            }
-        });
+        // PR-56 C4: skip audit log registration under dry-run. The outer
+        // transaction is rollback-only so afterCommit would not fire, but
+        // we also don't want to churn TransactionSynchronizationManager
+        // state when we know the success path is synthetic.
+        if (!dryRun) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    effectExecutor.saveAuditLog(tenantId, commandCode, commandPid, userId,
+                            auditPayload, auditResult, true, null, execTimeMs, phase, auditTimings);
+                }
+            });
+        } else {
+            log.info("Dry-run: skipped audit log registration for command {}", commandCode);
+        }
 
-        log.info("Command {} executed successfully in {}ms", ctx.getCommandCode(), execTimeMs);
+        log.info("Command {} executed successfully in {}ms{}", ctx.getCommandCode(), execTimeMs,
+                dryRun ? " (dry-run)" : "");
     }
 
     // ==================== Inlined delegate methods ====================
