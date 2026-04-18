@@ -502,6 +502,18 @@ function DashboardView({
           desc={l('浏览 Agent 记忆数据', 'Browse agent memory data')}
           onClick={() => navigate('/p/agent-memory')}
         />
+        <QuickLink
+          icon="💡"
+          title={l('技能草稿', 'Skill Drafts')}
+          desc={l('审核 Learning Loop 产生的草稿', 'Review drafts from the learning loop')}
+          onClick={() => navigate('/aurabot/learning-drafts')}
+        />
+        <QuickLink
+          icon="⚠️"
+          title={l('中断审计', 'Interrupts')}
+          desc={l('查看分类器产出的中断记录', 'Inspect interrupt classifier output')}
+          onClick={() => navigate('/aurabot/interrupts')}
+        />
       </div>
 
       {/* Quick Links to Config Pages */}
