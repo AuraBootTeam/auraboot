@@ -59,6 +59,7 @@ async function openDesigner(
         pageKey,
         title: 'E2E Deep Test',
         kind: 'list',
+        modelCode: 'tenant',
         blocks: [
           { id: 'blk_tbl', blockType: 'table', config: {}, layout: { col: 0, colSpan: 12, rowSpan: 1, order: 0 } },
         ],
@@ -188,6 +189,7 @@ test.describe('Page Designer Deep Operations', () => {
             pageKey,
             title: 'E2E Deep Operations Test Page',
             kind: 'list',
+            modelCode: 'tenant',
             blocks: [
               { id: 'blk_tbl', blockType: 'table', config: {}, layout: { col: 0, colSpan: 12, rowSpan: 1, order: 0 } },
               { id: 'blk_chart', blockType: 'chart', config: {}, layout: { col: 0, colSpan: 6, rowSpan: 1, order: 1 } },

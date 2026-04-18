@@ -26,6 +26,7 @@ test.beforeAll(async ({ browser }) => {
       pageKey,
       title: name,
       kind: 'list',
+      modelCode: 'tenant',
       blocks: [
         { blockType: 'filters', label: 'Filters', fields: [] },
         { blockType: 'toolbar', label: 'Toolbar', actions: [] },

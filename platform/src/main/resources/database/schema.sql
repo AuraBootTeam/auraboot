@@ -750,7 +750,7 @@ CREATE TABLE ab_page_schema (
 
     -- Page identification
     page_key VARCHAR(200) NOT NULL,
-    model_code VARCHAR(100),
+    model_code VARCHAR(100) NOT NULL,
 
     -- Basic info
     name VARCHAR(200) NOT NULL,

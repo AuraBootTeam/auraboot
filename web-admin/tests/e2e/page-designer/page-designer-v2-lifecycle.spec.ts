@@ -64,6 +64,7 @@ test.describe('Page Designer V2 — Composite Page Lifecycle (DEPRECATED)', () =
         pageKey: `${PREFIX.toLowerCase()}_page`,
         title: 'Untitled',
         kind: 'list',
+        modelCode: 'tenant',
         blocks: [],
         semver: '0.1.0',
       },

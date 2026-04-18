@@ -49,6 +49,7 @@ test.describe.serial('Page Schema List (DSL)', () => {
       name: seedName,
       page_key: seedPageKey,
       kind: 'list',
+      model_code: 'tenant',
       description: `E2E seed page ${uid}`,
       profile: 'admin',
     }, undefined, undefined, { allowHttpError: true });
