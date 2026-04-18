@@ -247,14 +247,16 @@ test.describe('BPM Designer ServiceTask HTTP lifecycle', { tag: ['@bpm-regressio
 
     // D8: BPMN content stored on the backend must carry the HTTP delegate
     // reference — this is the "converter emitted smart:class" assertion.
-    const detailResp = await page.request.get(
-      `/api/bpm/process-definitions/${processPid}`,
+    // The BPMN XML is served by the dedicated /{pid}/bpmn endpoint
+    // (ProcessDefinitionController#getBpmn); the detail endpoint does NOT
+    // include it.
+    const bpmnResp = await page.request.get(
+      `/api/bpm/process-definitions/${processPid}/bpmn`,
       { headers: { Authorization: `Bearer ${adminToken}` } },
     );
-    expect(detailResp.ok(), `detail fetch must succeed: ${detailResp.status()}`).toBe(true);
-    const detail = await detailResp.json();
-    const bpmnContent: string =
-      detail?.data?.bpmnContent ?? detail?.data?.bpmnXml ?? detail?.data?.bpmn ?? '';
+    expect(bpmnResp.ok(), `bpmn fetch must succeed: ${bpmnResp.status()}`).toBe(true);
+    const bpmnBody = await bpmnResp.json();
+    const bpmnContent: string = bpmnBody?.data ?? '';
     expect(
       bpmnContent,
       'deployed BPMN must contain smart:class=httpServiceTaskDelegate',
