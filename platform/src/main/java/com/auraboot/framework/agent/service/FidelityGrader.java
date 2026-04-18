@@ -39,15 +39,25 @@ public class FidelityGrader {
 
     /**
      * Grade an Action by the tool substrate that produced it.
+     * Per {@code skill-substrate-contract.md §10.1}:
+     *   - dsl_command writes produce full before/after snapshots → full fidelity.
+     *   - dsl_query and prompt are reads with no state delta to reconstruct
+     *     → semantic fidelity (the operation is known, no diff exists to store).
+     *   - api_call / mcp / connector cross opaque network boundaries; we know
+     *     the semantic op but not downstream DB state → semantic.
+     *   - code / llm_native run inside sandboxes where we only observe
+     *     exit_code + stdout → blackbox.
      *
-     * @param toolType one of dsl_command / dsl_query / api_call / mcp / code / llm_native
+     * @param toolType one of dsl_command / dsl_query / api_call / mcp /
+     *                 connector / prompt / code / llm_native
      */
     public String grade(String toolType) {
         if (toolType == null) return FIDELITY_BLACKBOX;
         return switch (toolType) {
-            case "dsl_command", "dsl_query" -> FIDELITY_FULL;
-            case "api_call", "mcp"           -> FIDELITY_SEMANTIC;
-            case "code", "llm_native"        -> FIDELITY_BLACKBOX;
+            case "dsl_command"                      -> FIDELITY_FULL;
+            case "dsl_query", "prompt"              -> FIDELITY_SEMANTIC;
+            case "api_call", "mcp", "connector"     -> FIDELITY_SEMANTIC;
+            case "code", "llm_native"               -> FIDELITY_BLACKBOX;
             default -> FIDELITY_BLACKBOX;
         };
     }
@@ -83,21 +93,37 @@ public class FidelityGrader {
     }
 
     /**
-     * Recursively wrap Maps in TreeMap so JSON serialization is deterministic.
-     * Lists are kept in order (list ordering is semantically meaningful).
+     * Recursively normalise a value tree so JSON serialization is deterministic:
+     *   - {@code Map} entries wrapped in {@link TreeMap} (sorted keys)
+     *   - {@code List} elements normalised recursively but ORDER IS PRESERVED
+     *     (list ordering is semantically meaningful; only map keys can reorder
+     *     without changing meaning)
+     *
+     * This also handles maps nested inside lists (e.g. {@code items: [{a:1,b:2}]})
+     * which the earlier map-only implementation missed.
      */
     @SuppressWarnings("unchecked")
     private Map<String, Object> canonicalize(Map<String, Object> m) {
         TreeMap<String, Object> sorted = new TreeMap<>();
         for (Map.Entry<String, Object> e : m.entrySet()) {
-            Object v = e.getValue();
-            if (v instanceof Map<?, ?> nested) {
-                sorted.put(e.getKey(), canonicalize((Map<String, Object>) nested));
-            } else {
-                sorted.put(e.getKey(), v);
-            }
+            sorted.put(e.getKey(), canonicalizeValue(e.getValue()));
         }
         return sorted;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Object canonicalizeValue(Object v) {
+        if (v instanceof Map<?, ?> nested) {
+            return canonicalize((Map<String, Object>) nested);
+        }
+        if (v instanceof java.util.List<?> list) {
+            java.util.List<Object> out = new java.util.ArrayList<>(list.size());
+            for (Object el : list) {
+                out.add(canonicalizeValue(el));
+            }
+            return out;
+        }
+        return v;
     }
 
     private String sha256Hex(String s) throws NoSuchAlgorithmException {

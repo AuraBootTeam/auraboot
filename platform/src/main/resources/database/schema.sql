@@ -4927,14 +4927,15 @@ CREATE TABLE IF NOT EXISTS ab_agent_memory (
   updated_by    BIGINT,
   deleted_flag  BOOLEAN DEFAULT FALSE,
   shareable     BOOLEAN DEFAULT FALSE,
-  embedding     vector(1536),
-  -- 2026-04-18 PR-13: 3D memory model (memory-lifecycle.md §2) — access boundary.
-  -- scope ∈ {user, tenant, global}; scope_key = boundary entity id (user_id /
-  -- tenant_id / NULL for global). GDPR deletion: DELETE WHERE scope='user' AND
-  -- scope_key=? covers all memory about a specific user.
-  scope         VARCHAR(16) NOT NULL DEFAULT 'tenant',
-  scope_key     VARCHAR(100)
+  embedding     vector(1536)
 );
+
+-- 2026-04-18 PR-13: 3D memory model (memory-lifecycle.md §2) — access boundary.
+-- scope ∈ {user, tenant, global}; scope_key = boundary entity id (user_id /
+-- tenant_id / NULL for global). GDPR deletion: DELETE WHERE tenant_id=? AND
+-- scope='user' AND scope_key=? covers all memory about a specific user.
+-- ALTER-only declaration keeps fresh and existing DBs converging to the same
+-- shape without duplicating the definition in two places.
 ALTER TABLE ab_agent_memory ADD COLUMN IF NOT EXISTS scope VARCHAR(16) NOT NULL DEFAULT 'tenant';
 ALTER TABLE ab_agent_memory ADD COLUMN IF NOT EXISTS scope_key VARCHAR(100);
 CREATE INDEX IF NOT EXISTS idx_agent_memory_tenant ON ab_agent_memory (tenant_id);
