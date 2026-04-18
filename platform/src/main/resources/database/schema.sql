@@ -6545,6 +6545,62 @@ CREATE INDEX IF NOT EXISTS idx_capability_tenant_status ON ab_agent_capability(t
     WHERE (deleted_flag = FALSE OR deleted_flag IS NULL);
 COMMENT ON TABLE ab_agent_capability IS 'ACP Capability Layer: routes BIF intent+object to domain capabilities, then capabilities to skills';
 
+-- ============================================================================
+-- ACP D1 Grounding: ab_agent_bif (Business Intent Frame persistence)
+-- DDL source: docs/agent/ACP-Ideal-Agent-Design.md §6.2.3
+-- Aligned with specs/03-BusinessIntentFrameSpec.md §1 BIF JSON Schema
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS ab_agent_bif (
+    id                     BIGSERIAL PRIMARY KEY,
+    pid                    VARCHAR(26) UNIQUE NOT NULL,
+    tenant_id              BIGINT NOT NULL,
+
+    -- execution context (run_id may be null when BIF computed pre-run)
+    run_id                 VARCHAR(26),
+    step_index             INTEGER,
+    conversation_id        VARCHAR(26),
+
+    nl_input               TEXT NOT NULL,
+
+    -- core semantics (aligned with specs/03 §1 BIF JSON Schema)
+    intent                 VARCHAR(32) NOT NULL,
+    object                 VARCHAR(128),
+    objects                JSONB,
+    primary_object         VARCHAR(128),
+    object_relations       JSONB,
+
+    scope                  JSONB,
+    filters                JSONB,
+    semantic_constraints   JSONB,
+    context                JSONB,
+
+    actionability          VARCHAR(16),
+    risk_level             VARCHAR(8) NOT NULL,
+
+    confidence             JSONB NOT NULL,
+    match_type             VARCHAR(16),
+
+    candidate_skills       JSONB,
+    candidate_skills_mode  VARCHAR(16)
+        CHECK (candidate_skills_mode IN ('hint', 'bounded', 'fixed')),
+    dispatched_skill       VARCHAR(128),
+    explanation            JSONB,
+
+    -- v1.1 extensions
+    pre_context            JSONB,
+    metrics                JSONB,
+
+    schema_version         SMALLINT NOT NULL DEFAULT 1,
+
+    created_at             TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_bif_tenant_time ON ab_agent_bif(tenant_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_bif_intent_obj  ON ab_agent_bif(intent, primary_object);
+CREATE INDEX IF NOT EXISTS idx_bif_skill       ON ab_agent_bif(dispatched_skill);
+CREATE INDEX IF NOT EXISTS idx_bif_run         ON ab_agent_bif(run_id);
+COMMENT ON TABLE ab_agent_bif IS 'ACP D1 Grounding: Business Intent Frame IR persistence — every LLM-turn grounding result';
+
 -- Seed: platform built-in capabilities (tenant_id = -1)
 INSERT INTO ab_agent_capability (pid, tenant_id, capability_code, capability_name, domain, intent_patterns, object_patterns, skills, selection_strategy) VALUES
 ('CAP_CRM_QUERY',  -1, 'crm.query',  'CRM Query',      'crm', '["query", "analyze", "summarize", "report"]', '["crm_*"]', '[]', 'auto_first'),
