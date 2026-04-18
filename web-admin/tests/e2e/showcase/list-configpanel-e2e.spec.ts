@@ -45,6 +45,42 @@
  */
 
 import { test, expect, type Page, type APIRequestContext } from '../../fixtures';
+import type { Locator } from '@playwright/test';
+
+// ---------------------------------------------------------------------------
+// Radix Select helper
+// ---------------------------------------------------------------------------
+//
+// `BaseSelect` (used by `PropertyFieldRenderer` for every `type: 'select'`
+// schema field) wraps Radix `<Select>`. Radix renders a `<button
+// role="combobox">` as the trigger and portals the option list (with each
+// option as `[role="option"]`) into `document.body`. Playwright's native
+// `selectOption()` only works on `<select>` elements, so we need a custom
+// click-then-portal-click helper.
+//
+// Trigger discovery order:
+//   1. Caller passes a Locator that already points to the trigger button
+//      (preferred — avoids label collisions).
+//   2. Fallback: caller passes a `name` (== schema.key, == FieldBase htmlFor
+//      target, == SelectTrigger id) and we look up `#${name}` scoped to a
+//      container.
+//
+async function selectRadixOption(
+  page: Page,
+  trigger: Locator,
+  optionValueOrLabel: string | RegExp,
+): Promise<void> {
+  await trigger.scrollIntoViewIfNeeded().catch(() => null);
+  await trigger.click();
+  // Radix listbox lands in a portal under document.body. Match by exact text
+  // (label) — fall back to substring match if exact fails.
+  const option = page
+    .locator('[role="option"]')
+    .filter({ hasText: optionValueOrLabel })
+    .first();
+  await expect(option).toBeVisible({ timeout: 5_000 });
+  await option.click();
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -326,10 +362,10 @@ test.describe('Phase 3 — List ConfigPanel E2E (4 tabs)', () => {
 
     const editor = page.getByTestId('column-detail-editor');
     await editor.locator('input[type="number"]').first().fill('200'); // width
-    // align select — the first <select> in the detail editor.
-    await editor.locator('select').nth(0).selectOption('center');
-    // renderer select — second <select>.
-    await editor.locator('select').nth(1).selectOption('badge');
+    // align select — Radix Select trigger keyed by schema key 'align'.
+    await selectRadixOption(page, editor.locator('#align'), '居中');
+    // renderer select — Radix Select trigger keyed by schema key 'renderer'.
+    await selectRadixOption(page, editor.locator('#renderer'), '标签');
     // format text input — labeled '格式化模板'.
     await editor.getByLabel(/格式化模板/).fill('{0}件');
 
@@ -385,7 +421,12 @@ test.describe('Phase 3 — List ConfigPanel E2E (4 tabs)', () => {
     const filterToggles = await page.locator('[data-testid^="filter-toggle-"]').all();
     expect(filterToggles.length).toBeGreaterThanOrEqual(2);
 
-    const operators = ['eq', 'neq', 'like', 'between'];
+    const operators: Array<{ value: string; label: string }> = [
+      { value: 'eq', label: '等于' },
+      { value: 'neq', label: '不等' },
+      { value: 'like', label: '包含' },
+      { value: 'between', label: '介于' },
+    ];
     const used: string[] = [];
 
     for (let i = 0; i < Math.min(filterToggles.length, operators.length); i++) {
@@ -395,13 +436,10 @@ test.describe('Phase 3 — List ConfigPanel E2E (4 tabs)', () => {
       used.push(code);
 
       await page.getByTestId(`filter-item-${i}`).click();
-      await expect(page.getByTestId('filter-detail-editor')).toBeVisible();
-      // Operator select is the first <select> in the detail editor.
-      await page
-        .getByTestId('filter-detail-editor')
-        .locator('select')
-        .first()
-        .selectOption(operators[i]);
+      const editor = page.getByTestId('filter-detail-editor');
+      await expect(editor).toBeVisible();
+      // Operator is a Radix Select trigger keyed by schema key 'operator'.
+      await selectRadixOption(page, editor.locator('#operator'), operators[i].label);
     }
 
     const saveResp = page.waitForResponse(
@@ -461,7 +499,11 @@ test.describe('Phase 3 — List ConfigPanel E2E (4 tabs)', () => {
 
     const editor = page.getByTestId('toolbar-custom-editor');
     await editor.getByLabel(/按钮文字/).fill('Bulk Approve');
-    await editor.getByLabel(/^Command$/).fill('showcase:bulk_approve');
+    // The 'command' field is rendered with `label: 'Command', required: true`
+    // → FieldBase appends a required asterisk inside the <Label>, so the
+    // accessible name becomes "Command *" and the strict `^Command$` regex
+    // no longer matches. Target the input by id (`schema.key` == 'command').
+    await editor.locator('#command').fill('showcase:bulk_approve');
     await editor.getByLabel(/需要选中行/).check();
 
     const saveResp = page.waitForResponse(
@@ -512,19 +554,27 @@ test.describe('Phase 3 — List ConfigPanel E2E (4 tabs)', () => {
 
     const tab = page.getByTestId('behavior-tab');
 
-    // defaultSortField — pick the first non-empty option.
-    const sortFieldSelect = tab.getByLabel(/默认排序字段/);
-    const sortOptions = await sortFieldSelect.locator('option').allTextContents();
-    const firstReal = sortOptions.find((o) => o && !o.includes('(不设)'));
+    // defaultSortField — Radix Select. Open the trigger, scrape option labels
+    // from the portal, then pick the first non-"(不设)" entry.
+    const sortFieldTrigger = tab.locator('#defaultSortField');
+    await sortFieldTrigger.click();
+    const portalOptions = page.locator('[role="option"]');
+    await expect(portalOptions.first()).toBeVisible({ timeout: 5_000 });
+    const sortOptionLabels = await portalOptions.allTextContents();
+    const firstReal = sortOptionLabels.find((o) => o && !o.includes('(不设)'));
     if (firstReal) {
-      await sortFieldSelect.selectOption({ label: firstReal });
-      // defaultSortOrder is dependsOn defaultSortField — should now be visible.
-      await tab.getByLabel(/排序方向/).selectOption('asc');
+      await portalOptions.filter({ hasText: firstReal }).first().click();
+      // defaultSortOrder is dependsOn defaultSortField — now rendered.
+      await selectRadixOption(page, tab.locator('#defaultSortOrder'), '升序');
+    } else {
+      // Close the dropdown by clicking the trigger again so subsequent fields
+      // remain interactable.
+      await sortFieldTrigger.click();
     }
 
     await tab.getByLabel(/每页条数/).fill('50');
     await tab.getByLabel(/启用多选/).check();
-    await tab.getByLabel(/行点击行为/).selectOption('drawer');
+    await selectRadixOption(page, tab.locator('#rowClickAction'), '打开抽屉');
     await tab.getByLabel(/空态文案/).fill('No showcase rows yet');
 
     const saveResp = page.waitForResponse(
