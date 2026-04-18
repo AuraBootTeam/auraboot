@@ -6558,6 +6558,33 @@ ALTER TABLE ab_agent_action
     ADD COLUMN IF NOT EXISTS estimated_risk VARCHAR(5),     -- risk predicted at plan/grounding time
     ADD COLUMN IF NOT EXISTS risk_deviation BOOLEAN DEFAULT FALSE;  -- true if actual_risk > estimated_risk
 
+-- ACP Action Contract v1.1 — fidelity grading + audit-precision fields
+-- (specs/01-ActionContractSpec.md §1.3 v1.1 ALTER).
+-- fidelity: how faithfully we can reconstruct the action from what we stored.
+--   full     — DSL write with before_snapshot + after_snapshot + field_changes (exact diff)
+--   semantic — semantic change known (API call / MCP tool), snapshots may be absent
+--   blackbox — only metadata known (code sandbox / llm_native), body opaque
+-- command_signature: SHA-256 of (commandCode + canonical JSON args). Used for
+--   idempotency dedup + learning-loop pattern aggregation.
+-- skill_code: which Skill produced this Action (spec §1 "step_index ↔ skill_code"
+--   pair is how learning-loop groups Actions into patterns).
+-- reversal_action_pid: if this Action was undone by a later compensating Action,
+--   point back to it here. Enables reversible chains / rollback machinery.
+ALTER TABLE ab_agent_action
+    ADD COLUMN IF NOT EXISTS fidelity             VARCHAR(10),
+    ADD COLUMN IF NOT EXISTS skill_code           VARCHAR(128),
+    ADD COLUMN IF NOT EXISTS tool_ref             VARCHAR(200),
+    ADD COLUMN IF NOT EXISTS command_signature    VARCHAR(64),
+    ADD COLUMN IF NOT EXISTS exit_code            INTEGER,
+    ADD COLUMN IF NOT EXISTS stdout_hash          VARCHAR(64),
+    ADD COLUMN IF NOT EXISTS affected_entities    JSONB,
+    ADD COLUMN IF NOT EXISTS change_summary       TEXT,
+    ADD COLUMN IF NOT EXISTS artifact_refs        JSONB,
+    ADD COLUMN IF NOT EXISTS reversal_action_pid  VARCHAR(26);
+CREATE INDEX IF NOT EXISTS idx_action_fidelity ON ab_agent_action(fidelity) WHERE fidelity IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_action_skill_code ON ab_agent_action(skill_code) WHERE skill_code IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_action_command_signature ON ab_agent_action(tenant_id, command_signature) WHERE command_signature IS NOT NULL;
+
 -- ============================================================================
 -- ACP Capability Layer (Spec 00 §5.6)
 -- Routes BIF(intent + object) → Capability → Skill
