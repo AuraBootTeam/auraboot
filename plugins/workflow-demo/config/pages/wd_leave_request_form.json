@@ -44,7 +44,7 @@
           "code": "submit",
           "primary": true,
           "label": "save",
-          "action": { "type": "command", "command": "wd:update_leave_request" }
+          "action": { "type": "command", "command": "wd:create_leave_request" }
         },
         { "code": "cancel", "label": "cancel" }
       ]

@@ -75,11 +75,16 @@ export interface UserTaskAuraConfig {
 
 // 服务任务配置
 export interface ServiceTaskConfig extends TaskBaseConfig {
-  serviceType?: 'http' | 'java' | 'script'; // 服务类型
+  serviceType?: 'http' | 'java' | 'script' | 'command'; // 服务类型
   serviceUrl?: string; // HTTP服务地址
   className?: string; // Java类名
   scriptContent?: string; // 脚本内容
   scriptType?: 'javascript' | 'groovy'; // 脚本类型
+  // AuraBoot Command bridge: when serviceType === 'command', the configured
+  // commandCode is routed at runtime through CommandServiceTaskDelegate
+  // (process variable `_chain_nodes[<activityId>].commandCode`), which then
+  // invokes the full 16-phase Command pipeline.
+  commandCode?: string;
   async?: boolean; // 是否异步执行
   hooks?: NodeHookEntry[]; // Pre/post execution hooks
 }
