@@ -88,6 +88,10 @@ public class StepLoopService {
         String lastTextResponse = "";
         List<Map<String, Object>> toolCallLog = new ArrayList<>();
 
+        // Classic agent loop = single logical step (index 0).
+        // Actions produced during this loop belong to execution_plan[0].
+        StepContext.setStepIndex(0);
+        try {
         for (int loop = 0; loop < maxLoops; loop++) {
             // Timeout check
             checkTimeout(runPid, LocalDateTime.now());
@@ -173,6 +177,9 @@ public class StepLoopService {
                 messages.add(LlmChatRequest.Message.builder().role("user").content(toolResults).build());
             }
         }
+        } finally {
+            StepContext.clear();
+        }
 
         updateRunToolCalls(runPid, toolCallLog);
 
@@ -230,6 +237,9 @@ public class StepLoopService {
         }
 
         for (int i = startStep; i < plan.size(); i++) {
+            // Bind the current step index so ActionRecorder stamps every Action
+            // produced during this step with the matching execution_plan[i] index.
+            StepContext.setStepIndex(i);
             AgentPlanStep step = plan.get(i);
             step.setStatus(AgentPlanStep.StepStatus.RUNNING);
             long stepStart = System.currentTimeMillis();
@@ -349,6 +359,7 @@ public class StepLoopService {
                 persistPlan(runPid, plan, i + 1);
             }
         }
+        StepContext.clear();
 
         updateRunToolCalls(runPid, toolCallLog);
 
