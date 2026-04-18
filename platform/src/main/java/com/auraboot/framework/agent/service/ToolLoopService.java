@@ -75,7 +75,19 @@ public class ToolLoopService implements ToolExecutionPort {
                     tools.stream().map(AgentToolDefinition::getName).limit(10).collect(Collectors.joining(", "));
         }
 
-        if (toolDef.isRequiresApproval()) {
+        // BIF-risk-aware approval: force approval when current-turn BIF says risk ≥ L3
+        // AND this is a write tool (cmd_*), regardless of per-tool flag. Closes the
+        // D1 Grounding → Approval Gate loop (spec §5.1 RiskEvaluator quality gate).
+        boolean requiresApproval = toolDef.isRequiresApproval();
+        if (!requiresApproval) {
+            com.auraboot.framework.agent.dto.BusinessIntentFrame bif = BifContext.getCurrentBif();
+            if (bif != null && isHighRisk(bif.getRiskLevel()) && isWriteTool(toolName, toolDef)) {
+                requiresApproval = true;
+                log.info("BIF risk={} escalates tool {} to approval-required (was false)",
+                        bif.getRiskLevel(), toolName);
+            }
+        }
+        if (requiresApproval) {
             String approvalPid = approvalGate.checkAndRequestApproval(
                     tenantId, runPid, taskPid, toolName, toolDef.getDescription(), input, true);
             if (approvalPid != null) {
@@ -260,6 +272,24 @@ public class ToolLoopService implements ToolExecutionPort {
     }
 
     // ========== Helpers ==========
+
+    /** Risk levels L3 and L4 trigger mandatory Approval Gate routing. */
+    private boolean isHighRisk(String riskLevel) {
+        return "L3".equals(riskLevel) || "L4".equals(riskLevel);
+    }
+
+    /**
+     * A write tool either declares a non-query tool_type or follows the cmd_*
+     * naming convention. dsl_query / read tools are never escalated.
+     */
+    private boolean isWriteTool(String toolName, com.auraboot.framework.agent.dto.AgentToolDefinition toolDef) {
+        if (toolDef != null) {
+            String type = toolDef.getToolType();
+            if ("dsl_query".equals(type) || "llm_native".equals(type)) return false;
+            if ("dsl_command".equals(type) || "api_call".equals(type)) return true;
+        }
+        return toolName != null && toolName.startsWith("cmd_");
+    }
 
     private String resolveModelCodeForCommand(Long tenantId, String commandCode) {
         try {

@@ -200,6 +200,14 @@ public class AuraBotChatService {
     // =========================================================================
 
     private void doStreamChat(Long tenantId, ChatRequest request, SseEmitter emitter) {
+        try {
+            doStreamChatInner(tenantId, request, emitter);
+        } finally {
+            com.auraboot.framework.agent.service.BifContext.clear();
+        }
+    }
+
+    private void doStreamChatInner(Long tenantId, ChatRequest request, SseEmitter emitter) {
         // 0. Route to ACP Agent if agentCode is set and not the default "aurabot"
         String agentCode = request.getAgentCode();
         if (agentCode != null && !agentCode.isBlank() && !"aurabot".equals(agentCode)) {
@@ -275,6 +283,7 @@ public class AuraBotChatService {
                         .build();
                 bif = groundingService.ground(tenantId, request.getMessage(), gctx);
                 tools = applyCandidateSkillsMode(tools, bif);
+                com.auraboot.framework.agent.service.BifContext.setCurrentBif(bif);
                 if (bifRecorder != null) {
                     bifRecorder.record(tenantId, request.getMessage(), bif, null, request.getSessionId());
                 }
