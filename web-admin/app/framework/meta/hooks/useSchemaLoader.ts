@@ -117,6 +117,17 @@ export function useSchemaLoader(options: UseSchemaLoaderOptions): UseSchemaLoade
 
       const pageKey = computePageKey();
 
+      // Sentinel used by useDslForm to signal "consumer is not ready yet"
+      // (enabled=false or empty pageKey). Clear any lingering state from a
+      // previous fetch and stay idle instead of hitting /api/pages/key with
+      // the sentinel — which would 404 and leave the error sticky across
+      // the subsequent valid pageKey transition.
+      if (pageKey === '__disabled__') {
+        setSchema(null);
+        setLoading(false);
+        return;
+      }
+
       // Check in-memory cache first
       const cached = getCachedSchema(pageKey);
       if (cached) {
