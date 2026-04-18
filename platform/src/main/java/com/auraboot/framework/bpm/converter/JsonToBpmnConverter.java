@@ -1,12 +1,18 @@
 package com.auraboot.framework.bpm.converter;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.bpm.chain.BpmServiceTaskConstants;
 import com.auraboot.framework.bpm.extension.BpmExtensionKeys;
+import com.auraboot.smart.framework.engine.SmartEngine;
+import com.auraboot.smart.framework.engine.model.assembly.ProcessDefinition;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+
+import java.util.Comparator;
 
 import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
@@ -39,9 +45,12 @@ public class JsonToBpmnConverter {
     private static final String TARGET_NAMESPACE = "http://auraboot.com/bpm";
 
     private final ObjectMapper objectMapper;
+    private final SmartEngine smartEngine;
 
-    public JsonToBpmnConverter(ObjectMapper objectMapper) {
+    public JsonToBpmnConverter(ObjectMapper objectMapper,
+                               @Autowired(required = false) SmartEngine smartEngine) {
         this.objectMapper = objectMapper;
+        this.smartEngine = smartEngine;
     }
 
     /**
@@ -922,42 +931,111 @@ public class JsonToBpmnConverter {
             writer.writeAttribute("name", name);
         }
 
+        Map<String, String> auraProps = new LinkedHashMap<>();
         if (config != null && !config.isMissingNode()) {
             String calledProcessKey = getTextOrNull(config, "calledProcessKey");
             if (calledProcessKey != null) {
                 writer.writeAttribute("calledElement", calledProcessKey);
             }
             String calledProcessVersion = getTextOrNull(config, "calledProcessVersion");
-            if (calledProcessVersion != null) {
+            if ("latest".equals(calledProcessVersion) && calledProcessKey != null) {
+                // The UI defaults version-mode to "latest"; SmartEngine's
+                // CallActivityParser stores the string verbatim and its
+                // runtime ProcessDefinitionContainer has no latest-alias
+                // resolver (lookup by literal {key}:{version}:{tenant} only).
+                // Resolve to the highest deployed version for this tenant at
+                // convert-time so the deployed BPMN carries a concrete
+                // version attribute. If nothing is deployed yet we skip the
+                // attribute — the child reference will fail at runtime with
+                // a clear "No ProcessDefinition found" error, which is
+                // preferable to silently pinning a stale version.
+                String resolved = resolveLatestVersion(calledProcessKey);
+                if (resolved != null) {
+                    calledProcessVersion = resolved;
+                }
+            }
+            if (calledProcessVersion != null && !"latest".equals(calledProcessVersion)) {
                 writer.writeAttribute(SMART_NAMESPACE, "calledElementVersion", calledProcessVersion);
             }
 
-            // NOTE: inputMappings / outputMappings are intentionally NOT serialized
-            // into BPMN XML. SmartEngine's CallActivityParser
-            // (com.auraboot.smart.framework.engine.bpmn.assembly.callactivity.parser.CallActivityParser)
-            // only reads the `calledElement` and `calledElementVersion` attributes
-            // and ignores any child elements. The XML parser facade
-            // (DefaultXmlParserFacade#parseElement) throws
-            // `EngineException("No parser found for QName: ...")` for any unknown
-            // element it encounters, which caused the prior
-            // `<extensionElements><smart:in/><smart:out/></extensionElements>`
-            // emission to fail deploy with "Parse process definition file failure!".
+            // Collect UI-authored variable mappings into a single aura.callMappings
+            // JSON payload. SmartEngine's CallActivityBehavior isolates parent
+            // and child request maps (only tenantId is forwarded — see
+            // CallActivityBehavior#startChildProcessInstance), so BPMN itself
+            // has no channel for <smart:in>/<smart:out>. At runtime
+            // AuraCallActivityListener reads this payload on the child's
+            // PROCESS_START and the parent's callActivity ACTIVITY_END to
+            // bridge the isolation.
             //
-            // Variable propagation between parent and child processes is not
-            // supported by SmartEngine's CallActivityBehavior at the engine level
-            // (see the `隔离父子流程的request和response` comment in
-            // CallActivityBehavior#startChildProcessInstance — only tenantId is
-            // forwarded). The UI-level inputMappings / outputMappings stay in
-            // designerJson config for future platform-level implementation via
-            // ExecutionListener / AuraVariablePersister; they are NOT a
-            // BPMN-level contract. See GAP-250 and the CA-2/CA-3 skip notes in
-            // web-admin/tests/e2e/bpm/designer-callactivity.spec.ts.
+            // We piggyback on the generic <smart:properties> extension (same
+            // mechanism as aura.hooks / aura.formKey) because SmartEngine's
+            // BPMN parser rejects unknown child elements under <callActivity>
+            // (GAP-250: "Parse process definition file failure!"). <smart:in>
+            // and <smart:out> are NOT registered parsers; a named smart:property
+            // nested inside <extensionElements><smart:properties> IS.
+            JsonNode inputMappingsNode = config.path("inputMappings");
+            JsonNode outputMappingsNode = config.path("outputMappings");
+            boolean hasInputs = inputMappingsNode.isObject() && inputMappingsNode.size() > 0;
+            boolean hasOutputs = outputMappingsNode.isObject() && outputMappingsNode.size() > 0;
+            if (hasInputs || hasOutputs) {
+                Map<String, Object> payload = new LinkedHashMap<>();
+                if (hasInputs) {
+                    payload.put("inputs", objectMapper.convertValue(inputMappingsNode, Map.class));
+                }
+                if (hasOutputs) {
+                    payload.put("outputs", objectMapper.convertValue(outputMappingsNode, Map.class));
+                }
+                try {
+                    auraProps.put(BpmExtensionKeys.CALL_MAPPINGS,
+                            objectMapper.writeValueAsString(payload));
+                } catch (JsonProcessingException e) {
+                    throw new BpmnConversionException(
+                            "Failed to serialize callActivity mappings payload", e);
+                }
+            }
         }
 
-        // Self-closing <callActivity .../> — matches the canonical SmartEngine
-        // test fixture shape (storage-mysql/src/test/resources/parent-callactivity-process.bpmn20.xml).
-        writer.writeCharacters("\n");
+        if (!auraProps.isEmpty()) {
+            writer.writeCharacters("\n      ");
+            writer.writeStartElement("extensionElements");
+            writeSmartProperties(writer, auraProps, "        ");
+            writer.writeCharacters("\n      ");
+            writer.writeEndElement(); // extensionElements
+            writer.writeCharacters("\n    ");
+        } else {
+            writer.writeCharacters("\n");
+        }
         writer.writeEndElement(); // callActivity
+    }
+
+    /**
+     * Resolve the highest deployed version for a process key under the
+     * current tenant. Returns {@code null} when no matching definition is
+     * deployed yet, or when the SmartEngine bean is unavailable (e.g. in
+     * lightweight unit tests of the converter itself — those cases should
+     * supply a concrete version literal in the designer config).
+     */
+    private String resolveLatestVersion(String processKey) {
+        if (smartEngine == null) return null;
+        String tenantId;
+        try {
+            tenantId = MetaContext.getCurrentTenantIdAsString();
+        } catch (Exception e) {
+            return null;
+        }
+        try {
+            return smartEngine.getRepositoryQueryService()
+                    .getAllCachedProcessDefinition()
+                    .stream()
+                    .filter(pd -> processKey.equals(pd.getId()))
+                    .filter(pd -> tenantId == null || tenantId.equals(pd.getTenantId()))
+                    .map(ProcessDefinition::getVersion)
+                    .max(Comparator.naturalOrder())
+                    .orElse(null);
+        } catch (Exception e) {
+            log.warn("resolveLatestVersion({}) failed: {}", processKey, e.getMessage());
+            return null;
+        }
     }
 
     /**

@@ -378,12 +378,53 @@ public class BpmnToJsonConverter {
             config.put("calledProcessVersion", calledVersion);
         }
 
-        // Parse extension elements for input/output mappings
+        // Parse <extensionElements><smart:properties><smart:property
+        // name="aura.callMappings" value='{"inputs":{...},"outputs":{...}}'/>
+        // — the GAP-250 follow-up mechanism used by AuraCallActivityListener
+        // to bridge SmartEngine's parent/child request-map isolation. This
+        // replaces the legacy <smart:in>/<smart:out> scheme that SmartEngine's
+        // BPMN parser rejected. We still tolerate the legacy form here so that
+        // exports from older AuraBoot versions round-trip back into designer
+        // JSON without loss.
         Element extensionElements = findChildElement(element, "extensionElements");
         if (extensionElements != null) {
             ObjectNode inputMappings = objectMapper.createObjectNode();
             ObjectNode outputMappings = objectMapper.createObjectNode();
 
+            // Preferred path: aura.callMappings smart:property.
+            String callMappingsJson = readAuraProperty(extensionElements, "aura.callMappings");
+            if (callMappingsJson != null && !callMappingsJson.isBlank()) {
+                try {
+                    Map<String, Map<String, String>> decoded = objectMapper.readValue(
+                            callMappingsJson,
+                            objectMapper.getTypeFactory().constructMapType(
+                                    LinkedHashMap.class,
+                                    objectMapper.getTypeFactory().constructType(String.class),
+                                    objectMapper.getTypeFactory().constructMapType(
+                                            LinkedHashMap.class, String.class, String.class)));
+                    Map<String, String> inputs = decoded.get("inputs");
+                    if (inputs != null) {
+                        for (Map.Entry<String, String> e : inputs.entrySet()) {
+                            inputMappings.put(e.getKey(), e.getValue());
+                        }
+                    }
+                    Map<String, String> outputs = decoded.get("outputs");
+                    if (outputs != null) {
+                        for (Map.Entry<String, String> e : outputs.entrySet()) {
+                            outputMappings.put(e.getKey(), e.getValue());
+                        }
+                    }
+                } catch (Exception e) {
+                    // Surface malformed payload loudly rather than silently
+                    // dropping mappings — callers rely on round-trip fidelity.
+                    throw new BpmnConversionException(
+                            "Malformed aura.callMappings payload on callActivity "
+                                    + element.getAttribute("id") + ": " + callMappingsJson, e);
+                }
+            }
+
+            // Legacy path: <smart:in>/<smart:out> direct children. Retained for
+            // backward compatibility with artifacts exported before GAP-250.
             NodeList children = extensionElements.getChildNodes();
             for (int i = 0; i < children.getLength(); i++) {
                 Node child = children.item(i);
@@ -393,13 +434,13 @@ public class BpmnToJsonConverter {
                 if ("in".equals(localName)) {
                     String source = ext.getAttribute("source");
                     String target = ext.getAttribute("target");
-                    if (source != null && target != null) {
+                    if (source != null && target != null && !source.isEmpty()) {
                         inputMappings.put(source, target);
                     }
                 } else if ("out".equals(localName)) {
                     String source = ext.getAttribute("source");
                     String target = ext.getAttribute("target");
-                    if (source != null && target != null) {
+                    if (source != null && target != null && !source.isEmpty()) {
                         outputMappings.put(source, target);
                     }
                 }
@@ -410,6 +451,32 @@ public class BpmnToJsonConverter {
         }
 
         return config;
+    }
+
+    /**
+     * Read {@code <smart:property name="<key>" value="..."/>} from a
+     * {@code <extensionElements><smart:properties>} container. Returns
+     * {@code null} when the key is absent.
+     */
+    private String readAuraProperty(Element extensionElements, String key) {
+        NodeList children = extensionElements.getChildNodes();
+        for (int i = 0; i < children.getLength(); i++) {
+            Node child = children.item(i);
+            if (child.getNodeType() != Node.ELEMENT_NODE) continue;
+            Element ext = (Element) child;
+            if (!"properties".equals(ext.getLocalName())) continue;
+            NodeList propChildren = ext.getChildNodes();
+            for (int j = 0; j < propChildren.getLength(); j++) {
+                Node pNode = propChildren.item(j);
+                if (pNode.getNodeType() != Node.ELEMENT_NODE) continue;
+                Element prop = (Element) pNode;
+                if (!"property".equals(prop.getLocalName())) continue;
+                if (key.equals(prop.getAttribute("name"))) {
+                    return prop.getAttribute("value");
+                }
+            }
+        }
+        return null;
     }
 
     /**
