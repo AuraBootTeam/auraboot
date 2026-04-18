@@ -272,6 +272,7 @@ public class AuraBotChatService {
 
         // --- D1 Grounding: compile user message → BIF, constrain tools, persist ---
         com.auraboot.framework.agent.dto.BusinessIntentFrame bif = null;
+        String qualityIssue = null;
         if (groundingService != null) {
             SpanContext groundingSpan = aiTraceService.startSpan(trace, null, "span", "d1_grounding", null);
             try {
@@ -287,11 +288,16 @@ public class AuraBotChatService {
                 if (bifRecorder != null) {
                     bifRecorder.record(tenantId, request.getMessage(), bif, null, request.getSessionId());
                 }
+                // Spec §5.1 quality gate: record degradation but continue — the LLM
+                // can still produce a useful answer; the hint we inject below nudges
+                // it to ask for clarification when grounding is uncertain.
+                qualityIssue = groundingService.checkQualityGate(bif);
                 aiTraceService.endSpan(groundingSpan, Map.of(
                         "intent", bif.getIntent() != null ? bif.getIntent() : "",
                         "object", bif.getObject() != null ? bif.getObject() : "",
                         "mode", bif.getCandidateSkillsMode() != null ? bif.getCandidateSkillsMode() : "",
                         "risk", bif.getRiskLevel() != null ? bif.getRiskLevel() : "",
+                        "quality_issue", qualityIssue != null ? qualityIssue : "ok",
                         "tool_count_after", tools.size()), "success");
             } catch (Exception e) {
                 log.warn("D1 Grounding failed, falling back to TF-IDF tool selection: {}", e.getMessage());
@@ -305,6 +311,9 @@ public class AuraBotChatService {
         String systemPrompt = buildSystemPrompt(tenantId, request, resolved);
         if (bif != null) {
             systemPrompt = systemPrompt + buildBifContextHint(bif);
+            if (qualityIssue != null) {
+                systemPrompt = systemPrompt + buildQualityIssueHint(qualityIssue);
+            }
         }
         aiTraceService.endSpan(promptSpan, Map.of("char_count", systemPrompt.length()), "success");
 
@@ -1415,6 +1424,15 @@ public class AuraBotChatService {
 
     private static String nullSafe(String s) {
         return s == null ? "" : s;
+    }
+
+    /**
+     * Surface a degraded-grounding signal to the LLM so it can choose to ask for
+     * clarification instead of running tools with a shaky intent. Spec §5.1.
+     */
+    private String buildQualityIssueHint(String issue) {
+        return "\n- quality_gate: " + issue +
+                " — grounding is uncertain; if the user's request is ambiguous, ask a clarifying question before using any write tool.\n";
     }
 
     /**
