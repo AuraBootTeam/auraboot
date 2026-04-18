@@ -6739,7 +6739,20 @@ COMMENT ON TABLE ab_agent_skill_draft IS 'ACP Learning Loop §4 — generated Sk
 
 -- PR-55: schema integrity tightening (N8 status enum + N9 tenant_id NOT NULL)
 -- Dev stage: purge orphan rows then lock down the column. No prod data to preserve.
-DELETE FROM ab_agent_skill_draft WHERE tenant_id IS NULL;
+-- PR-63 (R2-N4): guard + log the purge so re-running schema.sql is a silent no-op
+-- when there are no NULL rows, and emits a NOTICE with the row count otherwise.
+DO $$
+DECLARE
+    null_count BIGINT;
+BEGIN
+    SELECT COUNT(*) INTO null_count FROM ab_agent_skill_draft WHERE tenant_id IS NULL;
+    IF null_count > 0 THEN
+        RAISE NOTICE 'PR-55 migration: purging % ab_agent_skill_draft rows with NULL tenant_id (dev-stage cleanup)', null_count;
+        DELETE FROM ab_agent_skill_draft WHERE tenant_id IS NULL;
+    END IF;
+END
+$$;
+-- ALTER COLUMN ... SET NOT NULL is naturally idempotent — a no-op when already applied.
 ALTER TABLE ab_agent_skill_draft ALTER COLUMN tenant_id SET NOT NULL;
 ALTER TABLE ab_agent_skill_draft DROP CONSTRAINT IF EXISTS chk_skill_draft_status;
 ALTER TABLE ab_agent_skill_draft
@@ -6801,11 +6814,28 @@ ALTER TABLE ab_agent_shadow_run
 -- ab_agent_run row, so adding FK → ab_agent_run(pid) would break real ingestion.
 -- Treated as logical foreign key enforced at application layer.
 -- Notable #6: refuse multi-node scheduler race double-insert. Purge dupes first.
-DELETE FROM ab_agent_shadow_run a
-USING ab_agent_shadow_run b
-WHERE a.id > b.id
-  AND a.draft_id = b.draft_id
-  AND a.original_run_id = b.original_run_id;
+-- PR-63 (R2-N4): guard + log the dedup purge so re-running schema.sql is a no-op
+-- when no duplicates exist.
+DO $$
+DECLARE
+    dup_count BIGINT;
+BEGIN
+    SELECT COUNT(*) INTO dup_count
+    FROM ab_agent_shadow_run a
+    USING ab_agent_shadow_run b
+    WHERE a.id > b.id
+      AND a.draft_id = b.draft_id
+      AND a.original_run_id = b.original_run_id;
+    IF dup_count > 0 THEN
+        RAISE NOTICE 'PR-55 migration: purging % duplicate ab_agent_shadow_run rows (dev-stage cleanup)', dup_count;
+        DELETE FROM ab_agent_shadow_run a
+        USING ab_agent_shadow_run b
+        WHERE a.id > b.id
+          AND a.draft_id = b.draft_id
+          AND a.original_run_id = b.original_run_id;
+    END IF;
+END
+$$;
 ALTER TABLE ab_agent_shadow_run DROP CONSTRAINT IF EXISTS uq_shadow_run_draft_original;
 ALTER TABLE ab_agent_shadow_run
     ADD CONSTRAINT uq_shadow_run_draft_original
