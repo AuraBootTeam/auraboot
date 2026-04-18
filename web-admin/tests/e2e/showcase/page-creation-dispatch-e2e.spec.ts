@@ -76,13 +76,17 @@ async function navigateToPageSchemaListViaMenu(page: Page): Promise<void> {
 // rendered as <textbox aria-label="..."> / <combobox>. We select by visible
 // label text via `getByLabel` (matches HTML label & aria-label).
 function nameInput(page: Page) {
-  return page.getByLabel(/页面名称|Page Name/).first();
+  // ab_meta_field stores generic displayName "名称" (not page-manager-specific
+  // "页面名称"); fields.json `displayName:zh-CN` localized variant is not
+  // currently picked up by the import. Match both for forward-compat.
+  return page.getByLabel(/^名称\*?$|^页面名称\*?$|^Name$|^Page Name$/).first();
 }
 function pageKeyInput(page: Page) {
-  return page.getByLabel(/页面标识|Page Key/).first();
+  return page.getByLabel(/^页面标识\*?$|^Page Key$/).first();
 }
 function modelCodeInput(page: Page) {
-  return page.getByLabel(/主\s*Model|Primary Model/).first();
+  // Generic displayName is "模型编码"; "主 Model" / "Primary Model" not active.
+  return page.getByLabel(/^模型编码\*?$|^Model Code$|主\s*Model|Primary Model/).first();
 }
 function descriptionInput(page: Page) {
   return page.getByLabel(/^描述$|^Description$/).first();

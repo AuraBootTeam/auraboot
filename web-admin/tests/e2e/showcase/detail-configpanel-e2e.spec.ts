@@ -51,6 +51,13 @@ function uniquePageKey(): string {
  * plan ("Setup: API 创建 detail kind page_schema").
  */
 async function createDetailPageViaApi(page: Page, pageKey: string): Promise<string> {
+  // Backend bug workaround (PageSchemaDefaultBlockGenerator):
+  // When `blocks` is empty/null, the backend injects detail-section blocks
+  // with hard-coded Chinese titles ("基本信息" / "系统信息") on every GET.
+  // Subsequent designer auto-save PUT then 422s because the i18n validator
+  // rejects raw zh-CN strings on `block.title`. Workaround: seed with a
+  // single English-titled placeholder block so the default generator stays
+  // dormant and the designer state starts from clean English content.
   const resp = await page.request.post('/api/pages', {
     data: {
       pageKey,
@@ -58,7 +65,15 @@ async function createDetailPageViaApi(page: Page, pageKey: string): Promise<stri
       title: `E2E P5 Detail ${pageKey}`,
       kind: 'detail',
       modelCode: SHOWCASE_MODEL_CODE,
-      blocks: [],
+      blocks: [
+        {
+          id: 'placeholder',
+          blockType: 'detail-section',
+          title: 'Placeholder',
+          columns: 2,
+          fields: [],
+        },
+      ],
       layout: { type: 'stack' },
     },
   });
@@ -283,7 +298,11 @@ test.describe('Phase 5 — Detail ConfigPanel E2E', () => {
 
     // ----- API verification -----
     const blocks = await fetchPageBlocks(page, pid);
-    const sectionBlocks = blocks.filter((b) => b?.blockType === 'detail-section');
+    // Filter out the seed "Placeholder" block injected by createDetailPageViaApi
+    // to defeat the backend default-block generator (PageSchemaDefaultBlockGenerator).
+    const sectionBlocks = blocks.filter(
+      (b) => b?.blockType === 'detail-section' && b?.title !== 'Placeholder',
+    );
     expect(sectionBlocks.length).toBeGreaterThanOrEqual(2);
 
     const first = sectionBlocks[0];
