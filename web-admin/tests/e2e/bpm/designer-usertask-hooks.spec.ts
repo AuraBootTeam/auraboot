@@ -650,16 +650,27 @@ test.describe(
     //
     // Platform backlog candidates (for controller to add as GAP-253+):
     //   - GAP-253: Persist designerJson node hooks into ab_bpm_node_hook on
-    //     process definition deploy. Also align UI hookType vocabulary
-    //     (pre_execute/post_execute/pre_complete/post_complete) with backend
-    //     (pre_check/post_action) OR map one to the other at deploy time.
+    //     process definition deploy (UI → DB binding still open).
     //   - GAP-254: Support hook-side writes to execution variables
     //     (SimpleEvaluationContext → writeable Context + re-apply to
     //     SmartEngine ExecutionContext in ProcessEventListener).
-    //   - GAP-255: Align UI actionType ('http_callback' | 'script' |
-    //     'command') with backend hookConfig.type ('rest_call' | 'script' |
-    //     'drools_rule'); 'command' and 'http_callback' currently have no
+    //     → STILL OPEN. HOOK-2/3 remain .fixme on this.
+    //   - GAP-255: hookType vocab mismatch (UI pre_execute/post_execute/
+    //     pre_complete/post_complete vs backend pre_check/post_action).
+    //     → RESOLVED 2026-04-17 via BpmNodeHookService.normalizeHookType()
+    //     (applied on createHook write-path AND getHooks query-path) +
+    //     BpmNodeHookServiceVocabAliasIntegrationTest (VOCAB-01..04/09).
+    //   - GAP-256: actionType vocab mismatch (UI http_callback/command vs
+    //     backend rest_call/drools_rule) plus the missing `command`
     //     executor branch.
+    //     → RESOLVED 2026-04-17 via BpmNodeHookService.normalizeActionType()
+    //     + new executeCommand() branch wired through CommandExecutor +
+    //     VOCAB-05..09 integration tests.
+    //
+    // NOTE: HOOK-2/3 are still .fixme because GAP-254 (variable write-through)
+    // blocks the observable assertion even now that vocab aliasing works end
+    // to end. Once GAP-254 (and the upstream GAP-A at deploy time) land, the
+    // .fixme markers can be removed without further hook-service changes.
     // =======================================================================
     test.fixme(
       'HOOK-2: start instance → pre-check hook fires, writes preHookFired variable',
