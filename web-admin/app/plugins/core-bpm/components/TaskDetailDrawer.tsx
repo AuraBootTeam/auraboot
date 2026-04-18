@@ -1,6 +1,11 @@
 /**
  * TaskDetailDrawer - Right-side drawer for task details
- * Integrates ApprovalTimeline, TaskFormRenderer, AttachmentPanel, SlaMonitorPanel
+ *
+ * Integrates ApprovalTimeline, AttachmentPanel, SlaMonitorPanel and renders
+ * the bound DSL form (when present) via the platform `useDslForm` /
+ * `DslFormRenderer` pipeline — the same path BpmTaskDrawer uses for the
+ * approval drawer. The previous bespoke TaskFormRenderer was deleted along
+ * with the now-corrected TaskFormData shape (see bpmFormService.ts header).
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -11,11 +16,12 @@ import type { TaskInstance } from '../services/bpmWorkbenchService';
 import type { DialogState } from '../hooks/useTaskCenter';
 import { ApprovalTimeline } from './ApprovalTimeline';
 import { AttachmentPanel } from './AttachmentPanel';
-import { TaskFormRenderer } from './TaskFormRenderer';
 import type { SlaRecord } from '../services/slaService';
 import type { TaskFormData } from '../services/bpmFormService';
 import * as slaService from '../services/slaService';
 import * as bpmFormService from '../services/bpmFormService';
+import { useDslForm } from '~/framework/meta/hooks/useDslForm';
+import { DslFormRenderer } from '~/framework/meta/rendering/DslFormRenderer';
 
 // ==================== Types ====================
 
@@ -248,6 +254,19 @@ function InfoTab({
 
 // ==================== FormTab ====================
 
+/**
+ * FormTab — renders the DSL form bound to the current task via formBinding.
+ *
+ * Backend contract (TaskFormResponse): `formBinding` is a single object with
+ * `formRef` (target page key) or `null` when no form is bound. We delegate
+ * actual rendering to the same `useDslForm` + `DslFormRenderer` path used by
+ * BpmTaskDrawer so field permission, variable mapping, validation, and
+ * widget resolution all behave identically across the two drawers.
+ *
+ * Submit flow: DslFormRenderer calls `form.submit()` → onSubmit callback →
+ * POST /api/bpm/forms/task/{taskId}/submit with the saveStrategy declared on
+ * the binding. Success closes the parent drawer.
+ */
 function FormTab({
   formData,
   loading,
@@ -260,40 +279,73 @@ function FormTab({
   onSubmitSuccess: () => void;
 }) {
   const [submitting, setSubmitting] = useState(false);
+  const formBinding = formData?.formBinding ?? null;
+  const hasForm = !!formBinding?.formRef;
+
+  const handleFormSubmit = useCallback(
+    async (payload: { values: Record<string, unknown> }) => {
+      setSubmitting(true);
+      try {
+        const variableBindings = formBinding?.variableBindings ?? {};
+        const mappedVars: Record<string, unknown> = {};
+        for (const [varName, fieldCode] of Object.entries(variableBindings)) {
+          if (fieldCode in payload.values) {
+            mappedVars[varName] = payload.values[fieldCode];
+          }
+        }
+        await bpmFormService.submitTaskForm(taskId, {
+          saveStrategy: formBinding?.saveStrategy || 'business_only',
+          businessData: payload.values,
+          variables: mappedVars,
+        });
+        onSubmitSuccess();
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [taskId, formBinding, onSubmitSuccess],
+  );
+
+  const form = useDslForm({
+    pageKey: formBinding?.formRef || '',
+    enabled: hasForm,
+    recordId: formData?.businessKey || undefined,
+    initialValues: (formData?.processVariables as Record<string, unknown>) || undefined,
+    fieldPermissions: formBinding?.fieldPermissions || undefined,
+    permissionMode: (formBinding?.permissionMode as 'merge' | 'override') || 'merge',
+    onSubmit: hasForm ? handleFormSubmit : undefined,
+  });
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12 text-gray-400">
+      <div
+        className="flex items-center justify-center py-12 text-gray-400"
+        data-testid="form-tab-loading"
+      >
         <div className="mr-2 h-5 w-5 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600" />
         <span className="text-sm">加载表单...</span>
       </div>
     );
   }
 
-  if (!formData || !formData.hasForm || !formData.forms?.length) {
+  if (!formData || !hasForm) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+      <div
+        className="flex flex-col items-center justify-center py-12 text-gray-400"
+        data-testid="form-tab-empty"
+      >
         <ClipboardList className="mb-3 h-10 w-10 opacity-30" />
         <p className="text-sm">该任务未绑定表单</p>
       </div>
     );
   }
 
-  const handleSubmit = async (data: Record<string, unknown>) => {
-    setSubmitting(true);
-    try {
-      await bpmFormService.submitTaskForm(taskId, data);
-      onSubmitSuccess();
-    } catch {
-      // Error handled by caller via toast
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   return (
-    <div className={submitting ? 'pointer-events-none opacity-60' : ''}>
-      <TaskFormRenderer formData={formData} onSubmit={handleSubmit} />
+    <div
+      className={submitting ? 'pointer-events-none opacity-60' : ''}
+      data-testid="form-tab-content"
+    >
+      <DslFormRenderer form={form} compact className="bpm-detail-task-form" />
     </div>
   );
 }
