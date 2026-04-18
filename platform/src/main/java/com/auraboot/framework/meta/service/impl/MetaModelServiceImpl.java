@@ -1042,8 +1042,15 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
                         ModelFieldBinding binding = bindingMap.get(fieldEntity.getId());
                         Integer fieldOrder = binding != null ? binding.getFieldOrder() : null;
                         FieldDefinition fd = convertToFieldDefinition(fieldEntity, fieldOrder);
-                        if (binding != null && Boolean.TRUE.equals(binding.getRequired())) {
-                            fd.setRequired(true);
+                        // GAP-265: required-ness is a per-binding concept (one field can be
+                        // required in model_A but optional in model_B). Binding is the authoritative
+                        // source after GAP-259 stopped propagating constraints.required to the global
+                        // FieldFeatureBean. Override field-level required with binding value (both
+                        // directions), so all downstream readers of FieldDefinition.isRequired()
+                        // (DDL emission, validation, Excel template, BPM form metadata, page meta,
+                        // plugin generator) automatically honor the per-binding required flag.
+                        if (binding != null) {
+                            fd.setRequired(Boolean.TRUE.equals(binding.getRequired()));
                         }
                         if (binding != null && Boolean.TRUE.equals(binding.getSearchable())) {
                             fd.setSearchable(true);
