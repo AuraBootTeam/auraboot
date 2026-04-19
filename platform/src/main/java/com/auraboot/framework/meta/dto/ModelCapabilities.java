@@ -1,6 +1,7 @@
 package com.auraboot.framework.meta.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import lombok.Builder;
 import lombok.Value;
 
@@ -20,6 +21,7 @@ import java.util.List;
 @Value
 @Builder(toBuilder = true)
 @JsonInclude(JsonInclude.Include.NON_NULL)
+@JsonDeserialize(builder = ModelCapabilities.ModelCapabilitiesBuilder.class)
 public class ModelCapabilities {
 
     boolean list;
