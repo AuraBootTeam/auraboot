@@ -37,16 +37,8 @@ test.describe('BPM end-to-end smoke', () => {
   test('designer→deploy→run: tiny flow with exclusive gateway', async ({ page, request }) => {
     const processKey = 'e2e_smoke_' + Date.now();
 
-    // -------------------------------------------------------------------------
-    // UI login
-    // -------------------------------------------------------------------------
-    await page.goto('/login');
-    await page.getByLabel(/email|邮箱/i).fill('admin@example.com');
-    await page.getByLabel(/password|密码/i).fill('Test2026x');
-    await page.getByRole('button', { name: /login|登录|sign in/i }).click();
-    await page.waitForURL(/\/(dashboard|home|p\/|dashboards)/, { timeout: 15_000 });
-
-    // API token for Layer 1/2/3 assertions
+    // Admin session is preloaded via storageState (see playwright.config.ts:
+    // [chromium] project → tests/storage/admin.json). No UI login needed.
     const adminToken = await loginAs(request, 'admin@example.com', 'Test2026x');
 
     // -------------------------------------------------------------------------
