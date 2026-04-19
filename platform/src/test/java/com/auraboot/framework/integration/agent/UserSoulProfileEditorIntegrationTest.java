@@ -20,6 +20,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import com.auraboot.framework.integration.TestIdGenerator;
 
 /** PR-76 Phase 2 — {@link UserSoulProfileEditor}. */
 @Commit
@@ -36,7 +37,7 @@ class UserSoulProfileEditorIntegrationTest extends BaseIntegrationTest {
 
     @BeforeEach
     void setup() {
-        tenantId = 9_780_000L + System.nanoTime() % 10_000;
+        tenantId = TestIdGenerator.uniqueTenantId();
         userId = "ue_" + Long.toString(System.nanoTime() & 0xffff, 36);
     }
 

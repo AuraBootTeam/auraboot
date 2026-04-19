@@ -16,6 +16,7 @@ import org.springframework.web.context.WebApplicationContext;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import com.auraboot.framework.integration.TestIdGenerator;
 
 /**
  * Per-controller non-admin→409 assertion for every platform
@@ -68,7 +69,7 @@ class AllAdminControllersGuardIntegrationTest extends BaseIntegrationTest {
             "/api/admin/login-channels"
     })
     void nonAdminBlocked(String url) throws Exception {
-        tenantId = 9_920_000L + (System.nanoTime() % 10_000);
+        tenantId = TestIdGenerator.uniqueTenantId();
         // Authenticated non-admin: MetaContext carries tenantId+userId but no
         // tenant_admin grant. The interceptor must short-circuit before the
         // controller, surfacing the uniform 409 envelope.

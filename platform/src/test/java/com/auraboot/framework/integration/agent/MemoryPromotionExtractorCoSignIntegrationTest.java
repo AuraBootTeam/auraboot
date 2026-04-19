@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import com.auraboot.framework.integration.TestIdGenerator;
 
 /**
  * PR-66 follow-up to the Phase 1 extractor tests: exercise the newly
@@ -35,7 +36,7 @@ class MemoryPromotionExtractorCoSignIntegrationTest extends BaseIntegrationTest 
 
     @BeforeEach
     void setup() {
-        tenantId = 9_795_000L + System.nanoTime() % 10_000;
+        tenantId = TestIdGenerator.uniqueTenantId();
         ReflectionTestUtils.setField(extractor, "importanceSpikeEnabled", false);
         ReflectionTestUtils.setField(extractor, "minUsersPerTenant", 3);
         ReflectionTestUtils.setField(extractor, "minSimilarity", 0.85d);
