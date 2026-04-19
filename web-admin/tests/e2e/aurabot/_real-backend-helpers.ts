@@ -16,12 +16,63 @@ import { execSync } from 'node:child_process';
 // Admin primary tenant — matches the JWT issued by
 // `admin@example.com / Test2026x`. Keep in sync with
 // scripts/reset-and-init.sh.
-export const ADMIN_TENANT_ID = '303848950530707456';
+/**
+ * Admin's primary tenant. Resolved lazily at first import by querying
+ * the JWT claim via `/api/auth/login` — the id rotates on DB resets, so
+ * hard-coding is fragile.
+ */
+function resolveAdminTenantId(): string {
+  try {
+    const out = execSync(
+      `curl -s -X POST http://localhost:6443/api/auth/login -H 'Content-Type: application/json' ` +
+        `-d '{"email":"admin@example.com","password":"Test2026x"}'`,
+    ).toString();
+    const parsed = JSON.parse(out);
+    const token = parsed?.data?.jwt;
+    if (!token) throw new Error('no jwt in login response');
+    const payload = token.split('.')[1];
+    const pad = '='.repeat((4 - (payload.length % 4)) % 4);
+    // JWT tenantId is a 19-digit snowflake — JS Number precision drops the
+    // last 2 digits. Parse the raw claim string with a regex to preserve
+    // exact bytes.
+    const rawClaim = Buffer.from(payload + pad, 'base64').toString('utf-8');
+    const m = rawClaim.match(/"tenantId"\s*:\s*(\d+)/);
+    if (!m) throw new Error('no tenantId in claim');
+    return m[1];
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.error('resolveAdminTenantId failed:', e);
+    // Fallback to the historical hard-coded value so tests don't all break
+    // if the backend is down during helper-module load.
+    return '303848950530707456';
+  }
+}
 
-// Parent menu id of "AI 中心" in ab_menu — seeded by
-// default-bootstrap. Used so seeded leaf menus show up under the
-// correct submenu node.
-export const AI_CENTER_MENU_ID = '303848987541245952';
+export const ADMIN_TENANT_ID = resolveAdminTenantId();
+// eslint-disable-next-line no-console
+console.log('[real-helpers] ADMIN_TENANT_ID =', ADMIN_TENANT_ID);
+
+// Parent menu id of "AI 中心" — resolve from DB at load time (rotates on
+// DB reset like tenant id). Look up via children's parent_id to avoid
+// CJK literal quoting issues in the subprocess.
+function resolveAiCenterMenuId(): string {
+  try {
+    const sql = `SELECT DISTINCT parent_id FROM ab_menu WHERE tenant_id = ${ADMIN_TENANT_ID} AND path LIKE '/aurabot/%' AND parent_id IS NOT NULL LIMIT 1;`;
+    const id = execSync(`psql -h localhost -U ghj -d aura_boot -tA`, {
+      input: sql,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    })
+      .toString()
+      .trim();
+    return id || '303848987541245952';
+  } catch (e) {
+    return '303848987541245952';
+  }
+}
+
+export const AI_CENTER_MENU_ID = resolveAiCenterMenuId();
+// eslint-disable-next-line no-console
+console.log('[real-helpers] AI_CENTER_MENU_ID =', AI_CENTER_MENU_ID);
 
 // ---------------------------------------------------------------------------
 // psql helpers
@@ -471,6 +522,164 @@ export function cleanupMemoryPromotionsMenu(menu: SeededPromotionMenu): void {
     `DELETE FROM ab_menu
       WHERE tenant_id = ${ADMIN_TENANT_ID}
         AND path = '/aurabot/memory-promotions'
+        AND id IN (${list});`,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// User Soul Profile seeding (PR-80 Phase 6)
+// ---------------------------------------------------------------------------
+
+export const SOUL_PROFILE_PID_PREFIX = 'E2EUSP';
+
+/** Compact profile JSONB that matches §4 shape well enough for UI assertions. */
+function defaultProfileJson(userId: string): Record<string, unknown> {
+  return {
+    schema_version: '1.0',
+    persona: {
+      text: `E2E persona for user ${userId} — pragmatic engineer.`,
+      source_memory_pids: ['M01', 'M02'],
+      confidence: 0.82,
+    },
+    preferences: {
+      communication_style: {
+        text: 'concise bullet points',
+        source_memory_pids: ['M03'],
+        confidence: 0.91,
+      },
+      domain_vocabulary: {
+        text: ['SKU', '月结'],
+        source_memory_pids: ['M04'],
+        confidence: 0.85,
+      },
+    },
+    boundaries: {
+      text: 'never send external email without explicit confirm',
+      source_memory_pids: ['M05'],
+      confidence: 0.95,
+    },
+    language: 'zh-CN',
+  };
+}
+
+export interface SeededSoulProfile {
+  pid: string;
+  userId: string;
+}
+
+export function seedUserSoulProfile(args: {
+  userId: string;
+  status: 'DRAFT' | 'ACTIVE' | 'SUPERSEDED' | 'ARCHIVED';
+  version?: number;
+  profileJson?: Record<string, unknown>;
+  confidence?: number;
+  stale?: boolean;
+  hidden?: boolean;
+  editedFields?: Record<string, unknown>;
+}): SeededSoulProfile {
+  const pid = randomPid(SOUL_PROFILE_PID_PREFIX);
+  const profile = args.profileJson ?? defaultProfileJson(args.userId);
+  const profileJsonStr = JSON.stringify(profile).replace(/\$/g, '\\$');
+  const editedFieldsJson = args.editedFields
+    ? `'${JSON.stringify(args.editedFields).replace(/'/g, "''")}'::jsonb`
+    : 'NULL';
+  const activatedAt = args.status === 'ACTIVE' ? 'NOW()' : 'NULL';
+  psql(`
+    INSERT INTO ab_agent_user_soul_profile
+      (pid, tenant_id, user_id, version, status,
+       profile, profile_hash, language_preference,
+       derivation_confidence, edited_fields,
+       stale_flagged_at, hidden_at, activated_at, created_at)
+    VALUES
+      ('${pid}', ${ADMIN_TENANT_ID}, '${args.userId}',
+       ${args.version ?? 1}, '${args.status}',
+       $JSON$${profileJsonStr}$JSON$::jsonb,
+       'hash_${pid}', 'zh-CN',
+       ${args.confidence ?? 0.82}, ${editedFieldsJson},
+       ${args.stale ? 'NOW()' : 'NULL'},
+       ${args.hidden ? 'NOW()' : 'NULL'},
+       ${activatedAt}, NOW());
+  `);
+  return { pid, userId: args.userId };
+}
+
+export interface UserSoulProfileRow {
+  status: string;
+  editedFields: string | null;
+  hiddenAt: string | null;
+  staleFlaggedAt: string | null;
+}
+
+export function dbUserSoulProfileRow(pid: string): UserSoulProfileRow {
+  const raw = psql(
+    `SELECT status || '|' ||
+            COALESCE(edited_fields::text, '') || '|' ||
+            COALESCE(hidden_at::text, '') || '|' ||
+            COALESCE(stale_flagged_at::text, '')
+       FROM ab_agent_user_soul_profile WHERE pid = '${pid}';`,
+  );
+  const [status, editedFields, hiddenAt, staleFlaggedAt] = raw.split('|');
+  return {
+    status,
+    editedFields: editedFields || null,
+    hiddenAt: hiddenAt || null,
+    staleFlaggedAt: staleFlaggedAt || null,
+  };
+}
+
+/** Delete seeded profiles by pid prefix within the admin tenant. */
+export function cleanupUserSoulProfiles(pidPrefix: string): void {
+  psql(
+    `DELETE FROM ab_agent_user_soul_profile
+       WHERE tenant_id = ${ADMIN_TENANT_ID} AND pid LIKE '${pidPrefix}%';`,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Soul Profile menu seeding (my-profile + admin dashboard)
+// ---------------------------------------------------------------------------
+
+export interface SeededSoulProfileMenus {
+  myProfileMenuId: string;
+  adminMenuId: string;
+  ownedIds: string[];
+}
+
+export function seedSoulProfileMenus(): SeededSoulProfileMenus {
+  const rand = () => Math.random().toString(36).slice(2, 8).toUpperCase();
+  const mpPid = `E2EM_USP_${rand()}`.slice(0, 26);
+  const admPid = `E2EM_UAD_${rand()}`.slice(0, 26);
+  const mp = upsertMenu({
+    pid: mpPid,
+    code: 'aurabot.my-profile',
+    name: '我的画像',
+    path: '/aurabot/my-profile',
+    order: 38,
+  });
+  const adm = upsertMenu({
+    pid: admPid,
+    code: 'aurabot.soul-profiles-admin',
+    name: 'Soul Profiles (管理)',
+    path: '/aurabot/soul-profiles',
+    order: 39,
+  });
+  const ownedIds: string[] = [];
+  if (mp.didInsert) ownedIds.push(mp.id);
+  if (adm.didInsert) ownedIds.push(adm.id);
+  return {
+    myProfileMenuId: mp.id,
+    adminMenuId: adm.id,
+    ownedIds,
+  };
+}
+
+export function cleanupSoulProfileMenus(menus: SeededSoulProfileMenus): void {
+  if (menus.ownedIds.length === 0) return;
+  const list = menus.ownedIds.join(',');
+  psql(
+    `DELETE FROM ab_menu
+      WHERE tenant_id = ${ADMIN_TENANT_ID}
+        AND path IN ('/aurabot/my-profile', '/aurabot/soul-profiles')
         AND id IN (${list});`,
   );
 }
