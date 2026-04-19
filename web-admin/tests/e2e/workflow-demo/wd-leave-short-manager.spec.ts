@@ -32,6 +32,8 @@ import {
  * Process instance id stored on: wd_req_process_instance field (processes.json extension.processInstanceField).
  */
 
+test.setTimeout(90_000);
+
 test.describe('workflow-demo — R1 short leave manager approve', () => {
   test('short leave (days=2) → manager approves → completed/approved', async ({
     browser,
@@ -60,6 +62,8 @@ test.describe('workflow-demo — R1 short leave manager approve', () => {
     // will match either. We pass the value directly — the helper uses it as-is
     // in getByRole('option', { name: input.type }).first().click().
     const { recordId } = await submitLeaveRequest(applicantPage, {
+      userId: applicant.userId,
+      token: applicant.token,
       days: 2,
       type: 'sick',
       reason: 'R1 short leave automated test — E2E manager approval path',

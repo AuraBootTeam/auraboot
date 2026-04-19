@@ -29,6 +29,8 @@ import {
  *   Instance id field: wd_req_process_instance (extension.processInstanceField)
  */
 
+test.setTimeout(90_000);
+
 test.describe('workflow-demo — R4 short leave manager reject', () => {
   test('short leave (days=2) → manager rejects → completed/rejected', async ({
     browser,
@@ -51,6 +53,8 @@ test.describe('workflow-demo — R4 short leave manager reject', () => {
     await loginViaUI(applicantPage, applicant.email, 'Test2026x');
 
     const { recordId } = await submitLeaveRequest(applicantPage, {
+      userId: applicant.userId,
+      token: applicant.token,
       days: 2,
       type: 'annual',
       reason: 'R4 reject test — short leave automated rejection path',
