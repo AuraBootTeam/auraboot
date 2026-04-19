@@ -3,6 +3,36 @@
     {
       "roleCode": "tenant_admin",
       "permissionCodes": ["*"]
+    },
+    {
+      "roleCode": "wd_manager",
+      "permissionCodes": [
+        "wd.leave_request.read",
+        "wd.leave_request.manage",
+        "wd.leave_request.submit",
+        "wd.leave_request.approve",
+        "wd.leave_balance.read"
+      ]
+    },
+    {
+      "roleCode": "wd_hr",
+      "permissionCodes": [
+        "wd.leave_request.read",
+        "wd.leave_request.manage",
+        "wd.leave_request.submit",
+        "wd.leave_request.approve",
+        "wd.leave_balance.read",
+        "wd.leave_balance.manage"
+      ]
+    },
+    {
+      "roleCode": "wd_employee",
+      "permissionCodes": [
+        "wd.leave_request.read",
+        "wd.leave_request.manage",
+        "wd.leave_request.submit",
+        "wd.leave_balance.read"
+      ]
     }
   ]
 }
