@@ -106,16 +106,22 @@ public class UserSoulProfileReader {
             return Optional.empty();
         }
 
-        Map<String, Object> profile = readJson(row.get("profile"));
-        if (profile == null || profile.isEmpty()) {
-            // Malformed / empty payload — treat as "no profile" rather than exploding
-            // the LLM pipeline for every agent run. Log WARN so ops can see it.
-            log.warn("User Soul Profile row has empty/invalid 'profile' JSON: pid={}",
-                    row.get("pid"));
+        Map<String, Object> profile;
+        Map<String, Object> editedFields;
+        try {
+            profile = readJson(row.get("profile"));
+            editedFields = readJson(row.get("edited_fields"));
+        } catch (IllegalStateException corrupt) {
+            // Corrupt payload — skip grounding entirely rather than risk leaking
+            // a field the user previously hid. Ops sees WARN with pid.
+            log.warn("User Soul Profile row has corrupt JSON, skipping grounding: pid={} err={}",
+                    row.get("pid"), corrupt.getMessage());
             return Optional.empty();
         }
-
-        Map<String, Object> editedFields = readJson(row.get("edited_fields"));
+        if (profile.isEmpty()) {
+            log.warn("User Soul Profile row has empty 'profile' JSON: pid={}", row.get("pid"));
+            return Optional.empty();
+        }
         boolean stale = row.get("stale_flagged_at") != null;
         int version = numberAsInt(row.get("version"), 1);
         String pid = (String) row.get("pid");
@@ -384,8 +390,10 @@ public class UserSoulProfileReader {
             Map<String, Object> parsed = objectMapper.readValue(raw, MAP_TYPE);
             return parsed != null ? parsed : Collections.emptyMap();
         } catch (Exception e) {
-            log.warn("Failed to parse JSONB column as Map: {}", e.getMessage());
-            return null;
+            // Corrupt JSONB must NOT fall through to "no edits" — that would
+            // leak fields the user previously hid. Fail loudly; grounding
+            // skips this row via Optional.empty upstream.
+            throw new IllegalStateException("Corrupt JSONB column in ab_agent_user_soul_profile", e);
         }
     }
 

@@ -189,8 +189,9 @@ public class UserSoulProfileController {
                             "       stale_flagged_at, activated_at, created_at, " +
                             "       superseded_at, hidden_at " +
                             "FROM ab_agent_user_soul_profile " +
-                            "WHERE pid = ? AND tenant_id = ? AND user_id = ?",
-                    pid, tenantId, userId);
+                            "WHERE pid = ? AND tenant_id = ? AND user_id = ? " +
+                            "  AND status <> ?",
+                    pid, tenantId, userId, STATUS_ARCHIVED);
             parseJsonField(row, "profile_json", "profile");
             parseJsonField(row, "edited_fields_json", "edited_fields");
             return ApiResponse.ok(row);
