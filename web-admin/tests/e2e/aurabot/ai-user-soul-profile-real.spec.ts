@@ -31,26 +31,26 @@ import {
   type SeededSoulProfileMenus,
 } from './_real-backend-helpers';
 
-import { execSync } from 'node:child_process';
-
-// The admin JWT's `sub` claim is the user_id the Soul Profile controller
-// uses when it calls MetaContext.getCurrentUserId(). Resolved lazily; the
-// id rotates on DB resets.
-// MetaContext.getCurrentUserId() returns the numeric ab_user.id (NOT the
-// ULID pid / sub claim). UserSoulProfileController stores user_id as a
-// stringified Long, so the seed must use the same numeric id.
-function resolveAdminUserId(): string {
-  return execSync(
-    `psql -h localhost -U ghj -d aura_boot -tA`,
-    {
-      input: `SELECT id FROM ab_user WHERE email = 'admin@example.com' LIMIT 1;`,
-      stdio: ['pipe', 'pipe', 'pipe'],
-    },
-  )
-    .toString()
-    .trim();
+// Per-test spoof-user id generator. Every test in this file used to seed
+// under the same admin numeric id which made `uq_user_soul_profile_active`
+// (tenant_id, user_id) collide as soon as two Playwright workers ran in
+// parallel (--workers>=2 or --repeat-each>=2). We now allocate a unique
+// synthetic user id per test and pass it to the backend via the
+// `X-Test-Spoof-User-Id` header (see TestUserSpoofFilter).
+//
+// Range: 7-prefix + 14 digits (~7e14) → comfortably inside Java Long,
+// outside the snowflake id range used by production rows, and guaranteed
+// collision-free across workers + repeats because we mix in workerIndex
+// and a per-file monotonic counter.
+let __testUserSeq = 0;
+function allocateTestUserId(workerIndex: number): string {
+  __testUserSeq += 1;
+  // 13-digit ms timestamp fits; prefix '7' keeps us away from real ids.
+  const ts = Date.now().toString().slice(-12); // 12 digits
+  const w = String(workerIndex).padStart(2, '0');
+  const seq = String(__testUserSeq % 1000).padStart(3, '0');
+  return `7${ts}${w}${seq}`; // 18 digits ≤ Long.MAX_VALUE (19 digits)
 }
-const ADMIN_USER_ID = resolveAdminUserId();
 
 let seededMenus: SeededSoulProfileMenus;
 
@@ -108,30 +108,41 @@ async function navigateToAdminDashboard(page: Page): Promise<void> {
   );
 }
 
+/**
+ * Allocate a unique synthetic user id for the current test and register it
+ * as a spoof header on the browser context. Every subsequent page request
+ * (including XHR/fetch from the React app) carries the header, so the
+ * backend's `TestUserSpoofFilter` overrides `MetaContext.getCurrentUserId()`
+ * to this id and seed rows can key off it without racing the admin id.
+ *
+ * Must be called before any navigation — after `page.goto`, extra headers
+ * still apply, but we want all initial requests (menu fetch, etc.) to
+ * carry the header too.
+ */
+async function setupSpoofedIdentity(page: Page, workerIndex: number): Promise<string> {
+  const testUserId = allocateTestUserId(workerIndex);
+  await page.setExtraHTTPHeaders({ 'X-Test-Spoof-User-Id': testUserId });
+  return testUserId;
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
-// All tests in this file seed rows under the same admin user_id (required so
-// that MetaContext.getCurrentUserId() returns a match for the UI fetches).
-// That makes the seed rows race on the partial unique index
-// uq_user_soul_profile_active when specs run in parallel, causing
-// duplicate-key violations. This real-backend suite is fundamentally
-// single-user (the admin identity is shared across tests), so we force
-// serial execution within the describe here. The mocked counterpart
-// (ai-user-soul-profile.spec.ts) remains parallel.
-//
-// Known limitation: `--repeat-each=N --workers>1` can still dispatch repeat
-// groups of this file to different workers and re-introduce the race. Use
-// `PW_WORKERS=1` when you need to run this spec with --repeat-each. Default
-// `pnpm test` / `oss-test.sh` runs are unaffected because each spec file is
-// assigned to a single worker under `fullyParallel: false`.
-test.describe.configure({ mode: 'serial' });
+// Parallel-safe via per-test spoofed user identity. Each test synthesises a
+// unique numeric user id (see `allocateTestUserId`) and publishes it via
+// the `X-Test-Spoof-User-Id` header; the backend's test-profile-only
+// `TestUserSpoofFilter` overrides `MetaContext.getCurrentUserId()` for
+// that request so seeded rows key off the synthetic id instead of the
+// shared admin id. This removes the `uq_user_soul_profile_active`
+// (tenant_id, user_id) collision that previously forced `mode: 'serial'`
+// and is safe with `--workers=N --repeat-each=N` (N > 1).
 
 test.describe('Mission Control — User Soul Profile (real backend, PR-80)', () => {
-  test('USP-E2E-01: pin persona persists in DB edited_fields', async ({ page }) => {
+  test('USP-E2E-01: pin persona persists in DB edited_fields', async ({ page }, testInfo) => {
+    const testUserId = await setupSpoofedIdentity(page, testInfo.workerIndex);
     const seed = seedUserSoulProfile({
-      userId: ADMIN_USER_ID,
+      userId: testUserId,
       status: 'active',
       version: 1,
     });
@@ -155,9 +166,10 @@ test.describe('Mission Control — User Soul Profile (real backend, PR-80)', () 
 
   test('USP-E2E-02: hide field marks DB + removes card from DOM', async ({
     page,
-  }) => {
+  }, testInfo) => {
+    const testUserId = await setupSpoofedIdentity(page, testInfo.workerIndex);
     const seed = seedUserSoulProfile({
-      userId: ADMIN_USER_ID,
+      userId: testUserId,
       status: 'active',
     });
 
@@ -179,9 +191,10 @@ test.describe('Mission Control — User Soul Profile (real backend, PR-80)', () 
     expect(row.editedFields ?? '').toMatch(/hidden|hide/i);
   });
 
-  test('USP-E2E-03: edit field stores override_text', async ({ page }) => {
+  test('USP-E2E-03: edit field stores override_text', async ({ page }, testInfo) => {
+    const testUserId = await setupSpoofedIdentity(page, testInfo.workerIndex);
     const seed = seedUserSoulProfile({
-      userId: ADMIN_USER_ID,
+      userId: testUserId,
       status: 'active',
     });
 
@@ -203,9 +216,10 @@ test.describe('Mission Control — User Soul Profile (real backend, PR-80)', () 
     expect(row.editedFields ?? '').toContain('Manually edited');
   });
 
-  test('USP-E2E-04: reset persona field removes its key from edited_fields', async ({ page }) => {
+  test('USP-E2E-04: reset persona field removes its key from edited_fields', async ({ page }, testInfo) => {
+    const testUserId = await setupSpoofedIdentity(page, testInfo.workerIndex);
     const seed = seedUserSoulProfile({
-      userId: ADMIN_USER_ID,
+      userId: testUserId,
       status: 'active',
       editedFields: {
         persona: 'locked',
@@ -233,9 +247,10 @@ test.describe('Mission Control — User Soul Profile (real backend, PR-80)', () 
 
   test('USP-E2E-05: stale banner renders when stale_flagged_at is set', async ({
     page,
-  }) => {
+  }, testInfo) => {
+    const testUserId = await setupSpoofedIdentity(page, testInfo.workerIndex);
     seedUserSoulProfile({
-      userId: ADMIN_USER_ID,
+      userId: testUserId,
       status: 'active',
       stale: true,
     });
@@ -247,14 +262,15 @@ test.describe('Mission Control — User Soul Profile (real backend, PR-80)', () 
     await expect(banner).toContainText(/outdated|过时|观察/);
   });
 
-  test('USP-E2E-06: history tab lists SUPERSEDED versions', async ({ page }) => {
+  test('USP-E2E-06: history tab lists SUPERSEDED versions', async ({ page }, testInfo) => {
+    const testUserId = await setupSpoofedIdentity(page, testInfo.workerIndex);
     seedUserSoulProfile({
-      userId: ADMIN_USER_ID,
+      userId: testUserId,
       status: 'active',
       version: 2,
     });
     const oldSeed = seedUserSoulProfile({
-      userId: ADMIN_USER_ID,
+      userId: testUserId,
       status: 'superseded',
       version: 1,
       confidence: 0.7,
@@ -274,9 +290,10 @@ test.describe('Mission Control — User Soul Profile (real backend, PR-80)', () 
 
   test('USP-E2E-07: forget profile archives row + tombstone marker', async ({
     page,
-  }) => {
+  }, testInfo) => {
+    const testUserId = await setupSpoofedIdentity(page, testInfo.workerIndex);
     const seed = seedUserSoulProfile({
-      userId: ADMIN_USER_ID,
+      userId: testUserId,
       status: 'active',
     });
 
@@ -302,15 +319,16 @@ test.describe('Mission Control — User Soul Profile (real backend, PR-80)', () 
 
   test('USP-E2E-09: user exports full soul profile via export button (UI path)', async ({
     page,
-  }) => {
+  }, testInfo) => {
+    const testUserId = await setupSpoofedIdentity(page, testInfo.workerIndex);
     // Seed: ACTIVE v2 + SUPERSEDED v1. Export must return both.
     seedUserSoulProfile({
-      userId: ADMIN_USER_ID,
+      userId: testUserId,
       status: 'ACTIVE',
       version: 2,
     });
     seedUserSoulProfile({
-      userId: ADMIN_USER_ID,
+      userId: testUserId,
       status: 'SUPERSEDED',
       version: 1,
       confidence: 0.7,
@@ -344,7 +362,7 @@ test.describe('Mission Control — User Soul Profile (real backend, PR-80)', () 
     expect(resp.status()).toBe(200);
     const payload = await resp.json();
     expect(payload.schema_version).toBe('1.0');
-    expect(payload.user_id).toBe(ADMIN_USER_ID);
+    expect(payload.user_id).toBe(testUserId);
     expect(payload.row_count).toBeGreaterThanOrEqual(2);
     const versions = payload.profiles.map((p: any) => p.version).sort();
     expect(versions).toEqual(expect.arrayContaining([1, 2]));

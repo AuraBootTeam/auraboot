@@ -1,6 +1,7 @@
 package com.auraboot.framework.application.security;
 
 import com.auraboot.framework.application.web.filter.JwtAuthenticationFilter;
+import com.auraboot.framework.application.web.filter.TestUserSpoofFilter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -32,6 +33,14 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final UserDetailsService userDetailsService;
+
+    /**
+     * Test-only filter that allows E2E specs to override MetaContext user id
+     * via {@code X-Test-Spoof-User-Id}. Bean is only registered under the
+     * {@code test} Spring profile; absent in prod / dev / integration-test.
+     */
+    @Autowired(required = false)
+    private TestUserSpoofFilter testUserSpoofFilter;
 
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -76,6 +85,13 @@ public class SecurityConfig {
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+
+        // Test-only: honor X-Test-Spoof-User-Id AFTER JwtAuthenticationFilter
+        // populates MetaContext. Bean is only present when the "test" profile
+        // is active — no chance of spoofing leaking into prod.
+        if (testUserSpoofFilter != null) {
+            http.addFilterAfter(testUserSpoofFilter, JwtAuthenticationFilter.class);
+        }
 
         return http.build();
     }
