@@ -393,6 +393,134 @@ class UserSoulProfileControllerIntegrationTest extends BaseIntegrationTest {
         jdbc.update("DELETE FROM ab_agent_user_soul_profile WHERE tenant_id = ?", otherTenant);
     }
 
+    // =======================================================================
+    // PR-81 Phase 9 — GET /export
+    // =======================================================================
+
+    @Test
+    @DisplayName("GET /export returns all versions (ACTIVE + SUPERSEDED + ARCHIVED) for current user")
+    void export_allVersions() throws Exception {
+        seedActive(tenantId, userId, 3);
+        seedSuperseded(tenantId, userId, 2);
+        seedSuperseded(tenantId, userId, 1);
+
+        org.springframework.mock.web.MockHttpServletResponse response =
+                new org.springframework.mock.web.MockHttpServletResponse();
+        controller.export(response);
+
+        String body = response.getContentAsString();
+        com.fasterxml.jackson.databind.ObjectMapper mapper =
+                new com.fasterxml.jackson.databind.ObjectMapper();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> payload = mapper.readValue(body, Map.class);
+        assertThat(payload.get("user_id")).isEqualTo(userId);
+        assertThat(((Number) payload.get("row_count")).intValue()).isEqualTo(3);
+        assertThat(payload).containsKey("profiles");
+        assertThat(payload.get("schema_version")).isEqualTo("1.0");
+        // Content included for self-export (GDPR).
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> profiles = (List<Map<String, Object>>) payload.get("profiles");
+        assertThat(profiles).hasSize(3);
+        assertThat(profiles.get(0)).containsKey("profile");
+    }
+
+    @Test
+    @DisplayName("GET /export excludes rows for other users (no cross-user leak)")
+    void export_isolatedPerUser() throws Exception {
+        seedActive(tenantId, userId, 1);
+        seedActive(tenantId, "other_user_" + System.nanoTime(), 1);
+
+        org.springframework.mock.web.MockHttpServletResponse response =
+                new org.springframework.mock.web.MockHttpServletResponse();
+        controller.export(response);
+
+        com.fasterxml.jackson.databind.ObjectMapper mapper =
+                new com.fasterxml.jackson.databind.ObjectMapper();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> payload = mapper.readValue(response.getContentAsString(), Map.class);
+        assertThat(((Number) payload.get("row_count")).intValue()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("GET /export sets Content-Disposition attachment header")
+    void export_contentDispositionAttachment() throws Exception {
+        seedActive(tenantId, userId, 1);
+        org.springframework.mock.web.MockHttpServletResponse response =
+                new org.springframework.mock.web.MockHttpServletResponse();
+        controller.export(response);
+        String disposition = response.getHeader("Content-Disposition");
+        assertThat(disposition).isNotNull();
+        assertThat(disposition).startsWith("attachment;");
+        assertThat(disposition).contains("user-soul-profile-");
+        assertThat(disposition).endsWith(".json\"");
+        assertThat(response.getContentType()).contains("application/json");
+    }
+
+    // =======================================================================
+    // PR-81 Phase 9 — admin POST /forget
+    // =======================================================================
+
+    @Test
+    @DisplayName("Admin POST /forget archives target user's rows + inserts tombstone")
+    void adminForget_cascade() {
+        String victim = "victim_" + System.nanoTime();
+        seedActive(tenantId, victim, 1);
+
+        ApiResponse<Map<String, Object>> r = adminController.forget(
+                Map.of("userId", victim, "reason", "gdpr_request"));
+
+        assertThat(r.getCode()).isEqualTo("0");
+        assertThat(r.getData().get("noop")).isEqualTo(false);
+        assertThat(r.getData().get("target_user_id")).isEqualTo(victim);
+        assertThat(r.getData().get("reason")).isEqualTo("gdpr_request");
+        assertThat(r.getData().get("status")).isEqualTo("ARCHIVED");
+
+        Long archivedCount = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM ab_agent_user_soul_profile "
+                        + "WHERE tenant_id = ? AND user_id = ? AND status = 'ARCHIVED'",
+                Long.class, tenantId, victim);
+        assertThat(archivedCount).isGreaterThanOrEqualTo(2L);
+
+        Long tombstoneCount = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM ab_agent_user_soul_profile "
+                        + "WHERE tenant_id = ? AND user_id = ? "
+                        + "  AND status = 'ARCHIVED' "
+                        + "  AND (edited_fields ->> '_forgotten') = 'true'",
+                Long.class, tenantId, victim);
+        assertThat(tombstoneCount).isGreaterThanOrEqualTo(1L);
+    }
+
+    @Test
+    @DisplayName("Admin POST /forget rejects missing userId / reason")
+    void adminForget_requiresFields() {
+        assertThat(adminController.forget(Map.of("reason", "gdpr_request")).getCode()).isEqualTo("400");
+        assertThat(adminController.forget(Map.of("userId", "42")).getCode()).isEqualTo("400");
+        assertThat(adminController.forget(Map.of()).getCode()).isEqualTo("400");
+    }
+
+    @Test
+    @DisplayName("Admin POST /forget is idempotent when target has no rows (noop)")
+    void adminForget_noopWhenNoRows() {
+        String ghost = "ghost_" + System.nanoTime();
+        ApiResponse<Map<String, Object>> r = adminController.forget(
+                Map.of("userId", ghost, "reason", "account_closed"));
+        assertThat(r.getCode()).isEqualTo("0");
+        assertThat(r.getData().get("noop")).isEqualTo(true);
+        assertThat(r.getData().get("target_user_id")).isEqualTo(ghost);
+    }
+
+    @Test
+    @DisplayName("Admin POST /forget does not leak profile content in response")
+    void adminForget_noContentLeak() {
+        String victim = "victim_" + System.nanoTime();
+        seedActive(tenantId, victim, 1);
+        ApiResponse<Map<String, Object>> r = adminController.forget(
+                Map.of("userId", victim, "reason", "policy_violation"));
+        assertThat(r.getCode()).isEqualTo("0");
+        assertThat(r.getData()).doesNotContainKeys(
+                "profile", "profile_json", "edited_fields", "edited_fields_json", "source_memory_pids");
+    }
+
     @Test
     @DisplayName("Admin GET /stats shape: active_count, stale_count, avg_confidence, by_status")
     void admin_statsShape() {
