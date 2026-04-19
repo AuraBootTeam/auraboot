@@ -19,6 +19,7 @@ import java.util.concurrent.CompletableFuture;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import com.auraboot.framework.integration.TestIdGenerator;
 
 /**
  * Integration tests for {@link MemoryPromotionApplier} (PR-66 Phase 2).
@@ -35,7 +36,7 @@ class MemoryPromotionApplierIntegrationTest extends BaseIntegrationTest {
 
     @BeforeEach
     void setup() {
-        tenantId = 9_791_000L + System.nanoTime() % 10_000;
+        tenantId = TestIdGenerator.uniqueTenantId();
     }
 
     @AfterEach

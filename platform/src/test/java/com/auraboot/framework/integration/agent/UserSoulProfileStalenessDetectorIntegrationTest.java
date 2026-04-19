@@ -22,6 +22,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
+import com.auraboot.framework.integration.TestIdGenerator;
 
 /** PR-76 Phase 2 — {@link UserSoulProfileStalenessDetector}. */
 @Commit
@@ -42,7 +43,7 @@ class UserSoulProfileStalenessDetectorIntegrationTest extends BaseIntegrationTes
 
     @BeforeEach
     void setup() {
-        tenantId = 9_785_000L + System.nanoTime() % 10_000;
+        tenantId = TestIdGenerator.uniqueTenantId();
         userId = "us_" + Long.toString(System.nanoTime() & 0xffff, 36);
         ReflectionTestUtils.setField(detector, "enabled", true);
         ReflectionTestUtils.setField(detector, "minDivergentMemories", 3);

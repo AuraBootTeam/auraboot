@@ -15,6 +15,7 @@ import org.springframework.web.context.WebApplicationContext;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import com.auraboot.framework.integration.TestIdGenerator;
 
 /**
  * Round-trip verification that the USP admin controller now goes through the
@@ -41,7 +42,7 @@ class UserSoulProfileAdminGuardIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("non-admin GET /api/admin/user-soul-profiles -> 409")
     void nonAdminBlocked() throws Exception {
-        tenantId = 9_930_000L + (System.nanoTime() % 10_000);
+        tenantId = TestIdGenerator.uniqueTenantId();
 
         MockMvc mockMvc = AdminGuardTestSupport.buildMockMvc(
                 webApplicationContext,
@@ -58,7 +59,7 @@ class UserSoulProfileAdminGuardIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("admin GET /api/admin/user-soul-profiles -> 200")
     void adminPasses() throws Exception {
-        tenantId = 9_940_000L + (System.nanoTime() % 10_000);
+        tenantId = TestIdGenerator.uniqueTenantId();
         AdminGuardTestSupport.grantTenantAdmin(jdbc, tenantId, testUser.getId());
 
         MockMvc mockMvc = AdminGuardTestSupport.buildMockMvc(

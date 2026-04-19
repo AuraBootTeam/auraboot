@@ -20,6 +20,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import com.auraboot.framework.integration.TestIdGenerator;
 
 
 /**
@@ -81,7 +82,7 @@ class AdminRoleInterceptorIntegrationTest extends BaseIntegrationTest {
     }
 
     private void freshTenant() {
-        tenantId = 9_910_000L + (System.nanoTime() % 10_000);
+        tenantId = TestIdGenerator.uniqueTenantId();
     }
 
     // =======================================================================

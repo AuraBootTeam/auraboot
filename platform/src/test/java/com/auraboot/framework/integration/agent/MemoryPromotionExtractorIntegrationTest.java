@@ -20,6 +20,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import com.auraboot.framework.integration.TestIdGenerator;
 
 /**
  * Integration tests for {@link MemoryPromotionExtractor} (PR-65 Phase 1).
@@ -41,7 +42,7 @@ class MemoryPromotionExtractorIntegrationTest extends BaseIntegrationTest {
 
     @BeforeEach
     void setup() {
-        tenantId = 9_790_000L + System.nanoTime() % 10_000;
+        tenantId = TestIdGenerator.uniqueTenantId();
         tag = "mpe" + Long.toString(System.nanoTime() & 0xfffff, 36) + "_";
         // Force importance-spike disabled by default; specific tests flip it.
         ReflectionTestUtils.setField(extractor, "importanceSpikeEnabled", false);
