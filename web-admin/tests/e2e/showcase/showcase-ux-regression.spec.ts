@@ -71,8 +71,10 @@ test.describe('Showcase UX Regression', () => {
 
   test('B5: CRM Account list page loads', async ({ page }) => {
     await navigateToListViaMenu(page, /CRM|客户关系|menu\.crm/i, '/p/crm_account', 'crm_account');
+    // Table renders synchronously after the list response settles in
+    // navigateToListViaMenu — 5s is sufficient for per-action visibility.
     await expect(page.locator('table, [data-testid="dynlist_table_view"]')).toBeVisible({
-      timeout: 10000,
+      timeout: 5000,
     });
   });
 
@@ -154,11 +156,17 @@ test.describe('Showcase UX Regression', () => {
     // Dashboards live under /dashboards?code=… (see plugins/showcase/config/menus.json),
     // not the legacy /p/c/ custom-page route which was removed when dashboards moved
     // to ab_dashboard table (2026-04-15 architecture pivot).
+    // Dashboard initial-load: smoke-style top-level route (not /p/{model}).
+    // Wait on dashboards API before asserting the container so 5s per-action holds.
+    const dashResp = page.waitForResponse(
+      (r) => r.url().includes('/api/dashboards') && r.status() === 200,
+      { timeout: 10_000 },
+    );
     await page.goto('/dashboards?code=sc_arsenal_dashboard');
-    await page.waitForLoadState('domcontentloaded');
+    await dashResp.catch(() => null);
     // Dashboard container uses unified TestId convention: ab:dashboard:{code}:container
     // (see docs/e2e/06-Selector-TestId-迁移计划.md, deriveTestId.ts)
-    await expect(page.locator('[data-testid^="ab:dashboard:"]').first()).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('[data-testid^="ab:dashboard:"]').first()).toBeVisible({ timeout: 5000 });
     const content = await page.textContent('body');
     expect(content).not.toContain('Page not found');
   });
