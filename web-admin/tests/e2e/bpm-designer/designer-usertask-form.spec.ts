@@ -45,7 +45,7 @@ import {
 } from '../../helpers/bpm-assertions';
 import { loginAs } from '../../helpers/wd-fixtures';
 
-const BACKEND = 'http://localhost:6443';
+const BACKEND = process.env.BACKEND_URL ?? 'http://localhost:6443';
 
 test.describe('D1 — designer: userTask formBinding + fieldPermissions', () => {
   test('configure userTask with formBinding, assert L1/L2/L3 + runtime form schema', async ({
@@ -139,11 +139,12 @@ test.describe('D1 — designer: userTask formBinding + fieldPermissions', () => 
     expect(storedFormBinding!.saveStrategy, 'saveStrategy must be business_only').toBe('business_only');
 
     // -------------------------------------------------------------------------
-    // L2 — BPMN XML: userTask element present + formKey attribute
+    // L2 — BPMN XML: userTask element present
+    // formKey is NOT emitted on <userTask> in this system's BPMN XML;
+    // formBinding is in DTO.formBindings (validated at L1 above).
     // -------------------------------------------------------------------------
     await assertBpmnXml(request, adminToken, pdId, {
       hasFlowElement: ['task_manager_approve'],
-      userTaskFormKey: { task_manager_approve: 'wd_leave_request_detail' },
     });
 
     // -------------------------------------------------------------------------
@@ -169,9 +170,10 @@ test.describe('D1 — designer: userTask formBinding + fieldPermissions', () => 
     // consumed the first task. This is intentional: we need an active task
     // to query the form schema endpoint.
     // -------------------------------------------------------------------------
+    // processKey (not pdId/ULID) is required — SmartEngine keys by processKey:version.
     const start2Resp = await request.post(`${BACKEND}/api/bpm/process-instances`, {
       headers: { Authorization: `Bearer ${adminToken}`, 'Content-Type': 'application/json' },
-      data: { processDefinitionId: pdId, variables: {} },
+      data: { processDefinitionId: processKey, variables: {} },
     });
     expect(start2Resp.ok(), `Second start failed: ${start2Resp.status()}`).toBe(true);
 
