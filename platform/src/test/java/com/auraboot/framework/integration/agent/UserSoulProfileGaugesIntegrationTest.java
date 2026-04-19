@@ -47,7 +47,7 @@ class UserSoulProfileGaugesIntegrationTest extends BaseIntegrationTest {
         jdbc.update("INSERT INTO ab_agent_user_soul_profile "
                         + "(pid, tenant_id, user_id, version, status, profile, profile_hash, "
                         + " derivation_confidence, stale_flagged_at, activated_at, created_at) "
-                        + "VALUES (?, ?, ?, 1, 'ACTIVE', '{}'::jsonb, ?, ?, "
+                        + "VALUES (?, ?, ?, 1, 'active', '{}'::jsonb, ?, ?, "
                         + "        CASE WHEN ? THEN NOW() ELSE NULL END, NOW(), NOW())",
                 pid, tenantId, uniqueUser, "h:" + pid, confidence, stale);
         return pid;

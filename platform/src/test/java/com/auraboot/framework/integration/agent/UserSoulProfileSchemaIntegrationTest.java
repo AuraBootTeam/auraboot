@@ -53,10 +53,10 @@ class UserSoulProfileSchemaIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("Happy path: DRAFT row inserts and reads back")
     void happyPath() {
-        String p = insert("a1", "u1", "DRAFT", 1);
+        String p = insert("a1", "u1", "draft", 1);
         Map<String, Object> row = jdbc.queryForMap(
                 "SELECT status, version FROM ab_agent_user_soul_profile WHERE pid = ?", p);
-        assertThat(row.get("status")).isEqualTo("DRAFT");
+        assertThat(row.get("status")).isEqualTo("draft");
         assertThat(((Number) row.get("version")).intValue()).isEqualTo(1);
     }
 
@@ -74,7 +74,7 @@ class UserSoulProfileSchemaIntegrationTest extends BaseIntegrationTest {
                 "INSERT INTO ab_agent_user_soul_profile "
                         + "(pid, tenant_id, user_id, version, status, profile, profile_hash, "
                         + " derivation_confidence, created_at) "
-                        + "VALUES (?, ?, ?, ?, 'DRAFT', '{}'::jsonb, 'h', 1.5, NOW())",
+                        + "VALUES (?, ?, ?, ?, 'draft', '{}'::jsonb, 'h', 1.5, NOW())",
                 tag + "a3", tenantId, "u3", 1))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
@@ -82,17 +82,17 @@ class UserSoulProfileSchemaIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("UNIQUE partial index: two ACTIVE rows per (tenant,user) rejected")
     void uniqueActivePerUser() {
-        insert("b1", "u1", "ACTIVE", 1);
-        assertThatThrownBy(() -> insert("b2", "u1", "ACTIVE", 2))
+        insert("b1", "u1", "active", 1);
+        assertThatThrownBy(() -> insert("b2", "u1", "active", 2))
                 .isInstanceOfAny(DuplicateKeyException.class, DataIntegrityViolationException.class);
     }
 
     @Test
     @DisplayName("Multiple DRAFT rows allowed per (tenant,user); ACTIVE+DRAFT coexist")
     void draftsAndOneActiveCoexist() {
-        insert("c1", "u1", "ACTIVE", 1);
-        insert("c2", "u1", "DRAFT", 2);
-        insert("c3", "u1", "DRAFT", 3);
+        insert("c1", "u1", "active", 1);
+        insert("c2", "u1", "draft", 2);
+        insert("c3", "u1", "draft", 3);
         Long count = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM ab_agent_user_soul_profile WHERE tenant_id = ? AND user_id = 'u1'",
                 Long.class, tenantId);
@@ -102,8 +102,8 @@ class UserSoulProfileSchemaIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("Duplicate pid rejected by UNIQUE constraint")
     void duplicatePidRejected() {
-        insert("d1", "u1", "DRAFT", 1);
-        assertThatThrownBy(() -> insert("d1", "u1", "DRAFT", 2))
+        insert("d1", "u1", "draft", 1);
+        assertThatThrownBy(() -> insert("d1", "u1", "draft", 2))
                 .isInstanceOfAny(DuplicateKeyException.class, DataIntegrityViolationException.class);
     }
 

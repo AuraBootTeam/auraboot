@@ -86,7 +86,7 @@ class UserSoulProfileStalenessDetectorIntegrationTest extends BaseIntegrationTes
         jdbc.update("INSERT INTO ab_agent_user_soul_profile "
                         + "(pid, tenant_id, user_id, version, status, profile, profile_hash, "
                         + " activated_at, created_at) "
-                        + "VALUES (?, ?, ?, 1, 'ACTIVE', ?::jsonb, ?, NOW(), NOW())",
+                        + "VALUES (?, ?, ?, 1, 'active', ?::jsonb, ?, NOW(), NOW())",
                 pid, tenantId, userId, json, "h:" + pid);
         return pid;
     }

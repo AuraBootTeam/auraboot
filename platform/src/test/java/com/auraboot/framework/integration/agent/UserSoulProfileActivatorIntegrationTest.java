@@ -61,21 +61,21 @@ class UserSoulProfileActivatorIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("DRAFT >24h → ACTIVE; previous ACTIVE → SUPERSEDED")
     void activatesOldDraft() {
-        String prevActive = seedProfile(tenantId, userId, 1, "ACTIVE", "- INTERVAL '5 days'");
-        String oldDraft = seedProfile(tenantId, userId, 2, "DRAFT", "- INTERVAL '2 days'");
+        String prevActive = seedProfile(tenantId, userId, 1, "active", "- INTERVAL '5 days'");
+        String oldDraft = seedProfile(tenantId, userId, 2, "draft", "- INTERVAL '2 days'");
 
         int activated = activator.runOnce();
         assertThat(activated).isEqualTo(1);
 
         assertThat(jdbc.queryForObject(
                 "SELECT status FROM ab_agent_user_soul_profile WHERE pid = ?", String.class, oldDraft))
-                .isEqualTo("ACTIVE");
+                .isEqualTo("active");
         assertThat(jdbc.queryForObject(
                 "SELECT status FROM ab_agent_user_soul_profile WHERE pid = ?", String.class, prevActive))
-                .isEqualTo("SUPERSEDED");
+                .isEqualTo("superseded");
         // Exactly one ACTIVE row remains for this user.
         Long activeCount = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM ab_agent_user_soul_profile WHERE tenant_id = ? AND user_id = ? AND status = 'ACTIVE'",
+                "SELECT COUNT(*) FROM ab_agent_user_soul_profile WHERE tenant_id = ? AND user_id = ? AND status = 'active'",
                 Long.class, tenantId, userId);
         assertThat(activeCount).isEqualTo(1L);
     }
@@ -83,22 +83,22 @@ class UserSoulProfileActivatorIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("DRAFT <24h stays DRAFT")
     void skipsYoungDraft() {
-        String freshDraft = seedProfile(tenantId, userId, 1, "DRAFT", "- INTERVAL '2 hours'");
+        String freshDraft = seedProfile(tenantId, userId, 1, "draft", "- INTERVAL '2 hours'");
         int activated = activator.runOnce();
         assertThat(activated).isZero();
         assertThat(jdbc.queryForObject(
                 "SELECT status FROM ab_agent_user_soul_profile WHERE pid = ?", String.class, freshDraft))
-                .isEqualTo("DRAFT");
+                .isEqualTo("draft");
     }
 
     @Test
     @DisplayName("Only one ACTIVE per (tenant, user) after activation")
     void singleActiveInvariant() {
-        seedProfile(tenantId, userId, 1, "ACTIVE", "- INTERVAL '10 days'");
-        seedProfile(tenantId, userId, 2, "DRAFT", "- INTERVAL '3 days'");
+        seedProfile(tenantId, userId, 1, "active", "- INTERVAL '10 days'");
+        seedProfile(tenantId, userId, 2, "draft", "- INTERVAL '3 days'");
         activator.runOnce();
         Long activeCount = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM ab_agent_user_soul_profile WHERE tenant_id = ? AND user_id = ? AND status = 'ACTIVE'",
+                "SELECT COUNT(*) FROM ab_agent_user_soul_profile WHERE tenant_id = ? AND user_id = ? AND status = 'active'",
                 Long.class, tenantId, userId);
         assertThat(activeCount).isEqualTo(1L);
     }
@@ -106,23 +106,23 @@ class UserSoulProfileActivatorIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("Hidden DRAFT not activated")
     void hiddenDraftSkipped() {
-        String pid = seedProfile(tenantId, userId, 1, "DRAFT", "- INTERVAL '3 days'");
+        String pid = seedProfile(tenantId, userId, 1, "draft", "- INTERVAL '3 days'");
         jdbc.update("UPDATE ab_agent_user_soul_profile SET hidden_at = NOW() WHERE pid = ?", pid);
         int activated = activator.runOnce();
         assertThat(activated).isZero();
         assertThat(jdbc.queryForObject(
                 "SELECT status FROM ab_agent_user_soul_profile WHERE pid = ?", String.class, pid))
-                .isEqualTo("DRAFT");
+                .isEqualTo("draft");
     }
 
     @Test
     @DisplayName("Disabled scheduler is a no-op")
     void disabledSchedulerNoop() {
-        seedProfile(tenantId, userId, 1, "DRAFT", "- INTERVAL '3 days'");
+        seedProfile(tenantId, userId, 1, "draft", "- INTERVAL '3 days'");
         ReflectionTestUtils.setField(activator, "enabled", false);
         activator.runScheduled();
         Long active = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM ab_agent_user_soul_profile WHERE tenant_id = ? AND status = 'ACTIVE'",
+                "SELECT COUNT(*) FROM ab_agent_user_soul_profile WHERE tenant_id = ? AND status = 'active'",
                 Long.class, tenantId);
         assertThat(active).isZero();
     }
@@ -130,13 +130,13 @@ class UserSoulProfileActivatorIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("Concurrent runOnce() respects advisory lock — never duplicates")
     void advisoryLockSerialises() throws InterruptedException {
-        seedProfile(tenantId, userId, 1, "DRAFT", "- INTERVAL '2 days'");
+        seedProfile(tenantId, userId, 1, "draft", "- INTERVAL '2 days'");
         Thread t1 = new Thread(activator::runOnce);
         Thread t2 = new Thread(activator::runOnce);
         t1.start(); t2.start();
         t1.join(); t2.join();
         Long active = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM ab_agent_user_soul_profile WHERE tenant_id = ? AND user_id = ? AND status = 'ACTIVE'",
+                "SELECT COUNT(*) FROM ab_agent_user_soul_profile WHERE tenant_id = ? AND user_id = ? AND status = 'active'",
                 Long.class, tenantId, userId);
         assertThat(active).isEqualTo(1L);
     }
@@ -169,20 +169,20 @@ class UserSoulProfileActivatorIntegrationTest extends BaseIntegrationTest {
         assertThat(activated).isEqualTo(1);
         assertThat(jdbc.queryForObject(
                 "SELECT status FROM ab_agent_user_soul_profile WHERE pid = ?", String.class, r.profilePid()))
-                .isEqualTo("ACTIVE");
+                .isEqualTo("active");
     }
 
     @Test
     @DisplayName("Returns count of activations per tick")
     void returnsCount() {
         String otherUser = userId + "_b";
-        seedProfile(tenantId, userId, 1, "DRAFT", "- INTERVAL '2 days'");
-        seedProfile(tenantId, otherUser, 1, "DRAFT", "- INTERVAL '3 days'");
+        seedProfile(tenantId, userId, 1, "draft", "- INTERVAL '2 days'");
+        seedProfile(tenantId, otherUser, 1, "draft", "- INTERVAL '3 days'");
         int activated = activator.runOnce();
         assertThat(activated).isEqualTo(2);
 
         List<Map<String, Object>> actives = jdbc.queryForList(
-                "SELECT user_id FROM ab_agent_user_soul_profile WHERE tenant_id = ? AND status = 'ACTIVE'",
+                "SELECT user_id FROM ab_agent_user_soul_profile WHERE tenant_id = ? AND status = 'active'",
                 tenantId);
         assertThat(actives).hasSize(2);
     }
