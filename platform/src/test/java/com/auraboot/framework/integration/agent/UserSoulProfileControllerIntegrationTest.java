@@ -29,6 +29,7 @@ import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import com.auraboot.framework.integration.TestIdGenerator;
 
 /**
  * PR-78 — {@link UserSoulProfileController} + {@link UserSoulProfileAdminController}.
@@ -55,7 +56,7 @@ class UserSoulProfileControllerIntegrationTest extends BaseIntegrationTest {
 
     @BeforeEach
     void setup() {
-        tenantId = 9_810_000L + System.nanoTime() % 10_000;
+        tenantId = TestIdGenerator.uniqueTenantId();
         userId = testUser.getId().toString();
         MetaContext.setContext(tenantId, testUser.getId(), testUser.getPid(), testUser.getUserName());
         reset(deriver);

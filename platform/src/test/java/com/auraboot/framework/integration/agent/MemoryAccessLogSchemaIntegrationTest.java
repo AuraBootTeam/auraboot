@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import com.auraboot.framework.integration.TestIdGenerator;
 
 /**
  * PR-73 — schema invariants for {@code ab_agent_memory_access_log}:
@@ -44,7 +45,7 @@ class MemoryAccessLogSchemaIntegrationTest extends BaseIntegrationTest {
 
     @BeforeEach
     void setup() {
-        tenantId = 9_797_000L + System.nanoTime() % 10_000;
+        tenantId = TestIdGenerator.uniqueTenantId();
         agentCode = "acclog-test-" + System.nanoTime();
     }
 
