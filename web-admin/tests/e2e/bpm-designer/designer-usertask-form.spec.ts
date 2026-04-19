@@ -181,7 +181,7 @@ test.describe('D1 — designer: userTask formBinding + fieldPermissions', () => 
   // Until then, GET /api/bpm/forms/task/{taskId} returns formBinding: null for
   // all processes configured via the designer, so this assertion cannot pass.
   // ---------------------------------------------------------------------------
-  test.fixme(
+  test(
     'L3-extended: runtime GET /api/bpm/forms/task/{taskId} returns fieldPermissions',
     async ({ request }) => {
       const adminToken = await loginAs(request, 'admin@example.com', 'Test2026x');
