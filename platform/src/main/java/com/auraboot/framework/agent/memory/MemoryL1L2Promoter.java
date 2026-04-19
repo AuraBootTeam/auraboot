@@ -1,10 +1,11 @@
 package com.auraboot.framework.agent.memory;
 
 import com.auraboot.framework.agent.metrics.MemoryL1L2PromotionMetrics;
+import com.auraboot.framework.agent.service.MemoryEmbeddingService;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.event.EventListener;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -61,16 +62,45 @@ import java.util.Objects;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class MemoryL1L2Promoter {
 
     /** Hard importance gate per design §4.1 — below this, candidate is not even loaded. */
     public static final int BASE_IMPORTANCE_GATE = 6;
 
+    /**
+     * Phase 3 default cosine threshold for semantic dedup. Values {@code >=}
+     * this count as the same memory. The brief (PR-84 §2) pins this at 0.92;
+     * see design §4.3 layer 2 for rationale (cosine ≥ 0.85 was an earlier
+     * draft — the 0.92 ceiling trades recall for precision on the write path).
+     */
+    public static final double DEFAULT_SEMANTIC_DEDUP_THRESHOLD = 0.92;
+
     private final JdbcTemplate jdbc;
     private final MemoryTierEvaluator evaluator;
     private final MemoryL1L2PromotionMetrics metrics;
     private final ObjectMapper objectMapper;
+    private final MemoryEmbeddingService memoryEmbeddingService;
+
+    @Value("${acp.memory.l1l2.semantic-dedup-threshold:0.92}")
+    private double semanticDedupThreshold = DEFAULT_SEMANTIC_DEDUP_THRESHOLD;
+
+    public MemoryL1L2Promoter(JdbcTemplate jdbc,
+                              MemoryTierEvaluator evaluator,
+                              MemoryL1L2PromotionMetrics metrics,
+                              ObjectMapper objectMapper,
+                              MemoryEmbeddingService memoryEmbeddingService) {
+        this.jdbc = jdbc;
+        this.evaluator = evaluator;
+        this.metrics = metrics;
+        this.objectMapper = objectMapper;
+        // Red-line: no fallback / ensure — null bean must fail loudly rather
+        // than silently skipping semantic dedup. Tests that do not want the
+        // real HTTP embedder should @MockBean EmbeddingService (returning
+        // null from embed()) so MemoryEmbeddingService.resolveEmbedding yields
+        // null gracefully.
+        this.memoryEmbeddingService = Objects.requireNonNull(memoryEmbeddingService,
+                "MemoryEmbeddingService bean must be present — semantic dedup depends on it");
+    }
 
     /**
      * Spring synchronous listener. Joins the current transaction (if any) so
@@ -110,14 +140,16 @@ public class MemoryL1L2Promoter {
         int promoted = 0;
         int skippedLowScore = 0;
         int skippedDup = 0;
+        int skippedDupSemantic = 0;
 
         Instant now = Instant.now();
         for (Map<String, Object> row : candidates) {
             try {
-                Outcome o = evaluate(tenantId, runId, row, now);
+                Outcome o = promoteCandidate(tenantId, runId, row, now);
                 switch (o) {
                     case PROMOTED -> promoted++;
                     case DEDUP_HIT -> skippedDup++;
+                    case DEDUP_HIT_SEMANTIC -> skippedDupSemantic++;
                     case LOW_SCORE -> skippedLowScore++;
                 }
             } catch (RuntimeException e) {
@@ -131,12 +163,25 @@ public class MemoryL1L2Promoter {
         }
 
         log.info("L1->L2 promotion for tenant={} run={}: candidates={} promoted={} "
-                        + "dedup={} lowScore={}",
-                tenantId, runId, candidates.size(), promoted, skippedDup, skippedLowScore);
-        return new PromotionSummary(candidates.size(), promoted, skippedDup, skippedLowScore);
+                        + "dedup={} dedupSemantic={} lowScore={}",
+                tenantId, runId, candidates.size(), promoted, skippedDup,
+                skippedDupSemantic, skippedLowScore);
+        return new PromotionSummary(candidates.size(), promoted, skippedDup,
+                skippedDupSemantic, skippedLowScore);
     }
 
-    private Outcome evaluate(Long tenantId, String runId, Map<String, Object> row, Instant now) {
+    /**
+     * Per-candidate promotion pipeline — extracted so {@code MemoryL1L2OrphanScanner}
+     * can reuse the identical scoring + dedup path on a different candidate-selection
+     * query (aged L1 rows rather than single-run rows).
+     *
+     * <p>The {@code row} map must carry the columns from the SELECT in {@link #handle}
+     * / the orphan scanner; {@code runId} may be null when the candidate is being
+     * rescued by the orphan cron (we still stamp {@code promoted_from_run_id} with
+     * whatever was on the original L1 row, not the cron tick).
+     */
+    public Outcome promoteCandidate(Long tenantId, String runId,
+                                    Map<String, Object> row, Instant now) {
         String pid = (String) row.get("pid");
         int importance = ((Number) row.get("importance")).intValue();
         int accessCount = row.get("access_count") == null
@@ -148,23 +193,16 @@ public class MemoryL1L2Promoter {
         String agentCode = (String) row.get("memory_agent_id");
         Object embedding = row.get("embedding");
 
-        double maxCosineToL2 = (embedding == null)
-                ? 0.0
-                : queryMaxCosineToL2(tenantId, scope, scopeKey, pid);
-
-        MemoryTierEvaluator.ScoreResult score = evaluator.score(
-                new MemoryTierEvaluator.Candidate(importance, accessCount, createdAt, maxCosineToL2),
-                now);
-
-        if (!evaluator.shouldPromote(score)) {
-            metrics.recordPromotionOutcome(tenantId,
-                    MemoryL1L2PromotionMetrics.OUTCOME_SKIPPED_LOW_SCORE);
-            return Outcome.LOW_SCORE;
-        }
+        // Dedup runs BEFORE the score threshold gate (design §4.3). A semantic
+        // duplicate will always score low on the uniqueness factor — but the
+        // design intent is to merge duplicates, not drop them. Running dedup
+        // first also lets us bump access_count + importance on the target L2
+        // even when the incoming candidate is a near-verbatim repeat whose
+        // own score would otherwise fall below 0.65.
 
         String hash = contentHash(content);
 
-        // Hash dedup against existing L2 in the same partition.
+        // Layer 1 — hash dedup against existing L2 in the same partition.
         String existingL2Pid = findL2ByHash(tenantId, scope, scopeKey, hash);
         if (existingL2Pid != null) {
             jdbc.update(
@@ -174,11 +212,66 @@ public class MemoryL1L2Promoter {
                             + "       updated_at = NOW() "
                             + " WHERE pid = ?",
                     importance, existingL2Pid);
+            // score snapshot still computed so the audit row carries the
+            // contextual score — use a dummy cosine of 0.0 since the row
+            // hashed identical and the uniqueness factor is irrelevant here.
+            MemoryTierEvaluator.ScoreResult hashScore = evaluator.score(
+                    new MemoryTierEvaluator.Candidate(importance, accessCount, createdAt, 0.0),
+                    now);
             writeAuditRow(tenantId, pid, MemoryL1L2PromotionMetrics.EVENT_TYPE_DEDUP_HIT,
-                    "hash", existingL2Pid, score, runId);
+                    MemoryL1L2PromotionMetrics.DEDUP_MODE_HASH, existingL2Pid, hashScore, runId);
             metrics.recordPromotionOutcome(tenantId,
                     MemoryL1L2PromotionMetrics.OUTCOME_SKIPPED_DUP);
             return Outcome.DEDUP_HIT;
+        }
+
+        // Layer 2 — semantic (cosine) dedup per design §4.3. Compute / lazily
+        // fetch the candidate embedding. MemoryEmbeddingService.resolveEmbedding
+        // returns null when the CloudConfig embedding provider is not configured
+        // — in that case we skip semantic dedup and fall through to scoring
+        // rather than silently merging.
+        double maxCosineToL2 = 0.0;
+        if (memoryEmbeddingService.resolveEmbedding(pid) != null) {
+            maxCosineToL2 = queryMaxCosineToL2(tenantId, scope, scopeKey, pid);
+            if (maxCosineToL2 >= semanticDedupThreshold) {
+                String semanticTargetPid = findNearestL2BySemantic(
+                        tenantId, scope, scopeKey, pid, semanticDedupThreshold);
+                if (semanticTargetPid != null) {
+                    jdbc.update(
+                            "UPDATE ab_agent_memory "
+                                    + "   SET access_count = COALESCE(access_count, 0) + 1, "
+                                    + "       importance = GREATEST(COALESCE(importance, 0), ?), "
+                                    + "       updated_at = NOW() "
+                                    + " WHERE pid = ?",
+                            importance, semanticTargetPid);
+                    MemoryTierEvaluator.ScoreResult cosScore = evaluator.score(
+                            new MemoryTierEvaluator.Candidate(importance, accessCount,
+                                    createdAt, maxCosineToL2),
+                            now);
+                    writeAuditRow(tenantId, pid,
+                            MemoryL1L2PromotionMetrics.EVENT_TYPE_DEDUP_HIT,
+                            MemoryL1L2PromotionMetrics.DEDUP_MODE_COSINE, semanticTargetPid,
+                            cosScore, runId);
+                    metrics.recordPromotionOutcome(tenantId,
+                            MemoryL1L2PromotionMetrics.OUTCOME_SKIPPED_DUP_SEMANTIC);
+                    return Outcome.DEDUP_HIT_SEMANTIC;
+                }
+            }
+        } else if (embedding != null) {
+            // Row already has embedding on disk even though resolveEmbedding
+            // returned null — unusual but tolerate (e.g. malformed cached
+            // state). Use the pgvector query directly.
+            maxCosineToL2 = queryMaxCosineToL2(tenantId, scope, scopeKey, pid);
+        }
+
+        MemoryTierEvaluator.ScoreResult score = evaluator.score(
+                new MemoryTierEvaluator.Candidate(importance, accessCount, createdAt, maxCosineToL2),
+                now);
+
+        if (!evaluator.shouldPromote(score)) {
+            metrics.recordPromotionOutcome(tenantId,
+                    MemoryL1L2PromotionMetrics.OUTCOME_SKIPPED_LOW_SCORE);
+            return Outcome.LOW_SCORE;
         }
 
         // Promote: flip category, stamp metadata, write content_hash.
@@ -248,6 +341,64 @@ public class MemoryL1L2Promoter {
         if (cos < 0.0) return 0.0;
         if (cos > 1.0) return 1.0;
         return cos;
+    }
+
+    /**
+     * Phase 3 layer-2 semantic dedup lookup. Returns the nearest L2 row's pid
+     * when {@code cosine_similarity >= threshold}; null otherwise. The caller
+     * must have already ensured the candidate {@code selfPid} has an embedding
+     * (no recomputation here — the query uses the stored vector).
+     */
+    private String findNearestL2BySemantic(Long tenantId, String scope, String scopeKey,
+                                           String selfPid, double threshold) {
+        // pgvector distance <=> is (1 - cosine_similarity) ∈ [0,2] for
+        // arbitrary vectors, [0,1] for unit vectors. We compare
+        // `1 - distance >= threshold` which is equivalent to
+        // `distance <= 1 - threshold`.
+        double maxDistance = 1.0 - threshold;
+        Map<String, Object> hit;
+        try {
+            if (scopeKey == null) {
+                hit = jdbc.queryForMap(
+                        "SELECT pid, (embedding <=> (SELECT embedding FROM ab_agent_memory WHERE pid = ?)) AS dist "
+                                + "  FROM ab_agent_memory "
+                                + " WHERE tenant_id = ? "
+                                + "   AND scope = ? "
+                                + "   AND scope_key IS NULL "
+                                + "   AND category IN ('user','agent') "
+                                + "   AND embedding IS NOT NULL "
+                                + "   AND (deleted_flag IS NULL OR deleted_flag = FALSE) "
+                                + "   AND pid <> ? "
+                                + " ORDER BY embedding <=> (SELECT embedding FROM ab_agent_memory WHERE pid = ?) ASC "
+                                + " LIMIT 1",
+                        selfPid, tenantId, scope, selfPid, selfPid);
+            } else {
+                hit = jdbc.queryForMap(
+                        "SELECT pid, (embedding <=> (SELECT embedding FROM ab_agent_memory WHERE pid = ?)) AS dist "
+                                + "  FROM ab_agent_memory "
+                                + " WHERE tenant_id = ? "
+                                + "   AND scope = ? "
+                                + "   AND scope_key = ? "
+                                + "   AND category IN ('user','agent') "
+                                + "   AND embedding IS NOT NULL "
+                                + "   AND (deleted_flag IS NULL OR deleted_flag = FALSE) "
+                                + "   AND pid <> ? "
+                                + " ORDER BY embedding <=> (SELECT embedding FROM ab_agent_memory WHERE pid = ?) ASC "
+                                + " LIMIT 1",
+                        selfPid, tenantId, scope, scopeKey, selfPid, selfPid);
+            }
+        } catch (org.springframework.dao.EmptyResultDataAccessException e) {
+            return null;
+        }
+        Object distObj = hit.get("dist");
+        if (distObj == null) {
+            return null;
+        }
+        double dist = ((Number) distObj).doubleValue();
+        if (dist <= maxDistance) {
+            return (String) hit.get("pid");
+        }
+        return null;
     }
 
     private String findL2ByHash(Long tenantId, String scope, String scopeKey, String hash) {
@@ -331,13 +482,17 @@ public class MemoryL1L2Promoter {
     public enum Outcome {
         PROMOTED,
         DEDUP_HIT,
+        /** Phase 3 — cosine-similarity dedup hit (design §4.3 layer 2). */
+        DEDUP_HIT_SEMANTIC,
         LOW_SCORE
     }
 
     /**
      * Summary returned by the test-friendly {@link #handle} overload. Values
-     * are per-event counts, never cumulative.
+     * are per-event counts, never cumulative. {@code semanticDedupHits} was
+     * added in PR-84 / Phase 3 alongside cosine dedup.
      */
-    public record PromotionSummary(int candidates, int promoted, int dedupHits, int lowScore) {
+    public record PromotionSummary(int candidates, int promoted, int dedupHits,
+                                   int semanticDedupHits, int lowScore) {
     }
 }
