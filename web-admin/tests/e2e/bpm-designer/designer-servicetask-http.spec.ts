@@ -82,7 +82,8 @@ test.describe('BPM designer — serviceTask http', { tag: ['@bpm-regression'] },
       { headers: { Authorization: `Bearer ${adminToken}` } },
     );
     expect(xmlResp.ok()).toBe(true);
-    const xml = await xmlResp.text();
+    const xmlBody = (await xmlResp.json()) as Record<string, unknown>;
+    const xml = xmlBody.data as string;
     const tagMatch = xml.match(
       /<serviceTask[^>]*id=["']svc_http["'][^>]*(?:\/>|>[\s\S]*?<\/serviceTask>)/,
     );

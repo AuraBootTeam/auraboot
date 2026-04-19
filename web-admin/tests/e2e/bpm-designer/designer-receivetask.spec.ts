@@ -64,7 +64,8 @@ test.describe('BPM designer — receiveTask', { tag: ['@bpm-regression'] }, () =
       { headers: { Authorization: `Bearer ${adminToken}` } },
     );
     expect(xmlResp.ok()).toBe(true);
-    const xml = await xmlResp.text();
+    const xmlBody = (await xmlResp.json()) as Record<string, unknown>;
+    const xml = xmlBody.data as string;
     expect(xml).toMatch(/<receiveTask[^>]*id=["']recv_1["']/);
     expect(xml).toMatch(/<receiveTask[^>]*name=["']Wait Message["']/);
   });
