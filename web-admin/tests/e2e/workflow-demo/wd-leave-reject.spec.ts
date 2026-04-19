@@ -9,30 +9,27 @@ import {
 } from '../../helpers/wd-fixtures';
 
 /**
- * R1 — Short leave (days=2) → Drools routes to wd_manager → Manager approves
- *      → process completed, business record status = approved.
+ * R4 — Short leave (days=2) → Drools routes to wd_manager → Manager REJECTS
+ *      → process completed (reaches end_rejected event), business record status = rejected.
  *
- * Business key investigation:
- *   commands.json wd:submit_leave_request postActions[0].businessKey = "${recordId}"
- *   → processTask(page, recordId, ...) matches task-business-key cell directly.
+ * Process investigation:
+ *   processes.json task_manager_approve.taskActions[1]:
+ *     { key: "reject", resultVariable: "taskResult", resultValue: "rejected" }
+ *   Edges from gw_result:
+ *     flow_result_rejected: ${taskResult == 'rejected'} → svc_notify_rejected → end_rejected
+ *   Terminal end event: end_rejected (type=endEvent) — BPM engine marks instance as "completed".
  *
- * Leave type "sick" label: dicts.json wd_leave_type item value="sick", label="Sick Leave",
- *   label:zh-CN="病假". submitLeaveRequest clicks getByRole('option', { name: input.type })
- *   so we pass the raw dict value "sick" and let the helper resolve the option.
+ * Post-action writes wd_req_status via the task result variable hook:
+ *   Expected terminal value: "rejected" (matches resultValue in taskActions).
  *
- * Terminal status: dicts.json wd_leave_status value="approved" (string stored in wd_req_status).
- *
- * Business record endpoint: GET /api/dynamic/wd_leave_request_detail/{pid} → data.wd_req_status
- *   (confirmed by existing test WD1-005 in same suite pattern).
- *
- * Process instance endpoint: GET /api/bpm/process-instances/{instanceId} → data.status
- *   (confirmed from bpm-assertions.ts startInstanceAndAdvance final-fetch contract).
- *
- * Process instance id stored on: wd_req_process_instance field (processes.json extension.processInstanceField).
+ * Endpoints:
+ *   Business record: GET /api/dynamic/wd_leave_request_detail/{pid} → data.wd_req_status
+ *   Process instance: GET /api/bpm/process-instances/{instanceId} → data.status
+ *   Instance id field: wd_req_process_instance (extension.processInstanceField)
  */
 
-test.describe('workflow-demo — R1 short leave manager approve', () => {
-  test('short leave (days=2) → manager approves → completed/approved', async ({
+test.describe('workflow-demo — R4 short leave manager reject', () => {
+  test('short leave (days=2) → manager rejects → completed/rejected', async ({
     browser,
     request,
   }) => {
@@ -41,7 +38,7 @@ test.describe('workflow-demo — R1 short leave manager approve', () => {
     // ------------------------------------------------------------------
     const adminToken = await loginAs(request, 'admin@example.com', 'Test2026x');
     const { managerToken: _managerToken } = await ensureRoleUsers(request);
-    const applicant = await createLeaveApplicant(request, adminToken, 'r1_short');
+    const applicant = await createLeaveApplicant(request, adminToken, 'r4_reject');
     await setLeaveBalance(request, adminToken, applicant.userId, 20);
 
     // ------------------------------------------------------------------
@@ -58,21 +55,15 @@ test.describe('workflow-demo — R1 short leave manager approve', () => {
       timeout: 10_000,
     });
 
-    // Leave type "sick" → option rendered as "Sick Leave" or "病假" (i18n-driven).
-    // submitLeaveRequest clicks getByRole('option', { name: input.type }) after
-    // clicking the type combobox; we pass the dict item value "sick" which the
-    // form option label resolves to. If i18n renders the zh-CN label, the helper
-    // will match either. We pass the value directly — the helper uses it as-is
-    // in getByRole('option', { name: input.type }).first().click().
     const { recordId } = await submitLeaveRequest(applicantPage, {
       days: 2,
-      type: 'sick',
-      reason: 'R1 short leave automated test — E2E manager approval path',
+      type: 'annual',
+      reason: 'R4 reject test — short leave automated rejection path',
     });
     expect(recordId, 'submitLeaveRequest must return a non-empty recordId').toBeTruthy();
 
     // ------------------------------------------------------------------
-    // 3. Manager context: login via UI, approve task via Task Center
+    // 3. Manager context: login via UI, reject task via Task Center
     // ------------------------------------------------------------------
     const managerCtx = await browser.newContext();
     const managerPage = await managerCtx.newPage();
@@ -86,14 +77,14 @@ test.describe('workflow-demo — R1 short leave manager approve', () => {
     });
 
     // processTask navigates via sidebar to /bpm/task-center, finds the row whose
-    // data-testid="task-business-key" contains recordId (= businessKey set to
-    // "${recordId}" in postActions), and approves it.
-    await processTask(managerPage, recordId, 'approve', 'LGTM — R1 automated approval');
+    // data-testid="task-business-key" contains recordId, and rejects it.
+    // requireComment=true is set on the reject action in processes.json.
+    await processTask(managerPage, recordId, 'reject', 'Denied — R4 automated: insufficient justification');
 
     // ------------------------------------------------------------------
-    // 4a. Assert: business record status = 'approved'
+    // 4a. Assert: business record status = 'rejected'
     //     Endpoint: GET /api/dynamic/wd_leave_request_detail/{pid}
-    //     → data.wd_req_status === 'approved'
+    //     → data.wd_req_status === 'rejected'
     // ------------------------------------------------------------------
     const recordResp = await applicantPage.request.get(
       `/api/dynamic/wd_leave_request_detail/${recordId}`,
@@ -104,19 +95,20 @@ test.describe('workflow-demo — R1 short leave manager approve', () => {
     const record = recordBody?.data as Record<string, unknown> | undefined;
     if (!record) {
       throw new Error(
-        `R1: business record detail response missing "data". Full body: ${JSON.stringify(recordBody)}`,
+        `R4: business record detail response missing "data". Full body: ${JSON.stringify(recordBody)}`,
       );
     }
 
     expect(
       record.wd_req_status,
-      `business record wd_req_status must be "approved" after manager approval`,
-    ).toBe('approved');
+      `business record wd_req_status must be "rejected" after manager rejection`,
+    ).toBe('rejected');
 
     // ------------------------------------------------------------------
     // 4b. Assert: process instance status = completed (via BPM API)
-    //     Field wd_req_process_instance holds the instance id (stored by
-    //     postActions[0].storeInstanceIdIn in submit command).
+    //     The reject path terminates at end_rejected (endEvent) which the
+    //     BPM engine records as "completed" — not "rejected" at engine level.
+    //     Field wd_req_process_instance holds the instance id.
     //     Endpoint: GET /api/bpm/process-instances/{instanceId} → data.status
     // ------------------------------------------------------------------
     const instanceId = record.wd_req_process_instance as string | undefined;
@@ -133,22 +125,21 @@ test.describe('workflow-demo — R1 short leave manager approve', () => {
       const instanceData = instanceBody?.data as Record<string, unknown> | undefined;
       if (!instanceData) {
         throw new Error(
-          `R1: process instance response missing "data". Full body: ${JSON.stringify(instanceBody)}`,
+          `R4: process instance response missing "data". Full body: ${JSON.stringify(instanceBody)}`,
         );
       }
 
-      // Status is a string from InstanceStatus enum serialised to lowercase.
-      // Expected terminal state after approval: "completed".
+      // The reject path ends at end_rejected (endEvent) — the engine marks the
+      // instance as "completed" regardless of which end event was reached.
       expect(
         (instanceData.status as string | undefined)?.toLowerCase(),
-        `process instance status must be "completed" after manager approval`,
+        `process instance status must be "completed" after manager rejection`,
       ).toBe('completed');
     }
-    // If instanceId is absent (BPM not wired in this deployment), we still
-    // verified the business record status — that is the primary assertion.
+    // If instanceId is absent (BPM not wired), wd_req_status assertion above is the primary check.
 
     // ------------------------------------------------------------------
-    // 5. Detail page visual assertion: wd_req_status shows approved label
+    // 5. Detail page visual assertion: wd_req_status shows rejected label
     // ------------------------------------------------------------------
     await applicantPage.goto(
       `/p/wd_leave_request/view/${recordId}`,
@@ -157,7 +148,7 @@ test.describe('workflow-demo — R1 short leave manager approve', () => {
     const main = applicantPage.locator('main').first();
     await expect(
       main.locator('[data-testid="form-field-wd_req_status"]').first(),
-    ).toContainText(/approved|已通过/i, { timeout: 5_000 });
+    ).toContainText(/rejected|已驳回/i, { timeout: 5_000 });
 
     // ------------------------------------------------------------------
     // Cleanup: close browser contexts
