@@ -1,0 +1,23 @@
+# E2E test override — adds plugin mount and non-conflicting host ports.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.e2e.override.yml \
+#     --profile full up -d
+#
+# This file is intentionally kept in the OSS repo root so that the compose
+# project (working_dir = /Users/.../auraboot) resolves relative paths correctly.
+
+services:
+  postgres:
+    container_name: auraboot-e2e-postgres
+    ports:
+      - "15432:5432"
+
+  backend:
+    container_name: auraboot-e2e-backend
+    ports:
+      - "16443:6443"
+    volumes:
+      # Mount host plugins dir read-only so /api/plugins/import/import-directory-sync
+      # can resolve absolute paths like /app/plugins/<name>.
+      - ./plugins:/app/plugins:ro
