@@ -334,7 +334,7 @@ test.describe('Phase 6 — showcase_all_fields runtime rendering', () => {
     const sections = page.locator('.form-section');
     await expect(sections.first()).toBeVisible({ timeout: 10_000 });
     const sectionCount = await sections.count();
-    expect(sectionCount, 'form should render 9 form-section blocks').toBeGreaterThanOrEqual(9);
+    expect(sectionCount, 'form must render exactly 9 form-section blocks').toBe(9);
 
     // Spot-check several widget categories actually mounted: text, number,
     // enum (select), boolean, date.
@@ -565,7 +565,7 @@ test.describe('Phase 6 — showcase_all_fields runtime rendering', () => {
     if (tabBarVisible) {
       // Confirm at least 2 tab items render (overview + one more).
       const tabCount = await tabItems.count();
-      expect(tabCount, 'detail page should render ≥2 tabs').toBeGreaterThanOrEqual(2);
+      expect(tabCount, 'detail page must render exactly 2 tabs (overview + selectors_people)').toBe(2);
 
       // Switch to the second tab and assert section content updates.
       const secondTab = tabItems.nth(1);
