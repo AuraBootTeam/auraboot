@@ -168,6 +168,14 @@ export interface DslFieldOverride {
   visible?: string; // SpEL expression
   disabled?: string; // SpEL expression
   required?: boolean;
+  /**
+   * Render the field as read-only inside the form. The reference DSL spells
+   * this `readonly` (camelCase shorthand). The `parseFieldShorthand` decoder
+   * already accepts it (boolFlags list includes 'readonly'), so it round-trips
+   * via `code|readonly` shorthand. Adding it to the typed override surface so
+   * the FieldsEditor checkbox + page-rebuild parity test can flip it.
+   */
+  readonly?: boolean;
   component?: string;
   /** Label override — may be string, `$i18n:key`, or LocalizedText object. */
   label?: string | { [locale: string]: string };

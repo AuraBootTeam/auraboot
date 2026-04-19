@@ -10,7 +10,6 @@ export { default as TreeSelect } from '~/ui/smart/picker/TreeSelect';
 export { default as UserSelect } from '~/ui/smart/picker/UserSelect';
 export { default as OrganizationSelect } from '~/ui/smart/picker/OrganizationSelect';
 export { default as TimeRangePicker } from '~/ui/smart/datetime/TimeRangePicker';
-export { default as CoordinatesPicker } from '~/ui/smart/picker/CoordinatesPicker';
 export { default as CascadeSelect } from '~/ui/smart/picker/CascadeSelect';
 export { FormRef, FormRefPreview } from '~/ui/smart/form/FormRef';
 
@@ -69,7 +68,6 @@ import TreeSelectComponent from '~/ui/smart/picker/TreeSelect';
 import UserSelectComponent from '~/ui/smart/picker/UserSelect';
 import OrganizationSelectComponent from '~/ui/smart/picker/OrganizationSelect';
 import TimeRangePickerComponent from '~/ui/smart/datetime/TimeRangePicker';
-import CoordinatesPickerComponent from '~/ui/smart/picker/CoordinatesPicker';
 import CascadeSelectComponent from '~/ui/smart/picker/CascadeSelect';
 import { FormRef as FormRefComponent } from '~/ui/smart/form/FormRef';
 import DisplayComponent from '~/ui/smart/display/Display';
@@ -99,7 +97,6 @@ export const SMART_COMPONENT_MAP = {
   userselect: UserSelectComponent,
   organizationselect: OrganizationSelectComponent,
   timerangepicker: TimeRangePickerComponent,
-  coordinatespicker: CoordinatesPickerComponent,
   cascadeselect: CascadeSelectComponent,
   formref: FormRefComponent,
 
