@@ -411,12 +411,14 @@ test.describe('D8 — showcase_all_fields validation runtime', () => {
   // D8.3 — dependsOn / cascade (gap)
   // -----------------------------------------------------------------------
 
-  test('D8.3: dependsOn cascade — currently no field configured, documented gap', async () => {
+  test('D8.3: dependsOn cascade — fixture gap tracked as BACKLOG-CASCADE-001', async () => {
     test.skip(
       true,
-      'showcase_all_fields_form.json defines visibleWhen on sc_advanced_settings ' +
-        'but no field-to-field dependsOn / cascade rule. Add such a configuration ' +
-        '(e.g. sc_priority dependsOn sc_category) to enable this assertion.',
+      'BACKLOG-CASCADE-001: showcase_all_fields lacks a field-to-field cascade ' +
+        'fixture (e.g. sc_subcategory.options depend on sc_category.value). ' +
+        'visibleWhen on sc_advanced_settings is already covered by D8.2. Add ' +
+        'a cascadeselect/treeselect with parent-driven options to enable this. ' +
+        'Logged in coverage report v5 §6 backlog.',
     );
   });
 });
