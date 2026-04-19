@@ -299,7 +299,7 @@ public class JsonToBpmnConverter {
         switch (nodeType) {
             case "startEvent" -> writeStartEvent(writer, nodeId, label);
             case "endEvent" -> writeEndEvent(writer, nodeId, label);
-            case "userTask" -> writeUserTask(writer, nodeId, label, config);
+            case "userTask" -> writeUserTask(writer, nodeId, label, config, data);
             case "serviceTask" -> writeServiceTask(writer, nodeId, label, config, null);
             case BpmServiceTaskConstants.NODE_TYPE_RULE_TASK ->
                     // rule-task reads smart:* attrs directly off node.data
@@ -309,6 +309,9 @@ public class JsonToBpmnConverter {
             case BpmServiceTaskConstants.NODE_TYPE_NOTIFICATION_TASK ->
                     writeServiceTask(writer, nodeId, label, data,
                             BpmServiceTaskConstants.NODE_TYPE_NOTIFICATION_TASK);
+            case BpmServiceTaskConstants.NODE_TYPE_RECORD_UPDATE_TASK ->
+                    writeServiceTask(writer, nodeId, label, data,
+                            BpmServiceTaskConstants.NODE_TYPE_RECORD_UPDATE_TASK);
             case "receiveTask" -> writeReceiveTask(writer, nodeId, label, config);
             case "exclusiveGateway" -> writeExclusiveGateway(writer, nodeId, label, gatewayDefaultFlows.get(nodeId));
             case "parallelGateway" -> writeParallelGateway(writer, nodeId, label, gatewayDefaultFlows.get(nodeId));
@@ -340,8 +343,8 @@ public class JsonToBpmnConverter {
         writer.writeCharacters("\n");
     }
 
-    private void writeUserTask(XMLStreamWriter writer, String id, String name, JsonNode config)
-            throws XMLStreamException {
+    private void writeUserTask(XMLStreamWriter writer, String id, String name, JsonNode config,
+                                JsonNode data) throws XMLStreamException {
         JsonNode multiInstance = config != null ? config.path("multiInstance") : null;
         boolean hasMultiInstance = multiInstance != null && !multiInstance.isMissingNode()
                 && multiInstance.path("enabled").asBoolean(false);
@@ -368,8 +371,13 @@ public class JsonToBpmnConverter {
             writer.writeAttribute("name", name);
         }
 
-        // Handle assignee configuration
-        writeUserTaskAssigneeAttributes(writer, config);
+        // Handle assignee configuration.
+        // Two supported formats:
+        // 1. Nested: data.config.assignee.{type,roleIds,userIds,...} — used by Page Designer
+        // 2. Flat:   data.{assigneeType,assigneeValue} — used by plugin processes.json
+        //    In flat format, assigneeValue is a role/user code (resolved at runtime by
+        //    AssigneeResolverService which supports both numeric IDs and string codes).
+        writeUserTaskAssigneeAttributes(writer, config, data);
 
         // GAP-249: propagate multi-instance config as userTask-level attributes so
         // they become part of AbstractActivity.properties after parsing. SmartEngine's
@@ -693,58 +701,85 @@ public class JsonToBpmnConverter {
      *   <li>candidateGroups -> smart:candidateGroups (comma-separated)</li>
      *   <li>assignee expression -> smart:assignee</li>
      * </ul>
+     *
+     * <p>Also supports the flat format used by plugin {@code processes.json}:
+     * <ul>
+     *   <li>data.assigneeType + data.assigneeValue — e.g. assigneeType="role", assigneeValue="wd_manager"</li>
+     * </ul>
+     * In the flat format, {@code assigneeValue} is a role/user code (string).
+     * {@link com.auraboot.framework.bpm.service.AssigneeResolverService} resolves both
+     * numeric IDs and string codes at runtime.
+     *
+     * @param config  the {@code data.config} node (may be missing/null for plugin processes.json)
+     * @param data    the {@code data} node (contains flat assigneeType/assigneeValue if present)
      */
-    private void writeUserTaskAssigneeAttributes(XMLStreamWriter writer, JsonNode config) throws XMLStreamException {
-        if (config == null || config.isMissingNode()) {
-            return;
-        }
+    private void writeUserTaskAssigneeAttributes(XMLStreamWriter writer, JsonNode config,
+                                                  JsonNode data) throws XMLStreamException {
+        // Format 1: nested assignee object inside data.config (Page Designer format)
+        if (config != null && !config.isMissingNode()) {
+            JsonNode assignee = config.path("assignee");
+            if (!assignee.isMissingNode() && !assignee.isNull()) {
+                String assigneeType = getTextOrNull(assignee, "type");
 
-        JsonNode assignee = config.path("assignee");
-        if (!assignee.isMissingNode() && !assignee.isNull()) {
-            String assigneeType = getTextOrNull(assignee, "type");
+                if ("expression".equals(assigneeType)) {
+                    // Expression-based assignee: use smart:assignee
+                    String expression = getTextOrNull(assignee, "expression");
+                    if (expression != null) {
+                        writer.writeAttribute(SMART_NAMESPACE, "assignee", expression);
+                    }
+                } else if (assigneeType != null) {
+                    // Type-based assignee (user, role, dept, starter)
+                    writer.writeAttribute(SMART_NAMESPACE, "assigneeType", assigneeType);
 
-            if ("expression".equals(assigneeType)) {
-                // Expression-based assignee: use smart:assignee
-                String expression = getTextOrNull(assignee, "expression");
-                if (expression != null) {
-                    writer.writeAttribute(SMART_NAMESPACE, "assignee", expression);
+                    // For user type, use the first userId as assigneeId
+                    if ("user".equals(assigneeType)) {
+                        JsonNode userIds = assignee.path("userIds");
+                        if (userIds.isArray() && !userIds.isEmpty()) {
+                            writer.writeAttribute(SMART_NAMESPACE, "assigneeId", userIds.get(0).asText());
+                        }
+                    } else if ("role".equals(assigneeType)) {
+                        JsonNode roleIds = assignee.path("roleIds");
+                        if (roleIds.isArray() && !roleIds.isEmpty()) {
+                            writer.writeAttribute(SMART_NAMESPACE, "assigneeId", roleIds.get(0).asText());
+                        }
+                    } else if ("dept".equals(assigneeType)) {
+                        JsonNode deptIds = assignee.path("deptIds");
+                        if (deptIds.isArray() && !deptIds.isEmpty()) {
+                            writer.writeAttribute(SMART_NAMESPACE, "assigneeId", deptIds.get(0).asText());
+                        }
+                    }
                 }
-            } else if (assigneeType != null) {
-                // Type-based assignee (user, role, dept, starter)
-                writer.writeAttribute(SMART_NAMESPACE, "assigneeType", assigneeType);
 
-                // For user type, use the first userId as assigneeId
-                if ("user".equals(assigneeType)) {
-                    JsonNode userIds = assignee.path("userIds");
-                    if (userIds.isArray() && !userIds.isEmpty()) {
-                        writer.writeAttribute(SMART_NAMESPACE, "assigneeId", userIds.get(0).asText());
-                    }
-                } else if ("role".equals(assigneeType)) {
-                    JsonNode roleIds = assignee.path("roleIds");
-                    if (roleIds.isArray() && !roleIds.isEmpty()) {
-                        writer.writeAttribute(SMART_NAMESPACE, "assigneeId", roleIds.get(0).asText());
-                    }
-                } else if ("dept".equals(assigneeType)) {
-                    JsonNode deptIds = assignee.path("deptIds");
-                    if (deptIds.isArray() && !deptIds.isEmpty()) {
-                        writer.writeAttribute(SMART_NAMESPACE, "assigneeId", deptIds.get(0).asText());
-                    }
+                // Candidate users
+                JsonNode candidateUsers = config.path("candidateUsers");
+                if (candidateUsers.isArray() && !candidateUsers.isEmpty()) {
+                    String candidateUsersStr = joinArrayNode(candidateUsers);
+                    writer.writeAttribute(SMART_NAMESPACE, "candidateUsers", candidateUsersStr);
                 }
+
+                // Candidate groups
+                JsonNode candidateGroups = config.path("candidateGroups");
+                if (candidateGroups.isArray() && !candidateGroups.isEmpty()) {
+                    String candidateGroupsStr = joinArrayNode(candidateGroups);
+                    writer.writeAttribute(SMART_NAMESPACE, "candidateGroups", candidateGroupsStr);
+                }
+                return; // nested format handled, done
             }
         }
 
-        // Candidate users
-        JsonNode candidateUsers = config.path("candidateUsers");
-        if (candidateUsers.isArray() && !candidateUsers.isEmpty()) {
-            String candidateUsersStr = joinArrayNode(candidateUsers);
-            writer.writeAttribute(SMART_NAMESPACE, "candidateUsers", candidateUsersStr);
-        }
-
-        // Candidate groups
-        JsonNode candidateGroups = config.path("candidateGroups");
-        if (candidateGroups.isArray() && !candidateGroups.isEmpty()) {
-            String candidateGroupsStr = joinArrayNode(candidateGroups);
-            writer.writeAttribute(SMART_NAMESPACE, "candidateGroups", candidateGroupsStr);
+        // Format 2: flat assigneeType + assigneeValue in data node (plugin processes.json format)
+        // assigneeValue is a role/user code — AssigneeResolverService handles code→ID lookup at runtime.
+        if (data != null && !data.isMissingNode()) {
+            String flatType = getTextOrNull(data, "assigneeType");
+            String flatValue = getTextOrNull(data, "assigneeValue");
+            if (flatType != null && !flatType.isBlank()) {
+                writer.writeAttribute(SMART_NAMESPACE, "assigneeType", flatType);
+                if (flatValue != null && !flatValue.isBlank()) {
+                    // Write assigneeValue under a dedicated attribute so AssigneeResolverService
+                    // can distinguish "code" (string) from "id" (numeric) at runtime.
+                    writer.writeAttribute(SMART_NAMESPACE, "assigneeId", flatValue);
+                }
+            }
         }
     }
 
@@ -809,6 +844,40 @@ public class JsonToBpmnConverter {
                 }
             } else {
                 throw new BpmnConversionException("notification-task '" + id + "' missing config");
+            }
+        } else if (BpmServiceTaskConstants.NODE_TYPE_RECORD_UPDATE_TASK.equals(subType)) {
+            // Dedicated SmartEngine delegate for updating a single field on a dynamic model record.
+            writer.writeAttribute(SMART_NAMESPACE, "class",
+                    BpmServiceTaskConstants.BEAN_RECORD_UPDATE_DELEGATE);
+            if (config != null && !config.isMissingNode()) {
+                String modelCode = getTextOrNull(config, BpmServiceTaskConstants.ATTR_MODEL_CODE);
+                if (modelCode == null) {
+                    throw new BpmnConversionException("record-update-task '" + id + "' missing '"
+                            + BpmServiceTaskConstants.ATTR_MODEL_CODE + "' in config");
+                }
+                writer.writeAttribute(SMART_NAMESPACE,
+                        BpmServiceTaskConstants.ATTR_MODEL_CODE, modelCode);
+                String recordIdVar = getTextOrNull(config, BpmServiceTaskConstants.ATTR_RECORD_ID_VAR);
+                if (recordIdVar != null) {
+                    writer.writeAttribute(SMART_NAMESPACE,
+                            BpmServiceTaskConstants.ATTR_RECORD_ID_VAR, recordIdVar);
+                }
+                String fieldName = getTextOrNull(config, BpmServiceTaskConstants.ATTR_FIELD_NAME);
+                if (fieldName == null) {
+                    throw new BpmnConversionException("record-update-task '" + id + "' missing '"
+                            + BpmServiceTaskConstants.ATTR_FIELD_NAME + "' in config");
+                }
+                writer.writeAttribute(SMART_NAMESPACE,
+                        BpmServiceTaskConstants.ATTR_FIELD_NAME, fieldName);
+                String fieldValue = getTextOrNull(config, BpmServiceTaskConstants.ATTR_FIELD_VALUE);
+                if (fieldValue == null) {
+                    throw new BpmnConversionException("record-update-task '" + id + "' missing '"
+                            + BpmServiceTaskConstants.ATTR_FIELD_VALUE + "' in config");
+                }
+                writer.writeAttribute(SMART_NAMESPACE,
+                        BpmServiceTaskConstants.ATTR_FIELD_VALUE, fieldValue);
+            } else {
+                throw new BpmnConversionException("record-update-task '" + id + "' missing config");
             }
         } else if (config != null && !config.isMissingNode()) {
             String serviceType = getTextOrNull(config, "serviceType");

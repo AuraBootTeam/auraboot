@@ -7,6 +7,7 @@ import com.auraboot.smart.framework.engine.model.instance.VariableInstance;
 import com.auraboot.smart.framework.engine.service.param.query.TaskInstanceQueryByAssigneeParam;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.bpm.audit.BpmAuditService;
+import com.auraboot.framework.bpm.dto.TaskSummaryDto;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -96,21 +97,40 @@ public class BpmIntegrationService {
 
         // 获取待办任务
         List<TaskInstance> todoTasks = taskService.getTodoTasks(userId);
-        
+
+        // Enrich todo tasks with business key from parent process instance.
+        // SmartEngine TaskInstance does not carry bizUniqueId (businessKey); we look it
+        // up from the ProcessInstance so the frontend task-center table can show it.
+        List<TaskSummaryDto> todoTaskDtos = todoTasks.stream().map(t -> {
+            TaskSummaryDto dto = TaskSummaryDto.from(t);
+            if (t.getProcessInstanceId() != null) {
+                try {
+                    ProcessInstance pi = processEngineService.getProcessInstance(t.getProcessInstanceId());
+                    if (pi != null && pi.getBizUniqueId() != null) {
+                        dto.setBusinessKey(pi.getBizUniqueId());
+                    }
+                } catch (Exception e) {
+                    log.debug("Could not fetch process instance {} for task {}: {}",
+                            t.getProcessInstanceId(), t.getInstanceId(), e.getMessage());
+                }
+            }
+            return dto;
+        }).toList();
+
         // 获取已办任务（最近10个）
         TaskInstanceQueryByAssigneeParam param = new TaskInstanceQueryByAssigneeParam();
         param.setAssigneeUserId(userId); //todo add group
         List<TaskInstance> completedTasks = taskService.getCompletedTasks(param);
-        
+
         // 获取发起的流程实例
         List<ProcessInstance> startedProcesses = processEngineService.getProcessInstancesByUser(userId);
 
         // 构建工作台数据
         WorkbenchData workbench = new WorkbenchData();
-        workbench.setTodoTasks(todoTasks);
+        workbench.setTodoTasks(todoTaskDtos);
         workbench.setCompletedTasks(completedTasks.stream().limit(10).toList());
         workbench.setStartedProcesses(startedProcesses.stream().limit(10).toList());
-        workbench.setTodoCount(todoTasks.size());
+        workbench.setTodoCount(todoTaskDtos.size());
         workbench.setCompletedCount(completedTasks.size());
         workbench.setStartedCount(startedProcesses.size());
 
@@ -229,7 +249,8 @@ public class BpmIntegrationService {
      */
     @Data
     public static class WorkbenchData {
-        private List<TaskInstance> todoTasks;
+        /** Todo tasks enriched with businessKey from the parent ProcessInstance. */
+        private List<TaskSummaryDto> todoTasks;
         private List<TaskInstance> completedTasks;
         private List<ProcessInstance> startedProcesses;
         private int todoCount;

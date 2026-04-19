@@ -121,7 +121,7 @@ export function TaskDetailDrawer({ task, onClose, onOpenDialog, onClaim }: TaskD
       <div className="fixed inset-0 z-40 bg-black/20" onClick={onClose} />
 
       {/* Drawer */}
-      <div className="animate-in slide-in-from-right fixed top-0 right-0 bottom-0 z-50 flex w-[520px] flex-col bg-white shadow-xl duration-200">
+      <div data-testid="task-detail-drawer" className="animate-in slide-in-from-right fixed top-0 right-0 bottom-0 z-50 flex w-[520px] flex-col bg-white shadow-xl duration-200">
         {/* Header */}
         <div className="flex items-center justify-between border-b px-6 py-4">
           <div className="min-w-0 flex-1">

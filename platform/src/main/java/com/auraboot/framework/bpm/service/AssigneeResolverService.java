@@ -1,9 +1,12 @@
 package com.auraboot.framework.bpm.service;
 
 import com.auraboot.framework.bpm.rule.DroolsEngineService;
+import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.rbac.mapper.RoleMapper;
 import com.auraboot.framework.rbac.mapper.UserRoleMapper;
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
 import com.auraboot.framework.tenant.service.TenantMemberService;
+import com.auraboot.framework.user.mapper.UserMapper;
 import com.auraboot.smart.framework.engine.constant.RequestMapSpecialKeyConstant;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,8 +30,10 @@ import java.util.Objects;
 public class AssigneeResolverService {
 
     private final UserRoleMapper userRoleMapper;
+    private final RoleMapper roleMapper;
     private final TenantMemberService tenantMemberService;
     private final DroolsEngineService droolsEngineService;
+    private final UserMapper userMapper;
     private final ExpressionParser spelParser = new SpelExpressionParser();
 
     /**
@@ -73,20 +78,23 @@ public class AssigneeResolverService {
     }
 
     private List<String> resolveByRole(Map<String, Object> config) {
+        // Support both roleIds (numeric Long IDs) and roleCodes (string codes from plugin processes.json).
+        // For plugin processes.json the assigneeId is a role code like "wd_manager"; we resolve it
+        // to a numeric role ID via RoleMapper.findIdByCode before looking up members.
         Object roleIds = config.get("roleIds");
-        List<Long> memberIds;
+        List<Long> numericRoleIds;
         if (roleIds instanceof List<?> list) {
-            memberIds = list.stream()
-                    .map(id -> Long.parseLong(id.toString()))
-                    .flatMap(roleId -> userRoleMapper.findMemberIdsByRoleId(roleId).stream())
+            numericRoleIds = list.stream()
+                    .map(id -> resolveRoleIdOrCode(id.toString()))
+                    .filter(Objects::nonNull)
                     .distinct()
                     .toList();
         } else if (roleIds instanceof String str) {
-            memberIds = Arrays.stream(str.split(","))
+            numericRoleIds = Arrays.stream(str.split(","))
                     .map(String::trim)
                     .filter(s -> !s.isEmpty())
-                    .map(Long::parseLong)
-                    .flatMap(roleId -> userRoleMapper.findMemberIdsByRoleId(roleId).stream())
+                    .map(this::resolveRoleIdOrCode)
+                    .filter(Objects::nonNull)
                     .distinct()
                     .toList();
         } else {
@@ -94,15 +102,55 @@ public class AssigneeResolverService {
             return List.of();
         }
 
-        // Convert memberIds to userIds for BPM assignee resolution
+        if (numericRoleIds.isEmpty()) {
+            log.warn("ROLE assignee rule: all role references resolved to null: {}", config);
+            return List.of();
+        }
+
+        List<Long> memberIds = numericRoleIds.stream()
+                .flatMap(roleId -> userRoleMapper.findMemberIdsByRoleId(roleId).stream())
+                .distinct()
+                .toList();
+
+        // Convert memberIds → TenantMember.userId (numeric) → ab_user.pid (ULID).
+        // BPM canonical user identity is the user PID (ULID), which is what
+        // BpmSecurityUtil.getCurrentUserId() / MetaContext.getCurrentUsername() returns.
         return memberIds.stream()
                 .map(tenantMemberService::getById)
                 .filter(Objects::nonNull)
                 .map(TenantMember::getUserId)
                 .filter(Objects::nonNull)
                 .distinct()
-                .map(Object::toString)
+                .map(userMapper::findPidByUserId)
+                .filter(Objects::nonNull)
                 .toList();
+    }
+
+    /**
+     * Resolve a role reference that may be either a numeric ID (Long) or a string role code.
+     * Plugin processes.json uses string codes (e.g. "wd_manager"); Page Designer uses numeric PIDs.
+     *
+     * @param idOrCode  numeric string or role code
+     * @return numeric role ID, or null if not found
+     */
+    private Long resolveRoleIdOrCode(String idOrCode) {
+        if (idOrCode == null || idOrCode.isBlank()) return null;
+        try {
+            // If it parses as a long, treat it as a direct numeric role ID.
+            return Long.parseLong(idOrCode.trim());
+        } catch (NumberFormatException e) {
+            // Non-numeric: treat as role code — look up by code in current tenant.
+            Long tenantId = MetaContext.getCurrentTenantId();
+            if (tenantId == null) {
+                log.warn("ROLE assignee: cannot resolve role code '{}' — no tenant in context", idOrCode);
+                return null;
+            }
+            Long roleId = roleMapper.findIdByCode(tenantId, idOrCode.trim());
+            if (roleId == null) {
+                log.warn("ROLE assignee: role code '{}' not found in tenant {}", idOrCode, tenantId);
+            }
+            return roleId;
+        }
     }
 
     private List<String> resolveByDepartment(Map<String, Object> config) {
