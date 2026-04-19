@@ -11,6 +11,23 @@
 
 import { test, expect } from '../../fixtures';
 import type { Page, Route } from '@playwright/test';
+import {
+  seedSoulProfileMenus,
+  cleanupSoulProfileMenus,
+  type SeededSoulProfileMenus,
+} from './_real-backend-helpers';
+
+// Phase 10 — menu rows are required so we can navigate via sidebar
+// (red-line: no direct page.goto). Seed once per worker.
+let seededMenus: SeededSoulProfileMenus;
+
+test.beforeAll(async () => {
+  seededMenus = seedSoulProfileMenus();
+});
+
+test.afterAll(async () => {
+  if (seededMenus) cleanupSoulProfileMenus(seededMenus);
+});
 
 // ---------------------------------------------------------------------------
 // Canned responses
@@ -236,20 +253,39 @@ function makeState(overrides: Partial<MockState> = {}): MockState {
   };
 }
 
-async function openMyProfile(page: Page) {
-  await page.goto('/aurabot/my-profile');
+// Phase 10 — navigate via sidebar click (red-line: no direct page.goto).
+async function clickSidebarLeaf(
+  page: Page,
+  leafPattern: RegExp,
+  pageTestId: string,
+): Promise<void> {
+  await page.goto('/');
   await page.waitForLoadState('domcontentloaded');
-  await expect(page.locator('[data-testid="my-profile-page"]')).toBeVisible({
+
+  const nav = page.locator('nav').first();
+  const aiCenter = nav.getByRole('button', { name: /AI 中心|AI Center/ });
+  await aiCenter.waitFor({ state: 'visible', timeout: 10_000 });
+  await aiCenter.evaluate((el: HTMLElement) => el.click());
+
+  const leaf = nav.getByRole('link', { name: leafPattern });
+  await leaf.waitFor({ state: 'visible', timeout: 5_000 });
+  await leaf.evaluate((el: HTMLElement) => el.click());
+
+  await expect(page.locator(`[data-testid="${pageTestId}"]`)).toBeVisible({
     timeout: 10_000,
   });
 }
 
+async function openMyProfile(page: Page) {
+  await clickSidebarLeaf(page, /我的画像|My Profile/, 'my-profile-page');
+}
+
 async function openAdmin(page: Page) {
-  await page.goto('/aurabot/soul-profiles');
-  await page.waitForLoadState('domcontentloaded');
-  await expect(page.locator('[data-testid="soul-profiles-admin-page"]')).toBeVisible({
-    timeout: 10_000,
-  });
+  await clickSidebarLeaf(
+    page,
+    /Soul Profiles \(管理\)|Soul Profiles \(Admin\)|Soul Profiles/,
+    'soul-profiles-admin-page',
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -494,11 +530,7 @@ test.describe('Mission Control — User Soul Profile (PR-79)', () => {
     const state2 = makeState({ derive429: true });
     const page2 = await page.context().newPage();
     await interceptApi(page2, state2);
-    await page2.goto('/aurabot/my-profile');
-    await page2.waitForLoadState('domcontentloaded');
-    await expect(
-      page2.locator('[data-testid="my-profile-page"]'),
-    ).toBeVisible();
+    await openMyProfile(page2);
     await page2.locator('[data-testid="derive-now-btn"]').click();
     await expect(page2.locator('[data-testid="toast"]')).toContainText(
       /频繁|Too many|rate/i,
