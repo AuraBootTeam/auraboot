@@ -197,7 +197,7 @@ class UserSoulProfileEditorIntegrationTest extends BaseIntegrationTest {
         jdbc.update("INSERT INTO ab_agent_user_soul_profile "
                         + "(pid, tenant_id, user_id, version, status, profile, profile_hash, "
                         + " activated_at, superseded_at, created_at) "
-                        + "VALUES (?, ?, ?, 1, 'SUPERSEDED', ?::jsonb, ?, NOW(), NOW(), NOW())",
+                        + "VALUES (?, ?, ?, 1, 'superseded', ?::jsonb, ?, NOW(), NOW(), NOW())",
                 pid, tenantId, userId, "{\"persona\":{\"text\":\"old\"}}", "h:" + pid);
 
         assertThatThrownBy(() -> editor.pin(tenantId, userId, "persona"))
@@ -223,13 +223,13 @@ class UserSoulProfileEditorIntegrationTest extends BaseIntegrationTest {
         jdbc.update("INSERT INTO ab_agent_user_soul_profile "
                         + "(pid, tenant_id, user_id, version, status, profile, profile_hash, "
                         + " activated_at, superseded_at, created_at) "
-                        + "VALUES (?, ?, ?, 1, 'SUPERSEDED', ?::jsonb, ?, NOW(), NOW(), NOW())",
+                        + "VALUES (?, ?, ?, 1, 'superseded', ?::jsonb, ?, NOW(), NOW(), NOW())",
                 superseded, tenantId, userId, "{\"persona\":{\"text\":\"old\"}}", "h:" + superseded);
         String active = seedActive();
 
         EditResult r = editor.pin(tenantId, userId, "persona");
         assertThat(r.pid()).isEqualTo(active);
-        assertThat(r.status()).isEqualTo("ACTIVE");
+        assertThat(r.status()).isEqualTo("active");
         // SUPERSEDED row is untouched.
         String supersededEdits = readEditedFields(superseded);
         assertThat(supersededEdits.replaceAll("\\s+", "")).isEqualTo("{}");

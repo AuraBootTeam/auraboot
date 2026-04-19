@@ -140,7 +140,7 @@ class UserSoulProfileDeriverIntegrationTest extends BaseIntegrationTest {
                 String.class, first.profilePid());
 
         // Promote DRAFT → ACTIVE so run 2 compares against a prior ACTIVE row.
-        jdbc.update("UPDATE ab_agent_user_soul_profile SET status = 'ACTIVE', activated_at = NOW() "
+        jdbc.update("UPDATE ab_agent_user_soul_profile SET status = 'active', activated_at = NOW() "
                 + "WHERE pid = ?", first.profilePid());
 
         // Run 2 — same seeded memories, no changes → must skip, hash must match.
