@@ -186,6 +186,52 @@ class MemoryL1L2DemoterIntegrationTest extends BaseIntegrationTest {
     }
 
     // ------------------------------------------------------------------
+    // 4) Round-2 review #7 — grace period for recently-promoted rows.
+    //    A row with last_accessed=NULL but promoted_at=NOW() must NOT be
+    //    demoted: COALESCE(last_accessed, promoted_at, created_at) falls
+    //    through to promoted_at which is fresh, so the staleness predicate
+    //    is not satisfied.
+    // ------------------------------------------------------------------
+    @Test
+    @DisplayName("does NOT demote recently-promoted row with last_accessed=NULL")
+    void runOnce_recentlyPromotedRowIsNotDemoted() {
+        String pid = UniqueIdGenerator.generate();
+        // low importance, not pinned, last_accessed=NULL, promoted_at=NOW(),
+        // created_at old (365d ago). Without the grace period fix, this row
+        // would demote because last_accessed IS NULL bypassed the cutoff.
+        jdbc.update(
+                "INSERT INTO ab_agent_memory "
+                        + "(pid, tenant_id, memory_agent_id, memory_type, category, "
+                        + " memory_title, memory_content, importance, access_count, "
+                        + " shareable, scope, scope_key, demotion_count, "
+                        + " last_accessed, promoted_at, created_at, updated_at, deleted_flag) "
+                        + "VALUES (?, ?, ?, 'fact', 'user', ?, ?, ?, 0, FALSE, "
+                        + " 'user', ?, 0, "
+                        + " NULL, NOW(), NOW() - INTERVAL '365 days', NOW(), FALSE)",
+                pid, tenantId, agentCode, TEST_PREFIX + "title",
+                TEST_PREFIX + "freshly-promoted-" + UniqueIdGenerator.generate()
+                        + " user prefers markdown",
+                /*importance*/ 2, userId);
+
+        demoter.runOnce();
+
+        Map<String, Object> row = jdbc.queryForMap(
+                "SELECT category, demoted_at, demotion_count FROM ab_agent_memory WHERE pid = ?",
+                pid);
+        assertThat(row.get("category"))
+                .as("recently-promoted row must stay L2 until grace expires")
+                .isEqualTo("user");
+        assertThat(row.get("demoted_at")).isNull();
+        assertThat(((Number) row.get("demotion_count")).intValue()).isZero();
+
+        Integer auditCount = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM ab_agent_memory_tier_event "
+                        + " WHERE memory_pid = ? AND event_type = 'L2_DEMOTED'",
+                Integer.class, pid);
+        assertThat(auditCount).isZero();
+    }
+
+    // ------------------------------------------------------------------
     // helpers
     // ------------------------------------------------------------------
 
