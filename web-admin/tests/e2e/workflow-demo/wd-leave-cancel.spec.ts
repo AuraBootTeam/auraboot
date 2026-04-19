@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import {
   loginAs,
+  loginViaUI,
   ensureRoleUsers,
   createLeaveApplicant,
   setLeaveBalance,
@@ -85,16 +86,10 @@ test.describe('workflow-demo — R5 applicant cancel', () => {
       // ------------------------------------------------------------------
       // 2. Applicant UI: login → navigate to leave list → submit leave
       // ------------------------------------------------------------------
-      const applicantCtx = await browser.newContext();
+      const applicantCtx = await browser.newContext({ storageState: { cookies: [], origins: [] } });
       const applicantPage = await applicantCtx.newPage();
 
-      await applicantPage.goto('/login');
-      await applicantPage.getByLabel(/email/i).fill(applicant.email);
-      await applicantPage.getByLabel(/password|密码/i).fill('Test2026x');
-      await applicantPage.getByRole('button', { name: /login|登录/i }).click();
-      await applicantPage.waitForURL((u) => !u.pathname.endsWith('/login'), {
-        timeout: 10_000,
-      });
+      await loginViaUI(applicantPage, applicant.email, 'Test2026x');
 
       const { recordId } = await submitLeaveRequest(applicantPage, {
         days: 2,
@@ -219,16 +214,10 @@ test.describe('workflow-demo — R5 applicant cancel', () => {
       // ------------------------------------------------------------------
       // 4d. Assert: manager Task Center no longer shows this task
       // ------------------------------------------------------------------
-      const managerCtx = await browser.newContext();
+      const managerCtx = await browser.newContext({ storageState: { cookies: [], origins: [] } });
       const managerPage = await managerCtx.newPage();
 
-      await managerPage.goto('/login');
-      await managerPage.getByLabel(/email/i).fill('wd_manager@example.com');
-      await managerPage.getByLabel(/password|密码/i).fill('Test2026x');
-      await managerPage.getByRole('button', { name: /login|登录/i }).click();
-      await managerPage.waitForURL((u) => !u.pathname.endsWith('/login'), {
-        timeout: 10_000,
-      });
+      await loginViaUI(managerPage, 'wd_manager@example.com', 'Test2026x');
 
       // Navigate via sidebar to Task Center
       await managerPage
