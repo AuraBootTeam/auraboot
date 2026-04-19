@@ -39,7 +39,11 @@ export const FormSectionPreview: React.FC<FormSectionPreviewProps> = ({
   });
 
   return (
-    <div className="bg-white" onClick={(e) => e.stopPropagation()}>
+    /* NOTE: outer wrapper must NOT stopPropagation — SortableBlock relies on
+       bubbling clicks to fire its onSelect handler. Field-level chip clicks
+       call e.stopPropagation themselves in SortableFieldItem to avoid double
+       firing. */
+    <div className="bg-white">
       {/* Section header */}
       {title && (
         <div className="flex items-center justify-between border-b border-gray-100 px-4 py-2.5">
