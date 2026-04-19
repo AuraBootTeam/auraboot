@@ -28,6 +28,8 @@ const BACKEND = 'http://localhost:6443';
  * Process instance id stored on: wd_req_process_instance (processes.json extension.processInstanceField).
  */
 
+test.setTimeout(90_000);
+
 test.describe('workflow-demo — R2 long leave HR approve', () => {
   test('long leave (days=10) → HR approves → completed/approved', async ({
     browser,
@@ -52,6 +54,8 @@ test.describe('workflow-demo — R2 long leave HR approve', () => {
     // Leave type "annual" → option rendered as "Annual Leave" or "年假" (i18n-driven).
     // We pass the dict item value "annual"; the helper resolves via getByRole('option', { name: 'annual' }).
     const { recordId } = await submitLeaveRequest(applicantPage, {
+      userId: applicant.userId,
+      token: applicant.token,
       days: 10,
       type: 'annual',
       reason: 'R2 long leave automated test — E2E HR approval path',

@@ -150,10 +150,42 @@
           }
         },
         {
+          "id": "svc_set_approved",
+          "type": "record-update-task",
+          "position": {
+            "x": 1120,
+            "y": 140
+          },
+          "data": {
+            "label:zh-CN": "更新状态（通过）",
+            "label:en": "Set Status Approved",
+            "modelCode": "wd_leave_request",
+            "recordIdVar": "recordId",
+            "fieldName": "wd_req_status",
+            "fieldValue": "approved"
+          }
+        },
+        {
+          "id": "svc_set_rejected",
+          "type": "record-update-task",
+          "position": {
+            "x": 1120,
+            "y": 340
+          },
+          "data": {
+            "label:zh-CN": "更新状态（驳回）",
+            "label:en": "Set Status Rejected",
+            "modelCode": "wd_leave_request",
+            "recordIdVar": "recordId",
+            "fieldName": "wd_req_status",
+            "fieldValue": "rejected"
+          }
+        },
+        {
           "id": "svc_notify_approved",
           "type": "notification-task",
           "position": {
-            "x": 1120,
+            "x": 1300,
             "y": 140
           },
           "data": {
@@ -168,7 +200,7 @@
           "id": "svc_notify_rejected",
           "type": "notification-task",
           "position": {
-            "x": 1120,
+            "x": 1300,
             "y": 340
           },
           "data": {
@@ -183,7 +215,7 @@
           "id": "end_approved",
           "type": "endEvent",
           "position": {
-            "x": 1300,
+            "x": 1480,
             "y": 140
           },
           "data": {
@@ -195,7 +227,7 @@
           "id": "end_rejected",
           "type": "endEvent",
           "position": {
-            "x": 1300,
+            "x": 1480,
             "y": 340
           },
           "data": {
@@ -278,7 +310,7 @@
         {
           "id": "flow_result_approved",
           "source": "gw_result",
-          "target": "svc_notify_approved",
+          "target": "svc_set_approved",
           "data": {
             "label:zh-CN": "通过",
             "label:en": "Approved",
@@ -291,12 +323,34 @@
         {
           "id": "flow_result_rejected",
           "source": "gw_result",
-          "target": "svc_notify_rejected",
+          "target": "svc_set_rejected",
           "data": {
             "label:zh-CN": "驳回",
             "label:en": "Rejected",
             "condition": {
               "content": "${taskResult == 'rejected'}",
+              "type": "expression"
+            }
+          }
+        },
+        {
+          "id": "flow_approved_notify",
+          "source": "svc_set_approved",
+          "target": "svc_notify_approved",
+          "data": {
+            "condition": {
+              "content": "${true}",
+              "type": "expression"
+            }
+          }
+        },
+        {
+          "id": "flow_rejected_notify",
+          "source": "svc_set_rejected",
+          "target": "svc_notify_rejected",
+          "data": {
+            "condition": {
+              "content": "${true}",
               "type": "expression"
             }
           }
