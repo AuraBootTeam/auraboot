@@ -347,7 +347,17 @@ async function addBlockViaPalette(page: Page, blockType: string): Promise<string
 async function selectBlockById(page: Page, blockId: string): Promise<void> {
   const block = page.locator(`[data-block-id="${blockId}"]`);
   await expect(block).toBeVisible({ timeout: 5_000 });
-  await block.click();
+  // Use a JS-dispatched click to bypass any inner stopPropagation handlers
+  // (FormSectionPreview's outer wrapper used to swallow clicks; even after the
+  // fix this is more deterministic than aiming at the element center which can
+  // land on a non-bubbling child).
+  await block.evaluate((el: HTMLElement) => el.click());
+  // Wait for the right-panel header to reflect the selected block id so we
+  // know subsequent panel reads target the correct block, not a stale
+  // selection. The header renders `<p>{block.id}</p>` next to the icon.
+  await expect(
+    page.getByTestId('designer-properties-panel').locator(`text="${blockId}"`).first(),
+  ).toBeVisible({ timeout: 5_000 });
 }
 
 /**
@@ -366,36 +376,36 @@ async function setSectionTitle(page: Page, title: any): Promise<void> {
 
   const zhValue =
     typeof title === 'string' ? title : title?.['zh-CN'] ?? title?.['en-US'] ?? '';
-  const enValue = typeof title === 'object' && title !== null ? title['en-US'] ?? title['en'] ?? '' : '';
+  const enValue =
+    typeof title === 'object' && title !== null ? title['en-US'] ?? title['en'] ?? '' : '';
 
   const zhInput = panel.getByTestId('block-title-input-zh').first();
   await expect(zhInput).toBeVisible({ timeout: 5_000 });
-  await zhInput.click();
-  await zhInput.fill(zhValue);
 
+  // Expand multi-locale FIRST when reference has en-US content. LocalizedTextInput
+  // emits a plain string in collapsed mode regardless of contents — only after
+  // expand does it emit `{ "zh-CN": "...", "en-US": "..." }` shape that matches
+  // the hand-authored reference. Toggle text reads "+ 多语言" when collapsed.
   if (enValue) {
-    // Expand to expose the en-US locale input. The toggle is only rendered when
-    // LocalizedTextInput receives a `label` prop; BlockSettingsEditor currently
-    // does NOT pass one (PropertyField wraps the label externally), so the toggle
-    // is absent for section titles. Field labels (FieldPropertyEditor) DO receive
-    // the prop, so the same helper pattern works there.
     const toggle = panel.getByTestId('block-title-input-toggle').first();
-    const toggleVisible = await toggle.isVisible({ timeout: 1_000 }).catch(() => false);
-    if (toggleVisible) {
+    if (await toggle.isVisible({ timeout: 2_000 }).catch(() => false)) {
       const text = (await toggle.textContent().catch(() => '')) ?? '';
       if (text.includes('多语言')) {
         await toggle.click();
       }
-      const enInput = panel.getByTestId('block-title-input-en').first();
-      if (await enInput.isVisible({ timeout: 2_000 }).catch(() => false)) {
-        await enInput.click();
-        await enInput.fill(enValue);
-      }
     }
-    // If toggle is unavailable, the saved title will be the zh-CN string form
-    // and the diff oracle will surface a string-vs-object mismatch — that is
-    // the documented BlockSettingsEditor integration gap (G2 component is fine,
-    // its host doesn't pass `label` so the toggle never renders).
+  }
+
+  await zhInput.click();
+  await zhInput.fill(zhValue);
+
+  if (enValue) {
+    const enInput = panel.getByTestId('block-title-input-en').first();
+    await expect(enInput).toBeVisible({ timeout: 3_000 });
+    await enInput.click();
+    await enInput.fill(enValue);
+    // Force blur so the controlled-input change commits before we move on.
+    await enInput.press('Tab').catch(() => null);
   }
 }
 
@@ -422,79 +432,57 @@ async function addFieldsToSelectedBlock(page: Page, fieldCodes: string[]): Promi
 }
 
 /**
- * After adding fields to a section, select a specific field on the canvas to
- * open its FieldPropertyEditor, then configure colSpan / readOnly / visibleWhen.
+ * Configure per-field overrides via the in-panel FieldsEditor. Each FieldItem
+ * exposes data-testid-keyed controls so we don't have to fish through the
+ * canvas (canvas-chip selection is fragile because SortableFieldItem renders
+ * field-name in a <label> not a button, and the section list is capped to 8
+ * preview chips). The right-panel editor renders ALL fields and is the
+ * sanctioned UI for span/readonly/visible.
  */
 async function configureFieldOverride(
   page: Page,
-  blockId: string,
+  _blockId: string,
   field: { field: string; colSpan?: number; readOnly?: boolean; visibleWhen?: string },
 ): Promise<void> {
-  const block = page.locator(`[data-block-id="${blockId}"]`);
-  await expect(block).toBeVisible({ timeout: 5_000 });
-  // Field chip selector — try multiple shapes since FormSectionPreview renders
-  // the field code as visible text inside a sortable button. If not found,
-  // skip override gracefully (per-field override is best-effort; the diff
-  // oracle catches unconfigured fields as known gaps).
-  const fieldChip = block.locator(`button:has-text("${field.field}"), [role="button"]:has-text("${field.field}")`).first();
-  const chipVisible = await fieldChip.isVisible({ timeout: 2_000 }).catch(() => false);
-  if (!chipVisible) {
-    console.warn(`[C-rebuild] field chip not found for ${field.field} in block ${blockId} — skipping override`);
+  const panel = page.getByTestId('designer-properties-panel');
+
+  const item = panel.getByTestId(`field-item-${field.field}`).first();
+  if (!(await item.isVisible({ timeout: 3_000 }).catch(() => false))) {
+    console.warn(`[C-rebuild] field-item testid missing for ${field.field} — skipping`);
     return;
   }
-  await fieldChip.click();
 
-  const panel = page.getByTestId('designer-properties-panel');
-  await expect(panel.locator('text=字段属性')).toBeVisible({ timeout: 5_000 });
+  // Expand the item so its controls are visible.
+  const header = panel.getByTestId(`field-item-header-${field.field}`).first();
+  await header.click();
 
-  // colSpan: if reference specifies a value, set it. Look for "列宽" or "colSpan"
-  // input.
+  // span — dropdown values 1/2/3/4/6/8/12. Reference uses 4/6/12.
   if (field.colSpan !== undefined) {
-    const colSpanInput = panel
-      .locator(
-        'label:has-text("列宽") >> xpath=following-sibling::input[1], label:has-text("colSpan") >> xpath=following-sibling::input[1], input[placeholder*="列"]',
-      )
-      .first();
-    if (await colSpanInput.isVisible({ timeout: 1_500 }).catch(() => false)) {
-      await colSpanInput.click();
-      await colSpanInput.fill(String(field.colSpan));
-    }
+    const spanSelect = panel.getByTestId(`field-item-span-${field.field}`).first();
+    await expect(spanSelect).toBeVisible({ timeout: 3_000 });
+    await spanSelect.selectOption(String(field.colSpan));
   }
 
-  // readOnly: SmartSwitch labeled "只读" in validation or behavior section.
+  // readonly — checkbox added 2026-04-19.
   if (field.readOnly) {
-    const readOnlySwitch = panel
-      .locator('span:has-text("只读") >> xpath=following-sibling::button[@role="switch"]')
-      .first();
-    if (await readOnlySwitch.isVisible({ timeout: 1_500 }).catch(() => false)) {
-      await readOnlySwitch.click();
-      await expect(readOnlySwitch)
-        .toHaveAttribute('aria-checked', 'true', { timeout: 3_000 })
-        .catch(() => null);
+    const cb = panel.getByTestId(`field-item-readonly-${field.field}`).first();
+    if (await cb.isVisible({ timeout: 2_000 }).catch(() => false)) {
+      await cb.check();
     }
   }
 
-  // visibleWhen: expand 行为控制 then fill "可见性条件".
+  // visible — text input.
   if (field.visibleWhen) {
-    const header = panel.locator('button:has-text("行为控制")').first();
-    if (await header.isVisible({ timeout: 1_500 }).catch(() => false)) {
-      await header.click();
-    }
-    const input = panel
-      .locator('label:has-text("可见性条件") >> xpath=following-sibling::input[1]')
-      .first();
+    const input = panel.getByTestId(`field-item-visible-${field.field}`).first();
     if (await input.isVisible({ timeout: 2_000 }).catch(() => false)) {
       await input.click();
       await input.fill(field.visibleWhen);
+      await input.press('Tab').catch(() => null);
     }
   }
 
-  // Return to block view so next section interactions start clean.
-  await panel
-    .locator('button:has-text("返回 Block")')
-    .first()
-    .click()
-    .catch(() => null);
+  // Collapse to keep the panel scrollable for the next field.
+  await header.click().catch(() => null);
 }
 
 async function configureFormButtons(page: Page, buttons: any[]): Promise<void> {
@@ -713,17 +701,25 @@ test.describe('Task C — Rebuild showcase form from Designer UI', () => {
       console.log('[Task C] SUCCESS: designer-rebuilt blocks deep-equal the reference.');
     }
 
-    // Threshold assertion: this test measures designer UI rebuild parity vs
-    // the hand-authored reference JSON. Each diff is a real UI capability gap
-    // (colSpan field-level UI cap, missing widget-specific PropertySchema
-    // editors, etc) tracked in 2026-04-19-ga-coverage-report.md. Hard-zero
-    // would require shipping all backlog items; threshold prevents regression
-    // beyond the current measured baseline.
-    const baseline = 100; // pre-G fixes diff count was ~59; with sc_advanced_settings extra field + missing widget UIs ~91.
-    expect(diffs.length, `designer-rebuild diffs grew beyond baseline ${baseline} (current=${diffs.length})`).toBeLessThanOrEqual(baseline);
+    // Threshold assertion: as of 2026-04-19 the designer can rebuild the
+    // hand-authored showcase form byte-for-byte (diff=0) after:
+    //   - FormSectionPreview wrapper no longer swallows block-select clicks
+    //   - FieldsEditor span dropdown extended to 1/2/3/4/6/8/12
+    //   - FieldItem exposes data-testid for span/required/readonly/visible
+    //   - Spec drives FieldsEditor (in-panel) instead of canvas chip clicks
+    //   - LocalizedTextInput multi-locale toggle clicked before fill so the
+    //     emitted DSL is object-form (matches reference)
+    // Keep a small (=2) cushion for occasional HMR-driven jitter under full
+    // suite parallel load; tighten further once we have stable baselines from
+    // the parallel runs.
+    const baseline = 2;
+    expect(
+      diffs.length,
+      `designer-rebuild diffs grew beyond baseline ${baseline} (current=${diffs.length})`,
+    ).toBeLessThanOrEqual(baseline);
     test.info().annotations.push({
       type: 'designer-ui-gap',
-      description: `${diffs.length} diff(s) between designer-rebuilt blocks and reference. See coverage report for backlog.`,
+      description: `${diffs.length} diff(s) between designer-rebuilt blocks and reference. Baseline=${baseline}.`,
     });
   });
 });
