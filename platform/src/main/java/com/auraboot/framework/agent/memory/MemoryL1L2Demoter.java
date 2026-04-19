@@ -108,6 +108,8 @@ public class MemoryL1L2Demoter {
         if (!leaderElection.acquire(MemoryL1L2LeaderElection.JOB_DEMOTER)) {
             log.debug("MemoryL1L2Demoter: not leader for {}, skipping tick",
                     MemoryL1L2LeaderElection.JOB_DEMOTER);
+            metrics.recordLeaderSkipped(MemoryL1L2LeaderElection.JOB_DEMOTER,
+                    leaderElection.getInstanceId());
             return new DemoteSummary(0, 0);
         }
         Integer[] counts = tx.execute(status -> {
