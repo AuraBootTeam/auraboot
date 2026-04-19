@@ -249,14 +249,6 @@
   },
   {
     "modelCode": "showcase_all_fields",
-    "fieldCode": "sc_location",
-    "sequence": 32,
-    "required": false,
-    "visible": true,
-    "editable": true
-  },
-  {
-    "modelCode": "showcase_all_fields",
     "fieldCode": "sc_address",
     "sequence": 33,
     "required": false,

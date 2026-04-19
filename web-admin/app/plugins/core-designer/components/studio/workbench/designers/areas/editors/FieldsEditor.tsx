@@ -179,10 +179,14 @@ const FieldItem: React.FC<FieldItemProps> = ({
   readonly,
 }) => {
   return (
-    <div className="overflow-hidden rounded-md border border-gray-200">
+    <div
+      className="overflow-hidden rounded-md border border-gray-200"
+      data-testid={`field-item-${field.field}`}
+    >
       {/* Field header */}
       <div
         className="flex cursor-pointer items-center gap-2 bg-gray-50 px-3 py-2 hover:bg-gray-100"
+        data-testid={`field-item-header-${field.field}`}
         onClick={onToggle}
       >
         {/* Reorder buttons */}
@@ -255,7 +259,10 @@ const FieldItem: React.FC<FieldItemProps> = ({
       {/* Expanded content */}
       {isExpanded && (
         <div className="space-y-3 border-t border-gray-100 p-3">
-          {/* Span */}
+          {/* Span — covers the full 1..12 grid range used by reference forms.
+              Reference DSL uses span values 4 / 6 / 12 across 36+ fields, so
+              limiting the dropdown to 1-4 prevented the designer from
+              expressing those layouts (Task C diff baseline). */}
           <div>
             <label className="mb-1 block text-xs text-gray-500">栅格宽度</label>
             <select
@@ -265,12 +272,14 @@ const FieldItem: React.FC<FieldItemProps> = ({
               }
               disabled={readonly}
               className="w-full rounded border border-gray-200 px-2 py-1.5 text-sm"
+              data-testid={`field-item-span-${field.field}`}
             >
               <option value="">默认</option>
-              <option value="1">1</option>
-              <option value="2">2</option>
-              <option value="3">3</option>
-              <option value="4">4</option>
+              {[1, 2, 3, 4, 6, 8, 12].map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -283,6 +292,20 @@ const FieldItem: React.FC<FieldItemProps> = ({
               onChange={(e) => onUpdate({ required: e.target.checked })}
               disabled={readonly}
               className="rounded border-gray-300"
+              data-testid={`field-item-required-${field.field}`}
+            />
+          </div>
+
+          {/* Readonly (matches reference DSL `readonly` field) */}
+          <div className="flex items-center justify-between">
+            <label className="text-xs text-gray-500">只读</label>
+            <input
+              type="checkbox"
+              checked={field.readonly || false}
+              onChange={(e) => onUpdate({ readonly: e.target.checked })}
+              disabled={readonly}
+              className="rounded border-gray-300"
+              data-testid={`field-item-readonly-${field.field}`}
             />
           </div>
 
@@ -309,6 +332,7 @@ const FieldItem: React.FC<FieldItemProps> = ({
               disabled={readonly}
               className="w-full rounded border border-gray-200 px-2 py-1.5 font-mono text-sm text-xs"
               placeholder="{{ true }}"
+              data-testid={`field-item-visible-${field.field}`}
             />
           </div>
 

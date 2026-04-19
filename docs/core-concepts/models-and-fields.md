@@ -118,7 +118,6 @@ Beyond the base data types, fields support specialized UI rendering through `ext
 | `userselect` | `string` | User picker | Assignee, owner |
 | `memberpicker` | `string` | Multi-user picker | Team members |
 | `organizationselect` | `string` | Org unit picker | Department assignment |
-| `coordinatespicker` | `json` | Map coordinate picker | Geographic locations |
 | `timepicker` | `string` | Time picker | Time-of-day values |
 | `daterange` | `string` | Date range picker | Start-end date pairs |
 | `timerangepicker` | `string` | Time range picker | Working hours, shifts |
@@ -410,7 +409,6 @@ Stores structured data as PostgreSQL `JSONB`. Use this for attachments, coordina
 
 **UI:** The default rendering shows raw JSON. Use render components to provide specialized UIs:
 - `fileattachment` -- file upload/download widget
-- `coordinatespicker` -- map with lat/lng selection
 
 ### TAGS (via multiselect)
 
@@ -910,7 +908,6 @@ Commands can automatically set field values during execution:
 | People assignment | `string` + `renderComponent: "userselect"` |
 | Department/org | `string` + `renderComponent: "organizationselect"` |
 | Hierarchical categories | `string` + `renderComponent: "cascadeselect"` |
-| Geographic coordinates | `json` + `renderComponent: "coordinatespicker"` |
 
 ### Indexing tips
 

@@ -54,9 +54,6 @@ export const COMPONENT_RUNTIME_MANIFEST: Record<string, ComponentRuntimeConfig> 
   organizationselect: runtime('picker', 'OrganizationSelect', {
     aliases: ['SmartOrganizationSelect', 'OrganizationSelect', 'organizationselect'],
   }),
-  coordinatespicker: runtime('picker', 'CoordinatesPicker', {
-    aliases: ['SmartCoordinatesPicker', 'CoordinatesPicker', 'coordinatespicker'],
-  }),
   cascadeselect: runtime('picker', 'CascadeSelect', {
     aliases: ['CascadeSelect', 'cascadeSelect', 'cascadeselect'],
   }),

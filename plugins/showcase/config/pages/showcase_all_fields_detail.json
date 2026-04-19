@@ -237,10 +237,6 @@
               "columns": 1,
               "fields": [
                 {
-                  "field": "sc_location",
-                  "readOnly": true
-                },
-                {
                   "field": "sc_address",
                   "readOnly": true
                 }
