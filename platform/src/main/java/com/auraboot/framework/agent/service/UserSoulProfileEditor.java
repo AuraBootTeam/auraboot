@@ -254,8 +254,8 @@ public class UserSoulProfileEditor {
                         + "WHERE tenant_id = ? AND user_id = ? AND status = ?",
                 Integer.class, tenantId, userId, UserSoulProfileStatus.ARCHIVED.code());
         if (archivedCount != null && archivedCount > 0) {
-            throw new IllegalStateException(
-                    "profile ARCHIVED (GDPR-forgotten) for tenant=" + tenantId + " user=" + userId);
+            throw new UserSoulProfileArchivedException(
+                    "profile archived (GDPR-forgotten) for tenant=" + tenantId + " user=" + userId);
         }
         Integer supersededCount = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM ab_agent_user_soul_profile "

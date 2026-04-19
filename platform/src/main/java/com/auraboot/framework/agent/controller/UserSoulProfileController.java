@@ -2,6 +2,7 @@ package com.auraboot.framework.agent.controller;
 
 import com.auraboot.framework.agent.metrics.UserSoulProfileMetrics;
 import com.auraboot.framework.agent.profile.UserSoulProfileStatus;
+import com.auraboot.framework.agent.service.UserSoulProfileArchivedException;
 import com.auraboot.framework.agent.service.UserSoulProfileDeriver;
 import com.auraboot.framework.agent.service.UserSoulProfileEditor;
 import com.auraboot.framework.agent.service.UserSoulProfileEditor.EditResult;
@@ -259,8 +260,14 @@ public class UserSoulProfileController {
         byte[] body = objectMapper.writerWithDefaultPrettyPrinter()
                 .writeValueAsBytes(payload);
 
-        String filename = "user-soul-profile-" + userId + "-" +
-                Instant.now().toString().replace(':', '-') + ".json";
+        // Sanitize both tokens defensively — userId comes from MetaContext
+        // (normally numeric) but downstream code must not assume so, and the
+        // ISO-8601 timestamp contains colons which some HTTP clients treat as
+        // header delimiters. See sanitizeFilenameToken().
+        String filename = "user-soul-profile-"
+                + sanitizeFilenameToken(userId) + "-"
+                + sanitizeFilenameToken(Instant.now().toString())
+                + ".json";
         response.setStatus(HttpServletResponse.SC_OK);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
@@ -397,6 +404,18 @@ public class UserSoulProfileController {
         return tenantId + ":" + userId;
     }
 
+    /**
+     * Replace any character outside {@code [A-Za-z0-9_.-]} with {@code _} and
+     * clip to 64 chars. Used to build {@code Content-Disposition} filename
+     * tokens so malicious user ids / timestamps cannot inject CRLF or quote
+     * characters that browsers / proxies might parse as extra headers.
+     */
+    public static String sanitizeFilenameToken(String raw) {
+        if (raw == null) return "anon";
+        String cleaned = raw.replaceAll("[^A-Za-z0-9_.-]", "_");
+        return cleaned.length() > 64 ? cleaned.substring(0, 64) : cleaned;
+    }
+
     private ApiResponse<Map<String, Object>> invokeEditor(EditorInvocation call) {
         String userId = requireUserId();
         if (userId == null) return ApiResponse.error(401, "no user context");
@@ -406,11 +425,15 @@ public class UserSoulProfileController {
         } catch (IllegalArgumentException notFound) {
             // Editor throws IllegalArgumentException when there is no live row.
             return ApiResponse.error(404, notFound.getMessage());
-        } catch (IllegalStateException archived) {
-            // Editor throws IllegalStateException when every row is ARCHIVED
-            // (GDPR-forgotten). Surface as 409 — the resource exists but its
-            // current state forbids further mutation.
-            return ApiResponse.error(409, archived.getMessage());
+        } catch (UserSoulProfileArchivedException archived) {
+            // Editor throws this when every row is ARCHIVED (GDPR-forgotten).
+            // Surface as 410 Gone — the resource was permanently tombstoned.
+            return ApiResponse.error(410, archived.getMessage());
+        } catch (IllegalStateException superseded) {
+            // Editor throws plain IllegalStateException for SUPERSEDED-only
+            // rows. Surface as 409 — the resource exists but its current
+            // state forbids further mutation.
+            return ApiResponse.error(409, superseded.getMessage());
         }
     }
 
