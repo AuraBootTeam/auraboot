@@ -309,7 +309,13 @@ test.describe('D6 — SLA panel: userTask SLA config (single-level + multi-level
     expect(rule2Roles, 'level 2 must notify wd_hr (escalation target)').toContain('wd_hr');
 
     // =========================================================================
-    // L3b — Runtime: start process instance, assert task is active
+    // L3b — Runtime: start process instance, verify SLA record is auto-created
+    // at task activation via SlaActivationListener (gap #2 fix wired).
+    //
+    // The test uses a separate instance so the SLA config (targetType="node",
+    // targetKey="task_approve") created above is in place before instance start.
+    // startInstanceAndAdvance immediately completes the task, but the SLA record
+    // should be persisted by the time task_assign event fires synchronously.
     // =========================================================================
     const { instanceId, finalStatus } = await startInstanceAndAdvance(
       request,
@@ -324,36 +330,35 @@ test.describe('D6 — SLA panel: userTask SLA config (single-level + multi-level
     ).toBe('completed');
     expect(instanceId, 'instance must have been started').toBeTruthy();
 
-    // =========================================================================
-    // L3b-fixme — SLA records NOT auto-created at task activation
-    //
-    // CONCERN: SlaRecordService.createRecord() has no callers at task activation
-    //   time. The scheduler (SlaSchedulerService) scans existing records but nothing
-    //   creates them when a task starts. Confirmed by grep: no call sites for
-    //   slaRecordService.createRecord() in TaskService, BpmNodeHookService, or
-    //   ProcessOrchestrationService.
-    //
-    //   Expected fix: wire SlaRecordService.createRecord() into task activation
-    //   using SlaConfigService.findByTarget("node", taskNodeId).
-    //
-    //   When the scheduler is wired, this fixme block should be replaced with:
-    //     const slaResp = await request.get(
-    //       `${BACKEND}/api/bpm/monitor/instances/${instanceId}/sla`,
-    //       { headers: { Authorization: `Bearer ${adminToken}` } }
-    //     );
-    //     expect(slaResp.ok()).toBe(true);
-    //     const slaList = (await slaResp.json()).data as Array<Record<string, unknown>>;
-    //     expect(slaList.length, 'must have 2 active SLA records (one per config)').toBeGreaterThanOrEqual(1);
-    //     const activeRecord = slaList.find(r => r.nodeId === 'task_approve');
-    //     expect(activeRecord, 'SLA record for task_approve must exist').toBeDefined();
-    //     expect(activeRecord!.status, 'SLA record must be running').toBe('running');
-    // =========================================================================
-    test.fixme(
-      true,
-      'SLA runtime activation not wired: SlaRecordService.createRecord() has no ' +
-      'callers in TaskService/BpmNodeHookService. GET /api/bpm/monitor/instances/{id}/sla ' +
-      'returns empty even after task activation. Fix: wire createRecord() into task ' +
-      'activation path via SlaConfigService.findByTarget("node", activityId).',
+    // L3b — SLA record must have been created at task activation
+    const slaResp = await request.get(
+      `${BACKEND}/api/bpm/monitor/instances/${instanceId}/sla`,
+      { headers: { Authorization: `Bearer ${adminToken}` } },
     );
+    expect(
+      slaResp.ok(),
+      `GET /api/bpm/monitor/instances/${instanceId}/sla must succeed: ${slaResp.status()}`,
+    ).toBe(true);
+
+    const slaList = ((await slaResp.json()).data as Array<Record<string, unknown>>) ?? [];
+    expect(
+      slaList.length,
+      'SlaActivationListener must have created at least 1 SLA record for task_approve',
+    ).toBeGreaterThanOrEqual(1);
+
+    const slaRecord = slaList.find((r) => r.nodeId === 'task_approve');
+    expect(
+      slaRecord,
+      'SLA record for task_approve node must exist — SlaActivationListener wired correctly',
+    ).toBeDefined();
+
+    // Status may be 'running' (just created) or 'overdue' (scheduler already scanned)
+    // Both are acceptable — the key assertion is that the record exists.
+    expect(
+      ['running', 'warning', 'overdue', 'completed'].includes(
+        (slaRecord!.status as string)?.toLowerCase(),
+      ),
+      `SLA record status must be a known active/terminal value, got: ${slaRecord!.status}`,
+    ).toBe(true);
   });
 });
