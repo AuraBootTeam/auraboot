@@ -286,7 +286,7 @@ test.describe('Mission Control — User Soul Profile (real backend, PR-80)', () 
 
     await navigateToAdminDashboard(page);
 
-    const table = page.locator('[data-testid="admin-profiles-table"]');
+    const table = page.locator('[data-testid="admin-table"]');
     await expect(table).toBeVisible({ timeout: 5_000 });
 
     // Row should contain the user id (metadata) but NOT the persona text.

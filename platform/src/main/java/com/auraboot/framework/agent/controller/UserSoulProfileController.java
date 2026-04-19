@@ -6,6 +6,7 @@ import com.auraboot.framework.agent.service.UserSoulProfileEditor;
 import com.auraboot.framework.agent.service.UserSoulProfileEditor.EditResult;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import lombok.extern.slf4j.Slf4j;
@@ -80,15 +81,19 @@ public class UserSoulProfileController {
             .maximumSize(100_000)
             .build();
 
+    private final ObjectMapper objectMapper;
+
     @Autowired
     public UserSoulProfileController(JdbcTemplate jdbcTemplate,
                                      UserSoulProfileEditor editor,
                                      UserSoulProfileDeriver deriver,
-                                     UserSoulProfileMetrics metrics) {
+                                     UserSoulProfileMetrics metrics,
+                                     ObjectMapper objectMapper) {
         this.jdbcTemplate = jdbcTemplate;
         this.editor = editor;
         this.deriver = deriver;
         this.metrics = metrics;
+        this.objectMapper = objectMapper;
     }
 
     // =========================================================================
@@ -113,9 +118,31 @@ public class UserSoulProfileController {
                             "WHERE tenant_id = ? AND user_id = ? AND status = ? " +
                             "LIMIT 1",
                     tenantId, userId, STATUS_ACTIVE);
+            parseJsonField(row, "profile_json", "profile");
+            parseJsonField(row, "edited_fields_json", "edited_fields");
             return ApiResponse.ok(row);
         } catch (EmptyResultDataAccessException none) {
             return ApiResponse.error(404, "no active soul profile");
+        }
+    }
+
+    /**
+     * Parse a stringified JSONB column into a nested object under a new key,
+     * so frontend consumers receive {@code profile} as a real object rather
+     * than a raw string. Null / blank JSON becomes null. Removes the
+     * original string-valued key to avoid duplication on the wire.
+     */
+    private void parseJsonField(Map<String, Object> row, String stringKey, String objectKey) {
+        Object raw = row.remove(stringKey);
+        if (!(raw instanceof String s) || s.isBlank()) {
+            row.put(objectKey, null);
+            return;
+        }
+        try {
+            row.put(objectKey, objectMapper.readValue(s, Object.class));
+        } catch (Exception e) {
+            log.warn("UserSoulProfile: failed to parse {} as JSON: {}", stringKey, e.getMessage());
+            row.put(objectKey, null);
         }
     }
 
@@ -164,6 +191,8 @@ public class UserSoulProfileController {
                             "FROM ab_agent_user_soul_profile " +
                             "WHERE pid = ? AND tenant_id = ? AND user_id = ?",
                     pid, tenantId, userId);
+            parseJsonField(row, "profile_json", "profile");
+            parseJsonField(row, "edited_fields_json", "edited_fields");
             return ApiResponse.ok(row);
         } catch (EmptyResultDataAccessException none) {
             // Deliberately return the same 404 for: non-existent pid,
