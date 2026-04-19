@@ -552,8 +552,9 @@ public class MemoryL1L2Promoter {
      * @return the resulting {@link AdminPromoteOutcome} — never null
      */
     @Transactional
-    public AdminPromoteOutcome promoteNow(String pid, String adminUserId, String reason) {
+    public AdminPromoteOutcome promoteNow(String pid, Long callerTenantId, String adminUserId, String reason) {
         Objects.requireNonNull(pid, "pid");
+        Objects.requireNonNull(callerTenantId, "callerTenantId");
         if (reason == null || reason.isBlank()) {
             throw new IllegalArgumentException("reason required");
         }
@@ -563,14 +564,16 @@ public class MemoryL1L2Promoter {
 
         // Load the candidate row. Do NOT apply the importance gate here — the
         // admin explicitly wants this row promoted.
+        // Tenant filter enforced at SQL layer: without it a tenant-A admin
+        // could promote a pid belonging to tenant B (Round-3 C1).
         List<Map<String, Object>> rows = jdbc.queryForList(
                 "SELECT pid, tenant_id, memory_agent_id, memory_type, memory_title, "
                         + "       memory_content, importance, access_count, created_at, "
                         + "       scope, scope_key, embedding, source_run_id, category "
                         + "  FROM ab_agent_memory "
-                        + " WHERE pid = ? "
+                        + " WHERE pid = ? AND tenant_id = ? "
                         + "   AND (deleted_flag IS NULL OR deleted_flag = FALSE)",
-                pid);
+                pid, callerTenantId);
         if (rows.isEmpty()) {
             IllegalStateException ex = new IllegalStateException("memory_not_found");
             throw ex;

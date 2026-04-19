@@ -201,7 +201,7 @@ class MemoryL1L2Phase4IntegrationTest extends BaseIntegrationTest {
 
         String reason = "ops requested pin for debugging";
         MemoryL1L2Promoter.AdminPromoteOutcome out =
-                promoter.promoteNow(pid, userId, reason);
+                promoter.promoteNow(pid, tenantId, userId, reason);
 
         assertThat(out.outcome()).isEqualTo(MemoryL1L2Promoter.Outcome.PROMOTED);
         assertThat(out.targetPid()).isEqualTo(pid);
@@ -232,7 +232,7 @@ class MemoryL1L2Phase4IntegrationTest extends BaseIntegrationTest {
                 TEST_PREFIX + "already-l2 " + UniqueIdGenerator.generate(),
                 "user", 7);
 
-        assertThatThrownBy(() -> promoter.promoteNow(pid, userId, "try again"))
+        assertThatThrownBy(() -> promoter.promoteNow(pid, tenantId, userId, "try again"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("memory_not_l1");
     }
@@ -241,18 +241,37 @@ class MemoryL1L2Phase4IntegrationTest extends BaseIntegrationTest {
     @DisplayName("promoteNow: missing pid throws memory_not_found")
     void promoteNow_missing_throws() {
         String ghost = "gh_" + UniqueIdGenerator.generate();
-        assertThatThrownBy(() -> promoter.promoteNow(ghost, userId, "forced"))
+        assertThatThrownBy(() -> promoter.promoteNow(ghost, tenantId, userId, "forced"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("memory_not_found");
+    }
+
+    @Test
+    @DisplayName("promoteNow: cross-tenant pid rejected as memory_not_found (Round-3 C1)")
+    void promoteNow_crossTenantRejected() {
+        Long otherTenant = tenantId + 99999L;
+        String pid = UniqueIdGenerator.generate();
+        jdbc.update("INSERT INTO ab_agent_memory "
+                        + "(pid, tenant_id, memory_agent_id, memory_type, memory_title, memory_content, "
+                        + " importance, access_count, scope, scope_key, category, created_at) "
+                        + "VALUES (?, ?, ?, 'insight', 'x', ?, 5, 0, 'user', 'other-user', 'session', NOW())",
+                pid, otherTenant, agentCode, TEST_PREFIX + "cross-tenant content");
+        try {
+            assertThatThrownBy(() -> promoter.promoteNow(pid, tenantId, userId, "try leak"))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("memory_not_found");
+        } finally {
+            jdbc.update("DELETE FROM ab_agent_memory WHERE pid = ?", pid);
+        }
     }
 
     @Test
     @DisplayName("promoteNow: blank reason rejected")
     void promoteNow_blankReason_throws() {
         String pid = insertL1(TEST_PREFIX + "r " + UniqueIdGenerator.generate(), 2, 0);
-        assertThatThrownBy(() -> promoter.promoteNow(pid, userId, ""))
+        assertThatThrownBy(() -> promoter.promoteNow(pid, tenantId, userId, ""))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> promoter.promoteNow(pid, userId, null))
+        assertThatThrownBy(() -> promoter.promoteNow(pid, tenantId, userId, null))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
