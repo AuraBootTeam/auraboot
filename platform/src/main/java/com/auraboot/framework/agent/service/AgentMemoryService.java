@@ -482,6 +482,86 @@ public class AgentMemoryService {
     }
 
     /**
+     * Phase 4 (PR-85) — L2-only scoped importance recall for callers that must
+     * not mix L1 signal into their inputs (notably
+     * {@link UserSoulProfileDeriver}). Semantics identical to
+     * {@link #loadScopedByImportance} except rows are restricted to
+     * {@code category IN ('user','agent')} — the L2 partition.
+     *
+     * <p>Design §9.2 — Soul Profile is a derived summary of durable memory;
+     * mixing in L1 rows lets a single session's ephemeral notes swamp the
+     * projection. Phase 4 closes that gap with this category-aware reader.
+     */
+    public List<Map<String, Object>> loadScopedByImportanceL2Only(Long tenantId, String userId,
+                                                                   String agentCode, int limit) {
+        Objects.requireNonNull(tenantId, "tenantId");
+        boolean hasUser = userId != null && !userId.isBlank();
+        String sql =
+                "SELECT pid, memory_type, category, memory_title, memory_content, "
+                + "  importance, shareable, scope, scope_key, shadow_mode, created_at "
+                + "FROM ab_agent_memory "
+                + "WHERE memory_agent_id = ? "
+                + "  AND category IN ('user','agent') "
+                + "  AND (deleted_flag IS NULL OR deleted_flag = FALSE) "
+                + "  AND ( "
+                + "    scope = 'global' "
+                + "    OR (scope = 'tenant' AND tenant_id = ?) "
+                + (hasUser ? "    OR (scope = 'user'   AND scope_key = ?) " : "")
+                + "  ) "
+                + "ORDER BY importance DESC, created_at DESC "
+                + "LIMIT ?";
+        return hasUser
+                ? jdbcTemplate.queryForList(sql, agentCode, tenantId, userId, limit)
+                : jdbcTemplate.queryForList(sql, agentCode, tenantId, limit);
+    }
+
+    /**
+     * Phase 4 (PR-85) — L1 read cap for the grounding path.
+     *
+     * <p>Returns up to {@code maxRows} {@code category='session'} memories
+     * visible to the given {@code (tenantId, scopeKey)} pair, ordered by
+     * {@code last_accessed DESC NULLS LAST, created_at DESC}. This is the
+     * primary knob that prevents a long-running session's L1 bucket from
+     * swelling the LLM prompt before {@link com.auraboot.framework.agent.memory.MemoryL1L2Demoter}
+     * / decay has had a chance to trim it.
+     *
+     * <p>Unlike {@link #loadScopedByImportance}, this method does NOT mix
+     * user / tenant / global scopes — design §9.2 asks for a pure L1 cap
+     * on the user partition that {@link com.auraboot.framework.agent.service.ActiveMemoryService}
+     * reads. Callers that need L2 should use the existing scoped readers.
+     *
+     * <p>Disabled by default at the consumer layer — {@code ActiveMemoryService}
+     * reads the cap from {@code acp.memory.l1l2.max-l1}. The service method
+     * itself always enforces the cap passed in (it is a simple LIMIT clause).
+     *
+     * @param tenantId current tenant (required)
+     * @param scopeKey user id when scope='user'; must be non-blank (this
+     *                 method does NOT fan out to tenant/global L1)
+     * @param maxRows  hard cap; must be &gt; 0
+     */
+    public List<Map<String, Object>> loadL1Capped(Long tenantId, String scopeKey, int maxRows) {
+        Objects.requireNonNull(tenantId, "tenantId");
+        if (scopeKey == null || scopeKey.isBlank()) {
+            throw new IllegalArgumentException("scopeKey required for L1 cap lookup");
+        }
+        if (maxRows <= 0) {
+            throw new IllegalArgumentException("maxRows must be > 0");
+        }
+        return jdbcTemplate.queryForList(
+                "SELECT pid, memory_agent_id, memory_type, category, memory_title, "
+                + "  memory_content, importance, shareable, scope, scope_key, "
+                + "  source_run_id, access_count, last_accessed, created_at "
+                + "FROM ab_agent_memory "
+                + "WHERE tenant_id = ? "
+                + "  AND scope = 'user' AND scope_key = ? "
+                + "  AND category = 'session' "
+                + "  AND (deleted_flag IS NULL OR deleted_flag = FALSE) "
+                + "ORDER BY last_accessed DESC NULLS LAST, created_at DESC "
+                + "LIMIT ?",
+                tenantId, scopeKey, maxRows);
+    }
+
+    /**
      * GDPR-compliant forget-user: soft-delete every memory whose scope='user',
      * scope_key matches the given user_id, AND tenant_id matches the requesting
      * tenant. The tenant filter prevents a GDPR request in tenant A from

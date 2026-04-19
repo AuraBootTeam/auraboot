@@ -65,6 +65,7 @@ public class MemoryL1L2Demoter {
     private final JdbcTemplate jdbc;
     private final TransactionTemplate tx;
     private final MemoryL1L2PromotionMetrics metrics;
+    private final MemoryL1L2LeaderElection leaderElection;
 
     @Value("${acp.memory.l1l2.demoter.enabled:false}")
     private boolean enabled;
@@ -77,10 +78,12 @@ public class MemoryL1L2Demoter {
 
     public MemoryL1L2Demoter(JdbcTemplate jdbc,
                              PlatformTransactionManager txManager,
-                             MemoryL1L2PromotionMetrics metrics) {
+                             MemoryL1L2PromotionMetrics metrics,
+                             MemoryL1L2LeaderElection leaderElection) {
         this.jdbc = jdbc;
         this.tx = new TransactionTemplate(txManager);
         this.metrics = metrics;
+        this.leaderElection = leaderElection;
     }
 
     /** Daily at 03:00 — design §6. Override via {@code acp.memory.l1l2.demoter.cron}. */
@@ -101,6 +104,12 @@ public class MemoryL1L2Demoter {
      * stale / low-importance L2 rows.
      */
     public DemoteSummary runOnce() {
+        // Phase 4 (PR-85): multi-instance gate — see MemoryL1L2OrphanScanner.
+        if (!leaderElection.acquire(MemoryL1L2LeaderElection.JOB_DEMOTER)) {
+            log.debug("MemoryL1L2Demoter: not leader for {}, skipping tick",
+                    MemoryL1L2LeaderElection.JOB_DEMOTER);
+            return new DemoteSummary(0, 0);
+        }
         Integer[] counts = tx.execute(status -> {
             Boolean acquired = jdbc.queryForObject(
                     "SELECT pg_try_advisory_lock(?)", Boolean.class, LOCK_KEY);
