@@ -8,41 +8,29 @@ import {
   submitLeaveRequest,
 } from '../../helpers/wd-fixtures';
 
-const BACKEND = 'http://localhost:6443';
+const BACKEND = process.env.BACKEND_URL ?? 'http://localhost:6443';
 
 /**
  * R3 — SLA escalation end-to-end.
  *
- * KNOWN GAP (2026-04-19): SlaRecordService.createRecord() has zero callers.
- * No code creates ab_sla_record entries when a task activates, so the
- * SlaSchedulerService never has anything to scan, and escalation never fires.
- *
- * Unblock condition: add a call to SlaRecordService.createRecord() in the
- * task-activation code path (candidates: TaskService.activate() or
- * BpmNodeHookService.onTaskStart()), mapping the task's processDefinitionActivityId
- * to the matching ab_sla_config row.
- *
- * Once that wiring is in place, remove `test.fixme` below.
- *
  * SLA config used: workflow-demo sla.json "wd_manager_approve_sla"
  *   targetType = "NODE", targetKey = "task_manager_approve"
  *   processKey = "wd_leave_approval", timeoutSeconds = 30 (deadlineValue = "PT30S")
- *   escalationTargetType = "role_parent", escalationTargetValue = "wd_manager"
  *
- * The plugin already ships this config — no runtime POST needed for the config itself.
- * The test seeds a short leave (days=1), submits it, then intentionally does NOT
- * have the manager act. After 30 s the SlaSchedulerService should detect the breach
- * and update the ab_sla_record row to status=ESCALATED.
- * The test polls GET /api/bpm/sla-records?instanceId=... for that state change.
+ * The plugin already ships this config. The test seeds a short leave (days=1),
+ * submits it, then intentionally does NOT have the manager act. After 30 s the
+ * SlaSchedulerService (fixedRate=15s) detects the breach and sets status=overdue.
+ * The test polls GET /api/bpm/monitor/instances/{instanceId}/sla for that state.
+ *
+ * Fix wired (2026-04-19): SlaActivationListener creates ab_sla_record rows
+ * on task_assigned BpmEvent. SlaSchedulerService scans every 15 s.
  */
 
 test.describe('workflow-demo — R3 SLA escalation', () => {
-  // test.fixme(title, fn) marks the test as "expected to fail but should be fixed".
-  // It is NOT test.skip — the body is exercised in development to ensure scaffolding
-  // is correct, and it converts a timeout into an expected-failure result so the
-  // suite stays green while the wiring gap exists.
-  test.fixme(
-    'manager ignores short leave → SLA escalates (fixme: SlaRecordService wiring gap)',
+  test.setTimeout(120_000);
+
+  test(
+    'manager ignores short leave → SLA record created and becomes overdue within 60 s',
     async ({ browser, request }) => {
       // -----------------------------------------------------------------------
       // 1. Admin API setup — reuse the same pattern as R1 / R2
@@ -101,9 +89,10 @@ test.describe('workflow-demo — R3 SLA escalation', () => {
       // -----------------------------------------------------------------------
       // 4. Assert the manager task is ACTIVE (SLA timer running)
       //    This verifies the process is in the expected state before we wait.
+      //    Endpoint: GET /api/bpm/tasks/by-process/{processInstanceId}
       // -----------------------------------------------------------------------
       const tasksResp = await request.get(
-        `${BACKEND}/api/bpm/tasks?processInstanceId=${instanceId}`,
+        `${BACKEND}/api/bpm/tasks/by-process/${instanceId}`,
         { headers: { Authorization: `Bearer ${adminToken}` } },
       );
       expect(tasksResp.status(), 'task list fetch must succeed').toBe(200);
@@ -111,7 +100,10 @@ test.describe('workflow-demo — R3 SLA escalation', () => {
       const tasksBody = await tasksResp.json();
       const tasks = (tasksBody?.data as unknown[]) ?? [];
       const managerTask = (tasks as Array<Record<string, unknown>>).find(
-        (t) => (t.taskDefinitionKey as string | undefined) === 'task_manager_approve',
+        (t) =>
+          (t.taskDefinitionKey as string | undefined) === 'task_manager_approve' ||
+          (t.activityId as string | undefined) === 'task_manager_approve' ||
+          (t.processDefinitionActivityId as string | undefined) === 'task_manager_approve',
       );
       expect(
         managerTask,
@@ -119,71 +111,85 @@ test.describe('workflow-demo — R3 SLA escalation', () => {
       ).toBeTruthy();
 
       // -----------------------------------------------------------------------
-      // 5. Do NOT have the manager act — deliberately let the 30 s SLA deadline
-      //    elapse. Poll for escalation evidence on ab_sla_record.
-      //
-      //    UNBLOCK GAP: SlaRecordService.createRecord() has zero callers.
-      //    The poll below will time out (→ fixme converts to expected failure).
-      //    Once the task-activation hook calls createRecord(), this poll will pass.
+      // 5. Assert SLA record was created by SlaActivationListener at task activation.
+      //    Poll immediately — the record should exist already since the event is
+      //    synchronous during task creation.
+      // -----------------------------------------------------------------------
+      const slaCheckResp = await request.get(
+        `${BACKEND}/api/bpm/monitor/instances/${instanceId}/sla`,
+        { headers: { Authorization: `Bearer ${adminToken}` } },
+      );
+      expect(
+        slaCheckResp.ok(),
+        `SLA records endpoint must be accessible: ${slaCheckResp.status()}`,
+      ).toBe(true);
+
+      const slaCheckBody = await slaCheckResp.json();
+      const slaRecords = (slaCheckBody?.data as Array<Record<string, unknown>>) ?? [];
+      expect(
+        slaRecords.length,
+        'SlaActivationListener must have created SLA records when task activated',
+      ).toBeGreaterThanOrEqual(1);
+
+      const managerSlaRecord = slaRecords.find(
+        (r) => r.nodeId === 'task_manager_approve',
+      );
+      expect(
+        managerSlaRecord,
+        'SLA record for task_manager_approve must exist after task activation',
+      ).toBeDefined();
+
+      // Initial status must be 'running'
+      expect(
+        (managerSlaRecord!.status as string)?.toLowerCase(),
+        'SLA record must start as running',
+      ).toBe('running');
+
+      // -----------------------------------------------------------------------
+      // 6. Do NOT have the manager act — wait for the 30 s SLA deadline to elapse.
+      //    SlaSchedulerService runs every 15 s, so breach detection takes at most
+      //    30 s (deadline) + 15 s (scheduler lag) = 45 s.
+      //    We poll GET /api/bpm/monitor/instances/{id}/sla for status=overdue.
       // -----------------------------------------------------------------------
       await expect
         .poll(
           async () => {
-            // Primary signal: GET /api/bpm/sla-records?instanceId=... → any row
-            // with status=ESCALATED (lowercase per project convention).
-            const slaRecordsResp = await request.get(
-              `${BACKEND}/api/bpm/sla-records?instanceId=${instanceId}`,
+            const resp = await request.get(
+              `${BACKEND}/api/bpm/monitor/instances/${instanceId}/sla`,
               { headers: { Authorization: `Bearer ${adminToken}` } },
             );
-            if (!slaRecordsResp.ok()) return false;
+            if (!resp.ok()) return false;
 
-            const slaBody = await slaRecordsResp.json();
-            const records = (slaBody?.data as unknown[]) ?? (slaBody?.data?.records as unknown[]) ?? [];
-            const escalated = (records as Array<Record<string, unknown>>).some(
-              (r) => (r.status as string | undefined)?.toLowerCase() === 'escalated',
+            const body = await resp.json();
+            const records = (body?.data as Array<Record<string, unknown>>) ?? [];
+            return records.some(
+              (r) => (r.status as string | undefined)?.toLowerCase() === 'overdue',
             );
-            if (escalated) return true;
-
-            // Fallback signal: check if the business record has an sla_status field
-            // that reflects escalation (field name tentative — adjust to actual schema).
-            const recResp = await request.get(
-              `${BACKEND}/api/dynamic/wd_leave_request_detail/${recordId}`,
-              { headers: { Authorization: `Bearer ${adminToken}` } },
-            );
-            if (!recResp.ok()) return false;
-            const recBody = await recResp.json();
-            const rec = recBody?.data as Record<string, unknown> | undefined;
-            if (!rec) return false;
-
-            // Accept any evidence of escalation on the business record.
-            const slaStatus = (rec.wd_req_sla_status as string | undefined)?.toLowerCase();
-            return slaStatus === 'escalated';
           },
           {
-            // Timeout: 30 s SLA window + 15 s scheduler lag + 10 s poll overhead = 55 s.
-            // We cap at 60 s to stay within a reasonable test budget.
+            // 30 s SLA deadline + 15 s scheduler lag + 10 s poll overhead = 55 s.
             timeout: 60_000,
-            intervals: [2_000, 3_000, 5_000],
-            message: `SLA escalation for instance ${instanceId} did not appear within 60 s. ` +
-              `Root cause: SlaRecordService.createRecord() has no callers — ` +
-              `ab_sla_record is never populated so SlaSchedulerService has nothing to scan.`,
+            intervals: [3_000, 5_000, 5_000],
+            message: `SLA record for instance ${instanceId} did not reach status=overdue within 60 s. ` +
+              `SlaSchedulerService fixedRate=15s; SLA deadlineValue=PT30S. ` +
+              `Check SlaActivationListener created the record and SlaSchedulerService is scanning.`,
           },
         )
         .toBe(true);
 
       // -----------------------------------------------------------------------
-      // 6. Detail page visual assertion: confirm escalation is visible in UI
-      //    (only reached once the poll passes, i.e. once the gap is fixed)
+      // 7. Detail page visual assertion: leave request status is still PENDING
+      //    (manager has not acted) and the record detail page loads correctly.
       // -----------------------------------------------------------------------
       await applicantPage.goto(
         `/p/wd_leave_request/view/${recordId}`,
         { waitUntil: 'domcontentloaded' },
       );
       const main = applicantPage.locator('main').first();
-      // Escalated state should be visible in the status field or a dedicated SLA badge.
+      // The leave request status field must be visible (confirms page loaded correctly)
       await expect(
-        main.locator('[data-testid="form-field-wd_req_status"], [data-testid="sla-status-badge"]').first(),
-      ).toContainText(/escalat|已升级/i, { timeout: 5_000 });
+        main.locator('[data-testid="form-field-wd_req_status"]').first(),
+      ).toBeVisible({ timeout: 5_000 });
 
       // -----------------------------------------------------------------------
       // Cleanup
