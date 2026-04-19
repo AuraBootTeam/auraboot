@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import com.auraboot.framework.integration.TestIdGenerator;
 
 /** PR-75 Phase 1 — end-to-end behaviour of {@link UserSoulProfileDeriver}. */
 @Commit
@@ -34,7 +35,7 @@ class UserSoulProfileDeriverIntegrationTest extends BaseIntegrationTest {
 
     @BeforeEach
     void setup() {
-        tenantId = 9_760_000L + System.nanoTime() % 10_000;
+        tenantId = TestIdGenerator.uniqueTenantId();
         userId = "uu_" + Long.toString(System.nanoTime() & 0xffff, 36);
         tag = "usd" + Long.toString(System.nanoTime() & 0xfffff, 36) + "_";
         // Default: derivation enabled for direct tests; runScheduled test

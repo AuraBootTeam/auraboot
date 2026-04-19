@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.Random;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import com.auraboot.framework.integration.TestIdGenerator;
 
 /**
  * Parity + correctness test for the pgvector ANN shortlist path (PR-74 / N3).
@@ -43,9 +44,9 @@ class MemoryPromotionExtractorAnnParityIntegrationTest extends BaseIntegrationTe
 
     @BeforeEach
     void setup() {
-        long base = 9_770_000L + System.nanoTime() % 10_000;
-        tenantA = base;
-        tenantB = base + 1;
+        // base replaced by two unique TestIdGenerator.uniqueTenantId() calls below
+        tenantA = TestIdGenerator.uniqueTenantId();
+        tenantB = TestIdGenerator.uniqueTenantId();
         ReflectionTestUtils.setField(extractor, "importanceSpikeEnabled", false);
         ReflectionTestUtils.setField(extractor, "minUsersPerTenant", 3);
         ReflectionTestUtils.setField(extractor, "minSimilarity", 0.85d);

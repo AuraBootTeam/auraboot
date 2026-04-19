@@ -22,6 +22,7 @@ import java.util.Map;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import com.auraboot.framework.integration.TestIdGenerator;
 
 /**
  * PR-85 / Phase 4 — MemoryTierAdminController guard + happy-path integration.
@@ -65,7 +66,7 @@ class MemoryTierAdminGuardIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("non-admin POST .../promote-now -> 409")
     void nonAdminBlocked() throws Exception {
-        tenantId = 9_960_000L + (System.nanoTime() % 10_000);
+        tenantId = TestIdGenerator.uniqueTenantId();
         String pid = insertL1(tenantId, String.valueOf(testUser.getId()),
                 "non-admin blocked test " + UniqueIdGenerator.generate(), 2);
 
@@ -83,7 +84,7 @@ class MemoryTierAdminGuardIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("admin POST .../promote-now on L1 row -> 200 + category=user")
     void adminPromotesL1() throws Exception {
-        tenantId = 9_970_000L + (System.nanoTime() % 10_000);
+        tenantId = TestIdGenerator.uniqueTenantId();
         AdminGuardTestSupport.grantTenantAdmin(jdbc, tenantId, testUser.getId());
 
         String pid = insertL1(tenantId, String.valueOf(testUser.getId()),
@@ -109,7 +110,7 @@ class MemoryTierAdminGuardIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("admin POST .../promote-now on already-L2 row -> 409 memory_not_l1")
     void adminAlreadyL2_conflict() throws Exception {
-        tenantId = 9_980_000L + (System.nanoTime() % 10_000);
+        tenantId = TestIdGenerator.uniqueTenantId();
         AdminGuardTestSupport.grantTenantAdmin(jdbc, tenantId, testUser.getId());
 
         String pid = insertL2(tenantId, String.valueOf(testUser.getId()),
