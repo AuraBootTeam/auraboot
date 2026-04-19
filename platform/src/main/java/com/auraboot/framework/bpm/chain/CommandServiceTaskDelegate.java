@@ -147,12 +147,13 @@ public class CommandServiceTaskDelegate implements JavaDelegation {
             throw e; // Re-throw chain exceptions
         } catch (Exception e) {
             long durationMs = System.currentTimeMillis() - startTime;
-            handleFailure(activityId, commandCode, e.getMessage(), onFail,
-                    executionId, durationMs, processVars);
-
             executionLogService.logNodeFailure(executionId, activityId, e,
                     Map.of("commandCode", commandCode));
-            throw e;
+            // handleFailure throws CommandChainStepException for onFail=abort;
+            // for skip_and_warn it records the skip and returns normally so the
+            // process can continue to the next node without propagating the error.
+            handleFailure(activityId, commandCode, e.getMessage(), onFail,
+                    executionId, durationMs, processVars);
         }
     }
 

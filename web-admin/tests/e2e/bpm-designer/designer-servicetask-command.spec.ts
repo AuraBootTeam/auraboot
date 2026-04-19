@@ -16,8 +16,8 @@
  * L1 (designerJson):
  *   - Nodes: start_1, svc_1, end_1
  *   - Edges: start_1→svc_1, svc_1→end_1
- *   - svc_1.data.serviceType === 'command'
- *   - svc_1.data.commandCode === 'wd:submit_leave_request'
+ *   - svc_1.data.config.serviceType === 'command'
+ *   - svc_1.data.config.commandCode === 'wd:submit_leave_request'
  *
  * L2 (BPMN XML):
  *   - serviceTask element with id="svc_1" present
@@ -102,11 +102,15 @@ test.describe('D3 — designer: serviceTask + command binding', () => {
     });
 
     // Configure the serviceTask: serviceType=command, commandCode=wd:submit_leave_request
-    // The configureNode call merges the patch into node.data via store.updateNode()
-    // ServiceTaskConfig fields: serviceType, commandCode (see types/index.ts:77-90)
+    // configureNode merges the patch into node.data via store.updateNode().
+    // The converter reads serviceType from node.data.config (not node.data directly):
+    //   writeServiceTask(... config = data.path("config") ...) → getTextOrNull(config, "serviceType")
+    // Therefore we must nest under 'config' so it lands at node.data.config.serviceType.
     await configureNode(page, 'svc_1', {
-      serviceType: 'command',
-      commandCode: 'wd:submit_leave_request',
+      config: {
+        serviceType: 'command',
+        commandCode: 'wd:submit_leave_request',
+      },
     });
 
     // Connect nodes
@@ -152,9 +156,12 @@ test.describe('D3 — designer: serviceTask + command binding', () => {
     const svcData = svcNode!.data as Record<string, unknown>;
     expect(svcData, 'svc_1 node must have data').toBeDefined();
 
-    // configureNode patches top-level node.data (store.updateNode merges at data level)
-    expect(svcData.serviceType, 'serviceType must be command').toBe('command');
-    expect(svcData.commandCode, 'commandCode must be wd:submit_leave_request').toBe(
+    // configureNode patches node.data.config (the patch was { config: { serviceType, commandCode } })
+    // converter reads: config = data.path("config"); serviceType = getTextOrNull(config, "serviceType")
+    const svcConfig = svcData.config as Record<string, unknown>;
+    expect(svcConfig, 'svc_1 node.data.config must be present').toBeDefined();
+    expect(svcConfig.serviceType, 'serviceType must be command').toBe('command');
+    expect(svcConfig.commandCode, 'commandCode must be wd:submit_leave_request').toBe(
       'wd:submit_leave_request',
     );
 
