@@ -218,13 +218,29 @@ test.describe('View Management Panel', () => {
 
     // Reload to ensure the saved viewConfig is fetched from server
     await page.reload({ waitUntil: 'load' });
-    // Wait for view to fully load (kanban needs API data)
+    // Wait for view to fully load (kanban needs API data).
     await page.waitForLoadState('networkidle').catch(() => {});
-    // Extra wait for kanban columns to render
-    await page.waitForTimeout(2000);
 
-    // CRITICAL: Verify Kanban view actually renders
+    // CRITICAL: Verify Kanban view actually renders.
+    // Poll for either the rendered kanban or the "not configured" fallback
+    // so we don't race the client render. Bounded to 5s.
     const notConfigured = page.getByText('Kanban not configured');
+    const emptyNotConfigured = page.locator('[data-testid="view-empty-not-configured"]');
+    await expect
+      .poll(
+        async () => {
+          if (await notConfigured.isVisible().catch(() => false)) return 'not-configured';
+          if (await emptyNotConfigured.isVisible().catch(() => false)) return 'empty';
+          // Any kanban-like board present? (.flex.gap-4.overflow-x-auto is the
+          // observed structural marker, see saved-view-kanban.spec.ts)
+          if (await page.locator('.flex.gap-4.overflow-x-auto').first().isVisible().catch(() => false)) {
+            return 'rendered';
+          }
+          return 'pending';
+        },
+        { timeout: 5_000 },
+      )
+      .not.toBe('pending');
     const isNotConfigured = await notConfigured.isVisible().catch(() => false);
 
     if (isNotConfigured) {
@@ -237,7 +253,6 @@ test.describe('View Management Panel', () => {
     }
 
     // Check that the "view-empty-not-configured" state does NOT appear
-    const emptyNotConfigured = page.locator('[data-testid="view-empty-not-configured"]');
     await expect(emptyNotConfigured).not.toBeVisible({ timeout: 3_000 });
   });
 
@@ -301,12 +316,23 @@ test.describe('View Management Panel', () => {
     // Reload to ensure saved viewConfig is fetched
     await page.reload({ waitUntil: 'load' });
     await page.waitForLoadState('networkidle').catch(() => {});
-    await page.waitForTimeout(2000);
+    // Poll for either the FullCalendar root (.fc) or the not-configured
+    // fallback so we don't race the client render. Bounded to 5s.
+    const calendarContainer = page.locator('.fc');
+    const notConfiguredCal = page.getByText('Calendar not configured');
+    await expect
+      .poll(
+        async () => {
+          if (await calendarContainer.isVisible().catch(() => false)) return 'rendered';
+          if (await notConfiguredCal.isVisible().catch(() => false)) return 'not-configured';
+          return 'pending';
+        },
+        { timeout: 5_000 },
+      )
+      .not.toBe('pending');
 
     // CRITICAL: Verify calendar renders — FullCalendar injects .fc class
-    const calendarContainer = page.locator('.fc');
-    const notConfigured = page.getByText('Calendar not configured');
-    const isNotConfigured = await notConfigured.isVisible().catch(() => false);
+    const isNotConfigured = await notConfiguredCal.isVisible().catch(() => false);
 
     if (isNotConfigured) {
       test.fail(true, 'BUG: Calendar shows "not configured" after saving date field in config step.');
