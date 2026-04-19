@@ -122,6 +122,19 @@ async function ensureUser(
   });
 
   if (!createResp.ok()) {
+    // Concurrency: another worker may have just created this user between our
+    // login attempt and this create. Retry login once before giving up.
+    const retryLoginResp = await api.post(`${BACKEND_URL}/api/auth/login`, {
+      data: { email: opts.email, password: opts.password },
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (retryLoginResp.ok()) {
+      const retryBody = await retryLoginResp.json();
+      const retryJwt: unknown = retryBody?.data?.jwt;
+      if (typeof retryJwt === 'string' && retryJwt.trim() !== '') {
+        return retryJwt;
+      }
+    }
     const errBody = await createResp.text();
     throw new Error(
       `ensureUser(${opts.email}): admin create failed with HTTP ${createResp.status()}: ${errBody}`,
@@ -209,10 +222,12 @@ export async function setLeaveBalance(
     `${BACKEND_URL}/api/meta/commands/execute/wd:create_leave_balance`,
     {
       data: {
-        wd_bal_employee: userId,
-        wd_bal_year: currentYear,
-        wd_bal_annual_remaining: days,
-        wd_bal_sick_used: 0,
+        payload: {
+          wd_bal_employee: userId,
+          wd_bal_year: currentYear,
+          wd_bal_annual_remaining: days,
+          wd_bal_sick_used: 0,
+        },
       },
       headers: {
         'Content-Type': 'application/json',
@@ -229,9 +244,9 @@ export async function setLeaveBalance(
   }
 
   const body = await resp.json();
-  // Command execute returns code 200/OK on success; non-success codes indicate a domain error
+  // Command execute ApiResponse convention: code === "0" means success.
   const code: unknown = body?.code;
-  if (code !== 200 && code !== 'OK' && code !== '200') {
+  if (code !== '0') {
     throw new Error(
       `setLeaveBalance command failed: ${JSON.stringify(body)}`,
     );
@@ -442,4 +457,38 @@ export async function processTask(
 
   // Dialog should close after success
   await expect(dialog).not.toBeVisible({ timeout: 5000 });
+}
+
+// ---------------------------------------------------------------------------
+// loginViaUI
+// ---------------------------------------------------------------------------
+
+/**
+ * Login as a specific user via the UI (for tests that need multiple user contexts).
+ * Requires the page to be on or about to navigate to /login.
+ *
+ * Goes through the real login form — so downstream pages land with proper
+ * session cookies for that user (not the admin storageState default).
+ */
+export async function loginViaUI(page: Page, email: string, password: string): Promise<void> {
+  await page.goto('/login');
+  const emailInput = page
+    .locator(
+      'input#email, input[name="email"], input[type="email"], input[placeholder*="邮箱"], input[placeholder*="Email"]',
+    )
+    .first();
+  await emailInput.waitFor({ state: 'visible', timeout: 10_000 });
+  await emailInput.fill(email);
+
+  const passwordInput = page
+    .locator(
+      'input#password, input[name="password"], input[type="password"], input[placeholder*="密码"], input[placeholder*="Password"]',
+    )
+    .first();
+  await passwordInput.fill(password);
+
+  const submitBtn = page.getByRole('button', { name: /login|登录|sign in/i });
+  await submitBtn.click();
+
+  await page.waitForURL((url) => !url.pathname.endsWith('/login'), { timeout: 15_000 });
 }
