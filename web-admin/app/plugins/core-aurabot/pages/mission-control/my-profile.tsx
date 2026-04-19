@@ -324,18 +324,41 @@ function ProfileTab({
     }
   }, [fetchProfile, l, setToast]);
 
-  const exportJson = useCallback(() => {
-    if (!row) return;
-    const blob = new Blob([JSON.stringify(row, null, 2)], {
-      type: 'application/json',
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `soul-profile-v${row.version}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [row]);
+  const exportJson = useCallback(async () => {
+    // GDPR data portability: hit the server-side export endpoint which
+    // returns Content-Disposition: attachment with the full JSON dump
+    // (all versions, including archived tombstones). The browser handles
+    // the download; we still surface a toast on completion/failure.
+    setInFlight('export');
+    try {
+      const resp = await fetch('/api/user/soul-profile/export', {
+        method: 'GET',
+        credentials: 'include',
+      });
+      if (!resp.ok) {
+        setToast({
+          kind: 'err',
+          msg: l('导出失败', 'Export failed') + ` (${resp.status})`,
+        });
+        return;
+      }
+      const blob = await resp.blob();
+      const disposition = resp.headers.get('content-disposition') ?? '';
+      const m = disposition.match(/filename="?([^";]+)"?/i);
+      const filename = m?.[1] ?? `user-soul-profile-${Date.now()}.json`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      setToast({ kind: 'ok', msg: l('导出成功', 'Export succeeded') });
+    } finally {
+      setInFlight(null);
+    }
+  }, [l, setToast]);
 
   if (loading) {
     return (

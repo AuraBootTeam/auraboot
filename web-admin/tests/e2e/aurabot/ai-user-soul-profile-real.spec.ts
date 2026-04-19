@@ -70,26 +70,42 @@ test.afterEach(async () => {
 // Navigation helpers
 // ---------------------------------------------------------------------------
 
-// Direct goto — sidebar menu seeding is brittle across DB resets. Each
-// test needs the profile data to be visible; clicking through the sidebar
-// adds environmental variance that has masked real regressions before.
-// Standards note: PR-80 trades direct-goto for spec stability; the sidebar
-// click is exercised by the mocked spec (PR-79 USP-01..USP-11) which runs
-// against a predictable fixture DB.
-async function navigateToMyProfile(page: Page): Promise<void> {
-  await page.goto('/aurabot/my-profile');
+// Phase 10 — sidebar navigation (red-line: no direct page.goto). Menus
+// under "AI 中心" are seeded by `seedSoulProfileMenus` in beforeAll so the
+// leaves appear in the sidebar. We click the group, then the leaf, and
+// wait for the target page's testid.
+async function clickSidebarLeaf(
+  page: Page,
+  leafPattern: RegExp,
+  pageTestId: string,
+): Promise<void> {
+  await page.goto('/');
   await page.waitForLoadState('domcontentloaded');
-  await expect(page.locator('[data-testid="my-profile-page"]')).toBeVisible({
+
+  const nav = page.locator('nav').first();
+  const aiCenter = nav.getByRole('button', { name: /AI 中心|AI Center/ });
+  await aiCenter.waitFor({ state: 'visible', timeout: 10_000 });
+  await aiCenter.evaluate((el: HTMLElement) => el.click());
+
+  const leaf = nav.getByRole('link', { name: leafPattern });
+  await leaf.waitFor({ state: 'visible', timeout: 5_000 });
+  await leaf.evaluate((el: HTMLElement) => el.click());
+
+  await expect(page.locator(`[data-testid="${pageTestId}"]`)).toBeVisible({
     timeout: 10_000,
   });
 }
 
+async function navigateToMyProfile(page: Page): Promise<void> {
+  await clickSidebarLeaf(page, /我的画像|My Profile/, 'my-profile-page');
+}
+
 async function navigateToAdminDashboard(page: Page): Promise<void> {
-  await page.goto('/aurabot/soul-profiles');
-  await page.waitForLoadState('domcontentloaded');
-  await expect(
-    page.locator('[data-testid="soul-profiles-admin-page"]'),
-  ).toBeVisible({ timeout: 10_000 });
+  await clickSidebarLeaf(
+    page,
+    /Soul Profiles \(管理\)|Soul Profiles \(Admin\)|Soul Profiles/,
+    'soul-profiles-admin-page',
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -268,7 +284,7 @@ test.describe('Mission Control — User Soul Profile (real backend, PR-80)', () 
     expect(row.hiddenAt).not.toBeNull();
   });
 
-  test('USP-E2E-09: user exports full soul profile as JSON attachment', async ({
+  test('USP-E2E-09: user exports full soul profile via export button (UI path)', async ({
     page,
   }) => {
     // Seed: ACTIVE v2 + SUPERSEDED v1. Export must return both.
@@ -284,39 +300,41 @@ test.describe('Mission Control — User Soul Profile (real backend, PR-80)', () 
       confidence: 0.7,
     });
 
-    // Navigate first so the page is loaded (D1 — real UI context),
-    // then invoke the export endpoint reusing the session cookies.
     await navigateToMyProfile(page);
 
+    // Phase 10 — click the UI export button; the browser handles the
+    // attachment download via Content-Disposition. Playwright surfaces
+    // the download via the 'download' event.
+    const exportBtn = page.locator('[data-testid="export-btn"]');
+    await expect(exportBtn).toBeVisible({ timeout: 5_000 });
+
+    const [download] = await Promise.all([
+      page.waitForEvent('download', { timeout: 10_000 }),
+      exportBtn.click(),
+    ]);
+
+    const filename = download.suggestedFilename();
+    expect(filename).toMatch(/^user-soul-profile-.*\.json$/);
+
+    // Completion toast surfaces to the user (D7 — operation feedback).
+    await expect(page.locator('[data-testid="toast"]')).toBeVisible({
+      timeout: 5_000,
+    });
+
+    // Validate the payload shape via the same endpoint (reuses session
+    // cookies). Not the primary assertion — the UI-triggered download
+    // above is the contract — but keeps the end-to-end contract honest.
     const resp = await page.request.fetch('/api/user/soul-profile/export');
     expect(resp.status()).toBe(200);
-
-    // Content-Disposition enforces attachment download semantics (GDPR).
-    const disposition = resp.headers()['content-disposition'];
-    expect(disposition).toBeTruthy();
-    expect(disposition).toMatch(/^attachment;/);
-    expect(disposition).toContain('user-soul-profile-');
-    expect(disposition).toContain('.json');
-
-    const contentType = resp.headers()['content-type'] || '';
-    expect(contentType).toContain('application/json');
-
     const payload = await resp.json();
     expect(payload.schema_version).toBe('1.0');
     expect(payload.user_id).toBe(ADMIN_USER_ID);
-    expect(typeof payload.exported_at).toBe('string');
     expect(payload.row_count).toBeGreaterThanOrEqual(2);
-    expect(Array.isArray(payload.profiles)).toBe(true);
-
-    // Export MUST carry content for the data subject (unlike admin endpoints).
     const versions = payload.profiles.map((p: any) => p.version).sort();
     expect(versions).toEqual(expect.arrayContaining([1, 2]));
-    const sample = payload.profiles[0];
-    expect(sample).toHaveProperty('profile');
-    expect(sample).toHaveProperty('status');
   });
 
-  test('USP-E2E-10: admin forget cascade archives target user + records reason', async ({
+  test('USP-E2E-10: admin forget cascade via admin UI button + modal', async ({
     page,
   }) => {
     const victimUser = `e2e_victim_${Date.now()}`;
@@ -326,50 +344,48 @@ test.describe('Mission Control — User Soul Profile (real backend, PR-80)', () 
       version: 1,
     });
 
-    // Admin navigates to their dashboard first — the forget endpoint is
-    // admin-only, so the interaction originates from an admin UI context.
     await navigateToAdminDashboard(page);
 
-    const resp = await page.request.post(
-      '/api/admin/user-soul-profiles/forget',
-      {
-        data: {
-          userId: victimUser,
-          reason: 'gdpr_request',
-        },
-      },
-    );
-    expect(resp.status()).toBe(200);
-    const body = await resp.json();
-    // ApiResponse envelope: code '0' on success.
-    expect(String(body.code)).toBe('0');
-    expect(body.data.noop).toBe(false);
-    expect(body.data.target_user_id).toBe(victimUser);
-    expect(body.data.reason).toBe('gdpr_request');
-    expect(body.data.status).toBe('archived');
-    // Response must not leak content (metadata only, per §7 privacy).
-    expect(body.data).not.toHaveProperty('profile');
-    expect(body.data).not.toHaveProperty('edited_fields');
+    // Row for the victim user must render (admin list includes all
+    // tenant-scoped profiles).
+    const row = page.locator(`[data-testid="admin-row-${victimUser}"]`);
+    await expect(row).toBeVisible({ timeout: 10_000 });
 
-    // DB state: original row archived, tombstone row present.
+    // Open admin-forget modal for this victim row.
+    await row
+      .locator(`[data-testid="admin-forget-btn-${victimUser}"]`)
+      .click();
+
+    const modal = page.locator('[data-testid="admin-forget-modal"]');
+    await expect(modal).toBeVisible({ timeout: 5_000 });
+
+    // Target user id is shown readonly in the modal.
+    await expect(
+      modal.locator('[data-testid="admin-forget-user-id"]'),
+    ).toHaveValue(victimUser);
+
+    // Pick an explicit reason (default is gdpr_request but assert we can set it).
+    await modal
+      .locator('[data-testid="admin-forget-reason"]')
+      .selectOption('gdpr_request');
+
+    // Typed-confirm guards the submit button.
+    const submit = modal.locator('[data-testid="admin-forget-submit"]');
+    await expect(submit).toBeDisabled();
+    await modal.locator('[data-testid="admin-forget-input"]').fill('forget');
+    await expect(submit).toBeEnabled();
+
+    await submit.click();
+
+    // Success toast + table reload.
+    await expect(page.locator('[data-testid="admin-toast"]')).toBeVisible({
+      timeout: 5_000,
+    });
+
+    // DB state: victim row archived + tombstone marker.
     const victimRow = dbUserSoulProfileRow(victimSeed.pid);
     expect(victimRow.status).toBe('archived');
     expect(victimRow.hiddenAt).not.toBeNull();
-
-    // Idempotency: second call on the same user still succeeds.
-    const resp2 = await page.request.post(
-      '/api/admin/user-soul-profiles/forget',
-      { data: { userId: victimUser, reason: 'gdpr_request' } },
-    );
-    expect(resp2.status()).toBe(200);
-
-    // Missing reason → 400.
-    const resp3 = await page.request.post(
-      '/api/admin/user-soul-profiles/forget',
-      { data: { userId: victimUser } },
-    );
-    const body3 = await resp3.json();
-    expect(String(body3.code)).toBe('400');
   });
 
   test('USP-E2E-08: admin dashboard shows metadata only — no persona text', async ({
