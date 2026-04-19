@@ -64,8 +64,8 @@ class UserSoulProfileDeriverIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("skips when fewer than min-memories available")
     void skipsTooLittleSignal() {
-        seedMemory("m1", "profile", "a", "hi", 7);
-        seedMemory("m2", "profile", "b", "hello", 7);
+        seedMemory("m1", "user", "a", "hi", 7);
+        seedMemory("m2", "user", "b", "hello", 7);
         DerivationResult r = deriver.deriveForUser(tenantId, userId);
         assertThat(r.outcome()).isEqualTo(Outcome.SKIPPED_TOO_LITTLE_SIGNAL);
         Long rows = jdbc.queryForObject(
@@ -78,7 +78,10 @@ class UserSoulProfileDeriverIntegrationTest extends BaseIntegrationTest {
     @DisplayName("produces DRAFT from 5 seeded memories with source_memory_pids populated")
     void producesDraft() {
         for (int i = 1; i <= 5; i++) {
-            seedMemory("m" + i, i <= 2 ? "profile" : "general",
+            // Phase 4 narrowed deriver to L2 (category IN user/agent) — seed all
+            // as 'user' so the 5-memory drafting scenario still exercises the
+            // full projection path; prior mix of user+general was arbitrary.
+            seedMemory("m" + i, "user",
                     "title_" + i, "concise bullet content " + i, 8);
         }
         DerivationResult r = deriver.deriveForUser(tenantId, userId);
@@ -100,7 +103,7 @@ class UserSoulProfileDeriverIntegrationTest extends BaseIntegrationTest {
     @DisplayName("idempotent: same inputs + ACTIVE prior with same hash → skipped_no_change")
     void idempotentSkipsWhenUnchanged() {
         for (int i = 1; i <= 5; i++) {
-            seedMemory("m" + i, "profile", "t" + i, "concise bullet " + i, 8);
+            seedMemory("m" + i, "user", "t" + i, "concise bullet " + i, 8);
         }
         DerivationResult first = deriver.deriveForUser(tenantId, userId);
         assertThat(first.outcome()).isEqualTo(Outcome.DRAFTED);
@@ -130,7 +133,7 @@ class UserSoulProfileDeriverIntegrationTest extends BaseIntegrationTest {
     @DisplayName("ProfileHasher idempotency: identical inputs produce identical hashes across back-to-back runs")
     void profileHasherIdempotentAcrossRuns() {
         for (int i = 1; i <= 5; i++) {
-            seedMemory("m" + i, "profile", "t" + i, "concise bullet " + i, 8);
+            seedMemory("m" + i, "user", "t" + i, "concise bullet " + i, 8);
         }
         // Run 1 — produces DRAFT.
         DerivationResult first = deriver.deriveForUser(tenantId, userId);
@@ -189,7 +192,7 @@ class UserSoulProfileDeriverIntegrationTest extends BaseIntegrationTest {
     @DisplayName("runScheduled is a no-op when derivation.enabled = false")
     void scheduledDisabled() {
         for (int i = 1; i <= 5; i++) {
-            seedMemory("m" + i, "profile", "t", "x", 8);
+            seedMemory("m" + i, "user", "t", "x", 8);
         }
         ReflectionTestUtils.setField(deriver, "enabled", false);
         int drafted = deriver.runScheduled();
@@ -204,7 +207,7 @@ class UserSoulProfileDeriverIntegrationTest extends BaseIntegrationTest {
     @DisplayName("runScheduled discovers candidate users and drafts when enabled")
     void scheduledDiscoversUsers() {
         for (int i = 1; i <= 5; i++) {
-            seedMemory("m" + i, "profile", "t", "x", 8);
+            seedMemory("m" + i, "user", "t", "x", 8);
         }
         int drafted = deriver.runScheduled();
         assertThat(drafted).isGreaterThanOrEqualTo(1);
@@ -218,7 +221,7 @@ class UserSoulProfileDeriverIntegrationTest extends BaseIntegrationTest {
     @DisplayName("deriver skips forgotten user (tombstone)")
     void deriverSkipsForgottenUser() {
         for (int i = 1; i <= 5; i++) {
-            seedMemory("m" + i, "profile", "t", "x", 8);
+            seedMemory("m" + i, "user", "t", "x", 8);
         }
         // Insert a tombstone row — status=ARCHIVED with edited_fields._forgotten=true.
         jdbc.update("INSERT INTO ab_agent_user_soul_profile "
@@ -240,7 +243,7 @@ class UserSoulProfileDeriverIntegrationTest extends BaseIntegrationTest {
     @DisplayName("advisory lock 7306 prevents concurrent runScheduled")
     void advisoryLockSerialisesScheduled() throws InterruptedException {
         for (int i = 1; i <= 5; i++) {
-            seedMemory("m" + i, "profile", "t", "x", 8);
+            seedMemory("m" + i, "user", "t", "x", 8);
         }
         // Pre-acquire the lock on this connection thread via a dedicated DataSource
         // connection isn't portable through JdbcTemplate, so instead we run
