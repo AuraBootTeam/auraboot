@@ -77,6 +77,7 @@ public class MemoryL1L2OrphanScanner {
     private final TransactionTemplate tx;
     private final MemoryL1L2Promoter promoter;
     private final MemoryL1L2PromotionMetrics metrics;
+    private final MemoryL1L2LeaderElection leaderElection;
 
     @Value("${acp.memory.l1l2.orphan-scan.enabled:false}")
     private boolean enabled;
@@ -84,11 +85,13 @@ public class MemoryL1L2OrphanScanner {
     public MemoryL1L2OrphanScanner(JdbcTemplate jdbc,
                                    PlatformTransactionManager txManager,
                                    MemoryL1L2Promoter promoter,
-                                   MemoryL1L2PromotionMetrics metrics) {
+                                   MemoryL1L2PromotionMetrics metrics,
+                                   MemoryL1L2LeaderElection leaderElection) {
         this.jdbc = jdbc;
         this.tx = new TransactionTemplate(txManager);
         this.promoter = promoter;
         this.metrics = metrics;
+        this.leaderElection = leaderElection;
     }
 
     /** Every 15 minutes; override via {@code acp.memory.l1l2.orphan-scan.cron}. */
@@ -109,6 +112,15 @@ public class MemoryL1L2OrphanScanner {
      * and releases on commit.
      */
     public ScanSummary runOnce() {
+        // Phase 4 (PR-85): coarse multi-instance gate before the advisory lock.
+        // When leader-election is disabled (default) acquire() returns true
+        // and behaviour is unchanged; when enabled, non-leader instances skip
+        // the tick entirely so we don't duplicate scans across replicas.
+        if (!leaderElection.acquire(MemoryL1L2LeaderElection.JOB_ORPHAN)) {
+            log.debug("MemoryL1L2OrphanScanner: not leader for {}, skipping tick",
+                    MemoryL1L2LeaderElection.JOB_ORPHAN);
+            return new ScanSummary(0, 0, 0, 0, 0);
+        }
         Integer[] counts = tx.execute(status -> {
             Boolean acquired = jdbc.queryForObject(
                     "SELECT pg_try_advisory_lock(?)", Boolean.class, LOCK_KEY);
