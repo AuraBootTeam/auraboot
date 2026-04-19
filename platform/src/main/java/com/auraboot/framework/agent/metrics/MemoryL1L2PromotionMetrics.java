@@ -30,6 +30,15 @@ public class MemoryL1L2PromotionMetrics {
     public static final String DEMOTION_TOTAL = "auraboot_memory_tier_demotion_total";
     /** Phase 4 (PR-85) — admin-triggered promote-now counter. */
     public static final String ADMIN_PROMOTE_TOTAL = "auraboot_memory_tier_admin_promote_total";
+    /**
+     * Phase 4 Round-3 (I2) — counter fired when a scheduler tick is skipped
+     * because the current JVM did not win the {@code ab_scheduler_leader}
+     * election for its job. Gives operators a Prometheus signal distinguishing
+     * "scheduler healthy but other instance is leader" from "scheduler broken"
+     * (silent log.debug alone left the healthy-but-idle case indistinguishable
+     * from the broken case).
+     */
+    public static final String LEADER_SKIPPED_TOTAL = "auraboot_memory_l1l2_leader_skipped_total";
 
     public static final String OUTCOME_PROMOTED = "promoted";
     public static final String OUTCOME_SKIPPED_LOW_SCORE = "skipped_low_score";
@@ -104,6 +113,22 @@ public class MemoryL1L2PromotionMetrics {
                 .description("Admin-triggered L1->L2 promote-now attempts by outcome")
                 .tag("tenant", tenantId == null ? "unknown" : tenantId.toString())
                 .tag("outcome", outcome == null ? "unknown" : outcome)
+                .register(registry)
+                .increment();
+    }
+
+    /**
+     * Phase 4 Round-3 (I2) — record a scheduler tick that was skipped because
+     * this instance is not the current leader for {@code jobCode}. Labelled
+     * with {@code instance_id} so per-replica behaviour is observable;
+     * cardinality is bounded by deploy size and stable per JVM (UUID assigned
+     * once at startup — see {@link com.auraboot.framework.agent.memory.MemoryL1L2LeaderElection}).
+     */
+    public void recordLeaderSkipped(String jobCode, String instanceId) {
+        Counter.builder(LEADER_SKIPPED_TOTAL)
+                .description("Scheduler ticks skipped because another instance holds the leader lease")
+                .tag("job_code", jobCode == null ? "unknown" : jobCode)
+                .tag("instance_id", instanceId == null ? "unknown" : instanceId)
                 .register(registry)
                 .increment();
     }
