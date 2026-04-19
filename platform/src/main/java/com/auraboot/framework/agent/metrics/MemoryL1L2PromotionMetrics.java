@@ -28,6 +28,8 @@ public class MemoryL1L2PromotionMetrics {
     public static final String PROMOTION_TOTAL = "auraboot_memory_tier_promotion_total";
     public static final String EVENT_TOTAL = "auraboot_memory_tier_event_total";
     public static final String DEMOTION_TOTAL = "auraboot_memory_tier_demotion_total";
+    /** Phase 4 (PR-85) — admin-triggered promote-now counter. */
+    public static final String ADMIN_PROMOTE_TOTAL = "auraboot_memory_tier_admin_promote_total";
 
     public static final String OUTCOME_PROMOTED = "promoted";
     public static final String OUTCOME_SKIPPED_LOW_SCORE = "skipped_low_score";
@@ -43,6 +45,8 @@ public class MemoryL1L2PromotionMetrics {
     public static final String EVENT_TYPE_L1_PROMOTED = "L1_PROMOTED";
     public static final String EVENT_TYPE_DEDUP_HIT = "DEDUP_HIT";
     public static final String EVENT_TYPE_L2_DEMOTED = "L2_DEMOTED";
+    /** Phase 4 (PR-85) — admin override flipped a session row to user. */
+    public static final String EVENT_TYPE_ADMIN_PROMOTED = "admin_promoted";
     /**
      * Phase 3 Round-2: audit event emitted when a candidate is skipped on the
      * race path (atomic UPDATE matched 0 rows because a concurrent promoter
@@ -90,6 +94,20 @@ public class MemoryL1L2PromotionMetrics {
      * broken down by {@code outcome ∈ {demoted, skipped}}. Skipped rows still
      * increment so we can compute a skip rate for tuning the threshold.
      */
+    /**
+     * Phase 4 (PR-85) — one increment per admin-triggered
+     * {@code POST /api/admin/memory/{pid}/promote-now} call, broken down by
+     * {@code outcome ∈ {promoted, skipped_dup, skipped_dup_semantic, conflict}}.
+     */
+    public void recordAdminPromoteOutcome(Long tenantId, String outcome) {
+        Counter.builder(ADMIN_PROMOTE_TOTAL)
+                .description("Admin-triggered L1->L2 promote-now attempts by outcome")
+                .tag("tenant", tenantId == null ? "unknown" : tenantId.toString())
+                .tag("outcome", outcome == null ? "unknown" : outcome)
+                .register(registry)
+                .increment();
+    }
+
     public void recordDemotionOutcome(Long tenantId, String outcome) {
         Counter.builder(DEMOTION_TOTAL)
                 .description("L2 -> L1 demotion attempts broken down by outcome")

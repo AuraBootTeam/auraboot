@@ -7947,3 +7947,30 @@ CREATE INDEX IF NOT EXISTS idx_memory_tier_event_tenant_type
 
 COMMENT ON TABLE ab_agent_memory_tier_event IS 'Audit trail for L1<->L2 tier transitions';
 
+-- ===========================================================================
+-- PR-85 / Phase 4 — Scheduler leader election (multi-instance protection)
+-- ===========================================================================
+--
+-- Design: docs/plans/2026-04/2026-04-19-memory-l1-l2-promotion-design.md §9.2.
+--
+-- Postgres advisory locks (7311/7312) are per-connection, which means
+-- multi-instance deployments double-run the orphan scanner and demoter: the
+-- second instance acquires the lock on its own session, both scan the same
+-- rows, content-hash dedup masks the duplication, but metrics double-count
+-- and DB load doubles unnecessarily.
+--
+-- This table adds a coarser leader-election gate BEFORE the advisory-lock
+-- attempt: whichever instance most recently updated heartbeat_at on a given
+-- job_code within the last 60s is the leader; the others skip the tick.
+--
+-- Heartbeat is renewed every leader tick; stale leaders (crashed JVM) are
+-- replaced after 60s.
+CREATE TABLE IF NOT EXISTS ab_scheduler_leader (
+    job_code      VARCHAR(64) PRIMARY KEY,
+    instance_id   VARCHAR(64) NOT NULL,
+    heartbeat_at  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+COMMENT ON TABLE ab_scheduler_leader IS
+    'PR-85 — coarse leader election for multi-instance schedulers (orphan / demoter)';
+

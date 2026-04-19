@@ -1,7 +1,7 @@
 package com.auraboot.framework.agent.service;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 
@@ -30,8 +30,23 @@ import java.util.Map;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class ActiveMemoryService {
+
+    /**
+     * Phase 4 (PR-85) — hard cap on L1 rows returned from {@link #recallL1Capped}
+     * (and any future caller that pulls raw L1 for prompt assembly). Defaults
+     * to 30 per design §9.2; configurable via {@code acp.memory.l1l2.max-l1}.
+     * Disabled-by-default at the feature-flag level means this cap only
+     * matters when a caller explicitly opts into the capped reader — the
+     * existing {@link #preRecall} snippet pipeline is independently bounded
+     * by {@link #MAX_SNIPPETS}.
+     */
+    @Value("${acp.memory.l1l2.max-l1:30}")
+    private int maxL1 = 30;
+
+    public ActiveMemoryService(AgentMemoryService memoryService) {
+        this.memoryService = memoryService;
+    }
 
     /** Default agent code when caller doesn't specify one (built-in chat path). */
     public static final String DEFAULT_AGENT = "aurabot";
@@ -175,6 +190,29 @@ public class ActiveMemoryService {
             log.warn("access-log write failed for memory={} user={}: {}",
                     pid, userId, e.getMessage());
         }
+    }
+
+    /**
+     * Phase 4 (PR-85) — capped L1 recall. Delegates to
+     * {@link AgentMemoryService#loadL1Capped} with the configured
+     * {@link #maxL1} ceiling. Callers that want raw L1 rows (e.g. a future
+     * "L1 peek" admin endpoint or an alternative prompt assembler that
+     * wants to inject working-memory verbatim) must go through this method
+     * so the {@code acp.memory.l1l2.max-l1} knob has a single honouring
+     * surface.
+     *
+     * <p>Returns an empty list when {@code scopeKey} is null/blank — system
+     * / cron callers have no user partition to cap.
+     */
+    public List<Map<String, Object>> recallL1Capped(Long tenantId, String scopeKey) {
+        if (tenantId == null) return List.of();
+        if (scopeKey == null || scopeKey.isBlank()) return List.of();
+        return memoryService.loadL1Capped(tenantId, scopeKey, maxL1);
+    }
+
+    /** Returns the cap that will be applied by {@link #recallL1Capped} — {@code acp.memory.l1l2.max-l1} (default 30). */
+    public int getMaxL1() {
+        return maxL1;
     }
 
     /**

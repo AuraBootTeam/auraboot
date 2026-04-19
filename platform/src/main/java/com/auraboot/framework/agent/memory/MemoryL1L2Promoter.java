@@ -521,6 +521,213 @@ public class MemoryL1L2Promoter {
 
     // -----------------------------------------------------------------
 
+    // -----------------------------------------------------------------
+    // Phase 4 (PR-85) — admin promote-now override.
+    //
+    // Kept additive: this method does NOT reuse promoteCandidate() so the
+    // existing Phase 1-3 pipeline is untouched (avoids conflict with
+    // fix/memory-l1l2-phase3-round2-perf which also edits promoteCandidate).
+    // Dedup still runs — admin override bypasses the SCORE gate only, not
+    // the uniqueness contract.
+    // -----------------------------------------------------------------
+
+    /**
+     * Admin-triggered promote: force-flip an L1 row to L2 regardless of
+     * score. Dedup still applies (hash first, then cosine) so an admin
+     * can't create a near-duplicate L2 row by hand.
+     *
+     * <p>Pre-conditions (caller responsibility — the controller enforces):
+     * <ul>
+     *   <li>The caller holds tenant-admin role (via AdminRoleInterceptor).</li>
+     *   <li>The row identified by {@code pid} must exist and have
+     *       {@code category='session'}. Otherwise throws
+     *       {@link IllegalStateException} tagged with code
+     *       {@code memory_not_l1} — the controller maps this to HTTP 409.</li>
+     * </ul>
+     *
+     * @param pid           memory row identifier
+     * @param adminUserId   acting admin's user id (stored in
+     *                      {@code score_snapshot.admin_user_id})
+     * @param reason        human-readable justification (required, ≤512 chars)
+     * @return the resulting {@link AdminPromoteOutcome} — never null
+     */
+    @Transactional
+    public AdminPromoteOutcome promoteNow(String pid, String adminUserId, String reason) {
+        Objects.requireNonNull(pid, "pid");
+        if (reason == null || reason.isBlank()) {
+            throw new IllegalArgumentException("reason required");
+        }
+        if (reason.length() > 512) {
+            throw new IllegalArgumentException("reason must be <= 512 chars");
+        }
+
+        // Load the candidate row. Do NOT apply the importance gate here — the
+        // admin explicitly wants this row promoted.
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT pid, tenant_id, memory_agent_id, memory_type, memory_title, "
+                        + "       memory_content, importance, access_count, created_at, "
+                        + "       scope, scope_key, embedding, source_run_id, category "
+                        + "  FROM ab_agent_memory "
+                        + " WHERE pid = ? "
+                        + "   AND (deleted_flag IS NULL OR deleted_flag = FALSE)",
+                pid);
+        if (rows.isEmpty()) {
+            IllegalStateException ex = new IllegalStateException("memory_not_found");
+            throw ex;
+        }
+        Map<String, Object> row = rows.get(0);
+        String category = (String) row.get("category");
+        if (!"session".equals(category)) {
+            // Strict — admin-promote is only for L1 rows. Already-L2 rows
+            // need no action; archived rows must be un-archived separately.
+            throw new IllegalStateException("memory_not_l1");
+        }
+
+        Long tenantId = ((Number) row.get("tenant_id")).longValue();
+        int importance = ((Number) row.get("importance")).intValue();
+        int accessCount = row.get("access_count") == null
+                ? 0 : ((Number) row.get("access_count")).intValue();
+        Instant createdAt = ((Timestamp) row.get("created_at")).toInstant();
+        String scope = (String) row.get("scope");
+        String scopeKey = (String) row.get("scope_key");
+        String content = (String) row.get("memory_content");
+        String sourceRunId = (String) row.get("source_run_id");
+
+        // Dedup: hash-first, then cosine. Admin override bypasses SCORE gate
+        // but does NOT bypass uniqueness (design §9.2 explicit).
+        String hash = contentHash(content);
+        String existingL2Pid = findL2ByHash(tenantId, scope, scopeKey, hash);
+        Instant now = Instant.now();
+        if (existingL2Pid != null) {
+            jdbc.update(
+                    "UPDATE ab_agent_memory "
+                            + "   SET access_count = COALESCE(access_count, 0) + 1, "
+                            + "       importance = GREATEST(COALESCE(importance, 0), ?), "
+                            + "       updated_at = NOW() "
+                            + " WHERE pid = ?",
+                    importance, existingL2Pid);
+            MemoryTierEvaluator.ScoreResult hashScore = evaluator.score(
+                    new MemoryTierEvaluator.Candidate(importance, accessCount, createdAt, 0.0),
+                    now);
+            writeAdminAuditRow(tenantId, pid, MemoryL1L2PromotionMetrics.EVENT_TYPE_DEDUP_HIT,
+                    MemoryL1L2PromotionMetrics.DEDUP_MODE_HASH, existingL2Pid, hashScore,
+                    sourceRunId, adminUserId, reason);
+            metrics.recordAdminPromoteOutcome(tenantId,
+                    MemoryL1L2PromotionMetrics.OUTCOME_SKIPPED_DUP);
+            return new AdminPromoteOutcome(Outcome.DEDUP_HIT, existingL2Pid);
+        }
+
+        double maxCosineToL2 = 0.0;
+        if (memoryEmbeddingService.resolveEmbedding(pid) != null) {
+            maxCosineToL2 = queryMaxCosineToL2(tenantId, scope, scopeKey, pid);
+            if (maxCosineToL2 >= semanticDedupThreshold) {
+                String semanticTargetPid = findNearestL2BySemantic(
+                        tenantId, scope, scopeKey, pid, semanticDedupThreshold);
+                if (semanticTargetPid != null) {
+                    jdbc.update(
+                            "UPDATE ab_agent_memory "
+                                    + "   SET access_count = COALESCE(access_count, 0) + 1, "
+                                    + "       importance = GREATEST(COALESCE(importance, 0), ?), "
+                                    + "       updated_at = NOW() "
+                                    + " WHERE pid = ?",
+                            importance, semanticTargetPid);
+                    MemoryTierEvaluator.ScoreResult cosScore = evaluator.score(
+                            new MemoryTierEvaluator.Candidate(importance, accessCount,
+                                    createdAt, maxCosineToL2),
+                            now);
+                    writeAdminAuditRow(tenantId, pid,
+                            MemoryL1L2PromotionMetrics.EVENT_TYPE_DEDUP_HIT,
+                            MemoryL1L2PromotionMetrics.DEDUP_MODE_COSINE, semanticTargetPid,
+                            cosScore, sourceRunId, adminUserId, reason);
+                    metrics.recordAdminPromoteOutcome(tenantId,
+                            MemoryL1L2PromotionMetrics.OUTCOME_SKIPPED_DUP_SEMANTIC);
+                    return new AdminPromoteOutcome(Outcome.DEDUP_HIT_SEMANTIC, semanticTargetPid);
+                }
+            }
+        }
+
+        // Force-promote (bypass score gate). Score is still computed + stamped
+        // so postmortems can see where the row would have landed without the
+        // admin override.
+        MemoryTierEvaluator.ScoreResult score = evaluator.score(
+                new MemoryTierEvaluator.Candidate(importance, accessCount, createdAt, maxCosineToL2),
+                now);
+        String scoreJson = toJsonWithAdmin(score, adminUserId, reason);
+
+        int updated = jdbc.update(
+                "UPDATE ab_agent_memory "
+                        + "   SET category = 'user', "
+                        + "       promoted_at = NOW(), "
+                        + "       promoted_from_run_id = ?, "
+                        + "       score_snapshot = ?::jsonb, "
+                        + "       content_hash = ?, "
+                        + "       updated_at = NOW() "
+                        + " WHERE pid = ? "
+                        + "   AND category = 'session' "
+                        + "   AND (deleted_flag IS NULL OR deleted_flag = FALSE)",
+                sourceRunId, scoreJson, hash, pid);
+
+        if (updated == 0) {
+            // Race — another process (normal promoter, orphan scanner) flipped
+            // the row between our SELECT and UPDATE. Treat as dedup-skipped
+            // race (same contract as the normal path).
+            writeAdminAuditRow(tenantId, pid,
+                    MemoryL1L2PromotionMetrics.EVENT_TYPE_DEDUP_SKIPPED,
+                    MemoryL1L2PromotionMetrics.DEDUP_MODE_RACE, null, score,
+                    sourceRunId, adminUserId, reason);
+            metrics.recordAdminPromoteOutcome(tenantId,
+                    MemoryL1L2PromotionMetrics.OUTCOME_SKIPPED_DUP);
+            return new AdminPromoteOutcome(Outcome.DEDUP_HIT, null);
+        }
+
+        writeAdminAuditRow(tenantId, pid,
+                MemoryL1L2PromotionMetrics.EVENT_TYPE_ADMIN_PROMOTED,
+                null, null, score, sourceRunId, adminUserId, reason);
+        metrics.recordAdminPromoteOutcome(tenantId,
+                MemoryL1L2PromotionMetrics.OUTCOME_PROMOTED);
+        log.info("Admin promote-now: pid={} admin={} tenant={} reason={}",
+                pid, adminUserId, tenantId, reason);
+        return new AdminPromoteOutcome(Outcome.PROMOTED, pid);
+    }
+
+    private String toJsonWithAdmin(MemoryTierEvaluator.ScoreResult score,
+                                   String adminUserId, String reason) {
+        try {
+            return objectMapper.writeValueAsString(Map.of(
+                    "score", score.score(),
+                    "factors", Map.of(
+                            "imp", score.importanceFactor(),
+                            "acc", score.accessFactor(),
+                            "rec", score.recencyFactor(),
+                            "uni", score.uniquenessFactor()),
+                    "weights_version", score.weightsVersion(),
+                    "computed_at", score.computedAt().toString(),
+                    "admin_user_id", adminUserId == null ? "" : adminUserId,
+                    "admin_reason", reason));
+        } catch (Exception e) {
+            throw new IllegalStateException("failed to serialize admin score_snapshot", e);
+        }
+    }
+
+    private void writeAdminAuditRow(Long tenantId, String memoryPid, String eventType,
+                                    String dedupMode, String mergedIntoPid,
+                                    MemoryTierEvaluator.ScoreResult score, String runId,
+                                    String adminUserId, String reason) {
+        String scoreJson = toJsonWithAdmin(score, adminUserId, reason);
+        jdbc.update(
+                "INSERT INTO ab_agent_memory_tier_event "
+                        + "  (pid, tenant_id, memory_pid, event_type, dedup_mode, "
+                        + "   merged_into_pid, score_snapshot, source_run_id, created_at) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, ?, NOW())",
+                UniqueIdGenerator.generate(), tenantId, memoryPid, eventType,
+                dedupMode, mergedIntoPid, scoreJson, runId);
+        metrics.recordTierEvent(tenantId, eventType);
+    }
+
+    /** Phase 4 (PR-85) — result of an admin promote-now call. */
+    public record AdminPromoteOutcome(Outcome outcome, String targetPid) {
+    }
+
     public enum Outcome {
         PROMOTED,
         DEDUP_HIT,
