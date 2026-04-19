@@ -1,6 +1,6 @@
 # User Soul Profile — Subsystem Reference
 
-**Status**: Phases 1-9 shipped; design for L1→L2 landed.
+**Status**: Phases 1-10 + Round-1/2/3 fixes shipped. Admin audit extended to list+stats.
 **Plan**: [2026-04-19 design](../plans/2026-04/2026-04-19-user-soul-profile-design.md)
 **Follow-up design**: [Memory L1→L2 promotion](../plans/2026-04/2026-04-19-memory-l1-l2-promotion-design.md)
 
@@ -123,6 +123,8 @@ auraboot_user_soul_profile_manual_derive_total{tenant, outcome}
   outcome ∈ {triggered, rate_limited}
 auraboot_user_soul_profile_admin_forget_total{tenant, reason}
   reason ∈ {gdpr_request, account_closed, policy_violation, other, ...}
+auraboot_user_soul_profile_admin_access_total{tenant, action}
+  action ∈ {list, stats}   # GDPR paper trail for admin reads (not just forget)
 auraboot_user_soul_profile_read_total{tenant}  (emitted by Reader)
 ```
 
@@ -165,6 +167,8 @@ auraboot_user_soul_profile_avg_confidence
 - Admin dashboard metadata only; no content visibility even for debugging.
 - Manual-derive rate limit uses in-process Caffeine cache → multi-instance deployments may allow 1 derive per instance per 24h.
 - Access-log silently skips hard-deleted memories (FK cascade); intentional.
+- Admin **promote-now** (`POST /api/admin/memory/{pid}/promote-now`) has no frontend surface — API only. Ops-tool status; UI deferred.
+- `GET /api/user/soul-profile/export` currently writes **no audit row** (user reading own data). GDPR export log is a common ask — flagged in backlog.
 
 ## Related PRs
 
@@ -177,6 +181,8 @@ auraboot_user_soul_profile_avg_confidence
 | 79 | 5 | Mission Control UI + mocked E2E |
 | 80 | 6 | Real-backend E2E + Grafana dashboard + alerts + this doc |
 | 81 | 9 | JSON export (GDPR portability) + admin forget-user cascade |
+| `d357d5c4` | Round-3 C1 | Admin promote-now tenant filter (cross-tenant blast-radius fix) |
+| `0dc84ec3` | Round-3 I | Admin list + stats audit rows (`admin_access_total` counter) |
 
 ### Follow-up fixes (post-merge, bundled)
 
