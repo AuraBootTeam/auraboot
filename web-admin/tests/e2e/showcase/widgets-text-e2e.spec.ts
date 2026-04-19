@@ -289,13 +289,19 @@ async function toggleRequired(page: Page): Promise<void> {
 
 async function fillVisibleCondition(page: Page, expr: string): Promise<void> {
   const panel = page.getByTestId('designer-properties-panel');
-  const header = panel.locator('button:has-text("行为控制")').first();
-  if (await header.isVisible({ timeout: 1_500 }).catch(() => false)) {
-    await header.click();
-  }
   const input = panel
     .locator('label:has-text("可见性条件") >> xpath=following-sibling::input[1]')
     .first();
+  // Section "行为控制" is collapsed by default — only click header when the
+  // input isn't already revealed (avoids the toggle bug where a 2nd click
+  // would collapse it again).
+  const alreadyOpen = await input.isVisible({ timeout: 500 }).catch(() => false);
+  if (!alreadyOpen) {
+    const header = panel.locator('button:has-text("行为控制")').first();
+    if (await header.isVisible({ timeout: 1_500 }).catch(() => false)) {
+      await header.click();
+    }
+  }
   await expect(input).toBeVisible({ timeout: 5_000 });
   await input.click();
   await input.fill(expr);
@@ -343,68 +349,87 @@ async function setReadOnly(page: Page, target: boolean): Promise<boolean> {
 }
 
 // ---------------------------------------------------------------------------
-// Widget-specific props setters. Each attempts a best-effort fill by walking
-// every <input>/<textarea>/<select> under the FieldPropertyEditor after the
-// widget has been chosen — the exact PropertySchema widgets render as native
-// controls keyed by label (placeholder/maxLength/rows/pattern/separator/...).
-// Returns a map of prop → value actually written, so the caller can assert
-// persistence only on props the editor actually exposed.
+// Widget-specific props are configured through the G1 WidgetSpecificPanel
+// (`[data-testid="widget-specific-panel"]` + per-prop testids) below. The
+// previous label-based `fillLabeledText`/`fillLabeledNumber`/`clickLabeledSwitch`
+// helpers were removed 2026-04-19: they drove the legacy generic panel and
+// did not exercise the schema-driven G1 path that this spec is supposed to
+// cover (PUT-API/label fallback ≠ widget-aware UI).
 // ---------------------------------------------------------------------------
 
-async function fillLabeledText(
+/**
+ * Configure widget-specific props through the G1 WidgetSpecificPanel
+ * (`[data-testid="widget-specific-panel"]` + `[data-testid="widget-prop-{key}"]`).
+ *
+ * Returns:
+ *   applied — props the panel actually rendered widget-prop testids for
+ *   gaps    — props NOT in WidgetRegistry[component].schema (real G1 gaps)
+ *
+ * NO PUT-API fallback. Missing schema entries become test annotations so the
+ * truth-self-audit can see the delta.
+ */
+async function configureWidgetPropsViaG1Panel(
   page: Page,
-  labelPattern: RegExp,
-  value: string,
-): Promise<boolean> {
-  const panel = page.getByTestId('designer-properties-panel');
-  const label = panel.locator('label').filter({ hasText: labelPattern }).first();
-  if (!(await label.isVisible({ timeout: 1_500 }).catch(() => false))) return false;
-  // The input typically follows the label in the DOM.
-  const input = label.locator('xpath=following-sibling::input[1]').first();
-  if (!(await input.isVisible({ timeout: 1_500 }).catch(() => false))) {
-    const alt = label
-      .locator(
-        'xpath=../following-sibling::*//input | xpath=../..//input[not(@type="checkbox")]',
-      )
-      .first();
-    if (!(await alt.isVisible({ timeout: 1_000 }).catch(() => false))) return false;
-    await alt.click();
-    await alt.fill(value);
-    return true;
+  component: string,
+  widgetProps: Record<string, unknown>,
+): Promise<{ applied: Record<string, unknown>; gaps: string[] }> {
+  const panel = page.locator('[data-testid="widget-specific-panel"]').first();
+  const mounted = await panel.isVisible({ timeout: 5_000 }).catch(() => false);
+  if (!mounted) {
+    // Panel did not mount — either component has empty schema or registry
+    // has not been loaded. Caller will surface as gap.
+    return { applied: {}, gaps: Object.keys(widgetProps) };
   }
-  await input.click();
-  await input.fill(value);
-  return true;
-}
-
-async function fillLabeledNumber(
-  page: Page,
-  labelPattern: RegExp,
-  value: number,
-): Promise<boolean> {
-  return fillLabeledText(page, labelPattern, String(value));
-}
-
-async function clickLabeledSwitch(
-  page: Page,
-  labelPattern: RegExp,
-  target: boolean,
-): Promise<boolean> {
-  const panel = page.getByTestId('designer-properties-panel');
-  const sw = panel
-    .locator('span')
-    .filter({ hasText: labelPattern })
-    .locator('xpath=following-sibling::button[@role="switch"]')
-    .first();
-  if (!(await sw.isVisible({ timeout: 1_500 }).catch(() => false))) return false;
-  const checked = (await sw.getAttribute('aria-checked').catch(() => 'false')) === 'true';
-  if (checked !== target) {
-    await sw.click();
-    await expect(sw).toHaveAttribute('aria-checked', target ? 'true' : 'false', {
-      timeout: 3_000,
-    });
+  await expect(panel).toHaveAttribute('data-component', component, { timeout: 3_000 });
+  const applied: Record<string, unknown> = {};
+  const gaps: string[] = [];
+  for (const [key, value] of Object.entries(widgetProps)) {
+    // Yield to React between iterations — the panel's `makeAdapter` reads a
+    // snapshot of `props`; back-to-back synchronous fills would each see
+    // the same stale snapshot and overwrite earlier writes via spread.
+    await page.evaluate(
+      () => new Promise<void>((r) => requestAnimationFrame(() => r())),
+    );
+    const wrapper = panel.locator(`[data-testid="widget-prop-${key}"]`).first();
+    const present = await wrapper.isVisible({ timeout: 2_000 }).catch(() => false);
+    if (!present) {
+      gaps.push(key);
+      continue;
+    }
+    if (typeof value === 'boolean') {
+      const sw = wrapper.locator('button[role="switch"]').first();
+      await expect(sw).toBeVisible({ timeout: 3_000 });
+      const checked = (await sw.getAttribute('aria-checked').catch(() => 'false')) === 'true';
+      if (checked !== value) {
+        await sw.click();
+        await expect(sw).toHaveAttribute('aria-checked', value ? 'true' : 'false', {
+          timeout: 3_000,
+        });
+      }
+      applied[key] = value;
+      continue;
+    }
+    const sel = wrapper.locator('select').first();
+    if (await sel.isVisible({ timeout: 500 }).catch(() => false)) {
+      await sel.selectOption({ value: String(value) });
+      applied[key] = value;
+      continue;
+    }
+    const input = wrapper.locator('input, textarea').first();
+    await expect(input).toBeVisible({ timeout: 3_000 });
+    // Two-stage Playwright fill: clear → RAF yield → write target. Survives
+    // even when `target` matches the schema defaultValue (a single fill
+    // would be a React no-op against the input value tracker).
+    await input.click();
+    await input.fill('');
+    await page.evaluate(
+      () => new Promise<void>((r) => requestAnimationFrame(() => r())),
+    );
+    await input.fill(String(value));
+    await input.evaluate((el) => (el as HTMLElement).blur());
+    applied[key] = value;
   }
-  return true;
+  return { applied, gaps };
 }
 
 // ---------------------------------------------------------------------------
@@ -523,6 +548,10 @@ interface WidgetCase {
 
 const WIDGET_CASES: WidgetCase[] = [
   {
+    // Server `renderComponents` exposes the string-input widget as `input`;
+    // WidgetRegistry registers it as `text` PLUS an `input` alias (see
+    // registry/widgets/index.ts) so the G1 WidgetSpecificPanel mounts for
+    // either name. We use the dropdown-exposed `input` here.
     id: 'input',
     widget: 'input',
     field: 'sc_phone',
@@ -724,64 +753,12 @@ test.describe('Task B1 — Text-bucket widget full coverage', () => {
         }
       }
 
-      // --- Widget-specific props ---
-      // The shared FieldPropertyEditor (configs/field-property-panel.json)
-      // exposes only universal field overrides keyed in Chinese:
-      //   占位符 (placeholder)  — string + text
-      //   最大长度 (maxLength)  — string + text
-      //   正则表达式 (pattern)  — string only
-      // It does NOT yet render widget-specific PropertySchema fields such as
-      // textarea.rows / tag-input.maxCount / tag-input.separator /
-      // tag-input.allowDuplicate / richtext.placeholder. Those are surfaced
-      // as a panel gap in the per-widget annotations below; this test only
-      // asserts the props the panel actually writes.
-      const persistedTopLevel: Record<string, unknown> = {};
-      const widgetGaps: string[] = [];
-      if (wc.id === 'input' || wc.id === 'textarea') {
-        if (await fillLabeledText(page, /占位符|placeholder/i, String(wc.specificProps.placeholder)))
-          persistedTopLevel.placeholder = wc.specificProps.placeholder;
-        else widgetGaps.push('placeholder');
-        if (
-          await fillLabeledNumber(
-            page,
-            /最大长度|maxLength/i,
-            wc.specificProps.maxLength as number,
-          )
-        )
-          persistedTopLevel.maxLength = wc.specificProps.maxLength;
-        else widgetGaps.push('maxLength');
-        if (wc.id === 'input') {
-          if (
-            await fillLabeledText(
-              page,
-              /正则表达式|pattern/i,
-              String(wc.specificProps.pattern),
-            )
-          )
-            persistedTopLevel.pattern = wc.specificProps.pattern;
-          else widgetGaps.push('pattern');
-        } else {
-          // textarea.rows is widget-specific and not surfaced by the
-          // generic FieldPropertyEditor — record as gap.
-          widgetGaps.push('rows (panel gap: not in field-property-panel.json)');
-        }
-      } else if (wc.id === 'richtext') {
-        if (await fillLabeledText(page, /占位符|placeholder/i, String(wc.specificProps.placeholder)))
-          persistedTopLevel.placeholder = wc.specificProps.placeholder;
-        else widgetGaps.push('placeholder');
-      } else if (wc.id === 'tag-input') {
-        // All tag-input specific props are widget-private; the shared
-        // FieldPropertyEditor exposes none of them today.
-        widgetGaps.push('maxCount (panel gap)');
-        widgetGaps.push('separator (panel gap)');
-        widgetGaps.push('allowDuplicate (panel gap)');
-      }
-      if (widgetGaps.length > 0) {
-        test.info().annotations.push({
-          type: 'gap',
-          description: `${wc.id}: widget-specific props not surfaced by FieldPropertyEditor — ${widgetGaps.join(', ')}`,
-        });
-      }
+      // --- Widget-specific props moved to G1 WidgetSpecificPanel below ---
+      // (Removed legacy `fillLabeledText` path that drove the generic
+      // FieldPropertyEditor — that path was not exercising the G1
+      // widget-aware UI introduced in 08c195f0. The panel now mounts after
+      // `chooseWidgetByValue` and is driven via `widget-prop-{key}` testids.
+      // See `configureWidgetPropsViaG1Panel` invocation later in this test.)
 
       // --- Common props ---
       await toggleRequired(page);
@@ -810,6 +787,30 @@ test.describe('Task B1 — Text-bucket widget full coverage', () => {
       // chosen value is the last write into React's controlled value.
       if (effectiveWidget !== null) {
         await chooseWidgetByValue(page, effectiveWidget);
+      }
+
+      // --- G1 WidgetSpecificPanel: drive widget-prop testids (no PUT-API) ---
+      // Once a registry-backed widget is chosen, the schema-driven panel
+      // mounts and exposes one [data-testid="widget-prop-{key}"] per
+      // PropertySchema entry. We drive the widget-private props through it
+      // (placeholder/maxLength/rows/...) — anything missing is a real G1
+      // PropertySchema gap, recorded as `g1-gap` annotation.
+      let g1Applied: Record<string, unknown> = {};
+      let g1Gaps: string[] = [];
+      if (effectiveWidget !== null) {
+        const result = await configureWidgetPropsViaG1Panel(
+          page,
+          effectiveWidget,
+          wc.specificProps,
+        );
+        g1Applied = result.applied;
+        g1Gaps = result.gaps;
+        if (g1Gaps.length > 0) {
+          test.info().annotations.push({
+            type: 'g1-gap',
+            description: `${wc.id} (${effectiveWidget}): widget-prop testids missing for [${g1Gaps.join(', ')}] — not in WidgetRegistry[${effectiveWidget}].schema`,
+          });
+        }
       }
 
       // --- Save and verify persistence ---
@@ -880,20 +881,23 @@ test.describe('Task B1 — Text-bucket widget full coverage', () => {
         wc.commonProps.visibleExpr,
       );
 
-      // Widget-specific props that the FieldPropertyEditor surfaces persist
-      // at the TOP LEVEL of the override (the panel writes
-      // override.placeholder / override.maxLength / override.pattern
-      // directly, not into override.props.*). Only assert the ones the
-      // panel exposed for this widget's dataType.
-      for (const [k, v] of Object.entries(persistedTopLevel)) {
-        expect(
-          (override as any)[k],
-          `${wc.field}.${k} should persist as ${JSON.stringify(v)} (got ${JSON.stringify((override as any)[k])})`,
-        ).toEqual(v);
+      // Widget-specific props go through the G1 WidgetSpecificPanel and
+      // land under `override.props.*` (the schema-driven panel writes into
+      // the field's `props` namespace, NOT top-level). Only assert keys
+      // that the panel actually accepted (g1Applied). Gaps are surfaced
+      // via test annotations above.
+      const persistedProps = ((override as any).props ?? {}) as Record<string, unknown>;
+      for (const [k, v] of Object.entries(g1Applied)) {
+        const got = persistedProps[k];
+        if (typeof v === 'number') {
+          expect(Number(got), `${wc.field}.props.${k}`).toBe(v);
+        } else {
+          expect(got, `${wc.field}.props.${k}`).toEqual(v);
+        }
       }
       // Surface the persisted override for the run report.
       console.log(
-        `[B1/${wc.id}] persisted: component=${override.component} placeholder=${JSON.stringify((override as any).placeholder)} maxLength=${JSON.stringify((override as any).maxLength)} pattern=${JSON.stringify((override as any).pattern)} span=${JSON.stringify((override as any).span)} visible=${JSON.stringify(override.visible)} required=${override.required}`,
+        `[B1/${wc.id}] persisted: component=${override.component} props=${JSON.stringify(persistedProps)} span=${JSON.stringify((override as any).span)} visible=${JSON.stringify(override.visible)} required=${override.required} g1Applied=${JSON.stringify(g1Applied)} g1Gaps=${JSON.stringify(g1Gaps)}`,
       );
 
       // --- Runtime verification: showcase menu → runtime form → widget DOM ---

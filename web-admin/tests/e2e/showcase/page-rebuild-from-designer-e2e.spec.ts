@@ -603,10 +603,9 @@ const createdPagePids: string[] = [];
 
 test.describe('Task C — Rebuild showcase form from Designer UI', () => {
   test.setTimeout(300_000);
-  // Designer-heavy 36+ click-fill sequence; under full-suite parallel load
-  // dev-server HMR can lag and cause palette item click 5s timeout. Allow
-  // 1 retry to absorb that flake without inflating per-action timeout.
-  test.describe.configure({ retries: 1 });
+  // No retry wrapping: a flaky pass = a real bug. If HMR-driven palette item
+  // click lags, the test fails and the underlying instability is investigated
+  // rather than papered over.
 
   test.afterEach(async ({ page }) => {
     while (createdPagePids.length > 0) {
@@ -680,6 +679,66 @@ test.describe('Task C — Rebuild showcase form from Designer UI', () => {
     const normalizedSaved = savedBusinessBlocks.map(normalizeBlockForCompare);
     const normalizedRef = reference.blocks.map(normalizeBlockForCompare);
 
+    // -------- Specific high-signal value assertions ----------
+    // These run BEFORE the deepDiff so failures pinpoint the offending field
+    // rather than getting drowned in a large diff list. They cover D8/D11
+    // semantics (readonly / visibility expressions / button action descriptors)
+    // that are easy to lose in an aggregate count.
+    const findField = (
+      sectionId: string,
+      fieldCode: string,
+    ): Record<string, unknown> | undefined => {
+      const section = normalizedSaved.find(
+        (b) => (b as any).blockType === 'form-section' && (b as any).id === sectionId,
+      ) as any;
+      if (!section) {
+        // Fallback: match section by index using the reference order.
+        const refIdx = refFormSections.findIndex((s) => s.id === sectionId);
+        if (refIdx < 0) return undefined;
+        const sectionByIdx = normalizedSaved.filter(
+          (b) => (b as any).blockType === 'form-section',
+        )[refIdx] as any;
+        return (sectionByIdx?.fields ?? []).find((f: any) => f.field === fieldCode);
+      }
+      return (section.fields ?? []).find((f: any) => f.field === fieldCode);
+    };
+
+    // D8: readOnly preserved (sc_code in section_basic).
+    const scCode = findField('section_basic', 'sc_code');
+    expect(scCode, 'sc_code field must exist in section_basic').toBeDefined();
+    expect(scCode?.readonly, 'sc_code.readonly must be true').toBe(true);
+
+    // D8: readOnly preserved (sc_created_at in section_dates).
+    const scCreatedAt = findField('section_dates', 'sc_created_at');
+    expect(scCreatedAt, 'sc_created_at field must exist').toBeDefined();
+    expect(scCreatedAt?.readonly, 'sc_created_at.readonly must be true').toBe(true);
+
+    // D11: visibleWhen expression preserved verbatim.
+    const scAdvanced = findField('section_enums', 'sc_advanced_settings');
+    expect(scAdvanced, 'sc_advanced_settings field must exist').toBeDefined();
+    expect(scAdvanced?.visible, 'sc_advanced_settings.visible expression must match').toBe(
+      "record.sc_status === 'active'",
+    );
+
+    // colSpan/span normalisation: sc_name colSpan=6 → span=6.
+    const scName = findField('section_basic', 'sc_name');
+    expect(scName?.span, 'sc_name.span must be 6').toBe(6);
+
+    // form-buttons: submit primary + command action descriptor preserved.
+    const buttonsBlock = normalizedSaved.find((b) => (b as any).blockType === 'form-buttons') as
+      | any
+      | undefined;
+    expect(buttonsBlock, 'form-buttons block must exist').toBeDefined();
+    const submitBtn = (buttonsBlock?.buttons ?? []).find((b: any) => b.code === 'submit');
+    expect(submitBtn, 'submit button must exist').toBeDefined();
+    expect(submitBtn?.primary, 'submit.primary must be true').toBe(true);
+    expect(submitBtn?.action?.type, 'submit.action.type must be command').toBe('command');
+    expect(submitBtn?.action?.command, 'submit.action.command must match reference').toBe(
+      'sc:update_showcase',
+    );
+    const cancelBtn = (buttonsBlock?.buttons ?? []).find((b: any) => b.code === 'cancel');
+    expect(cancelBtn, 'cancel button must exist').toBeDefined();
+
     const diffs = deepDiff(normalizedRef, normalizedSaved, 'blocks');
 
     // Diagnostic output — always printed so partial runs are debuggable.
@@ -701,25 +760,17 @@ test.describe('Task C — Rebuild showcase form from Designer UI', () => {
       console.log('[Task C] SUCCESS: designer-rebuilt blocks deep-equal the reference.');
     }
 
-    // Threshold assertion: as of 2026-04-19 the designer can rebuild the
-    // hand-authored showcase form byte-for-byte (diff=0) after:
+    // Hard byte-equality assertion. As of 2026-04-19 the designer can rebuild
+    // the hand-authored showcase form with zero diffs after:
     //   - FormSectionPreview wrapper no longer swallows block-select clicks
     //   - FieldsEditor span dropdown extended to 1/2/3/4/6/8/12
     //   - FieldItem exposes data-testid for span/required/readonly/visible
     //   - Spec drives FieldsEditor (in-panel) instead of canvas chip clicks
     //   - LocalizedTextInput multi-locale toggle clicked before fill so the
     //     emitted DSL is object-form (matches reference)
-    // Keep a small (=2) cushion for occasional HMR-driven jitter under full
-    // suite parallel load; tighten further once we have stable baselines from
-    // the parallel runs.
-    const baseline = 2;
-    expect(
-      diffs.length,
-      `designer-rebuild diffs grew beyond baseline ${baseline} (current=${diffs.length})`,
-    ).toBeLessThanOrEqual(baseline);
-    test.info().annotations.push({
-      type: 'designer-ui-gap',
-      description: `${diffs.length} diff(s) between designer-rebuilt blocks and reference. Baseline=${baseline}.`,
-    });
+    // No threshold cushion: any divergence indicates a real designer-UI gap
+    // and must be diagnosed (BlocksDesigner / FieldsEditor / button editor)
+    // rather than absorbed by raising the baseline.
+    expect(diffs, 'designer-rebuilt blocks must deep-equal the reference').toEqual([]);
   });
 });

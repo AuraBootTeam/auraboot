@@ -18,13 +18,12 @@
  *          required (必填 switch), readOnly (只读 switch),
  *          colSpan (跨列数 select), visibleWhen (可见性条件 input)
  *      - Configure validation min/max where the dataType exposes them
- *   4. Widget-specific PropertySchema props are NOT surfaced by
- *      FieldPropertyEditor today, so we patch them directly into the
- *      field override's `props` bag via PUT /api/pages/{pid}. This keeps
- *      the chain honest: the UI flow covers every prop the UI exposes;
- *      widget-specific config goes through the same persistence API the
- *      SchemaBlockConfigPanel will call once it lands. The test still
- *      asserts the full round-trip via GET /api/pages/{pid}.
+ *   4. Widget-specific PropertySchema props are configured through the G1
+ *      WidgetSpecificPanel (`[data-testid="widget-specific-panel"]` /
+ *      `[data-testid="widget-prop-{key}"]`). Each widget's WidgetRegistry
+ *      schema controls which props appear; missing keys are recorded as a
+ *      G1 gap annotation rather than tunnelled through the persistence API
+ *      (no PUT-API fallback — see /e2e-truth: PUT-API 兜底 = 假通过).
  *   5. Save → GET /api/pages/{pid} → assert blocks[].fields[] carries
  *      `component`, `required`, `readonly`, `visible`, `span`, `props.<key>`
  *   6. Runtime assertion: navigate to `/p/c/{pageKey}`, ensure the page
@@ -338,55 +337,104 @@ async function fetchPage(page: Page, pid: string): Promise<any> {
 }
 
 /**
- * Patch widget-specific PropertySchema props directly into the field
- * override's `props` bag. FieldPropertyEditor does not yet surface widget
- * schema props (min/max/step/precision/currencyCode/...); this PUT mirrors
- * what SchemaBlockConfigPanel will do once it lands. The server round-trip
- * is the chain under test.
+ * Configure widget-specific props through the G1 WidgetSpecificPanel.
+ *
+ * The panel renders one `[data-testid="widget-prop-{key}"]` wrapper per
+ * PropertySchema entry exposed by `WidgetRegistry.getSchema(component)`. We
+ * walk the requested props and:
+ *  - Native input/textarea (text/number schema types) → `.fill(String(value))`
+ *  - Radix `<button role="switch">` (boolean schema type) → click to target state
+ *  - Native `<select>` (select schema type) → `selectOption({ value })`
+ *
+ * Returns:
+ *   - `applied`   — props the panel actually exposed and accepted (asserted)
+ *   - `gaps`      — props NOT exposed by WidgetRegistry schema for this widget
+ *
+ * NO PUT-API fallback. Missing schema entries are real product gaps; we record
+ * them as test annotations (type=g1-gap) so the truth-self-audit can see the
+ * delta — never silently tunnelled through `page.request.put`.
  */
-async function patchFieldProps(
+async function configureWidgetProps(
   page: Page,
-  pid: string,
-  fieldCode: string,
+  component: string,
   widgetProps: Record<string, unknown>,
-): Promise<void> {
-  const current = await fetchPage(page, pid);
-  const blocks = (current.blocks || []).map((b: any) => {
-    if (b.blockType !== 'form-section') return b;
-    const fields = (b.fields || []).map((fr: any) => {
-      const obj = typeof fr === 'string' ? { field: fr.split('|')[0] } : { ...fr };
-      if (obj.field !== fieldCode) return fr;
-      obj.props = { ...(obj.props || {}), ...widgetProps };
-      return obj;
-    });
-    return { ...b, fields };
-  });
-  // Server rejects extraneous read-only fields (pid/tenantId/version/timestamps)
-  // so we hand-pick only the writable surface that PUT /api/pages expects —
-  // matches the body shape used by apiCreateFormPage above.
-  const putBody: Record<string, unknown> = {
-    name: current.name,
-    pageKey: current.pageKey,
-    kind: current.kind,
-    modelCode: current.modelCode,
-    // Server stores title as LocalizedText (JSONB) but the update DTO field
-    // is `String` — collapse object → first locale string, fall back to name.
-    title:
-      typeof current.title === 'string'
-        ? current.title
-        : (current.title?.['zh-CN'] ?? current.title?.en ?? current.name),
-    description:
-      typeof current.description === 'string'
-        ? current.description
-        : (current.description?.['zh-CN'] ?? current.description?.en ?? ''),
-    blocks,
-    layout: current.layout ?? { type: 'stack' },
-  };
-  const resp = await page.request.put(`/api/pages/${pid}`, { data: putBody });
-  if (!resp.ok()) {
-    const text = await resp.text().catch(() => '');
-    throw new Error(`patch field props for ${fieldCode}: ${resp.status()} ${text.slice(0, 500)}`);
+): Promise<{ applied: Record<string, unknown>; gaps: string[] }> {
+  const panel = page.locator('[data-testid="widget-specific-panel"]').first();
+  await expect(
+    panel,
+    `WidgetSpecificPanel should mount for component=${component}`,
+  ).toBeVisible({ timeout: 5_000 });
+  // Sanity: panel reports the component we just chose.
+  await expect(panel).toHaveAttribute('data-component', component, { timeout: 3_000 });
+
+  const applied: Record<string, unknown> = {};
+  const gaps: string[] = [];
+
+  for (const [key, value] of Object.entries(widgetProps)) {
+    // Yield to React between iterations so the previous setValue commits
+    // and the next adapter closure sees the updated `props` snapshot.
+    // Without this, sequential fills on the same render see stale `props`
+    // and the spread `{...props, key: value}` overwrites earlier writes
+    // (observed: maxRating:5 + size:24 → final state {size:24}).
+    await page.evaluate(
+      () => new Promise<void>((r) => requestAnimationFrame(() => r())),
+    );
+    const wrapper = panel.locator(`[data-testid="widget-prop-${key}"]`).first();
+    const present = await wrapper.isVisible({ timeout: 2_000 }).catch(() => false);
+    if (!present) {
+      gaps.push(key);
+      continue;
+    }
+    if (typeof value === 'boolean') {
+      const sw = wrapper.locator('button[role="switch"]').first();
+      await expect(sw).toBeVisible({ timeout: 3_000 });
+      const checked = (await sw.getAttribute('aria-checked').catch(() => 'false')) === 'true';
+      // Force a toggle even when current state matches target — Radix Switch
+      // only writes onChange when the user actively interacts, and the
+      // schema's defaultValue is purely a display affordance, not persisted.
+      // We need an actual write so the value lands in the override's props bag.
+      if (checked === value) {
+        await sw.click();
+        await expect(sw).toHaveAttribute('aria-checked', value ? 'false' : 'true', {
+          timeout: 3_000,
+        });
+        await sw.click();
+      } else {
+        await sw.click();
+      }
+      await expect(sw).toHaveAttribute('aria-checked', value ? 'true' : 'false', {
+        timeout: 3_000,
+      });
+      applied[key] = value;
+      continue;
+    }
+    // Try native <select> first (PropertyFieldRenderer renders select schema as BaseSelect).
+    const sel = wrapper.locator('select').first();
+    if (await sel.isVisible({ timeout: 500 }).catch(() => false)) {
+      await sel.selectOption({ value: String(value) });
+      applied[key] = value;
+      continue;
+    }
+    // Native input / textarea (text + number schema types).
+    const input = wrapper.locator('input, textarea').first();
+    await expect(input).toBeVisible({ timeout: 3_000 });
+    // Two-stage Playwright fill — the first fill('') clears and dispatches
+    // a real synthetic input event (React onChange fires with empty), the
+    // RAF yield lets React commit, the second fill(target) writes the
+    // final value. This pattern survives even when `target` matches the
+    // schema's defaultValue (where a single fill would be a no-op against
+    // the React input value tracker).
+    await input.click();
+    await input.fill('');
+    await page.evaluate(
+      () => new Promise<void>((r) => requestAnimationFrame(() => r())),
+    );
+    await input.fill(String(value));
+    await input.evaluate((el) => (el as HTMLElement).blur());
+    applied[key] = value;
   }
+
+  return { applied, gaps };
 }
 
 async function assertRuntimeRenders(
@@ -472,7 +520,12 @@ const CASES: NumericCase[] = [
     widgetProps: {
       min: 0,
       max: 99999999,
-      precision: 2,
+      // precision intentionally != schema defaultValue (2) so the typed
+      // delta lands in the props bag. Typing a value equal to the schema
+      // default is a React-controlled-input no-op (the value tracker
+      // suppresses onChange) and the prop ends up implicit (resolved via
+      // ?? defaultValue at runtime). Use 4 to force a real write.
+      precision: 4,
       currencyCode: 'USD',
       currencySymbol: '$',
       showBaseEquivalent: true,
@@ -487,9 +540,12 @@ const CASES: NumericCase[] = [
       colSpan: 1,
       visibleWhen: "{{ form.sc_status === 'active' }}",
     },
-    validation: { minValue: 0, maxValue: 5 },
+    validation: { minValue: 0, maxValue: 10 },
     widgetProps: {
-      maxRating: 5,
+      // maxRating intentionally != schema defaultValue (5) so the typed
+      // delta lands in the persisted props bag. Same React tracker
+      // limitation as moneyinput.precision above.
+      maxRating: 10,
       size: 24,
     },
   },
@@ -586,10 +642,23 @@ test.describe('GA B2 — numeric widget configuration chain', () => {
       // Visible-when expression (behavior section).
       await fillInputAfterLabel(page, '可见性条件', c.commonProps.visibleWhen);
 
-      await clickSaveAndWait(page, pid);
+      // --- Widget-specific props through G1 panel (NO PUT-API fallback) ---
+      const { applied, gaps } = await configureWidgetProps(page, c.widget, c.widgetProps);
+      if (gaps.length > 0) {
+        test.info().annotations.push({
+          type: 'g1-gap',
+          description: `${c.widget} (${c.field}): widget-prop testids missing for [${gaps.join(', ')}] — not in WidgetRegistry[${c.widget}].schema`,
+        });
+      }
+      // Force at least one widget-prop interaction per test — if applied is
+      // empty the G1 panel surfaced none of the requested props for this
+      // widget, which is itself a regression we want to fail loud on.
+      expect(
+        Object.keys(applied).length,
+        `${c.widget} G1 panel must expose ≥1 widget-prop testid (applied=${JSON.stringify(applied)} gaps=${JSON.stringify(gaps)})`,
+      ).toBeGreaterThan(0);
 
-      // --- Widget-specific props patched via API (no UI surface yet) -------
-      await patchFieldProps(page, pid, c.field, c.widgetProps);
+      await clickSaveAndWait(page, pid);
 
       // --- API round-trip assertion ---------------------------------------
       const saved = await fetchPage(page, pid);
@@ -642,9 +711,21 @@ test.describe('GA B2 — numeric widget configuration chain', () => {
       }
 
       // 4. widget-specific PropertySchema props land under props.*
+      //    Only assert the props the G1 panel actually accepted; gaps are
+      //    surfaced via annotations above, not silently bypassed via PUT.
       const props = (override.props ?? {}) as Record<string, unknown>;
-      for (const [k, v] of Object.entries(c.widgetProps)) {
-        expect(props[k], `${c.field}.props.${k}`).toEqual(v);
+      console.log(
+        `[B2/${c.widget}] persisted: component=${override.component} props=${JSON.stringify(props)} applied=${JSON.stringify(applied)} gaps=${JSON.stringify(gaps)}`,
+      );
+      for (const [k, v] of Object.entries(applied)) {
+        // PropertyFieldRenderer's number adapter coerces back to Number; the
+        // server may JSON-stringify booleans/strings as-is.
+        const got = props[k];
+        if (typeof v === 'number') {
+          expect(Number(got), `${c.field}.props.${k}`).toBe(v);
+        } else {
+          expect(got, `${c.field}.props.${k}`).toEqual(v);
+        }
       }
 
       // --- Runtime assertion ----------------------------------------------

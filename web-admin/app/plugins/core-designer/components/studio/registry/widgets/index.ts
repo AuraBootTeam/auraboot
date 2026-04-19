@@ -53,6 +53,15 @@ import { fileattachmentWidget } from './fileattachment';
 export function registerAllWidgets(): void {
   // Phase 4.3 core widgets
   WidgetRegistry.register(textWidget);
+  // Server `renderComponents` exposes the string-input widget as `input`
+  // (see DslRegistry extensions.renderComponents). The WidgetRegistry
+  // ships it as `text` for historical reasons. Register an `input` alias
+  // pointing at the same PropertySchema so the WidgetSpecificPanel mounts
+  // when the dropdown's `input` option is chosen. Without this, picking
+  // `input` leaves the panel with an empty schema and no
+  // `widget-prop-{key}` testids — placeholder/maxLength/pattern would be
+  // silently un-configurable.
+  WidgetRegistry.register({ ...textWidget, component: 'input' });
   WidgetRegistry.register(textareaWidget);
   WidgetRegistry.register(numberWidget);
   WidgetRegistry.register(selectWidget);
