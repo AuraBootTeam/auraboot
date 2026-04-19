@@ -59,6 +59,13 @@ public class UserSoulProfileAdminController {
         Long tenantId = MetaContext.getCurrentTenantId();
         int capped = Math.min(Math.max(1, limit), 200);
 
+        // GDPR read-access audit (plan §7 / feat/usp-admin-read-audit): every
+        // admin list call leaves a paper trail. target_user_id is NULL because
+        // list is aggregate-across-users. Best-effort but exceptions propagate.
+        String actingAdminId = Objects.toString(MetaContext.getCurrentUserId(), "unknown");
+        insertAdminActionAudit(tenantId, actingAdminId, null, ACTION_ADMIN_LIST, null);
+        metrics.recordAdminAccess(tenantId, ACTION_ADMIN_LIST);
+
         // NOTE: content columns (profile, edited_fields, source_memory_pids)
         // are deliberately excluded from the SELECT. Do not add them back
         // without revisiting plan §7.
@@ -80,6 +87,11 @@ public class UserSoulProfileAdminController {
     @GetMapping("/stats")
     public ApiResponse<Map<String, Object>> stats() {
         Long tenantId = MetaContext.getCurrentTenantId();
+
+        // GDPR read-access audit (see list() above).
+        String actingAdminId = Objects.toString(MetaContext.getCurrentUserId(), "unknown");
+        insertAdminActionAudit(tenantId, actingAdminId, null, ACTION_ADMIN_STATS, null);
+        metrics.recordAdminAccess(tenantId, ACTION_ADMIN_STATS);
 
         Map<String, Long> byStatus = new LinkedHashMap<>();
         byStatus.put(UserSoulProfileStatus.DRAFT.code(), 0L);
@@ -169,6 +181,7 @@ public class UserSoulProfileAdminController {
                     ACTION_ADMIN_FORGET, reason);
             EditResult r = editor.forgetProfile(tenantId, targetUserId);
             metrics.recordAdminForget(tenantId, reason);
+            metrics.recordAdminAccess(tenantId, ACTION_ADMIN_FORGET);
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("pid", r.pid());
             out.put("version", r.version());
@@ -206,7 +219,9 @@ public class UserSoulProfileAdminController {
     // Admin guard + audit helpers
     // =========================================================================
 
-    static final String ACTION_ADMIN_FORGET = "admin_forget";
+    public static final String ACTION_ADMIN_FORGET = "admin_forget";
+    public static final String ACTION_ADMIN_LIST = "list";
+    public static final String ACTION_ADMIN_STATS = "stats";
 
     // Role-based admin guard is now enforced by
     // {@link com.auraboot.framework.application.security.AdminRoleInterceptor}
