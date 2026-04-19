@@ -81,6 +81,18 @@ public class MetaModelDTO {
     private String tableName;
 
     /**
+     * Model source type (physical/sqlView/namedQuery/inline).
+     * Top-level field so frontend isVirtualModel(model) checks need not dig into extension.
+     */
+    private String sourceType;
+
+    /**
+     * Model source reference (table name / view name / query code / inline ref).
+     * Required when sourceType != physical.
+     */
+    private String sourceRef;
+
+    /**
      * 扩展属性
      */
     private Map<String, Object> extension;

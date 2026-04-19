@@ -146,23 +146,42 @@ public class ModelController {
         if (existingModel == null) {
             return ApiResponse.error("模型不存在: " + pid);
         }
-        
-        // 创建新版本的创建请求
-        MetaModelCreateRequest createRequest = new MetaModelCreateRequest();
-        createRequest.setCode(existingModel.getCode());
-        createRequest.setDisplayName(request.getDisplayName());
-        createRequest.setDescription(request.getDescription());
-        createRequest.setModelType(request.getModelType() != null ? request.getModelType() : existingModel.getModelType());
 
-        createRequest.setTenantId(existingModel.getTenantId());
-        createRequest.setExtension(request.getExtension());
-        createRequest.setVersionNote(request.getVersionNote());
-        
-        // 创建新版本
-        MetaModelDTO result = metaModelService.create(createRequest);
+        // Update via saveDefinition() — the legacy create() path would throw
+        // "Model code already exists" because the model row is already there.
+        // saveDefinition() looks up by code and routes to UPDATE for existing rows,
+        // preserving sourceType/sourceRef/capabilities/primaryKey.
+        Map<String, Object> mergedExtension = new java.util.LinkedHashMap<>();
+        if (request.getExtension() != null) {
+            mergedExtension.putAll(request.getExtension());
+        }
+        // displayName / description / modelType are stored as extension keys (Model entity getters read from extension)
+        if (request.getDisplayName() != null) {
+            mergedExtension.put("displayName", request.getDisplayName());
+        }
+        if (request.getDescription() != null) {
+            mergedExtension.put("description", request.getDescription());
+        }
+        String effectiveModelType = request.getModelType() != null ? request.getModelType() : existingModel.getModelType();
+        if (effectiveModelType != null) {
+            mergedExtension.put("modelType", effectiveModelType);
+        }
+
+        ModelDefinition updateDef = ModelDefinition.builder()
+                .code(existingModel.getCode())
+                .displayName(request.getDisplayName())
+                .description(request.getDescription())
+                .modelType(effectiveModelType)
+                .extension(mergedExtension)
+                .build();
+        metaModelService.saveDefinition(updateDef);
+
+        // Reload by pid so the response reflects the freshly persisted row
+        // (sourceType/sourceRef/extension/displayName).
+        MetaModelDTO result = metaModelService.findByPid(pid);
         pluginResourceTracker.markAsUserModified(ResourceType.MODEL, existingModel.getCode());
 
-        log.info("模型更新成功: pid={}, newVersion={}", pid, result.getVersion());
+        log.info("模型更新成功: pid={}, version={}", pid, result != null ? result.getVersion() : null);
         return ApiResponse.success("模型更新成功", result);
     }
 
