@@ -642,11 +642,42 @@ export function dbUserSoulProfileRow(pid: string): UserSoulProfileRow {
   };
 }
 
-/** Delete seeded profiles by pid prefix within the admin tenant. */
+/**
+ * Delete seeded profiles within the admin tenant.
+ *
+ * Matches BOTH:
+ *   1. `pid LIKE '<prefix>%'`       — rows inserted by `seedUserSoulProfile`.
+ *   2. `user_id LIKE 'e2e_%'`       — rows seeded under e2e_victim_* /
+ *      e2e_admin_probe_* users (USP-E2E-08 / USP-E2E-10).
+ *   3. Rows in the admin tenant whose `user_id` matches any user_id we
+ *      still have a seeded row for, AND whose pid does NOT look like a
+ *      seeded pid — covers tombstone rows inserted by the backend's
+ *      `UserSoulProfileEditor.forgetProfile` / admin-forget paths. Those
+ *      rows use `UniqueIdGenerator.generate()` (ULID), not the
+ *      `E2EUSP` prefix, and were leaking across runs.
+ *
+ * The existing per-pid-prefix contract is preserved so callers that rely
+ * on `SOUL_PROFILE_PID_PREFIX` still do the right thing — we just match
+ * MORE rows, never fewer.
+ */
 export function cleanupUserSoulProfiles(pidPrefix: string): void {
+  // Collect user_ids that were touched by seeded rows (either still in
+  // the table with the seeded pid prefix, or already rewritten to
+  // tombstones). For each such user_id in the admin tenant, purge every
+  // row — including backend-generated tombstones with non-prefixed pids.
   psql(
     `DELETE FROM ab_agent_user_soul_profile
-       WHERE tenant_id = ${ADMIN_TENANT_ID} AND pid LIKE '${pidPrefix}%';`,
+       WHERE tenant_id = ${ADMIN_TENANT_ID}
+         AND (
+              pid LIKE '${pidPrefix}%'
+           OR user_id LIKE 'e2e_%'
+           OR user_id IN (
+                SELECT DISTINCT user_id
+                  FROM ab_agent_user_soul_profile
+                 WHERE tenant_id = ${ADMIN_TENANT_ID}
+                   AND pid LIKE '${pidPrefix}%'
+              )
+         );`,
   );
 }
 
