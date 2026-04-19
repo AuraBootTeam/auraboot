@@ -103,8 +103,7 @@ test.describe('Showcase Smoke Tests', () => {
   });
 
   test('Page Designer is accessible', async ({ page }) => {
-    test.fixme(true, 'Page Designer route /p/page_schema returns Page not found — route may have changed');
-    // Page designer moved to /p/page_schema (DSL-managed route)
+    // Page designer moved to /p/page_schema (DSL-managed route, page_schema_list pageKey)
     await page.goto('/p/page_schema');
     await page.waitForLoadState('domcontentloaded');
     await page.waitForLoadState('networkidle').catch(() => null);

@@ -12,28 +12,11 @@
  *   3. Drive the 4 tabs (`list-tab-columns` / `list-tab-filters` /
  *      `list-tab-toolbar` / `list-tab-behavior`) of `ListConfigPanel`.
  *
- * Capability gating note (2026-04-18):
- *   The OSS `auraboot-core-1.0.0-SNAPSHOT.jar` currently published to mavenLocal
- *   does NOT include `ModelCapabilitiesController.class` — verified by
- *   `unzip -l ~/.m2/.../auraboot-core-1.0.0-SNAPSHOT.jar | grep ModelCapabilit`.
- *   Therefore `GET /api/meta/models/{code}/capabilities` returns 500
- *   `NoResourceFoundException` against the running server.
- *
- *   ListConfigPanel tabs degrade as follows when capabilities is undefined:
- *     - ColumnsTab : returns "加载字段中..." (fields = derived from capabilities)
- *     - FiltersTab : returns "加载字段中..." (same dependency)
- *     - ToolbarTab : returns "加载 capabilities 中..."
- *     - BehaviorTab: returns "加载 capabilities 中..."
- *
- *   In this state we assert:
- *     a) the 4 tab buttons render and are clickable (panel structure intact);
- *     b) clicking each tab swaps content (loading-state text appears);
- *     c) the deep config + save assertions are SKIPPED with an explicit reason
- *        pointing to the missing capabilities endpoint.
- *
- *   Once `ModelCapabilitiesController` is republished into mavenLocal, the
- *   `requireCapabilities()` guard below should turn green and the deep
- *   sub-tests will run as written.
+ * Capabilities endpoint:
+ *   `GET /api/meta/models/{code}/capabilities` is now shipped in OSS core
+ *   (B1 commit 4b0039e5 + B12 follow-up). All 4 deep tabs depend on the
+ *   shape `{ list, sortableFields[], filterableFields[] }`; the previous
+ *   defensive `test.skip` for "controller missing" has been removed.
  *
  * Red lines honoured:
  *   - No `page.goto` to deep designer URLs — the row click in the page_schema
@@ -203,59 +186,6 @@ async function openDesignerByPageKey(
   await expect(page.getByTestId('list-config-panel')).toBeVisible({ timeout: 5_000 });
 }
 
-/**
- * Probe whether the running backend exposes `GET /api/meta/models/{code}/capabilities`.
- * If it returns non-2xx, the deep config sub-tests must be skipped because
- * every list-config tab degrades to a loading placeholder.
- *
- * Cached per-test-run via module-level Promise so we hit the API at most once.
- */
-let capabilitiesProbe: Promise<boolean> | null = null;
-function probeCapabilities(request: APIRequestContext): Promise<boolean> {
-  if (!capabilitiesProbe) {
-    capabilitiesProbe = (async () => {
-      try {
-        const r = await request.get(
-          `/api/meta/models/${SHOWCASE_MODEL_CODE}/capabilities`,
-          { failOnStatusCode: false },
-        );
-        if (!r.ok()) return false;
-        const body = (await r.json()) as {
-          code?: string;
-          data?: {
-            list?: boolean;
-            sortableFields?: unknown[];
-            filterableFields?: unknown[];
-          };
-        };
-        if (body.code !== '0' || !body.data) return false;
-        // Endpoint exists. The deep config tabs (Columns/Filters/Toolbar/
-        // Behavior) derive their field list from
-        // `sortableFields ∪ filterableFields`. If both arrays are empty the
-        // ColumnsTab renders "加载字段中..." (because the
-        // ListConfigPanel.fields useMemo returns undefined for "no
-        // capabilities" but [] for "empty arrays" — and an empty map yields
-        // a truthy [] which then renders zero rows; here we additionally
-        // observe in browser that the React fetch result resolves with
-        // empty arrays late enough that the test exceeds 5 s waiting for
-        // the tab body. Treat empty fields as "deep configuration not
-        // exercisable" and skip the deep tabs.
-        const hasShape =
-          Array.isArray(body.data.sortableFields) &&
-          Array.isArray(body.data.filterableFields);
-        const hasAnyCapability = body.data.list === true;
-        const hasFields =
-          (body.data.sortableFields?.length ?? 0) > 0 ||
-          (body.data.filterableFields?.length ?? 0) > 0;
-        return hasShape && hasAnyCapability && hasFields;
-      } catch {
-        return false;
-      }
-    })();
-  }
-  return capabilitiesProbe;
-}
-
 async function readPageBlocks(
   request: APIRequestContext,
   pid: string,
@@ -318,21 +248,6 @@ test.describe('Phase 3 — List ConfigPanel E2E (4 tabs)', () => {
     page,
     request,
   }) => {
-    // BACKLOG B14: GET /api/meta/models/{code}/capabilities returns 200 via
-    // Playwright APIRequestContext + curl (cookie-authed), but the in-browser
-    // SPA `fetch` from useModelCapabilities never resolves data — ColumnsTab
-    // stays on "加载字段中..." indefinitely. Suspect cookie/credentials handling
-    // mismatch between Playwright storageState and same-origin browser fetch.
-    // Tested credentials:'include' — no effect. Needs deeper diagnosis (network
-    // panel + actual response inspection in real browser).
-    const capabilitiesAvailable = await probeCapabilities(request);
-    test.skip(
-      !capabilitiesAvailable,
-      'GET /api/meta/models/{code}/capabilities is not registered in the running ' +
-        'OSS jar (ModelCapabilitiesController missing). ColumnsTab degrades to ' +
-        '"加载字段中..." without it. Republish auraboot-core to mavenLocal to enable.',
-    );
-
     const pageKey = uniquePageKey();
     const created = await apiCreateListPage(request, pageKey);
     createdPids.push(created.pid);
@@ -401,13 +316,6 @@ test.describe('Phase 3 — List ConfigPanel E2E (4 tabs)', () => {
     page,
     request,
   }) => {
-    const capabilitiesAvailable = await probeCapabilities(request);
-    test.skip(
-      !capabilitiesAvailable,
-      'capabilities endpoint missing (see P3.1 reason). FiltersTab degrades to ' +
-        '"加载字段中..." without filterableFields whitelist.',
-    );
-
     const pageKey = uniquePageKey();
     const created = await apiCreateListPage(request, pageKey);
     createdPids.push(created.pid);
@@ -469,13 +377,6 @@ test.describe('Phase 3 — List ConfigPanel E2E (4 tabs)', () => {
     page,
     request,
   }) => {
-    const capabilitiesAvailable = await probeCapabilities(request);
-    test.skip(
-      !capabilitiesAvailable,
-      'capabilities endpoint missing (see P3.1). ToolbarTab degrades to ' +
-        '"加载 capabilities 中..." because it gates presets on the capability flags.',
-    );
-
     const pageKey = uniquePageKey();
     const created = await apiCreateListPage(request, pageKey);
     createdPids.push(created.pid);
@@ -534,14 +435,6 @@ test.describe('Phase 3 — List ConfigPanel E2E (4 tabs)', () => {
     page,
     request,
   }) => {
-    const capabilitiesAvailable = await probeCapabilities(request);
-    test.skip(
-      !capabilitiesAvailable,
-      'capabilities endpoint missing (see P3.1). BehaviorTab degrades to ' +
-        '"加载 capabilities 中..." and the sort-field options are derived from ' +
-        'capabilities.sortableFields.',
-    );
-
     const pageKey = uniquePageKey();
     const created = await apiCreateListPage(request, pageKey);
     createdPids.push(created.pid);
