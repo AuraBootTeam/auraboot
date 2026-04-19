@@ -119,6 +119,8 @@ public class MemoryL1L2OrphanScanner {
         if (!leaderElection.acquire(MemoryL1L2LeaderElection.JOB_ORPHAN)) {
             log.debug("MemoryL1L2OrphanScanner: not leader for {}, skipping tick",
                     MemoryL1L2LeaderElection.JOB_ORPHAN);
+            metrics.recordLeaderSkipped(MemoryL1L2LeaderElection.JOB_ORPHAN,
+                    leaderElection.getInstanceId());
             return new ScanSummary(0, 0, 0, 0, 0);
         }
         Integer[] counts = tx.execute(status -> {

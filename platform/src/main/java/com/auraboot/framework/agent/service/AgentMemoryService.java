@@ -447,7 +447,7 @@ public class AgentMemoryService {
                 + "    OR (scope = 'tenant' AND tenant_id = ?) "
                 + (hasUser ? "    OR (scope = 'user'   AND scope_key = ?) " : "")
                 + "  ) "
-                + "ORDER BY importance DESC, created_at DESC "
+                + "ORDER BY importance DESC, created_at DESC, pid ASC "
                 + "LIMIT ?";
         return hasUser
                 ? jdbcTemplate.queryForList(sql, agentCode, pattern, pattern, tenantId, userId, limit)
@@ -474,7 +474,7 @@ public class AgentMemoryService {
                 + "    OR (scope = 'tenant' AND tenant_id = ?) "
                 + (hasUser ? "    OR (scope = 'user'   AND scope_key = ?) " : "")
                 + "  ) "
-                + "ORDER BY importance DESC, created_at DESC "
+                + "ORDER BY importance DESC, created_at DESC, pid ASC "
                 + "LIMIT ?";
         return hasUser
                 ? jdbcTemplate.queryForList(sql, agentCode, tenantId, userId, limit)
@@ -508,7 +508,7 @@ public class AgentMemoryService {
                 + "    OR (scope = 'tenant' AND tenant_id = ?) "
                 + (hasUser ? "    OR (scope = 'user'   AND scope_key = ?) " : "")
                 + "  ) "
-                + "ORDER BY importance DESC, created_at DESC "
+                + "ORDER BY importance DESC, created_at DESC, pid ASC "
                 + "LIMIT ?";
         return hasUser
                 ? jdbcTemplate.queryForList(sql, agentCode, tenantId, userId, limit)
@@ -556,7 +556,7 @@ public class AgentMemoryService {
                 + "  AND scope = 'user' AND scope_key = ? "
                 + "  AND category = 'session' "
                 + "  AND (deleted_flag IS NULL OR deleted_flag = FALSE) "
-                + "ORDER BY last_accessed DESC NULLS LAST, created_at DESC "
+                + "ORDER BY last_accessed DESC NULLS LAST, created_at DESC, pid ASC "
                 + "LIMIT ?",
                 tenantId, scopeKey, maxRows);
     }
