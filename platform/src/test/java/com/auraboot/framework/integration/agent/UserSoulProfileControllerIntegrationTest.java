@@ -81,7 +81,7 @@ class UserSoulProfileControllerIntegrationTest extends BaseIntegrationTest {
         jdbc.update("INSERT INTO ab_agent_user_soul_profile "
                         + "(pid, tenant_id, user_id, version, status, profile, profile_hash, "
                         + " derivation_confidence, activated_at, created_at) "
-                        + "VALUES (?, ?, ?, ?, 'ACTIVE', ?::jsonb, ?, 0.85, NOW(), NOW())",
+                        + "VALUES (?, ?, ?, ?, 'active', ?::jsonb, ?, 0.85, NOW(), NOW())",
                 pid, tenant, user, version,
                 "{\"persona\":{\"text\":\"engineer\"}}", "h:" + pid);
         return pid;
@@ -92,7 +92,7 @@ class UserSoulProfileControllerIntegrationTest extends BaseIntegrationTest {
         jdbc.update("INSERT INTO ab_agent_user_soul_profile "
                         + "(pid, tenant_id, user_id, version, status, profile, profile_hash, "
                         + " derivation_confidence, activated_at, superseded_at, created_at) "
-                        + "VALUES (?, ?, ?, ?, 'SUPERSEDED', ?::jsonb, ?, 0.80, NOW(), NOW(), NOW())",
+                        + "VALUES (?, ?, ?, ?, 'superseded', ?::jsonb, ?, 0.80, NOW(), NOW(), NOW())",
                 pid, tenant, user, version,
                 "{\"persona\":{\"text\":\"older\"}}", "h:" + pid);
         return pid;
@@ -110,7 +110,7 @@ class UserSoulProfileControllerIntegrationTest extends BaseIntegrationTest {
         assertThat(r.getCode()).isEqualTo("0");
         assertThat(r.getData().get("pid")).isEqualTo(pid);
         assertThat(r.getData().get("version")).isEqualTo(2);
-        assertThat(r.getData().get("status")).isEqualTo("ACTIVE");
+        assertThat(r.getData().get("status")).isEqualTo("active");
         assertThat(r.getData().get("profile_json")).asString().contains("engineer");
     }
 
@@ -306,7 +306,7 @@ class UserSoulProfileControllerIntegrationTest extends BaseIntegrationTest {
         assertThat(r.getData().get("noop")).isEqualTo(false);
         Long archivedCount = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM ab_agent_user_soul_profile "
-                        + "WHERE tenant_id = ? AND user_id = ? AND status = 'ARCHIVED'",
+                        + "WHERE tenant_id = ? AND user_id = ? AND status = 'archived'",
                 Long.class, tenantId, userId);
         assertThat(archivedCount).isGreaterThanOrEqualTo(2L); // original archived + tombstone
     }
@@ -409,6 +409,6 @@ class UserSoulProfileControllerIntegrationTest extends BaseIntegrationTest {
         assertThat(((Number) r.getData().get("stale_count")).longValue()).isEqualTo(1L);
         @SuppressWarnings("unchecked")
         Map<String, Long> byStatus = (Map<String, Long>) r.getData().get("by_status");
-        assertThat(byStatus.get("ACTIVE")).isEqualTo(1L);
+        assertThat(byStatus.get("active")).isEqualTo(1L);
     }
 }

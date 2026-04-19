@@ -100,7 +100,7 @@ test.describe('Mission Control — User Soul Profile (real backend, PR-80)', () 
   test('USP-E2E-01: pin persona persists in DB edited_fields', async ({ page }) => {
     const seed = seedUserSoulProfile({
       userId: ADMIN_USER_ID,
-      status: 'ACTIVE',
+      status: 'active',
       version: 1,
     });
 
@@ -116,7 +116,7 @@ test.describe('Mission Control — User Soul Profile (real backend, PR-80)', () 
     });
 
     const row = dbUserSoulProfileRow(seed.pid);
-    expect(row.status).toBe('ACTIVE');
+    expect(row.status).toBe('active');
     expect(row.editedFields ?? '').toContain('persona');
     expect(row.editedFields ?? '').toMatch(/locked|pin/i);
   });
@@ -126,7 +126,7 @@ test.describe('Mission Control — User Soul Profile (real backend, PR-80)', () 
   }) => {
     const seed = seedUserSoulProfile({
       userId: ADMIN_USER_ID,
-      status: 'ACTIVE',
+      status: 'active',
     });
 
     await navigateToMyProfile(page);
@@ -150,7 +150,7 @@ test.describe('Mission Control — User Soul Profile (real backend, PR-80)', () 
   test('USP-E2E-03: edit field stores override_text', async ({ page }) => {
     const seed = seedUserSoulProfile({
       userId: ADMIN_USER_ID,
-      status: 'ACTIVE',
+      status: 'active',
     });
 
     await navigateToMyProfile(page);
@@ -174,7 +174,7 @@ test.describe('Mission Control — User Soul Profile (real backend, PR-80)', () 
   test('USP-E2E-04: reset persona field removes its key from edited_fields', async ({ page }) => {
     const seed = seedUserSoulProfile({
       userId: ADMIN_USER_ID,
-      status: 'ACTIVE',
+      status: 'active',
       editedFields: {
         persona: 'locked',
         'preferences.communication_style': 'hidden',
@@ -204,7 +204,7 @@ test.describe('Mission Control — User Soul Profile (real backend, PR-80)', () 
   }) => {
     seedUserSoulProfile({
       userId: ADMIN_USER_ID,
-      status: 'ACTIVE',
+      status: 'active',
       stale: true,
     });
 
@@ -218,12 +218,12 @@ test.describe('Mission Control — User Soul Profile (real backend, PR-80)', () 
   test('USP-E2E-06: history tab lists SUPERSEDED versions', async ({ page }) => {
     seedUserSoulProfile({
       userId: ADMIN_USER_ID,
-      status: 'ACTIVE',
+      status: 'active',
       version: 2,
     });
     const oldSeed = seedUserSoulProfile({
       userId: ADMIN_USER_ID,
-      status: 'SUPERSEDED',
+      status: 'superseded',
       version: 1,
       confidence: 0.7,
     });
@@ -245,7 +245,7 @@ test.describe('Mission Control — User Soul Profile (real backend, PR-80)', () 
   }) => {
     const seed = seedUserSoulProfile({
       userId: ADMIN_USER_ID,
-      status: 'ACTIVE',
+      status: 'active',
     });
 
     await navigateToMyProfile(page);
@@ -264,7 +264,7 @@ test.describe('Mission Control — User Soul Profile (real backend, PR-80)', () 
     });
 
     const row = dbUserSoulProfileRow(seed.pid);
-    expect(row.status).toBe('ARCHIVED');
+    expect(row.status).toBe('archived');
     expect(row.hiddenAt).not.toBeNull();
   });
 
@@ -275,7 +275,7 @@ test.describe('Mission Control — User Soul Profile (real backend, PR-80)', () 
     const uniquePersona = `UNIQUE-PERSONA-TEXT-${Date.now()}`;
     seedUserSoulProfile({
       userId: uniqueUser,
-      status: 'ACTIVE',
+      status: 'active',
       profileJson: {
         schema_version: '1.0',
         persona: { text: uniquePersona, confidence: 0.82 },
