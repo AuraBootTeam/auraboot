@@ -43,10 +43,27 @@ public class MemoryL1L2PromotionMetrics {
     public static final String EVENT_TYPE_L1_PROMOTED = "L1_PROMOTED";
     public static final String EVENT_TYPE_DEDUP_HIT = "DEDUP_HIT";
     public static final String EVENT_TYPE_L2_DEMOTED = "L2_DEMOTED";
+    /**
+     * Phase 3 Round-2: audit event emitted when a candidate is skipped on the
+     * race path (atomic UPDATE matched 0 rows because a concurrent promoter
+     * already flipped {@code category}). Separate from {@code DEDUP_HIT} so
+     * that hash/cosine dedup and race-loss can be counted independently in
+     * audit-driven analytics.
+     */
+    public static final String EVENT_TYPE_DEDUP_SKIPPED = "dedup_skipped";
 
     /** Phase 3: dedup mode code stored on {@code ab_agent_memory_tier_event.dedup_mode}. */
     public static final String DEDUP_MODE_HASH = "hash";
     public static final String DEDUP_MODE_COSINE = "cosine";
+    /**
+     * Phase 3 Round-2: race-path dedup. Used when the atomic UPDATE that flips
+     * {@code category session -> user} affects 0 rows because another process
+     * won the race and already promoted the same L1 pid. Audit invariant: every
+     * outcome writes an audit row — race path is indistinguishable from a hash
+     * hit at the DB layer, but we tag it {@code race} so postmortems can tell
+     * the two apart.
+     */
+    public static final String DEDUP_MODE_RACE = "race";
 
     private final MeterRegistry registry;
 
