@@ -62,6 +62,8 @@ test.describe('workflow-demo — R3 SLA escalation', () => {
       await loginViaUI(applicantPage, applicant.email, 'Test2026x');
 
       const { recordId } = await submitLeaveRequest(applicantPage, {
+        userId: applicant.userId,
+        token: applicant.token,
         days: 1,
         type: 'annual',
         reason: 'R3 SLA escalation automated test — intentional manager no-action',
