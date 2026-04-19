@@ -26,6 +26,13 @@ import { pageManagerService } from '~/plugins/core-designer/components/studio/se
 import type { PageMeta } from '~/plugins/core-designer/components/studio/services/page-manager';
 import type { PageSchema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 import { DEVICE_PRESETS } from '~/plugins/core-designer/components/studio/workbench/canvas/devices/presets';
+import { initRegistry } from '~/plugins/core-designer/components/studio/registry';
+
+// Populate WidgetRegistry + BlockRegistry on first import so the
+// schema-driven WidgetSpecificPanel (08c195f0) and block palette have
+// definitions to render. `initRegistry` is idempotent — subsequent calls
+// are no-ops, so it is safe to invoke at module-load time.
+initRegistry();
 
 /**
  * Pure helpers for the Settings ↔ Schema ↔ Settings bridge.
