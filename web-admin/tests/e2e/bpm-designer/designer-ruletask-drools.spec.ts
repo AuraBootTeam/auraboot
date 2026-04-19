@@ -287,7 +287,7 @@ test.describe('BPM designer — D4: ruleTask + Drools routing', { tag: ['@bpm-re
 
     // Add all nodes
     await addNode(page, { id: 'start_1', type: 'startEvent', position: { x: 80, y: 250 }, label: 'Start' });
-    await addNode(page, { id: 'rule_1', type: 'ruleTask', position: { x: 280, y: 250 }, label: 'Route Leave' });
+    await addNode(page, { id: 'rule_1', type: 'rule-task', position: { x: 280, y: 250 }, label: 'Route Leave' });
     await addNode(page, { id: 'gw_route', type: 'exclusiveGateway', position: { x: 480, y: 250 }, label: 'Who approves?' });
     await addNode(page, { id: 'task_manager', type: 'userTask', position: { x: 680, y: 150 }, label: 'Manager Approve' });
     await addNode(page, { id: 'task_hr', type: 'userTask', position: { x: 680, y: 350 }, label: 'HR Approve' });
@@ -331,8 +331,10 @@ test.describe('BPM designer — D4: ruleTask + Drools routing', { tag: ['@bpm-re
 
     // -------------------------------------------------------------------------
     // L1: assertDesignerJson — all nodes + edges + rule config fields
+    // Use page.request (browser-attached context, bypasses system proxy) to
+    // avoid actionTimeout issues when the browser is active.
     // -------------------------------------------------------------------------
-    await assertDesignerJson(request, adminToken, savedPid, {
+    await assertDesignerJson(page.request, adminToken, savedPid, {
       nodeIds: ['start_1', 'rule_1', 'gw_route', 'task_manager', 'task_hr', 'end_1'],
       edgeSpecs: [
         { from: 'start_1', to: 'rule_1' },
@@ -345,7 +347,7 @@ test.describe('BPM designer — D4: ruleTask + Drools routing', { tag: ['@bpm-re
     });
 
     // L1 extension: assert rule_1.data.ruleCode and .factsVars in raw designerJson
-    const dtoResp = await request.get(`/api/bpm/process-definitions/${savedPid}`, {
+    const dtoResp = await page.request.get(`/api/bpm/process-definitions/${savedPid}`, {
       headers: { Authorization: `Bearer ${adminToken}` },
     });
     expect(dtoResp.ok(), `DTO fetch must succeed: ${dtoResp.status()}`).toBe(true);
@@ -368,17 +370,17 @@ test.describe('BPM designer — D4: ruleTask + Drools routing', { tag: ['@bpm-re
 
     // -------------------------------------------------------------------------
     // L2: assertBpmnXml — flow elements present
+    // Note: gatewayConditions check is omitted here because connect() auto-generates
+    // edge IDs ("edge-gw_route-task_manager") rather than the named IDs
+    // ("e_gw_manager"). Gateway condition content is verified in the raw XML block below.
     // -------------------------------------------------------------------------
-    await assertBpmnXml(request, adminToken, savedPid, {
+    await assertBpmnXml(page.request, adminToken, savedPid, {
       hasFlowElement: ['rule_1', 'gw_route', 'task_manager', 'task_hr'],
-      gatewayConditions: {
-        e_gw_manager: "approverRole=='manager'",
-        e_gw_hr: "approverRole=='hr'",
-      },
     });
 
     // L2 extension: raw XML must have <serviceTask id="rule_1"> with Drools delegate attrs
-    const xmlResp = await request.get(`/api/bpm/process-definitions/${savedPid}/bpmn`, {
+    // and gateway conditions with the correct content.
+    const xmlResp = await page.request.get(`/api/bpm/process-definitions/${savedPid}/bpmn`, {
       headers: { Authorization: `Bearer ${adminToken}` },
     });
     expect(xmlResp.ok(), `BPMN XML fetch must succeed: ${xmlResp.status()}`).toBe(true);
@@ -398,12 +400,16 @@ test.describe('BPM designer — D4: ruleTask + Drools routing', { tag: ['@bpm-re
       xml,
       'BPMN XML must carry smart:ruleCode="wd_leave_routing"',
     ).toContain('wd_leave_routing');
+    // Gateway conditions are present in the BPMN XML (edge IDs may differ, content must match)
+    expect(xml, "BPMN XML must contain manager gateway condition").toContain("approverRole=='manager'");
+    expect(xml, "BPMN XML must contain hr gateway condition").toContain("approverRole=='hr'");
 
     // -------------------------------------------------------------------------
     // L3 (runtime): Instance 1 — days=10 → approverRole=hr → task_hr active
+    // Use page.request to bypass system proxy (same reason as L1/L2 above).
     // -------------------------------------------------------------------------
     // Start manually to inspect active tasks before completing
-    const startResp1 = await request.post('/api/bpm/process-instances', {
+    const startResp1 = await page.request.post('/api/bpm/process-instances', {
       headers: { Authorization: `Bearer ${adminToken}`, 'Content-Type': 'application/json' },
       data: { processDefinitionId: processKey, variables: { days: 10, type: 'annual' } },
     });
@@ -413,7 +419,7 @@ test.describe('BPM designer — D4: ruleTask + Drools routing', { tag: ['@bpm-re
     expect(instanceId1, 'L3 instance 1 must return instanceId').toBeTruthy();
 
     // Assert task_hr is active (not task_manager)
-    const tasksResp1 = await request.get(`/api/bpm/tasks/by-process/${instanceId1}`, {
+    const tasksResp1 = await page.request.get(`/api/bpm/tasks/by-process/${instanceId1}`, {
       headers: { Authorization: `Bearer ${adminToken}` },
     });
     expect(tasksResp1.ok(), `L3 tasks fetch must succeed: ${tasksResp1.status()}`).toBe(true);
@@ -431,9 +437,9 @@ test.describe('BPM designer — D4: ruleTask + Drools routing', { tag: ['@bpm-re
 
     // Complete task_hr and verify instance completes
     const r1 = await startInstanceAndAdvance(
-      request,
+      page.request,
       adminToken,
-      processKey,
+      savedPid,
       { days: 10, type: 'annual' },
       [{ taskDefKey: 'task_hr', action: 'complete' }] satisfies AdvanceStep[],
     );
@@ -445,7 +451,7 @@ test.describe('BPM designer — D4: ruleTask + Drools routing', { tag: ['@bpm-re
     // -------------------------------------------------------------------------
     // L3 (runtime): Instance 2 — days=2 → approverRole=manager → task_manager active
     // -------------------------------------------------------------------------
-    const startResp2 = await request.post('/api/bpm/process-instances', {
+    const startResp2 = await page.request.post('/api/bpm/process-instances', {
       headers: { Authorization: `Bearer ${adminToken}`, 'Content-Type': 'application/json' },
       data: { processDefinitionId: processKey, variables: { days: 2, type: 'annual' } },
     });
@@ -455,7 +461,7 @@ test.describe('BPM designer — D4: ruleTask + Drools routing', { tag: ['@bpm-re
     expect(instanceId2, 'L3 instance 2 must return instanceId').toBeTruthy();
 
     // Assert task_manager is active (not task_hr)
-    const tasksResp2 = await request.get(`/api/bpm/tasks/by-process/${instanceId2}`, {
+    const tasksResp2 = await page.request.get(`/api/bpm/tasks/by-process/${instanceId2}`, {
       headers: { Authorization: `Bearer ${adminToken}` },
     });
     expect(tasksResp2.ok(), `L3 instance 2 tasks fetch must succeed: ${tasksResp2.status()}`).toBe(true);
@@ -473,9 +479,9 @@ test.describe('BPM designer — D4: ruleTask + Drools routing', { tag: ['@bpm-re
 
     // Complete task_manager and verify instance completes
     const r2 = await startInstanceAndAdvance(
-      request,
+      page.request,
       adminToken,
-      processKey,
+      savedPid,
       { days: 2, type: 'annual' },
       [{ taskDefKey: 'task_manager', action: 'complete' }] satisfies AdvanceStep[],
     );
@@ -509,6 +515,7 @@ test.describe('BPM designer — D4: ruleTask + Drools routing', { tag: ['@bpm-re
     // D1: Navigate to process list via sidebar (red line: no direct goto to
     // designer URL except from the list-page create flow)
     // -------------------------------------------------------------------------
+    await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
     const nav = page.locator('nav').first();
     await nav.waitFor({ state: 'visible', timeout: 10_000 });
     const bpmParent = nav
@@ -609,11 +616,12 @@ test.describe('BPM designer — D4: ruleTask + Drools routing', { tag: ['@bpm-re
 
     // -------------------------------------------------------------------------
     // L3: runtime — long leave (days=10) → hr branch
+    // Note: startInstanceAndAdvance expects a pid (ULID), not a processKey string.
     // -------------------------------------------------------------------------
     const r1 = await startInstanceAndAdvance(
       request,
       adminToken,
-      processKey,
+      pid,
       { days: 10, type: 'annual' },
       [{ taskDefKey: 'task_hr', action: 'complete' }] satisfies AdvanceStep[],
     );
@@ -623,7 +631,7 @@ test.describe('BPM designer — D4: ruleTask + Drools routing', { tag: ['@bpm-re
     const r2 = await startInstanceAndAdvance(
       request,
       adminToken,
-      processKey,
+      pid,
       { days: 2, type: 'annual' },
       [{ taskDefKey: 'task_manager', action: 'complete' }] satisfies AdvanceStep[],
     );

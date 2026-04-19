@@ -32,7 +32,7 @@ export type NodeType =
   | 'endEvent'
   | 'userTask'
   | 'serviceTask'
-  | 'ruleTask'
+  | 'rule-task'
   | 'callActivity'
   | 'exclusiveGateway'
   | 'parallelGateway'
