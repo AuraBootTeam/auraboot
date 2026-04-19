@@ -62,9 +62,16 @@ public class MemoryL1L2OrphanScanner {
     /** Per-tick row cap so the lock never hogs one connection for minutes. */
     public static final int BATCH_CAP = 500;
 
-    /** Candidate must be at least this old — design §4.1 uses 1h here to keep
-     *  normal-path event listener as the primary; only rescue truly stuck rows. */
-    public static final String MIN_AGE_INTERVAL = "1 hour";
+    /**
+     * Candidate must be at least this many hours old — design §4.1 uses 1h
+     * here to keep the normal-path event listener as the primary; only
+     * rescue truly stuck rows.
+     *
+     * <p>Round-2 review #6: int constant (no longer a text-interval literal).
+     * The SELECT uses {@code make_interval(hours => ?)} — preemptively kills
+     * any injection vector should this constant become configurable later.
+     */
+    public static final int AGE_HOURS = 1;
 
     private final JdbcTemplate jdbc;
     private final TransactionTemplate tx;
@@ -140,11 +147,11 @@ public class MemoryL1L2OrphanScanner {
                         + " WHERE category = 'session' "
                         + "   AND importance >= ? "
                         + "   AND promoted_at IS NULL "
-                        + "   AND created_at < NOW() - INTERVAL '" + MIN_AGE_INTERVAL + "' "
+                        + "   AND created_at < NOW() - make_interval(hours => ?) "
                         + "   AND (deleted_flag IS NULL OR deleted_flag = FALSE) "
                         + " ORDER BY created_at ASC "
                         + " LIMIT ?",
-                MemoryL1L2Promoter.BASE_IMPORTANCE_GATE, BATCH_CAP);
+                MemoryL1L2Promoter.BASE_IMPORTANCE_GATE, AGE_HOURS, BATCH_CAP);
 
         int promoted = 0;
         int skippedDup = 0;

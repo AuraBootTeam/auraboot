@@ -125,16 +125,25 @@ public class MemoryL1L2Demoter {
         // Select L2 rows that are stale AND low-importance AND not pinned.
         // last_accessed IS NULL counts as "stale" — rows that were promoted
         // but never re-accessed are prime demotion candidates.
+        // Round-2 review fix #1 + #7:
+        //  (#1) Use make_interval(days => ?) with setInt rather than
+        //       (? || ' days')::interval — avoids text→interval coercion under
+        //       prepared-statement caching and plays nicer with pgBouncer.
+        //  (#7) A newly-promoted row has last_accessed=NULL and promoted_at=NOW();
+        //       without a grace period it is immediately eligible for demotion.
+        //       Fall back through COALESCE(last_accessed, promoted_at, created_at)
+        //       so the freshest "touch" timestamp gates demotion.
         List<Map<String, Object>> rows = jdbc.queryForList(
                 "SELECT pid, tenant_id FROM ab_agent_memory "
                         + " WHERE category IN ('user','agent') "
                         + "   AND (deleted_flag IS NULL OR deleted_flag = FALSE) "
                         + "   AND (shareable IS NULL OR shareable = FALSE) "
                         + "   AND importance < ? "
-                        + "   AND (last_accessed IS NULL OR last_accessed < NOW() - (? || ' days')::interval) "
-                        + " ORDER BY COALESCE(last_accessed, created_at) ASC "
+                        + "   AND COALESCE(last_accessed, promoted_at, created_at) "
+                        + "       < NOW() - make_interval(days => ?) "
+                        + " ORDER BY COALESCE(last_accessed, promoted_at, created_at) ASC "
                         + " LIMIT ?",
-                importanceMax, String.valueOf(ageDays), BATCH_CAP);
+                importanceMax, ageDays, BATCH_CAP);
 
         int scanned = rows.size();
         int demoted = 0;
@@ -146,6 +155,10 @@ public class MemoryL1L2Demoter {
             // Atomic UPDATE guards against racing promoters: if the row was
             // re-accessed / re-promoted between the SELECT and here, the
             // category predicate will fail and the UPDATE affects 0 rows.
+            // Round-2 review #7: include the same staleness predicate as the
+            // SELECT (COALESCE(last_accessed, promoted_at, created_at)) so a
+            // row re-promoted in the race window is not demoted just because
+            // the category check still matches.
             int updated = jdbc.update(
                     "UPDATE ab_agent_memory "
                             + "   SET category = 'session', "
@@ -155,8 +168,10 @@ public class MemoryL1L2Demoter {
                             + " WHERE pid = ? "
                             + "   AND category IN ('user','agent') "
                             + "   AND (deleted_flag IS NULL OR deleted_flag = FALSE) "
-                            + "   AND (shareable IS NULL OR shareable = FALSE)",
-                    pid);
+                            + "   AND (shareable IS NULL OR shareable = FALSE) "
+                            + "   AND COALESCE(last_accessed, promoted_at, created_at) "
+                            + "       < NOW() - make_interval(days => ?)",
+                    pid, ageDays);
 
             if (updated == 1) {
                 demoted++;
