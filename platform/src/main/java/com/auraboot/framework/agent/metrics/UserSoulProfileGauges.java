@@ -1,5 +1,6 @@
 package com.auraboot.framework.agent.metrics;
 
+import com.auraboot.framework.agent.profile.UserSoulProfileStatus;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.binder.MeterBinder;
@@ -47,14 +48,16 @@ public class UserSoulProfileGauges {
         return (MeterRegistry registry) -> {
             Gauge.builder(ACTIVE_COUNT,
                     () -> countOrZero(jdbc,
-                            "SELECT COUNT(*) FROM ab_agent_user_soul_profile WHERE status = 'ACTIVE'"))
+                            "SELECT COUNT(*) FROM ab_agent_user_soul_profile WHERE status = ?",
+                            UserSoulProfileStatus.ACTIVE.code()))
                     .description("Total User Soul Profile rows in ACTIVE status (cross-tenant)")
                     .register(registry);
 
             Gauge.builder(STALE_COUNT,
                     () -> countOrZero(jdbc,
                             "SELECT COUNT(*) FROM ab_agent_user_soul_profile " +
-                                    "WHERE status = 'ACTIVE' AND stale_flagged_at IS NOT NULL"))
+                                    "WHERE status = ? AND stale_flagged_at IS NOT NULL",
+                            UserSoulProfileStatus.ACTIVE.code()))
                     .description("Total ACTIVE User Soul Profile rows flagged as stale (cross-tenant)")
                     .register(registry);
 
@@ -65,16 +68,16 @@ public class UserSoulProfileGauges {
         };
     }
 
-    private static double countOrZero(JdbcTemplate jdbc, String sql) {
-        Long value = jdbc.queryForObject(sql, Long.class);
+    private static double countOrZero(JdbcTemplate jdbc, String sql, Object... args) {
+        Long value = jdbc.queryForObject(sql, Long.class, args);
         return value == null ? 0.0d : value.doubleValue();
     }
 
     private static double avgConfidence(JdbcTemplate jdbc) {
         Double value = jdbc.queryForObject(
                 "SELECT COALESCE(AVG(derivation_confidence), 0) " +
-                        "FROM ab_agent_user_soul_profile WHERE status = 'ACTIVE'",
-                Double.class);
+                        "FROM ab_agent_user_soul_profile WHERE status = ?",
+                Double.class, UserSoulProfileStatus.ACTIVE.code());
         return value == null ? 0.0d : value;
     }
 }

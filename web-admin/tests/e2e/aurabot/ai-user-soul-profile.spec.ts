@@ -30,7 +30,7 @@ function makeProfile(overrides: Record<string, unknown> = {}) {
     tenant_id: 1,
     user_id: 101,
     version: 3,
-    status: 'ACTIVE',
+    status: 'active',
     profile: {
       schema_version: '1.0',
       persona: {
@@ -398,7 +398,7 @@ test.describe('Mission Control — User Soul Profile (PR-79)', () => {
         {
           pid: 'USP0000000000000000002',
           version: 2,
-          status: 'SUPERSEDED',
+          status: 'superseded',
           derivation_confidence: 0.7,
           activated_at: '2026-04-10T04:00:00Z',
           superseded_at: '2026-04-18T04:00:00Z',
@@ -408,7 +408,7 @@ test.describe('Mission Control — User Soul Profile (PR-79)', () => {
         {
           pid: 'USP0000000000000000003',
           version: 1,
-          status: 'ARCHIVED',
+          status: 'archived',
           derivation_confidence: 0.6,
           activated_at: '2026-03-01T04:00:00Z',
           superseded_at: '2026-04-10T04:00:00Z',
@@ -517,7 +517,7 @@ test.describe('Mission Control — User Soul Profile (PR-79)', () => {
           user_email: 'alice@example.com',
           user_name: 'Alice',
           version: 3,
-          status: 'ACTIVE',
+          status: 'active',
           activated_at: '2026-04-18T04:30:00Z',
           derivation_confidence: 0.82,
           stale_flagged_at: null,
@@ -527,7 +527,7 @@ test.describe('Mission Control — User Soul Profile (PR-79)', () => {
           user_email: 'bob@example.com',
           user_name: 'Bob',
           version: 1,
-          status: 'ACTIVE',
+          status: 'active',
           activated_at: '2026-04-17T04:30:00Z',
           derivation_confidence: 0.55,
           stale_flagged_at: '2026-04-18T00:00:00Z',

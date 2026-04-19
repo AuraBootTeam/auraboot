@@ -89,7 +89,7 @@ class UserSoulProfileDeriverIntegrationTest extends BaseIntegrationTest {
                 "SELECT status, version, profile_hash, source_memory_pids::text AS pids, "
                         + " derivation_model, derivation_confidence "
                         + "FROM ab_agent_user_soul_profile WHERE pid = ?", r.profilePid());
-        assertThat(row.get("status")).isEqualTo("DRAFT");
+        assertThat(row.get("status")).isEqualTo("draft");
         assertThat(((Number) row.get("version")).intValue()).isEqualTo(1);
         assertThat((String) row.get("pids")).contains(tag + "m1").contains(tag + "m5");
         assertThat(row.get("derivation_model")).isEqualTo("template:v1");
@@ -106,7 +106,7 @@ class UserSoulProfileDeriverIntegrationTest extends BaseIntegrationTest {
         assertThat(first.outcome()).isEqualTo(Outcome.DRAFTED);
 
         // Promote DRAFT → ACTIVE so second run sees prior hash.
-        jdbc.update("UPDATE ab_agent_user_soul_profile SET status = 'ACTIVE', activated_at = NOW() "
+        jdbc.update("UPDATE ab_agent_user_soul_profile SET status = 'active', activated_at = NOW() "
                 + "WHERE pid = ?", first.profilePid());
 
         DerivationResult second = deriver.deriveForUser(tenantId, userId);
@@ -171,7 +171,7 @@ class UserSoulProfileDeriverIntegrationTest extends BaseIntegrationTest {
         List<String> statuses = jdbc.queryForList(
                 "SELECT status FROM ab_agent_user_soul_profile WHERE tenant_id = ? AND user_id = ?",
                 String.class, tenantId, userId);
-        assertThat(statuses).contains("DRAFT");
+        assertThat(statuses).contains("draft");
     }
 
     @Test
@@ -184,14 +184,14 @@ class UserSoulProfileDeriverIntegrationTest extends BaseIntegrationTest {
         jdbc.update("INSERT INTO ab_agent_user_soul_profile "
                         + "(pid, tenant_id, user_id, version, status, profile, profile_hash, "
                         + " edited_fields, hidden_at, created_at) "
-                        + "VALUES (?, ?, ?, 1, 'ARCHIVED', '{}'::jsonb, ?, "
+                        + "VALUES (?, ?, ?, 1, 'archived', '{}'::jsonb, ?, "
                         + " '{\"_forgotten\":true}'::jsonb, NOW(), NOW())",
                 tag + "tomb", tenantId, userId, "h:tomb");
         DerivationResult r = deriver.deriveForUser(tenantId, userId);
         assertThat(r.outcome()).isEqualTo(Outcome.SKIPPED_FORGOTTEN);
         Long newDrafts = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM ab_agent_user_soul_profile "
-                        + "WHERE tenant_id = ? AND user_id = ? AND status = 'DRAFT'",
+                        + "WHERE tenant_id = ? AND user_id = ? AND status = 'draft'",
                 Long.class, tenantId, userId);
         assertThat(newDrafts).isZero();
     }

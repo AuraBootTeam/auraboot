@@ -1,5 +1,6 @@
 package com.auraboot.framework.agent.controller;
 
+import com.auraboot.framework.agent.profile.UserSoulProfileStatus;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
@@ -28,11 +29,6 @@ import java.util.Map;
 public class UserSoulProfileAdminController {
 
     public static final String BASE_PATH = "/api/admin/user-soul-profiles";
-
-    private static final String STATUS_ACTIVE = "ACTIVE";
-    private static final String STATUS_DRAFT = "DRAFT";
-    private static final String STATUS_SUPERSEDED = "SUPERSEDED";
-    private static final String STATUS_ARCHIVED = "ARCHIVED";
 
     private final JdbcTemplate jdbcTemplate;
 
@@ -74,10 +70,10 @@ public class UserSoulProfileAdminController {
         Long tenantId = MetaContext.getCurrentTenantId();
 
         Map<String, Long> byStatus = new LinkedHashMap<>();
-        byStatus.put(STATUS_DRAFT, 0L);
-        byStatus.put(STATUS_ACTIVE, 0L);
-        byStatus.put(STATUS_SUPERSEDED, 0L);
-        byStatus.put(STATUS_ARCHIVED, 0L);
+        byStatus.put(UserSoulProfileStatus.DRAFT.code(), 0L);
+        byStatus.put(UserSoulProfileStatus.ACTIVE.code(), 0L);
+        byStatus.put(UserSoulProfileStatus.SUPERSEDED.code(), 0L);
+        byStatus.put(UserSoulProfileStatus.ARCHIVED.code(), 0L);
 
         for (Map<String, Object> row : jdbcTemplate.queryForList(
                 "SELECT status, COUNT(*) AS n FROM ab_agent_user_soul_profile " +
@@ -91,18 +87,18 @@ public class UserSoulProfileAdminController {
         Long activeCount = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM ab_agent_user_soul_profile " +
                         "WHERE tenant_id = ? AND status = ?",
-                Long.class, tenantId, STATUS_ACTIVE);
+                Long.class, tenantId, UserSoulProfileStatus.ACTIVE.code());
 
         Long staleCount = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM ab_agent_user_soul_profile " +
                         "WHERE tenant_id = ? AND status = ? AND stale_flagged_at IS NOT NULL",
-                Long.class, tenantId, STATUS_ACTIVE);
+                Long.class, tenantId, UserSoulProfileStatus.ACTIVE.code());
 
         Double avgConfidence = jdbcTemplate.queryForObject(
                 "SELECT COALESCE(AVG(derivation_confidence), 0) " +
                         "FROM ab_agent_user_soul_profile " +
                         "WHERE tenant_id = ? AND status = ?",
-                Double.class, tenantId, STATUS_ACTIVE);
+                Double.class, tenantId, UserSoulProfileStatus.ACTIVE.code());
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("active_count", activeCount == null ? 0L : activeCount);

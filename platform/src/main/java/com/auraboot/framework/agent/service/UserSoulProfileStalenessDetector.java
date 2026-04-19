@@ -1,6 +1,7 @@
 package com.auraboot.framework.agent.service;
 
 import com.auraboot.framework.agent.metrics.UserSoulProfileMetrics;
+import com.auraboot.framework.agent.profile.UserSoulProfileStatus;
 import com.auraboot.framework.rag.service.EmbeddingService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -105,9 +106,10 @@ public class UserSoulProfileStalenessDetector {
         List<Map<String, Object>> profiles = jdbcTemplate.queryForList(
                 "SELECT pid, tenant_id, user_id, profile::text AS profile_json "
                         + "FROM ab_agent_user_soul_profile "
-                        + "WHERE status = 'ACTIVE' "
+                        + "WHERE status = ? "
                         + "  AND hidden_at IS NULL "
-                        + "  AND stale_flagged_at IS NULL");
+                        + "  AND stale_flagged_at IS NULL",
+                UserSoulProfileStatus.ACTIVE.code());
 
         int flagged = 0;
         for (Map<String, Object> row : profiles) {
@@ -167,8 +169,8 @@ public class UserSoulProfileStalenessDetector {
                 int updated = jdbcTemplate.update(
                         "UPDATE ab_agent_user_soul_profile "
                                 + "SET stale_flagged_at = NOW() "
-                                + "WHERE pid = ? AND status = 'ACTIVE' AND stale_flagged_at IS NULL",
-                        pid);
+                                + "WHERE pid = ? AND status = ? AND stale_flagged_at IS NULL",
+                        pid, UserSoulProfileStatus.ACTIVE.code());
                 if (updated == 1) {
                     flagged++;
                     metrics.recordStaleFlagged(tenantId);

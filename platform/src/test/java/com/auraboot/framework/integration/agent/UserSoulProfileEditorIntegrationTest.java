@@ -51,7 +51,7 @@ class UserSoulProfileEditorIntegrationTest extends BaseIntegrationTest {
         jdbc.update("INSERT INTO ab_agent_user_soul_profile "
                         + "(pid, tenant_id, user_id, version, status, profile, profile_hash, "
                         + " activated_at, created_at) "
-                        + "VALUES (?, ?, ?, 1, 'ACTIVE', ?::jsonb, ?, NOW(), NOW())",
+                        + "VALUES (?, ?, ?, 1, 'active', ?::jsonb, ?, NOW(), NOW())",
                 pid, tenantId, userId, "{\"persona\":{\"text\":\"engineer\"}}", "h:" + pid);
         return pid;
     }
@@ -129,7 +129,7 @@ class UserSoulProfileEditorIntegrationTest extends BaseIntegrationTest {
         editor.hideProfile(tenantId, userId);
         Map<String, Object> row = jdbc.queryForMap(
                 "SELECT status, hidden_at FROM ab_agent_user_soul_profile WHERE pid = ?", pid);
-        assertThat(row.get("status")).isEqualTo("ACTIVE");
+        assertThat(row.get("status")).isEqualTo("active");
         assertThat(row.get("hidden_at")).isNotNull();
     }
 
@@ -149,15 +149,15 @@ class UserSoulProfileEditorIntegrationTest extends BaseIntegrationTest {
         }
 
         EditResult r = editor.forgetProfile(tenantId, userId);
-        assertThat(r.status()).isEqualTo("ARCHIVED");
+        assertThat(r.status()).isEqualTo("archived");
         // Original active row is archived.
         assertThat(jdbc.queryForObject(
                 "SELECT status FROM ab_agent_user_soul_profile WHERE pid = ?", String.class, active))
-                .isEqualTo("ARCHIVED");
+                .isEqualTo("archived");
         // Tombstone is present and carries _forgotten = true.
         Long tombstoneCount = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM ab_agent_user_soul_profile "
-                        + "WHERE tenant_id = ? AND user_id = ? AND status = 'ARCHIVED' "
+                        + "WHERE tenant_id = ? AND user_id = ? AND status = 'archived' "
                         + "  AND (edited_fields ->> '_forgotten') = 'true'",
                 Long.class, tenantId, userId);
         assertThat(tombstoneCount).isGreaterThanOrEqualTo(1L);
