@@ -497,18 +497,18 @@ class UserSoulProfileControllerIntegrationTest extends BaseIntegrationTest {
         assertThat(r.getData().get("noop")).isEqualTo(false);
         assertThat(r.getData().get("target_user_id")).isEqualTo(victim);
         assertThat(r.getData().get("reason")).isEqualTo("gdpr_request");
-        assertThat(r.getData().get("status")).isEqualTo("ARCHIVED");
+        assertThat(r.getData().get("status")).isEqualTo("archived");
 
         Long archivedCount = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM ab_agent_user_soul_profile "
-                        + "WHERE tenant_id = ? AND user_id = ? AND status = 'ARCHIVED'",
+                        + "WHERE tenant_id = ? AND user_id = ? AND status = 'archived'",
                 Long.class, tenantId, victim);
         assertThat(archivedCount).isGreaterThanOrEqualTo(2L);
 
         Long tombstoneCount = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM ab_agent_user_soul_profile "
                         + "WHERE tenant_id = ? AND user_id = ? "
-                        + "  AND status = 'ARCHIVED' "
+                        + "  AND status = 'archived' "
                         + "  AND (edited_fields ->> '_forgotten') = 'true'",
                 Long.class, tenantId, victim);
         assertThat(tombstoneCount).isGreaterThanOrEqualTo(1L);
