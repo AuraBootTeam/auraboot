@@ -6280,15 +6280,17 @@ CREATE INDEX IF NOT EXISTS idx_user_soul_profile_created
 COMMENT ON TABLE ab_agent_user_soul_profile IS
     'User Soul Profile — derived per-user personalisation profile for grounding LLM prompts (see 2026-04-19 design doc).';
 
--- Admin action audit for User Soul Profile destructive operations (GDPR forget etc.).
--- One row per successful admin-triggered mutation. Queryable forever — do not TTL.
+-- Admin action audit for User Soul Profile access + destructive operations (GDPR paper trail).
+-- One row per admin-triggered call. Queryable forever — do not TTL.
 -- tenant_id matches the admin's acting tenant (cross-tenant forgets noop and do not
 -- insert a row; see UserSoulProfileAdminController.forget()).
+-- action ∈ {admin_forget, list, stats}. target_user_id is NULL for aggregate-read
+-- access (list, stats) and NOT NULL for targeted destructive action (admin_forget).
 CREATE TABLE IF NOT EXISTS ab_agent_user_soul_profile_admin_action (
     id BIGSERIAL PRIMARY KEY,
     tenant_id BIGINT NOT NULL,
     acting_admin_id VARCHAR(64) NOT NULL,
-    target_user_id VARCHAR(64) NOT NULL,
+    target_user_id VARCHAR(64),
     action VARCHAR(32) NOT NULL,
     reason VARCHAR(512),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -6301,7 +6303,7 @@ CREATE INDEX IF NOT EXISTS idx_user_soul_profile_admin_action_target
     ON ab_agent_user_soul_profile_admin_action (tenant_id, target_user_id, created_at DESC);
 
 COMMENT ON TABLE ab_agent_user_soul_profile_admin_action IS
-    'Append-only audit log for admin-triggered User Soul Profile destructive actions (forget, etc.). GDPR compliance trail.';
+    'Append-only audit log for admin-triggered User Soul Profile access (list/stats) and destructive actions (admin_forget). GDPR compliance trail.';
 
 -- ============================================================
 -- CRM Multi-Channel Ingestion (GAP-035) + CRM Ecosystem Integration (GAP-036)

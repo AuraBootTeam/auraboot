@@ -35,6 +35,7 @@ public class UserSoulProfileMetrics {
     public static final String USER_EDIT_TOTAL = "auraboot_user_soul_profile_user_edit_total";
     public static final String MANUAL_DERIVE_TOTAL = "auraboot_user_soul_profile_manual_derive_total";
     public static final String ADMIN_FORGET_TOTAL = "auraboot_user_soul_profile_admin_forget_total";
+    public static final String ADMIN_ACCESS_TOTAL = "auraboot_user_soul_profile_admin_access_total";
 
     public static final String OUTCOME_DRAFTED = "drafted";
     public static final String OUTCOME_SKIPPED_NO_CHANGE = "skipped_no_change";
@@ -111,6 +112,24 @@ public class UserSoulProfileMetrics {
                 .description("User Soul Profile admin-triggered forget cascades per tenant + reason")
                 .tag("tenant", tenantLabel(tenantId))
                 .tag("reason", (reason == null || reason.isBlank()) ? "unspecified" : reason)
+                .register(registry)
+                .increment();
+    }
+
+    /**
+     * Record any admin-triggered access to User Soul Profile data (feat/usp-admin-read-audit).
+     *
+     * <p>Unified counter covering read-access (list / stats) alongside
+     * destructive action (admin_forget). Complements the forget-specific
+     * {@link #recordAdminForget(Long, String)} which remains for backcompat.
+     *
+     * <p>Cardinality: O(tenant × action). {@code action} ∈ {list, stats, admin_forget}.
+     */
+    public void recordAdminAccess(Long tenantId, String action) {
+        Counter.builder(ADMIN_ACCESS_TOTAL)
+                .description("User Soul Profile admin-triggered access per tenant + action (GDPR audit)")
+                .tag("tenant", tenantLabel(tenantId))
+                .tag("action", action == null ? "unknown" : action)
                 .register(registry)
                 .increment();
     }
