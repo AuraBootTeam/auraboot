@@ -84,6 +84,20 @@ function psql(sql: string): string {
     .trim();
 }
 
+/**
+ * Like `psql` but adds -q to suppress command tags (BEGIN/COMMIT/INSERT
+ * status lines) from stdout — required when running multi-statement
+ * transactional batches whose only meaningful output is a SELECT tuple.
+ */
+function psqlQuiet(sql: string): string {
+  return execSync(
+    `psql -h localhost -U ghj -d aura_boot -P pager=off -v ON_ERROR_STOP=1 -qtA`,
+    { input: sql, stdio: ['pipe', 'pipe', 'pipe'] },
+  )
+    .toString()
+    .trim();
+}
+
 function randomPid(prefix: string): string {
   const rand = Math.random().toString(36).slice(2, 10).toUpperCase();
   const ts = Date.now().toString(36).toUpperCase();
@@ -276,12 +290,23 @@ function upsertMenu(args: {
   // `name`. By leaving code NULL we fall back to `item.name` (the
   // Chinese label).
   //
-  // Racing parallel workers: do a "SELECT ... FOR UPDATE" style existence
-  // check via CTE so the second worker sees the first worker's insert
-  // and short-circuits. We guard on path because there's no natural
-  // unique index on path (intentional — code is nullable).
-  const raw = psql(
-    `WITH existing AS (
+  // Racing parallel workers: the CTE-level `WHERE NOT EXISTS` check is
+  // NOT atomic across concurrent transactions (TOCTOU) — two workers
+  // both pass the existence check before either commits and both
+  // insert, leaving duplicate menu rows that cause strict-mode
+  // `getByRole('link')` to resolve to 2 elements (observed flake).
+  //
+  // Fix: serialize the upsert per `path` via a PostgreSQL transactional
+  // advisory lock. hashtext(path) produces a stable int used as the
+  // lock key; pg_advisory_xact_lock blocks any second worker trying to
+  // upsert the same path until the first commits, after which the
+  // second worker sees the row in `existing` and short-circuits.
+  // psql defaults to statement-level auto-commit, so wrap the batch in
+  // explicit BEGIN/COMMIT so the lock, check, and insert share one tx.
+  const raw = psqlQuiet(
+    `BEGIN;
+     SELECT pg_advisory_xact_lock(hashtext('ab_menu_upsert:${args.path}')::bigint);
+     WITH existing AS (
        SELECT id FROM ab_menu
         WHERE tenant_id = ${ADMIN_TENANT_ID} AND path = '${args.path}' AND deleted_flag = false
         LIMIT 1
@@ -295,28 +320,30 @@ function upsertMenu(args: {
         WHERE NOT EXISTS (SELECT 1 FROM existing)
        RETURNING id
      )
-     SELECT id, 'ins' AS origin FROM inserted
-     UNION ALL
-     SELECT id, 'exi' AS origin FROM existing
-     LIMIT 1;`,
+     SELECT id || '|' || origin FROM (
+       SELECT id, 'ins' AS origin FROM inserted
+       UNION ALL
+       SELECT id, 'exi' AS origin FROM existing
+       LIMIT 1
+     ) s;
+     COMMIT;`,
   );
   // psql -tA emits columns separated by '|'.
   const [id, origin] = raw.split('|');
   return { id, didInsert: origin === 'ins' };
 }
 
-export function cleanupMissionControlMenus(ids: SeededMenus): void {
-  // Only delete rows this worker OWNS (inserted itself). If a sibling
-  // worker's seedMissionControlMenus() found our row first, its
-  // ownedIds list won't include those ids and it'll leave them alone.
-  if (ids.ownedIds.length === 0) return;
-  const list = ids.ownedIds.join(',');
-  psql(
-    `DELETE FROM ab_menu
-      WHERE tenant_id = ${ADMIN_TENANT_ID}
-        AND path IN ('/aurabot/learning-drafts', '/aurabot/interrupts')
-        AND id IN (${list});`,
-  );
+export function cleanupMissionControlMenus(_ids: SeededMenus): void {
+  // Intentional no-op. Previously deleted "owned" rows per spec file in
+  // afterAll, but with Playwright's file-level parallelism (workers=4,
+  // fullyParallel=false) two spec files that share a menu path (e.g.
+  // ai-learning-drafts-real + ai-interrupts-real) race to seed the same
+  // row; whichever file finishes first deletes the row while the other
+  // is still running, blanking its sidebar mid-test and causing flakes
+  // (observed on USP-11 and sibling tests). Menu rows are test infra —
+  // safe to leave behind; centralized cleanup runs once in
+  // global-teardown.ts against all E2EM_* pids in the admin tenant.
+  // Keeping the function signature avoids churning every call site.
 }
 
 // ---------------------------------------------------------------------------
@@ -509,15 +536,9 @@ export function seedMemoryPromotionsMenu(): SeededPromotionMenu {
   };
 }
 
-export function cleanupMemoryPromotionsMenu(menu: SeededPromotionMenu): void {
-  if (menu.ownedIds.length === 0) return;
-  const list = menu.ownedIds.join(',');
-  psql(
-    `DELETE FROM ab_menu
-      WHERE tenant_id = ${ADMIN_TENANT_ID}
-        AND path = '/aurabot/memory-promotions'
-        AND id IN (${list});`,
-  );
+export function cleanupMemoryPromotionsMenu(_menu: SeededPromotionMenu): void {
+  // No-op — see rationale on cleanupMissionControlMenus. Centralized
+  // teardown in global-teardown.ts deletes all E2EM_* menu rows.
 }
 
 // ---------------------------------------------------------------------------
@@ -667,13 +688,12 @@ export function seedSoulProfileMenus(): SeededSoulProfileMenus {
   };
 }
 
-export function cleanupSoulProfileMenus(menus: SeededSoulProfileMenus): void {
-  if (menus.ownedIds.length === 0) return;
-  const list = menus.ownedIds.join(',');
-  psql(
-    `DELETE FROM ab_menu
-      WHERE tenant_id = ${ADMIN_TENANT_ID}
-        AND path IN ('/aurabot/my-profile', '/aurabot/soul-profiles')
-        AND id IN (${list});`,
-  );
+export function cleanupSoulProfileMenus(_menus: SeededSoulProfileMenus): void {
+  // No-op — see rationale on cleanupMissionControlMenus. Two spec files
+  // (ai-user-soul-profile.spec.ts mocked + ai-user-soul-profile-real.spec.ts)
+  // both seed these same menu rows in beforeAll and ran in parallel
+  // workers; the file that finished first deleted the rows while USP-11
+  // in the other file was still opening the sidebar → menu leaf missing
+  // → 5s waitFor timeout. Centralized teardown in global-teardown.ts
+  // deletes all E2EM_* menu rows once all workers complete.
 }
