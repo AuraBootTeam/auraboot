@@ -612,40 +612,23 @@ class UserSoulProfileControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     // =======================================================================
-    // Round-2 #1 — Admin role guard for destructive endpoints
+    // Round-2 #1 — Admin role guard
+    //
+    // The per-controller guardTenantAdmin() helper was removed on 2026-04-19
+    // when the platform-wide AdminRoleInterceptor took over every
+    // /api/admin/** URL. Guard behaviour (admin pass / non-admin 409) is now
+    // covered by AdminRoleInterceptorIntegrationTest + the per-controller
+    // UserSoulProfileAdminGuardIntegrationTest — see design doc
+    // docs/plans/2026-04/2026-04-19-platform-admin-guard-design.md.
+    //
+    // The two tests that used to call adminController.list/stats/forget
+    // directly to exercise the in-method guard were removed because direct
+    // in-process invocation deliberately bypasses the servlet interceptor,
+    // making them unable to verify the new mechanism. The admin happy-path
+    // behaviour (content shape, cross-tenant isolation, audit rows, etc.)
+    // remains covered by the other admin_* tests above, which still call
+    // the controller directly with tenant_admin granted in setup().
     // =======================================================================
-
-    @Test
-    @DisplayName("Admin list/stats/forget return 409 when caller is not tenant_admin")
-    void admin_guardRejectsNonAdmin() {
-        revokeTenantAdmin();
-        ApiResponse<List<Map<String, Object>>> list = adminController.list(50);
-        assertThat(list.getCode()).isEqualTo("409");
-        assertThat(list.getMessage()).contains("admin role required");
-
-        ApiResponse<Map<String, Object>> stats = adminController.stats();
-        assertThat(stats.getCode()).isEqualTo("409");
-
-        ApiResponse<Map<String, Object>> forget = adminController.forget(
-                Map.of("userId", "anyone", "reason", "gdpr_request"));
-        assertThat(forget.getCode()).isEqualTo("409");
-    }
-
-    @Test
-    @DisplayName("Admin list/stats/forget succeed when caller holds tenant_admin")
-    void admin_guardAllowsAdmin() {
-        // setup() already granted tenant_admin.
-        seedActive(tenantId, userId, 1);
-        assertThat(adminController.list(50).getCode()).isEqualTo("0");
-        assertThat(adminController.stats().getCode()).isEqualTo("0");
-
-        String victim = "victim_" + System.nanoTime();
-        seedActive(tenantId, victim, 1);
-        ApiResponse<Map<String, Object>> forget = adminController.forget(
-                Map.of("userId", victim, "reason", "gdpr_request"));
-        assertThat(forget.getCode()).isEqualTo("0");
-        assertThat(forget.getData().get("noop")).isEqualTo(false);
-    }
 
     // =======================================================================
     // Round-2 #2 — DB audit row for admin-forget
