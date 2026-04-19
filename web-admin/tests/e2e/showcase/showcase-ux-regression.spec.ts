@@ -54,14 +54,23 @@ test.describe('Showcase UX Regression', () => {
   // ─── B7: Account detail has related data ─────────────────────────────
 
   test('B7: CRM Account detail page loads with related data', async ({ page, browserName }) => {
-    const listResp = await page.request.get('/api/dynamic/crm_account/list?pageSize=1');
-    const listBody = await listResp.json();
-    const pid = listBody?.data?.records?.[0]?.pid;
-    expect(pid).toBeTruthy();
+    // Navigate via list page, then use the row "view" action button to drill
+    // into detail. /p/{model} is the standard CRUD list URL (not a deep link).
+    await page.goto('/p/crm_account', { waitUntil: 'domcontentloaded' });
+    const firstRow = page
+      .locator('[data-testid="dynamic-list"] table tbody tr')
+      .first();
+    await firstRow.waitFor({ state: 'visible', timeout: 10_000 });
 
-    await page.goto(`/p/crm_account/${pid}/view`);
-    await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(5000); // Wait for React + DSL rendering
+    // Use the canonical row-action-view button emitted by RowActionButtons.
+    const viewBtn = firstRow.locator('[data-testid="row-action-view"]').first();
+    await viewBtn.waitFor({ state: 'visible', timeout: 5_000 });
+    await Promise.all([
+      page.waitForURL(/\/p\/crm_account\/view\/.+/, { timeout: 5_000 }),
+      viewBtn.click(),
+    ]);
+
+    // Detail page must render (not a 404 / 403 fallback).
     await expect(page.locator('body')).not.toContainText('Page not found');
     await expect(page.locator('body')).not.toContainText('Access forbidden');
   });
@@ -78,25 +87,37 @@ test.describe('Showcase UX Regression', () => {
   // ─── C4: Showcase detail page accessible ─────────────────────────────
 
   test('C4: Showcase detail page loads', async ({ page }) => {
-    const listResp = await page.request.get('/api/dynamic/showcase_all_fields/list?pageSize=1');
-    const listBody = await listResp.json();
-    const pid = listBody?.data?.records?.[0]?.pid;
-    expect(pid).toBeTruthy();
+    // Navigate via list page, then use the row "view" action to drill into detail.
+    await page.goto('/p/showcase_all_fields', { waitUntil: 'domcontentloaded' });
+    const firstRow = page
+      .locator('[data-testid="dynamic-list"] table tbody tr')
+      .first();
+    await firstRow.waitFor({ state: 'visible', timeout: 10_000 });
 
-    await page.goto(`/p/showcase_all_fields/${pid}/view`);
-    await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(5000);
+    const viewBtn = firstRow.locator('[data-testid="row-action-view"]').first();
+    await viewBtn.waitFor({ state: 'visible', timeout: 5_000 });
+    await Promise.all([
+      page.waitForURL(/\/p\/showcase_all_fields\/view\/.+/, { timeout: 5_000 }),
+      viewBtn.click(),
+    ]);
+
     await expect(page.locator('body')).not.toContainText('Page not found');
   });
 
   // ─── A1: Marketplace has data ────────────────────────────────────────
 
   test('A1: Plugin management page loads', async ({ page }) => {
-    // /marketplace + /system/plugins merged into /plugins (Tabs)
-    await page.goto('/plugins?tab=discovery');
-    await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(3000);
+    // /marketplace + /system/plugins merged into /plugins (Tabs).
+    // Wait for the plugin list API response instead of an arbitrary delay.
+    const apiResp = page.waitForResponse(
+      (r) => r.url().includes('/api/plugins') && r.status() === 200,
+      { timeout: 10_000 },
+    );
+    await page.goto('/plugins?tab=discovery', { waitUntil: 'domcontentloaded' });
+    await apiResp.catch(() => null);
     await expect(page.locator('body')).not.toContainText('Page not found');
+    // Discovery tab content should render (either marketplace cards or the empty state).
+    await expect(page.locator('main, [role="main"]').first()).toBeVisible({ timeout: 5_000 });
   });
 
   // ─── A2: Dashboard widget types correct ──────────────────────────────
