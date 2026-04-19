@@ -50,6 +50,9 @@ class UserSoulProfileControllerIntegrationTest extends BaseIntegrationTest {
     private Long tenantId;
     private String userId;
 
+    private Long adminRoleId;
+    private Long adminMemberId;
+
     @BeforeEach
     void setup() {
         tenantId = 9_810_000L + System.nanoTime() % 10_000;
@@ -65,11 +68,55 @@ class UserSoulProfileControllerIntegrationTest extends BaseIntegrationTest {
                 // Best-effort; cache TTL is 24h but tests never rely on it expiring.
             }
         }
+        // By default every test runs as tenant_admin for this fake tenantId.
+        // Tests that need to verify the role-guard denial path call
+        // revokeTenantAdmin() explicitly.
+        grantTenantAdmin();
     }
 
     @AfterEach
     void cleanup() {
         jdbc.update("DELETE FROM ab_agent_user_soul_profile WHERE tenant_id = ?", tenantId);
+        jdbc.update("DELETE FROM ab_agent_user_soul_profile_admin_action WHERE tenant_id = ?",
+                tenantId);
+        revokeTenantAdmin();
+    }
+
+    /**
+     * Insert a {@code tenant_admin} role + membership + assignment rows so the
+     * admin guard (which queries {@code ab_tenant_member → ab_user_role → ab_role})
+     * sees the current MetaContext user as admin in {@code tenantId}.
+     */
+    private void grantTenantAdmin() {
+        if (adminRoleId != null) return;
+        adminRoleId = System.nanoTime() & 0x7fffffffffffffffL;
+        adminMemberId = (System.nanoTime() ^ 0xabcdL) & 0x7fffffffffffffffL;
+        // ab_role has FK tenant_id → ab_tenant(id); ab_tenant_member too.
+        // The test uses a synthetic tenantId that does not exist in ab_tenant,
+        // so insert a throwaway ab_tenant row first. cleanup() cascades.
+        jdbc.update("INSERT INTO ab_tenant (id, pid, name, status, deleted_flag) " +
+                        "VALUES (?, ?, ?, 'active', FALSE) ON CONFLICT (id) DO NOTHING",
+                tenantId, "tn_" + tenantId, "usp_test_" + tenantId);
+        jdbc.update("INSERT INTO ab_role (id, pid, tenant_id, name, code, status, deleted_flag) " +
+                        "VALUES (?, ?, ?, ?, 'tenant_admin', 'active', FALSE)",
+                adminRoleId, "role_admin_" + adminRoleId, tenantId, "Tenant Admin " + adminRoleId);
+        jdbc.update("INSERT INTO ab_tenant_member (id, pid, tenant_id, user_id, status, deleted_flag) " +
+                        "VALUES (?, ?, ?, ?, 'active', FALSE)",
+                adminMemberId, "mem_" + adminMemberId, tenantId, testUser.getId());
+        jdbc.update("INSERT INTO ab_user_role (id, pid, member_id, tenant_id, role_id, status, deleted_flag) " +
+                        "VALUES (?, ?, ?, ?, ?, 'active', FALSE)",
+                System.nanoTime() & 0x7fffffffffffffffL,
+                "ur_" + adminRoleId, adminMemberId, tenantId, adminRoleId);
+    }
+
+    private void revokeTenantAdmin() {
+        if (adminRoleId == null) return;
+        jdbc.update("DELETE FROM ab_user_role WHERE tenant_id = ?", tenantId);
+        jdbc.update("DELETE FROM ab_role WHERE id = ?", adminRoleId);
+        jdbc.update("DELETE FROM ab_tenant_member WHERE id = ?", adminMemberId);
+        jdbc.update("DELETE FROM ab_tenant WHERE id = ? AND name LIKE 'usp_test_%'", tenantId);
+        adminRoleId = null;
+        adminMemberId = null;
     }
 
     // -----------------------------------------------------------------------
@@ -562,5 +609,159 @@ class UserSoulProfileControllerIntegrationTest extends BaseIntegrationTest {
         @SuppressWarnings("unchecked")
         Map<String, Long> byStatus = (Map<String, Long>) r.getData().get("by_status");
         assertThat(byStatus.get("active")).isEqualTo(1L);
+    }
+
+    // =======================================================================
+    // Round-2 #1 — Admin role guard for destructive endpoints
+    // =======================================================================
+
+    @Test
+    @DisplayName("Admin list/stats/forget return 409 when caller is not tenant_admin")
+    void admin_guardRejectsNonAdmin() {
+        revokeTenantAdmin();
+        ApiResponse<List<Map<String, Object>>> list = adminController.list(50);
+        assertThat(list.getCode()).isEqualTo("409");
+        assertThat(list.getMessage()).contains("admin role required");
+
+        ApiResponse<Map<String, Object>> stats = adminController.stats();
+        assertThat(stats.getCode()).isEqualTo("409");
+
+        ApiResponse<Map<String, Object>> forget = adminController.forget(
+                Map.of("userId", "anyone", "reason", "gdpr_request"));
+        assertThat(forget.getCode()).isEqualTo("409");
+    }
+
+    @Test
+    @DisplayName("Admin list/stats/forget succeed when caller holds tenant_admin")
+    void admin_guardAllowsAdmin() {
+        // setup() already granted tenant_admin.
+        seedActive(tenantId, userId, 1);
+        assertThat(adminController.list(50).getCode()).isEqualTo("0");
+        assertThat(adminController.stats().getCode()).isEqualTo("0");
+
+        String victim = "victim_" + System.nanoTime();
+        seedActive(tenantId, victim, 1);
+        ApiResponse<Map<String, Object>> forget = adminController.forget(
+                Map.of("userId", victim, "reason", "gdpr_request"));
+        assertThat(forget.getCode()).isEqualTo("0");
+        assertThat(forget.getData().get("noop")).isEqualTo(false);
+    }
+
+    // =======================================================================
+    // Round-2 #2 — DB audit row for admin-forget
+    // =======================================================================
+
+    @Test
+    @DisplayName("Admin POST /forget inserts an audit row with action=admin_forget")
+    void adminForget_insertsAuditRow() {
+        String victim = "victim_audit_" + System.nanoTime();
+        seedActive(tenantId, victim, 1);
+
+        ApiResponse<Map<String, Object>> r = adminController.forget(
+                Map.of("userId", victim, "reason", "gdpr_request"));
+        assertThat(r.getCode()).isEqualTo("0");
+
+        List<Map<String, Object>> audits = jdbc.queryForList(
+                "SELECT acting_admin_id, target_user_id, action, reason " +
+                        "FROM ab_agent_user_soul_profile_admin_action " +
+                        "WHERE tenant_id = ? AND target_user_id = ?",
+                tenantId, victim);
+        assertThat(audits).hasSize(1);
+        assertThat(audits.get(0))
+                .containsEntry("target_user_id", victim)
+                .containsEntry("action", "admin_forget")
+                .containsEntry("reason", "gdpr_request")
+                .containsEntry("acting_admin_id", testUser.getId().toString());
+    }
+
+    // =======================================================================
+    // Round-2 #3 — Cross-tenant isolation: noop, no metric, no audit
+    // =======================================================================
+
+    @Test
+    @DisplayName("Admin POST /forget on cross-tenant user: noop, no audit row, untouched")
+    void adminForget_crossTenantIsolation() {
+        // Seed a profile in a completely different tenant.
+        Long otherTenant = tenantId + 7_777L;
+        String remoteUser = "remote_" + System.nanoTime();
+        seedActive(otherTenant, remoteUser, 1);
+
+        // Admin of tenantId attempts forget on remoteUser — which has zero
+        // rows in tenantId. Editor throws IllegalArgumentException → noop.
+        ApiResponse<Map<String, Object>> r = adminController.forget(
+                Map.of("userId", remoteUser, "reason", "gdpr_request"));
+        assertThat(r.getCode()).isEqualTo("0");
+        assertThat(r.getData().get("noop")).isEqualTo(true);
+
+        // No audit row leaked into tenantId.
+        Long auditCount = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM ab_agent_user_soul_profile_admin_action " +
+                        "WHERE tenant_id = ? AND target_user_id = ?",
+                Long.class, tenantId, remoteUser);
+        assertThat(auditCount).isEqualTo(0L);
+
+        // Remote tenant's row is untouched (still active).
+        Long remoteActive = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM ab_agent_user_soul_profile " +
+                        "WHERE tenant_id = ? AND user_id = ? AND status = 'active'",
+                Long.class, otherTenant, remoteUser);
+        assertThat(remoteActive).isEqualTo(1L);
+
+        // cleanup cross-tenant seed
+        jdbc.update("DELETE FROM ab_agent_user_soul_profile WHERE tenant_id = ?", otherTenant);
+    }
+
+    // =======================================================================
+    // Round-2 #4 — Content-Disposition filename sanitization
+    // =======================================================================
+
+    @Test
+    @DisplayName("sanitizeFilenameToken replaces CRLF / special chars and clips to 64")
+    void sanitizeFilenameToken_injection() {
+        // Reflective access to the package-private static helper.
+        String out = UserSoulProfileController.sanitizeFilenameToken("foo\r\nX-Evil: y");
+        assertThat(out).doesNotContain("\r").doesNotContain("\n").doesNotContain(":");
+        // Every non-[A-Za-z0-9_.-] char replaced by underscore.
+        assertThat(out).isEqualTo("foo__X-Evil__y");
+
+        String clipped = UserSoulProfileController.sanitizeFilenameToken(
+                "a".repeat(200));
+        assertThat(clipped).hasSize(64);
+
+        assertThat(UserSoulProfileController.sanitizeFilenameToken(null)).isEqualTo("anon");
+    }
+
+    // =======================================================================
+    // Round-2 #5 — 409 (SUPERSEDED) vs 410 (ARCHIVED)
+    // =======================================================================
+
+    @Test
+    @DisplayName("POST /pin on SUPERSEDED-only profile returns 409")
+    void edits_supersededOnly_409_distinct() {
+        seedSuperseded(tenantId, userId, 1);
+        ApiResponse<Map<String, Object>> r = controller.pin(Map.of("field", "persona"));
+        assertThat(r.getCode()).isEqualTo("409");
+        assertThat(r.getMessage()).contains("superseded");
+    }
+
+    @Test
+    @DisplayName("POST /pin on ARCHIVED-only profile returns 410 Gone")
+    void edits_archivedOnly_410() {
+        // Seed then archive via forgetProfile cascade.
+        seedActive(tenantId, userId, 1);
+        controller.forget();
+        // At this point every row for (tenantId, userId) is ARCHIVED.
+        ApiResponse<Map<String, Object>> pin = controller.pin(Map.of("field", "persona"));
+        assertThat(pin.getCode()).isEqualTo("410");
+        assertThat(pin.getMessage()).contains("archived");
+
+        ApiResponse<Map<String, Object>> hide = controller.hide(Map.of("field", "persona"));
+        assertThat(hide.getCode()).isEqualTo("410");
+
+        ApiResponse<Map<String, Object>> edit = controller.edit(Map.of("field", "persona", "text", "x"));
+        assertThat(edit.getCode()).isEqualTo("410");
+
+        ApiResponse<Map<String, Object>> reset = controller.reset(Map.of("field", "persona"));
+        assertThat(reset.getCode()).isEqualTo("410");
     }
 }
