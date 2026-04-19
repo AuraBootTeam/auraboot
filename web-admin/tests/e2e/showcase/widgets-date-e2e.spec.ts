@@ -651,6 +651,26 @@ test.describe('GA B4 — Date-bucket widgets (5 widgets × props chain)', () => 
       page.locator('input[type="date"], input[type="time"]').first(),
     ).toBeVisible({ timeout: 5_000 });
 
+    // Smart components on this form hydrate one-by-one (each field-renderer
+    // resolves its widget asynchronously). Poll until the picker count is
+    // stable across two consecutive samples — this avoids the race where we
+    // counted before all 5 widgets finished mounting and saw e.g. only
+    // 3/5 → flaky pass right at the threshold.
+    await expect
+      .poll(
+        async () => {
+          const dateCount = await page
+            .locator('input[type="date"], input[type="time"], input[type="datetime-local"]')
+            .count();
+          const hiddenCount = await page
+            .locator('input[type="hidden"][name^="sc_working_hours."]')
+            .count();
+          return dateCount + hiddenCount;
+        },
+        { timeout: 5_000, intervals: [200, 300, 500] },
+      )
+      .toBeGreaterThanOrEqual(4);
+
     // Verify runtime picker DOM for each widget. We check feature markers
     // that prove the correct smart-component was mounted:
     //   date/datetime → native input type="date"

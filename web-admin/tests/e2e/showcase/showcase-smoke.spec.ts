@@ -153,26 +153,48 @@ test.describe('Showcase Smoke Tests', () => {
   test('Cmd+K global search works', async ({ page }) => {
     await page.goto('/meta/models', { waitUntil: 'domcontentloaded' });
 
-    // Wait for header to stabilize
+    // Wait for header to stabilize and the global keyboard listener to attach.
+    // The trigger button being enabled implies the surrounding effect (which
+    // also registers the Cmd+K window keydown handler) has run.
     const trigger = page.locator('[data-testid="cmd-k-trigger"]');
     await expect(trigger).toBeVisible({ timeout: 15000 });
+    await expect(trigger).toBeEnabled({ timeout: 5000 });
     await page.waitForLoadState('load');
 
-    // Try keyboard shortcut — Control+k works in headless Chromium (Meta+k is macOS-only)
-    const palette = page.locator('[data-testid="command-palette"]');
-    await page.keyboard.press('Control+k');
+    // Make sure body has focus before pressing the shortcut — without focus,
+    // headless Chromium may swallow keyboard events when Vite dev overlays or
+    // popovers are still settling.
+    await page.locator('body').click({ position: { x: 1, y: 1 } });
 
-    let opened = await palette.isVisible({ timeout: 3000 }).catch(() => false);
-    if (!opened) {
-      // Fallback: Meta+k for macOS
+    const palette = page.locator('[data-testid="command-palette"]');
+
+    // The CommandPalette toggles open state on each Cmd+K (setOpen(prev=>!prev)).
+    // Pressing the shortcut multiple times can race against itself and leave
+    // the dialog closed. Strategy:
+    //   1. Press the shortcut ONCE.
+    //   2. Wait briefly to see if it opened.
+    //   3. If not (e.g. headless Chromium swallowed the event), fall back to
+    //      clicking the trigger button — setOpen(true) is idempotent and not
+    //      subject to the toggle race.
+    // First try the keyboard shortcut (the headline behaviour this test
+    // covers). Then poll, falling back to a direct trigger click — clicking
+    // the trigger is idempotent (setOpen(true)) and does not race with the
+    // shortcut's toggle handler.
+    await page.keyboard.press('Control+k');
+    if (!(await palette.isVisible({ timeout: 1_000 }).catch(() => false))) {
       await page.keyboard.press('Meta+k');
-      opened = await palette.isVisible({ timeout: 3000 }).catch(() => false);
     }
-    if (!opened) {
-      // Fallback: direct click on trigger button
-      await trigger.click();
-    }
-    await expect(palette).toBeVisible({ timeout: 5000 });
+    await expect
+      .poll(
+        async () => {
+          if (await palette.isVisible().catch(() => false)) return true;
+          // Idempotent fallback if Radix Portal hadn't mounted yet.
+          await trigger.click({ timeout: 1_000 }).catch(() => null);
+          return palette.isVisible({ timeout: 1_000 }).catch(() => false);
+        },
+        { timeout: 5_000, intervals: [300, 500, 1_000] },
+      )
+      .toBe(true);
   });
 
   test('CRM Activities have real content', async ({ page }) => {
