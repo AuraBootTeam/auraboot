@@ -166,9 +166,12 @@ public class UserSoulProfileDeriver {
             return new DerivationResult(Outcome.SKIPPED_FORGOTTEN, null, null);
         }
 
-        // 1. Inputs.
+        // 1. Inputs. Phase 4 (PR-85): filter to L2 (category IN user/agent) so
+        //    ephemeral L1 session notes cannot swamp the projection — soul
+        //    profile is a derived summary of durable memory, not of working
+        //    memory. See design §9.2 and memory-tier-promotion.md §9.1.
         List<Map<String, Object>> memories =
-                agentMemoryService.loadScopedByImportance(tenantId, userId, "default", 50);
+                agentMemoryService.loadScopedByImportanceL2Only(tenantId, userId, "default", 50);
         if (memories.size() < minMemories) {
             metrics.recordDerivation(tenantId, Outcome.SKIPPED_TOO_LITTLE_SIGNAL.tag);
             return new DerivationResult(Outcome.SKIPPED_TOO_LITTLE_SIGNAL, null, null);
