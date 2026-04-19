@@ -6,10 +6,13 @@ import com.auraboot.framework.bpm.mapper.BpmRuleMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.kie.api.KieBase;
+import org.kie.api.KieServices;
+import org.kie.api.builder.KieBuilder;
+import org.kie.api.builder.KieFileSystem;
 import org.kie.api.builder.Message;
+import org.kie.api.builder.ReleaseId;
+import org.kie.api.runtime.KieContainer;
 import org.kie.api.runtime.StatelessKieSession;
-import org.kie.internal.utils.KieHelper;
-import org.kie.api.io.ResourceType;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -41,6 +44,16 @@ public class DroolsEngineService {
             Pattern.compile("\\.getClass\\(\\)\\."),
             Pattern.compile("java\\.lang\\.Thread")
     );
+
+    /**
+     * Drools 8.x KieBuilderImpl scans the classpath for Maven pom.xml files inside the
+     * Drools JARs themselves (META-INF/maven/org.drools/drools-compiler/pom.xml, etc.) and
+     * reports them as ERROR-level messages when it cannot parse them as Kie module descriptors.
+     * These messages are not DRL compilation errors — they are project-discovery noise.
+     * We filter messages whose path ends with these suffixes.
+     */
+    private static final Set<String> IGNORED_MESSAGE_PATH_SUFFIXES = Set.of("pom.xml", "kmodule.xml");
+
     private static final int MAX_CACHE_SIZE = 200;
 
     private final BpmRuleMapper ruleMapper;
@@ -88,9 +101,8 @@ public class DroolsEngineService {
     private KieBase getOrBuildKieBase(BpmRule rule) {
         String cacheKey = rule.getPid() + ":" + rule.getVersion();
         return kieBaseCache.computeIfAbsent(cacheKey, k -> {
-            // Enforce cache size limit (DR-2 fix)
+            // Enforce cache size limit
             if (kieBaseCache.size() >= MAX_CACHE_SIZE) {
-                // Evict oldest entries (simple FIFO via iterator)
                 var it = kieBaseCache.entrySet().iterator();
                 int toRemove = kieBaseCache.size() / 4; // remove 25%
                 for (int i = 0; i < toRemove && it.hasNext(); i++) {
@@ -100,14 +112,120 @@ public class DroolsEngineService {
                 log.info("KieBase cache evicted {} entries (size was {})", toRemove, MAX_CACHE_SIZE);
             }
 
-            // Security check before compiling DRL (DR-1 + DR-3 fix)
+            // Security check before compiling DRL
             validateDrlSecurity(rule.getRuleContent());
 
             log.info("Building KieBase for rule: code={}, version={}", rule.getRuleCode(), rule.getVersion());
-            KieHelper helper = new KieHelper();
-            helper.addContent(rule.getRuleContent(), ResourceType.DRL);
-            return helper.build();
+            return buildKieBase(rule.getRuleContent(), rule.getRuleCode(), rule.getVersion());
         });
+    }
+
+    /**
+     * Build a KieBase from DRL content using KieServices with KieFileSystem.
+     *
+     * <p>Uses a unique ReleaseId per rule+version so that KieBuilderImpl treats each rule
+     * as a distinct in-memory Kie module. Drools' classpath scanner may still report
+     * pom.xml/kmodule.xml entries from the Drools JARs themselves as ERROR-level messages;
+     * these are filtered out — only genuine DRL compilation errors abort the build.
+     */
+    private KieBase buildKieBase(String drlContent, String ruleCode, int version) {
+        KieServices ks = KieServices.Factory.get();
+
+        // Unique groupId per rule+version: forces a fresh in-memory Kie module
+        ReleaseId releaseId = ks.newReleaseId(
+                "com.auraboot.rules." + ruleCode,
+                ruleCode,
+                String.valueOf(version)
+        );
+
+        KieFileSystem kfs = ks.newKieFileSystem();
+        // generateAndWritePomXML registers this module in KieRepository and writes a
+        // synthetic pom.xml into the KFS, which prevents KieBuilderImpl from falling back
+        // to a classpath Maven project scan for THIS module's identity.
+        kfs.generateAndWritePomXML(releaseId);
+
+        // kmodule.xml required by KieBuilderImpl XML support (drools-xml-support on CP)
+        kfs.writeKModuleXML(
+                "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +
+                "<kmodule xmlns=\"http://www.drools.org/xsd/kmodule\"/>"
+        );
+
+        // DRL at src/main/resources/<pkgPath>/<ruleCode>.drl — matching its package decl
+        String packagePath = extractDrlPackagePath(drlContent);
+        kfs.write("src/main/resources/" + packagePath + "/" + ruleCode + ".drl", drlContent);
+
+        // Serialize KieBuilder construction and DRL compilation to prevent concurrent calls
+        // from overwriting each other's default-releaseId registration in KieRepository.
+        // KieBuilderImpl.buildPomModel() may fail to parse the generated pom.xml and fall
+        // back to the global default ReleaseId; holding this lock ensures only one rule is
+        // in-flight at a time so the KieRepository lookup returns the correct module.
+        synchronized (DroolsEngineService.class) {
+            org.kie.internal.builder.InternalKieBuilder kieBuilder =
+                    (org.kie.internal.builder.InternalKieBuilder) ks.newKieBuilder(kfs);
+            kieBuilder.buildAll();
+
+            // Filter out pom.xml / kmodule.xml discovery noise — these come from Drools JARs'
+            // own META-INF/maven/pom.xml entries found on the classpath, not from our DRL.
+            List<Message> realErrors = kieBuilder.getResults().getMessages(Message.Level.ERROR).stream()
+                    .filter(m -> !isClasspathDiscoveryNoise(m))
+                    .toList();
+
+            if (!realErrors.isEmpty()) {
+                throw new RuntimeException("DRL compilation errors for rule '" + ruleCode + "': " + realErrors);
+            }
+
+            // getKieModuleIgnoringErrors() returns the compiled KieModule even when the pom.xml
+            // parse produced an error message. Register it explicitly under our custom releaseId
+            // so that newKieContainer(releaseId) can find it.
+            org.kie.api.builder.KieModule kieModule = kieBuilder.getKieModuleIgnoringErrors();
+            if (kieModule == null) {
+                throw new RuntimeException("Drools failed to build KieModule for rule '" + ruleCode +
+                        "' (kModule is null after buildAll). Errors: " + kieBuilder.getResults().getMessages());
+            }
+            // kieModule may have been assigned the global default ReleaseId when our custom
+            // pom.xml failed to parse. Use the kModule's ACTUAL releaseId rather than our
+            // custom one to look it up — the KieRepository stores it under that actual id.
+            org.kie.api.builder.ReleaseId actualReleaseId = kieModule.getReleaseId();
+            ks.getRepository().addKieModule(kieModule);
+            log.debug("Built KieModule for rule '{}' under releaseId: {}", ruleCode, actualReleaseId);
+
+            KieContainer container = ks.newKieContainer(actualReleaseId);
+            return container.getKieBase();
+        }
+    }
+
+    /**
+     * Returns true if the KieBuilder message is classpath-discovery noise rather than a
+     * genuine DRL compilation error. Drools 8.x reports pom.xml and kmodule.xml entries
+     * from its own JARs as ERROR-level messages when it cannot parse them as Kie modules.
+     */
+    private boolean isClasspathDiscoveryNoise(Message m) {
+        String path = m.getPath();
+        if (path == null) return false;
+        for (String suffix : IGNORED_MESSAGE_PATH_SUFFIXES) {
+            if (path.endsWith(suffix)) {
+                log.debug("Ignoring Drools classpath discovery message [{}]: {}", path, m.getText());
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Extract the package declaration from DRL content and convert it to a file path.
+     * For example, "com.auraboot.workflow_demo" becomes "com/auraboot/workflow_demo".
+     * Returns "rules" as a fallback if no package declaration is found.
+     */
+    private String extractDrlPackagePath(String drlContent) {
+        if (drlContent == null) return "rules";
+        for (String line : drlContent.split("\\r?\\n")) {
+            String trimmed = line.trim();
+            if (trimmed.startsWith("package ")) {
+                String pkg = trimmed.substring("package".length()).trim().replace(";", "").trim();
+                return pkg.replace('.', '/');
+            }
+        }
+        return "rules";
     }
 
     /**
@@ -136,7 +254,7 @@ public class DroolsEngineService {
     public List<String> validateDrl(String drlContent) {
         List<String> errors = new ArrayList<>();
 
-        // Security validation first (DR-3)
+        // Security validation first
         for (Pattern pattern : BLOCKED_DRL_PATTERNS) {
             if (pattern.matcher(drlContent).find()) {
                 errors.add("Security: blocked pattern detected — " + pattern.pattern());
@@ -146,18 +264,12 @@ public class DroolsEngineService {
             return errors;
         }
 
-        // Syntax validation
+        // Syntax validation — pom.xml noise is filtered in buildKieBase
         try {
-            KieHelper helper = new KieHelper();
-            helper.addContent(drlContent, ResourceType.DRL);
-            var results = helper.verify();
-            if (results.hasMessages(Message.Level.ERROR)) {
-                for (var msg : results.getMessages(Message.Level.ERROR)) {
-                    errors.add("Line " + msg.getLine() + ": " + msg.getText());
-                }
-            }
-        } catch (Exception e) {
-            errors.add("Compilation error: " + e.getMessage());
+            buildKieBase(drlContent, "validated_" + System.nanoTime(), 0);
+        } catch (RuntimeException e) {
+            String msg = e.getMessage();
+            errors.add(msg != null ? msg : "Unknown compilation error");
         }
         return errors;
     }

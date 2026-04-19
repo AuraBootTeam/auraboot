@@ -4,6 +4,7 @@ import com.auraboot.smart.framework.engine.model.instance.ProcessInstance;
 import com.auraboot.smart.framework.engine.model.instance.TaskInstance;
 import com.auraboot.smart.framework.engine.service.param.query.TaskInstanceQueryByAssigneeParam;
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.bpm.dto.TaskSummaryDto;
 import com.auraboot.framework.bpm.service.CcService;
 import com.auraboot.framework.bpm.service.ProcessEngineService;
 import com.auraboot.framework.bpm.service.TaskService;
@@ -43,22 +44,43 @@ public class TaskController {
 
     /**
      * 查询待办任务
+     * Returns {@link TaskSummaryDto} list enriched with {@code businessKey} from
+     * the parent ProcessInstance (SmartEngine's native TaskInstance lacks this field).
      */
     @GetMapping("/todo")
     @RequirePermission(MetaPermission.WORKFLOW_EXECUTE)
     @Operation(summary = "查询待办任务", description = "查询当前用户的待办任务列表")
-    public ApiResponse<List<TaskInstance>> getTodoTasks(
+    public ApiResponse<List<TaskSummaryDto>> getTodoTasks(
             @RequestParam(required = false) String userId) {
         log.debug("Getting todo tasks for user: {}", userId);
-        
+
         // 如果没有指定用户ID，使用当前用户
         if (userId == null) {
             userId = getCurrentUserId();
         }
-        
+
         List<TaskInstance> tasks = taskService.getTodoTasks(userId);
-        
-        return ApiResponse.success(tasks);
+
+        // Enrich each task with the business key from its parent process instance.
+        // The SmartEngine TaskInstance interface does not carry this field, but the
+        // frontend task-center table needs it to correlate tasks with business records.
+        List<TaskSummaryDto> enriched = tasks.stream().map(t -> {
+            TaskSummaryDto dto = TaskSummaryDto.from(t);
+            if (t.getProcessInstanceId() != null) {
+                try {
+                    ProcessInstance pi = processEngineService.getProcessInstance(t.getProcessInstanceId());
+                    if (pi != null && pi.getBizUniqueId() != null) {
+                        dto.setBusinessKey(pi.getBizUniqueId());
+                    }
+                } catch (Exception e) {
+                    log.debug("Could not fetch process instance {} for task {}: {}",
+                            t.getProcessInstanceId(), t.getInstanceId(), e.getMessage());
+                }
+            }
+            return dto;
+        }).toList();
+
+        return ApiResponse.success(enriched);
     }
 
     /**

@@ -84,6 +84,14 @@ public interface UserMapper extends BaseMapper<User> {
             @Param("limit") int limit);
 
     /**
+     * Look up the business PID (ULID) of a user by their numeric internal ID.
+     * Returns null when the user does not exist or is deleted.
+     * Used by AssigneeResolverService to convert numeric userId to the canonical BPM actor identity.
+     */
+    @Select("SELECT pid FROM ab_user WHERE id = #{userId} AND deleted_flag = FALSE LIMIT 1")
+    String findPidByUserId(@Param("userId") Long userId);
+
+    /**
      * Single-user lookup with the same tenant-scoped projection as
      * {@link #searchUsersByTenant}, used by picker resolve-name flows.
      * Returns null when the user does not exist or is not a member of the tenant.
