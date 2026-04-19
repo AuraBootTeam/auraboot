@@ -31,8 +31,18 @@ public interface MetaModelFieldBindingMapper extends BaseMapper<ModelFieldBindin
     @Select("SELECT COUNT(*) FROM ab_meta_model_field_binding WHERE model_id = #{modelId} AND field_id = #{fieldId} AND deleted_flag = false")
     int countByModelAndField(@Param("modelId") Long modelId, @Param("fieldId") Long fieldId);
 
-    @Select("SELECT COUNT(*) FROM ab_meta_model_field_binding WHERE model_id = #{modelId}")
+    @Select("SELECT COUNT(*) FROM ab_meta_model_field_binding WHERE model_id = #{modelId} AND deleted_flag = false")
     int countFieldsByModelId(@Param("modelId") Long modelId);
+
+    /**
+     * Count user (non-system) field bindings for a model.
+     * Used by delete-model guard: system bindings (id/pid/created_at/updated_at)
+     * are auto-bound on creation and must not block deletion of an otherwise empty model.
+     */
+    @Select("SELECT COUNT(*) FROM ab_meta_model_field_binding " +
+            "WHERE model_id = #{modelId} AND deleted_flag = false " +
+            "AND (is_system_binding IS NULL OR is_system_binding = false)")
+    int countUserFieldsByModelId(@Param("modelId") Long modelId);
 
     @Select("SELECT COALESCE(MAX(field_order), -1) FROM ab_meta_model_field_binding WHERE model_id = #{modelId}")
     Integer getMaxFieldOrder(@Param("modelId") Long modelId);
