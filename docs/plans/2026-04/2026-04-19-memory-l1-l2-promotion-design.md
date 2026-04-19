@@ -345,6 +345,17 @@ auraboot_memory_l1l2_promotion_latency_seconds_bucket  # histogram
 
 每个 Phase 的验收基线统一包含："集成测试通过 + Grafana 面板能看到对应指标 + Controller review E2E"。
 
+### 9.1 Phase 2 实现备注（PR-83，已交付）
+
+- `SessionEndedEvent` + `MemoryL1L2Promoter` 落地；已接入 `AgentRunService.completeRun` 在 `saveRunMemory` 之后发射事件（位置比设计 §4.1 建议的 `RunLifecycleService.onComplete` 更下游 —— 保证 run 内最后一条 memory 先入库再晋升）。
+- 监听器目前为**同步** `@EventListener` + `@Transactional`（非 `REQUIRES_NEW`，遵守红线“禁止 REQUIRES_NEW 绕 rollback-only”）。`@Async` 延后到 Phase 3 线程池调优时再加。
+- 去重：Phase 2 仅实现**hash dedup**（design §4.3 第一层），embedding 缺失时 `maxCosineToL2 = 0.0`（design §10 问题 4 方案 a）。**语义 cosine dedup 未实现**，与 design §4.3 第二层相比是缺口，Phase 3 随 cron orphan promoter 一同补。
+- **Phase 3 backlog（PR-84 范围）**：
+  1. `MemoryL1L2OrphanPromoter` cron 7309：处理事件丢失 / 同步 listener 异常造成的"孤儿 L1"（`category='session' AND created_at < NOW() - INTERVAL '6 hours'`）。
+  2. 语义 cosine dedup（hash 未命中但 cosine ≥ 0.85 时合并）。
+  3. `MemoryL1L2Demoter` cron 7310（design §4.4）。
+  4. 多实例部署加 `advisory_xact_lock(7309, tenantId)` + `FOR UPDATE SKIP LOCKED`（design §6 草案骨架），当前同步 listener 在单节点部署下无需。
+
 ---
 
 ## 10. 开放问题
