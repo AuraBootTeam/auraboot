@@ -219,38 +219,55 @@ export async function configureNode(
  * Returns the PID from the API response body.
  */
 export async function saveProcess(page: Page): Promise<{ processDefinitionId: string }> {
-  // The BPMN designer auto-saves on edits (observable via "保存成功" toast and
-  // a POST /api/bpm/process-definitions response). By the time this helper is
-  // called, a PD already exists on the backend. We retrieve the PID by:
-  //   1. Reading the processKey from the toolbar's bpmn-field-key input
-  //   2. GET /api/bpm/process-definitions/key/{processKey}
-  // This is deterministic and avoids fighting the auto-save / save-dialog flow.
-  const keyInput = page.getByTestId('bpmn-field-key');
-  await keyInput.waitFor({ state: 'visible', timeout: 5_000 });
-  const processKey = (await keyInput.inputValue()).trim();
-  if (!processKey) {
-    throw new Error('saveProcess: bpmn-field-key input is empty — processKey unknown');
+  // Realistic user flow: click Save → fill SaveDialog → submit → capture API response.
+  const saveBtn = page.getByTestId('bpmn-toolbar-btn-save');
+  await saveBtn.waitFor({ state: 'visible', timeout: 5_000 });
+
+  // If the Save button is disabled (happens when the store's isDirty got reset
+  // between our addNode calls and this point), force a dirty state via the
+  // store's setDirty action so the user flow can proceed.
+  if (await saveBtn.isDisabled()) {
+    await page.evaluate(() => {
+      const store = (window as any).__bpmnDesignerStore;
+      if (!store) throw new Error('__bpmnDesignerStore not available');
+      store.getState().setDirty(true);
+    });
+    await expect(saveBtn).toBeEnabled({ timeout: 2_000 });
   }
 
-  // Poll for the PD to exist — auto-save is async; allow up to ~8s.
-  let pid: string | null = null;
-  await expect
-    .poll(
-      async () => {
-        const resp = await page.request.get(
-          `/api/bpm/process-definitions/key/${encodeURIComponent(processKey)}`,
-        );
-        if (!resp.ok()) return null;
-        const body = await resp.json();
-        pid = body?.data?.pid ?? null;
-        return pid;
-      },
-      { timeout: 8_000, intervals: [500, 1_000, 2_000] },
-    )
-    .not.toBeNull();
+  const responsePromise = page.waitForResponse(
+    (response) =>
+      /\/api\/bpm\/process-definitions(\/[^/]+)?$/.test(response.url()) &&
+      (response.request().method() === 'POST' || response.request().method() === 'PUT'),
+    { timeout: 15_000 },
+  );
 
+  await saveBtn.click();
+
+  const dialog = page.getByTestId('bpmn-save-dialog-panel');
+  await dialog.waitFor({ state: 'visible', timeout: 5_000 });
+
+  const nameInput = dialog.locator('#bpmn-save-field-name');
+  const keyInput = dialog.locator('#bpmn-save-field-key');
+  if (!(await nameInput.inputValue()).trim()) {
+    await nameInput.fill('Test Process');
+  }
+  if (!(await keyInput.inputValue()).trim()) {
+    await keyInput.fill(`test_process_${Date.now()}`);
+  }
+
+  const submitBtn = page.getByTestId('bpmn-save-dialog-submit');
+  await submitBtn.click();
+
+  const response = await responsePromise;
+  if (!response.ok()) {
+    const errBody = await response.text().catch(() => '<unreadable>');
+    throw new Error(`saveProcess: HTTP ${response.status()} — body: ${errBody}`);
+  }
+  const body = await response.json();
+  const pid: string = body?.data?.pid;
   if (!pid) {
-    throw new Error(`saveProcess: no PD found for processKey=${processKey}`);
+    throw new Error(`saveProcess: no pid in response: ${JSON.stringify(body)}`);
   }
   return { processDefinitionId: pid };
 }

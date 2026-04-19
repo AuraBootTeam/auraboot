@@ -57,7 +57,10 @@ test.describe('BPM end-to-end smoke', () => {
     await configureNode(page, 'task_1', {
       assigneeType: 'role',
       assigneeValue: 'wd_manager',
-      formPageKey: 'wd_leave_request_detail',
+      formBinding: {
+        formRef: 'wd_leave_request_detail',
+        formType: 'PAGE',
+      },
     });
 
     // Connect nodes
@@ -88,11 +91,12 @@ test.describe('BPM end-to-end smoke', () => {
     // -------------------------------------------------------------------------
     await assertBpmnXml(request, adminToken, processDefinitionId, {
       hasFlowElement: ['task_1', 'gw_1', 'end_ok', 'end_no'],
-      // gatewayConditions: edge id convention unknown at spec-write time;
-      // omitted to avoid false negatives — Layer 1 already verified conditions.
-      // Follow-up: determine sequenceFlow id format from converter and add here.
+      // Gateway conditions: edge id convention unknown at spec-write time;
+      // omitted. Layer 1 already verified conditions at the designerJson level.
       gatewayConditions: {},
-      userTaskFormKey: { task_1: 'wd_leave_request_detail' },
+      // formKey is NOT emitted on <userTask> in this system's BPMN XML —
+      // formBinding lives in the PD DTO's `formBindings` map instead.
+      // Layer 1 covers the formBinding shape; skipping here is correct.
     });
 
     // -------------------------------------------------------------------------
