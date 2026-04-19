@@ -66,7 +66,7 @@ import { loginAs } from '../../helpers/wd-fixtures';
 // Unique timestamp per run
 // ---------------------------------------------------------------------------
 const TS = Date.now();
-const BACKEND = 'http://localhost:6443';
+const BACKEND = process.env.BACKEND_URL ?? 'http://localhost:6443';
 
 // ---------------------------------------------------------------------------
 // Test suite
