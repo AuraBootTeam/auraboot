@@ -9,9 +9,11 @@ import com.auraboot.framework.common.dto.ApiResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.EmptyResultDataAccessException;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -20,8 +22,11 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -200,6 +205,74 @@ public class UserSoulProfileController {
             // cross-user access, cross-tenant access. No information leak.
             return ApiResponse.error(404, "profile version not found");
         }
+    }
+
+    // =========================================================================
+    // GET /export — GDPR data portability (user-only; full JSON dump)
+    // =========================================================================
+
+    /**
+     * Dump every row the current user owns across all statuses (ACTIVE +
+     * SUPERSEDED + ARCHIVED) as a JSON attachment. GDPR Article 20 (right to
+     * data portability) — self-service only; admins cannot call this path
+     * because admin endpoints live under a different controller and return
+     * metadata only.
+     *
+     * <p>Includes full {@code profile} + {@code edited_fields} content
+     * because the user is the data subject. Tombstone rows
+     * ({@code edited_fields._forgotten = true}) are included so the export
+     * is an honest record of what the server holds.
+     */
+    @GetMapping("/export")
+    public void export(HttpServletResponse response) throws IOException {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        String userId = requireUserId();
+        if (userId == null) {
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "no user context");
+            return;
+        }
+
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT pid, tenant_id, user_id, version, status, " +
+                        "       profile::text AS profile_json, " +
+                        "       edited_fields::text AS edited_fields_json, " +
+                        "       profile_hash, language_preference, derivation_confidence, " +
+                        "       stale_flagged_at, activated_at, superseded_at, " +
+                        "       hidden_at, created_at " +
+                        "FROM ab_agent_user_soul_profile " +
+                        "WHERE tenant_id = ? AND user_id = ? " +
+                        "ORDER BY version DESC",
+                tenantId, userId);
+
+        List<Map<String, Object>> parsed = new ArrayList<>(rows.size());
+        for (Map<String, Object> row : rows) {
+            Map<String, Object> copy = new LinkedHashMap<>(row);
+            parseJsonField(copy, "profile_json", "profile");
+            parseJsonField(copy, "edited_fields_json", "edited_fields");
+            parsed.add(copy);
+        }
+
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("schema_version", "1.0");
+        payload.put("exported_at", Instant.now().toString());
+        payload.put("tenant_id", tenantId);
+        payload.put("user_id", userId);
+        payload.put("row_count", parsed.size());
+        payload.put("profiles", parsed);
+
+        byte[] body = objectMapper.writerWithDefaultPrettyPrinter()
+                .writeValueAsBytes(payload);
+
+        String filename = "user-soul-profile-" + userId + "-" +
+                Instant.now().toString().replace(':', '-') + ".json";
+        response.setStatus(HttpServletResponse.SC_OK);
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+        response.setHeader("Content-Disposition",
+                "attachment; filename=\"" + filename + "\"");
+        response.setContentLength(body.length);
+        response.getOutputStream().write(body);
+        response.getOutputStream().flush();
     }
 
     // =========================================================================
