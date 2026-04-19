@@ -197,6 +197,14 @@ public class ProcessDeploymentService {
                 ? request.bpmnContent()
                 : "";
 
+        // Derive form_bindings from designerJson when the caller did not supply them explicitly
+        Map<String, Object> resolvedFormBindings = request.formBindings();
+        if ((resolvedFormBindings == null || resolvedFormBindings.isEmpty())
+                && StringUtils.hasText(request.designerJson())) {
+            resolvedFormBindings = deriveFormBindingsFromDesignerJson(
+                    request.designerJson(), request.processKey());
+        }
+
         BpmProcessDefinition definition = BpmProcessDefinition.builder()
                 .pid(pid)
                 .tenantId(tenantId)
@@ -205,7 +213,7 @@ public class ProcessDeploymentService {
                 .description(request.description())
                 .category(request.category())
                 .bpmnContent(bpmnContent)
-                .formBindings(request.formBindings())
+                .formBindings(resolvedFormBindings)
                 .businessDataBindings(request.businessDataBindings() != null
                         ? Map.of("bindings", request.businessDataBindings())
                         : Map.of())
@@ -261,6 +269,16 @@ public class ProcessDeploymentService {
                     : new HashMap<>();
             ext.put(EXTENSION_KEY_DESIGNER_JSON, request.designerJson());
             existing.setExtension(ext);
+
+            // Re-derive form_bindings from the new designerJson when the caller did
+            // not supply explicit formBindings (designer save path never pre-derives them).
+            if (request.formBindings() == null) {
+                Map<String, Object> derived = deriveFormBindingsFromDesignerJson(
+                        request.designerJson(), existing.getProcessKey());
+                if (derived != null && !derived.isEmpty()) {
+                    existing.setFormBindings(derived);
+                }
+            }
         }
 
         existing.setUpdatedAt(Instant.now());
@@ -388,6 +406,18 @@ public class ProcessDeploymentService {
         // (processKey, nodeId) tuple so re-deploys stay idempotent.
         if (designerRoot != null) {
             persistDesignerHooks(definition.getProcessKey(), designerRoot);
+
+            // Materialise form_bindings from designerJson at deploy time so that
+            // BpmFormService.loadFormBindings() finds them even when the frontend
+            // save path did not pre-derive them (common for UI-created processes).
+            if (definition.getFormBindings() == null || definition.getFormBindings().isEmpty()) {
+                Map<String, Object> derivedBindings = deriveFormBindingsFromDesignerJson(
+                        designerJson, definition.getProcessKey());
+                if (derivedBindings != null && !derivedBindings.isEmpty()) {
+                    definition.setFormBindings(derivedBindings);
+                    processDefinitionMapper.updateById(definition);
+                }
+            }
         }
 
         try {
@@ -649,6 +679,75 @@ public class ProcessDeploymentService {
             return Map.of();
         }
         return objectMapper.convertValue(node, Map.class);
+    }
+
+    /**
+     * Derive form_bindings from a designerJson string by scanning userTask nodes.
+     *
+     * <p>For each userTask node the method prefers {@code data.formBinding} (full
+     * object) when present; otherwise falls back to {@code data.formPageKey}
+     * (plain string) and synthesises a minimal {@code {formType:"PAGE",formRef:key}}
+     * binding. Mirrors {@code PluginResourceImporterImpl.deriveFormBindingsFromDesigner}.
+     *
+     * @param designerJsonStr raw JSON string stored by the designer save path
+     * @param processKey      used only for log messages
+     * @return non-null map keyed by node-id, or {@code null} when nothing was derived
+     */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> deriveFormBindingsFromDesignerJson(
+            String designerJsonStr, String processKey) {
+        if (!StringUtils.hasText(designerJsonStr)) {
+            return null;
+        }
+        com.fasterxml.jackson.databind.JsonNode root;
+        try {
+            root = objectMapper.readTree(designerJsonStr);
+        } catch (Exception e) {
+            log.warn("deriveFormBindings: failed to parse designerJson for process {}: {}",
+                    processKey, e.getMessage());
+            return null;
+        }
+
+        com.fasterxml.jackson.databind.JsonNode nodesNode = root.get("nodes");
+        if (nodesNode == null || !nodesNode.isArray() || nodesNode.isEmpty()) {
+            return null;
+        }
+
+        Map<String, Object> derived = new java.util.LinkedHashMap<>();
+        for (com.fasterxml.jackson.databind.JsonNode node : nodesNode) {
+            com.fasterxml.jackson.databind.JsonNode typeNode = node.get("type");
+            if (typeNode == null || !"userTask".equals(typeNode.asText())) continue;
+
+            com.fasterxml.jackson.databind.JsonNode idNode = node.get("id");
+            if (idNode == null || idNode.asText().isBlank()) continue;
+            String nodeId = idNode.asText();
+
+            com.fasterxml.jackson.databind.JsonNode dataNode = node.get("data");
+            if (dataNode == null || !dataNode.isObject()) continue;
+
+            // Prefer data.formBinding (full object) when present
+            com.fasterxml.jackson.databind.JsonNode formBindingNode = dataNode.get("formBinding");
+            if (formBindingNode != null && formBindingNode.isObject() && !formBindingNode.isEmpty()) {
+                derived.put(nodeId, objectMapper.convertValue(formBindingNode, Map.class));
+                continue;
+            }
+
+            // Fallback: synthesise from data.formPageKey (plain string)
+            com.fasterxml.jackson.databind.JsonNode formPageKeyNode = dataNode.get("formPageKey");
+            if (formPageKeyNode != null && !formPageKeyNode.asText().isBlank()) {
+                String pageKey = formPageKeyNode.asText();
+                Map<String, Object> binding = new java.util.LinkedHashMap<>();
+                binding.put("formType", "PAGE");
+                binding.put("formRef", pageKey);
+                derived.put(nodeId, binding);
+            }
+        }
+
+        if (derived.isEmpty()) {
+            return null;
+        }
+        log.info("Derived {} form binding(s) from designerJson for process {}", derived.size(), processKey);
+        return derived;
     }
 
     /**
