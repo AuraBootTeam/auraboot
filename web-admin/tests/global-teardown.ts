@@ -51,6 +51,14 @@ async function globalTeardown(config: FullConfig): Promise<void> {
     // Clean up temp integration test models
     await cleanupTempModels(baseURL, cookieHeader);
 
+    // Clean up E2E-seeded AI-center menu rows (E2EM_* pid prefix). These
+    // used to be cleaned up per spec file in afterAll but the per-file
+    // cleanup raced across workers (two spec files share the same menu
+    // path; whichever file finished first deleted rows the other still
+    // needed, causing sidebar-link timeouts — the USP-11 flake root
+    // cause). See _real-backend-helpers.ts cleanup* no-ops.
+    await cleanupE2eMenus();
+
     console.log('✅ Global teardown complete');
   } catch (error) {
     // Teardown should not fail the test run
@@ -138,6 +146,26 @@ async function cleanupTempModels(baseURL: string, cookieHeader: string): Promise
     }
   } catch {
     // Silently ignore
+  }
+}
+
+/**
+ * Delete menu rows seeded by aurabot E2E helpers (pid prefix `E2EM_`).
+ * Runs once after all workers finish so it cannot race with in-flight
+ * tests. psql is synchronous via child_process — acceptable in teardown.
+ */
+async function cleanupE2eMenus(): Promise<void> {
+  try {
+    const { execSync } = await import('node:child_process');
+    execSync(
+      `psql -h localhost -U ghj -d aura_boot -P pager=off -v ON_ERROR_STOP=1 -tA`,
+      {
+        input: `DELETE FROM ab_menu WHERE pid LIKE 'E2EM\\_%' ESCAPE '\\';`,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      },
+    );
+  } catch (e) {
+    console.log(`  ⚠️ E2E menu cleanup error (non-fatal): ${e}`);
   }
 }
 
