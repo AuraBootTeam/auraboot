@@ -130,18 +130,29 @@ test.describe('D8 — showcase_all_fields validation runtime', () => {
       }
     });
 
+    // Ensure the required field is actually mounted before we submit — under
+    // load the form-section may be visible but the inputs hydrate a tick
+    // later, which causes the very first submit to no-op (button click before
+    // form wires up its onSubmit handler).
+    const nameField = page.locator('[data-testid="field-sc_name"]').first();
+    await expect(nameField).toBeVisible({ timeout: 5_000 });
+    await expect(
+      page.locator('[data-testid="field-sc_name"] input, [data-testid="field-sc_name"] textarea').first(),
+    ).toBeVisible({ timeout: 5_000 });
+
     const submitBtn = page
       .locator(
         'button:has-text("保存"), button:has-text("Save"), button:has-text("提交"), button:has-text("Submit")',
       )
       .first();
     await expect(submitBtn).toBeVisible({ timeout: 5_000 });
+    await expect(submitBtn).toBeEnabled({ timeout: 5_000 });
     await submitBtn.click();
 
-    // Wait briefly for either: (a) inline error to appear, (b) toast, or
-    // (c) backend 422. We poll up to 5s without using waitForTimeout.
-    // Use multiple separate locators (Playwright doesn't accept
-    // comma-mixed text=/regex/ + CSS selector strings).
+    // Wait for any of: inline error, toast, required text, or backend 4xx.
+    // expect.poll runs every ~200ms and short-circuits as soon as any signal
+    // is present, replacing the previous serial isVisible() chain that could
+    // race when react-hook-form sets aria-invalid asynchronously.
     const inlineInvalid = page.locator('[aria-invalid="true"]').first();
     const fieldErrorClass = page.locator('.field-error, [data-testid="field-error"]').first();
     const requiredText = page
@@ -151,11 +162,20 @@ test.describe('D8 — showcase_all_fields validation runtime', () => {
       .first();
     const toastAlert = page.locator('[role="alert"], [data-sonner-toast], .toast-error').first();
 
-    const errorVisible =
-      (await inlineInvalid.isVisible({ timeout: 5_000 }).catch(() => false)) ||
-      (await fieldErrorClass.isVisible({ timeout: 1_000 }).catch(() => false)) ||
-      (await requiredText.isVisible({ timeout: 1_000 }).catch(() => false)) ||
-      (await toastAlert.isVisible({ timeout: 1_000 }).catch(() => false));
+    let errorVisible = false;
+    await expect
+      .poll(
+        async () => {
+          errorVisible =
+            (await inlineInvalid.isVisible().catch(() => false)) ||
+            (await fieldErrorClass.isVisible().catch(() => false)) ||
+            (await requiredText.isVisible().catch(() => false)) ||
+            (await toastAlert.isVisible().catch(() => false));
+          return errorVisible || createFiredStatus !== null;
+        },
+        { timeout: 5_000, intervals: [200, 300, 500] },
+      )
+      .toBe(true);
 
     // Acceptable outcomes:
     //   1. Inline / toast / required-text indicator (client-side block)
