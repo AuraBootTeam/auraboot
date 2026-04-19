@@ -115,3 +115,36 @@ groups:
         annotations:
           summary: "Manual-derive rate-limit rejections exceed triggers"
           description: "More manual-derive attempts are being blocked than succeeding — UX friction; consider 12h window or increasing budget"
+
+  - name: auraboot.memory_tier
+    interval: 1m
+    rules:
+      - alert: PromotionFailureRateHigh
+        expr: sum(rate(auraboot_memory_tier_promotion_total{outcome="failed"}[5m])) > (0.1 / 60)
+        for: 10m
+        labels:
+          severity: warning
+          component: acp-memory-tier
+        annotations:
+          summary: "Memory tier promotion failure rate high"
+          description: "auraboot_memory_tier_promotion_total{outcome=failed} rate > 0.1/min for 10m — check DB / pgvector availability and recent Promoter exceptions"
+
+      - alert: DemotionSpike
+        expr: sum(rate(auraboot_memory_tier_demotion_total{outcome="demoted"}[5m])) > (100 / 60)
+        for: 5m
+        labels:
+          severity: warning
+          component: acp-memory-tier
+        annotations:
+          summary: "Memory tier demotion spike"
+          description: "Demoter demoting > 100 rows/min for 5m — unusual cascade; verify acp.memory.l1l2.demoter.age-days / importance-max were not lowered accidentally"
+
+      - alert: OrphanBacklogGrowing
+        expr: sum(increase(auraboot_memory_tier_promotion_total{outcome="failed"}[3m])) == 0 and sum by (tenant) (increase(auraboot_memory_tier_event_total{event_type="L1_PROMOTED"}[45m])) > 150
+        for: 15m
+        labels:
+          severity: warning
+          component: acp-memory-tier
+        annotations:
+          summary: "Orphan scanner catching > 50 rows/tick for 3 consecutive ticks"
+          description: "Orphan backlog growing — event-driven path is losing events; check SessionEndedEvent publication in AgentRunService and listener exceptions"
