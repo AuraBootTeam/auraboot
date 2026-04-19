@@ -290,7 +290,15 @@ public class MemoryL1L2Promoter {
                 runId, scoreJson, hash, pid);
 
         if (updated == 0) {
-            // Race — someone else flipped this row. Count as dup and audit.
+            // Race — someone else flipped this row between our SELECT and
+            // UPDATE. Audit invariant (Phase 3 Round-2 review): every outcome
+            // must leave a trace. Write a dedup_skipped row tagged mode=race
+            // so postmortems can distinguish race-loss from hash/cosine dedup.
+            // merged_into_pid is NULL — we did not observe the winner's pid
+            // and inventing one here would be a fallback (red-line).
+            writeAuditRow(tenantId, pid,
+                    MemoryL1L2PromotionMetrics.EVENT_TYPE_DEDUP_SKIPPED,
+                    MemoryL1L2PromotionMetrics.DEDUP_MODE_RACE, null, score, runId);
             metrics.recordPromotionOutcome(tenantId,
                     MemoryL1L2PromotionMetrics.OUTCOME_SKIPPED_DUP);
             return Outcome.DEDUP_HIT;
