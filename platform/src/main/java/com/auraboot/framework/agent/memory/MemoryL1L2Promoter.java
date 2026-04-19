@@ -316,10 +316,28 @@ public class MemoryL1L2Promoter {
     private double queryMaxCosineToL2(Long tenantId, String scope, String scopeKey, String selfPid) {
         // pgvector cosine distance is (1 - cosine_similarity); clamp below.
         // Use scope + scope_key exact-match partition per design §4.2.
+        //
+        // Round-2 review #4: pre-fetch the candidate's embedding as a literal
+        // vector text and bind it as a `?::vector` parameter so the planner
+        // sees a constant operand on the right side of `<=>` and can use the
+        // hnsw index. A scalar subquery `(SELECT embedding FROM … WHERE pid=?)`
+        // is not considered constant by the planner and defeats the index.
+        List<String> selfEmbRows = jdbc.queryForList(
+                "SELECT embedding::text FROM ab_agent_memory WHERE pid = ?",
+                String.class, selfPid);
+        if (selfEmbRows.isEmpty()) {
+            return 0.0;
+        }
+        String selfEmbedding = selfEmbRows.get(0);
+        if (selfEmbedding == null) {
+            // Row exists but embedding is NULL — no dedup possible.
+            return 0.0;
+        }
+
         Double dist;
         if (scopeKey == null) {
             dist = jdbc.query(
-                    "SELECT MIN(embedding <=> (SELECT embedding FROM ab_agent_memory WHERE pid = ?)) "
+                    "SELECT MIN(embedding <=> ?::vector) "
                             + "  FROM ab_agent_memory "
                             + " WHERE tenant_id = ? "
                             + "   AND scope = ? "
@@ -329,10 +347,10 @@ public class MemoryL1L2Promoter {
                             + "   AND (deleted_flag IS NULL OR deleted_flag = FALSE) "
                             + "   AND pid <> ?",
                     rs -> rs.next() ? (Double) rs.getObject(1) : null,
-                    selfPid, tenantId, scope, selfPid);
+                    selfEmbedding, tenantId, scope, selfPid);
         } else {
             dist = jdbc.query(
-                    "SELECT MIN(embedding <=> (SELECT embedding FROM ab_agent_memory WHERE pid = ?)) "
+                    "SELECT MIN(embedding <=> ?::vector) "
                             + "  FROM ab_agent_memory "
                             + " WHERE tenant_id = ? "
                             + "   AND scope = ? "
@@ -342,7 +360,7 @@ public class MemoryL1L2Promoter {
                             + "   AND (deleted_flag IS NULL OR deleted_flag = FALSE) "
                             + "   AND pid <> ?",
                     rs -> rs.next() ? (Double) rs.getObject(1) : null,
-                    selfPid, tenantId, scope, scopeKey, selfPid);
+                    selfEmbedding, tenantId, scope, scopeKey, selfPid);
         }
         if (dist == null) return 0.0;
         double cos = 1.0 - dist;
@@ -364,40 +382,56 @@ public class MemoryL1L2Promoter {
         // `1 - distance >= threshold` which is equivalent to
         // `distance <= 1 - threshold`.
         double maxDistance = 1.0 - threshold;
-        Map<String, Object> hit;
-        try {
-            if (scopeKey == null) {
-                hit = jdbc.queryForMap(
-                        "SELECT pid, (embedding <=> (SELECT embedding FROM ab_agent_memory WHERE pid = ?)) AS dist "
-                                + "  FROM ab_agent_memory "
-                                + " WHERE tenant_id = ? "
-                                + "   AND scope = ? "
-                                + "   AND scope_key IS NULL "
-                                + "   AND category IN ('user','agent') "
-                                + "   AND embedding IS NOT NULL "
-                                + "   AND (deleted_flag IS NULL OR deleted_flag = FALSE) "
-                                + "   AND pid <> ? "
-                                + " ORDER BY embedding <=> (SELECT embedding FROM ab_agent_memory WHERE pid = ?) ASC "
-                                + " LIMIT 1",
-                        selfPid, tenantId, scope, selfPid, selfPid);
-            } else {
-                hit = jdbc.queryForMap(
-                        "SELECT pid, (embedding <=> (SELECT embedding FROM ab_agent_memory WHERE pid = ?)) AS dist "
-                                + "  FROM ab_agent_memory "
-                                + " WHERE tenant_id = ? "
-                                + "   AND scope = ? "
-                                + "   AND scope_key = ? "
-                                + "   AND category IN ('user','agent') "
-                                + "   AND embedding IS NOT NULL "
-                                + "   AND (deleted_flag IS NULL OR deleted_flag = FALSE) "
-                                + "   AND pid <> ? "
-                                + " ORDER BY embedding <=> (SELECT embedding FROM ab_agent_memory WHERE pid = ?) ASC "
-                                + " LIMIT 1",
-                        selfPid, tenantId, scope, scopeKey, selfPid, selfPid);
-            }
-        } catch (org.springframework.dao.EmptyResultDataAccessException e) {
+
+        // Round-2 review #4: pre-fetch self embedding as text and bind as
+        // `?::vector` — lets planner use hnsw index. Round-2 review #5:
+        // queryForList + isEmpty check rather than queryForMap + catch
+        // EmptyResultDataAccessException (exception-as-control-flow).
+        List<String> selfEmbRows = jdbc.queryForList(
+                "SELECT embedding::text FROM ab_agent_memory WHERE pid = ?",
+                String.class, selfPid);
+        if (selfEmbRows.isEmpty()) {
             return null;
         }
+        String selfEmbedding = selfEmbRows.get(0);
+        if (selfEmbedding == null) {
+            return null;
+        }
+
+        List<Map<String, Object>> hitRows;
+        if (scopeKey == null) {
+            hitRows = jdbc.queryForList(
+                    "SELECT pid, (embedding <=> ?::vector) AS dist "
+                            + "  FROM ab_agent_memory "
+                            + " WHERE tenant_id = ? "
+                            + "   AND scope = ? "
+                            + "   AND scope_key IS NULL "
+                            + "   AND category IN ('user','agent') "
+                            + "   AND embedding IS NOT NULL "
+                            + "   AND (deleted_flag IS NULL OR deleted_flag = FALSE) "
+                            + "   AND pid <> ? "
+                            + " ORDER BY embedding <=> ?::vector ASC "
+                            + " LIMIT 1",
+                    selfEmbedding, tenantId, scope, selfPid, selfEmbedding);
+        } else {
+            hitRows = jdbc.queryForList(
+                    "SELECT pid, (embedding <=> ?::vector) AS dist "
+                            + "  FROM ab_agent_memory "
+                            + " WHERE tenant_id = ? "
+                            + "   AND scope = ? "
+                            + "   AND scope_key = ? "
+                            + "   AND category IN ('user','agent') "
+                            + "   AND embedding IS NOT NULL "
+                            + "   AND (deleted_flag IS NULL OR deleted_flag = FALSE) "
+                            + "   AND pid <> ? "
+                            + " ORDER BY embedding <=> ?::vector ASC "
+                            + " LIMIT 1",
+                    selfEmbedding, tenantId, scope, scopeKey, selfPid, selfEmbedding);
+        }
+        if (hitRows.isEmpty()) {
+            return null;
+        }
+        Map<String, Object> hit = hitRows.get(0);
         Object distObj = hit.get("dist");
         if (distObj == null) {
             return null;

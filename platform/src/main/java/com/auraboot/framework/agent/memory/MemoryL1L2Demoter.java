@@ -10,8 +10,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * PR-84 / Phase 3 — daily demotion scan per design §4.4.
@@ -146,36 +150,92 @@ public class MemoryL1L2Demoter {
                 importanceMax, ageDays, BATCH_CAP);
 
         int scanned = rows.size();
-        int demoted = 0;
+        if (scanned == 0) {
+            return new Integer[]{0, 0};
+        }
 
-        for (Map<String, Object> row : rows) {
+        // Round-2 review #2: single-statement batch UPDATE with RETURNING.
+        // TODO(Phase 4): once the concurrent-test scaffold lands, add a
+        // MemoryL1L2DemoterIntegrationTest#runOnce_batchUpdateHandlesRace
+        // case that flips one pid back to category='user' with a fresh
+        // last_accessed between SELECT and UPDATE and asserts the
+        // demote_skipped metric fires for the raced pid.
+        // The staleness predicate (same COALESCE(last_accessed, promoted_at,
+        // created_at) < NOW() - make_interval(days => ?)) is re-checked
+        // atomically: a promoter that flipped category back to 'user' between
+        // our SELECT and UPDATE will still match category IN ('user','agent')
+        // but the staleness guard and last_accessed refresh (promoter sets
+        // last_accessed = NOW() on re-touch in L2 read path) would fail — so
+        // race-losers simply drop out of the RETURNING set.
+        String[] pidArray = new String[scanned];
+        Map<String, Long> pidToTenant = new HashMap<>(scanned * 2);
+        for (int i = 0; i < scanned; i++) {
+            Map<String, Object> row = rows.get(i);
             String pid = (String) row.get("pid");
             Long tenantId = ((Number) row.get("tenant_id")).longValue();
+            pidArray[i] = pid;
+            pidToTenant.put(pid, tenantId);
+        }
 
-            // Atomic UPDATE guards against racing promoters: if the row was
-            // re-accessed / re-promoted between the SELECT and here, the
-            // category predicate will fail and the UPDATE affects 0 rows.
-            // Round-2 review #7: include the same staleness predicate as the
-            // SELECT (COALESCE(last_accessed, promoted_at, created_at)) so a
-            // row re-promoted in the race window is not demoted just because
-            // the category check still matches.
-            int updated = jdbc.update(
-                    "UPDATE ab_agent_memory "
-                            + "   SET category = 'session', "
-                            + "       demoted_at = NOW(), "
-                            + "       demotion_count = COALESCE(demotion_count, 0) + 1, "
-                            + "       updated_at = NOW() "
-                            + " WHERE pid = ? "
-                            + "   AND category IN ('user','agent') "
-                            + "   AND (deleted_flag IS NULL OR deleted_flag = FALSE) "
-                            + "   AND (shareable IS NULL OR shareable = FALSE) "
-                            + "   AND COALESCE(last_accessed, promoted_at, created_at) "
-                            + "       < NOW() - make_interval(days => ?)",
-                    pid, ageDays);
+        List<String> demotedPids = jdbc.execute(
+                (java.sql.Connection conn) -> {
+                    java.sql.Array pgArray = conn.createArrayOf("text", pidArray);
+                    try (java.sql.PreparedStatement ps = conn.prepareStatement(
+                            "UPDATE ab_agent_memory "
+                                    + "   SET category = 'session', "
+                                    + "       demoted_at = NOW(), "
+                                    + "       demotion_count = COALESCE(demotion_count, 0) + 1, "
+                                    + "       updated_at = NOW() "
+                                    + " WHERE pid = ANY(?) "
+                                    + "   AND category IN ('user','agent') "
+                                    + "   AND (deleted_flag IS NULL OR deleted_flag = FALSE) "
+                                    + "   AND (shareable IS NULL OR shareable = FALSE) "
+                                    + "   AND COALESCE(last_accessed, promoted_at, created_at) "
+                                    + "       < NOW() - make_interval(days => ?) "
+                                    + " RETURNING pid")) {
+                        ps.setArray(1, pgArray);
+                        ps.setInt(2, ageDays);
+                        List<String> out = new ArrayList<>();
+                        try (java.sql.ResultSet rs = ps.executeQuery()) {
+                            while (rs.next()) {
+                                out.add(rs.getString(1));
+                            }
+                        }
+                        return out;
+                    }
+                });
 
-            if (updated == 1) {
-                demoted++;
-                writeAuditRow(tenantId, pid);
+        if (demotedPids == null) {
+            demotedPids = List.of();
+        }
+        int demoted = demotedPids.size();
+
+        // Batch audit INSERT for successfully-demoted rows only.
+        if (!demotedPids.isEmpty()) {
+            List<Object[]> auditBatch = new ArrayList<>(demotedPids.size());
+            for (String pid : demotedPids) {
+                Long tenantId = pidToTenant.get(pid);
+                auditBatch.add(new Object[]{
+                        UniqueIdGenerator.generate(),
+                        tenantId,
+                        pid,
+                        MemoryL1L2PromotionMetrics.EVENT_TYPE_L2_DEMOTED
+                });
+            }
+            jdbc.batchUpdate(
+                    "INSERT INTO ab_agent_memory_tier_event "
+                            + "  (pid, tenant_id, memory_pid, event_type, dedup_mode, "
+                            + "   merged_into_pid, score_snapshot, source_run_id, created_at) "
+                            + "VALUES (?, ?, ?, ?, NULL, NULL, NULL, NULL, NOW())",
+                    auditBatch);
+        }
+
+        // Metrics: one demoted outcome per actually-updated pid; one
+        // demote_skipped per SELECTed pid that lost the race.
+        Set<String> demotedSet = new HashSet<>(demotedPids);
+        for (Map.Entry<String, Long> entry : pidToTenant.entrySet()) {
+            Long tenantId = entry.getValue();
+            if (demotedSet.contains(entry.getKey())) {
                 metrics.recordDemotionOutcome(tenantId,
                         MemoryL1L2PromotionMetrics.OUTCOME_DEMOTED);
                 metrics.recordTierEvent(tenantId,
@@ -186,16 +246,6 @@ public class MemoryL1L2Demoter {
             }
         }
         return new Integer[]{scanned, demoted};
-    }
-
-    private void writeAuditRow(Long tenantId, String memoryPid) {
-        jdbc.update(
-                "INSERT INTO ab_agent_memory_tier_event "
-                        + "  (pid, tenant_id, memory_pid, event_type, dedup_mode, "
-                        + "   merged_into_pid, score_snapshot, source_run_id, created_at) "
-                        + "VALUES (?, ?, ?, ?, NULL, NULL, NULL, NULL, NOW())",
-                UniqueIdGenerator.generate(), tenantId, memoryPid,
-                MemoryL1L2PromotionMetrics.EVENT_TYPE_L2_DEMOTED);
     }
 
     /** Per-tick summary. {@code scanned} ≥ {@code demoted} (race-losers counted in scanned). */
