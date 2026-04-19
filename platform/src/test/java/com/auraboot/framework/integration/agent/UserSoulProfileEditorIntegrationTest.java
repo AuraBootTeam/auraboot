@@ -188,6 +188,54 @@ class UserSoulProfileEditorIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    @DisplayName("SUPERSEDED-only profile cannot be edited (409)")
+    void supersededCannotEdit() {
+        // Seed a SUPERSEDED row but NO ACTIVE/DRAFT — editor must reject
+        // because edits on SUPERSEDED never reach grounding (Reader loads
+        // only ACTIVE).
+        String pid = UniqueIdGenerator.generate();
+        jdbc.update("INSERT INTO ab_agent_user_soul_profile "
+                        + "(pid, tenant_id, user_id, version, status, profile, profile_hash, "
+                        + " activated_at, superseded_at, created_at) "
+                        + "VALUES (?, ?, ?, 1, 'SUPERSEDED', ?::jsonb, ?, NOW(), NOW(), NOW())",
+                pid, tenantId, userId, "{\"persona\":{\"text\":\"old\"}}", "h:" + pid);
+
+        assertThatThrownBy(() -> editor.pin(tenantId, userId, "persona"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("cannot edit superseded profile");
+        assertThatThrownBy(() -> editor.hide(tenantId, userId, "persona"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("cannot edit superseded profile");
+        assertThatThrownBy(() -> editor.edit(tenantId, userId, "persona", "new"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("cannot edit superseded profile");
+        assertThatThrownBy(() -> editor.reset(tenantId, userId, "persona"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("cannot edit superseded profile");
+    }
+
+    @Test
+    @DisplayName("ACTIVE preferred over SUPERSEDED when both present — edit targets ACTIVE")
+    void editorPrefersActiveOverSuperseded() {
+        // Seed a SUPERSEDED (version 1) AND ACTIVE (version 2). Editor must
+        // target the ACTIVE row.
+        String superseded = UniqueIdGenerator.generate();
+        jdbc.update("INSERT INTO ab_agent_user_soul_profile "
+                        + "(pid, tenant_id, user_id, version, status, profile, profile_hash, "
+                        + " activated_at, superseded_at, created_at) "
+                        + "VALUES (?, ?, ?, 1, 'SUPERSEDED', ?::jsonb, ?, NOW(), NOW(), NOW())",
+                superseded, tenantId, userId, "{\"persona\":{\"text\":\"old\"}}", "h:" + superseded);
+        String active = seedActive();
+
+        EditResult r = editor.pin(tenantId, userId, "persona");
+        assertThat(r.pid()).isEqualTo(active);
+        assertThat(r.status()).isEqualTo("ACTIVE");
+        // SUPERSEDED row is untouched.
+        String supersededEdits = readEditedFields(superseded);
+        assertThat(supersededEdits.replaceAll("\\s+", "")).isEqualTo("{}");
+    }
+
+    @Test
     @DisplayName("ARCHIVED profile cannot be edited")
     void archivedCannotEdit() {
         seedActive();
