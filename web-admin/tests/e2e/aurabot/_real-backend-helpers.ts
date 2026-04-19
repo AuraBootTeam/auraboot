@@ -40,8 +40,6 @@ function resolveAdminTenantId(): string {
     if (!m) throw new Error('no tenantId in claim');
     return m[1];
   } catch (e) {
-    // eslint-disable-next-line no-console
-    console.error('resolveAdminTenantId failed:', e);
     // Fallback to the historical hard-coded value so tests don't all break
     // if the backend is down during helper-module load.
     return '303848950530707456';
@@ -49,8 +47,6 @@ function resolveAdminTenantId(): string {
 }
 
 export const ADMIN_TENANT_ID = resolveAdminTenantId();
-// eslint-disable-next-line no-console
-console.log('[real-helpers] ADMIN_TENANT_ID =', ADMIN_TENANT_ID);
 
 // Parent menu id of "AI 中心" — resolve from DB at load time (rotates on
 // DB reset like tenant id). Look up via children's parent_id to avoid
@@ -71,8 +67,6 @@ function resolveAiCenterMenuId(): string {
 }
 
 export const AI_CENTER_MENU_ID = resolveAiCenterMenuId();
-// eslint-disable-next-line no-console
-console.log('[real-helpers] AI_CENTER_MENU_ID =', AI_CENTER_MENU_ID);
 
 // ---------------------------------------------------------------------------
 // psql helpers
