@@ -19,9 +19,16 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -131,11 +138,78 @@ class MemoryL1L2Phase4IntegrationTest extends BaseIntegrationTest {
     }
 
     // ------------------------------------------------------------------
-    // 3) Leader election — two instances, only one wins; stale leader replaced.
+    // 3a) Leader election — CONCURRENT acquire race.
+    //
+    // Phase 4 Round-3 (I3): previously the test called acquire() sequentially,
+    // so it would have passed even if the WHERE-race-guard in the ON CONFLICT
+    // branch were broken. We now gate both threads behind a CountDownLatch(1)
+    // barrier and invoke them via ExecutorService.invokeAll so both acquire()
+    // calls hit the DB as close to simultaneously as the JVM allows.
+    // Exactly one must win; the losing instance must NOT corrupt the row
+    // (heartbeat still belongs to the winner).
     // ------------------------------------------------------------------
     @Test
-    @DisplayName("leader election: only one of two instances wins; stale leader replaced after 60s")
-    void leaderElection_exclusiveAndStaleReplacement() {
+    @DisplayName("leader election: concurrent acquire — exactly one wins; loser does not corrupt row")
+    void leaderElection_concurrentAcquire_onlyOneWins() throws Exception {
+        String jobCode = TEST_PREFIX + "job_" + UniqueIdGenerator.generate();
+
+        String instA = "inst-A-" + UniqueIdGenerator.generate();
+        String instB = "inst-B-" + UniqueIdGenerator.generate();
+
+        MemoryL1L2LeaderElection a = new MemoryL1L2LeaderElection(
+                jdbc, instA, /*enabled*/ true);
+        MemoryL1L2LeaderElection b = new MemoryL1L2LeaderElection(
+                jdbc, instB, /*enabled*/ true);
+
+        CountDownLatch barrier = new CountDownLatch(1);
+        Callable<Boolean> tryAcquireA = () -> {
+            barrier.await();
+            return a.acquire(jobCode);
+        };
+        Callable<Boolean> tryAcquireB = () -> {
+            barrier.await();
+            return b.acquire(jobCode);
+        };
+
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            List<Callable<Boolean>> tasks = new ArrayList<>();
+            tasks.add(tryAcquireA);
+            tasks.add(tryAcquireB);
+
+            // Release both threads at once so they race into acquire().
+            barrier.countDown();
+            List<Future<Boolean>> results = pool.invokeAll(tasks, 30, TimeUnit.SECONDS);
+
+            boolean aWon = results.get(0).get();
+            boolean bWon = results.get(1).get();
+
+            // Exactly one winner.
+            assertThat(aWon ^ bWon)
+                    .as("exactly one of (A=%s, B=%s) must win concurrent acquire", aWon, bWon)
+                    .isTrue();
+
+            // The row's instance_id must match whichever thread reported true —
+            // i.e. the loser did NOT stomp the winner's row via a broken
+            // ON CONFLICT UPDATE. This is the core invariant the WHERE
+            // `ab_scheduler_leader.instance_id = EXCLUDED.instance_id
+            //   OR heartbeat_at < NOW() - ...` guards.
+            String winnerId = aWon ? instA : instB;
+            String ownerInDb = jdbc.queryForObject(
+                    "SELECT instance_id FROM ab_scheduler_leader WHERE job_code = ?",
+                    String.class, jobCode);
+            assertThat(ownerInDb).isEqualTo(winnerId);
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // 3b) Leader election — stale-leader takeover path (kept from Round-2).
+    // ------------------------------------------------------------------
+    @Test
+    @DisplayName("leader election: stale leader (>60s heartbeat) replaced; release re-opens election")
+    void leaderElection_staleReplacementAndRelease() {
         String jobCode = TEST_PREFIX + "job_" + UniqueIdGenerator.generate();
 
         MemoryL1L2LeaderElection a = new MemoryL1L2LeaderElection(
@@ -143,11 +217,8 @@ class MemoryL1L2Phase4IntegrationTest extends BaseIntegrationTest {
         MemoryL1L2LeaderElection b = new MemoryL1L2LeaderElection(
                 jdbc, "inst-B-" + UniqueIdGenerator.generate(), /*enabled*/ true);
 
-        boolean aWon = a.acquire(jobCode);
-        boolean bWon = b.acquire(jobCode);
-
-        assertThat(aWon).isTrue();
-        assertThat(bWon).isFalse();
+        assertThat(a.acquire(jobCode)).isTrue();
+        assertThat(b.acquire(jobCode)).isFalse();
 
         // The winner can re-acquire (heartbeat renewal).
         assertThat(a.acquire(jobCode)).isTrue();
