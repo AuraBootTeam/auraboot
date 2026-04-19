@@ -7,6 +7,11 @@
     {
       "roleCode": "wd_manager",
       "permissionCodes": [
+        "page.page.read",
+        "model.wd_leave_request.read",
+        "model.wd_leave_request.write",
+        "model.wd_leave_balance.read",
+        "workflow.execute",
         "wd.leave_request.read",
         "wd.leave_request.manage",
         "wd.leave_request.submit",
@@ -17,6 +22,12 @@
     {
       "roleCode": "wd_hr",
       "permissionCodes": [
+        "page.page.read",
+        "model.wd_leave_request.read",
+        "model.wd_leave_request.write",
+        "model.wd_leave_balance.read",
+        "model.wd_leave_balance.write",
+        "workflow.execute",
         "wd.leave_request.read",
         "wd.leave_request.manage",
         "wd.leave_request.submit",
@@ -28,6 +39,11 @@
     {
       "roleCode": "wd_employee",
       "permissionCodes": [
+        "page.page.read",
+        "model.wd_leave_request.read",
+        "model.wd_leave_request.write",
+        "model.wd_leave_balance.read",
+        "workflow.execute",
         "wd.leave_request.read",
         "wd.leave_request.manage",
         "wd.leave_request.submit",

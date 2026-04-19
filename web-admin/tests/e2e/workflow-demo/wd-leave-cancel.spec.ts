@@ -92,6 +92,8 @@ test.describe('workflow-demo — R5 applicant cancel', () => {
       await loginViaUI(applicantPage, applicant.email, 'Test2026x');
 
       const { recordId } = await submitLeaveRequest(applicantPage, {
+        userId: applicant.userId,
+        token: applicant.token,
         days: 2,
         type: 'annual',
         reason: 'R5 cancel test — applicant withdraws before manager acts',
