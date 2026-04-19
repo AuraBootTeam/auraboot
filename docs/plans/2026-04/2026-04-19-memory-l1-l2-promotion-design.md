@@ -356,6 +356,63 @@ auraboot_memory_l1l2_promotion_latency_seconds_bucket  # histogram
   3. `MemoryL1L2Demoter` cron 7310（design §4.4）。
   4. 多实例部署加 `advisory_xact_lock(7309, tenantId)` + `FOR UPDATE SKIP LOCKED`（design §6 草案骨架），当前同步 listener 在单节点部署下无需。
 
+### 9.1a Phase 3 实现备注（PR-84，已交付）
+
+PR-84 覆盖了 Phase 3 全部核心 backlog：
+
+- `MemoryL1L2OrphanScanner`（`com.auraboot.framework.agent.memory.MemoryL1L2OrphanScanner`）：
+  - Cron 默认 `0 */15 * * * *`（15 分钟），比设计稿的 6h 更激进——15 分钟足够兜底同步 listener 异常，又不会挤占事件路径。
+  - Advisory lock key **7311**（brief 指定，覆盖设计稿的 7309；7309/7310 被其他 subsystem 先占）。
+  - 1 小时 age 门槛（设计稿用 6h；Phase 3 改为 1h 与 cron 频率对齐，避免 orphan 积压）。
+  - 每次最多 500 行（`BATCH_CAP`），防止 advisory lock 长期占用。
+  - 复用 `MemoryL1L2Promoter.promoteCandidate(...)`，评分 + 去重管道与事件路径同源。
+- **语义 cosine dedup**（`MemoryL1L2Promoter` 内部）：
+  - 阈值 `0.92`（brief 指定，覆盖设计稿的 0.85）；配置键 `acp.memory.l1l2.semantic-dedup-threshold`。
+  - 通过 pgvector `<=>` 操作符直接查询最近 L2 行的距离。
+  - 依赖 `MemoryEmbeddingService.resolveEmbedding(pid)` 懒加载候选 embedding；provider 未配置返回 null 时优雅跳过语义层，落到打分路径（不是 throw）。
+  - 合并策略：`access_count += 1`、`importance = GREATEST(existing, candidate)`，写 `DEDUP_HIT / dedup_mode='cosine'` 审计行。
+  - **重要顺序调整**：dedup 层（hash + cosine）放在 score threshold **之前**，否则语义重复行因 `uniqueness = 0` 被低分 gate 拦下，永远走不到合并路径（设计稿 §4.3 意图是"合并"而非"跳过"）。
+- `MemoryL1L2Demoter`（`com.auraboot.framework.agent.memory.MemoryL1L2Demoter`）：
+  - Cron 默认 `0 0 3 * * *`（每天 03:00）。
+  - Advisory lock key **7312**（brief 指定）。
+  - 阈值：`last_accessed < NOW() - 90 days` OR NULL，`importance < 3`，`shareable=FALSE`。
+  - 审计行 `event_type='L2_DEMOTED'`，累加 `demotion_count`。
+  - Metric `auraboot_memory_tier_demotion_total{tenant, outcome}`，`outcome ∈ {demoted, skipped}`。
+- **Metrics 新增**：
+  - `auraboot_memory_tier_promotion_total{outcome='skipped_dup_semantic'}` — 余弦去重命中。
+  - `auraboot_memory_tier_demotion_total{tenant, outcome}` — 降级计数。
+  - 常量定义在 `MemoryL1L2PromotionMetrics`。
+- **测试**：`./gradlew :test --tests 'com.auraboot.framework.agent.memory.*' -x jacocoTestReport` → 24 green。
+  - 6 Phase 2 (`MemoryL1L2PromoterIntegrationTest`)
+  - 9 Phase 1 (`MemoryTierEvaluatorIntegrationTest`)
+  - 3 Phase 3 orphan cron (`MemoryL1L2OrphanScannerIntegrationTest`)
+  - 3 Phase 3 semantic dedup (`MemoryL1L2SemanticDedupIntegrationTest`)
+  - 3 Phase 3 demoter (`MemoryL1L2DemoterIntegrationTest`)
+
+### 9.2 Phase 4+ backlog（未实现）
+
+Phase 3 完成后仍遗留的工作项，按优先级排序：
+
+1. **`ActiveMemoryService` L1 硬上限 + `UserSoulProfileDeriver` category 过滤**（原 Phase 4 / PR-85）：
+   - 读路径对 L1 注入设硬上限 `acp.memory.l1l2.grounding.max-l1=30`。
+   - `UserSoulProfileDeriver` WHERE 加 `category IN ('user','agent')`，Soul Profile 的 `source_memory_pids` 不能引用 `category='session'` 行。
+2. **Grafana / 告警**（原 Phase 5 / PR-86）：
+   - `docs/operations/grafana-memory-l1l2.json`（7 panels）。
+   - `docs/operations/learning-loop-alerts.yaml` 新 group `auraboot.memory_l1l2`。
+   - Mission Control 只读页 `/aurabot/memory-tier-events`。
+3. **真后端 E2E**（原 Phase 6 / PR-87）：
+   - 模拟 50 条 L1 + 事件触发 + dedup 合并 + demote 60d stale 全链路。
+4. **核心概念文档**（原 Phase 7 / PR-88）：
+   - `docs/core-concepts/memory-l1-l2-promotion.md`。
+5. **多实例部署保护**（设计稿 §10 问题 5）：
+   - 同一 `runId` 跨节点竞争场景仍未覆盖；需要 `seen_run_ids` 去重缓存或 leader-only cron。当前单节点部署下 advisory lock 7311/7312 已足够。
+6. **配置化降级阈值**（设计稿 §10 问题 3）：
+   - `acp.memory.l1l2.demoter.age-days` / `importance-max` 已可配；但默认值 90d / <3 仍缺线上数据校准，需要观察 2 周后迭代。
+7. **可选的手工晋升 API**（设计稿 §10 问题 6）：
+   - `POST /api/admin/memory/{pid}/promote-now` — 运维一键固化；Phase 3 未实现，遵循"自动化 + cron 兜底足够"的原则。
+
+Phase 3 交付后，当前所有 scheduler 默认关闭（`acp.memory.l1l2.*.enabled=false`），需要 ops 显式 opt-in。
+
 ---
 
 ## 10. 开放问题
