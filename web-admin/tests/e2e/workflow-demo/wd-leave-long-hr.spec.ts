@@ -84,9 +84,11 @@ test.describe('workflow-demo — R2 long leave HR approve', () => {
 
     const instanceIdForRouting = recordForRouting.wd_req_process_instance as string | undefined;
     if (instanceIdForRouting) {
-      const tasksResp = await request.get(
-        `${BACKEND}/api/bpm/tasks/by-process/${instanceIdForRouting}`,
-        { headers: { Authorization: `Bearer ${adminToken}` } },
+      // Use applicantPage.request (routed via frontend → BFF) instead of the
+      // bare `request` fixture + absolute BACKEND URL, to avoid CORS issues
+      // from cross-origin test contexts.
+      const tasksResp = await applicantPage.request.get(
+        `/api/bpm/tasks/by-process/${instanceIdForRouting}`,
       );
       expect(
         tasksResp.status(),

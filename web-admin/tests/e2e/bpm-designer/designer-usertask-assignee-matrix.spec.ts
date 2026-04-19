@@ -133,7 +133,8 @@ test.describe('BPM designer — userTask assigneeType matrix', { tag: ['@bpm-reg
         { headers: { Authorization: `Bearer ${adminToken}` } },
       );
       expect(xmlResp.ok(), `GET bpmn failed: ${xmlResp.status()}`).toBe(true);
-      const xml = await xmlResp.text();
+      const xmlBody = (await xmlResp.json()) as Record<string, unknown>;
+    const xml = xmlBody.data as string;
 
       // Narrow to the userTask tag (self-closing OR opening form)
       const tagMatch = xml.match(

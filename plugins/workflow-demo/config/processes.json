@@ -55,8 +55,6 @@
           "data": {
             "label:zh-CN": "主管审批",
             "label:en": "Manager Approve",
-            "assigneeType": "role",
-            "assigneeValue": "wd_manager",
             "formPageKey": "wd_leave_request_detail",
             "formBinding": {
               "formRef": "wd_leave_request_detail",
@@ -88,7 +86,26 @@
                 "resultValue": "rejected",
                 "requireComment": true
               }
-            ]
+            ],
+            "config": {
+              "assignee": {
+                "type": "role",
+                "roleIds": [
+                  "wd_manager"
+                ]
+              },
+              "formBinding": {
+                "formRef": "wd_leave_request_detail",
+                "formType": "PAGE",
+                "fieldPermissions": {
+                  "days": "readonly",
+                  "type": "readonly",
+                  "reason": "readonly",
+                  "approver_comment": "editable"
+                },
+                "saveStrategy": "business_only"
+              }
+            }
           }
         },
         {
@@ -101,8 +118,6 @@
           "data": {
             "label:zh-CN": "HR 审批",
             "label:en": "HR Approve",
-            "assigneeType": "role",
-            "assigneeValue": "wd_hr",
             "formPageKey": "wd_leave_request_detail",
             "formBinding": {
               "formRef": "wd_leave_request_detail",
@@ -134,7 +149,26 @@
                 "resultValue": "rejected",
                 "requireComment": true
               }
-            ]
+            ],
+            "config": {
+              "assignee": {
+                "type": "role",
+                "roleIds": [
+                  "wd_hr"
+                ]
+              },
+              "formBinding": {
+                "formRef": "wd_leave_request_detail",
+                "formType": "PAGE",
+                "fieldPermissions": {
+                  "days": "readonly",
+                  "type": "readonly",
+                  "reason": "readonly",
+                  "approver_comment": "editable"
+                },
+                "saveStrategy": "business_only"
+              }
+            }
           }
         },
         {
