@@ -18,6 +18,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import com.auraboot.framework.integration.TestIdGenerator;
 
 /**
  * PR-65 Phase 1 — schema invariants for {@code ab_agent_memory_promotion}.
@@ -34,7 +35,7 @@ class MemoryPromotionSchemaIntegrationTest extends BaseIntegrationTest {
 
     @BeforeEach
     void setup() {
-        tenantId = 9_780_000L + System.nanoTime() % 10_000;
+        tenantId = TestIdGenerator.uniqueTenantId();
         tag = "mps" + Long.toString(System.nanoTime() & 0xfffff, 36) + "_";
     }
 
