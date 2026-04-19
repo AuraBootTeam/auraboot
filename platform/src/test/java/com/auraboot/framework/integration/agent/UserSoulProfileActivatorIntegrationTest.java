@@ -155,7 +155,7 @@ class UserSoulProfileActivatorIntegrationTest extends BaseIntegrationTest {
                             + "(pid, tenant_id, memory_agent_id, memory_type, category, "
                             + " memory_title, memory_content, importance, shareable, scope, scope_key, "
                             + " created_at, updated_at, deleted_flag) "
-                            + "VALUES (?, ?, 'default', 'fact', 'profile', 't', 'c', 8, FALSE, 'user', ?, NOW(), NOW(), FALSE)",
+                            + "VALUES (?, ?, 'default', 'fact', 'user', 't', 'c', 8, FALSE, 'user', ?, NOW(), NOW(), FALSE)",
                     tag + i, tenantId, userId);
         }
         var r = deriver.deriveForUser(tenantId, userId);
