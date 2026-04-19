@@ -33,10 +33,11 @@ public class SlaSchedulerService {
     private final ProcessEngineService processEngineService;
 
     /**
-     * Scan active SLA records every 60 seconds.
-     * For each record, calculate progress and match against warning rules.
+     * Scan active SLA records every 15 seconds.
+     * Short interval ensures warning/escalation fires within E2E test timeouts
+     * (e.g. 30 s SLA window + 15 s scheduler lag + test overhead ≤ 60 s).
      */
-    @Scheduled(fixedRate = 60000)
+    @Scheduled(fixedRate = 15000)
     public void scanSlaRecords() {
         List<SlaRecordEntity> activeRecords = slaRecordService.getActiveRecords();
         if (activeRecords.isEmpty()) {
