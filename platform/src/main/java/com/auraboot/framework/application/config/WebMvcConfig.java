@@ -1,5 +1,6 @@
 package com.auraboot.framework.application.config;
 
+import com.auraboot.framework.application.security.AdminRoleInterceptor;
 import com.auraboot.framework.permission.interceptor.PermissionInterceptor;
 import com.auraboot.framework.plugin.dto.imports.ImportRequest;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +40,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
     //todo confirm add doc WebMvcConfigurer
     private final PermissionInterceptor permissionInterceptor;
+    private final AdminRoleInterceptor adminRoleInterceptor;
     
     /**
      * Add interceptors to the registry
@@ -59,8 +61,16 @@ public class WebMvcConfig implements WebMvcConfigurer {
      */
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
+        // Admin role guard (design doc 2026-04-19). MUST be registered BEFORE
+        // PermissionInterceptor so the coarse "must hold tenant_admin" gate
+        // short-circuits before the fine-grained @RequirePermission check —
+        // otherwise a non-admin caller would get a confusing 1/AccessDenied
+        // from the permission evaluator instead of the canonical 409 envelope.
+        registry.addInterceptor(adminRoleInterceptor)
+            .addPathPatterns("/api/admin/**");
+        log.info("AdminRoleInterceptor registered for /api/admin/**");
+
         log.info("Registering PermissionInterceptor");
-        
         registry.addInterceptor(permissionInterceptor)
             .addPathPatterns("/api/**")
             .excludePathPatterns(
@@ -68,7 +78,6 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 "/api/public/**",    // Public endpoints (no authentication required)
                 "/actuator/**"       // Actuator endpoints (health, metrics, etc.)
             );
-        
         log.info("PermissionInterceptor registered successfully");
     }
 
