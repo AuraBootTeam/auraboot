@@ -89,7 +89,7 @@ public class MemoryTierAdminController {
 
         try {
             MemoryL1L2Promoter.AdminPromoteOutcome result =
-                    promoter.promoteNow(pid, adminUserId, reason);
+                    promoter.promoteNow(pid, tenantId, adminUserId, reason);
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("pid", pid);
             out.put("outcome", result.outcome().name().toLowerCase());
