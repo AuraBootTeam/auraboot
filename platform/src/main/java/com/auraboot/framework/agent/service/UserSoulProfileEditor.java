@@ -44,8 +44,6 @@ import java.util.Map;
 @Service
 public class UserSoulProfileEditor {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
-
     static final String STATUS_DRAFT = "DRAFT";
     static final String STATUS_ACTIVE = "ACTIVE";
     static final String STATUS_SUPERSEDED = "SUPERSEDED";
@@ -59,11 +57,14 @@ public class UserSoulProfileEditor {
 
     private final JdbcTemplate jdbcTemplate;
     private final UserSoulProfileMetrics metrics;
+    private final ObjectMapper objectMapper;
 
     public UserSoulProfileEditor(JdbcTemplate jdbcTemplate,
-                                 UserSoulProfileMetrics metrics) {
+                                 UserSoulProfileMetrics metrics,
+                                 ObjectMapper objectMapper) {
         this.jdbcTemplate = jdbcTemplate;
         this.metrics = metrics;
+        this.objectMapper = objectMapper;
     }
 
     public record EditResult(String pid, int version, Map<String, Object> editedFields,
@@ -219,10 +220,16 @@ public class UserSoulProfileEditor {
     }
 
     /**
-     * Load the most recent non-ARCHIVED row for this user — ACTIVE beats
-     * DRAFT beats SUPERSEDED. Throws {@link IllegalArgumentException} if
-     * there is no row, or {@link IllegalStateException} if every row is
-     * ARCHIVED (GDPR-forgotten).
+     * Load the most recent editable row for this user — ACTIVE beats DRAFT.
+     * SUPERSEDED and ARCHIVED rows are NOT editable:
+     * <ul>
+     *   <li>SUPERSEDED edits would be invisible to the Reader (which loads
+     *       only ACTIVE), so silently accepting them is misleading — throw
+     *       {@link IllegalStateException} with {@code "cannot edit superseded profile"}
+     *       so the controller surfaces HTTP 409.</li>
+     *   <li>ARCHIVED means GDPR-forgotten — also HTTP 409.</li>
+     * </ul>
+     * Throws {@link IllegalArgumentException} if no row exists at all.
      */
     private Map<String, Object> loadLiveRow(Long tenantId, String userId) {
         if (tenantId == null || userId == null || userId.isBlank()) {
@@ -231,20 +238,20 @@ public class UserSoulProfileEditor {
         List<Map<String, Object>> live = jdbcTemplate.queryForList(
                 "SELECT pid, tenant_id, version, status FROM ab_agent_user_soul_profile "
                         + "WHERE tenant_id = ? AND user_id = ? "
-                        + "  AND status IN (?, ?, ?) "
+                        + "  AND status IN (?, ?) "
                         + "ORDER BY CASE status "
                         + "  WHEN ? THEN 0 "
                         + "  WHEN ? THEN 1 "
-                        + "  WHEN ? THEN 2 "
                         + "  END, version DESC "
                         + "LIMIT 1",
                 tenantId, userId,
-                STATUS_ACTIVE, STATUS_DRAFT, STATUS_SUPERSEDED,
-                STATUS_ACTIVE, STATUS_DRAFT, STATUS_SUPERSEDED);
+                STATUS_ACTIVE, STATUS_DRAFT,
+                STATUS_ACTIVE, STATUS_DRAFT);
         if (!live.isEmpty()) {
             return live.get(0);
         }
-        // No live row. Distinguish between "nothing" and "forgotten".
+        // No editable row. Distinguish ARCHIVED (forgotten) from SUPERSEDED-only
+        // from "nothing exists". Both ARCHIVED and SUPERSEDED-only map to 409.
         Integer archivedCount = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM ab_agent_user_soul_profile "
                         + "WHERE tenant_id = ? AND user_id = ? AND status = ?",
@@ -252,6 +259,13 @@ public class UserSoulProfileEditor {
         if (archivedCount != null && archivedCount > 0) {
             throw new IllegalStateException(
                     "profile ARCHIVED (GDPR-forgotten) for tenant=" + tenantId + " user=" + userId);
+        }
+        Integer supersededCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ab_agent_user_soul_profile "
+                        + "WHERE tenant_id = ? AND user_id = ? AND status = ?",
+                Integer.class, tenantId, userId, STATUS_SUPERSEDED);
+        if (supersededCount != null && supersededCount > 0) {
+            throw new IllegalStateException("cannot edit superseded profile");
         }
         throw new IllegalArgumentException(
                 "no soul profile found for tenant=" + tenantId + " user=" + userId);
@@ -263,7 +277,7 @@ public class UserSoulProfileEditor {
                 String.class, pid);
         if (text == null || text.isBlank()) return new LinkedHashMap<>();
         try {
-            Map<String, Object> parsed = MAPPER.readValue(text, new TypeReference<>() {});
+            Map<String, Object> parsed = objectMapper.readValue(text, new TypeReference<>() {});
             return parsed == null ? new LinkedHashMap<>() : new LinkedHashMap<>(parsed);
         } catch (JsonProcessingException e) {
             // Explicit validation: edited_fields should always be a JSON object.
@@ -286,9 +300,9 @@ public class UserSoulProfileEditor {
         }
     }
 
-    private static String toJson(Object value) {
+    private String toJson(Object value) {
         try {
-            return MAPPER.writeValueAsString(value);
+            return objectMapper.writeValueAsString(value);
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("json serialisation failed", e);
         }
