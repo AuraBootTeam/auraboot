@@ -20,4 +20,11 @@ services:
     volumes:
       # Mount host plugins dir read-only so /api/plugins/import/import-directory-sync
       # can resolve absolute paths like /app/plugins/<name>.
-      - ./plugins:/app/plugins:ro
+      # Mount the WORKTREE's plugins (not main repo's) so E2E edits to workflow-demo
+      # are visible inside the container without needing to copy into main repo.
+      - /Users/ghj/work/auraboot/auraboot-wf-e2e/plugins:/app/plugins:ro
+    environment:
+      # CORS allow-list for E2E: worktree vite dev (5174) + loopback variants.
+      # Default FRONTEND_BASE_URL (3000) does not match where E2E targets.
+      FRONTEND_BASE_URL: http://localhost:5174
+      CORS_ALLOWED_ORIGINS: "http://localhost:5174,http://localhost:3501,http://127.0.0.1:5174"
