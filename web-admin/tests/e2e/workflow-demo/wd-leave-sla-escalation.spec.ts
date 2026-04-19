@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import {
   loginAs,
+  loginViaUI,
   ensureRoleUsers,
   createLeaveApplicant,
   setLeaveBalance,
@@ -55,16 +56,10 @@ test.describe('workflow-demo — R3 SLA escalation', () => {
       // 2. Applicant submits a short leave (days=1 → routes to manager)
       //    Days < 3 triggers the manager-approval branch in wd_leave_approval.
       // -----------------------------------------------------------------------
-      const applicantCtx = await browser.newContext();
+      const applicantCtx = await browser.newContext({ storageState: { cookies: [], origins: [] } });
       const applicantPage = await applicantCtx.newPage();
 
-      await applicantPage.goto('/login');
-      await applicantPage.getByLabel(/email/i).fill(applicant.email);
-      await applicantPage.getByLabel(/password|密码/i).fill('Test2026x');
-      await applicantPage.getByRole('button', { name: /login|登录/i }).click();
-      await applicantPage.waitForURL((u) => !u.pathname.endsWith('/login'), {
-        timeout: 10_000,
-      });
+      await loginViaUI(applicantPage, applicant.email, 'Test2026x');
 
       const { recordId } = await submitLeaveRequest(applicantPage, {
         days: 1,
