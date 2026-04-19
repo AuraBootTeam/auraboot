@@ -427,6 +427,18 @@ export async function startInstanceAndAdvance(
       );
     }
 
+    // Claim the task first so canCompleteTask passes for the caller's user.
+    // Without this, tasks configured with role/expression/starter assignees that
+    // resolved to a list of candidates (not just the caller) will 500 on complete.
+    const claimResp = await api.post(`/api/bpm/tasks/${taskId}/claim`, {
+      headers: authHeader(token),
+    });
+    expect(
+      claimResp.ok(),
+      `POST /api/bpm/tasks/${taskId}/claim failed with status ${claimResp.status()} ` +
+        `(step ${stepIndex}: taskDefKey="${step.taskDefKey}")`,
+    ).toBe(true);
+
     // Perform the action
     if (step.action === 'complete') {
       const completeResp = await api.post(`/api/bpm/tasks/${taskId}/complete`, {
