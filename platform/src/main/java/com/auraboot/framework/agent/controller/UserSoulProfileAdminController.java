@@ -57,6 +57,8 @@ public class UserSoulProfileAdminController {
     public ApiResponse<List<Map<String, Object>>> list(
             @RequestParam(required = false, defaultValue = "50") int limit) {
         Long tenantId = MetaContext.getCurrentTenantId();
+        ApiResponse<List<Map<String, Object>>> denied = guardTenantAdmin();
+        if (denied != null) return denied;
         int capped = Math.min(Math.max(1, limit), 200);
 
         // NOTE: content columns (profile, edited_fields, source_memory_pids)
@@ -80,6 +82,8 @@ public class UserSoulProfileAdminController {
     @GetMapping("/stats")
     public ApiResponse<Map<String, Object>> stats() {
         Long tenantId = MetaContext.getCurrentTenantId();
+        ApiResponse<Map<String, Object>> denied = guardTenantAdmin();
+        if (denied != null) return denied;
 
         Map<String, Long> byStatus = new LinkedHashMap<>();
         byStatus.put(UserSoulProfileStatus.DRAFT.code(), 0L);
@@ -149,6 +153,9 @@ public class UserSoulProfileAdminController {
     @PostMapping("/forget")
     public ApiResponse<Map<String, Object>> forget(@RequestBody Map<String, Object> body) {
         Long tenantId = MetaContext.getCurrentTenantId();
+        ApiResponse<Map<String, Object>> denied = guardTenantAdmin();
+        if (denied != null) return denied;
+
         String targetUserId = requireStringField(body, "userId");
         String reason = requireStringField(body, "reason");
         if (targetUserId == null) return ApiResponse.error(400, "userId required");
@@ -159,6 +166,13 @@ public class UserSoulProfileAdminController {
                 actingAdminId, targetUserId, tenantId, reason);
 
         try {
+            // Insert audit row BEFORE the destructive call, so an exception
+            // during forget still leaves a trail that the attempt was made.
+            // When the target has no rows (cross-tenant isolation / ghost),
+            // forgetProfile throws IllegalArgumentException and we roll the
+            // audit row back below.
+            insertAdminActionAudit(tenantId, actingAdminId, targetUserId,
+                    ACTION_ADMIN_FORGET, reason);
             EditResult r = editor.forgetProfile(tenantId, targetUserId);
             metrics.recordAdminForget(tenantId, reason);
             Map<String, Object> out = new LinkedHashMap<>();
@@ -170,10 +184,13 @@ public class UserSoulProfileAdminController {
             out.put("reason", reason);
             return ApiResponse.ok(out);
         } catch (IllegalArgumentException nothingToDo) {
-            // Editor throws when the user has no rows at all. Treat as noop
-            // 200 for idempotency + audit: the admin action was attempted,
-            // so we still record the metric.
-            metrics.recordAdminForget(tenantId, reason);
+            // Editor throws when the user has no rows at all — either the
+            // target genuinely has no profile, or (important cross-tenant
+            // case) the target exists in a different tenant. Either way the
+            // call is a noop: we must NOT record the metric and must NOT
+            // leave an audit row, so the audit table only reflects real
+            // destructive actions within the admin's own tenant.
+            deleteLastAdminActionAudit(tenantId, actingAdminId, targetUserId, ACTION_ADMIN_FORGET);
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("noop", true);
             out.put("message", "no profile to forget");
@@ -189,5 +206,79 @@ public class UserSoulProfileAdminController {
         if (v == null) return null;
         String s = v.toString();
         return s.isBlank() ? null : s;
+    }
+
+    // =========================================================================
+    // Admin guard + audit helpers
+    // =========================================================================
+
+    static final String TENANT_ADMIN_ROLE_CODE = "tenant_admin";
+    static final String ACTION_ADMIN_FORGET = "admin_forget";
+
+    /**
+     * Guard for destructive / privileged admin endpoints.
+     *
+     * <p>Returns a 409 {@code ApiResponse} when the caller does not hold the
+     * {@code tenant_admin} role in the current tenant; returns {@code null}
+     * otherwise (caller proceeds). 409 is chosen over 403 because the project
+     * standard surfaces {@link IllegalStateException} conditions as 409 and
+     * this guard expresses a state conflict ("you are not in a state that
+     * permits this operation").
+     *
+     * <p>Role lookup goes through:
+     * <pre>ab_tenant_member (user_id → id) → ab_user_role (member_id) → ab_role (code)</pre>
+     * — matching the Phase-2 RBAC schema where {@code ab_user_role.member_id}
+     * references {@code ab_tenant_member.id}. No caching: admin endpoints are
+     * low-QPS and freshness matters more than latency.
+     */
+    private <T> ApiResponse<T> guardTenantAdmin() {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        Long userId = MetaContext.getCurrentUserId();
+        if (tenantId == null || userId == null) {
+            return ApiResponse.error(409, "admin role required");
+        }
+        Long count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ab_user_role ur " +
+                        " JOIN ab_tenant_member tm ON ur.member_id = tm.id " +
+                        " JOIN ab_role r ON ur.role_id = r.id " +
+                        " WHERE tm.user_id = ? " +
+                        "   AND ur.tenant_id = ? " +
+                        "   AND r.code = ? " +
+                        "   AND (ur.deleted_flag = FALSE OR ur.deleted_flag IS NULL) " +
+                        "   AND ur.status = 'active' " +
+                        "   AND (r.deleted_flag = FALSE OR r.deleted_flag IS NULL)",
+                Long.class, userId, tenantId, TENANT_ADMIN_ROLE_CODE);
+        if (count == null || count == 0) {
+            log.warn("UserSoulProfileAdminController: admin guard rejected user={} tenant={}",
+                    userId, tenantId);
+            return ApiResponse.error(409, "admin role required");
+        }
+        return null;
+    }
+
+    private void insertAdminActionAudit(Long tenantId, String actingAdminId,
+                                        String targetUserId, String action, String reason) {
+        jdbcTemplate.update(
+                "INSERT INTO ab_agent_user_soul_profile_admin_action " +
+                        "(tenant_id, acting_admin_id, target_user_id, action, reason) " +
+                        "VALUES (?, ?, ?, ?, ?)",
+                tenantId, actingAdminId, targetUserId, action, reason);
+    }
+
+    /**
+     * Roll back the most recent audit row for the (tenant, admin, target, action)
+     * tuple. Used to keep the audit table free of noop attempts (cross-tenant
+     * isolation or ghost-user forgets). Deletes at most one row so concurrent
+     * unrelated audits are not affected.
+     */
+    private void deleteLastAdminActionAudit(Long tenantId, String actingAdminId,
+                                            String targetUserId, String action) {
+        jdbcTemplate.update(
+                "DELETE FROM ab_agent_user_soul_profile_admin_action " +
+                        "WHERE id = (SELECT id FROM ab_agent_user_soul_profile_admin_action " +
+                        "            WHERE tenant_id = ? AND acting_admin_id = ? " +
+                        "              AND target_user_id = ? AND action = ? " +
+                        "            ORDER BY id DESC LIMIT 1)",
+                tenantId, actingAdminId, targetUserId, action);
     }
 }
