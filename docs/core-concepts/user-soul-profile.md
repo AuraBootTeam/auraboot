@@ -199,6 +199,10 @@ Round-1 review fixes + enum migration were not separate PRs; these commits land 
 
 Enforced at three layers: JWT (user scope), controller `MetaContext.getCurrentUserId()` guard, SQL column-list projection in the admin query.
 
+## Related docs
+
+- Peer subsystem: [`memory-tier-promotion.md`](./memory-tier-promotion.md) — L1→L2 lifecycle promoter. The Reader here benefits from promoted L2 memories since `UserSoulProfileDeriver` consumes `scope='user'` rows regardless of `category`; tier promotion boosts signal quality.
+
 ## Related dashboards + alerts
 
 - Grafana: `docs/operations/grafana-user-soul-profile.json` (7-panel dashboard)
