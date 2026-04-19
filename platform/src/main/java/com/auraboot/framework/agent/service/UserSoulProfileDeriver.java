@@ -49,12 +49,11 @@ public class UserSoulProfileDeriver {
     static final long LOCK_KEY = 7306L;
     private static final String DERIVATION_MODEL_TEMPLATE = "template:v1";
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
-
     private final JdbcTemplate jdbcTemplate;
     private final AgentMemoryService agentMemoryService;
     private final UserSoulProfileMetrics metrics;
     private final TransactionTemplate transactionTemplate;
+    private final ObjectMapper objectMapper;
 
     @Value("${acp.user.soul-profile.derivation.enabled:false}")
     private boolean enabled;
@@ -71,11 +70,13 @@ public class UserSoulProfileDeriver {
     public UserSoulProfileDeriver(JdbcTemplate jdbcTemplate,
                                   AgentMemoryService agentMemoryService,
                                   UserSoulProfileMetrics metrics,
-                                  PlatformTransactionManager transactionManager) {
+                                  PlatformTransactionManager transactionManager,
+                                  ObjectMapper objectMapper) {
         this.jdbcTemplate = jdbcTemplate;
         this.agentMemoryService = agentMemoryService;
         this.metrics = metrics;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
+        this.objectMapper = objectMapper;
     }
 
     /**
@@ -352,9 +353,9 @@ public class UserSoulProfileDeriver {
         return ProfileConfidenceScorer.aggregateMin(arr);
     }
 
-    private static String toJson(Object value) {
+    private String toJson(Object value) {
         try {
-            return MAPPER.writeValueAsString(value);
+            return objectMapper.writeValueAsString(value);
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("canonical json serialisation failed", e);
         }
