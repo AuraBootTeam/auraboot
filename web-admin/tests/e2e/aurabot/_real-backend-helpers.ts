@@ -586,7 +586,7 @@ export function seedUserSoulProfile(args: {
        stale_flagged_at, hidden_at, activated_at, created_at)
     VALUES
       ('${pid}', ${ADMIN_TENANT_ID}, '${args.userId}',
-       ${args.version ?? 1}, '${args.status}',
+       ${args.version ?? 1}, '${args.status.toLowerCase()}',
        $JSON$${profileJsonStr}$JSON$::jsonb,
        'hash_${pid}', 'zh-CN',
        ${args.confidence ?? 0.82}, ${editedFieldsJson},

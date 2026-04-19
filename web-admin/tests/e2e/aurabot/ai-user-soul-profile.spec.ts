@@ -428,7 +428,7 @@ test.describe('Mission Control — User Soul Profile (PR-79)', () => {
     await expect(superseded).toBeVisible();
     await expect(superseded.locator('[data-testid="version-badge"]')).toHaveText('v2');
     await expect(superseded.locator('[data-testid="status-pill"]')).toContainText(
-      /已被取代|SUPERSEDED/,
+      /已被取代|superseded/i,
     );
     await superseded.locator('[data-testid="history-expand"]').click();
     await expect(superseded.locator('[data-testid="history-diff"]')).toContainText(

@@ -845,7 +845,7 @@ function HistoryTab({
     <ul className="space-y-3" data-testid="history-list">
       {entries.map((e, idx) => {
         const next = entries[idx - 1];
-        const isArchived = e.status === 'ARCHIVED';
+        const isArchived = e.status?.toLowerCase() === 'archived';
         const isExpanded = expanded.has(e.pid);
         return (
           <li
@@ -938,20 +938,21 @@ function StatusPill({
   status: string;
   l: (zh: string, en: string) => string;
 }) {
+  const s = status?.toLowerCase();
   const label =
-    status === 'ACTIVE'
+    s === 'active'
       ? l('已启用', 'ACTIVE')
-      : status === 'SUPERSEDED'
+      : s === 'superseded'
         ? l('已被取代', 'SUPERSEDED')
-        : status === 'ARCHIVED'
+        : s === 'archived'
           ? l('已归档', 'ARCHIVED')
           : status;
   const color =
-    status === 'ACTIVE'
+    s === 'active'
       ? 'bg-green-100 text-green-800'
-      : status === 'SUPERSEDED'
+      : s === 'superseded'
         ? 'bg-gray-100 text-gray-700'
-        : status === 'ARCHIVED'
+        : s === 'archived'
           ? 'bg-gray-200 text-gray-500'
           : 'bg-gray-100 text-gray-700';
   return (

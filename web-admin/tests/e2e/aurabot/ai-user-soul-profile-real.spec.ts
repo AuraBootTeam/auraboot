@@ -346,14 +346,14 @@ test.describe('Mission Control — User Soul Profile (real backend, PR-80)', () 
     expect(body.data.noop).toBe(false);
     expect(body.data.target_user_id).toBe(victimUser);
     expect(body.data.reason).toBe('gdpr_request');
-    expect(body.data.status).toBe('ARCHIVED');
+    expect(body.data.status).toBe('archived');
     // Response must not leak content (metadata only, per §7 privacy).
     expect(body.data).not.toHaveProperty('profile');
     expect(body.data).not.toHaveProperty('edited_fields');
 
     // DB state: original row archived, tombstone row present.
     const victimRow = dbUserSoulProfileRow(victimSeed.pid);
-    expect(victimRow.status).toBe('ARCHIVED');
+    expect(victimRow.status).toBe('archived');
     expect(victimRow.hiddenAt).not.toBeNull();
 
     // Idempotency: second call on the same user still succeeds.
