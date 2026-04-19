@@ -112,6 +112,22 @@ async function navigateToAdminDashboard(page: Page): Promise<void> {
 // Tests
 // ---------------------------------------------------------------------------
 
+// All tests in this file seed rows under the same admin user_id (required so
+// that MetaContext.getCurrentUserId() returns a match for the UI fetches).
+// That makes the seed rows race on the partial unique index
+// uq_user_soul_profile_active when specs run in parallel, causing
+// duplicate-key violations. This real-backend suite is fundamentally
+// single-user (the admin identity is shared across tests), so we force
+// serial execution within the describe here. The mocked counterpart
+// (ai-user-soul-profile.spec.ts) remains parallel.
+//
+// Known limitation: `--repeat-each=N --workers>1` can still dispatch repeat
+// groups of this file to different workers and re-introduce the race. Use
+// `PW_WORKERS=1` when you need to run this spec with --repeat-each. Default
+// `pnpm test` / `oss-test.sh` runs are unaffected because each spec file is
+// assigned to a single worker under `fullyParallel: false`.
+test.describe.configure({ mode: 'serial' });
+
 test.describe('Mission Control — User Soul Profile (real backend, PR-80)', () => {
   test('USP-E2E-01: pin persona persists in DB edited_fields', async ({ page }) => {
     const seed = seedUserSoulProfile({
