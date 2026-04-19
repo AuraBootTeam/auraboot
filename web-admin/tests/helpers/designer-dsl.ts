@@ -219,53 +219,39 @@ export async function configureNode(
  * Returns the PID from the API response body.
  */
 export async function saveProcess(page: Page): Promise<{ processDefinitionId: string }> {
-  // Click the Save button which triggers the SaveDialog
-  const saveBtn = page.getByTestId('bpmn-toolbar-btn-save');
-  await saveBtn.waitFor({ state: 'visible', timeout: 5_000 });
-
-  // Set up response intercept BEFORE clicking (to avoid race)
-  const responsePromise = page.waitForResponse(
-    (response) =>
-      /\/api\/bpm\/process-definitions(\/[^/]+)?$/.test(response.url()) &&
-      (response.request().method() === 'POST' || response.request().method() === 'PUT'),
-    { timeout: 30_000 },
-  );
-
-  await saveBtn.click();
-
-  // SaveDialog appears — fill fields if the dialog opened
-  const dialog = page.getByTestId('bpmn-save-dialog-panel');
-  await dialog.waitFor({ state: 'visible', timeout: 5_000 });
-
-  // Read current name/key from dialog inputs and ensure they have values
-  const nameInput = dialog.locator('#bpmn-save-field-name');
-  const keyInput = dialog.locator('#bpmn-save-field-key');
-
-  const currentName = await nameInput.inputValue();
-  const currentKey = await keyInput.inputValue();
-
-  // If fields are empty (fresh designer), fill with a safe default
-  if (!currentName.trim()) {
-    await nameInput.fill('Test Process');
-  }
-  if (!currentKey.trim()) {
-    await keyInput.fill(`test_process_${Date.now()}`);
+  // The BPMN designer auto-saves on edits (observable via "保存成功" toast and
+  // a POST /api/bpm/process-definitions response). By the time this helper is
+  // called, a PD already exists on the backend. We retrieve the PID by:
+  //   1. Reading the processKey from the toolbar's bpmn-field-key input
+  //   2. GET /api/bpm/process-definitions/key/{processKey}
+  // This is deterministic and avoids fighting the auto-save / save-dialog flow.
+  const keyInput = page.getByTestId('bpmn-field-key');
+  await keyInput.waitFor({ state: 'visible', timeout: 5_000 });
+  const processKey = (await keyInput.inputValue()).trim();
+  if (!processKey) {
+    throw new Error('saveProcess: bpmn-field-key input is empty — processKey unknown');
   }
 
-  // Submit the dialog — triggers the actual save API call
-  const submitBtn = page.getByTestId('bpmn-save-dialog-submit');
-  await submitBtn.click();
+  // Poll for the PD to exist — auto-save is async; allow up to ~8s.
+  let pid: string | null = null;
+  await expect
+    .poll(
+      async () => {
+        const resp = await page.request.get(
+          `/api/bpm/process-definitions/key/${encodeURIComponent(processKey)}`,
+        );
+        if (!resp.ok()) return null;
+        const body = await resp.json();
+        pid = body?.data?.pid ?? null;
+        return pid;
+      },
+      { timeout: 8_000, intervals: [500, 1_000, 2_000] },
+    )
+    .not.toBeNull();
 
-  // Wait for the API response
-  const response = await responsePromise;
-  expect(response.ok()).toBe(true);
-
-  const body = await response.json();
-  const pid: string = body?.data?.pid;
   if (!pid) {
-    throw new Error(`saveProcess: could not extract process definition ID from response: ${JSON.stringify(body)}`);
+    throw new Error(`saveProcess: no PD found for processKey=${processKey}`);
   }
-
   return { processDefinitionId: pid };
 }
 
