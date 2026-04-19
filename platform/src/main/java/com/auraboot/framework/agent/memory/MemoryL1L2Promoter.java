@@ -112,6 +112,14 @@ public class MemoryL1L2Promoter {
     @EventListener(SessionEndedEvent.class)
     @Transactional
     public void onSessionEnded(SessionEndedEvent event) {
+        // Record the outcome-labeled counter BEFORE running the promotion
+        // pipeline so even a pipeline failure (which rolls back via the
+        // @Transactional listener) still leaves a metric trace that the event
+        // was received. Micrometer counters are not transactional.
+        String outcomeLabel = event.getOutcome() == null
+                ? "unknown"
+                : event.getOutcome().name().toLowerCase();
+        metrics.recordSessionEnded(event.getTenantId(), outcomeLabel);
         handle(event);
     }
 

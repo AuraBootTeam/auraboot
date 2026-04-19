@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * PR-83 Phase 2 integration tests for {@link MemoryL1L2Promoter}.
@@ -61,6 +62,9 @@ class MemoryL1L2PromoterIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private com.auraboot.framework.agent.service.AgentMemoryService agentMemoryService;
 
+    @Autowired
+    private com.auraboot.framework.agent.service.RunLifecycleService runLifecycleService;
+
     // ------------------------------------------------------------------
     // 1) Above-threshold L1 -> L2
     // ------------------------------------------------------------------
@@ -76,7 +80,8 @@ class MemoryL1L2PromoterIntegrationTest extends BaseIntegrationTest {
                 /*importance*/ 9, /*accessCount*/ 4);
 
         MemoryL1L2Promoter.PromotionSummary summary = promoter.handle(
-                new SessionEndedEvent(tenantId, runId, agentCode, userId));
+                new SessionEndedEvent(tenantId, runId, agentCode, userId,
+                        SessionEndedEvent.TerminalOutcome.SUCCEEDED));
 
         assertThat(summary.candidates()).isEqualTo(1);
         assertThat(summary.promoted()).isEqualTo(1);
@@ -118,7 +123,8 @@ class MemoryL1L2PromoterIntegrationTest extends BaseIntegrationTest {
                 /*importance*/ 3, /*accessCount*/ 0);
 
         MemoryL1L2Promoter.PromotionSummary summary = promoter.handle(
-                new SessionEndedEvent(tenantId, runId, agentCode, userId));
+                new SessionEndedEvent(tenantId, runId, agentCode, userId,
+                        SessionEndedEvent.TerminalOutcome.SUCCEEDED));
 
         assertThat(summary.candidates()).isZero();
         assertThat(summary.promoted()).isZero();
@@ -156,7 +162,8 @@ class MemoryL1L2PromoterIntegrationTest extends BaseIntegrationTest {
                 /*importance*/ 9, /*accessCount*/ 5);
 
         MemoryL1L2Promoter.PromotionSummary summary = promoter.handle(
-                new SessionEndedEvent(tenantId, runId, agentCode, userId));
+                new SessionEndedEvent(tenantId, runId, agentCode, userId,
+                        SessionEndedEvent.TerminalOutcome.SUCCEEDED));
 
         assertThat(summary.candidates()).isEqualTo(1);
         assertThat(summary.promoted()).isZero();
@@ -201,7 +208,8 @@ class MemoryL1L2PromoterIntegrationTest extends BaseIntegrationTest {
         insertL1(tenantId, agentCode, userId, runId, content,
                 /*importance*/ 9, /*accessCount*/ 3);
 
-        promoter.handle(new SessionEndedEvent(tenantId, runId, agentCode, userId));
+        promoter.handle(new SessionEndedEvent(tenantId, runId, agentCode, userId,
+                SessionEndedEvent.TerminalOutcome.SUCCEEDED));
 
         // Keyword search (scope=user) now returns the row with category=user.
         List<Map<String, Object>> hits = agentMemoryService.searchScoped(
@@ -231,7 +239,8 @@ class MemoryL1L2PromoterIntegrationTest extends BaseIntegrationTest {
                 TEST_PREFIX + "fact-c " + UniqueIdGenerator.generate(), 10, 6);
 
         MemoryL1L2Promoter.PromotionSummary summary = promoter.handle(
-                new SessionEndedEvent(tenantId, runId, agentCode, userId));
+                new SessionEndedEvent(tenantId, runId, agentCode, userId,
+                        SessionEndedEvent.TerminalOutcome.SUCCEEDED));
 
         assertThat(summary.candidates()).isEqualTo(3);
         assertThat(summary.promoted()).isEqualTo(3);
@@ -306,6 +315,147 @@ class MemoryL1L2PromoterIntegrationTest extends BaseIntegrationTest {
     }
 
     // ------------------------------------------------------------------
+    // 8) Terminal-state fan-out — CANCELLED outcome also triggers promotion.
+    //
+    // Regression guard: the previous implementation only fired
+    // SessionEndedEvent on completeRun(). Cancelled runs' L1 memories
+    // persisted until the orphan cron, polluting the alert pipeline. This
+    // test asserts an L1 row promoted exactly like the success path does.
+    // ------------------------------------------------------------------
+    @Test
+    void sessionEndedEvent_firesOnCancel_promotesAboveThresholdL1() {
+        Long tenantId = getTestTenant().getId();
+        String agentCode = TEST_PREFIX + "agent_" + UniqueIdGenerator.generate();
+        String userId = String.valueOf(getTestUser().getId());
+        String runId = UniqueIdGenerator.generate();
+
+        String memoryPid = insertL1(tenantId, agentCode, userId, runId,
+                TEST_PREFIX + "cancelled-run fact " + UniqueIdGenerator.generate(),
+                /*importance*/ 9, /*accessCount*/ 4);
+
+        // Simulate the cancel path publishing the event. The promoter's
+        // selection SQL is outcome-agnostic: only (tenant_id, source_run_id,
+        // category='session', importance >= gate) matters.
+        eventPublisher.publishEvent(new SessionEndedEvent(
+                tenantId, runId, agentCode, userId,
+                SessionEndedEvent.TerminalOutcome.CANCELLED));
+
+        String category = jdbcTemplate.queryForObject(
+                "SELECT category FROM ab_agent_memory WHERE pid = ?",
+                String.class, memoryPid);
+        assertThat(category)
+                .as("cancelled runs must still flow L1 rows through promotion")
+                .isEqualTo("user");
+
+        Integer auditCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ab_agent_memory_tier_event "
+                        + " WHERE memory_pid = ? AND event_type = 'L1_PROMOTED'",
+                Integer.class, memoryPid);
+        assertThat(auditCount).isEqualTo(1);
+
+        // Event payload carries the outcome label unchanged.
+        assertThat(new SessionEndedEvent(tenantId, runId, agentCode, userId,
+                SessionEndedEvent.TerminalOutcome.CANCELLED)
+                .getOutcome())
+                .isEqualTo(SessionEndedEvent.TerminalOutcome.CANCELLED);
+    }
+
+    // ------------------------------------------------------------------
+    // 9) Terminal-state fan-out — FAILED outcome also triggers promotion.
+    // ------------------------------------------------------------------
+    @Test
+    void sessionEndedEvent_firesOnFail_promotesAboveThresholdL1() {
+        Long tenantId = getTestTenant().getId();
+        String agentCode = TEST_PREFIX + "agent_" + UniqueIdGenerator.generate();
+        String userId = String.valueOf(getTestUser().getId());
+        String runId = UniqueIdGenerator.generate();
+
+        String memoryPid = insertL1(tenantId, agentCode, userId, runId,
+                TEST_PREFIX + "failed-run fact " + UniqueIdGenerator.generate(),
+                /*importance*/ 8, /*accessCount*/ 2);
+
+        eventPublisher.publishEvent(new SessionEndedEvent(
+                tenantId, runId, agentCode, userId,
+                SessionEndedEvent.TerminalOutcome.FAILED));
+
+        String category = jdbcTemplate.queryForObject(
+                "SELECT category FROM ab_agent_memory WHERE pid = ?",
+                String.class, memoryPid);
+        assertThat(category)
+                .as("failed runs must still flow L1 rows through promotion")
+                .isEqualTo("user");
+
+        Integer auditCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ab_agent_memory_tier_event "
+                        + " WHERE memory_pid = ? AND event_type = 'L1_PROMOTED'",
+                Integer.class, memoryPid);
+        assertThat(auditCount).isEqualTo(1);
+    }
+
+    // ------------------------------------------------------------------
+    // 9b) Idempotency guard — only the first terminal-state caller publishes.
+    //
+    // Simulates the cancel-then-fail sequence (interrupt cancels the run,
+    // then the worker's catch block fires FAILED). Exactly one SessionEnded
+    // should land at the promoter — validated here at the DB guard layer
+    // since AgentRunService.publishSessionEndedIfApplicable short-circuits
+    // on a false claim.
+    // ------------------------------------------------------------------
+    @Test
+    void sessionEndedPublished_claimIsIdempotent() {
+        Long tenantId = getTestTenant().getId();
+        String agentCode = TEST_PREFIX + "agent_" + UniqueIdGenerator.generate();
+        String runId = UniqueIdGenerator.generate();
+
+        // Seed an ab_agent_run row we can claim against.
+        LocalDateTime now = LocalDateTime.now();
+        Map<String, Object> runRow = new LinkedHashMap<>();
+        runRow.put("pid", runId);
+        runRow.put("tenant_id", tenantId);
+        runRow.put("task_id", UniqueIdGenerator.generate());
+        runRow.put("agent_id", agentCode);
+        runRow.put("run_status", "running");
+        runRow.put("started_at", now);
+        runRow.put("created_at", now);
+        runRow.put("updated_at", now);
+        dynamicDataMapper.insert("ab_agent_run", runRow);
+
+        boolean first = runLifecycleService.markSessionEndedPublished(runId);
+        boolean second = runLifecycleService.markSessionEndedPublished(runId);
+
+        assertThat(first)
+                .as("first terminal-state caller must win the atomic claim")
+                .isTrue();
+        assertThat(second)
+                .as("second terminal-state caller must see the guard set and bail")
+                .isFalse();
+
+        // Column was actually flipped on disk.
+        Object stamp = jdbcTemplate.queryForObject(
+                "SELECT session_ended_published_at FROM ab_agent_run WHERE pid = ?",
+                Object.class, runId);
+        assertThat(stamp)
+                .as("session_ended_published_at must be populated after successful claim")
+                .isNotNull();
+    }
+
+    // ------------------------------------------------------------------
+    // 10) Outcome field validation — null outcome throws at construction.
+    // ------------------------------------------------------------------
+    @Test
+    void sessionEndedEvent_nullOutcome_throwsAtConstruction() {
+        Long tenantId = getTestTenant().getId();
+        String agentCode = TEST_PREFIX + "agent_null";
+        String runId = UniqueIdGenerator.generate();
+
+        // No fallback / default — null outcome is a contract violation.
+        assertThatThrownBy(() -> new SessionEndedEvent(
+                tenantId, runId, agentCode, /*userId*/ null, /*outcome*/ null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessageContaining("outcome");
+    }
+
+    // ------------------------------------------------------------------
     // 6) Spring event bus wiring — publishing the event reaches the listener.
     // ------------------------------------------------------------------
     @Test
@@ -319,7 +469,8 @@ class MemoryL1L2PromoterIntegrationTest extends BaseIntegrationTest {
                 TEST_PREFIX + "event-bus " + UniqueIdGenerator.generate(),
                 /*importance*/ 9, /*accessCount*/ 5);
 
-        eventPublisher.publishEvent(new SessionEndedEvent(tenantId, runId, agentCode, userId));
+        eventPublisher.publishEvent(new SessionEndedEvent(tenantId, runId, agentCode, userId,
+                SessionEndedEvent.TerminalOutcome.SUCCEEDED));
 
         String category = jdbcTemplate.queryForObject(
                 "SELECT category FROM ab_agent_memory WHERE pid = ?",
