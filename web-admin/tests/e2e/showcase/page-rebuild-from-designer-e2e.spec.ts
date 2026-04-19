@@ -615,6 +615,10 @@ const createdPagePids: string[] = [];
 
 test.describe('Task C — Rebuild showcase form from Designer UI', () => {
   test.setTimeout(300_000);
+  // Designer-heavy 36+ click-fill sequence; under full-suite parallel load
+  // dev-server HMR can lag and cause palette item click 5s timeout. Allow
+  // 1 retry to absorb that flake without inflating per-action timeout.
+  test.describe.configure({ retries: 1 });
 
   test.afterEach(async ({ page }) => {
     while (createdPagePids.length > 0) {
