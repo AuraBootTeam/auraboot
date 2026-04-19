@@ -6274,6 +6274,9 @@ CREATE INDEX IF NOT EXISTS idx_user_soul_profile_stale
     ON ab_agent_user_soul_profile (stale_flagged_at)
     WHERE stale_flagged_at IS NOT NULL AND status = 'active';
 
+CREATE INDEX IF NOT EXISTS idx_user_soul_profile_created
+    ON ab_agent_user_soul_profile (tenant_id, user_id, created_at DESC);
+
 COMMENT ON TABLE ab_agent_user_soul_profile IS
     'User Soul Profile — derived per-user personalisation profile for grounding LLM prompts (see 2026-04-19 design doc).';
 
