@@ -5,7 +5,38 @@
  * Tests verify pages load correctly and core data is accessible via API.
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
+
+/**
+ * Navigate to a model's runtime list via sidebar menu (no page.goto deep-link).
+ * Falls back to the dashboard landing first to ensure sidebar is rendered.
+ */
+async function navigateToListViaMenu(
+  page: Page,
+  parentLabel: RegExp,
+  listUrl: string,
+  modelCode: string,
+): Promise<void> {
+  await page.goto('/dashboards', { waitUntil: 'domcontentloaded' }).catch(() => {});
+  await page.evaluate(() => localStorage.removeItem('sidebar-collapsed'));
+  await page.reload({ waitUntil: 'domcontentloaded' });
+
+  const parent = page.locator('button, [role="menuitem"]', { hasText: parentLabel }).first();
+  await parent.waitFor({ state: 'visible', timeout: 10_000 });
+  await parent.evaluate((el: HTMLElement) => el.click());
+
+  const listResp = page.waitForResponse(
+    (r) => r.url().includes(`/api/dynamic/${modelCode}/list`) && r.status() === 200,
+    { timeout: 15_000 },
+  );
+
+  const leaf = page.locator(`a[href="${listUrl}"], a[href*="${listUrl}"]`).first();
+  await leaf.waitFor({ state: 'attached', timeout: 5_000 });
+  await leaf.evaluate((el: HTMLElement) => el.click());
+  await listResp;
+
+  await expect(page).toHaveURL(new RegExp(`${listUrl}(?:$|\\?)`), { timeout: 10_000 });
+}
 
 test.describe('Showcase UX Regression', () => {
   test.use({ storageState: 'tests/storage/admin.json' });
@@ -39,13 +70,7 @@ test.describe('Showcase UX Regression', () => {
   // ─── B5: Action column renders (page loads) ──────────────────────────
 
   test('B5: CRM Account list page loads', async ({ page }) => {
-    const [resp] = await Promise.all([
-      page.waitForResponse((r) => r.url().includes('/crm_account') && r.url().includes('list'), {
-        timeout: 15000,
-      }),
-      page.goto('/p/crm_account'),
-    ]);
-    expect(resp.status()).toBe(200);
+    await navigateToListViaMenu(page, /CRM|客户关系|menu\.crm/i, '/p/crm_account', 'crm_account');
     await expect(page.locator('table, [data-testid="dynlist_table_view"]')).toBeVisible({
       timeout: 10000,
     });
@@ -54,9 +79,8 @@ test.describe('Showcase UX Regression', () => {
   // ─── B7: Account detail has related data ─────────────────────────────
 
   test('B7: CRM Account detail page loads with related data', async ({ page, browserName }) => {
-    // Navigate via list page, then use the row "view" action button to drill
-    // into detail. /p/{model} is the standard CRUD list URL (not a deep link).
-    await page.goto('/p/crm_account', { waitUntil: 'domcontentloaded' });
+    // Navigate via sidebar menu, then drill into detail through row-action-view.
+    await navigateToListViaMenu(page, /CRM|客户关系|menu\.crm/i, '/p/crm_account', 'crm_account');
     const firstRow = page
       .locator('[data-testid="dynamic-list"] table tbody tr')
       .first();
@@ -87,8 +111,12 @@ test.describe('Showcase UX Regression', () => {
   // ─── C4: Showcase detail page accessible ─────────────────────────────
 
   test('C4: Showcase detail page loads', async ({ page }) => {
-    // Navigate via list page, then use the row "view" action to drill into detail.
-    await page.goto('/p/showcase_all_fields', { waitUntil: 'domcontentloaded' });
+    await navigateToListViaMenu(
+      page,
+      /能力展示|Showcase|menu\.sc_root/i,
+      '/p/showcase_all_fields',
+      'showcase_all_fields',
+    );
     const firstRow = page
       .locator('[data-testid="dynamic-list"] table tbody tr')
       .first();
