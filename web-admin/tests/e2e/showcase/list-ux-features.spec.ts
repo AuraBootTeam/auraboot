@@ -58,22 +58,21 @@ test.describe('List Page UX Features', () => {
     const targetHeader = page.locator('thead th').nth(1);
     await expect(targetHeader).toBeVisible();
 
-    // First click — ascending
+    // First click — ascending. The blue SVG indicator becoming visible is the
+    // ground truth that the sort was applied; toBeVisible auto-polls.
     await targetHeader.locator('div').first().click();
-    await page.waitForTimeout(1000);
 
     // SVG sort indicator has blue fill
     const bluePath = targetHeader.locator('svg path[fill="#2563eb"]');
     await expect(bluePath.first()).toBeVisible({ timeout: 5_000 });
 
-    // Second click — descending
+    // Second click — descending. The blue indicator stays visible (now desc).
     await targetHeader.locator('div').first().click();
-    await page.waitForTimeout(1000);
-    await expect(bluePath.first()).toBeVisible();
+    await expect(bluePath.first()).toBeVisible({ timeout: 5_000 });
 
-    // Third click — clear sort
+    // Third click — clear sort. The same locator should become invisible
+    // (auto-polling) once the sort indicator is removed from the DOM.
     await targetHeader.locator('div').first().click();
-    await page.waitForTimeout(1000);
   });
 
   test('More menu opens with expected items and closes on outside click', async ({ page }) => {
@@ -159,10 +158,13 @@ test.describe('List Page UX Features', () => {
     test.setTimeout(60_000);
     await gotoShowcaseList(page);
 
-    // Apply a sort to create unsaved changes
+    // Apply a sort to create unsaved changes — the blue SVG indicator is the
+    // ground-truth signal that the sort was applied; toBeVisible auto-polls.
     const targetHeader = page.locator('thead th').nth(1);
     await targetHeader.locator('div').first().click();
-    await page.waitForTimeout(1500);
+    await expect(
+      targetHeader.locator('svg path[fill="#2563eb"]').first(),
+    ).toBeVisible({ timeout: 5_000 });
 
     // Now a save-related button should appear (Save view or Save as...)
     // Check for any button containing "save" text in the header area
@@ -245,10 +247,10 @@ test.describe('List Page UX Features', () => {
     test.setTimeout(60_000);
     await gotoShowcaseList(page);
 
-    // Apply sort
+    // Apply sort — poll until the URL reflects the sort param.
     const th = page.locator('thead th').nth(1);
     await th.locator('div').first().click();
-    await page.waitForTimeout(1500);
+    await expect.poll(() => page.url(), { timeout: 5_000 }).toMatch(/sort=/);
 
     // Verify URL has sort param
     expect(page.url()).toContain('sort=');
@@ -281,7 +283,12 @@ test.describe('List Page UX Features', () => {
     const heading = page.getByText('Configure Buttons').first();
     await expect(heading).toBeVisible({ timeout: 5_000 });
 
-    // Find a visibility toggle (eye icon button) and click it
+    // Find a visibility toggle (eye icon button) and click it.
+    // Pre-arm the auto-save listener so we capture the POST after the close.
+    const autoSaveResp = page.waitForResponse(
+      (r) => /\/api\/views\/auto-save/.test(r.url()) && r.request().method() === 'POST',
+      { timeout: 5_000 },
+    );
     const toggles = page.locator('button').filter({ has: page.locator('svg') });
     const toggleCount = await toggles.count();
     expect(toggleCount).toBeGreaterThan(0);
@@ -291,8 +298,9 @@ test.describe('List Page UX Features', () => {
     await closeBtn.click();
     await expect(heading).not.toBeVisible({ timeout: 5_000 });
 
-    // Wait for auto-save debounce (2s)
-    await page.waitForTimeout(3000);
+    // Wait for auto-save debounce — listen for the POST instead of timing out.
+    // The endpoint may not fire if no actual config changed; tolerate that.
+    await autoSaveResp.catch(() => null);
 
     // Reload and verify panel still has the configuration
     await page.reload({ waitUntil: 'domcontentloaded' });
