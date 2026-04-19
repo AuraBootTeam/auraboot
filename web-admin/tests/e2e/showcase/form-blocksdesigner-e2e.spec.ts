@@ -962,14 +962,14 @@ test.describe('Phase 4 — Form BlocksDesigner E2E (widget config chain)', () =>
     console.log('[P4.5] hits:', hits.join('  '));
     if (misses.length > 0) console.log('[P4.5] misses:', misses.join('\n  '));
 
-    // Hard requirement: at least 12 of the 14 targeted widget chains must
-    // round-trip. The ≤2-miss tolerance is for registry naming variants
-    // (e.g. checkbox-group vs checkbox) that surface inconsistently across
-    // dataType buckets.
+    // Hard requirement: ALL 14 targeted widget chains must round-trip.
+    // Earlier ≤2-miss tolerance is removed after fix/truth-widget-true:
+    // G1 widget-aware panel + initRegistry bootstrap + text→input alias
+    // closed all known dropdown variance gaps.
     expect(
       hits.length,
-      `widget chain coverage too low: ${hits.length}/14, misses=\n  ${misses.join('\n  ')}`,
-    ).toBeGreaterThanOrEqual(12);
+      `widget chain coverage incomplete: ${hits.length}/14, misses=\n  ${misses.join('\n  ')}`,
+    ).toBe(14);
 
     // Bucket coverage: every dataType bucket in the plan must have at least
     // one persisted hit so the test cannot silently degrade to a single
