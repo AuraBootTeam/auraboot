@@ -10,6 +10,7 @@ import com.auraboot.framework.agent.provider.LlmProviderFactory;
 import com.auraboot.framework.agent.provider.ToolDefinition;
 import com.auraboot.framework.agent.provider.ToolDiscoveryContext;
 import com.auraboot.framework.agent.provider.ToolProviderRegistry;
+import com.auraboot.framework.agent.memory.SessionEndedEvent;
 import com.auraboot.framework.agent.trace.AiTraceService;
 import com.auraboot.framework.agent.trace.SpanContext;
 import com.auraboot.framework.agent.trace.TraceContext;
@@ -26,6 +27,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataAccessException;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -58,6 +60,7 @@ public class AgentRunService {
     private final RunLifecycleService runLifecycleService;
     private final GroundingService groundingService;
     private final AgentSkillService skillService;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * User Soul Profile grounding reader (plan §5.5 / PR-77).
@@ -488,8 +491,28 @@ public class AgentRunService {
                 String memModel = resolveModel(agentDef, providerCode);
                 runLifecycleService.saveRunMemory(tenantId, runPid, taskPid, result,
                         agentCode, taskTitle, providerCode, memModel);
+
+                // Fire SessionEndedEvent so MemoryL1L2Promoter can evaluate
+                // this run's L1 memories for promotion to L2. Design:
+                // docs/plans/2026-04/2026-04-19-memory-l1-l2-promotion-design.md §4.1.
+                // userId is taken from the current MetaContext user — may be
+                // null for system/cron runs, in which case the promoter only
+                // considers scope='tenant' L1 rows.
+                String userId = resolveCurrentUserId();
+                eventPublisher.publishEvent(new SessionEndedEvent(
+                        tenantId, runPid, agentCode, userId));
             }
         }
+    }
+
+    /**
+     * Best-effort current-user resolver for the SessionEndedEvent payload.
+     * Returns null when no user context is bound (system/cron run) — the
+     * promoter handles null userId without fallback.
+     */
+    private String resolveCurrentUserId() {
+        Long uid = MetaContext.getCurrentUserId();
+        return uid == null ? null : uid.toString();
     }
 
     /**
