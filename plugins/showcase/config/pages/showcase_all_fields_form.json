@@ -187,10 +187,6 @@
       },
       "fields": [
         {
-          "field": "sc_location",
-          "colSpan": 12
-        },
-        {
           "field": "sc_address",
           "colSpan": 12
         }

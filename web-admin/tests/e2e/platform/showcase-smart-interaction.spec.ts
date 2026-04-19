@@ -653,82 +653,10 @@ test.describe('Showcase Smart Component — Deep Interaction', () => {
   });
 
   // =========================================================================
-  // 8. CoordinatesPicker interaction
+  // 8. (removed) CoordinatesPicker interaction — B9 widget retired 2026-04-19.
+  //    Product decided not to ship a real map SDK; the prior runtime was a
+  //    mock with hardcoded preset cities and offered no real value.
   // =========================================================================
-  test('SCI-008 — CoordinatesPicker: open map modal → select preset location → coordinates displayed; clear resets', async ({
-    page,
-  }) => {
-    await openCreateForm(page);
-
-    // Fill required name
-    const nameInput = field(page, 'sc_name').locator('input').first();
-    await nameInput.fill(`SCI-008 Coords ${UID}`);
-
-    // Locate coordinates picker field
-    const coordField = field(page, 'sc_location');
-    await coordField.scrollIntoViewIfNeeded();
-    await expect(coordField).toBeVisible({ timeout: 5_000 });
-
-    // Click the trigger to open the map modal
-    const trigger = coordField.locator('.cursor-pointer').first();
-    await expect(trigger).toBeVisible({ timeout: 3_000 });
-    await trigger.click();
-
-    // Modal should appear with map placeholder and preset location buttons
-    // The modal is a fixed overlay with preset city buttons
-    const modal = page.locator('.fixed.inset-0').first();
-    await expect(modal, 'Map modal should open').toBeVisible({ timeout: 3_000 });
-
-    // Search input should be visible in the modal
-    const searchInput = modal.locator('input[type="text"]').first();
-    await expect(searchInput, 'Search input should be in modal').toBeVisible({ timeout: 3_000 });
-
-    // Preset location buttons should be visible
-    const beijingBtn = modal.locator('text=39.9042, 116.4074').first();
-    await expect(beijingBtn, 'Beijing preset should be visible with coordinates').toBeVisible({
-      timeout: 3_000,
-    });
-
-    const shanghaiBtn = modal.locator('text=31.2304, 121.4737').first();
-    await expect(shanghaiBtn, 'Shanghai preset should be visible').toBeVisible({ timeout: 3_000 });
-
-    const shenzhenBtn = modal.locator('text=22.3193, 114.1694').first();
-    await expect(shenzhenBtn, 'Shenzhen preset should be visible').toBeVisible({ timeout: 3_000 });
-
-    // Click the Shanghai preset button (the parent button element)
-    const shanghaiPreset = modal.locator('button').filter({ hasText: '上海市外滩' }).first();
-    await shanghaiPreset.click();
-
-    // Modal should close after selection
-    await expect(modal).not.toBeVisible({ timeout: 3_000 });
-
-    // Trigger should now display coordinate values
-    const triggerText = await trigger.innerText();
-    expect(
-      triggerText.includes('31.2304') && triggerText.includes('121.4737'),
-      `Trigger should show Shanghai coordinates, got: "${triggerText}"`,
-    ).toBeTruthy();
-    expect(
-      triggerText.includes('上海市外滩'),
-      `Trigger should include address label "上海市外滩", got: "${triggerText}"`,
-    ).toBeTruthy();
-
-    // Hidden input should hold JSON value
-    const hiddenInput = coordField.locator('input[type="hidden"]').first();
-    const hiddenValue = await hiddenInput.inputValue();
-    expect(hiddenValue.length, 'Hidden input should contain JSON coordinates').toBeGreaterThan(0);
-    const parsed = JSON.parse(hiddenValue);
-    expect(parsed.latitude, 'Latitude should be 31.2304').toBeCloseTo(31.2304, 3);
-    expect(parsed.longitude, 'Longitude should be 121.4737').toBeCloseTo(121.4737, 3);
-
-    // -- Clear the value --
-    const clearBtn = coordField.locator('button').filter({ hasText: '×' }).first();
-    if (await clearBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
-      await clearBtn.click();
-      const clearedValue = await hiddenInput.inputValue();
-      expect(clearedValue, 'Coordinates should be cleared').toBe('');
-    }
-  });
 
   // =========================================================================
   // 9. TimeRangePicker interaction
