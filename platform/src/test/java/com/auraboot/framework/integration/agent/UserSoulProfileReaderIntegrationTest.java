@@ -98,7 +98,7 @@ class UserSoulProfileReaderIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("ACTIVE profile → ProfileSection with rendered text")
     void active_profile_returns_section() {
-        seed(tenantId, userId, "ACTIVE", RICH_PROFILE, null, false, false);
+        seed(tenantId, userId, "active", RICH_PROFILE, null, false, false);
 
         Optional<UserSoulProfileReader.ProfileSection> section =
                 reader.loadForGrounding(tenantId, userId);
@@ -126,29 +126,29 @@ class UserSoulProfileReaderIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("hidden_at set → Optional.empty even when ACTIVE")
     void hidden_row_returns_empty() {
-        seed(tenantId, userId, "ACTIVE", RICH_PROFILE, null, true, false);
+        seed(tenantId, userId, "active", RICH_PROFILE, null, true, false);
         assertThat(reader.loadForGrounding(tenantId, userId)).isEmpty();
     }
 
     @Test
     @DisplayName("Only ACTIVE returns — DRAFT / SUPERSEDED / ARCHIVED do not")
     void only_active_returns() {
-        seed(tenantId, userId, "DRAFT", RICH_PROFILE, null, false, false);
+        seed(tenantId, userId, "draft", RICH_PROFILE, null, false, false);
         assertThat(reader.loadForGrounding(tenantId, userId)).isEmpty();
 
         jdbc.update("DELETE FROM ab_agent_user_soul_profile WHERE tenant_id = ?", tenantId);
-        seed(tenantId, userId, "SUPERSEDED", RICH_PROFILE, null, false, false);
+        seed(tenantId, userId, "superseded", RICH_PROFILE, null, false, false);
         assertThat(reader.loadForGrounding(tenantId, userId)).isEmpty();
 
         jdbc.update("DELETE FROM ab_agent_user_soul_profile WHERE tenant_id = ?", tenantId);
-        seed(tenantId, userId, "ARCHIVED", RICH_PROFILE, null, false, false);
+        seed(tenantId, userId, "archived", RICH_PROFILE, null, false, false);
         assertThat(reader.loadForGrounding(tenantId, userId)).isEmpty();
     }
 
     @Test
     @DisplayName("stale_flagged_at set → stale=true + warning line")
     void stale_appends_warning() {
-        seed(tenantId, userId, "ACTIVE", RICH_PROFILE, null, false, true);
+        seed(tenantId, userId, "active", RICH_PROFILE, null, false, true);
 
         Optional<UserSoulProfileReader.ProfileSection> section =
                 reader.loadForGrounding(tenantId, userId);
@@ -162,7 +162,7 @@ class UserSoulProfileReaderIntegrationTest extends BaseIntegrationTest {
     @DisplayName("edited_fields hides persona → persona line omitted")
     void edited_fields_hide() {
         String edited = "{\"persona\": \"hidden\"}";
-        seed(tenantId, userId, "ACTIVE", RICH_PROFILE, edited, false, false);
+        seed(tenantId, userId, "active", RICH_PROFILE, edited, false, false);
 
         Optional<UserSoulProfileReader.ProfileSection> section =
                 reader.loadForGrounding(tenantId, userId);
@@ -179,7 +179,7 @@ class UserSoulProfileReaderIntegrationTest extends BaseIntegrationTest {
     @DisplayName("edited_fields override_text → rendered text uses override")
     void edited_fields_override() {
         String edited = "{\"persona\": {\"override_text\": \"Overridden persona X\"}}";
-        seed(tenantId, userId, "ACTIVE", RICH_PROFILE, edited, false, false);
+        seed(tenantId, userId, "active", RICH_PROFILE, edited, false, false);
 
         String text = reader.loadForGrounding(tenantId, userId).orElseThrow().renderedPromptText();
         assertThat(text).contains("Overridden persona X");
@@ -190,7 +190,7 @@ class UserSoulProfileReaderIntegrationTest extends BaseIntegrationTest {
     @DisplayName("edited_fields hide wins over override")
     void hide_wins_over_override() {
         String edited = "{\"persona\": {\"override_text\": \"X\", \"hidden\": true}}";
-        seed(tenantId, userId, "ACTIVE", RICH_PROFILE, edited, false, false);
+        seed(tenantId, userId, "active", RICH_PROFILE, edited, false, false);
 
         String text = reader.loadForGrounding(tenantId, userId).orElseThrow().renderedPromptText();
         assertThat(text).doesNotContain("Persona:");
@@ -201,7 +201,7 @@ class UserSoulProfileReaderIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("Cross-tenant isolation: different tenant → empty")
     void tenant_isolation() {
-        seed(tenantId, userId, "ACTIVE", RICH_PROFILE, null, false, false);
+        seed(tenantId, userId, "active", RICH_PROFILE, null, false, false);
         Long otherTenant = tenantId + 99;
         assertThat(reader.loadForGrounding(otherTenant, userId)).isEmpty();
     }
@@ -209,7 +209,7 @@ class UserSoulProfileReaderIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("Cross-user isolation: user B query does not see user A's profile")
     void cross_user_isolation() {
-        seed(tenantId, userId, "ACTIVE", RICH_PROFILE, null, false, false);
+        seed(tenantId, userId, "active", RICH_PROFILE, null, false, false);
         assertThat(reader.loadForGrounding(tenantId, userId + "_other")).isEmpty();
     }
 
@@ -228,7 +228,7 @@ class UserSoulProfileReaderIntegrationTest extends BaseIntegrationTest {
         String huge = "{\"persona\": {\"text\": \"" + "x".repeat(2000) + "\"},"
                 + "\"preferences\": {\"communication_style\": {\"text\": \""
                 + "y".repeat(2000) + "\"}}}";
-        seed(tenantId, userId, "ACTIVE", huge, null, false, false);
+        seed(tenantId, userId, "active", huge, null, false, false);
 
         Optional<UserSoulProfileReader.ProfileSection> section =
                 reader.loadForGrounding(tenantId, userId);

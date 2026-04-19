@@ -71,7 +71,7 @@ class AgentRunSoulProfileInjectionIntegrationTest extends BaseIntegrationTest {
                 """;
         jdbc.update("INSERT INTO ab_agent_user_soul_profile " +
                 "(pid, tenant_id, user_id, version, status, profile, profile_hash, activated_at) " +
-                "VALUES (?, ?, ?, 1, 'ACTIVE', ?::jsonb, ?, ?)",
+                "VALUES (?, ?, ?, 1, 'active', ?::jsonb, ?, ?)",
                 UniqueIdGenerator.generate(), tid, uid, profile,
                 "h_" + System.nanoTime(), Timestamp.from(Instant.now()));
     }
@@ -139,7 +139,7 @@ class AgentRunSoulProfileInjectionIntegrationTest extends BaseIntegrationTest {
                 9, true, "tenant", null);
         jdbc.update("INSERT INTO ab_agent_user_soul_profile " +
                 "(pid, tenant_id, user_id, version, status, profile, profile_hash, hidden_at) " +
-                "VALUES (?, ?, ?, 1, 'ACTIVE', ?::jsonb, ?, ?)",
+                "VALUES (?, ?, ?, 1, 'active', ?::jsonb, ?, ?)",
                 UniqueIdGenerator.generate(), tenantId, testUser.getId().toString(),
                 "{\"persona\":{\"text\":\"hidden persona\"}}",
                 "h_" + System.nanoTime(), Timestamp.from(Instant.now()));
