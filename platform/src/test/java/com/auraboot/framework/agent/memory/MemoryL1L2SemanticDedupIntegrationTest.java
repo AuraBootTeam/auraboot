@@ -119,7 +119,8 @@ class MemoryL1L2SemanticDedupIntegrationTest extends BaseIntegrationTest {
                 vB, /*importance*/ 9, /*accessCount*/ 4);
 
         MemoryL1L2Promoter.PromotionSummary summary = promoter.handle(
-                new SessionEndedEvent(tenantId, runId, agentCode, userId));
+                new SessionEndedEvent(tenantId, runId, agentCode, userId,
+                        SessionEndedEvent.TerminalOutcome.SUCCEEDED));
 
         assertThat(summary.candidates()).isEqualTo(1);
         assertThat(summary.promoted()).isZero();
@@ -168,7 +169,8 @@ class MemoryL1L2SemanticDedupIntegrationTest extends BaseIntegrationTest {
                 vB, /*importance*/ 9, /*accessCount*/ 4);
 
         MemoryL1L2Promoter.PromotionSummary summary = promoter.handle(
-                new SessionEndedEvent(tenantId, runId, agentCode, userId));
+                new SessionEndedEvent(tenantId, runId, agentCode, userId,
+                        SessionEndedEvent.TerminalOutcome.SUCCEEDED));
 
         assertThat(summary.candidates()).isEqualTo(1);
         assertThat(summary.promoted()).isEqualTo(1);
@@ -211,7 +213,8 @@ class MemoryL1L2SemanticDedupIntegrationTest extends BaseIntegrationTest {
                 /*importance*/ 9, /*accessCount*/ 4);
 
         MemoryL1L2Promoter.PromotionSummary summary = promoter.handle(
-                new SessionEndedEvent(tenantId, runId, agentCode, userId));
+                new SessionEndedEvent(tenantId, runId, agentCode, userId,
+                        SessionEndedEvent.TerminalOutcome.SUCCEEDED));
 
         assertThat(summary.candidates()).isEqualTo(1);
         // With no embedding, semantic dedup is skipped and the row promotes

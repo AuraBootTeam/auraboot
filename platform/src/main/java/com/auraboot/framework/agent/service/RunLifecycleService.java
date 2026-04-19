@@ -11,6 +11,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -30,6 +31,7 @@ public class RunLifecycleService {
     private final AgentMemoryService memoryService;
     private final AgentObservationService observationService;
     private final LlmProviderFactory providerFactory;
+    private final JdbcTemplate jdbcTemplate;
 
     static final int DEFAULT_MAX_CONCURRENT_RUNS = 3;
     static final int HEARTBEAT_INTERVAL_SECONDS = 30;
@@ -105,6 +107,26 @@ public class RunLifecycleService {
     // =========================================================================
     // Failure handling
     // =========================================================================
+
+    /**
+     * Atomically claim the right to publish the single {@code SessionEndedEvent} for this run.
+     *
+     * <p>Implementation: UPDATE {@code session_ended_published_at} from NULL to NOW() for the
+     * given run pid. Returns true iff exactly one row was flipped — i.e. this caller is the
+     * first to reach a terminal state for this run. Subsequent terminal-state paths
+     * (e.g. a run that got flipped to 'cancelled' by an interrupt and then fails during
+     * teardown) see non-null and get a false return, so the event fires at most once per run.
+     *
+     * <p>Red-line compliance: no fallback / retry — if the UPDATE fails (DB down), the
+     * exception surfaces to the caller which then skips the publish rather than double-firing.
+     */
+    public boolean markSessionEndedPublished(String runPid) {
+        int updated = jdbcTemplate.update(
+                "UPDATE ab_agent_run SET session_ended_published_at = NOW() "
+                        + " WHERE pid = ? AND session_ended_published_at IS NULL",
+                runPid);
+        return updated == 1;
+    }
 
     void failRun(Long tenantId, String runPid, String taskPid, LocalDateTime startedAt, String error) {
         LocalDateTime now = LocalDateTime.now();

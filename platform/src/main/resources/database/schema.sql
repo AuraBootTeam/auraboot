@@ -4778,6 +4778,7 @@ CREATE TABLE IF NOT EXISTS ab_agent_run (
   resumed_from    VARCHAR(26),                    -- pid of previous Run if this is a resume
   timeout_at      TIMESTAMPTZ,                       -- When this run should be force-terminated
   hallucination_count INTEGER DEFAULT 0,           -- Consecutive non-existent tool calls
+  session_ended_published_at TIMESTAMPTZ,          -- Idempotency guard for SessionEndedEvent (memory L1->L2 promoter). Atomic flip from NULL -> NOW() on first terminal-state publish; second publish sees non-null and skips.
   created_at     TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   updated_at     TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   created_by     BIGINT,
