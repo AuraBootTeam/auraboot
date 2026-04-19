@@ -34,6 +34,7 @@ public class UserSoulProfileMetrics {
     public static final String STALE_FLAGGED_TOTAL = "auraboot_user_soul_profile_stale_flagged_total";
     public static final String USER_EDIT_TOTAL = "auraboot_user_soul_profile_user_edit_total";
     public static final String MANUAL_DERIVE_TOTAL = "auraboot_user_soul_profile_manual_derive_total";
+    public static final String ADMIN_FORGET_TOTAL = "auraboot_user_soul_profile_admin_forget_total";
 
     public static final String OUTCOME_DRAFTED = "drafted";
     public static final String OUTCOME_SKIPPED_NO_CHANGE = "skipped_no_change";
@@ -92,6 +93,24 @@ public class UserSoulProfileMetrics {
                 .description("User Soul Profile manual derive-now triggers per tenant + outcome")
                 .tag("tenant", tenantLabel(tenantId))
                 .tag("outcome", outcome == null ? "unknown" : outcome)
+                .register(registry)
+                .increment();
+    }
+
+    /**
+     * Record an admin-triggered forget-user cascade (PR-81 / Phase 9).
+     *
+     * <p>Cardinality: O(tenant × reason). Callers should normalise
+     * {@code reason} to a short bounded vocabulary (e.g. {@code gdpr_request},
+     * {@code account_closed}, {@code policy_violation}, {@code other})
+     * to keep the label set small. Null / blank values collapse to
+     * {@code "unspecified"}.
+     */
+    public void recordAdminForget(Long tenantId, String reason) {
+        Counter.builder(ADMIN_FORGET_TOTAL)
+                .description("User Soul Profile admin-triggered forget cascades per tenant + reason")
+                .tag("tenant", tenantLabel(tenantId))
+                .tag("reason", (reason == null || reason.isBlank()) ? "unspecified" : reason)
                 .register(registry)
                 .increment();
     }
