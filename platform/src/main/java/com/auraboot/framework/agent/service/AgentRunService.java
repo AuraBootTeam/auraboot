@@ -314,6 +314,12 @@ public class AgentRunService {
             // End trace with error
             try { aiTraceService.endTraceWithError(traceCtx, e.getMessage()); }
             catch (Exception traceEx) { log.debug("Failed to end trace for run {}: {}", runPid, traceEx.getMessage()); }
+            // Fire SessionEndedEvent on FAILED terminal state so any L1
+            // memories written before the failure still get promotion
+            // evaluation (otherwise they wait for the orphan cron and
+            // pollute OrphanBacklogGrowing alerts).
+            publishSessionEndedIfApplicable(tenantId, runPid, agentCode,
+                    SessionEndedEvent.TerminalOutcome.FAILED);
         } finally {
             currentTraceCtx.remove();
         }
@@ -492,17 +498,58 @@ public class AgentRunService {
                 runLifecycleService.saveRunMemory(tenantId, runPid, taskPid, result,
                         agentCode, taskTitle, providerCode, memModel);
 
-                // Fire SessionEndedEvent so MemoryL1L2Promoter can evaluate
-                // this run's L1 memories for promotion to L2. Design:
-                // docs/plans/2026-04/2026-04-19-memory-l1-l2-promotion-design.md §4.1.
-                // userId is taken from the current MetaContext user — may be
-                // null for system/cron runs, in which case the promoter only
-                // considers scope='tenant' L1 rows.
-                String userId = resolveCurrentUserId();
-                eventPublisher.publishEvent(new SessionEndedEvent(
-                        tenantId, runPid, agentCode, userId));
+                publishSessionEndedIfApplicable(tenantId, runPid, agentCode,
+                        SessionEndedEvent.TerminalOutcome.SUCCEEDED);
             }
         }
+    }
+
+    /**
+     * Shared terminal-state helper — publishes exactly one
+     * {@link SessionEndedEvent} per run regardless of which terminal path
+     * ({@code completeRun} / cancel / fail) reaches it first.
+     *
+     * <p>Design: {@code docs/plans/2026-04/2026-04-19-memory-l1-l2-promotion-design.md §4.1 / §6}.
+     * Cancelled and failed runs fire the event too so any L1
+     * {@code category='session'} rows they wrote before termination still
+     * reach the promoter — otherwise they would wait for the orphan cron and
+     * pollute {@code OrphanBacklogGrowing} alert noise.
+     *
+     * <p>Idempotency: uses {@code ab_agent_run.session_ended_published_at} as
+     * an atomic guard. The first caller flips NULL -> NOW() and publishes;
+     * any second caller (racy terminal-state handoff) sees non-null and
+     * returns without publishing. No fallback / retry — a DB error surfaces
+     * to the caller.
+     *
+     * <p>Called from both transactional success path and non-transactional
+     * exception catch; keep this method free of {@code @Transactional} so it
+     * does not interfere with either surrounding semantics.
+     *
+     * @param tenantId  non-null tenant
+     * @param runPid    non-null run pid
+     * @param agentCode non-null agent code (used by event listeners for metrics)
+     * @param outcome   terminal outcome label for metrics
+     */
+    void publishSessionEndedIfApplicable(Long tenantId, String runPid, String agentCode,
+                                         SessionEndedEvent.TerminalOutcome outcome) {
+        if (tenantId == null || runPid == null || agentCode == null || outcome == null) {
+            // Strict — callers must pass valid values. Missing agentCode on
+            // fail paths means the task row was never loaded, in which case
+            // there are no L1 memories tied to this runId anyway.
+            log.debug("publishSessionEndedIfApplicable: skipping, null field "
+                            + "(tenantId={} runPid={} agentCode={} outcome={})",
+                    tenantId, runPid, agentCode, outcome);
+            return;
+        }
+        boolean claimed = runLifecycleService.markSessionEndedPublished(runPid);
+        if (!claimed) {
+            log.debug("SessionEndedEvent already published for run {}, skipping ({})",
+                    runPid, outcome);
+            return;
+        }
+        String userId = resolveCurrentUserId();
+        eventPublisher.publishEvent(new SessionEndedEvent(
+                tenantId, runPid, agentCode, userId, outcome));
     }
 
     /**

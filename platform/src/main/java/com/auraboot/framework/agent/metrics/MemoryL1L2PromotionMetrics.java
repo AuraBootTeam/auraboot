@@ -40,6 +40,16 @@ public class MemoryL1L2PromotionMetrics {
      */
     public static final String LEADER_SKIPPED_TOTAL = "auraboot_memory_l1l2_leader_skipped_total";
 
+    /**
+     * Phase 4 (terminal-state fix 2026-04-19) — one increment per
+     * {@link com.auraboot.framework.agent.memory.SessionEndedEvent} received by
+     * the promoter, labelled by the run's terminal outcome
+     * {@code succeeded | cancelled | failed}. Lets alerting distinguish
+     * "session-end pipeline healthy" from "only success events are firing"
+     * (which was the pre-fix state — cancel/fail did not publish).
+     */
+    public static final String SESSION_ENDED_TOTAL = "auraboot_memory_tier_session_ended_total";
+
     public static final String OUTCOME_PROMOTED = "promoted";
     public static final String OUTCOME_SKIPPED_LOW_SCORE = "skipped_low_score";
     public static final String OUTCOME_SKIPPED_DUP = "skipped_dup";
@@ -129,6 +139,20 @@ public class MemoryL1L2PromotionMetrics {
                 .description("Scheduler ticks skipped because another instance holds the leader lease")
                 .tag("job_code", jobCode == null ? "unknown" : jobCode)
                 .tag("instance_id", instanceId == null ? "unknown" : instanceId)
+                .register(registry)
+                .increment();
+    }
+
+    /**
+     * Record one SessionEndedEvent received by the promoter listener. The
+     * {@code outcome} label is the lowercase {@link com.auraboot.framework.agent.memory.SessionEndedEvent.TerminalOutcome}
+     * name ({@code succeeded}, {@code cancelled}, {@code failed}).
+     */
+    public void recordSessionEnded(Long tenantId, String outcome) {
+        Counter.builder(SESSION_ENDED_TOTAL)
+                .description("SessionEndedEvent received by L1->L2 promoter, labelled by terminal outcome")
+                .tag("tenant", tenantId == null ? "unknown" : tenantId.toString())
+                .tag("outcome", outcome == null ? "unknown" : outcome)
                 .register(registry)
                 .increment();
     }

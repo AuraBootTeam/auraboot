@@ -111,16 +111,27 @@ Embedding 缺失（`MemoryEmbeddingService.resolveEmbedding` 返回 `null`，pro
 ## 事件路径
 
 ```
-AgentRunService.completeRun
+AgentRunService.doExecuteTask
         │
-        ├─ saveRunMemory(...)        ← L1 行落库（category='session'）
+        ├─ completeRun (success)  → saveRunMemory + publishSessionEndedIfApplicable(SUCCEEDED)
         │
-        └─ eventPublisher.publish(new SessionEndedEvent(tenantId, runId, agentCode, userId))
+        ├─ catch(Exception)       → failRun + publishSessionEndedIfApplicable(FAILED)
+        │
+        └─ InterruptDispatcher.cancelRun  → publishSessionEndedIfApplicable(CANCELLED)
+
+    publishSessionEndedIfApplicable:
+        markSessionEndedPublished(runPid)  // atomic NULL → NOW() guard
+            └─ if claimed → eventPublisher.publish(new SessionEndedEvent(
+                                tenantId, runId, agentCode, userId, outcome))
                 │
                 └─ MemoryL1L2Promoter.onSessionEnded  (@EventListener, @Transactional 同步)
+                        ├─ metrics.recordSessionEnded(tenantId, outcome)
                         └─ 对 (tenantId, runId) 范围内 importance ≥ 6 的 L1
                            逐条走 hash-dedup → semantic-dedup → score → promote 管道
 ```
+
+所有三种终态（SUCCEEDED / CANCELLED / FAILED）都会触发事件，Promoter 的推举管线对终态不感知——终态 label 只出现在
+`auraboot_memory_tier_session_ended_total{outcome}` 指标里，便于报警区分「推送管线健康」与「只有成功事件在触发」。
 
 **为什么同步 + 非 `@Async`**：Phase 2 刻意不加 `@Async`，原因有三：
 
