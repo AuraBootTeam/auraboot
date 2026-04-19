@@ -1,6 +1,6 @@
 # User Soul Profile — Subsystem Reference
 
-**Status**: Phases 1-6 shipped (PR-75 through PR-80). Live run + code review (Phase 7+) pending.
+**Status**: Phases 1-6 + Phase 9 shipped (PR-75 through PR-80, PR-81). Live run + code review (Phase 7+) pending.
 **Plan**: [2026-04-19 design](../plans/2026-04/2026-04-19-user-soul-profile-design.md)
 
 Per-user, dynamically-derived personalisation profile used to ground AuraBot responses. Distinct from `ab_agent_definition.soul_profile` (the **Agent** Soul Profile — manually authored per-agent persona) — this profile captures what the LLM should know about the **user**: persona, communication style, domain vocabulary, working hours, recurring habits, expertise, boundaries, preferred language.
@@ -80,6 +80,7 @@ User-facing (tenant + user scoped via `MetaContext`):
 GET  /api/user/soul-profile                   — own ACTIVE profile
 GET  /api/user/soul-profile/history           — own SUPERSEDED / ARCHIVED versions
 GET  /api/user/soul-profile/{pid}             — own specific version (404 if cross-user)
+GET  /api/user/soul-profile/export            — GDPR data portability (full JSON dump, Content-Disposition: attachment)
 POST /api/user/soul-profile/pin
 POST /api/user/soul-profile/hide
 POST /api/user/soul-profile/edit
@@ -94,7 +95,11 @@ Admin-facing returns **metadata only** (SQL explicitly excludes `profile`, `edit
 ```
 GET  /api/admin/user-soul-profiles            — paginated list
 GET  /api/admin/user-soul-profiles/stats      — counts + staleness + avg confidence
+POST /api/admin/user-soul-profiles/forget     — admin forget-user cascade ({userId, reason}; idempotent)
 ```
+
+The admin `/forget` endpoint delegates to `UserSoulProfileEditor.forgetProfile` (same cascade as the user's own `/forget`) and records
+`auraboot_user_soul_profile_admin_forget_total{tenant, reason}`. The response carries tombstone metadata only — no profile content.
 
 ## Mission Control UI
 
@@ -115,6 +120,8 @@ auraboot_user_soul_profile_user_edit_total{tenant, action}
   action ∈ {pin, hide, edit, reset, hide_profile, forget}
 auraboot_user_soul_profile_manual_derive_total{tenant, outcome}
   outcome ∈ {triggered, rate_limited}
+auraboot_user_soul_profile_admin_forget_total{tenant, reason}
+  reason ∈ {gdpr_request, account_closed, policy_violation, other, ...}
 auraboot_user_soul_profile_read_total{tenant}  (emitted by Reader)
 ```
 
@@ -168,6 +175,7 @@ auraboot_user_soul_profile_avg_confidence
 | 78 | 4 | REST controllers + gauges + Caffeine rate limiter |
 | 79 | 5 | Mission Control UI + mocked E2E |
 | 80 | 6 | Real-backend E2E + Grafana dashboard + alerts + this doc |
+| 81 | 9 | JSON export (GDPR portability) + admin forget-user cascade |
 
 ## Privacy boundary
 

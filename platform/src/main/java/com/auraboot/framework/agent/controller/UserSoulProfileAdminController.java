@@ -1,11 +1,16 @@
 package com.auraboot.framework.agent.controller;
 
+import com.auraboot.framework.agent.metrics.UserSoulProfileMetrics;
+import com.auraboot.framework.agent.service.UserSoulProfileEditor;
+import com.auraboot.framework.agent.service.UserSoulProfileEditor.EditResult;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -13,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Admin-facing User Soul Profile endpoints (plan §5.6 / PR-78).
@@ -35,10 +41,16 @@ public class UserSoulProfileAdminController {
     private static final String STATUS_ARCHIVED = "ARCHIVED";
 
     private final JdbcTemplate jdbcTemplate;
+    private final UserSoulProfileEditor editor;
+    private final UserSoulProfileMetrics metrics;
 
     @Autowired
-    public UserSoulProfileAdminController(JdbcTemplate jdbcTemplate) {
+    public UserSoulProfileAdminController(JdbcTemplate jdbcTemplate,
+                                          UserSoulProfileEditor editor,
+                                          UserSoulProfileMetrics metrics) {
         this.jdbcTemplate = jdbcTemplate;
+        this.editor = editor;
+        this.metrics = metrics;
     }
 
     // =========================================================================
@@ -110,5 +122,76 @@ public class UserSoulProfileAdminController {
         out.put("avg_confidence", avgConfidence == null ? 0.0d : avgConfidence);
         out.put("by_status", byStatus);
         return ApiResponse.ok(out);
+    }
+
+    // =========================================================================
+    // POST /forget — admin-triggered forget-user cascade (PR-81 / Phase 9)
+    // =========================================================================
+
+    /**
+     * Admin-triggered GDPR forget for another user's Soul Profile. Archives
+     * every live row and inserts a tombstone the deriver honours forever.
+     *
+     * <p>Body:
+     * <pre>{@code {"userId": "42", "reason": "gdpr_request"}}</pre>
+     *
+     * <p>Both fields are required. {@code reason} becomes a Prometheus label
+     * (counter {@code auraboot_user_soul_profile_admin_forget_total}) so
+     * callers should normalise to a short vocabulary
+     * ({@code gdpr_request}, {@code account_closed}, {@code policy_violation},
+     * {@code other}).
+     *
+     * <p>This endpoint deliberately does NOT expose the target user's
+     * profile content in the response — only the resulting tombstone pid /
+     * version / status metadata. The user-only {@code /export} endpoint
+     * remains the single content-visibility surface for Soul Profile data.
+     *
+     * <p>Idempotency: when the target user has no rows, returns
+     * {@code {"noop": true}} with 200. Repeated calls after a prior forget
+     * still succeed (Editor inserts a fresh tombstone version).
+     */
+    @PostMapping("/forget")
+    public ApiResponse<Map<String, Object>> forget(@RequestBody Map<String, Object> body) {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        String targetUserId = requireStringField(body, "userId");
+        String reason = requireStringField(body, "reason");
+        if (targetUserId == null) return ApiResponse.error(400, "userId required");
+        if (reason == null) return ApiResponse.error(400, "reason required");
+
+        String actingAdminId = Objects.toString(MetaContext.getCurrentUserId(), "unknown");
+        log.info("UserSoulProfileAdminController: admin={} forget target_user={} tenant={} reason={}",
+                actingAdminId, targetUserId, tenantId, reason);
+
+        try {
+            EditResult r = editor.forgetProfile(tenantId, targetUserId);
+            metrics.recordAdminForget(tenantId, reason);
+            Map<String, Object> out = new LinkedHashMap<>();
+            out.put("pid", r.pid());
+            out.put("version", r.version());
+            out.put("status", r.status());
+            out.put("noop", false);
+            out.put("target_user_id", targetUserId);
+            out.put("reason", reason);
+            return ApiResponse.ok(out);
+        } catch (IllegalArgumentException nothingToDo) {
+            // Editor throws when the user has no rows at all. Treat as noop
+            // 200 for idempotency + audit: the admin action was attempted,
+            // so we still record the metric.
+            metrics.recordAdminForget(tenantId, reason);
+            Map<String, Object> out = new LinkedHashMap<>();
+            out.put("noop", true);
+            out.put("message", "no profile to forget");
+            out.put("target_user_id", targetUserId);
+            out.put("reason", reason);
+            return ApiResponse.ok(out);
+        }
+    }
+
+    private static String requireStringField(Map<String, Object> body, String key) {
+        if (body == null) return null;
+        Object v = body.get(key);
+        if (v == null) return null;
+        String s = v.toString();
+        return s.isBlank() ? null : s;
     }
 }
