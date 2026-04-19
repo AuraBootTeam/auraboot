@@ -136,8 +136,12 @@ export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
     (blockType: BlockType) => {
       if (readonly) return;
 
+      // ID combines timestamp + random suffix to avoid same-millisecond
+      // collisions (rapid sequential addBlock calls in tests / drag-spam).
+      // Same-id blocks confuse SortableContext + React reconciliation,
+      // resulting in stale render order vs blocks[] state.
       const newBlock: DslBlock = {
-        id: `block_${Date.now()}`,
+        id: `block_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
         blockType,
         span: blockType === 'table' ? 12 : undefined,
       };
