@@ -928,9 +928,8 @@ test.describe('Phase 4 — Form BlocksDesigner E2E (widget config chain)', () =>
     const sections = blocks.filter(
       (b) => b.blockType === 'form-section' && b.title !== 'Placeholder',
     );
-    expect(sections.length, 'two added form-section blocks should exist').toBeGreaterThanOrEqual(
-      2,
-    );
+    // We added exactly 2 sections via UI; placeholder is filtered out.
+    expect(sections.length, 'two added form-section blocks must exist (Placeholder filtered)').toBe(2);
 
     // Aggregate persisted components across both sections.
     const persisted = new Map<string, string | undefined>();
