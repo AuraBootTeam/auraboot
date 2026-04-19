@@ -15,6 +15,23 @@ import java.util.Set;
  *
  * <p>Delegates to {@link CanonicalJsonHasher#sha256Canonical(Object)}
  * so we inherit deep map-key sorting and stable serialisation.
+ *
+ * <p><b>Canonical-order invariant</b> (verified by
+ * {@code ProfileHasherCanonicalOrderTest}):
+ * <ul>
+ *   <li>Map key order does not affect the hash at any nesting depth,
+ *       regardless of {@link java.util.Map} implementation
+ *       ({@link java.util.HashMap} / {@link java.util.LinkedHashMap} /
+ *       {@link java.util.TreeMap}). Keys are deep-sorted via
+ *       {@link java.util.TreeMap} + {@code ORDER_MAP_ENTRIES_BY_KEYS}
+ *       before serialisation.</li>
+ *   <li>List element order IS semantic — reordering entries of
+ *       {@code habits.recurring_actions[]} (or any other list) changes
+ *       the hash, because positional order carries behavioural meaning.</li>
+ *   <li>Mutable top-level ({@code meta}) and per-field
+ *       ({@code last_derived_at}, {@code derivation_run_id}) fields are
+ *       stripped before hashing at every nesting depth.</li>
+ * </ul>
  */
 public final class ProfileHasher {
 
