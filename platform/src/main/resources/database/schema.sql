@@ -7869,3 +7869,55 @@ ALTER TABLE ab_agent_memory_access_log
     FOREIGN KEY (memory_pid) REFERENCES ab_agent_memory(pid)
     ON DELETE CASCADE;
 
+-- ====================================================================
+-- PR-82 L1 -> L2 Memory Promotion (Phase 1) — schema additions
+-- Design: docs/plans/2026-04/2026-04-19-memory-l1-l2-promotion-design.md §5
+--
+-- Design intent: reuse ab_agent_memory.category as the lifecycle tier
+-- dimension (session = L1, user|agent = L2). This phase only adds
+-- companion columns for the scoring / dedup / promotion audit path.
+-- No dedicated 'tier' column is introduced — category already carries
+-- that semantic and adding a parallel field would violate the red-line
+-- "禁止 fallback / 自愈" by creating two sources of truth.
+-- ====================================================================
+
+ALTER TABLE ab_agent_memory ADD COLUMN IF NOT EXISTS content_hash CHAR(64);
+ALTER TABLE ab_agent_memory ADD COLUMN IF NOT EXISTS promoted_at TIMESTAMPTZ;
+ALTER TABLE ab_agent_memory ADD COLUMN IF NOT EXISTS promoted_from_run_id VARCHAR(26);
+ALTER TABLE ab_agent_memory ADD COLUMN IF NOT EXISTS score_snapshot JSONB;
+ALTER TABLE ab_agent_memory ADD COLUMN IF NOT EXISTS demoted_at TIMESTAMPTZ;
+ALTER TABLE ab_agent_memory ADD COLUMN IF NOT EXISTS demotion_count INTEGER NOT NULL DEFAULT 0;
+
+CREATE INDEX IF NOT EXISTS idx_agent_memory_content_hash
+    ON ab_agent_memory (tenant_id, scope, scope_key, content_hash)
+    WHERE (deleted_flag IS NULL OR deleted_flag = FALSE);
+
+CREATE INDEX IF NOT EXISTS idx_agent_memory_category_last_accessed
+    ON ab_agent_memory (category, last_accessed)
+    WHERE (deleted_flag IS NULL OR deleted_flag = FALSE);
+
+-- Audit trail for L1 <-> L2 tier transitions (and dedup hits).
+-- Separate from ab_agent_memory_promotion (scope promotion audit) because
+-- lifecycle promotion is automatic (no review gate) and mixing fields
+-- would force nullable columns on both sides.
+CREATE TABLE IF NOT EXISTS ab_agent_memory_tier_event (
+    id              BIGSERIAL PRIMARY KEY,
+    pid             VARCHAR(26) UNIQUE NOT NULL,
+    tenant_id       BIGINT NOT NULL,
+    memory_pid      VARCHAR(26) NOT NULL,
+    event_type      VARCHAR(20) NOT NULL,
+    dedup_mode      VARCHAR(10),
+    merged_into_pid VARCHAR(26),
+    score_snapshot  JSONB,
+    source_run_id   VARCHAR(26),
+    created_at      TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    created_by      BIGINT
+);
+
+CREATE INDEX IF NOT EXISTS idx_memory_tier_event_memory
+    ON ab_agent_memory_tier_event (memory_pid, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_memory_tier_event_tenant_type
+    ON ab_agent_memory_tier_event (tenant_id, event_type, created_at DESC);
+
+COMMENT ON TABLE ab_agent_memory_tier_event IS 'Audit trail for L1<->L2 tier transitions';
+
