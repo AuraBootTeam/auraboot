@@ -274,13 +274,9 @@ test.describe('BPM designer — D4: ruleTask + Drools routing', { tag: ['@bpm-re
     const processKey = `e2e_designer_rule_${TS}`;
 
     // -------------------------------------------------------------------------
-    // Auth
+    // Auth: API token (admin session preloaded via storageState)
     // -------------------------------------------------------------------------
-    await page.goto('/login');
-    await page.getByLabel(/email|邮箱/i).fill('admin@example.com');
-    await page.getByLabel(/password|密码/i).fill('Test2026x');
-    await page.getByRole('button', { name: /login|登录|sign in/i }).click();
-    await page.waitForURL(/\/(dashboard|home|p\/|dashboards)/, { timeout: 15_000 });
+    // Admin session preloaded via storageState (tests/storage/admin.json).
 
     const adminToken = await loginAs(request, 'admin@example.com', 'Test2026x');
 
@@ -501,12 +497,8 @@ test.describe('BPM designer — D4: ruleTask + Drools routing', { tag: ['@bpm-re
   }) => {
     const processKey = `e2e_designer_rule_api_${TS}`;
 
-    // Auth
-    await page.goto('/login');
-    await page.getByLabel(/email|邮箱/i).fill('admin@example.com');
-    await page.getByLabel(/password|密码/i).fill('Test2026x');
-    await page.getByRole('button', { name: /login|登录|sign in/i }).click();
-    await page.waitForURL(/\/(dashboard|home|p\/|dashboards)/, { timeout: 15_000 });
+    // Auth: API token (admin session preloaded via storageState)
+    // Admin session preloaded via storageState (tests/storage/admin.json).
 
     const adminToken = await loginAs(request, 'admin@example.com', 'Test2026x');
 
