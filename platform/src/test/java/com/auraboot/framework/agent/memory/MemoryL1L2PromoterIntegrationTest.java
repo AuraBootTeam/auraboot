@@ -251,6 +251,61 @@ class MemoryL1L2PromoterIntegrationTest extends BaseIntegrationTest {
     }
 
     // ------------------------------------------------------------------
+    // 7) Round-2 review — race path writes a dedup_skipped audit row.
+    //
+    // We drive the race directly on promoteCandidate(): load a candidate row
+    // (representing the state MemoryL1L2Promoter#handle observed during its
+    // SELECT), then flip the DB row to category='user' out-of-band before
+    // invoking promoteCandidate. The atomic UPDATE (WHERE category='session')
+    // will match 0 rows, triggering the race branch.
+    // ------------------------------------------------------------------
+    @Test
+    void racePath_updateReturnsZero_writesDedupSkippedAuditWithModeRace() {
+        Long tenantId = getTestTenant().getId();
+        String agentCode = TEST_PREFIX + "agent_" + UniqueIdGenerator.generate();
+        String userId = String.valueOf(getTestUser().getId());
+        String runId = UniqueIdGenerator.generate();
+
+        String content = TEST_PREFIX + "race " + UniqueIdGenerator.generate()
+                + " — concurrent promoter must not double-promote";
+        String pid = insertL1(tenantId, agentCode, userId, runId, content,
+                /*importance*/ 9, /*accessCount*/ 3);
+
+        // Snapshot the row as handle() would have done.
+        Map<String, Object> row = jdbcTemplate.queryForMap(
+                "SELECT pid, memory_agent_id, memory_type, memory_title, memory_content, "
+                        + "       importance, access_count, created_at, scope, scope_key, "
+                        + "       embedding "
+                        + "  FROM ab_agent_memory WHERE pid = ?",
+                pid);
+
+        // Simulate a concurrent promoter winning the race: flip category to
+        // user under us. No content_hash here — that forces promoteCandidate's
+        // hash-dedup probe to miss and its atomic UPDATE (WHERE category=
+        // 'session') to match 0 rows.
+        jdbcTemplate.update(
+                "UPDATE ab_agent_memory "
+                        + "   SET category = 'user', promoted_at = NOW() "
+                        + " WHERE pid = ?",
+                pid);
+
+        MemoryL1L2Promoter.Outcome outcome = promoter.promoteCandidate(
+                tenantId, runId, row, java.time.Instant.now());
+
+        assertThat(outcome).isEqualTo(MemoryL1L2Promoter.Outcome.DEDUP_HIT);
+
+        // Audit invariant (Round-2 review): one row must exist, tagged race.
+        Map<String, Object> audit = jdbcTemplate.queryForMap(
+                "SELECT event_type, dedup_mode, merged_into_pid, source_run_id "
+                        + "  FROM ab_agent_memory_tier_event WHERE memory_pid = ?",
+                pid);
+        assertThat(audit.get("event_type")).isEqualTo("dedup_skipped");
+        assertThat(audit.get("dedup_mode")).isEqualTo("race");
+        assertThat(audit.get("merged_into_pid")).isNull();
+        assertThat(audit.get("source_run_id")).isEqualTo(runId);
+    }
+
+    // ------------------------------------------------------------------
     // 6) Spring event bus wiring — publishing the event reaches the listener.
     // ------------------------------------------------------------------
     @Test
