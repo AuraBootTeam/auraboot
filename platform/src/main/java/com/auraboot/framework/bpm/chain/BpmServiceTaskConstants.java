@@ -24,6 +24,12 @@ public final class BpmServiceTaskConstants {
     /** Spring bean name used as {@code smart:class} for the HTTP delegate. */
     public static final String BEAN_HTTP_DELEGATE = "httpServiceTaskDelegate";
 
+    /** Spring bean name used as {@code smart:class} for the record-update delegate. */
+    public static final String BEAN_RECORD_UPDATE_DELEGATE = "recordUpdateServiceTaskDelegate";
+
+    /** Designer node type for a serviceTask that updates a single record field. */
+    public static final String NODE_TYPE_RECORD_UPDATE_TASK = "record-update-task";
+
     // ==================== smart:* extension attributes ====================
 
     public static final String ATTR_RULE_CODE = "ruleCode";
@@ -37,6 +43,12 @@ public final class BpmServiceTaskConstants {
     public static final String ATTR_METHOD = "method";
     public static final String ATTR_RESPONSE_VAR = "responseVar";
     public static final String ATTR_TIMEOUT_MS = "timeoutMs";
+
+    // record-update-task attributes
+    public static final String ATTR_MODEL_CODE = "modelCode";
+    public static final String ATTR_RECORD_ID_VAR = "recordIdVar";
+    public static final String ATTR_FIELD_NAME = "fieldName";
+    public static final String ATTR_FIELD_VALUE = "fieldValue";
 
     private BpmServiceTaskConstants() {
         // no instances
