@@ -111,7 +111,9 @@ class UserSoulProfileControllerIntegrationTest extends BaseIntegrationTest {
         assertThat(r.getData().get("pid")).isEqualTo(pid);
         assertThat(r.getData().get("version")).isEqualTo(2);
         assertThat(r.getData().get("status")).isEqualTo("ACTIVE");
-        assertThat(r.getData().get("profile_json")).asString().contains("engineer");
+        // Controller parses profile::text → profile (object) and removes profile_json.
+        assertThat(r.getData().get("profile_json")).as("raw JSON-string key should be removed").isNull();
+        assertThat(r.getData().get("profile")).asString().contains("engineer");
     }
 
     @Test
@@ -214,6 +216,28 @@ class UserSoulProfileControllerIntegrationTest extends BaseIntegrationTest {
     @DisplayName("POST /pin 404 when no profile exists")
     void pin_noProfile_404() {
         assertThat(controller.pin(Map.of("field", "persona")).getCode()).isEqualTo("404");
+    }
+
+    @Test
+    @DisplayName("POST /pin /hide /edit /reset return 409 when only SUPERSEDED rows exist")
+    void edits_supersededOnly_409() {
+        // Only a SUPERSEDED row — no ACTIVE/DRAFT. All four mutation endpoints
+        // must surface IllegalStateException as HTTP 409 via the controller's
+        // invokeEditor branch (which maps IllegalStateException → 409).
+        seedSuperseded(tenantId, userId, 1);
+
+        ApiResponse<Map<String, Object>> pin = controller.pin(Map.of("field", "persona"));
+        assertThat(pin.getCode()).isEqualTo("409");
+        assertThat(pin.getMessage()).contains("cannot edit superseded profile");
+
+        ApiResponse<Map<String, Object>> hide = controller.hide(Map.of("field", "persona"));
+        assertThat(hide.getCode()).isEqualTo("409");
+
+        ApiResponse<Map<String, Object>> edit = controller.edit(Map.of("field", "persona", "text", "x"));
+        assertThat(edit.getCode()).isEqualTo("409");
+
+        ApiResponse<Map<String, Object>> reset = controller.reset(Map.of("field", "persona"));
+        assertThat(reset.getCode()).isEqualTo("409");
     }
 
     @Test

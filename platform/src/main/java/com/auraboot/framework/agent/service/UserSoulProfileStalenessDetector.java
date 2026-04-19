@@ -34,13 +34,13 @@ public class UserSoulProfileStalenessDetector {
 
     static final long LOCK_KEY = 7308L;
     private static final String DEFAULT_PROVIDER = "openai";
-    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final JdbcTemplate jdbcTemplate;
     private final MemoryEmbeddingService memoryEmbeddingService;
     private final EmbeddingService embeddingService;
     private final UserSoulProfileMetrics metrics;
     private final TransactionTemplate transactionTemplate;
+    private final ObjectMapper objectMapper;
 
     @Value("${acp.user.soul-profile.staleness.enabled:false}")
     private boolean enabled;
@@ -61,12 +61,14 @@ public class UserSoulProfileStalenessDetector {
                                             MemoryEmbeddingService memoryEmbeddingService,
                                             EmbeddingService embeddingService,
                                             UserSoulProfileMetrics metrics,
-                                            PlatformTransactionManager transactionManager) {
+                                            PlatformTransactionManager transactionManager,
+                                            ObjectMapper objectMapper) {
         this.jdbcTemplate = jdbcTemplate;
         this.memoryEmbeddingService = memoryEmbeddingService;
         this.embeddingService = embeddingService;
         this.metrics = metrics;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
+        this.objectMapper = objectMapper;
     }
 
     @Scheduled(cron = "${acp.user.soul-profile.staleness.cron:0 30 4 * * *}")
@@ -116,7 +118,7 @@ public class UserSoulProfileStalenessDetector {
             String userId = (String) row.get("user_id");
             String profileJson = (String) row.get("profile_json");
 
-            String profileText = extractProfileText(profileJson);
+            String profileText = extractProfileText(profileJson, objectMapper);
             if (profileText == null || profileText.isBlank()) {
                 log.debug("StalenessDetector: pid {} has no persona/preferences text, skipping", pid);
                 continue;
@@ -184,11 +186,11 @@ public class UserSoulProfileStalenessDetector {
      * Extract the persona + preferences free-text for embedding. Tombstone
      * / empty profiles return null → caller skips.
      */
-    static String extractProfileText(String profileJson) {
+    static String extractProfileText(String profileJson, ObjectMapper mapper) {
         if (profileJson == null || profileJson.isBlank()) return null;
         Map<String, Object> profile;
         try {
-            profile = MAPPER.readValue(profileJson, new TypeReference<>() {});
+            profile = mapper.readValue(profileJson, new TypeReference<>() {});
         } catch (JsonProcessingException e) {
             // Explicit validation: profile column should always be a JSON
             // object. Corrupt rows must not silently pass.

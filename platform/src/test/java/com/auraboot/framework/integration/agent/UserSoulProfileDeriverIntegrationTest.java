@@ -104,6 +104,10 @@ class UserSoulProfileDeriverIntegrationTest extends BaseIntegrationTest {
         }
         DerivationResult first = deriver.deriveForUser(tenantId, userId);
         assertThat(first.outcome()).isEqualTo(Outcome.DRAFTED);
+        String firstHash = jdbc.queryForObject(
+                "SELECT profile_hash FROM ab_agent_user_soul_profile WHERE pid = ?",
+                String.class, first.profilePid());
+        assertThat(firstHash).isNotBlank();
 
         // Promote DRAFT → ACTIVE so second run sees prior hash.
         jdbc.update("UPDATE ab_agent_user_soul_profile SET status = 'ACTIVE', activated_at = NOW() "
@@ -111,6 +115,42 @@ class UserSoulProfileDeriverIntegrationTest extends BaseIntegrationTest {
 
         DerivationResult second = deriver.deriveForUser(tenantId, userId);
         assertThat(second.outcome()).isEqualTo(Outcome.SKIPPED_NO_CHANGE);
+        // ProfileHasher must produce byte-identical output for the same inputs —
+        // the second run's computed hash (returned as profileHash on skip) must
+        // equal the persisted first-run hash.
+        assertThat(second.profileHash()).isEqualTo(firstHash);
+
+        Long rows = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM ab_agent_user_soul_profile WHERE tenant_id = ? AND user_id = ?",
+                Long.class, tenantId, userId);
+        assertThat(rows).isEqualTo(1L);
+    }
+
+    @Test
+    @DisplayName("ProfileHasher idempotency: identical inputs produce identical hashes across back-to-back runs")
+    void profileHasherIdempotentAcrossRuns() {
+        for (int i = 1; i <= 5; i++) {
+            seedMemory("m" + i, "profile", "t" + i, "concise bullet " + i, 8);
+        }
+        // Run 1 — produces DRAFT.
+        DerivationResult first = deriver.deriveForUser(tenantId, userId);
+        assertThat(first.outcome()).isEqualTo(Outcome.DRAFTED);
+        String firstHash = jdbc.queryForObject(
+                "SELECT profile_hash FROM ab_agent_user_soul_profile WHERE pid = ?",
+                String.class, first.profilePid());
+
+        // Promote DRAFT → ACTIVE so run 2 compares against a prior ACTIVE row.
+        jdbc.update("UPDATE ab_agent_user_soul_profile SET status = 'ACTIVE', activated_at = NOW() "
+                + "WHERE pid = ?", first.profilePid());
+
+        // Run 2 — same seeded memories, no changes → must skip, hash must match.
+        DerivationResult second = deriver.deriveForUser(tenantId, userId);
+        assertThat(second.outcome()).isEqualTo(Outcome.SKIPPED_NO_CHANGE);
+        assertThat(second.profileHash())
+                .as("ProfileHasher must be deterministic for identical inputs")
+                .isEqualTo(firstHash);
+
+        // Exactly one persisted row — no duplicate DRAFT inserted.
         Long rows = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM ab_agent_user_soul_profile WHERE tenant_id = ? AND user_id = ?",
                 Long.class, tenantId, userId);
