@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import com.auraboot.framework.integration.TestIdGenerator;
 
 /** PR-78 — gauges reflect row counts and confidence mean. */
 @Commit
@@ -30,7 +31,7 @@ class UserSoulProfileGaugesIntegrationTest extends BaseIntegrationTest {
 
     @BeforeEach
     void setup() {
-        tenantId = 9_820_000L + System.nanoTime() % 10_000;
+        tenantId = TestIdGenerator.uniqueTenantId();
         userId = "gx_" + Long.toString(System.nanoTime() & 0xffff, 36);
     }
 

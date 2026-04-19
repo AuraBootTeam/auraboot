@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import com.auraboot.framework.integration.TestIdGenerator;
 
 /** PR-76 Phase 2 — {@link UserSoulProfileActivator}. */
 @Commit
@@ -35,7 +36,7 @@ class UserSoulProfileActivatorIntegrationTest extends BaseIntegrationTest {
 
     @BeforeEach
     void setup() {
-        tenantId = 9_770_000L + System.nanoTime() % 10_000;
+        tenantId = TestIdGenerator.uniqueTenantId();
         userId = "ua_" + Long.toString(System.nanoTime() & 0xffff, 36);
         ReflectionTestUtils.setField(activator, "enabled", true);
         ReflectionTestUtils.setField(activator, "shadowPeriodHours", 24);

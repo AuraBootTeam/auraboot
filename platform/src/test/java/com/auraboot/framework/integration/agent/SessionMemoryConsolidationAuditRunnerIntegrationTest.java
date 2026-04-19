@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import com.auraboot.framework.integration.TestIdGenerator;
 
 @Commit
 @Transactional(propagation = Propagation.NEVER)
@@ -31,7 +32,7 @@ class SessionMemoryConsolidationAuditRunnerIntegrationTest extends BaseIntegrati
 
     @BeforeEach
     void setup() {
-        tenantId = 9_794_000L + System.nanoTime() % 10_000;
+        tenantId = TestIdGenerator.uniqueTenantId();
         agentCode = "audit-test-" + System.nanoTime();
     }
 
