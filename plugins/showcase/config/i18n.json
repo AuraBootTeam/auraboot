@@ -28,7 +28,6 @@
   { "key": "model.showcase_all_fields.sc_assignee.label", "zh-CN": "负责人", "en-US": "Assignee", "source": "import", "refType": "field" },
   { "key": "model.showcase_all_fields.sc_team_members.label", "zh-CN": "团队成员", "en-US": "Team Members", "source": "import", "refType": "field" },
   { "key": "model.showcase_all_fields.sc_department.label", "zh-CN": "所属部门", "en-US": "Department", "source": "import", "refType": "field" },
-  { "key": "model.showcase_all_fields.sc_location.label", "zh-CN": "地理位置", "en-US": "Location", "source": "import", "refType": "field" },
   { "key": "model.showcase_all_fields.sc_budget.label", "zh-CN": "预算金额", "en-US": "Budget", "source": "import", "refType": "field" },
   { "key": "model.showcase_all_fields.sc_time_slot.label", "zh-CN": "时间点", "en-US": "Time Slot", "source": "import", "refType": "field" },
   { "key": "model.showcase_all_fields.sc_date_range.label", "zh-CN": "日期范围", "en-US": "Date Range", "source": "import", "refType": "field" },

@@ -1,9 +1,10 @@
 /**
  * Showcase Smart Components — E2E Test
  *
- * Tests the 11 new Smart Component field types added to `showcase_all_fields`:
+ * Tests the 10 new Smart Component field types added to `showcase_all_fields`:
  * cascadeselect, treeselect, userselect, memberpicker, organizationselect,
- * coordinatespicker, moneyinput, timepicker, daterange, timerangepicker, aifield.
+ * moneyinput, timepicker, daterange, timerangepicker, aifield.
+ * (B9 coordinatespicker removed 2026-04-19 — no map SDK shipped.)
  *
  * Coverage dimensions:
  * D1  Menu Navigation — sidebar click to list → create form
@@ -176,10 +177,7 @@ test.describe('Showcase Smart Components', () => {
     const dept = field(page, 'sc_department');
     await expect(dept).toBeVisible({ timeout: 5_000 });
 
-    // 6. CoordinatesPicker — should exist
-    const location = field(page, 'sc_location');
-    await location.scrollIntoViewIfNeeded();
-    await expect(location).toBeVisible({ timeout: 5_000 });
+    // 6. (removed) CoordinatesPicker — B9 widget retired 2026-04-19.
 
     // 7. MoneyInput — should have an <input> with currency symbol "¥"
     const budget = field(page, 'sc_budget');

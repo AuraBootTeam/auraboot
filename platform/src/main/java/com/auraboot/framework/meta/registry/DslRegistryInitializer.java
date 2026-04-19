@@ -128,7 +128,6 @@ public class DslRegistryInitializer {
         reg.register(new RenderComponentRegistry.ComponentMeta("userselect", "platform", List.of("string", "reference"), "selection"));
         reg.register(new RenderComponentRegistry.ComponentMeta("memberpicker", "platform", List.of("string", "reference"), "selection"));
         reg.register(new RenderComponentRegistry.ComponentMeta("organizationselect", "platform", List.of("string", "reference"), "selection"));
-        reg.register(new RenderComponentRegistry.ComponentMeta("coordinatespicker", "platform", List.of("string", "json"), "advanced"));
         reg.register(new RenderComponentRegistry.ComponentMeta("aifield", "platform", List.of("string", "text"), "advanced"));
         reg.register(new RenderComponentRegistry.ComponentMeta("addressfield", "platform", List.of("string", "json"), "advanced"));
         reg.register(new RenderComponentRegistry.ComponentMeta("richtext", "platform", List.of("text", "string"), "input"));

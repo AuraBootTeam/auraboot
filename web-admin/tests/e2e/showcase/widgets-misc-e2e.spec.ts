@@ -1,13 +1,14 @@
 /**
  * GA Phase B5 — Misc widgets E2E (Designer → ui_schema → Runtime round-trip).
  *
- * Scope: 13 "miscellaneous" widgets that don't fit the B1-B4 buckets (text,
+ * Scope: 12 "miscellaneous" widgets that don't fit the B1-B4 buckets (text,
  * number, choice, date). These span boolean, file/json/string/text with
  * specialised extension contracts — switch, checkbox, file, upload, image,
  * avatar, fileattachment, colorpicker, userselect, memberpicker,
- * organizationselect, coordinatespicker, addressfield, aifield.
+ * organizationselect, addressfield, aifield. (B9 coordinatespicker removed
+ * 2026-04-19 — product decision not to ship a real map SDK.)
  *
- * Coverage matrix (14 widget rows, 13 logical buckets — upload/file are
+ * Coverage matrix (13 widget rows, 12 logical buckets — upload/file are
  * aliases on the same dataType=file field, tested on separate fields):
  *
  *   field                     widget              dataType  notes
@@ -23,7 +24,6 @@
  *   sc_assignee               userselect          string    single user ref
  *   sc_team_members           memberpicker        string    multi-member
  *   sc_department             organizationselect  string    org hierarchy
- *   sc_location               coordinatespicker   json      mock map (BUG-6 deferred)
  *   sc_address                addressfield        string    china-regions native
  *   sc_ai_summary             aifield             text      AI-driven
  *
@@ -34,7 +34,7 @@
  * from the dropdown the row is recorded as a `skip` and the hit threshold
  * is enforced only against the *available* widgets for the current registry.
  *
- * The hard floor is 10 hits out of the 13 core widgets (checkbox alias and
+ * The hard floor is 9 hits out of the 12 core widgets (checkbox alias and
  * upload/image/avatar fallbacks excluded from the floor, since they overlap
  * other rows on the same field). Every bucket that the test expects to hit
  * must have at least one persisted component.
@@ -294,7 +294,7 @@ async function fetchSavedBlocks(page: Page, pid: string): Promise<any[]> {
 const createdPagePids: string[] = [];
 
 test.describe('GA B5 — Misc widgets E2E (Designer → ui_schema chain)', () => {
-  // 13 widgets × (select field → wait dataType → choose widget → back) is
+  // 12 widgets × (select field → wait dataType → choose widget → back) is
   // roughly 60s of UI work; grant 120s headroom like P4.5 (which did 14 rows
   // in 90s). Individual locator timeouts are still ≤5s.
   test.setTimeout(120_000);
@@ -307,9 +307,9 @@ test.describe('GA B5 — Misc widgets E2E (Designer → ui_schema chain)', () =>
   });
 
   // -------------------------------------------------------------------------
-  // B5.1 — configure all 13 misc widgets and verify ui_schema persistence.
+  // B5.1 — configure all 12 misc widgets and verify ui_schema persistence.
   // -------------------------------------------------------------------------
-  test('B5.1: configure 13 misc widgets across boolean/file/string/json/text buckets', async ({
+  test('B5.1: configure 12 misc widgets across boolean/file/string/json/text buckets', async ({
     page,
   }) => {
     const pageKey = uniquePageKey();
@@ -318,11 +318,11 @@ test.describe('GA B5 — Misc widgets E2E (Designer → ui_schema chain)', () =>
 
     await navigateToDesignerViaMenu(page, pid, pageKey);
 
-    // 10 unique fields across two sections (FormSectionPreview caps each
+    // 9 unique fields across two sections (FormSectionPreview caps each
     // section at 8 field previews — see P4.5 comment). Widget aliases tested
     // on the *same* field (checkbox after switch on sc_is_active, upload/image
     // after file on sc_attachment_file, avatar after colorpicker on sc_color)
-    // reuse the preview, so 10 unique fields = 7 + 3 split.
+    // reuse the preview, so 9 unique fields = 7 + 2 split.
     await addBlockViaPalette(page, 'form-section');
     await addBlockViaPalette(page, 'form-section');
 
@@ -342,10 +342,9 @@ test.describe('GA B5 — Misc widgets E2E (Designer → ui_schema chain)', () =>
       'sc_department', // organizationselect (string)
     ]);
 
-    // Section 2: 3 fields
+    // Section 2: 2 fields (B9 coordinatespicker removed 2026-04-19)
     await outlineButtons.nth(1).click();
     await addFieldsToSelectedBlock(page, [
-      'sc_location', // coordinatespicker (json)
       'sc_address', // addressfield (string)
       'sc_ai_summary', // aifield (text)
     ]);
@@ -382,7 +381,7 @@ test.describe('GA B5 — Misc widgets E2E (Designer → ui_schema chain)', () =>
     //     trace, since saved-component=undefined indicates the chain breaks
     //     for json-bucketed fields whose dataType resolves wrong. We
     //     downgrade sc_attachment to a best-effort alias to keep the floor
-    //     honest, and rely on sc_location (also json) to prove json works.
+    //     honest. (json bucket is now best-effort only after B9 removal.)
     const primaryPlan: Row[] = [
       { field: 'sc_is_active', widget: 'switch', bucket: 'boolean', section: 0 },
       { field: 'sc_attachment_file', widget: 'upload', bucket: 'file', section: 0 },
@@ -390,7 +389,7 @@ test.describe('GA B5 — Misc widgets E2E (Designer → ui_schema chain)', () =>
       { field: 'sc_assignee', widget: 'userselect', bucket: 'string', section: 0 },
       { field: 'sc_team_members', widget: 'memberpicker', bucket: 'string', section: 0 },
       { field: 'sc_department', widget: 'organizationselect', bucket: 'string', section: 0 },
-      { field: 'sc_location', widget: 'coordinatespicker', bucket: 'json', section: 1 },
+      // B9 coordinatespicker removed 2026-04-19 (no map SDK shipped)
       { field: 'sc_address', widget: 'addressfield', bucket: 'string', section: 1 },
       { field: 'sc_ai_summary', widget: 'aifield', bucket: 'text', section: 1 },
     ];
@@ -424,7 +423,7 @@ test.describe('GA B5 — Misc widgets E2E (Designer → ui_schema chain)', () =>
       // (no override needed when the field's default already matches), but it
       // would fail an exact-match equality assertion. The chain is exercised
       // by sc_attachment_file/upload (file dataType, fileattachment present
-      // in dropdown) and sc_location/coordinatespicker (json dataType).
+      // in dropdown).
     ];
 
     type TraceRow = {
@@ -589,13 +588,14 @@ test.describe('GA B5 — Misc widgets E2E (Designer → ui_schema chain)', () =>
     console.log('[B5.1] alias results:', aliasResults.join('  '));
 
     // --- Assertions ---
-    // 1. Hard floor: 9/9 primary widgets must round-trip. Every widget in
+    // 1. Hard floor: 8/8 primary widgets must round-trip. Every widget in
     //    the primary plan has a designer registry entry AND surfaces in the
     //    bucket dropdown empirically — any miss here is a real chain break.
+    //    (Was 9/9 before B9 coordinatespicker removal 2026-04-19.)
     expect(
       primaryHits.length,
-      `primary widget chain coverage too low: ${primaryHits.length}/9, misses=\n  ${primaryMisses.join('\n  ')}`,
-    ).toBeGreaterThanOrEqual(9);
+      `primary widget chain coverage too low: ${primaryHits.length}/8, misses=\n  ${primaryMisses.join('\n  ')}`,
+    ).toBeGreaterThanOrEqual(8);
 
     // 2. Bucket coverage: every bucket in primaryPlan has at least one hit.
     const bucketsCovered = new Set(

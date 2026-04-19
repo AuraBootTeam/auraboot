@@ -261,7 +261,7 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
   // display the raw value as text instead of loading the interactive component.
   const READONLY_TEXT_COMPONENTS = [
     'cascadeselect', 'treeselect', 'userselect', 'memberpicker',
-    'organizationselect', 'coordinatespicker', 'addressfield',
+    'organizationselect', 'addressfield',
   ];
   const shouldRenderAsText =
     isReadOnly &&
