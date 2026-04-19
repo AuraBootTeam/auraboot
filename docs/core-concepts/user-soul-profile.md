@@ -1,7 +1,8 @@
 # User Soul Profile — Subsystem Reference
 
-**Status**: Phases 1-6 + Phase 9 shipped (PR-75 through PR-80, PR-81). Live run + code review (Phase 7+) pending.
+**Status**: Phases 1-9 shipped; design for L1→L2 landed.
 **Plan**: [2026-04-19 design](../plans/2026-04/2026-04-19-user-soul-profile-design.md)
+**Follow-up design**: [Memory L1→L2 promotion](../plans/2026-04/2026-04-19-memory-l1-l2-promotion-design.md)
 
 Per-user, dynamically-derived personalisation profile used to ground AuraBot responses. Distinct from `ab_agent_definition.soul_profile` (the **Agent** Soul Profile — manually authored per-agent persona) — this profile captures what the LLM should know about the **user**: persona, communication style, domain vocabulary, working hours, recurring habits, expertise, boundaries, preferred language.
 
@@ -176,6 +177,16 @@ auraboot_user_soul_profile_avg_confidence
 | 79 | 5 | Mission Control UI + mocked E2E |
 | 80 | 6 | Real-backend E2E + Grafana dashboard + alerts + this doc |
 | 81 | 9 | JSON export (GDPR portability) + admin forget-user cascade |
+
+### Follow-up fixes (post-merge, bundled)
+
+Round-1 review fixes + enum migration were not separate PRs; these commits land on top of the Phase 1-9 merges:
+
+| Commit | Scope |
+|--------|-------|
+| `2cf6c6e2` | fix: SUPERSEDED edit rejection + ObjectMapper DI + idempotency test |
+| `743c935b` | refactor: status enum lowercase (DB values standardised per red line) |
+| `5102a5a6` | fix: Reader `readJson` no silent fallback + `byPid` excludes ARCHIVED |
 
 ## Privacy boundary
 
