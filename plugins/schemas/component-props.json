@@ -312,21 +312,6 @@
       ],
       "since": "1.0"
     },
-    "coordinatespicker": {
-      "code": "coordinatespicker",
-      "label": "Coordinates Picker",
-      "category": "input",
-      "compatibleDataTypes": ["json", "string"],
-      "props": [
-        { "name": "label", "type": "string", "required": true, "description": "Field label" },
-        { "name": "name", "type": "string", "required": true, "description": "Field name" },
-        { "name": "required", "type": "boolean", "required": false, "default": false, "description": "Whether field is required" },
-        { "name": "disabled", "type": "boolean", "required": false, "default": false, "description": "Whether field is disabled" },
-        { "name": "defaultCenter", "type": "object", "required": false, "description": "Default map center {lat, lng}" },
-        { "name": "zoom", "type": "number", "required": false, "default": 13, "description": "Default map zoom level" }
-      ],
-      "since": "1.0"
-    },
     "cascadeselect": {
       "code": "cascadeselect",
       "label": "Cascade Select",

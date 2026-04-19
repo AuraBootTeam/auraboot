@@ -3,7 +3,10 @@
  *
  * Call `registerAllWidgets()` once at app bootstrap (e.g. in StudioProvider or
  * the Page Designer entry point) to populate the WidgetRegistry singleton with
- * all 29 built-in widget definitions.
+ * all 28 built-in widget definitions.
+ *
+ * NOTE: B9 `coordinatespicker` widget was removed 2026-04-19 — product decision
+ * not to ship a real map SDK; the prior mock runtime was confusing.
  *
  * @since 4.3.0
  */
@@ -37,7 +40,6 @@ import { treeselectWidget } from './treeselect';
 import { userselectWidget } from './userselect';
 import { memberpickerWidget } from './memberpicker';
 import { organizationselectWidget } from './organizationselect';
-import { coordinatespickerWidget } from './coordinatespicker';
 import { aifieldWidget } from './aifield';
 import { addressfieldWidget } from './addressfield';
 import { richtextWidget } from './richtext';
@@ -76,7 +78,6 @@ export function registerAllWidgets(): void {
   WidgetRegistry.register(userselectWidget);
   WidgetRegistry.register(memberpickerWidget);
   WidgetRegistry.register(organizationselectWidget);
-  WidgetRegistry.register(coordinatespickerWidget);
   WidgetRegistry.register(aifieldWidget);
   WidgetRegistry.register(addressfieldWidget);
   WidgetRegistry.register(richtextWidget);
@@ -115,7 +116,6 @@ export {
   userselectWidget,
   memberpickerWidget,
   organizationselectWidget,
-  coordinatespickerWidget,
   aifieldWidget,
   addressfieldWidget,
   richtextWidget,

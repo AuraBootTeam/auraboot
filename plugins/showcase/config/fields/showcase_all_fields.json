@@ -223,16 +223,6 @@
     }
   },
   {
-    "code": "sc_location",
-    "displayName:zh-CN": "地理位置",
-    "displayName:en": "Location",
-    "dataType": "json",
-    "extension": {
-      "renderComponent": "coordinatespicker",
-      "defaultZoom": 12
-    }
-  },
-  {
     "code": "sc_budget",
     "displayName:zh-CN": "预算金额",
     "displayName:en": "Budget",
