@@ -1,6 +1,7 @@
 package com.auraboot.framework.agent.service;
 
 import com.auraboot.framework.agent.metrics.UserSoulProfileMetrics;
+import com.auraboot.framework.agent.profile.UserSoulProfileStatus;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -36,9 +37,6 @@ import java.util.Map;
 public class UserSoulProfileActivator {
 
     static final long LOCK_KEY = 7307L;
-    private static final String STATUS_DRAFT = "DRAFT";
-    private static final String STATUS_ACTIVE = "ACTIVE";
-    private static final String STATUS_SUPERSEDED = "SUPERSEDED";
 
     private final JdbcTemplate jdbcTemplate;
     private final UserSoulProfileMetrics metrics;
@@ -100,7 +98,7 @@ public class UserSoulProfileActivator {
                         + "  AND hidden_at IS NULL "
                         + "  AND created_at <= NOW() - make_interval(hours => ?) "
                         + "ORDER BY created_at ASC",
-                STATUS_DRAFT, shadowPeriodHours);
+                UserSoulProfileStatus.DRAFT.code(), shadowPeriodHours);
 
         int activated = 0;
         for (Map<String, Object> row : drafts) {
@@ -115,7 +113,7 @@ public class UserSoulProfileActivator {
                     "UPDATE ab_agent_user_soul_profile "
                             + "SET status = ?, superseded_at = NOW() "
                             + "WHERE tenant_id = ? AND user_id = ? AND status = ?",
-                    STATUS_SUPERSEDED, tenantId, userId, STATUS_ACTIVE);
+                    UserSoulProfileStatus.SUPERSEDED.code(), tenantId, userId, UserSoulProfileStatus.ACTIVE.code());
 
             // 2. Promote the DRAFT → ACTIVE. Status guard prevents activating
             //    a row already moved (e.g. hide / forget racing with the tick).
@@ -123,7 +121,7 @@ public class UserSoulProfileActivator {
                     "UPDATE ab_agent_user_soul_profile "
                             + "SET status = ?, activated_at = NOW() "
                             + "WHERE pid = ? AND status = ?",
-                    STATUS_ACTIVE, pid, STATUS_DRAFT);
+                    UserSoulProfileStatus.ACTIVE.code(), pid, UserSoulProfileStatus.DRAFT.code());
 
             if (updated == 1) {
                 activated++;

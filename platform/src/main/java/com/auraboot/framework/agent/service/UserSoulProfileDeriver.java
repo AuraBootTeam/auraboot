@@ -5,6 +5,7 @@ import com.auraboot.framework.agent.profile.ProfileConfidenceScorer;
 import com.auraboot.framework.agent.profile.ProfileHasher;
 import com.auraboot.framework.agent.profile.ProfileProjector;
 import com.auraboot.framework.agent.profile.ProfileProjector.ProjectionResult;
+import com.auraboot.framework.agent.profile.UserSoulProfileStatus;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -46,7 +47,6 @@ import java.util.Map;
 public class UserSoulProfileDeriver {
 
     static final long LOCK_KEY = 7306L;
-    private static final String STATUS_DRAFT = "DRAFT";
     private static final String DERIVATION_MODEL_TEMPLATE = "template:v1";
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -205,9 +205,9 @@ public class UserSoulProfileDeriver {
     private boolean isForgotten(Long tenantId, String userId) {
         Integer count = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM ab_agent_user_soul_profile "
-                        + "WHERE tenant_id = ? AND user_id = ? AND status = 'ARCHIVED' "
+                        + "WHERE tenant_id = ? AND user_id = ? AND status = ? "
                         + "  AND (edited_fields ->> '_forgotten') = 'true'",
-                Integer.class, tenantId, userId);
+                Integer.class, tenantId, userId, UserSoulProfileStatus.ARCHIVED.code());
         return count != null && count > 0;
     }
 
@@ -229,9 +229,9 @@ public class UserSoulProfileDeriver {
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(
                 "SELECT pid, version, profile_hash, edited_fields "
                         + "FROM ab_agent_user_soul_profile "
-                        + "WHERE tenant_id = ? AND user_id = ? AND status = 'ACTIVE' "
+                        + "WHERE tenant_id = ? AND user_id = ? AND status = ? "
                         + "LIMIT 1",
-                tenantId, userId);
+                tenantId, userId, UserSoulProfileStatus.ACTIVE.code());
         return rows.isEmpty() ? null : rows.get(0);
     }
 
@@ -334,7 +334,7 @@ public class UserSoulProfileDeriver {
                         + " source_window_days, derivation_model, derivation_confidence, "
                         + " created_at) "
                         + "VALUES (?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?::jsonb, ?, ?, ?, ?, NOW())",
-                pid, tenantId, userId, version, STATUS_DRAFT,
+                pid, tenantId, userId, version, UserSoulProfileStatus.DRAFT.code(),
                 toJson(profile), hash,
                 projection.language(),
                 toJson(sourcePids),

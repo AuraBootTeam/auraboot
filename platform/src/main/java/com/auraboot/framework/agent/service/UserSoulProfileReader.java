@@ -1,5 +1,6 @@
 package com.auraboot.framework.agent.service;
 
+import com.auraboot.framework.agent.profile.UserSoulProfileStatus;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -60,7 +61,7 @@ public class UserSoulProfileReader {
             "SELECT pid, version, profile, edited_fields, stale_flagged_at " +
             "FROM ab_agent_user_soul_profile " +
             "WHERE tenant_id = ? AND user_id = ? " +
-            "  AND status = 'ACTIVE' AND hidden_at IS NULL " +
+            "  AND status = ? AND hidden_at IS NULL " +
             "LIMIT 1";
 
     private static final DateTimeFormatter DATE_FMT =
@@ -101,7 +102,7 @@ public class UserSoulProfileReader {
 
         Map<String, Object> row;
         try {
-            row = jdbcTemplate.queryForMap(SQL_LOAD_ACTIVE, tenantId, userId);
+            row = jdbcTemplate.queryForMap(SQL_LOAD_ACTIVE, tenantId, userId, UserSoulProfileStatus.ACTIVE.code());
         } catch (EmptyResultDataAccessException none) {
             return Optional.empty();
         }
