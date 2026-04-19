@@ -58,6 +58,7 @@ async function globalTeardown(config: FullConfig): Promise<void> {
     // needed, causing sidebar-link timeouts — the USP-11 flake root
     // cause). See _real-backend-helpers.ts cleanup* no-ops.
     await cleanupE2eMenus();
+    await cleanupE2eSoulProfiles();
 
     console.log('✅ Global teardown complete');
   } catch (error) {
@@ -166,6 +167,40 @@ async function cleanupE2eMenus(): Promise<void> {
     );
   } catch (e) {
     console.log(`  ⚠️ E2E menu cleanup error (non-fatal): ${e}`);
+  }
+}
+
+/**
+ * Delete any lingering user-soul-profile rows seeded by aurabot E2E
+ * helpers. Covers:
+ *   - Rows with pid prefix `E2EUSP` (direct seed rows).
+ *   - Tombstone rows inserted by the backend's forgetProfile /
+ *     admin-forget code paths — these use a ULID pid that does NOT
+ *     carry the test prefix and therefore slip past the per-spec
+ *     afterEach cleanup (historical bug: tombstones accumulated across
+ *     runs and eventually collided with the `uq_user_soul_profile_active`
+ *     partial unique index).
+ *   - Any rows under e2e_victim_* / e2e_admin_probe_* user ids used by
+ *     the admin-dashboard specs.
+ *
+ * Runs once after all workers finish so it cannot race with in-flight
+ * tests.
+ */
+async function cleanupE2eSoulProfiles(): Promise<void> {
+  try {
+    const { execSync } = await import('node:child_process');
+    execSync(
+      `psql -h localhost -U ghj -d aura_boot -P pager=off -v ON_ERROR_STOP=1 -tA`,
+      {
+        input: `DELETE FROM ab_agent_user_soul_profile
+                 WHERE pid LIKE 'E2EUSP%'
+                    OR user_id LIKE 'e2e_%'
+                    OR edited_fields ? '_forgotten';`,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      },
+    );
+  } catch (e) {
+    console.log(`  ⚠️ E2E soul-profile cleanup error (non-fatal): ${e}`);
   }
 }
 
