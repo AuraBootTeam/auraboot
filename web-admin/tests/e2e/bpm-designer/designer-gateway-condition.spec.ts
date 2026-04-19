@@ -411,7 +411,7 @@ test.describe('BPM designer — gateway conditions', { tag: ['@bpm-regression'] 
     const r1 = await startInstanceAndAdvance(
       request,
       adminToken,
-      processKey,
+      pid,
       { decision: 'approved' },
       steps,
     );
@@ -423,7 +423,7 @@ test.describe('BPM designer — gateway conditions', { tag: ['@bpm-regression'] 
     const r2 = await startInstanceAndAdvance(
       request,
       adminToken,
-      processKey,
+      pid,
       { decision: 'rejected' },
       steps,
     );
@@ -435,7 +435,7 @@ test.describe('BPM designer — gateway conditions', { tag: ['@bpm-regression'] 
     const r3 = await startInstanceAndAdvance(
       request,
       adminToken,
-      processKey,
+      pid,
       { decision: 'unknown' },
       steps,
     );
@@ -559,9 +559,13 @@ test.describe('BPM designer — gateway conditions', { tag: ['@bpm-regression'] 
     // carry a <conditionExpression> element (that would be invalid BPMN for
     // parallelGateway and could cause SmartEngine to misroute)
     const xml = await fetchBpmnXml(request, adminToken, pid);
+    // BPMN XML may use self-closing <sequenceFlow ... /> (no content, no conditions)
+    // or <sequenceFlow ...>...</sequenceFlow> with a body. Match both forms:
+    //   self-closing: <sequenceFlow ... sourceRef="gw_par_fork" ... />
+    //   with body:    <sequenceFlow ... sourceRef="gw_par_fork" ...>...</sequenceFlow>
     const parallelEdges =
       xml.match(
-        /<sequenceFlow[^>]*sourceRef=["']gw_par_fork["'][^>]*>[\s\S]*?<\/sequenceFlow>/g,
+        /<sequenceFlow[^>]*sourceRef=["']gw_par_fork["'][^>]*(?:\/>|>[\s\S]*?<\/sequenceFlow>)/g,
       ) ?? [];
     expect(
       parallelEdges.length,
@@ -612,7 +616,7 @@ test.describe('BPM designer — gateway conditions', { tag: ['@bpm-regression'] 
     const result = await startInstanceAndAdvance(
       request,
       adminToken,
-      processKey,
+      pid,
       {}, // a second instance — the one above already has both tasks active
       // For this helper call we start a NEW instance; the manual instance above
       // proves parallelism. The helper call proves the full lifecycle completes.
@@ -808,7 +812,7 @@ test.describe('BPM designer — gateway conditions', { tag: ['@bpm-regression'] 
     const r3a = await startInstanceAndAdvance(
       request,
       adminToken,
-      processKey,
+      pid,
       { flags: { x: true, y: true } },
       [
         { taskDefKey: 'task_x', action: 'complete' },
@@ -869,7 +873,7 @@ test.describe('BPM designer — gateway conditions', { tag: ['@bpm-regression'] 
     const r3b = await startInstanceAndAdvance(
       request,
       adminToken,
-      processKey,
+      pid,
       { flags: { x: true, y: false } },
       [{ taskDefKey: 'task_x', action: 'complete' }] satisfies AdvanceStep[],
     );
