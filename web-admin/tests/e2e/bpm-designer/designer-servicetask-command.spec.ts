@@ -60,7 +60,7 @@ import {
 } from '../../helpers/bpm-assertions';
 import { loginAs } from '../../helpers/wd-fixtures';
 
-const BACKEND = 'http://localhost:6443';
+const BACKEND = process.env.BACKEND_URL ?? 'http://localhost:6443';
 
 test.describe('D3 — designer: serviceTask + command binding', () => {
   test('configure serviceTask with commandCode, assert L1/L2/L3 runtime completion', async ({
@@ -138,6 +138,9 @@ test.describe('D3 — designer: serviceTask + command binding', () => {
 
     const pdBody = (await pdResp.json()) as Record<string, unknown>;
     const pdData = pdBody.data as Record<string, unknown>;
+    // Resolve processKey for L3 runtime start — SmartEngine keys by processKey:version, not ULID.
+    const pdProcessKey = pdData.processKey as string | undefined;
+    if (!pdProcessKey) throw new Error(`GET /api/bpm/process-definitions/${pdId} missing processKey`);
     const rawDesignerJson = pdData.designerJson as string;
     expect(typeof rawDesignerJson, 'designerJson must be a string').toBe('string');
 
@@ -209,13 +212,14 @@ test.describe('D3 — designer: serviceTask + command binding', () => {
     // L3 asserts finalStatus='completed' only — this proves the serviceTask
     // executed (or was skipped gracefully) and the flow reached the end event.
     // -------------------------------------------------------------------------
+    // processKey (not pdId/ULID) is required — SmartEngine keys by processKey:version.
     const startResp = await request.post(`${BACKEND}/api/bpm/process-instances`, {
       headers: {
         Authorization: `Bearer ${adminToken}`,
         'Content-Type': 'application/json',
       },
       data: {
-        processDefinitionId: pdId,
+        processDefinitionId: pdProcessKey,
         variables: {
           // Feed the delegate its required _chain_nodes config
           _chain_nodes: {
