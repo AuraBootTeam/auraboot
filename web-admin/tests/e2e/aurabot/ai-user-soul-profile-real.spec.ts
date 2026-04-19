@@ -268,6 +268,110 @@ test.describe('Mission Control — User Soul Profile (real backend, PR-80)', () 
     expect(row.hiddenAt).not.toBeNull();
   });
 
+  test('USP-E2E-09: user exports full soul profile as JSON attachment', async ({
+    page,
+  }) => {
+    // Seed: ACTIVE v2 + SUPERSEDED v1. Export must return both.
+    seedUserSoulProfile({
+      userId: ADMIN_USER_ID,
+      status: 'ACTIVE',
+      version: 2,
+    });
+    seedUserSoulProfile({
+      userId: ADMIN_USER_ID,
+      status: 'SUPERSEDED',
+      version: 1,
+      confidence: 0.7,
+    });
+
+    // Navigate first so the page is loaded (D1 — real UI context),
+    // then invoke the export endpoint reusing the session cookies.
+    await navigateToMyProfile(page);
+
+    const resp = await page.request.fetch('/api/user/soul-profile/export');
+    expect(resp.status()).toBe(200);
+
+    // Content-Disposition enforces attachment download semantics (GDPR).
+    const disposition = resp.headers()['content-disposition'];
+    expect(disposition).toBeTruthy();
+    expect(disposition).toMatch(/^attachment;/);
+    expect(disposition).toContain('user-soul-profile-');
+    expect(disposition).toContain('.json');
+
+    const contentType = resp.headers()['content-type'] || '';
+    expect(contentType).toContain('application/json');
+
+    const payload = await resp.json();
+    expect(payload.schema_version).toBe('1.0');
+    expect(payload.user_id).toBe(ADMIN_USER_ID);
+    expect(typeof payload.exported_at).toBe('string');
+    expect(payload.row_count).toBeGreaterThanOrEqual(2);
+    expect(Array.isArray(payload.profiles)).toBe(true);
+
+    // Export MUST carry content for the data subject (unlike admin endpoints).
+    const versions = payload.profiles.map((p: any) => p.version).sort();
+    expect(versions).toEqual(expect.arrayContaining([1, 2]));
+    const sample = payload.profiles[0];
+    expect(sample).toHaveProperty('profile');
+    expect(sample).toHaveProperty('status');
+  });
+
+  test('USP-E2E-10: admin forget cascade archives target user + records reason', async ({
+    page,
+  }) => {
+    const victimUser = `e2e_victim_${Date.now()}`;
+    const victimSeed = seedUserSoulProfile({
+      userId: victimUser,
+      status: 'ACTIVE',
+      version: 1,
+    });
+
+    // Admin navigates to their dashboard first — the forget endpoint is
+    // admin-only, so the interaction originates from an admin UI context.
+    await navigateToAdminDashboard(page);
+
+    const resp = await page.request.post(
+      '/api/admin/user-soul-profiles/forget',
+      {
+        data: {
+          userId: victimUser,
+          reason: 'gdpr_request',
+        },
+      },
+    );
+    expect(resp.status()).toBe(200);
+    const body = await resp.json();
+    // ApiResponse envelope: code '0' on success.
+    expect(String(body.code)).toBe('0');
+    expect(body.data.noop).toBe(false);
+    expect(body.data.target_user_id).toBe(victimUser);
+    expect(body.data.reason).toBe('gdpr_request');
+    expect(body.data.status).toBe('ARCHIVED');
+    // Response must not leak content (metadata only, per §7 privacy).
+    expect(body.data).not.toHaveProperty('profile');
+    expect(body.data).not.toHaveProperty('edited_fields');
+
+    // DB state: original row archived, tombstone row present.
+    const victimRow = dbUserSoulProfileRow(victimSeed.pid);
+    expect(victimRow.status).toBe('ARCHIVED');
+    expect(victimRow.hiddenAt).not.toBeNull();
+
+    // Idempotency: second call on the same user still succeeds.
+    const resp2 = await page.request.post(
+      '/api/admin/user-soul-profiles/forget',
+      { data: { userId: victimUser, reason: 'gdpr_request' } },
+    );
+    expect(resp2.status()).toBe(200);
+
+    // Missing reason → 400.
+    const resp3 = await page.request.post(
+      '/api/admin/user-soul-profiles/forget',
+      { data: { userId: victimUser } },
+    );
+    const body3 = await resp3.json();
+    expect(String(body3.code)).toBe('400');
+  });
+
   test('USP-E2E-08: admin dashboard shows metadata only — no persona text', async ({
     page,
   }) => {
