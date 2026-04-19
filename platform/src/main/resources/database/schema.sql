@@ -6234,7 +6234,7 @@ CREATE TABLE IF NOT EXISTS ab_agent_user_soul_profile (
     user_id               VARCHAR(64) NOT NULL,
 
     version               INTEGER NOT NULL DEFAULT 1,
-    status                VARCHAR(16) NOT NULL DEFAULT 'DRAFT',
+    status                VARCHAR(16) NOT NULL DEFAULT 'draft',
 
     profile               JSONB NOT NULL,
     profile_hash          VARCHAR(64) NOT NULL,
@@ -6255,7 +6255,7 @@ CREATE TABLE IF NOT EXISTS ab_agent_user_soul_profile (
     stale_flagged_at      TIMESTAMPTZ,
 
     CONSTRAINT chk_user_soul_profile_status CHECK (status IN (
-        'DRAFT', 'ACTIVE', 'SUPERSEDED', 'ARCHIVED'
+        'draft', 'active', 'superseded', 'archived'
     )),
     CONSTRAINT chk_user_soul_profile_confidence CHECK (
         derivation_confidence IS NULL OR
@@ -6265,14 +6265,14 @@ CREATE TABLE IF NOT EXISTS ab_agent_user_soul_profile (
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_user_soul_profile_active
     ON ab_agent_user_soul_profile (tenant_id, user_id)
-    WHERE status = 'ACTIVE';
+    WHERE status = 'active';
 
 CREATE INDEX IF NOT EXISTS idx_user_soul_profile_tenant_user
     ON ab_agent_user_soul_profile (tenant_id, user_id, status);
 
 CREATE INDEX IF NOT EXISTS idx_user_soul_profile_stale
     ON ab_agent_user_soul_profile (stale_flagged_at)
-    WHERE stale_flagged_at IS NOT NULL AND status = 'ACTIVE';
+    WHERE stale_flagged_at IS NOT NULL AND status = 'active';
 
 COMMENT ON TABLE ab_agent_user_soul_profile IS
     'User Soul Profile — derived per-user personalisation profile for grounding LLM prompts (see 2026-04-19 design doc).';

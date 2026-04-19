@@ -1,6 +1,7 @@
 package com.auraboot.framework.agent.controller;
 
 import com.auraboot.framework.agent.metrics.UserSoulProfileMetrics;
+import com.auraboot.framework.agent.profile.UserSoulProfileStatus;
 import com.auraboot.framework.agent.service.UserSoulProfileDeriver;
 import com.auraboot.framework.agent.service.UserSoulProfileEditor;
 import com.auraboot.framework.agent.service.UserSoulProfileEditor.EditResult;
@@ -52,11 +53,6 @@ import java.util.Objects;
 public class UserSoulProfileController {
 
     public static final String BASE_PATH = "/api/user/soul-profile";
-
-    static final String STATUS_ACTIVE = "ACTIVE";
-    static final String STATUS_DRAFT = "DRAFT";
-    static final String STATUS_SUPERSEDED = "SUPERSEDED";
-    static final String STATUS_ARCHIVED = "ARCHIVED";
 
     static final String FIELD_PID = "pid";
     static final String FIELD_VERSION = "version";
@@ -117,7 +113,7 @@ public class UserSoulProfileController {
                             "FROM ab_agent_user_soul_profile " +
                             "WHERE tenant_id = ? AND user_id = ? AND status = ? " +
                             "LIMIT 1",
-                    tenantId, userId, STATUS_ACTIVE);
+                    tenantId, userId, UserSoulProfileStatus.ACTIVE.code());
             parseJsonField(row, "profile_json", "profile");
             parseJsonField(row, "edited_fields_json", "edited_fields");
             return ApiResponse.ok(row);
@@ -166,7 +162,7 @@ public class UserSoulProfileController {
                         "WHERE tenant_id = ? AND user_id = ? AND status <> ? " +
                         "ORDER BY version DESC " +
                         "LIMIT 20",
-                tenantId, userId, STATUS_ACTIVE);
+                tenantId, userId, UserSoulProfileStatus.ACTIVE.code());
         return ApiResponse.ok(rows);
     }
 
@@ -191,7 +187,7 @@ public class UserSoulProfileController {
                             "FROM ab_agent_user_soul_profile " +
                             "WHERE pid = ? AND tenant_id = ? AND user_id = ? " +
                             "  AND status <> ?",
-                    pid, tenantId, userId, STATUS_ARCHIVED);
+                    pid, tenantId, userId, UserSoulProfileStatus.ARCHIVED.code());
             parseJsonField(row, "profile_json", "profile");
             parseJsonField(row, "edited_fields_json", "edited_fields");
             return ApiResponse.ok(row);
