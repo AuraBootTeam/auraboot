@@ -1,102 +1,186 @@
-# User Soul Profile
+# User Soul Profile — Subsystem Reference
 
-**Status**: Phase 1 of 9 (PR-75). Deriver ships as DRAFT-producer; activation + grounding + UI come later.
+**Status**: Phases 1-6 shipped (PR-75 through PR-80). Live run + code review (Phase 7+) pending.
 **Plan**: [2026-04-19 design](../plans/2026-04/2026-04-19-user-soul-profile-design.md)
 
-## Problem
-
-Without a per-user profile, the agent has no durable handle on the *user's* preferences, expertise, or boundaries across sessions. Memory Promotion gives us a clean, citable corpus to project over — USP is the compression layer on top, never an invention.
-
-See the design doc for the full narrative. This page only tracks what Phase 1 actually shipped.
-
-## Components (Phase 1)
-
-| Path | Role |
-|------|------|
-| `ab_agent_user_soul_profile` table | Versioned, per-user profile storage. One `ACTIVE` row max per `(tenant, user)` (UNIQUE partial index). |
-| `ProfileProjector` | Pure-Java projection of memories + actions into candidate fields (persona / preferences / habits / expertise / boundaries / language). Deterministic. |
-| `ProfileConfidenceScorer` | Per-field confidence formulas; `aggregateMin` for profile-level score. |
-| `ProfileHasher` | SHA-256 over canonical JSON (via `CanonicalJsonHasher`), strips mutable `meta` + `last_derived_at` so unchanged content dedups. |
-| `UserSoulProfileDeriver` | Nightly cron `0 0 4 * * *`, advisory lock `7306`. Gathers inputs → projects → hashes → writes DRAFT (or skips). |
-| `UserSoulProfileMetrics` | `auraboot_user_soul_profile_derivation_total{tenant, outcome}` counter. |
-
-## Not in Phase 1
-
-- DRAFT → ACTIVE activator (Phase 2, lock 7307)
-- `UserSoulProfileEditor` (pin / hide / edit / reset / forget) — Phase 2
-- `UserSoulProfileStalenessDetector` — Phase 2 (lock 7308)
-- Grounding integration in `AgentRunService` / `ActiveMemoryService` — Phase 3
-- REST controller `/api/user/soul-profile/*` — Phase 4
-- Mission Control UI `/aurabot/my-profile` — Phase 5
-- Grafana + alerts — Phase 6
+Per-user, dynamically-derived personalisation profile used to ground AuraBot responses. Distinct from `ab_agent_definition.soul_profile` (the **Agent** Soul Profile — manually authored per-agent persona) — this profile captures what the LLM should know about the **user**: persona, communication style, domain vocabulary, working hours, recurring habits, expertise, boundaries, preferred language.
 
 ## Terminology
 
-Do not confuse with `ab_agent_definition.soul_profile`. That's the **Agent** Soul Profile — the agent's persona, manually authored. The table and services documented here describe the **User** Soul Profile — derived, per-user, opt-in per tenant.
-Per-user, dynamically-derived personalisation profile used to ground AuraBot
-responses. Distinct from the agent-side `soul_profile` (which defines an
-agent's voice) — this profile captures what the LLM should know about the
-_user_: persona, communication style, domain vocabulary, working hours,
-recurring habits, expertise, boundaries, preferred language.
+| Name | Scope | Storage | Source |
+|------|-------|---------|--------|
+| **Agent** Soul Profile | per-agent, static | `ab_agent_definition.soul_profile JSONB` | manual config |
+| **User** Soul Profile *(this doc)* | per-user, dynamic | `ab_agent_user_soul_profile` (full table) | derived from user memories + actions |
 
-Authoritative design doc: `docs/plans/2026-04/2026-04-19-user-soul-profile-design.md`.
+## Status lattice
 
-## Data model
+```
+DRAFT ──24h shadow──> ACTIVE ──superseded by new version──> SUPERSEDED
+  │
+  └── user forget / admin forget ──> ARCHIVED (+ tombstone row; deriver skips forever)
+```
 
-Table `ab_agent_user_soul_profile`. One `ACTIVE` row per `(tenant_id, user_id)`;
-older versions persist with `status='SUPERSEDED'` for audit. The derived profile
-is stored as JSONB and every field carries `text`, `source_memory_pids`, and a
-`confidence` score so the user can trace every AI assertion back to concrete
-evidence.
+A `UNIQUE` partial index guarantees **at most one** `ACTIVE` row per `(tenant_id, user_id)` at all times — the `Activator` atomically demotes prior ACTIVE and promotes the new DRAFT.
 
-## Lifecycle (phase status)
+## Derivation
 
-| Phase | PR | Subsystem |
-|-------|----|-----------|
-| 1 | PR-75 | Schema + `UserSoulProfileDeriver` + projector + scorer + hasher |
-| 2 | PR-76 | `UserSoulProfileActivator` (DRAFT→ACTIVE) + `StalenessDetector` + `Editor` |
-| **3** | **PR-77** | **`UserSoulProfileReader` + grounding injection (this doc)** |
-| 4 | PR-78 | REST controller + metrics |
-| 5 | PR-79 | Mission Control UI (`/aurabot/my-profile`) |
-| 6 | PR-80 | Real E2E + Grafana + alerts |
+**Sources**: `ab_agent_memory` with `scope='user'` (default 90d look-back) + `ab_agent_action` rows (target-model + action_type frequency).
 
-## Grounding integration (Phase 3)
+**Projection** (pure Java, `ProfileProjector.project`): persona text, preferences (communication_style / domain_vocabulary / working_hours), habits.recurring_actions, expertise.domains, boundaries, language.
 
-`UserSoulProfileReader.loadForGrounding(tenantId, userId)` returns an optional
-`ProfileSection` that gets prepended to the LLM system prompt in two paths:
+**Confidence** (`ProfileConfidenceScorer`): per-field formulas clamped to [0, 1]; `aggregateMin` yields profile-level score.
 
-- **`AgentRunService.loadMemorySection`** — scheduled/cron agent runs. The
-  profile block renders immediately above `## Agent Memory`. When
-  `MetaContext.getCurrentUserId()` is null (system/cron without a user) no
-  profile is injected — memory-only prompts remain unchanged.
+**Canonical hashing** (`ProfileHasher`): SHA-256 over canonical JSON (strips timestamps). Re-derivation with identical inputs → `skipped_no_change`.
 
-- **`AuraBotChatService.streamChat`** — interactive chat prompt assembly.
-  The profile block is prepended to the full system prompt (template-rendered
-  or fallback form) just before the trace-span closes.
+## Schedulers
 
-### Guarantees
+All gated by `acp.user.soul-profile.*.enabled` (default `false`); each uses `TransactionTemplate.execute` to pin a JDBC connection for the advisory lock.
 
-- Hidden profiles (`hidden_at IS NOT NULL`) return `Optional.empty()` — the
-  LLM sees nothing at all, not a "[hidden]" placeholder.
-- Only rows with `status='ACTIVE'` are returned; DRAFT/SUPERSEDED/ARCHIVED
-  never ground.
-- Stale profiles (`stale_flagged_at IS NOT NULL`) render with a trailing
-  warning line instructing the LLM to prefer recent memories over the profile
-  when they conflict.
-- User-edited fields in `edited_fields` JSONB honour a strict
-  **hide > override > raw** precedence (see `UserSoulProfileFieldPaths`).
-- Rendered prompt block is hard-capped at `MAX_PROMPT_CHARS = 500` to protect
-  the LLM context window. Verbose fields are truncated with an ellipsis.
-- `loadForGrounding` never returns `null` and never throws for benign absence —
-  only DB infrastructure failures propagate.
+| Service | Cron | Lock | Role |
+|---------|------|------|------|
+| `UserSoulProfileDeriver` | `0 0 4 * * *` | `7306` | Gather → project → hash → write DRAFT |
+| `UserSoulProfileActivator` | `0 */30 * * * *` | `7307` | DRAFT → ACTIVE after 24h; demote prior ACTIVE |
+| `UserSoulProfileStalenessDetector` | `0 30 4 * * *` | `7308` | Embed profile vs recent memories; flag divergent |
 
-### Metrics
+## User control — Editor
 
-`UserSoulProfileReader` increments `auraboot_user_soul_profile_read_total{tenant}`
-on each successful read. Derivation/activation/edit/stale counters live in
-`UserSoulProfileMetrics` (Phase 2).
+`UserSoulProfileEditor` methods:
 
-## User control
+| Method | Effect |
+|--------|--------|
+| `pin(tenantId, userId, field)` | `edited_fields[field] = "locked"` — survives re-derivation |
+| `hide(tenantId, userId, field)` | `edited_fields[field] = "hidden"` — Reader omits from prompt |
+| `edit(tenantId, userId, field, text)` | Stores `{override_text, edited_at}` |
+| `reset(tenantId, userId, field?)` | Removes one key (or all when null) |
+| `hideProfile(tenantId, userId)` | Sets `hidden_at` — Reader returns `Optional.empty` |
+| `forgetProfile(tenantId, userId)` | GDPR cascade: archive + tombstone `{_forgotten: true}`. Idempotent. |
 
-Users can pin, hide, edit, or GDPR-forget their own profile via
-`/aurabot/my-profile` (Phase 5). Admins see metadata only — never content.
+Deriver guards on tombstone presence → `skipped_forgotten`.
+
+## Grounding integration
+
+`UserSoulProfileReader.loadForGrounding(tenantId, userId)` → `Optional<ProfileSection>`:
+
+- Reads the ACTIVE row (respects `hidden_at`).
+- Merge semantics: hidden > override > raw.
+- Renders a ≤500-char prompt block.
+- Stale flag → appends `⚠️ This profile may be outdated`.
+
+Injection sites:
+- `AgentRunService.loadMemorySection` — prepends above `## Agent Memory`
+- `AuraBotChatService.streamChat` — prepends after `buildSystemPrompt`
+
+Null `userId` (system / cron) → no injection.
+
+## REST endpoints
+
+User-facing (tenant + user scoped via `MetaContext`):
+
+```
+GET  /api/user/soul-profile                   — own ACTIVE profile
+GET  /api/user/soul-profile/history           — own SUPERSEDED / ARCHIVED versions
+GET  /api/user/soul-profile/{pid}             — own specific version (404 if cross-user)
+POST /api/user/soul-profile/pin
+POST /api/user/soul-profile/hide
+POST /api/user/soul-profile/edit
+POST /api/user/soul-profile/reset
+POST /api/user/soul-profile/hide-profile
+POST /api/user/soul-profile/forget            — GDPR forget, idempotent
+POST /api/user/soul-profile/derive-now        — manual trigger, rate-limited 1/24h per user
+```
+
+Admin-facing returns **metadata only** (SQL explicitly excludes `profile`, `edited_fields`, `source_memory_pids`):
+
+```
+GET  /api/admin/user-soul-profiles            — paginated list
+GET  /api/admin/user-soul-profiles/stats      — counts + staleness + avg confidence
+```
+
+## Mission Control UI
+
+| Route | Audience | Purpose |
+|-------|----------|---------|
+| `/aurabot/my-profile` | end user | View / pin / hide / edit / reset / forget own profile; History tab; re-derive button |
+| `/aurabot/soul-profiles` | tenant admin | Metadata-only dashboard |
+
+## Metrics
+
+**Counters**:
+```
+auraboot_user_soul_profile_derivation_total{tenant, outcome}
+  outcome ∈ {drafted, skipped_no_change, skipped_too_little_signal, skipped_forgotten, failed}
+auraboot_user_soul_profile_activation_total{tenant}
+auraboot_user_soul_profile_stale_flagged_total{tenant}
+auraboot_user_soul_profile_user_edit_total{tenant, action}
+  action ∈ {pin, hide, edit, reset, hide_profile, forget}
+auraboot_user_soul_profile_manual_derive_total{tenant, outcome}
+  outcome ∈ {triggered, rate_limited}
+auraboot_user_soul_profile_read_total{tenant}  (emitted by Reader)
+```
+
+**Gauges (cross-tenant aggregate)**:
+```
+auraboot_user_soul_profile_active_count
+auraboot_user_soul_profile_stale_count
+auraboot_user_soul_profile_avg_confidence
+```
+
+## Operations
+
+### Enabling a tenant
+
+1. Opt-in: set `acp.user.soul-profile.derivation.enabled=true` + `activator.enabled=true` + `staleness.enabled=true`.
+2. Users need ≥ 3 high-importance user-scope memories before first derivation.
+3. First ACTIVE row lands 24h after first successful DRAFT.
+
+### Tuning knobs
+
+| Property | Default | Tune when |
+|----------|---------|-----------|
+| `min-memories-for-derivation` | 3 | Raise to 5+ for less-noisy profiles on very-active tenants |
+| `look-back-days` | 90 | Shorten to 30 for high-velocity tenants |
+| `shadow-period-hours` | 24 | Shorten to 3 for tenants with < 5 active users |
+| `staleness.min-divergent-memories` | 3 | Raise if false-positive rate too high |
+| `staleness.divergence-cosine-threshold` | 0.6 | Tighten to 0.7 for stricter staleness |
+
+### First-week watch list
+
+- Derivation failure rate
+- User edit rate (> 50% → threshold tuning needed)
+- Stale count growth (monotonic → detector too sensitive)
+- Manual-derive rate-limit hits (> triggers → 24h window too tight)
+
+## Known limitations
+
+- LLM rendering for prose fields is **template-only** in Phase 1 — quality ceiling limited until dedicated rendering lands.
+- Cross-user clustering explicitly deferred (privacy).
+- Admin dashboard metadata only; no content visibility even for debugging.
+- Manual-derive rate limit uses in-process Caffeine cache → multi-instance deployments may allow 1 derive per instance per 24h.
+- Access-log silently skips hard-deleted memories (FK cascade); intentional.
+
+## Related PRs
+
+| PR | Phase | Scope |
+|----|-------|-------|
+| 75 | 1 | Schema + projector + scorer + hasher + deriver + metrics |
+| 76 | 2 | Activator + StalenessDetector + Editor (+ tombstone path) |
+| 77 | 3 | Reader + grounding injection |
+| 78 | 4 | REST controllers + gauges + Caffeine rate limiter |
+| 79 | 5 | Mission Control UI + mocked E2E |
+| 80 | 6 | Real-backend E2E + Grafana dashboard + alerts + this doc |
+
+## Privacy boundary
+
+| Actor | Sees |
+|-------|------|
+| User (self) | Own profile content + history + edits + can forget |
+| Tenant admin | Metadata only — never content |
+| System / scheduler | Full profile within advisory-lock scope |
+| AuraBot / LLM | Current ACTIVE profile rendered as ≤500-char prompt block |
+
+Enforced at three layers: JWT (user scope), controller `MetaContext.getCurrentUserId()` guard, SQL column-list projection in the admin query.
+
+## Related dashboards + alerts
+
+- Grafana: `docs/operations/grafana-user-soul-profile.json` (7-panel dashboard)
+- Prometheus alerts: `docs/operations/learning-loop-alerts.yaml` group `auraboot.user_soul_profile` (4 rules)

@@ -72,3 +72,46 @@ groups:
         annotations:
           summary: "Memory promotion extractor idle"
           description: "No memory promotion proposals generated in 14d — extractor may be disabled (acp.memory.promotion.scheduler.enabled) or tenant may lack signal"
+
+  - name: auraboot.user_soul_profile
+    interval: 1m
+    rules:
+      - alert: UserSoulProfileHighStaleRate
+        expr: (auraboot_user_soul_profile_stale_count / clamp_min(auraboot_user_soul_profile_active_count, 1)) > 0.4
+        for: 30d
+        labels:
+          severity: warning
+          component: acp-user-soul-profile
+        annotations:
+          summary: "User Soul Profile stale-to-active ratio > 40%"
+          description: "Staleness detector is flagging > 40% of active profiles for 30 days — derivation algorithm may be drifting or look-back window is too narrow"
+
+      - alert: UserSoulProfileDerivationFailureSpike
+        expr: (sum(rate(auraboot_user_soul_profile_derivation_total{outcome="failed"}[7d])) / clamp_min(sum(rate(auraboot_user_soul_profile_derivation_total[7d])), 1)) > 0.05
+        for: 7d
+        labels:
+          severity: warning
+          component: acp-user-soul-profile
+        annotations:
+          summary: "User Soul Profile derivation failure rate > 5% for 7d"
+          description: "More than 5% of derivation runs are failing — LLM provider outage, schema drift, or embedding mismatch"
+
+      - alert: UserSoulProfileHighEditRate
+        expr: (sum(rate(auraboot_user_soul_profile_user_edit_total[30d])) / clamp_min(sum(auraboot_user_soul_profile_active_count), 1)) > 0.5
+        for: 30d
+        labels:
+          severity: info
+          component: acp-user-soul-profile
+        annotations:
+          summary: "Users override USP fields > 50% of the time"
+          description: "High user-edit rate over 30d — derivation signal is wrong enough that users routinely override; consider retraining / threshold adjustment"
+
+      - alert: UserSoulProfileRateLimitSpike
+        expr: sum(rate(auraboot_user_soul_profile_manual_derive_total{outcome="rate_limited"}[1h])) > sum(rate(auraboot_user_soul_profile_manual_derive_total{outcome="triggered"}[1h]))
+        for: 1h
+        labels:
+          severity: info
+          component: acp-user-soul-profile
+        annotations:
+          summary: "Manual-derive rate-limit rejections exceed triggers"
+          description: "More manual-derive attempts are being blocked than succeeding — UX friction; consider 12h window or increasing budget"
