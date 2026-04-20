@@ -16,8 +16,8 @@
  * L1 (designerJson):
  *   - Nodes: start_1, svc_1, end_1
  *   - Edges: start_1→svc_1, svc_1→end_1
- *   - svc_1.data.serviceType === 'command'
- *   - svc_1.data.commandCode === 'wd:submit_leave_request'
+ *   - svc_1.data.config.serviceType === 'command'
+ *   - svc_1.data.config.commandCode === 'wd:submit_leave_request'
  *
  * L2 (BPMN XML):
  *   - serviceTask element with id="svc_1" present
@@ -60,7 +60,7 @@ import {
 } from '../../helpers/bpm-assertions';
 import { loginAs } from '../../helpers/wd-fixtures';
 
-const BACKEND = 'http://localhost:6443';
+const BACKEND = process.env.BACKEND_URL ?? 'http://localhost:6443';
 
 test.describe('D3 — designer: serviceTask + command binding', () => {
   test('configure serviceTask with commandCode, assert L1/L2/L3 runtime completion', async ({
@@ -70,13 +70,9 @@ test.describe('D3 — designer: serviceTask + command binding', () => {
     const processKey = `e2e_designer_svc_${Date.now()}`;
 
     // -------------------------------------------------------------------------
-    // UI login
+    // Auth: API token (admin session preloaded via storageState)
     // -------------------------------------------------------------------------
-    await page.goto('/login');
-    await page.getByLabel(/email|邮箱/i).fill('admin@example.com');
-    await page.getByLabel(/password|密码/i).fill('Test2026x');
-    await page.getByRole('button', { name: /login|登录|sign in/i }).click();
-    await page.waitForURL(/\/(dashboard|home|p\/|dashboards)/, { timeout: 15_000 });
+    // Admin session preloaded via storageState (tests/storage/admin.json).
 
     // API token for backend assertions
     const adminToken = await loginAs(request, 'admin@example.com', 'Test2026x');
@@ -106,11 +102,15 @@ test.describe('D3 — designer: serviceTask + command binding', () => {
     });
 
     // Configure the serviceTask: serviceType=command, commandCode=wd:submit_leave_request
-    // The configureNode call merges the patch into node.data via store.updateNode()
-    // ServiceTaskConfig fields: serviceType, commandCode (see types/index.ts:77-90)
+    // configureNode merges the patch into node.data via store.updateNode().
+    // The converter reads serviceType from node.data.config (not node.data directly):
+    //   writeServiceTask(... config = data.path("config") ...) → getTextOrNull(config, "serviceType")
+    // Therefore we must nest under 'config' so it lands at node.data.config.serviceType.
     await configureNode(page, 'svc_1', {
-      serviceType: 'command',
-      commandCode: 'wd:submit_leave_request',
+      config: {
+        serviceType: 'command',
+        commandCode: 'wd:submit_leave_request',
+      },
     });
 
     // Connect nodes
@@ -142,6 +142,9 @@ test.describe('D3 — designer: serviceTask + command binding', () => {
 
     const pdBody = (await pdResp.json()) as Record<string, unknown>;
     const pdData = pdBody.data as Record<string, unknown>;
+    // Resolve processKey for L3 runtime start — SmartEngine keys by processKey:version, not ULID.
+    const pdProcessKey = pdData.processKey as string | undefined;
+    if (!pdProcessKey) throw new Error(`GET /api/bpm/process-definitions/${pdId} missing processKey`);
     const rawDesignerJson = pdData.designerJson as string;
     expect(typeof rawDesignerJson, 'designerJson must be a string').toBe('string');
 
@@ -153,9 +156,12 @@ test.describe('D3 — designer: serviceTask + command binding', () => {
     const svcData = svcNode!.data as Record<string, unknown>;
     expect(svcData, 'svc_1 node must have data').toBeDefined();
 
-    // configureNode patches top-level node.data (store.updateNode merges at data level)
-    expect(svcData.serviceType, 'serviceType must be command').toBe('command');
-    expect(svcData.commandCode, 'commandCode must be wd:submit_leave_request').toBe(
+    // configureNode patches node.data.config (the patch was { config: { serviceType, commandCode } })
+    // converter reads: config = data.path("config"); serviceType = getTextOrNull(config, "serviceType")
+    const svcConfig = svcData.config as Record<string, unknown>;
+    expect(svcConfig, 'svc_1 node.data.config must be present').toBeDefined();
+    expect(svcConfig.serviceType, 'serviceType must be command').toBe('command');
+    expect(svcConfig.commandCode, 'commandCode must be wd:submit_leave_request').toBe(
       'wd:submit_leave_request',
     );
 
@@ -213,13 +219,14 @@ test.describe('D3 — designer: serviceTask + command binding', () => {
     // L3 asserts finalStatus='completed' only — this proves the serviceTask
     // executed (or was skipped gracefully) and the flow reached the end event.
     // -------------------------------------------------------------------------
+    // processKey (not pdId/ULID) is required — SmartEngine keys by processKey:version.
     const startResp = await request.post(`${BACKEND}/api/bpm/process-instances`, {
       headers: {
         Authorization: `Bearer ${adminToken}`,
         'Content-Type': 'application/json',
       },
       data: {
-        processDefinitionId: pdId,
+        processDefinitionId: pdProcessKey,
         variables: {
           // Feed the delegate its required _chain_nodes config
           _chain_nodes: {

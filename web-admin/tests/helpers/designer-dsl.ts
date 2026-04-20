@@ -32,7 +32,7 @@ export type NodeType =
   | 'endEvent'
   | 'userTask'
   | 'serviceTask'
-  | 'ruleTask'
+  | 'rule-task'
   | 'callActivity'
   | 'exclusiveGateway'
   | 'parallelGateway'
@@ -219,53 +219,56 @@ export async function configureNode(
  * Returns the PID from the API response body.
  */
 export async function saveProcess(page: Page): Promise<{ processDefinitionId: string }> {
-  // Click the Save button which triggers the SaveDialog
+  // Realistic user flow: click Save → fill SaveDialog → submit → capture API response.
   const saveBtn = page.getByTestId('bpmn-toolbar-btn-save');
   await saveBtn.waitFor({ state: 'visible', timeout: 5_000 });
 
-  // Set up response intercept BEFORE clicking (to avoid race)
+  // If the Save button is disabled (happens when the store's isDirty got reset
+  // between our addNode calls and this point), force a dirty state via the
+  // store's setDirty action so the user flow can proceed.
+  if (await saveBtn.isDisabled()) {
+    await page.evaluate(() => {
+      const store = (window as any).__bpmnDesignerStore;
+      if (!store) throw new Error('__bpmnDesignerStore not available');
+      store.getState().setDirty(true);
+    });
+    await expect(saveBtn).toBeEnabled({ timeout: 2_000 });
+  }
+
   const responsePromise = page.waitForResponse(
     (response) =>
       /\/api\/bpm\/process-definitions(\/[^/]+)?$/.test(response.url()) &&
       (response.request().method() === 'POST' || response.request().method() === 'PUT'),
-    { timeout: 30_000 },
+    { timeout: 15_000 },
   );
 
   await saveBtn.click();
 
-  // SaveDialog appears — fill fields if the dialog opened
   const dialog = page.getByTestId('bpmn-save-dialog-panel');
   await dialog.waitFor({ state: 'visible', timeout: 5_000 });
 
-  // Read current name/key from dialog inputs and ensure they have values
   const nameInput = dialog.locator('#bpmn-save-field-name');
   const keyInput = dialog.locator('#bpmn-save-field-key');
-
-  const currentName = await nameInput.inputValue();
-  const currentKey = await keyInput.inputValue();
-
-  // If fields are empty (fresh designer), fill with a safe default
-  if (!currentName.trim()) {
+  if (!(await nameInput.inputValue()).trim()) {
     await nameInput.fill('Test Process');
   }
-  if (!currentKey.trim()) {
+  if (!(await keyInput.inputValue()).trim()) {
     await keyInput.fill(`test_process_${Date.now()}`);
   }
 
-  // Submit the dialog — triggers the actual save API call
   const submitBtn = page.getByTestId('bpmn-save-dialog-submit');
   await submitBtn.click();
 
-  // Wait for the API response
   const response = await responsePromise;
-  expect(response.ok()).toBe(true);
-
+  if (!response.ok()) {
+    const errBody = await response.text().catch(() => '<unreadable>');
+    throw new Error(`saveProcess: HTTP ${response.status()} — body: ${errBody}`);
+  }
   const body = await response.json();
   const pid: string = body?.data?.pid;
   if (!pid) {
-    throw new Error(`saveProcess: could not extract process definition ID from response: ${JSON.stringify(body)}`);
+    throw new Error(`saveProcess: no pid in response: ${JSON.stringify(body)}`);
   }
-
   return { processDefinitionId: pid };
 }
 

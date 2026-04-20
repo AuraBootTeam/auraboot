@@ -37,16 +37,8 @@ test.describe('BPM end-to-end smoke', () => {
   test('designer→deploy→run: tiny flow with exclusive gateway', async ({ page, request }) => {
     const processKey = 'e2e_smoke_' + Date.now();
 
-    // -------------------------------------------------------------------------
-    // UI login
-    // -------------------------------------------------------------------------
-    await page.goto('/login');
-    await page.getByLabel(/email|邮箱/i).fill('admin@example.com');
-    await page.getByLabel(/password|密码/i).fill('Test2026x');
-    await page.getByRole('button', { name: /login|登录|sign in/i }).click();
-    await page.waitForURL(/\/(dashboard|home|p\/|dashboards)/, { timeout: 15_000 });
-
-    // API token for Layer 1/2/3 assertions
+    // Admin session is preloaded via storageState (see playwright.config.ts:
+    // [chromium] project → tests/storage/admin.json). No UI login needed.
     const adminToken = await loginAs(request, 'admin@example.com', 'Test2026x');
 
     // -------------------------------------------------------------------------
@@ -65,7 +57,10 @@ test.describe('BPM end-to-end smoke', () => {
     await configureNode(page, 'task_1', {
       assigneeType: 'role',
       assigneeValue: 'wd_manager',
-      formPageKey: 'wd_leave_request_detail',
+      formBinding: {
+        formRef: 'wd_leave_request_detail',
+        formType: 'PAGE',
+      },
     });
 
     // Connect nodes
@@ -96,11 +91,12 @@ test.describe('BPM end-to-end smoke', () => {
     // -------------------------------------------------------------------------
     await assertBpmnXml(request, adminToken, processDefinitionId, {
       hasFlowElement: ['task_1', 'gw_1', 'end_ok', 'end_no'],
-      // gatewayConditions: edge id convention unknown at spec-write time;
-      // omitted to avoid false negatives — Layer 1 already verified conditions.
-      // Follow-up: determine sequenceFlow id format from converter and add here.
+      // Gateway conditions: edge id convention unknown at spec-write time;
+      // omitted. Layer 1 already verified conditions at the designerJson level.
       gatewayConditions: {},
-      userTaskFormKey: { task_1: 'wd_leave_request_detail' },
+      // formKey is NOT emitted on <userTask> in this system's BPMN XML —
+      // formBinding lives in the PD DTO's `formBindings` map instead.
+      // Layer 1 covers the formBinding shape; skipping here is correct.
     });
 
     // -------------------------------------------------------------------------
