@@ -10,7 +10,13 @@ export function installDesignerTestHooks(store: DesignerStoreLike, devMode: bool
   (window as any).__bpmDesigner = {
     addNode: store.addNode.bind(store),
     connect: (from: string, to: string, condition?: string) =>
-      store.addEdge({ source: from, target: to, data: condition ? { condition } : undefined }),
+      store.addEdge({
+        source: from,
+        target: to,
+        data: condition
+          ? { condition: { type: 'expression', content: condition } }
+          : undefined,
+      }),
     configureNode: (id: string, patch: Record<string, unknown>) => store.setNodeData(id, patch),
     getDesignerJson: () => store.getSnapshot(),
   };

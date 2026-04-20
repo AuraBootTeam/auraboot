@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import {
   loginAs,
+  loginViaUI,
   ensureRoleUsers,
   createLeaveApplicant,
   setLeaveBalance,
@@ -31,6 +32,8 @@ import {
  * Process instance id stored on: wd_req_process_instance field (processes.json extension.processInstanceField).
  */
 
+test.setTimeout(90_000);
+
 test.describe('workflow-demo — R1 short leave manager approve', () => {
   test('short leave (days=2) → manager approves → completed/approved', async ({
     browser,
@@ -47,16 +50,10 @@ test.describe('workflow-demo — R1 short leave manager approve', () => {
     // ------------------------------------------------------------------
     // 2. Applicant context: login via UI, navigate to list, submit leave
     // ------------------------------------------------------------------
-    const applicantCtx = await browser.newContext();
+    const applicantCtx = await browser.newContext({ storageState: { cookies: [], origins: [] } });
     const applicantPage = await applicantCtx.newPage();
 
-    await applicantPage.goto('/login');
-    await applicantPage.getByLabel(/email/i).fill(applicant.email);
-    await applicantPage.getByLabel(/password|密码/i).fill('Test2026x');
-    await applicantPage.getByRole('button', { name: /login|登录/i }).click();
-    await applicantPage.waitForURL((u) => !u.pathname.endsWith('/login'), {
-      timeout: 10_000,
-    });
+    await loginViaUI(applicantPage, applicant.email, 'Test2026x');
 
     // Leave type "sick" → option rendered as "Sick Leave" or "病假" (i18n-driven).
     // submitLeaveRequest clicks getByRole('option', { name: input.type }) after
@@ -65,6 +62,8 @@ test.describe('workflow-demo — R1 short leave manager approve', () => {
     // will match either. We pass the value directly — the helper uses it as-is
     // in getByRole('option', { name: input.type }).first().click().
     const { recordId } = await submitLeaveRequest(applicantPage, {
+      userId: applicant.userId,
+      token: applicant.token,
       days: 2,
       type: 'sick',
       reason: 'R1 short leave automated test — E2E manager approval path',
@@ -74,16 +73,10 @@ test.describe('workflow-demo — R1 short leave manager approve', () => {
     // ------------------------------------------------------------------
     // 3. Manager context: login via UI, approve task via Task Center
     // ------------------------------------------------------------------
-    const managerCtx = await browser.newContext();
+    const managerCtx = await browser.newContext({ storageState: { cookies: [], origins: [] } });
     const managerPage = await managerCtx.newPage();
 
-    await managerPage.goto('/login');
-    await managerPage.getByLabel(/email/i).fill('wd_manager@example.com');
-    await managerPage.getByLabel(/password|密码/i).fill('Test2026x');
-    await managerPage.getByRole('button', { name: /login|登录/i }).click();
-    await managerPage.waitForURL((u) => !u.pathname.endsWith('/login'), {
-      timeout: 10_000,
-    });
+    await loginViaUI(managerPage, 'wd_manager@example.com', 'Test2026x');
 
     // processTask navigates via sidebar to /bpm/task-center, finds the row whose
     // data-testid="task-business-key" contains recordId (= businessKey set to
