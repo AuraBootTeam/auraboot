@@ -58,8 +58,6 @@ import {
 import {
   assertDesignerJson,
   assertBpmnXml,
-  startInstanceAndAdvance,
-  type AdvanceStep,
 } from '../../helpers/bpm-assertions';
 import { loginAs } from '../../helpers/wd-fixtures';
 
@@ -191,13 +189,9 @@ test.describe('BPM designer — D5: callActivity + parent-child variable mapping
     const parentProcessKey = `e2e_designer_ca_parent_${TS}`;
 
     // -----------------------------------------------------------------------
-    // Auth: UI login + API token
+    // Auth: API token (admin session preloaded via storageState)
     // -----------------------------------------------------------------------
-    await page.goto('/login');
-    await page.getByLabel(/email|邮箱/i).fill('admin@example.com');
-    await page.getByLabel(/password|密码/i).fill('Test2026x');
-    await page.getByRole('button', { name: /login|登录|sign in/i }).click();
-    await page.waitForURL(/\/(dashboard|home|p\/|dashboards)/, { timeout: 15_000 });
+    // Admin session preloaded via storageState (tests/storage/admin.json).
 
     const adminToken = await loginAs(request, 'admin@example.com', 'Test2026x');
 
@@ -234,15 +228,23 @@ test.describe('BPM designer — D5: callActivity + parent-child variable mapping
       label: 'End',
     });
 
-    // Configure call_1: calledProcessKey + input/output mappings
+    // Configure call_1: calledProcessKey + input/output mappings.
+    // MUST wrap in { config: { ... } } because:
+    //   - configureNode(id, patch) → store.setNodeData(id, patch) → updateNode(id, patch)
+    //   - updateNode merges patch directly into node.data (useBPMNStore.ts line 276)
+    //   - JsonToBpmnConverter.writeCallActivity reads from data.path("config") (line 297)
+    //   So fields must live at node.data.config, not node.data.
     // Field names verified from:
     //   web-admin/app/plugins/core-designer/components/bpmn-designer/types/index.ts:133
     //   CallActivityEditor.tsx lines 125,145,187,195
     //   JsonToBpmnConverter.java lines 936,976-977
     await configureNode(page, 'call_1', {
-      calledProcessKey: childProcessKey,
-      inputMappings: { applicantId: 'childApplicantId' },
-      outputMappings: { childResult: 'parentResult' },
+      config: {
+        calledProcessKey: childProcessKey,
+        calledProcessVersion: 'latest',
+        inputMappings: { applicantId: 'childApplicantId' },
+        outputMappings: { childResult: 'parentResult' },
+      },
     });
 
     // Connect edges
@@ -286,20 +288,24 @@ test.describe('BPM designer — D5: callActivity + parent-child variable mapping
 
     // configureNode calls store.setNodeData → updateNode which merges patch directly
     // into node.data (useBPMNStore.ts line 276: node.data = { ...node.data, ...data })
-    // So calledProcessKey, inputMappings, outputMappings all live at data level.
+    // The patch is { config: { calledProcessKey, inputMappings, outputMappings } }
+    // so these fields live at node.data.config (not node.data directly).
+    // JsonToBpmnConverter reads from data.path("config") (line 297).
     const callData = callNode!.data as Record<string, unknown>;
+    const callConfig = callData.config as Record<string, unknown>;
+    expect(callConfig, 'call_1.data.config must be present').toBeTruthy();
     expect(
-      callData.calledProcessKey,
-      'call_1.data.calledProcessKey must equal childProcessKey',
+      callConfig.calledProcessKey,
+      'call_1.data.config.calledProcessKey must equal childProcessKey',
     ).toBe(childProcessKey);
 
     expect(
-      callData.inputMappings,
-      'call_1.data.inputMappings must contain applicantId→childApplicantId',
+      callConfig.inputMappings,
+      'call_1.data.config.inputMappings must contain applicantId→childApplicantId',
     ).toMatchObject({ applicantId: 'childApplicantId' });
     expect(
-      callData.outputMappings,
-      'call_1.data.outputMappings must contain childResult→parentResult',
+      callConfig.outputMappings,
+      'call_1.data.config.outputMappings must contain childResult→parentResult',
     ).toMatchObject({ childResult: 'parentResult' });
 
     // -----------------------------------------------------------------------
@@ -359,21 +365,29 @@ test.describe('BPM designer — D5: callActivity + parent-child variable mapping
     const parentInstanceId = String(startBody?.data?.instanceId ?? '');
     expect(parentInstanceId, 'parent instance must return instanceId').toBeTruthy();
 
-    // GET /api/bpm/tasks/by-process/{parentInstanceId} returns tasks across all
-    // instances in the call hierarchy (parent + spawned children). The child's
-    // user_child task will have a processInstanceId DIFFERENT from parentInstanceId,
-    // proving the child sub-process was spawned.
-    const tasksResp = await request.get(
-      `/api/bpm/tasks/by-process/${parentInstanceId}`,
+    // NOTE: /api/bpm/tasks/by-process/{id} only returns tasks for that specific
+    // process instance, NOT for spawned child instances. For callActivity, we
+    // must query /todo (returns the authenticated user's pending tasks as a flat
+    // list) and filter by the child process definition key.
+    //
+    // /todo response: { data: TaskInstance[] } (flat list, not paginated records).
+    // TaskInstance fields: instanceId, processDefinitionIdAndVersion, processDefinitionActivityId,
+    //                       processInstanceId, status.
+    const todoResp = await request.get(
+      `/api/bpm/tasks/todo?pageNum=1&pageSize=50`,
       { headers: { Authorization: `Bearer ${adminToken}` } },
     );
-    expect(tasksResp.ok(), `tasks fetch must succeed: ${tasksResp.status()}`).toBe(true);
-    const tasksBody = await tasksResp.json();
-    const allTasks = (tasksBody?.data ?? []) as Array<Record<string, unknown>>;
+    expect(todoResp.ok(), `todo tasks fetch must succeed: ${todoResp.status()}`).toBe(true);
+    const todoBody = await todoResp.json();
+    // /todo returns a flat list: data is TaskInstance[]
+    const allTasks = (Array.isArray(todoBody?.data) ? todoBody.data : todoBody?.data?.records ?? []) as Array<Record<string, unknown>>;
 
-    // Assert the child's user_child task is present
+    // Assert the child's user_child task is present — filter by child process definition key
+    // (processDefinitionIdAndVersion = "{childProcessKey}:{version}") and task activity key.
     const childTask = allTasks.find(
-      (t) => String(t.processDefinitionActivityId ?? '') === 'user_child',
+      (t) =>
+        String(t.processDefinitionActivityId ?? '') === 'user_child' &&
+        String(t.processDefinitionIdAndVersion ?? '').startsWith(childProcessKey),
     );
     expect(childTask, 'user_child task must be active after callActivity starts').toBeTruthy();
 
@@ -385,9 +399,10 @@ test.describe('BPM designer — D5: callActivity + parent-child variable mapping
     ).not.toBe(parentInstanceId);
     expect(childInstanceId, 'child instanceId must be non-empty').toBeTruthy();
 
-    // Complete the child task with an output variable
-    const childTaskId = String(childTask!.taskId ?? childTask!.id ?? '');
-    expect(childTaskId, 'child task must have a taskId').toBeTruthy();
+    // Complete the child task with an output variable.
+    // /todo returns TaskInstance where instanceId is the task ID used by /complete endpoint.
+    const childTaskId = String(childTask!.instanceId ?? childTask!.taskId ?? '');
+    expect(childTaskId, 'child task must have an instanceId/taskId').toBeTruthy();
 
     const completeResp = await request.post(
       `/api/bpm/tasks/${childTaskId}/complete`,
@@ -401,18 +416,20 @@ test.describe('BPM designer — D5: callActivity + parent-child variable mapping
       `child task complete must succeed: ${completeResp.status()}`,
     ).toBe(true);
 
-    // After child completes, parent callActivity should finish and parent should reach end
-    // Use startInstanceAndAdvance for the final status poll (starts a fresh instance to
-    // avoid timing issues with the already-running one)
-    const r = await startInstanceAndAdvance(
-      request,
-      adminToken,
-      parentProcessKey,
-      { applicantId: 'user-abc-2' },
-      [{ taskDefKey: 'user_child', action: 'complete' }] satisfies AdvanceStep[],
+    // After child completes, parent callActivity should finish and parent should reach end.
+    // Poll the already-started parent instance for final status.
+    // Note: for callActivity flows, startInstanceAndAdvance cannot be used here because
+    // it uses by-process/{instanceId} which only returns tasks for the parent instance,
+    // not for spawned child instances. The child task was already completed above.
+    const finalResp = await request.get(
+      `/api/bpm/process-instances/${parentInstanceId}`,
+      { headers: { Authorization: `Bearer ${adminToken}` } },
     );
+    expect(finalResp.ok(), `final status fetch must succeed: ${finalResp.status()}`).toBe(true);
+    const finalBody = await finalResp.json();
+    const finalStatus = String(finalBody?.data?.status ?? '').toLowerCase();
     expect(
-      r.finalStatus.toLowerCase(),
+      finalStatus,
       'parent instance must reach completed after child task is done',
     ).toBe('completed');
 

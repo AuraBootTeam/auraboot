@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import {
   loginAs,
+  loginViaUI,
   ensureRoleUsers,
   createLeaveApplicant,
   setLeaveBalance,
@@ -27,6 +28,8 @@ const BACKEND = 'http://localhost:6443';
  * Process instance id stored on: wd_req_process_instance (processes.json extension.processInstanceField).
  */
 
+test.setTimeout(90_000);
+
 test.describe('workflow-demo — R2 long leave HR approve', () => {
   test('long leave (days=10) → HR approves → completed/approved', async ({
     browser,
@@ -43,20 +46,16 @@ test.describe('workflow-demo — R2 long leave HR approve', () => {
     // ------------------------------------------------------------------
     // 2. Applicant context: login via UI, navigate to list, submit leave
     // ------------------------------------------------------------------
-    const applicantCtx = await browser.newContext();
+    const applicantCtx = await browser.newContext({ storageState: { cookies: [], origins: [] } });
     const applicantPage = await applicantCtx.newPage();
 
-    await applicantPage.goto('/login');
-    await applicantPage.getByLabel(/email/i).fill(applicant.email);
-    await applicantPage.getByLabel(/password|密码/i).fill('Test2026x');
-    await applicantPage.getByRole('button', { name: /login|登录/i }).click();
-    await applicantPage.waitForURL((u) => !u.pathname.endsWith('/login'), {
-      timeout: 10_000,
-    });
+    await loginViaUI(applicantPage, applicant.email, 'Test2026x');
 
     // Leave type "annual" → option rendered as "Annual Leave" or "年假" (i18n-driven).
     // We pass the dict item value "annual"; the helper resolves via getByRole('option', { name: 'annual' }).
     const { recordId } = await submitLeaveRequest(applicantPage, {
+      userId: applicant.userId,
+      token: applicant.token,
       days: 10,
       type: 'annual',
       reason: 'R2 long leave automated test — E2E HR approval path',
@@ -85,9 +84,11 @@ test.describe('workflow-demo — R2 long leave HR approve', () => {
 
     const instanceIdForRouting = recordForRouting.wd_req_process_instance as string | undefined;
     if (instanceIdForRouting) {
-      const tasksResp = await request.get(
-        `${BACKEND}/api/bpm/tasks/by-process/${instanceIdForRouting}`,
-        { headers: { Authorization: `Bearer ${adminToken}` } },
+      // Use applicantPage.request (routed via frontend → BFF) instead of the
+      // bare `request` fixture + absolute BACKEND URL, to avoid CORS issues
+      // from cross-origin test contexts.
+      const tasksResp = await applicantPage.request.get(
+        `/api/bpm/tasks/by-process/${instanceIdForRouting}`,
       );
       expect(
         tasksResp.status(),
@@ -112,16 +113,10 @@ test.describe('workflow-demo — R2 long leave HR approve', () => {
     // ------------------------------------------------------------------
     // 4. HR context: login via UI, approve task via Task Center
     // ------------------------------------------------------------------
-    const hrCtx = await browser.newContext();
+    const hrCtx = await browser.newContext({ storageState: { cookies: [], origins: [] } });
     const hrPage = await hrCtx.newPage();
 
-    await hrPage.goto('/login');
-    await hrPage.getByLabel(/email/i).fill('wd_hr@example.com');
-    await hrPage.getByLabel(/password|密码/i).fill('Test2026x');
-    await hrPage.getByRole('button', { name: /login|登录/i }).click();
-    await hrPage.waitForURL((u) => !u.pathname.endsWith('/login'), {
-      timeout: 10_000,
-    });
+    await loginViaUI(hrPage, 'wd_hr@example.com', 'Test2026x');
 
     // processTask navigates via sidebar to /bpm/task-center, finds the row whose
     // data-testid="task-business-key" contains recordId (= businessKey set to

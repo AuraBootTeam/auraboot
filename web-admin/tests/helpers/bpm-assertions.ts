@@ -331,10 +331,27 @@ export async function startInstanceAndAdvance(
   startVars: Record<string, unknown>,
   steps: AdvanceStep[],
 ): Promise<{ instanceId: string; finalStatus: string }> {
+  // --- Resolve processKey from pid ---
+  // SmartEngine's startProcess API keys by processKey:version, not the DB pid (ULID).
+  // The /api/bpm/process-instances endpoint proxies processDefinitionId straight into
+  // SmartEngine, so we must pass the processKey here.
+  const pdResp = await api.get(`/api/bpm/process-definitions/${pdId}`, {
+    headers: authHeader(token),
+  });
+  expect(pdResp.ok(), `lookup PD ${pdId} failed with status ${pdResp.status()}`).toBe(true);
+  const pdBody = (await pdResp.json()) as Record<string, unknown>;
+  const pdData = pdBody?.data as Record<string, unknown> | undefined;
+  const processKey = pdData?.processKey as string | undefined;
+  if (!processKey) {
+    throw new Error(
+      `startInstanceAndAdvance: PD ${pdId} has no processKey field in DTO`,
+    );
+  }
+
   // --- Start process instance ---
   const startResp = await api.post('/api/bpm/process-instances', {
     headers: { ...authHeader(token), 'Content-Type': 'application/json' },
-    data: { processDefinitionId: pdId, variables: startVars },
+    data: { processDefinitionId: processKey, variables: startVars },
   });
 
   expect(
@@ -409,6 +426,18 @@ export async function startInstanceAndAdvance(
           `Task fields: ${Object.keys(task).join(', ')}`,
       );
     }
+
+    // Claim the task first so canCompleteTask passes for the caller's user.
+    // Without this, tasks configured with role/expression/starter assignees that
+    // resolved to a list of candidates (not just the caller) will 500 on complete.
+    const claimResp = await api.post(`/api/bpm/tasks/${taskId}/claim`, {
+      headers: authHeader(token),
+    });
+    expect(
+      claimResp.ok(),
+      `POST /api/bpm/tasks/${taskId}/claim failed with status ${claimResp.status()} ` +
+        `(step ${stepIndex}: taskDefKey="${step.taskDefKey}")`,
+    ).toBe(true);
 
     // Perform the action
     if (step.action === 'complete') {
