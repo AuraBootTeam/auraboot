@@ -69,6 +69,7 @@ export interface ListTableProps {
   t: (key: string) => string;
   onInlineSave?: (field: string, value: any, record: Record<string, any>) => Promise<void>;
   dictDataCache?: Map<string, DictItem[]>;
+  enableSelection?: boolean;
 }
 
 export const ListTable = React.memo(function ListTable({
@@ -102,6 +103,7 @@ export const ListTable = React.memo(function ListTable({
   t,
   onInlineSave,
   dictDataCache,
+  enableSelection = true,
 }: ListTableProps) {
   const effectiveRowHeight = rowHeight || DEFAULT_ROW_HEIGHT;
   const rowHeightCfg = ROW_HEIGHT_CONFIG[effectiveRowHeight];
@@ -154,8 +156,8 @@ export const ListTable = React.memo(function ListTable({
   );
 
   // Checkbox state
-  const allSelected = selectedIds.size > 0 && selectedIds.size === data.length;
-  const someSelected = selectedIds.size > 0 && selectedIds.size < data.length;
+  const allSelected = enableSelection && selectedIds.size > 0 && selectedIds.size === data.length;
+  const someSelected = enableSelection && selectedIds.size > 0 && selectedIds.size < data.length;
 
   // Visible data when grouping is active (exclude collapsed groups)
   const visibleData = useMemo(() => {
@@ -196,19 +198,20 @@ export const ListTable = React.memo(function ListTable({
           <table className="min-w-full divide-y divide-gray-200">
             <thead className={`bg-gray-50 ${enableVirtualization ? 'sticky top-0 z-20' : ''}`}>
               <tr>
-                {/* Checkbox column */}
-                <th className="print-hide w-10 px-3 py-3" data-print="hide">
-                  <input
-                    type="checkbox"
-                    checked={allSelected}
-                    ref={(el) => {
-                      if (el) el.indeterminate = someSelected;
-                    }}
-                    onChange={() => onSelectAll(!allSelected)}
-                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    data-testid="select-all-checkbox"
-                  />
-                </th>
+                {enableSelection && (
+                  <th className="print-hide w-10 px-3 py-3" data-print="hide">
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      ref={(el) => {
+                        if (el) el.indeterminate = someSelected;
+                      }}
+                      onChange={() => onSelectAll(!allSelected)}
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      data-testid="select-all-checkbox"
+                    />
+                  </th>
+                )}
 
                 {/* Data columns — draggable */}
                 {orderedDataColumns.map((column) => {
@@ -263,7 +266,7 @@ export const ListTable = React.memo(function ListTable({
               {loading ? (
                 <tr>
                   <td
-                    colSpan={(columns.length || 1) + 1}
+                    colSpan={(columns.length || 1) + (enableSelection ? 1 : 0)}
                     className="px-6 py-4 text-center"
                   >
                     <div className="flex items-center justify-center">
@@ -276,7 +279,7 @@ export const ListTable = React.memo(function ListTable({
                 /* Empty state */
                 <tr>
                   <td
-                    colSpan={(columns.length || 1) + 1}
+                    colSpan={(columns.length || 1) + (enableSelection ? 1 : 0)}
                     className="px-6 py-4 text-center text-gray-500"
                   >
                     {t('table.noData')}
@@ -296,7 +299,7 @@ export const ListTable = React.memo(function ListTable({
                           onClick={() => onToggleGroupCollapse(group.key)}
                         >
                           <td
-                            colSpan={(columns.length || 1) + 1}
+                            colSpan={(columns.length || 1) + (enableSelection ? 1 : 0)}
                             className="px-6 py-2 text-sm font-medium text-gray-700"
                           >
                             <span className="mr-2 text-xs text-gray-400">
@@ -325,7 +328,7 @@ export const ListTable = React.memo(function ListTable({
                     <tr>
                       <td
                         style={{ height: `${rowVirtualizer.getVirtualItems()[0]?.start ?? 0}px`, padding: 0, border: 'none' }}
-                        colSpan={(columns.length || 1) + 1}
+                        colSpan={(columns.length || 1) + (enableSelection ? 1 : 0)}
                       />
                     </tr>
                   )}
@@ -343,19 +346,21 @@ export const ListTable = React.memo(function ListTable({
                         style={{ height: `${rowHeightCfg.px}px`, ...cfInline }}
                         onClick={() => onRowClick(record)}
                       >
-                        <td
-                          className={`px-3 ${rowHeightCfg.pyClass} print-hide w-10`}
-                          data-print="hide"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedIds.has(rowId)}
-                            onChange={() => onSelectRow(rowId, !selectedIds.has(rowId))}
-                            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                            data-testid={`row-checkbox-${index}`}
-                          />
-                        </td>
+                        {enableSelection && (
+                          <td
+                            className={`px-3 ${rowHeightCfg.pyClass} print-hide w-10`}
+                            data-print="hide"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.has(rowId)}
+                              onChange={() => onSelectRow(rowId, !selectedIds.has(rowId))}
+                              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              data-testid={`row-checkbox-${index}`}
+                            />
+                          </td>
+                        )}
                         {orderedDataColumns.map((column) => {
                           const tdFrozenPos = column.fixed || (column as any).frozenPosition;
                           const tdFrozenLeft = tdFrozenPos === 'left';
@@ -426,7 +431,7 @@ export const ListTable = React.memo(function ListTable({
                           padding: 0,
                           border: 'none',
                         }}
-                        colSpan={(columns.length || 1) + 1}
+                        colSpan={(columns.length || 1) + (enableSelection ? 1 : 0)}
                       />
                     </tr>
                   )}

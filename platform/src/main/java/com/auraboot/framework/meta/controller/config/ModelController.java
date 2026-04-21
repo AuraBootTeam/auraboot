@@ -217,14 +217,20 @@ public class ModelController {
             @Parameter(description = "显示名称（模糊查询）") @RequestParam(required = false) String displayName,
             @Parameter(description = "模型类型") @RequestParam(required = false) String modelType,
             @Parameter(description = "状态") @RequestParam(required = false) String status,
+            @Parameter(description = "数据来源类型") @RequestParam(required = false) String sourceType,
+            @Parameter(description = "排序字段") @RequestParam(required = false) String sortField,
+            @Parameter(description = "排序方向") @RequestParam(required = false) String sortOrder,
 
             @Parameter(description = "是否只查询当前版本") @RequestParam(defaultValue = "true") Boolean currentOnly) {
 
-        log.info("查询模型列表: page={}, size={}, keyword={}, code={}, displayName={}, modelType={}, status={}",
-                page, size, keyword, code, displayName, modelType, status);
+        log.info(
+                "查询模型列表: page={}, size={}, keyword={}, code={}, displayName={}, modelType={}, status={}, sourceType={}, sortField={}, sortOrder={}",
+                page, size, keyword, code, displayName, modelType, status, sourceType, sortField, sortOrder
+        );
 
         PageResult<MetaModelDTO> result = metaModelService.searchModels(
-                page, size, keyword, code, displayName, modelType, status,   currentOnly);
+                page, size, keyword, code, displayName, modelType, status, sourceType, sortField, sortOrder, currentOnly
+        );
 
         log.info("模型列表查询完成: total={}", result.getTotal());
         return ApiResponse.success(result);

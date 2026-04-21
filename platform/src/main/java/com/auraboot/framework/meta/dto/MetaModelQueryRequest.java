@@ -39,6 +39,11 @@ public class MetaModelQueryRequest {
      */
     private String status;
 
+    /**
+     * 数据来源类型
+     */
+    private String sourceType;
+
       
 
     

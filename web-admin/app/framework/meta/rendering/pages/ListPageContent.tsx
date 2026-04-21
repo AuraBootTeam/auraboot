@@ -114,7 +114,7 @@ type QuickFilterKey = 'my_records' | 'created_today' | 'modified_this_week';
 
 // List Page Content Component
 export function ListPageContent(props: PageContentProps) {
-  const { schema, tableName, token } = props;
+  const { schema, tableName, token, listExtensions } = props;
   const { user } = useAuth();
   const { showSuccessToast, showErrorToast, showWarningToast, showInfoToast } = useToastContext();
   const showToast = useCallback(
@@ -408,7 +408,7 @@ export function ListPageContent(props: PageContentProps) {
     duplicateView,
     reload: reloadViews,
     loading: viewsLoading,
-  } = useSavedViews({ modelCode, pageKey, autoLoad: !!schema });
+  } = useSavedViews({ modelCode, pageKey, autoLoad: !!schema && !listExtensions?.hideSavedViews });
 
   // Resolve modelPid from modelCode for ViewManagePanel field operations
   const [modelPid, setModelPid] = useState<string | undefined>();
@@ -698,6 +698,13 @@ export function ListPageContent(props: PageContentProps) {
               }
             }
           }
+          if (activeSorts.length === 1) {
+            queryParams.sortField = activeSorts[0].fieldCode;
+            queryParams.sortOrder = activeSorts[0].direction;
+          } else if (tableBlock?.defaultSort?.field) {
+            queryParams.sortField = tableBlock.defaultSort.field;
+            queryParams.sortOrder = String(tableBlock.defaultSort.order || 'desc').toLowerCase();
+          }
         } else {
           // For standard dynamic tables, use JSON filters array
           const tabCondition = getTabFilter();
@@ -836,13 +843,31 @@ export function ListPageContent(props: PageContentProps) {
   // Initial data load - only execute once when schema is loaded
   // Pass current filters (which may include URL filter_* params) for the first load
   useEffect(() => {
-    if (schema) {
-      loadDataRef.current?.({ page: pagination.current - 1, size: pagination.pageSize, filters });
-    }
+      if (schema) {
+        loadDataRef.current?.({ page: pagination.current - 1, size: pagination.pageSize, filters });
+      }
     // Intentionally only react to schema changes.
     // Pagination or filter updates are handled by explicit user actions.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [schema]);
+
+  useEffect(() => {
+    listExtensions?.onDataChange?.(data);
+  }, [data, listExtensions]);
+
+  useEffect(() => {
+    const eventName = listExtensions?.reloadEventName;
+    if (!eventName) {
+      return;
+    }
+
+    const handleReload = () => {
+      loadDataRef.current?.({ page: pagination.current - 1, size: pagination.pageSize, filters });
+    };
+
+    window.addEventListener(eventName, handleReload);
+    return () => window.removeEventListener(eventName, handleReload);
+  }, [filters, pagination.current, pagination.pageSize, listExtensions?.reloadEventName]);
 
   // Handle tab change - reload data with tab filter
   const handleTabChange = useCallback(
@@ -907,6 +932,13 @@ export function ListPageContent(props: PageContentProps) {
                 }
               }
             }
+            if (activeSorts.length === 1) {
+              queryParams.sortField = activeSorts[0].fieldCode;
+              queryParams.sortOrder = activeSorts[0].direction;
+            } else if (tableBlock?.defaultSort?.field) {
+              queryParams.sortField = tableBlock.defaultSort.field;
+              queryParams.sortOrder = String(tableBlock.defaultSort.order || 'desc').toLowerCase();
+            }
           } else {
             const filtersParam = buildFiltersParam(tabCondition, filters, chipFilters);
             if (filtersParam) {
@@ -959,7 +991,7 @@ export function ListPageContent(props: PageContentProps) {
         }
       })();
     },
-    [schema, buildFiltersParam, filters, pagination.pageSize, tableName, token, t],
+    [schema, buildFiltersParam, filters, pagination.pageSize, tableName, token, t, activeSorts, tableBlock],
   );
 
   // Evaluate visibleWhen expression against a row record
@@ -1226,7 +1258,7 @@ export function ListPageContent(props: PageContentProps) {
       const effectiveValueType = inferValueType(column, value, record);
 
       // Null/undefined handling
-      if (value === null || value === undefined) {
+      if (!((column as any).allowNullRenderer === true) && (value === null || value === undefined)) {
         return <span className="text-gray-400">-</span>;
       }
 
@@ -1628,6 +1660,9 @@ export function ListPageContent(props: PageContentProps) {
   // Row click → navigate to detail page or open preview drawer
   const handleRowClick = useCallback(
     (record: Record<string, unknown>) => {
+      if (listExtensions?.disableRowClick) {
+        return;
+      }
       const pid = record.pid as string | undefined;
       if (!pid) return;
 
@@ -1659,7 +1694,7 @@ export function ListPageContent(props: PageContentProps) {
 
       setPreviewRecordId(pid);
     },
-    [schema, tableBlock, tableName, navigate],
+    [schema, tableBlock, tableName, navigate, listExtensions?.disableRowClick],
   );
 
   // All column definitions for ColumnSettingsPanel (with labels)
@@ -2126,6 +2161,10 @@ export function ListPageContent(props: PageContentProps) {
               resetMemberImportState();
               setMemberImportDialogOpen(true);
             }}
+            hideSavedViews={listExtensions?.hideSavedViews}
+            hideBuiltInImport={listExtensions?.hideBuiltInImport}
+            hideBuiltInExport={listExtensions?.hideBuiltInExport}
+            hideBuiltInPrint={listExtensions?.hideBuiltInPrint}
           />
 
           {isTenantMemberPage && memberImportDialogOpen && (
@@ -2691,6 +2730,7 @@ export function ListPageContent(props: PageContentProps) {
                 t={t}
                 onInlineSave={handleInlineSave}
                 dictDataCache={dictDataCache.current}
+                enableSelection={!!tableBlock?.table?.selection && !listExtensions?.disableRowSelection}
               />
 
               {/* G7 — misc blocks (chart / description / rich-text / divider /

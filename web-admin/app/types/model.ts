@@ -202,6 +202,7 @@ export interface ModelQueryParams {
   keyword?: string;
   modelType?: ModelType | '';
   status?: ModelStatus | '';
+  sourceType?: 'physical' | 'namedQuery' | 'sqlView' | 'endpoint' | '';
   page?: number;
   size?: number;
   sortField?: string;

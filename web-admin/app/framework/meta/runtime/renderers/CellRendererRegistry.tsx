@@ -15,6 +15,7 @@
  */
 
 import React from 'react';
+import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
 import dayjs from 'dayjs';
 import type { ExpressionContext } from '~/framework/meta/runtime/expression/context';
 
@@ -275,7 +276,13 @@ cellRendererRegistry.register('tag', ({ value, column }) => {
       const key = String(v);
       const entry = tagMap[key] ?? tagMap[key.toUpperCase()] ?? tagMap[key.toLowerCase()];
       if (entry) {
-        return { label: entry.label || key, color: entry.color || 'gray' };
+        return {
+          label:
+            typeof entry.label === 'string'
+              ? entry.label
+              : getLocalizedText(entry.label, locale),
+          color: entry.color || 'gray',
+        };
       }
     }
     return { label: String(v), color: colorMap[v] || 'gray' };
