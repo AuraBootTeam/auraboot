@@ -3,10 +3,10 @@ import React from 'react';
 export type SourceType = 'physical' | 'namedQuery' | 'endpoint' | 'sqlView';
 
 const LABELS: Record<SourceType, string> = {
-  physical: '物理',
-  namedQuery: '虚拟(namedQuery)',
-  endpoint: '虚拟(endpoint)',
-  sqlView: '虚拟(sqlView)',
+  physical: '物理表',
+  namedQuery: 'NamedQuery',
+  endpoint: 'Endpoint',
+  sqlView: 'SQL View',
 };
 
 const COLORS: Record<SourceType, string> = {

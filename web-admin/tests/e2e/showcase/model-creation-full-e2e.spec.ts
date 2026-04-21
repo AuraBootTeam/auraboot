@@ -38,6 +38,10 @@ function uniqueModelCode(prefix: string): string {
   return `${prefix}_${ts}_${rnd}`;
 }
 
+function modelListRow(page: Page, code: string) {
+  return page.locator('tbody tr', { hasText: code }).first();
+}
+
 async function navigateToModelListViaMenu(page: Page): Promise<void> {
   await page.goto('/dashboards', { waitUntil: 'domcontentloaded' }).catch(() => {});
 
@@ -56,7 +60,15 @@ async function navigateToModelListViaMenu(page: Page): Promise<void> {
   await leaf.evaluate((el: HTMLElement) => el.click());
   await listResp.catch(() => null);
 
-  await expect(page.getByTestId('sourcetype-filter-group')).toBeVisible({ timeout: 5_000 });
+  const ready = await Promise.any([
+    page.locator('[data-ab-testid="ab:list:meta_models:container"]').waitFor({
+      state: 'visible',
+      timeout: 5_000,
+    }),
+    page.getByTestId('list-search-input').waitFor({ state: 'visible', timeout: 5_000 }),
+    page.getByTestId('toolbar-btn-create').waitFor({ state: 'visible', timeout: 5_000 }),
+  ]).catch(() => null);
+  expect(ready).not.toBeNull();
 
   // Dismiss Vite HMR error overlay if present (pre-existing dev-mode warning).
   await page.evaluate(() => {
@@ -73,14 +85,14 @@ async function clickCreateButton(page: Page): Promise<void> {
 }
 
 async function searchByKeyword(page: Page, keyword: string): Promise<void> {
-  const input = page.getByTestId('filter-keyword');
+  const input = page.getByTestId('list-search-input');
   await input.click();
   await input.fill(keyword);
   const resp = page.waitForResponse(
     (r) => r.url().includes('/api/meta/models') && r.status() === 200,
     { timeout: 5_000 },
   );
-  await page.getByTestId('filter-search').click();
+  await input.press('Enter');
   await resp.catch(() => null);
 }
 
@@ -272,9 +284,9 @@ test.describe('Task A — Model creation full lifecycle E2E', () => {
     // 8. Back to list — search + confirm row visible.
     await navigateToModelListViaMenu(page);
     await searchByKeyword(page, code);
-    const sourceCell = page.getByTestId(`model-source-cell-${code}`);
-    await expect(sourceCell).toBeVisible({ timeout: 5_000 });
-    await expect(sourceCell).toContainText(/物理|Physical/i);
+    const row = modelListRow(page, code);
+    await expect(row).toBeVisible({ timeout: 5_000 });
+    await expect(row).toContainText(/物理表|Physical|Physical Table/i);
 
     // 9. Capabilities API — assert response shape (OSS returns flags).
     const caps = await page.request.get(`/api/meta/models/${code}/capabilities`);
@@ -428,7 +440,7 @@ test.describe('Task A — Model creation full lifecycle E2E', () => {
 
     await navigateToModelListViaMenu(page);
     await searchByKeyword(page, physCode);
-    const row = page.locator(`tr:has([data-testid="model-source-cell-${physCode}"])`);
+    const row = modelListRow(page, physCode);
     await expect(row).toBeVisible({ timeout: 5_000 });
 
     // Click 查看 inside the row.
@@ -438,9 +450,9 @@ test.describe('Task A — Model creation full lifecycle E2E', () => {
     // Physical → no virtual-model-strip.
     await expect(page.getByTestId('virtual-model-strip')).toHaveCount(0);
     // Both kinds render the 6 tab buttons (basic/fields/permissions/versions/pages/runtime).
-    await expect(page.locator('nav button:has-text("基本信息")')).toBeVisible();
-    await expect(page.locator('nav button:has-text("字段")')).toBeVisible();
-    await expect(page.locator('nav button:has-text("权限点")')).toBeVisible();
+    await expect(page.locator('nav button').filter({ hasText: /^基本信息$/ }).first()).toBeVisible();
+    await expect(page.locator('nav button').filter({ hasText: /^字段(?:\s*\(\d+\))?$/ }).first()).toBeVisible();
+    await expect(page.locator('nav button').filter({ hasText: /^权限点(?:\s*\(\d+\))?$/ }).first()).toBeVisible();
   });
 
   // -------------------------------------------------------------------------
@@ -459,7 +471,7 @@ test.describe('Task A — Model creation full lifecycle E2E', () => {
     await navigateToModelListViaMenu(page);
     await searchByKeyword(page, code);
 
-    const row = page.locator(`tr:has([data-testid="model-source-cell-${code}"])`);
+    const row = modelListRow(page, code);
     await expect(row).toBeVisible({ timeout: 5_000 });
     await row.locator('button:has-text("编辑")').click();
 
@@ -498,9 +510,7 @@ test.describe('Task A — Model creation full lifecycle E2E', () => {
 
       await navigateToModelListViaMenu(page);
       await searchByKeyword(page, code);
-      await expect(
-        page.locator(`tr:has([data-testid="model-source-cell-${code}"])`),
-      ).toContainText(newName);
+      await expect(modelListRow(page, code)).toContainText(newName);
     } else {
       // eslint-disable-next-line no-console
       console.warn(
@@ -529,7 +539,7 @@ test.describe('Task A — Model creation full lifecycle E2E', () => {
     await navigateToModelListViaMenu(page);
     await searchByKeyword(page, code);
 
-    const row = page.locator(`tr:has([data-testid="model-source-cell-${code}"])`);
+    const row = modelListRow(page, code);
     await expect(row).toBeVisible({ timeout: 5_000 });
     await row.locator('button:has-text("删除")').click();
 
@@ -552,7 +562,7 @@ test.describe('Task A — Model creation full lifecycle E2E', () => {
     // simplify back to `expect(dr.ok()).toBe(true)`.
     if (dr.ok()) {
       await searchByKeyword(page, code);
-      await expect(page.getByTestId(`model-source-cell-${code}`)).toHaveCount(0);
+      await expect(modelListRow(page, code)).toHaveCount(0);
 
       const afterDelete = await api.getModelByCode(code);
       if (afterDelete.data) {

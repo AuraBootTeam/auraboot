@@ -12,12 +12,14 @@
   "minPlatformVersion": "1.0.0",
   "dependencies": [],
   "resourceDirs": {
+    "pages": "config/pages.json",
     "permissions": "config/permissions.json",
     "menus": "config/menus.json"
   },
   "importOptions": {
     "conflictStrategy": "overwrite",
     "validateReferences": false,
+    "autoPublishPages": true,
     "createResourcePermissions": false
   }
 }

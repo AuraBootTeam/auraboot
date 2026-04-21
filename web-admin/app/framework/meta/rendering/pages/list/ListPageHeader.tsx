@@ -44,6 +44,10 @@ export interface ListPageHeaderProps {
   isTenantMemberPage?: boolean;
   onInvite?: () => void;
   onImportMembers?: () => void;
+  hideSavedViews?: boolean;
+  hideBuiltInImport?: boolean;
+  hideBuiltInExport?: boolean;
+  hideBuiltInPrint?: boolean;
 }
 
 export const ListPageHeader: React.FC<ListPageHeaderProps> = ({
@@ -69,22 +73,28 @@ export const ListPageHeader: React.FC<ListPageHeaderProps> = ({
   isTenantMemberPage,
   onInvite,
   onImportMembers,
+  hideSavedViews,
+  hideBuiltInImport,
+  hideBuiltInExport,
+  hideBuiltInPrint,
 }) => {
   return (
     <div className="border-b border-gray-200 px-6 py-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
-          <ViewSelector
-            views={savedViews}
-            currentView={currentView}
-            onSelectView={onSelectView}
-            onCreateView={onCreateView}
-            onManageViews={onManageViews}
-            loading={viewsLoading}
-            activeViewType={activeViewType}
-            onViewTypeChange={onViewTypeChange}
-          />
+          {!hideSavedViews && (
+            <ViewSelector
+              views={savedViews}
+              currentView={currentView}
+              onSelectView={onSelectView}
+              onCreateView={onCreateView}
+              onManageViews={onManageViews}
+              loading={viewsLoading}
+              activeViewType={activeViewType}
+              onViewTypeChange={onViewTypeChange}
+            />
+          )}
         </div>
         <div
           className="print-hide flex items-center gap-2"
@@ -122,7 +132,9 @@ export const ListPageHeader: React.FC<ListPageHeaderProps> = ({
             onExport={onExport}
             modelCode={modelCode}
             filters={exportFilters}
-            hideBuiltInImport={isTenantMemberPage}
+            hideBuiltInImport={hideBuiltInImport ?? isTenantMemberPage}
+            hideBuiltInExport={hideBuiltInExport}
+            hideBuiltInPrint={hideBuiltInPrint}
           />
         </div>
       </div>

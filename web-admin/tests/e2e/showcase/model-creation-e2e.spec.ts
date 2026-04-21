@@ -28,6 +28,10 @@ function uniqueModelCode(prefix: string): string {
   return `${prefix}_${ts}_${rnd}`;
 }
 
+function modelListRow(page: Page, code: string) {
+  return page.locator('tbody tr', { hasText: code }).first();
+}
+
 /**
  * Navigate to the model management list page through the sidebar menu.
  * Required by red line "page.goto 直达禁止".
@@ -53,8 +57,17 @@ async function navigateToModelListViaMenu(page: Page): Promise<void> {
   await leaf.evaluate((el: HTMLElement) => el.click());
   await listResp.catch(() => null);
 
-  // Confirm we landed on the list (filter group is the most stable testid).
-  await expect(page.getByTestId('sourcetype-filter-group')).toBeVisible({ timeout: 5_000 });
+  // Confirm we landed on the list. The legacy sourceType pill group was removed
+  // when the page was migrated to the schema-driven list shell.
+  const ready = await Promise.any([
+    page.locator('[data-ab-testid="ab:list:meta_models:container"]').waitFor({
+      state: 'visible',
+      timeout: 5_000,
+    }),
+    page.getByTestId('list-search-input').waitFor({ state: 'visible', timeout: 5_000 }),
+    page.getByTestId('toolbar-btn-create').waitFor({ state: 'visible', timeout: 5_000 }),
+  ]).catch(() => null);
+  expect(ready).not.toBeNull();
 
   // Dismiss any Vite HMR error overlay that intercepts pointer events.
   // Pre-existing dev-mode lazy-import warnings on /meta/models leak an
@@ -73,6 +86,19 @@ async function clickCreateButton(page: Page): Promise<void> {
   await btn.click();
   await expect(page.getByTestId('model-type-physical')).toBeVisible({ timeout: 8_000 });
   await expect(page.getByTestId('model-type-virtual')).toBeVisible();
+}
+
+async function searchByKeyword(page: Page, keyword: string): Promise<void> {
+  const input = page.getByTestId('list-search-input');
+  await expect(input).toBeVisible({ timeout: 5_000 });
+  await input.click();
+  await input.fill(keyword);
+  const resp = page.waitForResponse(
+    (r) => r.url().includes('/api/meta/models') && r.status() === 200,
+    { timeout: 10_000 },
+  );
+  await input.press('Enter');
+  await resp.catch(() => null);
 }
 
 // ---------------------------------------------------------------------------
@@ -147,19 +173,11 @@ test.describe('Phase 1 — Model creation E2E', () => {
     await navigateToModelListViaMenu(page);
 
     // Filter by keyword to make the new row appear on the first page.
-    const keyword = page.getByTestId('filter-keyword');
-    await keyword.click();
-    await keyword.fill(code);
-    await page.getByTestId('filter-search').click();
-    await page.waitForResponse(
-      (r) => r.url().includes('/api/meta/models') && r.status() === 200,
-      { timeout: 10_000 },
-    );
+    await searchByKeyword(page, code);
 
-    const sourceCell = page.getByTestId(`model-source-cell-${code}`);
-    await expect(sourceCell).toBeVisible({ timeout: 10_000 });
-    // Badge text should mention the physical concept (zh "物理" or en "Physical").
-    await expect(sourceCell).toContainText(/物理|Physical/i);
+    const row = modelListRow(page, code);
+    await expect(row).toBeVisible({ timeout: 10_000 });
+    await expect(row).toContainText(/物理表|Physical|Physical Table/i);
   });
 
   // -------------------------------------------------------------------------
@@ -280,36 +298,11 @@ test.describe('Phase 1 — Model creation E2E', () => {
     // 1. Navigate to list via sidebar (click).
     await navigateToModelListViaMenu(page);
 
-    // 2. Filter — All → Physical → Virtual, asserting filter state changes.
-    const allBtn = page.getByTestId('sourcetype-filter-all');
-    const physBtn = page.getByTestId('sourcetype-filter-physical');
-    const virtBtn = page.getByTestId('sourcetype-filter-virtual');
-    await expect(allBtn).toBeVisible();
-
-    await physBtn.click();
-    // active button has bg-blue-600 + text-white classes — assert via attribute.
-    await expect(physBtn).toHaveClass(/bg-blue-600/);
-    await expect(virtBtn).not.toHaveClass(/bg-blue-600/);
-
-    await virtBtn.click();
-    await expect(virtBtn).toHaveClass(/bg-blue-600/);
-    await expect(physBtn).not.toHaveClass(/bg-blue-600/);
-
-    await allBtn.click();
-    await expect(allBtn).toHaveClass(/bg-blue-600/);
-
-    // 3. Search for the physical model and assert the row + sourceType badge.
-    const keyword = page.getByTestId('filter-keyword');
-    await keyword.click();
-    await keyword.fill(physCode);
-    await page.getByTestId('filter-search').click();
-    await page.waitForResponse(
-      (r) => r.url().includes('/api/meta/models') && r.status() === 200,
-      { timeout: 10_000 },
-    );
-    const physCell = page.getByTestId(`model-source-cell-${physCode}`);
-    await expect(physCell).toBeVisible({ timeout: 10_000 });
-    await expect(physCell).toContainText(/物理|Physical/i);
+    // 2. Search for the physical model and assert the row + sourceType badge.
+    await searchByKeyword(page, physCode);
+    const row = modelListRow(page, physCode);
+    await expect(row).toBeVisible({ timeout: 10_000 });
+    await expect(row).toContainText(/物理表|Physical|Physical Table/i);
 
     // 4. Capabilities API contract — physical model should be readable + writable.
     // OSS build does not expose /api/meta/models/{code}/capabilities (404/500);
@@ -346,15 +339,12 @@ test.describe('Phase 1 — Model creation E2E', () => {
 
     // 5. Detail tab divergence — open the physical model's detail page by clicking
     // its row link (not page.goto). Then count the rendered tabs.
-    const codeLink = page
-      .locator(`tr:has([data-testid="model-source-cell-${physCode}"]) a`)
-      .first();
+    const codeLink = modelListRow(page, physCode).locator('a').first();
     if (await codeLink.isVisible({ timeout: 2_000 }).catch(() => false)) {
       await codeLink.click();
     } else {
       // Fall back to the eye/view button in the actions column.
-      const viewBtn = page
-        .locator(`tr:has([data-testid="model-source-cell-${physCode}"])`)
+      const viewBtn = modelListRow(page, physCode)
         .locator('button, a')
         .filter({ hasText: /查看|View|详情|Detail/i })
         .first();
