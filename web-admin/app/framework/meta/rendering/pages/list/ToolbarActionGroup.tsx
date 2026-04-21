@@ -28,6 +28,8 @@ export interface ToolbarActionGroupProps {
   modelCode: string;
   filters?: Array<{ field: string; operator: string; value: unknown }>;
   hideBuiltInImport?: boolean;
+  hideBuiltInExport?: boolean;
+  hideBuiltInPrint?: boolean;
 }
 
 /** Default pinning logic: primary buttons are pinned, first 2 non-primary are pinned */
@@ -92,6 +94,8 @@ export const ToolbarActionGroup: React.FC<ToolbarActionGroupProps> = ({
   modelCode,
   filters,
   hideBuiltInImport,
+  hideBuiltInExport,
+  hideBuiltInPrint,
 }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [configPanelOpen, setConfigPanelOpen] = useState(false);
@@ -134,6 +138,12 @@ export const ToolbarActionGroup: React.FC<ToolbarActionGroupProps> = ({
     }
     return { pinnedButtons: pinned, overflowButtons: overflow };
   }, [effectiveConfig, buttons, evaluateVisible]);
+
+  const hasBuiltInMenuItems =
+    (!hideBuiltInImport && builtinVisibility._import) ||
+    (!hideBuiltInExport && (builtinVisibility._export_excel || builtinVisibility._export_csv)) ||
+    (!hideBuiltInPrint && builtinVisibility._print);
+  const showMoreButton = overflowButtons.length > 0 || hasBuiltInMenuItems;
 
   // Close menu on outside click
   useEffect(() => {
@@ -179,7 +189,7 @@ export const ToolbarActionGroup: React.FC<ToolbarActionGroupProps> = ({
       ))}
 
       {/* More button with overflow menu */}
-      <div ref={menuRef} className="relative inline-block">
+      {showMoreButton && <div ref={menuRef} className="relative inline-block">
         <button
           type="button"
           data-testid="toolbar-more-menu"
@@ -244,7 +254,7 @@ export const ToolbarActionGroup: React.FC<ToolbarActionGroupProps> = ({
               </button>
             )}
 
-            {builtinVisibility._export_excel && (
+            {!hideBuiltInExport && builtinVisibility._export_excel && (
               <button
                 type="button"
                 data-testid="more-menu-export-excel"
@@ -271,7 +281,7 @@ export const ToolbarActionGroup: React.FC<ToolbarActionGroupProps> = ({
               </button>
             )}
 
-            {builtinVisibility._export_csv && (
+            {!hideBuiltInExport && builtinVisibility._export_csv && (
               <button
                 type="button"
                 data-testid="more-menu-export-csv"
@@ -298,7 +308,7 @@ export const ToolbarActionGroup: React.FC<ToolbarActionGroupProps> = ({
               </button>
             )}
 
-            {builtinVisibility._print && (
+            {!hideBuiltInPrint && builtinVisibility._print && (
               <button
                 type="button"
                 data-testid="more-menu-print"
@@ -357,7 +367,7 @@ export const ToolbarActionGroup: React.FC<ToolbarActionGroupProps> = ({
             </button>
           </div>
         )}
-      </div>
+      </div>}
 
       {/* Action config panel */}
       {configPanelOpen && (

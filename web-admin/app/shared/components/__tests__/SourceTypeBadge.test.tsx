@@ -8,10 +8,10 @@ describe('SourceTypeBadge', () => {
   });
 
   it.each([
-    ['physical', '物理'],
-    ['namedQuery', '虚拟(namedQuery)'],
-    ['endpoint', '虚拟(endpoint)'],
-    ['sqlView', '虚拟(sqlView)'],
+    ['physical', '物理表'],
+    ['namedQuery', 'NamedQuery'],
+    ['endpoint', 'Endpoint'],
+    ['sqlView', 'SQL View'],
   ])('renders %s as "%s"', (type, expected) => {
     render(<SourceTypeBadge sourceType={type} />);
     expect(screen.getByText(expected)).toBeInTheDocument();
@@ -19,7 +19,7 @@ describe('SourceTypeBadge', () => {
 
   it('defaults to physical when sourceType is undefined', () => {
     render(<SourceTypeBadge />);
-    expect(screen.getByText('物理')).toBeInTheDocument();
+    expect(screen.getByText('物理表')).toBeInTheDocument();
   });
 
   it('shows raw value for unknown sourceType', () => {

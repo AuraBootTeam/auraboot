@@ -1,6 +1,7 @@
 package com.auraboot.framework.meta.service;
 
 import com.auraboot.framework.integration.BaseIntegrationTest;
+import com.auraboot.framework.common.dto.PageResult;
 import com.auraboot.framework.meta.dto.FieldDefinition;
 import com.auraboot.framework.meta.dto.ModelCapabilities;
 import com.auraboot.framework.meta.dto.ModelDefinition;
@@ -158,5 +159,44 @@ class MetaModelServiceVirtualIntegrationTest extends BaseIntegrationTest {
         assertThatThrownBy(() -> metaModelService.getDefinitionByCode(code))
             .isInstanceOf(MetaServiceException.class)
             .hasMessageContaining("capabilities");
+    }
+
+    @Test
+    void searchModels_filters_by_sourceType_on_server_side() {
+        String ts = String.valueOf(System.currentTimeMillis());
+
+        metaModelService.saveDefinition(ModelDefinition.builder()
+            .code("p1_t3_phys_filter_" + ts)
+            .displayName("Physical Filter")
+            .tableName("mt_p1_t3_phys_filter_" + ts)
+            .sourceType("physical")
+            .primaryKey("id")
+            .capabilities(ModelCapabilities.fullPhysical())
+            .build());
+
+        metaModelService.saveDefinition(ModelDefinition.builder()
+            .code("p1_t3_named_query_filter_" + ts)
+            .displayName("NamedQuery Filter")
+            .sourceType("namedQuery")
+            .sourceRef("queries/filter_" + ts + ".sql")
+            .primaryKey("id")
+            .capabilities(ModelCapabilities.virtualReadOnly())
+            .build());
+
+        PageResult<?> physicalPage = metaModelService.searchModels(
+            1, 50, "p1_t3_", null, null, null, null, "physical", null, null, true
+        );
+        assertThat(physicalPage.getRecords())
+            .extracting("code")
+            .contains("p1_t3_phys_filter_" + ts)
+            .doesNotContain("p1_t3_named_query_filter_" + ts);
+
+        PageResult<?> namedQueryPage = metaModelService.searchModels(
+            1, 50, "p1_t3_", null, null, null, null, "namedQuery", null, null, true
+        );
+        assertThat(namedQueryPage.getRecords())
+            .extracting("code")
+            .contains("p1_t3_named_query_filter_" + ts)
+            .doesNotContain("p1_t3_phys_filter_" + ts);
     }
 }

@@ -1,0 +1,451 @@
+[
+  {
+    "pageKey": "meta_models_admin",
+    "name:zh-CN": "模型管理",
+    "name:en": "Model Management",
+    "modelCode": "meta_models",
+    "kind": "list",
+    "profile": "admin",
+    "schemaVersion": 2,
+    "title": {
+      "zh-CN": "模型",
+      "en-US": "Models"
+    },
+    "layout": {
+      "type": "stack",
+      "gap": 0
+    },
+    "extension": {
+      "dataSource": {
+        "type": "api",
+        "endpoint": "/api/meta/models",
+        "method": "get"
+      }
+    },
+    "blocks": [
+      {
+        "id": "model_filters",
+        "blockType": "filters",
+        "fields": [
+          {
+            "field": "sourceType",
+            "label": {
+              "zh-CN": "数据来源",
+              "en-US": "Data Source"
+            },
+            "component": "SmartSelect",
+            "dataSource": {
+              "type": "static",
+              "data": [
+                { "value": "", "label": { "zh-CN": "全部来源", "en-US": "All Sources" } },
+                { "value": "physical", "label": { "zh-CN": "物理表", "en-US": "Physical Table" } },
+                { "value": "namedQuery", "label": "NamedQuery" },
+                { "value": "sqlView", "label": "SQL View" },
+                { "value": "endpoint", "label": "Endpoint" }
+              ],
+              "valueField": "value",
+              "labelField": "label"
+            },
+            "props": {
+              "placeholder": {
+                "zh-CN": "全部来源",
+                "en-US": "All Sources"
+              }
+            }
+          },
+          {
+            "field": "status",
+            "label": {
+              "zh-CN": "状态",
+              "en-US": "Status"
+            },
+            "component": "SmartSelect",
+            "dataSource": {
+              "type": "static",
+              "data": [
+                { "value": "", "label": { "zh-CN": "全部状态", "en-US": "All Statuses" } },
+                { "value": "draft", "label": { "zh-CN": "草稿", "en-US": "Draft" } },
+                { "value": "published", "label": { "zh-CN": "已发布", "en-US": "Published" } },
+                { "value": "archived", "label": { "zh-CN": "已归档", "en-US": "Archived" } }
+              ],
+              "valueField": "value",
+              "labelField": "label"
+            },
+            "props": {
+              "placeholder": {
+                "zh-CN": "全部状态",
+                "en-US": "All Statuses"
+              }
+            }
+          }
+        ],
+        "buttons": [
+          {
+            "code": "reset",
+            "content": {
+              "zh-CN": "重置",
+              "en-US": "Reset"
+            }
+          },
+          {
+            "code": "search",
+            "content": {
+              "zh-CN": "查询",
+              "en-US": "Search"
+            },
+            "primary": true
+          }
+        ]
+      },
+      {
+        "id": "model_toolbar",
+        "blockType": "form-buttons",
+        "buttons": [
+          {
+            "code": "create",
+            "content": {
+              "zh-CN": "新建模型",
+              "en-US": "New Model"
+            },
+            "primary": true,
+            "navigateTo": "/meta/models/new"
+          }
+        ]
+      },
+      {
+        "id": "model_table",
+        "blockType": "table",
+        "table": {
+          "rowKey": "pid",
+          "dataSource": "modelList",
+          "pagination": {
+            "pageSize": 20,
+            "pageSizeOptions": [20, 50, 100],
+            "showTotal": true,
+            "showSizeChanger": true
+          },
+          "columns": [
+            {
+              "field": "code",
+              "label": {
+                "zh-CN": "模型编码",
+                "en-US": "Model Code"
+              },
+              "width": 220,
+              "sortable": true,
+              "valueType": "meta_model_code"
+            },
+            {
+              "field": "displayName",
+              "label": {
+                "zh-CN": "显示名称",
+                "en-US": "Display Name"
+              },
+              "width": 220,
+              "sortable": true
+            },
+            {
+              "field": "sourceType",
+              "label": {
+                "zh-CN": "数据来源",
+                "en-US": "Data Source"
+              },
+              "width": 140,
+              "valueType": "meta_model_source_type",
+              "allowNullRenderer": true
+            },
+            {
+              "field": "health",
+              "label": {
+                "zh-CN": "健康",
+                "en-US": "Health"
+              },
+              "width": 140,
+              "valueType": "meta_model_health",
+              "allowNullRenderer": true
+            },
+            {
+              "field": "status",
+              "label": {
+                "zh-CN": "状态",
+                "en-US": "Status"
+              },
+              "width": 110,
+              "valueType": "tag",
+              "tagMap": {
+                "draft": { "label": { "zh-CN": "草稿", "en-US": "Draft" }, "color": "gray" },
+                "published": { "label": { "zh-CN": "已发布", "en-US": "Published" }, "color": "green" },
+                "archived": { "label": { "zh-CN": "已归档", "en-US": "Archived" }, "color": "blue" },
+                "deprecated": { "label": { "zh-CN": "已废弃", "en-US": "Deprecated" }, "color": "orange" },
+                "disabled": { "label": { "zh-CN": "已禁用", "en-US": "Disabled" }, "color": "red" }
+              }
+            },
+            {
+              "field": "version",
+              "label": {
+                "zh-CN": "版本",
+                "en-US": "Version"
+              },
+              "width": 80,
+              "sortable": true
+            },
+            {
+              "field": "fieldCount",
+              "label": {
+                "zh-CN": "字段数",
+                "en-US": "Field Count"
+              },
+              "width": 90
+            },
+            {
+              "field": "createdAt",
+              "label": {
+                "zh-CN": "创建时间",
+                "en-US": "Created At"
+              },
+              "width": 180,
+              "sortable": true,
+              "valueType": "datetime"
+            },
+            {
+              "field": "pid",
+              "label": {
+                "zh-CN": "操作",
+                "en-US": "Actions"
+              },
+              "width": 190,
+              "valueType": "meta_model_actions"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "pageKey": "meta_fields_admin",
+    "name:zh-CN": "字段库",
+    "name:en": "Field Library",
+    "modelCode": "meta_fields",
+    "kind": "list",
+    "profile": "admin",
+    "schemaVersion": 2,
+    "title": {
+      "zh-CN": "字段库",
+      "en-US": "Field Library"
+    },
+    "layout": {
+      "type": "stack",
+      "gap": 0
+    },
+    "extension": {
+      "dataSource": {
+        "type": "api",
+        "endpoint": "/api/meta/field-library/search",
+        "method": "post"
+      }
+    },
+    "blocks": [
+      {
+        "id": "field_filters",
+        "blockType": "filters",
+        "fields": [
+          {
+            "field": "baseType",
+            "label": {
+              "zh-CN": "基础类型",
+              "en-US": "Base Type"
+            },
+            "component": "SmartSelect",
+            "dataSource": {
+              "type": "static",
+              "data": [
+                { "value": "", "label": { "zh-CN": "全部类型", "en-US": "All Types" } },
+                { "value": "string", "label": "String" },
+                { "value": "integer", "label": "Integer" },
+                { "value": "long", "label": "Long" },
+                { "value": "decimal", "label": "Decimal" },
+                { "value": "boolean", "label": "Boolean" },
+                { "value": "date", "label": "Date" },
+                { "value": "datetime", "label": "DateTime" },
+                { "value": "text", "label": "Text" },
+                { "value": "json", "label": "json" },
+                { "value": "reference", "label": "Reference" }
+              ],
+              "valueField": "value",
+              "labelField": "label"
+            },
+            "props": {
+              "placeholder": {
+                "zh-CN": "全部类型",
+                "en-US": "All Types"
+              }
+            }
+          },
+          {
+            "field": "semanticType",
+            "label": {
+              "zh-CN": "语义类型",
+              "en-US": "Semantic Type"
+            },
+            "component": "SmartInput",
+            "props": {
+              "placeholder": "email, phone"
+            }
+          },
+          {
+            "field": "systemFieldsOnly",
+            "label": {
+              "zh-CN": "仅系统字段",
+              "en-US": "System Fields Only"
+            },
+            "component": "checkbox",
+            "props": {
+              "checkedLabel": {
+                "zh-CN": "是",
+                "en-US": "Yes"
+              },
+              "uncheckedLabel": {
+                "zh-CN": "否",
+                "en-US": "No"
+              }
+            }
+          },
+          {
+            "field": "unusedOnly",
+            "label": {
+              "zh-CN": "仅未使用",
+              "en-US": "Unused Only"
+            },
+            "component": "checkbox",
+            "props": {
+              "checkedLabel": {
+                "zh-CN": "是",
+                "en-US": "Yes"
+              },
+              "uncheckedLabel": {
+                "zh-CN": "否",
+                "en-US": "No"
+              }
+            }
+          }
+        ],
+        "buttons": [
+          {
+            "code": "reset",
+            "content": {
+              "zh-CN": "重置",
+              "en-US": "Reset"
+            }
+          },
+          {
+            "code": "search",
+            "content": {
+              "zh-CN": "查询",
+              "en-US": "Search"
+            },
+            "primary": true
+          }
+        ]
+      },
+      {
+        "id": "field_toolbar",
+        "blockType": "form-buttons",
+        "buttons": [
+          {
+            "code": "create",
+            "content": {
+              "zh-CN": "新建字段",
+              "en-US": "New Field"
+            },
+            "primary": true,
+            "navigateTo": "/meta/fields/new"
+          }
+        ]
+      },
+      {
+        "id": "field_table",
+        "blockType": "table",
+        "table": {
+          "rowKey": "pid",
+          "dataSource": "fieldList",
+          "pagination": {
+            "pageSize": 20,
+            "pageSizeOptions": [20, 50, 100],
+            "showTotal": true,
+            "showSizeChanger": true
+          },
+          "columns": [
+            {
+              "field": "code",
+              "label": {
+                "zh-CN": "字段编码",
+                "en-US": "Field Code"
+              },
+              "width": 220,
+              "valueType": "meta_field_code"
+            },
+            {
+              "field": "dataType",
+              "label": {
+                "zh-CN": "数据类型",
+                "en-US": "Data Type"
+              },
+              "width": 140
+            },
+            {
+              "field": "status",
+              "label": {
+                "zh-CN": "状态",
+                "en-US": "Status"
+              },
+              "width": 110,
+              "valueType": "tag",
+              "tagMap": {
+                "draft": { "label": { "zh-CN": "草稿", "en-US": "Draft" }, "color": "gray" },
+                "published": { "label": { "zh-CN": "已发布", "en-US": "Published" }, "color": "green" },
+                "archived": { "label": { "zh-CN": "已归档", "en-US": "Archived" }, "color": "blue" },
+                "deprecated": { "label": { "zh-CN": "已废弃", "en-US": "Deprecated" }, "color": "orange" },
+                "disabled": { "label": { "zh-CN": "已禁用", "en-US": "Disabled" }, "color": "red" }
+              }
+            },
+            {
+              "field": "version",
+              "label": {
+                "zh-CN": "版本",
+                "en-US": "Version"
+              },
+              "width": 90
+            },
+            {
+              "field": "required",
+              "label": {
+                "zh-CN": "必填",
+                "en-US": "Required"
+              },
+              "width": 90,
+              "valueType": "boolean"
+            },
+            {
+              "field": "createdAt",
+              "label": {
+                "zh-CN": "创建时间",
+                "en-US": "Created At"
+              },
+              "width": 180,
+              "valueType": "datetime"
+            },
+            {
+              "field": "pid",
+              "label": {
+                "zh-CN": "操作",
+                "en-US": "Actions"
+              },
+              "width": 220,
+              "valueType": "meta_field_actions"
+            }
+          ]
+        }
+      }
+    ]
+  }
+]

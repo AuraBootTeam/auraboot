@@ -317,6 +317,7 @@ public interface MetaModelMapper extends BaseMapper<Model> {
      * @param keyword Search keyword
      * @param modelType Model type filter
      * @param status Status filter
+     * @param sourceType Source type filter
      * @param currentOnly Whether to only return current versions
      * @param offset Pagination offset
      * @param limit Pagination limit
@@ -340,7 +341,29 @@ public interface MetaModelMapper extends BaseMapper<Model> {
         <if test="status != null and status != ''">
           AND status = #{status}
         </if>
-        ORDER BY created_at DESC
+        <if test="sourceType != null and sourceType != ''">
+          <choose>
+            <when test="sourceType == 'physical'">
+              AND (source_type = 'physical' OR source_type IS NULL OR source_type = '')
+            </when>
+            <otherwise>
+              AND source_type = #{sourceType}
+            </otherwise>
+          </choose>
+        </if>
+        ORDER BY
+        <choose>
+          <when test="sortField == 'code'">code</when>
+          <when test="sortField == 'displayName'">extension->>'displayName'</when>
+          <when test="sortField == 'status'">status</when>
+          <when test="sortField == 'version'">version</when>
+          <when test="sortField == 'createdAt'">created_at</when>
+          <otherwise>created_at</otherwise>
+        </choose>
+        <choose>
+          <when test="sortOrder == 'asc'">ASC</when>
+          <otherwise>DESC</otherwise>
+        </choose>
         LIMIT #{limit} OFFSET #{offset}
         </script>
         """)
@@ -348,6 +371,9 @@ public interface MetaModelMapper extends BaseMapper<Model> {
         @Param("keyword") String keyword,
         @Param("modelType") String modelType,
         @Param("status") String status,
+        @Param("sourceType") String sourceType,
+        @Param("sortField") String sortField,
+        @Param("sortOrder") String sortOrder,
         @Param("currentOnly") Boolean currentOnly,
         @Param("offset") long offset,
         @Param("limit") long limit
@@ -358,6 +384,7 @@ public interface MetaModelMapper extends BaseMapper<Model> {
      * @param keyword Search keyword
      * @param modelType Model type filter
      * @param status Status filter
+     * @param sourceType Source type filter
      * @param currentOnly Whether to only count current versions
      * @return Total count
      */
@@ -379,12 +406,23 @@ public interface MetaModelMapper extends BaseMapper<Model> {
         <if test="status != null and status != ''">
           AND status = #{status}
         </if>
+        <if test="sourceType != null and sourceType != ''">
+          <choose>
+            <when test="sourceType == 'physical'">
+              AND (source_type = 'physical' OR source_type IS NULL OR source_type = '')
+            </when>
+            <otherwise>
+              AND source_type = #{sourceType}
+            </otherwise>
+          </choose>
+        </if>
         </script>
         """)
     long countByKeyword(
         @Param("keyword") String keyword,
         @Param("modelType") String modelType,
         @Param("status") String status,
+        @Param("sourceType") String sourceType,
         @Param("currentOnly") Boolean currentOnly
     );
 }

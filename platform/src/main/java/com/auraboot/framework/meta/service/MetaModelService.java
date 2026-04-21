@@ -418,13 +418,13 @@ public interface MetaModelService {
      * @param displayName 显示名称模糊匹配
      * @param modelType 模型类型
      * @param status 状态
-       
+     * @param sourceType 数据来源类型
      * @param currentOnly 是否只查询当前版本
      * @return 分页结果
      */
     PageResult<MetaModelDTO> searchModels(
-        Integer page, Integer size, String keyword, String code, String displayName,
-        String modelType, String status,  Boolean currentOnly
+            Integer page, Integer size, String keyword, String code, String displayName,
+            String modelType, String status, String sourceType, String sortField, String sortOrder, Boolean currentOnly
     );
 
     /**

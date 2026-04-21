@@ -21,6 +21,16 @@ export interface PageContentProps {
   tableName: string;
   recordId?: string;
   token?: string | null;
+  listExtensions?: {
+    onDataChange?: (records: Record<string, any>[]) => void;
+    disableRowClick?: boolean;
+    disableRowSelection?: boolean;
+    hideBuiltInImport?: boolean;
+    hideBuiltInExport?: boolean;
+    hideBuiltInPrint?: boolean;
+    hideSavedViews?: boolean;
+    reloadEventName?: string;
+  };
   // --- L1 SDK extensions ---
   initialValues?: Record<string, any>;
   fieldPermissions?: Record<string, 'editable' | 'readonly' | 'hidden'>;

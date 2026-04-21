@@ -1799,10 +1799,12 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
     @Override
     public PageResult<MetaModelDTO> searchModels(
             Integer page, Integer size, String keyword, String code, String displayName,
-            String modelType, String status,  Boolean currentOnly) {
+            String modelType, String status, String sourceType, String sortField, String sortOrder, Boolean currentOnly) {
 
-        log.info("分页查询模型列表: page={}, size={}, keyword={}, code={}, displayName={}, modelType={}, status={}",
-                page, size, keyword, code, displayName, modelType, status);
+        log.info(
+                "分页查询模型列表: page={}, size={}, keyword={}, code={}, displayName={}, modelType={}, status={}, sourceType={}, sortField={}, sortOrder={}",
+                page, size, keyword, code, displayName, modelType, status, sourceType, sortField, sortOrder
+        );
 
         // Validate and set defaults
         if (page == null || page < 1) page = 1;
@@ -1825,11 +1827,14 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
         long offset = (long) (page - 1) * size;
 
         // Get total count
-        long total = metaModelMapper.countByKeyword(searchKeyword, modelType, status, currentOnly);
+        long total = metaModelMapper.countByKeyword(
+                searchKeyword, modelType, status, sourceType, currentOnly
+        );
 
         // Get page data
         List<Model> models = metaModelMapper.searchByKeyword(
-                searchKeyword, modelType, status, currentOnly, offset, size);
+                searchKeyword, modelType, status, sourceType, sortField, sortOrder, currentOnly, offset, size
+        );
 
         // Convert to DTOs
         List<MetaModelDTO> dtos = models.stream()

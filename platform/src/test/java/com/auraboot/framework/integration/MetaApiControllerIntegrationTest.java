@@ -125,11 +125,46 @@ public class MetaApiControllerIntegrationTest extends BaseIntegrationTest {
 
         metaModelService.create(request);
 
-        var result = metaModelService.searchModels(1, 10, null, null, null, null, null, true);
+        var result = metaModelService.searchModels(1, 10, null, null, null, null, null, null, null, null, true);
 
         assertNotNull(result, "Search result should not be null");
         assertNotNull(result.getRecords(), "Result records should not be null");
         assertTrue(result.getTotal() > 0, "Should have at least one model");
+    }
+
+    /**
+     * Test 3.1: Search models supports server-side single-field sorting
+     */
+    @Test
+    @Order(31)
+    public void test031_searchModelsSupportsSorting() {
+        String prefix = uniqueCode("sort_test_model");
+
+        MetaModelCreateRequest bRequest = new MetaModelCreateRequest();
+        bRequest.setCode(prefix + "_b");
+        bRequest.setDisplayName("Sort Test B");
+        bRequest.setModelType("entity");
+        bRequest.setTenantId(MetaContext.getCurrentTenantId());
+        metaModelService.create(bRequest);
+
+        MetaModelCreateRequest aRequest = new MetaModelCreateRequest();
+        aRequest.setCode(prefix + "_a");
+        aRequest.setDisplayName("Sort Test A");
+        aRequest.setModelType("entity");
+        aRequest.setTenantId(MetaContext.getCurrentTenantId());
+        metaModelService.create(aRequest);
+
+        var result = metaModelService.searchModels(
+            1, 10, prefix, null, null, null, null, null, "code", "asc", true
+        );
+
+        assertNotNull(result, "Search result should not be null");
+        assertNotNull(result.getRecords(), "Result records should not be null");
+        assertTrue(result.getRecords().size() >= 2, "Should include both seeded models");
+        assertTrue(
+            result.getRecords().get(0).getCode().compareTo(result.getRecords().get(1).getCode()) <= 0,
+            "Records should be sorted by code ascending"
+        );
     }
 
     /**
