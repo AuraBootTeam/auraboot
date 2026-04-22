@@ -332,11 +332,11 @@ public interface MetaModelMapper extends BaseMapper<Model> {
         </if>
         <if test="keyword != null and keyword != ''">
           AND (code LIKE CONCAT('%', #{keyword}, '%')
-               OR extension->>'displayName' LIKE CONCAT('%', #{keyword}, '%')
-               OR extension->>'description' LIKE CONCAT('%', #{keyword}, '%'))
+               OR COALESCE(extension->>'displayName', extension->'extension'->>'displayName') LIKE CONCAT('%', #{keyword}, '%')
+               OR COALESCE(extension->>'description', extension->'extension'->>'description') LIKE CONCAT('%', #{keyword}, '%'))
         </if>
         <if test="modelType != null and modelType != ''">
-          AND extension->>'modelType' = #{modelType}
+          AND COALESCE(extension->>'modelType', extension->'extension'->>'modelType') = #{modelType}
         </if>
         <if test="status != null and status != ''">
           AND status = #{status}
@@ -354,7 +354,7 @@ public interface MetaModelMapper extends BaseMapper<Model> {
         ORDER BY
         <choose>
           <when test="sortField == 'code'">code</when>
-          <when test="sortField == 'displayName'">extension->>'displayName'</when>
+          <when test="sortField == 'displayName'">COALESCE(extension->>'displayName', extension->'extension'->>'displayName')</when>
           <when test="sortField == 'status'">status</when>
           <when test="sortField == 'version'">version</when>
           <when test="sortField == 'createdAt'">created_at</when>
@@ -397,11 +397,11 @@ public interface MetaModelMapper extends BaseMapper<Model> {
         </if>
         <if test="keyword != null and keyword != ''">
           AND (code LIKE CONCAT('%', #{keyword}, '%')
-               OR extension->>'displayName' LIKE CONCAT('%', #{keyword}, '%')
-               OR extension->>'description' LIKE CONCAT('%', #{keyword}, '%'))
+               OR COALESCE(extension->>'displayName', extension->'extension'->>'displayName') LIKE CONCAT('%', #{keyword}, '%')
+               OR COALESCE(extension->>'description', extension->'extension'->>'description') LIKE CONCAT('%', #{keyword}, '%'))
         </if>
         <if test="modelType != null and modelType != ''">
-          AND extension->>'modelType' = #{modelType}
+          AND COALESCE(extension->>'modelType', extension->'extension'->>'modelType') = #{modelType}
         </if>
         <if test="status != null and status != ''">
           AND status = #{status}
