@@ -449,10 +449,11 @@ test.describe('Task A — Model creation full lifecycle E2E', () => {
 
     // Physical → no virtual-model-strip.
     await expect(page.getByTestId('virtual-model-strip')).toHaveCount(0);
-    // Both kinds render the 6 tab buttons (basic/fields/permissions/versions/pages/runtime).
-    await expect(page.locator('nav button').filter({ hasText: /^基本信息$/ }).first()).toBeVisible();
+    // Both kinds render the control-center tabs (overview/fields/pages/versions/runtime/advanced).
+    await expect(page.locator('nav button').filter({ hasText: /^概览$/ }).first()).toBeVisible();
     await expect(page.locator('nav button').filter({ hasText: /^字段(?:\s*\(\d+\))?$/ }).first()).toBeVisible();
-    await expect(page.locator('nav button').filter({ hasText: /^权限点(?:\s*\(\d+\))?$/ }).first()).toBeVisible();
+    await expect(page.locator('nav button').filter({ hasText: /^页面(?:\s*\(\d+\))?$/ }).first()).toBeVisible();
+    await expect(page.locator('nav button').filter({ hasText: /^高级$/ }).first()).toBeVisible();
   });
 
   // -------------------------------------------------------------------------
