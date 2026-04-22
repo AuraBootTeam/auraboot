@@ -11,10 +11,10 @@
  * - 版本管理
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { useNavigate, useParams, useLoaderData, useLocation, Link } from 'react-router';
 import type { LoaderFunctionArgs } from 'react-router';
-import { modelService } from '~/shared/services/modelService';
+import { modelService, type RelatedPage } from '~/shared/services/modelService';
 import { confirmDialog } from '~/utils/confirmDialog';
 import { permissionService } from '~/shared/services/permissionService';
 import { useToastContext } from '~/contexts/ToastContext';
@@ -55,7 +55,47 @@ function capabilityLabel(key: string): string {
 /**
  * Tab类型定义
  */
-type TabType = 'basic' | 'fields' | 'permissions' | 'versions' | 'pages' | 'runtime';
+type TabType = 'overview' | 'fields' | 'pages' | 'versions' | 'runtime' | 'advanced';
+
+type StandardPageKind = 'list' | 'detail' | 'form';
+
+function formatDateLabel(value?: string): string {
+  if (!value) return '-';
+  const timestamp = Date.parse(value);
+  if (Number.isNaN(timestamp)) return '-';
+  return new Date(timestamp).toLocaleString();
+}
+
+function getPageStatus(page: RelatedPage | null | undefined): string {
+  const status = page && typeof page.status === 'string' ? page.status.toLowerCase() : '';
+  if (status === 'published') return '已发布';
+  if (status === 'draft') return '草稿';
+  if (status === 'archived') return '已归档';
+  return page ? '未标记' : '未创建';
+}
+
+function getPageStatusClass(page: RelatedPage | null | undefined): string {
+  const status = page && typeof page.status === 'string' ? page.status.toLowerCase() : '';
+  if (status === 'published') return 'bg-green-100 text-green-800';
+  if (status === 'draft') return 'bg-amber-100 text-amber-800';
+  if (status === 'archived') return 'bg-gray-100 text-gray-700';
+  return page ? 'bg-sky-100 text-sky-800' : 'bg-gray-100 text-gray-500';
+}
+
+function normalizePageKind(page: RelatedPage): StandardPageKind | 'custom' {
+  const raw = String(page.kind || page.type || '').toLowerCase();
+  if (raw.includes('list')) return 'list';
+  if (raw.includes('detail') || raw.includes('view')) return 'detail';
+  if (raw.includes('form') || raw.includes('edit') || raw.includes('new')) return 'form';
+  return 'custom';
+}
+
+function resolvePageRoute(page: RelatedPage): string {
+  if (typeof page.route === 'string' && page.route.startsWith('/')) {
+    return page.route;
+  }
+  return `/p/${page.code}`;
+}
 
 /**
  * Loader函数 - 加载Model数据
@@ -102,8 +142,10 @@ export default function ModelDetailPage() {
    */
   const getInitialTab = (): TabType => {
     const hash = location.hash.replace('#', '');
-    const validTabs: TabType[] = ['basic', 'fields', 'permissions', 'versions', 'pages', 'runtime'];
-    return validTabs.includes(hash as TabType) ? (hash as TabType) : 'basic';
+    if (hash === 'basic') return 'overview';
+    if (hash === 'permissions') return 'advanced';
+    const validTabs: TabType[] = ['overview', 'fields', 'pages', 'versions', 'runtime', 'advanced'];
+    return validTabs.includes(hash as TabType) ? (hash as TabType) : 'overview';
   };
 
   // 当前激活的Tab
@@ -143,6 +185,45 @@ export default function ModelDetailPage() {
   const [connectivityStatus, setConnectivityStatus] = useState<
     { ok: boolean; message?: string } | null
   >(null);
+
+  const standardPages = useMemo(() => {
+    const grouped: Record<StandardPageKind, RelatedPage | null> = {
+      list: null,
+      detail: null,
+      form: null,
+    };
+    for (const page of pages as RelatedPage[]) {
+      const kind = normalizePageKind(page);
+      if (kind !== 'custom' && !grouped[kind]) {
+        grouped[kind] = page;
+      }
+    }
+    return grouped;
+  }, [pages]);
+
+  const customPages = useMemo(
+    () => (pages as RelatedPage[]).filter((page) => normalizePageKind(page) === 'custom'),
+    [pages],
+  );
+
+  const primaryDesignerPage = useMemo(
+    () =>
+      standardPages.detail ||
+      standardPages.list ||
+      standardPages.form ||
+      (pages[0] as RelatedPage | undefined) ||
+      null,
+    [pages, standardPages],
+  );
+
+  const latestPage = useMemo(() => {
+    const sorted = [...(pages as Array<RelatedPage & { updatedAt?: string }>)].sort((a, b) => {
+      const left = a.updatedAt ? Date.parse(a.updatedAt) : 0;
+      const right = b.updatedAt ? Date.parse(b.updatedAt) : 0;
+      return right - left;
+    });
+    return sorted[0] ?? null;
+  }, [pages]);
 
   /**
    * 虚拟 Model: 重新检测 schema
@@ -479,17 +560,23 @@ export default function ModelDetailPage() {
    * 预览表单
    */
   const handlePreviewForm = useCallback(() => {
-    // TODO: 实现表单预览功能
-    showSuccessToast('表单预览功能开发中');
-  }, [showSuccessToast]);
+    if (standardPages.form) {
+      navigate(resolvePageRoute(standardPages.form));
+      return;
+    }
+    showSuccessToast('暂无表单页，先创建页面');
+  }, [navigate, showSuccessToast, standardPages.form]);
 
   /**
    * 预览列表
    */
   const handlePreviewList = useCallback(() => {
-    // TODO: 实现列表预览功能
-    showSuccessToast('列表预览功能开发中');
-  }, [showSuccessToast]);
+    if (standardPages.list) {
+      navigate(resolvePageRoute(standardPages.list));
+      return;
+    }
+    showSuccessToast('暂无列表页，先创建页面');
+  }, [navigate, showSuccessToast, standardPages.list]);
 
   /**
    * 打开CRUD向导
@@ -497,6 +584,39 @@ export default function ModelDetailPage() {
   const handleOpenCrudWizard = useCallback(() => {
     setShowCrudWizard(true);
   }, []);
+
+  const handleOpenPageDesigner = useCallback(() => {
+    if (primaryDesignerPage?.pid) {
+      navigate(`/page-designer/${primaryDesignerPage.pid}`);
+      return;
+    }
+    navigate(`/p/page_schema/new?modelCode=${encodeURIComponent(model.code)}`);
+  }, [model.code, navigate, primaryDesignerPage]);
+
+  const handleCreatePage = useCallback(
+    (kind?: string) => {
+      const params = new URLSearchParams({ modelCode: model.code });
+      if (kind) {
+        params.set('kind', kind);
+      }
+      navigate(`/p/page_schema/new?${params.toString()}`);
+    },
+    [model.code, navigate],
+  );
+
+  const handleOpenPage = useCallback(
+    (page: RelatedPage) => {
+      navigate(resolvePageRoute(page));
+    },
+    [navigate],
+  );
+
+  const handleEditPage = useCallback(
+    (page: RelatedPage) => {
+      navigate(`/page-designer/${page.pid}`);
+    },
+    [navigate],
+  );
 
   /**
    * 关闭CRUD向导
@@ -564,56 +684,130 @@ export default function ModelDetailPage() {
 
   return (
     <div className="mx-auto max-w-7xl p-6">
-      {/* 页面标题和操作按钮 */}
-      <div className="mb-6 flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">{model.displayName}</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            模型编码: <span className="font-mono text-blue-600">{model.code}</span>
-            {model.description && ` · ${model.description}`}
-          </p>
-        </div>
+      <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+          <div className="space-y-4">
+            <div>
+              <div className="mb-2 flex flex-wrap items-center gap-2">
+                <span
+                  className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
+                    model.status === 'published'
+                      ? 'bg-green-100 text-green-800'
+                      : model.status === 'draft'
+                        ? 'bg-yellow-100 text-yellow-800'
+                        : 'bg-gray-100 text-gray-800'
+                  }`}
+                >
+                  {model.status === 'published' && '已发布'}
+                  {model.status === 'draft' && '草稿'}
+                  {model.status === 'archived' && '已归档'}
+                </span>
+                <SourceTypeBadge sourceType={model.sourceType} />
+              </div>
+              <h1 className="text-2xl font-bold text-gray-900">{model.displayName}</h1>
+              <p className="mt-1 text-sm text-gray-500">
+                模型编码: <span className="font-mono text-blue-600">{model.code}</span>
+                {model.description && ` · ${model.description}`}
+              </p>
+            </div>
 
-        <div className="flex gap-2">
-          {model.status === 'draft' && (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+                <div className="text-xs uppercase tracking-wide text-gray-500">字段</div>
+                <div className="mt-1 text-lg font-semibold text-gray-900">{fields.length}</div>
+              </div>
+              <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+                <div className="text-xs uppercase tracking-wide text-gray-500">页面</div>
+                <div className="mt-1 text-lg font-semibold text-gray-900">{pages.length}</div>
+              </div>
+              <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+                <div className="text-xs uppercase tracking-wide text-gray-500">版本</div>
+                <div className="mt-1 text-lg font-semibold text-gray-900">{model.version || 'N/A'}</div>
+              </div>
+              <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+                <div className="text-xs uppercase tracking-wide text-gray-500">最近更新</div>
+                <div className="mt-1 text-sm font-medium text-gray-900">
+                  {new Date(model.updatedAt).toLocaleDateString()}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 lg:max-w-md lg:justify-end">
             <button
-              onClick={handlePublishClick}
-              className="rounded-md bg-green-600 px-4 py-2 text-white hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:outline-none"
-              disabled={loading || publishLoading}
+              onClick={handleOpenPageDesigner}
+              className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:outline-none"
             >
-              {publishLoading ? '加载中...' : '发布'}
+              打开页面设计
             </button>
-          )}
-          {model.status === 'published' && (
             <button
-              onClick={handleUnpublish}
-              className="rounded-md bg-yellow-500 px-4 py-2 text-white hover:bg-yellow-600 focus:ring-2 focus:ring-yellow-400 focus:outline-none"
+              onClick={() => {
+                if (standardPages.detail) {
+                  handleOpenPage(standardPages.detail);
+                } else {
+                  handlePreviewList();
+                }
+              }}
+              className="rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-gray-500 focus:outline-none"
+            >
+              预览
+            </button>
+            <button
+              onClick={handleEdit}
+              className="rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-gray-500 focus:outline-none"
               disabled={loading}
             >
-              取消发布
+              编辑模型
             </button>
-          )}
-          <button
-            onClick={handleEdit}
-            className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-            disabled={loading}
-          >
-            编辑
-          </button>
-          <button
-            onClick={handleRefreshCache}
-            className="rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-gray-500 focus:outline-none"
-            disabled={loading}
-          >
-            刷新缓存
-          </button>
-          <button
-            onClick={handleDelete}
-            className="rounded-md border border-red-300 px-4 py-2 text-red-700 hover:bg-red-50 focus:ring-2 focus:ring-red-500 focus:outline-none"
-            disabled={loading}
-          >
-            删除
-          </button>
+            <details className="group relative">
+              <summary className="list-none rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-gray-500 focus:outline-none">
+                更多
+              </summary>
+              <div className="absolute right-0 z-10 mt-2 w-44 rounded-xl border border-gray-200 bg-white p-2 shadow-lg">
+                {model.status === 'draft' && (
+                  <button
+                    onClick={handlePublishClick}
+                    className="block w-full rounded-lg px-3 py-2 text-left text-sm text-green-700 hover:bg-green-50"
+                    disabled={loading || publishLoading}
+                  >
+                    {publishLoading ? '加载中...' : '发布模型'}
+                  </button>
+                )}
+                {model.status === 'published' && (
+                  <button
+                    onClick={handleUnpublish}
+                    className="block w-full rounded-lg px-3 py-2 text-left text-sm text-amber-700 hover:bg-amber-50"
+                    disabled={loading}
+                  >
+                    取消发布
+                  </button>
+                )}
+                <button
+                  onClick={handleRefreshCache}
+                  className="block w-full rounded-lg px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                  disabled={loading}
+                >
+                  刷新缓存
+                </button>
+                {isVirtualModel(model) && (
+                  <button
+                    className="block w-full rounded-lg px-3 py-2 text-left text-sm text-blue-700 hover:bg-blue-50"
+                    onClick={() => triggerRedetection(model.pid)}
+                    data-testid="redetect-btn"
+                  >
+                    重新检测
+                  </button>
+                )}
+                <button
+                  onClick={handleDelete}
+                  className="block w-full rounded-lg px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50"
+                  disabled={loading}
+                >
+                  删除模型
+                </button>
+              </div>
+            </details>
+          </div>
         </div>
       </div>
 
@@ -622,14 +816,14 @@ export default function ModelDetailPage() {
         <div className="border-b border-gray-200">
           <nav className="-mb-px flex">
             <button
-              onClick={() => handleTabChange('basic')}
+              onClick={() => handleTabChange('overview')}
               className={`border-b-2 px-6 py-3 text-sm font-medium ${
-                activeTab === 'basic'
+                activeTab === 'overview'
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
               }`}
             >
-              基本信息
+              概览
             </button>
             <button
               onClick={() => handleTabChange('fields')}
@@ -642,14 +836,14 @@ export default function ModelDetailPage() {
               字段 ({fields.length})
             </button>
             <button
-              onClick={() => handleTabChange('permissions')}
+              onClick={() => handleTabChange('pages')}
               className={`border-b-2 px-6 py-3 text-sm font-medium ${
-                activeTab === 'permissions'
+                activeTab === 'pages'
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
               }`}
             >
-              权限点 ({permissions.length})
+              页面 ({pages.length})
             </button>
             <button
               onClick={() => handleTabChange('versions')}
@@ -662,16 +856,6 @@ export default function ModelDetailPage() {
               版本 ({versions.length})
             </button>
             <button
-              onClick={() => handleTabChange('pages')}
-              className={`border-b-2 px-6 py-3 text-sm font-medium ${
-                activeTab === 'pages'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
-              }`}
-            >
-              关联页面 ({pages.length})
-            </button>
-            <button
               onClick={() => handleTabChange('runtime')}
               className={`border-b-2 px-6 py-3 text-sm font-medium ${
                 activeTab === 'runtime'
@@ -681,13 +865,23 @@ export default function ModelDetailPage() {
             >
               运行时验证
             </button>
+            <button
+              onClick={() => handleTabChange('advanced')}
+              className={`border-b-2 px-6 py-3 text-sm font-medium ${
+                activeTab === 'advanced'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+              }`}
+            >
+              高级
+            </button>
           </nav>
         </div>
 
         {/* Tab内容 */}
         <div className="p-6">
-          {/* 基本信息Tab */}
-          {activeTab === 'basic' && (
+          {/* 概览Tab */}
+          {activeTab === 'overview' && (
             <div className="space-y-6">
               {isVirtualModel(model) && (
                 <div
@@ -718,131 +912,108 @@ export default function ModelDetailPage() {
                           ))}
                       </div>
                     </div>
-                    <button
-                      className="shrink-0 rounded border border-blue-300 bg-white px-3 py-1.5 text-xs text-blue-700 hover:bg-blue-100"
-                      onClick={() => triggerRedetection(model.pid)}
-                      data-testid="redetect-btn"
-                    >
-                      🔄 重新检测
-                    </button>
                   </div>
                 </div>
               )}
-              <div className="grid grid-cols-2 gap-6">
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">模型编码</label>
-                  <div className="font-mono text-sm text-gray-900">{model.code}</div>
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">显示名称</label>
-                  <div className="text-sm text-gray-900">{model.displayName}</div>
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">模型类型</label>
-                  <div className="text-sm text-gray-900">
-                    {model.modelType === 'entity' && '实体'}
-                    {model.modelType === 'view' && '视图'}
-                    {model.modelType === 'aggregate' && '聚合'}
-                  </div>
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">状态</label>
-                  <div className="text-sm">
-                    <span
-                      className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
-                        model.status === 'published'
-                          ? 'bg-green-100 text-green-800'
-                          : model.status === 'draft'
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : 'bg-gray-100 text-gray-800'
-                      }`}
-                    >
-                      {model.status === 'published' && '已发布'}
-                      {model.status === 'draft' && '草稿'}
-                      {model.status === 'archived' && '已归档'}
-                    </span>
-                  </div>
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">版本号</label>
-                  <div className="font-mono text-sm text-gray-900">{model.version || 'N/A'}</div>
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    是否当前版本
-                  </label>
-                  <div className="text-sm text-gray-900">{model.isCurrent ? '是' : '否'}</div>
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">命名空间</label>
-                  <div className="text-sm text-gray-900">{model.namespace || '-'}</div>
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">环境</label>
-                  <div className="text-sm text-gray-900">{model.env || '-'}</div>
-                </div>
-                <div className="col-span-2">
-                  <label className="mb-1 block text-sm font-medium text-gray-700">描述</label>
-                  <div className="text-sm text-gray-900">{model.description || '-'}</div>
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">创建时间</label>
-                  <div className="text-sm text-gray-900">
-                    {new Date(model.createdAt).toLocaleString()}
-                  </div>
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">更新时间</label>
-                  <div className="text-sm text-gray-900">
-                    {new Date(model.updatedAt).toLocaleString()}
-                  </div>
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">创建人</label>
-                  <div className="text-sm text-gray-900">{model.createdBy}</div>
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">更新人</label>
-                  <div className="text-sm text-gray-900">{model.updatedBy}</div>
-                </div>
-                {model.releaseId && (
-                  <>
+              <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+                <div className="rounded-xl border border-gray-200 p-5">
+                  <h2 className="mb-4 text-sm font-semibold tracking-wide text-gray-900">模型信息</h2>
+                  <div className="grid grid-cols-2 gap-5">
                     <div>
-                      <label className="mb-1 block text-sm font-medium text-gray-700">
-                        Release ID
-                      </label>
-                      <div className="font-mono text-sm text-gray-900">{model.releaseId}</div>
+                      <label className="mb-1 block text-sm font-medium text-gray-700">模型编码</label>
+                      <div className="font-mono text-sm text-gray-900">{model.code}</div>
                     </div>
                     <div>
-                      <label className="mb-1 block text-sm font-medium text-gray-700">
-                        Release PID
-                      </label>
-                      <div className="font-mono text-sm text-gray-900">{model.releasePid}</div>
+                      <label className="mb-1 block text-sm font-medium text-gray-700">显示名称</label>
+                      <div className="text-sm text-gray-900">{model.displayName}</div>
                     </div>
-                  </>
-                )}
-              </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-gray-700">状态</label>
+                      <div className="text-sm text-gray-900">{model.status}</div>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-gray-700">来源</label>
+                      <div className="text-sm text-gray-900">{model.sourceType || 'physical'}</div>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-gray-700">命名空间</label>
+                      <div className="text-sm text-gray-900">{model.namespace || '-'}</div>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-gray-700">环境</label>
+                      <div className="text-sm text-gray-900">{model.env || '-'}</div>
+                    </div>
+                    <div className="col-span-2">
+                      <label className="mb-1 block text-sm font-medium text-gray-700">描述</label>
+                      <div className="text-sm text-gray-900">{model.description || '-'}</div>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-gray-700">更新时间</label>
+                      <div className="text-sm text-gray-900">{new Date(model.updatedAt).toLocaleString()}</div>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-gray-700">更新人</label>
+                      <div className="text-sm text-gray-900">{model.updatedBy}</div>
+                    </div>
+                  </div>
+                </div>
 
-              {/* 操作按钮 */}
-              <div className="flex gap-3 border-t pt-4">
-                <button
-                  onClick={handlePreviewForm}
-                  className="rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
-                >
-                  预览表单
-                </button>
-                <button
-                  onClick={handlePreviewList}
-                  className="rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
-                >
-                  预览列表
-                </button>
-                <button
-                  onClick={handleOpenCrudWizard}
-                  className="rounded-md bg-green-600 px-4 py-2 text-white hover:bg-green-700"
-                >
-                  生成CRUD页面
-                </button>
+                <div className="rounded-xl border border-gray-200 p-5">
+                  <h2 className="mb-4 text-sm font-semibold tracking-wide text-gray-900">设计联动摘要</h2>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <div className="text-xs uppercase tracking-wide text-gray-500">页面覆盖情况</div>
+                      {(['list', 'detail', 'form'] as StandardPageKind[]).map((kind) => {
+                        const page = standardPages[kind];
+                        const label =
+                          kind === 'list' ? '列表页' : kind === 'detail' ? '详情页' : '表单页';
+                        return (
+                          <div
+                            key={kind}
+                            className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                          >
+                            <span className="text-gray-700">{label}</span>
+                            <span className={page ? 'text-green-700' : 'text-gray-400'}>
+                              {page ? '已创建' : '未创建'}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="rounded-lg bg-gray-50 p-3">
+                      <div className="text-xs uppercase tracking-wide text-gray-500">最近编辑页面</div>
+                      <div className="mt-1 text-sm font-medium text-gray-900">
+                        {latestPage?.title || latestPage?.code || '暂无页面'}
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => handleCreatePage('list')}
+                        className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                      >
+                        新建列表页
+                      </button>
+                      <button
+                        onClick={() => handleCreatePage('detail')}
+                        className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                      >
+                        新建详情页
+                      </button>
+                      <button
+                        onClick={() => handleCreatePage('form')}
+                        className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                      >
+                        新建表单页
+                      </button>
+                      <button
+                        onClick={handleOpenCrudWizard}
+                        className="rounded-md bg-green-600 px-3 py-2 text-sm text-white hover:bg-green-700"
+                      >
+                        一键生成 CRUD
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -850,6 +1021,25 @@ export default function ModelDetailPage() {
           {/* 字段Tab */}
           {activeTab === 'fields' && (
             <div>
+              {pages.length > 0 && (
+                <div className="mb-3 flex items-center justify-between rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">
+                  <span>此模型已有 {pages.length} 个关联页面，字段变更可能影响页面配置。</span>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleTabChange('pages')}
+                      className="rounded border border-sky-300 bg-white px-3 py-1.5 text-xs text-sky-700 hover:bg-sky-100"
+                    >
+                      查看关联页面
+                    </button>
+                    <button
+                      onClick={handleOpenPageDesigner}
+                      className="rounded border border-sky-300 bg-white px-3 py-1.5 text-xs text-sky-700 hover:bg-sky-100"
+                    >
+                      打开页面设计
+                    </button>
+                  </div>
+                </div>
+              )}
               {isVirtualModel(model) && (
                 <div
                   className="mb-3 rounded bg-amber-50 p-3 text-xs text-amber-800"
@@ -869,43 +1059,6 @@ export default function ModelDetailPage() {
                 onFieldBound={handleFieldBound}
                 onDictConfig={handleDictConfig}
               />
-            </div>
-          )}
-
-          {/* 权限点Tab */}
-          {activeTab === 'permissions' && (
-            <div>
-              {permissions.length === 0 ? (
-                <div className="py-12 text-center">
-                  <p className="text-gray-500">暂无权限点</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {permissions.map((permission) => (
-                    <div key={permission.id} className="rounded-lg border border-gray-200 p-4">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <h3 className="text-sm font-medium text-gray-900">
-                            {permission.displayName}
-                          </h3>
-                          <p className="mt-1 text-sm text-gray-500">{permission.description}</p>
-                          <div className="mt-2 flex gap-2">
-                            <span className="inline-flex rounded bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800">
-                              {permission.type}
-                            </span>
-                            <span className="inline-flex rounded bg-green-100 px-2 py-1 text-xs font-medium text-green-800">
-                              {permission.action}
-                            </span>
-                          </div>
-                        </div>
-                        <button className="text-sm text-blue-600 hover:text-blue-900">
-                          查看引用
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
           )}
 
@@ -976,54 +1129,174 @@ export default function ModelDetailPage() {
 
           {/* 关联页面Tab */}
           {activeTab === 'pages' && (
-            <div>
-              <div className="mb-4 flex justify-end">
-                <Link
-                  to={`/p/page_schema/new?modelCode=${encodeURIComponent(model.code)}`}
-                  className="inline-flex items-center gap-1 rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
-                  data-testid="create-page-for-model-btn"
-                >
-                  + 为此 Model 新建页面
-                </Link>
-              </div>
-              {pages.length === 0 ? (
-                <div className="py-12 text-center">
-                  <p className="text-gray-500">暂无关联页面</p>
+            <div className="space-y-6">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">页面工作台</h2>
+                  <p className="mt-1 text-sm text-gray-500">从这里直接创建、访问或编辑此模型的页面设计。</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
                   <button
-                    onClick={handleOpenCrudWizard}
-                    className="mt-4 rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+                    onClick={() => handleCreatePage()}
+                    className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                    data-testid="create-page-for-model-btn"
                   >
-                    生成CRUD页面
+                    新建页面
+                  </button>
+                  <button
+                    onClick={handleOpenPageDesigner}
+                    className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                  >
+                    打开页面设计
                   </button>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  {pages.map((page) => (
-                    <div key={page.id} className="rounded-lg border border-gray-200 p-4">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h3 className="text-sm font-medium text-gray-900">{page.name}</h3>
-                            {page.kind && (
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-3">
+                {(['list', 'detail', 'form'] as StandardPageKind[]).map((kind) => {
+                  const page = standardPages[kind];
+                  const label =
+                    kind === 'list' ? '列表页' : kind === 'detail' ? '详情页' : '表单页';
+                  return (
+                    <div key={kind} className="rounded-xl border border-gray-200 p-5">
+                      <div className="mb-3 flex items-center justify-between">
+                        <h3 className="text-sm font-semibold text-gray-900">{label}</h3>
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                            page
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-gray-100 text-gray-500'
+                          }`}
+                        >
+                          {page ? '已创建' : '未创建'}
+                        </span>
+                      </div>
+                      <div className="mb-4 min-h-16 text-sm text-gray-500">
+                        {page ? (
+                          <>
+                            <div className="font-medium text-gray-900">{String(page.title || page.code)}</div>
+                            <div className="mt-1 font-mono text-xs text-gray-500">{page.code}</div>
+                            <div className="mt-3 flex flex-wrap items-center gap-2">
                               <span
-                                className="inline-flex rounded bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700"
-                                data-testid="page-kind-badge"
+                                className={`rounded-full px-2 py-1 text-xs font-medium ${getPageStatusClass(page)}`}
                               >
-                                {page.kind}
+                                {getPageStatus(page)}
                               </span>
-                            )}
-                          </div>
-                          <p className="mt-1 text-sm text-gray-500">{page.description}</p>
-                          <p className="mt-1 text-xs text-gray-400">
-                            类型: {page.type} · 路由: {page.route}
-                          </p>
-                        </div>
-                        <button className="text-sm text-blue-600 hover:text-blue-900">访问</button>
+                              <span className="text-xs text-gray-500">
+                                更新于 {formatDateLabel(typeof page.updatedAt === 'string' ? page.updatedAt : undefined)}
+                              </span>
+                            </div>
+                          </>
+                        ) : (
+                          '还没有此类标准页面'
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {page ? (
+                          <>
+                            <button
+                              onClick={() => handleOpenPage(page)}
+                              className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                            >
+                              打开页面
+                            </button>
+                            <button
+                              onClick={() => handleEditPage(page)}
+                              className="rounded-md border border-blue-300 px-3 py-2 text-sm text-blue-700 hover:bg-blue-50"
+                            >
+                              编辑设计
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => handleCreatePage(kind)}
+                            className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                          >
+                            立即创建
+                          </button>
+                        )}
                       </div>
                     </div>
-                  ))}
+                  );
+                })}
+              </div>
+
+              <div className="rounded-xl border border-gray-200 p-5">
+                <div className="mb-4 flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-gray-900">其他页面</h3>
+                  <Link to="/p/page_schema" className="text-sm text-blue-600 hover:text-blue-800">
+                    打开 Page Schema 列表
+                  </Link>
                 </div>
-              )}
+                {customPages.length === 0 ? (
+                  <p className="text-sm text-gray-500">暂无其他自定义页面</p>
+                ) : (
+                  <div className="space-y-3">
+                    {customPages.map((page) => (
+                      <div
+                        key={page.pid}
+                        className="flex items-center justify-between rounded-lg border border-gray-200 px-4 py-3"
+                      >
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">{String(page.title || page.code)}</div>
+                          <div className="mt-1 text-xs text-gray-500">{resolvePageRoute(page)}</div>
+                          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                            <span
+                              className={`rounded-full px-2 py-1 font-medium ${getPageStatusClass(page)}`}
+                            >
+                              {getPageStatus(page)}
+                            </span>
+                            <span className="text-gray-500">
+                              更新于 {formatDateLabel(typeof page.updatedAt === 'string' ? page.updatedAt : undefined)}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleOpenPage(page)}
+                            className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+                          >
+                            打开
+                          </button>
+                          <button
+                            onClick={() => handleEditPage(page)}
+                            className="rounded-md border border-blue-300 px-3 py-1.5 text-sm text-blue-700 hover:bg-blue-50"
+                          >
+                            编辑设计
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-wrap gap-2 rounded-xl border border-dashed border-gray-300 bg-gray-50 p-4">
+                <button
+                  onClick={handleOpenCrudWizard}
+                  className="rounded-md bg-green-600 px-3 py-2 text-sm text-white hover:bg-green-700"
+                >
+                  一键生成 CRUD
+                </button>
+                <button
+                  onClick={() => handleCreatePage('list')}
+                  className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-white"
+                >
+                  新建列表页
+                </button>
+                <button
+                  onClick={() => handleCreatePage('detail')}
+                  className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-white"
+                >
+                  新建详情页
+                </button>
+                <button
+                  onClick={() => handleCreatePage('form')}
+                  className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-white"
+                >
+                  新建表单页
+                </button>
+              </div>
             </div>
           )}
 
@@ -1086,6 +1359,81 @@ export default function ModelDetailPage() {
                 fields={fields}
                 onRefresh={() => window.location.reload()}
               />
+            </div>
+          )}
+
+          {activeTab === 'advanced' && (
+            <div className="space-y-6">
+              <div className="rounded-xl border border-gray-200 p-5">
+                <h2 className="mb-4 text-sm font-semibold tracking-wide text-gray-900">权限点</h2>
+                {permissions.length === 0 ? (
+                  <div className="py-8 text-center text-sm text-gray-500">暂无权限点</div>
+                ) : (
+                  <div className="space-y-4">
+                    {permissions.map((permission) => (
+                      <div key={permission.id} className="rounded-lg border border-gray-200 p-4">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <h3 className="text-sm font-medium text-gray-900">
+                              {permission.displayName}
+                            </h3>
+                            <p className="mt-1 text-sm text-gray-500">{permission.description}</p>
+                            <div className="mt-2 flex gap-2">
+                              <span className="inline-flex rounded bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800">
+                                {permission.type}
+                              </span>
+                              <span className="inline-flex rounded bg-green-100 px-2 py-1 text-xs font-medium text-green-800">
+                                {permission.action}
+                              </span>
+                            </div>
+                          </div>
+                          <button className="text-sm text-blue-600 hover:text-blue-900">
+                            查看引用
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-xl border border-gray-200 p-5">
+                <h2 className="mb-4 text-sm font-semibold tracking-wide text-gray-900">技术元数据</h2>
+                <div className="grid grid-cols-2 gap-5">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">模型类型</label>
+                    <div className="text-sm text-gray-900">
+                      {model.modelType === 'entity' && '实体'}
+                      {model.modelType === 'view' && '视图'}
+                      {model.modelType === 'aggregate' && '聚合'}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">是否当前版本</label>
+                    <div className="text-sm text-gray-900">{model.isCurrent ? '是' : '否'}</div>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">创建时间</label>
+                    <div className="text-sm text-gray-900">{new Date(model.createdAt).toLocaleString()}</div>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">创建人</label>
+                    <div className="text-sm text-gray-900">{model.createdBy}</div>
+                  </div>
+                  {model.releaseId && (
+                    <>
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-gray-700">Release ID</label>
+                        <div className="font-mono text-sm text-gray-900">{model.releaseId}</div>
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-gray-700">Release PID</label>
+                        <div className="font-mono text-sm text-gray-900">{model.releasePid}</div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
             </div>
           )}
         </div>
