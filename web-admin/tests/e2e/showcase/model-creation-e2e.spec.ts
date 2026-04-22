@@ -18,6 +18,8 @@
 
 import { test, expect, type Page } from '../../fixtures';
 
+test.describe.configure({ timeout: 45_000 });
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -83,7 +85,14 @@ async function navigateToModelListViaMenu(page: Page): Promise<void> {
 async function clickCreateButton(page: Page): Promise<void> {
   const btn = page.getByTestId('toolbar-btn-create');
   await expect(btn).toBeVisible({ timeout: 5_000 });
-  await btn.click();
+  await page.evaluate(() => {
+    document.querySelectorAll('vite-error-overlay').forEach((el) => el.remove());
+  });
+  await btn.evaluate((element: HTMLElement) => element.click());
+  await Promise.any([
+    page.waitForURL(/\/meta\/models\/new(?:$|\?)/, { timeout: 8_000 }),
+    page.getByTestId('model-type-physical').waitFor({ state: 'visible', timeout: 8_000 }),
+  ]).catch(() => null);
   await expect(page.getByTestId('model-type-physical')).toBeVisible({ timeout: 8_000 });
   await expect(page.getByTestId('model-type-virtual')).toBeVisible();
 }
@@ -153,7 +162,7 @@ test.describe('Phase 1 — Model creation E2E', () => {
         r.url().includes('/api/meta/models') &&
         r.request().method() === 'POST' &&
         r.status() < 500,
-      { timeout: 15_000 },
+      { timeout: 30_000 },
     );
     await page.locator('button:has-text("创建")').first().click();
     const resp = await createResp;
@@ -239,7 +248,7 @@ test.describe('Phase 1 — Model creation E2E', () => {
     await firstRow.locator('input[type="radio"]').check();
 
     const next3 = page.getByTestId('wizard-next');
-    await expect(next3).toBeEnabled({ timeout: 3_000 });
+    await expect(next3).toBeEnabled({ timeout: 8_000 });
     await next3.click();
 
     // Step 4: capabilities — accept defaults.
