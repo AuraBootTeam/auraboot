@@ -199,8 +199,9 @@ export function FieldSelectionDialog({
 
     setCreating(true);
     try {
+      const { modelPid: _modelPid, ...fieldDefinition } = creationFormData;
       // Create the field
-      const newField = await fieldLibraryService.createField(creationFormData);
+      const newField = await fieldLibraryService.createField(fieldDefinition);
 
       // Automatically bind the field to the model
       await modelService.bindFieldToModel(modelPid, {
@@ -248,7 +249,7 @@ export function FieldSelectionDialog({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
+    <div data-testid="field-selection-dialog" className="fixed inset-0 z-50 overflow-y-auto">
       {/* Overlay */}
       <div
         className="bg-opacity-50 fixed inset-0 bg-black transition-opacity"
@@ -284,6 +285,7 @@ export function FieldSelectionDialog({
             {/* Tabs */}
             <div className="mt-4 flex border-b border-gray-200">
               <button
+                data-testid="field-selection-tab-select"
                 onClick={() => setActiveTab('select')}
                 className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium ${
                   activeTab === 'select'
@@ -294,6 +296,7 @@ export function FieldSelectionDialog({
                 选择已有字段
               </button>
               <button
+                data-testid="field-selection-tab-create"
                 onClick={() => setActiveTab('create')}
                 className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium ${
                   activeTab === 'create'
@@ -317,6 +320,7 @@ export function FieldSelectionDialog({
                     {/* Search */}
                     <div>
                       <input
+                        data-testid="field-selection-search"
                         type="text"
                         value={searchKeyword}
                         onChange={(e) => setSearchKeyword(e.target.value)}
@@ -541,6 +545,7 @@ export function FieldSelectionDialog({
               </>
             ) : (
               <button
+                data-testid="field-selection-create-bind"
                 onClick={handleCreateField}
                 disabled={creating || !isCreationFormValid}
                 className="flex items-center rounded-md bg-green-600 px-4 py-2 text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"

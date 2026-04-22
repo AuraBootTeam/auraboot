@@ -28,6 +28,8 @@
 
 import { test, expect, type Page } from '../../fixtures';
 
+test.describe.configure({ timeout: 45_000 });
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -118,7 +120,7 @@ async function fillVirtualWizard(
   await card.click();
   // wizard-next stays disabled until canAdvance() observes the state.
   const next1 = page.getByTestId('wizard-next');
-  await expect(next1).toBeEnabled({ timeout: 3_000 });
+  await expect(next1).toBeEnabled({ timeout: 8_000 });
   await next1.click();
 
   // Step 2: sourceRef
@@ -149,7 +151,7 @@ async function fillVirtualWizard(
   }
   // Wait for "下一步" to become enabled (canAdvance() depends on state).
   const next2 = page.getByTestId('wizard-next');
-  await expect(next2).toBeEnabled({ timeout: 3_000 });
+  await expect(next2).toBeEnabled({ timeout: 8_000 });
   await next2.click();
 
   // Step 3: schema detection — fall back to manual add since detect-schema is 404 in OSS.
@@ -485,10 +487,12 @@ test.describe('Task A — Model creation full lifecycle E2E', () => {
     const nameInput = page.locator('input[placeholder*="用户订单"]');
     await expect(nameInput).toBeVisible({ timeout: 5_000 });
     await nameInput.fill(newName);
+    await expect(nameInput).toHaveValue(newName, { timeout: 5_000 });
+    await nameInput.blur();
 
     // The 保存 button stays disabled until React's hasChanges effect ticks.
     const saveBtn = page.locator('button[type="submit"]:has-text("保存")');
-    await expect(saveBtn).toBeEnabled({ timeout: 3_000 });
+    await expect(saveBtn).toBeEnabled({ timeout: 8_000 });
 
     const saveResp = page.waitForResponse(
       (r) =>

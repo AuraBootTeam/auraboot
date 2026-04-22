@@ -6,7 +6,7 @@
  * 功能特性:
  * - 5个Tab页（基本信息、字段、权限点、版本、页面）
  * - 操作按钮（编辑、删除、刷新缓存）
- * - 预览功能（表单预览、列表预览）
+ * - 主页面预览
  * - CRUD向导集成
  * - 版本管理
  */
@@ -82,6 +82,48 @@ function getPageStatusClass(page: RelatedPage | null | undefined): string {
   return page ? 'bg-sky-100 text-sky-800' : 'bg-gray-100 text-gray-500';
 }
 
+function getRelatedPageTitle(page: RelatedPage | null | undefined): string {
+  if (!page) return '暂无页面';
+  const parseLocalizedString = (value: string): string | null => {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    if (!trimmed.startsWith('{')) return trimmed;
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (parsed && typeof parsed === 'object') {
+        const localized = parsed as Record<string, unknown>;
+        const preferred = localized['zh-CN'] ?? localized['en-US'] ?? Object.values(localized)[0];
+        return typeof preferred === 'string' && preferred.trim() ? preferred : null;
+      }
+    } catch {
+      return trimmed;
+    }
+    return null;
+  };
+
+  const pickDisplay = (value: unknown): string | null => {
+    if (typeof value === 'string') {
+      return parseLocalizedString(value);
+    }
+    if (value && typeof value === 'object') {
+      const localized = value as Record<string, unknown>;
+      const preferred = localized['zh-CN'] ?? localized['en-US'] ?? Object.values(localized)[0];
+      if (typeof preferred === 'string') {
+        return parseLocalizedString(preferred);
+      }
+    }
+    return null;
+  };
+
+  return (
+    pickDisplay(page.title) ||
+    page.pageKey ||
+    page.code ||
+    page.name ||
+    '未命名页面'
+  );
+}
+
 function normalizePageKind(page: RelatedPage): StandardPageKind | 'custom' {
   const raw = String(page.kind || page.type || '').toLowerCase();
   if (raw.includes('list')) return 'list';
@@ -94,7 +136,11 @@ function resolvePageRoute(page: RelatedPage): string {
   if (typeof page.route === 'string' && page.route.startsWith('/')) {
     return page.route;
   }
-  return `/p/${page.code}`;
+  const pageKey = page.pageKey || page.code || page.name;
+  if (pageKey) {
+    return `/p/${pageKey}`;
+  }
+  return '/p/page_schema';
 }
 
 /**
@@ -224,6 +270,11 @@ export default function ModelDetailPage() {
     });
     return sorted[0] ?? null;
   }, [pages]);
+
+  const hasGeneratedPages = pages.length > 0;
+  const hasStandardPages = Boolean(
+    standardPages.list || standardPages.detail || standardPages.form,
+  );
 
   /**
    * 虚拟 Model: 重新检测 schema
@@ -557,28 +608,6 @@ export default function ModelDetailPage() {
   }, [pid, showSuccessToast, showErrorToast]);
 
   /**
-   * 预览表单
-   */
-  const handlePreviewForm = useCallback(() => {
-    if (standardPages.form) {
-      navigate(resolvePageRoute(standardPages.form));
-      return;
-    }
-    showSuccessToast('暂无表单页，先创建页面');
-  }, [navigate, showSuccessToast, standardPages.form]);
-
-  /**
-   * 预览列表
-   */
-  const handlePreviewList = useCallback(() => {
-    if (standardPages.list) {
-      navigate(resolvePageRoute(standardPages.list));
-      return;
-    }
-    showSuccessToast('暂无列表页，先创建页面');
-  }, [navigate, showSuccessToast, standardPages.list]);
-
-  /**
    * 打开CRUD向导
    */
   const handleOpenCrudWizard = useCallback(() => {
@@ -606,7 +635,12 @@ export default function ModelDetailPage() {
 
   const handleOpenPage = useCallback(
     (page: RelatedPage) => {
-      navigate(resolvePageRoute(page));
+      const destination = resolvePageRoute(page);
+      if (typeof window !== 'undefined' && destination.startsWith('/')) {
+        window.location.assign(destination);
+        return;
+      }
+      navigate(destination);
     },
     [navigate],
   );
@@ -617,6 +651,30 @@ export default function ModelDetailPage() {
     },
     [navigate],
   );
+
+  const handlePrimaryPageAction = useCallback(() => {
+    if (hasGeneratedPages) {
+      handleOpenPageDesigner();
+      return;
+    }
+    handleOpenCrudWizard();
+  }, [handleOpenCrudWizard, handleOpenPageDesigner, hasGeneratedPages]);
+
+  const handlePrimaryPreview = useCallback(() => {
+    if (standardPages.detail) {
+      handleOpenPage(standardPages.detail);
+      return;
+    }
+    if (standardPages.list) {
+      handleOpenPage(standardPages.list);
+      return;
+    }
+    if (standardPages.form) {
+      handleOpenPage(standardPages.form);
+      return;
+    }
+    showSuccessToast('暂无可预览页面，先生成或创建页面');
+  }, [handleOpenPage, showSuccessToast, standardPages.detail, standardPages.form, standardPages.list]);
 
   /**
    * 关闭CRUD向导
@@ -735,23 +793,21 @@ export default function ModelDetailPage() {
 
           <div className="flex flex-wrap items-center gap-2 lg:max-w-md lg:justify-end">
             <button
-              onClick={handleOpenPageDesigner}
+              data-testid="model-primary-page-action"
+              onClick={handlePrimaryPageAction}
               className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:outline-none"
             >
-              打开页面设计
+              {hasGeneratedPages ? '打开页面设计' : '生成基础 CRUD'}
             </button>
-            <button
-              onClick={() => {
-                if (standardPages.detail) {
-                  handleOpenPage(standardPages.detail);
-                } else {
-                  handlePreviewList();
-                }
-              }}
-              className="rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-gray-500 focus:outline-none"
-            >
-              预览
-            </button>
+            {hasGeneratedPages && (
+              <button
+                data-testid="model-primary-page-preview"
+                onClick={handlePrimaryPreview}
+                className="rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-gray-500 focus:outline-none"
+              >
+                预览主页面
+              </button>
+            )}
             <button
               onClick={handleEdit}
               className="rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-gray-500 focus:outline-none"
@@ -983,33 +1039,22 @@ export default function ModelDetailPage() {
                     <div className="rounded-lg bg-gray-50 p-3">
                       <div className="text-xs uppercase tracking-wide text-gray-500">最近编辑页面</div>
                       <div className="mt-1 text-sm font-medium text-gray-900">
-                        {latestPage?.title || latestPage?.code || '暂无页面'}
+                        {getRelatedPageTitle(latestPage)}
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <button
-                        onClick={() => handleCreatePage('list')}
-                        className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                        onClick={handlePrimaryPageAction}
+                        className="rounded-md bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700"
                       >
-                        新建列表页
+                        {hasGeneratedPages ? '打开页面设计' : '生成基础 CRUD'}
                       </button>
                       <button
-                        onClick={() => handleCreatePage('detail')}
+                        data-testid="overview-page-workbench-link"
+                        onClick={() => handleTabChange('pages')}
                         className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
                       >
-                        新建详情页
-                      </button>
-                      <button
-                        onClick={() => handleCreatePage('form')}
-                        className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                      >
-                        新建表单页
-                      </button>
-                      <button
-                        onClick={handleOpenCrudWizard}
-                        className="rounded-md bg-green-600 px-3 py-2 text-sm text-white hover:bg-green-700"
-                      >
-                        一键生成 CRUD
+                        查看页面工作台
                       </button>
                     </div>
                   </div>
@@ -1022,16 +1067,21 @@ export default function ModelDetailPage() {
           {activeTab === 'fields' && (
             <div>
               {pages.length > 0 && (
-                <div className="mb-3 flex items-center justify-between rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">
+                <div
+                  data-testid="fields-page-impact-notice"
+                  className="mb-3 flex items-center justify-between rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900"
+                >
                   <span>此模型已有 {pages.length} 个关联页面，字段变更可能影响页面配置。</span>
                   <div className="flex gap-2">
                     <button
+                      data-testid="fields-impact-view-pages"
                       onClick={() => handleTabChange('pages')}
                       className="rounded border border-sky-300 bg-white px-3 py-1.5 text-xs text-sky-700 hover:bg-sky-100"
                     >
                       查看关联页面
                     </button>
                     <button
+                      data-testid="fields-impact-open-designer"
                       onClick={handleOpenPageDesigner}
                       className="rounded border border-sky-300 bg-white px-3 py-1.5 text-xs text-sky-700 hover:bg-sky-100"
                     >
@@ -1130,27 +1180,39 @@ export default function ModelDetailPage() {
           {/* 关联页面Tab */}
           {activeTab === 'pages' && (
             <div className="space-y-6">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900">页面工作台</h2>
-                  <p className="mt-1 text-sm text-gray-500">从这里直接创建、访问或编辑此模型的页面设计。</p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={() => handleCreatePage()}
-                    className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
-                    data-testid="create-page-for-model-btn"
-                  >
-                    新建页面
-                  </button>
-                  <button
-                    onClick={handleOpenPageDesigner}
-                    className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                  >
-                    打开页面设计
-                  </button>
-                </div>
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">页面工作台</h2>
+                <p className="mt-1 text-sm text-gray-500">先补齐页面，再直接进入设计器调整细节。</p>
               </div>
+
+              {!hasStandardPages && (
+                <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-5 py-5">
+                  <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-900">还没有标准页面</h3>
+                      <p className="mt-1 text-sm text-gray-500">
+                        可以一键生成基础 CRUD 页面，或按页面类型逐个创建。
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        data-testid="pages-empty-generate-crud"
+                        onClick={handleOpenCrudWizard}
+                        className="rounded-md bg-green-600 px-3 py-2 text-sm text-white hover:bg-green-700"
+                      >
+                        一键生成 CRUD
+                      </button>
+                      <button
+                        data-testid="pages-empty-create-page"
+                        onClick={() => handleCreatePage()}
+                        className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-white"
+                      >
+                        手动选择页面
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="grid gap-4 lg:grid-cols-3">
                 {(['list', 'detail', 'form'] as StandardPageKind[]).map((kind) => {
@@ -1158,7 +1220,11 @@ export default function ModelDetailPage() {
                   const label =
                     kind === 'list' ? '列表页' : kind === 'detail' ? '详情页' : '表单页';
                   return (
-                    <div key={kind} className="rounded-xl border border-gray-200 p-5">
+                    <div
+                      key={kind}
+                      data-testid={`standard-page-card-${kind}`}
+                      className="rounded-xl border border-gray-200 p-5"
+                    >
                       <div className="mb-3 flex items-center justify-between">
                         <h3 className="text-sm font-semibold text-gray-900">{label}</h3>
                         <span
@@ -1174,7 +1240,9 @@ export default function ModelDetailPage() {
                       <div className="mb-4 min-h-16 text-sm text-gray-500">
                         {page ? (
                           <>
-                            <div className="font-medium text-gray-900">{String(page.title || page.code)}</div>
+                            <div className="font-medium text-gray-900">
+                              {getRelatedPageTitle(page)}
+                            </div>
                             <div className="mt-1 font-mono text-xs text-gray-500">{page.code}</div>
                             <div className="mt-3 flex flex-wrap items-center gap-2">
                               <span
@@ -1195,24 +1263,27 @@ export default function ModelDetailPage() {
                         {page ? (
                           <>
                             <button
-                              onClick={() => handleOpenPage(page)}
-                              className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                            >
-                              打开页面
-                            </button>
-                            <button
+                              data-testid={`standard-page-${kind}-edit`}
                               onClick={() => handleEditPage(page)}
                               className="rounded-md border border-blue-300 px-3 py-2 text-sm text-blue-700 hover:bg-blue-50"
                             >
                               编辑设计
                             </button>
+                            <button
+                              data-testid={`standard-page-${kind}-preview`}
+                              onClick={() => handleOpenPage(page)}
+                              className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                            >
+                              预览
+                            </button>
                           </>
                         ) : (
                           <button
+                            data-testid={`standard-page-${kind}-create`}
                             onClick={() => handleCreatePage(kind)}
                             className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
                           >
-                            立即创建
+                            创建
                           </button>
                         )}
                       </div>
@@ -1238,7 +1309,9 @@ export default function ModelDetailPage() {
                         className="flex items-center justify-between rounded-lg border border-gray-200 px-4 py-3"
                       >
                         <div>
-                          <div className="text-sm font-medium text-gray-900">{String(page.title || page.code)}</div>
+                          <div className="text-sm font-medium text-gray-900">
+                            {getRelatedPageTitle(page)}
+                          </div>
                           <div className="mt-1 text-xs text-gray-500">{resolvePageRoute(page)}</div>
                           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
                             <span
@@ -1269,33 +1342,6 @@ export default function ModelDetailPage() {
                     ))}
                   </div>
                 )}
-              </div>
-
-              <div className="flex flex-wrap gap-2 rounded-xl border border-dashed border-gray-300 bg-gray-50 p-4">
-                <button
-                  onClick={handleOpenCrudWizard}
-                  className="rounded-md bg-green-600 px-3 py-2 text-sm text-white hover:bg-green-700"
-                >
-                  一键生成 CRUD
-                </button>
-                <button
-                  onClick={() => handleCreatePage('list')}
-                  className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-white"
-                >
-                  新建列表页
-                </button>
-                <button
-                  onClick={() => handleCreatePage('detail')}
-                  className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-white"
-                >
-                  新建详情页
-                </button>
-                <button
-                  onClick={() => handleCreatePage('form')}
-                  className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-white"
-                >
-                  新建表单页
-                </button>
               </div>
             </div>
           )}
