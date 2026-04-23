@@ -24,6 +24,9 @@ import { render, screen, waitFor } from '@testing-library/react';
 // -- Mocks must be declared before importing the component under test. -------
 
 const getProcessDefinitionByKeyMock = vi.fn();
+const fitViewMock = vi.fn();
+const observedElements: Element[] = [];
+let resizeObserverCallback: ResizeObserverCallback | null = null;
 
 vi.mock('~/plugins/core-designer/components/bpmn-designer/services/bpmnService', () => ({
   getProcessDefinitionByKey: (...args: unknown[]) => getProcessDefinitionByKeyMock(...args),
@@ -36,7 +39,13 @@ vi.mock('@xyflow/react/dist/style.css', () => ({}));
 // test can inspect the wiring. `Controls` / `Background` are irrelevant to
 // assertions and stubbed to empty elements.
 vi.mock('@xyflow/react', () => ({
-  ReactFlow: ({ nodes }: { nodes: Array<{ id: string; data: { highlight?: string } }> }) => (
+  ReactFlow: ({
+    nodes,
+    children,
+  }: {
+    nodes: Array<{ id: string; data: { highlight?: string } }>;
+    children?: React.ReactNode;
+  }) => (
     <div data-testid="xyflow-stub">
       {nodes.map((n) => (
         <span
@@ -45,10 +54,13 @@ vi.mock('@xyflow/react', () => ({
           data-highlight={n.data.highlight ?? 'none'}
         />
       ))}
+      {children}
     </div>
   ),
   Controls: () => <div data-testid="xyflow-controls" />,
   Background: () => <div data-testid="xyflow-background" />,
+  useNodesInitialized: () => true,
+  useReactFlow: () => ({ fitView: fitViewMock }),
   Handle: () => null,
   Position: { Left: 'left', Right: 'right', Top: 'top', Bottom: 'bottom' },
 }));
@@ -106,10 +118,28 @@ function buildDefinition(
 
 beforeEach(() => {
   getProcessDefinitionByKeyMock.mockReset();
+  fitViewMock.mockReset();
+  observedElements.length = 0;
+  resizeObserverCallback = null;
+  class ResizeObserverMock {
+    constructor(callback: ResizeObserverCallback) {
+      resizeObserverCallback = callback;
+    }
+
+    observe(target: Element) {
+      observedElements.push(target);
+    }
+
+    unobserve() {}
+
+    disconnect() {}
+  }
+  vi.stubGlobal('ResizeObserver', ResizeObserverMock);
 });
 
 afterEach(() => {
   document.body.innerHTML = '';
+  vi.unstubAllGlobals();
 });
 
 describe('BpmDiagramSection', () => {
@@ -188,5 +218,44 @@ describe('BpmDiagramSection', () => {
     });
     expect(screen.getByTestId('bpm-diagram-error')).toHaveTextContent('network down');
     expect(screen.queryByTestId('bpm-diagram-container')).toBeNull();
+  });
+
+  it('re-fits the viewport when the diagram container resizes after initial mount', async () => {
+    getProcessDefinitionByKeyMock.mockResolvedValue(
+      buildDefinition([{ id: 'approve-1', type: 'userTask', label: 'Approve' }]),
+    );
+
+    render(<BpmDiagramSection instance={buildInstance()} t={t} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('bpm-diagram-container')).toBeInTheDocument();
+    });
+
+    expect(observedElements).toHaveLength(1);
+    fitViewMock.mockClear();
+
+    resizeObserverCallback?.(
+      [
+        {
+          target: observedElements[0],
+          contentRect: {
+            width: 820,
+            height: 320,
+            top: 0,
+            left: 0,
+            right: 820,
+            bottom: 320,
+            x: 0,
+            y: 0,
+            toJSON: () => ({}),
+          },
+        } as ResizeObserverEntry,
+      ],
+      {} as ResizeObserver,
+    );
+
+    await waitFor(() => {
+      expect(fitViewMock).toHaveBeenCalled();
+    });
   });
 });
