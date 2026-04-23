@@ -41,11 +41,10 @@ public class PageSchemaUpdateRequest extends AbstractUpdateRequest {
 
     /**
      * 页面标题
-     * 可选，长度限制
+     * 兼容旧字符串和 LocalizedText 对象。
      */
-    @Size(min = 1, max = 200, message = "{page.schema.title.size}")
     @JsonProperty("title")
-    private String title;
+    private Object title;
 
     /**
      * 页面描述

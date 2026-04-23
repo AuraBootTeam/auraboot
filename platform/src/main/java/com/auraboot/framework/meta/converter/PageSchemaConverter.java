@@ -68,7 +68,7 @@ public abstract class PageSchemaConverter {
     @Mapping(target = "kind", source = "kind")
     @Mapping(target = "profile", source = "profile")
     @Mapping(target = "name", source = "name")
-    @Mapping(target = "title", source = "title", qualifiedByName = "titleStringToJsonb")
+    @Mapping(target = "title", source = "title", qualifiedByName = "titleValueToJsonb")
     @Mapping(target = "description", source = "description")
     @Mapping(target = "layout", source = "layout", qualifiedByName = "mapToString")
     @Mapping(target = "blocks", source = "blocks", qualifiedByName = "listToString")
@@ -100,7 +100,7 @@ public abstract class PageSchemaConverter {
     @Mapping(target = "kind", source = "kind")
     @Mapping(target = "profile", source = "profile")
     @Mapping(target = "name", source = "name")
-    @Mapping(target = "title", source = "title", qualifiedByName = "titleStringToJsonb")
+    @Mapping(target = "title", source = "title", qualifiedByName = "titleValueToJsonb")
     @Mapping(target = "description", source = "description")
     @Mapping(target = "layout", source = "layout", qualifiedByName = "mapToString")
     @Mapping(target = "blocks", source = "blocks", qualifiedByName = "listToString")
@@ -207,16 +207,23 @@ public abstract class PageSchemaConverter {
     }
 
     /**
-     * Convert a plain title string (from CreateRequest/UpdateRequest) to JSONB storage format.
-     * Wraps as {"en": "value"}.
+     * Convert update/create title value to JSONB storage format.
+     * Supports a plain string or a LocalizedText-style map.
      */
-    @Named("titleStringToJsonb")
-    public String titleStringToJsonb(String title) {
-        if (title == null || title.trim().isEmpty()) {
+    @Named("titleValueToJsonb")
+    public String titleValueToJsonb(Object title) {
+        if (title == null) {
             return null;
         }
         try {
-            return objectMapper.writeValueAsString(Map.of("en", title));
+            if (title instanceof Map<?, ?> titleMap) {
+                return objectMapper.writeValueAsString(titleMap);
+            }
+            String titleString = title.toString().trim();
+            if (titleString.isEmpty()) {
+                return null;
+            }
+            return objectMapper.writeValueAsString(Map.of("en", titleString));
         } catch (Exception e) {
             // CATCH: non-transactional JSON serialisation, safe to handle
             return null;
